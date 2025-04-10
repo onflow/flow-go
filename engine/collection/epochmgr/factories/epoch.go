@@ -55,7 +55,7 @@ func NewEpochComponentsFactory(
 }
 
 func (factory *EpochComponentsFactory) Create(
-	epoch protocol.Epoch,
+	epoch protocol.CommittedEpoch,
 ) (
 	state cluster.State,
 	compliance component.Component,
@@ -67,18 +67,10 @@ func (factory *EpochComponentsFactory) Create(
 	err error,
 ) {
 
-	epochCounter, err := epoch.Counter()
-	if err != nil {
-		err = fmt.Errorf("could not get epoch counter: %w", err)
-		return
-	}
+	epochCounter := epoch.Counter()
 
 	// if we are not an authorized participant in this epoch, return a sentinel
-	identities, err := epoch.InitialIdentities()
-	if err != nil {
-		err = fmt.Errorf("could not get initial identities for epoch: %w", err)
-		return
-	}
+	identities := epoch.InitialIdentities()
 	_, exists := identities.ByNodeID(factory.me.NodeID())
 	if !exists {
 		err = fmt.Errorf("%w (node_id=%x, epoch=%d)", epochmgr.ErrNotAuthorizedForEpoch, factory.me.NodeID(), epochCounter)

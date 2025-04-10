@@ -19,7 +19,7 @@ const (
 
 	// codes for fields associated with the root state
 	codeSporkID              = 13
-	codeProtocolVersion      = 14
+	_                        = 14 // DEPRECATED: 14 was used for ProtocolVersion before the versioned Protocol State
 	_                        = 15 // DEPRECATED: 15 was used to save the finalization safety threshold
 	codeSporkRootBlockHeight = 16
 
@@ -83,7 +83,7 @@ const (
 	// code for ComputationResult upload status storage
 	// NOTE: for now only GCP uploader is supported. When other uploader (AWS e.g.) needs to
 	//		 be supported, we will need to define new code.
-	codeComputationResults = 66
+	_ = 66 // used by ComputationResults in storage/operation
 
 	// job queue consumers and producers
 	codeJobConsumerProcessed = 70

@@ -332,11 +332,11 @@ func main() {
 				return fmt.Errorf("could not load beacon key file: %w", err)
 			}
 
-			rootEpoch := rootSnapshot.Epochs().Current()
-			rootEpochCounter, err := rootEpoch.Counter()
+			rootEpoch, err := rootSnapshot.Epochs().Current()
 			if err != nil {
-				return fmt.Errorf("could not get root epoch counter: %w", err)
+				return fmt.Errorf("could not get root epoch: %w", err)
 			}
+			rootEpochCounter := rootEpoch.Counter()
 
 			// confirm the beacon key file matches the canonical public keys
 			rootDKG, err := rootEpoch.DKG()
@@ -383,8 +383,8 @@ func main() {
 			return nil
 		}).
 		Module("collection guarantees mempool", func(node *cmd.NodeConfig) error {
-			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
-			return err
+			guarantees = stdmap.NewGuarantees(guaranteeLimit)
+			return nil
 		}).
 		Module("execution receipts mempool", func(node *cmd.NodeConfig) error {
 			receipts = consensusMempools.NewExecutionTree()

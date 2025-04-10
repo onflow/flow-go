@@ -33,7 +33,6 @@ import (
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
-	sutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -77,7 +76,8 @@ func (suite *BuilderSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	log := zerolog.Nop()
-	all := sutil.StorageLayer(suite.T(), suite.db)
+
+	all := bstorage.InitAll(metrics, suite.db)
 	consumer := events.NewNoop()
 
 	suite.headers = all.Headers
@@ -157,7 +157,7 @@ func (suite *BuilderSuite) SetupTest() {
 			tx.ProposalKey.SequenceNumber = uint64(i)
 			tx.GasLimit = uint64(9999)
 		})
-		added := suite.pool.Add(&transaction)
+		added := suite.pool.Add(transaction.ID(), &transaction)
 		suite.Assert().True(added)
 	}
 
@@ -209,17 +209,14 @@ func (suite *BuilderSuite) ProtoStateRoot() *flow.Header {
 
 // ClearPool removes all items from the pool
 func (suite *BuilderSuite) ClearPool() {
-	// TODO use Clear()
-	for _, tx := range suite.pool.All() {
-		suite.pool.Remove(tx.ID())
-	}
+	suite.pool.Clear()
 }
 
 // FillPool adds n transactions to the pool, using the given generator function.
 func (suite *BuilderSuite) FillPool(n int, create func() *flow.TransactionBody) {
 	for i := 0; i < n; i++ {
 		tx := create()
-		suite.pool.Add(tx)
+		suite.pool.Add(tx.ID(), tx)
 	}
 }
 
@@ -262,7 +259,7 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 	suite.Assert().Equal(mainGenesis.ID(), built.Payload.ReferenceBlockID)
 
 	// payload should include only items from mempool
-	mempoolTransactions := suite.pool.All()
+	mempoolTransactions := suite.pool.Values()
 	suite.Assert().Len(builtCollection.Transactions, 3)
 	suite.Assert().True(collectionContains(builtCollection, flow.GetIDs(mempoolTransactions)...))
 }
@@ -302,12 +299,12 @@ func (suite *BuilderSuite) TestBuildOn_SignerErrorPassthrough() {
 func (suite *BuilderSuite) TestBuildOn_WithUnknownReferenceBlock() {
 
 	// before modifying the mempool, note the valid transactions already in the pool
-	validMempoolTransactions := suite.pool.All()
+	validMempoolTransactions := suite.pool.Values()
 
 	// add a transaction unknown reference block to the pool
 	unknownReferenceTx := unittest.TransactionBodyFixture()
 	unknownReferenceTx.ReferenceBlockID = unittest.IdentifierFixture()
-	suite.pool.Add(&unknownReferenceTx)
+	suite.pool.Add(unknownReferenceTx.ID(), &unknownReferenceTx)
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, noopSigner)
 	suite.Require().NoError(err)
@@ -329,7 +326,7 @@ func (suite *BuilderSuite) TestBuildOn_WithUnknownReferenceBlock() {
 func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
 
 	// before modifying the mempool, note the valid transactions already in the pool
-	validMempoolTransactions := suite.pool.All()
+	validMempoolTransactions := suite.pool.Values()
 
 	// add an unfinalized block to the protocol state
 	genesis, err := suite.protoState.Final().Head()
@@ -346,7 +343,7 @@ func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
 	// add a transaction with unfinalized reference block to the pool
 	unfinalizedReferenceTx := unittest.TransactionBodyFixture()
 	unfinalizedReferenceTx.ReferenceBlockID = unfinalizedReferenceBlock.ID()
-	suite.pool.Add(&unfinalizedReferenceTx)
+	suite.pool.Add(unfinalizedReferenceTx.ID(), &unfinalizedReferenceTx)
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, noopSigner)
 	suite.Require().NoError(err)
@@ -368,7 +365,7 @@ func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
 func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
 
 	// before modifying the mempool, note the valid transactions already in the pool
-	validMempoolTransactions := suite.pool.All()
+	validMempoolTransactions := suite.pool.Values()
 
 	// add an orphaned block to the protocol state
 	genesis, err := suite.protoState.Final().Head()
@@ -393,7 +390,7 @@ func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
 	// add a transaction with orphaned reference block to the pool
 	orphanedReferenceTx := unittest.TransactionBodyFixture()
 	orphanedReferenceTx.ReferenceBlockID = orphan.ID()
-	suite.pool.Add(&orphanedReferenceTx)
+	suite.pool.Add(orphanedReferenceTx.ID(), &orphanedReferenceTx)
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, noopSigner)
 	suite.Require().NoError(err)
@@ -416,7 +413,7 @@ func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
 func (suite *BuilderSuite) TestBuildOn_WithForks() {
 	t := suite.T()
 
-	mempoolTransactions := suite.pool.All()
+	mempoolTransactions := suite.pool.Values()
 	tx1 := mempoolTransactions[0] // in fork 1
 	tx2 := mempoolTransactions[1] // in fork 2
 	tx3 := mempoolTransactions[2] // in no block
@@ -456,7 +453,7 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 	t := suite.T()
 
-	mempoolTransactions := suite.pool.All()
+	mempoolTransactions := suite.pool.Values()
 	tx1 := mempoolTransactions[0] // in a finalized block
 	tx2 := mempoolTransactions[1] // in an un-finalized block
 	tx3 := mempoolTransactions[2] // in no blocks
@@ -504,7 +501,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 	t := suite.T()
 
-	mempoolTransactions := suite.pool.All()
+	mempoolTransactions := suite.pool.Values()
 	tx1 := mempoolTransactions[0] // in a finalized block
 	tx2 := mempoolTransactions[1] // in an invalidated block
 	tx3 := mempoolTransactions[2] // in no blocks
@@ -572,7 +569,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 			tx.ReferenceBlockID = refID
 			tx.ProposalKey.SequenceNumber = uint64(i)
 		})
-		added := suite.pool.Add(&tx)
+		added := suite.pool.Add(tx.ID(), &tx)
 		assert.True(t, added)
 
 		// 1/3 of the time create a conflicting fork that will be invalidated
@@ -711,7 +708,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 		tx.ReferenceBlockID = genesis.ID()
 		tx.ProposalKey.SequenceNumber = 0
 	})
-	added := suite.pool.Add(&tx1)
+	added := suite.pool.Add(tx1.ID(), &tx1)
 	suite.Assert().True(added)
 
 	// insert a transaction referencing the head (valid)
@@ -719,7 +716,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 		tx.ReferenceBlockID = head.ID()
 		tx.ProposalKey.SequenceNumber = 1
 	})
-	added = suite.pool.Add(&tx2)
+	added = suite.pool.Add(tx2.ID(), &tx2)
 	suite.Assert().True(added)
 
 	suite.T().Log("tx1: ", tx1.ID())
@@ -1062,7 +1059,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		all := sutil.StorageLayer(suite.T(), suite.db)
+		all := bstorage.InitAll(metrics, suite.db)
 		suite.headers = all.Headers
 		suite.blocks = all.Blocks
 		suite.payloads = bstorage.NewClusterPayloads(metrics, suite.db)
@@ -1079,7 +1076,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		// add some transactions to transaction pool
 		for i := 0; i < 3; i++ {
 			tx := unittest.TransactionBodyFixture()
-			added := suite.pool.Add(&tx)
+			added := suite.pool.Add(tx.ID(), &tx)
 			assert.True(b, added)
 		}
 

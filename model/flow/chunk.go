@@ -144,7 +144,7 @@ var _ rlp.Encoder = &Chunk{}
 // not interpreted as the RLP encoding for the entire Chunk.
 // No errors expected during normal operation.
 // TODO(mainnet27, #6773): remove this method https://github.com/onflow/flow-go/issues/6773
-func (ch Chunk) EncodeRLP(w io.Writer) error {
+func (ch *Chunk) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, struct {
 		ChunkBody ChunkBody
 		Index     uint64
@@ -225,9 +225,9 @@ func NewChunk_ProtocolVersion1(
 	}
 }
 
-// ID returns a unique id for this entity
+// ID returns the unique identifier of the Chunk
 func (ch *Chunk) ID() Identifier {
-	return MakeID(ch.ChunkBody)
+	return MakeID(ch)
 }
 
 // Checksum provides a cryptographic commitment for a chunk content
@@ -281,10 +281,9 @@ func NewChunkDataPack(
 	}
 }
 
-// ID returns the unique identifier for the concrete view, which is the ID of
-// the chunk the view is for.
+// ID returns a collision-resistant hash of the ChunkDataPack struct.
 func (c *ChunkDataPack) ID() Identifier {
-	return c.ChunkID
+	return MakeID(c)
 }
 
 // Checksum returns the checksum of the chunk data pack.
@@ -321,16 +320,6 @@ func (cl ChunkList) Indices() []uint64 {
 	return indices
 }
 
-// ByChecksum returns an entity from the list by entity fingerprint
-func (cl ChunkList) ByChecksum(cs Identifier) (*Chunk, bool) {
-	for _, ch := range cl {
-		if ch.Checksum() == cs {
-			return ch, true
-		}
-	}
-	return nil, false
-}
-
 // ByIndex returns an entity from the list by index
 // if requested chunk is within range of list, it returns chunk and true
 // if requested chunk is out of the range, it returns nil and false
@@ -365,6 +354,20 @@ type BlockExecutionDataRoot struct {
 	// ChunkExecutionDataIDs is a list of the root CIDs for each serialized execution_data.ChunkExecutionData
 	// associated with this block.
 	ChunkExecutionDataIDs []cid.Cid
+}
+
+// EncodeRLP defines an RLP encoding BlockExecutionDataRoot. We need to define a custom RLP encoding since [cid.Cid] doesn't have one. Without it we can't produce a collision-resistant hash.
+// No errors are expected during normal operations.
+func (b BlockExecutionDataRoot) EncodeRLP(w io.Writer) error {
+	encodingCanonicalForm := struct {
+		BlockID               Identifier
+		ChunkExecutionDataIDs []string
+	}{
+		BlockID:               b.BlockID,
+		ChunkExecutionDataIDs: cidsToStrings(b.ChunkExecutionDataIDs),
+	}
+
+	return rlp.Encode(w, encodingCanonicalForm)
 }
 
 // MarshalMsgpack implements the msgpack.Marshaler interface

@@ -9,10 +9,10 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -381,69 +381,101 @@ type EpochQuery struct {
 	snap *Snapshot
 }
 
+var _ protocol.EpochQuery = (*EpochQuery)(nil)
+
 // Current returns the current epoch.
-func (q *EpochQuery) Current() protocol.Epoch {
+// No errors are expected during normal operation.
+func (q *EpochQuery) Current() (protocol.CommittedEpoch, error) {
 	// all errors returned from storage reads here are unexpected, because all
 	// snapshots reside within a current epoch, which must be queryable
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
+		return nil, fmt.Errorf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
 
 	setup := epochState.EpochSetup()
 	commit := epochState.EpochCommit()
 	firstHeight, _, isFirstHeightKnown, _, err := q.retrieveEpochHeightBounds(setup.Counter)
 	if err != nil {
-		return invalid.NewEpochf("could not get current epoch height bounds: %s", err.Error())
+		return nil, fmt.Errorf("could not get current epoch height bounds: %s", err.Error())
 	}
 	if isFirstHeightKnown {
-		return inmem.NewEpochWithStartBoundary(setup, epochState.EpochExtensions(), commit, firstHeight)
+		return inmem.NewEpochWithStartBoundary(setup, commit, epochState.EpochExtensions(), firstHeight), nil
 	}
-	return inmem.NewCommittedEpoch(setup, epochState.EpochExtensions(), commit)
+	return inmem.NewCommittedEpoch(setup, commit, epochState.EpochExtensions()), nil
 }
 
-// Next returns the next epoch, if it is available.
-func (q *EpochQuery) Next() protocol.Epoch {
-
+// NextUnsafe returns the next epoch, if it has been set up but not yet committed.
+// Error returns:
+//   - protocol.ErrNextEpochNotSetup if the next epoch has not yet been set up as of the snapshot's reference block
+//     (the reference block resides in the EpochStaking phase)
+//   - protocol.ErrNextEpochAlreadyCommitted if the next epoch has already been committed at the snapshot's reference block
+//     (the reference block resides in the EpochCommitted phase)
+//   - generic error in case of unexpected critical internal corruption or bugs
+func (q *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
+		return nil, fmt.Errorf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
-	phase := epochState.EpochPhase()
+	switch epochState.EpochPhase() {
+	// if we are in the staking or fallback phase, the next epoch is not setup yet
+	case flow.EpochPhaseStaking, flow.EpochPhaseFallback:
+		return nil, protocol.ErrNextEpochNotSetup
+	// if we are in setup phase, return a [protocol.TentativeEpoch] backed by the [flow.SetupEpoch] event
+	case flow.EpochPhaseSetup:
+		return inmem.NewSetupEpoch(epochState.Entry().NextEpochSetup), nil
+	// if we are in committed phase, the caller should use the `NextCommitted` method instead, which we indicate by a sentinel error
+	case flow.EpochPhaseCommitted:
+		return nil, protocol.ErrNextEpochAlreadyCommitted
+	default:
+		return nil, fmt.Errorf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
+	}
+}
+
+// NextCommitted returns the next epoch as of this snapshot, only if it has been committed already.
+// Error returns:
+//   - protocol.ErrNextEpochNotCommitted if the next epoch has not yet been committed at the snapshot's reference block
+//     (the reference block does not reside in the EpochCommitted phase)
+//   - generic error in case of unexpected critical internal corruption or bugs
+func (q *EpochQuery) NextCommitted() (protocol.CommittedEpoch, error) {
+	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
+	}
 	entry := epochState.Entry()
 
-	// if we are in the staking or fallback phase, the next epoch is not setup yet
-	if phase == flow.EpochPhaseStaking || phase == flow.EpochPhaseFallback {
-		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
+	switch epochState.EpochPhase() {
+	// if we are in the staking or fallback phase, the next epoch is neither setup nor committed yet
+	case flow.EpochPhaseStaking, flow.EpochPhaseFallback, flow.EpochPhaseSetup:
+		return nil, protocol.ErrNextEpochNotCommitted
+	case flow.EpochPhaseCommitted:
+		// A protocol state snapshot is immutable and only represents the state as of the corresponding block. The
+		// flow protocol implies that future epochs cannot have extensions, because in order to add extensions to
+		// an epoch, we have to enter that epoch. Hence, `entry.NextEpoch.EpochExtensions` must be empty:
+		if len(entry.NextEpoch.EpochExtensions) > 0 {
+			return nil, irrecoverable.NewExceptionf("state with current epoch %d corrupted, because future epoch %d already has %d extensions",
+				entry.CurrentEpochCommit.Counter, entry.NextEpochSetup.Counter, len(entry.NextEpoch.EpochExtensions))
+		}
+		return inmem.NewCommittedEpoch(entry.NextEpochSetup, entry.NextEpochCommit, entry.NextEpoch.EpochExtensions), nil
+	default:
+		return nil, fmt.Errorf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 	}
-	// if we are in setup phase, return a SetupEpoch
-	nextSetup := entry.NextEpochSetup
-	if phase == flow.EpochPhaseSetup {
-		return inmem.NewSetupEpoch(nextSetup, entry.NextEpoch.EpochExtensions)
-	}
-	// if we are in committed phase, return a CommittedEpoch
-	nextCommit := entry.NextEpochCommit
-	if phase == flow.EpochPhaseCommitted {
-		return inmem.NewCommittedEpoch(nextSetup, entry.NextEpoch.EpochExtensions, nextCommit)
-	}
-	return invalid.NewEpochf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 }
 
 // Previous returns the previous epoch. During the first epoch after the root
-// block, this returns a sentinel error (since there is no previous epoch).
+// block, this returns [protocol.ErrNoPreviousEpoch] (since there is no previous epoch).
 // For all other epochs, returns the previous epoch.
-func (q *EpochQuery) Previous() protocol.Epoch {
-
+func (q *EpochQuery) Previous() (protocol.CommittedEpoch, error) {
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
+		return nil, fmt.Errorf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
 	entry := epochState.Entry()
 
 	// CASE 1: there is no previous epoch - this indicates we are in the first
 	// epoch after a spork root or genesis block
 	if !epochState.PreviousEpochExists() {
-		return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
+		return nil, protocol.ErrNoPreviousEpoch
 	}
 
 	// CASE 2: we are in any other epoch - retrieve the setup and commit events
@@ -454,28 +486,28 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 
 	firstHeight, finalHeight, firstHeightKnown, finalHeightKnown, err := q.retrieveEpochHeightBounds(setup.Counter)
 	if err != nil {
-		return invalid.NewEpochf("could not get epoch height bounds: %w", err)
+		return nil, fmt.Errorf("could not get epoch height bounds: %w", err)
 	}
 	if firstHeightKnown && finalHeightKnown {
 		// typical case - we usually know both boundaries for a past epoch
-		return inmem.NewEpochWithStartAndEndBoundaries(setup, extensions, commit, firstHeight, finalHeight)
+		return inmem.NewEpochWithStartAndEndBoundaries(setup, commit, extensions, firstHeight, finalHeight), nil
 	}
 	if firstHeightKnown && !finalHeightKnown {
 		// this case is possible when the snapshot reference block is un-finalized
 		// and is past an un-finalized epoch boundary
-		return inmem.NewEpochWithStartBoundary(setup, extensions, commit, firstHeight)
+		return inmem.NewEpochWithStartBoundary(setup, commit, extensions, firstHeight), nil
 	}
 	if !firstHeightKnown && finalHeightKnown {
 		// this case is possible when this node's lowest known block is after
 		// the queried epoch's start boundary
-		return inmem.NewEpochWithEndBoundary(setup, extensions, commit, finalHeight)
+		return inmem.NewEpochWithEndBoundary(setup, commit, extensions, finalHeight), nil
 	}
 	if !firstHeightKnown && !finalHeightKnown {
 		// this case is possible when this node's lowest known block is after
 		// the queried epoch's end boundary
-		return inmem.NewCommittedEpoch(setup, extensions, commit)
+		return inmem.NewCommittedEpoch(setup, commit, extensions), nil
 	}
-	return invalid.NewEpochf("sanity check failed: impossible combination of boundaries for previous epoch")
+	return nil, fmt.Errorf("sanity check failed: impossible combination of boundaries for previous epoch")
 }
 
 // retrieveEpochHeightBounds retrieves the height bounds for an epoch.

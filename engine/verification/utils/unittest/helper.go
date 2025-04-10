@@ -61,7 +61,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 	exeEngine := new(mocknetwork.Engine)
 
 	exeChunkDataConduit, err := exeNode.Net.Register(channels.ProvideChunks, exeEngine)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	replied := make(map[flow.Identifier]struct{})
 
@@ -110,7 +110,7 @@ func RespondChunkDataPackRequestImmediately(t *testing.T,
 	res := completeERs.ChunkDataResponseOf(t, chunkID)
 
 	err := con.Unicast(res, verID)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	log.Debug().
 		Hex("origin_id", logging.ID(verID)).
@@ -132,7 +132,7 @@ func RespondChunkDataPackRequestAfterNTrials(n int) MockChunkDataProviderFunc {
 			res := completeERs.ChunkDataResponseOf(t, chunkID)
 
 			err := con.Unicast(res, verID)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			log.Debug().
 				Hex("origin_id", logging.ID(verID)).
@@ -255,7 +255,7 @@ func SetupMockConsensusNode(t *testing.T,
 		}).Return(nil)
 
 	_, err := conNode.Net.Register(channels.ReceiveApprovals, conEngine)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	return &conNode, conEngine, wg
 }
@@ -307,12 +307,6 @@ func WithAssignee(t *testing.T, assignee flow.Identifier) func(flow.Identifier, 
 		fmt.Printf("with assignee: %v, chunk id: %v\n", index, chunk.ID())
 		require.NoError(t, assignmentBuilder.Add(chunk.Index, flow.IdentifierList{assignee}))
 		return chunk
-	}
-}
-
-func FromChunkID(chunkID flow.Identifier) flow.ChunkDataPack {
-	return flow.ChunkDataPack{
-		ChunkID: chunkID,
 	}
 }
 

@@ -396,6 +396,22 @@ func RunWithPebbleDB(t testing.TB, f func(*pebble.DB)) {
 	})
 }
 
+func RunWithBadgerDBAndPebbleDB(t testing.TB, f func(*badger.DB, *pebble.DB)) {
+	RunWithTempDir(t, func(dir string) {
+		bdb := BadgerDB(t, dir)
+		defer func() {
+			assert.NoError(t, bdb.Close())
+		}()
+
+		pdb := PebbleDB(t, dir)
+		defer func() {
+			assert.NoError(t, pdb.Close())
+		}()
+
+		f(bdb, pdb)
+	})
+}
+
 func PebbleDB(t testing.TB, dir string) *pebble.DB {
 	db, err := pebble.Open(dir, &pebble.Options{})
 	require.NoError(t, err)

@@ -23,11 +23,14 @@ import (
 )
 
 var (
-	flagRootChain                   string
-	flagRootParent                  string
-	flagRootHeight                  uint64
-	flagRootTimestamp               string
-	flagProtocolVersion             uint
+	flagRootChain     string
+	flagRootParent    string
+	flagRootHeight    uint64
+	flagRootTimestamp string
+	// Deprecated: Replaced by ProtocolStateVersion
+	// Historically, this flag set a spork-scoped version number, by convention equal to the major software version.
+	// Now that we have HCUs which change the major software version mid-spork, this is no longer useful.
+	deprecatedFlagProtocolVersion   uint
 	flagFinalizationSafetyThreshold uint64
 	flagEpochExtensionViewCount     uint64
 	flagCollectionClusters          uint
@@ -92,14 +95,13 @@ func addRootBlockCmdFlags() {
 	rootBlockCmd.Flags().StringVar(&flagRootParent, "root-parent", "0000000000000000000000000000000000000000000000000000000000000000", "ID for the parent of the root block")
 	rootBlockCmd.Flags().Uint64Var(&flagRootHeight, "root-height", 0, "height of the root block")
 	rootBlockCmd.Flags().StringVar(&flagRootTimestamp, "root-timestamp", time.Now().UTC().Format(time.RFC3339), "timestamp of the root block (RFC3339)")
-	rootBlockCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", flow.DefaultProtocolVersion, "major software version used for the duration of this spork")
+	rootBlockCmd.Flags().UintVar(&deprecatedFlagProtocolVersion, "protocol-version", 0, "deprecated: this flag will be ignored and remove in a future release")
 	rootBlockCmd.Flags().Uint64Var(&flagFinalizationSafetyThreshold, "finalization-safety-threshold", 500, "defines finalization safety threshold")
 	rootBlockCmd.Flags().Uint64Var(&flagEpochExtensionViewCount, "epoch-extension-view-count", 100_000, "length of epoch extension in views, default is 100_000 which is approximately 1 day")
 
 	cmd.MarkFlagRequired(rootBlockCmd, "root-chain")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-parent")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-height")
-	cmd.MarkFlagRequired(rootBlockCmd, "protocol-version")
 	cmd.MarkFlagRequired(rootBlockCmd, "finalization-safety-threshold")
 	cmd.MarkFlagRequired(rootBlockCmd, "epoch-extension-view-count")
 
@@ -133,6 +135,9 @@ func rootBlock(cmd *cobra.Command, args []string) {
 		} else {
 			log.Fatal().Msg("cannot use both --partner-stakes and --partner-weights flags (use only --partner-weights)")
 		}
+	}
+	if deprecatedFlagProtocolVersion != 0 {
+		log.Warn().Msg("using deprecated flag --protocol-version; please remove this flag from your workflow, it is ignored and will be removed in a future release")
 	}
 
 	// validate epoch configs
@@ -226,7 +231,6 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	intermediaryParamsData := IntermediaryParamsData{
 		FinalizationSafetyThreshold: flagFinalizationSafetyThreshold,
 		EpochExtensionViewCount:     flagEpochExtensionViewCount,
-		ProtocolVersion:             flagProtocolVersion,
 	}
 	intermediaryData := IntermediaryBootstrappingData{
 		IntermediaryEpochData:  intermediaryEpochData,

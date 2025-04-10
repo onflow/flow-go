@@ -58,6 +58,7 @@ const (
 	ResourceGuarantee                                        = "guarantee"
 	ResourceResult                                           = "result"
 	ResourceResultApprovals                                  = "result_approvals"
+	ResourceChunkLocators                                    = "chunk_locators"
 	ResourceReceipt                                          = "receipt"
 	ResourceQC                                               = "qc"
 	ResourceMyReceipt                                        = "my_receipt"

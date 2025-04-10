@@ -165,6 +165,9 @@ func InsertClusterPayload(blockID flow.Identifier, payload *cluster.Payload) fun
 		// cluster payloads only contain a single collection, allow duplicates,
 		// because it is valid for two competing forks to have the same payload.
 		light := payload.Collection.Light()
+		// SkipDuplicates here is to ignore the error if the collection already exists
+		// This means the Insert operation is actually a Upsert operation.
+		// The upsert is ok, because the data is unique by its ID
 		err := operation.SkipDuplicates(operation.InsertCollection(&light))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert payload collection: %w", err)
@@ -172,6 +175,9 @@ func InsertClusterPayload(blockID flow.Identifier, payload *cluster.Payload) fun
 
 		// insert constituent transactions
 		for _, colTx := range payload.Collection.Transactions {
+			// SkipDuplicates here is to ignore the error if the collection already exists
+			// This means the Insert operation is actually a Upsert operation.
+			// The upsert is ok, because the data is unique by its ID
 			err = operation.SkipDuplicates(operation.InsertTransaction(colTx.ID(), colTx))(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert payload transaction: %w", err)
@@ -180,6 +186,8 @@ func InsertClusterPayload(blockID flow.Identifier, payload *cluster.Payload) fun
 
 		// index the transaction IDs within the collection
 		txIDs := payload.Collection.Light().Transactions
+		// SkipDuplicates here is to ignore the error if the collection already exists
+		// This means the Insert operation is actually a Upsert operation.
 		err = operation.SkipDuplicates(operation.IndexCollectionPayload(blockID, txIDs))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index collection: %w", err)

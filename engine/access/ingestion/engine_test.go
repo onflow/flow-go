@@ -127,14 +127,10 @@ func (s *Suite) SetupTest() {
 	s.receipts = new(storage.ExecutionReceipts)
 	s.transactions = new(storage.Transactions)
 	s.results = new(storage.ExecutionResults)
-	collectionsToMarkFinalized, err := stdmap.NewTimes(100)
-	require.NoError(s.T(), err)
-	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
-	require.NoError(s.T(), err)
-	blocksToMarkExecuted, err := stdmap.NewTimes(100)
-	require.NoError(s.T(), err)
-	blockTransactions, err := stdmap.NewIdentifierMap(100)
-	require.NoError(s.T(), err)
+	collectionsToMarkFinalized := stdmap.NewTimes(100)
+	collectionsToMarkExecuted := stdmap.NewTimes(100)
+	blocksToMarkExecuted := stdmap.NewTimes(100)
+	blockTransactions := stdmap.NewIdentifierMap(100)
 
 	s.proto.state.On("Identity").Return(s.obsIdentity, nil)
 	s.proto.state.On("Params").Return(s.proto.params)
@@ -172,6 +168,7 @@ func (s *Suite) SetupTest() {
 	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	s.proto.params.On("FinalizedRoot").Return(header, nil)
 
+	var err error
 	s.collectionExecutedMetric, err = indexer.NewCollectionExecutedMetricImpl(
 		s.log,
 		metrics.NewNoopCollector(),
@@ -258,12 +255,12 @@ func (s *Suite) generateBlock(clusterCommittee flow.IdentitySkeletonList, snap *
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
 func (s *Suite) TestOnFinalizedBlockSingle() {
 	cluster := new(protocol.Cluster)
-	epoch := new(protocol.Epoch)
+	epoch := new(protocol.CommittedEpoch)
 	epochs := new(protocol.EpochQuery)
 	snap := new(protocol.Snapshot)
 
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snap.On("Epochs").Return(epochs)
 
 	// prepare cluster committee members
@@ -314,12 +311,12 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 // TestOnFinalizedBlockSeveralBlocksAhead checks OnFinalizedBlock with a block several blocks newer than the last block processed
 func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	cluster := new(protocol.Cluster)
-	epoch := new(protocol.Epoch)
+	epoch := new(protocol.CommittedEpoch)
 	epochs := new(protocol.EpochQuery)
 	snap := new(protocol.Snapshot)
 
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snap.On("Epochs").Return(epochs)
 
 	// prepare cluster committee members
@@ -580,10 +577,10 @@ func (s *Suite) TestRequestMissingCollections() {
 
 	cluster := new(protocol.Cluster)
 	cluster.On("Members").Return(clusterCommittee, nil)
-	epoch := new(protocol.Epoch)
+	epoch := new(protocol.CommittedEpoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snap := new(protocol.Snapshot)
 	snap.On("Epochs").Return(epochs)
 	s.proto.state.On("AtBlockID", refBlockID).Return(snap)
@@ -679,10 +676,10 @@ func (s *Suite) TestProcessBackgroundCalls() {
 
 	cluster := new(protocol.Cluster)
 	cluster.On("Members").Return(clusterCommittee, nil)
-	epoch := new(protocol.Epoch)
+	epoch := new(protocol.CommittedEpoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snap := new(protocol.Snapshot)
 	snap.On("Epochs").Return(epochs)
 	s.proto.state.On("AtBlockID", refBlockID).Return(snap)

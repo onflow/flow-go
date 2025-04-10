@@ -21,7 +21,7 @@ type EpochComponentsFactory struct {
 }
 
 // Create provides a mock function with given fields: epoch
-func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, component.Component, module.ReadyDoneAware, module.HotStuff, hotstuff.VoteAggregator, hotstuff.TimeoutAggregator, component.Component, error) {
+func (_m *EpochComponentsFactory) Create(epoch protocol.CommittedEpoch) (cluster.State, component.Component, module.ReadyDoneAware, module.HotStuff, hotstuff.VoteAggregator, hotstuff.TimeoutAggregator, component.Component, error) {
 	ret := _m.Called(epoch)
 
 	if len(ret) == 0 {
@@ -36,10 +36,10 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, c
 	var r5 hotstuff.TimeoutAggregator
 	var r6 component.Component
 	var r7 error
-	if rf, ok := ret.Get(0).(func(protocol.Epoch) (cluster.State, component.Component, module.ReadyDoneAware, module.HotStuff, hotstuff.VoteAggregator, hotstuff.TimeoutAggregator, component.Component, error)); ok {
+	if rf, ok := ret.Get(0).(func(protocol.CommittedEpoch) (cluster.State, component.Component, module.ReadyDoneAware, module.HotStuff, hotstuff.VoteAggregator, hotstuff.TimeoutAggregator, component.Component, error)); ok {
 		return rf(epoch)
 	}
-	if rf, ok := ret.Get(0).(func(protocol.Epoch) cluster.State); ok {
+	if rf, ok := ret.Get(0).(func(protocol.CommittedEpoch) cluster.State); ok {
 		r0 = rf(epoch)
 	} else {
 		if ret.Get(0) != nil {
@@ -47,7 +47,7 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, c
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(protocol.Epoch) component.Component); ok {
+	if rf, ok := ret.Get(1).(func(protocol.CommittedEpoch) component.Component); ok {
 		r1 = rf(epoch)
 	} else {
 		if ret.Get(1) != nil {
@@ -55,7 +55,7 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, c
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func(protocol.Epoch) module.ReadyDoneAware); ok {
+	if rf, ok := ret.Get(2).(func(protocol.CommittedEpoch) module.ReadyDoneAware); ok {
 		r2 = rf(epoch)
 	} else {
 		if ret.Get(2) != nil {
@@ -63,7 +63,7 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, c
 		}
 	}
 
-	if rf, ok := ret.Get(3).(func(protocol.Epoch) module.HotStuff); ok {
+	if rf, ok := ret.Get(3).(func(protocol.CommittedEpoch) module.HotStuff); ok {
 		r3 = rf(epoch)
 	} else {
 		if ret.Get(3) != nil {
@@ -71,7 +71,7 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, c
 		}
 	}
 
-	if rf, ok := ret.Get(4).(func(protocol.Epoch) hotstuff.VoteAggregator); ok {
+	if rf, ok := ret.Get(4).(func(protocol.CommittedEpoch) hotstuff.VoteAggregator); ok {
 		r4 = rf(epoch)
 	} else {
 		if ret.Get(4) != nil {
@@ -79,7 +79,7 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, c
 		}
 	}
 
-	if rf, ok := ret.Get(5).(func(protocol.Epoch) hotstuff.TimeoutAggregator); ok {
+	if rf, ok := ret.Get(5).(func(protocol.CommittedEpoch) hotstuff.TimeoutAggregator); ok {
 		r5 = rf(epoch)
 	} else {
 		if ret.Get(5) != nil {
@@ -87,7 +87,7 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, c
 		}
 	}
 
-	if rf, ok := ret.Get(6).(func(protocol.Epoch) component.Component); ok {
+	if rf, ok := ret.Get(6).(func(protocol.CommittedEpoch) component.Component); ok {
 		r6 = rf(epoch)
 	} else {
 		if ret.Get(6) != nil {
@@ -95,7 +95,7 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, c
 		}
 	}
 
-	if rf, ok := ret.Get(7).(func(protocol.Epoch) error); ok {
+	if rf, ok := ret.Get(7).(func(protocol.CommittedEpoch) error); ok {
 		r7 = rf(epoch)
 	} else {
 		r7 = ret.Error(7)

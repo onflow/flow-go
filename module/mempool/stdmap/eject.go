@@ -6,7 +6,6 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/rand"
 )
 
@@ -30,14 +29,14 @@ const overCapacityThreshold = 128
 //     concurrency (specifically, it locks the mempool during ejection).
 //   - The implementation should be non-blocking (though, it is allowed to
 //     take a bit of time; the mempool will just be locked during this time).
-type BatchEjectFunc func(b *Backend) (bool, error)
-type EjectFunc func(b *Backend) (flow.Identifier, flow.Entity, bool)
+type BatchEjectFunc[K comparable, V any] func(b *Backend[K, V]) (bool, error)
+type EjectFunc[K comparable, V any] func(b *Backend[K, V]) (K, V, bool)
 
 // EjectRandomFast checks if the map size is beyond the
 // threshold size, and will iterate through them and eject unneeded
 // entries if that is the case.  Return values are unused
-func EjectRandomFast(b *Backend) (bool, error) {
-	currentSize := b.backData.Size()
+func EjectRandomFast[K comparable, V any](b *Backend[K, V]) (bool, error) {
+	currentSize := b.mutableBackData.Size()
 
 	if b.guaranteedCapacity >= currentSize {
 		return false, nil
@@ -66,11 +65,11 @@ func EjectRandomFast(b *Backend) (bool, error) {
 	idx := 0                     // index into mapIndices
 	next2Remove := mapIndices[0] // index of the element to be removed next
 	i := 0                       // index into the entities map
-	for entityID, entity := range b.backData.All() {
+	for key, value := range b.mutableBackData.All() {
 		if i == next2Remove {
-			b.backData.Remove(entityID) // remove entity
+			b.mutableBackData.Remove(key) // remove entity
 			for _, callback := range b.ejectionCallbacks {
-				callback(entity) // notify callback
+				callback(value) // notify callback
 			}
 
 			idx++
@@ -93,31 +92,31 @@ func EjectRandomFast(b *Backend) (bool, error) {
 
 // EjectPanic simply panics, crashing the program. Useful when cache is not expected
 // to grow beyond certain limits, but ejecting is not applicable
-func EjectPanic(b *Backend) (flow.Identifier, flow.Entity, bool) {
+func EjectPanic[K comparable, V any](b *Backend[K, V]) (K, V, bool) {
 	panic("unexpected: mempool size over the limit")
 }
 
 // LRUEjector provides a swift FIFO ejection functionality
-type LRUEjector struct {
+type LRUEjector[K comparable] struct {
 	sync.Mutex
-	table  map[flow.Identifier]uint64 // keeps sequence number of entities it tracks
-	seqNum uint64                     // keeps the most recent sequence number
+	table  map[K]uint64 // keeps sequence number of values it tracks
+	seqNum uint64       // keeps the most recent sequence number
 }
 
-func NewLRUEjector() *LRUEjector {
-	return &LRUEjector{
-		table:  make(map[flow.Identifier]uint64),
+func NewLRUEjector[K comparable]() *LRUEjector[K] {
+	return &LRUEjector[K]{
+		table:  make(map[K]uint64),
 		seqNum: 0,
 	}
 }
 
 // Track should be called every time a new entity is added to the mempool.
 // It tracks the entity for later ejection.
-func (q *LRUEjector) Track(entityID flow.Identifier) {
+func (q *LRUEjector[K]) Track(key K) {
 	q.Lock()
 	defer q.Unlock()
 
-	if _, ok := q.table[entityID]; ok {
+	if _, ok := q.table[key]; ok {
 		// skips adding duplicate item
 		return
 	}
@@ -127,28 +126,28 @@ func (q *LRUEjector) Track(entityID flow.Identifier) {
 	// With proper resource cleanups by the mempools, the Eject is supposed
 	// as a very infrequent operation. However, further optimizations on
 	// Eject efficiency is needed.
-	q.table[entityID] = q.seqNum
+	q.table[key] = q.seqNum
 	q.seqNum++
 }
 
 // Untrack simply removes the tracker of the ejector off the entityID
-func (q *LRUEjector) Untrack(entityID flow.Identifier) {
+func (q *LRUEjector[K]) Untrack(key K) {
 	q.Lock()
 	defer q.Unlock()
 
-	delete(q.table, entityID)
+	delete(q.table, key)
 }
 
-// Eject implements EjectFunc for LRUEjector. It finds the entity with the lowest sequence number (i.e.,
-// the oldest entity). It also untracks.  This is using a linear search
-func (q *LRUEjector) Eject(b *Backend) flow.Identifier {
+// Eject implements EjectFunc for LRUEjector. It finds the value with the lowest sequence number (i.e.,
+// the oldest entity). It also untracks. This is using a linear search.
+func Eject[K comparable, V any](q *LRUEjector[K], b *Backend[K, V]) K {
 	q.Lock()
 	defer q.Unlock()
 
 	// finds the oldest entity
 	oldestSQ := uint64(math.MaxUint64)
-	var oldestID flow.Identifier
-	for _, id := range b.backData.Identifiers() {
+	var oldestID K
+	for _, id := range b.mutableBackData.Keys() {
 		if sq, ok := q.table[id]; ok {
 			if sq < oldestSQ {
 				oldestID = id

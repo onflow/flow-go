@@ -885,24 +885,24 @@ func (_m *Client) SubscribeEventsByBlockID(ctx context.Context, startBlockID flo
 }
 
 // SubscribeExecutionDataByBlockHeight provides a mock function with given fields: ctx, startHeight
-func (_m *Client) SubscribeExecutionDataByBlockHeight(ctx context.Context, startHeight uint64) (<-chan flow.ExecutionDataStreamResponse, <-chan error, error) {
+func (_m *Client) SubscribeExecutionDataByBlockHeight(ctx context.Context, startHeight uint64) (<-chan *flow.ExecutionDataStreamResponse, <-chan error, error) {
 	ret := _m.Called(ctx, startHeight)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeExecutionDataByBlockHeight")
 	}
 
-	var r0 <-chan flow.ExecutionDataStreamResponse
+	var r0 <-chan *flow.ExecutionDataStreamResponse
 	var r1 <-chan error
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64) (<-chan flow.ExecutionDataStreamResponse, <-chan error, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) (<-chan *flow.ExecutionDataStreamResponse, <-chan error, error)); ok {
 		return rf(ctx, startHeight)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint64) <-chan flow.ExecutionDataStreamResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) <-chan *flow.ExecutionDataStreamResponse); ok {
 		r0 = rf(ctx, startHeight)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(<-chan flow.ExecutionDataStreamResponse)
+			r0 = ret.Get(0).(<-chan *flow.ExecutionDataStreamResponse)
 		}
 	}
 
@@ -924,24 +924,24 @@ func (_m *Client) SubscribeExecutionDataByBlockHeight(ctx context.Context, start
 }
 
 // SubscribeExecutionDataByBlockID provides a mock function with given fields: ctx, startBlockID
-func (_m *Client) SubscribeExecutionDataByBlockID(ctx context.Context, startBlockID flow.Identifier) (<-chan flow.ExecutionDataStreamResponse, <-chan error, error) {
+func (_m *Client) SubscribeExecutionDataByBlockID(ctx context.Context, startBlockID flow.Identifier) (<-chan *flow.ExecutionDataStreamResponse, <-chan error, error) {
 	ret := _m.Called(ctx, startBlockID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeExecutionDataByBlockID")
 	}
 
-	var r0 <-chan flow.ExecutionDataStreamResponse
+	var r0 <-chan *flow.ExecutionDataStreamResponse
 	var r1 <-chan error
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (<-chan flow.ExecutionDataStreamResponse, <-chan error, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (<-chan *flow.ExecutionDataStreamResponse, <-chan error, error)); ok {
 		return rf(ctx, startBlockID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) <-chan flow.ExecutionDataStreamResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) <-chan *flow.ExecutionDataStreamResponse); ok {
 		r0 = rf(ctx, startBlockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(<-chan flow.ExecutionDataStreamResponse)
+			r0 = ret.Get(0).(<-chan *flow.ExecutionDataStreamResponse)
 		}
 	}
 
