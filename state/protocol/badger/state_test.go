@@ -21,6 +21,7 @@ import (
 	protoutil "github.com/onflow/flow-go/state/protocol/util"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -57,7 +58,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 		// protocol state has been bootstrapped, now open a protocol state with the database
 		state, err := bprotocol.OpenState(
 			complianceMetrics,
-			db,
+			badgerimpl.ToDB(db),
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -133,7 +134,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		all := storagebadger.InitAll(noopMetrics, db)
 		state, err := bprotocol.OpenState(
 			complianceMetrics,
-			db,
+			badgerimpl.ToDB(db),
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -721,7 +722,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 	all := bstorage.InitAll(metrics, db)
 	state, err := bprotocol.Bootstrap(
 		metrics,
-		db,
+		badgerimpl.ToDB(db),
 		all.Headers,
 		all.Seals,
 		all.Results,

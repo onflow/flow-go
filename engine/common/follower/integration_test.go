@@ -55,7 +55,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		// bootstrap root snapshot
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
 			all.Headers,
 			all.Seals,
 			all.Results,
