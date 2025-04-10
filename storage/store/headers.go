@@ -2,7 +2,6 @@ package store
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -27,9 +26,8 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 
 	// CAUTION: should only be used to index FINALIZED blocks by their
 	// respective height
-	indexing := &sync.Mutex{}
 	storeHeight := func(rw storage.ReaderBatchWriter, height uint64, id flow.Identifier) error {
-		return operation.IndexBlockHeight(indexing, rw, height, id)
+		return operation.IndexBlockHeight(rw, height, id)
 	}
 
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.Header, error) {

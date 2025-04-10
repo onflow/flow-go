@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/storage/operation"
 )
 
@@ -92,14 +93,14 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 // which persists the given KV-store snapshot as part of a DB tx.
 // Expected errors of the returned anonymous function:
 //   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
-func (s *ProtocolKVStore) StoreTx(stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
-	return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return s.cache.PutTx(rw, stateID, data)
-	})
+func (s *ProtocolKVStore) StoreTx(stateID flow.Identifier, data *flow.PSKeyValueStoreData) func(*transaction.Tx) error {
+	panic("not implemented")
 }
 
 func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
-	panic("not implemented")
+	return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return s.cache.PutTx(rw, stateID, data)
+	})
 }
 
 // IndexTx returns an anonymous function intended to be executed as part of a database transaction.
@@ -115,7 +116,7 @@ func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.
 //
 // Expected errors during normal operations:
 //   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
-func (s *ProtocolKVStore) IndexTx(blockID flow.Identifier, stateID flow.Identifier) error {
+func (s *ProtocolKVStore) IndexTx(blockID flow.Identifier, stateID flow.Identifier) func(*transaction.Tx) error {
 	panic("not implemented")
 }
 
