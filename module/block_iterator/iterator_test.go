@@ -25,7 +25,7 @@ func TestIterateHeight(t *testing.T) {
 
 		// index height
 		for _, b := range bs {
-			require.NoError(t, db.Update(operation.IndexBlockHeight(b.Height, b.ID())))
+			require.NoError(t, db.Update(operation.IndexFinalizedBlockByHeight(b.Height, b.ID())))
 		}
 
 		progress := &saveNextHeight{}
