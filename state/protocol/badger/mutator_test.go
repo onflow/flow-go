@@ -103,7 +103,7 @@ func TestExtendValid(t *testing.T) {
 
 		state, err := protocol.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -122,6 +122,7 @@ func TestExtendValid(t *testing.T) {
 			log,
 			tracer,
 			consumer,
+			db,
 			state,
 			all.Index,
 			all.Payloads,
@@ -856,7 +857,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		all := bstorage.InitAll(mmetrics.NewNoopCollector(), db)
 		protoState, err := protocol.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -876,6 +877,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			log,
 			tracer,
 			consumer,
+			db,
 			protoState,
 			all.Index,
 			all.Payloads,
@@ -2583,7 +2585,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 
 		state, err := protocol.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -2639,6 +2641,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 			log,
 			tracer,
 			consumer,
+			db,
 			state,
 			all.Index,
 			all.Payloads,
@@ -3144,7 +3147,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 
 		state, err := protocol.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -3166,6 +3169,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 			log,
 			tracer,
 			consumer,
+			db,
 			state,
 			all.Index,
 			all.Payloads,

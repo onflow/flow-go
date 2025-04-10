@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	protocolbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 )
 
 func InitProtocolState(db *badger.DB, storages *storage.All) (protocol.State, error) {
@@ -16,7 +17,8 @@ func InitProtocolState(db *badger.DB, storages *storage.All) (protocol.State, er
 
 	protocolState, err := protocolbadger.OpenState(
 		metrics,
-		db,
+		// TODO: use storage db
+		badgerimpl.ToDB(db),
 		storages.Headers,
 		storages.Seals,
 		storages.Results,

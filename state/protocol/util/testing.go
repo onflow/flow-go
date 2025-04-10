@@ -21,6 +21,7 @@ import (
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -71,7 +72,7 @@ func RunWithBootstrapState(t testing.TB, rootSnapshot protocol.Snapshot, f func(
 		all := bstorage.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -98,7 +99,7 @@ func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f fu
 		all := bstorage.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -119,6 +120,7 @@ func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f fu
 			log,
 			tracer,
 			consumer,
+			db,
 			state,
 			all.Index,
 			all.Payloads,
@@ -139,7 +141,7 @@ func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snap
 		all := bstorage.InitAll(mmetrics.NewNoopCollector(), db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -160,6 +162,7 @@ func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snap
 			log,
 			tracer,
 			consumer,
+			db,
 			state,
 			all.Index,
 			all.Payloads,
@@ -181,7 +184,7 @@ func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Sn
 		all := bstorage.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -201,6 +204,7 @@ func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Sn
 			log,
 			tracer,
 			consumer,
+			db,
 			state,
 			all.Index,
 			all.Payloads,
@@ -222,7 +226,7 @@ func RunWithFollowerProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, 
 		all := bstorage.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -259,7 +263,7 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 		all := bstorage.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -280,6 +284,7 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 			log,
 			tracer,
 			consumer,
+			db,
 			state,
 			all.Index,
 			all.Payloads,
@@ -299,7 +304,7 @@ func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot pr
 		all := bstorage.InitAll(mmetrics.NewNoopCollector(), db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -320,6 +325,7 @@ func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot pr
 			log,
 			tracer,
 			consumer,
+			db,
 			state,
 			all.Index,
 			all.Payloads,
@@ -351,7 +357,7 @@ func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.
 		all := bstorage.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -389,7 +395,7 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 		all := bstorage.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -410,6 +416,7 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 			log,
 			tracer,
 			consumer,
+			db,
 			state,
 			all.Index,
 			all.Payloads,

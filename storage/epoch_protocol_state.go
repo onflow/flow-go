@@ -15,6 +15,7 @@ type EpochProtocolStateEntries interface {
 	// Expected errors of the returned anonymous function:
 	//   - storage.ErrAlreadyExists if an epoch sub-state with the given id is already stored
 	StoreTx(epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.MinEpochStateEntry) func(*transaction.Tx) error
+	BatchStore(rw ReaderBatchWriter, epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.MinEpochStateEntry) error
 
 	// Index returns an anonymous function that is intended to be executed as part of a database transaction.
 	// In a nutshell, we want to maintain a map from `blockID` to `epochProtocolStateID`, where `blockID` references the
@@ -31,6 +32,7 @@ type EpochProtocolStateEntries interface {
 	// Expected errors during normal operations:
 	//   - storage.ErrAlreadyExists if a epoch sub-state for the given blockID has already been indexed
 	Index(blockID flow.Identifier, epochProtocolStateID flow.Identifier) func(*transaction.Tx) error
+	BatchIndex(rw ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateID flow.Identifier) error
 
 	// ByID returns the flow.RichEpochStateEntry by its ID.
 	// Expected errors during normal operations:

@@ -59,7 +59,7 @@ func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 	log := nodeConfig.Logger.With().Str("component", "dynamic-startup").Logger()
 
 	// CASE 1: The state is already bootstrapped - nothing to do
-	isBootstrapped, err := badgerstate.IsBootstrapped(nodeConfig.DB)
+	isBootstrapped, err := badgerstate.IsBootstrapped(nodeConfig.ProtocolDB)
 	if err != nil {
 		return fmt.Errorf("could not check if state is boostrapped: %w", err)
 	}

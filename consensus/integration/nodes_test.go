@@ -384,7 +384,7 @@ func createNode(
 	receiptsDB := storage.NewExecutionReceipts(metricsCollector, db, resultsDB, storage.DefaultCacheSize)
 	payloadsDB := storage.NewPayloads(db, indexDB, guaranteesDB, sealsDB, receiptsDB, resultsDB)
 	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
-	qcsDB := storage.NewQuorumCertificates(metricsCollector, db, storage.DefaultCacheSize)
+	qcsDB := store.NewQuorumCertificates(metricsCollector, badgerimpl.ToDB(db), storage.DefaultCacheSize)
 	setupsDB := storage.NewEpochSetups(metricsCollector, db)
 	commitsDB := storage.NewEpochCommits(metricsCollector, db)
 	protocolStateDB := storage.NewEpochProtocolStateEntries(metricsCollector, setupsDB, commitsDB, db,
@@ -403,7 +403,7 @@ func createNode(
 
 	state, err := bprotocol.Bootstrap(
 		metricsCollector,
-		db,
+		badgerimpl.ToDB(db),
 		headersDB,
 		sealsDB,
 		resultsDB,
@@ -425,6 +425,7 @@ func createNode(
 		log,
 		tracer,
 		protocolStateEvents,
+		db,
 		state,
 		indexDB,
 		payloadsDB,
@@ -518,7 +519,7 @@ func createNode(
 	protocolStateEvents.AddConsumer(committee)
 
 	// initialize the block finalizer
-	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
+	final := finalizer.NewFinalizer(badgerimpl.ToDB(db), headersDB, fullState, trace.NewNoopTracer())
 
 	syncCore, err := synccore.New(log, synccore.DefaultConfig(), metricsCollector, rootHeader.ChainID)
 	require.NoError(t, err)

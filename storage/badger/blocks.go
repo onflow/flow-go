@@ -6,6 +6,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
@@ -39,6 +40,10 @@ func (b *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
 		}
 		return nil
 	}
+}
+
+func (b *Blocks) BatchStore(rw storage.ReaderBatchWriter, block *flow.Block) error {
+	panic("not implemented")
 }
 
 func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Block, error) {

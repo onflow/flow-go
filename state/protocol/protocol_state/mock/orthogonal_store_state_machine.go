@@ -6,6 +6,8 @@ import (
 	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 
+	storage "github.com/onflow/flow-go/storage"
+
 	transaction "github.com/onflow/flow-go/storage/badger/transaction"
 )
 
@@ -32,6 +34,36 @@ func (_m *OrthogonalStoreStateMachine[P]) Build() (*transaction.DeferredBlockPer
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*transaction.DeferredBlockPersist)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// BuildBatchOps provides a mock function with given fields:
+func (_m *OrthogonalStoreStateMachine[P]) BuildBatchOps() (storage.BlockIndexingBatchWrite, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for BuildBatchOps")
+	}
+
+	var r0 storage.BlockIndexingBatchWrite
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (storage.BlockIndexingBatchWrite, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() storage.BlockIndexingBatchWrite); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(storage.BlockIndexingBatchWrite)
 		}
 	}
 

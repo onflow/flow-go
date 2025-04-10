@@ -1,8 +1,10 @@
 package common
 
 import (
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
@@ -31,6 +33,12 @@ func NewBaseKeyValueStoreStateMachine(
 // Build is a no-op by default. If a state machine needs to persist data, it should override this method.
 func (m *BaseKeyValueStoreStateMachine) Build() (*transaction.DeferredBlockPersist, error) {
 	return transaction.NewDeferredBlockPersist(), nil
+}
+
+func (m *BaseKeyValueStoreStateMachine) BuildBatchOps() (storage.BlockIndexingBatchWrite, error) {
+	return func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+		return nil
+	}, nil
 }
 
 // View returns the view associated with this state machine.
