@@ -91,7 +91,7 @@ func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, e
 // indices inserted by Store.
 // Remove does not error if the collection does not exist
 // Note: this method should only be called for collections included in blocks below sealed height
-// any error returned are exceptions
+// No errors are expected during normal operation.
 func (c *Collections) Remove(colID flow.Identifier) error {
 	col, err := c.LightByID(colID)
 	if err != nil {

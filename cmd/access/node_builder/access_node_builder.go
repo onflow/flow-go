@@ -2071,7 +2071,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				EventQueryMode:        eventQueryMode,
 				BlockTracker:          blockTracker,
 				SubscriptionHandler: subscription.NewSubscriptionHandler(
-					notNil(builder.Logger),
+					builder.Logger,
 					broadcaster,
 					builder.stateStreamConf.ClientSendTimeout,
 					builder.stateStreamConf.ResponseLimit,

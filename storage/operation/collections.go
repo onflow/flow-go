@@ -21,7 +21,7 @@ func RetrieveCollection(r storage.Reader, collID flow.Identifier, collection *fl
 
 // RemoveCollection removes a collection from the storage.
 // It returns nil if the collection does not exist.
-// any error returned are exceptions
+// No errors are expected during normal operation.
 func RemoveCollection(w storage.Writer, collID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeCollection, collID))
 }
@@ -38,7 +38,7 @@ func LookupCollectionPayload(r storage.Reader, blockID flow.Identifier, txIDs *[
 }
 
 // RemoveCollectionPayloadIndices removes a collection id indexed by a block id
-// any error returned are exceptions
+// No errors are expected during normal operation.
 func RemoveCollectionPayloadIndices(w storage.Writer, blockID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeIndexCollection, blockID))
 }
@@ -62,7 +62,7 @@ func LookupCollectionByTransaction(r storage.Reader, txID flow.Identifier, colle
 
 // RemoveCollectionByTransactionIndex removes a collection id indexed by a transaction id,
 // created by [UnsafeIndexCollectionByTransaction].
-// Any error returned is an exception.
+// No errors are expected during normal operation.
 func RemoveCollectionTransactionIndices(w storage.Writer, txID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeIndexCollectionByTransaction, txID))
 }
