@@ -45,7 +45,7 @@ func TestProtocolStateStorage(t *testing.T) {
 
 			err = s.BatchStore(rw, protocolStateID, expected.MinEpochStateEntry)
 			require.NoError(t, err)
-			return s.Index(blockID, protocolStateID)
+			return s.BatchIndex(rw, blockID, protocolStateID)
 		})
 		require.NoError(t, err)
 
@@ -167,7 +167,7 @@ func TestProtocolStateRootSnapshot(t *testing.T) {
 
 			err = s.BatchStore(rw, protocolStateID, expected.MinEpochStateEntry)
 			require.NoError(t, err)
-			return s.Index(blockID, protocolStateID)
+			return s.BatchIndex(rw, blockID, protocolStateID)
 		})
 		require.NoError(t, err)
 
