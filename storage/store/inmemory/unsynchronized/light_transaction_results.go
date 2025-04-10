@@ -29,8 +29,10 @@ func NewLightTransactionResults() *LightTransactionResults {
 	}
 }
 
-// ByBlockIDTransactionID returns the transaction result for the given block ID and transaction ID
-// Returns storage.ErrNotFound if block wasn't found.
+// ByBlockIDTransactionID returns the transaction result for the given block ID and transaction
+//
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if light tx result at given blockID wasn't found.
 func (l *LightTransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, transactionID flow.Identifier) (*flow.LightTransactionResult, error) {
 	key := store.KeyFromBlockIDTransactionID(blockID, transactionID)
 	l.lock.RLock()
@@ -45,7 +47,9 @@ func (l *LightTransactionResults) ByBlockIDTransactionID(blockID flow.Identifier
 }
 
 // ByBlockIDTransactionIndex returns the transaction result for the given blockID and transaction index
-// Returns storage.ErrNotFound if block wasn't found.
+//
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if light tx result at given blockID and txIndex wasn't found.
 func (l *LightTransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.LightTransactionResult, error) {
 	key := store.KeyFromBlockIDIndex(blockID, txIndex)
 	l.lock.RLock()
@@ -60,7 +64,9 @@ func (l *LightTransactionResults) ByBlockIDTransactionIndex(blockID flow.Identif
 }
 
 // ByBlockID gets all transaction results for a block, ordered by transaction index
-// Returns storage.ErrNotFound if block wasn't found.
+//
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if light tx results at given blockID weren't found.
 func (l *LightTransactionResults) ByBlockID(id flow.Identifier) ([]flow.LightTransactionResult, error) {
 	key := store.KeyFromBlockID(id)
 	l.lock.RLock()
@@ -75,7 +81,7 @@ func (l *LightTransactionResults) ByBlockID(id flow.Identifier) ([]flow.LightTra
 }
 
 // Store inserts a transaction results into a storage
-// No errors expected during normal operation.
+// No errors are expected during normal operation.
 func (l *LightTransactionResults) Store(blockID flow.Identifier, transactionResults []flow.LightTransactionResult) error {
 	key := store.KeyFromBlockID(blockID)
 	l.lock.Lock()
