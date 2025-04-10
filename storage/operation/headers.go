@@ -3,7 +3,6 @@ package operation
 import (
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -19,12 +18,8 @@ func RetrieveHeader(r storage.Reader, blockID flow.Identifier, header *flow.Head
 
 // IndexBlockHeight indexes the height of a block. It should only be called on
 // finalized blocks.
-func IndexBlockHeight(indexing *sync.Mutex, rw storage.ReaderBatchWriter, height uint64, blockID flow.Identifier) error {
-	indexing.Lock()
-	rw.AddCallback(func(err error) {
-		indexing.Unlock()
-	})
-
+// TODO(leo): add synchronization
+func IndexBlockHeight(rw storage.ReaderBatchWriter, height uint64, blockID flow.Identifier) error {
 	var existingID flow.Identifier
 	err := RetrieveByKey(rw.GlobalReader(), MakePrefix(codeHeightToBlock, height), &existingID)
 	if err == nil {

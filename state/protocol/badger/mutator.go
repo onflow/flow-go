@@ -48,8 +48,7 @@ type FollowerState struct {
 	protocolState protocol.MutableProtocolState
 
 	// locks
-	indexingNewBlock        *sync.Mutex
-	indexingFinalizedHeight *sync.Mutex
+	indexingNewBlock *sync.Mutex
 }
 
 var _ protocol.FollowerState = (*FollowerState)(nil)
@@ -95,8 +94,7 @@ func NewFollowerState(
 			state.epoch.commits,
 		),
 
-		indexingNewBlock:        &sync.Mutex{},
-		indexingFinalizedHeight: &sync.Mutex{},
+		indexingNewBlock: &sync.Mutex{},
 	}
 	return followerState, nil
 }
@@ -901,7 +899,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// * set the epoch fallback flag, if it is triggered
 	// err = badgeroperation.RetryOnConflict(m.db.Update, func(tx *badger.Txn) error {
 	err = m.sdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		err = operation.IndexBlockHeight(m.indexingFinalizedHeight, rw, header.Height, blockID)
+		err = operation.IndexBlockHeight(rw, header.Height, blockID)
 		if err != nil {
 			return fmt.Errorf("could not insert number mapping: %w", err)
 		}
