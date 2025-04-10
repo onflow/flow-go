@@ -159,7 +159,6 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 
 	for _, guarantee := range block.Payload.Guarantees {
 		colID := guarantee.CollectionID
-		//colID := guarantee.ID()
 		colInfo, ok := q.collections[colID]
 		if ok {
 			// some other block also includes this collection

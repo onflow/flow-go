@@ -185,7 +185,7 @@ func (e *Engine) publishCollectionGuarantee(guarantee *flow.CollectionGuarantee)
 	e.engMetrics.MessageSent(metrics.EngineCollectionProvider, metrics.MessageCollectionGuarantee)
 
 	e.log.Debug().
-		Hex("guarantee_id", logging.ID(guarantee.CollectionID)).
+		Hex("collection_id", logging.ID(guarantee.CollectionID)).
 		Hex("ref_block_id", logging.ID(guarantee.ReferenceBlockID)).
 		Msg("submitting collection guarantee")
 
