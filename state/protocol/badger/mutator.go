@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/storage"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	badgeroperation "github.com/onflow/flow-go/storage/badger/operation"
 	badgerprocedure "github.com/onflow/flow-go/storage/badger/procedure"
 	"github.com/onflow/flow-go/storage/badger/transaction"
@@ -64,8 +63,8 @@ type ParticipantState struct {
 	// TODO: remove these fields after refactoring ParticipantState to use
 	// new storage interface
 	db     *badger.DB
-	qcs    *badgerstorage.QuorumCertificates
-	blocks *badgerstorage.Blocks
+	qcs    storage.QuorumCertificates
+	blocks storage.Blocks
 
 	receiptValidator module.ReceiptValidator
 	sealValidator    module.SealValidator
@@ -123,8 +122,8 @@ func NewFullConsensusState(
 	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
-	qcs *badgerstorage.QuorumCertificates,
-	blocks *badgerstorage.Blocks,
+	qcs storage.QuorumCertificates,
+	blocks storage.Blocks,
 ) (*ParticipantState, error) {
 	followerState, err := NewFollowerState(
 		logger,
