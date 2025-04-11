@@ -111,6 +111,7 @@ require (
 	github.com/onflow/go-ethereum v1.14.7
 	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0
 	github.com/onflow/wal v1.0.2
+	github.com/qmuntal/stateless v1.7.1
 	github.com/slok/go-http-metrics v0.12.0
 	github.com/sony/gobreaker v0.5.0
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da
