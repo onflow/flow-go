@@ -17,6 +17,7 @@ on:
   merge_group:
     branches:
       - master
+  workflow_dispatch:
 
 env:
   GO_VERSION: "1.23"
