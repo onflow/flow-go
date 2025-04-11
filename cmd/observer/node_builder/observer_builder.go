@@ -1150,6 +1150,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
 			db := builder.ExecutionDatastoreManager.DB()
+
 			processedNotifications = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).

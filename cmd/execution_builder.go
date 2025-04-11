@@ -151,10 +151,10 @@ type ExecutionNode struct {
 	myReceipts      storageerr.MyExecutionReceipts
 	commits         storageerr.Commits
 	commitsReader   storageerr.CommitsReader
+	collections     storageerr.Collections
 
 	chunkDataPackDB        *pebble.DB
 	chunkDataPacks         storageerr.ChunkDataPacks
-	collections            storageerr.Collections
 	providerEngine         exeprovider.ProviderEngine
 	checkerEng             *checker.Engine
 	syncCore               *chainsync.Core
