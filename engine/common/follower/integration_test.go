@@ -80,6 +80,10 @@ func TestFollowerHappyPath(t *testing.T) {
 			all.Index,
 			all.Payloads,
 			mockTimer,
+			pbadger.MutableProtocolStateFromState(
+				log,
+				state,
+			),
 		)
 		require.NoError(t, err)
 		finalizer := moduleconsensus.NewFinalizer(badgerimpl.ToDB(db), all.Headers, followerState, tracer)

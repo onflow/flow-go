@@ -148,6 +148,10 @@ func (suite *BuilderSuite) SetupTest() {
 		all.Index,
 		all.Payloads,
 		util.MockBlockTimer(),
+		pbadger.MutableProtocolStateFromState(
+			log,
+			state,
+		),
 	)
 	require.NoError(suite.T(), err)
 
