@@ -210,7 +210,7 @@ func (s *MutableProtocolState) EvolveState(
 		return flow.ZeroID, nil, fmt.Errorf("failure initializing sub-state machines for evolving the Protocol State: %w", err)
 	}
 
-	resultingStateID, dbUpdates, err := s.followerBuild(parentStateID, stateMachines, serviceEvents, evolvingState)
+	resultingStateID, dbUpdates, err := s.participantBuild(parentStateID, stateMachines, serviceEvents, evolvingState)
 	if err != nil {
 		return flow.ZeroID, nil, fmt.Errorf("evolving and building the resulting Protocol State failed: %w", err)
 	}
@@ -232,7 +232,7 @@ func (s *MutableProtocolState) FollowerEvolveState(
 		return flow.ZeroID, nil, fmt.Errorf("failure initializing sub-state machines for evolving the Protocol State: %w", err)
 	}
 
-	resultingStateID, dbUpdates, err := s.build(parentStateID, stateMachines, serviceEvents, evolvingState)
+	resultingStateID, dbUpdates, err := s.followerBuild(parentStateID, stateMachines, serviceEvents, evolvingState)
 	if err != nil {
 		return flow.ZeroID, nil, fmt.Errorf("evolving and building the resulting Protocol State failed: %w", err)
 	}
@@ -333,7 +333,7 @@ func (s *MutableProtocolState) serviceEventsFromSeals(candidateSeals []*flow.Sea
 //     dependencies and respective indices. Though, the resulting batch of deferred database updates still depends
 //     on the candidate block's ID, which is still unknown at the time of block construction.
 //   - err: All error returns indicate potential state corruption and should therefore be treated as fatal.
-func (s *MutableProtocolState) build(
+func (s *MutableProtocolState) followerBuild(
 	parentStateID flow.Identifier,
 	stateMachines []protocol_state.KeyValueStoreStateMachine,
 	serviceEvents []flow.ServiceEvent,
@@ -374,7 +374,7 @@ func (s *MutableProtocolState) build(
 	return resultingStateID, dbUpdates, nil
 }
 
-func (s *MutableProtocolState) followerBuild(
+func (s *MutableProtocolState) participantBuild(
 	parentStateID flow.Identifier,
 	stateMachines []protocol_state.KeyValueStoreStateMachine,
 	serviceEvents []flow.ServiceEvent,

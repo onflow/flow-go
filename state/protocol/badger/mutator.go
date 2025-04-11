@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/storage"
+	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	badgeroperation "github.com/onflow/flow-go/storage/badger/operation"
 	badgerprocedure "github.com/onflow/flow-go/storage/badger/procedure"
 	"github.com/onflow/flow-go/storage/badger/transaction"
@@ -57,7 +58,15 @@ var _ protocol.FollowerState = (*FollowerState)(nil)
 // state with a new block, by checking the _entire_ block payload.
 type ParticipantState struct {
 	*FollowerState
-	db               *badger.DB
+
+	// these fields are only used by the consensus participant
+	// they are not used by the consensus follower
+	// TODO: remove these fields after refactoring ParticipantState to use
+	// new storage interface
+	db     *badger.DB
+	qcs    *badgerstorage.QuorumCertificates
+	blocks *badgerstorage.Blocks
+
 	receiptValidator module.ReceiptValidator
 	sealValidator    module.SealValidator
 }
@@ -114,6 +123,8 @@ func NewFullConsensusState(
 	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
+	qcs *badgerstorage.QuorumCertificates,
+	blocks *badgerstorage.Blocks,
 ) (*ParticipantState, error) {
 	followerState, err := NewFollowerState(
 		logger,
@@ -129,9 +140,12 @@ func NewFullConsensusState(
 	}
 	return &ParticipantState{
 		FollowerState:    followerState,
-		db:               db,
 		receiptValidator: receiptValidator,
 		sealValidator:    sealValidator,
+
+		db:     db,
+		qcs:    qcs,
+		blocks: blocks,
 	}, nil
 }
 
