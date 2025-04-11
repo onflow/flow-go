@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/access"
 	accessmock "github.com/onflow/flow-go/access/mock"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -31,7 +31,8 @@ type SendTransactionStatusesProviderSuite struct {
 	rootBlock      flow.Block
 	finalizedBlock *flow.Header
 
-	factory *DataProviderFactoryImpl
+	factory       *DataProviderFactoryImpl
+	linkGenerator *mockcommonmodels.LinkGenerator
 }
 
 func TestNewSendTransactionStatusesDataProvider(t *testing.T) {
@@ -41,6 +42,7 @@ func TestNewSendTransactionStatusesDataProvider(t *testing.T) {
 func (s *SendTransactionStatusesProviderSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.api = accessmock.NewAPI(s.T())
+	s.linkGenerator = mockcommonmodels.NewLinkGenerator(s.T())
 
 	s.chain = flow.Testnet.Chain()
 
@@ -53,7 +55,9 @@ func (s *SendTransactionStatusesProviderSuite) SetupTest() {
 		s.api,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval)
+		subscription.DefaultHeartbeatInterval,
+		s.linkGenerator,
+	)
 	s.Require().NotNil(s.factory)
 }
 
@@ -61,14 +65,24 @@ func (s *SendTransactionStatusesProviderSuite) SetupTest() {
 // when it is configured correctly and operating under normal conditions. It
 // validates that tx statuses are correctly streamed to the channel and ensures
 // no unexpected errors occur.
-func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_HappyPath() {
+func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_HappyPath() {
+	tx := unittest.TransactionBodyFixture()
+	tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
+	tx.Arguments = [][]uint8{}
+
+	s.linkGenerator.On("TransactionResultLink", mock.AnythingOfType("flow.Identifier")).Return(
+		func(id flow.Identifier) (string, error) {
+			return "some_link", nil
+		},
+	)
+
+	backendResponse := backendTransactionStatusesResponse(s.rootBlock)
+	expectedResponse := s.expectedTransactionStatusesResponses(backendResponse, SendAndGetTransactionStatusesTopic)
 
 	sendTxStatutesTestCases := []testType{
 		{
-			name: "SubscribeTransactionStatusesFromStartBlockID happy path",
-			arguments: models.Arguments{
-				"start_block_id": s.rootBlock.ID().String(),
-			},
+			name:      "SubscribeTransactionStatusesFromStartBlockID happy path",
+			arguments: unittest.CreateSendTxHttpPayload(tx),
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
 					"SendAndSubscribeTransactionStatuses",
@@ -77,10 +91,9 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 					entities.EventEncodingVersion_JSON_CDC_V0,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponse,
 		},
 	}
-
-	expectedResponse := expectedTransactionStatusesResponse(s.rootBlock)
 
 	testHappyPath(
 		s.T(),
@@ -88,52 +101,47 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 		s.factory,
 		sendTxStatutesTestCases,
 		func(dataChan chan interface{}) {
-			dataChan <- expectedResponse
+			dataChan <- backendResponse
 		},
-		expectedResponse,
 		s.requireTransactionStatuses,
 	)
-
 }
 
 // requireTransactionStatuses ensures that the received transaction statuses information matches the expected data.
 func (s *SendTransactionStatusesProviderSuite) requireTransactionStatuses(
-	v interface{},
-	expectedResponse interface{},
+	actual interface{},
+	expected interface{},
 ) {
-	expectedTxStatusesResponse, ok := expectedResponse.(*access.TransactionResult)
-	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
+	expectedResponse, expectedResponsePayload := extractPayload[*models.TransactionStatusesResponse](s.T(), expected)
+	actualResponse, actualResponsePayload := extractPayload[*models.TransactionStatusesResponse](s.T(), actual)
 
-	actualResponse, ok := v.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "Expected *models.TransactionStatusesResponse, got %T", v)
-
-	require.Equal(s.T(), expectedTxStatusesResponse.BlockID, actualResponse.TransactionResult.BlockID)
-	require.Equal(s.T(), expectedTxStatusesResponse.BlockHeight, actualResponse.TransactionResult.BlockHeight)
-
+	require.Equal(s.T(), expectedResponse.Topic, actualResponse.Topic)
+	require.Equal(s.T(), expectedResponsePayload.TransactionResult.BlockId, actualResponsePayload.TransactionResult.BlockId)
 }
 
 // TestSendTransactionStatusesDataProvider_InvalidArguments tests the behavior of the send transaction statuses data provider
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_InvalidArguments() {
-	ctx := context.Background()
 	send := make(chan interface{})
-
 	topic := SendAndGetTransactionStatusesTopic
 
 	for _, test := range invalidSendTransactionStatusesArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewSendAndGetTransactionStatusesDataProvider(
-				ctx,
+				context.Background(),
 				s.log,
 				s.api,
+				"dummy-id",
+				s.linkGenerator,
 				topic,
 				test.arguments,
 				send,
+				s.chain,
 			)
-			s.Require().Nil(provider)
 			s.Require().Error(err)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
+			s.Require().Nil(provider)
 		})
 	}
 }
@@ -141,19 +149,6 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 // invalidSendTransactionStatusesArgumentsTestCases returns a list of test cases with invalid argument combinations
 // for testing the behavior of send transaction statuses data providers. Each test case includes a name,
 // a set of input arguments, and the expected error message that should be returned.
-//
-// The test cases cover scenarios such as:
-// 1. Providing invalid 'script' type.
-// 2. Providing invalid 'script' value.
-// 3. Providing invalid 'arguments' type.
-// 4. Providing invalid 'arguments' value.
-// 5. Providing invalid 'reference_block_id' value.
-// 6. Providing invalid 'gas_limit' value.
-// 7. Providing invalid 'payer' value.
-// 8. Providing invalid 'proposal_key' value.
-// 9. Providing invalid 'authorizers' value.
-// 10. Providing invalid 'payload_signatures' value.
-// 11. Providing invalid 'envelope_signatures' value.
 func invalidSendTransactionStatusesArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
@@ -161,77 +156,84 @@ func invalidSendTransactionStatusesArgumentsTestCases() []testErrType {
 			arguments: map[string]interface{}{
 				"script": 0,
 			},
-			expectedErrorMsg: "'script' must be a string",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'script' argument",
 			arguments: map[string]interface{}{
 				"script": "invalid_script",
 			},
-			expectedErrorMsg: "invalid 'script': illegal base64 data ",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'arguments' type",
 			arguments: map[string]interface{}{
 				"arguments": 0,
 			},
-			expectedErrorMsg: "'arguments' must be a []string type",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'arguments' argument",
 			arguments: map[string]interface{}{
 				"arguments": []string{"invalid_base64_1", "invalid_base64_2"},
 			},
-			expectedErrorMsg: "invalid 'arguments'",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'reference_block_id' argument",
 			arguments: map[string]interface{}{
 				"reference_block_id": "invalid_reference_block_id",
 			},
-			expectedErrorMsg: "invalid ID format",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'gas_limit' argument",
 			arguments: map[string]interface{}{
 				"gas_limit": "-1",
 			},
-			expectedErrorMsg: "value must be an unsigned 64 bit integer",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'payer' argument",
 			arguments: map[string]interface{}{
 				"payer": "invalid_payer",
 			},
-			expectedErrorMsg: "invalid 'payer': can not decode hex string",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'proposal_key' argument",
 			arguments: map[string]interface{}{
 				"proposal_key": "invalid ProposalKey object",
 			},
-			expectedErrorMsg: "'proposal_key' must be a object (ProposalKey)",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'authorizers' argument",
 			arguments: map[string]interface{}{
 				"authorizers": []string{"invalid_base64_1", "invalid_base64_2"},
 			},
-			expectedErrorMsg: "invalid 'authorizers': can not decode hex string",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'payload_signatures' argument",
 			arguments: map[string]interface{}{
 				"payload_signatures": "invalid TransactionSignature array",
 			},
-			expectedErrorMsg: "'payload_signatures' must be an array of objects (TransactionSignature)",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'envelope_signatures' argument",
 			arguments: map[string]interface{}{
 				"envelope_signatures": "invalid TransactionSignature array",
 			},
-			expectedErrorMsg: "'envelope_signatures' must be an array of objects (TransactionSignature)",
+			expectedErrorMsg: "failed to parse transaction",
+		},
+		{
+			name: "unexpected argument",
+			arguments: map[string]interface{}{
+				"unexpected_argument": "dummy",
+			},
+			expectedErrorMsg: "request body contains unknown field",
 		},
 	}
 }

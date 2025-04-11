@@ -72,8 +72,6 @@ func (suite *Suite) SetupTest() {
 		metrics,
 		metrics,
 		suite.me,
-		suite.collections,
-		suite.transactions,
 	)
 	suite.Require().Nil(err)
 }

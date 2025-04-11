@@ -43,8 +43,8 @@ type Core struct {
 	headers                   storage.Headers
 	state                     clusterkv.MutableState
 	// track latest finalized view/height - used to efficiently drop outdated or too-far-ahead blocks
-	finalizedView     counters.StrictMonotonousCounter
-	finalizedHeight   counters.StrictMonotonousCounter
+	finalizedView     counters.StrictMonotonicCounter
+	finalizedHeight   counters.StrictMonotonicCounter
 	pending           module.PendingClusterBlockBuffer // pending block cache
 	sync              module.BlockRequester
 	hotstuff          module.HotStuff

@@ -639,7 +639,7 @@ func TestComponentManagerShutdown(t *testing.T) {
 		}).Build()
 
 	parent, cancel := context.WithCancel(context.Background())
-	ctx, _ := irrecoverable.WithSignaler(parent)
+	ctx := irrecoverable.NewMockSignalerContext(t, parent)
 
 	mgr.Start(ctx)
 	unittest.AssertClosesBefore(t, mgr.Ready(), 10*time.Millisecond)

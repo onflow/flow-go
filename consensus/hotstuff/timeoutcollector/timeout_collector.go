@@ -20,8 +20,8 @@ type TimeoutCollector struct {
 	timeoutsCache    *TimeoutObjectsCache // cache for tracking double timeout and timeout equivocation
 	notifier         hotstuff.TimeoutAggregationConsumer
 	processor        hotstuff.TimeoutProcessor
-	newestReportedQC counters.StrictMonotonousCounter // view of newest QC that was reported
-	newestReportedTC counters.StrictMonotonousCounter // view of newest TC that was reported
+	newestReportedQC counters.StrictMonotonicCounter // view of newest QC that was reported
+	newestReportedTC counters.StrictMonotonicCounter // view of newest TC that was reported
 }
 
 var _ hotstuff.TimeoutCollector = (*TimeoutCollector)(nil)
@@ -40,8 +40,8 @@ func NewTimeoutCollector(log zerolog.Logger,
 		notifier:         notifier,
 		timeoutsCache:    NewTimeoutObjectsCache(view),
 		processor:        processor,
-		newestReportedQC: counters.NewMonotonousCounter(0),
-		newestReportedTC: counters.NewMonotonousCounter(0),
+		newestReportedQC: counters.NewMonotonicCounter(0),
+		newestReportedTC: counters.NewMonotonicCounter(0),
 	}
 }
 
@@ -96,7 +96,7 @@ func (c *TimeoutCollector) processTimeout(timeout *model.TimeoutObject) error {
 	//  * Over larger time scales, the emitted events are for statistically increasing views.
 	//  * However, on short time scales there are _no_ monotonicity guarantees w.r.t. the views.
 	// Explanation:
-	// While only QCs with strict monotonously increasing views pass the
+	// While only QCs with strict monotonicly increasing views pass the
 	// `if c.newestReportedQC.Set(timeout.NewestQC.View)` statement, we emit the notification in a separate
 	// step. Therefore, emitting the notifications is subject to races, where on very short time-scales
 	// the notifications can be out of order.

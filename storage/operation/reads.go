@@ -15,10 +15,12 @@ import (
 // CheckFunc is a function that checks if the value should be read and decoded.
 // return (true, nil) to read the value and pass it to the CreateFunc and HandleFunc for decoding
 // return (false, nil) to skip reading the value
-// return (false, err) if running into any error, the iteration should be stopped.
+// return (false, err) if running into any exception, the iteration should be stopped.
 // when making a CheckFunc to be used in the IterationFunc to iterate over the keys, a sentinel error
 // can be defined and checked to stop the iteration early, such as finding the first key that match
 // certain condition.
+// Note: the returned bool is to decide whether to read the value or not, rather than whether to stop
+// the iteration or not.
 type CheckFunc func(key []byte) (bool, error)
 
 // CreateFunc returns a pointer to an initialized entity that we can potentially
@@ -127,6 +129,25 @@ func IterateKeys(r storage.Reader, startPrefix []byte, endPrefix []byte, iterFun
 // No other errors are expected during normal operation.
 func TraverseByPrefix(r storage.Reader, prefix []byte, iterFunc IterationFunc, opt storage.IteratorOption) error {
 	return IterateKeys(r, prefix, prefix, iterFunc, opt)
+}
+
+// KeyOnlyIterateFunc returns an IterationFunc that only iterates over keys
+func KeyOnlyIterateFunc(fn func(key []byte) error) IterationFunc {
+	return func() (CheckFunc, CreateFunc, HandleFunc) {
+		checker := func(key []byte) (bool, error) {
+			return false, fn(key)
+		}
+
+		create := func() interface{} {
+			return nil
+		}
+
+		handle := func() error {
+			return nil
+		}
+
+		return checker, create, handle
+	}
 }
 
 // KeyExists returns true if a key exists in the database.

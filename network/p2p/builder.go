@@ -8,6 +8,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
@@ -71,6 +72,10 @@ type GossipSubBuilder interface {
 	// or experimentation.
 	// It is NOT recommended to override the default RPC inspector suite factory in production unless you know what you are doing.
 	OverrideDefaultRpcInspectorFactory(GossipSubRpcInspectorFactoryFunc)
+
+	// OverrideDefaultValidateQueueSize overrides the default validate queue size of libp2p nodes.
+	// CAUTION: Be careful setting this to a larger number as it will change the backpressure behavior of the system.
+	OverrideDefaultValidateQueueSize(int)
 
 	// Build creates a new GossipSub pubsub system.
 	// It returns the newly created GossipSub pubsub system and any errors encountered during its creation.
@@ -160,6 +165,10 @@ type NodeBuilder interface {
 	// - NodeBuilder: the node builder
 	OverrideDefaultRpcInspectorFactory(GossipSubRpcInspectorFactoryFunc) NodeBuilder
 
+	// OverrideDefaultValidateQueueSize overrides the default validate queue size of libp2p nodes.
+	// CAUTION: Be careful setting this to a larger number as it will change the backpressure behavior of the system.
+	OverrideDefaultValidateQueueSize(int) NodeBuilder
+
 	// Build creates a new libp2p node. It returns the newly created libp2p node and any errors encountered during its creation.
 	// Args:
 	// none
@@ -198,7 +207,8 @@ type NodeConfig struct {
 	// logger used to provide logging
 	Logger zerolog.Logger `validate:"required"`
 	// reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
-	Host                 host.Host `validate:"required"`
-	PeerManager          PeerManager
-	DisallowListCacheCfg *DisallowListCacheConfig `validate:"required"`
+	Host                  host.Host `validate:"required"`
+	PeerManager           PeerManager
+	DisallowListCacheCfg  *DisallowListCacheConfig `validate:"required"`
+	ProtocolPeerCacheList []protocol.ID
 }

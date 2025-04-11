@@ -1,10 +1,7 @@
 package operation
 
 import (
-	"encoding/binary"
-	"fmt"
-
-	"github.com/onflow/flow-go/model/flow"
+	op "github.com/onflow/flow-go/storage/operation"
 )
 
 const (
@@ -18,10 +15,10 @@ const (
 	codeLivenessData = 11 // liveness data for hotstuff state
 
 	// codes for fields associated with the root state
-	codeSporkID                    = 13
-	codeProtocolVersion            = 14
-	codeEpochCommitSafetyThreshold = 15
-	codeSporkRootBlockHeight       = 16
+	codeSporkID              = 13
+	_                        = 14 // DEPRECATED: 14 was used for ProtocolVersion before the versioned Protocol State
+	_                        = 15 // DEPRECATED: 15 was used to save the finalization safety threshold
+	codeSporkRootBlockHeight = 16
 
 	// code for heights with special meaning
 	codeFinalizedHeight         = 20 // latest finalized block height
@@ -72,8 +69,9 @@ const (
 	codeEpochSetup         = 61 // EpochSetup service event, keyed by ID
 	codeEpochCommit        = 62 // EpochCommit service event, keyed by ID
 	codeBeaconPrivateKey   = 63 // BeaconPrivateKey, keyed by epoch counter
-	codeDKGStarted         = 64 // flag that the DKG for an epoch has been started
-	codeDKGEnded           = 65 // flag that the DKG for an epoch has ended (stores end state)
+	_                      = 64 // [DEPRECATED] flag that the DKG for an epoch has been started, used in protocol version v1
+	codeDKGEndState        = 65 // [DEPRECATED] flag for DKG end state, used in protocol version v1
+	codeDKGState           = 66 // current state of Recoverable Random Beacon State Machine for given epoch
 	codeVersionBeacon      = 67 // flag for storing version beacons
 	codeEpochProtocolState = 68
 	codeProtocolKVStore    = 69
@@ -81,7 +79,7 @@ const (
 	// code for ComputationResult upload status storage
 	// NOTE: for now only GCP uploader is supported. When other uploader (AWS e.g.) needs to
 	//		 be supported, we will need to define new code.
-	codeComputationResults = 66
+	_ = 66 // used by ComputationResults in storage/operation
 
 	// job queue consumers and producers
 	codeJobConsumerProcessed = 70
@@ -114,36 +112,10 @@ const (
 	codeEpochEmergencyFallbackTriggered = 255
 )
 
-func makePrefix(code byte, keys ...interface{}) []byte {
-	prefix := make([]byte, 1)
-	prefix[0] = code
-	for _, key := range keys {
-		prefix = append(prefix, b(key)...)
-	}
-	return prefix
+func makePrefix(code byte, keys ...any) []byte {
+	return op.MakePrefix(code, keys...)
 }
 
-func b(v interface{}) []byte {
-	switch i := v.(type) {
-	case uint8:
-		return []byte{i}
-	case uint32:
-		b := make([]byte, 4)
-		binary.BigEndian.PutUint32(b, i)
-		return b
-	case uint64:
-		b := make([]byte, 8)
-		binary.BigEndian.PutUint64(b, i)
-		return b
-	case string:
-		return []byte(i)
-	case flow.Role:
-		return []byte{byte(i)}
-	case flow.Identifier:
-		return i[:]
-	case flow.ChainID:
-		return []byte(i)
-	default:
-		panic(fmt.Sprintf("unsupported type to convert (%T)", v))
-	}
+func keyPartToBinary(v any) []byte {
+	return op.AppendPrefixKeyPart(nil, v)
 }

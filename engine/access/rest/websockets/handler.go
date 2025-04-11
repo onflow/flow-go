@@ -1,7 +1,6 @@
 package websockets
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -10,11 +9,18 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 type Handler struct {
 	*common.HttpHandler
 
+	// ctx holds the irrecoverable context used to start the REST server
+	// typically we do not store contexts within a struct. it is necessary in this case
+	// because we need to pass an irrecoverable context into the API backend logic to
+	// handle exceptions, and we cannot use the request's context since the websocket
+	// connection lives longer than the request duration.
+	ctx                 irrecoverable.SignalerContext
 	logger              zerolog.Logger
 	websocketConfig     Config
 	dataProviderFactory dp.DataProviderFactory
@@ -23,6 +29,7 @@ type Handler struct {
 var _ http.Handler = (*Handler)(nil)
 
 func NewWebSocketHandler(
+	ctx irrecoverable.SignalerContext,
 	logger zerolog.Logger,
 	config Config,
 	chain flow.Chain,
@@ -30,6 +37,7 @@ func NewWebSocketHandler(
 	dataProviderFactory dp.DataProviderFactory,
 ) *Handler {
 	return &Handler{
+		ctx:                 ctx,
 		HttpHandler:         common.NewHttpHandler(logger, chain, maxRequestSize),
 		websocketConfig:     config,
 		logger:              logger,
@@ -38,8 +46,7 @@ func NewWebSocketHandler(
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	//TODO: change to accept topic instead of URL
-	logger := h.HttpHandler.Logger.With().Str("websocket_subscribe_url", r.URL.String()).Logger()
+	logger := h.HttpHandler.Logger.With().Str("component", "websocket-handler").Logger()
 
 	err := h.HttpHandler.VerifyRequest(w, r)
 	if err != nil {
@@ -62,5 +69,5 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	controller := NewWebSocketController(logger, h.websocketConfig, NewWebsocketConnection(conn), h.dataProviderFactory)
-	controller.HandleConnection(context.TODO())
+	controller.HandleConnection(h.ctx)
 }

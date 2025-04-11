@@ -68,7 +68,7 @@ func (p *transactionEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error
 		cadence.NewUInt8(p.Result.TxType),
 		bytesToCadenceUInt8ArrayValue(p.Payload),
 		cadence.NewUInt16(uint16(p.Result.ResultSummary().ErrorCode)),
-		cadence.String(p.Result.ErrorMsg()),
+		cadence.String(p.Result.ErrorMessageWithRevertReason()),
 		cadence.NewUInt64(p.Result.GasConsumed),
 		cadence.String(p.Result.DeployedContractAddressString()),
 		bytesToCadenceUInt8ArrayValue(encodedLogs),

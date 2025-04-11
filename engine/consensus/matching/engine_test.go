@@ -1,6 +1,7 @@
 package matching
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -10,9 +11,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
@@ -36,6 +37,7 @@ type MatchingEngineSuite struct {
 
 	// Matching Engine
 	engine *Engine
+	cancel context.CancelFunc
 }
 
 func (s *MatchingEngineSuite) SetupTest() {
@@ -57,7 +59,17 @@ func (s *MatchingEngineSuite) SetupTest() {
 	s.engine, err = NewEngine(unittest.Logger(), net, me, metrics, metrics, s.state, s.receipts, s.index, s.core)
 	require.NoError(s.T(), err)
 
-	<-s.engine.Ready()
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(s.T(), context.Background())
+	s.cancel = cancel
+	s.engine.Start(ctx)
+	unittest.AssertClosesBefore(s.T(), s.engine.Ready(), 10*time.Millisecond)
+}
+
+func (s *MatchingEngineSuite) TearDownTest() {
+	if s.cancel != nil {
+		s.cancel()
+		unittest.AssertClosesBefore(s.T(), s.engine.Done(), 10*time.Millisecond)
+	}
 }
 
 // TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
@@ -135,15 +147,12 @@ func (s *MatchingEngineSuite) TestMultipleProcessingItems() {
 	s.core.AssertExpectations(s.T())
 }
 
-// TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
-// was submitted from network layer.
+// TestProcessUnsupportedMessageType tests that Process correctly handles a case where invalid message type
+// (byzantine message) was submitted from network layer.
 func (s *MatchingEngineSuite) TestProcessUnsupportedMessageType() {
 	invalidEvent := uint64(42)
 	err := s.engine.Process("ch", unittest.IdentifierFixture(), invalidEvent)
 	// shouldn't result in error since byzantine inputs are expected
 	require.NoError(s.T(), err)
-	// in case of local processing error cannot be consumed since all inputs are trusted
-	err = s.engine.ProcessLocal(invalidEvent)
-	require.Error(s.T(), err)
-	require.True(s.T(), engine.IsIncompatibleInputTypeError(err))
+	// Local processing happens only via HandleReceipt, which will log.Fatal on invalid input
 }

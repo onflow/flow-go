@@ -43,8 +43,7 @@ func TestLoadSecretsEncryptionKey(t *testing.T) {
 		t.Run("should return ErrNotExist if file doesn't exist", func(t *testing.T) {
 			require.NoFileExists(t, path)
 			_, err := loadSecretsEncryptionKey(dir, myID)
-			assert.Error(t, err)
-			assert.True(t, errors.Is(err, os.ErrNotExist))
+			assert.ErrorIs(t, err, os.ErrNotExist)
 		})
 
 		t.Run("should return key and no error if file exists", func(t *testing.T) {
@@ -65,7 +64,7 @@ func TestLoadSecretsEncryptionKey(t *testing.T) {
 // Test the components are started in the correct order, and are run serially
 func TestComponentsRunSerially(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	nb := FlowNode("scaffold test")
 	nb.componentBuilder = component.NewComponentManagerBuilder()
@@ -166,7 +165,7 @@ func TestPostShutdown(t *testing.T) {
 
 func TestOverrideComponent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	nb := FlowNode("scaffold test")
 	nb.componentBuilder = component.NewComponentManagerBuilder()
@@ -226,7 +225,7 @@ func TestOverrideComponent(t *testing.T) {
 
 func TestOverrideModules(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	nb := FlowNode("scaffold test")
 	nb.componentBuilder = component.NewComponentManagerBuilder()
@@ -603,7 +602,7 @@ func TestDependableComponentWaitForDependencies(t *testing.T) {
 
 func testDependableComponentWaitForDependencies(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	nb := FlowNode("scaffold test")
 	nb.componentBuilder = component.NewComponentManagerBuilder()

@@ -5,6 +5,8 @@ import (
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func Test_MapToCadenceVersion(t *testing.T) {
@@ -59,5 +61,103 @@ func Test_MapToCadenceVersion(t *testing.T) {
 		version := mapToCadenceVersion(v, mapping)
 
 		require.Equal(t, cadenceV1, version)
+	})
+}
+
+func Test_VersionBeaconAsDataSource(t *testing.T) {
+	t.Run("no version beacon", func(t *testing.T) {
+		versionBeacon := VersionBeaconExecutionVersionProvider{
+			getVersionBeacon: func() (*flow.SealedVersionBeacon, error) {
+				return nil, nil
+			},
+		}
+		version, err := versionBeacon.ExecutionVersion()
+		require.NoError(t, err)
+		require.Equal(t, semver.Version{}, version)
+	})
+
+	t.Run("version beacon", func(t *testing.T) {
+		versionBeacon := NewVersionBeaconExecutionVersionProvider(
+			func() (*flow.SealedVersionBeacon, error) {
+				return &flow.SealedVersionBeacon{
+					VersionBeacon: &flow.VersionBeacon{
+						VersionBoundaries: []flow.VersionBoundary{
+							{
+								BlockHeight: 10,
+								Version:     semver.Version{Major: 0, Minor: 37, Patch: 0}.String(),
+							},
+						},
+					},
+				}, nil
+			},
+		)
+		version, err := versionBeacon.ExecutionVersion()
+		require.NoError(t, err)
+		require.Equal(t, semver.Version{Major: 0, Minor: 37, Patch: 0}, version)
+	})
+
+	t.Run("version beacon, multiple boundaries", func(t *testing.T) {
+		versionBeacon := NewVersionBeaconExecutionVersionProvider(
+			func() (*flow.SealedVersionBeacon, error) {
+				return &flow.SealedVersionBeacon{
+					VersionBeacon: &flow.VersionBeacon{
+						VersionBoundaries: []flow.VersionBoundary{
+							{
+								BlockHeight: 10,
+								Version:     semver.Version{Major: 0, Minor: 37, Patch: 0}.String(),
+							},
+							{
+								BlockHeight: 20,
+								Version:     semver.Version{Major: 1, Minor: 0, Patch: 0}.String(),
+							},
+						},
+					},
+				}, nil
+			},
+		)
+
+		version, err := versionBeacon.ExecutionVersion()
+		require.NoError(t, err)
+		// the first boundary is by definition the newest past one and defines the version
+		require.Equal(t, semver.Version{Major: 0, Minor: 37, Patch: 0}, version)
+	})
+}
+
+func Test_MinimumCadenceRequiredVersion(t *testing.T) {
+	t.Run("no version beacon", func(t *testing.T) {
+		getCadenceVersion := func(executionVersion string) (string, error) {
+			versionBeacon := NewVersionBeaconExecutionVersionProvider(
+				func() (*flow.SealedVersionBeacon, error) {
+					return &flow.SealedVersionBeacon{
+						VersionBeacon: &flow.VersionBeacon{
+							VersionBoundaries: []flow.VersionBoundary{
+								{
+									BlockHeight: 10,
+									Version:     executionVersion,
+								},
+							},
+						},
+					}, nil
+				},
+			)
+			cadenceVersion := NewMinimumCadenceRequiredVersion(versionBeacon)
+			return cadenceVersion.MinimumRequiredVersion()
+		}
+
+		setFVMToCadenceVersionMappingForTestingOnly(FlowGoToCadenceVersionMapping{
+			FlowGoVersion:  semver.Version{Major: 0, Minor: 37, Patch: 0},
+			CadenceVersion: semver.Version{Major: 1, Minor: 0, Patch: 0},
+		})
+
+		requireExpectedSemver := func(t *testing.T, executionVersion semver.Version, expectedCadenceVersion semver.Version) {
+			t.Helper()
+			actualCadenceVersion, err := getCadenceVersion(executionVersion.String())
+			require.NoError(t, err)
+			require.Equal(t, expectedCadenceVersion.String(), actualCadenceVersion)
+		}
+
+		requireExpectedSemver(t, semver.Version{Major: 0, Minor: 36, Patch: 9}, semver.Version{Major: 0, Minor: 0, Patch: 0})
+		requireExpectedSemver(t, semver.Version{Major: 0, Minor: 37, Patch: 0}, semver.Version{Major: 1, Minor: 0, Patch: 0})
+		requireExpectedSemver(t, semver.Version{Major: 0, Minor: 37, Patch: 1}, semver.Version{Major: 1, Minor: 0, Patch: 0})
 	})
 }

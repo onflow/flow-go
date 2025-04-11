@@ -34,7 +34,7 @@ type Suite struct {
 	state *protocol.State
 	snap  *protocol.Snapshot
 
-	epoch      *protocol.Epoch
+	epoch      *protocol.TentativeEpoch
 	counter    uint64
 	phase      flow.EpochPhase
 	nodes      flow.IdentityList
@@ -67,7 +67,7 @@ func (suite *Suite) SetupTest() {
 		func() error { return nil },
 	)
 
-	suite.epoch = new(protocol.Epoch)
+	suite.epoch = new(protocol.TentativeEpoch)
 	suite.counter = rand.Uint64()
 
 	suite.nodes = unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleCollection))

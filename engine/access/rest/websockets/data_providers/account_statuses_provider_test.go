@@ -2,15 +2,18 @@ package data_providers
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
@@ -52,7 +55,9 @@ func (s *AccountStatusesProviderSuite) SetupTest() {
 		nil,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval)
+		subscription.DefaultHeartbeatInterval,
+		nil,
+	)
 	s.Require().NotNil(s.factory)
 }
 
@@ -61,45 +66,60 @@ func (s *AccountStatusesProviderSuite) SetupTest() {
 // validates that events are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_HappyPath() {
-
-	expectedEvents := []flow.Event{
+	events := []flow.Event{
 		unittest.EventFixture(state_stream.CoreEventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
 		unittest.EventFixture(state_stream.CoreEventAccountKeyAdded, 0, 0, unittest.IdentifierFixture(), 0),
 	}
 
-	var expectedAccountStatusesResponses []backend.AccountStatusesResponse
-	for i := 0; i < len(expectedEvents); i++ {
-		expectedAccountStatusesResponses = append(expectedAccountStatusesResponses, backend.AccountStatusesResponse{
-			Height:  s.rootBlock.Header.Height,
-			BlockID: s.rootBlock.ID(),
-			AccountEvents: map[string]flow.EventsList{
-				unittest.RandomAddressFixture().String(): expectedEvents,
-			},
-		})
-	}
+	backendResponses := s.backendAccountStatusesResponses(events)
 
 	testHappyPath(
 		s.T(),
 		AccountStatusesTopic,
 		s.factory,
-		s.subscribeAccountStatusesDataProviderTestCases(),
+		s.subscribeAccountStatusesDataProviderTestCases(backendResponses),
 		func(dataChan chan interface{}) {
-			for i := 0; i < len(expectedAccountStatusesResponses); i++ {
-				dataChan <- &expectedAccountStatusesResponses[i]
+			for i := 0; i < len(backendResponses); i++ {
+				dataChan <- backendResponses[i]
 			}
 		},
-		expectedAccountStatusesResponses,
 		s.requireAccountStatuses,
 	)
 }
 
-func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestCases() []testType {
+func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_StateStreamNotConfigured() {
+	send := make(chan interface{})
+	topic := AccountStatusesTopic
+
+	provider, err := NewAccountStatusesDataProvider(
+		context.Background(),
+		s.log,
+		nil,
+		"dummy-id",
+		topic,
+		wsmodels.Arguments{},
+		send,
+		s.chain,
+		state_stream.DefaultEventFilterConfig,
+		subscription.DefaultHeartbeatInterval,
+	)
+	s.Require().Error(err)
+	s.Require().Nil(provider)
+	s.Require().Contains(err.Error(), "does not support streaming account statuses")
+}
+
+func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestCases(
+	backendResponses []*backend.AccountStatusesResponse,
+) []testType {
+	expectedResponses := s.expectedAccountStatusesResponses(backendResponses)
+
 	return []testType{
 		{
 			name: "SubscribeAccountStatusesFromStartBlockID happy path",
-			arguments: models.Arguments{
-				"start_block_id": s.rootBlock.ID().String(),
-				"event_types":    []string{"flow.AccountCreated", "flow.AccountKeyAdded"},
+			arguments: wsmodels.Arguments{
+				"start_block_id":    s.rootBlock.ID().String(),
+				"event_types":       []string{string(flow.EventAccountCreated)},
+				"account_addresses": []string{unittest.AddressFixture().String()},
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
@@ -109,11 +129,14 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 					mock.Anything,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 		{
 			name: "SubscribeAccountStatusesFromStartHeight happy path",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
+				"event_types":        []string{string(flow.EventAccountCreated)},
+				"account_addresses":  []string{unittest.AddressFixture().String()},
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
@@ -123,10 +146,14 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 					mock.Anything,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 		{
-			name:      "SubscribeAccountStatusesFromLatestBlock happy path",
-			arguments: models.Arguments{},
+			name: "SubscribeAccountStatusesFromLatestBlock happy path",
+			arguments: wsmodels.Arguments{
+				"event_types":       []string{string(flow.EventAccountCreated)},
+				"account_addresses": []string{unittest.AddressFixture().String()},
+			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
 					"SubscribeAccountStatusesFromLatestBlock",
@@ -134,51 +161,59 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 					mock.Anything,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 	}
 }
 
 // requireAccountStatuses ensures that the received account statuses information matches the expected data.
-func (s *AccountStatusesProviderSuite) requireAccountStatuses(
-	v interface{},
-	expectedResponse interface{},
-) {
-	expectedAccountStatusesResponse, ok := expectedResponse.(backend.AccountStatusesResponse)
-	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
+func (s *AccountStatusesProviderSuite) requireAccountStatuses(actual interface{}, expected interface{}) {
+	expectedResponse, expectedResponsePayload := extractPayload[*models.AccountStatusesResponse](s.T(), expected)
+	actualResponse, actualResponsePayload := extractPayload[*models.AccountStatusesResponse](s.T(), actual)
 
-	actualResponse, ok := v.(*models.AccountStatusesResponse)
-	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", v)
+	require.Equal(s.T(), expectedResponsePayload.BlockID, actualResponsePayload.BlockID)
+	require.Equal(s.T(), len(expectedResponsePayload.AccountEvents), len(actualResponsePayload.AccountEvents))
+	require.Equal(s.T(), expectedResponsePayload.MessageIndex, actualResponsePayload.MessageIndex)
+	require.Equal(s.T(), expectedResponsePayload.Height, actualResponsePayload.Height)
+	require.Equal(s.T(), expectedResponse.Topic, actualResponse.Topic)
 
-	require.Equal(s.T(), expectedAccountStatusesResponse.BlockID.String(), actualResponse.BlockID)
-	require.Equal(s.T(), len(expectedAccountStatusesResponse.AccountEvents), len(actualResponse.AccountEvents))
-
-	for key, expectedEvents := range expectedAccountStatusesResponse.AccountEvents {
-		actualEvents, ok := actualResponse.AccountEvents[key]
+	for key, expectedEvents := range expectedResponsePayload.AccountEvents {
+		actualEvents, ok := actualResponsePayload.AccountEvents[key]
 		require.True(s.T(), ok, "Missing key in actual AccountEvents: %s", key)
 
 		s.Require().Equal(expectedEvents, actualEvents, "Mismatch for key: %s", key)
 	}
 }
 
+// expectedAccountStatusesResponses creates the expected responses for the provided events and backend responses.
+func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendResponses []*backend.AccountStatusesResponse) []interface{} {
+	expectedResponses := make([]interface{}, len(backendResponses))
+
+	for i, resp := range backendResponses {
+		expectedResponsePayload := models.NewAccountStatusesResponse(resp, uint64(i))
+		expectedResponses[i] = &models.BaseDataProvidersResponse{
+			Topic:   AccountStatusesTopic,
+			Payload: expectedResponsePayload,
+		}
+	}
+
+	return expectedResponses
+}
+
 // TestAccountStatusesDataProvider_InvalidArguments tests the behavior of the account statuses data provider
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
-// This test covers the test cases:
-// 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
-// 2. Invalid 'start_block_id' argument.
-// 3. Invalid 'start_block_height' argument.
 func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidArguments() {
-	ctx := context.Background()
 	send := make(chan interface{})
-
 	topic := AccountStatusesTopic
 
-	for _, test := range invalidArgumentsTestCases() {
+	for _, test := range invalidAccountStatusesArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewAccountStatusesDataProvider(
-				ctx,
+				context.Background(),
 				s.log,
 				s.api,
+				"dummy-id",
 				topic,
 				test.arguments,
 				send,
@@ -186,8 +221,8 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidAr
 				state_stream.DefaultEventFilterConfig,
 				subscription.DefaultHeartbeatInterval,
 			)
-			s.Require().Nil(provider)
 			s.Require().Error(err)
+			s.Require().Nil(provider)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
 		})
 	}
@@ -195,7 +230,6 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidAr
 
 // TestMessageIndexAccountStatusesProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
 func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderResponse_HappyPath() {
-	ctx := context.Background()
 	send := make(chan interface{}, 10)
 	topic := AccountStatusesTopic
 	accountStatusesCount := 4
@@ -206,20 +240,23 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 	// Create a mock subscription and mock the channel
 	sub := ssmock.NewSubscription(s.T())
 	sub.On("Channel").Return((<-chan interface{})(accountStatusesChan))
-	sub.On("Err").Return(nil)
+	sub.On("Err").Return(nil).Once()
 
 	s.api.On("SubscribeAccountStatusesFromStartBlockID", mock.Anything, mock.Anything, mock.Anything).Return(sub)
 
 	arguments :=
 		map[string]interface{}{
-			"start_block_id": s.rootBlock.ID().String(),
+			"start_block_id":    s.rootBlock.ID().String(),
+			"event_types":       []string{string(flow.EventAccountCreated)},
+			"account_addresses": []string{unittest.AddressFixture().String()},
 		}
 
 	// Create the AccountStatusesDataProvider instance
 	provider, err := NewAccountStatusesDataProvider(
-		ctx,
+		context.Background(),
 		s.log,
 		s.api,
+		"dummy-id",
 		topic,
 		arguments,
 		send,
@@ -227,14 +264,16 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 		state_stream.DefaultEventFilterConfig,
 		subscription.DefaultHeartbeatInterval,
 	)
-	s.Require().NotNil(provider)
 	s.Require().NoError(err)
+	s.Require().NotNil(provider)
 
 	// Ensure the provider is properly closed after the test
 	defer provider.Close()
 
 	// Run the provider in a separate goroutine to simulate subscription processing
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		err = provider.Run()
 		s.Require().NoError(err)
 	}()
@@ -252,10 +291,14 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 	var responses []*models.AccountStatusesResponse
 	for i := 0; i < accountStatusesCount; i++ {
 		res := <-send
-		accountStatusesRes, ok := res.(*models.AccountStatusesResponse)
-		s.Require().True(ok, "Expected *models.AccountStatusesResponse, got %T", res)
-		responses = append(responses, accountStatusesRes)
+
+		_, accStatusesResponsePayload := extractPayload[*models.AccountStatusesResponse](s.T(), res)
+
+		responses = append(responses, accStatusesResponsePayload)
 	}
+
+	// Wait for the provider goroutine to finish
+	unittest.RequireCloseBefore(s.T(), done, time.Second, "provider failed to stop")
 
 	// Verifying that indices are starting from 0
 	s.Require().Equal(uint64(0), responses[0].MessageIndex, "Expected MessageIndex to start with 0")
@@ -265,5 +308,75 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 		prevIndex := responses[i-1].MessageIndex
 		currentIndex := responses[i].MessageIndex
 		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
+	}
+}
+
+// backendAccountStatusesResponses creates backend account statuses responses based on the provided events.
+func (s *AccountStatusesProviderSuite) backendAccountStatusesResponses(events []flow.Event) []*backend.AccountStatusesResponse {
+	responses := make([]*backend.AccountStatusesResponse, len(events))
+
+	for i := range events {
+		responses[i] = &backend.AccountStatusesResponse{
+			Height:  s.rootBlock.Header.Height,
+			BlockID: s.rootBlock.ID(),
+			AccountEvents: map[string]flow.EventsList{
+				unittest.RandomAddressFixture().String(): events,
+			},
+		}
+	}
+
+	return responses
+}
+
+func invalidAccountStatusesArgumentsTestCases() []testErrType {
+	return []testErrType{
+		{
+			name: "provide both 'start_block_id' and 'start_block_height' arguments",
+			arguments: wsmodels.Arguments{
+				"start_block_id":     unittest.BlockFixture().ID().String(),
+				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
+				"event_types":        []string{state_stream.CoreEventAccountCreated},
+				"account_addresses":  []string{unittest.AddressFixture().String()},
+			},
+			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
+		},
+		{
+			name: "invalid 'start_block_id' argument",
+			arguments: map[string]interface{}{
+				"start_block_id":    "invalid_block_id",
+				"event_types":       []string{state_stream.CoreEventAccountCreated},
+				"account_addresses": []string{unittest.AddressFixture().String()},
+			},
+			expectedErrorMsg: "invalid ID format",
+		},
+		{
+			name: "invalid 'start_block_height' argument",
+			arguments: map[string]interface{}{
+				"start_block_height": "-1",
+				"event_types":        []string{state_stream.CoreEventAccountCreated},
+				"account_addresses":  []string{unittest.AddressFixture().String()},
+			},
+			expectedErrorMsg: "'start_block_height' must be convertible to uint64",
+		},
+		{
+			name: "invalid 'heartbeat_interval' argument",
+			arguments: map[string]interface{}{
+				"start_block_id":     unittest.BlockFixture().ID().String(),
+				"event_types":        []string{state_stream.CoreEventAccountCreated},
+				"account_addresses":  []string{unittest.AddressFixture().String()},
+				"heartbeat_interval": "-1",
+			},
+			expectedErrorMsg: "'heartbeat_interval' must be convertible to uint64",
+		},
+		{
+			name: "unexpected argument",
+			arguments: map[string]interface{}{
+				"start_block_id":      unittest.BlockFixture().ID().String(),
+				"event_types":         []string{state_stream.CoreEventAccountCreated},
+				"account_addresses":   []string{unittest.AddressFixture().String()},
+				"unexpected_argument": "dummy",
+			},
+			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
+		},
 	}
 }

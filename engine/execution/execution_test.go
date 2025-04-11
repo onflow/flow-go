@@ -67,7 +67,7 @@ func TestExecutionFlow(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	unittest.RequireReturnsBefore(t, func() {
-		exeNode.Ready(ctx)
+		exeNode.Ready(t, ctx)
 	}, 1*time.Second, "could not start execution node on time")
 	defer exeNode.Done(cancel)
 
@@ -400,7 +400,7 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	unittest.RequireReturnsBefore(t, func() {
-		exe1Node.Ready(ctx)
+		exe1Node.Ready(t, ctx)
 	}, 1*time.Second, "could not start execution node on time")
 	defer exe1Node.Done(cancel)
 
@@ -495,7 +495,7 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 	scExe1Block2, err := exe1Node.ExecutionState.StateCommitmentByBlockID(block2.ID())
 	assert.NoError(t, err)
 	// TODO this is no longer valid because the system chunk can change the state
-	//assert.Equal(t, scExe1Block1, scExe1Block2)
+	// assert.Equal(t, scExe1Block1, scExe1Block2)
 	_ = scExe1Block2
 
 	collectionEngine.AssertExpectations(t)
@@ -567,7 +567,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	unittest.RequireReturnsBefore(t, func() {
-		exeNode.Ready(ctx)
+		exeNode.Ready(t, ctx)
 	}, 1*time.Second, "could not start execution node on time")
 	defer exeNode.Done(cancel)
 

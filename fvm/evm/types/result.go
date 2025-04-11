@@ -1,8 +1,12 @@
 package types
 
 import (
+	"fmt"
+
+	"github.com/onflow/go-ethereum/accounts/abi"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethVM "github.com/onflow/go-ethereum/core/vm"
 	"github.com/onflow/go-ethereum/rlp"
 )
 
@@ -142,6 +146,22 @@ func (res *Result) ErrorMsg() string {
 		errorMsg = res.ValidationError.Error()
 	}
 	return errorMsg
+}
+
+// ErrorMessageWithRevertReason returns the error message, if any VM or Validation
+// error occurred. Execution reverts coming from `assert` or `require` Solidity
+// statements, are parsed into their human-friendly representation.
+func (res *Result) ErrorMessageWithRevertReason() string {
+	errorMessage := res.ErrorMsg()
+
+	if res.ResultSummary().ErrorCode == ExecutionErrCodeExecutionReverted {
+		reason, errUnpack := abi.UnpackRevert(res.ReturnedData)
+		if errUnpack == nil {
+			errorMessage = fmt.Sprintf("%v: %v", gethVM.ErrExecutionReverted.Error(), reason)
+		}
+	}
+
+	return errorMessage
 }
 
 // RLPEncodedLogs returns the rlp encoding of the logs

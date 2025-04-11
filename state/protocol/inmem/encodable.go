@@ -86,16 +86,23 @@ func (snap EncodableSnapshot) LatestSealedResult() (*flow.ExecutionResult, error
 	return nil, fmt.Errorf("LatestSealedResult: unreachable for correctly formatted sealing segments")
 }
 
-// EncodableDKG is the encoding format for protocol.DKG
-type EncodableDKG struct {
+// ThresholdKeySet contains the key set for a threshold signature scheme. Typically, the ThresholdKeySet is used to
+// encode the output of a trusted setup. In general, signature scheme is configured with a threshold parameter t,
+// which is the number of malicious colluding nodes the signature scheme is safe against. To balance liveness and
+// safety, the Flow protocol fixes threshold to t = floor((n-1)/2), for n the number of parties in the threshold
+// cryptography scheme, specifically n = len(Participants).
+// Without loss of generality, our threshold cryptography protocol with n parties identifies the individual
+// participants by the indices {0, 1, …, n-1}. The slice Participants is ordered accordingly.
+type ThresholdKeySet struct {
 	GroupKey     encodable.RandomBeaconPubKey
-	Participants map[flow.Identifier]flow.DKGParticipant
+	Participants []ThresholdParticipant
 }
 
-type EncodableFullDKG struct {
-	GroupKey      encodable.RandomBeaconPubKey
-	PrivKeyShares []encodable.RandomBeaconPrivKey
-	PubKeyShares  []encodable.RandomBeaconPubKey
+// ThresholdParticipant encodes the threshold key data for single participant.
+type ThresholdParticipant struct {
+	PrivKeyShare encodable.RandomBeaconPrivKey
+	PubKeyShare  encodable.RandomBeaconPubKey
+	NodeID       flow.Identifier
 }
 
 // EncodableCluster is the encoding format for protocol.Cluster
@@ -112,5 +119,4 @@ type EncodableParams struct {
 	ChainID              flow.ChainID
 	SporkID              flow.Identifier
 	SporkRootBlockHeight uint64
-	ProtocolVersion      uint
 }

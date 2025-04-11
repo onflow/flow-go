@@ -343,8 +343,14 @@ func (e *Engine) processEntityRequestWorker(ctx irrecoverable.SignalerContext, r
 		lg.Trace().Msg("worker picked up entity request for processing")
 		err := e.onEntityRequest(request)
 		if err != nil {
-			if engine.IsInvalidInputError(err) || engine.IsNetworkTransmissionError(err) {
-				lg.Error().Err(err).Msg("worker could not process entity request")
+			if engine.IsInvalidInputError(err) {
+				// log at debug level since nodes that recently unstaked are allowed to communicate over
+				// the network, but not allowed to request entities. Even an honest node may have been
+				// behind processing blocks and inadvertently continue requesting entities after they
+				// have left the network.
+				lg.Debug().Err(err).Msg("could not process entity request: invalid request")
+			} else if engine.IsNetworkTransmissionError(err) {
+				lg.Error().Err(err).Msg("could not process entity request: transmit error")
 			} else {
 				// this is an unexpected error, we crash the node.
 				ctx.Throw(err)

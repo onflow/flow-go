@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
@@ -53,7 +54,9 @@ func (s *EventsProviderSuite) SetupTest() {
 		nil,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval)
+		subscription.DefaultHeartbeatInterval,
+		nil,
+	)
 	s.Require().NotNil(s.factory)
 }
 
@@ -62,45 +65,40 @@ func (s *EventsProviderSuite) SetupTest() {
 // validates that events are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
-
-	expectedEvents := []flow.Event{
+	events := []flow.Event{
 		unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
 		unittest.EventFixture(flow.EventAccountUpdated, 0, 0, unittest.IdentifierFixture(), 0),
 	}
 
-	var expectedEventsResponses []backend.EventsResponse
-	for i := 0; i < len(expectedEvents); i++ {
-		expectedEventsResponses = append(expectedEventsResponses, backend.EventsResponse{
-			Height:         s.rootBlock.Header.Height,
-			BlockID:        s.rootBlock.ID(),
-			Events:         expectedEvents,
-			BlockTimestamp: s.rootBlock.Header.Timestamp,
-		})
-	}
+	backendResponses := s.backendEventsResponses(events)
 
 	testHappyPath(
 		s.T(),
 		EventsTopic,
 		s.factory,
-		s.subscribeEventsDataProviderTestCases(),
+		s.subscribeEventsDataProviderTestCases(backendResponses),
 		func(dataChan chan interface{}) {
-			for i := 0; i < len(expectedEventsResponses); i++ {
-				dataChan <- &expectedEventsResponses[i]
+			for i := 0; i < len(backendResponses); i++ {
+				dataChan <- backendResponses[i]
 			}
 		},
-		expectedEventsResponses,
 		s.requireEvents,
 	)
 }
 
 // subscribeEventsDataProviderTestCases generates test cases for events data providers.
-func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases() []testType {
+func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendResponses []*backend.EventsResponse) []testType {
+	expectedResponses := s.expectedEventsResponses(backendResponses)
+
 	return []testType{
 		{
 			name: "SubscribeBlocksFromStartBlockID happy path",
-			arguments: models.Arguments{
-				"start_block_id": s.rootBlock.ID().String(),
-				"event_types":    []string{"flow.AccountCreated", "flow.AccountUpdated"},
+			arguments: wsmodels.Arguments{
+				"start_block_id":     s.rootBlock.ID().String(),
+				"event_types":        []string{string(flow.EventAccountCreated)},
+				"addresses":          []string{unittest.AddressFixture().String()},
+				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+				"heartbeat_interval": "3",
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
@@ -110,11 +108,16 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases() []testType 
 					mock.Anything,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 		{
 			name: "SubscribeEventsFromStartHeight happy path",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
+				"event_types":        []string{string(flow.EventAccountCreated)},
+				"addresses":          []string{unittest.AddressFixture().String()},
+				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+				"heartbeat_interval": "3",
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
@@ -124,10 +127,16 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases() []testType 
 					mock.Anything,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 		{
-			name:      "SubscribeEventsFromLatest happy path",
-			arguments: models.Arguments{},
+			name: "SubscribeEventsFromLatest happy path",
+			arguments: wsmodels.Arguments{
+				"event_types":        []string{string(flow.EventAccountCreated)},
+				"addresses":          []string{unittest.AddressFixture().String()},
+				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+				"heartbeat_interval": "3",
+			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
 					"SubscribeEventsFromLatest",
@@ -135,92 +144,55 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases() []testType 
 					mock.Anything,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 	}
 }
 
 // requireEvents ensures that the received event information matches the expected data.
-func (s *EventsProviderSuite) requireEvents(v interface{}, expectedResponse interface{}) {
-	expectedEventsResponse, ok := expectedResponse.(backend.EventsResponse)
-	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
+func (s *EventsProviderSuite) requireEvents(actual interface{}, expected interface{}) {
+	expectedResponse, expectedResponsePayload := extractPayload[*models.EventResponse](s.T(), expected)
+	actualResponse, actualResponsePayload := extractPayload[*models.EventResponse](s.T(), actual)
 
-	actualResponse, ok := v.(*models.EventResponse)
-	require.True(s.T(), ok, "Expected *models.EventResponse, got %T", v)
-
-	s.Require().ElementsMatch(expectedEventsResponse.Events, actualResponse.Events)
+	s.Require().Equal(expectedResponse.Topic, actualResponse.Topic)
+	s.Require().Equal(expectedResponsePayload.MessageIndex, actualResponsePayload.MessageIndex)
+	s.Require().ElementsMatch(expectedResponsePayload.Events, actualResponsePayload.Events)
 }
 
-// invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
-// for testing the behavior of events data providers. Each test case includes a name,
-// a set of input arguments, and the expected error message that should be returned.
-//
-// The test cases cover scenarios such as:
-// 1. Supplying both 'start_block_id' and 'start_block_height' simultaneously, which is not allowed.
-// 2. Providing invalid 'start_block_id' value.
-// 3. Providing invalid 'start_block_height' value.
-func invalidArgumentsTestCases() []testErrType {
-	return []testErrType{
-		{
-			name: "provide both 'start_block_id' and 'start_block_height' arguments",
-			arguments: models.Arguments{
-				"start_block_id":     unittest.BlockFixture().ID().String(),
-				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
-			},
-			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
-		},
-		{
-			name: "invalid 'start_block_id' argument",
-			arguments: map[string]interface{}{
-				"start_block_id": "invalid_block_id",
-			},
-			expectedErrorMsg: "invalid ID format",
-		},
-		{
-			name: "invalid 'start_block_height' argument",
-			arguments: map[string]interface{}{
-				"start_block_height": "-1",
-			},
-			expectedErrorMsg: "value must be an unsigned 64 bit integer",
-		},
+// backendEventsResponses creates backend events responses based on the provided events.
+func (s *EventsProviderSuite) backendEventsResponses(events []flow.Event) []*backend.EventsResponse {
+	responses := make([]*backend.EventsResponse, len(events))
+
+	for i := range events {
+		responses[i] = &backend.EventsResponse{
+			Height:         s.rootBlock.Header.Height,
+			BlockID:        s.rootBlock.ID(),
+			Events:         events,
+			BlockTimestamp: s.rootBlock.Header.Timestamp,
+		}
 	}
+
+	return responses
 }
 
-// TestEventsDataProvider_InvalidArguments tests the behavior of the event data provider
-// when invalid arguments are provided. It verifies that appropriate errors are returned
-// for missing or conflicting arguments.
-// This test covers the test cases:
-// 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
-// 2. Invalid 'start_block_id' argument.
-// 3. Invalid 'start_block_height' argument.
-func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
-	ctx := context.Background()
-	send := make(chan interface{})
+// expectedEventsResponses creates the expected responses for the provided backend responses.
+func (s *EventsProviderSuite) expectedEventsResponses(
+	backendResponses []*backend.EventsResponse,
+) []interface{} {
+	expectedResponses := make([]interface{}, len(backendResponses))
 
-	topic := EventsTopic
-
-	for _, test := range invalidArgumentsTestCases() {
-		s.Run(test.name, func() {
-			provider, err := NewEventsDataProvider(
-				ctx,
-				s.log,
-				s.api,
-				topic,
-				test.arguments,
-				send,
-				s.chain,
-				state_stream.DefaultEventFilterConfig,
-				subscription.DefaultHeartbeatInterval,
-			)
-			s.Require().Nil(provider)
-			s.Require().Error(err)
-			s.Require().Contains(err.Error(), test.expectedErrorMsg)
-		})
+	for i, resp := range backendResponses {
+		expectedResponsePayload := models.NewEventResponse(resp, uint64(i))
+		expectedResponses[i] = &models.BaseDataProvidersResponse{
+			Topic:   EventsTopic,
+			Payload: expectedResponsePayload,
+		}
 	}
+	return expectedResponses
 }
 
 // TestMessageIndexEventProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
 func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() {
-	ctx := context.Background()
 	send := make(chan interface{}, 10)
 	topic := EventsTopic
 	eventsCount := 4
@@ -231,35 +203,42 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	// Create a mock subscription and mock the channel
 	sub := ssmock.NewSubscription(s.T())
 	sub.On("Channel").Return((<-chan interface{})(eventChan))
-	sub.On("Err").Return(nil)
+	sub.On("Err").Return(nil).Once()
 
 	s.api.On("SubscribeEventsFromStartBlockID", mock.Anything, mock.Anything, mock.Anything).Return(sub)
 
 	arguments :=
 		map[string]interface{}{
 			"start_block_id": s.rootBlock.ID().String(),
+			"event_types":    []string{state_stream.CoreEventAccountCreated},
+			"addresses":      []string{unittest.AddressFixture().String()},
+			"contracts":      []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 		}
 
 	// Create the EventsDataProvider instance
 	provider, err := NewEventsDataProvider(
-		ctx,
+		context.Background(),
 		s.log,
 		s.api,
+		"dummy-id",
 		topic,
 		arguments,
 		send,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval)
+		subscription.DefaultHeartbeatInterval,
+	)
 
-	s.Require().NotNil(provider)
 	s.Require().NoError(err)
+	s.Require().NotNil(provider)
 
 	// Ensure the provider is properly closed after the test
 	defer provider.Close()
 
 	// Run the provider in a separate goroutine to simulate subscription processing
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		err = provider.Run()
 		s.Require().NoError(err)
 	}()
@@ -279,12 +258,16 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	var responses []*models.EventResponse
 	for i := 0; i < eventsCount; i++ {
 		res := <-send
-		eventRes, ok := res.(*models.EventResponse)
-		s.Require().True(ok, "Expected *models.EventResponse, got %T", res)
-		responses = append(responses, eventRes)
+
+		_, eventResData := extractPayload[*models.EventResponse](s.T(), res)
+
+		responses = append(responses, eventResData)
 	}
 
-	// Verifying that indices are starting from 1
+	// Wait for the provider goroutine to finish
+	unittest.RequireCloseBefore(s.T(), done, time.Second, "provider failed to stop")
+
+	// Verifying that indices are starting from 0
 	s.Require().Equal(uint64(0), responses[0].MessageIndex, "Expected MessageIndex to start with 0")
 
 	// Verifying that indices are strictly increasing
@@ -292,5 +275,119 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		prevIndex := responses[i-1].MessageIndex
 		currentIndex := responses[i].MessageIndex
 		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
+	}
+}
+
+// TestEventsDataProvider_InvalidArguments tests the behavior of the event data provider
+// when invalid arguments are provided. It verifies that appropriate errors are returned
+// for missing or conflicting arguments.
+// This test covers the test cases:
+// 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
+// 2. Invalid 'start_block_id' argument.
+// 3. Invalid 'start_block_height' argument.
+func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
+	send := make(chan interface{})
+	topic := EventsTopic
+
+	for _, test := range invalidEventsArgumentsTestCases() {
+		s.Run(test.name, func() {
+			provider, err := NewEventsDataProvider(
+				context.Background(),
+				s.log,
+				s.api,
+				"dummy-id",
+				topic,
+				test.arguments,
+				send,
+				s.chain,
+				state_stream.DefaultEventFilterConfig,
+				subscription.DefaultHeartbeatInterval,
+			)
+			s.Require().Error(err)
+			s.Require().Nil(provider)
+			s.Require().Contains(err.Error(), test.expectedErrorMsg)
+		})
+	}
+}
+
+func (s *EventsProviderSuite) TestEventsDataProvider_StateStreamNotConfigured() {
+	send := make(chan interface{})
+	topic := EventsTopic
+
+	provider, err := NewEventsDataProvider(
+		context.Background(),
+		s.log,
+		nil,
+		"dummy-id",
+		topic,
+		wsmodels.Arguments{},
+		send,
+		s.chain,
+		state_stream.DefaultEventFilterConfig,
+		subscription.DefaultHeartbeatInterval,
+	)
+	s.Require().Error(err)
+	s.Require().Nil(provider)
+	s.Require().Contains(err.Error(), "does not support streaming events")
+}
+
+// invalidEventsArgumentsTestCases returns a list of test cases with invalid argument combinations
+// for testing the behavior of events data providers. Each test case includes a name,
+// a set of input arguments, and the expected error message that should be returned.
+func invalidEventsArgumentsTestCases() []testErrType {
+	return []testErrType{
+		{
+			name: "provide both 'start_block_id' and 'start_block_height' arguments",
+			arguments: wsmodels.Arguments{
+				"start_block_id":     unittest.BlockFixture().ID().String(),
+				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
+				"event_types":        []string{state_stream.CoreEventAccountCreated},
+				"addresses":          []string{unittest.AddressFixture().String()},
+				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+			},
+			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
+		},
+		{
+			name: "invalid 'start_block_id' argument",
+			arguments: map[string]interface{}{
+				"start_block_id": "invalid_block_id",
+				"event_types":    []string{state_stream.CoreEventAccountCreated},
+				"addresses":      []string{unittest.AddressFixture().String()},
+				"contracts":      []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+			},
+			expectedErrorMsg: "invalid ID format",
+		},
+		{
+			name: "invalid 'start_block_height' argument",
+			arguments: map[string]interface{}{
+				"start_block_height": "-1",
+				"event_types":        []string{state_stream.CoreEventAccountCreated},
+				"addresses":          []string{unittest.AddressFixture().String()},
+				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+			},
+			expectedErrorMsg: "'start_block_height' must be convertible to uint64",
+		},
+		{
+			name: "invalid 'heartbeat_interval' argument",
+			arguments: map[string]interface{}{
+				"start_block_id":     unittest.BlockFixture().ID().String(),
+				"event_types":        []string{state_stream.CoreEventAccountCreated},
+				"addresses":          []string{unittest.AddressFixture().String()},
+				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+				"heartbeat_interval": "-1",
+			},
+			expectedErrorMsg: "'heartbeat_interval' must be convertible to uint64",
+		},
+		{
+			name: "unexpected argument",
+			arguments: map[string]interface{}{
+				"start_block_id":      unittest.BlockFixture().ID().String(),
+				"event_types":         []string{state_stream.CoreEventAccountCreated},
+				"addresses":           []string{unittest.AddressFixture().String()},
+				"contracts":           []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+				"unexpected_argument": "dummy",
+			},
+			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
+		},
 	}
 }

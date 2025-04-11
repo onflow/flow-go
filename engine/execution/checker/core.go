@@ -134,7 +134,7 @@ func (c *Core) findLastSealedBlock() (*flow.Header, *flow.Header, *flow.Seal, er
 
 // findLastExecutedBlockHeight finds the last executed block height
 func (c *Core) findLastExecutedBlockHeight() (uint64, error) {
-	height, _, err := c.execState.GetHighestExecutedBlockID(context.Background())
+	height, _, err := c.execState.GetLastExecutedBlockID(context.Background())
 	if err != nil {
 		return 0, fmt.Errorf("could not get the last executed block: %w", err)
 	}

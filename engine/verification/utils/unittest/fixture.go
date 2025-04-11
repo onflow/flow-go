@@ -290,6 +290,8 @@ func ExecutionResultFixture(t *testing.T,
 		me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, nil)
 
+		protocolState := testutil.ProtocolStateWithSourceFixture(source)
+
 		// create BlockComputer
 		bc, err := computer.NewBlockComputer(
 			vm,
@@ -301,7 +303,7 @@ func ExecutionResultFixture(t *testing.T,
 			me,
 			prov,
 			nil,
-			testutil.ProtocolStateWithSourceFixture(source),
+			protocolState,
 			testMaxConcurrency)
 		require.NoError(t, err)
 
@@ -501,7 +503,7 @@ func ExecutionResultForkFixture(t *testing.T) (*flow.ExecutionResult, *flow.Exec
 	resultB := &flow.ExecutionResult{
 		PreviousResultID: resultA.PreviousResultID,
 		BlockID:          resultA.BlockID,
-		Chunks:           append(flow.ChunkList{resultA.Chunks[0]}, unittest.ChunkListFixture(1, resultA.BlockID)...),
+		Chunks:           append(flow.ChunkList{resultA.Chunks[0]}, unittest.ChunkListFixture(1, resultA.BlockID, resultA.Chunks[0].EndState)...),
 		ServiceEvents:    nil,
 	}
 

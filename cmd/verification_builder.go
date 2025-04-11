@@ -37,7 +37,10 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/dbops"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 type VerificationConfig struct {
@@ -88,11 +91,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 	var (
 		followerState protocol.FollowerState
 
-		chunkStatuses        *stdmap.ChunkStatuses    // used in fetcher engine
-		chunkRequests        *stdmap.ChunkRequests    // used in requester engine
-		processedChunkIndex  *badger.ConsumerProgress // used in chunk consumer
-		processedBlockHeight *badger.ConsumerProgress // used in block consumer
-		chunkQueue           *badger.ChunksQueue      // used in chunk consumer
+		chunkStatuses        *stdmap.ChunkStatuses               // used in fetcher engine
+		chunkRequests        *stdmap.ChunkRequests               // used in requester engine
+		processedChunkIndex  storage.ConsumerProgressInitializer // used in chunk consumer
+		processedBlockHeight storage.ConsumerProgressInitializer // used in block consumer
+		chunkQueue           storage.ChunksQueue                 // used in chunk consumer
 
 		syncCore            *chainsync.Core   // used in follower engine
 		assignerEngine      *assigner.Engine  // the assigner engine
@@ -155,18 +158,37 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return nil
 		}).
 		Module("processed chunk index consumer progress", func(node *NodeConfig) error {
-			processedChunkIndex = badger.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationChunkIndex)
+			processedChunkIndex = store.NewConsumerProgress(node.ProtocolDB, module.ConsumeProgressVerificationChunkIndex)
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *NodeConfig) error {
-			processedBlockHeight = badger.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationBlockHeight)
+			processedBlockHeight = store.NewConsumerProgress(node.ProtocolDB, module.ConsumeProgressVerificationBlockHeight)
 			return nil
 		}).
 		Module("chunks queue", func(node *NodeConfig) error {
-			chunkQueue = badger.NewChunkQueue(node.DB)
-			ok, err := chunkQueue.Init(chunkconsumer.DefaultJobIndex)
-			if err != nil {
-				return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
+			var ok bool
+			var err error
+
+			if dbops.IsBadgerTransaction(node.dbops) {
+				queue := badger.NewChunkQueue(node.DB)
+				ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
+				if err != nil {
+					return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
+				}
+
+				chunkQueue = queue
+				node.Logger.Info().Msgf("chunks queue index has been initialized with badger db transaction updates")
+			} else if dbops.IsBatchUpdate(node.dbops) {
+				queue := store.NewChunkQueue(node.Metrics.Cache, node.ProtocolDB)
+				ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
+				if err != nil {
+					return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
+				}
+
+				chunkQueue = queue
+				node.Logger.Info().Msgf("chunks queue index has been initialized with protocol db batch updates")
+			} else {
+				return fmt.Errorf(dbops.UsageErrMsg, v.dbops)
 			}
 
 			node.Logger.Info().
@@ -201,7 +223,16 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			vmCtx := fvm.NewContext(fvmOptions...)
 
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
-			approvalStorage := badger.NewResultApprovals(node.Metrics.Cache, node.DB)
+
+			var approvalStorage storage.ResultApprovals
+			if dbops.IsBadgerTransaction(v.dbops) {
+				approvalStorage = badger.NewResultApprovals(node.Metrics.Cache, node.DB)
+			} else if dbops.IsBatchUpdate(v.dbops) {
+				approvalStorage = store.NewResultApprovals(node.Metrics.Cache, node.ProtocolDB)
+			} else {
+				return nil, fmt.Errorf("invalid db opts type: %v", v.dbops)
+			}
+
 			verifierEng, err = verifier.New(
 				node.Logger,
 				collector,

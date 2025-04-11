@@ -39,11 +39,12 @@ type Config struct {
 	CollectionAddr         string                           // the address of the upstream collection node
 	HistoricalAccessAddrs  string                           // the list of all access nodes from previous spork
 
-	BackendConfig   backend.Config // configurable options for creating Backend
-	RestConfig      rest.Config    // the REST server configuration
-	MaxMsgSize      uint           // GRPC max message size
-	CompressorName  string         // GRPC compressor name
-	WebSocketConfig websockets.Config
+	BackendConfig             backend.Config // configurable options for creating Backend
+	RestConfig                rest.Config    // the REST server configuration
+	MaxMsgSize                uint           // GRPC max message size
+	CompressorName            string         // GRPC compressor name
+	WebSocketConfig           websockets.Config
+	EnableWebSocketsStreamAPI bool
 }
 
 // Engine exposes the server with a simplified version of the Access API.
@@ -96,7 +97,7 @@ func NewBuilder(
 	log = log.With().Str("engine", "rpc").Logger()
 
 	// wrap the unsecured server with an HTTP proxy server to serve HTTP clients
-	httpServer := newHTTPProxyServer(unsecureGrpcServer.Server)
+	httpServer := newHTTPProxyServer(unsecureGrpcServer)
 
 	finalizedCache, finalizedCacheWorker, err := events.NewFinalizedHeaderCache(state)
 	if err != nil {
@@ -241,9 +242,8 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 		return
 	}
 
-	e.log.Info().Str("rest_api_address", e.config.RestConfig.ListenAddress).Msg("starting REST server on address")
-
 	r, err := rest.NewServer(
+		ctx,
 		e.restHandler,
 		e.config.RestConfig,
 		e.log,
@@ -251,6 +251,7 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 		e.restCollector,
 		e.stateStreamBackend,
 		e.stateStreamConfig,
+		e.config.EnableWebSocketsStreamAPI,
 		e.config.WebSocketConfig,
 	)
 	if err != nil {
@@ -264,6 +265,8 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 	e.restServer.BaseContext = func(_ net.Listener) context.Context {
 		return irrecoverable.WithSignalerContext(ctx, ctx)
 	}
+
+	e.log.Info().Str("rest_api_address", e.config.RestConfig.ListenAddress).Msg("starting REST server on address")
 
 	l, err := net.Listen("tcp", e.config.RestConfig.ListenAddress)
 	if err != nil {

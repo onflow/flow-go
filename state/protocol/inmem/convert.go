@@ -3,9 +3,7 @@ package inmem
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
@@ -57,32 +55,8 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 		ChainID:              from.ChainID(),
 		SporkID:              from.SporkID(),
 		SporkRootBlockHeight: from.SporkRootBlockHeight(),
-		ProtocolVersion:      from.ProtocolVersion(),
 	}
 	return &Params{params}, nil
-}
-
-// DKGFromEncodable returns a DKG backed by the given encodable representation.
-func DKGFromEncodable(enc EncodableDKG) (*DKG, error) {
-	return &DKG{enc}, nil
-}
-
-// EncodableDKGFromEvents returns an EncodableDKG constructed from epoch setup and commit events.
-// No errors are expected during normal operations.
-func EncodableDKGFromEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) (EncodableDKG, error) {
-	// filter initial participants to valid DKG participants
-	participants := setup.Participants.Filter(filter.IsValidDKGParticipant)
-	lookup, err := flow.ToDKGParticipantLookup(participants, commit.DKGParticipantKeys)
-	if err != nil {
-		return EncodableDKG{}, fmt.Errorf("could not construct dkg lookup: %w", err)
-	}
-
-	return EncodableDKG{
-		GroupKey: encodable.RandomBeaconPubKey{
-			PublicKey: commit.DKGGroupKey,
-		},
-		Participants: lookup,
-	}, nil
 }
 
 // ClusterFromEncodable returns a Cluster backed by the given encodable representation.
@@ -94,12 +68,11 @@ func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 // root bootstrap state. This is used to bootstrap the protocol state for
 // genesis or post-spork states.
 func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*Snapshot, error) {
-	version := flow.DefaultProtocolVersion
 	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
 	}
-	return SnapshotFromBootstrapStateWithParams(root, result, seal, qc, version, func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+	return SnapshotFromBootstrapStateWithParams(root, result, seal, qc, func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
 		return kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochStateID)
 	})
 }
@@ -111,7 +84,6 @@ func SnapshotFromBootstrapStateWithParams(
 	result *flow.ExecutionResult,
 	seal *flow.Seal,
 	qc *flow.QuorumCertificate,
-	protocolVersion uint,
 	kvStoreFactory func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error),
 ) (*Snapshot, error) {
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
@@ -148,7 +120,6 @@ func SnapshotFromBootstrapStateWithParams(
 		ChainID:              root.Header.ChainID, // chain ID must match the root block
 		SporkID:              root.ID(),           // use root block ID as the unique spork identifier
 		SporkRootBlockHeight: root.Header.Height,  // use root block height as the spork root block height
-		ProtocolVersion:      protocolVersion,     // major software version for this spork
 	}
 
 	rootMinEpochState := EpochProtocolStateFromServiceEvents(setup, commit)

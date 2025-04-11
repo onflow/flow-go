@@ -20,7 +20,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
+	"github.com/onflow/flow-go/engine/access/subscription/tracker"
+	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
@@ -63,9 +64,9 @@ type BackendExecutionDataSuite struct {
 	broadcaster              *engine.Broadcaster
 	execDataCache            *cache.ExecutionDataCache
 	execDataHeroCache        *herocache.BlockExecutionData
-	executionDataTracker     *subscriptionmock.ExecutionDataTracker
+	executionDataTracker     *trackermock.ExecutionDataTracker
 	backend                  *StateStreamBackend
-	executionDataTrackerReal subscription.ExecutionDataTracker
+	executionDataTrackerReal tracker.ExecutionDataTracker
 
 	blocks      []*flow.Block
 	blockEvents map[flow.Identifier][]flow.Event
@@ -159,7 +160,7 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 
 	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, s.logger, metrics.NewNoopCollector())
 	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
-	s.executionDataTracker = subscriptionmock.NewExecutionDataTracker(s.T())
+	s.executionDataTracker = trackermock.NewExecutionDataTracker(s.T())
 
 	s.execDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionDataEntity, blockCount)
 	s.blockEvents = make(map[flow.Identifier][]flow.Event, blockCount)
@@ -259,7 +260,7 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 	require.NoError(s.T(), err)
 
 	// create real execution data tracker to use GetStartHeight from it, instead of mocking
-	s.executionDataTrackerReal = subscription.NewExecutionDataTracker(
+	s.executionDataTrackerReal = tracker.NewExecutionDataTracker(
 		s.logger,
 		s.state,
 		s.rootBlock.Header.Height,

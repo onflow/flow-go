@@ -23,9 +23,14 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	modutil "github.com/onflow/flow-go/module/util"
 )
+
+var ErrNotImplemented = errors.New("not implemented")
 
 var (
 	flagPayloads        string
@@ -152,7 +157,6 @@ func run(*cobra.Command, []string) {
 	vm := fvm.NewVirtualMachine()
 
 	if flagServe {
-
 		api := &api{
 			chainID:         chainID,
 			vm:              vm,
@@ -160,7 +164,19 @@ func run(*cobra.Command, []string) {
 			storageSnapshot: storageSnapshot,
 		}
 
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		irrCtx, errCh := irrecoverable.WithSignaler(ctx)
+		go func() {
+			err := modutil.WaitError(errCh, ctx.Done())
+			if err != nil {
+				log.Fatal().Err(err).Msg("server finished with error")
+			}
+		}()
+
 		server, err := rest.NewServer(
+			irrCtx,
 			api,
 			rest.Config{
 				ListenAddress: fmt.Sprintf(":%d", flagPort),
@@ -170,6 +186,7 @@ func run(*cobra.Command, []string) {
 			metrics.NewNoopCollector(),
 			nil,
 			backend.Config{},
+			false,
 			websockets.NewDefaultWebsocketConfig(),
 		)
 		if err != nil {
@@ -241,13 +258,13 @@ func (*api) Ping(_ context.Context) error {
 	return nil
 }
 
-func (a *api) GetNetworkParameters(_ context.Context) access.NetworkParameters {
-	return access.NetworkParameters{
+func (a *api) GetNetworkParameters(_ context.Context) accessmodel.NetworkParameters {
+	return accessmodel.NetworkParameters{
 		ChainID: a.chainID,
 	}
 }
 
-func (*api) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo, error) {
+func (*api) GetNodeVersionInfo(_ context.Context) (*accessmodel.NodeVersionInfo, error) {
 	return nil, errors.New("unimplemented")
 }
 
@@ -301,7 +318,7 @@ func (*api) GetTransactionResult(
 	_ flow.Identifier,
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	return nil, errors.New("unimplemented")
 }
 
@@ -310,7 +327,7 @@ func (*api) GetTransactionResultByIndex(
 	_ flow.Identifier,
 	_ uint32,
 	_ entities.EventEncodingVersion,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	return nil, errors.New("unimplemented")
 }
 
@@ -318,7 +335,7 @@ func (*api) GetTransactionResultsByBlockID(
 	_ context.Context,
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
-) ([]*access.TransactionResult, error) {
+) ([]*accessmodel.TransactionResult, error) {
 	return nil, errors.New("unimplemented")
 }
 
@@ -333,7 +350,7 @@ func (*api) GetSystemTransactionResult(
 	_ context.Context,
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	return nil, errors.New("unimplemented")
 }
 
@@ -532,35 +549,18 @@ func (*api) SubscribeBlockDigestsFromLatest(
 	return nil
 }
 
-func (a *api) SubscribeTransactionStatusesFromStartBlockID(
+func (a *api) SubscribeTransactionStatuses(
 	_ context.Context,
-	_ flow.Identifier,
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
 ) subscription.Subscription {
-	return nil
+	return subscription.NewFailedSubscription(ErrNotImplemented, "failed to call SubscribeTransactionStatuses")
 }
 
-func (a *api) SubscribeTransactionStatusesFromStartHeight(
-	_ context.Context,
-	_ flow.Identifier,
-	_ uint64,
-	_ entities.EventEncodingVersion,
-) subscription.Subscription {
-	return nil
-}
-
-func (a *api) SubscribeTransactionStatusesFromLatest(
-	_ context.Context,
-	_ flow.Identifier,
-	_ entities.EventEncodingVersion,
-) subscription.Subscription {
-	return nil
-}
 func (a *api) SendAndSubscribeTransactionStatuses(
 	_ context.Context,
 	_ *flow.TransactionBody,
 	_ entities.EventEncodingVersion,
 ) subscription.Subscription {
-	return nil
+	return subscription.NewFailedSubscription(ErrNotImplemented, "failed to call SendAndSubscribeTransactionStatuses")
 }

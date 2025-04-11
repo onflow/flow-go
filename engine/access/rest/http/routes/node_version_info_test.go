@@ -9,10 +9,10 @@ import (
 	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/rest/router"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -31,14 +31,14 @@ func TestGetNodeVersionInfo(t *testing.T) {
 
 		nodeRootBlockHeight := unittest.Uint64InRange(10_000, 100_000)
 
-		params := &access.NodeVersionInfo{
+		params := &accessmodel.NodeVersionInfo{
 			Semver:               build.Version(),
 			Commit:               build.Commit(),
 			SporkId:              unittest.IdentifierFixture(),
-			ProtocolVersion:      unittest.Uint64InRange(10, 30),
+			ProtocolStateVersion: unittest.Uint64InRange(10, 30),
 			SporkRootBlockHeight: unittest.Uint64InRange(1000, 10_000),
 			NodeRootBlockHeight:  nodeRootBlockHeight,
-			CompatibleRange: &access.CompatibleRange{
+			CompatibleRange: &accessmodel.CompatibleRange{
 				StartHeight: nodeRootBlockHeight,
 				EndHeight:   uint64(0),
 			},
@@ -55,7 +55,7 @@ func TestGetNodeVersionInfo(t *testing.T) {
 	})
 }
 
-func nodeVersionInfoExpectedStr(nodeVersionInfo *access.NodeVersionInfo) string {
+func nodeVersionInfoExpectedStr(nodeVersionInfo *accessmodel.NodeVersionInfo) string {
 	compatibleRange := fmt.Sprintf(`"compatible_range": {
 		"start_height": "%d",
 		"end_height": "%d"
@@ -68,6 +68,7 @@ func nodeVersionInfoExpectedStr(nodeVersionInfo *access.NodeVersionInfo) string 
 			"semver": "%s",
 			"commit": "%s",
 			"spork_id": "%s",
+           "protocol_state_version": "%d",
            "protocol_version": "%d",
            "spork_root_block_height": "%d",
            "node_root_block_height": "%d",
@@ -76,6 +77,7 @@ func nodeVersionInfoExpectedStr(nodeVersionInfo *access.NodeVersionInfo) string 
 		nodeVersionInfo.Semver,
 		nodeVersionInfo.Commit,
 		nodeVersionInfo.SporkId.String(),
+		nodeVersionInfo.ProtocolStateVersion,
 		nodeVersionInfo.ProtocolVersion,
 		nodeVersionInfo.SporkRootBlockHeight,
 		nodeVersionInfo.NodeRootBlockHeight,

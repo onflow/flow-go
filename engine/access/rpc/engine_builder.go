@@ -6,8 +6,8 @@ import (
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
+	"google.golang.org/grpc"
 
-	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/module"
@@ -69,22 +69,21 @@ func (builder *RPCEngineBuilder) WithRpcHandler(handler accessproto.AccessAPISer
 // Returns self-reference for chaining.
 func (builder *RPCEngineBuilder) WithLegacy() *RPCEngineBuilder {
 	// Register legacy gRPC handlers for backwards compatibility, to be removed at a later date
-	legacyaccessproto.RegisterAccessAPIServer(
-		builder.unsecureGrpcServer.Server,
-		legacyaccess.NewHandler(builder.backend, builder.chain),
-	)
-	legacyaccessproto.RegisterAccessAPIServer(
-		builder.secureGrpcServer.Server,
-		legacyaccess.NewHandler(builder.backend, builder.chain),
-	)
+	builder.unsecureGrpcServer.RegisterService(func(s *grpc.Server) {
+		legacyaccessproto.RegisterAccessAPIServer(s, legacyaccess.NewHandler(builder.backend, builder.chain))
+	})
+	builder.secureGrpcServer.RegisterService(func(s *grpc.Server) {
+		legacyaccessproto.RegisterAccessAPIServer(s, legacyaccess.NewHandler(builder.backend, builder.chain))
+	})
+
 	return builder
 }
 
-func (builder *RPCEngineBuilder) DefaultHandler(signerIndicesDecoder hotstuff.BlockSignerDecoder) *access.Handler {
+func (builder *RPCEngineBuilder) DefaultHandler(signerIndicesDecoder hotstuff.BlockSignerDecoder) *Handler {
 	if signerIndicesDecoder == nil {
-		return access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams, access.WithIndexReporter(builder.indexReporter))
+		return NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams, WithIndexReporter(builder.indexReporter))
 	} else {
-		return access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams, access.WithBlockSignerDecoder(signerIndicesDecoder), access.WithIndexReporter(builder.indexReporter))
+		return NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams, WithBlockSignerDecoder(signerIndicesDecoder), WithIndexReporter(builder.indexReporter))
 	}
 }
 
@@ -93,8 +92,12 @@ func (builder *RPCEngineBuilder) DefaultHandler(signerIndicesDecoder hotstuff.Bl
 func (builder *RPCEngineBuilder) WithMetrics() *RPCEngineBuilder {
 	// Not interested in legacy metrics, so initialize here
 	grpc_prometheus.EnableHandlingTimeHistogram()
-	grpc_prometheus.Register(builder.unsecureGrpcServer.Server)
-	grpc_prometheus.Register(builder.secureGrpcServer.Server)
+	builder.unsecureGrpcServer.RegisterService(func(s *grpc.Server) {
+		grpc_prometheus.Register(s)
+	})
+	builder.secureGrpcServer.RegisterService(func(s *grpc.Server) {
+		grpc_prometheus.Register(s)
+	})
 	return builder
 }
 
@@ -106,7 +109,11 @@ func (builder *RPCEngineBuilder) Build() (*Engine, error) {
 	if rpcHandler == nil {
 		rpcHandler = builder.DefaultHandler(builder.signerIndicesDecoder)
 	}
-	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer.Server, rpcHandler)
-	accessproto.RegisterAccessAPIServer(builder.secureGrpcServer.Server, rpcHandler)
+	builder.unsecureGrpcServer.RegisterService(func(s *grpc.Server) {
+		accessproto.RegisterAccessAPIServer(s, rpcHandler)
+	})
+	builder.secureGrpcServer.RegisterService(func(s *grpc.Server) {
+		accessproto.RegisterAccessAPIServer(s, rpcHandler)
+	})
 	return builder.Engine, nil
 }

@@ -7,7 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
-	"github.com/onflow/flow-go/engine/access/rest/http/models"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 )
 
@@ -15,14 +15,14 @@ const BlockQueryParam = "block_ids"
 const EventTypeQuery = "type"
 
 // GetEvents for the provided block range or list of block IDs filtered by type.
-func GetEvents(r *common.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
+func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (interface{}, error) {
 	req, err := request.GetEventsRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
 
 	// if the request has block IDs provided then return events for block IDs
-	var blocksEvents models.BlocksEvents
+	var blocksEvents commonmodels.BlocksEvents
 	if len(req.BlockIDs) > 0 {
 		events, err := backend.GetEventsForBlockIDs(
 			r.Context(),

@@ -196,7 +196,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_UpdateLockedOneChainView() {
 // TestProduceVote_InvalidCurrentView tests that no vote is created if `curView` has invalid values.
 // In particular, `SafetyRules` requires that:
 //   - the block's view matches `curView`
-//   - that values for `curView` are monotonously increasing
+//   - that values for `curView` are monotonicly increasing
 //
 // Failing any of these conditions is a symptom of an internal bug; hence `SafetyRules` should
 // _not_ return a `NoVoteError`.
@@ -208,7 +208,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_InvalidCurrentView() {
 		require.Error(s.T(), err)
 		require.False(s.T(), model.IsNoVoteError(err))
 	})
-	s.Run("view-not-monotonously-increasing", func() {
+	s.Run("view-not-monotonicly-increasing", func() {
 		// create block with view < HighestAcknowledgedView
 		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(
@@ -450,7 +450,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnInvalidProposals() {
 // TestProduceVote_VoteEquivocation tests scenario when we try to vote twice in same view. We require that replica
 // follows next rules:
 //   - replica votes once per view
-//   - replica votes in monotonously increasing views
+//   - replica votes in monotonicly increasing views
 //
 // Voting twice per round on equivocating proposals is considered a byzantine behavior.
 // Expect a `model.NoVoteError` sentinel in such scenario.

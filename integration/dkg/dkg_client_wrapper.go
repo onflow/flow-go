@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow-go/module"
+
 	"github.com/onflow/crypto"
 	"go.uber.org/atomic"
 
@@ -26,6 +28,8 @@ type DKGClientWrapper struct {
 	client  *dkgmod.Client
 	enabled *atomic.Bool
 }
+
+var _ module.DKGContractClient = (*DKGClientWrapper)(nil)
 
 // NewDKGClientWrapper instantiates a new DKGClientWrapper
 func NewDKGClientWrapper(client *dkgmod.Client) *DKGClientWrapper {
@@ -76,10 +80,18 @@ func (c *DKGClientWrapper) ReadBroadcast(fromIndex uint, referenceBlock flow.Ide
 	return c.client.ReadBroadcast(fromIndex, referenceBlock)
 }
 
-// SubmitResult implements the DKGContractClient interface
-func (c *DKGClientWrapper) SubmitResult(groupPubKey crypto.PublicKey, pubKeys []crypto.PublicKey) error {
+// SubmitParametersAndResult implements the DKGContractClient interface
+func (c *DKGClientWrapper) SubmitParametersAndResult(indexMap flow.DKGIndexMap, groupPubKey crypto.PublicKey, pubKeys []crypto.PublicKey) error {
 	if !c.enabled.Load() {
 		return fmt.Errorf("failed to submit DKG result: %w", errClientDisabled)
 	}
-	return c.client.SubmitResult(groupPubKey, pubKeys)
+	return c.client.SubmitParametersAndResult(indexMap, groupPubKey, pubKeys)
+}
+
+// SubmitEmptyResult implements the DKGContractClient interface
+func (c *DKGClientWrapper) SubmitEmptyResult() error {
+	if !c.enabled.Load() {
+		return fmt.Errorf("failed to submit empty DKG result: %w", errClientDisabled)
+	}
+	return c.client.SubmitEmptyResult()
 }

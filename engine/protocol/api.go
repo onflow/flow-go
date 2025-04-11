@@ -3,19 +3,19 @@ package protocol
 import (
 	"context"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
 type NetworkAPI interface {
-	GetNetworkParameters(ctx context.Context) access.NetworkParameters
+	GetNetworkParameters(ctx context.Context) accessmodel.NetworkParameters
 	GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, error)
 	GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error)
 	GetProtocolStateSnapshotByHeight(ctx context.Context, blockHeight uint64) ([]byte, error)
-	GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionInfo, error)
+	GetNodeVersionInfo(ctx context.Context) (*accessmodel.NodeVersionInfo, error)
 }
 
 type API interface {

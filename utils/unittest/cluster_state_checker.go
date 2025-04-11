@@ -63,7 +63,7 @@ func (checker *ClusterStateChecker) Assert(t *testing.T) {
 
 	// start at the state head
 	head, err := checker.state.Final().Head()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// track properties of the state we will later compare against expectations
 	var (
@@ -75,10 +75,10 @@ func (checker *ClusterStateChecker) Assert(t *testing.T) {
 	// walk the chain state from head to genesis
 	for head.Height > 0 {
 		collection, err := checker.state.AtBlockID(head.ID()).Collection()
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		head, err = checker.state.AtBlockID(head.ParentID).Head()
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		if collection.Len() == 0 {
 			continue

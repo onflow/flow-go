@@ -134,6 +134,39 @@ type ReaderBatchWriter interface {
 	AddCallback(func(error))
 }
 
+// DB is an interface for a database store that provides a reader and a writer.
+type DB interface {
+	// Reader returns a database-backed reader which reads the latest
+	// committed global database state
+	Reader() Reader
+
+	// WithReaderBatchWriter creates a batch writer and allows the caller to perform
+	// atomic batch updates to the database.
+	// Any error returned are considered fatal and the batch is not committed.
+	WithReaderBatchWriter(func(ReaderBatchWriter) error) error
+
+	// NewBatch create a new batch for writing.
+	NewBatch() Batch
+}
+
+// Batch is an interface for a batch of writes to a storage backend.
+// The batch is pending until it is committed.
+// Useful for dynamically adding writes to the batch
+type Batch interface {
+	ReaderBatchWriter
+
+	// Commit applies the batched updates to the database.
+	Commit() error
+}
+
+// OnlyWriter is an adapter to convert a function that takes a Writer
+// to a function that takes a ReaderBatchWriter.
+func OnlyWriter(fn func(Writer) error) func(ReaderBatchWriter) error {
+	return func(rw ReaderBatchWriter) error {
+		return fn(rw.Writer())
+	}
+}
+
 // OnCommitSucceed adds a callback to execute after the batch has been successfully committed.
 func OnCommitSucceed(b ReaderBatchWriter, onSuccessFn func()) {
 	b.AddCallback(func(err error) {

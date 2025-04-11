@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// TestCrashTest_ErrorMessage tests that CrashTest() can check a function that crashed without any messages.
+// TestCrashTest_NoMessage tests that CrashTest() can check a function that crashed without any messages.
 func TestCrashTest_NoMessage(t *testing.T) {
 	f := func(t *testing.T) {
 		crash_NoMessage()

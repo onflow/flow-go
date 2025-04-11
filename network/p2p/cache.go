@@ -18,8 +18,8 @@ type ProtocolPeerCache interface {
 	// RemoveProtocols removes the specified protocols for the given peer from the protocol cache.
 	RemoveProtocols(peerID peer.ID, protocols []protocol.ID)
 
-	// GetPeers returns a copy of the set of peers that support the given protocol.
-	GetPeers(pid protocol.ID) map[peer.ID]struct{}
+	// GetPeers returns the set of peers that support the given protocol.
+	GetPeers(pid protocol.ID) peer.IDSlice
 }
 
 // UpdateFunction is a function that adjusts the GossipSub spam record of a peer.

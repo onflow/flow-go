@@ -11,6 +11,7 @@ import (
 
 	"github.com/dustin/go-humanize/english"
 	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/interpreter"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -26,17 +27,18 @@ import (
 )
 
 var (
-	flagOutputDirectory  string
-	flagPayloads1        string
-	flagPayloads2        string
-	flagState1           string
-	flagState2           string
-	flagStateCommitment1 string
-	flagStateCommitment2 string
-	flagMode             string
-	flagAlwaysDiffValues bool
-	flagNWorker          int
-	flagChain            string
+	flagOutputDirectory            string
+	flagPayloads1                  string
+	flagPayloads2                  string
+	flagState1                     string
+	flagState2                     string
+	flagStateCommitment1           string
+	flagStateCommitment2           string
+	flagMode                       string
+	flagAlwaysDiffValues           bool
+	flagExcludeRandomBeaconHistory bool
+	flagNWorker                    int
+	flagChain                      string
 )
 
 var Cmd = &cobra.Command{
@@ -139,7 +141,19 @@ func init() {
 		"Chain name",
 	)
 	_ = Cmd.MarkFlagRequired("chain")
+
+	Cmd.Flags().BoolVar(
+		&flagExcludeRandomBeaconHistory,
+		"exclude-randombeaconhistory",
+		false,
+		"exclude random beacon history",
+	)
 }
+
+const (
+	randomBeaconHistoryDomain    = common.StorageDomainContract
+	randomBeaconHistoryDomainKey = interpreter.StringStorageMapKey("RandomBeaconHistory")
+)
 
 type mode uint8
 
@@ -189,6 +203,10 @@ func run(*cobra.Command, []string) {
 			"--mode must be one of %s",
 			english.OxfordWordSeries(modeNames, "or"),
 		)
+	}
+
+	if flagExcludeRandomBeaconHistory {
+		log.Info().Msg("--exclude-randombeaconhistory is set to exclude random beacon history")
 	}
 
 	var acctsToSkipForCadenceValueDiff []string
@@ -336,15 +354,8 @@ func diffAccount(
 	rw reporters.ReportWriter,
 	mode mode,
 	acctsToSkip []string,
+	isValueIncludedFunc migrations.IsValueIncludedFunc,
 ) (err error) {
-
-	if accountRegisters1.Count() != accountRegisters2.Count() {
-		rw.Write(countDiff{
-			Owner:  owner,
-			State1: accountRegisters1.Count(),
-			State2: accountRegisters2.Count(),
-		})
-	}
 
 	diffValues := flagAlwaysDiffValues
 
@@ -405,7 +416,8 @@ func diffAccount(
 		).DiffStates(
 			accountRegisters1,
 			accountRegisters2,
-			util.StorageMapDomains,
+			common.AllStorageDomains,
+			isValueIncludedFunc,
 		)
 	}
 
@@ -423,6 +435,8 @@ func diff(
 ) error {
 	log.Info().Msgf("Diffing %d accounts", registers1.AccountCount())
 
+	randomBeaconHistoryAddress := randomBeaconHistoryAddressForChain(chainID)
+
 	if registers1.AccountCount() < nWorkers {
 		nWorkers = registers1.AccountCount()
 	}
@@ -434,6 +448,11 @@ func diff(
 			registers1.AccountCount(),
 		),
 	)
+
+	isValueIncludedFunc := alwaysIncludeValue
+	if flagExcludeRandomBeaconHistory {
+		isValueIncludedFunc = excludeRandomBeaconHistory(randomBeaconHistoryAddress)
+	}
 
 	if nWorkers <= 1 {
 		foundAccountCountInRegisters2 := 0
@@ -462,6 +481,7 @@ func diff(
 				rw,
 				mode,
 				acctsToSkip,
+				isValueIncludedFunc,
 			)
 			if err != nil {
 				log.Warn().Err(err).Msgf("failed to diff account %x", []byte(owner))
@@ -517,6 +537,7 @@ func diff(
 					rw,
 					mode,
 					acctsToSkip,
+					isValueIncludedFunc,
 				)
 
 				select {
@@ -676,4 +697,46 @@ func (e countDiff) MarshalJSON() ([]byte, error) {
 		State1: e.State1,
 		State2: e.State2,
 	})
+}
+
+func isRandomBeaconHistory(randomBeaconHistoryAddress, address common.Address, domain common.StorageDomain, key any) bool {
+	if randomBeaconHistoryAddress.Compare(address) != 0 {
+		return false
+	}
+
+	if domain != randomBeaconHistoryDomain {
+		return false
+	}
+
+	switch key := key.(type) {
+	case interpreter.StringAtreeValue:
+		return interpreter.StringStorageMapKey(key) == randomBeaconHistoryDomainKey
+
+	case interpreter.StringStorageMapKey:
+		return key == randomBeaconHistoryDomainKey
+
+	default:
+		return false
+	}
+}
+
+func randomBeaconHistoryAddressForChain(chainID flow.ChainID) common.Address {
+	sc := systemcontracts.SystemContractsForChain(chainID)
+	return common.Address(sc.RandomBeaconHistory.Address)
+}
+
+func excludeRandomBeaconHistory(randomBeaconHistoryAddress common.Address) migrations.IsValueIncludedFunc {
+	return func(address common.Address, domain common.StorageDomain, key any) bool {
+		foundRandomBeaconHistory := isRandomBeaconHistory(randomBeaconHistoryAddress, address, domain, key)
+
+		if foundRandomBeaconHistory {
+			log.Info().Msgf("excluding random beacon history in account %s, domain %s, key %v", address, domain.Identifier(), key)
+		}
+
+		return !foundRandomBeaconHistory
+	}
+}
+
+func alwaysIncludeValue(common.Address, common.StorageDomain, any) bool {
+	return true
 }

@@ -20,17 +20,18 @@ import (
 	_ "google.golang.org/grpc/encoding/gzip" // required for gRPC compression
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/engine"
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" // required for gRPC compression
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  // required for gRPC compression
-	"github.com/onflow/flow-go/engine/common/rpc"
+
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	exeEng "github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/metrics"
 	"github.com/onflow/flow-go/engine/execution/state"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -60,10 +61,10 @@ func New(
 	scriptsExecutor exeEng.ScriptExecutor,
 	headers storage.Headers,
 	state protocol.State,
-	events storage.Events,
-	exeResults storage.ExecutionResults,
-	txResults storage.TransactionResults,
-	commits storage.Commits,
+	events storage.EventsReader,
+	exeResults storage.ExecutionResultsReader,
+	txResults storage.TransactionResultsReader,
+	commits storage.CommitsReader,
 	transactionMetrics metrics.TransactionExecutionMetricsProvider,
 	chainID flow.ChainID,
 	signerIndicesDecoder hotstuff.BlockSignerDecoder,
@@ -84,7 +85,7 @@ func New(
 
 	if len(apiRatelimits) > 0 {
 		// create a rate limit interceptor
-		rateLimitInterceptor := rpc.NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).UnaryServerInterceptor
+		rateLimitInterceptor := grpcserver.NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).UnaryServerInterceptor
 		// append the rate limit interceptor to the list of interceptors
 		interceptors = append(interceptors, rateLimitInterceptor)
 	}
@@ -165,11 +166,11 @@ type handler struct {
 	headers              storage.Headers
 	state                protocol.State
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
-	events               storage.Events
-	exeResults           storage.ExecutionResults
-	transactionResults   storage.TransactionResults
+	events               storage.EventsReader
+	exeResults           storage.ExecutionResultsReader
+	transactionResults   storage.TransactionResultsReader
 	log                  zerolog.Logger
-	commits              storage.Commits
+	commits              storage.CommitsReader
 	transactionMetrics   metrics.TransactionExecutionMetricsProvider
 	maxBlockRange        int
 }
@@ -463,7 +464,7 @@ func (h *handler) GetTransactionResultsByBlockID(
 
 	responseTxResults := make([]*execution.GetTransactionResultResponse, len(txResults))
 
-	eventsByTxIndex := make(map[uint32][]flow.Event, len(txResults)) //we will have at most as many buckets as tx results
+	eventsByTxIndex := make(map[uint32][]flow.Event, len(txResults)) // we will have at most as many buckets as tx results
 
 	// re-partition events by tx index
 	// it's not documented but events are stored indexed by (blockID, event.TransactionID, event.TransactionIndex, event.EventIndex)

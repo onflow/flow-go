@@ -109,7 +109,7 @@ func newFacadeEnvironment(
 
 		SystemContracts: systemContracts,
 		MinimumCadenceRequiredVersion: NewMinimumCadenceRequiredVersion(
-			txnState,
+			params.ExecutionVersionProvider,
 		),
 
 		UUIDGenerator: NewUUIDGenerator(
@@ -210,6 +210,7 @@ func NewTransactionEnvironment(
 		params.Chain.ServiceAddress(),
 	)
 	env.EventEmitter = NewEventEmitter(
+		env.Logger(),
 		tracer,
 		env.Meter,
 		params.Chain,

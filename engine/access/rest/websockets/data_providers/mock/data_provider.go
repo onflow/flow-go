@@ -3,7 +3,7 @@
 package mock
 
 import (
-	uuid "github.com/google/uuid"
+	models "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -12,26 +12,44 @@ type DataProvider struct {
 	mock.Mock
 }
 
+// Arguments provides a mock function with given fields:
+func (_m *DataProvider) Arguments() models.Arguments {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Arguments")
+	}
+
+	var r0 models.Arguments
+	if rf, ok := ret.Get(0).(func() models.Arguments); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(models.Arguments)
+		}
+	}
+
+	return r0
+}
+
 // Close provides a mock function with given fields:
 func (_m *DataProvider) Close() {
 	_m.Called()
 }
 
 // ID provides a mock function with given fields:
-func (_m *DataProvider) ID() uuid.UUID {
+func (_m *DataProvider) ID() string {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for ID")
 	}
 
-	var r0 uuid.UUID
-	if rf, ok := ret.Get(0).(func() uuid.UUID); ok {
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
 		r0 = rf()
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(uuid.UUID)
-		}
+		r0 = ret.Get(0).(string)
 	}
 
 	return r0

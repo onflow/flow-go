@@ -2,10 +2,6 @@ package subscription
 
 import (
 	"fmt"
-
-	"google.golang.org/grpc/codes"
-
-	"github.com/onflow/flow-go/engine/common/rpc"
 )
 
 // HandleSubscription is a generic handler for subscriptions to a specific type. It continuously listens to the subscription channel,
@@ -36,23 +32,6 @@ func HandleSubscription[T any](sub Subscription, handleResponse func(resp T) err
 			return err
 		}
 	}
-}
-
-// HandleRPCSubscription is a generic handler for subscriptions to a specific type for rpc calls.
-//
-// Parameters:
-// - sub: The subscription.
-// - handleResponse: The function responsible for handling the response of the subscribed type.
-//
-// Expected errors during normal operation:
-//   - codes.Internal: If the subscription encounters an error or gets an unexpected response.
-func HandleRPCSubscription[T any](sub Subscription, handleResponse func(resp T) error) error {
-	err := HandleSubscription(sub, handleResponse)
-	if err != nil {
-		return rpc.ConvertError(err, "handle subscription error", codes.Internal)
-	}
-
-	return nil
 }
 
 // HandleResponse processes a generic response of type and sends it to the provided channel.

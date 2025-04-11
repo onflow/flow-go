@@ -8,8 +8,7 @@ type ListSubscriptionsMessageRequest struct {
 // ListSubscriptionsMessageResponse is the structure used to respond to list_subscriptions requests.
 // It contains a list of active subscriptions for the current WebSocket connection.
 type ListSubscriptionsMessageResponse struct {
-	ClientMessageID string               `json:"message_id"`
-	Success         bool                 `json:"success"`
-	Error           ErrorMessage         `json:"error,omitempty"`
-	Subscriptions   []*SubscriptionEntry `json:"subscriptions,omitempty"`
+	// Subscription list might be empty in case of no active subscriptions
+	Subscriptions []*SubscriptionEntry `json:"subscriptions"`
+	Action        string               `json:"action"`
 }

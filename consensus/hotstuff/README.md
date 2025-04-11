@@ -173,7 +173,7 @@ The event handler is designed to be executed single-threaded.
     To separate general graph-theoretical concepts from the concrete blockchain application, `LevelledForest` refers to blocks as graph `vertices`
     and to a block's view number as `level`.
 * `Validator` validates the HotStuff-relevant aspects of
-   - QC: total weight of all signers is more than 2/3 of committee weight, validity of signatures, view number is strictly monotonously increasing;
+   - QC: total weight of all signers is more than 2/3 of committee weight, validity of signatures, view number is strictly monotonicly increasing;
    - TC: total weight of all signers is more than 2/3 of committee weight, validity of signatures, proof for entering view;
    - block proposal: from designated primary for the block's respective view, contains proposer's vote for its own block, QC in block is valid,
      a valid TC for the previous view is included if and only if the QC is not for the previous view;

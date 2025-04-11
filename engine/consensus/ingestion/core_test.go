@@ -44,7 +44,7 @@ type IngestionCoreSuite struct {
 	ref   *mockprotocol.Snapshot // state snapshot w.r.t. reference block
 
 	query   *mockprotocol.EpochQuery
-	epoch   *mockprotocol.Epoch
+	epoch   *mockprotocol.CommittedEpoch
 	headers *mockstorage.Headers
 	pool    *mockmempool.Guarantees
 
@@ -82,7 +82,7 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	final := &mockprotocol.Snapshot{}
 	ref := &mockprotocol.Snapshot{}
 	suite.query = &mockprotocol.EpochQuery{}
-	suite.epoch = &mockprotocol.Epoch{}
+	suite.epoch = &mockprotocol.CommittedEpoch{}
 	headers := &mockstorage.Headers{}
 	pool := &mockmempool.Guarantees{}
 	cluster := &mockprotocol.Cluster{}
@@ -112,7 +112,7 @@ func (suite *IngestionCoreSuite) SetupTest() {
 		nil,
 	)
 	ref.On("Epochs").Return(suite.query)
-	suite.query.On("Current").Return(suite.epoch)
+	suite.query.On("Current").Return(suite.epoch, nil)
 	cluster.On("Members").Return(suite.clusterMembers.ToSkeleton())
 	suite.epoch.On("ClusterByChainID", mock.Anything).Return(
 		func(chainID flow.ChainID) protocol.Cluster {

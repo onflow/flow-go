@@ -16,17 +16,16 @@ import (
 
 // ExecutionReceipts implements storage for execution receipts.
 type ExecutionReceipts struct {
-	db      *badger.DB
-	results *ExecutionResults
-	cache   *Cache[flow.Identifier, *flow.ExecutionReceipt]
+	db    *badger.DB
+	cache *Cache[flow.Identifier, *flow.ExecutionReceipt]
 }
+
+var _ storage.ExecutionReceipts = (*ExecutionReceipts)(nil)
 
 // NewExecutionReceipts Creates ExecutionReceipts instance which is a database of receipts which
 // supports storing and indexing receipts by receipt ID and block ID.
 func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results *ExecutionResults, cacheSize uint) *ExecutionReceipts {
-	store := func(receiptTD flow.Identifier, receipt *flow.ExecutionReceipt) func(*transaction.Tx) error {
-		receiptID := receipt.ID()
-
+	store := func(receiptID flow.Identifier, receipt *flow.ExecutionReceipt) func(*transaction.Tx) error {
 		// assemble DB operations to store result (no execution)
 		storeResultOps := results.store(&receipt.ExecutionResult)
 		// assemble DB operations to index receipt (no execution)
@@ -69,9 +68,8 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results 
 	}
 
 	return &ExecutionReceipts{
-		db:      db,
-		results: results,
-		cache: newCache[flow.Identifier, *flow.ExecutionReceipt](collector, metrics.ResourceReceipt,
+		db: db,
+		cache: newCache(collector, metrics.ResourceReceipt,
 			withLimit[flow.Identifier, *flow.ExecutionReceipt](cacheSize),
 			withStore(store),
 			withRetrieve(retrieve)),
@@ -118,25 +116,8 @@ func (r *ExecutionReceipts) Store(receipt *flow.ExecutionReceipt) error {
 	return operation.RetryOnConflictTx(r.db, transaction.Update, r.storeTx(receipt))
 }
 
-func (r *ExecutionReceipts) BatchStore(receipt *flow.ExecutionReceipt, batch storage.BatchStorage) error {
-	writeBatch := batch.GetWriter()
-
-	err := r.results.BatchStore(&receipt.ExecutionResult, batch)
-	if err != nil {
-		return fmt.Errorf("cannot batch store execution result inside execution receipt batch store: %w", err)
-	}
-
-	err = operation.BatchInsertExecutionReceiptMeta(receipt.ID(), receipt.Meta())(writeBatch)
-	if err != nil {
-		return fmt.Errorf("cannot batch store execution meta inside execution receipt batch store: %w", err)
-	}
-
-	err = operation.BatchIndexExecutionReceipts(receipt.ExecutionResult.BlockID, receipt.ID())(writeBatch)
-	if err != nil {
-		return fmt.Errorf("cannot batch index execution receipt inside execution receipt batch store: %w", err)
-	}
-
-	return nil
+func (r *ExecutionReceipts) BatchStore(receipt *flow.ExecutionReceipt, batch storage.ReaderBatchWriter) error {
+	return fmt.Errorf("not implemented")
 }
 
 func (r *ExecutionReceipts) ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error) {

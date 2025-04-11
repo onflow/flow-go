@@ -37,7 +37,7 @@ func TestInogestionCoreExecuteBlock(t *testing.T) {
 
 	// start the core
 	ctx, cancel := context.WithCancel(context.Background())
-	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	core.Start(irrecoverableCtx)
 	<-core.Ready()
 	defer func() {

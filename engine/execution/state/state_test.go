@@ -1,7 +1,6 @@
 package state_test
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -40,7 +40,6 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger,
 			stateCommitments := storage.NewCommits(t)
 			headers := storage.NewHeaders(t)
 			blocks := storage.NewBlocks(t)
-			collections := storage.NewCollections(t)
 			events := storage.NewEvents(t)
 			serviceEvents := storage.NewServiceEvents(t)
 			txResults := storage.NewTransactionResults(t)
@@ -48,8 +47,13 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger,
 			results := storage.NewExecutionResults(t)
 			myReceipts := storage.NewMyExecutionReceipts(t)
 
+			getLatestFinalized := func() (uint64, error) {
+				return 0, nil
+			}
+
+			db := badgerimpl.ToDB(badgerDB)
 			es := state.NewExecutionState(
-				ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, badgerDB, trace.NewNoopTracer(),
+				ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, db, getLatestFinalized, trace.NewNoopTracer(),
 				nil,
 				false,
 			)
@@ -275,16 +279,14 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		unknown := unittest.BlockHeaderFixture()
 		headers.On("ByBlockID", unknown.ID()).Return(nil, fmt.Errorf("unknown: %w", storageerr.ErrNotFound))
 		_, _, err = es.CreateStorageSnapshot(unknown.ID())
-		require.Error(t, err)
-		require.True(t, errors.Is(err, storageerr.ErrNotFound))
+		require.ErrorIs(t, err, storageerr.ErrNotFound)
 
 		// test CreateStorageSnapshot for known and unexecuted block
 		unexecuted := unittest.BlockHeaderFixture()
 		headers.On("ByBlockID", unexecuted.ID()).Return(unexecuted, nil)
 		stateCommitments.On("ByBlockID", unexecuted.ID()).Return(nil, fmt.Errorf("not found: %w", storageerr.ErrNotFound))
 		_, _, err = es.CreateStorageSnapshot(unexecuted.ID())
-		require.Error(t, err)
-		require.True(t, errors.Is(err, state.ErrNotExecuted))
+		require.ErrorIs(t, err, state.ErrNotExecuted)
 
 		// test CreateStorageSnapshot for pruned block
 		pruned := unittest.BlockHeaderFixture()
@@ -292,8 +294,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		headers.On("ByBlockID", pruned.ID()).Return(pruned, nil)
 		stateCommitments.On("ByBlockID", pruned.ID()).Return(prunedState, nil)
 		_, _, err = es.CreateStorageSnapshot(pruned.ID())
-		require.Error(t, err)
-		require.True(t, errors.Is(err, state.ErrExecutionStatePruned))
+		require.ErrorIs(t, err, state.ErrExecutionStatePruned)
 	}))
 
 }

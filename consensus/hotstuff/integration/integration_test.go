@@ -32,7 +32,7 @@ func TestSingleInstance(t *testing.T) {
 	)
 
 	// run the event handler until we reach a stop condition
-	err := in.Run()
+	err := in.Run(t)
 	require.ErrorIs(t, err, errStopCondition, "should run until stop condition")
 
 	// check if forks and pacemaker are in expected view state
@@ -78,7 +78,7 @@ func TestThreeInstances(t *testing.T) {
 	for _, in := range instances {
 		wg.Add(1)
 		go func(in *Instance) {
-			err := in.Run()
+			err := in.Run(t)
 			require.True(t, errors.Is(err, errStopCondition), "should run until stop condition")
 			wg.Done()
 		}(in)
@@ -151,7 +151,7 @@ func TestSevenInstances(t *testing.T) {
 	for _, in := range instances {
 		wg.Add(1)
 		go func(in *Instance) {
-			err := in.Run()
+			err := in.Run(t)
 			require.True(t, errors.Is(err, errStopCondition), "should run until stop condition")
 			wg.Done()
 		}(in)

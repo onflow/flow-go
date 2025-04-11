@@ -163,11 +163,11 @@ func SetupFeesTransaction(
 
 // SetExecutionEffortWeightsTransaction creates a transaction that sets up weights for the weighted Meter.
 func SetExecutionEffortWeightsTransaction(
-	service flow.Address,
+	parametersAccount flow.Address,
 	weights map[uint]uint64,
 ) (*flow.TransactionBody, error) {
 	return setExecutionWeightsTransaction(
-		service,
+		parametersAccount,
 		weights,
 		TransactionFeesExecutionEffortWeightsPath,
 	)
@@ -175,18 +175,18 @@ func SetExecutionEffortWeightsTransaction(
 
 // SetExecutionMemoryWeightsTransaction creates a transaction that sets up weights for the weighted Meter.
 func SetExecutionMemoryWeightsTransaction(
-	service flow.Address,
+	parametersAccount flow.Address,
 	weights map[uint]uint64,
 ) (*flow.TransactionBody, error) {
 	return setExecutionWeightsTransaction(
-		service,
+		parametersAccount,
 		weights,
 		TransactionFeesExecutionMemoryWeightsPath,
 	)
 }
 
 func setExecutionWeightsTransaction(
-	service flow.Address,
+	parametersAccount flow.Address,
 	weights map[uint]uint64,
 	path cadence.Path,
 ) (*flow.TransactionBody, error) {
@@ -213,7 +213,7 @@ func setExecutionWeightsTransaction(
 		SetScript([]byte(setExecutionWeightsScript)).
 		AddArgument(newWeights).
 		AddArgument(storagePath).
-		AddAuthorizer(service)
+		AddAuthorizer(parametersAccount)
 
 	return tx, nil
 }
@@ -222,7 +222,7 @@ func setExecutionWeightsTransaction(
 var setExecutionWeightsScript string
 
 func SetExecutionMemoryLimitTransaction(
-	service flow.Address,
+	parametersAccount flow.Address,
 	limit uint64,
 ) (*flow.TransactionBody, error) {
 	newLimit, err := jsoncdc.Encode(cadence.UInt64(limit))
@@ -239,7 +239,7 @@ func SetExecutionMemoryLimitTransaction(
 		SetScript([]byte(setExecutionMemoryLimit)).
 		AddArgument(newLimit).
 		AddArgument(storagePath).
-		AddAuthorizer(service)
+		AddAuthorizer(parametersAccount)
 
 	return tx, nil
 }

@@ -11,8 +11,8 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common/middleware"
+	"github.com/onflow/flow-go/engine/access/rest/common/models"
 	flowhttp "github.com/onflow/flow-go/engine/access/rest/http"
-	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	legacyws "github.com/onflow/flow-go/engine/access/rest/websockets/legacy"
@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 // RouterBuilder is a utility for building HTTP routers with common middleware and routes.
@@ -27,6 +28,8 @@ type RouterBuilder struct {
 	logger      zerolog.Logger
 	router      *mux.Router
 	v1SubRouter *mux.Router
+
+	LinkGenerator models.LinkGenerator
 }
 
 // NewRouterBuilder creates a new RouterBuilder instance with common middleware and a v1 sub-router.
@@ -43,9 +46,10 @@ func NewRouterBuilder(
 	v1SubRouter.Use(middleware.MetricsMiddleware(restCollector))
 
 	return &RouterBuilder{
-		logger:      logger,
-		router:      router,
-		v1SubRouter: v1SubRouter,
+		logger:        logger,
+		router:        router,
+		v1SubRouter:   v1SubRouter,
+		LinkGenerator: models.NewLinkGeneratorImpl(v1SubRouter),
 	}
 }
 
@@ -55,9 +59,8 @@ func (b *RouterBuilder) AddRestRoutes(
 	chain flow.Chain,
 	maxRequestSize int64,
 ) *RouterBuilder {
-	linkGenerator := models.NewLinkGeneratorImpl(b.v1SubRouter)
 	for _, r := range Routes {
-		h := flowhttp.NewHandler(b.logger, backend, r.Handler, linkGenerator, chain, maxRequestSize)
+		h := flowhttp.NewHandler(b.logger, backend, r.Handler, b.LinkGenerator, chain, maxRequestSize)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
@@ -68,6 +71,9 @@ func (b *RouterBuilder) AddRestRoutes(
 }
 
 // AddLegacyWebsocketsRoutes adds WebSocket routes to the router.
+//
+// Deprecated: Use AddWebsocketsRoute instead, which allows managing multiple streams with
+// a single endpoint.
 func (b *RouterBuilder) AddLegacyWebsocketsRoutes(
 	stateStreamApi state_stream.API,
 	chain flow.Chain,
@@ -88,12 +94,13 @@ func (b *RouterBuilder) AddLegacyWebsocketsRoutes(
 }
 
 func (b *RouterBuilder) AddWebsocketsRoute(
+	ctx irrecoverable.SignalerContext,
 	chain flow.Chain,
 	config websockets.Config,
 	maxRequestSize int64,
 	dataProviderFactory dp.DataProviderFactory,
 ) *RouterBuilder {
-	handler := websockets.NewWebSocketHandler(b.logger, config, chain, maxRequestSize, dataProviderFactory)
+	handler := websockets.NewWebSocketHandler(ctx, b.logger, config, chain, maxRequestSize, dataProviderFactory)
 	b.v1SubRouter.
 		Methods(http.MethodGet).
 		Path("/ws").

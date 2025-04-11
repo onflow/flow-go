@@ -43,6 +43,8 @@ on:
         type: boolean
         description: 'Build amd64 `without_adx` and `without_netgo_without_adx` images, and arm64 images'
         required: false
+env:
+  GO_VERSION: "1.23"
 
 jobs:
   # matrix_builder generates a matrix that includes the roles selected in the input
@@ -92,12 +94,12 @@ jobs:
 
     steps:
     - name: Setup Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
-        go-version: '1.19'
+        go-version: ${{ env.GO_VERSION }}
 
     - name: Checkout repo
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         ref: ${{ inputs.tag }}
 

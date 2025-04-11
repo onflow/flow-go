@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/onflow/cadence/interpreter"
 	"golang.org/x/exp/maps"
 
 	"github.com/onflow/atree"
@@ -13,7 +14,6 @@ import (
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -70,16 +70,35 @@ func checkCadenceAtreeRegistersInEVMAccount(
 ) []accountStorageIssue {
 	var issues []accountStorageIssue
 
-	storage := runtime.NewStorage(ledger, nil)
+	storage := runtime.NewStorage(ledger, nil, runtime.StorageConfig{StorageFormatV2Enabled: true})
+
+	inter, err := interpreter.NewInterpreter(
+		nil,
+		nil,
+		&interpreter.Config{
+			Storage: storage,
+		},
+	)
+	if err != nil {
+		issues = append(
+			issues,
+			accountStorageIssue{
+				Address: address.Hex(),
+				Kind:    storageErrorKindString[otherErrorKind],
+				Msg:     fmt.Sprintf("failed to create interpreter for cadence registers: %s", err),
+			},
+		)
+		return issues
+	}
 
 	// Load Cadence domains storage map, so atree slab iterator can traverse connected slabs from loaded root slab.
 	// NOTE: don't preload all atree slabs in evm account because evm-atree registers require evm-atree decoder.
 
-	for _, domain := range util.StorageMapDomains {
-		_ = storage.GetStorageMap(address, domain, false)
+	for _, domain := range common.AllStorageDomains {
+		_ = storage.GetDomainStorageMap(inter, address, domain, false)
 	}
 
-	err := storage.CheckHealth()
+	err = storage.CheckHealth()
 	if err != nil {
 		issues = append(
 			issues,

@@ -165,9 +165,10 @@ func ValidateResult(
 		return fmt.Errorf("gas consumption mismatch %d != %d", res.GasConsumed, txEvent.GasConsumed)
 	}
 
-	// check error msg
-	if errMsg := res.ErrorMsg(); errMsg != txEvent.ErrorMessage {
-		return fmt.Errorf("error msg mismatch %s != %s", errMsg, txEvent.ErrorMessage)
+	// check error code
+	txEventErrorCode := types.ErrorCode(txEvent.ErrorCode)
+	if errorCode := res.ResultSummary().ErrorCode; errorCode != txEventErrorCode {
+		return fmt.Errorf("error code mismatch %d != %d", errorCode, txEventErrorCode)
 	}
 
 	// check encoded logs

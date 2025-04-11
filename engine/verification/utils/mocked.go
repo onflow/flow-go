@@ -23,12 +23,15 @@ func (m *MockAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identif
 	if len(result.Chunks) == 0 {
 		return nil, fmt.Errorf("assigner called with empty chunk list")
 	}
-	a := chmodel.NewAssignment()
+	a := chmodel.NewAssignmentBuilder()
 	for _, c := range result.Chunks {
 		if m.isAssigned(c.Index) {
-			a.Add(c, flow.IdentifierList{m.me})
+			err := a.Add(c.Index, flow.IdentifierList{m.me})
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	return a, nil
+	return a.Build(), nil
 }

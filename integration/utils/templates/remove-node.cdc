@@ -1,4 +1,4 @@
-import FlowIDTableStaking from "FlowIDTableStaking"
+import "FlowIDTableStaking"
 
 // This transaction removes an existing node from the identity table
 // by unstaking it and removing it from the approved list

@@ -15,7 +15,7 @@ type ChunkDataPacks struct {
 }
 
 // BatchRemove provides a mock function with given fields: chunkID, batch
-func (_m *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, batch storage.BatchStorage) error {
+func (_m *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, batch storage.ReaderBatchWriter) error {
 	ret := _m.Called(chunkID, batch)
 
 	if len(ret) == 0 {
@@ -23,7 +23,7 @@ func (_m *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, batch storage.Bat
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.ReaderBatchWriter) error); ok {
 		r0 = rf(chunkID, batch)
 	} else {
 		r0 = ret.Error(0)

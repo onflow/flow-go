@@ -3,8 +3,51 @@ package environment
 import (
 	"github.com/coreos/go-semver/semver"
 
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/model/flow"
 )
+
+type ExecutionVersionProvider interface {
+	ExecutionVersion() (semver.Version, error)
+}
+
+type GetVersionBeaconFunc func() (*flow.SealedVersionBeacon, error)
+
+type VersionBeaconExecutionVersionProvider struct {
+	getVersionBeacon GetVersionBeaconFunc
+}
+
+func NewVersionBeaconExecutionVersionProvider(getVersionBeacon GetVersionBeaconFunc) VersionBeaconExecutionVersionProvider {
+	return VersionBeaconExecutionVersionProvider{
+		getVersionBeacon: getVersionBeacon,
+	}
+}
+
+func (v VersionBeaconExecutionVersionProvider) ExecutionVersion() (semver.Version, error) {
+	vb, err := v.getVersionBeacon()
+	if err != nil {
+		return semver.Version{}, err
+	}
+	// Special case. If there are no version boundaries, then the execution version is 0.0.0.
+	if vb == nil || len(vb.VersionBoundaries) == 0 {
+		return semver.Version{}, nil
+	}
+
+	// by definition zero boundary is the last most recent past boundary
+	boundary := vb.VersionBoundaries[0]
+	sv, err := boundary.Semver()
+	if err != nil {
+		return semver.Version{}, err
+	}
+
+	return *sv, nil
+}
+
+type ZeroExecutionVersionProvider struct{}
+
+func (v ZeroExecutionVersionProvider) ExecutionVersion() (semver.Version, error) {
+	return semver.Version{}, nil
+}
 
 // MinimumCadenceRequiredVersion returns the minimum required cadence version for the current environment
 // in semver format.
@@ -13,14 +56,14 @@ type MinimumCadenceRequiredVersion interface {
 }
 
 type minimumCadenceRequiredVersion struct {
-	txnPreparer state.NestedTransactionPreparer
+	executionVersionProvider ExecutionVersionProvider
 }
 
 func NewMinimumCadenceRequiredVersion(
-	txnPreparer state.NestedTransactionPreparer,
+	executionVersionProvider ExecutionVersionProvider,
 ) MinimumCadenceRequiredVersion {
 	return minimumCadenceRequiredVersion{
-		txnPreparer: txnPreparer,
+		executionVersionProvider: executionVersionProvider,
 	}
 }
 
@@ -43,7 +86,7 @@ func NewMinimumCadenceRequiredVersion(
 // and map it to the cadence version to be used by cadence to decide feature flag status.
 //
 // For instance, let’s say all ENs are running flow-go v0.37.0 with cadence v1.
-// We first create a version mapping entry for flow-go v0.37.1 to cadence v2, and roll out v0.37.1 to all ENs.
+// We first create a version mapping entry for flow-go v0.37.1 to cadence v2, and roll out v0.37.1 to all ENs.Z
 // v0.37.1 ENs will produce the same result as v0.37.0 ENs, because the current version beacon still returns v0.37.0,
 // which maps zero cadence version, and cadence will keep the feature flag off.
 //
@@ -57,10 +100,13 @@ func NewMinimumCadenceRequiredVersion(
 // After height 1000 have been sealed, we can roll out v0.37.2 to all ENs with cadence v3, and it will produce the consistent
 // result as v0.37.1.
 func (c minimumCadenceRequiredVersion) MinimumRequiredVersion() (string, error) {
-	executionParameters := c.txnPreparer.ExecutionParameters()
+	executionVersion, err := c.executionVersionProvider.ExecutionVersion()
+	if err != nil {
+		return "", errors.NewExecutionVersionProviderFailure(err)
+	}
 
 	// map the minimum required flow-go version to a minimum required cadence version
-	cadenceVersion := mapToCadenceVersion(executionParameters.ExecutionVersion, minimumFvmToMinimumCadenceVersionMapping)
+	cadenceVersion := mapToCadenceVersion(executionVersion, minimumFvmToMinimumCadenceVersionMapping)
 
 	return cadenceVersion.String(), nil
 }
@@ -92,7 +138,7 @@ var minimumFvmToMinimumCadenceVersionMapping = FlowGoToCadenceVersionMapping{
 	//
 }
 
-func SetFVMToCadenceVersionMappingForTestingOnly(mapping FlowGoToCadenceVersionMapping) {
+func setFVMToCadenceVersionMappingForTestingOnly(mapping FlowGoToCadenceVersionMapping) {
 	minimumFvmToMinimumCadenceVersionMapping = mapping
 }
 

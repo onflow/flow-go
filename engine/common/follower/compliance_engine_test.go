@@ -73,7 +73,7 @@ func (s *EngineSuite) SetupTest() {
 		s.finalized,
 		s.core,
 		compliance.DefaultConfig())
-	require.Nil(s.T(), err)
+	require.NoError(s.T(), err)
 
 	s.engine = eng
 

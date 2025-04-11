@@ -13,12 +13,15 @@ import (
 type ClusterRootQCVoter interface {
 
 	// Vote handles the full procedure of generating a vote, submitting it to the epoch
-	// smart contract, and verifying submission. It is safe to run Vote multiple
-	// times within a single setup phase.
+	// smart contract, and verifying submission. This logic should run as part of the Epoch
+	// Setup Phase, i.e. at a time when the next epoch has not yet been committed. Hence,
+	// this function takes the [protocol.TentativeEpoch] information as input.
+	// It is safe to run `Vote` multiple times within a single Epoch Setup Phase.
+	// CAUTION: epoch transition might not happen as described by [protocol.TentativeEpoch].
 	// Error returns:
 	//   - epochs.ClusterQCNoVoteError if we fail to vote for a benign reason
 	//   - generic error in case of critical unexpected failure
-	Vote(context.Context, protocol.Epoch) error
+	Vote(context.Context, protocol.TentativeEpoch) error
 }
 
 // QCContractClient enables interacting with the cluster QC aggregator smart
@@ -46,6 +49,7 @@ type QCContractClient interface {
 }
 
 // EpochLookup enables looking up epochs by view.
+// Only Epochs that are fully committed can be retrieved.
 // CAUTION: EpochLookup should only be used for querying the previous, current, or next epoch.
 type EpochLookup interface {
 

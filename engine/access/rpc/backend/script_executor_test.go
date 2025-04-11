@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
-	"github.com/onflow/flow-go/engine/execution/computation/query/mock"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/derived"
@@ -109,12 +108,7 @@ func (s *ScriptExecutorSuite) SetupTest() {
 	s.headers = newBlockHeadersStorage(blockchain)
 	s.height = blockchain[0].Header.Height
 
-	entropyProvider := testutil.EntropyProviderFixture(nil)
-	entropyBlock := mock.NewEntropyProviderPerBlock(s.T())
-	entropyBlock.
-		On("AtBlockID", testifyMock.AnythingOfType("flow.Identifier")).
-		Return(entropyProvider).
-		Maybe()
+	protocolState := testutil.ProtocolStateWithSourceFixture(nil)
 
 	s.snapshot = snapshot.NewSnapshotTree(nil)
 	s.vm = fvm.NewVirtualMachine()
@@ -153,7 +147,7 @@ func (s *ScriptExecutorSuite) SetupTest() {
 		s.log,
 		metrics.NewNoopCollector(),
 		s.chain.ChainID(),
-		entropyBlock,
+		protocolState,
 		s.headers,
 		indexerCore.RegisterValue,
 		query.NewDefaultConfig(),

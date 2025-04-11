@@ -106,6 +106,17 @@ func NewRandomSourceFailure(
 		"implementation error in random source provider")
 }
 
+// NewExecutionVersionProviderFailure indicates a irrecoverable failure in the execution
+// version provider.
+func NewExecutionVersionProviderFailure(
+	err error,
+) CodedFailure {
+	return WrapCodedFailure(
+		FailureCodeExecutionVersionProvider,
+		err,
+		"Failure in execution version provider")
+}
+
 // NewComputationLimitExceededError constructs a new CodedError which indicates
 // that computation has exceeded its limit.
 func NewComputationLimitExceededError(limit uint64) CodedError {

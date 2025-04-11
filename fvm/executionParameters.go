@@ -5,10 +5,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/coreos/go-semver/semver"
 	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow-go/model/convert"
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 
@@ -22,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 )
 
 func ProcedureStateParameters(
@@ -73,8 +71,7 @@ func getExecutionParameters(
 		NewExecutionParametersComputer(log, ctx, txnState))
 	if err != nil {
 		return state.ExecutionParameters{
-			MeterParameters:  meterParams,
-			ExecutionVersion: semver.Version{},
+			MeterParameters: meterParams,
 		}, nil, err
 	}
 
@@ -99,8 +96,7 @@ func getExecutionParameters(
 	}
 
 	return state.ExecutionParameters{
-		MeterParameters:  meterParams,
-		ExecutionVersion: executionParams.ExecutionVersion,
+		MeterParameters: meterParams,
 	}, executionParamsStateRead, nil
 }
 
@@ -148,10 +144,14 @@ func (computer ExecutionParametersComputer) getExecutionParameters() (
 	derived.StateExecutionParameters,
 	error,
 ) {
-	// Check that the service account exists because all the settings are
-	// stored in it
-	serviceAddress := computer.ctx.Chain.ServiceAddress()
-	service := common.Address(serviceAddress)
+	sc := systemcontracts.SystemContractsForChain(computer.ctx.Chain.ChainID())
+
+	// The execution parameters are stored in the ExecutionParametersAccount. This is
+	// just the service account for all networks except mainnet and testnet.
+	// For mainnet and testnet, the execution parameters are stored in a separate
+	// account, so that they are separated from the frequently changing data on the
+	// service account.
+	service := common.Address(sc.ExecutionParametersAccount.Address)
 
 	env := environment.NewScriptEnv(
 		context.Background(),
@@ -212,15 +212,6 @@ func (computer ExecutionParametersComputer) getExecutionParameters() (
 		"execution memory limit",
 		err,
 		func() { overrides.MemoryLimit = &memoryLimit })
-	if err != nil {
-		return overrides, err
-	}
-
-	executionVersion, err := GetMinimumRequiredExecutionVersion(computer.log, computer.ctx, env)
-	err = setIfOk(
-		"execution version",
-		err,
-		func() { overrides.ExecutionVersion = executionVersion })
 	if err != nil {
 		return overrides, err
 	}
@@ -356,41 +347,4 @@ func GetExecutionMemoryLimit(
 	}
 
 	return uint64(memoryLimitRaw), nil
-}
-
-func GetMinimumRequiredExecutionVersion(
-	log zerolog.Logger,
-	ctx Context,
-	env environment.Environment,
-) (semver.Version, error) {
-	if !ctx.ReadVersionFromNodeVersionBeacon {
-		return semver.Version{}, nil
-	}
-
-	// the current version boundary defines a block height and a minimum required version that is required past that block height.
-	value, err := env.GetCurrentVersionBoundary()
-
-	if err != nil {
-		return semver.Version{}, fmt.Errorf("could not get current version boundary: %w", err)
-	}
-
-	boundary, err := convert.VersionBoundary(value)
-
-	if err != nil {
-		return semver.Version{}, fmt.Errorf("could not parse current version boundary: %w", err)
-	}
-
-	semVer, err := semver.NewVersion(boundary.Version)
-	if err != nil {
-		// This could be problematic, if the version is not a valid semver version. The NodeVersionBeacon should prevent
-		// this, but it could have bugs.
-		// Erroring here gives us no way to recover as no transactions would work anymore,
-		// instead return the version as 0.0.0 and log the error, allowing us to recover.
-		// this would mean that any if-statements that were relying on a higher version would fail,
-		// but that is preferable to all transactions halting.
-		log.Error().Err(err).Msg("could not parse version boundary. Version boundary as defined in the NodeVersionBeacon contract is not a valid semver version!")
-		return semver.Version{}, nil
-	}
-
-	return *semVer, nil
 }

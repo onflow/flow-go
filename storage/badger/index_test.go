@@ -1,7 +1,6 @@
 package badger_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -24,7 +23,7 @@ func TestIndexStoreRetrieve(t *testing.T) {
 
 		// retreive without store
 		_, err := store.ByBlockID(blockID)
-		require.True(t, errors.Is(err, storage.ErrNotFound))
+		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// store index
 		err = store.Store(blockID, expected)

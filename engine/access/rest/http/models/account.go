@@ -1,6 +1,7 @@
 package models
 
 import (
+	"github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -8,7 +9,7 @@ import (
 const expandableKeys = "keys"
 const expandableContracts = "contracts"
 
-func (a *Account) Build(flowAccount *flow.Account, link LinkGenerator, expand map[string]bool) error {
+func (a *Account) Build(flowAccount *flow.Account, link models.LinkGenerator, expand map[string]bool) error {
 	a.Address = flowAccount.Address.String()
 	a.Balance = util.FromUint(flowAccount.Balance)
 	a.Expandable = &AccountExpandable{}
@@ -31,7 +32,7 @@ func (a *Account) Build(flowAccount *flow.Account, link LinkGenerator, expand ma
 		a.Expandable.Contracts = expandableContracts
 	}
 
-	var self Links
+	var self models.Links
 	err := self.Build(link.AccountLink(a.Address))
 	if err != nil {
 		return err

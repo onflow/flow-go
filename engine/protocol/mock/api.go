@@ -5,7 +5,7 @@ package mock
 import (
 	context "context"
 
-	access "github.com/onflow/flow-go/access"
+	access "github.com/onflow/flow-go/model/access"
 
 	flow "github.com/onflow/flow-go/model/flow"
 

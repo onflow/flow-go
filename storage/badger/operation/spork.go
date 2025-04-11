@@ -29,31 +29,3 @@ func InsertSporkRootBlockHeight(height uint64) func(*badger.Txn) error {
 func RetrieveSporkRootBlockHeight(height *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeSporkRootBlockHeight), height)
 }
-
-// InsertProtocolVersion inserts the protocol version for the present spork.
-// A single database and protocol state instance spans at most one spork, and
-// a spork has exactly one protocol version for its duration, so this is
-// inserted exactly once, when bootstrapping the state.
-func InsertProtocolVersion(version uint) func(*badger.Txn) error {
-	return insert(makePrefix(codeProtocolVersion), version)
-}
-
-// RetrieveProtocolVersion retrieves the protocol version for the present spork.
-func RetrieveProtocolVersion(version *uint) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeProtocolVersion), version)
-}
-
-// InsertEpochCommitSafetyThreshold inserts the epoch commit safety threshold
-// for the present spork.
-// A single database and protocol state instance spans at most one spork, and
-// a spork has exactly one protocol version for its duration, so this is
-// inserted exactly once, when bootstrapping the state.
-func InsertEpochCommitSafetyThreshold(threshold uint64) func(*badger.Txn) error {
-	return insert(makePrefix(codeEpochCommitSafetyThreshold), threshold)
-}
-
-// RetrieveEpochCommitSafetyThreshold retrieves the epoch commit safety threshold
-// for the present spork.
-func RetrieveEpochCommitSafetyThreshold(threshold *uint64) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeEpochCommitSafetyThreshold), threshold)
-}

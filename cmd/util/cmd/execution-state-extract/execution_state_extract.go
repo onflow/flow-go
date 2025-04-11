@@ -10,7 +10,10 @@ import (
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/onflow/flow-go-sdk/crypto"
+
 	migrators "github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
@@ -355,4 +358,38 @@ func createTrieFromPayloads(logger zerolog.Logger, payloads []*ledger.Payload) (
 	}
 
 	return newTrie, nil
+}
+
+func addMigrationMainnetKeysMigration(
+	log zerolog.Logger,
+	outputDir string,
+	workerCount int,
+	chainID flow.ChainID,
+) []migrators.NamedMigration {
+
+	log.Info().Msg("initializing add-migrationmainnet-keys migrations ...")
+
+	rwf := reporters.NewReportFileWriterFactory(outputDir, log)
+
+	key, err := crypto.DecodePublicKeyHex(crypto.ECDSA_P256, "711d4cd9930d695ef5c79b668d321f92ba00ed8280fded52c0fa2b15501411d026fe6fb4be3ec894facd3a00f04e32e2db5f5696d3b2b3419e4fba89fb95dca8")
+	if err != nil {
+		panic("failed to decode key")
+	}
+
+	namedMigrations := []migrators.NamedMigration{
+		{
+			Name: "add-migrationmainnet-keys",
+			Migrate: migrators.NewAccountBasedMigration(
+				log,
+				workerCount,
+				[]migrators.AccountBasedMigration{
+					migrators.NewAddKeyMigration(chainID, key, rwf),
+				},
+			),
+		},
+	}
+
+	log.Info().Msg("initialized migrations")
+
+	return namedMigrations
 }

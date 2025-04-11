@@ -43,9 +43,8 @@ type Builder struct {
 	log            zerolog.Logger
 	clusterEpoch   uint64 // the operating epoch for this cluster
 	// cache of values about the operating epoch which never change
-	refEpochFirstHeight uint64           // first height of this cluster's operating epoch
-	epochFinalHeight    *uint64          // last height of this cluster's operating epoch (nil if epoch not ended)
-	epochFinalID        *flow.Identifier // ID of last block in this cluster's operating epoch (nil if epoch not ended)
+	epochFinalHeight *uint64          // last height of this cluster's operating epoch (nil if epoch not ended)
+	epochFinalID     *flow.Identifier // ID of last block in this cluster's operating epoch (nil if epoch not ended)
 }
 
 func NewBuilder(
@@ -75,11 +74,6 @@ func NewBuilder(
 		clusterEpoch:   epochCounter,
 	}
 
-	err := db.View(operation.RetrieveEpochFirstHeight(epochCounter, &b.refEpochFirstHeight))
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch first height: %w", err)
-	}
-
 	for _, apply := range opts {
 		apply(&b.config)
 	}
@@ -92,8 +86,19 @@ func NewBuilder(
 	return &b, nil
 }
 
-// BuildOn creates a new block built on the given parent. It produces a payload
-// that is valid with respect to the un-finalized chain it extends.
+// BuildOn generates a new payload that is valid with respect to the parent
+// being built upon, with the view being provided by the consensus algorithm.
+// The builder stores the block and validates it against the cluster state
+// before returning it. The specified parent block must exist in the cluster state.
+//
+// NOTE: Since the block is stored within Builder, HotStuff MUST propose the
+// block once BuildOn successfully returns.
+//
+// # Errors
+// This function does not produce any expected errors.
+// However, it will pass through all errors returned by `setter` and `sign`.
+// Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
+// and handle them accordingly when handling errors returned from BuildOn.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error) {
 	parentSpan, ctx := b.tracer.StartSpanFromContext(context.Background(), trace.COLBuildOn)
 	defer parentSpan.End()

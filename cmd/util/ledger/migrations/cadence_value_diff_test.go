@@ -24,7 +24,11 @@ func TestDiffCadenceValues(t *testing.T) {
 	address, err := common.HexToAddress("0x1")
 	require.NoError(t, err)
 
-	domain := common.PathDomainStorage.Identifier()
+	const domain = common.StorageDomainPathStorage
+
+	alwaysDiff := func(address common.Address, domain common.StorageDomain, key any) bool {
+		return true
+	}
 
 	t.Run("no diff", func(t *testing.T) {
 		t.Parallel()
@@ -36,7 +40,8 @@ func TestDiffCadenceValues(t *testing.T) {
 		diffReporter.DiffStates(
 			createTestRegisters(t, address, domain),
 			createTestRegisters(t, address, domain),
-			[]string{domain},
+			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 		require.Equal(t, 0, len(writer.entries))
@@ -52,7 +57,8 @@ func TestDiffCadenceValues(t *testing.T) {
 		diffReporter.DiffStates(
 			createTestRegisters(t, address, domain),
 			registers.NewByAccount(),
-			[]string{domain},
+			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(writer.entries))
@@ -60,7 +66,7 @@ func TestDiffCadenceValues(t *testing.T) {
 		diff := writer.entries[0].(difference)
 		require.Equal(t, diffKindString[storageMapExistDiffKind], diff.Kind)
 		require.Equal(t, address.Hex(), diff.Address)
-		require.Equal(t, domain, diff.Domain)
+		require.Equal(t, domain.Identifier(), diff.Domain)
 	})
 
 	t.Run("storage maps have different sets of keys", func(t *testing.T) {
@@ -73,7 +79,8 @@ func TestDiffCadenceValues(t *testing.T) {
 		diffReporter.DiffStates(
 			createTestRegisters(t, address, domain),
 			createStorageMapRegisters(t, address, domain, []string{"unique_key"}, []interpreter.Value{interpreter.UInt64Value(0)}),
-			[]string{domain},
+			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 
@@ -86,7 +93,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			diff := entry.(difference)
 			require.Equal(t, diffKindString[storageMapKeyDiffKind], diff.Kind)
 			require.Equal(t, address.Hex(), diff.Address)
-			require.Equal(t, domain, diff.Domain)
+			require.Equal(t, domain.Identifier(), diff.Domain)
 		}
 	})
 
@@ -100,7 +107,8 @@ func TestDiffCadenceValues(t *testing.T) {
 		diffReporter.DiffStates(
 			createStorageMapRegisters(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(0), interpreter.UInt64Value(0)}),
 			createStorageMapRegisters(t, address, domain, []string{"2", "0"}, []interpreter.Value{interpreter.UInt64Value(0), interpreter.UInt64Value(0)}),
-			[]string{domain},
+			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 
@@ -113,7 +121,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			diff := entry.(difference)
 			require.Equal(t, diffKindString[storageMapKeyDiffKind], diff.Kind)
 			require.Equal(t, address.Hex(), diff.Address)
-			require.Equal(t, domain, diff.Domain)
+			require.Equal(t, domain.Identifier(), diff.Domain)
 		}
 	})
 
@@ -127,7 +135,8 @@ func TestDiffCadenceValues(t *testing.T) {
 		diffReporter.DiffStates(
 			createStorageMapRegisters(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(100), interpreter.UInt64Value(101)}),
 			createStorageMapRegisters(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(111), interpreter.UInt64Value(101)}),
-			[]string{domain},
+			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 
@@ -138,7 +147,7 @@ func TestDiffCadenceValues(t *testing.T) {
 		diff := writer.entries[0].(difference)
 		require.Equal(t, diffKindString[cadenceValueDiffKind], diff.Kind)
 		require.Equal(t, address.Hex(), diff.Address)
-		require.Equal(t, domain, diff.Domain)
+		require.Equal(t, domain.Identifier(), diff.Domain)
 		require.Equal(t, "storage[0]", diff.Trace)
 		require.Equal(t, "100", diff.OldValue)
 		require.Equal(t, "111", diff.NewValue)
@@ -154,7 +163,8 @@ func TestDiffCadenceValues(t *testing.T) {
 		diffReporter.DiffStates(
 			createStorageMapRegisters(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(100), interpreter.UInt64Value(101)}),
 			createStorageMapRegisters(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(111), interpreter.UInt64Value(102)}),
-			[]string{domain},
+			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 
@@ -165,7 +175,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			diff := entry.(difference)
 			require.Equal(t, diffKindString[cadenceValueDiffKind], diff.Kind)
 			require.Equal(t, address.Hex(), diff.Address)
-			require.Equal(t, domain, diff.Domain)
+			require.Equal(t, domain.Identifier(), diff.Domain)
 			require.True(t, diff.Trace == "storage[0]" || diff.Trace == "storage[1]")
 		}
 	})
@@ -204,7 +214,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create new storage map
-			storageMap := mr.Storage.GetStorageMap(address, domain, true)
+			storageMap := mr.Storage.GetDomainStorageMap(mr.Interpreter, address, domain, true)
 
 			nestedArray := interpreter.NewArrayValue(
 				mr.Interpreter,
@@ -260,7 +270,8 @@ func TestDiffCadenceValues(t *testing.T) {
 				interpreter.UInt64Value(3),
 				interpreter.UInt64Value(5),
 			}),
-			[]string{domain},
+			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 
@@ -272,7 +283,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			diff := entry.(difference)
 			require.Equal(t, diffKindString[cadenceValueDiffKind], diff.Kind)
 			require.Equal(t, address.Hex(), diff.Address)
-			require.Equal(t, domain, diff.Domain)
+			require.Equal(t, domain.Identifier(), diff.Domain)
 			require.True(t, diff.Trace == "storage[key_0][0][0]" || diff.Trace == "storage[key_0][0][1]" || diff.Trace == "storage[key_0][0][2]")
 
 			switch diff.Trace {
@@ -325,7 +336,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create new storage map
-			storageMap := mr.Storage.GetStorageMap(address, domain, true)
+			storageMap := mr.Storage.GetDomainStorageMap(mr.Interpreter, address, domain, true)
 
 			nestedDict := interpreter.NewDictionaryValueWithAddress(
 				mr.Interpreter,
@@ -384,7 +395,8 @@ func TestDiffCadenceValues(t *testing.T) {
 					interpreter.NewUnmeteredStringValue("dict_key_1"),
 					interpreter.UInt64Value(3),
 				}),
-			[]string{domain},
+			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 
@@ -396,7 +408,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			diff := entry.(difference)
 			require.Equal(t, diffKindString[cadenceValueDiffKind], diff.Kind)
 			require.Equal(t, address.Hex(), diff.Address)
-			require.Equal(t, domain, diff.Domain)
+			require.Equal(t, domain.Identifier(), diff.Domain)
 			require.True(t, diff.Trace == "storage[key_0][0][\"dict_key_0\"]" || diff.Trace == "storage[key_0][0][\"dict_key_1\"]")
 
 			switch diff.Trace {
@@ -445,7 +457,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create new storage map
-			storageMap := mr.Storage.GetStorageMap(address, domain, true)
+			storageMap := mr.Storage.GetDomainStorageMap(mr.Interpreter, address, domain, true)
 
 			var fields []interpreter.CompositeField
 
@@ -515,7 +527,8 @@ func TestDiffCadenceValues(t *testing.T) {
 					interpreter.UInt64Value(1),
 					interpreter.UInt64Value(3),
 				}),
-			[]string{domain},
+			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 
@@ -527,7 +540,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			diff := entry.(difference)
 			require.Equal(t, diffKindString[cadenceValueDiffKind], diff.Kind)
 			require.Equal(t, address.Hex(), diff.Address)
-			require.Equal(t, domain, diff.Domain)
+			require.Equal(t, domain.Identifier(), diff.Domain)
 			require.True(t, diff.Trace == "storage[key_0][0].Field_0" || diff.Trace == "storage[key_0][0].Field_1")
 
 			switch diff.Trace {
@@ -576,7 +589,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create new storage map
-			storageMap := mr.Storage.GetStorageMap(address, domain, true)
+			storageMap := mr.Storage.GetDomainStorageMap(mr.Interpreter, address, domain, true)
 
 			var fields []interpreter.CompositeField
 
@@ -646,7 +659,8 @@ func TestDiffCadenceValues(t *testing.T) {
 					interpreter.UInt64Value(1),
 					interpreter.UInt64Value(3),
 				}),
-			[]string{domain},
+			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 
@@ -660,7 +674,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			diff := entry.(difference)
 			require.Equal(t, diffKindString[cadenceValueDiffKind], diff.Kind)
 			require.Equal(t, address.Hex(), diff.Address)
-			require.Equal(t, domain, diff.Domain)
+			require.Equal(t, domain.Identifier(), diff.Domain)
 			require.True(t, diff.Trace == "storage[key_0][0].Field_0" || diff.Trace == "storage[key_0][0].Field_1")
 
 			switch diff.Trace {
@@ -678,7 +692,7 @@ func TestDiffCadenceValues(t *testing.T) {
 		diff := writer.entries[2].(difference)
 		require.Equal(t, diffKindString[storageMapValueDiffKind], diff.Kind)
 		require.Equal(t, address.Hex(), diff.Address)
-		require.Equal(t, domain, diff.Domain)
+		require.Equal(t, domain.Identifier(), diff.Domain)
 		require.Equal(t, "storage[key_0]", diff.Trace)
 		require.Equal(t, "[S.test.Test(Field_1: 2, Field_0: 0)]", diff.OldValue)
 		require.Equal(t, "[S.test.Test(Field_1: 3, Field_0: 1)]", diff.NewValue)
@@ -688,7 +702,7 @@ func TestDiffCadenceValues(t *testing.T) {
 func createStorageMapRegisters(
 	t *testing.T,
 	address common.Address,
-	domain string,
+	domain common.StorageDomain,
 	keys []string,
 	values []interpreter.Value,
 ) registers.Registers {
@@ -718,7 +732,7 @@ func createStorageMapRegisters(
 	require.NoError(t, err)
 
 	// Create new storage map
-	storageMap := mr.Storage.GetStorageMap(address, domain, true)
+	storageMap := mr.Storage.GetDomainStorageMap(mr.Interpreter, address, domain, true)
 
 	for i, k := range keys {
 		storageMap.WriteValue(
@@ -747,7 +761,7 @@ func createStorageMapRegisters(
 	return registers
 }
 
-func createTestRegisters(t *testing.T, address common.Address, domain string) registers.Registers {
+func createTestRegisters(t *testing.T, address common.Address, domain common.StorageDomain) registers.Registers {
 
 	// Create account status payload
 	accountStatus := environment.NewAccountStatus()
@@ -773,7 +787,7 @@ func createTestRegisters(t *testing.T, address common.Address, domain string) re
 	require.NoError(t, err)
 
 	// Create new storage map
-	storageMap := mr.Storage.GetStorageMap(address, domain, true)
+	storageMap := mr.Storage.GetDomainStorageMap(mr.Interpreter, address, domain, true)
 
 	// Add Cadence UInt64Value
 	storageMap.WriteValue(

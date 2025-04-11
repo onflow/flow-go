@@ -13,11 +13,16 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	storagepebble "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 var (
-	flagHeight  uint64
-	flagDataDir string
+	flagHeight           uint64
+	flagDataDir          string
+	flagChunkDataPackDir string
 )
 
 var Cmd = &cobra.Command{
@@ -36,11 +41,16 @@ func init() {
 	Cmd.Flags().StringVar(&flagDataDir, "datadir", "",
 		"directory that stores the protocol state")
 	_ = Cmd.MarkFlagRequired("datadir")
+
+	Cmd.Flags().StringVar(&flagChunkDataPackDir, "chunk_data_pack_dir", "/var/flow/data/chunk_data_pack",
+		"directory that stores the protocol state")
+	_ = Cmd.MarkFlagRequired("chunk_data_pack_dir")
 }
 
 func run(*cobra.Command, []string) {
 	log.Info().
 		Str("datadir", flagDataDir).
+		Str("chunk_data_pack_dir", flagChunkDataPackDir).
 		Uint64("height", flagHeight).
 		Msg("flags")
 
@@ -50,30 +60,42 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Msg("height must be above 0")
 	}
 
-	db := common.InitStorage(flagDataDir)
-	storages := common.InitStorages(db)
-	state, err := common.InitProtocolState(db, storages)
+	bdb := common.InitStorage(flagDataDir)
+	storages := common.InitStorages(bdb)
+	state, err := common.InitProtocolState(bdb, storages)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not init protocol states")
 	}
 
+	db := badgerimpl.ToDB(bdb)
 	metrics := &metrics.NoopCollector{}
-	transactionResults := badger.NewTransactionResults(metrics, db, badger.DefaultCacheSize)
-	commits := badger.NewCommits(metrics, db)
-	chunkDataPacks := badger.NewChunkDataPacks(metrics, db, badger.NewCollections(db, badger.NewTransactions(metrics, db)), badger.DefaultCacheSize)
-	results := badger.NewExecutionResults(metrics, db)
-	receipts := badger.NewExecutionReceipts(metrics, db, results, badger.DefaultCacheSize)
-	myReceipts := badger.NewMyExecutionReceipts(metrics, db, receipts)
-	headers := badger.NewHeaders(metrics, db)
-	events := badger.NewEvents(metrics, db)
-	serviceEvents := badger.NewServiceEvents(metrics, db)
 
-	writeBatch := badger.NewBatch(db)
+	transactionResults := store.NewTransactionResults(metrics, db, badger.DefaultCacheSize)
+	commits := store.NewCommits(metrics, db)
+	results := store.NewExecutionResults(metrics, db)
+	receipts := store.NewExecutionReceipts(metrics, db, results, badger.DefaultCacheSize)
+	myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
+	headers := badger.NewHeaders(metrics, bdb)
+	events := store.NewEvents(metrics, db)
+	serviceEvents := store.NewServiceEvents(metrics, db)
+	transactions := badger.NewTransactions(metrics, bdb)
+	collections := badger.NewCollections(bdb, transactions)
+	// require the chunk data pack data must exist before returning the storage module
+	chunkDataPacksPebbleDB, err := storagepebble.MustOpenDefaultPebbleDB(
+		log.Logger.With().Str("pebbledb", "cdp").Logger(), flagChunkDataPackDir)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not open chunk data pack DB at %v", flagChunkDataPackDir)
+	}
+	chunkDataPacksDB := pebbleimpl.ToDB(chunkDataPacksPebbleDB)
+	chunkDataPacks := store.NewChunkDataPacks(metrics, chunkDataPacksDB, collections, 1000)
+	chunkBatch := chunkDataPacksDB.NewBatch()
+
+	writeBatch := db.NewBatch()
 
 	err = removeExecutionResultsFromHeight(
 		writeBatch,
+		chunkBatch,
 		state,
-		headers,
 		transactionResults,
 		commits,
 		chunkDataPacks,
@@ -86,7 +108,14 @@ func run(*cobra.Command, []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not remove result from height %v", flagHeight)
 	}
-	err = writeBatch.Flush()
+
+	// remove chunk data packs first, because otherwise the index to find chunk data pack will be removed.
+	err = chunkBatch.Commit()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not commit chunk batch at %v", flagHeight)
+	}
+
+	err = writeBatch.Commit()
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not flush write batch at %v", flagHeight)
 	}
@@ -108,16 +137,16 @@ func run(*cobra.Command, []string) {
 // use badger instances directly instead of stroage interfaces so that the interface don't
 // need to include the Remove methods
 func removeExecutionResultsFromHeight(
-	writeBatch *badger.Batch,
+	writeBatch storage.Batch,
+	chunkBatch storage.Batch,
 	protoState protocol.State,
-	headers *badger.Headers,
-	transactionResults *badger.TransactionResults,
-	commits *badger.Commits,
-	chunkDataPacks *badger.ChunkDataPacks,
-	results *badger.ExecutionResults,
-	myReceipts *badger.MyExecutionReceipts,
-	events *badger.Events,
-	serviceEvents *badger.ServiceEvents,
+	transactionResults storage.TransactionResults,
+	commits storage.Commits,
+	chunkDataPacks storage.ChunkDataPacks,
+	results storage.ExecutionResults,
+	myReceipts storage.MyExecutionReceipts,
+	events storage.Events,
+	serviceEvents storage.ServiceEvents,
 	fromHeight uint64) error {
 	log.Info().Msgf("removing results for blocks from height: %v", fromHeight)
 
@@ -148,7 +177,7 @@ func removeExecutionResultsFromHeight(
 
 		blockID := head.ID()
 
-		err = removeForBlockID(writeBatch, headers, commits, transactionResults, results, chunkDataPacks, myReceipts, events, serviceEvents, blockID)
+		err = removeForBlockID(writeBatch, chunkBatch, commits, transactionResults, results, chunkDataPacks, myReceipts, events, serviceEvents, blockID)
 		if err != nil {
 			return fmt.Errorf("could not remove result for finalized block: %v, %w", blockID, err)
 		}
@@ -167,7 +196,7 @@ func removeExecutionResultsFromHeight(
 	total = len(pendings)
 
 	for _, pending := range pendings {
-		err = removeForBlockID(writeBatch, headers, commits, transactionResults, results, chunkDataPacks, myReceipts, events, serviceEvents, pending)
+		err = removeForBlockID(writeBatch, chunkBatch, commits, transactionResults, results, chunkDataPacks, myReceipts, events, serviceEvents, pending)
 
 		if err != nil {
 			return fmt.Errorf("could not remove result for pending block %v: %w", pending, err)
@@ -187,15 +216,15 @@ func removeExecutionResultsFromHeight(
 // All data to be removed will be removed in a batch write.
 // It bubbles up any error encountered
 func removeForBlockID(
-	writeBatch *badger.Batch,
-	headers *badger.Headers,
-	commits *badger.Commits,
-	transactionResults *badger.TransactionResults,
-	results *badger.ExecutionResults,
-	chunks *badger.ChunkDataPacks,
-	myReceipts *badger.MyExecutionReceipts,
-	events *badger.Events,
-	serviceEvents *badger.ServiceEvents,
+	writeBatch storage.Batch,
+	chunkBatch storage.Batch,
+	commits storage.Commits,
+	transactionResults storage.TransactionResults,
+	results storage.ExecutionResults,
+	chunks storage.ChunkDataPacks,
+	myReceipts storage.MyExecutionReceipts,
+	events storage.Events,
+	serviceEvents storage.ServiceEvents,
 	blockID flow.Identifier,
 ) error {
 	result, err := results.ByBlockID(blockID)
@@ -211,12 +240,7 @@ func removeForBlockID(
 	for _, chunk := range result.Chunks {
 		chunkID := chunk.ID()
 		// remove chunk data pack
-		err := chunks.BatchRemove(chunkID, writeBatch)
-		if errors.Is(err, storage.ErrNotFound) {
-			log.Warn().Msgf("chunk %v not found for block %v", chunkID, blockID)
-			continue
-		}
-
+		err := chunks.BatchRemove(chunkID, chunkBatch)
 		if err != nil {
 			return fmt.Errorf("could not remove chunk id %v for block id %v: %w", chunkID, blockID, err)
 		}

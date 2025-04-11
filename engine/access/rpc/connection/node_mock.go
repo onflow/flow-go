@@ -64,11 +64,19 @@ type executionNode struct {
 	handler *mock.ExecutionAPIServer
 }
 
+func newExecutionNode(tb testing.TB) *executionNode {
+	return &executionNode{
+		handler: mock.NewExecutionAPIServer(tb),
+	}
+}
+
 func (en *executionNode) start(tb testing.TB) {
+	if en.handler == nil {
+		tb.Fatalf("executionNode must be initialized using newExecutionNode")
+	}
+
 	en.setupNode(tb)
-	handler := new(mock.ExecutionAPIServer)
-	execution.RegisterExecutionAPIServer(en.server, handler)
-	en.handler = handler
+	execution.RegisterExecutionAPIServer(en.server, en.handler)
 	en.node.start(tb)
 }
 
@@ -81,14 +89,22 @@ type collectionNode struct {
 	handler *mock.AccessAPIServer
 }
 
-func (cn *collectionNode) start(t *testing.T) {
-	cn.setupNode(t)
-	handler := new(mock.AccessAPIServer)
-	access.RegisterAccessAPIServer(cn.server, handler)
-	cn.handler = handler
-	cn.node.start(t)
+func newCollectionNode(tb testing.TB) *collectionNode {
+	return &collectionNode{
+		handler: mock.NewAccessAPIServer(tb),
+	}
 }
 
-func (cn *collectionNode) stop(t *testing.T) {
-	cn.node.stop(t)
+func (cn *collectionNode) start(tb testing.TB) {
+	if cn.handler == nil {
+		tb.Fatalf("collectionNode must be initialized using newCollectionNode")
+	}
+
+	cn.setupNode(tb)
+	access.RegisterAccessAPIServer(cn.server, cn.handler)
+	cn.node.start(tb)
+}
+
+func (cn *collectionNode) stop(tb testing.TB) {
+	cn.node.stop(tb)
 }

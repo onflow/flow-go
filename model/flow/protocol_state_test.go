@@ -331,7 +331,6 @@ func TestProtocolStateEntry_Copy(t *testing.T) {
 	assert.Equal(t, entry, cpy)
 	assert.NotSame(t, entry.NextEpoch, cpy.NextEpoch)
 	assert.NotSame(t, entry.PreviousEpoch, cpy.PreviousEpoch)
-	assert.NotSame(t, entry.CurrentEpoch, cpy.CurrentEpoch)
 
 	cpy.EpochFallbackTriggered = !entry.EpochFallbackTriggered
 	assert.NotEqual(t, entry, cpy)

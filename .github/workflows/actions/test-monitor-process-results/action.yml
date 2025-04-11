@@ -42,13 +42,13 @@ runs:
       uses: 'google-github-actions/setup-gcloud@v2'
 
     - name: Upload results to BigQuery (skipped tests)
-      uses: nick-fields/retry@v2
+      uses: nick-fields/retry@v3
       with:
         timeout_minutes: 1
         max_attempts: 3
         command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE $SKIPPED_TESTS_FILE tools/test_monitor/schemas/skipped_tests_schema.json
     - name: Upload results to BigQuery (test run)
-      uses: nick-fields/retry@v2
+      uses: nick-fields/retry@v3
       with:
         timeout_minutes: 2
         max_attempts: 3
