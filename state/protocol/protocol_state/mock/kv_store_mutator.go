@@ -14,6 +14,54 @@ type KVStoreMutator struct {
 	mock.Mock
 }
 
+// GetCadenceComponentVersion provides a mock function with given fields:
+func (_m *KVStoreMutator) GetCadenceComponentVersion() (protocol.MagnitudeVersion, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCadenceComponentVersion")
+	}
+
+	var r0 protocol.MagnitudeVersion
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (protocol.MagnitudeVersion, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() protocol.MagnitudeVersion); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(protocol.MagnitudeVersion)
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetCadenceComponentVersionUpgrade provides a mock function with given fields:
+func (_m *KVStoreMutator) GetCadenceComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeVersion] {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCadenceComponentVersionUpgrade")
+	}
+
+	var r0 *protocol.ViewBasedActivator[protocol.MagnitudeVersion]
+	if rf, ok := ret.Get(0).(func() *protocol.ViewBasedActivator[protocol.MagnitudeVersion]); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*protocol.ViewBasedActivator[protocol.MagnitudeVersion])
+		}
+	}
+
+	return r0
+}
+
 // GetEpochExtensionViewCount provides a mock function with given fields:
 func (_m *KVStoreMutator) GetEpochExtensionViewCount() uint64 {
 	ret := _m.Called()
@@ -46,6 +94,102 @@ func (_m *KVStoreMutator) GetEpochStateID() flow.Identifier {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(flow.Identifier)
+		}
+	}
+
+	return r0
+}
+
+// GetExecutionComponentVersion provides a mock function with given fields:
+func (_m *KVStoreMutator) GetExecutionComponentVersion() (protocol.MagnitudeVersion, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExecutionComponentVersion")
+	}
+
+	var r0 protocol.MagnitudeVersion
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (protocol.MagnitudeVersion, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() protocol.MagnitudeVersion); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(protocol.MagnitudeVersion)
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetExecutionComponentVersionUpgrade provides a mock function with given fields:
+func (_m *KVStoreMutator) GetExecutionComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeVersion] {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExecutionComponentVersionUpgrade")
+	}
+
+	var r0 *protocol.ViewBasedActivator[protocol.MagnitudeVersion]
+	if rf, ok := ret.Get(0).(func() *protocol.ViewBasedActivator[protocol.MagnitudeVersion]); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*protocol.ViewBasedActivator[protocol.MagnitudeVersion])
+		}
+	}
+
+	return r0
+}
+
+// GetExecutionMeteringParameters provides a mock function with given fields:
+func (_m *KVStoreMutator) GetExecutionMeteringParameters() (protocol.ExecutionMeteringParameters, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExecutionMeteringParameters")
+	}
+
+	var r0 protocol.ExecutionMeteringParameters
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (protocol.ExecutionMeteringParameters, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() protocol.ExecutionMeteringParameters); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(protocol.ExecutionMeteringParameters)
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetExecutionMeteringParametersUpgrade provides a mock function with given fields:
+func (_m *KVStoreMutator) GetExecutionMeteringParametersUpgrade() *protocol.ViewBasedActivator[protocol.ExecutionMeteringParameters] {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExecutionMeteringParametersUpgrade")
+	}
+
+	var r0 *protocol.ViewBasedActivator[protocol.ExecutionMeteringParameters]
+	if rf, ok := ret.Get(0).(func() *protocol.ViewBasedActivator[protocol.ExecutionMeteringParameters]); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*protocol.ViewBasedActivator[protocol.ExecutionMeteringParameters])
 		}
 	}
 
