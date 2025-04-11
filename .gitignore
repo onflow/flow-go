@@ -72,3 +72,6 @@ go.work.sum
 
 # Local testing result files
 tps-results*.json
+
+# Custom golangcilint build
+custom-gcl

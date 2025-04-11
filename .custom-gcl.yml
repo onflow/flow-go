@@ -1,0 +1,10 @@
+version: v1.63.4
+plugins:
+  # a plugin from a Go proxy
+  - module: 'github.com/golangci/example-plugin-module-linter'
+    import: 'github.com/golangci/example-plugin-module-linter'
+    version: v0.1.0
+      # a plugin from local source
+  - module: 'github.com/jordanschalm/structwrite'
+    import: 'github.com/jordanschalm/structwrite'
+    version: latest
