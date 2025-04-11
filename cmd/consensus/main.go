@@ -67,6 +67,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
+	"github.com/onflow/flow-go/storage/badger"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/utils/io"
@@ -287,6 +288,8 @@ func main() {
 				return err
 			}
 
+			all := badger.InitAllBadger(node.Metrics.Cache, node.DB)
+
 			mutableState, err = badgerState.NewFullConsensusState(
 				node.Logger,
 				node.Tracer,
@@ -298,6 +301,8 @@ func main() {
 				blockTimer,
 				receiptValidator,
 				sealValidator,
+				all.QuorumCertificates,
+				all.Blocks,
 			)
 			return err
 		}).

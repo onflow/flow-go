@@ -253,6 +253,7 @@ func CompleteStateFixture(
 	)
 	require.NoError(t, err)
 
+	allbadger := storage.InitAllBadger(metric, db)
 	mutableState, err := badgerstate.NewFullConsensusState(
 		log,
 		tracer,
@@ -264,6 +265,8 @@ func CompleteStateFixture(
 		util.MockBlockTimer(),
 		util.MockReceiptValidator(),
 		util.MockSealValidator(s.Seals),
+		allbadger.QuorumCertificates,
+		allbadger.Blocks,
 	)
 	require.NoError(t, err)
 
