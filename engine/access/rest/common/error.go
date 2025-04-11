@@ -2,6 +2,7 @@ package common
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/onflow/flow-go/access"
@@ -79,7 +80,7 @@ func ErrorToStatusError(err error) StatusError {
 	case access.IsInvalidRequestError(err):
 		return NewBadRequestError(err)
 	case access.IsDataNotFoundError(err):
-		return NewNotFoundError(err.Error(), err)
+		return NewNotFoundError(fmt.Sprintf("Flow resource not found: %v", err.Error()), err)
 	case access.IsPreconditionFailedError(err):
 		return NewRestError(http.StatusPreconditionFailed, err.Error(), err)
 	case access.IsOutOfRangeError(err):

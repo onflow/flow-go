@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
@@ -128,16 +125,14 @@ func getBlock(option blockProviderOption, req *common.Request, backend access.AP
 	executionResult, err := backend.GetExecutionResultForBlockID(req.Context(), blk.ID())
 	if err != nil {
 		// handle case where execution result is not yet available
-		if se, ok := status.FromError(err); ok {
-			if se.Code() == codes.NotFound {
-				err := block.Build(blk, nil, link, blockStatus, req.ExpandFields)
-				if err != nil {
-					return nil, err
-				}
-				return &block, nil
+		if access.IsDataNotFoundError(err) {
+			err := block.Build(blk, nil, link, blockStatus, req.ExpandFields)
+			if err != nil {
+				return nil, common.ErrorToStatusError(err)
 			}
+			return &block, nil
 		}
-		return nil, err
+		return nil, common.ErrorToStatusError(err)
 	}
 
 	err = block.Build(blk, executionResult, link, blockStatus, req.ExpandFields)

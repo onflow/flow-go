@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rest/util"
@@ -90,7 +91,7 @@ func TestGetResultBlockID(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		backend.Mock.
 			On("GetExecutionResultForBlockID", mocks.Anything, blockID).
-			Return(nil, status.Error(codes.NotFound, "block not found")).
+			Return(nil, access.NewDataNotFoundError("block", fmt.Errorf("block not found"))).
 			Once()
 
 		req := getResultByIDReq("", []string{blockID.String()})
