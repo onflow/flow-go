@@ -512,14 +512,15 @@ func BlockHeaderFixtureOnChain(
 ) *flow.Header {
 	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
-	header := BlockHeaderWithParentFixture(&flow.Header{
-		HeaderFields: flow.HeaderFields{
-			ChainID:  chainID,
-			ParentID: IdentifierFixture(),
-			Height:   height,
-			View:     view,
-		},
-	})
+	header := BlockHeaderWithParentFixture(
+		&flow.Header{
+			HeaderFields: flow.HeaderFields{
+				ChainID:  chainID,
+				ParentID: IdentifierFixture(),
+				Height:   height,
+				View:     view,
+			},
+		})
 
 	for _, opt := range opts {
 		opt(header)
@@ -528,9 +529,63 @@ func BlockHeaderFixtureOnChain(
 	return header
 }
 
-func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
+// TODO(Uliana): simplified this fixture after merge
+func BlockHeaderFieldsWithParentFixture(parent *flow.Header) *flow.HeaderFields {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
+
+	var lastViewTC *flow.TimeoutCertificate
+	if view != parent.View+1 {
+		newestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
+			qc.View = parent.View
+		})
+		lastViewTC = &flow.TimeoutCertificate{
+			View:          view - 1,
+			NewestQCViews: []uint64{newestQC.View},
+			NewestQC:      newestQC,
+			SignerIndices: SignerIndicesFixture(4),
+			SigData:       SignatureFixture(),
+		}
+	}
+	return &flow.HeaderFields{
+		ChainID:            parent.ChainID,
+		ParentID:           parent.ID(),
+		Height:             height,
+		Timestamp:          time.Now().UTC(),
+		View:               view,
+		ParentView:         parent.View,
+		ParentVoterIndices: SignerIndicesFixture(4),
+		ParentVoterSigData: QCSigDataFixture(),
+		ProposerID:         IdentifierFixture(),
+		LastViewTC:         lastViewTC,
+	}
+}
+
+// TODO(Uliana): simplified this fixture after merge
+func BlockHeaderFieldsFixture(opts ...func(headerFields *flow.HeaderFields)) *flow.HeaderFields {
+	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
+	view := height + uint64(rand.Intn(1000))
+
+	headerFields := BlockHeaderFieldsWithParentFixture(
+		&flow.Header{
+			HeaderFields: flow.HeaderFields{
+				ChainID:  flow.Emulator,
+				ParentID: IdentifierFixture(),
+				Height:   height,
+				View:     view,
+			},
+		})
+
+	for _, opt := range opts {
+		opt(headerFields)
+	}
+
+	return headerFields
+}
+
+func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
+	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
+	view := height + uint64(rand.Intn(1000))
 	var lastViewTC *flow.TimeoutCertificate
 	if view != parent.View+1 {
 		newestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
@@ -609,13 +664,11 @@ func ClusterPayloadFixture(n int) *cluster.Payload {
 }
 
 func ClusterBlockFixture() cluster.Block {
-
 	payload := ClusterPayloadFixture(3)
-	header := BlockHeaderFixture()
-	header.PayloadHash = payload.Hash()
+	headerFields := BlockHeaderFieldsFixture()
 
 	return cluster.Block{
-		Header:  header,
+		Header:  headerFields,
 		Payload: payload,
 	}
 }
@@ -639,18 +692,17 @@ func ClusterBlockChainFixture(n int) []cluster.Block {
 func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 
 	payload := ClusterPayloadFixture(3)
+	headerFields := BlockHeaderFieldsFixture()
 
-	header := BlockHeaderFixture()
-	header.Height = parent.Header.Height + 1
-	header.View = parent.Header.View + 1
-	header.ChainID = parent.Header.ChainID
-	header.Timestamp = time.Now()
-	header.ParentID = parent.ID()
-	header.ParentView = parent.Header.View
-	header.PayloadHash = payload.Hash()
+	headerFields.Height = parent.Header.Height + 1
+	headerFields.View = parent.Header.View + 1
+	headerFields.ChainID = parent.Header.ChainID
+	headerFields.Timestamp = time.Now()
+	headerFields.ParentID = parent.ID()
+	headerFields.ParentView = parent.Header.View
 
 	block := cluster.Block{
-		Header:  header,
+		Header:  headerFields,
 		Payload: payload,
 	}
 

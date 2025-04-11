@@ -36,7 +36,7 @@ type UntrustedClusterBlockPayload struct {
 // Deprecated: Please update cluster.Payload.Collection to use []flow.TransactionBody,
 // then replace instances of this type with cluster.Block
 type UntrustedClusterBlock struct {
-	Header  flow.Header
+	Header  flow.HeaderFields
 	Payload UntrustedClusterBlockPayload
 }
 

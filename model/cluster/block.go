@@ -7,7 +7,7 @@ import (
 )
 
 func Genesis() *Block {
-	header := &flow.Header{
+	header := &flow.HeaderFields{
 		View:      0,
 		ChainID:   "cluster",
 		Timestamp: flow.GenesisTime,
@@ -27,7 +27,7 @@ func Genesis() *Block {
 // Block represents a block in collection node cluster consensus. It contains
 // a standard block header with a payload containing only a single collection.
 type Block struct {
-	Header  *flow.Header
+	Header  *flow.HeaderFields
 	Payload *Payload
 }
 
@@ -38,13 +38,13 @@ type BlockProposal struct {
 	ProposerSigData []byte
 }
 
-// ID returns the ID of the underlying block header.
-func (b Block) ID() flow.Identifier {
-	return b.Header.ID()
+// ID returns a collision-resistant hash of the Block struct.
+func (b *Block) ID() flow.Identifier {
+	return flow.MakeID(b)
 }
 
+// TODO: (Uliana) remove usages of this; include the payload in struct initialization, or as an argument to a builder or builder function
 // SetPayload sets the payload and payload hash.
 func (b *Block) SetPayload(payload Payload) {
 	b.Payload = &payload
-	b.Header.PayloadHash = payload.Hash()
 }
