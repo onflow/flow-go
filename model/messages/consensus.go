@@ -77,7 +77,7 @@ type UntrustedBlock struct {
 // ToInternal returns the internal representation of the type.
 func (ub *UntrustedBlock) ToInternal() *flow.Block {
 	block := flow.Block{
-		Header: &ub.Header,
+		Header: ub.Header.HeaderFields,
 		Payload: &flow.Payload{
 			ProtocolStateID: ub.Payload.ProtocolStateID,
 		},
@@ -106,7 +106,7 @@ func (ub *UntrustedBlock) ToInternal() *flow.Block {
 // to the representation used in untrusted messages.
 func UntrustedBlockFromInternal(flowBlock *flow.Block) UntrustedBlock {
 	block := UntrustedBlock{
-		Header: *flowBlock.Header,
+		Header: *flowBlock.ToHeader(),
 		Payload: UntrustedBlockPayload{
 			ProtocolStateID: flowBlock.Payload.ProtocolStateID,
 		},

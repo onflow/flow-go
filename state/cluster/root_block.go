@@ -22,8 +22,7 @@ var rootBlockPayloadHash = rootBlockPayload.Hash()
 func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) *cluster.Block {
 	chainID := CanonicalClusterID(epoch, participants.NodeIDs())
 
-	headerBody := cluster.HeaderBody{
-
+	headerFields := flow.HeaderFields{
 		ChainID:            chainID,
 		ParentID:           flow.ZeroID,
 		Height:             0,
@@ -35,7 +34,7 @@ func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) *c
 	}
 
 	return &cluster.Block{
-		Header:  &headerBody,
+		Header:  &headerFields,
 		Payload: &rootBlockPayload,
 	}
 }
