@@ -157,6 +157,11 @@ type Batch interface {
 
 	// Commit applies the batched updates to the database.
 	Commit() error
+
+	// Close releases memory of the batch.
+	// This can be called as a defer statement immediately after creating Batch
+	// to reduce risk of unbounded memory consumption.
+	Close() error
 }
 
 // OnlyWriter is an adapter to convert a function that takes a Writer
