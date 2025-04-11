@@ -230,7 +230,7 @@ func (h *MessageHub) sendOwnMessages(ctx context.Context) error {
 // No errors are expected during normal operations.
 func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 	log := timeout.LogContext(h.log).Logger()
-	log.Info().Msg("processing timeout broadcast request from hotstuff")
+	log.Debug().Msg("processing timeout broadcast request from hotstuff")
 
 	// Retrieve all consensus nodes (excluding myself).
 	// CAUTION: We must include consensus nodes that are joining, because otherwise
@@ -260,7 +260,7 @@ func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 		}
 		return nil
 	}
-	log.Info().Msg("consensus timeout was broadcast")
+	log.Debug().Msg("consensus timeout was broadcast")
 	h.engineMetrics.MessageSent(metrics.EngineConsensusMessageHub, metrics.MessageTimeoutObject)
 
 	return nil
@@ -274,7 +274,7 @@ func (h *MessageHub) sendOwnVote(packed *packedVote) error {
 		Uint64("block_view", packed.vote.View).
 		Hex("recipient_id", packed.recipientID[:]).
 		Logger()
-	log.Info().Msg("processing vote transmission request from hotstuff")
+	log.Debug().Msg("processing vote transmission request from hotstuff")
 
 	// send the vote the desired recipient
 	err := h.con.Unicast(packed.vote, packed.recipientID)
@@ -283,7 +283,7 @@ func (h *MessageHub) sendOwnVote(packed *packedVote) error {
 		return nil
 	}
 	h.engineMetrics.MessageSent(metrics.EngineConsensusMessageHub, metrics.MessageBlockVote)
-	log.Info().Msg("block vote transmitted")
+	log.Debug().Msg("block vote transmitted")
 
 	return nil
 }
@@ -374,7 +374,7 @@ func (h *MessageHub) provideProposal(proposal *messages.BlockProposal, recipient
 		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
 		Logger()
-	log.Info().Msg("block proposal submitted for propagation")
+	log.Debug().Msg("block proposal submitted for propagation")
 
 	// submit the block to the targets
 	err := h.pushBlocksCon.Publish(proposal, recipients.NodeIDs()...)
@@ -495,7 +495,7 @@ func (h *MessageHub) forwardToOwnVoteAggregator(vote *messages.BlockVote, origin
 		SignerID: originID,
 		SigData:  vote.SigData,
 	}
-	h.log.Info().
+	h.log.Debug().
 		Uint64("block_view", v.View).
 		Hex("block_id", v.BlockID[:]).
 		Hex("voter", v.SignerID[:]).
@@ -508,7 +508,7 @@ func (h *MessageHub) forwardToOwnVoteAggregator(vote *messages.BlockVote, origin
 // Per API convention, timeoutAggregator` is non-blocking, hence, this call returns quickly.
 func (h *MessageHub) forwardToOwnTimeoutAggregator(t *model.TimeoutObject) {
 	h.engineMetrics.MessageReceived(metrics.EngineConsensusMessageHub, metrics.MessageTimeoutObject)
-	h.log.Info().
+	h.log.Debug().
 		Hex("origin_id", t.SignerID[:]).
 		Uint64("view", t.View).
 		Str("timeout_id", t.ID().String()).
