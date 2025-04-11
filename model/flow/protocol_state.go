@@ -2,8 +2,7 @@ package flow
 
 import (
 	"fmt"
-
-	"golang.org/x/exp/slices"
+	"slices"
 )
 
 // DynamicIdentityEntry encapsulates nodeID and dynamic portion of identity.
