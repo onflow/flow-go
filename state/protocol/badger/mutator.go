@@ -82,29 +82,54 @@ func NewFollowerState(
 	index storage.Index,
 	payloads storage.Payloads,
 	blockTimer protocol.BlockTimer,
+	protocolState protocol.MutableProtocolState,
 ) (*FollowerState, error) {
 	followerState := &FollowerState{
-		State:      state,
-		index:      index,
-		payloads:   payloads,
-		tracer:     tracer,
-		logger:     logger,
-		consumer:   consumer,
-		blockTimer: blockTimer,
-		protocolState: protocol_state.NewMutableProtocolState(
-			logger,
-			state.epochProtocolStateEntriesDB,
-			state.protocolKVStoreSnapshotsDB,
-			state.params,
-			state.headers,
-			state.results,
-			state.epoch.setups,
-			state.epoch.commits,
-		),
+		State:         state,
+		index:         index,
+		payloads:      payloads,
+		tracer:        tracer,
+		logger:        logger,
+		consumer:      consumer,
+		blockTimer:    blockTimer,
+		protocolState: protocolState,
 
 		indexingNewBlock: &sync.Mutex{},
 	}
 	return followerState, nil
+}
+
+func MutableProtocolStateFromState(
+	logger zerolog.Logger,
+	state *State,
+) protocol.MutableProtocolState {
+	return protocol_state.NewMutableProtocolState(
+		logger,
+		state.epochProtocolStateEntriesDB,
+		state.protocolKVStoreSnapshotsDB,
+		state.params,
+		state.headers,
+		state.results,
+		state.epoch.setups,
+		state.epoch.commits,
+	)
+}
+
+func ConsensusMutableProtocolState(
+	logger zerolog.Logger,
+	state *State,
+	allBadger *storage.All,
+) protocol.MutableProtocolState {
+	return protocol_state.NewMutableProtocolState(
+		logger,
+		allBadger.EpochProtocolStateEntries,
+		allBadger.ProtocolKVStore,
+		state.Params(),
+		allBadger.Headers,
+		allBadger.Results,
+		allBadger.Setups,
+		allBadger.EpochCommits,
+	)
 }
 
 // NewFullConsensusState initializes a new mutable protocol state backed by a
@@ -124,6 +149,7 @@ func NewFullConsensusState(
 	sealValidator module.SealValidator,
 	qcs storage.QuorumCertificates,
 	blocks storage.Blocks,
+	mutatableProtocolState protocol.MutableProtocolState,
 ) (*ParticipantState, error) {
 	followerState, err := NewFollowerState(
 		logger,
@@ -133,6 +159,7 @@ func NewFullConsensusState(
 		index,
 		payloads,
 		blockTimer,
+		mutatableProtocolState,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initialization of Mutable Follower State failed: %w", err)

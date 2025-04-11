@@ -421,7 +421,7 @@ func createNode(
 	blockTimer, err := blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second)
 	require.NoError(t, err)
 
-	allbadger := storage.InitAllBadger(metricsCollector, db)
+	allBadger := storage.InitAllBadger(metricsCollector, db)
 	fullState, err := bprotocol.NewFullConsensusState(
 		log,
 		tracer,
@@ -433,8 +433,13 @@ func createNode(
 		blockTimer,
 		util.MockReceiptValidator(),
 		util.MockSealValidator(sealsDB),
-		allbadger.QuorumCertificates,
-		allbadger.Blocks,
+		allBadger.QuorumCertificates,
+		allBadger.Blocks,
+		bprotocol.ConsensusMutableProtocolState(
+			log,
+			state,
+			allBadger,
+		),
 	)
 	require.NoError(t, err)
 

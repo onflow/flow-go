@@ -118,7 +118,7 @@ func TestExtendValid(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		allbadger := bstorage.InitAllBadger(metrics, db)
+		allBadger := bstorage.InitAllBadger(metrics, db)
 
 		fullState, err := protocol.NewFullConsensusState(
 			log,
@@ -131,8 +131,13 @@ func TestExtendValid(t *testing.T) {
 			util.MockBlockTimer(),
 			util.MockReceiptValidator(),
 			util.MockSealValidator(all.Seals),
-			allbadger.QuorumCertificates,
-			allbadger.Blocks,
+			allBadger.QuorumCertificates,
+			allBadger.Blocks,
+			protocol.ConsensusMutableProtocolState(
+				log,
+				state,
+				allBadger,
+			),
 		)
 		require.NoError(t, err)
 
@@ -877,7 +882,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 		receiptValidator := util.MockReceiptValidator()
 		sealValidator := util.MockSealValidator(all.Seals)
-		allbadger := bstorage.InitAllBadger(mmetrics.NewNoopCollector(), db)
+		allBadger := bstorage.InitAllBadger(mmetrics.NewNoopCollector(), db)
 		state, err := protocol.NewFullConsensusState(
 			log,
 			tracer,
@@ -889,8 +894,13 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			util.MockBlockTimer(),
 			receiptValidator,
 			sealValidator,
-			allbadger.QuorumCertificates,
-			allbadger.Blocks,
+			allBadger.QuorumCertificates,
+			allBadger.Blocks,
+			protocol.ConsensusMutableProtocolState(
+				log,
+				protoState,
+				allBadger,
+			),
 		)
 		require.NoError(t, err)
 
@@ -2644,7 +2654,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 			}).
 			Times(3)
 
-		allbadger := bstorage.InitAllBadger(metrics, db)
+		allBadger := bstorage.InitAllBadger(metrics, db)
 		fullState, err := protocol.NewFullConsensusState(
 			log,
 			tracer,
@@ -2656,8 +2666,13 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 			util.MockBlockTimer(),
 			util.MockReceiptValidator(),
 			sealValidator,
-			allbadger.QuorumCertificates,
-			allbadger.Blocks,
+			allBadger.QuorumCertificates,
+			allBadger.Blocks,
+			protocol.ConsensusMutableProtocolState(
+				log,
+				state,
+				allBadger,
+			),
 		)
 		require.NoError(t, err)
 
@@ -3175,7 +3190,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 		blockTimer := &mockprotocol.BlockTimer{}
 		blockTimer.On("Validate", mock.Anything, mock.Anything).Return(realprotocol.NewInvalidBlockTimestamp(""))
 
-		allbadger := bstorage.InitAllBadger(metrics, db)
+		allBadger := bstorage.InitAllBadger(metrics, db)
 		fullState, err := protocol.NewFullConsensusState(
 			log,
 			tracer,
@@ -3187,8 +3202,13 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 			blockTimer,
 			util.MockReceiptValidator(),
 			util.MockSealValidator(all.Seals),
-			allbadger.QuorumCertificates,
-			allbadger.Blocks,
+			allBadger.QuorumCertificates,
+			allBadger.Blocks,
+			protocol.ConsensusMutableProtocolState(
+				log,
+				state,
+				allBadger,
+			),
 		)
 		require.NoError(t, err)
 
