@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -77,7 +76,7 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 	incorporatingBlock flow.Identifier,
 ) (flow.ChunkList, error) {
 	resultID := result.ID()
-	log := log.With().
+	log := e.log.With().
 		Hex("result_id", logging.ID(resultID)).
 		Hex("executed_block_id", logging.ID(result.BlockID)).
 		Hex("incorporating_block_id", logging.ID(incorporatingBlock)).
@@ -101,8 +100,7 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 	}
 	e.metrics.OnChunksAssignmentDoneAtAssigner(len(chunkList))
 
-	// TODO: de-escalate to debug level on stable version.
-	log.Info().
+	log.Debug().
 		Int("total_chunks", len(result.Chunks)).
 		Int("total_assigned_chunks", len(chunkList)).
 		Msg("chunk assignment done")
@@ -144,7 +142,7 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier, block
 
 	// notifies chunk queue consumer of a new chunk
 	e.newChunkListener.Check()
-	lg.Info().Msg("chunk locator successfully pushed to chunks queue")
+	lg.Debug().Msg("chunk locator successfully pushed to chunks queue")
 
 	return true, nil
 }
@@ -229,7 +227,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 	}
 
 	e.metrics.OnFinalizedBlockArrivedAtAssigner(block.Header.Height)
-	lg.Info().
+	lg.Debug().
 		Uint64("total_assigned_chunks", assignedChunksCount).
 		Uint64("total_processed_chunks", processedChunksCount).
 		Msg("finished processing finalized block")
