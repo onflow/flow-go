@@ -5,20 +5,20 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// UpsertComputationResult upserts given existing instance of ComputationResult in local BadgerDB.
+// UpsertComputationResultUploadStatus upserts given existing instance of ComputationResult in local BadgerDB.
 func UpsertComputationResultUploadStatus(w storage.Writer, blockID flow.Identifier,
 	wasUploadCompleted bool) error {
 	return UpsertByKey(w, MakePrefix(codeComputationResults, blockID), wasUploadCompleted)
 }
 
-// RemoveComputationResult removes an instance of ComputationResult with given ID.
+// RemoveComputationResultUploadStatus removes an instance of ComputationResult with given ID.
 func RemoveComputationResultUploadStatus(
 	w storage.Writer,
 	blockID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeComputationResults, blockID))
 }
 
-// GetComputationResult returns stored ComputationResult instance with given ID.
+// GetComputationResultUploadStatus returns stored ComputationResult instance with given ID.
 func GetComputationResultUploadStatus(r storage.Reader, blockID flow.Identifier,
 	wasUploadCompleted *bool) error {
 	return RetrieveByKey(r, MakePrefix(codeComputationResults, blockID), wasUploadCompleted)
