@@ -328,6 +328,8 @@ func bootstrapSealingSegment(
 		}
 	}
 
+	sealsLookup := make(map[flow.Identifier]struct{})
+	sealsLookup[rootSeal.ID()] = struct{}{}
 	for i, block := range segment.Blocks {
 		blockID := block.ID()
 		height := block.Header.Height
@@ -350,11 +352,15 @@ func bootstrapSealingSegment(
 		if !ok {
 			return fmt.Errorf("missing latest seal for sealing segment block (id=%s)", blockID)
 		}
+
+		// build seals lookup
+		for _, seal := range block.Payload.Seals {
+			sealsLookup[seal.ID()] = struct{}{}
+		}
 		// sanity check: make sure the seal exists
-		var latestSeal flow.Seal
-		err = operation.RetrieveSeal(rw.GlobalReader(), latestSealID, &latestSeal)
-		if err != nil {
-			return fmt.Errorf("could not verify latest seal for block (id=%x) exists: %w", blockID, err)
+		_, ok = sealsLookup[latestSealID]
+		if !ok {
+			return fmt.Errorf("missing latest seal for sealing segment block (id=%s)", blockID)
 		}
 		err = operation.IndexLatestSealAtBlock(w, blockID, latestSealID)
 		if err != nil {
