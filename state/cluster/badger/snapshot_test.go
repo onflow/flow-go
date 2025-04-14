@@ -172,7 +172,7 @@ func (suite *SnapshotSuite) TestAtBlockID() {
 	// ensure head is correct
 	head, err := snapshot.Head()
 	assert.NoError(t, err)
-	assert.Equal(t, suite.genesis.ID(), head.ID())
+	assert.Equal(t, suite.genesis.ToHeader().ID(), head.ID())
 }
 
 func (suite *SnapshotSuite) TestEmptyCollection() {
@@ -224,7 +224,7 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	// ensure head is correct
 	head, err := snapshot.Head()
 	assert.NoError(t, err)
-	assert.Equal(t, finalizedBlock1.ID(), head.ID())
+	assert.Equal(t, finalizedBlock1.ToHeader().ID(), head.ID())
 }
 
 // test that no pending blocks are returned when there are none
@@ -282,7 +282,7 @@ func (suite *SnapshotSuite) TestPending_Grandchildren() {
 
 		// we must have already seen the parent
 		_, seen := parents[header.ParentID]
-		suite.Assert().True(seen, "pending list contained child (%x) before parent (%x)", header.ID(), header.ParentID)
+		suite.Assert().True(seen, "pending list contained child (%x) before parent (%x)", blockID, header.ParentID)
 
 		// mark this block as seen
 		parents[header.ID()] = struct{}{}

@@ -67,9 +67,9 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 	}
 }
 
-// RetrieveLatestFinalizedClusterHeader retrieves the latest finalized for the
+// RetrieveLatestFinalizedClusterBlock retrieves the latest finalized for the
 // given cluster chain ID.
-func RetrieveLatestFinalizedClusterHeader(chainID flow.ChainID, final *flow.Header) func(tx *badger.Txn) error {
+func RetrieveLatestFinalizedClusterBlock(chainID flow.ChainID, final *cluster.Block) func(tx *badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		var boundary uint64
 		err := operation.RetrieveClusterFinalizedHeight(chainID, &boundary)(tx)
@@ -83,10 +83,22 @@ func RetrieveLatestFinalizedClusterHeader(chainID flow.ChainID, final *flow.Head
 			return fmt.Errorf("could not retrieve final ID: %w", err)
 		}
 
-		err = operation.RetrieveHeader(finalID, final)(tx)
+		var header flow.Header
+		err = operation.RetrieveHeader(finalID, &header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized header: %w", err)
 		}
+		headerFields := header.HeaderFields()
+
+		// get the payload
+		var payload cluster.Payload
+		err = RetrieveClusterPayload(finalID, &payload)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve payload: %w", err)
+		}
+
+		final.Header = &headerFields
+		final.Payload = &payload
 
 		return nil
 	}

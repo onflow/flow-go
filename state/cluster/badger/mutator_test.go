@@ -214,13 +214,6 @@ func (suite *MutatorSuite) TestBootstrap_InvalidParentHash() {
 	suite.Assert().Error(err)
 }
 
-func (suite *MutatorSuite) TestBootstrap_InvalidPayloadHash() {
-	suite.genesis.Header.PayloadHash = unittest.IdentifierFixture()
-
-	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
-	suite.Assert().Error(err)
-}
-
 func (suite *MutatorSuite) TestBootstrap_InvalidPayload() {
 	// this is invalid because genesis collection should be empty
 	suite.genesis.Payload = unittest.ClusterPayloadFixture(2)
@@ -248,7 +241,7 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 		var header flow.Header
 		err = operation.RetrieveHeader(suite.genesis.ID(), &header)(tx)
 		suite.Assert().Nil(err)
-		suite.Assert().Equal(suite.genesis.Header.ID(), header.ID())
+		suite.Assert().Equal(suite.genesis.ToHeader().ID(), header.ID())
 
 		// should insert block height -> ID lookup
 		var blockID flow.Identifier
