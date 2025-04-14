@@ -9,6 +9,24 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestExecutionReceiptID_Malleability confirms that ExecutionReceipt and ExecutionReceiptMeta, which implement
+// the [flow.IDEntity] interface, are resistant to tampering.
+func TestExecutionReceiptID_Malleability(t *testing.T) {
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithServiceEvents(3))),
+		unittest.WithSpocks(unittest.SignaturesFixture(3)),
+	)
+	receiptMeta := receipt.Meta()
+	// check ID of body used for signature
+	unittest.RequireEntityNonMalleable(t, &receiptMeta.ExecutionReceiptMetaBody)
+	// check full ID used for indexing
+	unittest.RequireEntityNonMalleable(t, receiptMeta)
+	unittest.RequireEntityNonMalleable(t, receipt,
+		unittest.WithFieldGenerator("ExecutionReceiptBody.ExecutionResult.ServiceEvents", func() []flow.ServiceEvent {
+			return unittest.ServiceEventsFixture(3)
+		}))
+}
+
 // TestExecutionReceiptGroupBy tests the GroupBy method of ExecutionReceiptList:
 // * grouping should preserve order and multiplicity of elements
 // * group for unknown identifier should be empty

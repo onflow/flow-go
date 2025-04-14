@@ -447,8 +447,10 @@ func ExecutionReceiptsFromParentBlockFixture(t *testing.T,
 		// makes several copies of the same result
 		for cp := 0; cp < builder.executorCount; cp++ {
 			allReceipts = append(allReceipts, &flow.ExecutionReceipt{
-				ExecutorID:      builder.executorIDs[cp],
-				ExecutionResult: *result,
+				ExecutionReceiptBody: flow.ExecutionReceiptBody{
+					ExecutorID:      builder.executorIDs[cp],
+					ExecutionResult: *result,
+				},
 			})
 
 			allData = append(allData, data)
