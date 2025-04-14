@@ -167,6 +167,7 @@ type EpochStateMachine struct {
 	commits              storage.EpochCommits
 	epochProtocolStateDB storage.EpochProtocolStateEntries
 	pendingDbUpdates     *transaction.DeferredBlockPersist
+	pendingDBWrites      []storage.BlockIndexingBatchWrite
 }
 
 var _ protocol_state.KeyValueStoreStateMachine = (*EpochStateMachine)(nil)
@@ -251,6 +252,23 @@ func (e *EpochStateMachine) Build() (*transaction.DeferredBlockPersist, error) {
 	return e.pendingDbUpdates, nil
 }
 
+func (e *EpochStateMachine) BuildBatchOps() ([]storage.BlockIndexingBatchWrite, error) {
+	updatedEpochState, updatedStateID, hasChanges := e.activeStateMachine.Build()
+
+	e.pendingDBWrites = append(e.pendingDBWrites, func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+		return e.epochProtocolStateDB.BatchIndex(rw, blockID, updatedStateID)
+	})
+
+	if hasChanges {
+		e.pendingDBWrites = append(e.pendingDBWrites, func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+			return e.epochProtocolStateDB.BatchStore(rw, updatedStateID, updatedEpochState.MinEpochStateEntry)
+		})
+	}
+	e.EvolvingState.SetEpochStateID(updatedStateID)
+
+	return e.pendingDBWrites, nil
+}
+
 // EvolveState applies the state change(s) on the Epoch sub-state, based on information from the candidate block
 // (under construction). Information that potentially changes the state (compared to the parent block's state):
 //   - Service Events sealed in the candidate block
@@ -296,6 +314,35 @@ func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent)
 		}
 	}
 	e.pendingDbUpdates.AddIndexingOps(dbUpdates.Pending())
+	return nil
+}
+
+func (e *EpochStateMachine) FollowerEvolveState(sealedServiceEvents []flow.ServiceEvent) error {
+	dbUpdates, err := e.followerEvolveActiveStateMachine(sealedServiceEvents)
+	if err != nil {
+		if protocol.IsInvalidServiceEventError(err) {
+			// When the happy path state machine returns an InvalidServiceEventError, we discard its state and use the fallback state machine
+			// to handle the block's epoch state evolution. The fallback state machine sets the state's EFM flag and gracefully handle all
+			// service events to keep the protocol alive, no matter whether the service events are incorrect, inconsistent or unexpected.
+			// Once we enter EFM, the only way to return to normal is by processing an epoch recover event by the fallback state machine.
+			//    Without loss of generality, we can assume that the error above is from the happy path state machine. In case of a bug, where
+			// the fallback state machine was already active above, yet it returned the `InvalidServiceEventError`, we would re-execute exactly
+			// that same logic below, arrive exactly at the same conclusion (fallback state machine returned an error which it shouldn't have)
+			// and crash.
+			e.activeStateMachine, err = e.epochFallbackStateMachineFactory()
+			if err != nil {
+				return fmt.Errorf("could not create epoch fallback state machine: %w", err)
+			}
+			dbUpdates, err = e.followerEvolveActiveStateMachine(sealedServiceEvents)
+			if err != nil {
+				return irrecoverable.NewExceptionf("could not transition to epoch fallback mode: %w", err)
+			}
+		} else {
+			return irrecoverable.NewExceptionf("could not apply service events from ordered results: %w", err)
+		}
+	}
+
+	e.pendingDBWrites = append(e.pendingDBWrites, dbUpdates...)
 	return nil
 }
 
@@ -348,6 +395,66 @@ func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.
 			}
 			if processed {
 				dbUpdates.AddDbOps(e.setups.StoreTx(&ev.EpochSetup), e.commits.StoreTx(&ev.EpochCommit)) // we'll insert the setup & commit events when we insert the block
+			}
+		case *flow.EjectNode:
+			_ = e.activeStateMachine.EjectIdentity(ev)
+		default:
+			continue
+		}
+	}
+	return dbUpdates, nil
+}
+
+func (e *EpochStateMachine) followerEvolveActiveStateMachine(sealedServiceEvents []flow.ServiceEvent) ([]storage.BlockIndexingBatchWrite, error) {
+	parentProtocolState := e.activeStateMachine.ParentState()
+
+	// STEP 1: transition to next epoch if next epoch is committed *and* we are at first block of epoch
+	phase := parentProtocolState.EpochPhase()
+	if (phase == flow.EpochPhaseCommitted) && (e.activeStateMachine.View() > parentProtocolState.CurrentEpochFinalView()) {
+		err := e.activeStateMachine.TransitionToNextEpoch()
+		if err != nil {
+			return nil, fmt.Errorf("could not transition protocol state to next epoch: %w", err)
+		}
+	}
+
+	// STEP 2: apply service events (input events already required to be ordered by block height).
+	dbUpdates := make([]storage.BlockIndexingBatchWrite, 0, len(sealedServiceEvents))
+	for _, event := range sealedServiceEvents {
+		switch ev := event.Event.(type) {
+		case *flow.EpochSetup:
+			processed, err := e.activeStateMachine.ProcessEpochSetup(ev)
+			if err != nil {
+				return nil, fmt.Errorf("could not process epoch setup event: %w", err)
+			}
+			if processed {
+				dbUpdates = append(dbUpdates, func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+					return e.setups.BatchStore(rw, ev) // we'll insert the setup event when we insert the block
+				})
+			}
+
+		case *flow.EpochCommit:
+			processed, err := e.activeStateMachine.ProcessEpochCommit(ev)
+			if err != nil {
+				return nil, fmt.Errorf("could not process epoch commit event: %w", err)
+			}
+			if processed {
+				dbUpdates = append(dbUpdates, func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+					return e.commits.BatchStore(rw, ev) // we'll insert the commit event when we insert the block
+				})
+			}
+		case *flow.EpochRecover:
+			processed, err := e.activeStateMachine.ProcessEpochRecover(ev)
+			if err != nil {
+				return nil, fmt.Errorf("could not process epoch recover event: %w", err)
+			}
+			if processed {
+				dbUpdates = append(dbUpdates, func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+					err := e.setups.BatchStore(rw, &ev.EpochSetup)
+					if err != nil {
+						return err
+					}
+					return e.commits.BatchStore(rw, &ev.EpochCommit) // we'll insert the setup & commit events when we insert the block
+				})
 			}
 		case *flow.EjectNode:
 			_ = e.activeStateMachine.EjectIdentity(ev)

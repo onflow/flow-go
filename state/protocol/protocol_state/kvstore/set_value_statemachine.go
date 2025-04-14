@@ -69,3 +69,7 @@ func (m *SetValueStateMachine) EvolveState(orderedUpdates []flow.ServiceEvent) e
 
 	return nil
 }
+
+func (m *SetValueStateMachine) FollowerEvolveState(orderedUpdates []flow.ServiceEvent) error {
+	return m.EvolveState(orderedUpdates)
+}

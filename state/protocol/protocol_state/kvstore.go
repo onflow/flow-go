@@ -107,8 +107,7 @@ type OrthogonalStoreStateMachine[P any] interface {
 	//
 	// No errors are expected during normal operations.
 	Build() (*transaction.DeferredBlockPersist, error)
-
-	BuildBatchOps() (storage.BlockIndexingBatchWrite, error)
+	BuildBatchOps() ([]storage.BlockIndexingBatchWrite, error)
 
 	// EvolveState applies the state change(s) on sub-state P for the candidate block (under construction).
 	// Information that potentially changes the Epoch state (compared to the parent block's state):
@@ -141,6 +140,7 @@ type OrthogonalStoreStateMachine[P any] interface {
 	//
 	// No errors are expected during normal operations.
 	EvolveState(sealedServiceEvents []flow.ServiceEvent) error
+	FollowerEvolveState(sealedServiceEvents []flow.ServiceEvent) error
 
 	// View returns the view associated with this state machine.
 	// The view of the state machine equals the view of the block carrying the respective updates.

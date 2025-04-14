@@ -69,6 +69,10 @@ func (m *PSVersionUpgradeStateMachine) EvolveState(orderedUpdates []flow.Service
 	return nil
 }
 
+func (m *PSVersionUpgradeStateMachine) FollowerEvolveState(orderedUpdates []flow.ServiceEvent) error {
+	return m.EvolveState(orderedUpdates)
+}
+
 // processSingleEvent performs processing of a single protocol version upgrade event.
 // Expected errors indicating that we have observed and invalid service event from protocol's point of view.
 //   - `protocol.InvalidServiceEventError` - if the service event is invalid for the current protocol state.

@@ -1,7 +1,6 @@
 package common
 
 import (
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/storage"
@@ -35,10 +34,8 @@ func (m *BaseKeyValueStoreStateMachine) Build() (*transaction.DeferredBlockPersi
 	return transaction.NewDeferredBlockPersist(), nil
 }
 
-func (m *BaseKeyValueStoreStateMachine) BuildBatchOps() (storage.BlockIndexingBatchWrite, error) {
-	return func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-		return nil
-	}, nil
+func (m *BaseKeyValueStoreStateMachine) BuildBatchOps() ([]storage.BlockIndexingBatchWrite, error) {
+	return []storage.BlockIndexingBatchWrite{}, nil
 }
 
 // View returns the view associated with this state machine.

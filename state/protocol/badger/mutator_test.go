@@ -920,6 +920,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 		result, _, err := rootSnapshot.SealedResult()
 		require.NoError(t, err)
+		_, err = state.AtBlockID(head.ID()).Epochs().Current()
+		require.NoError(t, err)
 
 		// we should begin the epoch in the staking phase
 		phase, err := state.AtBlockID(head.ID()).EpochPhase()
@@ -1551,7 +1553,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		// swap consensus node for a new one for epoch 2
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 		epoch2Participants := append(
-			participants.Filter(filter.Not[flow.Identity](filter.HasRole[flow.Identity](flow.RoleConsensus))),
+			participants.Filter(filter.Not(filter.HasRole[flow.Identity](flow.RoleConsensus))),
 			epoch2NewParticipant,
 		).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 
@@ -3297,7 +3299,7 @@ func getRootProtocolStateID(t *testing.T, rootSnapshot *inmem.Snapshot) flow.Ide
 // calculateExpectedStateId is a utility function which makes easier to get expected protocol state ID after applying service events contained in seals.
 func calculateExpectedStateId(t *testing.T, mutableProtocolState realprotocol.MutableProtocolState) func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
 	return func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
-		expectedStateID, _, err := mutableProtocolState.EvolveState(header.ParentID, header.View, seals)
+		expectedStateID, _, err := mutableProtocolState.FollowerEvolveState(header.ParentID, header.View, seals)
 		require.NoError(t, err)
 		return expectedStateID
 	}
