@@ -16,15 +16,9 @@ import (
 // associated indexes.
 func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
-
-		// check payload integrity
-		if block.Header.PayloadHash != block.Payload.Hash() {
-			return fmt.Errorf("computed payload hash does not match header")
-		}
-
 		// store the block header
 		blockID := block.ID()
-		err := operation.InsertHeader(blockID, block.Header)(tx)
+		err := operation.InsertHeader(blockID, block.ToHeader())(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
 		}
@@ -63,8 +57,9 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 		}
 
 		// overwrite block
+		headerFields := header.HeaderFields()
 		*block = cluster.Block{
-			Header:  &header,
+			Header:  &headerFields,
 			Payload: &payload,
 		}
 
@@ -131,7 +126,7 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 		}
 
 		// insert block view -> ID mapping
-		err = operation.IndexClusterBlockHeight(chainID, header.Height, header.ID())(tx)
+		err = operation.IndexClusterBlockHeight(chainID, header.Height, blockID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert view->ID mapping: %w", err)
 		}

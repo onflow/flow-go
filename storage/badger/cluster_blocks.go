@@ -35,7 +35,7 @@ func (b *ClusterBlocks) Store(block *cluster.Block) error {
 
 func (b *ClusterBlocks) storeTx(block *cluster.Block) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		err := b.headers.storeTx(block.Header)(tx)
+		err := b.headers.storeTx(block.ToHeader())(tx)
 		if err != nil {
 			return fmt.Errorf("could not store header: %w", err)
 		}
@@ -56,8 +56,9 @@ func (b *ClusterBlocks) ByID(blockID flow.Identifier) (*cluster.Block, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve payload: %w", err)
 	}
+	headerFields := header.HeaderFields()
 	block := cluster.Block{
-		Header:  header,
+		Header:  &headerFields,
 		Payload: payload,
 	}
 	return &block, nil

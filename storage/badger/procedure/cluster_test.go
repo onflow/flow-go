@@ -20,7 +20,7 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 		require.NoError(t, err)
 
 		var retrieved cluster.Block
-		err = db.View(RetrieveClusterBlock(block.Header.ID(), &retrieved))
+		err = db.View(RetrieveClusterBlock(block.ID(), &retrieved))
 		require.NoError(t, err)
 
 		require.Equal(t, block, retrieved)
@@ -42,7 +42,7 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		err = db.Update(operation.InsertClusterFinalizedHeight(block.Header.ChainID, parent.Header.Height))
 		require.NoError(t, err)
 
-		err = db.Update(FinalizeClusterBlock(block.Header.ID()))
+		err = db.Update(FinalizeClusterBlock(block.ID()))
 		require.NoError(t, err)
 
 		var boundary uint64

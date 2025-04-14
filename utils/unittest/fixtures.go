@@ -479,6 +479,23 @@ func HeaderWithView(view uint64) func(*flow.Header) {
 	}
 }
 
+func BlockHeaderFieldsFixture(opts ...func(header *flow.HeaderFields)) *flow.HeaderFields {
+	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
+	view := height + uint64(rand.Intn(1000))
+	header := BlockHeaderFieldsWithParentFixture(&flow.Header{
+		ChainID:  flow.Emulator,
+		ParentID: IdentifierFixture(),
+		Height:   height,
+		View:     view,
+	})
+
+	for _, opt := range opts {
+		opt(header)
+	}
+
+	return header
+}
+
 func BlockHeaderFixture(opts ...func(header *flow.Header)) *flow.Header {
 	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
@@ -547,6 +564,36 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 	}
 }
 
+func BlockHeaderFieldsWithParentFixture(parent *flow.Header) *flow.HeaderFields {
+	height := parent.Height + 1
+	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
+	var lastViewTC *flow.TimeoutCertificate
+	if view != parent.View+1 {
+		newestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
+			qc.View = parent.View
+		})
+		lastViewTC = &flow.TimeoutCertificate{
+			View:          view - 1,
+			NewestQCViews: []uint64{newestQC.View},
+			NewestQC:      newestQC,
+			SignerIndices: SignerIndicesFixture(4),
+			SigData:       SignatureFixture(),
+		}
+	}
+	return &flow.HeaderFields{
+		ChainID:            parent.ChainID,
+		ParentID:           parent.ID(),
+		Height:             height,
+		Timestamp:          time.Now().UTC(),
+		View:               view,
+		ParentView:         parent.View,
+		ParentVoterIndices: SignerIndicesFixture(4),
+		ParentVoterSigData: QCSigDataFixture(),
+		ProposerID:         IdentifierFixture(),
+		LastViewTC:         lastViewTC,
+	}
+}
+
 func BlockHeaderWithHeight(height uint64) *flow.Header {
 	return BlockHeaderFixture(WithHeaderHeight(height))
 }
@@ -593,10 +640,8 @@ func ClusterPayloadFixture(n int) *cluster.Payload {
 }
 
 func ClusterBlockFixture() cluster.Block {
-
 	payload := ClusterPayloadFixture(3)
-	header := BlockHeaderFixture()
-	header.PayloadHash = payload.Hash()
+	header := BlockHeaderFieldsFixture()
 
 	return cluster.Block{
 		Header:  header,
@@ -624,14 +669,13 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 
 	payload := ClusterPayloadFixture(3)
 
-	header := BlockHeaderFixture()
+	header := BlockHeaderFieldsFixture()
 	header.Height = parent.Header.Height + 1
 	header.View = parent.Header.View + 1
 	header.ChainID = parent.Header.ChainID
 	header.Timestamp = time.Now()
 	header.ParentID = parent.ID()
 	header.ParentView = parent.Header.View
-	header.PayloadHash = payload.Hash()
 
 	block := cluster.Block{
 		Header:  header,

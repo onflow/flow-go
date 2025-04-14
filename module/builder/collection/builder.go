@@ -191,8 +191,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not build header: %w", err)
 	}
 
+	headerFields := proposal.Header.HeaderFields()
 	block := cluster.Block{
-		Header:  proposal.Header,
+		Header:  &headerFields,
 		Payload: payload,
 	}
 

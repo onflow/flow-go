@@ -17,7 +17,7 @@ func NewPendingClusterBlocks() *PendingClusterBlocks {
 func (b *PendingClusterBlocks) Add(block flow.Slashable[*cluster.BlockProposal]) bool {
 	return b.backend.add(flow.Slashable[*flow.Proposal]{
 		OriginID: flow.Identifier{},
-		Message:  &flow.Proposal{Header: block.Message.Block.Header, ProposerSigData: block.Message.ProposerSigData},
+		Message:  &flow.Proposal{Header: block.Message.Block.ToHeader(), ProposerSigData: block.Message.ProposerSigData},
 	}, block.Message.Block.Payload)
 }
 
@@ -27,11 +27,12 @@ func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cl
 		return flow.Slashable[*cluster.BlockProposal]{}, false
 	}
 
+	headerFields := item.header.Message.Header.HeaderFields()
 	block := flow.Slashable[*cluster.BlockProposal]{
 		OriginID: item.header.OriginID,
 		Message: &cluster.BlockProposal{
 			Block: &cluster.Block{
-				Header:  item.header.Message.Header,
+				Header:  &headerFields,
 				Payload: item.payload.(*cluster.Payload),
 			},
 			ProposerSigData: item.header.Message.ProposerSigData,
@@ -49,11 +50,12 @@ func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slas
 
 	blocks := make([]flow.Slashable[*cluster.BlockProposal], 0, len(items))
 	for _, item := range items {
+		headerFields := item.header.Message.Header.HeaderFields()
 		block := flow.Slashable[*cluster.BlockProposal]{
 			OriginID: item.header.OriginID,
 			Message: &cluster.BlockProposal{
 				Block: &cluster.Block{
-					Header:  item.header.Message.Header,
+					Header:  &headerFields,
 					Payload: item.payload.(*cluster.Payload),
 				},
 				ProposerSigData: item.header.Message.ProposerSigData,

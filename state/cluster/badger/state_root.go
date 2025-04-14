@@ -36,11 +36,6 @@ func validateClusterGenesis(genesis *cluster.Block) error {
 		return fmt.Errorf("genesis parent ID must be zero hash (got %x)", genesis.Header.ParentID)
 	}
 
-	// check payload integrity
-	if genesis.Header.PayloadHash != genesis.Payload.Hash() {
-		return fmt.Errorf("computed payload hash does not match header")
-	}
-
 	// check payload
 	collSize := len(genesis.Payload.Collection.Transactions)
 	if collSize != 0 {
