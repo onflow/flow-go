@@ -2,10 +2,13 @@ package flow
 
 import (
 	"encoding/json"
+	"io"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/vmihailenco/msgpack/v4"
+
+	"github.com/onflow/go-ethereum/rlp"
 
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/fingerprint"
@@ -54,13 +57,41 @@ type HeaderFields struct {
 }
 
 // QuorumCertificate returns quorum certificate that is incorporated in the block.
-func (h HeaderFields) QuorumCertificate() *QuorumCertificate {
+func (h *HeaderFields) QuorumCertificate() *QuorumCertificate {
 	return &QuorumCertificate{
 		BlockID:       h.ParentID,
 		View:          h.ParentView,
 		SignerIndices: h.ParentVoterIndices,
 		SigData:       h.ParentVoterSigData,
 	}
+}
+
+func (h *HeaderFields) EncodeRLP(w io.Writer) error {
+	encodingCanonicalForm := struct {
+		ChainID            ChainID
+		ParentID           Identifier
+		Height             uint64
+		Timestamp          uint64
+		View               uint64
+		ParentView         uint64
+		ParentVoterIndices []byte
+		ParentVoterSigData []byte
+		ProposerID         Identifier
+		LastViewTCID       Identifier
+	}{
+		ChainID:            h.ChainID,
+		ParentID:           h.ParentID,
+		Height:             h.Height,
+		Timestamp:          uint64(h.Timestamp.UnixNano()),
+		View:               h.View,
+		ParentView:         h.ParentView,
+		ParentVoterIndices: h.ParentVoterIndices,
+		ParentVoterSigData: h.ParentVoterSigData,
+		ProposerID:         h.ProposerID,
+		LastViewTCID:       h.LastViewTC.ID(),
+	}
+
+	return rlp.Encode(w, encodingCanonicalForm)
 }
 
 // Header contains all meta-data for a block, as well as a hash representing
