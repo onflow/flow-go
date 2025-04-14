@@ -47,23 +47,23 @@ func (_m *OrthogonalStoreStateMachine[P]) Build() (*transaction.DeferredBlockPer
 }
 
 // BuildBatchOps provides a mock function with given fields:
-func (_m *OrthogonalStoreStateMachine[P]) BuildBatchOps() (storage.BlockIndexingBatchWrite, error) {
+func (_m *OrthogonalStoreStateMachine[P]) BuildBatchOps() ([]storage.BlockIndexingBatchWrite, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for BuildBatchOps")
 	}
 
-	var r0 storage.BlockIndexingBatchWrite
+	var r0 []storage.BlockIndexingBatchWrite
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (storage.BlockIndexingBatchWrite, error)); ok {
+	if rf, ok := ret.Get(0).(func() ([]storage.BlockIndexingBatchWrite, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() storage.BlockIndexingBatchWrite); ok {
+	if rf, ok := ret.Get(0).(func() []storage.BlockIndexingBatchWrite); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(storage.BlockIndexingBatchWrite)
+			r0 = ret.Get(0).([]storage.BlockIndexingBatchWrite)
 		}
 	}
 
@@ -82,6 +82,24 @@ func (_m *OrthogonalStoreStateMachine[P]) EvolveState(sealedServiceEvents []flow
 
 	if len(ret) == 0 {
 		panic("no return value specified for EvolveState")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]flow.ServiceEvent) error); ok {
+		r0 = rf(sealedServiceEvents)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// FollowerEvolveState provides a mock function with given fields: sealedServiceEvents
+func (_m *OrthogonalStoreStateMachine[P]) FollowerEvolveState(sealedServiceEvents []flow.ServiceEvent) error {
+	ret := _m.Called(sealedServiceEvents)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FollowerEvolveState")
 	}
 
 	var r0 error

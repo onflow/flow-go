@@ -340,7 +340,7 @@ func (s *MutableProtocolState) followerBuild(
 	evolvingState protocol.KVStoreReader,
 ) (flow.Identifier, []storage.BlockIndexingBatchWrite, error) {
 	for _, stateMachine := range stateMachines {
-		err := stateMachine.EvolveState(serviceEvents) // state machine should only bubble up exceptions
+		err := stateMachine.FollowerEvolveState(serviceEvents) // state machine should only bubble up exceptions
 		if err != nil {
 			return flow.ZeroID, nil, fmt.Errorf("exception from sub-state machine during state evolution: %w", err)
 		}
@@ -353,7 +353,7 @@ func (s *MutableProtocolState) followerBuild(
 		if err != nil {
 			return flow.ZeroID, nil, fmt.Errorf("unexpected exception from sub-state machine while building its output state: %w", err)
 		}
-		dbUpdates = append(dbUpdates, dbOps)
+		dbUpdates = append(dbUpdates, dbOps...)
 	}
 	resultingStateID := evolvingState.ID()
 
