@@ -29,7 +29,7 @@ type cachedLatest struct {
 
 type State struct {
 	metrics module.ComplianceMetrics
-	sdb     storage.DB
+	db      storage.DB
 	headers storage.Headers
 	blocks  storage.Blocks
 	qcs     storage.QuorumCertificates
@@ -781,7 +781,7 @@ func newState(
 ) (*State, error) {
 	state := &State{
 		metrics: metrics,
-		sdb:     db,
+		db:      db,
 		headers: headers,
 		results: results,
 		seals:   seals,
@@ -872,7 +872,7 @@ func boostrapVersionBeacon(rw storage.ReaderBatchWriter, snapshot protocol.Snaps
 func (state *State) populateCache() error {
 	// cache the initial value for finalized block
 	// finalized header
-	r := state.sdb.Reader()
+	r := state.db.Reader()
 	var finalizedHeight uint64
 	err := operation.RetrieveFinalizedHeight(r, &finalizedHeight)
 	if err != nil {
