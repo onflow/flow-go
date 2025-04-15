@@ -96,39 +96,6 @@ func NewFollowerState(
 	return followerState, nil
 }
 
-func MutableProtocolStateFromState(
-	logger zerolog.Logger,
-	state *State,
-) protocol.MutableProtocolState {
-	return protocol_state.NewMutableProtocolState(
-		logger,
-		state.epochProtocolStateEntriesDB,
-		state.protocolKVStoreSnapshotsDB,
-		state.params,
-		state.headers,
-		state.results,
-		state.epoch.setups,
-		state.epoch.commits,
-	)
-}
-
-func ConsensusMutableProtocolState(
-	logger zerolog.Logger,
-	state *State,
-	allBadger *storage.All,
-) protocol.MutableProtocolState {
-	return protocol_state.NewMutableProtocolState(
-		logger,
-		allBadger.EpochProtocolStateEntries,
-		allBadger.ProtocolKVStore,
-		state.Params(),
-		allBadger.Headers,
-		allBadger.Results,
-		allBadger.Setups,
-		allBadger.EpochCommits,
-	)
-}
-
 // NewFullConsensusState initializes a new mutable protocol state backed by a
 // badger database. When extending the state with a new block, it checks the
 // _entire_ block payload. Consensus nodes should use the FullConsensusState,
@@ -146,7 +113,6 @@ func NewFullConsensusState(
 	sealValidator module.SealValidator,
 	qcs storage.QuorumCertificates,
 	blocks storage.Blocks,
-	mutatableProtocolState protocol.MutableProtocolState,
 ) (*ParticipantState, error) {
 	followerState, err := NewFollowerState(
 		logger,

@@ -130,11 +130,6 @@ func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f fu
 			sealValidator,
 			allBadger.QuorumCertificates,
 			allBadger.Blocks,
-			pbadger.ConsensusMutableProtocolState(
-				log,
-				state,
-				allBadger,
-			),
 		)
 		require.NoError(t, err)
 		f(db, fullState)
@@ -182,11 +177,6 @@ func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snap
 			sealValidator,
 			allBadger.QuorumCertificates,
 			allBadger.Blocks,
-			pbadger.ConsensusMutableProtocolState(
-				log,
-				state,
-				allBadger,
-			),
 		)
 		require.NoError(t, err)
 		f(db, fullState)
@@ -232,11 +222,6 @@ func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Sn
 			sealValidator,
 			allBadger.QuorumCertificates,
 			allBadger.Blocks,
-			pbadger.ConsensusMutableProtocolState(
-				log,
-				state,
-				allBadger,
-			),
 		)
 		require.NoError(t, err)
 		f(db, fullState)
@@ -320,11 +305,6 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 			sealValidator,
 			allBadger.QuorumCertificates,
 			allBadger.Blocks,
-			pbadger.ConsensusMutableProtocolState(
-				log,
-				state,
-				allBadger,
-			),
 		)
 		require.NoError(t, err)
 		f(db, fullState)
@@ -370,11 +350,6 @@ func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot pr
 			sealValidator,
 			allBadger.QuorumCertificates,
 			allBadger.Blocks,
-			pbadger.ConsensusMutableProtocolState(
-				log,
-				state,
-				allBadger,
-			),
 		)
 		require.NoError(t, err)
 		mutableProtocolState := protocol_state.NewMutableProtocolState(
@@ -429,7 +404,7 @@ func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.
 	})
 }
 
-func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.ParticipantState, protocol.MutableProtocolState, protocol.MutableProtocolState)) {
+func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.ParticipantState, protocol.MutableProtocolState)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
@@ -456,11 +431,6 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
 		allBadger := bstorage.InitAllBadger(metrics, db)
-		consensusMutableProtocolState := pbadger.ConsensusMutableProtocolState(
-			log,
-			state,
-			allBadger,
-		)
 		fullState, err := pbadger.NewFullConsensusState(
 			log,
 			tracer,
@@ -474,10 +444,10 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 			sealValidator,
 			allBadger.QuorumCertificates,
 			allBadger.Blocks,
-			consensusMutableProtocolState,
 		)
 		require.NoError(t, err)
-		followerMutableProtocolState := protocol_state.NewMutableProtocolState(
+
+		mutableProtocolState := protocol_state.NewMutableProtocolState(
 			log,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -487,6 +457,6 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 			all.Setups,
 			all.EpochCommits,
 		)
-		f(db, fullState, followerMutableProtocolState, consensusMutableProtocolState)
+		f(db, fullState, mutableProtocolState)
 	})
 }

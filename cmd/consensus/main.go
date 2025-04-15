@@ -308,11 +308,6 @@ func main() {
 				sealValidator,
 				allBadger.QuorumCertificates,
 				allBadger.Blocks,
-				badgerState.ConsensusMutableProtocolState(
-					node.Logger,
-					state,
-					allBadger,
-				),
 			)
 			return err
 		}).

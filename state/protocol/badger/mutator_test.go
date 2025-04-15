@@ -134,11 +134,6 @@ func TestExtendValid(t *testing.T) {
 			util.MockSealValidator(all.Seals),
 			allBadger.QuorumCertificates,
 			allBadger.Blocks,
-			protocol.ConsensusMutableProtocolState(
-				log,
-				state,
-				allBadger,
-			),
 		)
 		require.NoError(t, err)
 
@@ -897,11 +892,6 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			sealValidator,
 			allBadger.QuorumCertificates,
 			allBadger.Blocks,
-			protocol.ConsensusMutableProtocolState(
-				log,
-				protoState,
-				allBadger,
-			),
 		)
 		require.NoError(t, err)
 
@@ -1158,7 +1148,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 	})
 	rootSnapshot := unittest.RootSnapshotFixture(append(participants, extraCollectors...))
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
-	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableProtocolState realprotocol.MutableProtocolState, participantMutableState realprotocol.MutableProtocolState) {
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableProtocolState realprotocol.MutableProtocolState) {
 		expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
 
 		head, err := rootSnapshot.Head()
@@ -2671,11 +2661,6 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 			sealValidator,
 			allBadger.QuorumCertificates,
 			allBadger.Blocks,
-			protocol.ConsensusMutableProtocolState(
-				log,
-				state,
-				allBadger,
-			),
 		)
 		require.NoError(t, err)
 
@@ -3207,11 +3192,6 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 			util.MockSealValidator(all.Seals),
 			allBadger.QuorumCertificates,
 			allBadger.Blocks,
-			protocol.ConsensusMutableProtocolState(
-				log,
-				state,
-				allBadger,
-			),
 		)
 		require.NoError(t, err)
 
