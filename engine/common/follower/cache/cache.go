@@ -137,8 +137,7 @@ func (c *Cache) handleEjectedBlock(proposal *flow.BlockProposal) {
 func (c *Cache) AddBlocks(batch []*flow.BlockProposal) (certifiedBatch []flow.CertifiedBlock, err error) {
 	batch = c.trimLeadingBlocksBelowPruningThreshold(batch)
 
-	batchSize := len(batch)
-	if batchSize < 1 { // empty batch is no-op
+	if len(batch) < 1 { // empty batch is no-op
 		return nil, nil
 	}
 

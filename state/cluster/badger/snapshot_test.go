@@ -109,22 +109,11 @@ func (suite *SnapshotSuite) Payload(transactions ...*flow.TransactionBody) model
 	return model.PayloadFromTransactions(minRefID, transactions...)
 }
 
-// BlockWithParent returns a valid block with the given parent.
-func (suite *SnapshotSuite) BlockWithParent(parent *model.Block) model.Block {
+// ProposalWithParent returns a valid block proposal with the given parent.
+func (suite *SnapshotSuite) ProposalWithParent(parent *model.Block) model.BlockProposal {
 	block := unittest.ClusterBlockWithParent(parent)
 	payload := suite.Payload()
 	block.SetPayload(payload)
-	return block
-}
-
-// Block returns a valid cluster block with genesis as parent.
-func (suite *SnapshotSuite) Block() model.Block {
-	return suite.BlockWithParent(suite.genesis)
-}
-
-// ProposalWithParent returns a valid block proposal with the given parent.
-func (suite *SnapshotSuite) ProposalWithParent(parent *model.Block) model.BlockProposal {
-	block := suite.BlockWithParent(parent)
 	return *unittest.ClusterProposalFromBlock(&block)
 }
 

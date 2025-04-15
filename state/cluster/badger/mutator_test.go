@@ -157,22 +157,11 @@ func (suite *MutatorSuite) Payload(transactions ...*flow.TransactionBody) model.
 	return model.PayloadFromTransactions(minRefID, transactions...)
 }
 
-// BlockWithParent returns a valid block with the given parent.
-func (suite *MutatorSuite) BlockWithParent(parent *model.Block) model.Block {
+// ProposalWithParent returns a valid block proposal with the given parent.
+func (suite *MutatorSuite) ProposalWithParent(parent *model.Block) model.BlockProposal {
 	block := unittest.ClusterBlockWithParent(parent)
 	payload := suite.Payload()
 	block.SetPayload(payload)
-	return block
-}
-
-// Block returns a valid cluster block with genesis as parent.
-func (suite *MutatorSuite) Block() model.Block {
-	return suite.BlockWithParent(suite.genesis)
-}
-
-// ProposalWithParent returns a valid block proposal with the given parent.
-func (suite *MutatorSuite) ProposalWithParent(parent *model.Block) model.BlockProposal {
-	block := suite.BlockWithParent(parent)
 	return *unittest.ClusterProposalFromBlock(&block)
 }
 
@@ -280,8 +269,7 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 
 func (suite *MutatorSuite) TestExtend_WithoutBootstrap() {
 	block := unittest.ClusterBlockWithParent(suite.genesis)
-	proposal := unittest.ClusterProposalFromBlock(&block)
-	err := suite.state.Extend(proposal)
+	err := suite.state.Extend(unittest.ClusterProposalFromBlock(&block))
 	suite.Assert().Error(err)
 }
 
@@ -612,8 +600,7 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 		block := unittest.ClusterBlockWithParent(&head)
 		payload := suite.Payload(&tx)
 		block.SetPayload(payload)
-		proposal := unittest.ClusterProposalFromBlock(&block)
-		err = suite.state.Extend(proposal)
+		err = suite.state.Extend(unittest.ClusterProposalFromBlock(&block))
 		assert.NoError(t, err)
 
 		// reset the valid head if we aren't building a conflicting fork
@@ -637,8 +624,7 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 		block := unittest.ClusterBlockWithParent(&head)
 		payload := suite.Payload(invalidatedTransactions...)
 		block.SetPayload(payload)
-		proposal := unittest.ClusterProposalFromBlock(&block)
-		err = suite.state.Extend(proposal)
+		err = suite.state.Extend(unittest.ClusterProposalFromBlock(&block))
 		assert.NoError(t, err)
 	})
 
@@ -646,8 +632,7 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 		block := unittest.ClusterBlockWithParent(&head)
 		payload := suite.Payload(oldTransactions...)
 		block.SetPayload(payload)
-		proposal := unittest.ClusterProposalFromBlock(&block)
-		err = suite.state.Extend(proposal)
+		err = suite.state.Extend(unittest.ClusterProposalFromBlock(&block))
 		assert.Error(t, err)
 		suite.Assert().True(state.IsInvalidExtensionError(err))
 	})

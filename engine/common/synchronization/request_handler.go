@@ -223,7 +223,8 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	// get all the blocks, one by one
 	// We currently require all blocks in the block response to be sent with a valid proposer signature.
 	// Consensus Followers theoretically only need the last block to have a valid proposer signature,
-	// as the other blocks can be verified via included QCs, but we want to avoid having sometimes-nil data.
+	// as the other blocks can be verified via included QCs. Though, for now we keep it simple and just
+	// uniformly use proposals, so all nodes (consensus participants and followers) maintain the same data.
 	blocks := make([]messages.BlockProposal, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
 		proposal, err := r.blocks.ProposalByHeight(height)

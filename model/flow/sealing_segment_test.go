@@ -146,8 +146,7 @@ func (suite *SealingSegmentSuite) AddBlocks(blocks ...*flow.Block) {
 			latestSeal = seal
 		}
 		suite.addSeal(block.ID(), latestSeal)
-		proposal := unittest.ProposalFromBlock(block)
-		err := suite.builder.AddBlock(proposal)
+		err := suite.builder.AddBlock(unittest.ProposalFromBlock(block))
 		require.NoError(suite.T(), err)
 	}
 }
@@ -309,8 +308,7 @@ func (suite *SealingSegmentSuite) TestBuild_RootSegment() {
 	suite.sealsByBlockID[root.ID()] = seal
 	suite.addProtocolStateEntry(root.Payload.ProtocolStateID, suite.ProtocolStateEntryWrapperFixture())
 	suite.addResult(result)
-	rootProposal := unittest.ProposalFromBlock(root)
-	err := suite.builder.AddBlock(rootProposal)
+	err := suite.builder.AddBlock(unittest.ProposalFromBlock(root))
 	require.NoError(suite.T(), err)
 
 	segment, err := suite.builder.SealingSegment()
@@ -334,8 +332,7 @@ func (suite *SealingSegmentSuite) TestBuild_RootSegmentWrongView() {
 	suite.sealsByBlockID[root.ID()] = seal
 	suite.addProtocolStateEntry(root.Payload.ProtocolStateID, suite.ProtocolStateEntryWrapperFixture())
 	suite.addResult(result)
-	rootProposal := unittest.ProposalFromBlock(root)
-	err := suite.builder.AddBlock(rootProposal)
+	err := suite.builder.AddBlock(unittest.ProposalFromBlock(root))
 	require.NoError(suite.T(), err)
 
 	_, err = suite.builder.SealingSegment()

@@ -38,11 +38,12 @@ func (b *ClusterBlocks) Store(proposal *cluster.BlockProposal) error {
 
 func (b *ClusterBlocks) storeTx(proposal *cluster.BlockProposal) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		err := b.headers.storeTx(proposal.Block.Header, proposal.ProposerSigData)(tx)
+		blockID := proposal.Block.ID()
+		err := b.headers.storeTx(blockID, proposal.Block.Header, proposal.ProposerSigData)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store header: %w", err)
 		}
-		err = b.payloads.storeTx(proposal.Block.ID(), proposal.Block.Payload)(tx)
+		err = b.payloads.storeTx(blockID, proposal.Block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store payload: %w", err)
 		}
