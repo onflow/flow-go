@@ -51,3 +51,43 @@ func TestRegisters_HappyPath(t *testing.T) {
 	_, err = registers.Get(unittest.RegisterIDFixture(), newHeight)
 	require.ErrorIs(t, err, storage.ErrNotFound)
 }
+
+func TestRegisters_Get(t *testing.T) {
+	firstHeight := uint64(5)
+	latestHeight := firstHeight
+	registers := NewRegisters(firstHeight, latestHeight)
+
+	// Store at height 6
+	entries := flow.RegisterEntries{unittest.RegisterEntryFixture()}
+	entries[0].Key = flow.RegisterID{
+		Owner: "owner1",
+		Key:   "key1",
+	}
+	err := registers.Store(entries, 6)
+	require.NoError(t, err)
+
+	// Exists at exact height
+	got, err := registers.Get(entries[0].Key, 6)
+	require.NoError(t, err)
+	require.Equal(t, entries[0].Value, got)
+
+	// Exists at fallback height
+	got, err = registers.Get(entries[0].Key, 7) // height not indexed
+	require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
+
+	err = registers.Store(flow.RegisterEntries{}, 7) // index height 7 with no data
+	require.NoError(t, err)
+
+	got, err = registers.Get(entries[0].Key, 7)
+	require.NoError(t, err)
+	require.Equal(t, entries[0].Value, got)
+
+	// Not found at any height
+	nonExistent := unittest.RegisterEntryFixture()
+	_, err = registers.Get(nonExistent.Key, 7)
+	require.ErrorIs(t, err, storage.ErrNotFound)
+
+	// Below first height
+	_, err = registers.Get(nonExistent.Key, firstHeight-1)
+	require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
+}

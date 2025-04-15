@@ -39,21 +39,29 @@ func (r *Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, 
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
-	h, ok := r.store[height]
-	if !ok {
-		return flow.RegisterValue{}, storage.ErrNotFound
+	if height < r.firstHeight || height > r.latestHeight {
+		return flow.RegisterValue{}, storage.ErrHeightNotIndexed
 	}
 
-	val, ok := h[ID]
-	if !ok {
-		return flow.RegisterValue{}, storage.ErrNotFound
+	// Start at the requested height and go backwards
+	for h := height; h >= r.firstHeight; h-- {
+		if registers, ok := r.store[h]; ok {
+			if val, ok := registers[ID]; ok {
+				return val, nil
+			}
+		}
+		if h == 0 { // prevent uint64 underflow
+			break
+		}
 	}
 
-	return val, nil
+	return flow.RegisterValue{}, storage.ErrNotFound
 }
 
 // LatestHeight returns the latest indexed height.
 func (r *Registers) LatestHeight() uint64 {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
 	return r.latestHeight
 }
 
@@ -70,6 +78,9 @@ func (r *Registers) FirstHeight() uint64 {
 //
 // No errors are expected during normal operation.
 func (r *Registers) Store(registers flow.RegisterEntries, height uint64) error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	if height == r.latestHeight {
 		return nil
 	}
@@ -77,16 +88,12 @@ func (r *Registers) Store(registers flow.RegisterEntries, height uint64) error {
 	if height != r.latestHeight+1 {
 		return fmt.Errorf("height mismatch: expected %d, got %d", r.latestHeight+1, height)
 	}
+	r.latestHeight = height
 
 	newRegisters := make(RegisterEntries)
 	for _, reg := range registers {
 		newRegisters[reg.Key] = reg.Value
 	}
-
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	r.latestHeight = height
 	r.store[height] = newRegisters
 
 	return nil
