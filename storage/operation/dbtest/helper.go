@@ -67,6 +67,26 @@ func RunWithPebbleDB(t *testing.T, opts *pebble.Options, fn func(*testing.T, sto
 	})
 }
 
+func RunWithBadgerDB(t *testing.T, opts *badger.Options, fn func(*testing.T, storage.Reader, WithWriter, string, *badger.DB)) {
+	t.Run("BadgerStorage", func(t *testing.T) {
+		unittest.RunWithTempDir(t, func(dir string) {
+			opts := badger.
+				DefaultOptions(dir).
+				WithKeepL0InMemory(true).
+				WithLogger(nil)
+			db, err := badger.Open(opts)
+			require.NoError(t, err)
+			defer func() {
+				require.NoError(t, db.Close())
+			}()
+
+			runWithBadger(func(r storage.Reader, w WithWriter) {
+				fn(t, r, w, dir, db)
+			})(db)
+		})
+	})
+}
+
 func BenchWithStorages(t *testing.B, fn func(*testing.B, storage.Reader, WithWriter)) {
 	t.Run("BadgerStorage", func(t *testing.B) {
 		unittest.RunWithBadgerDB(t, runWithBadger(func(r storage.Reader, wr WithWriter) {

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/dgraph-io/badger/v4"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -142,7 +143,7 @@ func TestRemove(t *testing.T) {
 	})
 }
 
-func TestRemoveDiskUsage(t *testing.T) {
+func TestRemoveDiskUsagePebble(t *testing.T) {
 	count := 10000
 	wg := sync.WaitGroup{}
 	// 10000 chunk data packs will produce 4 log files
@@ -217,6 +218,63 @@ func TestRemoveDiskUsage(t *testing.T) {
 		case <-timeout:
 			t.Fatal("Test timed out waiting for WAL files to be deleted")
 		}
+
+		// Verify the disk usage is reduced
+		sizeAfter := getFolderSize(t, dir)
+		require.Greater(t, sizeBefore, sizeAfter,
+			fmt.Sprintf("expected disk usage to be reduced after compaction, before: %d, after: %d", sizeBefore, sizeAfter))
+	})
+}
+
+func TestRemoveDiskUsageBadger(t *testing.T) {
+	count := 10000
+	// Configure Pebble DB with the event listener
+	opts := &badger.Options{}
+
+	dbtest.RunWithBadgerDB(t, opts, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter, dir string, db *badger.DB) {
+		items := make([]*flow.ChunkDataPack, count)
+
+		// prefix is needed for defining the key range for compaction
+		prefix := []byte{1}
+		getKey := func(c *flow.ChunkDataPack) []byte {
+			return append(prefix, c.ChunkID[:]...)
+		}
+
+		for i := 0; i < count; i++ {
+			chunkID := unittest.IdentifierFixture()
+			chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
+			items[i] = chunkDataPack
+		}
+
+		// Insert 100 entities
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
+			for i := 0; i < count; i++ {
+				if err := operation.Upsert(getKey(items[i]), items[i])(writer); err != nil {
+					return err
+				}
+			}
+			return nil
+		}))
+		sizeBefore := getFolderSize(t, dir)
+
+		// Remove all entities
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
+			for i := 0; i < count; i++ {
+				if err := operation.Remove(getKey(items[i]))(writer); err != nil {
+					return err
+				}
+			}
+			return nil
+		}))
+
+		// Trigger compaction
+		db.RunValueLogGC(0.5)
+
+		// Use a timer to implement a timeout for wg.Wait()
+		timeout := time.After(30 * time.Second)
+
+		// WaitGroup finished successfully
+		<-timeout
 
 		// Verify the disk usage is reduced
 		sizeAfter := getFolderSize(t, dir)
