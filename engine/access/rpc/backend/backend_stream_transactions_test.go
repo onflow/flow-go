@@ -141,7 +141,7 @@ func (s *TransactionStatusSuite) TearDownTest() {
 
 // initializeBackend sets up and initializes the backend with required dependencies, mocks, and configurations for testing.
 func (s *TransactionStatusSuite) initializeBackend() {
-	s.transactions.On("Store", mock.Anything).Return(nil).Maybe()
+	s.transactions.On("StoreByID", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	s.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(nil, status.Error(codes.NotFound, "not found")).Maybe()
 	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).Return(s.execClient, &mocks.MockCloser{}, nil).Maybe()
@@ -227,7 +227,7 @@ func (s *TransactionStatusSuite) backendParams() Params {
 
 // initializeMainMockInstructions sets up the main mock behaviors for components used in TransactionStatusSuite tests.
 func (s *TransactionStatusSuite) initializeMainMockInstructions() {
-	s.transactions.On("Store", mock.Anything).Return(nil).Maybe()
+	s.transactions.On("StoreByID", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(mocks.StorageMapGetter(s.blockMap)).Maybe()
 	s.blocks.On("ByID", mock.Anything).Return(

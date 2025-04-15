@@ -403,9 +403,11 @@ func (s *Suite) TestOnCollection() {
 	for _, txID := range light.Transactions {
 		needed[txID] = struct{}{}
 	}
-	s.transactions.On("Store", mock.Anything).Return(nil).Run(
+	s.transactions.On("StoreByID", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
-			tx := args.Get(0).(*flow.TransactionBody)
+			txID := args.Get(0).(flow.Identifier)
+			tx := args.Get(1).(*flow.TransactionBody)
+			s.Assert().Equal(txID, tx.ID())
 			_, pending := needed[tx.ID()]
 			s.Assert().True(pending, "tx not pending (%x)", tx.ID())
 		},
@@ -416,7 +418,7 @@ func (s *Suite) TestOnCollection() {
 
 	// check that the collection was stored and indexed, and we stored all transactions
 	s.collections.AssertExpectations(s.T())
-	s.transactions.AssertNumberOfCalls(s.T(), "Store", len(collection.Transactions))
+	s.transactions.AssertNumberOfCalls(s.T(), "StoreByID", len(collection.Transactions))
 }
 
 // TestExecutionReceiptsAreIndexed checks that execution receipts are properly indexed
