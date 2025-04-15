@@ -3,7 +3,6 @@ package protocol
 import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // EpochProtocolState represents the subset of the Protocol State KVStore related to epochs:
@@ -164,7 +163,5 @@ type MutableProtocolState interface {
 	//   - A consistency or sanity check failing within the StateMutator is likely the symptom of an internal bug
 	//     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 	//     of this function is not nil. If such an exception is returned, continuing is not an option.
-	EvolveState(parentBlockID flow.Identifier, candidateView uint64, candidateSeals []*flow.Seal) (stateID flow.Identifier, dbUpdates *transaction.DeferredBlockPersist, err error)
-
-	FollowerEvolveState(parentBlockID flow.Identifier, candidateView uint64, candidateSeals []*flow.Seal) (stateID flow.Identifier, dbUpdates []storage.BlockIndexingBatchWrite, err error)
+	EvolveState(parentBlockID flow.Identifier, candidateView uint64, candidateSeals []*flow.Seal) (stateID flow.Identifier, dbUpdates []storage.BlockIndexingBatchWrite, err error)
 }
