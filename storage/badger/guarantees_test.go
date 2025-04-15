@@ -16,7 +16,7 @@ import (
 func TestGuaranteeStoreRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := badgerstorage.NewGuarantees(metrics, db, 1000)
+		store := badgerstorage.NewGuarantees(metrics, db, 1000, 1000)
 
 		// abiturary guarantees
 		expected := unittest.CollectionGuaranteeFixture()

@@ -1240,7 +1240,8 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	}
 
 	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
-	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB, fnb.BaseConfig.guaranteesCacheSize)
+	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB,
+		fnb.BaseConfig.guaranteesCacheSize, bstorage.DefaultGuaranteeIndexCacheSize)
 	seals := bstorage.NewSeals(fnb.Metrics.Cache, fnb.DB)
 	results := bstorage.NewExecutionResults(fnb.Metrics.Cache, fnb.DB)
 	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results, fnb.BaseConfig.receiptsCacheSize)

@@ -491,8 +491,8 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor index (%x): %w", ancestorID, err)
 		}
-		for _, collID := range index.CollectionIDs {
-			lookup[collID] = struct{}{}
+		for _, guaranteeID := range index.GuaranteeIDs {
+			lookup[guaranteeID] = struct{}{}
 		}
 		if ancestor.Height <= limit {
 			break
@@ -504,9 +504,9 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 	for _, guarantee := range payload.Guarantees {
 
 		// if the guarantee was already included before, error
-		_, duplicated := lookup[guarantee.CollectionID]
+		_, duplicated := lookup[guarantee.ID()]
 		if duplicated {
-			return state.NewInvalidExtensionErrorf("payload includes duplicate guarantee (%x)", guarantee.CollectionID)
+			return state.NewInvalidExtensionErrorf("payload includes duplicate guarantee (%x)", guarantee.ID())
 		}
 
 		// get the reference block to check expiry
@@ -530,9 +530,9 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 			if signature.IsInvalidSignerIndicesError(err) ||
 				errors.Is(err, protocol.ErrNextEpochNotCommitted) ||
 				errors.Is(err, protocol.ErrClusterNotFound) {
-				return state.NewInvalidExtensionErrorf("guarantee %v contains invalid guarantors: %w", guarantee.CollectionID, err)
+				return state.NewInvalidExtensionErrorf("guarantee %v contains invalid guarantors: %w", guarantee.ID(), err)
 			}
-			return fmt.Errorf("could not find guarantor for guarantee %v: %w", guarantee.CollectionID, err)
+			return fmt.Errorf("could not find guarantor for guarantee %v: %w", guarantee.ID(), err)
 		}
 	}
 
