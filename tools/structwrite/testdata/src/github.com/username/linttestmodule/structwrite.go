@@ -2,6 +2,7 @@
 // See package golang.org/x/tools/go/analysis/analysistest for details.
 package linttestmodule
 
+// NonWritable is configured for linting.
 type NonWritable struct {
 	A int
 }
@@ -69,6 +70,7 @@ func NonWritableSetWithinAnonymousFunc() {
 	fn()
 }
 
+// Writable is not configured for linting.
 type Writable struct {
 	A int
 }
@@ -83,6 +85,7 @@ func (w Writable) SetA() {
 	w.A = 1
 }
 
+// EmbedsNonWritable is not configured for linting, but embeds a type that is.
 type EmbedsNonWritable struct {
 	NonWritable
 	B int
