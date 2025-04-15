@@ -159,11 +159,11 @@ func (segment *SealingSegment) Validate() error {
 	if segment.FirstSeal != nil {
 		seals[segment.FirstSeal.ID()] = segment.FirstSeal
 	}
-	for _, block := range segment.Blocks {
-		for _, result := range block.Block.Payload.Results {
+	for _, proposal := range segment.Blocks {
+		for _, result := range proposal.Block.Payload.Results {
 			results[result.ID()] = result
 		}
-		for _, seal := range block.Block.Payload.Seals {
+		for _, seal := range proposal.Block.Payload.Seals {
 			seals[seal.ID()] = seal
 		}
 	}
@@ -195,8 +195,8 @@ func (segment *SealingSegment) Validate() error {
 	}
 
 	builder := NewSealingSegmentBuilder(getResult, getSeal, getProtocolStateEntry)
-	for _, block := range segment.Blocks {
-		err := builder.AddBlock(block)
+	for _, proposal := range segment.Blocks {
+		err := builder.AddBlock(proposal)
 		if err != nil {
 			return fmt.Errorf("invalid segment: %w", err)
 		}
@@ -566,8 +566,8 @@ func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBl
 // The node logic requires a valid sealing segment to bootstrap.
 // No errors are expected during normal operations.
 func findLatestSealForLowestBlock(blocks []*BlockProposal, latestSeals map[Identifier]Identifier) (*Seal, error) {
-	lowestBlockID := blocks[0].ID()
-	highestBlockID := blocks[len(blocks)-1].ID()
+	lowestBlockID := blocks[0].Block.ID()
+	highestBlockID := blocks[len(blocks)-1].Block.ID()
 
 	// get the ID of the latest seal for highest block
 	latestSealID := latestSeals[highestBlockID]

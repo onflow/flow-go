@@ -370,8 +370,8 @@ func TestBootstrapNonRoot(t *testing.T) {
 			unittest.AssertSnapshotsEqual(t, after, finalSnap)
 			segment, err := finalSnap.SealingSegment()
 			require.NoError(t, err)
-			for _, block := range segment.Blocks {
-				snapshot := state.AtBlockID(block.ID())
+			for _, proposal := range segment.Blocks {
+				snapshot := state.AtBlockID(proposal.Block.ID())
 				// should be able to read all QCs
 				_, err := snapshot.QuorumCertificate()
 				require.NoError(t, err)
@@ -423,8 +423,8 @@ func TestBootstrapNonRoot(t *testing.T) {
 			unittest.AssertSnapshotsEqual(t, after, finalSnap)
 			segment, err := finalSnap.SealingSegment()
 			require.NoError(t, err)
-			for _, block := range segment.Blocks {
-				snapshot := state.AtBlockID(block.ID())
+			for _, proposal := range segment.Blocks {
+				snapshot := state.AtBlockID(proposal.Block.ID())
 				// should be able to read all QCs
 				_, err := snapshot.QuorumCertificate()
 				require.NoError(t, err)
@@ -461,12 +461,12 @@ func TestBootstrapNonRoot(t *testing.T) {
 			segment, err := finalSnap.SealingSegment()
 			require.NoError(t, err)
 			assert.GreaterOrEqual(t, len(segment.ProtocolStateEntries), 2, "should have >2 distinct protocol state entries")
-			for _, block := range segment.Blocks {
-				snapshot := state.AtBlockID(block.ID())
+			for _, proposal := range segment.Blocks {
+				snapshot := state.AtBlockID(proposal.Block.ID())
 				// should be able to read all protocol state entries
 				protocolStateEntry, err := snapshot.ProtocolState()
 				require.NoError(t, err)
-				assert.Equal(t, block.Block.Payload.ProtocolStateID, protocolStateEntry.ID())
+				assert.Equal(t, proposal.Block.Payload.ProtocolStateID, protocolStateEntry.ID())
 			}
 		})
 	})
@@ -493,12 +493,12 @@ func TestBootstrapNonRoot(t *testing.T) {
 			segment, err := finalSnap.SealingSegment()
 			require.NoError(t, err)
 			assert.GreaterOrEqual(t, len(segment.ProtocolStateEntries), 2, "should have >2 distinct protocol state entries")
-			for _, block := range segment.Blocks {
-				snapshot := state.AtBlockID(block.ID())
+			for _, proposal := range segment.Blocks {
+				snapshot := state.AtBlockID(proposal.Block.ID())
 				// should be able to read all protocol state entries
 				protocolStateEntry, err := snapshot.ProtocolState()
 				require.NoError(t, err)
-				assert.Equal(t, block.Block.Payload.ProtocolStateID, protocolStateEntry.ID())
+				assert.Equal(t, proposal.Block.Payload.ProtocolStateID, protocolStateEntry.ID())
 			}
 		})
 	})
@@ -533,12 +533,12 @@ func TestBootstrapNonRoot(t *testing.T) {
 			segment, err := finalSnap.SealingSegment()
 			require.NoError(t, err)
 			assert.GreaterOrEqual(t, len(segment.ProtocolStateEntries), 2, "should have >2 distinct protocol state entries")
-			for _, block := range segment.Blocks {
-				snapshot := state.AtBlockID(block.ID())
+			for _, proposal := range segment.Blocks {
+				snapshot := state.AtBlockID(proposal.Block.ID())
 				// should be able to read all protocol state entries
 				protocolStateEntry, err := snapshot.ProtocolState()
 				require.NoError(t, err)
-				assert.Equal(t, block.Block.Payload.ProtocolStateID, protocolStateEntry.ID())
+				assert.Equal(t, proposal.Block.Payload.ProtocolStateID, protocolStateEntry.ID())
 			}
 		})
 	})
@@ -783,8 +783,8 @@ func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot pr
 		// * Head
 		// * SealedResult
 		// * Commit
-		for _, block := range segment.Blocks {
-			blockID := block.ID()
+		for _, proposal := range segment.Blocks {
+			blockID := proposal.Block.ID()
 			snap := state.AtBlockID(blockID)
 			header, err := snap.Head()
 			assert.NoError(t, err)
@@ -797,8 +797,8 @@ func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot pr
 			assert.Equal(t, seal.FinalState, commit)
 		}
 		// for all blocks but the head, we should be unable to query SealingSegment:
-		for _, block := range segment.Blocks[:len(segment.Blocks)-1] {
-			snap := state.AtBlockID(block.ID())
+		for _, proposal := range segment.Blocks[:len(segment.Blocks)-1] {
+			snap := state.AtBlockID(proposal.Block.ID())
 			_, err := snap.SealingSegment()
 			assert.ErrorIs(t, err, protocol.ErrSealingSegmentBelowRootBlock)
 		}

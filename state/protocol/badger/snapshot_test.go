@@ -408,8 +408,8 @@ func TestSealingSegment(t *testing.T) {
 			assert.Len(t, segment.ExtraBlocks, 1)
 			assert.Equal(t, segment.ExtraBlocks[0].Block.Header.Height, head.Height)
 			// first and last blocks should be B1, BN
-			assert.Equal(t, block1.ID(), segment.Blocks[0].ID())
-			assert.Equal(t, blockN.ID(), segment.Blocks[101].ID())
+			assert.Equal(t, block1.ID(), segment.Blocks[0].Block.ID())
+			assert.Equal(t, blockN.ID(), segment.Blocks[101].Block.ID())
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(blockN.ID()))
 		})
 	})

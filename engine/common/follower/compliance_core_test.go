@@ -229,7 +229,7 @@ func (s *CoreSuite) TestProcessingConnectedRangesOutOfOrder() {
 					"blocks submitted to protocol state are not sequential at height %d", certified.Proposal.Block.Header.Height)
 			}
 		}
-		lastSubmittedBlockID = certified.Proposal.ID()
+		lastSubmittedBlockID = certified.Proposal.Block.ID()
 	}).Return(nil).Times(len(blocks) - 1)
 
 	s.validator.On("ValidateProposal", mock.Anything).Return(nil).Once()
@@ -295,7 +295,7 @@ func (s *CoreSuite) TestConcurrentAdd() {
 					"blocks submitted to protocol state are not sequential at height %d", certified.Proposal.Block.Header.Height)
 			}
 		}
-		lastSubmittedBlockID = certified.Proposal.ID()
+		lastSubmittedBlockID = certified.Proposal.Block.ID()
 	}).Return(nil).Times(len(blocks) - 1)
 
 	var wg sync.WaitGroup

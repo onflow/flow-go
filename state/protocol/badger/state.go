@@ -190,8 +190,8 @@ func Bootstrap(
 		metrics.BlockSealed(lastSealed)
 		metrics.SealedHeight(lastSealed.Header.Height)
 		metrics.FinalizedHeight(lastFinalized.Header.Height)
-		for _, block := range segment.Blocks {
-			metrics.BlockFinalized(block.Block)
+		for _, proposal := range segment.Blocks {
+			metrics.BlockFinalized(proposal.Block)
 		}
 
 		return nil
@@ -259,14 +259,14 @@ func bootstrapProtocolState(
 			}
 		}
 
-		for _, block := range segment.AllBlocks() {
-			blockID := block.ID()
-			protocolStateEntryWrapper := segment.ProtocolStateEntries[block.Block.Payload.ProtocolStateID]
+		for _, proposal := range segment.AllBlocks() {
+			blockID := proposal.Block.ID()
+			protocolStateEntryWrapper := segment.ProtocolStateEntries[proposal.Block.Payload.ProtocolStateID]
 			err := epochProtocolStateSnapshots.Index(blockID, protocolStateEntryWrapper.EpochEntry.ID())(tx)
 			if err != nil {
 				return fmt.Errorf("could not index root protocol state: %w", err)
 			}
-			err = protocolKVStoreSnapshots.IndexTx(blockID, block.Block.Payload.ProtocolStateID)(tx)
+			err = protocolKVStoreSnapshots.IndexTx(blockID, proposal.Block.Payload.ProtocolStateID)(tx)
 			if err != nil {
 				return fmt.Errorf("could not index root kv store: %w", err)
 			}
