@@ -88,7 +88,7 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState 
 	seals := []*flow.Seal{seal}
 	updatedStateId, dbUpdates, err := mutableProtocolState.EvolveState(block3.Header.ParentID, block3.Header.View, seals)
 	require.NoError(t, err)
-	require.False(t, dbUpdates.IsEmpty())
+	require.True(t, len(dbUpdates) == 0)
 
 	block3.SetPayload(flow.Payload{
 		Seals:           seals,
