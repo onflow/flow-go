@@ -42,12 +42,12 @@ type UntrustedClusterBlock struct {
 
 // ToInternal returns the internal representation of the type.
 func (ub *UntrustedClusterBlock) ToInternal() *cluster.Block {
-	block := &cluster.Block{
-		Header: &ub.Header,
-		Payload: &cluster.Payload{
+	block := cluster.NewBlock(
+		ub.Header,
+		cluster.Payload{
 			ReferenceBlockID: ub.Payload.ReferenceBlockID,
 		},
-	}
+	)
 	for _, tx := range ub.Payload.Collection {
 		tx := tx
 		block.Payload.Collection.Transactions = append(block.Payload.Collection.Transactions, &tx)

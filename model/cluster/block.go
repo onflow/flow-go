@@ -7,7 +7,6 @@ import (
 )
 
 func Genesis() *Block {
-	// TODO: Uliana: refactor after PR #7100 will be fixed
 	header := &flow.Header{
 		View:      0,
 		ChainID:   "cluster",
@@ -15,15 +14,8 @@ func Genesis() *Block {
 		ParentID:  flow.ZeroID,
 	}
 
-	payload := EmptyPayload(flow.ZeroID)
-	headerFields := header.HeaderFields()
-
-	block := &Block{
-		Header: &headerFields,
-	}
-	block.SetPayload(payload)
-
-	return block
+	// TODO: Uliana: refactor all usages HeaderFields() after PR #7100 will be fixed
+	return NewBlock(header.HeaderFields(), EmptyPayload(flow.ZeroID))
 }
 
 // Block represents a block in collection node cluster consensus. It contains
@@ -33,8 +25,17 @@ type Block struct {
 	Payload *Payload
 }
 
-// ToHeader hashes the payload of the block.
+func NewBlock(
+	header flow.HeaderFields,
+	payload Payload,
+) *Block {
+	return &Block{
+		Header:  &header,
+		Payload: &payload,
+	}
+}
 
+// ToHeader hashes the payload of the block.
 func (b *Block) ToHeader() *flow.Header {
 	return &flow.Header{
 		ChainID:            b.Header.ChainID,
@@ -61,9 +62,4 @@ type BlockProposal struct {
 // ID returns the ID of the underlying block header.
 func (b *Block) ID() flow.Identifier {
 	return flow.MakeID(b)
-}
-
-// SetPayload sets the payload and payload hash.
-func (b *Block) SetPayload(payload Payload) {
-	b.Payload = &payload
 }

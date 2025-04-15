@@ -56,12 +56,8 @@ func (b *ClusterBlocks) ByID(blockID flow.Identifier) (*cluster.Block, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve payload: %w", err)
 	}
-	headerFields := header.HeaderFields()
-	block := cluster.Block{
-		Header:  &headerFields,
-		Payload: payload,
-	}
-	return &block, nil
+	block := cluster.NewBlock(header.HeaderFields(), *payload)
+	return block, nil
 }
 
 func (b *ClusterBlocks) ByHeight(height uint64) (*cluster.Block, error) {

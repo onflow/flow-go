@@ -57,11 +57,7 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 		}
 
 		// overwrite block
-		headerFields := header.HeaderFields()
-		*block = cluster.Block{
-			Header:  &headerFields,
-			Payload: &payload,
-		}
+		block = cluster.NewBlock(header.HeaderFields(), payload)
 
 		return nil
 	}
@@ -88,7 +84,6 @@ func RetrieveLatestFinalizedClusterBlock(chainID flow.ChainID, final *cluster.Bl
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized header: %w", err)
 		}
-		headerFields := header.HeaderFields()
 
 		// get the payload
 		var payload cluster.Payload
@@ -97,8 +92,7 @@ func RetrieveLatestFinalizedClusterBlock(chainID flow.ChainID, final *cluster.Bl
 			return fmt.Errorf("could not retrieve payload: %w", err)
 		}
 
-		final.Header = &headerFields
-		final.Payload = &payload
+		final = cluster.NewBlock(header.HeaderFields(), payload)
 
 		return nil
 	}

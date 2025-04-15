@@ -125,10 +125,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				return fmt.Errorf("could not finalize cluster block (id=%x): %w", clusterBlockID, err)
 			}
 
-			block := &cluster.Block{
-				Header:  step,
-				Payload: &payload,
-			}
+			block := cluster.NewBlock(step.HeaderFields(), payload)
 			f.metrics.ClusterBlockFinalized(block)
 
 			// if the finalized collection is empty, we don't need to include it

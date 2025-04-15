@@ -643,10 +643,7 @@ func ClusterBlockFixture() cluster.Block {
 	payload := ClusterPayloadFixture(3)
 	header := BlockHeaderFieldsFixture()
 
-	return cluster.Block{
-		Header:  header,
-		Payload: payload,
-	}
+	return *cluster.NewBlock(*header, *payload)
 }
 
 func ClusterBlockChainFixture(n int) []cluster.Block {
@@ -666,7 +663,6 @@ func ClusterBlockChainFixture(n int) []cluster.Block {
 // ClusterBlockWithParent creates a new cluster consensus block that is valid
 // with respect to the given parent block.
 func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
-
 	payload := ClusterPayloadFixture(3)
 
 	header := BlockHeaderFieldsFixture()
@@ -677,12 +673,21 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 	header.ParentID = parent.ID()
 	header.ParentView = parent.Header.View
 
-	block := cluster.Block{
-		Header:  header,
-		Payload: payload,
-	}
+	return *cluster.NewBlock(*header, *payload)
+}
 
-	return block
+// ClusterBlockWithParentAndPayload creates a new cluster consensus block that is valid
+// with respect to the given parent block and with given payload.
+func ClusterBlockWithParentAndPayload(parent *cluster.Block, payload cluster.Payload) cluster.Block {
+	header := BlockHeaderFieldsFixture()
+	header.Height = parent.Header.Height + 1
+	header.View = parent.Header.View + 1
+	header.ChainID = parent.Header.ChainID
+	header.Timestamp = time.Now()
+	header.ParentID = parent.ID()
+	header.ParentView = parent.Header.View
+
+	return *cluster.NewBlock(*header, payload)
 }
 
 func WithCollRef(refID flow.Identifier) func(*flow.CollectionGuarantee) {

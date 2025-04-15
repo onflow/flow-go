@@ -21,19 +21,17 @@ func TestGenerateClusterRootQC(t *testing.T) {
 	block.Header.ParentID = flow.ZeroID
 	block.Header.View = 3
 	block.Header.Height = 0
-	block.Header.PayloadHash = block.Payload.Hash()
 
-	clusterBlock := cluster.Block{
-		Header: &flow.HeaderFields{
+	clusterBlock := cluster.NewBlock(
+		flow.HeaderFields{
 			ParentID: flow.ZeroID,
 			View:     42,
 		},
-	}
-	payload := cluster.EmptyPayload(flow.ZeroID)
-	clusterBlock.SetPayload(payload)
+		cluster.EmptyPayload(flow.ZeroID),
+	)
 
 	orderedParticipants := model.ToIdentityList(participants).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
-	_, err := GenerateClusterRootQC(participants, orderedParticipants, &clusterBlock)
+	_, err := GenerateClusterRootQC(participants, orderedParticipants, clusterBlock)
 	require.NoError(t, err)
 }
 

@@ -85,8 +85,7 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx1.ID(), &tx1))
 
 			// create a new block on genesis
-			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
+			block := unittest.ClusterBlockWithParentAndPayload(genesis, model.PayloadFromTransactions(refBlock.ID(), &tx1))
 			insert(block)
 
 			// finalize the block
@@ -106,9 +105,8 @@ func TestFinalizer(t *testing.T) {
 			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// create a new block that isn't connected to a parent
-			block := unittest.ClusterBlockWithParent(genesis)
+			block := unittest.ClusterBlockWithParentAndPayload(genesis, model.EmptyPayload(refBlock.ID()))
 			block.Header.ParentID = unittest.IdentifierFixture()
-			block.SetPayload(model.EmptyPayload(refBlock.ID()))
 			insert(block)
 
 			// try to finalize - this should fail
@@ -124,8 +122,7 @@ func TestFinalizer(t *testing.T) {
 			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// create a block with empty payload on genesis
-			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.EmptyPayload(refBlock.ID()))
+			block := unittest.ClusterBlockWithParentAndPayload(genesis, model.EmptyPayload(refBlock.ID()))
 			insert(block)
 
 			// finalize the block
@@ -156,8 +153,7 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
-			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
+			block := unittest.ClusterBlockWithParentAndPayload(genesis, model.PayloadFromTransactions(refBlock.ID(), &tx1))
 			insert(block)
 
 			// block should be passed to pusher
@@ -201,13 +197,11 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
-			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
+			block1 := unittest.ClusterBlockWithParentAndPayload(genesis, model.PayloadFromTransactions(refBlock.ID(), &tx1))
 			insert(block1)
 
 			// create a block containing tx2 on top of block1
-			block2 := unittest.ClusterBlockWithParent(&block1)
-			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
+			block2 := unittest.ClusterBlockWithParentAndPayload(&block1, model.PayloadFromTransactions(refBlock.ID(), &tx2))
 			insert(block2)
 
 			// both blocks should be passed to pusher
@@ -256,13 +250,11 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
-			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
+			block1 := unittest.ClusterBlockWithParentAndPayload(genesis, model.PayloadFromTransactions(refBlock.ID(), &tx1))
 			insert(block1)
 
 			// create a block containing tx2 on top of block1
-			block2 := unittest.ClusterBlockWithParent(&block1)
-			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
+			block2 := unittest.ClusterBlockWithParentAndPayload(&block1, model.PayloadFromTransactions(refBlock.ID(), &tx2))
 			insert(block2)
 
 			// block should be passed to pusher
@@ -306,13 +298,11 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
-			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
+			block1 := unittest.ClusterBlockWithParentAndPayload(genesis, model.PayloadFromTransactions(refBlock.ID(), &tx1))
 			insert(block1)
 
 			// create a block containing tx2 on top of genesis (conflicting with block1)
-			block2 := unittest.ClusterBlockWithParent(genesis)
-			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
+			block2 := unittest.ClusterBlockWithParentAndPayload(genesis, model.PayloadFromTransactions(refBlock.ID(), &tx2))
 			insert(block2)
 
 			// block should be passed to pusher

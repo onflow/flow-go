@@ -111,10 +111,7 @@ func (suite *SnapshotSuite) Payload(transactions ...*flow.TransactionBody) model
 
 // BlockWithParent returns a valid block with the given parent.
 func (suite *SnapshotSuite) BlockWithParent(parent *model.Block) model.Block {
-	block := unittest.ClusterBlockWithParent(parent)
-	payload := suite.Payload()
-	block.SetPayload(payload)
-	return block
+	return unittest.ClusterBlockWithParentAndPayload(parent, suite.Payload())
 }
 
 // Block returns a valid cluster block with genesis as parent.
@@ -179,8 +176,7 @@ func (suite *SnapshotSuite) TestEmptyCollection() {
 	t := suite.T()
 
 	// create a block with an empty collection
-	block := suite.BlockWithParent(suite.genesis)
-	block.SetPayload(model.EmptyPayload(flow.ZeroID))
+	block := unittest.ClusterBlockWithParentAndPayload(suite.genesis, model.EmptyPayload(flow.ZeroID))
 	suite.InsertBlock(block)
 
 	snapshot := suite.state.AtBlockID(block.ID())
