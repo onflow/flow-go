@@ -1,7 +1,7 @@
 package transaction
 
 import (
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v4"
 )
 
 // DeferredDBUpdate is a shorthand notation for an anonymous function that takes

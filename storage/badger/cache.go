@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v4"
 	lru "github.com/hashicorp/golang-lru/v2"
 
 	"github.com/onflow/flow-go/module"

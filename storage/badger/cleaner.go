@@ -3,7 +3,7 @@ package badger
 import (
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v4"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"

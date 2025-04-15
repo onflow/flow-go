@@ -3,7 +3,7 @@ package operation_test
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v4"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/storage/badger/operation"

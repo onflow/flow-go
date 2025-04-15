@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	badgerdb "github.com/dgraph-io/badger/v2"
+	badgerdb "github.com/dgraph-io/badger/v4"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 

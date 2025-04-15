@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 
 	"github.com/dapperlabs/testingdock"
-	badgerv2 "github.com/dgraph-io/badger/v2"
+	badgerv2 "github.com/dgraph-io/badger/v4"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	dockercontainer "github.com/docker/docker/api/types/container"

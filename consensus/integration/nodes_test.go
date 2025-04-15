@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v4"
 	"github.com/gammazero/workerpool"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"

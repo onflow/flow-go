@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v4"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"

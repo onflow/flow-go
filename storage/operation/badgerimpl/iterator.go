@@ -3,7 +3,7 @@ package badgerimpl
 import (
 	"bytes"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v4"
 
 	"github.com/onflow/flow-go/storage"
 )

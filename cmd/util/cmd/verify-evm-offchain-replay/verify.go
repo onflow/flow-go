@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v4"
 	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"

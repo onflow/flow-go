@@ -3,7 +3,7 @@
 package mock
 
 import (
-	badger "github.com/dgraph-io/badger/v2"
+	badger "github.com/dgraph-io/badger/v4"
 	mock "github.com/stretchr/testify/mock"
 )
 

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	badger "github.com/dgraph-io/badger/v2"
+	badger "github.com/dgraph-io/badger/v4"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"

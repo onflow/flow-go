@@ -13,7 +13,7 @@ import (
 
 	gcemd "cloud.google.com/go/compute/metadata"
 	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v4"
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"

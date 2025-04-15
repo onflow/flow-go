@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-semver/semver"
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v4"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"

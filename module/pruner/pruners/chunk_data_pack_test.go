@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v4"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"

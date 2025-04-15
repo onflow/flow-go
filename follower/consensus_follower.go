@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v4"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 

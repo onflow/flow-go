@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/dapperlabs/testingdock"
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v4"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"

@@ -1,7 +1,7 @@
 package badgerimpl
 
 import (
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v4"
 
 	"github.com/onflow/flow-go/storage"
 )

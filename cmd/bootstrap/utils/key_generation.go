@@ -39,7 +39,7 @@ func GenerateMachineAccountKey(seed []byte) (crypto.PrivateKey, error) {
 // Badger database.
 func GenerateSecretsDBEncryptionKey() ([]byte, error) {
 	// 32-byte key to use AES-256
-	// https://pkg.go.dev/github.com/dgraph-io/badger/v2#Options.WithEncryptionKey
+	// https://pkg.go.dev/github.com/dgraph-io/badger/v4#Options.WithEncryptionKey
 	const keyLen = 32
 
 	key := make([]byte, keyLen)

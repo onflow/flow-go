@@ -4,7 +4,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v4"
 	"github.com/onflow/crypto"
 	"github.com/onflow/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"

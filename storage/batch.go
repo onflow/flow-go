@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v4"
 )
 
 // Deprecated: Transaction is being deprecated as part of the transition from Badger to Pebble.
