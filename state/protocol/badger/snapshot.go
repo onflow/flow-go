@@ -567,8 +567,5 @@ func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (
 		finalHeight = subsequentEpochFirstHeight - 1
 	}
 
-	if err != nil {
-		return 0, 0, false, false, err
-	}
 	return firstHeight, finalHeight, isFirstHeightKnown, isLastHeightKnown, nil
 }
