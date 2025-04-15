@@ -12,11 +12,12 @@ import (
 
 func TestRegisters_HappyPath(t *testing.T) {
 	firstHeight := uint64(1)
-	registers := NewRegisters(firstHeight)
+	latestHeight := firstHeight
+	registers := NewRegisters(firstHeight, latestHeight)
 
 	// Ensure initial heights are correct
 	require.Equal(t, firstHeight, registers.FirstHeight())
-	require.Equal(t, uint64(0), registers.LatestHeight())
+	require.Equal(t, latestHeight, registers.LatestHeight())
 
 	// Define register entries
 	entries := flow.RegisterEntries{unittest.RegisterEntryFixture(), unittest.RegisterEntryFixture()}
@@ -29,23 +30,24 @@ func TestRegisters_HappyPath(t *testing.T) {
 		Key:   "key2",
 	}
 
-	// Store entries at height 1
-	err := registers.Store(entries, 1)
+	// Store entries at the new height
+	newHeight := latestHeight + 1
+	err := registers.Store(entries, newHeight)
 	require.NoError(t, err)
 
 	// Verify latest height is updated
-	require.Equal(t, uint64(1), registers.LatestHeight())
+	require.Equal(t, newHeight, registers.LatestHeight())
 
 	// Retrieve stored value
-	val, err := registers.Get(entries[0].Key, 1)
+	val, err := registers.Get(entries[0].Key, newHeight)
 	require.NoError(t, err)
 	require.Equal(t, entries[0].Value, val)
 
 	// Ensure retrieving a non-existent height returns an error
-	_, err = registers.Get(unittest.RegisterIDFixture(), 2)
+	_, err = registers.Get(unittest.RegisterIDFixture(), newHeight+1)
 	require.ErrorIs(t, err, storage.ErrNotFound)
 
 	// Ensure retrieving a non-existent register ID returns an error
-	_, err = registers.Get(unittest.RegisterIDFixture(), 1)
+	_, err = registers.Get(unittest.RegisterIDFixture(), newHeight)
 	require.ErrorIs(t, err, storage.ErrNotFound)
 }
