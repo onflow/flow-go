@@ -392,10 +392,6 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 			node.Storage.Index,
 			node.Storage.Payloads,
 			blocktimer.DefaultBlockTimer,
-			badgerState.MutableProtocolStateFromState(
-				node.Logger,
-				state,
-			),
 		)
 		builder.FollowerState = followerState
 

@@ -245,10 +245,6 @@ func main() {
 				node.Storage.Index,
 				node.Storage.Payloads,
 				blocktimer.DefaultBlockTimer,
-				badgerState.MutableProtocolStateFromState(
-					node.Logger,
-					state,
-				),
 			)
 			return err
 		}).

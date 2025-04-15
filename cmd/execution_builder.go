@@ -290,10 +290,6 @@ func (exeNode *ExecutionNode) LoadMutableFollowerState(node *NodeConfig) error {
 		node.Storage.Index,
 		node.Storage.Payloads,
 		blocktimer.DefaultBlockTimer,
-		badgerState.MutableProtocolStateFromState(
-			node.Logger,
-			bState,
-		),
 	)
 	return err
 }

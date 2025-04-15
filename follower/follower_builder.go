@@ -149,10 +149,6 @@ func (builder *FollowerServiceBuilder) buildFollowerState() *FollowerServiceBuil
 			node.Storage.Index,
 			node.Storage.Payloads,
 			blocktimer.DefaultBlockTimer,
-			badgerState.MutableProtocolStateFromState(
-				node.Logger,
-				state,
-			),
 		)
 		builder.FollowerState = followerState
 
