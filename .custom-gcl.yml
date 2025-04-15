@@ -1,10 +1,12 @@
+# The version of golangci-lint used to build the custom binary
 version: v1.63.4
+
+# The name of the custom binary
+name: custom-gcl
+
+# The directory path used to store the custom binary.
+destination: ./tools/
+
 plugins:
-  # a plugin from a Go proxy
-  - module: 'github.com/golangci/example-plugin-module-linter'
-    import: 'github.com/golangci/example-plugin-module-linter'
-    version: v0.1.0
-      # a plugin from local source
-  - module: 'github.com/jordanschalm/structwrite'
-    import: 'github.com/jordanschalm/structwrite'
-    version: latest
+  - module: 'github.com/onflow/flow-go'
+    path: ./tools/structwrite

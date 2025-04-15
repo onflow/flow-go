@@ -100,7 +100,6 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/go-playground/validator/v10 v10.19.0
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb
-	github.com/golangci/plugin-module-register v0.1.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/holiman/uint256 v1.3.0

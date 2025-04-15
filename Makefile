@@ -235,10 +235,14 @@ tidy:
 	cd insecure; go mod tidy -v
 	git diff --exit-code
 
+# Builds a custom version of the golangci-lint binary which includes custom plugins
+tools/custom-gcl: tools/structwrite .custom-gcl.yml
+	golangci-lint custom
+
 .PHONY: lint
-lint: tidy
+lint: tidy tools/custom-gcl
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	golangci-lint run -v ./...
+	./tools/custom-gcl run -v ./...
 
 .PHONY: fix-lint
 fix-lint:
