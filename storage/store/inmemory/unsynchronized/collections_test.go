@@ -29,7 +29,6 @@ func TestCollection_HappyCase(t *testing.T) {
 	require.NoError(t, err)
 
 	retrieved, err = collections.ByID(collection.ID())
-	require.Error(t, err)
 	require.ErrorIs(t, err, storage.ErrNotFound)
 	require.Nil(t, retrieved)
 }

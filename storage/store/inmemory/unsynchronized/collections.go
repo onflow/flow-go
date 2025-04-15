@@ -89,6 +89,7 @@ func (c *Collections) Store(collection *flow.Collection) error {
 // StoreLight inserts the collection. It does not insert, nor check existence of, the constituent transactions.
 // No errors are expected during normal operation.
 func (c *Collections) StoreLight(collection *flow.LightCollection) error {
+	//TODO: this method is to be removed from interface. remove this impl once it is done
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
