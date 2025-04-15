@@ -163,7 +163,7 @@ func (i *indexCoreTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID,
 func (i *indexCoreTest) useDefaultStorageMocks() *indexCoreTest {
 
 	i.collections.On("StoreLightAndIndexByTransaction", mock.AnythingOfType("*flow.LightCollection")).Return(nil).Maybe()
-	i.transactions.On("Store", mock.AnythingOfType("*flow.TransactionBody")).Return(nil).Maybe()
+	i.transactions.On("StoreByID", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("*flow.TransactionBody")).Return(nil).Maybe()
 
 	return i
 }
