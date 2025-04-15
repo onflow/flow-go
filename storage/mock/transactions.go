@@ -60,6 +60,24 @@ func (_m *Transactions) Store(tx *flow.TransactionBody) error {
 	return r0
 }
 
+// StoreByID provides a mock function with given fields: txID, tx
+func (_m *Transactions) StoreByID(txID flow.Identifier, tx *flow.TransactionBody) error {
+	ret := _m.Called(txID, tx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StoreByID")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.TransactionBody) error); ok {
+		r0 = rf(txID, tx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // NewTransactions creates a new instance of Transactions. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewTransactions(t interface {

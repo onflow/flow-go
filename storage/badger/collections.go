@@ -42,8 +42,9 @@ func (c *Collections) Store(collection *flow.Collection) error {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}
 
-		for _, tx := range collection.Transactions {
-			err = c.transactions.storeTx(tx)(ttx)
+		for i, tx := range collection.Transactions {
+			txID := light.Transactions[i]
+			err = c.transactions.storeTx(txID, tx)(ttx)
 			if err != nil {
 				return fmt.Errorf("could not insert transaction: %w", err)
 			}

@@ -14,6 +14,8 @@ type Transactions struct {
 	cache *Cache[flow.Identifier, *flow.TransactionBody]
 }
 
+var _ storage.Transactions = &Transactions{}
+
 // NewTransactions ...
 func NewTransactions(cacheMetrics module.CacheMetrics, db storage.DB) *Transactions {
 	store := func(rw storage.ReaderBatchWriter, txID flow.Identifier, flowTX *flow.TransactionBody) error {
@@ -37,14 +39,18 @@ func NewTransactions(cacheMetrics module.CacheMetrics, db storage.DB) *Transacti
 	return t
 }
 
-func (t *Transactions) Store(flowTx *flow.TransactionBody) error {
+func (t *Transactions) StoreByID(flowTxID flow.Identifier, flowTx *flow.TransactionBody) error {
 	return t.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return t.storeTx(rw, flowTx)
+		return t.storeTx(rw, flowTxID, flowTx)
 	})
 }
 
-func (t *Transactions) storeTx(rw storage.ReaderBatchWriter, flowTx *flow.TransactionBody) error {
-	return t.cache.PutTx(rw, flowTx.ID(), flowTx)
+func (t *Transactions) Store(flowTx *flow.TransactionBody) error {
+	return t.StoreByID(flowTx.ID(), flowTx)
+}
+
+func (t *Transactions) storeTx(rw storage.ReaderBatchWriter, flowTxID flow.Identifier, flowTx *flow.TransactionBody) error {
+	return t.cache.PutTx(rw, flowTxID, flowTx)
 }
 
 func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {

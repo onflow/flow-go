@@ -358,8 +358,9 @@ func HandleCollection(
 	}
 
 	// now store each of the transaction body
-	for _, tx := range collection.Transactions {
-		err := transactions.Store(tx)
+	for i, tx := range collection.Transactions {
+		txID := light.Transactions[i]
+		err := transactions.StoreByID(txID, tx)
 		if err != nil {
 			return fmt.Errorf("could not store transaction (%x): %w", tx.ID(), err)
 		}

@@ -16,6 +16,8 @@ type Collections struct {
 	indexingByTx sync.Mutex
 }
 
+var _ storage.Collections = &Collections{}
+
 func NewCollections(db storage.DB, transactions *Transactions) *Collections {
 	c := &Collections{
 		db:           db,
@@ -49,8 +51,9 @@ func (c *Collections) Store(collection *flow.Collection) error {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}
 
-		for _, tx := range collection.Transactions {
-			err = c.transactions.storeTx(rw, tx)
+		for i, tx := range collection.Transactions {
+			txID := light.Transactions[i]
+			err = c.transactions.storeTx(rw, txID, tx)
 			if err != nil {
 				return fmt.Errorf("could not insert transaction: %w", err)
 			}
@@ -72,13 +75,15 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 		return nil, fmt.Errorf("could not retrieve collection: %w", err)
 	}
 
-	for _, txID := range light.Transactions {
+	collection.Transactions = make([]*flow.TransactionBody, 0, len(light.Transactions))
+
+	for i, txID := range light.Transactions {
 		tx, err := c.transactions.ByID(txID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve transaction %v: %w", txID, err)
 		}
 
-		collection.Transactions = append(collection.Transactions, tx)
+		collection.Transactions[i] = tx
 	}
 
 	return &collection, nil

@@ -32,7 +32,7 @@ func NewTransactions(cacheMetrics module.CacheMetrics, db *badger.DB) *Transacti
 
 	t := &Transactions{
 		db: db,
-		cache: newCache[flow.Identifier, *flow.TransactionBody](cacheMetrics, metrics.ResourceTransaction,
+		cache: newCache(cacheMetrics, metrics.ResourceTransaction,
 			withLimit[flow.Identifier, *flow.TransactionBody](flow.DefaultTransactionExpiry+100),
 			withStore(store),
 			withRetrieve(retrieve)),
@@ -43,7 +43,11 @@ func NewTransactions(cacheMetrics module.CacheMetrics, db *badger.DB) *Transacti
 
 // Store ...
 func (t *Transactions) Store(flowTx *flow.TransactionBody) error {
-	return operation.RetryOnConflictTx(t.db, transaction.Update, t.storeTx(flowTx))
+	return t.StoreByID(flowTx.ID(), flowTx)
+}
+
+func (t *Transactions) StoreByID(flowTxID flow.Identifier, flowTx *flow.TransactionBody) error {
+	return operation.RetryOnConflictTx(t.db, transaction.Update, t.storeTx(flowTxID, flowTx))
 }
 
 // ByID ...
@@ -53,8 +57,8 @@ func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error)
 	return t.retrieveTx(txID)(tx)
 }
 
-func (t *Transactions) storeTx(flowTx *flow.TransactionBody) func(*transaction.Tx) error {
-	return t.cache.PutTx(flowTx.ID(), flowTx)
+func (t *Transactions) storeTx(flowTxID flow.Identifier, flowTx *flow.TransactionBody) func(*transaction.Tx) error {
+	return t.cache.PutTx(flowTxID, flowTx)
 }
 
 func (t *Transactions) retrieveTx(txID flow.Identifier) func(*badger.Txn) (*flow.TransactionBody, error) {

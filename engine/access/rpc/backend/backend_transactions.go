@@ -75,10 +75,12 @@ func (b *backendTransactions) SendTransaction(
 		return rpc.ConvertError(err, "failed to send transaction to a collection node", codes.Internal)
 	}
 
-	b.transactionMetrics.TransactionReceived(tx.ID(), now)
+	txID := tx.ID()
+
+	b.transactionMetrics.TransactionReceived(txID, now)
 
 	// store the transaction locally
-	err = b.transactions.Store(tx)
+	err = b.transactions.StoreByID(txID, tx)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to store transaction: %v", err)
 	}
