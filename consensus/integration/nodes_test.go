@@ -435,11 +435,6 @@ func createNode(
 		util.MockSealValidator(sealsDB),
 		allBadger.QuorumCertificates,
 		allBadger.Blocks,
-		bprotocol.ConsensusMutableProtocolState(
-			log,
-			state,
-			allBadger,
-		),
 	)
 	require.NoError(t, err)
 

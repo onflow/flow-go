@@ -38,7 +38,7 @@ const expectedErrorMsg = "expected test error"
 func (suite *Suite) withPreConfiguredState(f func(snap protocol.Snapshot)) {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState, participantMutableState realprotocol.MutableProtocolState) {
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 
 		epochBuilder.

@@ -267,11 +267,6 @@ func CompleteStateFixture(
 		util.MockSealValidator(s.Seals),
 		allBadger.QuorumCertificates,
 		allBadger.Blocks,
-		badgerstate.ConsensusMutableProtocolState(
-			log,
-			state,
-			allBadger,
-		),
 	)
 	require.NoError(t, err)
 
