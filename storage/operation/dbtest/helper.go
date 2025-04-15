@@ -72,7 +72,6 @@ func RunWithBadgerDB(t *testing.T, opts *badger.Options, fn func(*testing.T, sto
 		unittest.RunWithTempDir(t, func(dir string) {
 			opts := badger.
 				DefaultOptions(dir).
-				WithKeepL0InMemory(true).
 				WithLogger(nil)
 			db, err := badger.Open(opts)
 			require.NoError(t, err)
