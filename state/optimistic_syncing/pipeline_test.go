@@ -1,257 +1,339 @@
 package pipeline
 
 import (
-	"errors"
+	"context"
 	"testing"
+	"time"
 
-	"github.com/qmuntal/stateless"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-// TestNewPipeline verifies that a new pipeline is created with the correct initial state
-func TestNewPipeline(t *testing.T) {
-	logger := zerolog.Nop()
-	opMock := NewOperationMock()
+// TestPipelineStateTransitions verifies that the pipeline correctly transitions
+// through states when provided with the correct conditions.
+func TestPipelineStateTransitions(t *testing.T) {
+	// Create channels for state updates
+	childrenUpdateChan := make(chan StateUpdate)
 
-	p := NewPipeline(
-		logger,
-		opMock.Download,
-		opMock.Index,
-		opMock.Persist,
-	)
+	// Create mock processor
+	processor := new(OperationMock)
+	processor.On("Download", mock.Anything).Return(nil)
+	processor.On("Index", mock.Anything).Return(nil)
+	processor.On("Persist", mock.Anything).Return(nil)
 
-	// Verify initial state
-	assert.Equal(t, StateReady, p.CurrentState())
-	assert.False(t, p.IsDescendantOfSealed())
-	assert.False(t, p.IsSealed())
-}
-
-// TestStateTransitions verifies that operations are called in the correct order
-func TestStateTransitions(t *testing.T) {
-	opMock := NewOperationMock()
-
-	// Setup expectations - each operation will be called exactly once
-	opMock.On("Download").Return(nil).Once()
-	opMock.On("Index").Return(nil).Once()
-	opMock.On("Persist").Return(nil).Once()
-
-	// Track state changes
-	stateChanges := make([]string, 0)
-
-	// Create pipeline with mocked operations and state listener
-	p := NewPipeline(
-		zerolog.Nop(),
-		opMock.Download,
-		opMock.Index,
-		opMock.Persist,
-		WithStateListener(func(state string) {
-			stateChanges = append(stateChanges, state)
-		}),
-	)
-
-	p.UpdateFromParent(ParentUpdate{
-		ParentState:        StateIndexing,
-		DescendsFromSealed: true,
-		IsSealed:           false,
+	// Create a pipeline
+	pipeline := NewPipeline(Config{
+		Logger:                  zerolog.Nop(),
+		IsSealed:                false,
+		ChildrenStateUpdateChan: childrenUpdateChan,
+		downloadFunc:            processor.Download,
+		indexFunc:               processor.Index,
+		persistFunc:             processor.Persist,
 	})
 
-	// Verify state progression so far
-	assert.Contains(t, stateChanges, StateDownloading)
-	assert.Contains(t, stateChanges, StateIndexing)
-	assert.Contains(t, stateChanges, StateWaitingPersist)
+	parentUpdateChan := pipeline.GetStateUpdateChan()
 
-	// Verify operations were called correctly
-	opMock.AssertNumberOfCalls(t, "Download", 1)
-	opMock.AssertNumberOfCalls(t, "Index", 1)
-	opMock.AssertNumberOfCalls(t, "Persist", 0)
+	// Start the pipeline in a goroutine
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	// Trigger persisting
-	p.UpdateFromParent(ParentUpdate{
-		ParentState:        StateComplete,
-		DescendsFromSealed: true,
-		IsSealed:           true,
-	})
+	go pipeline.Run(ctx)
 
-	// Verify complete state progression
-	assert.Contains(t, stateChanges, StatePersisting)
-	assert.Contains(t, stateChanges, StateComplete)
+	// Assert initial state
+	assert.Equal(t, StateReady, pipeline.GetState())
 
-	// Verify persist was called
-	opMock.AssertNumberOfCalls(t, "Persist", 1)
+	// Send parent update to trigger state transition
+	parentUpdateChan <- StateUpdate{
+		DescendsFromLastPersistedSealed: true,
+		ParentState:                     StateComplete, // Assume that parent is already complete
+	}
 
-	// Verify all expectations were met
-	opMock.AssertExpectations(t)
+	// Wait for pipeline to reach WaitingPersist state
+	waitForStateUpdate(t, childrenUpdateChan, StateWaitingPersist)
+	assert.Equal(t, StateWaitingPersist, pipeline.GetState(), "Pipeline should be in WaitingPersist state")
+	processor.AssertCalled(t, "Download", mock.Anything)
+	processor.AssertCalled(t, "Index", mock.Anything)
+	processor.AssertNotCalled(t, "Persist")
+
+	// Mark the execution result as sealed to trigger persisting
+	pipeline.SetSealed()
+
+	waitForStateUpdate(t, childrenUpdateChan, StateComplete)
+
+	processor.AssertCalled(t, "Persist", mock.Anything)
 }
 
-// TestPipelineCancellation verifies that the pipeline cancels when conditions change
+// TestPipelineCancellation verifies that a pipeline is properly canceled when
+// it no longer descends from the last persisted sealed result.
 func TestPipelineCancellation(t *testing.T) {
-	opMock := NewOperationMock()
+	// Create channels for state updates
+	childrenUpdateChan := make(chan StateUpdate)
 
-	// Setup expectations - each operation will be called exactly once
-	opMock.On("Download").Return(nil).Once()
-	opMock.On("Index").Return(nil).Once()
-	opMock.On("Persist").Return(nil).Once()
+	// Set up a download function that signals when it starts and sleeps
+	downloadStarted := make(chan struct{})
 
-	// Create pipeline with controlled download and state listener
-	stateChanges := make([]string, 0)
+	// Create a pipeline with a slow download function
+	pipeline := NewPipeline(Config{
+		Logger:                  zerolog.Nop(),
+		IsSealed:                false,
+		ChildrenStateUpdateChan: childrenUpdateChan,
+		downloadFunc: func(ctx context.Context) error {
+			close(downloadStarted) // Signal that download has started
 
-	logger := zerolog.Nop()
-	p := NewPipeline(
-		logger,
-		opMock.Download,
-		opMock.Index,
-		opMock.Persist,
-		WithStateListener(func(state string) {
-			stateChanges = append(stateChanges, state)
-		}),
-	)
-
-	// Start the transition to downloading
-	p.UpdateFromParent(ParentUpdate{
-		ParentState:        StateIndexing,
-		DescendsFromSealed: true,
-		IsSealed:           false,
+			// Simulate long-running operation
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(500 * time.Millisecond):
+				return nil
+			}
+		},
 	})
+	parentUpdateChan := pipeline.GetStateUpdateChan()
 
-	// Start the transition to downloading
-	p.UpdateFromParent(ParentUpdate{
-		ParentState:        StateIndexing,
-		DescendsFromSealed: false,
-		IsSealed:           false,
-	})
+	// Start the pipeline
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	assert.Contains(t, stateChanges, StateCanceled)
-}
+	go pipeline.Run(ctx)
 
-// TestOperationFailures verifies that the pipeline handles operation failures correctly
-func TestOperationFailures(t *testing.T) {
-	tests := []struct {
-		name          string
-		downloadErr   error
-		indexErr      error
-		persistErr    error
-		expectedState string
-		setupPipeline func(*Pipeline)
-	}{
-		{
-			name:          "download failure leads to canceled state",
-			downloadErr:   errors.New("download error"),
-			indexErr:      nil,
-			persistErr:    nil,
-			expectedState: StateCanceled,
-			setupPipeline: func(p *Pipeline) {
-				p.UpdateFromParent(ParentUpdate{
-					ParentState:        StateIndexing,
-					DescendsFromSealed: true,
-					IsSealed:           false,
-				})
-			},
-		},
-		{
-			name:          "index failure leads to canceled state",
-			downloadErr:   nil,
-			indexErr:      errors.New("index error"),
-			persistErr:    nil,
-			expectedState: StateCanceled,
-			setupPipeline: func(p *Pipeline) {
-				// Set state to downloading and manually fire download complete
-				p.stateMachine = stateless.NewStateMachine(StateDownloading)
-				p.pipelineInitialize()
-				p.UpdateFromParent(ParentUpdate{
-					ParentState:        StateIndexing,
-					DescendsFromSealed: true,
-					IsSealed:           false,
-				})
-				p.Fire(TriggerDownloadComplete)
-			},
-		},
-		{
-			name:          "persist failure leads to canceled state",
-			downloadErr:   nil,
-			indexErr:      nil,
-			persistErr:    errors.New("persist error"),
-			expectedState: StateCanceled,
-			setupPipeline: func(p *Pipeline) {
-				// Set state to waiting_persist and simulate conditions for persisting
-				p.stateMachine = stateless.NewStateMachine(StateWaitingPersist)
-				p.pipelineInitialize()
-				p.UpdateFromParent(ParentUpdate{
-					ParentState:        StateComplete,
-					DescendsFromSealed: true,
-					IsSealed:           true,
-				})
-			},
-		},
+	// Send an update that allows starting
+	parentUpdateChan <- StateUpdate{
+		DescendsFromLastPersistedSealed: true,
+		ParentState:                     StateComplete,
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Track final state
-			var finalState string
+	// Wait for download to start
+	<-downloadStarted
 
-			// Create mock
-			opMock := NewOperationMock()
+	// Now send an update that causes cancellation
+	parentUpdateChan <- StateUpdate{
+		DescendsFromLastPersistedSealed: false, // No longer descends from latest
+		ParentState:                     StateComplete,
+	}
 
-			// Configure mock behavior
-			if tt.downloadErr != nil {
-				opMock.On("Download").Return(tt.downloadErr)
-			} else {
-				opMock.On("Download").Return(nil)
+	waitForStateUpdate(t, childrenUpdateChan, StateCanceled)
+}
+
+// TestPipelineParentDependentTransitions verifies that a pipeline's transitions
+// depend on the parent pipeline's state.
+func TestPipelineParentDependentTransitions(t *testing.T) {
+	// Create channels for state updates
+	childrenUpdateChan := make(chan StateUpdate)
+
+	// Create a pipeline with process functions
+	processor := new(OperationMock)
+	processor.On("Download", mock.Anything).Return(nil)
+	processor.On("Index", mock.Anything).Return(nil)
+	processor.On("Persist", mock.Anything).Return(nil)
+
+	// Create a pipeline with initial state
+	pipeline := NewPipeline(Config{
+		Logger:                  zerolog.Nop(),
+		IsSealed:                false,
+		ChildrenStateUpdateChan: childrenUpdateChan,
+		downloadFunc:            processor.Download,
+		indexFunc:               processor.Index,
+		persistFunc:             processor.Persist,
+	})
+	parentUpdateChan := pipeline.GetStateUpdateChan()
+
+	// Start the pipeline
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go pipeline.Run(ctx)
+
+	// Initial update - parent in Ready state
+	parentUpdateChan <- StateUpdate{
+		DescendsFromLastPersistedSealed: true,
+		ParentState:                     StateReady,
+	}
+
+	// Check that pipeline is still in Ready state
+	assert.Equal(t, StateReady, pipeline.GetState(), "Pipeline should remain in Ready state")
+	processor.AssertNotCalled(t, "Download")
+
+	// Update parent to downloading
+	parentUpdateChan <- StateUpdate{
+		DescendsFromLastPersistedSealed: true,
+		ParentState:                     StateDownloading,
+	}
+
+	// Wait for pipeline to progress to WaitingPersist
+	waitForStateUpdate(t, childrenUpdateChan, StateWaitingPersist)
+	assert.Equal(t, StateWaitingPersist, pipeline.GetState(), "Pipeline should progress to WaitingPersist state")
+	processor.AssertCalled(t, "Download", mock.Anything)
+	processor.AssertCalled(t, "Index", mock.Anything)
+	processor.AssertNotCalled(t, "Persist")
+
+	// Update parent to complete - should trigger persisting
+	parentUpdateChan <- StateUpdate{
+		DescendsFromLastPersistedSealed: true,
+		ParentState:                     StateComplete,
+	}
+
+	// Mark the execution result as sealed to trigger persisting
+	pipeline.SetSealed()
+
+	// Wait for pipeline to complete
+	waitForStateUpdate(t, childrenUpdateChan, StateComplete)
+	assert.Equal(t, StateComplete, pipeline.GetState(), "Pipeline should reach Complete state")
+	processor.AssertCalled(t, "Persist", mock.Anything)
+}
+
+// TestPipelineInitialState verifies that a pipeline can be created with a specific
+// initial state and behaves correctly based on that state.
+func TestPipelineInitialState(t *testing.T) {
+	// Create channels for state updates
+	childrenUpdateChan := make(chan StateUpdate)
+
+	// Create mock processor
+	processor := new(OperationMock)
+	processor.On("Persist", mock.Anything).Return(nil)
+
+	// Create a pipeline with non-default initial state
+	pipeline := NewPipeline(Config{
+		Logger:                    zerolog.Nop(),
+		IsSealed:                  true,
+		InitialState:              StateWaitingPersist,
+		InitialDescendsFromSealed: true,
+		ChildrenStateUpdateChan:   childrenUpdateChan,
+		persistFunc:               processor.Persist,
+	})
+	parentUpdateChan := pipeline.GetStateUpdateChan()
+
+	// Verify initial state is set correctly
+	assert.Equal(t, StateWaitingPersist, pipeline.GetState(), "Pipeline should be initialized in WaitingPersist state")
+
+	// Start the pipeline
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go pipeline.Run(ctx)
+
+	// Send parent update to trigger persisting
+	parentUpdateChan <- StateUpdate{
+		DescendsFromLastPersistedSealed: true,
+		ParentState:                     StateComplete,
+	}
+
+	// Wait for pipeline to complete
+	waitForStateUpdate(t, childrenUpdateChan, StateComplete)
+	assert.Equal(t, StateComplete, pipeline.GetState(), "Pipeline should complete")
+	processor.AssertCalled(t, "Persist", mock.Anything)
+}
+
+// TestBroadcastStateUpdate verifies that descendsFromSealed is correctly propagated
+// and is based on the pipeline's state, not just forwarded from the parent.
+func TestBroadcastStateUpdate(t *testing.T) {
+	// Create channels for state updates
+	childrenUpdateChan := make(chan StateUpdate)
+
+	// Create mock processor
+	processor := new(OperationMock)
+	processor.On("Download", mock.Anything).Return(nil)
+	processor.On("Index", mock.Anything).Return(nil)
+	processor.On("Persist", mock.Anything).Return(nil)
+
+	// Create a pipeline with initial state
+	pipeline := NewPipeline(Config{
+		Logger:                    zerolog.Nop(),
+		InitialDescendsFromSealed: true,
+		ChildrenStateUpdateChan:   childrenUpdateChan,
+		downloadFunc:              processor.Download,
+		indexFunc:                 processor.Index,
+		persistFunc:               processor.Persist,
+	})
+	parentUpdateChan := pipeline.GetStateUpdateChan()
+
+	// Start the pipeline
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go pipeline.Run(ctx)
+
+	// Send a state update to trigger a broadcast to children
+	parentUpdateChan <- StateUpdate{
+		DescendsFromLastPersistedSealed: true,
+		ParentState:                     StateDownloading, // This will trigger a state transition
+	}
+
+	// Wait for an update to be sent to children
+	update := waitForAnyStateUpdate(t, childrenUpdateChan)
+
+	// Check that the update has the correct flag
+	assert.True(t, update.DescendsFromLastPersistedSealed, "Initial update should indicate descends=true")
+
+	// The state could be any non-terminal state depending on timing
+	assert.NotEqual(t, StateComplete, update.ParentState, "State should not be Complete")
+	assert.NotEqual(t, StateCanceled, update.ParentState, "State should not be Canceled")
+
+	// Now simulate this pipeline being cancelled
+	parentUpdateChan <- StateUpdate{
+		DescendsFromLastPersistedSealed: false, // No longer descends
+		ParentState:                     StateReady,
+	}
+
+	// Wait for canceled update
+	cancelUpdate := waitForStateUpdate(t, childrenUpdateChan, StateCanceled)
+
+	// Check the cancel update
+	assert.False(t, cancelUpdate.DescendsFromLastPersistedSealed, "Update after cancellation should indicate descends=false")
+	assert.Equal(t, StateCanceled, cancelUpdate.ParentState, "State should be Canceled")
+}
+
+// Helper function to wait for a specific state update
+func waitForStateUpdate(t *testing.T, updateChan <-chan StateUpdate, expectedState State) StateUpdate {
+	timeoutChan := time.After(500 * time.Millisecond)
+
+	for {
+		select {
+		case update := <-updateChan:
+			if update.ParentState == expectedState {
+				return update
 			}
-
-			if tt.indexErr != nil {
-				opMock.On("Index").Return(tt.indexErr)
-			} else {
-				opMock.On("Index").Return(nil)
-			}
-
-			if tt.persistErr != nil {
-				opMock.On("Persist").Return(tt.persistErr)
-			} else {
-				opMock.On("Persist").Return(nil)
-			}
-
-			// Create pipeline with mocked operations
-			p := NewPipeline(
-				zerolog.Nop(),
-				opMock.Download,
-				opMock.Index,
-				opMock.Persist,
-				WithStateListener(func(state string) {
-					finalState = state
-				}),
-			)
-
-			tt.setupPipeline(p)
-
-			// Wait for the expected state
-			assert.Equal(t, tt.expectedState, finalState)
-		})
+			// Continue waiting if this isn't the state we're looking for
+		case <-timeoutChan:
+			t.Fatalf("Timed out waiting for state update to %s", expectedState)
+			return StateUpdate{} // Never reached, just to satisfy compiler
+		}
 	}
 }
 
-// Mock for the operation functions
+// Helper function to wait for any state update
+func waitForAnyStateUpdate(t *testing.T, updateChan <-chan StateUpdate) StateUpdate {
+	timeoutChan := time.After(500 * time.Millisecond)
+
+	select {
+	case update := <-updateChan:
+		return update
+	case <-timeoutChan:
+		t.Fatal("Timed out waiting for any state update")
+		return StateUpdate{} // Never reached, just to satisfy compiler
+	}
+}
+
+// OperationMock is a mock implementation of process functions
 type OperationMock struct {
 	mock.Mock
 }
 
-func NewOperationMock() *OperationMock {
-	return &OperationMock{}
-}
-
-func (m *OperationMock) Download() error {
-	args := m.Called()
+// Download implements the download process function
+func (m *OperationMock) Download(ctx context.Context) error {
+	args := m.Called(ctx)
 	return args.Error(0)
 }
 
-func (m *OperationMock) Index() error {
-	args := m.Called()
+// Index implements the index process function
+func (m *OperationMock) Index(ctx context.Context) error {
+	args := m.Called(ctx)
 	return args.Error(0)
 }
 
-func (m *OperationMock) Persist() error {
-	args := m.Called()
+// Persist implements the persist process function
+func (m *OperationMock) Persist(ctx context.Context) error {
+	args := m.Called(ctx)
 	return args.Error(0)
 }
