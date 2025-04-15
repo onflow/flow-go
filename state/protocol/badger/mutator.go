@@ -662,7 +662,7 @@ func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow
 
 	// Evolve the Protocol State starting from the parent block's state. Information that may change the state is:
 	// the candidate block's view and Service Events from execution results sealed in the candidate block.
-	updatedStateID, dbUpdates, err := m.protocolState.FollowerEvolveState(candidate.Header.ParentID, candidate.Header.View, candidate.Payload.Seals)
+	updatedStateID, dbUpdates, err := m.protocolState.EvolveState(candidate.Header.ParentID, candidate.Header.View, candidate.Payload.Seals)
 	if err != nil {
 		return nil, fmt.Errorf("evolving protocol state failed: %w", err)
 	}
