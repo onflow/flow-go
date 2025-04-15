@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
@@ -18,6 +19,8 @@ type ClusterBlocks struct {
 	headers  *Headers
 	payloads *ClusterPayloads
 }
+
+var _ storage.ClusterBlocks = (*ClusterBlocks)(nil)
 
 func NewClusterBlocks(db *badger.DB, chainID flow.ChainID, headers *Headers, payloads *ClusterPayloads) *ClusterBlocks {
 	b := &ClusterBlocks{

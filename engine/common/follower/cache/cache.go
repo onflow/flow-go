@@ -90,21 +90,21 @@ func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetric
 // handleEjectedBlock performs cleanup of secondary indexes to prevent memory leaks.
 // WARNING: Concurrency safety of this function is guaranteed by `c.lock`. This method is only called
 // by `herocache.Cache.Add` and we perform this call while `c.lock` is in locked state.
-func (c *Cache) handleEjectedBlock(block *flow.BlockProposal) {
-	blockID := block.ID()
+func (c *Cache) handleEjectedBlock(proposal *flow.BlockProposal) {
+	blockID := proposal.Block.ID()
 
 	// remove block from the set of blocks for this view
-	blocksForView := c.byView[block.Block.Header.View]
+	blocksForView := c.byView[proposal.Block.Header.View]
 	delete(blocksForView, blockID)
 	if len(blocksForView) == 0 {
-		delete(c.byView, block.Block.Header.View)
+		delete(c.byView, proposal.Block.Header.View)
 	}
 
 	// remove block from the parent's set of its children
-	siblings := c.byParent[block.Block.Header.ParentID]
+	siblings := c.byParent[proposal.Block.Header.ParentID]
 	delete(siblings, blockID)
 	if len(siblings) == 0 {
-		delete(c.byParent, block.Block.Header.ParentID)
+		delete(c.byParent, proposal.Block.Header.ParentID)
 	}
 }
 
@@ -163,12 +163,13 @@ func (c *Cache) AddBlocks(batch []*flow.BlockProposal) (certifiedBatch []flow.Ce
 	}
 
 	// If there exists a parent for the batch's first block, then this is parent is certified
-	//  by the batch. Hence, we prepend certifiedBatch by the parent.
+	// by the batch. Hence, we prepend certifiedBatch by the parent.
 	if bc.batchParent != nil {
 		batch = append([]*flow.BlockProposal{bc.batchParent}, batch...)
 	}
-	// If there exists a child of the last block in the batch, then the entire batch is certified.
-	// Otherwise, all blocks in the batch _except_ for the last one are certified
+	// If a child of the last block in the batch already exists in the cache: Then the entire batch is certified,
+	// and we append the child to the batch. Hence, after this operation the following holds: all blocks in the
+	// batch _except_ for the last one, their certifying QC is in the subsequent batch element.
 	if bc.batchChild != nil {
 		batch = append(batch, bc.batchChild)
 	}

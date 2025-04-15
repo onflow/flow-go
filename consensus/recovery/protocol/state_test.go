@@ -30,19 +30,16 @@ func TestSaveBlockAsReplica(t *testing.T) {
 		b1 := unittest.BlockWithParentFixture(b0)
 		b1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		b1p := unittest.ProposalFromBlock(b1)
-
 		err = state.Extend(context.Background(), b1p)
 		require.NoError(t, err)
 
 		b2 := unittest.BlockWithParentProtocolState(b1)
 		b2p := unittest.ProposalFromBlock(b2)
-
 		err = state.Extend(context.Background(), b2p)
 		require.NoError(t, err)
 
 		b3 := unittest.BlockWithParentProtocolState(b2)
 		b3p := unittest.ProposalFromBlock(b3)
-
 		err = state.Extend(context.Background(), b3p)
 		require.NoError(t, err)
 

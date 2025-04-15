@@ -18,7 +18,6 @@ import (
 // results for final block of the state
 // Root <- A <- B(result(A(VB))) <- C(seal(B))
 func AddVersionBeacon(t *testing.T, beacon *flow.VersionBeacon, state protocol.FollowerState) {
-
 	final, err := state.Final().Head()
 	require.NoError(t, err)
 
@@ -54,7 +53,6 @@ func AddVersionBeacon(t *testing.T, beacon *flow.VersionBeacon, state protocol.F
 }
 
 func addToState(t *testing.T, state protocol.FollowerState, block *flow.Block, finalize bool) {
-
 	err := state.ExtendCertified(context.Background(), NewCertifiedBlock(block))
 	require.NoError(t, err)
 

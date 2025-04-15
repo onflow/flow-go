@@ -43,10 +43,10 @@ func (s *CacheSuite) TestPeek() {
 	blocks := unittest.ProposalChainFixtureFrom(10, unittest.BlockHeaderFixture())
 	_, err := s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
-	for _, block := range blocks {
-		actual := s.cache.Peek(block.ID())
+	for _, proposal := range blocks {
+		actual := s.cache.Peek(proposal.Block.ID())
 		require.NotNil(s.T(), actual)
-		require.Equal(s.T(), actual.ID(), block.ID())
+		require.Equal(s.T(), actual.Block.ID(), proposal.Block.ID())
 	}
 }
 
@@ -110,7 +110,8 @@ func (s *CacheSuite) TestBlocksAreNotConnected() {
 // We expect that A will get certified after adding B.
 func (s *CacheSuite) TestChildCertifiesParent() {
 	block := unittest.BlockFixture()
-	certifiedBatch, err := s.cache.AddBlocks([]*flow.BlockProposal{unittest.ProposalFromBlock(&block)})
+	proposal := unittest.ProposalFromBlock(&block)
+	certifiedBatch, err := s.cache.AddBlocks([]*flow.BlockProposal{proposal})
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), certifiedBatch)
 	child := unittest.BlockWithParentFixture(block.Header)
@@ -118,7 +119,7 @@ func (s *CacheSuite) TestChildCertifiesParent() {
 	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBatch, 1)
 	require.Equal(s.T(), block.ID(), certifiedBatch[0].CertifyingQC.BlockID)
-	require.Equal(s.T(), certifiedBatch[0].Proposal.Block, &block)
+	require.Equal(s.T(), certifiedBatch[0].Proposal, proposal)
 }
 
 // TestChildBeforeParent tests a scenario: A <- B[QC_A].
@@ -153,6 +154,7 @@ func (s *CacheSuite) TestBlockInTheMiddle() {
 	// add B
 	certifiedBlocks, err = s.cache.AddBlocks(blocks[1:2])
 	require.NoError(s.T(), err)
+	require.Len(s.T(), certifiedBlocks, 2)
 	require.Equal(s.T(), blocks[0], certifiedBlocks[0].Proposal)
 	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBlocks[len(certifiedBlocks)-1].Proposal)
 	require.Equal(s.T(), blocks[2].Block.Header.QuorumCertificate(), certifiedBlocks[1].CertifyingQC)
@@ -187,7 +189,7 @@ func (s *CacheSuite) TestDuplicatedBatch() {
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), certifiedBatch)
 
-	// add batch with one extra leading block, this has to accepted even though 9 out of 10 blocks
+	// add batch with one extra leading block, this should be accepted even though 9 out of 10 blocks
 	// were already processed
 	certifiedBatch, err = s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
@@ -276,15 +278,18 @@ func (s *CacheSuite) TestMultipleChildrenForSameParent() {
 	B := unittest.BlockWithParentFixture(A.Header)
 	C := unittest.BlockWithParentFixture(A.Header)
 	C.Header.View = B.Header.View + 1 // make sure views are different
+	Ap := unittest.ProposalFromBlock(&A)
+	Bp := unittest.ProposalFromBlock(B)
+	Cp := unittest.ProposalFromBlock(C)
 
-	_, err := s.cache.AddBlocks([]*flow.BlockProposal{unittest.ProposalFromBlock(B)})
+	_, err := s.cache.AddBlocks([]*flow.BlockProposal{Bp})
 	require.NoError(s.T(), err)
-	_, err = s.cache.AddBlocks([]*flow.BlockProposal{unittest.ProposalFromBlock(C)})
+	_, err = s.cache.AddBlocks([]*flow.BlockProposal{Cp})
 	require.NoError(s.T(), err)
-	certifiedBlocks, err := s.cache.AddBlocks([]*flow.BlockProposal{unittest.ProposalFromBlock(&A)})
+	certifiedBlocks, err := s.cache.AddBlocks([]*flow.BlockProposal{Ap})
 	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBlocks, 1)
-	require.Equal(s.T(), &A, certifiedBlocks[0].Proposal.Block)
+	require.Equal(s.T(), Ap, certifiedBlocks[0].Proposal)
 	require.Equal(s.T(), A.ID(), certifiedBlocks[0].CertifyingQC.BlockID)
 }
 
