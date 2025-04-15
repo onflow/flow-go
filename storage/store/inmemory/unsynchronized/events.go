@@ -48,7 +48,7 @@ func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
 func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) ([]flow.Event, error) {
 	events, err := e.ByBlockID(blockID)
 	if err != nil {
-		return nil, storage.ErrNotFound
+		return nil, err
 	}
 
 	var matched []flow.Event
@@ -68,7 +68,7 @@ func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Ident
 func (e *Events) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) ([]flow.Event, error) {
 	events, err := e.ByBlockID(blockID)
 	if err != nil {
-		return nil, storage.ErrNotFound
+		return nil, err
 	}
 
 	var matched []flow.Event
@@ -88,7 +88,7 @@ func (e *Events) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint
 func (e *Events) ByBlockIDEventType(blockID flow.Identifier, eventType flow.EventType) ([]flow.Event, error) {
 	events, err := e.ByBlockID(blockID)
 	if err != nil {
-		return nil, storage.ErrNotFound
+		return nil, err
 	}
 
 	var matched []flow.Event
@@ -110,13 +110,15 @@ func (e *Events) Store(blockID flow.Identifier, blockEvents []flow.EventsList) e
 	}
 
 	e.lock.Lock()
+	defer e.lock.Unlock()
 	e.blockIdToEvents[blockID] = events
-	e.lock.Unlock()
 
 	return nil
 }
 
-// BatchStore will store events for the given block ID in a given batch
+// BatchStore will store events for the given block ID in a given batch.
+//
+// This method is NOT implemented and will always return an error.
 func (e *Events) BatchStore(flow.Identifier, []flow.EventsList, storage.ReaderBatchWriter) error {
 	return fmt.Errorf("not implemented")
 }
@@ -124,6 +126,8 @@ func (e *Events) BatchStore(flow.Identifier, []flow.EventsList, storage.ReaderBa
 // BatchRemoveByBlockID removes events keyed by a blockID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
 // If database unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+//
+// This method is NOT implemented and will always return an error.
 func (e *Events) BatchRemoveByBlockID(flow.Identifier, storage.ReaderBatchWriter) error {
 	return fmt.Errorf("not implemented")
 }
