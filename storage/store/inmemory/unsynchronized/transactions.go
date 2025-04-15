@@ -40,14 +40,14 @@ func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error)
 }
 
 // Store inserts the transaction, keyed by fingerprint. Duplicate transaction insertion is ignored
-// No errors are returned during normal operation.
+// No errors are expected during normal operation.
 func (t *Transactions) Store(tx *flow.TransactionBody) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	_, ok := t.store[tx.ID()]
-	if !ok {
-		t.store[tx.ID()] = tx
+	txID := tx.ID()
+	if _, ok := t.store[txID]; !ok {
+		t.store[txID] = tx
 	}
 
 	return nil
