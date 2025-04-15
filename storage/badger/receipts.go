@@ -16,9 +16,8 @@ import (
 
 // ExecutionReceipts implements storage for execution receipts.
 type ExecutionReceipts struct {
-	db      *badger.DB
-	results *ExecutionResults
-	cache   *Cache[flow.Identifier, *flow.ExecutionReceipt]
+	db    *badger.DB
+	cache *Cache[flow.Identifier, *flow.ExecutionReceipt]
 }
 
 var _ storage.ExecutionReceipts = (*ExecutionReceipts)(nil)
@@ -26,9 +25,7 @@ var _ storage.ExecutionReceipts = (*ExecutionReceipts)(nil)
 // NewExecutionReceipts Creates ExecutionReceipts instance which is a database of receipts which
 // supports storing and indexing receipts by receipt ID and block ID.
 func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results *ExecutionResults, cacheSize uint) *ExecutionReceipts {
-	store := func(receiptTD flow.Identifier, receipt *flow.ExecutionReceipt) func(*transaction.Tx) error {
-		receiptID := receipt.ID()
-
+	store := func(receiptID flow.Identifier, receipt *flow.ExecutionReceipt) func(*transaction.Tx) error {
 		// assemble DB operations to store result (no execution)
 		storeResultOps := results.store(&receipt.ExecutionResult)
 		// assemble DB operations to index receipt (no execution)
@@ -71,8 +68,7 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results 
 	}
 
 	return &ExecutionReceipts{
-		db:      db,
-		results: results,
+		db: db,
 		cache: newCache(collector, metrics.ResourceReceipt,
 			withLimit[flow.Identifier, *flow.ExecutionReceipt](cacheSize),
 			withStore(store),

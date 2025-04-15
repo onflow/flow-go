@@ -1121,9 +1121,6 @@ func (fnb *FlowNodeBuilder) initBadgerDB() error {
 		return fmt.Errorf("could not open public db: %w", err)
 	}
 	fnb.DB = publicDB
-	// set badger db as protocol db
-	// TODO: making it dynamic to switch between badger and pebble
-	fnb.ProtocolDB = badgerimpl.ToDB(publicDB)
 
 	fnb.ShutdownFunc(func() error {
 		if err := publicDB.Close(); err != nil {

@@ -9,6 +9,7 @@ import (
 )
 
 type badgerIterator struct {
+	tx            *badger.Txn
 	iter          *badger.Iterator
 	lowerBound    []byte
 	upperBound    []byte
@@ -29,6 +30,7 @@ func newBadgerIterator(db *badger.DB, startPrefix, endPrefix []byte, ops storage
 	lowerBound, upperBound, hasUpperBound := storage.StartEndPrefixToLowerUpperBound(startPrefix, endPrefix)
 
 	return &badgerIterator{
+		tx:            tx,
 		iter:          iter,
 		lowerBound:    lowerBound,
 		upperBound:    upperBound,
@@ -82,9 +84,12 @@ func (i *badgerIterator) IterItem() storage.IterItem {
 
 var _ storage.IterItem = (*badger.Item)(nil)
 
-// Close closes the iterator. Iterator must be closed, otherwise it causes memory leak.
-// No errors expected during normal operation
+// Close closes the iterator and discards transaction.
+// Iterator must be closed, otherwise it causes memory leaks.
+// Transaction.Discard must be called.
+// No errors are expected during normal operation.
 func (i *badgerIterator) Close() error {
 	i.iter.Close()
+	i.tx.Discard()
 	return nil
 }
