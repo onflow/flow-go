@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/common"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
@@ -238,21 +237,8 @@ func NewEpochStateMachine(
 // but the actual epoch state is stored separately, nevertheless, the epoch state ID is used to sanity check if the
 // epoch state is consistent with the KV Store. Using this approach, we commit the epoch sub-state to the KV Store which in
 // affects the Dynamic Protocol State ID which is essentially hash of the KV Store.
-func (e *EpochStateMachine) Build() (*transaction.DeferredBlockPersist, error) {
-	updatedEpochState, updatedStateID, hasChanges := e.activeStateMachine.Build()
-	e.pendingDbUpdates.AddIndexingOp(func(blockID flow.Identifier, tx *transaction.Tx) error {
-		return e.epochProtocolStateDB.Index(blockID, updatedStateID)(tx)
-	})
-	if hasChanges {
-		e.pendingDbUpdates.AddDbOp(operation.SkipDuplicatesTx(
-			e.epochProtocolStateDB.StoreTx(updatedStateID, updatedEpochState.MinEpochStateEntry)))
-	}
-	e.EvolvingState.SetEpochStateID(updatedStateID)
-
-	return e.pendingDbUpdates, nil
-}
-
-func (e *EpochStateMachine) BuildBatchOps() ([]storage.BlockIndexingBatchWrite, error) {
+// TODO: update comments
+func (e *EpochStateMachine) Build() ([]storage.BlockIndexingBatchWrite, error) {
 	updatedEpochState, updatedStateID, hasChanges := e.activeStateMachine.Build()
 
 	e.pendingDBWrites = append(e.pendingDBWrites, func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
@@ -313,34 +299,6 @@ func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent)
 			return irrecoverable.NewExceptionf("could not apply service events from ordered results: %w", err)
 		}
 	}
-	e.pendingDbUpdates.AddIndexingOps(dbUpdates.Pending())
-	return nil
-}
-
-func (e *EpochStateMachine) FollowerEvolveState(sealedServiceEvents []flow.ServiceEvent) error {
-	dbUpdates, err := e.followerEvolveActiveStateMachine(sealedServiceEvents)
-	if err != nil {
-		if protocol.IsInvalidServiceEventError(err) {
-			// When the happy path state machine returns an InvalidServiceEventError, we discard its state and use the fallback state machine
-			// to handle the block's epoch state evolution. The fallback state machine sets the state's EFM flag and gracefully handle all
-			// service events to keep the protocol alive, no matter whether the service events are incorrect, inconsistent or unexpected.
-			// Once we enter EFM, the only way to return to normal is by processing an epoch recover event by the fallback state machine.
-			//    Without loss of generality, we can assume that the error above is from the happy path state machine. In case of a bug, where
-			// the fallback state machine was already active above, yet it returned the `InvalidServiceEventError`, we would re-execute exactly
-			// that same logic below, arrive exactly at the same conclusion (fallback state machine returned an error which it shouldn't have)
-			// and crash.
-			e.activeStateMachine, err = e.epochFallbackStateMachineFactory()
-			if err != nil {
-				return fmt.Errorf("could not create epoch fallback state machine: %w", err)
-			}
-			dbUpdates, err = e.followerEvolveActiveStateMachine(sealedServiceEvents)
-			if err != nil {
-				return irrecoverable.NewExceptionf("could not transition to epoch fallback mode: %w", err)
-			}
-		} else {
-			return irrecoverable.NewExceptionf("could not apply service events from ordered results: %w", err)
-		}
-	}
 
 	e.pendingDBWrites = append(e.pendingDBWrites, dbUpdates...)
 	return nil
@@ -355,57 +313,7 @@ func (e *EpochStateMachine) FollowerEvolveState(sealedServiceEvents []flow.Servi
 // it returns the deferred DB updates to be applied to the storage.
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if any service event is invalid or is not a valid state transition for the current protocol state
-func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.ServiceEvent) (*transaction.DeferredBlockPersist, error) {
-	parentProtocolState := e.activeStateMachine.ParentState()
-
-	// STEP 1: transition to next epoch if next epoch is committed *and* we are at first block of epoch
-	phase := parentProtocolState.EpochPhase()
-	if (phase == flow.EpochPhaseCommitted) && (e.activeStateMachine.View() > parentProtocolState.CurrentEpochFinalView()) {
-		err := e.activeStateMachine.TransitionToNextEpoch()
-		if err != nil {
-			return nil, fmt.Errorf("could not transition protocol state to next epoch: %w", err)
-		}
-	}
-
-	// STEP 2: apply service events (input events already required to be ordered by block height).
-	dbUpdates := transaction.NewDeferredBlockPersist()
-	for _, event := range sealedServiceEvents {
-		switch ev := event.Event.(type) {
-		case *flow.EpochSetup:
-			processed, err := e.activeStateMachine.ProcessEpochSetup(ev)
-			if err != nil {
-				return nil, fmt.Errorf("could not process epoch setup event: %w", err)
-			}
-			if processed {
-				dbUpdates.AddDbOp(e.setups.StoreTx(ev)) // we'll insert the setup event when we insert the block
-			}
-
-		case *flow.EpochCommit:
-			processed, err := e.activeStateMachine.ProcessEpochCommit(ev)
-			if err != nil {
-				return nil, fmt.Errorf("could not process epoch commit event: %w", err)
-			}
-			if processed {
-				dbUpdates.AddDbOp(e.commits.StoreTx(ev)) // we'll insert the commit event when we insert the block
-			}
-		case *flow.EpochRecover:
-			processed, err := e.activeStateMachine.ProcessEpochRecover(ev)
-			if err != nil {
-				return nil, fmt.Errorf("could not process epoch recover event: %w", err)
-			}
-			if processed {
-				dbUpdates.AddDbOps(e.setups.StoreTx(&ev.EpochSetup), e.commits.StoreTx(&ev.EpochCommit)) // we'll insert the setup & commit events when we insert the block
-			}
-		case *flow.EjectNode:
-			_ = e.activeStateMachine.EjectIdentity(ev)
-		default:
-			continue
-		}
-	}
-	return dbUpdates, nil
-}
-
-func (e *EpochStateMachine) followerEvolveActiveStateMachine(sealedServiceEvents []flow.ServiceEvent) ([]storage.BlockIndexingBatchWrite, error) {
+func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.ServiceEvent) ([]storage.BlockIndexingBatchWrite, error) {
 	parentProtocolState := e.activeStateMachine.ParentState()
 
 	// STEP 1: transition to next epoch if next epoch is committed *and* we are at first block of epoch
