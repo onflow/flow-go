@@ -450,9 +450,15 @@ func Concurrently(n int, f func(int)) {
 	wg.Wait()
 }
 
-// AssertEqualBlocksLenAndOrder asserts that both a segment of blocks have the same len and blocks are in the same order
-func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks []*flow.Block, actualSegmentBlocks []*flow.BlockProposal) {
-	assert.Equal(t, flow.GetIDs(expectedBlocks), flow.GetIDs(actualSegmentBlocks))
+// AssertEqualBlockSequences is given a sequence of Blocks and a sequence of Proposals. It asserts that
+// both sequences are of the same length, and that each proposal is for the block at the same index (via block hash).
+// Used as a convenience function for Sealing Segment tests due to differences with nils vs empty slices.
+func AssertEqualBlockSequences(t *testing.T, blocks []*flow.Block, proposals []*flow.BlockProposal) {
+	assert.Equal(t, len(blocks), len(proposals), "block and proposal sequences have different lengths (%d vs %d)", len(blocks), len(proposals))
+	for i, block := range blocks {
+		proposal := proposals[i]
+		assert.Equal(t, block.ID(), proposal.Block.ID(), "block and proposal at index %d do not match", i)
+	}
 }
 
 // NetworkCodec returns cbor codec.

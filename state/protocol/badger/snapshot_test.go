@@ -307,7 +307,7 @@ func TestSealingSegment(t *testing.T) {
 
 			// sealing segment should contain B1 and B2
 			// B2 is reference of snapshot, B1 is latest sealed
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{rootSnapshot.Encodable().SealingSegment.Sealed(), block1}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{rootSnapshot.Encodable().SealingSegment.Sealed(), block1}, segment.Blocks)
 			assert.Len(t, segment.ExecutionResults, 1)
 			assert.Empty(t, segment.ExtraBlocks)
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(block1.ID()))
@@ -355,7 +355,7 @@ func TestSealingSegment(t *testing.T) {
 
 			// sealing segment should contain B1, B2, B3
 			// B3 is reference of snapshot, B1 is latest sealed
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block1, block2, block3}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{block1, block2, block3}, segment.Blocks)
 			assert.Len(t, segment.ExecutionResults, 1)
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(block3.ID()))
 		})
@@ -464,8 +464,8 @@ func TestSealingSegment(t *testing.T) {
 
 			// sealing segment should be [B2, B3, B4, B5, B6]
 			require.Len(t, segment.Blocks, 5)
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block2, block3, block4, block5, block6}, segment.Blocks)
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block1}, segment.ExtraBlocks[1:])
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{block2, block3, block4, block5, block6}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{block1}, segment.ExtraBlocks[1:])
 			require.Len(t, segment.ExecutionResults, 1)
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(block6.ID()))
@@ -529,7 +529,7 @@ func TestSealingSegment(t *testing.T) {
 			buildBlock(t, state, unittest.BlockWithParentProtocolState(block5))
 
 			require.Len(t, segment.Blocks, 4)
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block2, block3, block4, block5}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{block2, block3, block4, block5}, segment.Blocks)
 			require.Contains(t, segment.ExecutionResults, resultA)
 			require.Len(t, segment.ExecutionResults, 2)
 
@@ -601,7 +601,7 @@ func TestSealingSegment(t *testing.T) {
 			buildBlock(t, state, unittest.BlockWithParentProtocolState(block5))
 
 			require.Len(t, segment.Blocks, 4)
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block2, block3, block4, block5}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{block2, block3, block4, block5}, segment.Blocks)
 			require.Contains(t, segment.ExecutionResults, resultA)
 			// ResultA should only be added once even though it is referenced in 2 different blocks
 			require.Len(t, segment.ExecutionResults, 2)
@@ -652,7 +652,7 @@ func TestSealingSegment(t *testing.T) {
 			require.NoError(t, err)
 			// sealing segment should contain B1 and B5
 			// B5 is reference of snapshot, B1 is latest sealed
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block1, block2, block3, block4, block5}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{block1, block2, block3, block4, block5}, segment.Blocks)
 			assert.Len(t, segment.ExecutionResults, 1)
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
@@ -708,7 +708,7 @@ func TestSealingSegment(t *testing.T) {
 			assert.Equal(t, lastSealedBlock.Header, segment.Sealed().Header)
 
 			// there are DefaultTransactionExpiry number of blocks in total
-			unittest.AssertEqualBlocksLenAndOrder(t, blocks[:flow.DefaultTransactionExpiry], segment.ExtraBlocks)
+			unittest.AssertEqualBlockSequences(t, blocks[:flow.DefaultTransactionExpiry], segment.ExtraBlocks)
 			assert.Len(t, segment.ExtraBlocks, flow.DefaultTransactionExpiry)
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
 
@@ -786,7 +786,7 @@ func TestSealingSegment(t *testing.T) {
 			assert.Equal(t, lastBlock.Header, segment.Highest().Header)
 			assert.Equal(t, block4.Header, segment.Sealed().Header)
 			root := rootSnapshot.Encodable().SealingSegment.Sealed()
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{root, block1, block2, block3}, segment.ExtraBlocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{root, block1, block2, block3}, segment.ExtraBlocks)
 			assert.Len(t, segment.ExecutionResults, 2)
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
@@ -969,8 +969,8 @@ func TestBootstrapSealingSegmentWithExtraBlocks(t *testing.T) {
 
 		// sealing segment should be [B2, B3, B4, B5, B6]
 		require.Len(t, segment.Blocks, 5)
-		unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block2, block3, block4, block5, block6}, segment.Blocks)
-		unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block1}, segment.ExtraBlocks[1:])
+		unittest.AssertEqualBlockSequences(t, []*flow.Block{block2, block3, block4, block5, block6}, segment.Blocks)
+		unittest.AssertEqualBlockSequences(t, []*flow.Block{block1}, segment.ExtraBlocks[1:])
 		require.Len(t, segment.ExecutionResults, 1)
 
 		assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
