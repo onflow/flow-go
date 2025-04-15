@@ -25,11 +25,8 @@ type BlockProposal struct {
 	ProposerSigData []byte
 }
 
-// TODO(malleability, #7100, herocache): this is only to support insertion and retrieval by parentID for follower pending blocks herocache
+// TODO(malleability, #7100): this is currently unused
 func (b *BlockProposal) ID() Identifier {
-	return b.Block.ID()
-}
-func (b *BlockProposal) Checksum() Identifier {
 	return MakeID(b)
 }
 
