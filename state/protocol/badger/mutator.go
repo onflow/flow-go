@@ -71,17 +71,25 @@ func NewFollowerState(
 	index storage.Index,
 	payloads storage.Payloads,
 	blockTimer protocol.BlockTimer,
-	protocolState protocol.MutableProtocolState,
 ) (*FollowerState, error) {
 	followerState := &FollowerState{
-		State:         state,
-		index:         index,
-		payloads:      payloads,
-		tracer:        tracer,
-		logger:        logger,
-		consumer:      consumer,
-		blockTimer:    blockTimer,
-		protocolState: protocolState,
+		State:      state,
+		index:      index,
+		payloads:   payloads,
+		tracer:     tracer,
+		logger:     logger,
+		consumer:   consumer,
+		blockTimer: blockTimer,
+		protocolState: protocol_state.NewMutableProtocolState(
+			logger,
+			state.epochProtocolStateEntriesDB,
+			state.protocolKVStoreSnapshotsDB,
+			state.params,
+			state.headers,
+			state.results,
+			state.epoch.setups,
+			state.epoch.commits,
+		),
 
 		indexingNewBlock: &sync.Mutex{},
 	}
@@ -148,7 +156,6 @@ func NewFullConsensusState(
 		index,
 		payloads,
 		blockTimer,
-		mutatableProtocolState,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initialization of Mutable Follower State failed: %w", err)

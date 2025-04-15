@@ -299,7 +299,7 @@ func (s *Snapshot) Descendants() ([]flow.Identifier, error) {
 
 func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, error) {
 	var children flow.IdentifierList
-	err := procedure.LookupBlockChildren(s.state.sdb.Reader(), blockID, &children)
+	err := procedure.LookupBlockChildren(s.state.db.Reader(), blockID, &children)
 	if err != nil {
 		return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
 	}
@@ -541,7 +541,7 @@ func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (
 	err error,
 ) {
 
-	r := q.snap.state.sdb.Reader()
+	r := q.snap.state.db.Reader()
 	// Retrieve the epoch's first height
 	err = operation.RetrieveEpochFirstHeight(r, epoch, &firstHeight)
 	if err != nil {

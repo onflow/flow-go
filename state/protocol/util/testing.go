@@ -275,10 +275,6 @@ func RunWithFollowerProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, 
 			all.Index,
 			all.Payloads,
 			mockTimer,
-			pbadger.MutableProtocolStateFromState(
-				log,
-				state,
-			),
 		)
 		require.NoError(t, err)
 		f(db, followerState)
@@ -427,10 +423,6 @@ func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.
 			all.Index,
 			all.Payloads,
 			mockTimer,
-			pbadger.MutableProtocolStateFromState(
-				log,
-				state,
-			),
 		)
 		require.NoError(t, err)
 		f(db, followerState, all.Headers, all.Index)
