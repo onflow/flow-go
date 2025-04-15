@@ -75,3 +75,4 @@ tps-results*.json
 
 # Custom golangcilint build
 custom-gcl
+tools/custom-gcl

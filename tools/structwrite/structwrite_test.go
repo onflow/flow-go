@@ -17,7 +17,7 @@ func TestPluginExample(t *testing.T) {
 	plugin, err := newPlugin(Settings{
 		Structs: []string{
 			"github.com/username/linttestmodule.NonWritable",
-			"github.com/username/linttestmodule/subpkg.NonWritable",
+			"github.com/username/linttestmodule/subpkg.NonWritableInSubpackage",
 		},
 	})
 	require.NoError(t, err)
