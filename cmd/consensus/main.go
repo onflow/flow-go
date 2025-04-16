@@ -267,17 +267,17 @@ func main() {
 
 			receiptValidator = validation.NewReceiptValidator(
 				node.State,
-				all.Headers,
-				all.Index,
-				all.Results,
-				all.Seals)
+				node.Storage.Headers,
+				node.Storage.Index,
+				node.Storage.Results,
+				node.Storage.Seals)
 
 			sealValidator := validation.NewSealValidator(
 				node.State,
-				all.Headers,
-				all.Index,
-				all.Results,
-				all.Seals,
+				node.Storage.Headers,
+				node.Storage.Index,
+				node.Storage.Results,
+				node.Storage.Seals,
 				chunkAssigner,
 				getSealingConfigs,
 				conMetrics)
@@ -293,13 +293,13 @@ func main() {
 				node.ProtocolEvents,
 				node.DB,
 				state,
-				all.Index,
-				all.Payloads,
+				node.Storage.Index,
+				node.Storage.Payloads,
 				blockTimer,
 				receiptValidator,
 				sealValidator,
-				all.QuorumCertificates,
-				all.Blocks,
+				node.Storage.QuorumCertificates,
+				node.Storage.Blocks,
 			)
 			return err
 		}).
@@ -402,7 +402,7 @@ func main() {
 			// use a custom ejector, so we don't eject seals that would break
 			// the chain of seals
 			rawMempool := stdmap.NewIncorporatedResultSeals(sealLimit)
-			multipleReceiptsFilterMempool := consensusMempools.NewIncorporatedResultSeals(rawMempool, all.Receipts)
+			multipleReceiptsFilterMempool := consensusMempools.NewIncorporatedResultSeals(rawMempool, node.Storage.Receipts)
 			seals, err = consensusMempools.NewExecStateForkSuppressor(
 				multipleReceiptsFilterMempool,
 				consensusMempools.LogForkAndCrash(node.Logger),
@@ -416,7 +416,7 @@ func main() {
 			return nil
 		}).
 		Module("pending receipts mempool", func(node *cmd.NodeConfig) error {
-			pendingReceipts = stdmap.NewPendingReceipts(all.Headers, pendingReceiptsLimit)
+			pendingReceipts = stdmap.NewPendingReceipts(node.Storage.Headers, pendingReceiptsLimit)
 			return nil
 		}).
 		Module("hotstuff main metrics", func(node *cmd.NodeConfig) error {
@@ -468,7 +468,7 @@ func main() {
 		}).
 		Component("sealing engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
-			sealingTracker := tracker.NewSealingTracker(node.Logger, all.Headers, all.Receipts, seals)
+			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Headers, node.Storage.Receipts, seals)
 
 			e, err := sealing.NewEngine(
 				node.Logger,
@@ -479,12 +479,12 @@ func main() {
 				sealingTracker,
 				node.EngineRegistry,
 				node.Me,
-				all.Headers,
-				all.Payloads,
-				all.Results,
-				all.Index,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				node.Storage.Results,
+				node.Storage.Index,
 				node.State,
-				all.Seals,
+				node.Storage.Seals,
 				chunkAssigner,
 				seals,
 				getSealingConfigs,
@@ -522,8 +522,8 @@ func main() {
 				conMetrics,
 				node.Metrics.Mempool,
 				node.State,
-				all.Headers,
-				all.Receipts,
+				node.Storage.Headers,
+				node.Storage.Receipts,
 				receipts,
 				pendingReceipts,
 				seals,
@@ -539,8 +539,8 @@ func main() {
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				node.State,
-				all.Receipts,
-				all.Index,
+				node.Storage.Receipts,
+				node.Storage.Index,
 				core,
 			)
 			if err != nil {
@@ -560,7 +560,7 @@ func main() {
 				node.Tracer,
 				node.Metrics.Mempool,
 				node.State,
-				all.Headers,
+				node.Storage.Headers,
 				guarantees,
 			)
 
@@ -588,13 +588,13 @@ func main() {
 			// initialize the block finalizer
 			finalize := finalizer.NewFinalizer(
 				node.ProtocolDB,
-				all.Headers,
+				node.Storage.Headers,
 				mutableState,
 				node.Tracer,
 				finalizer.WithCleanup(finalizer.CleanupMempools(
 					node.Metrics.Mempool,
 					conMetrics,
-					all.Payloads,
+					node.Storage.Payloads,
 					guarantees,
 					seals,
 				)),
@@ -644,7 +644,7 @@ func main() {
 
 			forks, err := consensus.NewForks(
 				finalizedBlock,
-				all.Headers,
+				node.Storage.Headers,
 				finalize,
 				notifier,
 				node.FinalizedRootBlock.Header,
@@ -753,13 +753,13 @@ func main() {
 			// create different epochs setups
 			mutableProtocolState := protocol_state.NewMutableProtocolState(
 				node.Logger,
-				all.EpochProtocolStateEntries,
-				all.ProtocolKVStore,
+				node.Storage.EpochProtocolStateEntries,
+				node.Storage.ProtocolKVStore,
 				node.State.Params(),
-				all.Headers,
-				all.Results,
-				all.Setups,
-				all.EpochCommits,
+				node.Storage.Headers,
+				node.Storage.Results,
+				node.Storage.Setups,
+				node.Storage.EpochCommits,
 			)
 			// initialize the block builder
 			var build module.Builder
@@ -767,12 +767,12 @@ func main() {
 				node.Metrics.Mempool,
 				node.DB,
 				mutableState,
-				all.Headers,
-				all.Seals,
-				all.Index,
-				all.Blocks,
-				all.Results,
-				all.Receipts,
+				node.Storage.Headers,
+				node.Storage.Seals,
+				node.Storage.Index,
+				node.Storage.Blocks,
+				node.Storage.Results,
+				node.Storage.Receipts,
 				mutableProtocolState,
 				guarantees,
 				seals,
@@ -797,7 +797,7 @@ func main() {
 			if !startupTime.IsZero() {
 				opts = append(opts, consensus.WithStartupTime(startupTime))
 			}
-			finalizedBlock, pending, err := recovery.FindLatest(node.State, all.Headers)
+			finalizedBlock, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, err
 			}
@@ -831,8 +831,8 @@ func main() {
 				node.Metrics.Compliance,
 				followerDistributor,
 				node.Tracer,
-				all.Headers,
-				all.Payloads,
+				node.Storage.Headers,
+				node.Storage.Payloads,
 				mutableState,
 				proposals,
 				syncCore,
@@ -870,7 +870,7 @@ func main() {
 				hotstuffModules.VoteAggregator,
 				hotstuffModules.TimeoutAggregator,
 				node.State,
-				all.Payloads,
+				node.Storage.Payloads,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create consensus message hub: %w", err)
@@ -890,7 +890,7 @@ func main() {
 				node.EngineRegistry,
 				node.Me,
 				node.State,
-				all.Blocks,
+				node.Storage.Blocks,
 				comp,
 				syncCore,
 				node.SyncEngineIdentifierProvider,
