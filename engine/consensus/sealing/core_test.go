@@ -683,6 +683,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 				Header:  s.rootHeader,
 				Payload: &flow.Payload{},
 			},
+			// By convention, root block has no proposer signature - implementation has to handle this edge case
 			ProposerSigData: nil}},
 		}, nil)
 
@@ -818,7 +819,9 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 			{Block: &flow.Block{
 				Header:  s.Block,
 				Payload: &candidatePayload,
-			}, ProposerSigData: nil},
+			},
+				// By convention, root block has no proposer signature - implementation has to handle this edge case
+				ProposerSigData: nil},
 			{Block: &flow.Block{
 				Header:  s.ParentBlock,
 				Payload: &flow.Payload{},

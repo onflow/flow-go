@@ -53,6 +53,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		collections := bstorage.NewCollections(bdb, transactions)
 		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
 
+		// By convention, root block has no proposer signature - implementation has to handle this edge case
 		err = headers.Store(&flow.Proposal{Header: genesis, ProposerSigData: nil})
 		require.NoError(t, err)
 
