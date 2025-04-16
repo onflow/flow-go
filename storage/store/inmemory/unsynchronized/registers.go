@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/bits-and-blooms/bloom/v3"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -16,15 +18,22 @@ type Registers struct {
 	latestHeight uint64
 	lock         sync.RWMutex
 	store        HeightToRegisterEntries
+	bloomFilter  *bloom.BloomFilter
 }
 
 var _ storage.RegisterIndex = (*Registers)(nil)
 
-func NewRegisters(firstHeight uint64, latestHeight uint64) *Registers {
+func NewRegisters(
+	firstHeight uint64,
+	latestHeight uint64,
+	estimatedNumberOfRegisters uint,
+	falsePositiveRate float64,
+) *Registers {
 	return &Registers{
 		firstHeight:  firstHeight,
 		latestHeight: latestHeight,
 		store:        make(HeightToRegisterEntries),
+		bloomFilter:  bloom.NewWithEstimates(estimatedNumberOfRegisters, falsePositiveRate),
 	}
 }
 
@@ -41,6 +50,10 @@ func (r *Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, 
 
 	if height < r.firstHeight || height > r.latestHeight {
 		return flow.RegisterValue{}, storage.ErrHeightNotIndexed
+	}
+
+	if !r.bloomFilter.Test(ID.Bytes()) {
+		return flow.RegisterValue{}, storage.ErrNotFound
 	}
 
 	// Start at the requested height and go backwards
@@ -93,6 +106,7 @@ func (r *Registers) Store(registers flow.RegisterEntries, height uint64) error {
 	newRegisters := make(RegisterEntries)
 	for _, reg := range registers {
 		newRegisters[reg.Key] = reg.Value
+		r.bloomFilter.Add(reg.Key.Bytes())
 	}
 	r.store[height] = newRegisters
 

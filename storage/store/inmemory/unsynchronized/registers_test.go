@@ -13,7 +13,7 @@ import (
 func TestRegisters_HappyPath(t *testing.T) {
 	firstHeight := uint64(1)
 	latestHeight := firstHeight
-	registers := NewRegisters(firstHeight, latestHeight)
+	registers := NewRegisters(firstHeight, latestHeight, 100, 0.1)
 
 	// Ensure initial heights are correct
 	require.Equal(t, firstHeight, registers.FirstHeight())
@@ -45,7 +45,7 @@ func TestRegisters_HappyPath(t *testing.T) {
 
 	// Ensure retrieving a non-existent height returns an error
 	_, err = registers.Get(unittest.RegisterIDFixture(), newHeight+1)
-	require.ErrorIs(t, err, storage.ErrNotFound)
+	require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 
 	// Ensure retrieving a non-existent register ID returns an error
 	_, err = registers.Get(unittest.RegisterIDFixture(), newHeight)
@@ -55,7 +55,7 @@ func TestRegisters_HappyPath(t *testing.T) {
 func TestRegisters_Get(t *testing.T) {
 	firstHeight := uint64(5)
 	latestHeight := firstHeight
-	registers := NewRegisters(firstHeight, latestHeight)
+	registers := NewRegisters(firstHeight, latestHeight, 100, 0.1)
 
 	// Store at height 6
 	entries := flow.RegisterEntries{unittest.RegisterEntryFixture()}
