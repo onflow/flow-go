@@ -74,6 +74,21 @@ func (s BlockStatus) String() string {
 	return [...]string{"BLOCK_UNKNOWN", "BLOCK_FINALIZED", "BLOCK_SEALED"}[s]
 }
 
+// BlockProposal is a signed proposal that includes the block payload, in addition to the required header and signature.
+type BlockProposal struct {
+	Block           *Block
+	ProposerSigData []byte
+}
+
+// TODO(malleability, #7100): this is currently unused
+func (b *BlockProposal) ID() Identifier {
+	return MakeID(b)
+}
+
+func (b *BlockProposal) HeaderProposal() *Proposal {
+	return &Proposal{Header: b.Block.Header, ProposerSigData: b.ProposerSigData}
+}
+
 // CertifiedBlock holds a certified block, which is a block and a Quorum Certificate [QC] pointing
 // to the block. A QC is the aggregated form of votes from a supermajority of HotStuff and therefore
 // proves validity of the block. A certified block satisfies:
