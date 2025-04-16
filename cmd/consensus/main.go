@@ -67,8 +67,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
-	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/utils/io"
@@ -133,8 +131,6 @@ func main() {
 		hotstuffModules         *consensus.HotstuffModules
 		myBeaconKeyStateMachine *bstorage.RecoverablePrivateBeaconKeyStateMachine
 		getSealingConfigs       module.SealingConfigsGetter
-
-		allBadger *storage.All
 	)
 	var deprecatedFlagBlockRateDelay time.Duration
 
@@ -256,10 +252,6 @@ func main() {
 				setter.SetRequiredApprovalsForSealingConstruction)
 			return err
 		}).
-		Module("init badger storage", func(node *cmd.NodeConfig) error {
-			allBadger = badger.InitAllBadger(node.Metrics.Cache, node.DB)
-			return nil
-		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
@@ -275,17 +267,17 @@ func main() {
 
 			receiptValidator = validation.NewReceiptValidator(
 				node.State,
-				allBadger.Headers,
-				allBadger.Index,
-				allBadger.Results,
-				allBadger.Seals)
+				all.Headers,
+				all.Index,
+				all.Results,
+				all.Seals)
 
 			sealValidator := validation.NewSealValidator(
 				node.State,
-				allBadger.Headers,
-				allBadger.Index,
-				allBadger.Results,
-				allBadger.Seals,
+				all.Headers,
+				all.Index,
+				all.Results,
+				all.Seals,
 				chunkAssigner,
 				getSealingConfigs,
 				conMetrics)
@@ -301,13 +293,13 @@ func main() {
 				node.ProtocolEvents,
 				node.DB,
 				state,
-				allBadger.Index,
-				allBadger.Payloads,
+				all.Index,
+				all.Payloads,
 				blockTimer,
 				receiptValidator,
 				sealValidator,
-				allBadger.QuorumCertificates,
-				allBadger.Blocks,
+				all.QuorumCertificates,
+				all.Blocks,
 			)
 			return err
 		}).
@@ -410,7 +402,7 @@ func main() {
 			// use a custom ejector, so we don't eject seals that would break
 			// the chain of seals
 			rawMempool := stdmap.NewIncorporatedResultSeals(sealLimit)
-			multipleReceiptsFilterMempool := consensusMempools.NewIncorporatedResultSeals(rawMempool, allBadger.Receipts)
+			multipleReceiptsFilterMempool := consensusMempools.NewIncorporatedResultSeals(rawMempool, all.Receipts)
 			seals, err = consensusMempools.NewExecStateForkSuppressor(
 				multipleReceiptsFilterMempool,
 				consensusMempools.LogForkAndCrash(node.Logger),
@@ -424,7 +416,7 @@ func main() {
 			return nil
 		}).
 		Module("pending receipts mempool", func(node *cmd.NodeConfig) error {
-			pendingReceipts = stdmap.NewPendingReceipts(allBadger.Headers, pendingReceiptsLimit)
+			pendingReceipts = stdmap.NewPendingReceipts(all.Headers, pendingReceiptsLimit)
 			return nil
 		}).
 		Module("hotstuff main metrics", func(node *cmd.NodeConfig) error {
@@ -476,7 +468,7 @@ func main() {
 		}).
 		Component("sealing engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
-			sealingTracker := tracker.NewSealingTracker(node.Logger, allBadger.Headers, allBadger.Receipts, seals)
+			sealingTracker := tracker.NewSealingTracker(node.Logger, all.Headers, all.Receipts, seals)
 
 			e, err := sealing.NewEngine(
 				node.Logger,
@@ -487,12 +479,12 @@ func main() {
 				sealingTracker,
 				node.EngineRegistry,
 				node.Me,
-				allBadger.Headers,
-				allBadger.Payloads,
-				allBadger.Results,
-				allBadger.Index,
+				all.Headers,
+				all.Payloads,
+				all.Results,
+				all.Index,
 				node.State,
-				allBadger.Seals,
+				all.Seals,
 				chunkAssigner,
 				seals,
 				getSealingConfigs,
@@ -530,8 +522,8 @@ func main() {
 				conMetrics,
 				node.Metrics.Mempool,
 				node.State,
-				allBadger.Headers,
-				allBadger.Receipts,
+				all.Headers,
+				all.Receipts,
 				receipts,
 				pendingReceipts,
 				seals,
@@ -547,8 +539,8 @@ func main() {
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				node.State,
-				allBadger.Receipts,
-				allBadger.Index,
+				all.Receipts,
+				all.Index,
 				core,
 			)
 			if err != nil {
@@ -568,7 +560,7 @@ func main() {
 				node.Tracer,
 				node.Metrics.Mempool,
 				node.State,
-				allBadger.Headers,
+				all.Headers,
 				guarantees,
 			)
 
@@ -596,13 +588,13 @@ func main() {
 			// initialize the block finalizer
 			finalize := finalizer.NewFinalizer(
 				node.ProtocolDB,
-				allBadger.Headers,
+				all.Headers,
 				mutableState,
 				node.Tracer,
 				finalizer.WithCleanup(finalizer.CleanupMempools(
 					node.Metrics.Mempool,
 					conMetrics,
-					allBadger.Payloads,
+					all.Payloads,
 					guarantees,
 					seals,
 				)),
@@ -652,7 +644,7 @@ func main() {
 
 			forks, err := consensus.NewForks(
 				finalizedBlock,
-				allBadger.Headers,
+				all.Headers,
 				finalize,
 				notifier,
 				node.FinalizedRootBlock.Header,
@@ -761,13 +753,13 @@ func main() {
 			// create different epochs setups
 			mutableProtocolState := protocol_state.NewMutableProtocolState(
 				node.Logger,
-				allBadger.EpochProtocolStateEntries,
-				allBadger.ProtocolKVStore,
+				all.EpochProtocolStateEntries,
+				all.ProtocolKVStore,
 				node.State.Params(),
-				allBadger.Headers,
-				allBadger.Results,
-				allBadger.Setups,
-				allBadger.EpochCommits,
+				all.Headers,
+				all.Results,
+				all.Setups,
+				all.EpochCommits,
 			)
 			// initialize the block builder
 			var build module.Builder
@@ -775,12 +767,12 @@ func main() {
 				node.Metrics.Mempool,
 				node.DB,
 				mutableState,
-				allBadger.Headers,
-				allBadger.Seals,
-				allBadger.Index,
-				allBadger.Blocks,
-				allBadger.Results,
-				allBadger.Receipts,
+				all.Headers,
+				all.Seals,
+				all.Index,
+				all.Blocks,
+				all.Results,
+				all.Receipts,
 				mutableProtocolState,
 				guarantees,
 				seals,
@@ -805,7 +797,7 @@ func main() {
 			if !startupTime.IsZero() {
 				opts = append(opts, consensus.WithStartupTime(startupTime))
 			}
-			finalizedBlock, pending, err := recovery.FindLatest(node.State, allBadger.Headers)
+			finalizedBlock, pending, err := recovery.FindLatest(node.State, all.Headers)
 			if err != nil {
 				return nil, err
 			}
@@ -839,8 +831,8 @@ func main() {
 				node.Metrics.Compliance,
 				followerDistributor,
 				node.Tracer,
-				allBadger.Headers,
-				allBadger.Payloads,
+				all.Headers,
+				all.Payloads,
 				mutableState,
 				proposals,
 				syncCore,
@@ -878,7 +870,7 @@ func main() {
 				hotstuffModules.VoteAggregator,
 				hotstuffModules.TimeoutAggregator,
 				node.State,
-				allBadger.Payloads,
+				all.Payloads,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create consensus message hub: %w", err)
@@ -898,7 +890,7 @@ func main() {
 				node.EngineRegistry,
 				node.Me,
 				node.State,
-				allBadger.Blocks,
+				all.Blocks,
 				comp,
 				syncCore,
 				node.SyncEngineIdentifierProvider,
