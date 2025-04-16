@@ -35,8 +35,8 @@ type StateMutatorSuite struct {
 	protocolKVStoreDB       protocol_statemock.ProtocolKVStore
 	epochProtocolStateDB    storagemock.EpochProtocolStateEntries
 	globalParams            psmock.GlobalParams
-	kvStateMachines         []protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader]
-	kvStateMachineFactories []protocol_statemock.KeyValueStoreStateMachineFactory
+	kvStateMachines         []*protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader]
+	kvStateMachineFactories []*protocol_statemock.KeyValueStoreStateMachineFactory
 
 	// basic setup for happy path test
 	parentState           protocol_statemock.KVStoreAPI // Protocol state of `candidate`s parent block
@@ -73,13 +73,13 @@ func (s *StateMutatorSuite) SetupTest() {
 
 	// Factories for the state machines expect `s.parentState` as parent state and `s.replicatedState` as target state.
 	// CAUTION: the behaviour of each state machine has to be defined by the tests.
-	s.kvStateMachines = make([]protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader], 2)
-	s.kvStateMachineFactories = make([]protocol_statemock.KeyValueStoreStateMachineFactory, len(s.kvStateMachines))
+	s.kvStateMachines = make([]*protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader], 2)
+	s.kvStateMachineFactories = make([]*protocol_statemock.KeyValueStoreStateMachineFactory, len(s.kvStateMachines))
 	kvStateMachineFactories := make([]protocol_state.KeyValueStoreStateMachineFactory, len(s.kvStateMachines)) // slice of interface-typed pointers to the elements of s.kvStateMachineFactories
 	for i := range s.kvStateMachines {
-		s.kvStateMachineFactories[i] = *protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
+		s.kvStateMachineFactories[i] = protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 		s.kvStateMachineFactories[i].On("Create", s.candidate.View, s.candidate.ParentID, &s.parentState, &s.evolvingState).Return(&s.kvStateMachines[i], nil)
-		kvStateMachineFactories[i] = &s.kvStateMachineFactories[i]
+		kvStateMachineFactories[i] = s.kvStateMachineFactories[i]
 	}
 
 	s.mutableState = newMutableProtocolState(
@@ -417,8 +417,8 @@ func (s *StateMutatorSuite) Test_ReplicateFails() {
 	s.parentState.On("Replicate", s.latestProtocolVersion).Return(nil, exception).Once()
 
 	// `SetupTest` initializes the mock factories to expect to be called, so we overwrite the mocks here:
-	s.kvStateMachineFactories[0] = *protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
-	s.kvStateMachineFactories[1] = *protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
+	s.kvStateMachineFactories[0] = protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
+	s.kvStateMachineFactories[1] = protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 
 	_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 	require.ErrorIs(s.T(), err, exception)
@@ -436,12 +436,12 @@ func (s *StateMutatorSuite) Test_ReplicateFails() {
 //
 // This test also verifies that the `MutableProtocolState` does not engage in step (ii) or (iii) before the completing step (i) on all state machines.
 func (s *StateMutatorSuite) Test_StateMachineFactoryFails() {
-	workingFactory := *protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
+	workingFactory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 	stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T()) // we expect no methods to be called on this state machine
 	workingFactory.On("Create", s.candidate.View, s.candidate.ParentID, &s.parentState, &s.evolvingState).Return(stateMachine, nil).Maybe()
 
 	exception := errors.New("exception")
-	failingFactory := *protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
+	failingFactory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 	failingFactory.On("Create", s.candidate.View, s.candidate.ParentID, &s.parentState, &s.evolvingState).Return(nil, exception).Once()
 
 	s.Run("failing factory is last", func() {
@@ -474,11 +474,11 @@ func (s *StateMutatorSuite) Test_StateMachineFactoryFails() {
 //
 // This test also verifies that the `MutableProtocolState` does not engage in step (iii) before the completing step (ii) on all state machines.
 func (s *StateMutatorSuite) Test_StateMachineProcessingServiceEventsFails() {
-	workingStateMachine := *protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
+	workingStateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
 	workingStateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(nil).Once()
 
 	exception := errors.New("exception")
-	failingStateMachine := *protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
+	failingStateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
 	failingStateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(exception).Once()
 
 	s.Run("failing state machine is last", func() {
@@ -503,12 +503,12 @@ func (s *StateMutatorSuite) Test_StateMachineProcessingServiceEventsFails() {
 // during their `Build` step. Specifically, the state machine should handle invalid events internally and only escalate internal
 // errors in case of an irrecoverable problem.
 func (s *StateMutatorSuite) Test_StateMachineBuildFails() {
-	workingStateMachine := *protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
+	workingStateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
 	workingStateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(nil).Twice()
 	workingStateMachine.On("Build").Return(transaction.NewDeferredBlockPersist(), nil).Maybe()
 
 	exception := errors.New("exception")
-	failingStateMachine := *protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
+	failingStateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
 	failingStateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(nil).Twice()
 	failingStateMachine.On("Build").Return(nil, exception).Once()
 
@@ -620,7 +620,7 @@ func (m *mockStateTransition) DuringEvolveState(fn func(mock.Arguments)) *mockSt
 }
 
 // Mock constructs and configures the OrthogonalStoreStateMachine mock.
-func (m *mockStateTransition) Mock() protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader] {
+func (m *mockStateTransition) Mock() *protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader] {
 	evolveStateCalled := false
 	stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](m.T)
 	if m.expectedServiceEvents == nil {
@@ -639,5 +639,5 @@ func (m *mockStateTransition) Mock() protocol_statemock.OrthogonalStoreStateMach
 	stateMachine.On("Build").Run(func(args mock.Arguments) {
 		require.True(m.T, evolveStateCalled, "Method `OrthogonalStoreStateMachine.Build` called before `EvolveState`!")
 	}).Return(deferredDBUpdates, nil).Once()
-	return *stateMachine //nolint:govet
+	return stateMachine //nolint:govet
 }
