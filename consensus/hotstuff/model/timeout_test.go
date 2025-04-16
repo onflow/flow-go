@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
 // TestTimeoutObject_Equals verifies the correctness of the Equals method on TimeoutObject.
@@ -26,8 +27,7 @@ func TestTimeoutObject_Equals(t *testing.T) {
 	// Create two TimeoutObjects with random but different values.
 	timeout1 := helper.TimeoutObjectFixture()
 	timeout2 := helper.TimeoutObjectFixture()
-	// Initially, all fields are different, so the objects should not be equal.
-	require.False(t, timeout1.Equals(timeout2))
+	require.False(t, timeout1.Equals(timeout2), "Initially, all fields are different, so the objects should not be equal.")
 
 	// List of mutations to apply on timeout1 to gradually make it equal to timeout2
 	// (excluding TimeoutTick).
@@ -64,4 +64,20 @@ func TestTimeoutObject_Equals(t *testing.T) {
 	// Even if TimeoutTick differs, equality should still hold since TimeoutTick is not important for equality.
 	timeout1.TimeoutTick = timeout2.TimeoutTick + 1
 	require.True(t, timeout1.Equals(timeout2))
+}
+
+// TestTimeoutObject_Equals_Nil verifies the behavior of the Equals method when either
+// or both the receiver and the function input are nil
+func TestTimeoutObject_Equals_Nil(t *testing.T) {
+	var nilTO *model.TimeoutObject
+	to := helper.TimeoutObjectFixture()
+	t.Run("nil receiver", func(t *testing.T) {
+		require.False(t, nilTO.Equals(to))
+	})
+	t.Run("nil input", func(t *testing.T) {
+		require.False(t, to.Equals(nilTO))
+	})
+	t.Run("both nil", func(t *testing.T) {
+		require.True(t, nilTO.Equals(nil))
+	})
 }
