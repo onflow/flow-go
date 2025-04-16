@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs/mock"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -104,9 +103,14 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 
 	dbUpdates, err := s.stateMachine.Build()
 	require.NoError(s.T(), err)
+
+	rw := storagemock.NewReaderBatchWriter(s.T())
 	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
-	err = dbUpdates.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
+	blockID := s.candidate.ID()
+	for _, update := range dbUpdates {
+		require.NoError(s.T(), update(blockID, rw))
+	}
 	require.NoError(s.T(), err)
 }
 
@@ -151,9 +155,13 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 
 	dbUpdates, err := s.stateMachine.Build()
 	require.NoError(s.T(), err)
+	rw := storagemock.NewReaderBatchWriter(s.T())
 	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
-	err = dbUpdates.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
+	blockID := s.candidate.ID()
+	for _, update := range dbUpdates {
+		require.NoError(s.T(), update(blockID, rw))
+	}
 	require.NoError(s.T(), err)
 }
 
@@ -552,8 +560,13 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 
 	dbOps, err := stateMachine.Build()
 	require.NoError(s.T(), err)
+
+	rw := storagemock.NewReaderBatchWriter(s.T())
 	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
-	err = dbOps.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
+	blockID := s.candidate.ID()
+	for _, update := range dbOps {
+		require.NoError(s.T(), update(blockID, rw))
+	}
 	require.NoError(s.T(), err)
 }
