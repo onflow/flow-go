@@ -31,7 +31,7 @@ func TestReadClusterRange(t *testing.T) {
 			err := db.Update(procedure.InsertClusterBlock(&block))
 			require.NoError(t, err)
 
-			err = db.Update(procedure.FinalizeClusterBlock(block.Header.ID()))
+			err = db.Update(procedure.FinalizeClusterBlock(block.ID()))
 			require.NoError(t, err)
 		}
 

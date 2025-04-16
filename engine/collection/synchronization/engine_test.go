@@ -432,12 +432,12 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 
 	// add one block that should be processed
 	processable := unittest.ClusterBlockFixture()
-	ss.core.On("HandleBlock", processable.Header).Return(true)
+	ss.core.On("HandleBlock", processable.ToHeader()).Return(true)
 	res.Blocks = append(res.Blocks, messages.UntrustedClusterBlockFromInternal(&processable))
 
 	// add one block that should not be processed
 	unprocessable := unittest.ClusterBlockFixture()
-	ss.core.On("HandleBlock", unprocessable.Header).Return(false)
+	ss.core.On("HandleBlock", unprocessable.ToHeader()).Return(false)
 	res.Blocks = append(res.Blocks, messages.UntrustedClusterBlockFromInternal(&unprocessable))
 
 	ss.comp.On("OnSyncedClusterBlock", mock.Anything).Run(func(args mock.Arguments) {

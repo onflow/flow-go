@@ -293,8 +293,7 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.ClusterBlockResponse) {
 	// process the blocks one by one
 	for _, block := range res.Blocks {
-		header := block.Header
-		if !e.core.HandleBlock(&header) {
+		if !e.core.HandleBlock(block.ToHeader()) {
 			continue
 		}
 		synced := flow.Slashable[*messages.ClusterBlockProposal]{

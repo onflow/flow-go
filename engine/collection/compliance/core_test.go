@@ -73,7 +73,7 @@ func (cs *CommonSuite) SetupTest() {
 	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[*cluster.BlockProposal])
 
 	// store the head header and payload
-	cs.headerDB[block.ID()] = cs.head.Block.Header
+	cs.headerDB[block.ID()] = cs.head.Block.ToHeader()
 
 	// set up header storage mock
 	cs.headers = &storage.Headers{}
@@ -118,7 +118,7 @@ func (cs *CommonSuite) SetupTest() {
 	cs.snapshot = &clusterstate.Snapshot{}
 	cs.snapshot.On("Head").Return(
 		func() *flow.Header {
-			return cs.head.Block.Header
+			return cs.head.Block.ToHeader()
 		},
 		nil,
 	)
@@ -225,8 +225,8 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	proposal := unittest.ClusterProposalFromBlock(&block)
 
 	// store the data for retrieval
-	cs.headerDB[parent.ID()] = parent.Header
-	cs.headerDB[ancestor.ID()] = ancestor.Header
+	cs.headerDB[parent.ID()] = parent.ToHeader()
+	cs.headerDB[ancestor.ID()] = ancestor.ToHeader()
 
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
@@ -280,8 +280,8 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 
 	// store the data for retrieval
-	cs.headerDB[parent.ID()] = parent.Header
-	cs.headerDB[ancestor.ID()] = ancestor.Header
+	cs.headerDB[parent.ID()] = parent.ToHeader()
+	cs.headerDB[ancestor.ID()] = ancestor.ToHeader()
 
 	cs.Run("invalid block error", func() {
 		// the block fails HotStuff validation
@@ -364,8 +364,8 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 
 	// store the data for retrieval
-	cs.headerDB[parent.ID()] = parent.Header
-	cs.headerDB[ancestor.ID()] = ancestor.Header
+	cs.headerDB[parent.ID()] = parent.ToHeader()
+	cs.headerDB[ancestor.ID()] = ancestor.ToHeader()
 
 	// the block passes HotStuff validation
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
@@ -471,7 +471,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 
 	// store the parent on disk
 	parentID := parent.ID()
-	cs.headerDB[parentID] = proposal0.Block.Header
+	cs.headerDB[parentID] = proposal0.Block.ToHeader()
 
 	// store the pending children in the cache
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending1)
@@ -496,7 +496,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	cs.hotstuff.AssertExpectations(cs.T())
 
 	// make sure we drop the cache after trying to process
-	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.Header.ID())
+	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.ID())
 }
 
 func (cs *CoreSuite) TestProposalBufferingOrder() {
@@ -528,7 +528,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 		cs.sync.On("RequestBlock", mock.Anything, mock.AnythingOfType("uint64")).Once().Run(
 			func(args mock.Arguments) {
 				ancestorID := args.Get(0).(flow.Identifier)
-				assert.Equal(cs.T(), missing.Header.ID(), ancestorID, "should always request root block")
+				assert.Equal(cs.T(), missing.ID(), ancestorID, "should always request root block")
 			},
 		)
 
@@ -547,17 +547,17 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	*cs.hotstuff = module.HotStuff{}
 	index := 0
 	order := []flow.Identifier{
-		missing.Header.ID(),
-		proposals[0].Block.Header.ID(),
-		proposals[1].Block.Header.ID(),
-		proposals[2].Block.Header.ID(),
+		missing.ID(),
+		proposals[0].Block.ToHeader().ID(),
+		proposals[1].Block.ToHeader().ID(),
+		proposals[2].Block.ToHeader().ID(),
 	}
 	cs.hotstuff.On("SubmitProposal", mock.Anything).Times(4).Run(
 		func(args mock.Arguments) {
 			header := args.Get(0).(*model.SignedProposal).Block
 			assert.Equal(cs.T(), order[index], header.BlockID, "should submit correct header to hotstuff")
 			index++
-			cs.headerDB[header.BlockID] = proposalsLookup[header.BlockID].Block.Header
+			cs.headerDB[header.BlockID] = proposalsLookup[header.BlockID].Block.ToHeader()
 		},
 	)
 	cs.voteAggregator.On("AddBlock", mock.Anything).Times(4)

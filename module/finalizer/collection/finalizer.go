@@ -86,7 +86,17 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 		// including the current, we first enumerate each of these blocks.
 		// We start at the youngest block and remember all visited blocks,
 		// while tracing back until we reach the finalized state
-		steps := []*flow.Header{&header}
+		type step struct {
+			header  *flow.Header
+			blockID flow.Identifier
+		}
+
+		steps := []step{
+			{
+				header:  &header,
+				blockID: blockID,
+			},
+		}
 		parentID := header.ParentID
 		for parentID != headID {
 			var parent flow.Header
@@ -94,7 +104,12 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			if err != nil {
 				return fmt.Errorf("could not retrieve parent (%x): %w", parentID, err)
 			}
-			steps = append(steps, &parent)
+			steps = append(steps,
+				step{
+					header:  &parent,
+					blockID: parentID,
+				},
+			)
 			parentID = parent.ParentID
 		}
 
@@ -102,10 +117,10 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 		// each header, we reconstruct the block and then apply the related
 		// changes to the protocol state
 		for i := len(steps) - 1; i >= 0; i-- {
-			clusterBlockID := steps[i].ID()
-
 			// look up the transactions included in the payload
 			step := steps[i]
+			clusterBlockID := step.blockID
+
 			var payload cluster.Payload
 			err = procedure.RetrieveClusterPayload(clusterBlockID, &payload)(tx)
 			if err != nil {
@@ -125,7 +140,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				return fmt.Errorf("could not finalize cluster block (id=%x): %w", clusterBlockID, err)
 			}
 
-			block := cluster.NewBlock(step.HeaderFields(), payload)
+			block := cluster.NewBlock(step.header.HeaderFields(), payload)
 			f.metrics.ClusterBlockFinalized(block)
 
 			// if the finalized collection is empty, we don't need to include it
@@ -160,7 +175,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				CollectionID:     payload.Collection.ID(),
 				ReferenceBlockID: payload.ReferenceBlockID,
 				ChainID:          header.ChainID,
-				SignerIndices:    step.ParentVoterIndices,
+				SignerIndices:    step.header.ParentVoterIndices,
 				Signature:        nil, // TODO: to remove because it's not easily verifiable by consensus nodes
 			})
 		}

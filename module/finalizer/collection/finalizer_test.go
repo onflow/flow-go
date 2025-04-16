@@ -23,7 +23,7 @@ import (
 func TestFinalizer(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		// reference block on the main consensus chain
-		refBlock := unittest.BlockHeaderFixture()
+		refBlock := unittest.ClusterBlockFixture()
 		// genesis block for the cluster chain
 		genesis := model.Genesis()
 
@@ -50,7 +50,7 @@ func TestFinalizer(t *testing.T) {
 			require.NoError(t, err)
 			state, err = cluster.Bootstrap(db, stateRoot)
 			require.NoError(t, err)
-			err = db.Update(operation.InsertHeader(refBlock.ID(), refBlock))
+			err = db.Update(operation.InsertHeader(refBlock.ID(), refBlock.ToHeader()))
 			require.NoError(t, err)
 		}
 
@@ -132,7 +132,7 @@ func TestFinalizer(t *testing.T) {
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
-			assert.Equal(t, block.ID(), final.ID())
+			assert.Equal(t, block.ToHeader().ID(), final.ID())
 
 			// collection should not have been propagated
 			pusher.AssertNotCalled(t, "SubmitCollectionGuarantee", mock.Anything)
@@ -177,8 +177,8 @@ func TestFinalizer(t *testing.T) {
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
-			assert.Equal(t, block.ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, final.ID())
+			assert.Equal(t, block.ToHeader().ID(), final.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Header.Height, final.ID())
 		})
 
 		// when finalizing a block with un-finalized ancestors, those ancestors should be finalized as well
@@ -231,8 +231,8 @@ func TestFinalizer(t *testing.T) {
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
-			assert.Equal(t, block2.ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID(), block2.ID())
+			assert.Equal(t, block2.ToHeader().ID(), final.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Header.Height, block1.ID(), block2.ID())
 		})
 
 		t.Run("finalize with un-finalized child", func(t *testing.T) {
@@ -278,8 +278,8 @@ func TestFinalizer(t *testing.T) {
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
-			assert.Equal(t, block1.ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
+			assert.Equal(t, block1.ToHeader().ID(), final.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Header.Height, block1.ID())
 		})
 
 		// when finalizing a block with a conflicting fork, the fork should not be finalized.
@@ -326,8 +326,8 @@ func TestFinalizer(t *testing.T) {
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
-			assert.Equal(t, block1.ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
+			assert.Equal(t, block1.ToHeader().ID(), final.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Header.Height, block1.ID())
 		})
 	})
 }

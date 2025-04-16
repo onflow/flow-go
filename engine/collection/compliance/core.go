@@ -120,7 +120,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.ClusterBlock
 		Message:  proposal.Message.Block,
 	}
 	header := block.Message.Header
-	blockID := header.ID()
+	blockID := block.Message.ID()
 	finalHeight := c.finalizedHeight.Value()
 	finalView := c.finalizedView.Value()
 
@@ -241,7 +241,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.ClusterBlock
 // processed as well.
 func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.BlockProposal]) error {
 	header := proposal.Message.Block.Header
-	blockID := header.ID()
+	blockID := proposal.Message.Block.ID()
 	log := c.log.With().
 		Str("block_id", blockID.String()).
 		Uint64("block_height", header.Height).
@@ -308,14 +308,15 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Block
 //   - engine.UnverifiableInputError if the proposal cannot be validated
 func (c *Core) processBlockProposal(proposal *cluster.BlockProposal) error {
 	header := proposal.Block.Header
-	blockID := header.ID()
+	blockID := proposal.Block.ID()
+	payloadHash := proposal.Block.Payload.Hash()
 	log := c.log.With().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
-		Hex("payload_hash", header.PayloadHash[:]).
+		Hex("payload_hash", payloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
@@ -347,7 +348,7 @@ func (c *Core) processBlockProposal(proposal *cluster.BlockProposal) error {
 			return engine.NewOutdatedInputErrorf("outdated extension of cluster state: %w", err)
 		} else if state.IsUnverifiableExtensionError(err) {
 			return engine.NewUnverifiableInputError("unverifiable extension of cluster state (block_id: %x, height: %d): %w",
-				header.ID(), header.Height, err)
+				blockID, header.Height, err)
 		} else {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return fmt.Errorf("unexpected exception while extending cluster state with block %x at height %d: %w", blockID, header.Height, err)

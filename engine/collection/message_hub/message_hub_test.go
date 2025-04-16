@@ -141,7 +141,7 @@ func (s *MessageHubSuite) SetupTest() {
 	s.snapshot = &clusterstate.Snapshot{}
 	s.snapshot.On("Head").Return(
 		func() *flow.Header {
-			return s.head.Header
+			return s.head.ToHeader()
 		},
 		nil,
 	)
@@ -240,11 +240,11 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	block := unittest.ClusterBlockWithParent(&parent)
 	block.Header.ProposerID = s.myID
 
-	s.payloads.On("ByBlockID", block.Header.ID()).Return(block.Payload, nil)
+	s.payloads.On("ByBlockID", block.ID()).Return(block.Payload, nil)
 	s.payloads.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)
 
 	s.Run("should fail with wrong proposer", func() {
-		header := *block.Header
+		header := *block.ToHeader()
 		header.ProposerID = unittest.IdentifierFixture()
 		err := s.hub.sendOwnProposal(unittest.ProposalFromHeader(&header))
 		require.Error(s.T(), err, "should fail with wrong proposer")
@@ -253,7 +253,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 
 	// should fail since we can't query payload
 	s.Run("should fail with changed/missing parent", func() {
-		header := *block.Header
+		header := *block.ToHeader()
 		header.ParentID[0]++
 		err := s.hub.sendOwnProposal(unittest.ProposalFromHeader(&header))
 		require.Error(s.T(), err, "should fail with missing parent")
@@ -262,7 +262,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 
 	// should fail with wrong block ID (payload unavailable)
 	s.Run("should fail with wrong block ID", func() {
-		header := *block.Header
+		header := *block.ToHeader()
 		header.View++
 		err := s.hub.sendOwnProposal(unittest.ProposalFromHeader(&header))
 		require.Error(s.T(), err, "should fail with missing payload")
@@ -273,7 +273,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 		expectedBroadcastMsg := messages.NewClusterBlockProposal(&block, unittest.SignatureFixture())
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
-		headerProposal := &flow.Proposal{Header: block.Header, ProposerSigData: expectedBroadcastMsg.ProposerSigData}
+		headerProposal := &flow.Proposal{Header: block.ToHeader(), ProposerSigData: expectedBroadcastMsg.ProposerSigData}
 		hotstuffProposal := model.SignedProposalFromFlow(headerProposal)
 		s.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		s.hotstuff.On("SubmitProposal", hotstuffProposal).
@@ -332,8 +332,8 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		// prepare proposal fixture
 		block := unittest.ClusterBlockWithParent(s.head)
 		block.Header.ProposerID = s.myID
-		s.payloads.On("ByBlockID", block.Header.ID()).Return(block.Payload, nil)
-		proposal := unittest.ProposalFromHeader(block.Header)
+		s.payloads.On("ByBlockID", block.ID()).Return(block.Payload, nil)
+		proposal := unittest.ProposalFromHeader(block.ToHeader())
 
 		// unset chain and height to make sure they are correctly reconstructed
 		hotstuffProposal := model.SignedProposalFromFlow(proposal)

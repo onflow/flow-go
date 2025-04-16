@@ -22,11 +22,16 @@ type CollectionResponse struct {
 // untrusted messages. It exists only to provide a memory-safe structure for
 // decoding messages and should be replaced in the future by updating the core
 // cluster.Payload type.
-// Deprecated: Please update cluster.Payload.Collection to use []flow.TransactionBody,
+// Deprecated: Please update cluster.Payload.Collection to use flow.Collection,
 // then replace instances of this type with cluster.Payload
 type UntrustedClusterBlockPayload struct {
-	Collection       []flow.TransactionBody
+	Collection       flow.Collection
 	ReferenceBlockID flow.Identifier
+}
+
+// Hash returns the hash of the payload.
+func (p UntrustedClusterBlockPayload) Hash() flow.Identifier {
+	return flow.MakeID(p)
 }
 
 // UntrustedClusterBlock is a duplicate of cluster.Block used within
@@ -40,35 +45,44 @@ type UntrustedClusterBlock struct {
 	Payload UntrustedClusterBlockPayload
 }
 
+// ToHeader return flow.Header data for UntrustedClusterBlock.
+func (ub *UntrustedClusterBlock) ToHeader() *flow.Header {
+	return &flow.Header{
+		ChainID:            ub.Header.ChainID,
+		ParentID:           ub.Header.ParentID,
+		Height:             ub.Header.Height,
+		Timestamp:          ub.Header.Timestamp,
+		View:               ub.Header.View,
+		ParentView:         ub.Header.ParentView,
+		ParentVoterIndices: ub.Header.ParentVoterIndices,
+		ParentVoterSigData: ub.Header.ParentVoterSigData,
+		ProposerID:         ub.Header.ProposerID,
+		LastViewTC:         ub.Header.LastViewTC,
+		PayloadHash:        ub.Payload.Hash(),
+	}
+}
+
 // ToInternal returns the internal representation of the type.
 func (ub *UntrustedClusterBlock) ToInternal() *cluster.Block {
-	block := cluster.NewBlock(
+	return cluster.NewBlock(
 		ub.Header,
 		cluster.Payload{
 			ReferenceBlockID: ub.Payload.ReferenceBlockID,
+			Collection:       ub.Payload.Collection,
 		},
 	)
-	for _, tx := range ub.Payload.Collection {
-		tx := tx
-		block.Payload.Collection.Transactions = append(block.Payload.Collection.Transactions, &tx)
-	}
-	return block
 }
 
 // UntrustedClusterBlockFromInternal converts the internal cluster.Block representation
 // to the representation used in untrusted messages.
 func UntrustedClusterBlockFromInternal(clusterBlock *cluster.Block) UntrustedClusterBlock {
-	block := UntrustedClusterBlock{
+	return UntrustedClusterBlock{
 		Header: *clusterBlock.Header,
 		Payload: UntrustedClusterBlockPayload{
 			ReferenceBlockID: clusterBlock.Payload.ReferenceBlockID,
-			Collection:       make([]flow.TransactionBody, 0, clusterBlock.Payload.Collection.Len()),
+			Collection:       clusterBlock.Payload.Collection,
 		},
 	}
-	for _, tx := range clusterBlock.Payload.Collection.Transactions {
-		block.Payload.Collection = append(block.Payload.Collection, *tx)
-	}
-	return block
 }
 
 // ClusterBlockProposal is a proposal for a block in collection node cluster

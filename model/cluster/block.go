@@ -35,7 +35,7 @@ func NewBlock(
 	}
 }
 
-// ToHeader hashes the payload of the block.
+// ToHeader return flow.Header data for cluster.Block
 func (b *Block) ToHeader() *flow.Header {
 	return &flow.Header{
 		ChainID:            b.Header.ChainID,
