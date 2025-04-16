@@ -28,12 +28,18 @@ func NewTransactions(cacheMetrics module.CacheMetrics, db storage.DB) *Transacti
 		return &flowTx, err
 	}
 
+	remove := func(rw storage.ReaderBatchWriter, txID flow.Identifier) error {
+		return operation.RemoveTransaction(rw.Writer(), txID)
+	}
+
 	t := &Transactions{
 		db: db,
 		cache: newCache(cacheMetrics, metrics.ResourceTransaction,
 			withLimit[flow.Identifier, *flow.TransactionBody](flow.DefaultTransactionExpiry+100),
 			withStore(store),
-			withRetrieve(retrieve)),
+			withRemove[flow.Identifier, *flow.TransactionBody](remove),
+			withRetrieve(retrieve),
+		),
 	}
 
 	return t
@@ -55,5 +61,5 @@ func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error)
 
 // RemoveBatch removes a transaction by fingerprint.
 func (t *Transactions) RemoveBatch(rw storage.ReaderBatchWriter, txID flow.Identifier) error {
-	return operation.RemoveTransaction(rw.Writer(), txID)
+	return t.cache.RemoveTx(rw, txID)
 }
