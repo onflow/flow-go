@@ -119,8 +119,6 @@ func TestExtendValid(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		allBadger := bstorage.InitAllBadger(metrics, db)
-
 		fullState, err := protocol.NewFullConsensusState(
 			log,
 			tracer,
@@ -132,8 +130,8 @@ func TestExtendValid(t *testing.T) {
 			util.MockBlockTimer(),
 			util.MockReceiptValidator(),
 			util.MockSealValidator(all.Seals),
-			allBadger.QuorumCertificates,
-			allBadger.Blocks,
+			all.QuorumCertificates,
+			all.Blocks,
 		)
 		require.NoError(t, err)
 
@@ -878,7 +876,6 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 		receiptValidator := util.MockReceiptValidator()
 		sealValidator := util.MockSealValidator(all.Seals)
-		allBadger := bstorage.InitAllBadger(mmetrics.NewNoopCollector(), db)
 		state, err := protocol.NewFullConsensusState(
 			log,
 			tracer,
@@ -890,8 +887,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			util.MockBlockTimer(),
 			receiptValidator,
 			sealValidator,
-			allBadger.QuorumCertificates,
-			allBadger.Blocks,
+			all.QuorumCertificates,
+			all.Blocks,
 		)
 		require.NoError(t, err)
 
@@ -2647,7 +2644,6 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 			}).
 			Times(3)
 
-		allBadger := bstorage.InitAllBadger(metrics, db)
 		fullState, err := protocol.NewFullConsensusState(
 			log,
 			tracer,
@@ -2659,8 +2655,8 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 			util.MockBlockTimer(),
 			util.MockReceiptValidator(),
 			sealValidator,
-			allBadger.QuorumCertificates,
-			allBadger.Blocks,
+			all.QuorumCertificates,
+			all.Blocks,
 		)
 		require.NoError(t, err)
 
@@ -3178,7 +3174,6 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 		blockTimer := &mockprotocol.BlockTimer{}
 		blockTimer.On("Validate", mock.Anything, mock.Anything).Return(realprotocol.NewInvalidBlockTimestamp(""))
 
-		allBadger := bstorage.InitAllBadger(metrics, db)
 		fullState, err := protocol.NewFullConsensusState(
 			log,
 			tracer,
@@ -3190,8 +3185,8 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 			blockTimer,
 			util.MockReceiptValidator(),
 			util.MockSealValidator(all.Seals),
-			allBadger.QuorumCertificates,
-			allBadger.Blocks,
+			all.QuorumCertificates,
+			all.Blocks,
 		)
 		require.NoError(t, err)
 
