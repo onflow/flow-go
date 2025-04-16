@@ -27,8 +27,7 @@ func TestTimeoutObject_Equals(t *testing.T) {
 	// Create two TimeoutObjects with random but different values.
 	timeout1 := helper.TimeoutObjectFixture()
 	timeout2 := helper.TimeoutObjectFixture()
-	// Initially, all fields are different, so the objects should not be equal.
-	require.False(t, timeout1.Equals(timeout2))
+	require.False(t, timeout1.Equals(timeout2), "Initially, all fields are different, so the objects should not be equal.")
 
 	// List of mutations to apply on timeout1 to gradually make it equal to timeout2
 	// (excluding TimeoutTick).

@@ -21,14 +21,11 @@ func TestTimeoutCertificateID_Malleability(t *testing.T) {
 // TestTimeoutCertificate_Equals verifies the correctness of the Equals method on TimeoutCertificates.
 // It checks that TimeoutCertificates are considered equal if and only if all fields match.
 func TestTimeoutCertificate_Equals(t *testing.T) {
-	// Create two TimeoutCertificate with random but different values.
-	tc1 := helper.MakeTC()
-	tc2 := helper.MakeTC()
-	// Initially, all fields are different, so the objects should not be equal.
-	require.False(t, tc1.Equals(tc2))
+	// Create two TimeoutCertificates with random but different values.
+	tc1, tc2 := helper.MakeTC(), helper.MakeTC()
+	require.False(t, tc1.Equals(tc2), "Initially, all fields are different, so the objects should not be equal")
 
-	// List of mutations to apply on timeout1 to gradually make it equal to tc2
-	// (excluding TimeoutTick).
+	// List of mutations to apply on tc1 to gradually make it equal to tc2
 	mutations := []func(){
 		func() {
 			tc1.View = tc2.View
@@ -58,6 +55,45 @@ func TestTimeoutCertificate_Equals(t *testing.T) {
 	// Apply the final mutation; now all relevant fields should match, so the objects must be equal.
 	mutations[len(mutations)-1]()
 	require.True(t, tc1.Equals(tc2))
+}
+
+// TestTimeoutCertificate_Equals_EmptyNewestQCViews verifies the behavior of the Equals method when either
+// or both `NewestQCViews` are nil in the receiver and/or the function input.
+func TestTimeoutCertificate_Equals_EmptyNewestQCViews(t *testing.T) {
+	// Create two identical TimeoutCertificates
+	tc1 := helper.MakeTC()
+	tc2 := clone.Clone(tc1)
+	require.True(t, tc1.Equals(tc2), "Initially, all fields are identical, so the objects should be equal")
+	require.True(t, len(tc1.NewestQCViews) > 0, "sanity check that NewestQCViews is not empty")
+
+	t.Run("NewestQCViews is nil in tc2 only", func(t *testing.T) {
+		tc2.NewestQCViews = nil
+		require.False(t, tc1.Equals(tc2))
+		require.False(t, tc2.Equals(tc1))
+	})
+	t.Run("NewestQCViews is empty slice in tc2 only", func(t *testing.T) {
+		tc2.NewestQCViews = []uint64{}
+		require.False(t, tc1.Equals(tc2))
+		require.False(t, tc2.Equals(tc1))
+	})
+	t.Run("NewestQCViews is nil in tc1 and tc2", func(t *testing.T) {
+		tc1.NewestQCViews = nil
+		tc2.NewestQCViews = nil
+		require.True(t, tc1.Equals(tc2))
+		require.True(t, tc2.Equals(tc1))
+	})
+	t.Run("NewestQCViews is empty slice in tc1 and tc2", func(t *testing.T) {
+		tc1.NewestQCViews = []uint64{}
+		tc2.NewestQCViews = []uint64{}
+		require.True(t, tc1.Equals(tc2))
+		require.True(t, tc2.Equals(tc1))
+	})
+	t.Run("NewestQCViews is empty slice in tc1 and nil tc2", func(t *testing.T) {
+		tc1.NewestQCViews = []uint64{}
+		tc2.NewestQCViews = nil
+		require.True(t, tc1.Equals(tc2))
+		require.True(t, tc2.Equals(tc1))
+	})
 }
 
 // TestTimeoutCertificate_Equals_Nil verifies the behavior of the Equals method when either

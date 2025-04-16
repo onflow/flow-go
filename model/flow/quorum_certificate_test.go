@@ -20,14 +20,11 @@ func TestQuorumCertificateID_Malleability(t *testing.T) {
 // TestQuorumCertificate_Equals verifies the correctness of the Equals method on QuorumCertificates.
 // It checks that QuorumCertificates are considered equal if and only if all fields match.
 func TestQuorumCertificate_Equals(t *testing.T) {
-	// Create two QuorumCertificate with random but different values.
-	qc1 := unittest.QuorumCertificateFixture()
-	qc2 := unittest.QuorumCertificateFixture()
-	// Initially, all fields are different, so the objects should not be equal.
-	require.False(t, qc1.Equals(qc2))
+	// Create two QuorumCertificates with random but different values.
+	qc1, qc2 := unittest.QuorumCertificateFixture(), unittest.QuorumCertificateFixture()
+	require.False(t, qc1.Equals(qc2), "Initially, all fields are different, so the objects should not be equal")
 
-	// List of mutations to apply on timeout1 to gradually make it equal to qc2
-	// (excluding TimeoutTick).
+	// List of mutations to apply on qc1 to gradually make it equal to qc2
 	mutations := []func(){
 		func() {
 			qc1.View = qc2.View
