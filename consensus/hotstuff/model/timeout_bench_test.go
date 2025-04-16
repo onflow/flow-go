@@ -5,19 +5,20 @@ import (
 	"testing"
 
 	clone "github.com/huandu/go-clone/generic" //nolint:goimports
-	
+
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
-// createDummyTimeoutObject constructs a TimeoutObject with dummy data for benchmarking.
+// createDummyTimeoutObjects construct two identical TimeoutObject with entirely disjoint memory representation
 func createDummyTimeoutObjects() (*model.TimeoutObject, *model.TimeoutObject) {
 	to := helper.TimeoutObjectFixture()
 	return to, clone.Clone(to)
 }
 
-// comparingUsingFieldsAndHashes compares two TimeoutObjects using field comparisons of primitive types
-// and comparison of hashes for the embedded `NewestQC` and `LastViewTC` objects.
+// comparingUsingFieldsAndHashes evaluates equality of two TimeoutObjects using
+//   - field comparisons for primitive types
+//   - and comparison of hashes for the embedded `NewestQC` and `LastViewTC` objects.
 func comparingUsingFieldsAndHashes(a, b *model.TimeoutObject) bool {
 	if a == b { // shortcut the same pointer is provided
 		return true
@@ -33,7 +34,8 @@ func comparingUsingFieldsAndHashes(a, b *model.TimeoutObject) bool {
 		bytes.Equal(a.SigData, b.SigData)
 }
 
-// BenchmarkTimeoutObjectEquals_CompareFieldsAndHashes benchmarks an Equals implementation that compares via fields and hashes.
+// BenchmarkTimeoutObjectEquals_CompareFieldsAndHashes benchmarks `Equals` implementation that is based on
+// comparison of fields (for primitive types) and comparison of hashes (for `NewestQC` and `LastViewTC`).
 func BenchmarkTimeoutObjectEquals_CompareFieldsAndHashes(t *testing.B) {
 	a, b := createDummyTimeoutObjects()
 
@@ -43,7 +45,7 @@ func BenchmarkTimeoutObjectEquals_CompareFieldsAndHashes(t *testing.B) {
 	}
 }
 
-// comparingOnlyUsingFields compares two TimeoutObjects using only field comparisons.
+// comparingOnlyUsingFields evaluates equality of two TimeoutObjects using only field comparisons.
 func comparingOnlyUsingFields(a, b *model.TimeoutObject) bool {
 	if a == b { // shortcut the same pointer is provided
 		return true
@@ -58,7 +60,8 @@ func comparingOnlyUsingFields(a, b *model.TimeoutObject) bool {
 		a.LastViewTC.Equals(b.LastViewTC)
 }
 
-// BenchmarkTimeoutObjectEquals_CompareFieldsOnly benchmarks an Equals implementation that compares via fields only.
+// BenchmarkTimeoutObjectEquals_CompareFieldsOnly benchmarks `Equals` implementation that is based
+// solely on comparison of fields (no serialization and hash computations)
 func BenchmarkTimeoutObjectEquals_CompareFieldsOnly(t *testing.B) {
 	a, b := createDummyTimeoutObjects()
 
@@ -68,7 +71,7 @@ func BenchmarkTimeoutObjectEquals_CompareFieldsOnly(t *testing.B) {
 	}
 }
 
-// BenchmarkTimeoutObjectEquals benchmarks the field comparison using the implementation
+// BenchmarkTimeoutObjectEquals benchmarks the `Equals` implementation provided by `TimeoutObject`
 func BenchmarkTimeoutObjectEquals(t *testing.B) {
 	a, b := createDummyTimeoutObjects()
 
