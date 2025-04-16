@@ -25,7 +25,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
-	accessNode "github.com/onflow/flow-go/access"
+	txvalidator "github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
@@ -55,6 +55,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	subscriptiontracker "github.com/onflow/flow-go/engine/access/subscription/tracker"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
@@ -231,7 +232,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
 			CompressorName:            grpcutils.NoCompressor,
 			WebSocketConfig:           websockets.NewDefaultWebsocketConfig(),
-			EnableWebSocketsStreamAPI: false,
+			EnableWebSocketsStreamAPI: true,
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
@@ -286,7 +287,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registerCacheType:                    pstorage.CacheTypeTwoQueue.String(),
 		registerCacheSize:                    0,
 		programCacheSize:                     0,
-		checkPayerBalanceMode:                accessNode.Disabled.String(),
+		checkPayerBalanceMode:                txvalidator.Disabled.String(),
 		versionControlEnabled:                true,
 		storeTxResultErrorMessages:           false,
 		stopControlEnabled:                   false,
@@ -1059,7 +1060,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			useIndex := builder.executionDataIndexingEnabled &&
 				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
 
-			executionDataTracker := subscription.NewExecutionDataTracker(
+			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
 				builder.Logger,
 				node.State,
 				builder.executionDataConfig.InitialBlockHeight,
@@ -1479,9 +1480,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		)
 		flags.BoolVar(
 			&builder.rpcConf.EnableWebSocketsStreamAPI,
-			"experimental-enable-websockets-stream-api",
+			"websockets-stream-api-enabled",
 			defaultConfig.rpcConf.EnableWebSocketsStreamAPI,
-			"[experimental] enables WebSockets Stream API that operates under /ws endpoint. this flag may change in a future release.",
+			"whether to enable the WebSockets Stream API.",
 		)
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
@@ -1543,7 +1544,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			}
 		}
 
-		if builder.checkPayerBalanceMode != accessNode.Disabled.String() && !builder.executionDataIndexingEnabled {
+		if builder.checkPayerBalanceMode != txvalidator.Disabled.String() && !builder.executionDataIndexingEnabled {
 			return errors.New("execution-data-indexing-enabled must be set if check-payer-balance is enabled")
 		}
 
@@ -1986,7 +1987,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			broadcaster := engine.NewBroadcaster()
 			// create BlockTracker that will track for new blocks (finalized and sealed) and
 			// handles block-related operations.
-			blockTracker, err := subscription.NewBlockTracker(
+			blockTracker, err := subscriptiontracker.NewBlockTracker(
 				node.State,
 				builder.FinalizedRootBlock.Header.Height,
 				node.Storage.Headers,
@@ -2009,7 +2010,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				indexReporter = builder.Reporter
 			}
 
-			checkPayerBalanceMode, err := accessNode.ParsePayerBalanceMode(builder.checkPayerBalanceMode)
+			checkPayerBalanceMode, err := txvalidator.ParsePayerBalanceMode(builder.checkPayerBalanceMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse payer balance mode: %w", err)
 

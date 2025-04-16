@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 // Core contains the central business logic for the main consensus' compliance engine.
@@ -133,19 +132,23 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal])
 
 	log := c.log.With().
 		Hex("origin_id", proposal.OriginID[:]).
-		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
-		Hex("block_id", logging.Entity(header)).
+		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
-		Hex("payload_hash", header.PayloadHash[:]).
-		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Hex("parent_signer_indices", header.ParentVoterIndices).
-		Str("traceID", traceID). // traceID is used to connect logs to traces
-		Uint64("finalized_height", finalHeight).
-		Uint64("finalized_view", finalView).
+		Time("timestamp", header.Timestamp).
 		Logger()
+	if log.Debug().Enabled() {
+		log = log.With().
+			Uint64("finalized_height", finalHeight).
+			Uint64("finalized_view", finalView).
+			Str("chain_id", header.ChainID.String()).
+			Hex("payload_hash", header.PayloadHash[:]).
+			Hex("parent_signer_indices", header.ParentVoterIndices).
+			Str("traceID", traceID). // traceID is used to connect logs to traces
+			Logger()
+	}
 	log.Info().Msg("block proposal received")
 
 	// drop proposals below the finalized threshold
@@ -360,7 +363,7 @@ func (c *Core) processBlockProposal(proposal *flow.Block) error {
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Logger()
-	log.Info().Msg("processing block proposal")
+	log.Debug().Msg("processing block proposal")
 
 	// see if the block is a valid extension of the protocol state
 	block := &flow.Block{
@@ -387,7 +390,7 @@ func (c *Core) processBlockProposal(proposal *flow.Block) error {
 
 	// submit the model to hotstuff for processing
 	// TODO replace with pubsub https://github.com/dapperlabs/flow-go/issues/6395
-	log.Info().Msg("forwarding block proposal to hotstuff")
+	log.Debug().Msg("forwarding block proposal to hotstuff")
 	c.hotstuff.SubmitProposal(hotstuffProposal)
 
 	return nil

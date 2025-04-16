@@ -12,8 +12,9 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/tracker"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
@@ -32,7 +33,7 @@ type backendSubscribeTransactions struct {
 	log                 zerolog.Logger
 	backendTransactions *backendTransactions
 	subscriptionHandler *subscription.SubscriptionHandler
-	blockTracker        subscription.BlockTracker
+	blockTracker        tracker.BlockTracker
 	sendTransaction     sendTransaction
 }
 
@@ -199,9 +200,9 @@ func (b *backendSubscribeTransactions) checkBlockReady(height uint64) error {
 // 2. pending(1) -> expired(5)
 // No errors expected during normal operations.
 func generateResultsStatuses(
-	txResult *access.TransactionResult,
+	txResult *accessmodel.TransactionResult,
 	prevTxStatus flow.TransactionStatus,
-) ([]*access.TransactionResult, error) {
+) ([]*accessmodel.TransactionResult, error) {
 	// If the old and new transaction statuses are still the same, the status change should not be reported, so
 	// return here with no response.
 	if prevTxStatus == txResult.Status {
@@ -212,7 +213,7 @@ func generateResultsStatuses(
 	// If the previous status is anything other than pending or unknown, return an error since this transition is unexpected.
 	if txResult.Status == flow.TransactionStatusExpired {
 		if prevTxStatus == flow.TransactionStatusPending || prevTxStatus == flow.TransactionStatusUnknown {
-			return []*access.TransactionResult{
+			return []*accessmodel.TransactionResult{
 				txResult,
 			}, nil
 		} else {
@@ -220,19 +221,19 @@ func generateResultsStatuses(
 		}
 	}
 
-	var results []*access.TransactionResult
+	var results []*accessmodel.TransactionResult
 
 	// If the difference between statuses' values is more than one step, fill in the missing results.
 	if (txResult.Status - prevTxStatus) > 1 {
 		for missingStatus := prevTxStatus + 1; missingStatus < txResult.Status; missingStatus++ {
 			switch missingStatus {
 			case flow.TransactionStatusPending:
-				results = append(results, &access.TransactionResult{
+				results = append(results, &accessmodel.TransactionResult{
 					Status:        missingStatus,
 					TransactionID: txResult.TransactionID,
 				})
 			case flow.TransactionStatusFinalized:
-				results = append(results, &access.TransactionResult{
+				results = append(results, &accessmodel.TransactionResult{
 					Status:        missingStatus,
 					TransactionID: txResult.TransactionID,
 					BlockID:       txResult.BlockID,
