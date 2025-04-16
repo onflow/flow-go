@@ -167,9 +167,14 @@ func (s *CacheSuite) TestAddBatch() {
 	blocks := unittest.ProposalChainFixtureFrom(10, unittest.BlockHeaderFixture())
 	certifiedBatch, err := s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), blocks[0], certifiedBatch[0].Proposal)
-	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBatch[len(certifiedBatch)-1].Proposal)
-	require.Equal(s.T(), blocks[len(blocks)-1].Block.Header.QuorumCertificate(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
+	require.Len(s.T(), certifiedBatch, 9, "there should be %d - 1 certified blocks", len(blocks))
+	for i := 0; i < len(certifiedBatch)-1; i++ {
+		certifiedBlock := certifiedBatch[i]
+		require.Equal(s.T(), blocks[i], certifiedBlock.Proposal)
+		require.Equal(s.T(), blocks[i+1].Block.Header.QuorumCertificate(), certifiedBlock.CertifyingQC)
+		require.Equal(s.T(), certifiedBlock.Proposal.Block.ID(), certifiedBlock.CertifyingQC.BlockID)
+		require.Equal(s.T(), certifiedBlock.Proposal.Block.Header.View, certifiedBlock.CertifyingQC.View)
+	}
 }
 
 // TestDuplicatedBatch checks that processing redundant inputs rejects batches where all blocks
