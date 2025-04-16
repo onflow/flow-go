@@ -32,7 +32,6 @@ type Block struct {
 }
 
 // BlockProposal represents a signed proposed block in collection node cluster consensus.
-// TODO(malleability, #7100) clean up types
 type BlockProposal struct {
 	Block           *Block
 	ProposerSigData []byte

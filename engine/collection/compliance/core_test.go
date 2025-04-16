@@ -276,7 +276,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
 	proposal := unittest.ClusterProposalFromBlock(&block)
-	proposalMsg := messages.ClusterBlockProposalFrom(proposal) // TODO(tim) - unittest naming
+	proposalMsg := messages.ClusterBlockProposalFrom(proposal)
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 
 	// store the data for retrieval
