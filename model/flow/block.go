@@ -74,10 +74,20 @@ func (s BlockStatus) String() string {
 	return [...]string{"BLOCK_UNKNOWN", "BLOCK_FINALIZED", "BLOCK_SEALED"}[s]
 }
 
-// CertifiedBlock holds a certified block, which is a block and a QC that is pointing to
-// the block. A QC is the aggregated form of votes from a supermajority of HotStuff and
-// therefore proves validity of the block. A certified block satisfies:
+// CertifiedBlock holds a certified block, which is a block and a Quorum Certificate [QC] pointing
+// to the block. A QC is the aggregated form of votes from a supermajority of HotStuff and therefore
+// proves validity of the block. A certified block satisfies:
 // Block.View == QC.View and Block.BlockID == QC.BlockID
+//
+// Conceptually, blocks must always be signed by the proposer. Once a block is certified, the
+// proposer's signature is included in the QC and does not need to be provided individually anymore.
+// Therefore, from the protocol perspective, the canonical data structures are either a block proposal
+// (including the proposer's signature) or a certified block (including a QC for the block).
+// Though, for simplicity, we just extend the BlockProposal structure to represent a certified block,
+// including proof that the proposer has signed their block twice. Thereby it is easy to convert
+// a [CertifiedBlock] into a [BlockProposal], which otherwise would not be possible because the QC only
+// contains an aggregated signature (including the proposer's signature), which cannot be separated
+// into individual signatures.
 type CertifiedBlock struct {
 	Proposal     *BlockProposal
 	CertifyingQC *QuorumCertificate

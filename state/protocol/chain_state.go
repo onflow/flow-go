@@ -44,14 +44,15 @@ type FollowerState interface {
 
 	// ExtendCertified introduces the block with the given ID into the persistent
 	// protocol state without modifying the current finalized state. It allows us
-	// to execute fork-aware queries against the known protocol state. The caller
-	// must pass a QC for candidate block to prove that the candidate block has
-	// been certified, and it's safe to add it to the protocol state. The QC
-	// cannot be nil and must certify candidate block:
-	//   candidate.View == qc.View && candidate.BlockID == qc.BlockID
+	// to execute fork-aware queries against the known protocol state. As part of
+	// the CertifiedBlock, the caller must pass a Quorum Certificate [QC] (field
+	// `CertifyingQC`) to prove that the candidate block has been certified, and
+	// it's safe to add to it the protocol state. The QC cannot be nil and must
+	// certify candidate block:
+	//   candidate.View == QC.View && candidate.BlockID == QC.BlockID
 	//
 	// CAUTION:
-	//   - This function expects that `qc` has been validated. (otherwise, the state will be corrupted)
+	//   - This function expects that `QC` has been validated. (otherwise, the state will be corrupted)
 	//   - The parent block must already be stored.
 	// Orphaned blocks are excepted.
 	//

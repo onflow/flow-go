@@ -19,6 +19,7 @@ type Headers interface {
 	ByHeight(height uint64) (*flow.Header, error)
 
 	// Exists returns true if a header with the given ID has been stored.
+	// CAUTION: this method is not backed by a cache and therefore comparatively slow!
 	// No errors are expected during normal operation.
 	Exists(blockID flow.Identifier) (bool, error)
 
