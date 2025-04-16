@@ -80,11 +80,6 @@ type BlockProposal struct {
 	ProposerSigData []byte
 }
 
-// TODO(malleability, #7100): this is currently unused
-func (b *BlockProposal) ID() Identifier {
-	return MakeID(b)
-}
-
 func (b *BlockProposal) HeaderProposal() *Proposal {
 	return &Proposal{Header: b.Block.Header, ProposerSigData: b.ProposerSigData}
 }
