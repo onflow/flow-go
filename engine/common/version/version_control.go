@@ -414,10 +414,11 @@ func (v *VersionControl) isOverridden(ver *semver.Version) bool {
 	}
 
 	// only log the suppression once per version
-	if _, ok := v.overridesLogSuppression[normalizedVersion]; !ok {
-		v.overridesLogSuppression[normalizedVersion] = struct{}{}
+	eventVersion := ver.String()
+	if _, ok := v.overridesLogSuppression[eventVersion]; !ok {
+		v.overridesLogSuppression[eventVersion] = struct{}{}
 		v.log.Info().
-			Str("event_version", ver.String()).
+			Str("event_version", eventVersion).
 			Str("override_version", normalizedVersion).
 			Msg("ignoring version beacon event matching compatibility override")
 	}
