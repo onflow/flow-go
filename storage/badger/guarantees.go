@@ -77,8 +77,8 @@ func NewGuarantees(
 			withRetrieve(retrieveByGuaranteeID)),
 		byCollectionIdCache: newCache[flow.Identifier, flow.Identifier](collector, metrics.ResourceGuaranteeByCollectionID,
 			withLimit[flow.Identifier, flow.Identifier](byCollectionIDCacheSize),
-			withStore(storeByCollectionID),
-			withRetrieve(retrieveByCollectionID)),
+			withStore(indexByCollectionID),
+			withRetrieve(lookupByCollectionID)),
 	}
 
 	return g
