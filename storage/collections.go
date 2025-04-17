@@ -32,11 +32,6 @@ type CollectionsReader interface {
 type Collections interface {
 	CollectionsReader
 
-	// StoreLight inserts the collection. It does not insert, nor check
-	// existence of, the constituent transactions.
-	// No errors are expected during normal operation.
-	StoreLight(collection *flow.LightCollection) error
-
 	// Store inserts the collection keyed by ID and all constituent
 	// transactions.
 	// No errors are expected during normal operation.

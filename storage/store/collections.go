@@ -30,6 +30,16 @@ func NewCollections(db storage.DB, transactions *Transactions) *Collections {
 	return c
 }
 
+func (c *Collections) StoreLight(collection *flow.LightCollection) error {
+	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err := operation.UpsertCollection(rw.Writer(), collection)
+		if err != nil {
+			return fmt.Errorf("could not insert collection: %w", err)
+		}
+		return nil
+	})
+}
+
 // Store stores a collection in the database.
 // any error returned are exceptions
 func (c *Collections) Store(collection *flow.Collection) error {
