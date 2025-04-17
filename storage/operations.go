@@ -147,7 +147,16 @@ type DB interface {
 
 	// NewBatch create a new batch for writing.
 	NewBatch() Batch
+
+	ID() DBID
 }
+
+type DBID string
+
+const (
+	BadgerDBID DBID = "BadgerDB"
+	PebbleDBID DBID = "PebbleDB"
+)
 
 // Batch is an interface for a batch of writes to a storage backend.
 // The batch is pending until it is committed.

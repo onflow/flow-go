@@ -116,6 +116,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -579,12 +580,19 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
 		}).
 		Module("transactions and collections storage", func(node *cmd.NodeConfig) error {
-			// TODO: needs to be wrapped with ChainedCollections module, otherwise once we switch
-			// ProtocolDB to pebble based storage, the data previously stored in badger will not be
-			// accessable.
+
 			transactions := store.NewTransactions(node.Metrics.Cache, node.ProtocolDB)
-			builder.collections = store.NewCollections(node.ProtocolDB, transactions)
+			collections := store.NewCollections(node.ProtocolDB, transactions)
+
+			if node.ProtocolDB.ID() == storage.PebbleDBID && node.DB != nil {
+				badgerDB := badgerimpl.ToDB(node.DB)
+				transactions.AddReader(badgerDB.Reader())
+				collections.AddReader(badgerDB.Reader())
+			}
+
 			builder.transactions = transactions
+			builder.collections = collections
+
 			return nil
 		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
