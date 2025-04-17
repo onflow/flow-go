@@ -27,13 +27,14 @@ func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
 	return b
 }
 
-func (b *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
+func (b *Blocks) StoreTx(proposal *flow.BlockProposal) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		err := b.headers.storeTx(block.Header)(tx)
+		blockID := proposal.Block.ID()
+		err := b.headers.storeTx(blockID, proposal.Block.Header, proposal.ProposerSigData)(tx)
 		if err != nil {
-			return fmt.Errorf("could not store header %v: %w", block.Header.ID(), err)
+			return fmt.Errorf("could not store header %v: %w", blockID, err)
 		}
-		err = b.payloads.storeTx(block.ID(), block.Payload)(tx)
+		err = b.payloads.storeTx(blockID, proposal.Block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store payload: %w", err)
 		}
@@ -59,9 +60,23 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Bl
 	}
 }
 
+func (b *Blocks) retrieveProposalTx(blockID flow.Identifier) func(*badger.Txn) (*flow.BlockProposal, error) {
+	return func(tx *badger.Txn) (*flow.BlockProposal, error) {
+		block, err := b.retrieveTx(blockID)(tx)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve block body: %w", err)
+		}
+		sig, err := b.headers.sigs.retrieveTx(blockID)(tx)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve proposer signature: %w", err)
+		}
+		return &flow.BlockProposal{Block: block, ProposerSigData: sig}, nil
+	}
+}
+
 // Store ...
-func (b *Blocks) Store(block *flow.Block) error {
-	return operation.RetryOnConflictTx(b.db, transaction.Update, b.StoreTx(block))
+func (b *Blocks) Store(proposal *flow.BlockProposal) error {
+	return operation.RetryOnConflictTx(b.db, transaction.Update, b.StoreTx(proposal))
 }
 
 // ByID ...
@@ -69,6 +84,12 @@ func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	tx := b.db.NewTransaction(false)
 	defer tx.Discard()
 	return b.retrieveTx(blockID)(tx)
+}
+
+func (b *Blocks) ProposalByID(blockID flow.Identifier) (*flow.BlockProposal, error) {
+	tx := b.db.NewTransaction(false)
+	defer tx.Discard()
+	return b.retrieveProposalTx(blockID)(tx)
 }
 
 // ByHeight ...
@@ -81,6 +102,17 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 		return nil, err
 	}
 	return b.retrieveTx(blockID)(tx)
+}
+
+func (b *Blocks) ProposalByHeight(height uint64) (*flow.BlockProposal, error) {
+	tx := b.db.NewTransaction(false)
+	defer tx.Discard()
+
+	blockID, err := b.headers.retrieveIdByHeightTx(height)(tx)
+	if err != nil {
+		return nil, err
+	}
+	return b.retrieveProposalTx(blockID)(tx)
 }
 
 // ByCollectionID ...

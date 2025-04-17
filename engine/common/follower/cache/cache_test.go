@@ -40,38 +40,43 @@ func (s *CacheSuite) SetupTest() {
 
 // TestPeek tests if previously added blocks can be queried by block ID.
 func (s *CacheSuite) TestPeek() {
-	blocks := unittest.ChainFixtureFrom(10, unittest.BlockHeaderFixture())
-	_, _, err := s.cache.AddBlocks(blocks)
+	blocks := unittest.ProposalChainFixtureFrom(10, unittest.BlockHeaderFixture())
+	_, err := s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
-	for _, block := range blocks {
-		actual := s.cache.Peek(block.ID())
+	for _, proposal := range blocks {
+		actual := s.cache.Peek(proposal.Block.ID())
 		require.NotNil(s.T(), actual)
-		require.Equal(s.T(), actual.ID(), block.ID())
+		require.Equal(s.T(), actual.Block.ID(), proposal.Block.ID())
 	}
 }
 
 // TestBlocksEquivocation tests that cache tracks blocks equivocation when adding blocks that have the same view
 // but different block ID. Equivocation is a symptom of byzantine actions and needs to be detected and addressed.
 func (s *CacheSuite) TestBlocksEquivocation() {
-	blocks := unittest.ChainFixtureFrom(10, unittest.BlockHeaderFixture())
-	_, _, err := s.cache.AddBlocks(blocks)
+	blocks := unittest.ProposalChainFixtureFrom(10, unittest.BlockHeaderFixture())
+	_, err := s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
 	// adding same blocks again shouldn't result in any equivocation events
-	_, _, err = s.cache.AddBlocks(blocks)
+	_, err = s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
 
 	equivocatedBlocks, _, _ := unittest.ChainFixture(len(blocks) - 1)
+	equivocatedProposals := make([]*flow.BlockProposal, 0, len(equivocatedBlocks))
+	for _, block := range equivocatedBlocks {
+		equivocatedProposals = append(equivocatedProposals, unittest.ProposalFromBlock(block))
+	}
 	// we will skip genesis block as it will be the same
 	for i := 1; i < len(equivocatedBlocks); i++ {
 		block := equivocatedBlocks[i]
 		// update view to be the same as already submitted batch to trigger equivocation
-		block.Header.View = blocks[i].Header.View
-		// update parentID so blocks are still connected
+		block.Header.View = blocks[i].Block.Header.View
+		// update parentID and parentView so blocks are still connected
 		block.Header.ParentID = equivocatedBlocks[i-1].ID()
+		block.Header.ParentView = equivocatedBlocks[i-1].Header.View
 		s.consumer.On("OnDoubleProposeDetected",
-			model.BlockFromFlow(blocks[i].Header), model.BlockFromFlow(block.Header)).Return().Once()
+			model.BlockFromFlow(blocks[i].Block.Header), model.BlockFromFlow(block.Header)).Return().Once()
 	}
-	_, _, err = s.cache.AddBlocks(equivocatedBlocks)
+	_, err = s.cache.AddBlocks(equivocatedProposals)
 	require.NoError(s.T(), err)
 }
 
@@ -79,23 +84,23 @@ func (s *CacheSuite) TestBlocksEquivocation() {
 // results in error.
 func (s *CacheSuite) TestBlocksAreNotConnected() {
 	s.Run("blocks-not-sequential", func() {
-		blocks := unittest.ChainFixtureFrom(10, unittest.BlockHeaderFixture())
+		blocks := unittest.ProposalChainFixtureFrom(10, unittest.BlockHeaderFixture())
 
 		// shuffling blocks will break the order between them rendering batch as not sequential
 		rand.Shuffle(len(blocks), func(i, j int) {
 			blocks[i], blocks[j] = blocks[j], blocks[i]
 		})
 
-		_, _, err := s.cache.AddBlocks(blocks)
+		_, err := s.cache.AddBlocks(blocks)
 		require.ErrorIs(s.T(), err, ErrDisconnectedBatch)
 	})
 	s.Run("blocks-with-gaps", func() {
-		blocks := unittest.ChainFixtureFrom(10, unittest.BlockHeaderFixture())
+		blocks := unittest.ProposalChainFixtureFrom(10, unittest.BlockHeaderFixture())
 
 		// altering payload hash will break ParentID in next block rendering batch as not sequential
-		blocks[len(blocks)/2].Header.PayloadHash = unittest.IdentifierFixture()
+		blocks[len(blocks)/2].Block.Header.PayloadHash = unittest.IdentifierFixture()
 
-		_, _, err := s.cache.AddBlocks(blocks)
+		_, err := s.cache.AddBlocks(blocks)
 		require.ErrorIs(s.T(), err, ErrDisconnectedBatch)
 	})
 }
@@ -105,101 +110,109 @@ func (s *CacheSuite) TestBlocksAreNotConnected() {
 // We expect that A will get certified after adding B.
 func (s *CacheSuite) TestChildCertifiesParent() {
 	block := unittest.BlockFixture()
-	certifiedBatch, certifyingQC, err := s.cache.AddBlocks([]*flow.Block{&block})
+	proposal := unittest.ProposalFromBlock(&block)
+	certifiedBatch, err := s.cache.AddBlocks([]*flow.BlockProposal{proposal})
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), certifiedBatch)
-	require.Nil(s.T(), certifyingQC)
 	child := unittest.BlockWithParentFixture(block.Header)
-	certifiedBatch, certifyingQC, err = s.cache.AddBlocks([]*flow.Block{child})
+	certifiedBatch, err = s.cache.AddBlocks([]*flow.BlockProposal{unittest.ProposalFromBlock(child)})
 	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBatch, 1)
-	require.NotNil(s.T(), certifyingQC)
-	require.Equal(s.T(), block.ID(), certifyingQC.BlockID)
-	require.Equal(s.T(), certifiedBatch[0], &block)
+	require.Equal(s.T(), block.ID(), certifiedBatch[0].CertifyingQC.BlockID)
+	require.Equal(s.T(), certifiedBatch[0].Proposal, proposal)
 }
 
 // TestChildBeforeParent tests a scenario: A <- B[QC_A].
 // First we add B and then A, in two different batches.
 // We expect that A will get certified after adding A.
 func (s *CacheSuite) TestChildBeforeParent() {
-	blocks := unittest.ChainFixtureFrom(2, unittest.BlockHeaderFixture())
-	_, _, err := s.cache.AddBlocks([]*flow.Block{blocks[1]})
+	blocks := unittest.ProposalChainFixtureFrom(2, unittest.BlockHeaderFixture())
+	_, err := s.cache.AddBlocks(blocks[1:2])
 	require.NoError(s.T(), err)
-	certifiedBatch, certifyingQC, err := s.cache.AddBlocks([]*flow.Block{blocks[0]})
+	certifiedBatch, err := s.cache.AddBlocks(blocks[0:1])
 	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBatch, 1)
-	require.NotNil(s.T(), certifyingQC)
-	require.Equal(s.T(), blocks[0].ID(), certifyingQC.BlockID)
-	require.Equal(s.T(), certifiedBatch[0], blocks[0])
+	require.Equal(s.T(), blocks[0].Block.ID(), certifiedBatch[0].CertifyingQC.BlockID)
+	require.Equal(s.T(), blocks[0], certifiedBatch[0].Proposal)
 }
 
 // TestBlockInTheMiddle tests a scenario: A <- B[QC_A] <- C[QC_B].
 // We add blocks one by one: C, A, B, we expect that after adding B, we will be able to
 // certify [A, B] with QC_B as certifying QC.
 func (s *CacheSuite) TestBlockInTheMiddle() {
-	blocks := unittest.ChainFixtureFrom(3, unittest.BlockHeaderFixture())
+	blocks := unittest.ProposalChainFixtureFrom(3, unittest.BlockHeaderFixture())
 	// add C
-	certifiedBlocks, certifiedQC, err := s.cache.AddBlocks(blocks[2:])
+	certifiedBlocks, err := s.cache.AddBlocks(blocks[2:])
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), certifiedBlocks)
-	require.Nil(s.T(), certifiedQC)
 
 	// add A
-	certifiedBlocks, certifiedQC, err = s.cache.AddBlocks(blocks[:1])
+	certifiedBlocks, err = s.cache.AddBlocks(blocks[:1])
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), certifiedBlocks)
-	require.Nil(s.T(), certifiedQC)
 
 	// add B
-	certifiedBlocks, certifiedQC, err = s.cache.AddBlocks(blocks[1:2])
+	certifiedBlocks, err = s.cache.AddBlocks(blocks[1:2])
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), blocks[:2], certifiedBlocks)
-	require.Equal(s.T(), blocks[2].Header.QuorumCertificate(), certifiedQC)
+	require.Len(s.T(), certifiedBlocks, 2)
+	require.Equal(s.T(), blocks[0], certifiedBlocks[0].Proposal)
+	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBlocks[len(certifiedBlocks)-1].Proposal)
+	require.Equal(s.T(), blocks[2].Block.Header.QuorumCertificate(), certifiedBlocks[1].CertifyingQC)
 }
 
 // TestAddBatch tests a scenario: B1 <- ... <- BN added in one batch.
 // We expect that all blocks except the last one will be certified.
 // Certifying QC will be taken from last block.
 func (s *CacheSuite) TestAddBatch() {
-	blocks := unittest.ChainFixtureFrom(10, unittest.BlockHeaderFixture())
-	certifiedBatch, certifyingQC, err := s.cache.AddBlocks(blocks)
+	blocks := unittest.ProposalChainFixtureFrom(10, unittest.BlockHeaderFixture())
+	certifiedBatch, err := s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), blocks[:len(blocks)-1], certifiedBatch)
-	require.Equal(s.T(), blocks[len(blocks)-1].Header.QuorumCertificate(), certifyingQC)
+	require.Len(s.T(), certifiedBatch, 9, "there should be %d - 1 certified blocks", len(blocks))
+	for i := 0; i < len(certifiedBatch)-1; i++ {
+		certifiedBlock := certifiedBatch[i]
+		require.Equal(s.T(), blocks[i], certifiedBlock.Proposal)
+		require.Equal(s.T(), blocks[i+1].Block.Header.QuorumCertificate(), certifiedBlock.CertifyingQC)
+		require.Equal(s.T(), certifiedBlock.Proposal.Block.ID(), certifiedBlock.CertifyingQC.BlockID)
+		require.Equal(s.T(), certifiedBlock.Proposal.Block.Header.View, certifiedBlock.CertifyingQC.View)
+	}
 }
 
 // TestDuplicatedBatch checks that processing redundant inputs rejects batches where all blocks
 // already reside in the cache. Batches that have at least one new block should be accepted.
 func (s *CacheSuite) TestDuplicatedBatch() {
-	blocks := unittest.ChainFixtureFrom(10, unittest.BlockHeaderFixture())
+	blocks := unittest.ProposalChainFixtureFrom(10, unittest.BlockHeaderFixture())
 
-	certifiedBatch, certifyingQC, err := s.cache.AddBlocks(blocks[1:])
+	certifiedBatch, err := s.cache.AddBlocks(blocks[1:])
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), blocks[1:len(blocks)-1], certifiedBatch)
-	require.Equal(s.T(), blocks[len(blocks)-1].Header.QuorumCertificate(), certifyingQC)
+	require.Len(s.T(), certifiedBatch, len(blocks)-2)
+	require.Equal(s.T(), blocks[1], certifiedBatch[0].Proposal)
+	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBatch[len(certifiedBatch)-1].Proposal)
+	require.Equal(s.T(), blocks[len(blocks)-1].Block.Header.QuorumCertificate(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
 
 	// add same batch again, this has to be rejected as redundant input
-	certifiedBatch, certifyingQC, err = s.cache.AddBlocks(blocks[1:])
+	certifiedBatch, err = s.cache.AddBlocks(blocks[1:])
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), certifiedBatch)
-	require.Nil(s.T(), certifyingQC)
 
-	// add batch with one extra leading block, this has to accepted even though 9 out of 10 blocks
+	// add batch with one extra leading block, this should be accepted even though 9 out of 10 blocks
 	// were already processed
-	certifiedBatch, certifyingQC, err = s.cache.AddBlocks(blocks)
+	certifiedBatch, err = s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), blocks[:len(blocks)-1], certifiedBatch)
-	require.Equal(s.T(), blocks[len(blocks)-1].Header.QuorumCertificate(), certifyingQC)
+	require.Len(s.T(), certifiedBatch, len(blocks)-1)
+	require.Equal(s.T(), blocks[0], certifiedBatch[0].Proposal)
+	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBatch[len(certifiedBatch)-1].Proposal)
+	require.Equal(s.T(), blocks[len(blocks)-1].Block.Header.QuorumCertificate(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
 }
 
 // TestPruneUpToView tests that blocks lower than pruned height will be properly filtered out from incoming batch.
 func (s *CacheSuite) TestPruneUpToView() {
-	blocks := unittest.ChainFixtureFrom(3, unittest.BlockHeaderFixture())
-	s.cache.PruneUpToView(blocks[1].Header.View)
-	certifiedBatch, certifyingQC, err := s.cache.AddBlocks(blocks)
+	blocks := unittest.ProposalChainFixtureFrom(3, unittest.BlockHeaderFixture())
+	s.cache.PruneUpToView(blocks[1].Block.Header.View)
+	certifiedBatch, err := s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), blocks[1:len(blocks)-1], certifiedBatch)
-	require.Equal(s.T(), blocks[len(blocks)-1].Header.QuorumCertificate(), certifyingQC)
+	require.Equal(s.T(), blocks[1], certifiedBatch[0].Proposal)
+	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBatch[len(certifiedBatch)-1].Proposal)
+	require.Equal(s.T(), blocks[len(blocks)-1].Block.Header.QuorumCertificate(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
 }
 
 // TestConcurrentAdd simulates multiple workers adding batches of blocks out of order.
@@ -216,18 +229,18 @@ func (s *CacheSuite) TestConcurrentAdd() {
 	blocksPerBatch := 10
 	blocksPerWorker := blocksPerBatch * batchesPerWorker
 	// ChainFixture generates N+1 blocks since it adds a root block
-	blocks := unittest.ChainFixtureFrom(workers*blocksPerWorker, unittest.BlockHeaderFixture())
+	blocks := unittest.ProposalChainFixtureFrom(workers*blocksPerWorker, unittest.BlockHeaderFixture())
 
 	var wg sync.WaitGroup
 	wg.Add(workers)
 
 	var certifiedBlocksLock sync.Mutex
-	var allCertifiedBlocks []*flow.Block
+	var allCertifiedBlocks []flow.CertifiedBlock
 	for i := 0; i < workers; i++ {
-		go func(blocks []*flow.Block) {
+		go func(blocks []*flow.BlockProposal) {
 			defer wg.Done()
 			for batch := 0; batch < batchesPerWorker; batch++ {
-				certifiedBlocks, _, err := s.cache.AddBlocks(blocks[batch*blocksPerBatch : (batch+1)*blocksPerBatch])
+				certifiedBlocks, err := s.cache.AddBlocks(blocks[batch*blocksPerBatch : (batch+1)*blocksPerBatch])
 				require.NoError(s.T(), err)
 				certifiedBlocksLock.Lock()
 				allCertifiedBlocks = append(allCertifiedBlocks, certifiedBlocks...)
@@ -239,17 +252,19 @@ func (s *CacheSuite) TestConcurrentAdd() {
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "should submit blocks before timeout")
 
 	require.Len(s.T(), allCertifiedBlocks, len(blocks)-1)
-	slices.SortFunc(allCertifiedBlocks, func(lhs *flow.Block, rhs *flow.Block) int {
-		return int(lhs.Header.Height) - int(rhs.Header.Height)
+	slices.SortFunc(allCertifiedBlocks, func(lhs flow.CertifiedBlock, rhs flow.CertifiedBlock) int {
+		return int(lhs.Proposal.Block.Header.Height) - int(rhs.Proposal.Block.Header.Height)
 	})
-	require.Equal(s.T(), blocks[:len(blocks)-1], allCertifiedBlocks)
+	for i, block := range blocks[:len(blocks)-1] {
+		require.Equal(s.T(), block, allCertifiedBlocks[i].Proposal)
+	}
 }
 
 // TestSecondaryIndexCleanup tests if ejected entities are correctly cleaned up from secondary index
 func (s *CacheSuite) TestSecondaryIndexCleanup() {
 	// create blocks more than limit
-	blocks := unittest.ChainFixtureFrom(2*defaultHeroCacheLimit, unittest.BlockHeaderFixture())
-	_, _, err := s.cache.AddBlocks(blocks)
+	blocks := unittest.ProposalChainFixtureFrom(2*defaultHeroCacheLimit, unittest.BlockHeaderFixture())
+	_, err := s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
 	require.Len(s.T(), s.cache.byView, defaultHeroCacheLimit)
 	require.Len(s.T(), s.cache.byParent, defaultHeroCacheLimit)
@@ -268,16 +283,19 @@ func (s *CacheSuite) TestMultipleChildrenForSameParent() {
 	B := unittest.BlockWithParentFixture(A.Header)
 	C := unittest.BlockWithParentFixture(A.Header)
 	C.Header.View = B.Header.View + 1 // make sure views are different
+	Ap := unittest.ProposalFromBlock(&A)
+	Bp := unittest.ProposalFromBlock(B)
+	Cp := unittest.ProposalFromBlock(C)
 
-	_, _, err := s.cache.AddBlocks([]*flow.Block{B})
+	_, err := s.cache.AddBlocks([]*flow.BlockProposal{Bp})
 	require.NoError(s.T(), err)
-	_, _, err = s.cache.AddBlocks([]*flow.Block{C})
+	_, err = s.cache.AddBlocks([]*flow.BlockProposal{Cp})
 	require.NoError(s.T(), err)
-	certifiedBlocks, certifyingQC, err := s.cache.AddBlocks([]*flow.Block{&A})
+	certifiedBlocks, err := s.cache.AddBlocks([]*flow.BlockProposal{Ap})
 	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBlocks, 1)
-	require.Equal(s.T(), &A, certifiedBlocks[0])
-	require.Equal(s.T(), A.ID(), certifyingQC.BlockID)
+	require.Equal(s.T(), Ap, certifiedBlocks[0].Proposal)
+	require.Equal(s.T(), A.ID(), certifiedBlocks[0].CertifyingQC.BlockID)
 }
 
 // TestChildEjectedBeforeAddingParent tests a scenario where we have:
@@ -294,19 +312,22 @@ func (s *CacheSuite) TestChildEjectedBeforeAddingParent() {
 	C := unittest.BlockWithParentFixture(A.Header)
 	C.Header.View = B.Header.View + 1 // make sure views are different
 
-	_, _, err := s.cache.AddBlocks([]*flow.Block{B})
+	Ap := unittest.ProposalFromBlock(&A)
+	Bp := unittest.ProposalFromBlock(B)
+	Cp := unittest.ProposalFromBlock(C)
+	_, err := s.cache.AddBlocks([]*flow.BlockProposal{Bp})
 	require.NoError(s.T(), err)
-	_, _, err = s.cache.AddBlocks([]*flow.Block{C})
+	_, err = s.cache.AddBlocks([]*flow.BlockProposal{Cp})
 	require.NoError(s.T(), err)
 	// eject B
 	s.cache.backend.Remove(B.ID())
-	s.cache.handleEjectedBlock(B)
+	s.cache.handleEjectedBlock(Bp)
 
-	certifiedBlocks, certifyingQC, err := s.cache.AddBlocks([]*flow.Block{&A})
+	certifiedBlocks, err := s.cache.AddBlocks([]*flow.BlockProposal{Ap})
 	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBlocks, 1)
-	require.Equal(s.T(), &A, certifiedBlocks[0])
-	require.Equal(s.T(), A.ID(), certifyingQC.BlockID)
+	require.Equal(s.T(), Ap, certifiedBlocks[0].Proposal)
+	require.Equal(s.T(), A.ID(), certifiedBlocks[0].CertifyingQC.BlockID)
 }
 
 // TestAddOverCacheLimit tests a scenario where caller feeds blocks to the cache in concurrent way
@@ -319,7 +340,7 @@ func (s *CacheSuite) TestAddOverCacheLimit() {
 	blocksPerWorker := 10
 	s.cache = NewCache(unittest.Logger(), uint32(blocksPerWorker), metrics.NewNoopCollector(), s.consumer)
 
-	blocks := unittest.ChainFixtureFrom(blocksPerWorker*workers, unittest.BlockHeaderFixture())
+	blocks := unittest.ProposalChainFixtureFrom(blocksPerWorker*workers, unittest.BlockHeaderFixture())
 
 	var uniqueBlocksLock sync.Mutex
 	// AddBlocks can certify same blocks, especially when we push same blocks over and over
@@ -334,19 +355,19 @@ func (s *CacheSuite) TestAddOverCacheLimit() {
 	var wg sync.WaitGroup
 	wg.Add(workers)
 	for i := 0; i < workers; i++ {
-		go func(blocks []*flow.Block) {
+		go func(blocks []*flow.BlockProposal) {
 			defer wg.Done()
 			for !done.Load() {
 				// worker submits blocks while condition is not satisfied
 				for _, block := range blocks {
 					// push blocks one by one, pairing with randomness of scheduler
 					// blocks will be delivered chaotically
-					certifiedBlocks, _, err := s.cache.AddBlocks([]*flow.Block{block})
+					certifiedBlocks, err := s.cache.AddBlocks([]*flow.BlockProposal{block})
 					require.NoError(s.T(), err)
 					if len(certifiedBlocks) > 0 {
 						uniqueBlocksLock.Lock()
 						for _, block := range certifiedBlocks {
-							uniqueBlocks[block.ID()] = struct{}{}
+							uniqueBlocks[block.BlockID()] = struct{}{}
 						}
 						if len(uniqueBlocks) == certifiedGoal {
 							done.Store(true)

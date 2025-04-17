@@ -163,7 +163,7 @@ func TestSnapshot_Descendants(t *testing.T) {
 			for n := 0; n < i; n++ {
 				block := unittest.BlockWithParentFixture(parent)
 				block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-				err := state.Extend(context.Background(), block)
+				err := state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 				require.NoError(t, err)
 				expectedBlocks = append(expectedBlocks, block.ID())
 				parent = block.Header
@@ -281,7 +281,8 @@ func TestSealingSegment(t *testing.T) {
 			assert.Len(t, actual.ExecutionResults, 1)
 			assert.Len(t, actual.Blocks, 1)
 			assert.Empty(t, actual.ExtraBlocks)
-			unittest.AssertEqualBlocksLenAndOrder(t, expected.Blocks, actual.Blocks)
+			require.Equal(t, len(expected.Blocks), len(actual.Blocks))
+			require.Equal(t, expected.Blocks[0].Block.ID(), actual.Blocks[0].Block.ID())
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(head.ID()))
 		})
@@ -306,7 +307,7 @@ func TestSealingSegment(t *testing.T) {
 
 			// sealing segment should contain B1 and B2
 			// B2 is reference of snapshot, B1 is latest sealed
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{rootSnapshot.Encodable().SealingSegment.Sealed(), block1}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{rootSnapshot.Encodable().SealingSegment.Sealed(), block1}, segment.Blocks)
 			assert.Len(t, segment.ExecutionResults, 1)
 			assert.Empty(t, segment.ExtraBlocks)
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(block1.ID()))
@@ -347,14 +348,14 @@ func TestSealingSegment(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Len(t, segment.ExtraBlocks, 1)
-			assert.Equal(t, segment.ExtraBlocks[0].Header.Height, head.Height)
+			assert.Equal(t, segment.ExtraBlocks[0].Block.Header.Height, head.Height)
 
 			// build a valid child B3 to ensure we have a QC
 			buildBlock(t, state, unittest.BlockWithParentProtocolState(block3))
 
 			// sealing segment should contain B1, B2, B3
 			// B3 is reference of snapshot, B1 is latest sealed
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block1, block2, block3}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{block1, block2, block3}, segment.Blocks)
 			assert.Len(t, segment.ExecutionResults, 1)
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(block3.ID()))
 		})
@@ -405,10 +406,10 @@ func TestSealingSegment(t *testing.T) {
 			// sealing segment should cover range [B1, BN]
 			assert.Len(t, segment.Blocks, 102)
 			assert.Len(t, segment.ExtraBlocks, 1)
-			assert.Equal(t, segment.ExtraBlocks[0].Header.Height, head.Height)
+			assert.Equal(t, segment.ExtraBlocks[0].Block.Header.Height, head.Height)
 			// first and last blocks should be B1, BN
-			assert.Equal(t, block1.ID(), segment.Blocks[0].ID())
-			assert.Equal(t, blockN.ID(), segment.Blocks[101].ID())
+			assert.Equal(t, block1.ID(), segment.Blocks[0].Block.ID())
+			assert.Equal(t, blockN.ID(), segment.Blocks[101].Block.ID())
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(blockN.ID()))
 		})
 	})
@@ -463,8 +464,8 @@ func TestSealingSegment(t *testing.T) {
 
 			// sealing segment should be [B2, B3, B4, B5, B6]
 			require.Len(t, segment.Blocks, 5)
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block2, block3, block4, block5, block6}, segment.Blocks)
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block1}, segment.ExtraBlocks[1:])
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{block2, block3, block4, block5, block6}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{block1}, segment.ExtraBlocks[1:])
 			require.Len(t, segment.ExecutionResults, 1)
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(block6.ID()))
@@ -528,7 +529,7 @@ func TestSealingSegment(t *testing.T) {
 			buildBlock(t, state, unittest.BlockWithParentProtocolState(block5))
 
 			require.Len(t, segment.Blocks, 4)
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block2, block3, block4, block5}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{block2, block3, block4, block5}, segment.Blocks)
 			require.Contains(t, segment.ExecutionResults, resultA)
 			require.Len(t, segment.ExecutionResults, 2)
 
@@ -600,7 +601,7 @@ func TestSealingSegment(t *testing.T) {
 			buildBlock(t, state, unittest.BlockWithParentProtocolState(block5))
 
 			require.Len(t, segment.Blocks, 4)
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block2, block3, block4, block5}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{block2, block3, block4, block5}, segment.Blocks)
 			require.Contains(t, segment.ExecutionResults, resultA)
 			// ResultA should only be added once even though it is referenced in 2 different blocks
 			require.Len(t, segment.ExecutionResults, 2)
@@ -651,7 +652,7 @@ func TestSealingSegment(t *testing.T) {
 			require.NoError(t, err)
 			// sealing segment should contain B1 and B5
 			// B5 is reference of snapshot, B1 is latest sealed
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block1, block2, block3, block4, block5}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{block1, block2, block3, block4, block5}, segment.Blocks)
 			assert.Len(t, segment.ExecutionResults, 1)
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
@@ -707,7 +708,7 @@ func TestSealingSegment(t *testing.T) {
 			assert.Equal(t, lastSealedBlock.Header, segment.Sealed().Header)
 
 			// there are DefaultTransactionExpiry number of blocks in total
-			unittest.AssertEqualBlocksLenAndOrder(t, blocks[:flow.DefaultTransactionExpiry], segment.ExtraBlocks)
+			unittest.AssertEqualBlockSequences(t, blocks[:flow.DefaultTransactionExpiry], segment.ExtraBlocks)
 			assert.Len(t, segment.ExtraBlocks, flow.DefaultTransactionExpiry)
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
 
@@ -785,7 +786,7 @@ func TestSealingSegment(t *testing.T) {
 			assert.Equal(t, lastBlock.Header, segment.Highest().Header)
 			assert.Equal(t, block4.Header, segment.Sealed().Header)
 			root := rootSnapshot.Encodable().SealingSegment.Sealed()
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{root, block1, block2, block3}, segment.ExtraBlocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{root, block1, block2, block3}, segment.ExtraBlocks)
 			assert.Len(t, segment.ExecutionResults, 2)
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
@@ -838,7 +839,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 				buildFinalizedBlock(t, state, b)
 			}
 			b4 := unittest.BlockWithParentProtocolState(b3)
-			require.NoError(t, state.ExtendCertified(context.Background(), b4, unittest.CertifyBlock(b4.Header))) // add child of b3 to ensure we have a QC for b3
+			require.NoError(t, state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(b4))) // add child of b3 to ensure we have a QC for b3
 			return state.AtBlockID(b3.ID())
 		})
 
@@ -869,8 +870,8 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 			b1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			b2 := unittest.BlockWithParentFixture(b1.Header)
 			b2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-			require.NoError(t, state.ExtendCertified(context.Background(), b1, b2.Header.QuorumCertificate()))
-			require.NoError(t, state.ExtendCertified(context.Background(), b2, unittest.CertifyBlock(b2.Header))) // adding block b5 (providing required QC for b1)
+			require.NoError(t, state.ExtendCertified(context.Background(), unittest.CertifiedByChild(b1, b2)))
+			require.NoError(t, state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(b2))) // adding block b2 (providing required QC for b1)
 
 			// consistency check: there should be no finalized block in the protocol state at height `b1.Height`
 			_, err := state.AtHeight(b1.Header.Height).Head() // expect statepkg.ErrUnknownSnapshotReference as only finalized blocks are indexed by height
@@ -888,8 +889,8 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 			orphaned := unittest.BlockWithParentFixture(sporkRoot)
 			orphaned.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			orphanedChild := unittest.BlockWithParentProtocolState(orphaned)
-			require.NoError(t, state.ExtendCertified(context.Background(), orphaned, orphanedChild.Header.QuorumCertificate()))
-			require.NoError(t, state.ExtendCertified(context.Background(), orphanedChild, unittest.CertifyBlock(orphanedChild.Header)))
+			require.NoError(t, state.ExtendCertified(context.Background(), unittest.CertifiedByChild(orphaned, orphanedChild)))
+			require.NoError(t, state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(orphanedChild)))
 			block := unittest.BlockWithParentFixture(sporkRoot)
 			block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			buildFinalizedBlock(t, state, block)
@@ -968,8 +969,8 @@ func TestBootstrapSealingSegmentWithExtraBlocks(t *testing.T) {
 
 		// sealing segment should be [B2, B3, B4, B5, B6]
 		require.Len(t, segment.Blocks, 5)
-		unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block2, block3, block4, block5, block6}, segment.Blocks)
-		unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block1}, segment.ExtraBlocks[1:])
+		unittest.AssertEqualBlockSequences(t, []*flow.Block{block2, block3, block4, block5, block6}, segment.Blocks)
+		unittest.AssertEqualBlockSequences(t, []*flow.Block{block1}, segment.ExtraBlocks[1:])
 		require.Len(t, segment.ExecutionResults, 1)
 
 		assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
@@ -1044,13 +1045,13 @@ func TestLatestSealedResult(t *testing.T) {
 				unittest.WithProtocolStateID(rootProtocolStateID),
 			))
 
-			err = state.ExtendCertified(context.Background(), block1, block2.Header.QuorumCertificate())
+			err = state.ExtendCertified(context.Background(), unittest.CertifiedByChild(block1, block2))
 			require.NoError(t, err)
 
-			err = state.ExtendCertified(context.Background(), block2, block3.Header.QuorumCertificate())
+			err = state.ExtendCertified(context.Background(), unittest.CertifiedByChild(block2, block3))
 			require.NoError(t, err)
 
-			err = state.ExtendCertified(context.Background(), block3, block4.Header.QuorumCertificate())
+			err = state.ExtendCertified(context.Background(), unittest.CertifiedByChild(block3, block4))
 			require.NoError(t, err)
 
 			// B1 <- B2(R1) <- B3(S1)
@@ -1062,7 +1063,7 @@ func TestLatestSealedResult(t *testing.T) {
 				assert.Equal(t, block3.Payload.Seals[0], gotSeal)
 			})
 
-			err = state.ExtendCertified(context.Background(), block4, block5.Header.QuorumCertificate())
+			err = state.ExtendCertified(context.Background(), unittest.CertifiedByChild(block4, block5))
 			require.NoError(t, err)
 
 			// B1 <- B2(S1) <- B3(S1) <- B4(R2,R3)
@@ -1077,7 +1078,7 @@ func TestLatestSealedResult(t *testing.T) {
 			// B1 <- B2(R1) <- B3(S1) <- B4(R2,R3) <- B5(S2,S3)
 			// There are two seals in B5 - should return latest by height (S3,R3)
 			t.Run("reference block contains multiple seals", func(t *testing.T) {
-				err = state.ExtendCertified(context.Background(), block5, unittest.CertifyBlock(block5.Header))
+				err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block5))
 				require.NoError(t, err)
 
 				gotResult, gotSeal, err := state.AtBlockID(block5.ID()).SealedResult()
@@ -1104,7 +1105,7 @@ func TestQuorumCertificate(t *testing.T) {
 			// create a block to query
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-			err := state.Extend(context.Background(), block1)
+			err := state.Extend(context.Background(), unittest.ProposalFromBlock(block1))
 			require.NoError(t, err)
 
 			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
@@ -1134,8 +1135,9 @@ func TestQuorumCertificate(t *testing.T) {
 			// add a block so we aren't testing against root
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-			certifyingQC := unittest.CertifyBlock(block1.Header)
-			err := state.ExtendCertified(context.Background(), block1, certifyingQC)
+			certified := unittest.NewCertifiedBlock(block1)
+			certifyingQC := certified.CertifyingQC
+			err := state.ExtendCertified(context.Background(), certified)
 			require.NoError(t, err)
 
 			// should be able to get QC/seed
@@ -1157,14 +1159,14 @@ func TestQuorumCertificate(t *testing.T) {
 			// create a block to query
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-			err := state.Extend(context.Background(), block1)
+			err := state.Extend(context.Background(), unittest.ProposalFromBlock(block1))
 			require.NoError(t, err)
 
 			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
 			assert.ErrorIs(t, err, storage.ErrNotFound)
 
 			block2 := unittest.BlockWithParentProtocolState(block1)
-			err = state.Extend(context.Background(), block2)
+			err = state.Extend(context.Background(), unittest.ProposalFromBlock(block2))
 			require.NoError(t, err)
 
 			qc, err := state.AtBlockID(block1.ID()).QuorumCertificate()

@@ -292,16 +292,14 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 // onBlockResponse processes a response containing a specifically requested block.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.ClusterBlockResponse) {
 	// process the blocks one by one
-	for _, block := range res.Blocks {
-		header := block.Header
+	for _, proposal := range res.Blocks {
+		header := proposal.Block.Header
 		if !e.core.HandleBlock(&header) {
 			continue
 		}
 		synced := flow.Slashable[*messages.ClusterBlockProposal]{
 			OriginID: originID,
-			Message: &messages.ClusterBlockProposal{
-				Block: block,
-			},
+			Message:  &proposal,
 		}
 		// forward the block to the compliance engine for validation and processing
 		e.comp.OnSyncedClusterBlock(synced)

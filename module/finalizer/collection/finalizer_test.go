@@ -56,7 +56,7 @@ func TestFinalizer(t *testing.T) {
 
 		// a helper function to insert a block
 		insert := func(block model.Block) {
-			err := db.Update(procedure.InsertClusterBlock(&block))
+			err := db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(&block)))
 			assert.NoError(t, err)
 		}
 

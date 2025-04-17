@@ -95,15 +95,16 @@ func (s *CoreSuite) TearDownTest() {
 // If block is already in cache it should be no-op.
 func (s *CoreSuite) TestProcessingSingleBlock() {
 	block := unittest.BlockWithParentFixture(s.finalizedBlock)
+	proposal := unittest.ProposalFromBlock(block)
 
 	// incoming block has to be validated
-	s.validator.On("ValidateProposal", model.SignedProposalFromFlow(block.Header)).Return(nil).Once()
+	s.validator.On("ValidateProposal", model.SignedProposalFromBlock(proposal)).Return(nil).Once()
 
-	err := s.core.OnBlockRange(s.originID, []*flow.Block{block})
+	err := s.core.OnBlockRange(s.originID, []*flow.BlockProposal{proposal})
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), s.core.pendingCache.Peek(block.ID()))
 
-	err = s.core.OnBlockRange(s.originID, []*flow.Block{block})
+	err = s.core.OnBlockRange(s.originID, []*flow.BlockProposal{proposal})
 	require.NoError(s.T(), err)
 }
 
@@ -112,11 +113,12 @@ func (s *CoreSuite) TestProcessingSingleBlock() {
 func (s *CoreSuite) TestAddFinalizedBlock() {
 	block := unittest.BlockFixture()
 	block.Header.View = s.finalizedBlock.View - 1 // block is below finalized view
+	proposal := unittest.ProposalFromBlock(&block)
 
 	// incoming block has to be validated
-	s.validator.On("ValidateProposal", model.SignedProposalFromFlow(block.Header)).Return(nil).Once()
+	s.validator.On("ValidateProposal", model.SignedProposalFromBlock(proposal)).Return(nil).Once()
 
-	err := s.core.OnBlockRange(s.originID, []*flow.Block{&block})
+	err := s.core.OnBlockRange(s.originID, []*flow.BlockProposal{proposal})
 	require.NoError(s.T(), err)
 	require.Nil(s.T(), s.core.pendingCache.Peek(block.ID()))
 }
@@ -130,19 +132,23 @@ func (s *CoreSuite) TestAddFinalizedBlock() {
 //
 // Finally, the certified blocks should be forwarded to the HotStuff follower.
 func (s *CoreSuite) TestProcessingRangeHappyPath() {
-	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
+	proposals := unittest.ProposalChainFixtureFrom(10, s.finalizedBlock)
 
 	var wg sync.WaitGroup
-	wg.Add(len(blocks) - 1)
-	for i := 1; i < len(blocks); i++ {
-		s.state.On("ExtendCertified", mock.Anything, blocks[i-1], blocks[i].Header.QuorumCertificate()).Return(nil).Once()
-		s.follower.On("AddCertifiedBlock", blockWithID(blocks[i-1].ID())).Run(func(args mock.Arguments) {
+	wg.Add(len(proposals) - 1)
+	for i := 1; i < len(proposals); i++ {
+		expectCertified := &flow.CertifiedBlock{
+			Proposal:     proposals[i-1],
+			CertifyingQC: proposals[i].Block.Header.QuorumCertificate(),
+		}
+		s.state.On("ExtendCertified", mock.Anything, expectCertified).Return(nil).Once()
+		s.follower.On("AddCertifiedBlock", blockWithID(proposals[i-1].Block.ID())).Run(func(args mock.Arguments) {
 			wg.Done()
 		}).Return().Once()
 	}
-	s.validator.On("ValidateProposal", model.SignedProposalFromFlow(blocks[len(blocks)-1].Header)).Return(nil).Once()
+	s.validator.On("ValidateProposal", model.SignedProposalFromBlock(proposals[len(proposals)-1])).Return(nil).Once()
 
-	err := s.core.OnBlockRange(s.originID, blocks)
+	err := s.core.OnBlockRange(s.originID, proposals)
 	require.NoError(s.T(), err)
 
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, 500*time.Millisecond, "expect all blocks to be processed before timeout")
@@ -151,32 +157,32 @@ func (s *CoreSuite) TestProcessingRangeHappyPath() {
 // TestProcessingNotOrderedBatch tests that submitting a batch which is not properly ordered(meaning the batch is not connected)
 // has to result in error.
 func (s *CoreSuite) TestProcessingNotOrderedBatch() {
-	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
-	blocks[2], blocks[3] = blocks[3], blocks[2]
+	proposals := unittest.ProposalChainFixtureFrom(10, s.finalizedBlock)
+	proposals[2], proposals[3] = proposals[3], proposals[2]
 
-	s.validator.On("ValidateProposal", model.SignedProposalFromFlow(blocks[len(blocks)-1].Header)).Return(nil).Once()
+	s.validator.On("ValidateProposal", model.SignedProposalFromBlock(proposals[len(proposals)-1])).Return(nil).Once()
 
-	err := s.core.OnBlockRange(s.originID, blocks)
+	err := s.core.OnBlockRange(s.originID, proposals)
 	require.ErrorIs(s.T(), err, cache.ErrDisconnectedBatch)
 }
 
 // TestProcessingInvalidBlock tests that processing a batch which ends with invalid block discards the whole batch
 func (s *CoreSuite) TestProcessingInvalidBlock() {
-	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
+	proposals := unittest.ProposalChainFixtureFrom(10, s.finalizedBlock)
 
-	invalidProposal := model.SignedProposalFromFlow(blocks[len(blocks)-1].Header)
+	invalidProposal := model.SignedProposalFromBlock(proposals[len(proposals)-1])
 	sentinelError := model.NewInvalidProposalErrorf(invalidProposal, "")
 	s.validator.On("ValidateProposal", invalidProposal).Return(sentinelError).Once()
 	s.followerConsumer.On("OnInvalidBlockDetected", flow.Slashable[model.InvalidProposalError]{
 		OriginID: s.originID,
 		Message:  sentinelError.(model.InvalidProposalError),
 	}).Return().Once()
-	err := s.core.OnBlockRange(s.originID, blocks)
+	err := s.core.OnBlockRange(s.originID, proposals)
 	require.NoError(s.T(), err, "sentinel error has to be handled internally")
 
 	exception := errors.New("validate-proposal-exception")
 	s.validator.On("ValidateProposal", invalidProposal).Return(exception).Once()
-	err = s.core.OnBlockRange(s.originID, blocks)
+	err = s.core.OnBlockRange(s.originID, proposals)
 	require.ErrorIs(s.T(), err, exception, "exception has to be propagated")
 }
 
@@ -188,8 +194,8 @@ func (s *CoreSuite) TestProcessingBlocksAfterShutdown() {
 	// at this point workers are stopped and processing valid range of connected blocks won't be delivered
 	// to the protocol state
 
-	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
-	s.validator.On("ValidateProposal", model.SignedProposalFromFlow(blocks[len(blocks)-1].Header)).Return(nil).Once()
+	blocks := unittest.ProposalChainFixtureFrom(10, s.finalizedBlock)
+	s.validator.On("ValidateProposal", model.SignedProposalFromBlock(blocks[len(blocks)-1])).Return(nil).Once()
 
 	err := s.core.OnBlockRange(s.originID, blocks)
 	require.NoError(s.T(), err)
@@ -198,7 +204,7 @@ func (s *CoreSuite) TestProcessingBlocksAfterShutdown() {
 // TestProcessingConnectedRangesOutOfOrder tests that processing range of connected blocks [B1 <- ... <- BN+1] our of order
 // results in extending [B1 <- ... <- BN] in correct order.
 func (s *CoreSuite) TestProcessingConnectedRangesOutOfOrder() {
-	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
+	blocks := unittest.ProposalChainFixtureFrom(10, s.finalizedBlock)
 	midpoint := len(blocks) / 2
 	firstHalf, secondHalf := blocks[:midpoint], blocks[midpoint:]
 
@@ -209,21 +215,21 @@ func (s *CoreSuite) TestProcessingConnectedRangesOutOfOrder() {
 	var wg sync.WaitGroup
 	wg.Add(len(blocks) - 1)
 	for _, block := range blocks[:len(blocks)-1] {
-		s.follower.On("AddCertifiedBlock", blockWithID(block.ID())).Return().Run(func(args mock.Arguments) {
+		s.follower.On("AddCertifiedBlock", blockWithID(block.Block.ID())).Return().Run(func(args mock.Arguments) {
 			wg.Done()
 		}).Once()
 	}
 
 	lastSubmittedBlockID := flow.ZeroID
-	s.state.On("ExtendCertified", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		block := args.Get(1).(*flow.Block)
+	s.state.On("ExtendCertified", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		certified := args.Get(1).(*flow.CertifiedBlock)
 		if lastSubmittedBlockID != flow.ZeroID {
-			if block.Header.ParentID != lastSubmittedBlockID {
+			if certified.Proposal.Block.Header.ParentID != lastSubmittedBlockID {
 				s.Failf("blocks not sequential",
-					"blocks submitted to protocol state are not sequential at height %d", block.Header.Height)
+					"blocks submitted to protocol state are not sequential at height %d", certified.Proposal.Block.Header.Height)
 			}
 		}
-		lastSubmittedBlockID = block.ID()
+		lastSubmittedBlockID = certified.Proposal.Block.ID()
 	}).Return(nil).Times(len(blocks) - 1)
 
 	s.validator.On("ValidateProposal", mock.Anything).Return(nil).Once()
@@ -237,14 +243,16 @@ func (s *CoreSuite) TestDetectingProposalEquivocation() {
 	block := unittest.BlockWithParentFixture(s.finalizedBlock)
 	otherBlock := unittest.BlockWithParentFixture(s.finalizedBlock)
 	otherBlock.Header.View = block.Header.View
+	proposal := unittest.ProposalFromBlock(block)
+	otherProposal := unittest.ProposalFromBlock(otherBlock)
 
 	s.validator.On("ValidateProposal", mock.Anything).Return(nil).Times(2)
 	s.followerConsumer.On("OnDoubleProposeDetected", mock.Anything, mock.Anything).Return().Once()
 
-	err := s.core.OnBlockRange(s.originID, []*flow.Block{block})
+	err := s.core.OnBlockRange(s.originID, []*flow.BlockProposal{proposal})
 	require.NoError(s.T(), err)
 
-	err = s.core.OnBlockRange(s.originID, []*flow.Block{otherBlock})
+	err = s.core.OnBlockRange(s.originID, []*flow.BlockProposal{otherProposal})
 	require.NoError(s.T(), err)
 }
 
@@ -264,8 +272,8 @@ func (s *CoreSuite) TestConcurrentAdd() {
 	batchesPerWorker := 10
 	blocksPerBatch := 10
 	blocksPerWorker := blocksPerBatch * batchesPerWorker
-	blocks := unittest.ChainFixtureFrom(workers*blocksPerWorker, s.finalizedBlock)
-	targetSubmittedBlockID := blocks[len(blocks)-2].ID()
+	blocks := unittest.ProposalChainFixtureFrom(workers*blocksPerWorker, s.finalizedBlock)
+	targetSubmittedBlockID := blocks[len(blocks)-2].Block.ID()
 	require.Lessf(s.T(), len(blocks), defaultPendingBlocksCacheCapacity, "this test works under assumption that we operate under cache upper limit")
 
 	s.validator.On("ValidateProposal", mock.Anything).Return(nil) // any proposal is valid
@@ -279,22 +287,22 @@ func (s *CoreSuite) TestConcurrentAdd() {
 		}
 	}).Return().Times(len(blocks) - 1) // all proposals have to be submitted
 	lastSubmittedBlockID := flow.ZeroID
-	s.state.On("ExtendCertified", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		block := args.Get(1).(*flow.Block)
+	s.state.On("ExtendCertified", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		certified := args.Get(1).(*flow.CertifiedBlock)
 		if lastSubmittedBlockID != flow.ZeroID {
-			if block.Header.ParentID != lastSubmittedBlockID {
+			if certified.Proposal.Block.Header.ParentID != lastSubmittedBlockID {
 				s.Failf("blocks not sequential",
-					"blocks submitted to protocol state are not sequential at height %d", block.Header.Height)
+					"blocks submitted to protocol state are not sequential at height %d", certified.Proposal.Block.Header.Height)
 			}
 		}
-		lastSubmittedBlockID = block.ID()
+		lastSubmittedBlockID = certified.Proposal.Block.ID()
 	}).Return(nil).Times(len(blocks) - 1)
 
 	var wg sync.WaitGroup
 	wg.Add(workers)
 
 	for i := 0; i < workers; i++ {
-		go func(blocks []*flow.Block) {
+		go func(blocks []*flow.BlockProposal) {
 			defer wg.Done()
 			for batch := 0; batch < batchesPerWorker; batch++ {
 				err := s.core.OnBlockRange(s.originID, blocks[batch*blocksPerBatch:(batch+1)*blocksPerBatch])

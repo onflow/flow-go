@@ -84,7 +84,7 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 
 				metrics := metrics.NewNoopCollector()
 				headersDB := badgerstorage.NewHeaders(metrics, badgerDB)
-				require.NoError(t, headersDB.Store(finalizedHeaders[10]))
+				require.NoError(t, headersDB.Store(unittest.ProposalFromHeader(finalizedHeaders[10])))
 
 				getLatestFinalized := func() (uint64, error) {
 					return rootHeight, nil
