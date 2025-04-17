@@ -58,7 +58,7 @@ func NewGuarantees(
 		}
 	}
 
-	retrieveByCollectionID := func(collID flow.Identifier) func(tx *badger.Txn) (flow.Identifier, error) {
+	lookupByCollectionID := func(collID flow.Identifier) func(tx *badger.Txn) (flow.Identifier, error) {
 		return func(tx *badger.Txn) (flow.Identifier, error) {
 			var guaranteeID flow.Identifier
 			err := operation.LookupGuarantee(collID, &guaranteeID)(tx)
