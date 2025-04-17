@@ -62,7 +62,7 @@ jobs:
       - name: Upload linter binary as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: custom-gcl
+          name: golangci-lint # must have expected binary name for use in default gcl action
           path: tools/custom-gcl
 
 
@@ -80,8 +80,8 @@ jobs:
       - name: Download custom linter
         uses: actions/download-artifact@v4
         with:
-          name: custom-gcl
-          path: ./tools/golangci-lint # must have expected binary name for use in default gcl action
+          name: golangci-lint
+          path: ./tools/
       - name: Make lint binary executable
         run: chmod +x ./tools/golangci-lint
       - name: Add lint binary to path
