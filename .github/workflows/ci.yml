@@ -26,6 +26,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build-linter:
+    name: Build Custom Linter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Cache custom linter binary
+        id: cache-linter
+        uses: actions/cache@v3
+        with:
+          # Key should change whenever implementation (tools/structwrite), or compilation config (.custom-gcl.yml) changes
+          # When the key is different, it is a cache miss, and the custom linter binary is recompiled
+          key: custom-linter-${{ env.GO_VERSION }}-${{ runner.os }}-${{ hashFiles('.custom-gcl.yml', 'tools/structwrite/**') }}
+          path: tools/custom-gcl # path defined in .custom-gcl.yml
+      - name: Install golangci-lint
+        if: steps.cache-linter.outputs.cache-hit != 'true'
+        uses: golangci/golangci-lint-action@v6
+        continue-on-error: true
+        with:
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: v1.63
+          args: "--no-config --disable-all"
+      - name: Build custom linter
+        if: steps.cache-linter.outputs.cache-hit != 'true'
+        run: |
+          golangci-lint custom
+      - name: Upload linter binary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: custom-gcl
+          path: tools/custom-gcl # path defined in .custom-gcl.yml
+
   golangci:
     strategy:
       fail-fast: false
@@ -33,6 +70,7 @@ jobs:
         dir: [./, ./integration/, ./insecure/]
     name: Lint
     runs-on: ubuntu-latest
+    needs: build-linter # must wait for custom linter binary to be available
     steps:
     - name: Checkout repo
       uses: actions/checkout@v4
@@ -45,12 +83,26 @@ jobs:
     - name: Run go generate
       run: go generate ./...
       working-directory: ${{ matrix.dir }}
+    # Download the custom linter binary created (or loaded from cache) in the builder-linter job above.
+    - name: Download custom linter
+      uses: actions/download-artifact@v4
+      with:
+        name: custom-gcl
+        path: ./tools/
+    # The golangci-lint action has a configuration where it searches for a binary named
+    # "golangci-lint" in the path rather than downloading.
+    # Below we rename our binary to this expected canonical name, and add it to the path.
+    - name: Rename custom linter binary
+      run: mv ./tools/custom-gcl ./tools/golangci-lint
+    - name: Make custom linter binary executable
+      run: chmod +x ./tools/golangci-lint
+    - name: Add custom linter binary to path
+      run: echo "$(pwd)/tools" >> $GITHUB_PATH
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v6
       with:
-        # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-        version: v1.63
-        args: -v
+        install-mode: 'none' # looks for binary in path rather than downloading
+        args: "-v"
         working-directory: ${{ matrix.dir }}
 
   tidy:
