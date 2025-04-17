@@ -77,30 +77,6 @@ jobs:
         dir: [ ./, ./integration/, ./insecure/ ]
 
     steps:
-      - name: Download custom linter
-        uses: actions/download-artifact@v4
-        with:
-          name: custom-gcl
-          path: ./tools/
-      # must have expected binary name for use in default gcl action
-      - name: Rename custom linter binary to canonical
-        run: mv ./tools/custom-gcl ./tools/golangci-lint
-      - name: DEBUG print tools
-        run: ls tools/*
-      - name: Make lint binary executable
-        run: chmod +x ./tools/golangci-lint
-      - name: Add lint binary to path
-        run: echo "$(pwd)/tools" >> $GITHUB_PATH
-      - name: DEBUG print path
-        run: echo "$PATH --- $(pwd)"
-      - name: DEBUG which
-        run: which golangci-lint
-      - name: DEBUG lint run test
-        run: golangci-lint version
-        continue-on-error: true
-      - name: DEBUG print tools
-        run: ls tools/*
-
       - name: Check out code
         uses: actions/checkout@v4
       - name: Set up Go
@@ -112,14 +88,28 @@ jobs:
         run: go generate ./...
         working-directory: ${{ matrix.dir }}
 
+      - name: Download custom linter
+        uses: actions/download-artifact@v4
+        with:
+          name: custom-gcl
+          path: ./tools/
+      # must have expected binary name for use in default gcl action
+      - name: Rename custom linter binary to canonical
+        run: mv ./tools/custom-gcl ./tools/golangci-lint
+      - name: Make lint binary executable
+        run: chmod +x ./tools/golangci-lint
       - name: Add lint binary to path
         run: echo "$(pwd)/tools" >> $GITHUB_PATH
+
+      - name: DEBUG print tools
+        run: ls tools/*
       - name: DEBUG print path
         run: echo "$PATH --- $(pwd)"
       - name: DEBUG which
         run: which golangci-lint
       - name: DEBUG lint run test
         run: golangci-lint version
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
