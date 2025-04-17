@@ -45,15 +45,18 @@ jobs:
           # When the key is different, it is a cache miss, and the custom linter binary is recompiled
           key: custom-linter-${{ env.GO_VERSION }}-${{ runner.os }}-${{ hashFiles('.custom-gcl.yml', 'tools/structwrite/**') }}
           path: tools/custom-gcl # path defined in .custom-gcl.yml
+      # We install the non-custom golangci-lint binary using the golangci-lint action.
+      # The action is set up to always install and run the linter - there isn't a way to only install.
+      # We provide args to disable all linters which results in the linter run immediately failing.
       - name: Install golangci-lint
         if: steps.cache-linter.outputs.cache-hit != 'true'
         uses: golangci/golangci-lint-action@v6
-        continue-on-error: true
+        continue-on-error: true # after installation (what we care about), the run will fail - this line allows workflow to continue
         with:
           # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
           version: v1.63
-          args: "--no-config --disable-all"
-      - name: Build custom linter
+          args: "--no-config --disable-all" # set args so that no linters are actually run
+      - name: Build custom linter binary
         if: steps.cache-linter.outputs.cache-hit != 'true'
         run: |
           golangci-lint custom
