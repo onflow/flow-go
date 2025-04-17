@@ -58,6 +58,11 @@ func (b dbReader) NewIter(startPrefix, endPrefix []byte, ops storage.IteratorOpt
 	return newPebbleIterator(b.db, startPrefix, endPrefix, ops)
 }
 
+// NewSeeker returns a new Seeker.
+func (b dbReader) NewSeeker() storage.Seeker {
+	return newPebbleSeeker(b.db)
+}
+
 // ToReader is a helper function to convert a *pebble.DB to a Reader
 func ToReader(db *pebble.DB) storage.Reader {
 	return dbReader{db}
