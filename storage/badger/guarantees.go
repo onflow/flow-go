@@ -12,9 +12,6 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// DefaultGuaranteeIndexCacheSize is the default value for secondary byCollectionIdCache.
-var DefaultGuaranteeIndexCacheSize uint = 1000
-
 // Guarantees implements persistent storage for collection guarantees.
 type Guarantees struct {
 	db *badger.DB

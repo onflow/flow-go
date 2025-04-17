@@ -392,7 +392,7 @@ func (c *Container) OpenState() (*state.State, error) {
 	results := storage.NewExecutionResults(metrics, db)
 	receipts := storage.NewExecutionReceipts(metrics, db, results, storage.DefaultCacheSize)
 	guarantees := storage.NewGuarantees(metrics, db,
-		storage.DefaultCacheSize, storage.DefaultGuaranteeIndexCacheSize)
+		storage.DefaultCacheSize, storage.DefaultCacheSize)
 	payloads := storage.NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := storage.NewBlocks(db, headers, payloads)
 	qcs := storage.NewQuorumCertificates(metrics, db, storage.DefaultCacheSize)

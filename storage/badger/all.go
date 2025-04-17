@@ -11,7 +11,7 @@ import (
 
 func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	headers := NewHeaders(metrics, db)
-	guarantees := NewGuarantees(metrics, db, DefaultCacheSize, DefaultGuaranteeIndexCacheSize)
+	guarantees := NewGuarantees(metrics, db, DefaultCacheSize, DefaultCacheSize)
 	seals := NewSeals(metrics, db)
 	index := NewIndex(metrics, db)
 	results := NewExecutionResults(metrics, db)
