@@ -60,7 +60,7 @@ jobs:
           golangci-lint custom
 
       - name: Upload linter binary as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: custom-gcl
           path: tools/custom-gcl
@@ -78,7 +78,7 @@ jobs:
 
     steps:
       - name: Download custom linter
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: custom-gcl
           path: ./tools/golangci-lint # must have expected binary name for use in default gcl action
