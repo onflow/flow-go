@@ -48,7 +48,7 @@ func NewGuarantees(
 		}
 	}
 
-	storeByCollectionID := func(collID flow.Identifier, guaranteeID flow.Identifier) func(*transaction.Tx) error {
+	indexByCollectionID := func(collID flow.Identifier, guaranteeID flow.Identifier) func(*transaction.Tx) error {
 		return func(tx *transaction.Tx) error {
 			err := transaction.WithTx(operation.IndexGuarantee(collID, guaranteeID))(tx)
 			if err != nil {
