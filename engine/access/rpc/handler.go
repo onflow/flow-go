@@ -78,7 +78,7 @@ func NewHandler(
 func (h *Handler) Ping(ctx context.Context, _ *accessproto.PingRequest) (*accessproto.PingResponse, error) {
 	err := h.api.Ping(ctx)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	return &accessproto.PingResponse{}, nil
@@ -91,7 +91,7 @@ func (h *Handler) GetNodeVersionInfo(
 ) (*accessproto.GetNodeVersionInfoResponse, error) {
 	nodeVersionInfo, err := h.api.GetNodeVersionInfo(ctx)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	return &accessproto.GetNodeVersionInfoResponse{
@@ -216,7 +216,7 @@ func (h *Handler) GetCollectionByID(
 
 	col, err := h.api.GetCollectionByID(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	colMsg, err := convert.LightCollectionToMessage(col)
@@ -246,7 +246,7 @@ func (h *Handler) GetFullCollectionByID(
 
 	col, err := h.api.GetFullCollectionByID(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	transactions, err := convert.FullCollectionToMessage(col)
@@ -956,7 +956,7 @@ func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *acces
 
 	snapshot, err := h.api.GetLatestProtocolStateSnapshot(ctx)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	return &accessproto.ProtocolStateSnapshotResponse{
@@ -976,7 +976,7 @@ func (h *Handler) GetProtocolStateSnapshotByBlockID(ctx context.Context, req *ac
 
 	snapshot, err := h.api.GetProtocolStateSnapshotByBlockID(ctx, blockID)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	return &accessproto.ProtocolStateSnapshotResponse{
@@ -994,7 +994,7 @@ func (h *Handler) GetProtocolStateSnapshotByHeight(ctx context.Context, req *acc
 
 	snapshot, err := h.api.GetProtocolStateSnapshotByHeight(ctx, req.GetBlockHeight())
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	return &accessproto.ProtocolStateSnapshotResponse{
@@ -1016,7 +1016,7 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *accessp
 
 	result, err := h.api.GetExecutionResultForBlockID(ctx, blockID)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	return executionResultToMessages(result, metadata)
@@ -1033,7 +1033,7 @@ func (h *Handler) GetExecutionResultByID(ctx context.Context, req *accessproto.G
 
 	result, err := h.api.GetExecutionResultByID(ctx, resultID)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	execResult, err := convert.ExecutionResultToMessage(result)

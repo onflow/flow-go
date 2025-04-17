@@ -64,7 +64,9 @@ func NewExecutionNodeIdentitiesProvider(
 
 // ExecutionNodesForBlockID returns upto maxNodesCnt number of randomly chosen execution node identities
 // which have executed the given block ID.
-// If no such execution node is found, an InsufficientExecutionReceipts error is returned.
+//
+// TODO: this is supposed to return InsufficientExecutionReceipts if the number of execution nodes found is less than minExecutionNodesCnt
+// this will be updated soon to enable local soft-finality, at which time this should be updated to return an error.
 func (e *ExecutionNodeIdentitiesProvider) ExecutionNodesForBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -121,6 +123,10 @@ func (e *ExecutionNodeIdentitiesProvider) ExecutionNodesForBlockID(
 				return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 			}
 			executorIDs = newExecutorIDs.NodeIDs()
+
+			// TODO: this is supposed to return an error if not enough ENs were found that produced receipts for a shared
+			// 	result. it appears to have been optimized to just optimistically query any EN. this should be updated to
+			//  return the error when the soft-finality feature is enabled.
 		}
 	}
 
@@ -191,11 +197,15 @@ func (e *ExecutionNodeIdentitiesProvider) findAllExecutionNodes(
 	return executorIDs, nil
 }
 
-// chooseExecutionNodes finds the subset of execution nodes defined in the identity table by first
-// choosing the preferred execution nodes which have executed the transaction. If no such preferred
-// execution nodes are found, then the fixed execution nodes defined in the identity table are returned
-// If neither preferred nor fixed nodes are defined, then all execution node matching the executor IDs are returned.
-// e.g. If execution nodes in identity table are {1,2,3,4}, preferred ENs are defined as {2,3,4}
+// chooseExecutionNodes finds the subset of execution nodes defined in the identity table using the
+// following logic:
+//  1. first choose the preferred execution nodes which have executed the transaction.
+//  2. If no such preferred execution nodes are found, then the fixed execution nodes defined in the
+//     identity table are returned.
+//  3. If neither preferred nor fixed nodes are defined, then all execution node matching the executor
+//     IDs are returned.
+//
+// e.g. If execution nodes in the identity table are {1,2,3,4}, preferred ENs are defined as {2,3,4}
 // and the executor IDs is {1,2,3}, then {2, 3} is returned as the chosen subset of ENs
 func (e *ExecutionNodeIdentitiesProvider) chooseExecutionNodes(
 	executorIDs flow.IdentifierList,
