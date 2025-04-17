@@ -26,391 +26,82 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  golangci:
+  build-linter:
+    runs-on: ubuntu-latest
+    env:
+      GO_VERSION: "1.23"
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Cache custom linter binary
+        id: cache-linter
+        uses: actions/cache@v3
+        with:
+          # key should change whenever your linter code or Go version changes
+          key: custom-linter-${{ env.GO_VERSION }}-${{ runner.os }}-${{ hashFiles('.custom-gcl.yml', 'tools/structwrite/**') }}
+          path: tools/custom-gcl
+
+      - name: Install golangci-lint
+        if: steps.cache-linter.outputs.cache-hit != 'true'
+        uses: golangci/golangci-lint-action@v6
+        continue-on-error: true
+        with:
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: v1.63
+          args: "--no-config --disable-all"
+      - name: Build custom linter
+        if: steps.cache-linter.outputs.cache-hit != 'true'
+        run: |
+          golangci-lint custom
+
+      - name: Upload linter binary as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: custom-gcl
+          path: tools/custom-gcl
+
+
+  lint:
+    name: Lint
+    needs: build-linter
+    runs-on: ubuntu-latest
+
     strategy:
       fail-fast: false
       matrix:
-        dir: [./, ./integration/, ./insecure/]
-    name: Lint
-    runs-on: ubuntu-latest
+        dir: [ ./, ./integration/, ./insecure/ ]
+
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v4
-    - name: Setup Go
-      uses: actions/setup-go@v5
-      timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
-      with:
-        go-version: ${{ env.GO_VERSION }}
-        cache: true
-    - name: Run go generate
-      run: go generate ./...
-      working-directory: ${{ matrix.dir }}
-    - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v6
-      with:
-        # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-        version: v1.63
-        args: -v
+      - name: Download custom linter
+        uses: actions/download-artifact@v3
+        with:
+          name: custom-gcl
+          path: ./tools/golangci-lint # must have expected binary name for use in default gcl action
+
+      - name: Make lint binary executable
+        run: chmod +x ./tools/golangci-lint
+      - name: Add lint binary to path
+        run: echo "$(pwd)/tools" >> $GITHUB_PATH
+
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Run go generate
+        run: go generate ./...
         working-directory: ${{ matrix.dir }}
 
-  tidy:
-    name: Tidy
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Setup private build environment
-        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
-        uses: ./actions/private-setup
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
         with:
-          cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Run tidy
-        run: make tidy
-      - name: code sanity check
-        run: make code-sanity-check
-
-  create-dynamic-test-matrix:
-    name: Create Dynamic Test Matrix
-    runs-on: ubuntu-latest
-    outputs:
-      dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Set Test Matrix
-        id: set-test-matrix
-        run: go run tools/test_matrix_generator/matrix.go
-
-  create-insecure-dynamic-test-matrix:
-    name: Create Dynamic Unit Test Insecure Package Matrix
-    runs-on: ubuntu-latest
-    outputs:
-      dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Set Test Matrix
-        id: set-test-matrix
-        run: go run tools/test_matrix_generator/matrix.go -c insecure
-
-  create-integration-dynamic-test-matrix:
-    name: Create Dynamic Integration Test Package Matrix
-    runs-on: ubuntu-latest
-    outputs:
-      dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Set Test Matrix
-        id: set-test-matrix
-        run: go run tools/test_matrix_generator/matrix.go -c integration
-
-  unit-test:
-    name: Unit Tests (${{ matrix.targets.name }})
-    needs: create-dynamic-test-matrix
-    strategy:
-      fail-fast: false
-      matrix:
-        targets: ${{ fromJSON(needs.create-dynamic-test-matrix.outputs.dynamic-matrix)}}
-    ## need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
-    runs-on: ${{ matrix.targets.runner }}
-    steps:
-    - name: Checkout repo
-      uses: actions/checkout@v4
-
-    - name: Setup private build environment
-      if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
-      uses: ./actions/private-setup
-      with:
-        cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
-
-    - name: Setup Go
-      uses: actions/setup-go@v5
-      timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
-      with:
-        go-version: ${{ env.GO_VERSION }}
-        cache: true
-    - name: Setup tests (${{ matrix.targets.name }})
-      run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
-    - name: Run tests (${{ matrix.targets.name }})
-      uses: nick-fields/retry@v3
-      with:
-        timeout_minutes: 35
-        max_attempts: 5
-        command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
-      # TODO(rbtz): re-enable when we fix exisiting races.
-      #env:
-      #  RACE_DETECTOR: 1
-    - name: Upload coverage report
-      uses: codecov/codecov-action@v5
-      timeout-minutes: 1
-      continue-on-error: true
-      with:
-        file: ./coverage.txt
-        flags: unittests
-        name: codecov-umbrella
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-  unit-test-insecure:
-    name: Unit Tests Insecure (${{ matrix.targets.name }})
-    needs: create-insecure-dynamic-test-matrix
-    strategy:
-      fail-fast: false
-      matrix:
-        targets: ${{ fromJSON(needs.create-insecure-dynamic-test-matrix.outputs.dynamic-matrix)}}
-    ## need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
-    runs-on: ${{ matrix.targets.runner }}
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Setup private build environment
-        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
-        uses: ./actions/private-setup
-        with:
-          cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Setup tests (${{ matrix.targets.name }})
-        run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
-      - name: Run tests (${{ matrix.targets.name }})
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 35
-          max_attempts: 5
-          command: VERBOSE=1 make -C ./insecure -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
-        # TODO(rbtz): re-enable when we fix exisiting races.
-        #env:
-        #  RACE_DETECTOR: 1
-      - name: Upload coverage report
-        uses: codecov/codecov-action@v5
-        timeout-minutes: 1
-        continue-on-error: true
-        with:
-          file: ./coverage.txt
-          flags: unittests
-          name: codecov-umbrella
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-  docker-build:
-    name: Docker Build
-    runs-on: buildjet-16vcpu-ubuntu-2204
-    env:
-      CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-        with:
-          # all tags are needed for integration tests
-          fetch-depth: 0
-
-      - name: Setup private build environment
-        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
-        uses: ./actions/private-setup
-        with:
-          cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Docker build
-        env:
-          CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
-        run: make docker-native-build-flow docker-native-build-flow-corrupt
-      - name: Save Docker images
-        run: |
-          docker save \
-          gcr.io/flow-container-registry/access:latest \
-          gcr.io/flow-container-registry/collection:latest \
-          gcr.io/flow-container-registry/consensus:latest \
-          gcr.io/flow-container-registry/execution:latest \
-          gcr.io/flow-container-registry/ghost:latest \
-          gcr.io/flow-container-registry/observer:latest \
-          gcr.io/flow-container-registry/verification:latest \
-          gcr.io/flow-container-registry/access-corrupted:latest \
-          gcr.io/flow-container-registry/execution-corrupted:latest \
-          gcr.io/flow-container-registry/verification-corrupted:latest > flow-docker-images.tar
-      - name: Cache Docker images
-        uses: actions/cache@v4
-        with:
-          path: flow-docker-images.tar
-          # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
-          key: flow-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
-
-  integration-test-others:
-    name: Integration Tests Others (${{ matrix.targets.name }})
-    needs: create-integration-dynamic-test-matrix
-    strategy:
-      fail-fast: false
-      matrix:
-        targets: ${{ fromJSON(needs.create-integration-dynamic-test-matrix.outputs.dynamic-matrix)}}
-    ## need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
-    runs-on: ${{ matrix.targets.runner }}
-
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-      
-      - name: Setup private build environment
-        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
-        uses: ./actions/private-setup
-        with:
-          cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Setup tests (${{ matrix.targets.name }})
-        run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
-      - name: Run tests (${{ matrix.targets.name }})
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 35
-          max_attempts: 5
-          command: VERBOSE=1 make -C ./integration -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
-        # TODO(rbtz): re-enable when we fix exisiting races.
-        #env:
-        #  RACE_DETECTOR: 1
-      - name: Upload coverage report
-        uses: codecov/codecov-action@v5
-        timeout-minutes: 1
-        continue-on-error: true
-        with:
-          file: ./coverage.txt
-          flags: unittests
-          name: codecov-umbrella
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-  integration-test:
-    name: Integration Tests
-    needs: docker-build
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Access Cohort1 Integration Tests
-            make: make -C integration access-cohort1-tests
-            runner: buildjet-4vcpu-ubuntu-2204
-          - name: Access Cohort2 Integration Tests
-            make: make -C integration access-cohort2-tests
-            runner: ubuntu-latest
-          - name: Access Cohort3 Integration Tests
-            make: make -C integration access-cohort3-tests
-            runner: ubuntu-latest
-          - name: Access Cohort4 Integration Tests
-            make: make -C integration access-cohort4-tests
-            runner: ubuntu-latest
-            # test suite has single test which is flaky and needs to be fixed - reminder here to put it back when it's fixed
-#          - name: BFT (Framework) Integration Tests
-#            make: make -C integration bft-framework-tests
-#            runner: ubuntu-latest
-          - name: BFT (Protocol) Integration Tests
-            make: make -C integration bft-protocol-tests
-            runner: buildjet-8vcpu-ubuntu-2204
-          - name: BFT (Gossipsub) Integration Tests
-            make: make -C integration bft-gossipsub-tests
-            runner: ubuntu-latest
-          - name: Collection Integration Tests
-            make: make -C integration collection-tests
-            runner: ubuntu-latest
-          - name: Consensus Integration Tests
-            make: make -C integration consensus-tests
-            runner: ubuntu-latest
-          - name: Epoch Cohort1 Integration Tests
-            make: make -C integration epochs-cohort1-tests
-            runner: buildjet-8vcpu-ubuntu-2204
-          - name: Epoch Cohort2 Integration Tests
-            make: make -C integration epochs-cohort2-tests
-            runner: buildjet-4vcpu-ubuntu-2204
-          - name: Execution Integration Tests
-            make: make -C integration execution-tests
-            runner: ubuntu-latest
-          - name: Ghost Integration Tests
-            make: make -C integration ghost-tests
-            runner: ubuntu-latest
-          - name: MVP Integration Tests
-            make: make -C integration mvp-tests
-            runner: ubuntu-latest
-          - name: Network Integration Tests
-            make: make -C integration network-tests
-            runner: ubuntu-latest
-          - name: Verification Integration Tests
-            make: make -C integration verification-tests
-            runner: ubuntu-latest
-          - name: Upgrade Integration Tests
-            make: make -C integration upgrades-tests
-            runner: ubuntu-latest
-    runs-on: ${{ matrix.runner }}
-    steps:
-    - name: Checkout repo
-      uses: actions/checkout@v4
-      with:
-          # all tags are needed for integration tests
-          fetch-depth: 0
-
-    - name: Setup private build environment
-      if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
-      uses: ./actions/private-setup
-      with:
-        cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
-
-    - name: Setup Go
-      uses: actions/setup-go@v5
-      timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
-      with:
-        go-version: ${{ env.GO_VERSION }}
-        cache: true
-    - name: Load cached Docker images
-      uses: actions/cache@v4
-      with:
-        path: flow-docker-images.tar
-        # use the same cache key as the docker-build job
-        key: flow-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
-    - name: Load Docker images
-      run: docker load -i flow-docker-images.tar
-    - name: Run tests (${{ matrix.name }})
-      # TODO(rbtz): re-enable when we fix exisiting races.
-      #env:
-      #  RACE_DETECTOR: 1
-      uses: nick-fields/retry@v3
-      with:
-        timeout_minutes: 35
-        max_attempts: 5
-        command: VERBOSE=1 ${{ matrix.make }}
+          install-mode: 'none' # looks for binary in path rather than downloading
+          args: "-v"
+          working-directory: ${{ matrix.dir }}
