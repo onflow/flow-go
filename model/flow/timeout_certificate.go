@@ -26,19 +26,5 @@ func (t *TimeoutCertificate) ID() Identifier {
 	if t == nil {
 		return ZeroID
 	}
-
-	body := struct {
-		View          uint64
-		NewestQCViews []uint64
-		NewestQCID    Identifier
-		SignerIndices []byte
-		SigData       crypto.Signature
-	}{
-		View:          t.View,
-		NewestQCViews: t.NewestQCViews,
-		NewestQCID:    t.NewestQC.ID(),
-		SignerIndices: t.SignerIndices,
-		SigData:       t.SigData,
-	}
-	return MakeID(body)
+	return MakeID(t)
 }
