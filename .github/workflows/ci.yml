@@ -96,7 +96,7 @@ jobs:
       - name: DEBUG which
         run: which golangci-lint
       - name: DEBUG lint run test
-        run: golangci-lint --help
+        run: golangci-lint version
         continue-on-error: true
       - name: DEBUG print tools
         run: ls tools/*
@@ -112,6 +112,12 @@ jobs:
         run: go generate ./...
         working-directory: ${{ matrix.dir }}
 
+      - name: DEBUG print path
+        run: echo "$PATH --- $(pwd)"
+      - name: DEBUG which
+        run: which golangci-lint
+      - name: DEBUG lint run test
+        run: golangci-lint version
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
