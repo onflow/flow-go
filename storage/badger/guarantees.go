@@ -2,6 +2,7 @@ package badger
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/storage"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -24,6 +25,10 @@ type Guarantees struct {
 	byCollectionIdCache *Cache[flow.Identifier, flow.Identifier]
 }
 
+var _ storage.Guarantees = (*Guarantees)(nil)
+
+// NewGuarantees creates a Guarantees instance, which stores collection guarantees.
+// It supports storing, caching and retrieving by guaranteeID or the additionally indexed collection ID.
 func NewGuarantees(
 	collector module.CacheMetrics,
 	db *badger.DB,
@@ -80,7 +85,20 @@ func NewGuarantees(
 }
 
 func (g *Guarantees) storeTx(guarantee *flow.CollectionGuarantee) func(*transaction.Tx) error {
-	return g.cache.PutTx(guarantee.ID(), guarantee)
+	return func(tx *transaction.Tx) error {
+		err := g.cache.PutTx(guarantee.ID(), guarantee)(tx)
+		if err != nil {
+			return err
+		}
+
+		err = g.byCollectionIdCache.PutTx(guarantee.CollectionID, guarantee.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not index guarantee %x under collection %x: %w",
+				guarantee.ID(), guarantee.CollectionID[:], err)
+		}
+
+		return nil
+	}
 }
 
 func (g *Guarantees) retrieveTx(guaranteeID flow.Identifier) func(*badger.Txn) (*flow.CollectionGuarantee, error) {
@@ -101,10 +119,6 @@ func (g *Guarantees) ByID(guaranteeID flow.Identifier) (*flow.CollectionGuarante
 	tx := g.db.NewTransaction(false)
 	defer tx.Discard()
 	return g.retrieveTx(guaranteeID)(tx)
-}
-
-func (g *Guarantees) Index(collID flow.Identifier, guaranteeID flow.Identifier) func(*transaction.Tx) error {
-	return g.byCollectionIdCache.PutTx(collID, guaranteeID)
 }
 
 func (g *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {

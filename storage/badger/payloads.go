@@ -67,11 +67,6 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 			if err != nil {
 				return fmt.Errorf("could not store guarantee: %w", err)
 			}
-
-			err = p.guarantees.Index(guarantee.CollectionID, guarantee.ID())(tx)
-			if err != nil {
-				return fmt.Errorf("could not index guarantee: %w", err)
-			}
 		}
 
 		// make sure all payload seals are stored
