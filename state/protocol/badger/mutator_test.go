@@ -631,7 +631,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		require.NoError(t, err)
 
 		// create a fork at view/height 1 and try to connect it to root
-		extend.Header.Timestamp = extend.Header.Timestamp.Add(time.Second)
+		extend.Header.Timestamp += uint64(time.Second / time.Millisecond)
 		extend.Header.ParentID = head.ID()
 
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(extend))

@@ -2,6 +2,7 @@ package convert
 
 import (
 	"fmt"
+	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -19,7 +20,7 @@ func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
 	id := h.ID()
 
 	parentID := h.Header.ParentID
-	t := timestamppb.New(h.Header.Timestamp)
+	t := timestamppb.New(time.UnixMilli(int64(h.Header.Timestamp)))
 	cg := CollectionGuaranteesToMessages(h.Payload.Guarantees)
 
 	seals := BlockSealsToMessages(h.Payload.Seals)
@@ -56,7 +57,7 @@ func BlockToMessageLight(h *flow.Block) *entities.Block {
 	id := h.ID()
 
 	parentID := h.Header.ParentID
-	t := timestamppb.New(h.Header.Timestamp)
+	t := timestamppb.New(time.UnixMilli(int64(h.Header.Timestamp)))
 	cg := CollectionGuaranteesToMessages(h.Payload.Guarantees)
 
 	return &entities.Block{

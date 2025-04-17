@@ -98,7 +98,7 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) (fl
 			ParentVoterIndices: hex.EncodeToString(header.ParentVoterIndices),
 			ParentVoterSigData: hex.EncodeToString(header.ParentVoterSigData),
 			ProposerID:         hex.EncodeToString(header.ProposerID[:]),
-			Timestamp:          header.Timestamp,
+			Timestamp:          time.UnixMilli(int64(header.Timestamp)),
 			CollectionIDs:      cols,
 			SealedBlocks:       seals,
 			SealedResults:      sealsResults,

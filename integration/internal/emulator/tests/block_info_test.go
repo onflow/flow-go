@@ -82,10 +82,10 @@ func TestBlockInfo(t *testing.T) {
 		AssertTransactionSucceeded(t, result)
 
 		require.Len(t, result.Logs, 2)
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height+1,
-			b.PendingBlockView(), b.PendingBlockID(), float64(b.PendingBlockTimestamp().Unix())), result.Logs[0])
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height,
-			block2.Header.View, block2.ID(), float64(block2.Header.Timestamp.Unix())), result.Logs[1])
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.3f)", block2.Header.Height+1,
+			b.PendingBlockView(), b.PendingBlockID(), float64(b.PendingBlockTimestamp())/1000), result.Logs[0])
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.3f)", block2.Header.Height,
+			block2.Header.View, block2.ID(), float64(block2.Header.Timestamp)/1000), result.Logs[1])
 	})
 
 	t.Run("works as script", func(t *testing.T) {
@@ -105,9 +105,9 @@ func TestBlockInfo(t *testing.T) {
 		assert.True(t, result.Succeeded())
 
 		require.Len(t, result.Logs, 2)
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height,
-			block2.Header.View, block2.ID(), float64(block2.Header.Timestamp.Unix())), result.Logs[0])
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height,
-			block1.Header.View, block1.ID(), float64(block1.Header.Timestamp.Unix())), result.Logs[1])
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.3f)", block2.Header.Height,
+			block2.Header.View, block2.ID(), float64(block2.Header.Timestamp)/1000), result.Logs[0])
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.3f)", block1.Header.Height,
+			block1.Header.View, block1.ID(), float64(block1.Header.Timestamp)/1000), result.Logs[1])
 	})
 }

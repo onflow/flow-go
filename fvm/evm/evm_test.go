@@ -1094,7 +1094,7 @@ func TestEVMBlockData(t *testing.T) {
 			require.Equal(t, types.StatusSuccessful, res.Status)
 			require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 			require.Empty(t, res.ErrorMessage)
-			require.Equal(t, ctx.BlockHeader.Timestamp.Unix(), new(big.Int).SetBytes(res.ReturnedData).Int64())
+			require.Equal(t, ctx.BlockHeader.Timestamp/1000, new(big.Int).SetBytes(res.ReturnedData).Uint64())
 
 		})
 }

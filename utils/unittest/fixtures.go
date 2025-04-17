@@ -546,7 +546,7 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 		ParentID:           parent.ID(),
 		Height:             height,
 		PayloadHash:        IdentifierFixture(),
-		Timestamp:          time.Now().UTC(),
+		Timestamp:          uint64(time.Now().UnixMilli()),
 		View:               view,
 		ParentView:         parent.View,
 		ParentVoterIndices: SignerIndicesFixture(4),
@@ -581,7 +581,7 @@ func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *fl
 		ParentID:           parent.ID(),
 		Height:             height,
 		PayloadHash:        IdentifierFixture(),
-		Timestamp:          time.Now().UTC(),
+		Timestamp:          uint64(time.Now().UnixMilli()),
 		View:               view,
 		ParentView:         parent.View,
 		ParentVoterIndices: SignerIndicesFixture(4),
@@ -637,7 +637,7 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 	header.Height = parent.Header.Height + 1
 	header.View = parent.Header.View + 1
 	header.ChainID = parent.Header.ChainID
-	header.Timestamp = time.Now()
+	header.Timestamp = uint64(time.Now().UnixMilli())
 	header.ParentID = parent.ID()
 	header.ParentView = parent.Header.View
 	header.PayloadHash = payload.Hash()
@@ -1843,7 +1843,7 @@ func BlockEventsFixture(
 	return flow.BlockEvents{
 		BlockID:        header.ID(),
 		BlockHeight:    header.Height,
-		BlockTimestamp: header.Timestamp,
+		BlockTimestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
 		Events:         EventsFixture(n, types...),
 	}
 }

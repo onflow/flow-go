@@ -507,7 +507,7 @@ func (b *Builder) buildHeader(
 		ParentID:    ctx.parentID,
 		Height:      ctx.parent.Height + 1,
 		PayloadHash: payload.Hash(),
-		Timestamp:   time.Now().UTC(),
+		Timestamp:   uint64(time.Now().UnixMilli()),
 
 		// NOTE: we rely on the HotStuff-provided setter to set the other
 		// fields, which are related to signatures and HotStuff internals

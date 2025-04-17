@@ -10,7 +10,7 @@ func Genesis() *Block {
 	header := &flow.Header{
 		View:      0,
 		ChainID:   "cluster",
-		Timestamp: flow.GenesisTime,
+		Timestamp: uint64(flow.GenesisTime.UnixMilli()),
 		ParentID:  flow.ZeroID,
 	}
 

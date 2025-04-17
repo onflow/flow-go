@@ -2,7 +2,6 @@ package model
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -15,7 +14,7 @@ type Block struct {
 	ProposerID  flow.Identifier
 	QC          *flow.QuorumCertificate
 	PayloadHash flow.Identifier
-	Timestamp   time.Time
+	Timestamp   uint64 // Unix milliseconds
 }
 
 // BlockFromFlow converts a flow header to a hotstuff block.

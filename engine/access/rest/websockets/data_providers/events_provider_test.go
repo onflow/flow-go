@@ -168,7 +168,7 @@ func (s *EventsProviderSuite) backendEventsResponses(events []flow.Event) []*bac
 			Height:         s.rootBlock.Header.Height,
 			BlockID:        s.rootBlock.ID(),
 			Events:         events,
-			BlockTimestamp: s.rootBlock.Header.Timestamp,
+			BlockTimestamp: time.UnixMilli(int64(s.rootBlock.Header.Timestamp)).UTC(),
 		}
 	}
 

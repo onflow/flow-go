@@ -2,7 +2,6 @@ package flow
 
 import (
 	"encoding/json"
-	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/vmihailenco/msgpack/v4"
@@ -31,9 +30,9 @@ type Header struct {
 	Height uint64
 	// PayloadHash is a hash of the payload of this block.
 	PayloadHash Identifier
-	// Timestamp is the time at which this block was proposed.
+	// Timestamp is the time at which this block was proposed, in Unix milliseconds.
 	// The proposer can choose any time, so this should not be trusted as accurate.
-	Timestamp time.Time
+	Timestamp uint64
 	// View number at which this block was proposed.
 	View uint64
 	// ParentView number at which parent block was proposed.
@@ -63,8 +62,7 @@ func (h Header) QuorumCertificate() *QuorumCertificate {
 }
 
 // Fingerprint defines custom encoding for the header to calculate its ID.
-// Timestamp is converted from time.Time to unix time (uint64), which is necessary
-// because time.Time is not RLP-encodable (due to having private fields).
+// LastViewTC is pre-hashed to its ID.
 func (h Header) Fingerprint() []byte {
 	return fingerprint.Fingerprint(struct {
 		ChainID            ChainID
@@ -83,7 +81,7 @@ func (h Header) Fingerprint() []byte {
 		ParentID:           h.ParentID,
 		Height:             h.Height,
 		PayloadHash:        h.PayloadHash,
-		Timestamp:          uint64(h.Timestamp.UnixNano()),
+		Timestamp:          h.Timestamp,
 		View:               h.View,
 		ParentView:         h.ParentView,
 		ParentVoterIndices: h.ParentVoterIndices,
@@ -107,12 +105,6 @@ func (h Header) Checksum() Identifier {
 // MarshalJSON makes sure the timestamp is encoded in UTC.
 func (h Header) MarshalJSON() ([]byte, error) {
 
-	// NOTE: this is just a sanity check to make sure that we don't get
-	// different encodings if someone forgets to use UTC timestamps
-	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
-	}
-
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// marshal function and encode like a raw header
 	type Encodable Header
@@ -133,24 +125,11 @@ func (h *Header) UnmarshalJSON(data []byte) error {
 	type Decodable *Header
 	err := json.Unmarshal(data, Decodable(h))
 
-	// NOTE: the timezone check is not required for JSON, as it already encodes
-	// timezones, but it doesn't hurt to add it in case someone messes with the
-	// raw encoded format
-	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
-	}
-
 	return err
 }
 
 // MarshalCBOR makes sure the timestamp is encoded in UTC.
 func (h Header) MarshalCBOR() ([]byte, error) {
-
-	// NOTE: this is just a sanity check to make sure that we don't get
-	// different encodings if someone forgets to use UTC timestamps
-	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
-	}
 
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// marshal function and encode like a raw header
@@ -170,24 +149,11 @@ func (h *Header) UnmarshalCBOR(data []byte) error {
 	err := cbor.Unmarshal(data, &decodable)
 	*h = Header(decodable)
 
-	// NOTE: the timezone check is not required for CBOR, as it already encodes
-	// timezones, but it doesn't hurt to add it in case someone messes with the
-	// raw encoded format
-	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
-	}
-
 	return err
 }
 
 // MarshalMsgpack makes sure the timestamp is encoded in UTC.
 func (h Header) MarshalMsgpack() ([]byte, error) {
-
-	// NOTE: this is just a sanity check to make sure that we don't get
-	// different encodings if someone forgets to use UTC timestamps
-	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
-	}
 
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// marshal function and encode like a raw header
@@ -206,13 +172,6 @@ func (h *Header) UnmarshalMsgpack(data []byte) error {
 	decodable := Decodable(*h)
 	err := msgpack.Unmarshal(data, &decodable)
 	*h = Header(decodable)
-
-	// NOTE: Msgpack unmarshals timestamps with the local timezone, which means
-	// that a block ID would suddenly be different after encoding and decoding
-	// on a machine with non-UTC local time
-	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
-	}
 
 	return err
 }

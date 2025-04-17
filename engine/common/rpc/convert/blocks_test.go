@@ -46,7 +46,7 @@ func TestConvertBlockLight(t *testing.T) {
 	assert.Equal(t, 0, bytes.Compare(blockID[:], msg.Id))
 	assert.Equal(t, block.Header.Height, msg.Height)
 	assert.Equal(t, 0, bytes.Compare(block.Header.ParentID[:], msg.ParentId))
-	assert.Equal(t, block.Header.Timestamp, msg.Timestamp.AsTime())
+	assert.Equal(t, block.Header.Timestamp, uint64(msg.Timestamp.AsTime().UnixMilli()))
 	assert.Equal(t, 0, bytes.Compare(block.Header.ParentVoterSigData, msg.Signatures[0]))
 
 	guarantees := []*flow.CollectionGuarantee{}

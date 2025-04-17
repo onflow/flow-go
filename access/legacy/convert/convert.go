@@ -3,6 +3,7 @@ package convert
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
@@ -131,7 +132,7 @@ func TransactionResultToMessage(result access.TransactionResult) *accessproto.Tr
 func BlockHeaderToMessage(h *flow.Header) (*entitiesproto.BlockHeader, error) {
 	id := h.ID()
 
-	t := timestamppb.New(h.Timestamp)
+	t := timestamppb.New(time.UnixMilli(int64(h.Timestamp)))
 
 	return &entitiesproto.BlockHeader{
 		Id:        id[:],
@@ -145,7 +146,7 @@ func BlockToMessage(h *flow.Block) (*entitiesproto.Block, error) {
 	id := h.ID()
 
 	parentID := h.Header.ParentID
-	t := timestamppb.New(h.Header.Timestamp)
+	t := timestamppb.New(time.UnixMilli(int64(h.Header.Timestamp)))
 
 	cg := make([]*entitiesproto.CollectionGuarantee, len(h.Payload.Guarantees))
 	for i, g := range h.Payload.Guarantees {

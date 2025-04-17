@@ -3,6 +3,7 @@ package emulator
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -71,7 +72,7 @@ func (b *SDKAdapter) GetLatestBlockHeader(
 		ID:        sdk.Identifier(block.ID()),
 		ParentID:  sdk.Identifier(block.Header.ParentID),
 		Height:    block.Header.Height,
-		Timestamp: block.Header.Timestamp,
+		Timestamp: time.UnixMilli(int64(block.Header.Timestamp)).UTC(),
 	}
 	return &blockHeader, sdk.BlockStatusSealed, nil
 }
@@ -93,7 +94,7 @@ func (b *SDKAdapter) GetBlockHeaderByHeight(
 		ID:        sdk.Identifier(block.ID()),
 		ParentID:  sdk.Identifier(block.Header.ParentID),
 		Height:    block.Header.Height,
-		Timestamp: block.Header.Timestamp,
+		Timestamp: time.UnixMilli(int64(block.Header.Timestamp)),
 	}
 	return &blockHeader, sdk.BlockStatusSealed, nil
 }
@@ -115,7 +116,7 @@ func (b *SDKAdapter) GetBlockHeaderByID(
 		ID:        sdk.Identifier(block.ID()),
 		ParentID:  sdk.Identifier(block.Header.ParentID),
 		Height:    block.Header.Height,
-		Timestamp: block.Header.Timestamp,
+		Timestamp: time.UnixMilli(int64(block.Header.Timestamp)),
 	}
 	return &blockHeader, sdk.BlockStatusSealed, nil
 }
@@ -138,7 +139,7 @@ func (b *SDKAdapter) GetLatestBlock(
 			ID:        sdk.Identifier(flowBlock.ID()),
 			ParentID:  sdk.Identifier(flowBlock.Header.ParentID),
 			Height:    flowBlock.Header.Height,
-			Timestamp: flowBlock.Header.Timestamp,
+			Timestamp: time.UnixMilli(int64(flowBlock.Header.Timestamp)),
 		},
 		BlockPayload: convertBlockPayload(flowBlock.Payload),
 	}
@@ -163,7 +164,7 @@ func (b *SDKAdapter) GetBlockByHeight(
 			ID:        sdk.Identifier(flowBlock.ID()),
 			ParentID:  sdk.Identifier(flowBlock.Header.ParentID),
 			Height:    flowBlock.Header.Height,
-			Timestamp: flowBlock.Header.Timestamp,
+			Timestamp: time.UnixMilli(int64(flowBlock.Header.Timestamp)),
 		},
 		BlockPayload: convertBlockPayload(flowBlock.Payload),
 	}
@@ -188,7 +189,7 @@ func (b *SDKAdapter) GetBlockByID(
 			ID:        sdk.Identifier(flowBlock.ID()),
 			ParentID:  sdk.Identifier(flowBlock.Header.ParentID),
 			Height:    flowBlock.Header.Height,
-			Timestamp: flowBlock.Header.Timestamp,
+			Timestamp: time.UnixMilli(int64(flowBlock.Header.Timestamp)),
 		},
 		BlockPayload: convertBlockPayload(flowBlock.Payload),
 	}

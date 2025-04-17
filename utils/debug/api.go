@@ -30,7 +30,7 @@ func GetExecutionAPIBlockHeader(
 		ChainID:   flow.ChainID(resp.Block.ChainId),
 		ParentID:  flow.Identifier(resp.Block.ParentId),
 		Height:    resp.Block.Height,
-		Timestamp: resp.Block.Timestamp.AsTime(),
+		Timestamp: uint64(resp.Block.Timestamp.AsTime().UnixMilli()),
 	}, nil
 }
 
@@ -55,6 +55,6 @@ func GetAccessAPIBlockHeader(
 		ChainID:   flow.ChainID(resp.Block.ChainId),
 		ParentID:  flow.Identifier(resp.Block.ParentId),
 		Height:    resp.Block.Height,
-		Timestamp: resp.Block.Timestamp.AsTime(),
+		Timestamp: uint64(resp.Block.Timestamp.AsTime().UnixMilli()),
 	}, nil
 }

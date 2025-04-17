@@ -16,7 +16,7 @@ func MakeBlock(options ...func(*model.Block)) *model.Block {
 		BlockID:     unittest.IdentifierFixture(),
 		PayloadHash: unittest.IdentifierFixture(),
 		ProposerID:  unittest.IdentifierFixture(),
-		Timestamp:   time.Now().UTC(),
+		Timestamp:   uint64(time.Now().UnixMilli()),
 		QC:          MakeQC(WithQCView(view - 1)),
 	}
 	for _, option := range options {

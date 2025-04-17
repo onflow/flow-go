@@ -130,7 +130,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.ClusterBlock
 		Hex("ref_block_id", payload.ReferenceBlockID[:]).
 		Hex("collection_id", logging.Entity(payload.Collection)).
 		Int("tx_count", payload.Collection.Len()).
-		Time("timestamp", header.Timestamp).
+		Time("timestamp", time.UnixMilli(int64(header.Timestamp))).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Uint64("finalized_height", finalHeight).
@@ -312,7 +312,7 @@ func (c *Core) processBlockProposal(proposal *cluster.BlockProposal) error {
 		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("payload_hash", header.PayloadHash[:]).
-		Time("timestamp", header.Timestamp).
+		Time("timestamp", time.UnixMilli(int64(header.Timestamp))).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Logger()

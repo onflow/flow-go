@@ -16,7 +16,7 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := &flow.Header{
 			View:               1337,
-			Timestamp:          time.Now().UTC(),
+			Timestamp:          uint64(time.Now().UnixMilli()),
 			ParentID:           flow.Identifier{0x11},
 			PayloadHash:        flow.Identifier{0x22},
 			ParentVoterIndices: []byte{0x44},

@@ -204,7 +204,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				ParentView:  parent.View,
 				Height:      parent.Height + 1,
 				PayloadHash: unittest.IdentifierFixture(),
-				Timestamp:   time.Now().UTC(),
+				Timestamp:   uint64(time.Now().UnixMilli()),
 			}
 			require.NoError(t, setter(header))
 			sig, err := sign(header)

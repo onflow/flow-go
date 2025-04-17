@@ -13,7 +13,7 @@ func DefaultRoot() *flow.Header {
 		ParentID:    flow.ZeroID,
 		Height:      0,
 		PayloadHash: unittest.IdentifierFixture(),
-		Timestamp:   time.Now().UTC(),
+		Timestamp:   uint64(time.Now().UnixMilli()),
 	}
 	return header
 }

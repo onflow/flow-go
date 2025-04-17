@@ -139,7 +139,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.BlockProposa
 		Hex("block_id", logging.Entity(header)).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("payload_hash", header.PayloadHash[:]).
-		Time("timestamp", header.Timestamp).
+		Time("timestamp", time.UnixMilli(int64(header.Timestamp))).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Str("traceID", traceID). // traceID is used to connect logs to traces
@@ -356,7 +356,7 @@ func (c *Core) processBlockProposal(proposal *flow.BlockProposal) error {
 		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("payload_hash", header.PayloadHash[:]).
-		Time("timestamp", header.Timestamp).
+		Time("timestamp", time.UnixMilli(int64(header.Timestamp))).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Logger()

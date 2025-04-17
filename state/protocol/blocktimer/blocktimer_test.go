@@ -18,34 +18,34 @@ func TestBlockTimestamp_Validate(t *testing.T) {
 	t.Run("parentTime + minInterval + 1", func(t *testing.T) {
 		parentTime := time.Now().UTC()
 		blockTime := parentTime.Add(builder.minInterval + time.Millisecond)
-		require.NoError(t, builder.Validate(parentTime, blockTime))
+		require.NoError(t, builder.Validate(uint64(parentTime.UnixMilli()), uint64(blockTime.UnixMilli())))
 	})
 	t.Run("parentTime + minInterval", func(t *testing.T) {
 		parentTime := time.Now().UTC()
 		blockTime := parentTime.Add(builder.minInterval)
-		require.NoError(t, builder.Validate(parentTime, blockTime))
+		require.NoError(t, builder.Validate(uint64(parentTime.UnixMilli()), uint64(blockTime.UnixMilli())))
 	})
 	t.Run("parentTime + minInterval - 1", func(t *testing.T) {
 		parentTime := time.Now().UTC()
 		blockTime := parentTime.Add(builder.minInterval - time.Millisecond)
-		err := builder.Validate(parentTime, blockTime)
+		err := builder.Validate(uint64(parentTime.UnixMilli()), uint64(blockTime.UnixMilli()))
 		require.Error(t, err)
 		require.True(t, protocol.IsInvalidBlockTimestampError(err))
 	})
 	t.Run("parentTime + maxInterval - 1", func(t *testing.T) {
 		parentTime := time.Now().UTC()
 		blockTime := parentTime.Add(builder.maxInterval - time.Millisecond)
-		require.NoError(t, builder.Validate(parentTime, blockTime))
+		require.NoError(t, builder.Validate(uint64(parentTime.UnixMilli()), uint64(blockTime.UnixMilli())))
 	})
 	t.Run("parentTime + maxInterval", func(t *testing.T) {
 		parentTime := time.Now().UTC()
 		blockTime := parentTime.Add(builder.maxInterval)
-		require.NoError(t, builder.Validate(parentTime, blockTime))
+		require.NoError(t, builder.Validate(uint64(parentTime.UnixMilli()), uint64(blockTime.UnixMilli())))
 	})
 	t.Run("parentTime + maxInterval + 1", func(t *testing.T) {
 		parentTime := time.Now().UTC()
 		blockTime := parentTime.Add(builder.maxInterval + time.Millisecond)
-		err := builder.Validate(parentTime, blockTime)
+		err := builder.Validate(uint64(parentTime.UnixMilli()), uint64(blockTime.UnixMilli()))
 		require.Error(t, err)
 		require.True(t, protocol.IsInvalidBlockTimestampError(err))
 	})
@@ -78,12 +78,12 @@ func TestBlockTimestamp_Build(t *testing.T) {
 
 			// now = parentTime + delta + {-1, 0, +1}
 			for i := -1; i <= 1; i++ {
-				builder.generator = func() time.Time {
-					return parentTime.Add(duration + time.Millisecond*time.Duration(i))
+				builder.generator = func() uint64 {
+					return uint64(parentTime.Add(duration + time.Millisecond*time.Duration(i)).UnixMilli())
 				}
 
-				blockTime := builder.Build(parentTime)
-				require.NoError(t, builder.Validate(parentTime, blockTime))
+				blockTime := builder.Build(uint64(parentTime.UnixMilli()))
+				require.NoError(t, builder.Validate(uint64(parentTime.UnixMilli()), blockTime))
 			}
 		})
 	}

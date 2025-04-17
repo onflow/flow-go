@@ -92,7 +92,7 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	require.NoError(s.T(), err)
 	s.rootHeader = &flow.Header{
 		ParentID:   parentID,
-		Timestamp:  time.Now().UTC(),
+		Timestamp:  uint64(time.Now().UnixMilli()),
 		Height:     21053,
 		View:       52078,
 		ParentView: 52077,

@@ -114,7 +114,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 		blockHeaders = append(blockHeaders, blockMetadata{
 			ID:        blockID,
 			Height:    header.Height,
-			Timestamp: header.Timestamp,
+			Timestamp: time.UnixMilli(int64(header.Timestamp)),
 		})
 	}
 
@@ -144,7 +144,7 @@ func (b *backendEvents) GetEventsForBlockIDs(
 		blockHeaders = append(blockHeaders, blockMetadata{
 			ID:        blockID,
 			Height:    header.Height,
-			Timestamp: header.Timestamp,
+			Timestamp: time.UnixMilli(int64(header.Timestamp)),
 		})
 	}
 

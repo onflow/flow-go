@@ -67,7 +67,7 @@ func (t *TelemetryConsumer) OnReceiveProposal(currentView uint64, proposal *mode
 		Uint64("block_view", block.View).
 		Hex("block_id", logging.ID(block.BlockID)).
 		Hex("block_proposer_id", logging.ID(block.ProposerID)).
-		Time("block_time", block.Timestamp).
+		Time("block_time", time.UnixMilli(int64(block.Timestamp))).
 		Uint64("qc_view", block.QC.View).
 		Hex("qc_block_id", logging.ID(block.QC.BlockID))
 
@@ -182,7 +182,7 @@ func (t *TelemetryConsumer) OnOwnProposal(proposal *flow.Proposal, targetPublica
 		Uint64("block_view", proposal.Header.View).
 		Hex("block_id", logging.ID(proposal.Header.ID())).
 		Hex("block_proposer_id", logging.ID(proposal.Header.ProposerID)).
-		Time("block_time", proposal.Header.Timestamp).
+		Time("block_time", time.UnixMilli(int64(proposal.Header.Timestamp))).
 		Uint64("qc_view", proposal.Header.ParentView).
 		Hex("qc_block_id", logging.ID(proposal.Header.ParentID)).
 		Time("targetPublicationTime", targetPublicationTime)
