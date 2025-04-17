@@ -8,6 +8,9 @@ import (
 type Headers interface {
 
 	// Store will store a header.
+	// Error returns:
+	//   - storage.ErrAlreadyExists if a header for the given blockID already exists in the database.
+	//   - generic error in case of unexpected failure from the database layer or encoding failure.
 	Store(proposal *flow.Proposal) error
 
 	// ByBlockID returns the header with the given ID. It is available for finalized blocks and those pending finalization.
@@ -16,6 +19,8 @@ type Headers interface {
 	ByBlockID(blockID flow.Identifier) (*flow.Header, error)
 
 	// ByHeight returns the block with the given number. It is only available for finalized blocks.
+	// Error returns:
+	//  - ErrNotFound if no finalized block is known at the given height
 	ByHeight(height uint64) (*flow.Header, error)
 
 	// Exists returns true if a header with the given ID has been stored.
@@ -36,5 +41,7 @@ type Headers interface {
 
 	// ProposalByBlockID returns the header with the given ID, along with the corresponding proposer signature.
 	// It is available for finalized blocks and those pending finalization.
+	// Error returns:
+	//  - ErrNotFound if no block header or proposer signature with the given blockID exists
 	ProposalByBlockID(blockID flow.Identifier) (*flow.Proposal, error)
 }
