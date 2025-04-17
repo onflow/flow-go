@@ -385,12 +385,14 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
+		proposal1 := unittest.ProposalFromBlock(&block1)
 		// test block2 get by height
 		block2 := unittest.BlockFixture()
 		block2.Header.Height = 2
+		proposal2 := unittest.ProposalFromBlock(&block2)
 
-		require.NoError(suite.T(), all.Blocks.Store(&block1))
-		require.NoError(suite.T(), all.Blocks.Store(&block2))
+		require.NoError(suite.T(), all.Blocks.Store(proposal1))
+		require.NoError(suite.T(), all.Blocks.Store(proposal2))
 
 		// the follower logic should update height index on the block storage when a block is finalized
 		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
@@ -606,7 +608,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 		enNodeIDs := enIdentities.NodeIDs()
 
 		// create block -> collection -> transactions
-		block, collection := suite.createChain()
+		proposal, collection := suite.createChain()
+		block := proposal.Block
 
 		// setup mocks
 		conduit := new(mocknetwork.Conduit)
@@ -713,7 +716,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
-		err = all.Blocks.Store(block)
+		err = all.Blocks.Store(proposal)
 		require.NoError(suite.T(), err)
 
 		err = db.Update(operation.IndexBlockHeight(block.Header.Height, block.ID()))
@@ -770,8 +773,10 @@ func (suite *Suite) TestGetTransactionResult() {
 		*suite.state = protocol.State{}
 
 		// create block -> collection -> transactions
-		block, collection := suite.createChain()
-		blockNegative, collectionNegative := suite.createChain()
+		proposal, collection := suite.createChain()
+		block := proposal.Block
+		proposalNegative, collectionNegative := suite.createChain()
+		blockNegative := proposalNegative.Block
 		blockId := block.ID()
 		blockNegativeId := blockNegative.ID()
 
@@ -785,9 +790,9 @@ func (suite *Suite) TestGetTransactionResult() {
 		// specifically for this test we will consider that sealed block is far behind finalized, so we get EXECUTED status
 		suite.sealedSnapshot.On("Head").Return(sealedBlock, nil)
 
-		err := all.Blocks.Store(block)
+		err := all.Blocks.Store(proposal)
 		require.NoError(suite.T(), err)
-		err = all.Blocks.Store(blockNegative)
+		err = all.Blocks.Store(proposalNegative)
 		require.NoError(suite.T(), err)
 
 		suite.state.On("AtBlockID", blockId).Return(suite.sealedSnapshot)
@@ -1150,10 +1155,12 @@ func (suite *Suite) TestExecuteScript() {
 
 		// create another block as a predecessor of the block created earlier
 		prevBlock := unittest.BlockWithParentFixture(suite.finalizedBlock)
+		prevProposal := unittest.ProposalFromBlock(prevBlock)
 
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockWithParentFixture(prevBlock.Header)
-		err = all.Blocks.Store(lastBlock)
+		lastProposal := unittest.ProposalFromBlock(lastBlock)
+		err = all.Blocks.Store(lastProposal)
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
@@ -1167,7 +1174,7 @@ func (suite *Suite) TestExecuteScript() {
 			require.NoError(suite.T(), err)
 		}
 
-		err = all.Blocks.Store(prevBlock)
+		err = all.Blocks.Store(prevProposal)
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.IndexBlockHeight(prevBlock.Header.Height, prevBlock.ID()))
 		require.NoError(suite.T(), err)
@@ -1288,10 +1295,11 @@ func (suite *Suite) TestAPICallNodeVersionInfo() {
 func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 	suite.RunTest(func(handler *rpc.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
 		block := unittest.BlockWithParentFixture(suite.finalizedBlock)
+		proposal := unittest.ProposalFromBlock(block)
 		newFinalizedBlock := unittest.BlockWithParentFixture(block.Header)
 
 		// store new block
-		require.NoError(suite.T(), all.Blocks.Store(block))
+		require.NoError(suite.T(), all.Blocks.Store(proposal))
 
 		assertFinalizedBlockHeader := func(resp *accessproto.BlockHeaderResponse, err error) {
 			require.NoError(suite.T(), err)
@@ -1322,7 +1330,7 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 	})
 }
 
-func (suite *Suite) createChain() (*flow.Block, *flow.Collection) {
+func (suite *Suite) createChain() (*flow.BlockProposal, *flow.Collection) {
 	collection := unittest.CollectionFixture(10)
 	refBlockID := unittest.IdentifierFixture()
 	// prepare cluster committee members
@@ -1339,6 +1347,7 @@ func (suite *Suite) createChain() (*flow.Block, *flow.Collection) {
 	}
 	block := unittest.BlockWithParentFixture(suite.finalizedBlock)
 	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
+	proposal := unittest.ProposalFromBlock(block)
 
 	cluster := new(protocol.Cluster)
 	cluster.On("Members").Return(clusterCommittee.ToSkeleton(), nil)
@@ -1353,5 +1362,5 @@ func (suite *Suite) createChain() (*flow.Block, *flow.Collection) {
 
 	suite.state.On("AtBlockID", refBlockID).Return(snap)
 
-	return block, &collection
+	return proposal, &collection
 }

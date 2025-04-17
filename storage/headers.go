@@ -8,9 +8,9 @@ import (
 type Headers interface {
 
 	// Store will store a header.
-	Store(header *flow.Header) error
+	Store(proposal *flow.Proposal) error
 
-	// ByBlockID returns the header with the given ID. It is available for finalized and ambiguous blocks.
+	// ByBlockID returns the header with the given ID. It is available for finalized blocks and those pending finalization.
 	// Error returns:
 	//  - ErrNotFound if no block header with the given ID exists
 	ByBlockID(blockID flow.Identifier) (*flow.Header, error)
@@ -19,6 +19,7 @@ type Headers interface {
 	ByHeight(height uint64) (*flow.Header, error)
 
 	// Exists returns true if a header with the given ID has been stored.
+	// CAUTION: this method is not backed by a cache and therefore comparatively slow!
 	// No errors are expected during normal operation.
 	Exists(blockID flow.Identifier) (bool, error)
 
@@ -30,5 +31,10 @@ type Headers interface {
 	// ByParentID finds all children for the given parent block. The returned headers
 	// might be unfinalized; if there is more than one, at least one of them has to
 	// be unfinalized.
+	// CAUTION: this method is not backed by a cache and therefore comparatively slow!
 	ByParentID(parentID flow.Identifier) ([]*flow.Header, error)
+
+	// ProposalByBlockID returns the header with the given ID, along with the corresponding proposer signature.
+	// It is available for finalized blocks and those pending finalization.
+	ProposalByBlockID(blockID flow.Identifier) (*flow.Proposal, error)
 }

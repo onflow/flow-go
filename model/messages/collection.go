@@ -93,6 +93,7 @@ func (cbp *ClusterBlockProposal) ToInternal() *cluster.BlockProposal {
 	}
 }
 
+// TODO(malleability, #7311) update this function when renaming messages.ClusterBlockProposal -> UntrustedClusterProposal
 func ClusterBlockProposalFrom(proposal *cluster.BlockProposal) *ClusterBlockProposal {
 	return &ClusterBlockProposal{
 		Block:           UntrustedClusterBlockFromInternal(proposal.Block),

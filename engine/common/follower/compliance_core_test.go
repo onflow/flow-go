@@ -132,19 +132,19 @@ func (s *CoreSuite) TestAddFinalizedBlock() {
 //
 // Finally, the certified blocks should be forwarded to the HotStuff follower.
 func (s *CoreSuite) TestProcessingRangeHappyPath() {
-	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
+	proposals := unittest.ProposalChainFixtureFrom(10, s.finalizedBlock)
 
 	var wg sync.WaitGroup
-	wg.Add(len(blocks) - 1)
-	for i := 1; i < len(blocks); i++ {
-		s.state.On("ExtendCertified", mock.Anything, blocks[i-1], blocks[i].Header.QuorumCertificate()).Return(nil).Once()
-		s.follower.On("AddCertifiedBlock", blockWithID(blocks[i-1].ID())).Run(func(args mock.Arguments) {
+	wg.Add(len(proposals) - 1)
+	for i := 1; i < len(proposals); i++ {
+		expectCertified := &flow.CertifiedBlock{
+			Proposal:     proposals[i-1],
+			CertifyingQC: proposals[i].Block.Header.QuorumCertificate(),
+		}
+		s.state.On("ExtendCertified", mock.Anything, expectCertified).Return(nil).Once()
+		s.follower.On("AddCertifiedBlock", blockWithID(proposals[i-1].Block.ID())).Run(func(args mock.Arguments) {
 			wg.Done()
 		}).Return().Once()
-	}
-	proposals := make([]*flow.BlockProposal, 0, len(blocks))
-	for _, block := range blocks {
-		proposals = append(proposals, unittest.ProposalFromBlock(block))
 	}
 	s.validator.On("ValidateProposal", model.SignedProposalFromBlock(proposals[len(proposals)-1])).Return(nil).Once()
 
@@ -221,15 +221,15 @@ func (s *CoreSuite) TestProcessingConnectedRangesOutOfOrder() {
 	}
 
 	lastSubmittedBlockID := flow.ZeroID
-	s.state.On("ExtendCertified", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		block := args.Get(1).(*flow.Block)
+	s.state.On("ExtendCertified", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		certified := args.Get(1).(*flow.CertifiedBlock)
 		if lastSubmittedBlockID != flow.ZeroID {
-			if block.Header.ParentID != lastSubmittedBlockID {
+			if certified.Proposal.Block.Header.ParentID != lastSubmittedBlockID {
 				s.Failf("blocks not sequential",
-					"blocks submitted to protocol state are not sequential at height %d", block.Header.Height)
+					"blocks submitted to protocol state are not sequential at height %d", certified.Proposal.Block.Header.Height)
 			}
 		}
-		lastSubmittedBlockID = block.ID()
+		lastSubmittedBlockID = certified.Proposal.Block.ID()
 	}).Return(nil).Times(len(blocks) - 1)
 
 	s.validator.On("ValidateProposal", mock.Anything).Return(nil).Once()
@@ -287,15 +287,15 @@ func (s *CoreSuite) TestConcurrentAdd() {
 		}
 	}).Return().Times(len(blocks) - 1) // all proposals have to be submitted
 	lastSubmittedBlockID := flow.ZeroID
-	s.state.On("ExtendCertified", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		block := args.Get(1).(*flow.Block)
+	s.state.On("ExtendCertified", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		certified := args.Get(1).(*flow.CertifiedBlock)
 		if lastSubmittedBlockID != flow.ZeroID {
-			if block.Header.ParentID != lastSubmittedBlockID {
+			if certified.Proposal.Block.Header.ParentID != lastSubmittedBlockID {
 				s.Failf("blocks not sequential",
-					"blocks submitted to protocol state are not sequential at height %d", block.Header.Height)
+					"blocks submitted to protocol state are not sequential at height %d", certified.Proposal.Block.Header.Height)
 			}
 		}
-		lastSubmittedBlockID = block.ID()
+		lastSubmittedBlockID = certified.Proposal.Block.ID()
 	}).Return(nil).Times(len(blocks) - 1)
 
 	var wg sync.WaitGroup

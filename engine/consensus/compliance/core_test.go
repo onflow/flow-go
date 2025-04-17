@@ -299,7 +299,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, block)
+	cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, proposal)
 }
 
 func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
@@ -328,7 +328,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, block)
+	cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, proposal)
 }
 
 func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
@@ -346,7 +346,7 @@ func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 	require.NoError(cs.T(), err)
 
 	// block should be dropped - not added to state or cache
-	cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything)
+	cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything, mock.Anything)
 	cs.validator.AssertNotCalled(cs.T(), "ValidateProposal", mock.Anything)
 	cs.pending.AssertNotCalled(cs.T(), "Add", originID, mock.Anything)
 }
@@ -390,7 +390,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
 		// we should not extend the state with the header
-		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything, block)
+		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything, proposal)
 		// we should not attempt to process the children
 		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
 	})
@@ -408,7 +408,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
 		// we should not extend the state with the header
-		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything, block)
+		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything, proposal)
 		// we should not attempt to process the children
 		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
 	})
@@ -427,7 +427,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		require.ErrorIs(cs.T(), err, unexpectedErr)
 
 		// we should not extend the state with the header
-		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything, block)
+		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything, proposal)
 		// we should not attempt to process the children
 		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
 	})
@@ -478,7 +478,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
 		// we should extend the state with the header
-		cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, block)
+		cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, proposal)
 		// we should not pass the block to hotstuff
 		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything)
 		// we should not attempt to process the children
@@ -499,7 +499,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
 		// we should extend the state with the header
-		cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, block)
+		cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, proposal)
 		// we should not pass the block to hotstuff
 		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything)
 		// we should not attempt to process the children
@@ -521,7 +521,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		require.ErrorIs(cs.T(), err, unexpectedErr)
 
 		// we should extend the state with the header
-		cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, block)
+		cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, proposal)
 		// we should not pass the block to hotstuff
 		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything)
 		// we should not attempt to process the children

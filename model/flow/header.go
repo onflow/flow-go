@@ -19,12 +19,6 @@ type Proposal struct {
 	ProposerSigData []byte
 }
 
-// BlockProposal is a signed proposal that includes the block payload, in addition to the required header and signature.
-type BlockProposal struct {
-	Block           *Block
-	ProposerSigData []byte
-}
-
 // Header contains all meta-data for a block, as well as a hash representing
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.

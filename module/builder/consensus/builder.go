@@ -156,12 +156,12 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	span, ctx := b.tracer.StartBlockSpan(context.Background(), blockProposal.Block.Header.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
 	defer span.End()
 
-	err = b.state.Extend(ctx, blockProposal.Block)
+	err = b.state.Extend(ctx, blockProposal)
 	if err != nil {
 		return nil, fmt.Errorf("could not extend state with built proposal: %w", err)
 	}
 
-	return &flow.Proposal{Header: blockProposal.Block.Header, ProposerSigData: blockProposal.ProposerSigData}, nil
+	return blockProposal.HeaderProposal(), nil
 }
 
 // repopulateExecutionTree restores latest state of execution tree mempool based on local chain state information.

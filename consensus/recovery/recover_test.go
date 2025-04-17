@@ -12,11 +12,10 @@ import (
 
 func TestRecover(t *testing.T) {
 	finalized := unittest.BlockHeaderFixture()
-	blocks := unittest.ProposalChainFixtureFrom(100, finalized)
+	proposals := unittest.ProposalChainFixtureFrom(100, finalized)
 	pending := make([]*flow.Proposal, 0)
-	for _, b := range blocks {
-		proposal := &flow.Proposal{Header: b.Block.Header, ProposerSigData: b.ProposerSigData}
-		pending = append(pending, proposal)
+	for _, b := range proposals {
+		pending = append(pending, b.HeaderProposal())
 	}
 
 	// Recover with `pending` blocks and record what blocks are forwarded to `onProposal`
@@ -28,7 +27,7 @@ func TestRecover(t *testing.T) {
 	err := Recover(unittest.Logger(), pending, scanner)
 	require.NoError(t, err)
 
-	// should forward blocks in exact order, just converting flow.Header to pending block
+	// should forward blocks in exact order, just converting flow.ProposalHeader to pending block
 	require.Len(t, recovered, len(pending))
 	for i, r := range recovered {
 		require.Equal(t, model.SignedProposalFromFlow(pending[i]), r)
