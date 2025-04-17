@@ -112,6 +112,8 @@ jobs:
         run: go generate ./...
         working-directory: ${{ matrix.dir }}
 
+      - name: Add lint binary to path
+        run: echo "$(pwd)/tools" >> $GITHUB_PATH
       - name: DEBUG print path
         run: echo "$PATH --- $(pwd)"
       - name: DEBUG which
