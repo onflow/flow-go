@@ -80,7 +80,7 @@ jobs:
       - name: Download custom linter
         uses: actions/download-artifact@v4
         with:
-          name: golangci-lint
+          name: custom-gcl
           path: ./tools/
       # must have expected binary name for use in default gcl action
       - name: Rename custom linter binary to canonical
