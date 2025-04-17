@@ -1,0 +1,8 @@
+# The version of golangci-lint used to build the custom binary
+version: v1.63.4
+
+# The name of the custom binary
+name: golangci-lint
+
+# The directory path used to store the custom binary.
+destination: ./tools/
