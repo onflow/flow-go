@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -28,7 +29,7 @@ func TestCollection_HappyCase(t *testing.T) {
 	require.NoError(t, err)
 
 	retrieved, err = collections.ByID(collection.ID())
-	require.Error(t, err)
+	require.ErrorIs(t, err, storage.ErrNotFound)
 	require.Nil(t, retrieved)
 }
 

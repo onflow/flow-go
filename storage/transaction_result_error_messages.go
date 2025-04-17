@@ -2,6 +2,7 @@ package storage
 
 import "github.com/onflow/flow-go/model/flow"
 
+// TransactionResultErrorMessagesReader represents persistent storage read operations for transaction result error messages
 type TransactionResultErrorMessagesReader interface {
 	// Exists returns true if transaction result error messages for the given ID have been stored.
 	//
