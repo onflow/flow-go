@@ -82,6 +82,8 @@ jobs:
         with:
           name: golangci-lint
           path: ./tools/
+      - name: DEBUG print tools
+        run: ls tools/*
       - name: Make lint binary executable
         run: chmod +x ./tools/golangci-lint
       - name: Add lint binary to path
