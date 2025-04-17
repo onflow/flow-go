@@ -93,8 +93,11 @@ jobs:
         run: echo "$(pwd)/tools" >> $GITHUB_PATH
       - name: DEBUG print path
         run: echo "$PATH --- $(pwd)"
-      - name: DEBUG print tools
-        run: ls tools
+      - name: DEBUG which
+        run: which golangci-lint
+      - name: DEBUG lint run test
+        run: golangci-lint --help
+        continue-on-error: true
       - name: DEBUG print tools
         run: ls tools/*
 
