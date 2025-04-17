@@ -13,7 +13,7 @@ import (
 type State int
 
 const (
-	//StateReady is the initial state after instantiation and before downloading has begun
+	// StateReady is the initial state after instantiation and before downloading has begun
 	StateReady State = iota
 	//StateDownloading represents the state where data download is in progress
 	StateDownloading
@@ -231,9 +231,7 @@ func (p *Pipeline) broadcastStateUpdate() {
 // processCurrentState handles the current state and transitions to the next state if possible.
 // It returns false when a terminal state is reached (StateComplete or StateCanceled), true otherwise.
 func (p *Pipeline) processCurrentState(ctx context.Context) bool {
-	p.mu.RLock()
-	currentState := p.state
-	p.mu.RUnlock()
+	currentState := p.GetState()
 
 	switch currentState {
 	case StateReady:
@@ -288,7 +286,7 @@ func (p *Pipeline) processReady() bool {
 }
 
 // processDownloading handles the Downloading state.
-// It executes the download function and transitions to StateIndexing if possible.
+// It executes the download function and transitions to StateIndexing if successful.
 // Returns true to continue processing, false if a terminal state was reached.
 //
 // No error returns during normal operations.
@@ -317,7 +315,7 @@ func (p *Pipeline) processDownloading(ctx context.Context) bool {
 //
 // No error returns during normal operations.
 func (p *Pipeline) processIndexing(ctx context.Context) bool {
-	p.logger.Info().Msg("starting index step")
+	p.logger.Debug().Msg("starting index step")
 
 	if err := p.indexFunc(ctx); err != nil {
 		p.logger.Error().Err(err).Msg("index step failed")
