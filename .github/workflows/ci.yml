@@ -82,11 +82,12 @@ jobs:
         with:
           name: custom-gcl
           path: ./tools/golangci-lint # must have expected binary name for use in default gcl action
-
       - name: Make lint binary executable
         run: chmod +x ./tools/golangci-lint
       - name: Add lint binary to path
         run: echo "$(pwd)/tools" >> $GITHUB_PATH
+      - name: DEBUG print path
+        run: echo "$PATH --- $(pwd)"
 
       - name: Check out code
         uses: actions/checkout@v4
