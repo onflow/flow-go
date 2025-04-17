@@ -12,8 +12,7 @@ import (
 // represented by the Quorum Certificate [QC]), the proposer's signature is included in the QC
 // and does not need to be provided individually anymore. Therefore, from the protocol perspective,
 // the proper data structures are either a block proposal (including the proposer's signature) or
-// a certified block (including a QC for the block). The usage of a bare block without proposer
-// signature or QC is discouraged.
+// a certified block (including a QC for the block).
 type Blocks interface {
 
 	// Store will atomically store a block with all its dependencies.
