@@ -88,6 +88,10 @@ jobs:
         run: echo "$(pwd)/tools" >> $GITHUB_PATH
       - name: DEBUG print path
         run: echo "$PATH --- $(pwd)"
+      - name: DEBUG print tools
+        run: ls tools
+      - name: DEBUG print tools
+        run: ls tools/*
 
       - name: Check out code
         uses: actions/checkout@v4
