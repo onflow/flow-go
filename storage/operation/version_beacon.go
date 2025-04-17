@@ -7,6 +7,9 @@ import (
 
 // IndexVersionBeaconByHeight stores a sealed version beacon indexed by
 // flow.SealedVersionBeacon.SealHeight.
+// DO NOT use this function directly, instead, use the
+// storage/store/version_beacon.go#BatchIndexVersionBeaconByHeight,
+// so that the cached highest version beacon in storage/store/versionbeacon is consistent.
 //
 // No errors are expected during normal operation.
 func IndexVersionBeaconByHeight(
