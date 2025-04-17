@@ -204,7 +204,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
 			CompressorName:            grpcutils.NoCompressor,
 			WebSocketConfig:           websockets.NewDefaultWebsocketConfig(),
-			EnableWebSocketsStreamAPI: false,
+			EnableWebSocketsStreamAPI: true,
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
@@ -842,9 +842,9 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		)
 		flags.BoolVar(
 			&builder.rpcConf.EnableWebSocketsStreamAPI,
-			"experimental-enable-websockets-stream-api",
+			"websockets-stream-api-enabled",
 			defaultConfig.rpcConf.EnableWebSocketsStreamAPI,
-			"[experimental] enables WebSockets Stream API that operates under /ws endpoint. this flag may change in a future release.",
+			"whether to enable the WebSockets Stream API.",
 		)
 	}).ValidateFlags(func() error {
 		if builder.executionDataSyncEnabled {
