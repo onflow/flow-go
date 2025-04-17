@@ -45,8 +45,8 @@ func RemoveByKey(w storage.Writer, key []byte) error {
 // RemoveByKeyPrefix removes all keys with the given prefix
 // Error returns:
 // * generic error in case of unexpected database error
-func RemoveByKeyPrefix(reader storage.Reader, w storage.Writer, key []byte) error {
-	return RemoveByKeyRange(reader, w, key, key)
+func RemoveByKeyPrefix(reader storage.Reader, w storage.Writer, prefix []byte) error {
+	return RemoveByKeyRange(reader, w, prefix, prefix)
 }
 
 // RemoveByKeyRange removes all keys with a prefix that falls within the range [start, end], both inclusive.
