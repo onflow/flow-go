@@ -6,3 +6,9 @@ name: golangci-lint
 
 # The directory path used to store the custom binary.
 destination: ./tools/
+
+# The list of the plugins to integrate inside the custom binary.
+plugins:
+  # a plugin from a Go proxy
+  - module: 'github.com/golangci/example-linter'
+    version: latest
