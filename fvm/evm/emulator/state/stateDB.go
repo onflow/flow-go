@@ -580,8 +580,12 @@ func (s *StateDB) Witness() *gethStateless.Witness {
 	return nil
 }
 
+// AccessEvents is not supported and only needed
+// when EIP-4762 is enabled in the future versions
+// (currently planned for after Verkle fork).
+// See: https://eips.ethereum.org/EIPS/eip-4762#access-events
 func (s *StateDB) AccessEvents() *gethState.AccessEvents {
-	return &gethState.AccessEvents{}
+	return nil
 }
 
 func (db *StateDB) latestView() *DeltaView {
