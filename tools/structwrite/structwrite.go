@@ -78,6 +78,27 @@ func (p *PluginStructWrite) run(pass *analysis.Pass) (interface{}, error) {
 
 // handleAssignStmt checks for disallowed writes to tracked struct fields in assignments.
 // It handles pointer and literal types, and writes to fields promoted through embedding.
+// In the examples below, suppose A is mutation-protected and B is not mutation-protected.
+// Suppose C is a struct which embeds A, and which is not mutation-protected.
+//
+//	type A struct {
+//	  FieldA int
+//	}
+//	type C struct {
+//	  A
+//	  FieldC int
+//	}
+//
+// You can only write to fields of non-mutation-protected structs:
+//
+//	A.FieldA = 1     // not allowed
+//	B.SomeField = 1  // allowed
+//
+// When a mutation-protected struct is embedded, you can write to fields of the outer struct.
+// You cannot write to fields defined on the inner struct that are promoted through embedding.
+//
+//	C.FieldC = 1     // allowed
+//	C.FieldA = 1     // not allowed
 func (p *PluginStructWrite) handleAssignStmt(assign *ast.AssignStmt, pass *analysis.Pass, file *ast.File) {
 	for i, lhs := range assign.Lhs {
 		selExpr, ok := lhs.(*ast.SelectorExpr)
@@ -99,7 +120,24 @@ func (p *PluginStructWrite) handleAssignStmt(assign *ast.AssignStmt, pass *analy
 	}
 }
 
-// handleCompositeLit checks for disallowed construction of tracked structs using literals.
+// handleCompositeLit checks for disallowed literal construction of mutation-protected structs.
+//
+// In the examples below, suppose A is mutation-protected and B is not mutation-protected.
+// In general, construction of empty instances of mutation-protected structs is allowed:
+//
+//	x := new(A)            // allowed
+//	var x A                // allowed
+//
+// However, for simplicity, literal construction is disallowed even when no fields are specified:
+//
+//	x := A{}               // not allowed
+//
+// Additional examples:
+//
+//	x := A{SomeField: 1}   // not allowed
+//	x := B{}               // allowed
+//	x := B{SomeField: 1}   // allowed
+//	x := B{SomeField: A{}} // not allowed
 func (p *PluginStructWrite) handleCompositeLit(lit *ast.CompositeLit, pass *analysis.Pass, file *ast.File) {
 	typ := pass.TypesInfo.Types[lit].Type
 	if typ == nil {
