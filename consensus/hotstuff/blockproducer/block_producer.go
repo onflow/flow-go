@@ -52,7 +52,6 @@ func (bp *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertifica
 	// the custom functions allows us to set some custom fields on the block;
 	// in hotstuff, we use this for view number and signature-related fields
 	setHotstuffFields := func(header *flow.Header) error {
-		//nolint: structwrite
 		header.View = view
 		header.ParentView = qc.View
 		header.ParentVoterIndices = qc.SignerIndices
