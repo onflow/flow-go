@@ -41,6 +41,7 @@ const (
 	ContractNameNonFungibleToken           = "NonFungibleToken"
 	ContractNameMetadataViews              = "MetadataViews"
 	ContractNameViewResolver               = "ViewResolver"
+	ContractNameCrossVMMetadataViews       = "CrossVMMetadataViews"
 	ContractNameEVM                        = "EVM"
 	ContractNameBurner                     = "Burner"
 	ContractNameCrypto                     = "Crypto"
@@ -174,9 +175,10 @@ type SystemContracts struct {
 	FungibleTokenMetadataViews SystemContract
 
 	// NFT related contracts
-	NonFungibleToken SystemContract
-	MetadataViews    SystemContract
-	ViewResolver     SystemContract
+	NonFungibleToken     SystemContract
+	MetadataViews        SystemContract
+	ViewResolver         SystemContract
+	CrossVMMetadataViews SystemContract
 
 	// EVM related contracts
 	EVMContract SystemContract
@@ -212,9 +214,10 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 		FungibleTokenSwitchboardAddress:   c.FungibleTokenSwitchboard.Address.Hex(),
 		FungibleTokenMetadataViewsAddress: c.FungibleTokenMetadataViews.Address.Hex(),
 
-		NonFungibleTokenAddress: c.NonFungibleToken.Address.Hex(),
-		MetadataViewsAddress:    c.MetadataViews.Address.Hex(),
-		ViewResolverAddress:     c.ViewResolver.Address.Hex(),
+		NonFungibleTokenAddress:     c.NonFungibleToken.Address.Hex(),
+		MetadataViewsAddress:        c.MetadataViews.Address.Hex(),
+		CrossVMMetadataViewsAddress: c.CrossVMMetadataViews.Address.Hex(),
+		ViewResolverAddress:         c.ViewResolver.Address.Hex(),
 
 		BurnerAddress: c.Burner.Address.Hex(),
 		CryptoAddress: c.Crypto.Address.Hex(),
@@ -243,6 +246,7 @@ func (c SystemContracts) All() []SystemContract {
 		c.NonFungibleToken,
 		c.MetadataViews,
 		c.ViewResolver,
+		c.CrossVMMetadataViews,
 
 		c.EVMContract,
 		// EVMStorage is not included here, since it is not a contract
@@ -393,9 +397,10 @@ func init() {
 		ContractNameFungibleTokenSwitchboard:   nthAddressFunc(FungibleTokenAccountIndex),
 		ContractNameFungibleTokenMetadataViews: nthAddressFunc(FungibleTokenAccountIndex),
 
-		ContractNameNonFungibleToken: nftTokenAddressFunc,
-		ContractNameMetadataViews:    nftTokenAddressFunc,
-		ContractNameViewResolver:     nftTokenAddressFunc,
+		ContractNameNonFungibleToken:     nftTokenAddressFunc,
+		ContractNameMetadataViews:        nftTokenAddressFunc,
+		ContractNameViewResolver:         nftTokenAddressFunc,
+		ContractNameCrossVMMetadataViews: nftTokenAddressFunc,
 
 		ContractNameEVM:       serviceAddressFunc,
 		AccountNameEVMStorage: evmStorageEVMFunc,
@@ -453,9 +458,10 @@ func init() {
 			FungibleTokenMetadataViews: addressOfContract(ContractNameFungibleTokenMetadataViews),
 			FungibleTokenSwitchboard:   addressOfContract(ContractNameFungibleTokenSwitchboard),
 
-			NonFungibleToken: addressOfContract(ContractNameNonFungibleToken),
-			MetadataViews:    addressOfContract(ContractNameMetadataViews),
-			ViewResolver:     addressOfContract(ContractNameViewResolver),
+			NonFungibleToken:     addressOfContract(ContractNameNonFungibleToken),
+			MetadataViews:        addressOfContract(ContractNameMetadataViews),
+			ViewResolver:         addressOfContract(ContractNameViewResolver),
+			CrossVMMetadataViews: addressOfContract(ContractNameCrossVMMetadataViews),
 
 			EVMContract: addressOfContract(ContractNameEVM),
 			EVMStorage:  addressOfAccount(AccountNameEVMStorage),

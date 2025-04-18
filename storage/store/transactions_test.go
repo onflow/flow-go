@@ -45,3 +45,30 @@ func TestTransactionRetrieveWithoutStore(t *testing.T) {
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})
 }
+
+func TestTransactionRemove(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		metrics := metrics.NewNoopCollector()
+		store := store.NewTransactions(metrics, db)
+
+		// Create and store a transaction
+		expected := unittest.TransactionFixture()
+		err := store.Store(&expected.TransactionBody)
+		require.NoError(t, err)
+
+		// Ensure it exists
+		tx, err := store.ByID(expected.ID())
+		require.NoError(t, err)
+		assert.Equal(t, &expected.TransactionBody, tx)
+
+		// Remove it
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return store.RemoveBatch(rw, expected.ID())
+		})
+		require.NoError(t, err)
+
+		// Ensure it no longer exists
+		_, err = store.ByID(expected.ID())
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
+	})
+}

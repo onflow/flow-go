@@ -18,19 +18,22 @@ type Transactions struct {
 	store map[flow.Identifier]*flow.TransactionBody
 }
 
+var _ storage.Transactions = (*Transactions)(nil)
+
 func NewTransactions() *Transactions {
 	return &Transactions{
 		store: make(map[flow.Identifier]*flow.TransactionBody),
 	}
 }
 
-var _ storage.Transactions = (*Transactions)(nil)
-
+// ByID returns the transaction for the given fingerprint.
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if transaction is not found.
 func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
 	t.lock.RLock()
-	val, ok := t.store[txID]
-	t.lock.RUnlock()
+	defer t.lock.RUnlock()
 
+	val, ok := t.store[txID]
 	if !ok {
 		return nil, storage.ErrNotFound
 	}
@@ -38,13 +41,22 @@ func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error)
 	return val, nil
 }
 
+// Store inserts the transaction, keyed by fingerprint. Duplicate transaction insertion is ignored
+// No errors are expected during normal operation.
 func (t *Transactions) Store(tx *flow.TransactionBody) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	t.store[tx.ID()] = tx
+
+	txID := tx.ID()
+	if _, ok := t.store[txID]; !ok {
+		t.store[txID] = tx
+	}
+
 	return nil
 }
 
+// AddToBatch adds all the in-memory storages to the given batch.
+// It is used for the batching writes to the DB.
 func (t *Transactions) AddToBatch(batch storage.ReaderBatchWriter) error {
 	writer := batch.Writer()
 
