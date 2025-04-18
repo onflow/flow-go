@@ -116,6 +116,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/dbops"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
@@ -584,7 +585,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			transactions := store.NewTransactions(node.Metrics.Cache, node.ProtocolDB)
 			collections := store.NewCollections(node.ProtocolDB, transactions)
 
-			if node.ProtocolDB.ID() == storage.PebbleDBID && node.DB != nil {
+			if dbops.IsPebbleBatch(node.DBOps) {
 				badgerDB := badgerimpl.ToDB(node.DB)
 				transactions.AddReader(badgerDB.Reader())
 				collections.AddReader(badgerDB.Reader())
