@@ -278,13 +278,6 @@ func (b *backendTransactions) GetTransactionResult(
 		return historicalTxResult, nil
 	}
 
-	b.log.Debug().
-		Str("transaction_id", txID.String()).
-		Str("block_id", blockID.String()).
-		Str("collection_ID", collectionID.String()).
-		//Str("tx.ReferenceBlockID", tx.ReferenceBlockID.String()).
-		Msg("DEBUG MSG")
-
 	block, err := b.retrieveBlock(blockID, collectionID, txID)
 	// an error occurred looking up the block or the requested block or collection was not found.
 	// If looking up the block based solely on the txID returns not found, then no error is
@@ -292,10 +285,6 @@ func (b *backendTransactions) GetTransactionResult(
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
-
-	//b.log.Debug().
-	//	Str("block_id", block.ID().String()).
-	//	Msg("DEBUG MSG")
 
 	var blockHeight uint64
 	var txResult *access.TransactionResult
@@ -653,10 +642,6 @@ func (b *backendTransactions) lookupBlock(txID flow.Identifier) (*flow.Block, er
 		return nil, err
 	}
 
-	b.log.Debug().
-		Str("collection_id", collection.ID().String()).
-		Msg("lookupBlock")
-
 	block, err := b.blocks.ByCollectionID(collection.ID())
 	if err != nil {
 		return nil, err
@@ -758,10 +743,6 @@ func (b *backendTransactions) getHistoricalTransactionResult(
 }
 
 func (b *backendTransactions) registerTransactionForRetry(tx *flow.TransactionBody) {
-
-	b.log.Debug().
-		Str("block_id", tx.ReferenceBlockID.String()).
-		Msg("tx.ReferenceBlockID.String()")
 	referenceBlock, err := b.state.AtBlockID(tx.ReferenceBlockID).Head()
 	if err != nil {
 		return

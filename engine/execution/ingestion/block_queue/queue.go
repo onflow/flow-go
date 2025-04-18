@@ -54,10 +54,6 @@ type MissingCollection struct {
 	Guarantee *flow.CollectionGuarantee
 }
 
-func (m *MissingCollection) ID() flow.Identifier {
-	return flow.MakeID(m)
-}
-
 // collectionInfo is an internal struct used to keep track of the state of a collection,
 // and the blocks that include the collection
 type collectionInfo struct {

@@ -1360,8 +1360,6 @@ func (suite *Suite) createChain() (*flow.Block, *flow.Collection) {
 		Str("collection", collection.ID().String()).
 		Msg("createChain DEBUG")
 
-	//collectionID := collection.ID()
-
 	suite.state.On("AtBlockID", refBlockID).Return(snap)
 
 	return block, &collection

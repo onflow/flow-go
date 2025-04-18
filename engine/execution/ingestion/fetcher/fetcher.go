@@ -47,7 +47,7 @@ func (e *CollectionFetcher) FetchCollection(blockID flow.Identifier, height uint
 		// have validated the block payload. And that validation includes checking the guarantors are correct.
 		// Based on that assumption, failing to find guarantors for guarantees contained in an incorporated block
 		// should be treated as fatal error
-		e.log.Fatal().Err(err).Msgf("failed to find guarantors for guarantee %v at block %v, height %v",
+		e.log.Fatal().Err(err).Msgf("failed to find guarantors for collection %v at block %v, height %v",
 			guarantee.CollectionID,
 			blockID,
 			height,
