@@ -340,10 +340,18 @@ func (s *MutableProtocolState) build(
 	})
 
 	if parentStateID != resultingStateID {
-		// TODO(leo): update comment
-		// note that `SkipDuplicatesTx` is still required, because the result might equal to an earlier known state (we explicitly want to de-duplicate)
 		dbUpdates = append(dbUpdates, func(_ flow.Identifier, rw storage.ReaderBatchWriter) error {
-			return s.kvStoreSnapshots.BatchStore(rw, resultingStateID, evolvingState)
+			err := s.kvStoreSnapshots.BatchStore(rw, resultingStateID, evolvingState)
+			if err == nil {
+				return nil
+			}
+
+			// note, skip already existing error because the result might equal to an earlier known state (we explicitly want to de-duplicate)
+			if errors.Is(err, storage.ErrAlreadyExists) {
+				return nil
+			}
+
+			return err
 		})
 	}
 
