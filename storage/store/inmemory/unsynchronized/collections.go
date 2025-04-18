@@ -1,10 +1,12 @@
 package unsynchronized
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 type Collections struct {
@@ -123,6 +125,29 @@ func (c *Collections) Remove(collID flow.Identifier) error {
 	for txID, coll := range c.transactionIDToLightCollection {
 		if coll.ID() == collID {
 			delete(c.transactionIDToLightCollection, txID)
+		}
+	}
+
+	return nil
+}
+
+// AddToBatch adds all the in-memory storages to the given batch.
+// It is used for the batching writes to the DB.
+func (c *Collections) AddToBatch(batch storage.ReaderBatchWriter) error {
+	writer := batch.Writer()
+
+	for _, coll := range c.collections {
+		light := coll.Light()
+		err := operation.UpsertCollection(writer, &light)
+		if err != nil {
+			return fmt.Errorf("could not persist collection: %w", err)
+		}
+	}
+
+	for _, coll := range c.lightCollections {
+		err := operation.UpsertCollection(writer, coll)
+		if err != nil {
+			return fmt.Errorf("could not persist collection: %w", err)
 		}
 	}
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 type Events struct {
@@ -130,4 +131,21 @@ func (e *Events) BatchStore(flow.Identifier, []flow.EventsList, storage.ReaderBa
 // This method is NOT implemented and will always return an error.
 func (e *Events) BatchRemoveByBlockID(flow.Identifier, storage.ReaderBatchWriter) error {
 	return fmt.Errorf("not implemented")
+}
+
+// AddToBatch adds all the in-memory storages to the given batch.
+// It is used for the batching writes to the DB.
+func (e *Events) AddToBatch(batch storage.ReaderBatchWriter) error {
+	writer := batch.Writer()
+
+	for blockID, events := range e.blockIdToEvents {
+		for _, event := range events {
+			err := operation.InsertEvent(writer, blockID, event)
+			if err != nil {
+				return fmt.Errorf("cannot batch insert event: %w", err)
+			}
+		}
+	}
+
+	return nil
 }
