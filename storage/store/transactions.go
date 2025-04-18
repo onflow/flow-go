@@ -10,9 +10,8 @@ import (
 
 // Transactions ...
 type Transactions struct {
-	db      storage.DB
-	readers []storage.Reader
-	cache   *Cache[flow.Identifier, *flow.TransactionBody]
+	db    storage.DB
+	cache *Cache[flow.Identifier, *flow.TransactionBody]
 }
 
 var _ storage.Transactions = (*Transactions)(nil)
@@ -34,8 +33,7 @@ func NewTransactions(cacheMetrics module.CacheMetrics, db storage.DB) *Transacti
 	}
 
 	t := &Transactions{
-		db:      db,
-		readers: []storage.Reader{db.Reader()},
+		db: db,
 		cache: newCache(cacheMetrics, metrics.ResourceTransaction,
 			withLimit[flow.Identifier, *flow.TransactionBody](flow.DefaultTransactionExpiry+100),
 			withStore(store),
@@ -45,10 +43,6 @@ func NewTransactions(cacheMetrics module.CacheMetrics, db storage.DB) *Transacti
 	}
 
 	return t
-}
-
-func (t *Transactions) AddReader(reader storage.Reader) {
-	t.readers = append(t.readers, reader)
 }
 
 func (t *Transactions) Store(flowTx *flow.TransactionBody) error {
@@ -62,14 +56,10 @@ func (t *Transactions) storeTx(rw storage.ReaderBatchWriter, flowTx *flow.Transa
 }
 
 func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
-	return t.cache.Get(t.reader(), txID)
+	return t.cache.Get(t.db.Reader(), txID)
 }
 
 // RemoveBatch removes a transaction by fingerprint.
 func (t *Transactions) RemoveBatch(rw storage.ReaderBatchWriter, txID flow.Identifier) error {
 	return t.cache.RemoveTx(rw, txID)
-}
-
-func (t *Transactions) reader() storage.Reader {
-	return operation.NewMultiReader(t.readers...)
 }

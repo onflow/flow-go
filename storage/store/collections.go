@@ -14,7 +14,6 @@ import (
 
 type Collections struct {
 	db           storage.DB
-	readers      []storage.Reader
 	transactions *Transactions
 	indexingByTx sync.Mutex
 }
@@ -25,7 +24,6 @@ func NewCollections(db storage.DB, transactions *Transactions) *Collections {
 
 	c := &Collections{
 		db:           db,
-		readers:      []storage.Reader{db.Reader()},
 		transactions: transactions,
 		indexingByTx: sync.Mutex{},
 	}
@@ -40,10 +38,6 @@ func (c *Collections) StoreLight(collection *flow.LightCollection) error {
 		}
 		return nil
 	})
-}
-
-func (c *Collections) AddReader(reader storage.Reader) {
-	c.readers = append(c.readers, reader)
 }
 
 // Store stores a collection in the database.
@@ -74,7 +68,7 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 		collection flow.Collection
 	)
 
-	err := operation.RetrieveCollection(c.reader(), colID, &light)
+	err := operation.RetrieveCollection(c.db.Reader(), colID, &light)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve collection: %w", err)
 	}
@@ -95,7 +89,7 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, error) {
 	var collection flow.LightCollection
 
-	err := operation.RetrieveCollection(c.reader(), colID, &collection)
+	err := operation.RetrieveCollection(c.db.Reader(), colID, &collection)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve collection: %w", err)
 	}
@@ -198,20 +192,16 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 // LightByTransactionID retrieves a light collection by a transaction ID.
 func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCollection, error) {
 	collID := &flow.Identifier{}
-	err := operation.LookupCollectionByTransaction(c.reader(), txID, collID)
+	err := operation.LookupCollectionByTransaction(c.db.Reader(), txID, collID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve collection id: %w", err)
 	}
 
 	var collection flow.LightCollection
-	err = operation.RetrieveCollection(c.reader(), *collID, &collection)
+	err = operation.RetrieveCollection(c.db.Reader(), *collID, &collection)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve collection: %w", err)
 	}
 
 	return &collection, nil
-}
-
-func (c *Collections) reader() storage.Reader {
-	return operation.NewMultiReader(c.readers...)
 }
