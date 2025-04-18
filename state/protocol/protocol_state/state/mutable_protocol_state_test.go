@@ -403,7 +403,7 @@ func (s *StateMutatorSuite) Test_InvalidParent() {
 	_, dbUpdates, err := s.mutableState.EvolveState(unknownParent, s.candidate.View, []*flow.Seal{})
 	require.Error(s.T(), err)
 	require.False(s.T(), protocol.IsInvalidServiceEventError(err))
-	require.True(s.T(), len(dbUpdates) == 0)
+	require.False(s.T(), len(dbUpdates) == 0)
 }
 
 // Test_ReplicateFails verifies that errors during the parent state replication are escalated to the caller.
@@ -422,7 +422,7 @@ func (s *StateMutatorSuite) Test_ReplicateFails() {
 
 	_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 	require.ErrorIs(s.T(), err, exception)
-	require.True(s.T(), len(dbUpdates) == 0)
+	require.False(s.T(), len(dbUpdates) == 0)
 }
 
 // Test_StateMachineFactoryFails verifies that errors received while creating the sub-state machines are escalated to the caller.
@@ -448,7 +448,7 @@ func (s *StateMutatorSuite) Test_StateMachineFactoryFails() {
 		s.kvStateMachineFactories[0], s.kvStateMachineFactories[1] = workingFactory, failingFactory //nolint:govet
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
-		require.True(s.T(), len(dbUpdates) == 0)
+		require.False(s.T(), len(dbUpdates) == 0)
 	})
 
 	failingFactory.On("Create", s.candidate.View, s.candidate.ParentID, &s.parentState, &s.evolvingState).Return(nil, exception).Once()
@@ -456,7 +456,7 @@ func (s *StateMutatorSuite) Test_StateMachineFactoryFails() {
 		s.kvStateMachineFactories[0], s.kvStateMachineFactories[1] = failingFactory, workingFactory //nolint:govet
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
-		require.True(s.T(), len(dbUpdates) == 0)
+		require.False(s.T(), len(dbUpdates) == 0)
 	})
 }
 
@@ -486,7 +486,7 @@ func (s *StateMutatorSuite) Test_StateMachineProcessingServiceEventsFails() {
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
-		require.True(s.T(), len(dbUpdates) == 0)
+		require.False(s.T(), len(dbUpdates) == 0)
 	})
 
 	failingStateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(exception).Once()
@@ -495,7 +495,7 @@ func (s *StateMutatorSuite) Test_StateMachineProcessingServiceEventsFails() {
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
-		require.True(s.T(), len(dbUpdates) == 0)
+		require.False(s.T(), len(dbUpdates) == 0)
 	})
 }
 
@@ -517,7 +517,7 @@ func (s *StateMutatorSuite) Test_StateMachineBuildFails() {
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
-		require.True(s.T(), len(dbUpdates) == 0)
+		require.False(s.T(), len(dbUpdates) == 0)
 	})
 
 	failingStateMachine.On("Build").Return(nil, exception).Once()
@@ -526,7 +526,7 @@ func (s *StateMutatorSuite) Test_StateMachineBuildFails() {
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
-		require.True(s.T(), len(dbUpdates) == 0)
+		require.False(s.T(), len(dbUpdates) == 0)
 	})
 }
 
