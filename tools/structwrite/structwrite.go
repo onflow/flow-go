@@ -26,6 +26,39 @@ type Settings struct {
 }
 
 // PluginStructWrite implements the LinterPlugin interface for the structwrite linter.
+// This linter prevents mutations and non-empty construction of struct types marked as immutable.
+// A struct type is marked as immutable by adding a directive comment of the form: `//structwrite: .*`.
+// The directive comment must appear in the godoc for the type being marked immutable.
+//
+// See handleAssignStmt and handleCompositeLit in this file for examples of what operations are allowed.
+// See also the Go files under ./testdata, which represent the test cases for the linter.
+//
+// This linter does not guarantee that structs marked immutable cannot be mutated, but it does
+// warn for the majority of possible mutation situations. Below are a list of scenarios which will
+// mutate a mutation-protected struct without the linter noticing:
+//
+//  1. Reflection (for example passing a pointer to a struct type into json.Unmarshal)
+//
+//  2. Use of unsafe.Pointer
+//
+//  3. Re-assignment after reference escape.
+//
+// Example of (3.):
+//
+//	type Y struct {
+//	  B int
+//	}
+//	func NewY(b int) Y { return Y{B: b} }
+//	type X struct {
+//	  Y *Y
+//	}
+//	func NewX(y *Y) X { return X{Y:y} }
+//
+//	y := NewY(1)
+//	x := NewX(&y)
+//	// x.Y.B == 1
+//	y = NewY(2)
+//	// x.Y.B == 2: x has been mutated due to the shared reference
 type PluginStructWrite struct {
 	structs map[string]bool
 }
@@ -101,6 +134,7 @@ func (p *PluginStructWrite) run(pass *analysis.Pass) (interface{}, error) {
 //	C.FieldA = 1     // not allowed
 func (p *PluginStructWrite) handleAssignStmt(assign *ast.AssignStmt, pass *analysis.Pass, file *ast.File) {
 	for i, lhs := range assign.Lhs {
+		// we are only concerned about assignments
 		selExpr, ok := lhs.(*ast.SelectorExpr)
 		if !ok {
 			continue
