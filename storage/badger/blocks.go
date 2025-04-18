@@ -86,17 +86,22 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 // ByCollectionID ...
 func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	var blockID flow.Identifier
-	err := b.db.View(operation.LookupCollectionBlock(collID, &blockID))
+	guarantee, err := b.payloads.guarantees.ByCollectionID(collID)
+	if err != nil {
+		return nil, fmt.Errorf("could not look up guarantee: %w", err)
+	}
+
+	err = b.db.View(operation.LookupCollectionGuaranteeBlock(guarantee.ID(), &blockID))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up block: %w", err)
 	}
 	return b.ByID(blockID)
 }
 
-// IndexBlockForCollections ...
-func (b *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error {
+// IndexBlockForCollectionGuarantees ...
+func (b *Blocks) IndexBlockForCollectionGuarantees(blockID flow.Identifier, collIDs []flow.Identifier) error {
 	for _, collID := range collIDs {
-		err := operation.RetryOnConflict(b.db.Update, operation.SkipDuplicates(operation.IndexCollectionBlock(collID, blockID)))
+		err := operation.RetryOnConflict(b.db.Update, operation.SkipDuplicates(operation.IndexCollectionGuaranteeBlock(collID, blockID)))
 		if err != nil {
 			return fmt.Errorf("could not index collection block (%x): %w", collID, err)
 		}

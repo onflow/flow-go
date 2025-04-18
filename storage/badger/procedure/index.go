@@ -11,7 +11,7 @@ import (
 
 func InsertIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.Txn) error {
 	return func(tx *badger.Txn) error {
-		err := operation.IndexPayloadGuarantees(blockID, index.CollectionIDs)(tx)
+		err := operation.IndexPayloadGuarantees(blockID, index.GuaranteeIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store guarantee index: %w", err)
 		}
@@ -37,8 +37,8 @@ func InsertIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.Txn
 
 func RetrieveIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.Txn) error {
 	return func(tx *badger.Txn) error {
-		var collIDs []flow.Identifier
-		err := operation.LookupPayloadGuarantees(blockID, &collIDs)(tx)
+		var guaranteeIDs []flow.Identifier
+		err := operation.LookupPayloadGuarantees(blockID, &guaranteeIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve guarantee index: %w", err)
 		}
@@ -64,7 +64,7 @@ func RetrieveIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.T
 		}
 
 		*index = flow.Index{
-			CollectionIDs:   collIDs,
+			GuaranteeIDs:    guaranteeIDs,
 			SealIDs:         sealIDs,
 			ReceiptIDs:      receiptIDs,
 			ResultIDs:       resultsIDs,

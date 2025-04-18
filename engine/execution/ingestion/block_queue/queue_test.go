@@ -11,17 +11,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestMissingCollectionID_Malleability confirms that the MissingCollection struct, which implements
-// the [flow.IDEntity] interface, is resistant to tampering.
-// TODO: Uncomment this test after CollectionGuarantee ID() will be fixed https://github.com/onflow/flow-go/issues/6722 cause as for now it's malleable.
-//func TestMissingCollectionID_Malleability(t *testing.T) {
-//	unittest.RequireEntityNonMalleable(t, &MissingCollection{
-//		BlockID:   unittest.IdentifierFixture(),
-//		Height:    rand.Uint64(),
-//		Guarantee: unittest.CollectionGuaranteeFixture(),
-//	})
-//}
-
 func TestSingleBlockBecomeReady(t *testing.T) {
 	t.Parallel()
 	// Given a chain

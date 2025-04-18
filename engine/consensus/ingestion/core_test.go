@@ -165,14 +165,14 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeNewFromCollection() {
 
 	// the guarantee is not part of the memory pool yet
 	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee.CollectionID, guarantee).Return(true)
+	suite.pool.On("Add", guarantee.ID(), guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a collection node
 	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error on new guarantee from collection node")
 
 	// check that the guarantee has been added to the mempool
-	suite.pool.AssertCalled(suite.T(), "Add", guarantee.CollectionID, guarantee)
+	suite.pool.AssertCalled(suite.T(), "Add", guarantee.ID(), guarantee)
 
 }
 
@@ -199,14 +199,14 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeNotAdded() {
 
 	// the guarantee is not already part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee.CollectionID, guarantee).Return(false)
+	suite.pool.On("Add", guarantee.ID(), guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a collection node
 	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error when guarantee was already added")
 
 	// check that the guarantee has been added to the mempool
-	suite.pool.AssertCalled(suite.T(), "Add", guarantee.CollectionID, guarantee)
+	suite.pool.AssertCalled(suite.T(), "Add", guarantee.ID(), guarantee)
 
 }
 
@@ -309,7 +309,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeEpochEnd() {
 
 	// the guarantee is not part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee.CollectionID, guarantee).Return(true).Once()
+	suite.pool.On("Add", guarantee.ID(), guarantee).Return(true).Once()
 
 	// submit the guarantee as if it was sent by the collection node which
 	// is leaving at the current epoch boundary
@@ -326,14 +326,14 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeUnknownOrigin() {
 
 	// the guarantee is not part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee.CollectionID, guarantee).Return(true)
+	suite.pool.On("Add", guarantee.ID(), guarantee).Return(true)
 
 	// submit the guarantee with an unknown origin
 	err := suite.core.OnGuarantee(unittest.IdentifierFixture(), guarantee)
 	suite.Assert().Error(err)
 	suite.Assert().True(engine.IsInvalidInputError(err))
 
-	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee.CollectionID, guarantee)
+	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee.ID(), guarantee)
 
 }
 

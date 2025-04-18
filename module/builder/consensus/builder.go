@@ -308,8 +308,8 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 			return fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 		}
 
-		for _, collID := range index.CollectionIDs {
-			receiptLookup[collID] = struct{}{}
+		for _, guaranteeID := range index.GuaranteeIDs {
+			receiptLookup[guaranteeID] = struct{}{}
 		}
 
 		return nil
@@ -321,7 +321,7 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 
 	// go through mempool and collect valid collections
 	var guarantees []*flow.CollectionGuarantee
-	for collID, guarantee := range b.guarPool.All() {
+	for _, guarantee := range b.guarPool.All() {
 		// add at most <maxGuaranteeCount> number of collection guarantees in a new block proposal
 		// in order to prevent the block payload from being too big or computationally heavy for the
 		// execution nodes
@@ -330,7 +330,7 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 		}
 
 		// skip collections that are already included in a block on the fork
-		_, duplicated := receiptLookup[collID]
+		_, duplicated := receiptLookup[guarantee.ID()]
 		if duplicated {
 			continue
 		}

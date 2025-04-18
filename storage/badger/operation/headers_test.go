@@ -42,13 +42,13 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		headerID := unittest.IdentifierFixture()
-		collectionID := unittest.IdentifierFixture()
+		collectionGuaranteeID := unittest.IdentifierFixture()
 
-		err := db.Update(IndexCollectionBlock(collectionID, headerID))
+		err := db.Update(IndexCollectionGuaranteeBlock(collectionGuaranteeID, headerID))
 		require.NoError(t, err)
 
 		actualID := &flow.Identifier{}
-		err = db.View(LookupCollectionBlock(collectionID, actualID))
+		err = db.View(LookupCollectionGuaranteeBlock(collectionGuaranteeID, actualID))
 		require.NoError(t, err)
 		assert.Equal(t, headerID, *actualID)
 	})

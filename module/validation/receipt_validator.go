@@ -146,7 +146,7 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 		}
 		return irrecoverable.NewExceptionf("unexpected failure retrieving index for executed block %v: %w", result.BlockID, err)
 	}
-	requiredChunks := 1 + len(index.CollectionIDs) // one chunk per collection + 1 system chunk
+	requiredChunks := 1 + len(index.GuaranteeIDs) // one chunk per collection + 1 system chunk
 	if result.Chunks.Len() != requiredChunks {
 		return engine.NewInvalidInputErrorf("invalid number of chunks, expected %d got %d", requiredChunks, result.Chunks.Len())
 	}

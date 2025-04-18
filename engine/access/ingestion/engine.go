@@ -441,7 +441,7 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 	// TODO: substitute an indexer module as layer between engine and storage
 
 	// index the block storage with each of the collection guarantee
-	err := e.blocks.IndexBlockForCollections(block.Header.ID(), flow.GetIDs(block.Payload.Guarantees))
+	err := e.blocks.IndexBlockForCollectionGuarantees(block.Header.ID(), flow.GetIDs(block.Payload.Guarantees))
 	if err != nil {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}
@@ -743,8 +743,8 @@ func (e *Engine) requestCollectionsInFinalizedBlock(missingColls []*flow.Collect
 		guarantors, err := protocol.FindGuarantors(e.state, cg)
 		if err != nil {
 			// failed to find guarantors for guarantees contained in a finalized block is fatal error
-			e.log.Fatal().Err(err).Msgf("could not find guarantors for guarantee %v", cg.ID())
+			e.log.Fatal().Err(err).Msgf("could not find guarantors for collection %v", cg.CollectionID)
 		}
-		e.request.EntityByID(cg.ID(), filter.HasNodeID[flow.Identity](guarantors...))
+		e.request.EntityByID(cg.CollectionID, filter.HasNodeID[flow.Identity](guarantors...))
 	}
 }
