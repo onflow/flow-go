@@ -25,13 +25,17 @@ func NewRegisters(blockHeight uint64) *Registers {
 }
 
 // Get returns a register by the register ID at a storage's block height.
-// The provided argument 'height' is ignored.
 //
 // Expected errors:
-// - storage.ErrNotFound if the register does not exist.
-func (r *Registers) Get(registerID flow.RegisterID, _ uint64) (flow.RegisterValue, error) {
+// - storage.ErrNotFound if the register does not exist in this storage object or
+// this storage does not include registers for the given height.
+func (r *Registers) Get(registerID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
+
+	if r.blockHeight != height {
+		return flow.RegisterValue{}, storage.ErrNotFound
+	}
 
 	if reg, ok := r.store[registerID]; ok {
 		return reg, nil
@@ -51,12 +55,16 @@ func (r *Registers) FirstHeight() uint64 {
 }
 
 // Store stores a batch of register entries at the storage's block height.
-// The provided argument 'height' is ignored.
 //
-// No errors are expected during normal operation.
-func (r *Registers) Store(registers flow.RegisterEntries, _ uint64) error {
+// Expected errors:
+// - storage.ErrHeightNotIndexed if the given height does not match the storage's block height.
+func (r *Registers) Store(registers flow.RegisterEntries, height uint64) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
+
+	if r.blockHeight != height {
+		return storage.ErrHeightNotIndexed
+	}
 
 	for _, reg := range registers {
 		r.store[reg.Key] = reg.Value

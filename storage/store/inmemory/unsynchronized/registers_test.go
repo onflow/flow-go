@@ -39,6 +39,14 @@ func TestRegisters_HappyPath(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, entry2.Value, got2)
 
+	// Try retrieving at the wrong height
+	_, err = registers.Get(entry1.Key, height+1)
+	require.ErrorIs(t, err, storage.ErrNotFound)
+
+	// Try storing at the wrong height
+	err = registers.Store(entries, height+1)
+	require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
+
 	// Try getting a non-existent key
 	_, err = registers.Get(unittest.RegisterIDFixture(), height)
 	require.ErrorIs(t, err, storage.ErrNotFound)
