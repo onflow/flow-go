@@ -27,6 +27,13 @@ type Settings struct {
 
 // PluginStructWrite implements the LinterPlugin interface for the structwrite linter.
 // This linter prevents mutations and non-empty construction of struct types marked as immutable.
+// Mutation and construction of these types are only allowed in constructor functions.
+// Re-assignment of a variable with a type marked immutable is allowed.
+//
+//	x := NewImmutableType(1)
+//	x.SomeField = 2         // not allowed
+//	x = NewImmutableType(2) // allowed
+//
 // A struct type is marked as immutable by adding a directive comment of the form: `//structwrite: .*`.
 // The directive comment must appear in the godoc for the type being marked immutable.
 //
