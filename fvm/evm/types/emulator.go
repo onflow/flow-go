@@ -50,6 +50,9 @@ type BlockContext struct {
 
 	// a set of extra precompiled contracts to be injected
 	ExtraPrecompiledContracts []PrecompiledContract
+
+	// flags denoting whether certain forks are enabled or not
+	IsPrague bool
 }
 
 // NewDefaultBlockContext returns a new default block context
@@ -62,6 +65,7 @@ func NewDefaultBlockContext(BlockNumber uint64) BlockContext {
 		GetHashFunc: func(n uint64) gethCommon.Hash { // default returns some random hash values
 			return gethCommon.BytesToHash(gethCrypto.Keccak256([]byte(new(big.Int).SetUint64(n).String())))
 		},
+		IsPrague: true,
 	}
 }
 

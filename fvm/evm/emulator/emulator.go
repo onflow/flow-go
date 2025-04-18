@@ -66,8 +66,13 @@ func (em *Emulator) NewReadOnlyBlockView(ctx types.BlockContext) (types.ReadOnly
 
 // NewBlockView constructs a new block view (mutable)
 func (em *Emulator) NewBlockView(ctx types.BlockContext) (types.BlockView, error) {
+	cfg := newConfig(ctx)
+	if !ctx.IsPrague {
+		cfg.ChainConfig.PragueTime = nil
+	}
+
 	return &BlockView{
-		config:   newConfig(ctx),
+		config:   cfg,
 		rootAddr: em.rootAddr,
 		ledger:   em.ledger,
 	}, nil
@@ -304,8 +309,9 @@ func (bl *BlockView) DryRunTransaction(
 
 	// use the from as the signer
 	msg.From = from
-	// we need to skip nonce check for dry run
-	msg.SkipAccountChecks = true
+	// we need to skip nonce/eoa check for dry run
+	msg.SkipNonceChecks = true
+	msg.SkipFromEOACheck = true
 
 	// run and return without committing the state changes
 	return proc.run(msg, tx.Hash(), tx.Type())
@@ -317,16 +323,18 @@ func (bl *BlockView) newProcedure() (*procedure, error) {
 		return nil, err
 	}
 	cfg := bl.config
+	evm := gethVM.NewEVM(
+		*cfg.BlockContext,
+		execState,
+		cfg.ChainConfig,
+		cfg.EVMConfig,
+	)
+	evm.SetTxContext(*cfg.TxContext)
+
 	return &procedure{
 		config: cfg,
-		evm: gethVM.NewEVM(
-			*cfg.BlockContext,
-			*cfg.TxContext,
-			execState,
-			cfg.ChainConfig,
-			cfg.EVMConfig,
-		),
-		state: execState,
+		evm:    evm,
+		state:  execState,
 	}, nil
 }
 
@@ -338,6 +346,9 @@ type procedure struct {
 
 // commit commits the changes to the state (with optional finalization)
 func (proc *procedure) commit(finalize bool) (hash.Hash, error) {
+	// Calling `StateDB.Finalise(true)` is currently a no-op, but
+	// we add it here to be more in line with how its envisioned.
+	proc.state.Finalise(true)
 	stateUpdateCommitment, err := proc.state.Commit(finalize)
 	if err != nil {
 		// if known types (state errors) don't do anything and return
@@ -511,11 +522,15 @@ func (proc *procedure) deployAt(
 		proc.state.CreateAccount(callerCommon)
 	}
 	// increment the nonce for the caller
-	proc.state.SetNonce(callerCommon, proc.state.GetNonce(callerCommon)+1)
+	proc.state.SetNonce(
+		callerCommon,
+		proc.state.GetNonce(callerCommon)+1,
+		gethTracing.NonceChangeContractCreator,
+	)
 
 	// setup account
 	proc.state.CreateAccount(addr)
-	proc.state.SetNonce(addr, 1) // (EIP-158)
+	proc.state.SetNonce(addr, 1, gethTracing.NonceChangeNewContract) // (EIP-158)
 	if call.Value.Sign() > 0 {
 		proc.evm.Context.Transfer( // transfer value
 			proc.state,
@@ -530,12 +545,14 @@ func (proc *procedure) deployAt(
 	var err error
 	inter := gethVM.NewEVMInterpreter(proc.evm)
 	contract := gethVM.NewContract(
-		gethVM.AccountRef(callerCommon),
-		gethVM.AccountRef(addr),
+		callerCommon,
+		addr,
 		castedValue,
-		call.GasLimit)
+		call.GasLimit,
+		nil,
+	)
 
-	contract.SetCallCode(&addr, gethCrypto.Keccak256Hash(call.Data), call.Data)
+	contract.SetCallCode(gethCrypto.Keccak256Hash(call.Data), call.Data)
 	// update access list (Berlin)
 	proc.state.AddAddressToAccessList(addr)
 
@@ -639,11 +656,11 @@ func (proc *procedure) run(
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
 
 	// transit the state
-	execResult, err := gethCore.NewStateTransition(
+	execResult, err := gethCore.ApplyMessage(
 		proc.evm,
 		msg,
 		gasPool,
-	).TransitionDb()
+	)
 	if err != nil {
 		// if the error is a fatal error or a non-fatal state error or a backend err return it
 		// this condition should never happen given all StateDB errors are withheld for the commit time.

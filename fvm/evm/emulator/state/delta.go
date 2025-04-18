@@ -387,18 +387,23 @@ func (d *DeltaView) GetState(sk types.SlotAddress) (gethCommon.Hash, error) {
 	return d.parent.GetState(sk)
 }
 
-// SetState adds sets a value for the given slot of the main storage
-func (d *DeltaView) SetState(sk types.SlotAddress, value gethCommon.Hash) error {
+// SetState sets or adds a value for the given slot of the main storage.
+// It returns the previous value in any case.
+func (d *DeltaView) SetState(
+	sk types.SlotAddress,
+	value gethCommon.Hash,
+) (gethCommon.Hash, error) {
 	lastValue, err := d.GetState(sk)
 	if err != nil {
-		return err
+		return gethCommon.Hash{}, err
 	}
 	// if the value hasn't changed, skip
 	if value == lastValue {
-		return nil
+		return lastValue, nil
 	}
 	d.slots[sk] = value
-	return nil
+
+	return lastValue, nil
 }
 
 // GetStorageRoot returns some sort of storage root for the given address

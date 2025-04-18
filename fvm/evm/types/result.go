@@ -237,7 +237,7 @@ func (res *Result) Receipt() *gethTypes.Receipt {
 		receipt.Status = gethTypes.ReceiptStatusSuccessful
 	}
 
-	receipt.Bloom = gethTypes.CreateBloom(gethTypes.Receipts{receipt})
+	receipt.Bloom = gethTypes.CreateBloom(receipt)
 	return receipt
 }
 
@@ -350,6 +350,6 @@ func (lr *LightReceipt) ToReceipt() *gethTypes.Receipt {
 		}
 	}
 
-	receipt.Bloom = gethTypes.CreateBloom(gethTypes.Receipts{receipt})
+	receipt.Bloom = gethTypes.CreateBloom(receipt)
 	return receipt
 }

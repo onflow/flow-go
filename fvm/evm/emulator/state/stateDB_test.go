@@ -7,7 +7,7 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
 	gethCommon "github.com/onflow/go-ethereum/common"
-	"github.com/onflow/go-ethereum/core/tracing"
+	gethTracing "github.com/onflow/go-ethereum/core/tracing"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethParams "github.com/onflow/go-ethereum/params"
 	"github.com/stretchr/testify/require"
@@ -39,7 +39,7 @@ func TestStateDB(t *testing.T) {
 		require.True(t, db.Empty(addr1))
 		require.NoError(t, db.Error())
 
-		db.AddBalance(addr1, uint256.NewInt(10), tracing.BalanceChangeUnspecified)
+		db.AddBalance(addr1, uint256.NewInt(10), gethTracing.BalanceChangeUnspecified)
 		require.NoError(t, db.Error())
 
 		require.False(t, db.Empty(addr1))
@@ -73,7 +73,7 @@ func TestStateDB(t *testing.T) {
 		db.CreateAccount(addr1)
 		require.NoError(t, db.Error())
 
-		db.AddBalance(addr1, uint256.NewInt(5), tracing.BalanceChangeUnspecified)
+		db.AddBalance(addr1, uint256.NewInt(5), gethTracing.BalanceChangeUnspecified)
 		require.NoError(t, db.Error())
 
 		// should have code to be able to set state
@@ -126,7 +126,7 @@ func TestStateDB(t *testing.T) {
 		require.True(t, db.Exist(addr1))
 		require.NoError(t, db.Error())
 
-		db.AddBalance(addr1, uint256.NewInt(5), tracing.BalanceChangeUnspecified)
+		db.AddBalance(addr1, uint256.NewInt(5), gethTracing.BalanceChangeUnspecified)
 		require.NoError(t, db.Error())
 
 		bal := db.GetBalance(addr1)
@@ -136,7 +136,7 @@ func TestStateDB(t *testing.T) {
 		snapshot2 := db.Snapshot()
 		require.Equal(t, 2, snapshot2)
 
-		db.AddBalance(addr1, uint256.NewInt(5), tracing.BalanceChangeUnspecified)
+		db.AddBalance(addr1, uint256.NewInt(5), gethTracing.BalanceChangeUnspecified)
 		require.NoError(t, db.Error())
 
 		bal = db.GetBalance(addr1)
@@ -331,7 +331,7 @@ func TestStateDB(t *testing.T) {
 		require.NoError(t, db.Error())
 		require.Equal(t, gethTypes.EmptyRootHash, root)
 
-		db.AddBalance(addr1, uint256.NewInt(100), tracing.BalanceChangeTouchAccount)
+		db.AddBalance(addr1, uint256.NewInt(100), gethTracing.BalanceChangeTouchAccount)
 		require.NoError(t, db.Error())
 		commit, err = db.Commit(true)
 		require.NoError(t, err)
@@ -370,7 +370,7 @@ func TestStateDB(t *testing.T) {
 		code1 := []byte("some code")
 		db.CreateAccount(addr1)
 		db.SetCode(addr1, code1)
-		db.AddBalance(addr1, balance1, tracing.BalanceChangeTransfer)
+		db.AddBalance(addr1, balance1, gethTracing.BalanceChangeTransfer)
 		require.NoError(t, db.Error())
 		commit, err := db.Commit(true)
 		require.NoError(t, err)
@@ -379,7 +379,7 @@ func TestStateDB(t *testing.T) {
 		db, err = state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)
 		// call self destruct
-		db.Selfdestruct6780(addr1)
+		db.SelfDestruct6780(addr1)
 		require.NoError(t, db.Error())
 		// noop is expected
 		require.Equal(t, balance1, db.GetBalance(addr1))
@@ -391,7 +391,7 @@ func TestStateDB(t *testing.T) {
 		addr2 := testutils.RandomCommonAddress(t)
 		balance2 := uint256.NewInt(200)
 		db.CreateAccount(addr2)
-		db.AddBalance(addr2, balance2, tracing.BalanceChangeTransfer)
+		db.AddBalance(addr2, balance2, gethTracing.BalanceChangeTransfer)
 		require.NoError(t, db.Error())
 		// commit and renew db
 		commit, err = db.Commit(true)
@@ -400,7 +400,7 @@ func TestStateDB(t *testing.T) {
 		db, err = state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)
 		// call self destruct should not work
-		db.Selfdestruct6780(addr2)
+		db.SelfDestruct6780(addr2)
 		require.NoError(t, db.Error())
 		// still no impact
 		require.Equal(t, balance2, db.GetBalance(addr2))
@@ -417,7 +417,7 @@ func TestStateDB(t *testing.T) {
 		db.CreateContract(addr2)
 		require.Equal(t, code1, db.GetCode(addr2))
 		// now calling selfdestruct should do the job
-		db.Selfdestruct6780(addr2)
+		db.SelfDestruct6780(addr2)
 		require.NoError(t, db.Error())
 		commit, err = db.Commit(true)
 		require.NoError(t, err)
@@ -441,10 +441,10 @@ func TestStateDB(t *testing.T) {
 		db.CreateContract(addr3)
 		db.SetCode(addr3, code1)
 		db.SetState(addr3, key, value)
-		db.AddBalance(addr3, balance3, tracing.BalanceChangeTransfer)
+		db.AddBalance(addr3, balance3, gethTracing.BalanceChangeTransfer)
 		require.NoError(t, db.Error())
 		// call self destruct
-		db.Selfdestruct6780(addr3)
+		db.SelfDestruct6780(addr3)
 		require.NoError(t, db.Error())
 		// commit changes
 		commit, err = db.Commit(true)
