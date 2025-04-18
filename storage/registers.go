@@ -4,8 +4,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// RegisterIndex defines methods for the register index.
-type RegisterIndex interface {
+// RegisterIndexReader defines readonly methods for the register index.
+type RegisterIndexReader interface {
 	// Get register by the register ID at a given block height.
 	//
 	// If the register at the given height was not indexed, returns the highest
@@ -20,6 +20,11 @@ type RegisterIndex interface {
 
 	// FirstHeight at which we started to index. Returns the first indexed height found in the store.
 	FirstHeight() uint64
+}
+
+// RegisterIndex defines methods for the register index.
+type RegisterIndex interface {
+	RegisterIndexReader
 
 	// Store batch of register entries at the provided block height.
 	//
