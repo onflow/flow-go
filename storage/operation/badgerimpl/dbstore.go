@@ -27,7 +27,3 @@ func (b *dbStore) WithReaderBatchWriter(fn func(storage.ReaderBatchWriter) error
 func (b *dbStore) NewBatch() storage.Batch {
 	return NewReaderBatchWriter(b.db)
 }
-
-func (b *dbStore) ID() storage.DBID {
-	return storage.BadgerDBID
-}
