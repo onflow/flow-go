@@ -169,7 +169,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			var ok bool
 			var err error
 
-			if dbops.IsBadgerTransaction(node.dbops) {
+			if dbops.IsBadgerTransaction(node.DBOps) {
 				queue := badger.NewChunkQueue(node.DB)
 				ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
 				if err != nil {
@@ -178,7 +178,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 				chunkQueue = queue
 				node.Logger.Info().Msgf("chunks queue index has been initialized with badger db transaction updates")
-			} else if dbops.IsBatchUpdate(node.dbops) {
+			} else if dbops.IsBatchUpdate(node.DBOps) {
 				queue := store.NewChunkQueue(node.Metrics.Cache, node.ProtocolDB)
 				ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
 				if err != nil {
@@ -188,7 +188,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				chunkQueue = queue
 				node.Logger.Info().Msgf("chunks queue index has been initialized with protocol db batch updates")
 			} else {
-				return fmt.Errorf(dbops.UsageErrMsg, v.dbops)
+				return fmt.Errorf(dbops.UsageErrMsg, v.DBOps)
 			}
 
 			node.Logger.Info().
@@ -225,12 +225,12 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
 
 			var approvalStorage storage.ResultApprovals
-			if dbops.IsBadgerTransaction(v.dbops) {
+			if dbops.IsBadgerTransaction(v.DBOps) {
 				approvalStorage = badger.NewResultApprovals(node.Metrics.Cache, node.DB)
-			} else if dbops.IsBatchUpdate(v.dbops) {
+			} else if dbops.IsBatchUpdate(v.DBOps) {
 				approvalStorage = store.NewResultApprovals(node.Metrics.Cache, node.ProtocolDB)
 			} else {
-				return nil, fmt.Errorf("invalid db opts type: %v", v.dbops)
+				return nil, fmt.Errorf("invalid db opts type: %v", v.DBOps)
 			}
 
 			verifierEng, err = verifier.New(
