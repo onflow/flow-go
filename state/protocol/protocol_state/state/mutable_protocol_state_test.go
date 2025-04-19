@@ -36,6 +36,7 @@ type StateMutatorSuite struct {
 	globalParams            psmock.GlobalParams
 	kvStateMachines         []*protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader]
 	kvStateMachineFactories []*protocol_statemock.KeyValueStoreStateMachineFactory
+	kvErrors                []error
 
 	// basic setup for happy path test
 	parentState           protocol_statemock.KVStoreAPI // Protocol state of `candidate`s parent block
@@ -74,6 +75,7 @@ func (s *StateMutatorSuite) SetupTest() {
 	// CAUTION: the behaviour of each state machine has to be defined by the tests.
 	s.kvStateMachines = make([]*protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader], 2)
 	s.kvStateMachineFactories = make([]*protocol_statemock.KeyValueStoreStateMachineFactory, len(s.kvStateMachines))
+	s.kvErrors = make([]error, 2)
 	kvStateMachineFactories := make([]protocol_state.KeyValueStoreStateMachineFactory, len(s.kvStateMachines)) // slice of interface-typed pointers to the elements of s.kvStateMachineFactories
 	for i := range s.kvStateMachines {
 		func(i int) {
@@ -88,7 +90,7 @@ func (s *StateMutatorSuite) SetupTest() {
 					parentState protocol.KVStoreReader,
 					targetState protocol_state.KVStoreMutator,
 				) (protocol_state.OrthogonalStoreStateMachine[protocol.KVStoreReader], error) {
-					return s.kvStateMachines[i], nil
+					return s.kvStateMachines[i], s.kvErrors[i]
 				}).Maybe()
 			kvStateMachineFactories[i] = s.kvStateMachineFactories[i]
 		}(i)
@@ -448,24 +450,20 @@ func (s *StateMutatorSuite) Test_ReplicateFails() {
 //
 // This test also verifies that the `MutableProtocolState` does not engage in step (ii) or (iii) before the completing step (i) on all state machines.
 func (s *StateMutatorSuite) Test_StateMachineFactoryFails() {
-	workingFactory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 	stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T()) // we expect no methods to be called on this state machine
-	workingFactory.On("Create", s.candidate.View, s.candidate.ParentID, &s.parentState, &s.evolvingState).Return(stateMachine, nil).Maybe()
-
 	exception := errors.New("exception")
-	failingFactory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
-	failingFactory.On("Create", s.candidate.View, s.candidate.ParentID, &s.parentState, &s.evolvingState).Return(nil, exception).Once()
 
 	s.Run("failing factory is last", func() {
-		s.kvStateMachineFactories[0], s.kvStateMachineFactories[1] = workingFactory, failingFactory //nolint:govet
+		s.kvStateMachines[0], s.kvErrors[0] = stateMachine, nil
+		s.kvStateMachines[1], s.kvErrors[1] = nil, exception
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.True(s.T(), len(dbUpdates) == 0)
 	})
 
-	failingFactory.On("Create", s.candidate.View, s.candidate.ParentID, &s.parentState, &s.evolvingState).Return(nil, exception).Once()
 	s.Run("failing factory is first", func() {
-		s.kvStateMachineFactories[0], s.kvStateMachineFactories[1] = failingFactory, workingFactory //nolint:govet
+		s.kvStateMachines[0], s.kvErrors[0] = nil, exception
+		s.kvStateMachines[1], s.kvErrors[1] = stateMachine, nil
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.True(s.T(), len(dbUpdates) == 0)
