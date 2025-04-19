@@ -2,7 +2,6 @@ package state
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -78,9 +77,22 @@ func (s *StateMutatorSuite) SetupTest() {
 	s.kvStateMachineFactories = make([]*protocol_statemock.KeyValueStoreStateMachineFactory, len(s.kvStateMachines))
 	kvStateMachineFactories := make([]protocol_state.KeyValueStoreStateMachineFactory, len(s.kvStateMachines)) // slice of interface-typed pointers to the elements of s.kvStateMachineFactories
 	for i := range s.kvStateMachines {
-		s.kvStateMachineFactories[i] = protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
-		s.kvStateMachineFactories[i].On("Create", s.candidate.View, s.candidate.ParentID, &s.parentState, &s.evolvingState).Return(s.kvStateMachines[i], nil)
-		kvStateMachineFactories[i] = s.kvStateMachineFactories[i]
+		func(i int) {
+			s.kvStateMachineFactories[i] = protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
+			// the create method is mocked with a function which will return the kvStateMachines[i]
+			// and kvStateMachines[i] is nil at this moment, but should be updated in the test case
+			// before `Create` method is called.
+			s.kvStateMachineFactories[i].On("Create", s.candidate.View, s.candidate.ParentID, &s.parentState, &s.evolvingState).
+				Return(func(
+					view uint64,
+					parentID flow.Identifier,
+					parentState protocol.KVStoreReader,
+					targetState protocol_state.KVStoreMutator,
+				) (protocol_state.OrthogonalStoreStateMachine[protocol.KVStoreReader], error) {
+					return s.kvStateMachines[i], nil
+				})
+			kvStateMachineFactories[i] = s.kvStateMachineFactories[i]
+		}(i)
 	}
 
 	s.mutableState = newMutableProtocolState(
@@ -541,13 +553,11 @@ func (s *StateMutatorSuite) Test_EncodeFailed() {
 	modifyState := func(_ mock.Arguments) {
 		s.evolvingState.On("ID").Return(expectedResultingStateID, nil).Once()
 	}
-	fmt.Println("==========")
 	s.kvStateMachines[0] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).DuringEvolveState(modifyState).Mock()
 	s.kvStateMachines[1] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
-	fmt.Println("00000000", s.kvStateMachines[0], s.kvStateMachines[1])
 
 	rw := storagemock.NewReaderBatchWriter(s.T())
-	s.protocolKVStoreDB.On("BatchIndex", mock.Anything, s.candidate.ID(), expectedResultingStateID).Return().Once()
+	s.protocolKVStoreDB.On("BatchIndex", mock.Anything, s.candidate.ID(), expectedResultingStateID).Return(nil).Once()
 	s.protocolKVStoreDB.On("BatchStore", mock.Anything, expectedResultingStateID, &s.evolvingState).Return(exception).Once()
 
 	_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
@@ -555,11 +565,13 @@ func (s *StateMutatorSuite) Test_EncodeFailed() {
 
 	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
-	blockID := s.candidate.ParentID
+	blockID := s.candidate.ID()
 	for _, update := range dbUpdates {
-		require.NoError(s.T(), update(blockID, rw))
+		err := update(blockID, rw)
+		if err != nil {
+			require.ErrorIs(s.T(), err, exception)
+		}
 	}
-	require.ErrorIs(s.T(), err, exception)
 
 	s.protocolKVStoreDB.AssertExpectations(s.T())
 }
