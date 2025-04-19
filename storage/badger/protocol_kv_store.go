@@ -105,6 +105,10 @@ func (s *ProtocolKVStore) StoreTx(stateID flow.Identifier, data *flow.PSKeyValue
 	return s.cache.PutTx(stateID, data)
 }
 
+func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
+	panic("not implemented")
+}
+
 // IndexTx returns an anonymous function intended to be executed as part of a database transaction.
 // In a nutshell, we want to maintain a map from `blockID` to `stateID`, where `blockID` references the
 // block that _proposes_ updated key-value store.
@@ -120,6 +124,10 @@ func (s *ProtocolKVStore) StoreTx(stateID flow.Identifier, data *flow.PSKeyValue
 //   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
 func (s *ProtocolKVStore) IndexTx(blockID flow.Identifier, stateID flow.Identifier) func(*transaction.Tx) error {
 	return s.byBlockIdCache.PutTx(blockID, stateID)
+}
+
+func (s *ProtocolKVStore) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
+	panic("not implemented")
 }
 
 // ByID retrieves the KV store snapshot with the given ID.

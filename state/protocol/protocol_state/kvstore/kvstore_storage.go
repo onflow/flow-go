@@ -49,6 +49,17 @@ func (p *ProtocolKVStore) StoreTx(stateID flow.Identifier, kvStore protocol.KVSt
 	})
 }
 
+func (p *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, kvStore protocol.KVStoreReader) error {
+	version, data, err := kvStore.VersionedEncode()
+	if err != nil {
+		return fmt.Errorf("failed to VersionedEncode protocol state: %w", err)
+	}
+	return p.ProtocolKVStore.BatchStore(rw, stateID, &flow.PSKeyValueStoreData{
+		Version: version,
+		Data:    data,
+	})
+}
+
 // ByID retrieves the KV store snapshot with the given ID.
 // Expected errors during normal operations:
 //   - storage.ErrNotFound if no snapshot with the given Identifier is known.

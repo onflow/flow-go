@@ -291,12 +291,15 @@ func main() {
 				node.Logger,
 				node.Tracer,
 				node.ProtocolEvents,
+				node.DB,
 				state,
 				node.Storage.Index,
 				node.Storage.Payloads,
 				blockTimer,
 				receiptValidator,
 				sealValidator,
+				node.Storage.QuorumCertificates,
+				node.Storage.Blocks,
 			)
 			return err
 		}).
@@ -584,7 +587,7 @@ func main() {
 		Component("hotstuff modules", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block finalizer
 			finalize := finalizer.NewFinalizer(
-				node.DB,
+				node.ProtocolDB,
 				node.Storage.Headers,
 				mutableState,
 				node.Tracer,
@@ -747,6 +750,7 @@ func main() {
 			return ctl, nil
 		}).
 		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// create different epochs setups
 			mutableProtocolState := protocol_state.NewMutableProtocolState(
 				node.Logger,
 				node.Storage.EpochProtocolStateEntries,

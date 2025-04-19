@@ -238,7 +238,7 @@ func CompleteStateFixture(
 
 	state, err := badgerstate.Bootstrap(
 		metric,
-		db,
+		badgerimpl.ToDB(db),
 		s.Headers,
 		s.Seals,
 		s.Results,
@@ -253,16 +253,20 @@ func CompleteStateFixture(
 	)
 	require.NoError(t, err)
 
+	all := storage.InitAll(metric, db)
 	mutableState, err := badgerstate.NewFullConsensusState(
 		log,
 		tracer,
 		consumer,
+		db,
 		state,
 		s.Index,
 		s.Payloads,
 		util.MockBlockTimer(),
 		util.MockReceiptValidator(),
 		util.MockSealValidator(s.Seals),
+		all.QuorumCertificates,
+		all.Blocks,
 	)
 	require.NoError(t, err)
 
@@ -919,7 +923,7 @@ func createFollowerCore(
 	rootHead *flow.Header,
 	rootQC *flow.QuorumCertificate,
 ) (module.HotStuffFollower, *confinalizer.Finalizer) {
-	finalizer := confinalizer.NewFinalizer(node.PublicDB, node.Headers, followerState, trace.NewNoopTracer())
+	finalizer := confinalizer.NewFinalizer(badgerimpl.ToDB(node.PublicDB), node.Headers, followerState, trace.NewNoopTracer())
 
 	pending := make([]*flow.Header, 0)
 

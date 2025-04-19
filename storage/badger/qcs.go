@@ -46,6 +46,9 @@ func NewQuorumCertificates(collector module.CacheMetrics, db *badger.DB, cacheSi
 func (q *QuorumCertificates) StoreTx(qc *flow.QuorumCertificate) func(*transaction.Tx) error {
 	return q.cache.PutTx(qc.BlockID, qc)
 }
+func (q *QuorumCertificates) BatchStore(qc *flow.QuorumCertificate, rw storage.ReaderBatchWriter) error {
+	panic("not implemented")
+}
 
 func (q *QuorumCertificates) ByBlockID(blockID flow.Identifier) (*flow.QuorumCertificate, error) {
 	tx := q.db.NewTransaction(false)

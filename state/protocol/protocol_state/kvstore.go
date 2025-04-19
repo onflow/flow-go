@@ -3,7 +3,7 @@ package protocol_state
 import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage"
 )
 
 // This file contains versioned read-write interfaces to the Protocol State's
@@ -70,6 +70,8 @@ type KVStoreMutator interface {
 	SetEpochExtensionViewCount(viewCount uint64) error
 }
 
+type DeferredOp func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error
+
 // OrthogonalStoreStateMachine represents a state machine that exclusively evolves its state P.
 // The state's specific type P is kept as a generic. Generally, P is the type corresponding
 // to one specific key in the Key-Value store.
@@ -103,7 +105,7 @@ type OrthogonalStoreStateMachine[P any] interface {
 	//     Deferred updates must be applied in a transaction to ensure atomicity.
 	//
 	// No errors are expected during normal operations.
-	Build() (*transaction.DeferredBlockPersist, error)
+	Build() ([]storage.BlockIndexingBatchWrite, error)
 
 	// EvolveState applies the state change(s) on sub-state P for the candidate block (under construction).
 	// Information that potentially changes the Epoch state (compared to the parent block's state):
