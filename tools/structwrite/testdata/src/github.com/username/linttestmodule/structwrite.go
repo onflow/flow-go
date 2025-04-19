@@ -3,6 +3,8 @@
 package linttestmodule
 
 // NonWritable is configured for linting.
+//
+//structwrite:immutable
 type NonWritable struct {
 	A int
 }
@@ -22,8 +24,8 @@ func NonWritableConstructLiteral() {
 	nw = NonWritable{A: 1}   // want "construction of NonWritable outside constructor"
 	nwp := &NonWritable{}    // want "construction of NonWritable outside constructor"
 	nwp = &NonWritable{A: 1} // want "construction of NonWritable outside constructor"
-	//nwp = new(NonWritable)   // TODO - currently disallowed
-	var nwnw NonWritable // TODO - currently allowed
+	nwp = new(NonWritable)
+	var nwnw NonWritable
 	_ = nw
 	_ = nwp
 	_ = nwnw
@@ -102,13 +104,13 @@ func (w *EmbedsNonWritable) SetA() {
 }
 
 func NonEmbedsWritableConstructLiteral() {
-	nw := EmbedsNonWritable{}                                    // TODO - currently allowed
-	nw = EmbedsNonWritable{B: 2}                                 // TODO - currently allowed
+	nw := EmbedsNonWritable{}
+	nw = EmbedsNonWritable{B: 2}
 	nw = EmbedsNonWritable{NonWritable: NonWritable{A: 1}}       // want "construction of NonWritable outside constructor"
 	nw = EmbedsNonWritable{B: 2, NonWritable: NonWritable{A: 1}} // want "construction of NonWritable outside constructor"
-	nwp := &EmbedsNonWritable{}                                  // TODO - currently allowed
-	nwp = &EmbedsNonWritable{B: 2}                               // TODO - currently allowed
-	nwp = &EmbedsNonWritable{NonWritable: NonWritable{A: 1}}     // want "construction of NonWritable outside constructor"
+	nwp := &EmbedsNonWritable{}
+	nwp = &EmbedsNonWritable{B: 2}
+	nwp = &EmbedsNonWritable{NonWritable: NonWritable{A: 1}} // want "construction of NonWritable outside constructor"
 	_ = nw
 	_ = nwp
 }

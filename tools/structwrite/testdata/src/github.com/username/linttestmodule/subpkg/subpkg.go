@@ -3,6 +3,8 @@ package subpkg
 // NonWritable has the same type name as NonWritable in the root package.
 // The test configuration should specify only the root type.
 // This type exists to check that types are checked by fully qualified name.
+//
+//structwrite:immutable
 type NonWritable struct {
 	A int
 }

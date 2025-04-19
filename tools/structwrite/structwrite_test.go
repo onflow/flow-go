@@ -10,16 +10,11 @@ import (
 	"golang.org/x/tools/go/analysis/analysistest"
 )
 
-func TestPluginExample(t *testing.T) {
+func TestPlugin(t *testing.T) {
 	newPlugin, err := register.GetPlugin("structwrite")
 	require.NoError(t, err)
 
-	plugin, err := newPlugin(Settings{
-		Structs: []string{
-			"github.com/username/linttestmodule.NonWritable",
-			"github.com/username/linttestmodule/subpkg.NonWritableInSubpackage",
-		},
-	})
+	plugin, err := newPlugin(Settings{})
 	require.NoError(t, err)
 
 	analyzers, err := plugin.BuildAnalyzers()

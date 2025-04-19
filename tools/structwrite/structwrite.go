@@ -16,10 +16,6 @@ func init() {
 
 // Settings defines the configuration schema for the plugin.
 type Settings struct {
-	// Structs is a list of fully-qualified struct type names for which immutability is enforced.
-	// TODO: define in godoc instead?
-	Structs []string `json:"structs"`
-
 	// ConstructorRegex is a regex pattern (optional) to identify allowed constructor function names.
 	// TODO: unused - current just use New.*
 	ConstructorRegex string `json:"constructorRegex"`
@@ -34,7 +30,7 @@ type Settings struct {
 //	x.SomeField = 2         // not allowed
 //	x = NewImmutableType(2) // allowed
 //
-// A struct type is marked as immutable by adding a directive comment of the form: `//structwrite: .*`.
+// A struct type is marked as immutable by adding a directive comment of the form: `//structwrite:immutable .*`.
 // The directive comment must appear in the godoc for the type being marked immutable.
 //
 // See handleAssignStmt and handleCompositeLit in this file for examples of what operations are allowed.
@@ -45,9 +41,7 @@ type Settings struct {
 // mutate a mutation-protected struct without the linter noticing:
 //
 //  1. Reflection (for example passing a pointer to a struct type into json.Unmarshal)
-//
 //  2. Use of unsafe.Pointer
-//
 //  3. Re-assignment after reference escape.
 //
 // Example of (3.):
@@ -67,7 +61,8 @@ type Settings struct {
 //	y = NewY(2)
 //	// x.Y.B == 2: x has been mutated due to the shared reference
 type PluginStructWrite struct {
-	structs map[string]bool
+	// Set of mutation-protected types, stored as fully qualified type names
+	mutationProtected map[string]bool
 }
 
 // New creates a new instance of the PluginStructWrite plugin.
@@ -76,13 +71,9 @@ func New(cfg any) (register.LinterPlugin, error) {
 	if err != nil {
 		return nil, err
 	}
+	_ = s // TODO
 
-	structMap := make(map[string]bool)
-	for _, name := range s.Structs {
-		structMap[name] = true
-	}
-
-	return &PluginStructWrite{structs: structMap}, nil
+	return &PluginStructWrite{mutationProtected: make(map[string]bool)}, nil
 }
 
 func (p *PluginStructWrite) BuildAnalyzers() ([]*analysis.Analyzer, error) {
@@ -100,6 +91,8 @@ func (p *PluginStructWrite) GetLoadMode() string {
 
 // run is the main analysis function.
 func (p *PluginStructWrite) run(pass *analysis.Pass) (interface{}, error) {
+	p.gatherMutationProtectedTypes(pass)
+
 	for _, file := range pass.Files {
 		ast.Inspect(file, func(n ast.Node) bool {
 			switch node := n.(type) {
@@ -107,13 +100,45 @@ func (p *PluginStructWrite) run(pass *analysis.Pass) (interface{}, error) {
 				p.handleAssignStmt(node, pass, file)
 			case *ast.CompositeLit:
 				p.handleCompositeLit(node, pass, file)
-			case *ast.CallExpr:
-				p.handleCallExpr(node, pass, file)
 			}
 			return true
 		})
 	}
 	return nil, nil
+}
+
+// gatherMutationProtectedTypes populates the set of mutation-protected types before the linter runs.
+// A struct type is marked as immutable by adding a directive comment of the form: `//structwrite:immutable .*`.
+// The directive comment must appear in the godoc for the type being marked immutable.
+func (p *PluginStructWrite) gatherMutationProtectedTypes(pass *analysis.Pass) {
+	for _, file := range pass.Files {
+		for _, decl := range file.Decls {
+			genDecl, ok := decl.(*ast.GenDecl)
+			if !ok || genDecl.Tok != token.TYPE {
+				continue
+			}
+
+			for _, spec := range genDecl.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok {
+					continue
+				}
+
+				if genDecl.Doc != nil {
+					for _, comment := range genDecl.Doc.List {
+						if strings.HasPrefix(comment.Text, "//structwrite:immutable") {
+							typeObj := pass.TypesInfo.Defs[typeSpec.Name]
+							if named, ok := typeObj.Type().(*types.Named); ok {
+								fullyQualified := named.String()
+								p.mutationProtected[fullyQualified] = true
+							}
+							break
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 // handleAssignStmt checks for disallowed writes to tracked struct fields in assignments.
@@ -192,7 +217,7 @@ func (p *PluginStructWrite) handleCompositeLit(lit *ast.CompositeLit, pass *anal
 	}
 
 	fullyQualified := named.String()
-	if !p.structs[fullyQualified] {
+	if !p.mutationProtected[fullyQualified] {
 		return
 	}
 
@@ -200,42 +225,6 @@ func (p *PluginStructWrite) handleCompositeLit(lit *ast.CompositeLit, pass *anal
 	if funcDecl == nil || !strings.HasPrefix(funcDecl.Name.Name, "New") {
 		pass.Reportf(lit.Pos(),
 			"construction of %s outside constructor", named.Obj().Name())
-	}
-}
-
-// handleCallExpr checks for disallowed construction of tracked structs using new().
-// TODO: is this desirable? We should do one of the following:
-//   - consistently allow construction of empty instances of structs
-//   - prevent construction of empty instances in ALL cases
-//     (the main one not currently handled is instantiating a type where struct is a field of the type
-//     and the field is not explicitly set)
-func (p *PluginStructWrite) handleCallExpr(call *ast.CallExpr, pass *analysis.Pass, file *ast.File) {
-	ident, ok := call.Fun.(*ast.Ident)
-	if !ok || ident.Name != "new" || len(call.Args) != 1 {
-		return
-	}
-
-	typ := pass.TypesInfo.Types[call.Args[0]].Type
-	if typ == nil {
-		return
-	}
-	typ = deref(typ)
-
-	named, ok := typ.(*types.Named)
-	if !ok {
-		return
-	}
-
-	fullyQualified := named.String()
-	if !p.structs[fullyQualified] {
-		return
-	}
-
-	funcDecl := findEnclosingFunc(file, call.Pos())
-	if funcDecl == nil || !strings.HasPrefix(funcDecl.Name.Name, "New") {
-		pass.Reportf(call.Pos(),
-			"construction of %s using new() outside constructor function: func=%s",
-			fullyQualified, funcNameOrEmpty(funcDecl))
 	}
 }
 
@@ -255,7 +244,7 @@ func (p *PluginStructWrite) containsTrackedStruct(selExpr *ast.SelectorExpr, pas
 
 			if named, ok := deref(typ).(*types.Named); ok {
 				fullyQualified := named.String()
-				if p.structs[fullyQualified] {
+				if p.mutationProtected[fullyQualified] {
 					return true, named
 				}
 			}
@@ -274,7 +263,7 @@ func (p *PluginStructWrite) containsTrackedStruct(selExpr *ast.SelectorExpr, pas
 		return false, nil
 	}
 	fullyQualified := named.String()
-	if p.structs[fullyQualified] {
+	if p.mutationProtected[fullyQualified] {
 		return true, named
 	}
 
