@@ -172,7 +172,7 @@ func (p *PluginStructWrite) handleAssignStmt(assign *ast.AssignStmt, pass *analy
 			continue
 		}
 
-		found, named := p.containsTrackedStruct(selExpr, pass)
+		named, found := p.containsTrackedStruct(selExpr, pass)
 		if !found {
 			continue
 		}
@@ -230,7 +230,7 @@ func (p *PluginStructWrite) handleCompositeLit(lit *ast.CompositeLit, pass *anal
 
 // containsTrackedStruct checks whether the field accessed via selector expression belongs to a tracked struct,
 // either directly or via embedding.
-func (p *PluginStructWrite) containsTrackedStruct(selExpr *ast.SelectorExpr, pass *analysis.Pass) (bool, *types.Named) {
+func (p *PluginStructWrite) containsTrackedStruct(selExpr *ast.SelectorExpr, pass *analysis.Pass) (*types.Named, bool) {
 	// Handle promoted fields (embedding)
 	if sel := pass.TypesInfo.Selections[selExpr]; sel != nil && sel.Kind() == types.FieldVal {
 		typ := sel.Recv()
@@ -245,7 +245,7 @@ func (p *PluginStructWrite) containsTrackedStruct(selExpr *ast.SelectorExpr, pas
 			if named, ok := deref(typ).(*types.Named); ok {
 				fullyQualified := named.String()
 				if p.mutationProtected[fullyQualified] {
-					return true, named
+					return named, true
 				}
 			}
 		}
@@ -254,20 +254,20 @@ func (p *PluginStructWrite) containsTrackedStruct(selExpr *ast.SelectorExpr, pas
 	// Fallback: direct access (non-promoted)
 	tv, ok := pass.TypesInfo.Types[selExpr.X]
 	if !ok {
-		return false, nil
+		return nil, false
 	}
 
 	typ := deref(tv.Type)
 	named, ok := typ.(*types.Named)
 	if !ok {
-		return false, nil
+		return nil, false
 	}
 	fullyQualified := named.String()
 	if p.mutationProtected[fullyQualified] {
-		return true, named
+		return named, true
 	}
 
-	return false, nil
+	return nil, false
 }
 
 // findEnclosingFunc returns the enclosing function declaration for a given position.
