@@ -90,7 +90,7 @@ func (s *StateMutatorSuite) SetupTest() {
 					targetState protocol_state.KVStoreMutator,
 				) (protocol_state.OrthogonalStoreStateMachine[protocol.KVStoreReader], error) {
 					return s.kvStateMachines[i], nil
-				})
+				}).Maybe()
 			kvStateMachineFactories[i] = s.kvStateMachineFactories[i]
 		}(i)
 	}
