@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -518,7 +517,7 @@ func (s *StateMutatorSuite) Test_StateMachineProcessingServiceEventsFails() {
 func (s *StateMutatorSuite) Test_StateMachineBuildFails() {
 	workingStateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
 	workingStateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(nil).Twice()
-	workingStateMachine.On("Build").Return(transaction.NewDeferredBlockPersist(), nil).Maybe()
+	workingStateMachine.On("Build").Return([]storage.BlockIndexingBatchWrite{}, nil).Maybe()
 
 	exception := errors.New("exception")
 	failingStateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
@@ -648,11 +647,12 @@ func (m *mockStateTransition) Mock() *protocol_statemock.OrthogonalStoreStateMac
 		}
 	}).Return(nil).Once()
 
-	// deferredUpdate := storagemock.NewDeferredDBUpdate(m.T)
-	// deferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
-	// deferredDBUpdates := transaction.NewDeferredBlockPersist().AddDbOp(deferredUpdate.Execute)
 	stateMachine.On("Build").Run(func(args mock.Arguments) {
 		require.True(m.T, evolveStateCalled, "Method `OrthogonalStoreStateMachine.Build` called before `EvolveState`!")
-	}).Return([]storage.BlockIndexingBatchWrite{}, nil).Once()
+	}).Return([]storage.BlockIndexingBatchWrite{
+		func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+			return nil
+		},
+	}, nil).Once()
 	return stateMachine //nolint:govet
 }
