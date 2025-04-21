@@ -31,13 +31,7 @@ jobs:
     env:
       GO_VERSION: "1.23"
     steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+
       - name: Cache custom linter binary
         id: cache-linter
         uses: actions/cache@v3
@@ -45,7 +39,17 @@ jobs:
           # key should change whenever your linter code or Go version changes
           key: custom-linter-${{ env.GO_VERSION }}-${{ runner.os }}-${{ hashFiles('.custom-gcl.yml', 'tools/structwrite/**') }}
           path: tools/custom-gcl
+          lookup-only: 'true'
 
+      - name: Check out code
+        if: steps.cache-linter.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+      - name: Set up Go
+        if: steps.cache-linter.outputs.cache-hit != 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
       - name: Install golangci-lint
         if: steps.cache-linter.outputs.cache-hit != 'true'
         uses: golangci/golangci-lint-action@v6
@@ -59,13 +63,6 @@ jobs:
         run: |
           golangci-lint custom
 
-      - name: Upload linter binary as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: custom-gcl
-          path: tools/custom-gcl
-
-
   lint:
     name: Lint
     needs: build-linter
@@ -77,6 +74,18 @@ jobs:
         dir: [ ./, ./integration/, ./insecure/ ]
 
     steps:
+      - name: Restore custom linter binary from cache
+        id: cache-linter
+        uses: actions/cache@v3
+        with:
+          # key should change whenever your linter code or Go version changes
+          key: custom-linter-${{ env.GO_VERSION }}-${{ runner.os }}-${{ hashFiles('.custom-gcl.yml', 'tools/structwrite/**') }}
+          path: tools/custom-gcl
+          # We are using the cache to share data between the build-linter job and the 3 lint jobs
+          # If there is a cache miss, it likely means either the build-linter job failed or the cache entry was evicted
+          # We expect this to happen very infrequently
+          fail-on-cache-miss: 'true'
+
       - name: Check out code
         uses: actions/checkout@v4
       - name: Set up Go
@@ -88,11 +97,6 @@ jobs:
         run: go generate ./...
         working-directory: ${{ matrix.dir }}
 
-      - name: Download custom linter
-        uses: actions/download-artifact@v4
-        with:
-          name: custom-gcl
-          path: ./tools/
       # must have expected binary name for use in default gcl action
       - name: Rename custom linter binary to canonical
         run: mv ./tools/custom-gcl ./tools/golangci-lint
