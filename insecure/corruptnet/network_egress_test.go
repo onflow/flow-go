@@ -333,7 +333,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 			// filled up by the CCF.
 			dictatedResult := *unittest.ExecutionResultFixture()
 			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, &flow.ExecutionReceipt{
-				ExecutionReceiptBody: flow.ExecutionReceiptBody{ExecutionResult: dictatedResult},
+				UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{ExecutionResult: dictatedResult},
 			})
 
 			params := []interface{}{channels.Channel(msg.Egress.ChannelID), mock.Anything}
@@ -356,7 +356,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 				require.Equal(t, corruptedId.NodeID, receipt.ExecutorID)
 
 				// receipt should have a valid signature from corrupted node
-				unsignedReceiptID := receipt.ExecutionReceiptBody.ID()
+				unsignedReceiptID := receipt.UnsignedExecutionReceipt.ID()
 				valid, err := corruptedId.StakingPubKey.Verify(receipt.ExecutorSignature, unsignedReceiptID[:], corruptNetwork.receiptHasher)
 				require.NoError(t, err)
 				require.True(t, valid)

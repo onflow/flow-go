@@ -10,15 +10,15 @@ type Spock []byte
 
 // ExecutionReceipt is the full execution receipt, as sent by the Execution Node.
 // Specifically, it contains the detailed execution result. The `ExecutorSignature`
-// signs the `ExecutionReceiptBody`.
+// signs the `UnsignedExecutionReceipt`.
 type ExecutionReceipt struct {
-	ExecutionReceiptBody
+	UnsignedExecutionReceipt
 	ExecutorSignature crypto.Signature
 }
 
-// ExecutionReceiptBody represents the unsigned execution receipt, whose contents the
+// UnsignedExecutionReceipt represents the unsigned execution receipt, whose contents the
 // Execution Node testifies to be correct by its signature.
-type ExecutionReceiptBody struct {
+type UnsignedExecutionReceipt struct {
 	ExecutorID Identifier
 	ExecutionResult
 	Spocks []crypto.Signature
@@ -26,7 +26,7 @@ type ExecutionReceiptBody struct {
 
 // ID returns the canonical ID of the execution receipt.
 func (er *ExecutionReceipt) ID() Identifier {
-	return er.Meta().ID()
+	return er.Stub().ID()
 }
 
 // Checksum returns a checksum for the execution receipt including the signatures.
@@ -34,72 +34,72 @@ func (er *ExecutionReceipt) Checksum() Identifier {
 	return MakeID(er)
 }
 
-// Meta returns the receipt metadata for the receipt.
-func (er *ExecutionReceipt) Meta() *ExecutionReceiptMeta {
-	return &ExecutionReceiptMeta{
-		ExecutionReceiptMetaBody: er.ExecutionReceiptBody.Meta(),
-		ExecutorSignature:        er.ExecutorSignature,
+// Stub returns a shortened version of receipt, only containing the ResultID instead of the full ExecutionResult.
+func (er *ExecutionReceipt) Stub() *ExecutionReceiptStub {
+	return &ExecutionReceiptStub{
+		UnsignedExecutionReceiptStub: er.UnsignedExecutionReceipt.Stub(),
+		ExecutorSignature:            er.ExecutorSignature,
 	}
 }
 
 // ID returns a hash over the data of the execution receipt.
 // This is what is signed by the executor and verified by recipients.
 // Necessary to override ExecutionResult.ID().
-func (erb ExecutionReceiptBody) ID() Identifier {
-	return erb.Meta().ID()
+func (erb UnsignedExecutionReceipt) ID() Identifier {
+	return erb.Stub().ID()
 }
 
-func (erb ExecutionReceiptBody) Meta() ExecutionReceiptMetaBody {
-	return ExecutionReceiptMetaBody{
+func (erb UnsignedExecutionReceipt) Stub() UnsignedExecutionReceiptStub {
+	return UnsignedExecutionReceiptStub{
 		ExecutorID: erb.ExecutorID,
 		ResultID:   erb.ExecutionResult.ID(),
 		Spocks:     erb.Spocks,
 	}
 }
 
-// ExecutionReceiptMeta contains the fields from the Execution Receipts
+// ExecutionReceiptStub contains the fields from the Execution Receipts
 // that vary from one executor to another (assuming they commit to the same
 // result). It only contains the ID (cryptographic hash) of the execution
-// result the receipt commits to. The ExecutionReceiptMeta is useful for
+// result the receipt commits to. The ExecutionReceiptStub is useful for
 // storing results and receipts separately in a composable way.
-type ExecutionReceiptMeta struct {
-	ExecutionReceiptMetaBody
+type ExecutionReceiptStub struct {
+	UnsignedExecutionReceiptStub
 	ExecutorSignature crypto.Signature
 }
 
-// ExecutionReceiptMetaBody contains the fields of ExecutionReceiptMeta that are signed by the executor.
-type ExecutionReceiptMetaBody struct {
+// UnsignedExecutionReceiptStub contains the fields of ExecutionReceiptStub that are signed by the executor.
+type UnsignedExecutionReceiptStub struct {
 	ExecutorID Identifier
 	ResultID   Identifier
 	Spocks     []crypto.Signature
 }
 
-func ExecutionReceiptFromMeta(meta ExecutionReceiptMeta, result ExecutionResult) *ExecutionReceipt {
+func ExecutionReceiptFromStub(stub ExecutionReceiptStub, result ExecutionResult) *ExecutionReceipt {
 	return &ExecutionReceipt{
-		ExecutionReceiptBody: ExecutionReceiptBody{
-			ExecutorID:      meta.ExecutorID,
+		UnsignedExecutionReceipt: UnsignedExecutionReceipt{
+			ExecutorID:      stub.ExecutorID,
 			ExecutionResult: result,
-			Spocks:          meta.Spocks,
+			Spocks:          stub.Spocks,
 		},
-		ExecutorSignature: meta.ExecutorSignature,
+		ExecutorSignature: stub.ExecutorSignature,
 	}
 }
 
 // ID returns cryptographic hash of unsigned execution receipt.
 // This is what is signed by the executor and verified by recipients.
-// It is identical to the ID of the full receipt's body.
-func (erb ExecutionReceiptMetaBody) ID() Identifier {
+// It is identical to the ID of the full UnsignedExecutionReceipt.
+func (erb UnsignedExecutionReceiptStub) ID() Identifier {
 	return MakeID(erb)
 }
 
 // ID returns the canonical ID of the execution receipt.
 // It is identical to the ID of the full receipt.
-func (er *ExecutionReceiptMeta) ID() Identifier {
+func (er *ExecutionReceiptStub) ID() Identifier {
 	return MakeID(er)
 }
 
-func (er ExecutionReceiptMeta) MarshalJSON() ([]byte, error) {
-	type Alias ExecutionReceiptMeta
+func (er ExecutionReceiptStub) MarshalJSON() ([]byte, error) {
+	type Alias ExecutionReceiptStub
 	return json.Marshal(struct {
 		Alias
 		ID string
@@ -110,7 +110,7 @@ func (er ExecutionReceiptMeta) MarshalJSON() ([]byte, error) {
 }
 
 // Checksum returns a checksum for the execution receipt including the signatures.
-func (er *ExecutionReceiptMeta) Checksum() Identifier {
+func (er *ExecutionReceiptStub) Checksum() Identifier {
 	return MakeID(er)
 }
 
@@ -172,25 +172,25 @@ func (g ExecutionReceiptGroupedList) NumberGroups() int {
 }
 
 /*******************************************************************************
-GROUPING for ExecutionReceiptMeta information:
-allows to split a list of receipt meta information by some property
+GROUPING for ExecutionReceiptStub information:
+allows to split a list of receipt stub information by some property
 *******************************************************************************/
 
-// ExecutionReceiptMetaList is a slice of ExecutionResultMetas with the additional
+// ExecutionReceiptStubList is a slice of ExecutionResultStubs with the additional
 // functionality to group them by various properties
-type ExecutionReceiptMetaList []*ExecutionReceiptMeta
+type ExecutionReceiptStubList []*ExecutionReceiptStub
 
-// ExecutionReceiptMetaGroupedList is a partition of an ExecutionReceiptMetaList
-type ExecutionReceiptMetaGroupedList map[Identifier]ExecutionReceiptMetaList
+// ExecutionReceiptStubGroupedList is a partition of an ExecutionReceiptStubList
+type ExecutionReceiptStubGroupedList map[Identifier]ExecutionReceiptStubList
 
-// ExecutionReceiptMetaGroupingFunction is a function that assigns an identifier to each receipt meta
-type ExecutionReceiptMetaGroupingFunction func(*ExecutionReceiptMeta) Identifier
+// ExecutionReceiptStubGroupingFunction is a function that assigns an identifier to each receipt stub
+type ExecutionReceiptStubGroupingFunction func(*ExecutionReceiptStub) Identifier
 
-// GroupBy partitions the ExecutionReceiptMetaList. All receipts that are mapped
+// GroupBy partitions the ExecutionReceiptStubList. All receipts that are mapped
 // by the grouping function to the same identifier are placed in the same group.
 // Within each group, the order and multiplicity of the receipts is preserved.
-func (l ExecutionReceiptMetaList) GroupBy(grouper ExecutionReceiptMetaGroupingFunction) ExecutionReceiptMetaGroupedList {
-	groups := make(map[Identifier]ExecutionReceiptMetaList)
+func (l ExecutionReceiptStubList) GroupBy(grouper ExecutionReceiptStubGroupingFunction) ExecutionReceiptStubGroupedList {
+	groups := make(map[Identifier]ExecutionReceiptStubList)
 	for _, rcpt := range l {
 		groupID := grouper(rcpt)
 		groups[groupID] = append(groups[groupID], rcpt)
@@ -198,39 +198,39 @@ func (l ExecutionReceiptMetaList) GroupBy(grouper ExecutionReceiptMetaGroupingFu
 	return groups
 }
 
-// GroupByExecutorID partitions the ExecutionReceiptMetaList by the receipts' ExecutorIDs.
+// GroupByExecutorID partitions the ExecutionReceiptStubList by the receipts' ExecutorIDs.
 // Within each group, the order and multiplicity of the receipts is preserved.
-func (l ExecutionReceiptMetaList) GroupByExecutorID() ExecutionReceiptMetaGroupedList {
-	grouper := func(receipt *ExecutionReceiptMeta) Identifier { return receipt.ExecutorID }
+func (l ExecutionReceiptStubList) GroupByExecutorID() ExecutionReceiptStubGroupedList {
+	grouper := func(receipt *ExecutionReceiptStub) Identifier { return receipt.ExecutorID }
 	return l.GroupBy(grouper)
 }
 
-// GroupByResultID partitions the ExecutionReceiptMetaList by the receipts' Result IDs.
+// GroupByResultID partitions the ExecutionReceiptStubList by the receipts' Result IDs.
 // Within each group, the order and multiplicity of the receipts is preserved.
-func (l ExecutionReceiptMetaList) GroupByResultID() ExecutionReceiptMetaGroupedList {
-	grouper := func(receipt *ExecutionReceiptMeta) Identifier { return receipt.ResultID }
+func (l ExecutionReceiptStubList) GroupByResultID() ExecutionReceiptStubGroupedList {
+	grouper := func(receipt *ExecutionReceiptStub) Identifier { return receipt.ResultID }
 	return l.GroupBy(grouper)
 }
 
 // Size returns the number of receipts in the list
-func (l ExecutionReceiptMetaList) Size() int {
+func (l ExecutionReceiptStubList) Size() int {
 	return len(l)
 }
 
 // GetGroup returns the receipts that were mapped to the same identifier by the
-// grouping function. Returns an empty (nil) ExecutionReceiptMetaList if groupID does not exist.
-func (g ExecutionReceiptMetaGroupedList) GetGroup(groupID Identifier) ExecutionReceiptMetaList {
+// grouping function. Returns an empty (nil) ExecutionReceiptStubList if groupID does not exist.
+func (g ExecutionReceiptStubGroupedList) GetGroup(groupID Identifier) ExecutionReceiptStubList {
 	return g[groupID]
 }
 
 // NumberGroups returns the number of groups
-func (g ExecutionReceiptMetaGroupedList) NumberGroups() int {
+func (g ExecutionReceiptStubGroupedList) NumberGroups() int {
 	return len(g)
 }
 
-// Lookup generates a map from ExecutionReceipt ID to ExecutionReceiptMeta
-func (l ExecutionReceiptMetaList) Lookup() map[Identifier]*ExecutionReceiptMeta {
-	receiptsByID := make(map[Identifier]*ExecutionReceiptMeta, len(l))
+// Lookup generates a map from ExecutionReceipt ID to ExecutionReceiptStub
+func (l ExecutionReceiptStubList) Lookup() map[Identifier]*ExecutionReceiptStub {
+	receiptsByID := make(map[Identifier]*ExecutionReceiptStub, len(l))
 	for _, receipt := range l {
 		receiptsByID[receipt.ID()] = receipt
 	}

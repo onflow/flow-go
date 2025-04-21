@@ -50,8 +50,8 @@ func NewReceiptValidator(state protocol.State,
 // verifySignature ensures that the given receipt has a valid signature from nodeIdentity.
 // Expected errors during normal operations:
 //   - engine.InvalidInputError if the signature is invalid
-func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceiptMeta, nodeIdentity *flow.Identity) error {
-	unsignedReceiptID := receipt.ExecutionReceiptMetaBody.ID()
+func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceiptStub, nodeIdentity *flow.Identity) error {
+	unsignedReceiptID := receipt.UnsignedExecutionReceiptStub.ID()
 	valid, err := nodeIdentity.StakingPubKey.Verify(receipt.ExecutorSignature, unsignedReceiptID[:], v.signatureHasher)
 	if err != nil { // Verify(..) returns (false,nil) for invalid signature. Any error indicates unexpected internal failure.
 		return irrecoverable.NewExceptionf("failed to verify signature: %w", err)
@@ -244,7 +244,7 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 		return fmt.Errorf("could not validate single result %v at index: %w", receipt.ExecutionResult.ID(), err)
 	}
 
-	err = v.validateReceipt(receipt.Meta(), receipt.ExecutionResult.BlockID)
+	err = v.validateReceipt(receipt.Stub(), receipt.ExecutionResult.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not validate receipt %v: %w", receipt.ID(), err)
 	}
@@ -471,7 +471,7 @@ func (v *receiptValidator) validateResult(result *flow.ExecutionResult, prevResu
 // Error returns:
 //   - engine.InvalidInputError if `receipt` is invalid
 //   - module.UnknownBlockError if executedBlockID is unknown
-func (v *receiptValidator) validateReceipt(receipt *flow.ExecutionReceiptMeta, executedBlockID flow.Identifier) error {
+func (v *receiptValidator) validateReceipt(receipt *flow.ExecutionReceiptStub, executedBlockID flow.Identifier) error {
 	identity, err := identityForNode(v.state, executedBlockID, receipt.ExecutorID)
 	if err != nil {
 		return fmt.Errorf("retrieving idenity of node %v at block %v failed: %w", receipt.ExecutorID, executedBlockID, err)

@@ -444,7 +444,7 @@ func GenerateExecutionReceipt(
 	*flow.ExecutionReceipt,
 	error,
 ) {
-	body := flow.ExecutionReceiptBody{
+	body := flow.UnsignedExecutionReceipt{
 		ExecutionResult: *result,
 		Spocks:          spockSignatures,
 		ExecutorID:      signer.NodeID(),
@@ -458,7 +458,7 @@ func GenerateExecutionReceipt(
 	}
 
 	return &flow.ExecutionReceipt{
-		ExecutionReceiptBody: body,
-		ExecutorSignature:    sig,
+		UnsignedExecutionReceipt: body,
+		ExecutorSignature:        sig,
 	}, nil
 }

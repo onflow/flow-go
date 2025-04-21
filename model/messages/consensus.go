@@ -58,7 +58,7 @@ func UntrustedExecutionResultFromInternal(internal *flow.ExecutionResult) Untrus
 type UntrustedBlockPayload struct {
 	Guarantees      []flow.CollectionGuarantee
 	Seals           []flow.Seal
-	Receipts        []flow.ExecutionReceiptMeta
+	Receipts        []flow.ExecutionReceiptStub
 	Results         []UntrustedExecutionResult
 	ProtocolStateID flow.Identifier
 }

@@ -94,7 +94,7 @@ func MessagesToExecutionResults(m []*entities.ExecutionResult) (
 }
 
 // ExecutionResultMetaListToMessages converts an execution result meta list to a slice of protobuf messages
-func ExecutionResultMetaListToMessages(e flow.ExecutionReceiptMetaList) []*entities.ExecutionReceiptMeta {
+func ExecutionResultMetaListToMessages(e flow.ExecutionReceiptStubList) []*entities.ExecutionReceiptMeta {
 	messageList := make([]*entities.ExecutionReceiptMeta, len(e))
 	for i, execMeta := range e {
 		messageList[i] = &entities.ExecutionReceiptMeta{
@@ -108,11 +108,11 @@ func ExecutionResultMetaListToMessages(e flow.ExecutionReceiptMetaList) []*entit
 }
 
 // MessagesToExecutionResultMetaList converts a slice of protobuf messages to an execution result meta list
-func MessagesToExecutionResultMetaList(m []*entities.ExecutionReceiptMeta) flow.ExecutionReceiptMetaList {
-	execMetaList := make([]*flow.ExecutionReceiptMeta, len(m))
+func MessagesToExecutionResultMetaList(m []*entities.ExecutionReceiptMeta) flow.ExecutionReceiptStubList {
+	execMetaList := make([]*flow.ExecutionReceiptStub, len(m))
 	for i, message := range m {
-		execMetaList[i] = &flow.ExecutionReceiptMeta{
-			ExecutionReceiptMetaBody: flow.ExecutionReceiptMetaBody{
+		execMetaList[i] = &flow.ExecutionReceiptStub{
+			UnsignedExecutionReceiptStub: flow.UnsignedExecutionReceiptStub{
 				ExecutorID: MessageToIdentifier(message.ExecutorId),
 				ResultID:   MessageToIdentifier(message.ResultId),
 				Spocks:     MessagesToSignatures(message.Spocks),

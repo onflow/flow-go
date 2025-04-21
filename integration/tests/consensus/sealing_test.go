@@ -245,7 +245,7 @@ SearchLoop:
 	ss.T().Logf("execution result generated (result: %x)\n", result.ID())
 
 	// create the execution receipt for the only execution node
-	receiptBody := flow.ExecutionReceiptBody{
+	receiptBody := flow.UnsignedExecutionReceipt{
 		ExecutorID:      ss.exeID, // our fake execution node
 		ExecutionResult: result,   // result for target block
 		Spocks:          nil,      // ignored
@@ -256,12 +256,12 @@ SearchLoop:
 	sig, err := ss.exeSK.Sign(unsignedReceiptID[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
 	receipt := flow.ExecutionReceipt{
-		ExecutionReceiptBody: receiptBody,
-		ExecutorSignature:    sig,
+		UnsignedExecutionReceipt: receiptBody,
+		ExecutorSignature:        sig,
 	}
 
 	// keep trying to send 2 matching execution receipt to the first consensus node
-	receiptBody2 := flow.ExecutionReceiptBody{
+	receiptBody2 := flow.UnsignedExecutionReceipt{
 		ExecutorID:      ss.exe2ID, // our fake execution node
 		ExecutionResult: result,    // result for target block
 		Spocks:          nil,       // ignored
@@ -271,8 +271,8 @@ SearchLoop:
 	sig2, err := ss.exe2SK.Sign(unsignedReceiptID2[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
 	receipt2 := flow.ExecutionReceipt{
-		ExecutionReceiptBody: receiptBody2,
-		ExecutorSignature:    sig2,
+		UnsignedExecutionReceipt: receiptBody2,
+		ExecutorSignature:        sig2,
 	}
 
 	valid, err := ss.exe2SK.PublicKey().Verify(receipt2.ExecutorSignature, unsignedReceiptID2[:], exeUtils.NewExecutionReceiptHasher())

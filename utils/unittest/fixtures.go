@@ -233,9 +233,9 @@ func FullBlockFixture() flow.Block {
 		ExecutionResultFixture(),
 		ExecutionResultFixture(),
 	}
-	payload.Receipts = []*flow.ExecutionReceiptMeta{
-		ExecutionReceiptFixture(WithResult(payload.Results[0])).Meta(),
-		ExecutionReceiptFixture(WithResult(payload.Results[1])).Meta(),
+	payload.Receipts = []*flow.ExecutionReceiptStub{
+		ExecutionReceiptFixture(WithResult(payload.Results[0])).Stub(),
+		ExecutionReceiptFixture(WithResult(payload.Results[1])).Stub(),
 	}
 	payload.ProtocolStateID = IdentifierFixture()
 
@@ -319,7 +319,7 @@ func WithAllTheFixins(payload *flow.Payload) {
 			WithResult(ExecutionResultFixture(WithServiceEvents(3))),
 			WithSpocks(SignaturesFixture(3)),
 		)
-		payload.Receipts = flow.ExecutionReceiptMetaList{receipt.Meta()}
+		payload.Receipts = flow.ExecutionReceiptStubList{receipt.Stub()}
 		payload.Results = flow.ExecutionResultList{&receipt.ExecutionResult}
 	}
 	payload.ProtocolStateID = IdentifierFixture()
@@ -340,7 +340,7 @@ func WithGuarantees(guarantees ...*flow.CollectionGuarantee) func(*flow.Payload)
 func WithReceipts(receipts ...*flow.ExecutionReceipt) func(*flow.Payload) {
 	return func(payload *flow.Payload) {
 		for _, receipt := range receipts {
-			payload.Receipts = append(payload.Receipts, receipt.Meta())
+			payload.Receipts = append(payload.Receipts, receipt.Stub())
 			payload.Results = append(payload.Results, &receipt.ExecutionResult)
 		}
 	}
@@ -356,7 +356,7 @@ func WithProtocolStateID(stateID flow.Identifier) func(payload *flow.Payload) {
 func WithReceiptsAndNoResults(receipts ...*flow.ExecutionReceipt) func(*flow.Payload) {
 	return func(payload *flow.Payload) {
 		for _, receipt := range receipts {
-			payload.Receipts = append(payload.Receipts, receipt.Meta())
+			payload.Receipts = append(payload.Receipts, receipt.Stub())
 		}
 	}
 }
@@ -832,7 +832,7 @@ func WithSpocks(spocks []crypto.Signature) func(*flow.ExecutionReceipt) {
 
 func ExecutionReceiptFixture(opts ...func(*flow.ExecutionReceipt)) *flow.ExecutionReceipt {
 	receipt := &flow.ExecutionReceipt{
-		ExecutionReceiptBody: flow.ExecutionReceiptBody{
+		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
 			ExecutorID:      IdentifierFixture(),
 			ExecutionResult: *ExecutionResultFixture(),
 			Spocks:          nil,

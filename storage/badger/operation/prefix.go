@@ -43,7 +43,7 @@ const (
 	codeExecutionResult      = 36
 	codeResultApproval       = 37
 	codeChunk                = 38
-	codeExecutionReceiptMeta = 39 // NOTE: prior to Mainnet25, this erroneously had the same value as codeExecutionResult (36)
+	codeExecutionReceiptStub = 39 // NOTE: prior to Mainnet25, this erroneously had the same value as codeExecutionResult (36)
 
 	// codes for indexing single identifier by identifier/integer
 	codeHeightToBlock               = 40 // index mapping height to block ID
