@@ -74,6 +74,14 @@ jobs:
         dir: [ ./, ./integration/, ./insecure/ ]
 
     steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          
       - name: Restore custom linter binary from cache
         id: cache-linter
         uses: actions/cache@v3
@@ -86,13 +94,7 @@ jobs:
           # We expect this to happen very infrequently
           fail-on-cache-miss: 'true'
 
-      - name: Check out code
-        uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+
       - name: Run go generate
         run: go generate ./...
         working-directory: ${{ matrix.dir }}
