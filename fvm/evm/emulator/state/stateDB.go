@@ -517,6 +517,9 @@ func (db *StateDB) Commit(finalize bool) (hash.Hash, error) {
 	return updateCommit, nil
 }
 
+// This is a no-op for our custom implementation of the StateDB interface,
+// since Commit() already handles finalization and deletion of empty
+// objects.
 func (db *StateDB) Finalise(deleteEmptyObjects bool) {}
 
 // Finalize flushes all the changes
