@@ -22,20 +22,22 @@ linters-settings:
     # Disable SA1019 to allow use of deprecated label
     checks: ["all", "-SA1019"]
 
-  custom:
-    structwrite:
-      type: module
-      description: "disallow struct field writes outside constructor"
-      original-url: "github.com/onflow/flow-go/tools/structwrite"
-      settings:
-        structs:
-          - "github.com/onflow/flow-go/model/flow.Header"
+# TODO(7271): Un-comment in #7271
+#  custom:
+#    structwrite:
+#      type: module
+#      description: "disallow struct field writes outside constructor"
+#      original-url: "github.com/onflow/flow-go/tools/structwrite"
+#      settings:
+#        structs:
+#          - "github.com/onflow/flow-go/model/flow.Header"
 
 linters:
   enable:
     - goimports
     - gosec
-    - structwrite
+# TODO(7271): Un-comment in #7271
+#    - structwrite
 
 issues:
   exclude-rules:
