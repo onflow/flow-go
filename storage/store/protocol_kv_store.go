@@ -39,7 +39,7 @@ type ProtocolKVStore struct {
 	// without cache misses, so a cache size of roughly 1000 entries is reasonable.
 	byBlockIdCache *Cache[flow.Identifier, flow.Identifier]
 	storing        *sync.Mutex
-	indexing       *sync.Mutex
+	// indexing       *sync.Mutex
 }
 
 var _ storage.ProtocolKVStore = (*ProtocolKVStore)(nil)
@@ -81,9 +81,9 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 	}
 
 	return &ProtocolKVStore{
-		db:       db,
-		storing:  new(sync.Mutex),
-		indexing: new(sync.Mutex),
+		db:      db,
+		storing: new(sync.Mutex),
+		// indexing: new(sync.Mutex),
 		cache: newCache(collector, metrics.ResourceProtocolKVStore,
 			withLimit[flow.Identifier, *flow.PSKeyValueStoreData](kvStoreCacheSize),
 			withStore(storeByStateID),
@@ -141,10 +141,11 @@ func (s *ProtocolKVStore) IndexTx(blockID flow.Identifier, stateID flow.Identifi
 }
 
 func (s *ProtocolKVStore) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
-	s.indexing.Lock()
-	rw.AddCallback(func(error) {
-		s.indexing.Unlock()
-	})
+	// TODO: add synchronization, adding lock would cause deadlock during bootstrap
+	// s.indexing.Lock()
+	// rw.AddCallback(func(error) {
+	// 	s.indexing.Unlock()
+	// })
 
 	_, err := s.byBlockIdCache.Get(s.db.Reader(), blockID)
 	if err == nil {

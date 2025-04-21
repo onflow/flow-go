@@ -1,8 +1,6 @@
 package store
 
 import (
-	"sync"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -12,16 +10,14 @@ import (
 
 // Index implements a simple read-only payload storage around a badger DB.
 type Index struct {
-	db       storage.DB
-	indexing *sync.Mutex
-	cache    *Cache[flow.Identifier, *flow.Index]
+	db    storage.DB
+	cache *Cache[flow.Identifier, *flow.Index]
 }
 
 func NewIndex(collector module.CacheMetrics, db storage.DB) *Index {
 
-	indexing := &sync.Mutex{}
 	store := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, index *flow.Index) error {
-		return procedure.InsertIndex(indexing, rw, blockID, index)
+		return procedure.InsertIndex(rw, blockID, index)
 	}
 
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.Index, error) {
@@ -31,9 +27,8 @@ func NewIndex(collector module.CacheMetrics, db storage.DB) *Index {
 	}
 
 	p := &Index{
-		db:       db,
-		indexing: indexing,
-		cache: newCache[flow.Identifier, *flow.Index](collector, metrics.ResourceIndex,
+		db: db,
+		cache: newCache(collector, metrics.ResourceIndex,
 			withLimit[flow.Identifier, *flow.Index](flow.DefaultTransactionExpiry+100),
 			withStore(store),
 			withRetrieve(retrieve)),
