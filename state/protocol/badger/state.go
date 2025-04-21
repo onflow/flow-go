@@ -330,6 +330,7 @@ func bootstrapSealingSegment(
 
 	sealsLookup := make(map[flow.Identifier]struct{})
 	sealsLookup[rootSeal.ID()] = struct{}{}
+	sealsLookup[segment.FirstSeal.ID()] = struct{}{}
 	for i, block := range segment.Blocks {
 		blockID := block.ID()
 		height := block.Header.Height
@@ -360,7 +361,7 @@ func bootstrapSealingSegment(
 		// sanity check: make sure the seal exists
 		_, ok = sealsLookup[latestSealID]
 		if !ok {
-			return fmt.Errorf("missing latest seal for sealing segment block (id=%s)", blockID)
+			return fmt.Errorf("sanity check fail: missing latest seal for sealing segment block (id=%s)", blockID)
 		}
 		err = operation.IndexLatestSealAtBlock(w, blockID, latestSealID)
 		if err != nil {
