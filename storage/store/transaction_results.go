@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -122,6 +123,7 @@ func NewTransactionResults(collector module.CacheMetrics, db storage.DB, transac
 		}
 		return txResults, nil
 	}
+
 	return &TransactionResults{
 		db: db,
 		cache: newCache(collector, metrics.ResourceTransactionResults,
@@ -209,11 +211,20 @@ func (tr *TransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.Transac
 // RemoveByBlockID removes transaction results by block ID
 func (tr *TransactionResults) RemoveByBlockID(blockID flow.Identifier) error {
 	return tr.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.RemoveTransactionResultsByBlockID(rw.GlobalReader(), rw.Writer(), blockID)
+		return tr.BatchRemoveByBlockID(blockID, rw)
 	})
 }
 
 // BatchRemoveByBlockID batch removes transaction results by block ID
 func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.ReaderBatchWriter) error {
+	storage.OnCommitSucceed(batch, func() {
+		keyPrefix := KeyFromBlockID(blockID)
+
+		// TODO: optimize range removal from cache.
+		tr.cache.RemoveByPredicate(func(key string) bool {
+			return strings.HasPrefix(key, keyPrefix)
+		})
+	})
+
 	return operation.BatchRemoveTransactionResultsByBlockID(blockID, batch)
 }

@@ -86,13 +86,23 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db storage.DB, receip
 		return receipt, nil
 	}
 
+	remove := func(rw storage.ReaderBatchWriter, blockID flow.Identifier) error {
+		indexingMyReceipt.Lock()
+		rw.AddCallback(func(error) {
+			indexingMyReceipt.Unlock()
+		})
+		return operation.RemoveOwnExecutionReceipt(rw.Writer(), blockID)
+	}
+
 	return &MyExecutionReceipts{
 		genericReceipts: receipts,
 		db:              db,
 		cache: newCache(collector, metrics.ResourceMyReceipt,
 			withLimit[flow.Identifier, *flow.ExecutionReceipt](flow.DefaultTransactionExpiry+100),
 			withStore(store),
-			withRetrieve(retrieve)),
+			withRetrieve(retrieve),
+			withRemove[flow.Identifier, *flow.ExecutionReceipt](remove),
+		),
 		indexingMyReceipt: indexingMyReceipt,
 	}
 }
@@ -119,7 +129,7 @@ func (m *MyExecutionReceipts) MyReceipt(blockID flow.Identifier) (*flow.Executio
 
 func (m *MyExecutionReceipts) RemoveIndexByBlockID(blockID flow.Identifier) error {
 	return m.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.RemoveOwnExecutionReceipt(rw.Writer(), blockID)
+		return m.BatchRemoveIndexByBlockID(blockID, rw)
 	})
 }
 
@@ -127,5 +137,5 @@ func (m *MyExecutionReceipts) RemoveIndexByBlockID(blockID flow.Identifier) erro
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (m *MyExecutionReceipts) BatchRemoveIndexByBlockID(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-	return operation.RemoveOwnExecutionReceipt(rw.Writer(), blockID)
+	return m.cache.RemoveTx(rw, blockID)
 }

@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -38,5 +39,31 @@ func TestCommitsStoreAndRetrieve(t *testing.T) {
 		// re-insert the commit - should be idempotent
 		err = store1.Store(blockID, expected)
 		require.NoError(t, err)
+	})
+}
+
+func TestCommitStoreAndRemove(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		metrics := metrics.NewNoopCollector()
+		store := store.NewCommits(metrics, db)
+
+		// Create and store a commit
+		blockID := unittest.IdentifierFixture()
+		expected := unittest.StateCommitmentFixture()
+		err := store.Store(blockID, expected)
+		require.NoError(t, err)
+
+		// Ensure it exists
+		commit, err := store.ByBlockID(blockID)
+		require.NoError(t, err)
+		assert.Equal(t, expected, commit)
+
+		// Remove it
+		err = store.RemoveByBlockID(blockID)
+		require.NoError(t, err)
+
+		// Ensure it no longer exists
+		_, err = store.ByBlockID(blockID)
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})
 }

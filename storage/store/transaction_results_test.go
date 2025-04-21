@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"errors"
 	"fmt"
 	mathRand "math/rand"
 	"testing"
@@ -65,6 +66,47 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 			actual, err = newst.ByBlockIDTransactionIndex(blockID, uint32(i))
 			require.NoError(t, err)
 			assert.Equal(t, txResults[i], *actual)
+		}
+	})
+}
+
+func TestBatchStoreAndBatchRemoveTransactionResults(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		metrics := metrics.NewNoopCollector()
+		st := store.NewTransactionResults(metrics, db, 1000)
+
+		blockID := unittest.IdentifierFixture()
+		txResults := make([]flow.TransactionResult, 0)
+		for i := 0; i < 10; i++ {
+			txID := unittest.IdentifierFixture()
+			expected := flow.TransactionResult{
+				TransactionID: txID,
+				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
+			}
+			txResults = append(txResults, expected)
+		}
+
+		// Store transaction results
+		err := db.WithReaderBatchWriter(func(rbw storage.ReaderBatchWriter) error {
+			return st.BatchStore(blockID, txResults, rbw)
+		})
+		require.NoError(t, err)
+
+		// Retrieve transaction results
+		for _, txResult := range txResults {
+			actual, err := st.ByBlockIDTransactionID(blockID, txResult.TransactionID)
+			require.NoError(t, err)
+			assert.Equal(t, txResult, *actual)
+		}
+
+		// Remove transaction results
+		err = st.RemoveByBlockID(blockID)
+		require.NoError(t, err)
+
+		// Retrieve transaction results
+		for _, txResult := range txResults {
+			_, err := st.ByBlockIDTransactionID(blockID, txResult.TransactionID)
+			require.True(t, errors.Is(err, storage.ErrNotFound))
 		}
 	})
 }
