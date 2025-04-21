@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"regexp"
 	"strings"
 
 	"github.com/golangci/plugin-module-register/register"
@@ -17,7 +18,6 @@ func init() {
 // Settings defines the configuration schema for the plugin.
 type Settings struct {
 	// ConstructorRegex is a regex pattern (optional) to identify allowed constructor function names.
-	// TODO: unused - current just use New.*
 	ConstructorRegex string `json:"constructorRegex"`
 }
 
@@ -63,6 +63,8 @@ type Settings struct {
 type PluginStructWrite struct {
 	// Set of mutation-protected types, stored as fully qualified type names
 	mutationProtected map[string]bool
+	// Regex of constructor function names, where mutation is allowed.
+	constructorRegex *regexp.Regexp
 }
 
 // New creates a new instance of the PluginStructWrite plugin.
@@ -71,9 +73,20 @@ func New(cfg any) (register.LinterPlugin, error) {
 	if err != nil {
 		return nil, err
 	}
-	_ = s // TODO
 
-	return &PluginStructWrite{mutationProtected: make(map[string]bool)}, nil
+	// Default to New*
+	if s.ConstructorRegex == "" {
+		s.ConstructorRegex = "^New.*"
+	}
+	re, err := regexp.Compile(s.ConstructorRegex)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PluginStructWrite{
+		mutationProtected: make(map[string]bool),
+		constructorRegex:  re,
+	}, nil
 }
 
 func (p *PluginStructWrite) BuildAnalyzers() ([]*analysis.Analyzer, error) {
@@ -143,6 +156,7 @@ func (p *PluginStructWrite) gatherMutationProtectedTypes(pass *analysis.Pass) {
 
 // handleAssignStmt checks for disallowed writes to tracked struct fields in assignments.
 // It handles pointer and literal types, and writes to fields promoted through embedding.
+//
 // In the examples below, suppose A is mutation-protected and B is not mutation-protected.
 // Suppose C is a struct which embeds A, and which is not mutation-protected.
 //
@@ -178,9 +192,8 @@ func (p *PluginStructWrite) handleAssignStmt(assign *ast.AssignStmt, pass *analy
 		}
 
 		funcDecl := findEnclosingFunc(file, assign.Pos())
-		if funcDecl == nil || !strings.HasPrefix(funcDecl.Name.Name, "New") {
-			pass.Reportf(assign.Lhs[i].Pos(),
-				"write to %s field outside constructor: func=%s, named=%s",
+		if funcDecl == nil || !p.constructorRegex.MatchString(funcDecl.Name.Name) {
+			pass.Reportf(assign.Lhs[i].Pos(), "write to %s field outside constructor: func=%s, named=%s",
 				named.Obj().Name(), funcNameOrEmpty(funcDecl), named.String())
 		}
 	}
@@ -222,9 +235,8 @@ func (p *PluginStructWrite) handleCompositeLit(lit *ast.CompositeLit, pass *anal
 	}
 
 	funcDecl := findEnclosingFunc(file, lit.Pos())
-	if funcDecl == nil || !strings.HasPrefix(funcDecl.Name.Name, "New") {
-		pass.Reportf(lit.Pos(),
-			"construction of %s outside constructor", named.Obj().Name())
+	if funcDecl == nil || !p.constructorRegex.MatchString(funcDecl.Name.Name) {
+		pass.Reportf(lit.Pos(), "construction of %s outside constructor", named.Obj().Name())
 	}
 }
 
@@ -282,7 +294,8 @@ func findEnclosingFunc(file *ast.File, pos token.Pos) *ast.FuncDecl {
 	return nil
 }
 
-// deref removes pointer indirection from a type.
+// deref removes pointer indirection from a type if it is a pointer.
+// Otherwise returns the input unchanged.
 func deref(t types.Type) types.Type {
 	if ptr, ok := t.(*types.Pointer); ok {
 		return ptr.Elem()

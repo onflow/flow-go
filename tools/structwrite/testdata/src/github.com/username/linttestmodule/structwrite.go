@@ -15,6 +15,10 @@ func NewNonWritable() *NonWritable {
 	}
 }
 
+func NotConstructorButContainsNewString() *NonWritable {
+	return &NonWritable{A: 1} // want "construction of NonWritable outside constructor"
+}
+
 func (nw *NonWritable) SetA() {
 	nw.A = 1 // want "write to NonWritable field outside constructor"
 }
