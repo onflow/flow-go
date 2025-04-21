@@ -62,7 +62,7 @@ type Settings struct {
 //	// x.Y.B == 2: x has been mutated due to the shared reference
 type PluginStructWrite struct {
 	// Set of mutation-protected types, stored as fully qualified type names
-	mutationProtected map[string]bool
+	mutationProtected map[string]struct{}
 	// Regex of constructor function names, where mutation is allowed.
 	constructorRegex *regexp.Regexp
 }
@@ -84,7 +84,7 @@ func New(cfg any) (register.LinterPlugin, error) {
 	}
 
 	return &PluginStructWrite{
-		mutationProtected: make(map[string]bool),
+		mutationProtected: make(map[string]struct{}),
 		constructorRegex:  re,
 	}, nil
 }
@@ -143,7 +143,7 @@ func (p *PluginStructWrite) gatherMutationProtectedTypes(pass *analysis.Pass) {
 							typeObj := pass.TypesInfo.Defs[typeSpec.Name]
 							if named, ok := typeObj.Type().(*types.Named); ok {
 								fullyQualified := named.String()
-								p.mutationProtected[fullyQualified] = true
+								p.mutationProtected[fullyQualified] = struct{}{}
 							}
 							break
 						}
@@ -230,7 +230,7 @@ func (p *PluginStructWrite) handleCompositeLit(lit *ast.CompositeLit, pass *anal
 	}
 
 	fullyQualified := named.String()
-	if !p.mutationProtected[fullyQualified] {
+	if !p.isMutationProtected(fullyQualified) {
 		return
 	}
 
@@ -238,6 +238,12 @@ func (p *PluginStructWrite) handleCompositeLit(lit *ast.CompositeLit, pass *anal
 	if funcDecl == nil || !p.constructorRegex.MatchString(funcDecl.Name.Name) {
 		pass.Reportf(lit.Pos(), "construction of %s outside constructor", named.Obj().Name())
 	}
+}
+
+// isMutationProtected checks whether a fully qualified type is configured to be mutation-protected.
+func (p *PluginStructWrite) isMutationProtected(fullyQualifiedTypeName string) bool {
+	_, ok := p.mutationProtected[fullyQualifiedTypeName]
+	return ok
 }
 
 // containsTrackedStruct checks whether the field accessed via selector expression belongs to a tracked struct,
@@ -256,7 +262,7 @@ func (p *PluginStructWrite) containsTrackedStruct(selExpr *ast.SelectorExpr, pas
 
 			if named, ok := deref(typ).(*types.Named); ok {
 				fullyQualified := named.String()
-				if p.mutationProtected[fullyQualified] {
+				if p.isMutationProtected(fullyQualified) {
 					return named, true
 				}
 			}
@@ -275,7 +281,7 @@ func (p *PluginStructWrite) containsTrackedStruct(selExpr *ast.SelectorExpr, pas
 		return nil, false
 	}
 	fullyQualified := named.String()
-	if p.mutationProtected[fullyQualified] {
+	if p.isMutationProtected(fullyQualified) {
 		return named, true
 	}
 
