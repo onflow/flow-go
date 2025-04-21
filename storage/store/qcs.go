@@ -51,15 +51,9 @@ func (q *QuorumCertificates) StoreTx(qc *flow.QuorumCertificate) func(*transacti
 // TODO(leo): add locking/synchronization
 func (q *QuorumCertificates) BatchStore(qc *flow.QuorumCertificate, rw storage.ReaderBatchWriter) error {
 	// Check if the QC is already exist
-	existing, err := q.cache.Get(rw.GlobalReader(), qc.BlockID)
+	_, err := q.cache.Get(rw.GlobalReader(), qc.BlockID)
 	if err == nil {
-		if existing.ID() != qc.ID() {
-			return fmt.Errorf("different qc %v (!= %v)already exists for block ID %s: %w",
-				existing.ID(), qc.ID(), qc.BlockID, storage.ErrAlreadyExists)
-		}
-
-		// if the same QC is already exist, we can skip the store
-		return nil
+		return fmt.Errorf("qc already exists for block ID %s: %w", qc.BlockID, storage.ErrAlreadyExists)
 	}
 
 	if !errors.Is(err, storage.ErrNotFound) {
