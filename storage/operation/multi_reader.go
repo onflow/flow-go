@@ -79,3 +79,7 @@ func (b *multiReader) NewIter(startPrefix, endPrefix []byte, ops storage.Iterato
 
 	return NewMultiIterator(iterators...)
 }
+
+func (b *multiReader) NewSeeker() storage.Seeker {
+	panic("not implemented")
+}
