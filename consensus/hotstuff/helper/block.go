@@ -109,7 +109,7 @@ func WithLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*model.Proposal) {
 // (e.g. `ChainID` and `Height` are not included in `model.Block`) and hence the conversion
 // is *not reversible*. This is on purpose, because we wanted to only expose data to
 // HotStuff that HotStuff really needs.
-func SignedProposalToFlow(proposal *model.SignedProposal) *flow.Proposal {
+func SignedProposalToFlow(proposal *model.SignedProposal) *flow.ProposalHeader {
 	block := proposal.Block
 	header := &flow.Header{
 		ParentID:           block.QC.BlockID,
@@ -123,7 +123,7 @@ func SignedProposalToFlow(proposal *model.SignedProposal) *flow.Proposal {
 		LastViewTC:         proposal.LastViewTC,
 	}
 
-	return &flow.Proposal{
+	return &flow.ProposalHeader{
 		Header:          header,
 		ProposerSigData: proposal.SigData,
 	}

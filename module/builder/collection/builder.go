@@ -99,7 +99,7 @@ func NewBuilder(
 // However, it will pass through all errors returned by `setter` and `sign`.
 // Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
 // and handle them accordingly when handling errors returned from BuildOn.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) ([]byte, error)) (*flow.Proposal, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) ([]byte, error)) (*flow.ProposalHeader, error) {
 	parentSpan, ctx := b.tracer.StartSpanFromContext(context.Background(), trace.COLBuildOn)
 	defer parentSpan.End()
 
@@ -500,7 +500,7 @@ func (b *Builder) buildHeader(
 	payload *cluster.Payload,
 	setter func(header *flow.Header) error,
 	sign func(header *flow.Header) ([]byte, error),
-) (*flow.Proposal, error) {
+) (*flow.ProposalHeader, error) {
 
 	header := &flow.Header{
 		ChainID:     ctx.parent.ChainID,
@@ -522,7 +522,7 @@ func (b *Builder) buildHeader(
 	if err != nil {
 		return nil, fmt.Errorf("could not sign proposal: %w", err)
 	}
-	return &flow.Proposal{
+	return &flow.ProposalHeader{
 		Header:          header,
 		ProposerSigData: sig,
 	}, nil

@@ -210,7 +210,7 @@ func (h *MessageHub) sendOwnMessages(ctx context.Context) error {
 
 		msg, ok := h.ownOutboundProposals.Pop()
 		if ok {
-			proposal := msg.(*flow.Proposal)
+			proposal := msg.(*flow.ProposalHeader)
 			err := h.sendOwnProposal(proposal)
 			if err != nil {
 				return fmt.Errorf("could not process queued proposal %v: %w", proposal.Header.ID(), err)
@@ -300,7 +300,7 @@ func (h *MessageHub) sendOwnVote(packed *packedVote) error {
 
 // sendOwnProposal propagates the block proposal to the consensus committee by broadcasting to all other cluster participants (excluding myself)
 // No errors are expected during normal operations.
-func (h *MessageHub) sendOwnProposal(proposal *flow.Proposal) error {
+func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	header := proposal.Header
 	// first, check that we are the proposer of the block
 	if header.ProposerID != h.me.NodeID() {
@@ -398,7 +398,7 @@ func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
 // OnOwnProposal directly forwards proposal to HotStuff core logic(skipping compliance engine as we assume our
 // own proposals to be correct) and queues proposal for subsequent propagation to all consensus participants (including this node).
 // The proposal will only be placed in the queue, after the specified delay (or dropped on shutdown signal).
-func (h *MessageHub) OnOwnProposal(proposal *flow.Proposal, targetPublicationTime time.Time) {
+func (h *MessageHub) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicationTime time.Time) {
 	go func() {
 		select {
 		case <-time.After(time.Until(targetPublicationTime)):

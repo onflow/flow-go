@@ -30,7 +30,7 @@ func NewFollower(log zerolog.Logger,
 	rootHeader *flow.Header,
 	rootQC *flow.QuorumCertificate,
 	finalized *flow.Header,
-	pending []*flow.Proposal,
+	pending []*flow.ProposalHeader,
 ) (*hotstuff.FollowerLoop, error) {
 	forks, err := NewForks(finalized, headers, updater, notifier, rootHeader, rootQC)
 	if err != nil {

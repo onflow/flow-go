@@ -23,5 +23,5 @@ type BlockProducer interface {
 	//   - model.NoVoteError if it is not safe for us to vote (our proposal includes our vote)
 	//     for this view. This can happen if we have already proposed or timed out this view.
 	//   - generic error in case of unexpected failure
-	MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.Proposal, error)
+	MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.ProposalHeader, error)
 }

@@ -83,7 +83,7 @@ type MessageHub struct {
 	pushBlocksCon              network.Conduit
 	ownOutboundMessageNotifier engine.Notifier
 	ownOutboundVotes           *fifoqueue.FifoQueue // queue for handling outgoing vote transmissions
-	ownOutboundProposals       *fifoqueue.FifoQueue // queue for handling outgoing proposal transmissions (flow.Proposal)
+	ownOutboundProposals       *fifoqueue.FifoQueue // queue for handling outgoing proposal transmissions (flow.ProposalHeader)
 	ownOutboundTimeouts        *fifoqueue.FifoQueue // queue for handling outgoing timeout transmissions
 
 	// injected dependencies
@@ -193,7 +193,7 @@ func (h *MessageHub) sendOwnMessages(ctx context.Context) error {
 
 		msg, ok := h.ownOutboundProposals.Pop()
 		if ok {
-			proposal := msg.(*flow.Proposal)
+			proposal := msg.(*flow.ProposalHeader)
 			err := h.sendOwnProposal(proposal)
 			if err != nil {
 				return fmt.Errorf("could not process queued block %v: %w", proposal.Header.ID(), err)
@@ -293,7 +293,7 @@ func (h *MessageHub) sendOwnVote(packed *packedVote) error {
 //   - broadcast to all non-consensus participants
 //
 // No errors are expected during normal operations.
-func (h *MessageHub) sendOwnProposal(proposal *flow.Proposal) error {
+func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	// first, check that we are the proposer of the block
 	header := proposal.Header
 	if header.ProposerID != h.me.NodeID() {
@@ -432,7 +432,7 @@ func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
 // OnOwnProposal directly forwards proposal to HotStuff core logic (skipping compliance engine as we assume our
 // own proposals to be correct) and queues proposal for subsequent propagation to all consensus participants (including this node).
 // The proposal will only be placed in the queue, after the specified delay (or dropped on shutdown signal).
-func (h *MessageHub) OnOwnProposal(proposal *flow.Proposal, targetPublicationTime time.Time) {
+func (h *MessageHub) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicationTime time.Time) {
 	go func() {
 		select {
 		case <-time.After(time.Until(targetPublicationTime)):

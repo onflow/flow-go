@@ -87,8 +87,8 @@ func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.H
 	}
 }
 
-func (h *Headers) retrieveProposalTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Proposal, error) {
-	return func(tx *badger.Txn) (*flow.Proposal, error) {
+func (h *Headers) retrieveProposalTx(blockID flow.Identifier) func(*badger.Txn) (*flow.ProposalHeader, error) {
+	return func(tx *badger.Txn) (*flow.ProposalHeader, error) {
 		header, err := h.cache.Get(blockID)(tx)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve header: %w", err)
@@ -97,7 +97,7 @@ func (h *Headers) retrieveProposalTx(blockID flow.Identifier) func(*badger.Txn) 
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve proposer signature for id %x: %w", blockID, err)
 		}
-		return &flow.Proposal{Header: header, ProposerSigData: sig}, nil
+		return &flow.ProposalHeader{Header: header, ProposerSigData: sig}, nil
 	}
 }
 
@@ -112,7 +112,7 @@ func (h *Headers) retrieveIdByHeightTx(height uint64) func(*badger.Txn) (flow.Id
 	}
 }
 
-func (h *Headers) Store(proposal *flow.Proposal) error {
+func (h *Headers) Store(proposal *flow.ProposalHeader) error {
 	return operation.RetryOnConflictTx(h.db, transaction.Update, h.storeTx(proposal.Header.ID(), proposal.Header, proposal.ProposerSigData))
 }
 
@@ -133,7 +133,7 @@ func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 	return h.retrieveTx(blockID)(tx)
 }
 
-func (h *Headers) ProposalByBlockID(blockID flow.Identifier) (*flow.Proposal, error) {
+func (h *Headers) ProposalByBlockID(blockID flow.Identifier) (*flow.ProposalHeader, error) {
 	tx := h.db.NewTransaction(false)
 	defer tx.Discard()
 	return h.retrieveProposalTx(blockID)(tx)

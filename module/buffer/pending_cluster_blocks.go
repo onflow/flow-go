@@ -15,9 +15,9 @@ func NewPendingClusterBlocks() *PendingClusterBlocks {
 }
 
 func (b *PendingClusterBlocks) Add(block flow.Slashable[*cluster.BlockProposal]) bool {
-	return b.backend.add(flow.Slashable[*flow.Proposal]{
+	return b.backend.add(flow.Slashable[*flow.ProposalHeader]{
 		OriginID: flow.Identifier{},
-		Message:  &flow.Proposal{Header: block.Message.Block.Header, ProposerSigData: block.Message.ProposerSigData},
+		Message:  &flow.ProposalHeader{Header: block.Message.Block.Header, ProposerSigData: block.Message.ProposerSigData},
 	}, block.Message.Block.Payload)
 }
 

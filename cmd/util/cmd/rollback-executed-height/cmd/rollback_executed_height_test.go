@@ -49,7 +49,7 @@ func TestReExecuteBlock(t *testing.T) {
 			serviceEvents := store.NewServiceEvents(metrics, db)
 
 			// By convention, root block has no proposer signature - implementation has to handle this edge case
-			err = headers.Store(&flow.Proposal{Header: genesis, ProposerSigData: nil})
+			err = headers.Store(&flow.ProposalHeader{Header: genesis, ProposerSigData: nil})
 			require.NoError(t, err)
 
 			getLatestFinalized := func() (uint64, error) {
@@ -187,7 +187,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
 
 			// By convention, root block has no proposer signature - implementation has to handle this edge case
-			err = headers.Store(&flow.Proposal{Header: genesis, ProposerSigData: nil})
+			err = headers.Store(&flow.ProposalHeader{Header: genesis, ProposerSigData: nil})
 			require.NoError(t, err)
 
 			getLatestFinalized := func() (uint64, error) {

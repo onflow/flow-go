@@ -89,7 +89,7 @@ func (*NoopCommunicatorConsumer) OnOwnVote(flow.Identifier, uint64, []byte, flow
 
 func (*NoopCommunicatorConsumer) OnOwnTimeout(*model.TimeoutObject) {}
 
-func (*NoopCommunicatorConsumer) OnOwnProposal(*flow.Proposal, time.Time) {}
+func (*NoopCommunicatorConsumer) OnOwnProposal(*flow.ProposalHeader, time.Time) {}
 
 // no-op implementation of hotstuff.VoteCollectorConsumer
 

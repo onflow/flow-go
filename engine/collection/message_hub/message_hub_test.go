@@ -273,7 +273,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 		expectedBroadcastMsg := messages.NewUntrustedClusterProposal(&block, unittest.SignatureFixture())
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
-		headerProposal := &flow.Proposal{Header: block.Header, ProposerSigData: expectedBroadcastMsg.ProposerSigData}
+		headerProposal := &flow.ProposalHeader{Header: block.Header, ProposerSigData: expectedBroadcastMsg.ProposerSigData}
 		hotstuffProposal := model.SignedProposalFromFlow(headerProposal)
 		s.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		s.hotstuff.On("SubmitProposal", hotstuffProposal).

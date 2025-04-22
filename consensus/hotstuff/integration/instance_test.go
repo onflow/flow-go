@@ -190,7 +190,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything, mock.Anything).Return(
-		func(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) ([]byte, error)) *flow.Proposal {
+		func(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) ([]byte, error)) *flow.ProposalHeader {
 			in.updatingBlocks.Lock()
 			defer in.updatingBlocks.Unlock()
 
@@ -209,7 +209,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			require.NoError(t, setter(header))
 			sig, err := sign(header)
 			require.NoError(t, err)
-			proposal := &flow.Proposal{
+			proposal := &flow.ProposalHeader{
 				Header:          header,
 				ProposerSigData: sig,
 			}
@@ -286,7 +286,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	// program the hotstuff communicator behaviour
 	in.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
-			proposal, ok := args[0].(*flow.Proposal)
+			proposal, ok := args[0].(*flow.ProposalHeader)
 			require.True(t, ok)
 
 			// sender should always have the parent
