@@ -14,8 +14,8 @@ const WebAuthnTypeGet = "webauthn.get"
 
 type WebAuthnExtensionData struct {
 	// The WebAuthn extension data
-	AuthenticatorData []byte `rlp:"authenticatorData"`
-	ClientDataJson    []byte `rlp:"clientDataJson"`
+	AuthenticatorData []byte
+	ClientDataJson    []byte
 }
 
 type CollectedClientData struct {
@@ -29,9 +29,6 @@ func (w *WebAuthnExtensionData) GetCollectedClientData() (*CollectedClientData, 
 	err := json.Unmarshal(w.ClientDataJson, clientData)
 	if err != nil {
 		return nil, err
-	}
-	if clientData.Type != WebAuthnTypeGet || len(clientData.Challenge) != WebAuthnChallengeLength || len(clientData.Origin) == 0 {
-		return nil, errors.New("invalid client data")
 	}
 	return clientData, err
 }
@@ -60,6 +57,8 @@ func validateFlags(flags byte, extensions []byte) error {
 	// i.e. no extension data but flags are set.
 	if len(extensions) == 0 && (attestationCredentialData || extensionData) {
 		return errors.New("invalid flags: Attestation Credential Data (AT) Extension Data (ED) flag set without corrosponding extension data")
+	} else if len(extensions) != 0 && !(attestationCredentialData && extensionData) {
+		return errors.New("invalid flags: Extension Data (ED) flag set without corrosponding extension data")
 	}
 
 	// If all checks pass, return nil

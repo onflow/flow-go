@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence/runtime"
@@ -241,17 +242,22 @@ func VerifySignatureFromTransaction(
 		scheme = AuthenticationSchemeFromByte(extensionData[0])
 	}
 	if scheme == INVALID {
-		return false, errors.NewValueErrorf(fmt.Sprintf("%d", scheme), "authenticaion scheme type not found")
+		// TODO: Should we panic here instead?
+		// return false, errors.NewUnknownFailure(fmt.Errorf("authentication scheme %d not found ", scheme))
+		return false, nil
 	}
 
 	reconstructedMessage, err := reconstructMessage(scheme, extensionData, message)
 	if err != nil {
-		return false, errors.NewValueErrorf(err.Error(), "could not reconstruct message for signature verification")
+		// Log error here?
+
+		return false, nil
 	}
 
 	hasher, err := NewPrefixedHashing(hashAlgo, "")
 	if err != nil {
-		return false, errors.NewValueErrorf(err.Error(), "transaction verification failed")
+		return false, errors.NewUnknownFailure(fmt.Errorf(
+			hashAlgo.String(), "is not supported in transactions"))
 	}
 
 	valid, err := pk.Verify(signature, reconstructedMessage, hasher)
@@ -282,18 +288,27 @@ func reconstructMessage(scheme AuthenticationScheme, extensionData []byte, messa
 			return nil, errors.NewValueErrorf("extension data is empty", "extension data is empty")
 		}
 		rlpEncodedWebAuthnData := extensionData[1:]
-		decodedWebAuthnData := WebAuthnExtensionData{}
+		decodedWebAuthnData := &WebAuthnExtensionData{}
 		if err := rlp.DecodeBytes(rlpEncodedWebAuthnData, decodedWebAuthnData); err != nil {
-			return nil, errors.NewValueErrorf("could not decode webauthn extension data", "could not decode webauthn extension data")
+			return nil, err
 		}
 
 		clientData, err := decodedWebAuthnData.GetCollectedClientData()
 		if err != nil {
-			return nil, errors.NewValueErrorf("could not decode webauthn client data", "could not decode webauthn client data")
+			return nil, err
 		}
-		clientDataChallenge, err := hex.DecodeString(clientData.Challenge)
+		// do we allow 0x prefix for challenge?
+		challengeHex := clientData.Challenge
+		if len(challengeHex) > 2 && strings.ToLower(challengeHex[:2]) == "0x" {
+			challengeHex = challengeHex[2:]
+		}
+		clientDataChallenge, err := hex.DecodeString(challengeHex)
+
 		if err != nil {
-			return nil, errors.NewValueErrorf("could not decode webauthn client data", "could not decode webauthn client data")
+			return nil, err
+		}
+		if !strings.EqualFold(clientData.Type, WebAuthnTypeGet) || len(clientDataChallenge) != WebAuthnChallengeLength || len(clientData.Origin) == 0 {
+			return nil, fmt.Errorf("invalid client data %v", clientData)
 		}
 		// Validate challenge
 		hasher, err := NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)

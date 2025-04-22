@@ -18,3 +18,14 @@ func AuthenticationSchemeFromByte(b byte) AuthenticationScheme {
 		return INVALID
 	}
 }
+
+func (s AuthenticationScheme) String() string {
+	switch s {
+	case PLAIN:
+		return "PLAIN"
+	case WEBAUTHN:
+		return "WEBAUTHN"
+	default:
+		return "INVALID"
+	}
+}
