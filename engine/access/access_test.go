@@ -941,10 +941,6 @@ func (suite *Suite) TestGetTransactionResult() {
 		txIdNegative := collectionNegative.Transactions[0].ID()
 		collectionIdNegative := collectionNegative.ID()
 
-		debugCollection, err := all.Blocks.ByCollectionID(collectionId)
-
-		debugCollection.ID()
-
 		assertTransactionResult := func(
 			resp *accessproto.TransactionResultResponse,
 			err error,
@@ -1354,11 +1350,6 @@ func (suite *Suite) createChain() (*flow.Block, *flow.Collection) {
 	snap.On("Epochs").Return(epochs).Maybe()
 	snap.On("Params").Return(suite.params).Maybe()
 	snap.On("Head").Return(block.Header, nil).Maybe()
-
-	suite.log.Debug().
-		Str("refBlockID", refBlockID.String()).
-		Str("collection", collection.ID().String()).
-		Msg("createChain DEBUG")
 
 	suite.state.On("AtBlockID", refBlockID).Return(snap)
 
