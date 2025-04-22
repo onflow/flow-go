@@ -61,6 +61,8 @@ func (c Collection) Fingerprint() []byte {
 // LightCollection is a collection containing references to the constituent
 // transactions rather than full transaction bodies. It is used for indexing
 // transactions by collection and for computing the collection fingerprint.
+//
+//structwrite:immutable
 type LightCollection struct {
 	Transactions []Identifier
 }
