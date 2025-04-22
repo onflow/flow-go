@@ -96,7 +96,7 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 		outgoingMessageScope, err := message.NewOutgoingScope(
 			ids.NodeIDs(),
 			channels.TopicFromChannel(channels.PushBlocks, sporkId),
-			messages.NewBlockProposal(unittest.ProposalFixture()),
+			messages.NewUntrustedProposal(unittest.ProposalFixture()),
 			unittest.NetworkCodec().Encode,
 			message.ProtocolTypePubSub)
 		require.NoError(t, err)

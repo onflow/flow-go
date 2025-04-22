@@ -340,7 +340,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.Proposal) error {
 		},
 		ProposerSigData: proposal.ProposerSigData,
 	}
-	proposalMsg := messages.ClusterBlockProposalFrom(cbp)
+	proposalMsg := messages.UntrustedClusterProposalFromInternal(cbp)
 
 	// broadcast the proposal to consensus nodes
 	err = h.con.Publish(proposalMsg, recipients.NodeIDs()...)
@@ -427,8 +427,8 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.Proposal, targetPublicationTim
 // No errors are expected during normal operations.
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *messages.ClusterBlockProposal:
-		h.compliance.OnClusterBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+	case *messages.UntrustedClusterProposal:
+		h.compliance.OnClusterBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
 			OriginID: originID,
 			Message:  msg,
 		})

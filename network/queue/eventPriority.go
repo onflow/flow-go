@@ -40,7 +40,7 @@ func GetEventPriority(message interface{}) (Priority, error) {
 func getPriorityByType(message interface{}) Priority {
 	switch message.(type) {
 	// consensus
-	case *messages.BlockProposal:
+	case *messages.UntrustedProposal:
 		return HighPriority
 	case *messages.BlockVote:
 		return HighPriority
@@ -58,7 +58,7 @@ func getPriorityByType(message interface{}) Priority {
 		return HighPriority
 
 	// cluster consensus
-	case *messages.ClusterBlockProposal:
+	case *messages.UntrustedClusterProposal:
 		return HighPriority
 	case *messages.ClusterBlockVote:
 		return HighPriority

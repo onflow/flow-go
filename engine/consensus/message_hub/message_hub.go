@@ -343,7 +343,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.Proposal) error {
 	// NOTE: some fields are not needed for the message
 	// - proposer ID is conveyed over the network message
 	// - the payload hash is deduced from the payload
-	blockProposal := messages.NewBlockProposal(&flow.BlockProposal{
+	blockProposal := messages.NewUntrustedProposal(&flow.BlockProposal{
 		Block: &flow.Block{
 			Header:  header,
 			Payload: payload,
@@ -370,7 +370,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.Proposal) error {
 
 // provideProposal is used when we want to broadcast a local block to the rest  of the
 // network (non-consensus nodes).
-func (h *MessageHub) provideProposal(proposal *messages.BlockProposal, recipients flow.IdentityList) {
+func (h *MessageHub) provideProposal(proposal *messages.UntrustedProposal, recipients flow.IdentityList) {
 	header := proposal.Block.Header
 	blockID := header.ID()
 	log := h.log.With().
@@ -461,8 +461,8 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.Proposal, targetPublicationTim
 // No errors are expected during normal operations.
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *messages.BlockProposal:
-		h.compliance.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+	case *messages.UntrustedProposal:
+		h.compliance.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
 			OriginID: originID,
 			Message:  msg,
 		})

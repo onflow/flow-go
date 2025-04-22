@@ -253,13 +253,13 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ClusterPrefix
 	require.ErrorIs(s.T(), err, message.ErrUnauthorizedUnicastOnChannel)
 	require.Equal(s.T(), "*messages.SyncRequest", msgType)
 
-	// ensure ClusterBlockProposal not allowed to be sent on channel via unicast
+	// ensure UntrustedClusterProposal not allowed to be sent on channel via unicast
 	msgType, err = authorizedSenderValidator.Validate(pid, []byte{codec.CodeClusterBlockProposal.Uint8()}, channels.ConsensusCluster(clusterID), message.ProtocolTypeUnicast)
 	require.ErrorIs(s.T(), err, message.ErrUnauthorizedUnicastOnChannel)
-	require.Equal(s.T(), "*messages.ClusterBlockProposal", msgType)
+	require.Equal(s.T(), "*messages.UntrustedClusterProposal", msgType)
 
-	// ensure ClusterBlockProposal is allowed to be sent via pubsub by authorized sender
-	payload, err := s.codec.Encode(&messages.ClusterBlockProposal{})
+	// ensure UntrustedClusterProposal is allowed to be sent via pubsub by authorized sender
+	payload, err := s.codec.Encode(&messages.UntrustedClusterProposal{})
 	require.NoError(s.T(), err)
 	m := &message.Message{
 		ChannelID: channels.ConsensusCluster(clusterID).String(),
@@ -332,7 +332,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 		require.True(s.T(), codec.IsErrUnknownMsgCode(err))
 		require.Equal(s.T(), "", msgType)
 
-		payload, err := s.codec.Encode(&messages.BlockProposal{})
+		payload, err := s.codec.Encode(&messages.UntrustedProposal{})
 		require.NoError(s.T(), err)
 		payload[0] = byte('x')
 		netMsg := &message.Message{
