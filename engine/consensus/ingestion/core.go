@@ -73,8 +73,10 @@ func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionG
 		Logger()
 	log.Info().Msg("collection guarantee received")
 
+	guaranteeID := guarantee.ID()
+
 	// skip collection guarantees that are already in our memory pool
-	exists := e.pool.Has(guarantee.ID())
+	exists := e.pool.Has(guaranteeID)
 	if exists {
 		log.Debug().Msg("skipping known collection guarantee")
 		return nil
@@ -95,7 +97,7 @@ func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionG
 	}
 
 	// at this point, we can add the guarantee to the memory pool
-	added := e.pool.Add(guarantee.ID(), guarantee)
+	added := e.pool.Add(guaranteeID, guarantee)
 	if !added {
 		log.Debug().Msg("discarding guarantee already in pool")
 		return nil
