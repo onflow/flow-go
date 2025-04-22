@@ -30,22 +30,15 @@ func NewFollower(log zerolog.Logger,
 	rootHeader *flow.Header,
 	rootQC *flow.QuorumCertificate,
 	finalized *flow.Header,
-	pending []*flow.Header,
+	pending []*flow.Proposal,
 ) (*hotstuff.FollowerLoop, error) {
 	forks, err := NewForks(finalized, headers, updater, notifier, rootHeader, rootQC)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize forks: %w", err)
 	}
 
-	// TODO(malleability, #7100) - proposerSigData storage
-	// Followers don't need proposer signature (and all headers in storage must have been already verified)
-	pendingProposals := make([]*flow.Proposal, 0, len(pending))
-	for _, p := range pending {
-		pendingProposals = append(pendingProposals, &flow.Proposal{Header: p, ProposerSigData: nil})
-	}
-
 	// recover forks internal state (inserts all pending blocks)
-	err = recovery.Recover(log, pendingProposals, recovery.ForksState(forks))
+	err = recovery.Recover(log, pending, recovery.ForksState(forks))
 	if err != nil {
 		return nil, fmt.Errorf("could not recover hotstuff follower state: %w", err)
 	}

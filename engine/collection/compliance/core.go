@@ -115,12 +115,9 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.ClusterBlock
 		OriginID: proposalMsg.OriginID,
 		Message:  proposalMsg.Message.ToInternal(),
 	}
-	block := flow.Slashable[*cluster.Block]{
-		OriginID: proposal.OriginID,
-		Message:  proposal.Message.Block,
-	}
-	header := block.Message.Header
-	blockID := block.Message.ID()
+	header := proposal.Message.Block.Header
+	payload := proposal.Message.Block.Payload
+	blockID := proposal.Message.Block.ID()
 	finalHeight := c.finalizedHeight.Value()
 	finalView := c.finalizedView.Value()
 
@@ -131,9 +128,9 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.ClusterBlock
 		Uint64("block_view", header.View).
 		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
-		Hex("ref_block_id", block.Message.Payload.ReferenceBlockID[:]).
-		Hex("collection_id", logging.Entity(block.Message.Payload.Collection)).
-		Int("tx_count", block.Message.Payload.Collection.Len()).
+		Hex("ref_block_id", payload.ReferenceBlockID[:]).
+		Hex("collection_id", logging.Entity(payload.Collection)).
+		Int("tx_count", payload.Collection.Len()).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
@@ -142,7 +139,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.ClusterBlock
 		Logger()
 	if log.Debug().Enabled() {
 		log = log.With().Strs("tx_ids",
-			flow.IdentifierList(block.Message.Payload.Collection.Light().Transactions).Strings()).Logger()
+			flow.IdentifierList(payload.Collection.Light().Transactions).Strings()).Logger()
 	}
 	log.Info().Msg("block proposal received")
 
@@ -338,7 +335,7 @@ func (c *Core) processBlockProposal(proposal *cluster.BlockProposal) error {
 	}
 
 	// see if the block is a valid extension of the protocol state
-	err = c.state.Extend(proposal.Block)
+	err = c.state.Extend(proposal)
 	if err != nil {
 		if state.IsInvalidExtensionError(err) {
 			// if the block proposes an invalid extension of the cluster state, then the block is invalid

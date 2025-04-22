@@ -793,14 +793,9 @@ func main() {
 			if !startupTime.IsZero() {
 				opts = append(opts, consensus.WithStartupTime(startupTime))
 			}
-			finalizedBlock, pendingOrig, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			finalizedBlock, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, err
-			}
-			// TODO(malleability, #7100) proposer signature storage
-			pending := make([]*flow.Proposal, 0, len(pendingOrig))
-			for _, p := range pendingOrig {
-				pending = append(pending, &flow.Proposal{Header: p, ProposerSigData: nil})
 			}
 
 			// initialize hotstuff consensus algorithm

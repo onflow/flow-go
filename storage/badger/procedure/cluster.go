@@ -14,23 +14,29 @@ import (
 
 // InsertClusterBlock inserts a cluster consensus block, updating all
 // associated indexes.
-func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
+func InsertClusterBlock(proposal *cluster.BlockProposal) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// store the block header
-		blockID := block.ID()
-		err := operation.InsertHeader(blockID, block.ToHeader())(tx)
+		blockID := proposal.Block.ID()
+		err := operation.InsertHeader(blockID, proposal.Block.ToHeader())(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
 		}
 
+		// store the block proposer signature
+		err = operation.InsertProposalSignature(blockID, &proposal.ProposerSigData)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert proposer signature: %w", err)
+		}
+
 		// insert the block payload
-		err = InsertClusterPayload(blockID, block.Payload)(tx)
+		err = InsertClusterPayload(blockID, proposal.Block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert payload: %w", err)
 		}
 
 		// index the child block for recovery
-		err = IndexNewBlock(blockID, block.Header.ParentID)(tx)
+		err = IndexNewBlock(blockID, proposal.Block.Header.ParentID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}

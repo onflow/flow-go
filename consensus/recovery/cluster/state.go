@@ -32,12 +32,11 @@ func FindLatest(state cluster.State, headers storage.Headers) (*flow.Header, []*
 
 	pending := make([]*flow.Proposal, 0, len(pendingIDs))
 	for _, pendingID := range pendingIDs {
-		header, err := headers.ByBlockID(pendingID)
+		proposal, err := headers.ProposalByBlockID(pendingID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not find pending child: %w", err)
 		}
-		// TODO(malleability, #7100) - proposerSigData storage
-		pending = append(pending, &flow.Proposal{Header: header, ProposerSigData: nil})
+		pending = append(pending, proposal)
 	}
 
 	return finalizedBlock, pending, nil

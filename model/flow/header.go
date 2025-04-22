@@ -6,9 +6,8 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/vmihailenco/msgpack/v4"
-
 	"github.com/onflow/go-ethereum/rlp"
+	"github.com/vmihailenco/msgpack/v4"
 
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/fingerprint"
@@ -19,12 +18,6 @@ type Proposal struct {
 	Header *Header
 	// ProposerSigData is a signature of the proposer over the new block. Not a single cryptographic
 	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
-	ProposerSigData []byte
-}
-
-// BlockProposal is a signed proposal that includes the block payload, in addition to the required header and signature.
-type BlockProposal struct {
-	Block           *Block
 	ProposerSigData []byte
 }
 

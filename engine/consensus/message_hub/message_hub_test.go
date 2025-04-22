@@ -266,8 +266,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 		s.pushBlocksCon.On("Publish", expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
 
 		// submit to broadcast proposal
-		headerProposal := &flow.Proposal{Header: block.Header, ProposerSigData: proposal.ProposerSigData}
-		s.hub.OnOwnProposal(headerProposal, time.Now())
+		s.hub.OnOwnProposal(proposal.HeaderProposal(), time.Now())
 
 		unittest.AssertClosesBefore(s.T(), util.AllClosed(broadcast, submitted), time.Second)
 	})
@@ -328,8 +327,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		s.pushBlocksCon.On("Publish", expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
 
 		// submit proposal
-		headerProposal := &flow.Proposal{Header: block.Header, ProposerSigData: proposal.ProposerSigData}
-		s.hub.OnOwnProposal(headerProposal, time.Now())
+		s.hub.OnOwnProposal(proposal.HeaderProposal(), time.Now())
 	})
 
 	unittest.RequireReturnsBefore(s.T(), func() {

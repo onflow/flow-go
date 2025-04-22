@@ -99,7 +99,7 @@ type FollowerServiceBuilder struct {
 	FollowerDistributor *pubsub.FollowerDistributor
 	Committee           hotstuff.DynamicCommittee
 	Finalized           *flow.Header
-	Pending             []*flow.Header
+	Pending             []*flow.Proposal
 	FollowerCore        module.HotStuffFollower
 	// for the observer, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
