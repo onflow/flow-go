@@ -98,8 +98,10 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	return b.ByID(blockID)
 }
 
-// IndexBlockForCollectionGuarantees ...
-func (b *Blocks) IndexBlockForCollectionGuarantees(blockID flow.Identifier, collIDs []flow.Identifier) error {
+// IndexBlockForCollectionGuarantees creates an index `guaranteeID->blockID` for each guarantee
+// which appears in the block.
+// No errors are expected during normal operation.
+func (b *Blocks) IndexBlockForCollectionGuarantees(blockID flow.Identifier, guaranteeIDs []flow.Identifier) error {
 	for _, collID := range collIDs {
 		err := operation.RetryOnConflict(b.db.Update, operation.SkipDuplicates(operation.IndexCollectionGuaranteeBlock(collID, blockID)))
 		if err != nil {
