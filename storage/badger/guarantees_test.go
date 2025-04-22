@@ -8,9 +8,8 @@ import (
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/unittest"
-
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestGuaranteeStoreRetrieve(t *testing.T) {
@@ -35,7 +34,7 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		actual, err := store.ByID(expected.ID())
 		require.NoError(t, err)
 		require.Equal(t, expected, actual)
-		
+
 		actual, err = store.ByCollectionID(expected.CollectionID)
 		require.NoError(t, err)
 		require.Equal(t, expected, actual)
