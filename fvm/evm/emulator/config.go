@@ -89,7 +89,7 @@ func MakeChainConfig(chainID *big.Int) *gethParams.ChainConfig {
 		// Fork scheduling based on timestamps
 		ShanghaiTime: &zero, // already on Shanghai
 		CancunTime:   &zero, // already on Cancun
-		PragueTime:   nil,   // not on Prague
+		PragueTime:   &zero, // already on Prague
 		VerkleTime:   nil,   // not on Verkle
 	}
 }
