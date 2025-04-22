@@ -99,18 +99,18 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 		}
 		parentID := header.ParentID
 		for parentID != headID {
-			var parent flow.Header
-			err = operation.RetrieveHeader(parentID, &parent)(tx)
+			var parentHeader flow.Header
+			err = operation.RetrieveHeader(parentID, &parentHeader)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve parent (%x): %w", parentID, err)
 			}
 			steps = append(steps,
 				step{
-					header:  &parent,
+					header:  &parentHeader,
 					blockID: parentID,
 				},
 			)
-			parentID = parent.ParentID
+			parentID = parentHeader.ParentID
 		}
 
 		// now we can step backwards in order to go from oldest to youngest; for

@@ -42,7 +42,8 @@ func TraverseBackward(headers storage.Headers, forkHead flow.Identifier, visitor
 // TraverseForward traverses the given fork (specified by block ID `forkHead`)
 // in the order of increasing height. The `terminal` defines when the traversal
 // begins. The `visitor` callback is called for each block in this segment.
-func TraverseForward(headers storage.Headers,
+func TraverseForward(
+	headers storage.Headers,
 	forkHead flow.Identifier,
 	visitor onVisitBlock,
 	terminal Terminal,
