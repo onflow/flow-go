@@ -383,20 +383,6 @@ func (mr *MockCollectionsMockRecorder) Store(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockCollections)(nil).Store), arg0)
 }
 
-// StoreLight mocks base method.
-func (m *MockCollections) StoreLight(arg0 *flow.LightCollection) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StoreLight", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// StoreLight indicates an expected call of StoreLight.
-func (mr *MockCollectionsMockRecorder) StoreLight(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreLight", reflect.TypeOf((*MockCollections)(nil).StoreLight), arg0)
-}
-
 // StoreLightAndIndexByTransaction mocks base method.
 func (m *MockCollections) StoreLightAndIndexByTransaction(arg0 *flow.LightCollection) error {
 	m.ctrl.T.Helper()
