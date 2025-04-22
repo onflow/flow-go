@@ -35,5 +35,9 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		actual, err := store.ByID(expected.ID())
 		require.NoError(t, err)
 		require.Equal(t, expected, actual)
+		
+		actual, err = store.ByCollectionID(expected.CollectionID)
+		require.NoError(t, err)
+		require.Equal(t, expected, actual)
 	})
 }
