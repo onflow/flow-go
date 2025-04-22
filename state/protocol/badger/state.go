@@ -334,7 +334,9 @@ func bootstrapSealingSegment(
 
 	sealsLookup := make(map[flow.Identifier]struct{})
 	sealsLookup[rootSeal.ID()] = struct{}{}
-	sealsLookup[segment.FirstSeal.ID()] = struct{}{}
+	if segment.FirstSeal != nil {
+		sealsLookup[segment.FirstSeal.ID()] = struct{}{}
+	}
 	for i, block := range segment.Blocks {
 		blockID := block.ID()
 		height := block.Header.Height
