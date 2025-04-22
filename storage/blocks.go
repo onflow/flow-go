@@ -17,6 +17,7 @@ type Blocks interface {
 	StoreTx(block *flow.Block) func(*transaction.Tx) error
 
 	BatchStore(rw ReaderBatchWriter, block *flow.Block) error
+	BatchStoreWithStoringResults(rw ReaderBatchWriter, block *flow.Block, storingResults map[flow.Identifier]*flow.ExecutionResult) error
 
 	// ByID returns the block with the given hash. It is available for
 	// finalized and ambiguous blocks.

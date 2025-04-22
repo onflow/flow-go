@@ -193,6 +193,7 @@ func Bootstrap(
 
 		return nil
 	})
+
 	if err != nil {
 		return nil, fmt.Errorf("bootstrapping failed: %w", err)
 	}
@@ -283,6 +284,7 @@ func bootstrapSealingSegment(
 	rootSeal *flow.Seal,
 ) error {
 	w := rw.Writer()
+	storingResults := make(map[flow.Identifier]*flow.ExecutionResult, len(segment.ExecutionResults))
 	for _, result := range segment.ExecutionResults {
 		err := operation.InsertExecutionResult(rw.Writer(), result)
 		if err != nil {
@@ -292,6 +294,8 @@ func bootstrapSealingSegment(
 		if err != nil {
 			return fmt.Errorf("could not index execution result: %w", err)
 		}
+
+		storingResults[result.ID()] = result
 	}
 
 	// insert the first seal (in case the segment's first block contains no seal)
@@ -314,7 +318,7 @@ func bootstrapSealingSegment(
 	for _, block := range segment.ExtraBlocks {
 		blockID := block.ID()
 		height := block.Header.Height
-		err := blocks.BatchStore(rw, block)
+		err := blocks.BatchStoreWithStoringResults(rw, block, storingResults)
 		if err != nil {
 			return fmt.Errorf("could not insert SealingSegment extra block: %w", err)
 		}
@@ -335,7 +339,7 @@ func bootstrapSealingSegment(
 		blockID := block.ID()
 		height := block.Header.Height
 
-		err := blocks.BatchStore(rw, block)
+		err := blocks.BatchStoreWithStoringResults(rw, block, storingResults)
 		if err != nil {
 			return fmt.Errorf("could not insert SealingSegment block: %w", err)
 		}

@@ -34,6 +34,24 @@ func (_m *Blocks) BatchStore(rw storage.ReaderBatchWriter, block *flow.Block) er
 	return r0
 }
 
+// BatchStoreWithStoringResults provides a mock function with given fields: rw, block, storingResults
+func (_m *Blocks) BatchStoreWithStoringResults(rw storage.ReaderBatchWriter, block *flow.Block, storingResults map[flow.Identifier]*flow.ExecutionResult) error {
+	ret := _m.Called(rw, block, storingResults)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BatchStoreWithStoringResults")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(storage.ReaderBatchWriter, *flow.Block, map[flow.Identifier]*flow.ExecutionResult) error); ok {
+		r0 = rf(rw, block, storingResults)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // ByCollectionID provides a mock function with given fields: collID
 func (_m *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	ret := _m.Called(collID)

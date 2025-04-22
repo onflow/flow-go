@@ -33,11 +33,15 @@ func (b *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
 }
 
 func (b *Blocks) BatchStore(rw storage.ReaderBatchWriter, block *flow.Block) error {
+	return b.BatchStoreWithStoringResults(rw, block, make(map[flow.Identifier]*flow.ExecutionResult))
+}
+
+func (b *Blocks) BatchStoreWithStoringResults(rw storage.ReaderBatchWriter, block *flow.Block, storingResults map[flow.Identifier]*flow.ExecutionResult) error {
 	err := b.headers.storeTx(rw, block.Header)
 	if err != nil {
 		return fmt.Errorf("could not store header %v: %w", block.Header.ID(), err)
 	}
-	err = b.payloads.storeTx(rw, block.ID(), block.Payload)
+	err = b.payloads.storeTx(rw, block.ID(), block.Payload, storingResults)
 	if err != nil {
 		return fmt.Errorf("could not store payload: %w", err)
 	}

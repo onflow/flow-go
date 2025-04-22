@@ -33,7 +33,7 @@ func NewPayloads(db storage.DB, index *Index, guarantees *Guarantees, seals *Sea
 }
 
 // TODO(leo): rename to BatchStore, add to interface
-func (p *Payloads) storeTx(rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *flow.Payload) error {
+func (p *Payloads) storeTx(rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *flow.Payload, storingResults map[flow.Identifier]*flow.ExecutionResult) error {
 	// For correct payloads, the execution result is part of the payload or it's already stored
 	// in storage. If execution result is not present in either of those places, we error.
 	// ATTENTION: this is unnecessarily complex if we have execution receipt which points an execution result
@@ -45,15 +45,23 @@ func (p *Payloads) storeTx(rw storage.ReaderBatchWriter, blockID flow.Identifier
 	for _, meta := range payload.Receipts {
 		result, ok := resultsByID[meta.ResultID]
 		if !ok {
-			result, err = p.results.ByID(meta.ResultID)
-			if err != nil {
-				if errors.Is(err, storage.ErrNotFound) {
-					err = fmt.Errorf("invalid payload referencing unknown execution result %v, err: %w", meta.ResultID, err)
+			// check if the result exists in previous blocks that stored within the same batch
+			result, ok = storingResults[meta.ResultID]
+			if !ok {
+				result, err = p.results.ByID(meta.ResultID)
+				if err != nil {
+					if errors.Is(err, storage.ErrNotFound) {
+						err = fmt.Errorf("invalid payload referencing unknown execution result %v, err: %w", meta.ResultID, err)
+					}
+					return err
 				}
-				return err
 			}
 		}
 		fullReceipts = append(fullReceipts, flow.ExecutionReceiptFromMeta(*meta, *result))
+	}
+
+	for resultID, result := range resultsByID {
+		storingResults[resultID] = result
 	}
 
 	// make sure all payload guarantees are stored
@@ -148,7 +156,7 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) (*flow.Payload, error) {
 
 func (p *Payloads) Store(blockID flow.Identifier, payload *flow.Payload) error {
 	return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return p.storeTx(rw, blockID, payload)
+		return p.storeTx(rw, blockID, payload, make(map[flow.Identifier]*flow.ExecutionResult))
 	})
 }
 

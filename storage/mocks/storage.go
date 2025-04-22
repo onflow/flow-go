@@ -50,6 +50,20 @@ func (mr *MockBlocksMockRecorder) BatchStore(arg0, arg1 interface{}) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStore", reflect.TypeOf((*MockBlocks)(nil).BatchStore), arg0, arg1)
 }
 
+// BatchStoreWithStoringResults mocks base method.
+func (m *MockBlocks) BatchStoreWithStoringResults(arg0 storage.ReaderBatchWriter, arg1 *flow.Block, arg2 map[flow.Identifier]*flow.ExecutionResult) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchStoreWithStoringResults", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BatchStoreWithStoringResults indicates an expected call of BatchStoreWithStoringResults.
+func (mr *MockBlocksMockRecorder) BatchStoreWithStoringResults(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStoreWithStoringResults", reflect.TypeOf((*MockBlocks)(nil).BatchStoreWithStoringResults), arg0, arg1, arg2)
+}
+
 // ByCollectionID mocks base method.
 func (m *MockBlocks) ByCollectionID(arg0 flow.Identifier) (*flow.Block, error) {
 	m.ctrl.T.Helper()

@@ -46,6 +46,10 @@ func (b *Blocks) BatchStore(rw storage.ReaderBatchWriter, block *flow.Block) err
 	panic("not implemented")
 }
 
+func (b *Blocks) BatchStoreWithStoringResults(rw storage.ReaderBatchWriter, block *flow.Block, storingResults map[flow.Identifier]*flow.ExecutionResult) error {
+	panic("not implemented")
+}
+
 func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Block, error) {
 	return func(tx *badger.Txn) (*flow.Block, error) {
 		header, err := b.headers.retrieveTx(blockID)(tx)
