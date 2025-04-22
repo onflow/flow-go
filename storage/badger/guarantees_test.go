@@ -24,6 +24,8 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		// retrieve guarantee without stored
 		_, err := store.ByCollectionID(expected.CollectionID)
 		require.ErrorIs(t, err, storage.ErrNotFound)
+		_, err = store.ByID(expected.ID())
+		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// store guarantee
 		err = store.Store(expected)
