@@ -102,7 +102,7 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 // which appears in the block.
 // No errors are expected during normal operation.
 func (b *Blocks) IndexBlockForCollectionGuarantees(blockID flow.Identifier, guaranteeIDs []flow.Identifier) error {
-	for _, collID := range collIDs {
+	for _, guaranteeID := range guaranteeIDs {
 		err := operation.RetryOnConflict(b.db.Update, operation.SkipDuplicates(operation.IndexCollectionGuaranteeBlock(collID, blockID)))
 		if err != nil {
 			return fmt.Errorf("could not index collection block (%x): %w", collID, err)
