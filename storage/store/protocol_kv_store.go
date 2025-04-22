@@ -3,7 +3,6 @@ package store
 import (
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -38,7 +37,7 @@ type ProtocolKVStore struct {
 	// `byBlockIdCache` will contain an entry for every block. We want to be able to cover a broad interval of views
 	// without cache misses, so a cache size of roughly 1000 entries is reasonable.
 	byBlockIdCache *Cache[flow.Identifier, flow.Identifier]
-	storing        *sync.Mutex
+	// storing        *sync.Mutex
 	// indexing       *sync.Mutex
 }
 
@@ -81,8 +80,8 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 	}
 
 	return &ProtocolKVStore{
-		db:      db,
-		storing: new(sync.Mutex),
+		db: db,
+		// storing: new(sync.Mutex),
 		// indexing: new(sync.Mutex),
 		cache: newCache(collector, metrics.ResourceProtocolKVStore,
 			withLimit[flow.Identifier, *flow.PSKeyValueStoreData](kvStoreCacheSize),
@@ -104,10 +103,11 @@ func (s *ProtocolKVStore) StoreTx(stateID flow.Identifier, data *flow.PSKeyValue
 }
 
 func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
-	s.storing.Lock()
-	rw.AddCallback(func(error) {
-		s.storing.Unlock()
-	})
+	// TOOD: add synchronization, adding lock would cause deadlock during bootstrap
+	// s.storing.Lock()
+	// rw.AddCallback(func(error) {
+	// 	s.storing.Unlock()
+	// })
 
 	_, err := s.ByID(stateID)
 	if err == nil {
