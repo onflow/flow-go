@@ -1,7 +1,6 @@
 package operation
 
 import (
-	"bytes"
 	"errors"
 	"io"
 
@@ -61,10 +60,6 @@ func (b *multiReader) Get(key []byte) (value []byte, closer io.Closer, err error
 // NewIter returns error if the startPrefix key is greater than the endPrefix key.
 // No errors are expected during normal operation.
 func (b *multiReader) NewIter(startPrefix, endPrefix []byte, ops storage.IteratorOption) (storage.Iterator, error) {
-	if bytes.Compare(startPrefix, endPrefix) > 0 {
-		return nil, errors.New("startPrefix key must be less than or equal to endPrefix key")
-	}
-
 	// Create iterators from readers in reverse order
 	// because we want to iterate legacy databases first
 	// to preserve key orders.
