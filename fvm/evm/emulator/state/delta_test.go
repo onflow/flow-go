@@ -381,8 +381,9 @@ func TestDeltaView(t *testing.T) {
 
 		// set slot1 with some new value
 		newValue := gethCommon.BytesToHash([]byte{9, 8})
-		err = view.SetState(slot1, newValue)
+		prevValue, err := view.SetState(slot1, newValue)
 		require.NoError(t, err)
+		require.Equal(t, value, prevValue)
 
 		value, err = view.GetState(slot1)
 		require.NoError(t, err)
@@ -694,8 +695,13 @@ func TestDeltaView(t *testing.T) {
 		key := testutils.RandomCommonHash(t)
 		value := testutils.RandomCommonHash(t)
 		sk := types.SlotAddress{Address: addr1, Key: key}
-		err = view.SetState(sk, value)
+
+		stateValue, err := view.GetState(sk)
 		require.NoError(t, err)
+
+		prevValue, err := view.SetState(sk, value)
+		require.NoError(t, err)
+		require.Equal(t, stateValue, prevValue)
 
 		vret, err := view.GetState(sk)
 		require.NoError(t, err)
