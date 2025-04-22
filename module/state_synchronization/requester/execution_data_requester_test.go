@@ -1,4 +1,4 @@
-package requester
+package requester_test
 
 import (
 	"context"
@@ -29,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/state/protocol"
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
@@ -44,7 +45,7 @@ type ExecutionDataRequesterSuite struct {
 	datastore   datastore.Batching
 	db          *badger.DB
 	downloader  *exedatamock.Downloader
-	distributor *ExecutionDataDistributor
+	distributor *requester.ExecutionDataDistributor
 
 	run edTestRun
 
@@ -406,7 +407,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	state := suite.mockProtocolState(cfg.blocksByHeight)
 
 	suite.downloader = mockDownloader(cfg.executionDataEntries)
-	suite.distributor = NewExecutionDataDistributor()
+	suite.distributor = requester.NewExecutionDataDistributor()
 
 	heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metrics)
 	cache := cache.NewExecutionDataCache(suite.downloader, headers, seals, results, heroCache)
@@ -415,7 +416,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	processedHeight := store.NewConsumerProgress(badgerimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterBlockHeight)
 	processedNotification := store.NewConsumerProgress(badgerimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterNotification)
 
-	edr, err := New(
+	edr, err := requester.New(
 		logger,
 		metrics,
 		suite.downloader,
@@ -424,7 +425,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 		processedNotification,
 		state,
 		headers,
-		ExecutionDataConfig{
+		requester.ExecutionDataConfig{
 			InitialBlockHeight: cfg.startHeight - 1,
 			MaxSearchAhead:     cfg.maxSearchAhead,
 			FetchTimeout:       cfg.fetchTimeout,
@@ -714,8 +715,8 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 		executionDataIDByBlockID: executionDataIDByBlockID,
 		waitTimeout:              time.Second * 5,
 
-		maxSearchAhead: DefaultMaxSearchAhead,
-		fetchTimeout:   DefaultFetchTimeout,
+		maxSearchAhead: requester.DefaultMaxSearchAhead,
+		fetchTimeout:   requester.DefaultFetchTimeout,
 		retryDelay:     1 * time.Millisecond,
 		maxRetryDelay:  15 * time.Millisecond,
 	}
