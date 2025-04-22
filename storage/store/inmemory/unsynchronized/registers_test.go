@@ -41,7 +41,7 @@ func TestRegisters_HappyPath(t *testing.T) {
 
 	// Try retrieving at the wrong height
 	_, err = registers.Get(entry1.Key, height+1)
-	require.ErrorIs(t, err, storage.ErrNotFound)
+	require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 
 	// Try storing at the wrong height
 	err = registers.Store(entries, height+1)
