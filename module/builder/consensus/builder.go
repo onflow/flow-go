@@ -308,8 +308,8 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 			return fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 		}
 
-		for _, collID := range index.CollectionIDs {
-			receiptLookup[collID] = struct{}{}
+		for _, guaranteeID := range index.GuaranteeIDs {
+			receiptLookup[guaranteeID] = struct{}{}
 		}
 
 		return nil
@@ -321,7 +321,7 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 
 	// go through mempool and collect valid collections
 	var guarantees []*flow.CollectionGuarantee
-	for collID, guarantee := range b.guarPool.All() {
+	for _, guarantee := range b.guarPool.All() {
 		// add at most <maxGuaranteeCount> number of collection guarantees in a new block proposal
 		// in order to prevent the block payload from being too big or computationally heavy for the
 		// execution nodes
@@ -330,7 +330,7 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 		}
 
 		// skip collections that are already included in a block on the fork
-		_, duplicated := receiptLookup[collID]
+		_, duplicated := receiptLookup[guarantee.ID()]
 		if duplicated {
 			continue
 		}
@@ -493,12 +493,12 @@ func connectingSeal(sealsForNextBlock []*flow.IncorporatedResultSeal, lastSealed
 }
 
 type InsertableReceipts struct {
-	receipts []*flow.ExecutionReceiptMeta
+	receipts []*flow.ExecutionReceiptStub
 	results  []*flow.ExecutionResult
 }
 
 // getInsertableReceipts constructs:
-//   - (i)  the meta information of the ExecutionReceipts (i.e. ExecutionReceiptMeta)
+//   - (i)  the meta information of the ExecutionReceipts (i.e. ExecutionReceiptStub)
 //     that should be inserted in the next payload
 //   - (ii) the ExecutionResults the receipts from step (i) commit to
 //     (deduplicated w.r.t. the block under construction as well as ancestor blocks)
@@ -578,7 +578,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 	return insertables, nil
 }
 
-// toInsertables separates the provided receipts into ExecutionReceiptMeta and
+// toInsertables separates the provided receipts into ExecutionReceiptStub and
 // ExecutionResult. Results that are in includedResults are skipped.
 // We also limit the number of receipts to maxReceiptCount.
 func toInsertables(receipts []*flow.ExecutionReceipt, includedResults map[flow.Identifier]struct{}, maxReceiptCount uint) *InsertableReceipts {
@@ -590,11 +590,11 @@ func toInsertables(receipts []*flow.ExecutionReceipt, includedResults map[flow.I
 		count = maxReceiptCount
 	}
 
-	filteredReceipts := make([]*flow.ExecutionReceiptMeta, 0, count)
+	filteredReceipts := make([]*flow.ExecutionReceiptStub, 0, count)
 
 	for i := uint(0); i < count; i++ {
 		receipt := receipts[i]
-		meta := receipt.Meta()
+		meta := receipt.Stub()
 		resultID := meta.ResultID
 		if _, inserted := includedResults[resultID]; !inserted {
 			results = append(results, &receipt.ExecutionResult)

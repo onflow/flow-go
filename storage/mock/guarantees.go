@@ -42,6 +42,36 @@ func (_m *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGu
 	return r0, r1
 }
 
+// ByID provides a mock function with given fields: guaranteeID
+func (_m *Guarantees) ByID(guaranteeID flow.Identifier) (*flow.CollectionGuarantee, error) {
+	ret := _m.Called(guaranteeID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ByID")
+	}
+
+	var r0 *flow.CollectionGuarantee
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.CollectionGuarantee, error)); ok {
+		return rf(guaranteeID)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.CollectionGuarantee); ok {
+		r0 = rf(guaranteeID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.CollectionGuarantee)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(guaranteeID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Store provides a mock function with given fields: guarantee
 func (_m *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
 	ret := _m.Called(guarantee)

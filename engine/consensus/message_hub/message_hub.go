@@ -513,9 +513,9 @@ func (h *MessageHub) forwardToOwnVoteAggregator(vote *messages.BlockVote, origin
 func (h *MessageHub) forwardToOwnTimeoutAggregator(t *model.TimeoutObject) {
 	h.engineMetrics.MessageReceived(metrics.EngineConsensusMessageHub, metrics.MessageTimeoutObject)
 	h.log.Info().
-		Hex("origin_id", t.SignerID[:]).
+		Hex("signer_id", logging.ID(t.SignerID)).
 		Uint64("view", t.View).
-		Str("timeout_id", t.ID().String()).
+		Uint64("newest_qc_view", t.NewestQC.View).
 		Msg("timeout received, forwarding timeout to hotstuff timeout aggregator")
 	h.timeoutAggregator.AddTimeout(t)
 }

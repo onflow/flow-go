@@ -496,8 +496,8 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor index (%x): %w", ancestorID, err)
 		}
-		for _, collID := range index.CollectionIDs {
-			lookup[collID] = struct{}{}
+		for _, guaranteeID := range index.GuaranteeIDs {
+			lookup[guaranteeID] = struct{}{}
 		}
 		if ancestor.Height <= limit {
 			break

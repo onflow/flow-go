@@ -77,7 +77,7 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState 
 
 	block2 := BlockWithParentFixture(block.Header)
 	block2.SetPayload(flow.Payload{
-		Receipts:        []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Receipts:        []*flow.ExecutionReceiptStub{receipt.Stub()},
 		Results:         []*flow.ExecutionResult{&receipt.ExecutionResult},
 		ProtocolStateID: block.Payload.ProtocolStateID,
 	})
