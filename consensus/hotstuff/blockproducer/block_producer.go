@@ -48,7 +48,7 @@ func New(safetyRules hotstuff.SafetyRules, committee hotstuff.Replicas, builder 
 //   - model.NoVoteError if it is not safe for us to vote (our proposal includes our vote)
 //     for this view. This can happen if we have already proposed or timed out this view.
 //   - generic error in case of unexpected failure
-func (bp *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.Proposal, error) {
+func (bp *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.ProposalHeader, error) {
 	// the custom functions allows us to set some custom fields on the block;
 	// in hotstuff, we use this for view number and signature-related fields
 	setHotstuffFields := func(header *flow.Header) error {

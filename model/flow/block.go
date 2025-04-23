@@ -80,8 +80,8 @@ type BlockProposal struct {
 	ProposerSigData []byte
 }
 
-func (b *BlockProposal) HeaderProposal() *Proposal {
-	return &Proposal{Header: b.Block.Header, ProposerSigData: b.ProposerSigData}
+func (b *BlockProposal) HeaderProposal() *ProposalHeader {
+	return &ProposalHeader{Header: b.Block.Header, ProposerSigData: b.ProposerSigData}
 }
 
 // CertifiedBlock holds a certified block, which is a block and a Quorum Certificate [QC] pointing

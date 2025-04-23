@@ -626,7 +626,7 @@ func createNode(
 		metricsCollector,
 		build,
 		rootHeader,
-		[]*flow.Proposal{},
+		[]*flow.ProposalHeader{},
 		hotstuffModules,
 		consensus.WithMinTimeout(hotstuffTimeout),
 		func(cfg *consensus.ParticipantConfig) {

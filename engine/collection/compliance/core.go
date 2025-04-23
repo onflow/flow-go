@@ -104,7 +104,7 @@ func NewCore(
 
 // OnBlockProposal handles incoming block proposals.
 // No errors are expected during normal operation.
-func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.ClusterBlockProposal]) error {
+func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedClusterProposal]) error {
 	startTime := time.Now()
 	defer func() {
 		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))

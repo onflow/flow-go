@@ -319,7 +319,7 @@ type FlowAccessNodeBuilder struct {
 	PingMetrics                  module.PingMetrics
 	Committee                    hotstuff.DynamicCommittee
 	Finalized                    *flow.Header // latest finalized block that the node knows of at startup time
-	Pending                      []*flow.Proposal
+	Pending                      []*flow.ProposalHeader
 	FollowerCore                 module.HotStuffFollower
 	Validator                    hotstuff.Validator
 	ExecutionDataDownloader      execution_data.Downloader

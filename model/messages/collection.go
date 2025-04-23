@@ -85,31 +85,30 @@ func UntrustedClusterBlockFromInternal(clusterBlock *cluster.Block) UntrustedClu
 	}
 }
 
-// ClusterBlockProposal is a proposal for a block in collection node cluster
+// UntrustedClusterProposal is a proposal for a block in collection node cluster
 // consensus. The header contains information about consensus state and the
 // payload contains the proposed collection (may be empty).
-type ClusterBlockProposal struct {
+type UntrustedClusterProposal struct {
 	Block           UntrustedClusterBlock
 	ProposerSigData []byte
 }
 
-func NewClusterBlockProposal(internal *cluster.Block, proposerSig []byte) *ClusterBlockProposal {
-	return &ClusterBlockProposal{
+func NewUntrustedClusterProposal(internal *cluster.Block, proposerSig []byte) *UntrustedClusterProposal {
+	return &UntrustedClusterProposal{
 		Block:           UntrustedClusterBlockFromInternal(internal),
 		ProposerSigData: proposerSig,
 	}
 }
 
-func (cbp *ClusterBlockProposal) ToInternal() *cluster.BlockProposal {
+func (cbp *UntrustedClusterProposal) ToInternal() *cluster.BlockProposal {
 	return &cluster.BlockProposal{
 		Block:           cbp.Block.ToInternal(),
 		ProposerSigData: cbp.ProposerSigData,
 	}
 }
 
-// TODO(malleability, #7311) update this function when renaming messages.ClusterBlockProposal -> UntrustedClusterProposal
-func ClusterBlockProposalFrom(proposal *cluster.BlockProposal) *ClusterBlockProposal {
-	return &ClusterBlockProposal{
+func UntrustedClusterProposalFromInternal(proposal *cluster.BlockProposal) *UntrustedClusterProposal {
+	return &UntrustedClusterProposal{
 		Block:           UntrustedClusterBlockFromInternal(proposal.Block),
 		ProposerSigData: proposal.ProposerSigData,
 	}

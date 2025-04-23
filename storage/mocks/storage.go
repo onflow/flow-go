@@ -252,10 +252,10 @@ func (mr *MockHeadersMockRecorder) Exists(arg0 interface{}) *gomock.Call {
 }
 
 // ProposalByBlockID mocks base method.
-func (m *MockHeaders) ProposalByBlockID(arg0 flow.Identifier) (*flow.Proposal, error) {
+func (m *MockHeaders) ProposalByBlockID(arg0 flow.Identifier) (*flow.ProposalHeader, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ProposalByBlockID", arg0)
-	ret0, _ := ret[0].(*flow.Proposal)
+	ret0, _ := ret[0].(*flow.ProposalHeader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -267,7 +267,7 @@ func (mr *MockHeadersMockRecorder) ProposalByBlockID(arg0 interface{}) *gomock.C
 }
 
 // Store mocks base method.
-func (m *MockHeaders) Store(arg0 *flow.Proposal) error {
+func (m *MockHeaders) Store(arg0 *flow.ProposalHeader) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Store", arg0)
 	ret0, _ := ret[0].(error)

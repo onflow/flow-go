@@ -25,7 +25,7 @@ func Connect(t *testing.T, instances []*Instance) {
 		*sender.notifier = *NewMockedCommunicatorConsumer()
 		sender.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(
 			func(args mock.Arguments) {
-				proposal, ok := args[0].(*flow.Proposal)
+				proposal, ok := args[0].(*flow.ProposalHeader)
 				require.True(t, ok)
 
 				// sender should always have the parent

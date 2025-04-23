@@ -50,7 +50,7 @@ type BatchRequest struct {
 // that should correspond to the request.
 type BlockResponse struct {
 	Nonce  uint64
-	Blocks []BlockProposal
+	Blocks []UntrustedProposal
 }
 
 func (br *BlockResponse) BlocksInternal() []*flow.BlockProposal {
@@ -66,7 +66,7 @@ func (br *BlockResponse) BlocksInternal() []*flow.BlockProposal {
 // consensus.
 type ClusterBlockResponse struct {
 	Nonce  uint64
-	Blocks []ClusterBlockProposal
+	Blocks []UntrustedClusterProposal
 }
 
 func (br *ClusterBlockResponse) BlocksInternal() []*cluster.BlockProposal {

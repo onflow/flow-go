@@ -50,6 +50,6 @@ func TestSaveBlockAsReplica(t *testing.T) {
 		require.Equal(t, b0.ID(), finalized.ID(), "recover find latest returns inconsistent finalized block")
 
 		// b1,b2,b3 are unfinalized (pending) blocks
-		require.Equal(t, []*flow.Proposal{b1p.HeaderProposal(), b2p.HeaderProposal(), b3p.HeaderProposal()}, pending)
+		require.Equal(t, []*flow.ProposalHeader{b1p.HeaderProposal(), b2p.HeaderProposal(), b3p.HeaderProposal()}, pending)
 	})
 }

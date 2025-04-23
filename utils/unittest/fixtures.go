@@ -271,8 +271,8 @@ func ProposalFixture() *flow.BlockProposal {
 	return ProposalFromBlock(&block)
 }
 
-func ProposalFromHeader(header *flow.Header) *flow.Proposal {
-	return &flow.Proposal{
+func ProposalFromHeader(header *flow.Header) *flow.ProposalHeader {
+	return &flow.ProposalHeader{
 		Header:          header,
 		ProposerSigData: SignatureFixture(),
 	}

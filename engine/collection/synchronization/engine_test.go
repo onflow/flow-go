@@ -421,21 +421,21 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	originID := unittest.IdentifierFixture()
 	res := &messages.ClusterBlockResponse{
 		Nonce:  rand.Uint64(),
-		Blocks: []messages.ClusterBlockProposal{},
+		Blocks: []messages.UntrustedClusterProposal{},
 	}
 
 	// add one block that should be processed
 	processable := unittest.ClusterBlockFixture()
 	ss.core.On("HandleBlock", processable.ToHeader()).Return(true)
-	res.Blocks = append(res.Blocks, *messages.NewClusterBlockProposal(&processable, unittest.SignatureFixture()))
+	res.Blocks = append(res.Blocks, *messages.NewUntrustedClusterProposal(&processable, unittest.SignatureFixture()))
 
 	// add one block that should not be processed
 	unprocessable := unittest.ClusterBlockFixture()
 	ss.core.On("HandleBlock", unprocessable.ToHeader()).Return(false)
-	res.Blocks = append(res.Blocks, *messages.NewClusterBlockProposal(&unprocessable, unittest.SignatureFixture()))
+	res.Blocks = append(res.Blocks, *messages.NewUntrustedClusterProposal(&unprocessable, unittest.SignatureFixture()))
 
 	ss.comp.On("OnSyncedClusterBlock", mock.Anything).Run(func(args mock.Arguments) {
-		res := args.Get(0).(flow.Slashable[*messages.ClusterBlockProposal])
+		res := args.Get(0).(flow.Slashable[*messages.UntrustedClusterProposal])
 		converted := res.Message.ToInternal()
 		ss.Assert().Equal(processable.Header, converted.Block.Header)
 		ss.Assert().Equal(processable.Payload, converted.Block.Payload)

@@ -13,7 +13,7 @@ import (
 func TestRecover(t *testing.T) {
 	finalized := unittest.BlockHeaderFixture()
 	proposals := unittest.ProposalChainFixtureFrom(100, finalized)
-	pending := make([]*flow.Proposal, 0)
+	pending := make([]*flow.ProposalHeader, 0)
 	for _, b := range proposals {
 		pending = append(pending, b.HeaderProposal())
 	}
@@ -39,7 +39,7 @@ func TestRecoverEmptyInput(t *testing.T) {
 		require.Fail(t, "no proposal expected")
 		return nil
 	}
-	err := Recover(unittest.Logger(), []*flow.Proposal{}, scanner)
+	err := Recover(unittest.Logger(), []*flow.ProposalHeader{}, scanner)
 	require.NoError(t, err)
 }
 

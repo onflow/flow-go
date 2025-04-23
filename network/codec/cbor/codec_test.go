@@ -16,7 +16,7 @@ func TestCodec_Decode(t *testing.T) {
 	c := cbor.NewCodec()
 	t.Run("decodes message successfully", func(t *testing.T) {
 
-		data := messages.NewBlockProposal(unittest.ProposalFixture())
+		data := messages.NewUntrustedProposal(unittest.ProposalFixture())
 		encoded, err := c.Encode(data)
 		require.NoError(t, err)
 
@@ -60,7 +60,7 @@ func TestCodec_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when unmarshalling fails - wrong type", func(t *testing.T) {
-		data := messages.NewBlockProposal(unittest.ProposalFixture())
+		data := messages.NewUntrustedProposal(unittest.ProposalFixture())
 		encoded, err := c.Encode(data)
 		require.NoError(t, err)
 
@@ -72,7 +72,7 @@ func TestCodec_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when unmarshalling fails - corrupt", func(t *testing.T) {
-		data := messages.NewBlockProposal(unittest.ProposalFixture())
+		data := messages.NewUntrustedProposal(unittest.ProposalFixture())
 		encoded, err := c.Encode(data)
 		require.NoError(t, err)
 

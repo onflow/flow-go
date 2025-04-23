@@ -14,23 +14,23 @@ type BlockProducer struct {
 }
 
 // MakeBlockProposal provides a mock function with given fields: view, qc, lastViewTC
-func (_m *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.Proposal, error) {
+func (_m *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.ProposalHeader, error) {
 	ret := _m.Called(view, qc, lastViewTC)
 
 	if len(ret) == 0 {
 		panic("no return value specified for MakeBlockProposal")
 	}
 
-	var r0 *flow.Proposal
+	var r0 *flow.ProposalHeader
 	var r1 error
-	if rf, ok := ret.Get(0).(func(uint64, *flow.QuorumCertificate, *flow.TimeoutCertificate) (*flow.Proposal, error)); ok {
+	if rf, ok := ret.Get(0).(func(uint64, *flow.QuorumCertificate, *flow.TimeoutCertificate) (*flow.ProposalHeader, error)); ok {
 		return rf(view, qc, lastViewTC)
 	}
-	if rf, ok := ret.Get(0).(func(uint64, *flow.QuorumCertificate, *flow.TimeoutCertificate) *flow.Proposal); ok {
+	if rf, ok := ret.Get(0).(func(uint64, *flow.QuorumCertificate, *flow.TimeoutCertificate) *flow.ProposalHeader); ok {
 		r0 = rf(view, qc, lastViewTC)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Proposal)
+			r0 = ret.Get(0).(*flow.ProposalHeader)
 		}
 	}
 
