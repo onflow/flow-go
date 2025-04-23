@@ -53,7 +53,8 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		collections := bstorage.NewCollections(bdb, transactions)
 		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
 
-		err = headers.Store(genesis)
+		// By convention, root block has no proposer signature - implementation has to handle this edge case
+		err = headers.Store(&flow.ProposalHeader{Header: genesis, ProposerSigData: nil})
 		require.NoError(t, err)
 
 		getLatestFinalized := func() (uint64, error) {
@@ -97,7 +98,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 			&commit)
 		newheader := newexecutableBlock.Block.Header
 
-		err = headers.Store(header)
+		err = headers.Store(unittest.ProposalFromHeader(header))
 		require.NoError(t, err)
 
 		// save execution results
@@ -186,7 +187,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		)
 		require.NotNil(t, es)
 
-		err = headers.Store(newheader)
+		err = headers.Store(unittest.ProposalFromHeader(newheader))
 		require.NoError(t, err)
 
 		newcomputationResult := testutil.ComputationResultFixture(t)

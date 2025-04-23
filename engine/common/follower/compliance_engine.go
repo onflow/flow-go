@@ -81,7 +81,7 @@ type ComplianceEngine struct {
 	blocksAvailableNotifier    engine.Notifier             // notifies that new blocks are ready to be processed
 	finalizedBlockTracker      *tracker.NewestBlockTracker // tracks the latest finalization block
 	finalizedBlockNotifier     engine.Notifier             // notifies when the latest finalized block changes
-	pendingConnectedBlocksChan chan flow.Slashable[[]*flow.Block]
+	pendingConnectedBlocksChan chan flow.Slashable[[]*flow.BlockProposal]
 	core                       complianceCore // performs actual processing of incoming messages.
 }
 
@@ -121,7 +121,7 @@ func NewComplianceLayer(
 		pendingProposals:           pendingBlocks,
 		syncedBlocks:               syncedBlocks,
 		blocksAvailableNotifier:    engine.NewNotifier(),
-		pendingConnectedBlocksChan: make(chan flow.Slashable[[]*flow.Block], defaultPendingConnectedBlocksChanCapacity),
+		pendingConnectedBlocksChan: make(chan flow.Slashable[[]*flow.BlockProposal], defaultPendingConnectedBlocksChanCapacity),
 		finalizedBlockTracker:      tracker.NewNewestBlockTracker(),
 		finalizedBlockNotifier:     engine.NewNotifier(),
 		headers:                    headers,
@@ -169,7 +169,7 @@ func NewComplianceLayer(
 // OnBlockProposal queues *untrusted* proposals for further processing and notifies the Engine's
 // internal workers. This method is intended for fresh proposals received directly from leaders.
 // It can ingest synced blocks as well, but is less performant compared to method `OnSyncedBlocks`.
-func (e *ComplianceEngine) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) {
+func (e *ComplianceEngine) OnBlockProposal(proposal flow.Slashable[*messages.UntrustedProposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
 	// queue proposal
 	if e.pendingProposals.Push(proposal) {
@@ -181,7 +181,7 @@ func (e *ComplianceEngine) OnBlockProposal(proposal flow.Slashable[*messages.Blo
 // efficient for batches of continuously connected blocks (honest nodes supply finalized blocks
 // in suitable sequences where possible). Nevertheless, the method tolerates blocks in arbitrary
 // order (less efficient), making it robust against byzantine nodes.
-func (e *ComplianceEngine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]) {
+func (e *ComplianceEngine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.UntrustedProposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlocks)
 	// The synchronization engine feeds the follower with batches of blocks. The field `Slashable.OriginID`
 	// states which node forwarded the batch to us. Each block contains its proposer and signature.
@@ -210,8 +210,8 @@ func (e *ComplianceEngine) OnFinalizedBlock(block *model.Block) {
 // notifying us about fresh proposals directly from the consensus leaders.
 func (e *ComplianceEngine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *messages.BlockProposal:
-		e.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+	case *messages.UntrustedProposal:
+		e.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
 			OriginID: originID,
 			Message:  msg,
 		})
@@ -267,16 +267,16 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		// Priority 1: ingest fresh proposals
 		msg, ok := e.pendingProposals.Pop()
 		if ok {
-			blockMsg := msg.(flow.Slashable[*messages.BlockProposal])
-			block := blockMsg.Message.Block.ToInternal()
+			proposalMsg := msg.(flow.Slashable[*messages.UntrustedProposal])
+			proposal := proposalMsg.Message.ToInternal()
 			log := e.log.With().
-				Hex("origin_id", blockMsg.OriginID[:]).
-				Str("chain_id", block.Header.ChainID.String()).
-				Uint64("view", block.Header.View).
-				Uint64("height", block.Header.Height).
+				Hex("origin_id", proposalMsg.OriginID[:]).
+				Str("chain_id", proposal.Block.Header.ChainID.String()).
+				Uint64("view", proposal.Block.Header.View).
+				Uint64("height", proposal.Block.Header.Height).
 				Logger()
 			latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
-			e.submitConnectedBatch(log, latestFinalizedView, blockMsg.OriginID, []*flow.Block{block})
+			e.submitConnectedBatch(log, latestFinalizedView, proposalMsg.OriginID, []*flow.BlockProposal{proposal})
 			e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 			continue
 		}
@@ -289,17 +289,17 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 			return nil
 		}
 
-		batch := msg.(flow.Slashable[[]*messages.BlockProposal])
+		batch := msg.(flow.Slashable[[]*messages.UntrustedProposal])
 		if len(batch.Message) < 1 {
 			continue
 		}
-		blocks := make([]*flow.Block, 0, len(batch.Message))
+		blocks := make([]*flow.BlockProposal, 0, len(batch.Message))
 		for _, block := range batch.Message {
-			blocks = append(blocks, block.Block.ToInternal())
+			blocks = append(blocks, block.ToInternal())
 		}
 
-		firstBlock := blocks[0].Header
-		lastBlock := blocks[len(blocks)-1].Header
+		firstBlock := blocks[0].Block.Header
+		lastBlock := blocks[len(blocks)-1].Block.Header
 		log := e.log.With().
 			Hex("origin_id", batch.OriginID[:]).
 			Str("chain_id", lastBlock.ChainID.String()).
@@ -313,14 +313,14 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		// extract sequences of connected blocks and schedule them for further processing
 		// we assume the sender has already ordered blocks into connected ranges if possible
 		latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
-		parentID := blocks[0].ID()
+		parentID := blocks[0].Block.ID()
 		indexOfLastConnected := 0
 		for i, block := range blocks {
-			if block.Header.ParentID != parentID {
+			if block.Block.Header.ParentID != parentID {
 				e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, blocks[indexOfLastConnected:i])
 				indexOfLastConnected = i
 			}
-			parentID = block.Header.ID()
+			parentID = block.Block.Header.ID()
 		}
 		e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, blocks[indexOfLastConnected:])
 		e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlocks)
@@ -328,14 +328,15 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 }
 
 // submitConnectedBatch checks if batch is still pending and submits it via channel for further processing by worker goroutines.
-func (e *ComplianceEngine) submitConnectedBatch(log zerolog.Logger, latestFinalizedView uint64, originID flow.Identifier, blocks []*flow.Block) {
+func (e *ComplianceEngine) submitConnectedBatch(log zerolog.Logger, latestFinalizedView uint64, originID flow.Identifier, blocks []*flow.BlockProposal) {
 	if len(blocks) < 1 {
 		return
 	}
 	// if latest block of batch is already finalized we can drop such input.
-	lastBlock := blocks[len(blocks)-1].Header
+	firstBlock := blocks[0].Block.Header
+	lastBlock := blocks[len(blocks)-1].Block.Header
 	if lastBlock.View < latestFinalizedView {
-		log.Debug().Msgf("dropping range [%d, %d] below finalized view %d", blocks[0].Header.View, lastBlock.View, latestFinalizedView)
+		log.Debug().Msgf("dropping range [%d, %d] below finalized view %d", firstBlock.View, lastBlock.View, latestFinalizedView)
 		return
 	}
 	skipNewProposalsThreshold := e.config.GetSkipNewProposalsThreshold()
@@ -343,13 +344,13 @@ func (e *ComplianceEngine) submitConnectedBatch(log zerolog.Logger, latestFinali
 		log.Debug().
 			Uint64("skip_new_proposals_threshold", skipNewProposalsThreshold).
 			Msgf("dropping range [%d, %d] too far ahead of locally finalized view %d",
-				blocks[0].Header.View, lastBlock.View, latestFinalizedView)
+				firstBlock.View, lastBlock.View, latestFinalizedView)
 		return
 	}
-	log.Debug().Msgf("submitting sub-range with views [%d, %d] for further processing", blocks[0].Header.View, lastBlock.View)
+	log.Debug().Msgf("submitting sub-range with views [%d, %d] for further processing", firstBlock.View, lastBlock.View)
 
 	select {
-	case e.pendingConnectedBlocksChan <- flow.Slashable[[]*flow.Block]{
+	case e.pendingConnectedBlocksChan <- flow.Slashable[[]*flow.BlockProposal]{
 		OriginID: originID,
 		Message:  blocks,
 	}:

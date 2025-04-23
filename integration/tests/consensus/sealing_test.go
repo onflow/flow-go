@@ -164,7 +164,7 @@ SearchLoop:
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*messages.BlockProposal)
+		proposal, ok := msg.(*messages.UntrustedProposal)
 		if !ok {
 			continue
 		}
@@ -354,7 +354,7 @@ SealingLoop:
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*messages.BlockProposal)
+		proposal, ok := msg.(*messages.UntrustedProposal)
 		if !ok {
 			continue
 		}

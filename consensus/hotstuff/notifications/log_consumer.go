@@ -283,7 +283,8 @@ func (lc *LogConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 	log.Debug().Msg("publishing HotStuff timeout object")
 }
 
-func (lc *LogConsumer) OnOwnProposal(header *flow.Header, targetPublicationTime time.Time) {
+func (lc *LogConsumer) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicationTime time.Time) {
+	header := proposal.Header
 	lc.log.Debug().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).

@@ -11,6 +11,14 @@ import (
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
+// ProposalHeader is a block header and the proposer's signature for the block.
+type ProposalHeader struct {
+	Header *Header
+	// ProposerSigData is a signature of the proposer over the new block. Not a single cryptographic
+	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
+	ProposerSigData []byte
+}
+
 // Header contains all meta-data for a block, as well as a hash representing
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
@@ -39,17 +47,26 @@ type Header struct {
 	ParentVoterSigData []byte
 	// ProposerID is a proposer identifier for the block
 	ProposerID Identifier
-	// ProposerSigData is a signature of the proposer over the new block. Not a single cryptographic
-	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
-	ProposerSigData []byte
 	// LastViewTC is a timeout certificate for previous view, it can be nil
 	// it has to be present if previous round ended with timeout.
 	LastViewTC *TimeoutCertificate
 }
 
-// Body returns the immutable part of the block header.
-func (h Header) Body() interface{} {
-	return struct {
+// QuorumCertificate returns quorum certificate that is incorporated in the block header.
+func (h Header) QuorumCertificate() *QuorumCertificate {
+	return &QuorumCertificate{
+		BlockID:       h.ParentID,
+		View:          h.ParentView,
+		SignerIndices: h.ParentVoterIndices,
+		SigData:       h.ParentVoterSigData,
+	}
+}
+
+// Fingerprint defines custom encoding for the header to calculate its ID.
+// Timestamp is converted from time.Time to unix time (uint64), which is necessary
+// because time.Time is not RLP-encodable (due to having private fields).
+func (h Header) Fingerprint() []byte {
+	return fingerprint.Fingerprint(struct {
 		ChainID            ChainID
 		ParentID           Identifier
 		Height             uint64
@@ -73,21 +90,7 @@ func (h Header) Body() interface{} {
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerID:         h.ProposerID,
 		LastViewTCID:       h.LastViewTC.ID(),
-	}
-}
-
-// QuorumCertificate returns quorum certificate that is incorporated in the block header.
-func (h Header) QuorumCertificate() *QuorumCertificate {
-	return &QuorumCertificate{
-		BlockID:       h.ParentID,
-		View:          h.ParentView,
-		SignerIndices: h.ParentVoterIndices,
-		SigData:       h.ParentVoterSigData,
-	}
-}
-
-func (h Header) Fingerprint() []byte {
-	return fingerprint.Fingerprint(h.Body())
+	})
 }
 
 // ID returns a unique ID to singularly identify the header and its block

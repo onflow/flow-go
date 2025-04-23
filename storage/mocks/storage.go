@@ -95,8 +95,38 @@ func (mr *MockBlocksMockRecorder) IndexBlockForCollectionGuarantees(arg0, arg1 i
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IndexBlockForCollectionGuarantees", reflect.TypeOf((*MockBlocks)(nil).IndexBlockForCollectionGuarantees), arg0, arg1)
 }
 
+// ProposalByHeight mocks base method.
+func (m *MockBlocks) ProposalByHeight(arg0 uint64) (*flow.BlockProposal, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProposalByHeight", arg0)
+	ret0, _ := ret[0].(*flow.BlockProposal)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ProposalByHeight indicates an expected call of ProposalByHeight.
+func (mr *MockBlocksMockRecorder) ProposalByHeight(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProposalByHeight", reflect.TypeOf((*MockBlocks)(nil).ProposalByHeight), arg0)
+}
+
+// ProposalByID mocks base method.
+func (m *MockBlocks) ProposalByID(arg0 flow.Identifier) (*flow.BlockProposal, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProposalByID", arg0)
+	ret0, _ := ret[0].(*flow.BlockProposal)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ProposalByID indicates an expected call of ProposalByID.
+func (mr *MockBlocksMockRecorder) ProposalByID(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProposalByID", reflect.TypeOf((*MockBlocks)(nil).ProposalByID), arg0)
+}
+
 // Store mocks base method.
-func (m *MockBlocks) Store(arg0 *flow.Block) error {
+func (m *MockBlocks) Store(arg0 *flow.BlockProposal) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Store", arg0)
 	ret0, _ := ret[0].(error)
@@ -110,7 +140,7 @@ func (mr *MockBlocksMockRecorder) Store(arg0 interface{}) *gomock.Call {
 }
 
 // StoreTx mocks base method.
-func (m *MockBlocks) StoreTx(arg0 *flow.Block) func(*transaction.Tx) error {
+func (m *MockBlocks) StoreTx(arg0 *flow.BlockProposal) func(*transaction.Tx) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "StoreTx", arg0)
 	ret0, _ := ret[0].(func(*transaction.Tx) error)
@@ -221,8 +251,23 @@ func (mr *MockHeadersMockRecorder) Exists(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Exists", reflect.TypeOf((*MockHeaders)(nil).Exists), arg0)
 }
 
+// ProposalByBlockID mocks base method.
+func (m *MockHeaders) ProposalByBlockID(arg0 flow.Identifier) (*flow.ProposalHeader, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProposalByBlockID", arg0)
+	ret0, _ := ret[0].(*flow.ProposalHeader)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ProposalByBlockID indicates an expected call of ProposalByBlockID.
+func (mr *MockHeadersMockRecorder) ProposalByBlockID(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProposalByBlockID", reflect.TypeOf((*MockHeaders)(nil).ProposalByBlockID), arg0)
+}
+
 // Store mocks base method.
-func (m *MockHeaders) Store(arg0 *flow.Header) error {
+func (m *MockHeaders) Store(arg0 *flow.ProposalHeader) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Store", arg0)
 	ret0, _ := ret[0].(error)

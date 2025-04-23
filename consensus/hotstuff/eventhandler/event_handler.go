@@ -423,14 +423,14 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		}
 		return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 	}
-	targetPublicationTime := e.paceMaker.TargetPublicationTime(flowProposal.View, start, flowProposal.ParentID) // determine target publication time
+	targetPublicationTime := e.paceMaker.TargetPublicationTime(flowProposal.Header.View, start, flowProposal.Header.ParentID) // determine target publication time
 	log.Debug().
-		Uint64("block_view", flowProposal.View).
+		Uint64("block_view", flowProposal.Header.View).
 		Time("target_publication", targetPublicationTime).
-		Hex("block_id", logging.ID(flowProposal.ID())).
+		Hex("block_id", logging.ID(flowProposal.Header.ID())).
 		Uint64("parent_view", newestQC.View).
 		Hex("parent_id", newestQC.BlockID[:]).
-		Hex("signer", flowProposal.ProposerID[:]).
+		Hex("signer", flowProposal.Header.ProposerID[:]).
 		Msg("forwarding proposal to communicator for broadcasting")
 
 	// emit notification with own proposal (also triggers broadcast)

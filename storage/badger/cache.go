@@ -88,7 +88,7 @@ func (c *Cache[K, V]) IsCached(key K) bool {
 
 // Get will try to retrieve the resource from cache first, and then from the
 // injected. During normal operations, the following error returns are expected:
-//   - `storage.ErrNotFound` if key is unknown.
+//   - [storage.ErrNotFound] if key is unknown.
 func (c *Cache[K, V]) Get(key K) func(*badger.Txn) (V, error) {
 	return func(tx *badger.Txn) (V, error) {
 
@@ -135,6 +135,10 @@ func (c *Cache[K, V]) Insert(key K, resource V) {
 }
 
 // PutTx will return tx which adds a resource to the cache with the given ID.
+//
+// Error returns: (Note actual errors depend on the specific store function used)
+//   - storage.ErrAlreadyExists if the key already exists in the database.
+//   - generic error in case of unexpected failure from the database layer or encoding failure.
 func (c *Cache[K, V]) PutTx(key K, resource V) func(*transaction.Tx) error {
 	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
 

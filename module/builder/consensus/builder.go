@@ -117,7 +117,7 @@ func NewBuilder(
 // However, it will pass through all errors returned by `setter` and `sign`.
 // Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
 // and handle them accordingly when handling errors returned from BuildOn.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) ([]byte, error)) (*flow.ProposalHeader, error) {
 
 	// since we don't know the blockID when building the block we track the
 	// time indirectly and insert the span directly at the end
@@ -143,7 +143,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	// assemble the block proposal
-	proposal, err := b.createProposal(parentID,
+	blockProposal, err := b.createProposal(parentID,
 		insertableGuarantees,
 		insertableSeals,
 		insertableReceipts,
@@ -153,15 +153,15 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
 
-	span, ctx := b.tracer.StartBlockSpan(context.Background(), proposal.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
+	span, ctx := b.tracer.StartBlockSpan(context.Background(), blockProposal.Block.Header.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
 	defer span.End()
 
-	err = b.state.Extend(ctx, proposal)
+	err = b.state.Extend(ctx, blockProposal)
 	if err != nil {
 		return nil, fmt.Errorf("could not extend state with built proposal: %w", err)
 	}
 
-	return proposal.Header, nil
+	return blockProposal.HeaderProposal(), nil
 }
 
 // repopulateExecutionTree restores latest state of execution tree mempool based on local chain state information.
@@ -617,8 +617,8 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	seals []*flow.Seal,
 	insertableReceipts *InsertableReceipts,
 	setter func(*flow.Header) error,
-	sign func(*flow.Header) error,
-) (*flow.Block, error) {
+	sign func(*flow.Header) ([]byte, error),
+) (*flow.BlockProposal, error) {
 
 	parent, err := b.headers.ByBlockID(parentID)
 	if err != nil {
@@ -650,10 +650,10 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		return nil, fmt.Errorf("evolving protocol state failed: %w", err)
 	}
 
-	proposal := &flow.Block{
+	block := &flow.Block{
 		Header: header,
 	}
-	proposal.SetPayload(flow.Payload{
+	block.SetPayload(flow.Payload{
 		Guarantees:      guarantees,
 		Seals:           seals,
 		Receipts:        insertableReceipts.receipts,
@@ -662,9 +662,13 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	})
 
 	// sign the proposal
-	err = sign(header)
+	sig, err := sign(header)
 	if err != nil {
-		return nil, fmt.Errorf("could not sign the proposal: %w", err)
+		return nil, fmt.Errorf("could not sign the block: %w", err)
+	}
+	proposal := &flow.BlockProposal{
+		Block:           block,
+		ProposerSigData: sig,
 	}
 
 	return proposal, nil

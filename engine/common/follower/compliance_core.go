@@ -104,21 +104,22 @@ func NewComplianceCore(log zerolog.Logger,
 // Caution: method might block if internally too many certified blocks are queued in the channel `certifiedRangesChan`.
 // Expected errors during normal operations:
 //   - cache.ErrDisconnectedBatch
-func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error {
+func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.BlockProposal) error {
 	if len(batch) < 1 {
 		return nil
 	}
 
-	firstBlock := batch[0].Header
-	lastBlock := batch[len(batch)-1].Header
-	hotstuffProposal := model.SignedProposalFromFlow(lastBlock)
+	firstBlock := batch[0].Block.Header
+	lastBlock := batch[len(batch)-1]
+	lastHeader := lastBlock.Block.Header
+	hotstuffProposal := model.SignedProposalFromBlock(lastBlock)
 	log := c.log.With().
 		Hex("origin_id", originID[:]).
-		Str("chain_id", lastBlock.ChainID.String()).
+		Str("chain_id", lastHeader.ChainID.String()).
 		Uint64("first_block_height", firstBlock.Height).
 		Uint64("first_block_view", firstBlock.View).
-		Uint64("last_block_height", lastBlock.Height).
-		Uint64("last_block_view", lastBlock.View).
+		Uint64("last_block_height", lastHeader.Height).
+		Uint64("last_block_view", lastHeader.View).
 		Hex("last_block_id", hotstuffProposal.Block.BlockID[:]).
 		Int("range_length", len(batch)).
 		Logger()
@@ -162,7 +163,7 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 				//     -> In this case, it is ok for the protocol to halt. Consequently, we can just disregard
 				//        the block, which will probably lead to this node eventually halting.
 				log.Err(err).Msg(
-					"Unable to validate proposal with view from unknown epoch. While there is noting wrong with the node, " +
+					"Unable to validate proposal with view from unknown epoch. While there is nothing wrong with the node, " +
 						"this could be a symptom of (i) the node being severely behind, (ii) there is a byzantine proposer in " +
 						"the network, or (iii) there was no finalization progress for hundreds of views. This should be " +
 						"investigated to confirm the cause is the benign scenario (i).")
@@ -172,7 +173,7 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 		}
 	}
 
-	certifiedBatch, certifyingQC, err := c.pendingCache.AddBlocks(batch)
+	certifiedBatch, err := c.pendingCache.AddBlocks(batch)
 	if err != nil {
 		return fmt.Errorf("could not add a range of pending blocks: %w", err) // ErrDisconnectedBatch or exception
 	}
@@ -181,15 +182,11 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 	if len(certifiedBatch) < 1 {
 		return nil
 	}
-	certifiedRange, err := rangeToCertifiedBlocks(certifiedBatch, certifyingQC)
-	if err != nil {
-		return fmt.Errorf("converting the certified batch to list of certified blocks failed: %w", err)
-	}
 
 	// in case we have already stopped our worker, we use a select statement to avoid
 	// blocking since there is no active consumer for this channel
 	select {
-	case c.certifiedRangesChan <- certifiedRange:
+	case c.certifiedRangesChan <- certifiedBatch:
 	case <-c.ComponentManager.ShutdownSignal():
 	}
 	return nil
@@ -264,15 +261,15 @@ func (c *ComplianceCore) processCertifiedBlocks(ctx context.Context, blocks Cert
 	// Step 2 & 3: extend protocol state with connected certified blocks and forward them to consensus follower
 	for _, certifiedBlock := range connectedBlocks {
 		s, _ := c.tracer.StartBlockSpan(ctx, certifiedBlock.BlockID(), trace.FollowerExtendProtocolState)
-		err = c.state.ExtendCertified(ctx, certifiedBlock.Block, certifiedBlock.CertifyingQC)
+		err = c.state.ExtendCertified(ctx, &certifiedBlock)
 		s.End()
 		if err != nil {
 			return fmt.Errorf("could not extend protocol state with certified block: %w", err)
 		}
 
-		b, err := model.NewCertifiedBlock(model.BlockFromFlow(certifiedBlock.Block.Header), certifiedBlock.CertifyingQC)
+		b, err := model.NewCertifiedBlock(model.BlockFromFlow(certifiedBlock.Proposal.Block.Header), certifiedBlock.CertifyingQC)
 		if err != nil {
-			return fmt.Errorf("failed to convert certified block %v to HotStuff type: %w", certifiedBlock.Block.ID(), err)
+			return fmt.Errorf("failed to convert certified block %v to HotStuff type: %w", certifiedBlock.Proposal.Block.ID(), err)
 		}
 		c.follower.AddCertifiedBlock(&b) // submit the model to follower for async processing
 	}
@@ -301,28 +298,4 @@ func (c *ComplianceCore) processFinalizedBlock(ctx context.Context, finalized *f
 		return fmt.Errorf("finalizing block %v caused the PendingTree to connect additional blocks, which is a symptom of internal state corruption or a bug", finalized.ID())
 	}
 	return nil
-}
-
-// rangeToCertifiedBlocks transform batch of connected blocks and a QC that certifies last block to a range of
-// certified and connected blocks.
-// Pure function (side-effect free). No errors expected during normal operations.
-func rangeToCertifiedBlocks(certifiedRange []*flow.Block, certifyingQC *flow.QuorumCertificate) (CertifiedBlocks, error) {
-	certifiedBlocks := make(CertifiedBlocks, 0, len(certifiedRange))
-	lastIndex := len(certifiedRange) - 1
-	for i, block := range certifiedRange {
-		var qc *flow.QuorumCertificate
-		if i < lastIndex {
-			qc = certifiedRange[i+1].Header.QuorumCertificate()
-		} else {
-			qc = certifyingQC
-		}
-
-		// bundle block and its certifying QC to `CertifiedBlock`:
-		certBlock, err := flow.NewCertifiedBlock(block, qc)
-		if err != nil {
-			return nil, fmt.Errorf("constructing certified root block failed: %w", err)
-		}
-		certifiedBlocks = append(certifiedBlocks, certBlock)
-	}
-	return certifiedBlocks, nil
 }

@@ -9,7 +9,7 @@ import (
 // item represents an item in the cache: a block header, payload, and the ID
 // of the node that sent it to us. The payload is generic.
 type item struct {
-	header  flow.Slashable[*flow.Header]
+	header  flow.Slashable[*flow.ProposalHeader]
 	payload interface{}
 }
 
@@ -33,12 +33,12 @@ func newBackend() *backend {
 
 // add adds the item to the cache, returning false if it already exists and
 // true otherwise.
-func (b *backend) add(block flow.Slashable[*flow.Header], payload interface{}) bool {
+func (b *backend) add(block flow.Slashable[*flow.ProposalHeader], payload interface{}) bool {
 
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	blockID := block.Message.ID()
+	blockID := block.Message.Header.ID()
 
 	_, exists := b.blocksByID[blockID]
 	if exists {
@@ -51,7 +51,7 @@ func (b *backend) add(block flow.Slashable[*flow.Header], payload interface{}) b
 	}
 
 	b.blocksByID[blockID] = item
-	b.blocksByParent[block.Message.ParentID] = append(b.blocksByParent[block.Message.ParentID], blockID)
+	b.blocksByParent[block.Message.Header.ParentID] = append(b.blocksByParent[block.Message.Header.ParentID], blockID)
 
 	return true
 }
@@ -114,9 +114,9 @@ func (b *backend) pruneByView(view uint64) {
 	defer b.mu.Unlock()
 
 	for id, item := range b.blocksByID {
-		if item.header.Message.View <= view {
+		if item.header.Message.Header.View <= view {
 			delete(b.blocksByID, id)
-			delete(b.blocksByParent, item.header.Message.ParentID)
+			delete(b.blocksByParent, item.header.Message.Header.ParentID)
 		}
 	}
 }

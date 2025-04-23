@@ -33,7 +33,7 @@ func TestEntityExpirySnapshotValidation(t *testing.T) {
 		// advance height to be not spork root snapshot, but still lower than transaction expiry
 		rootSnapshot.Encodable().Head().Height += flow.DefaultTransactionExpiry / 2
 		// add blocks to sealing segment
-		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(int(flow.DefaultTransactionExpiry / 2))
+		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.ProposalFixtures(int(flow.DefaultTransactionExpiry / 2))
 		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
 		require.NoError(t, err)
 	})
@@ -42,7 +42,7 @@ func TestEntityExpirySnapshotValidation(t *testing.T) {
 		// advance height to be not spork root snapshot
 		rootSnapshot.Encodable().Head().Height += flow.DefaultTransactionExpiry * 2
 		// add blocks to sealing segment
-		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(int(flow.DefaultTransactionExpiry) - 1)
+		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.ProposalFixtures(int(flow.DefaultTransactionExpiry) - 1)
 		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
 		require.NoError(t, err)
 	})
@@ -51,7 +51,7 @@ func TestEntityExpirySnapshotValidation(t *testing.T) {
 		// advance height to be not spork root snapshot
 		rootSnapshot.Encodable().Head().Height += flow.DefaultTransactionExpiry * 2
 		// add blocks to sealing segment
-		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(flow.DefaultTransactionExpiry * 2)
+		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.ProposalFixtures(flow.DefaultTransactionExpiry * 2)
 		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
 		require.NoError(t, err)
 	})

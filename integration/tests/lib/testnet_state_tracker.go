@@ -81,7 +81,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 			tst.MsgState.Add(sender, msg)
 
 			switch m := msg.(type) {
-			case *messages.BlockProposal:
+			case *messages.UntrustedProposal:
 				tst.BlockState.Add(t, m)
 				t.Logf("%v block proposal received from %s at height %v, view %v: %x\n",
 					time.Now().UTC(),

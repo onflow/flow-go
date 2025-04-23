@@ -69,7 +69,7 @@ type BuilderSuite struct {
 	db       *badger.DB
 	sentinel uint64
 	setter   func(*flow.Header) error
-	sign     func(*flow.Header) error
+	sign     func(*flow.Header) ([]byte, error)
 
 	// mocked dependencies
 	state        *protocol.ParticipantState
@@ -270,15 +270,15 @@ func (bs *BuilderSuite) SetupTest() {
 		header.View = 1337
 		return nil
 	}
-	bs.sign = func(_ *flow.Header) error {
-		return nil
+	bs.sign = func(_ *flow.Header) ([]byte, error) {
+		return nil, nil
 	}
 
 	bs.state = &protocol.ParticipantState{}
 	bs.state.On("Extend", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		block := args.Get(1).(*flow.Block)
-		bs.Assert().Equal(bs.sentinel, block.Header.View)
-		bs.assembled = block.Payload
+		proposal := args.Get(1).(*flow.BlockProposal)
+		bs.Assert().Equal(bs.sentinel, proposal.Block.Header.View)
+		bs.assembled = proposal.Block.Payload
 	}).Return(nil)
 	bs.state.On("Final").Return(func() realproto.Snapshot {
 		if block, ok := bs.blocks[bs.finalID]; ok {
@@ -477,8 +477,8 @@ func (bs *BuilderSuite) TestSetterErrorPassthrough() {
 func (bs *BuilderSuite) TestSignErrorPassthrough() {
 	bs.T().Run("unexpected Exception", func(t *testing.T) {
 		exception := errors.New("exception")
-		sign := func(header *flow.Header) error {
-			return exception
+		sign := func(header *flow.Header) ([]byte, error) {
+			return nil, exception
 		}
 		_, err := bs.build.BuildOn(bs.parentID, bs.setter, sign)
 		bs.Assert().ErrorIs(err, exception)
@@ -486,8 +486,8 @@ func (bs *BuilderSuite) TestSignErrorPassthrough() {
 	bs.T().Run("NoVoteError", func(t *testing.T) {
 		// the EventHandler relies on this sentinel in particular to be passed through
 		sentinel := hotstuffmodel.NewNoVoteErrorf("not voting")
-		sign := func(header *flow.Header) error {
-			return sentinel
+		sign := func(header *flow.Header) ([]byte, error) {
+			return nil, sentinel
 		}
 		_, err := bs.build.BuildOn(bs.parentID, bs.setter, sign)
 		bs.Assert().ErrorIs(err, sentinel)

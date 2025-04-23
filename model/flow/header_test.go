@@ -6,13 +6,11 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
-	"github.com/onflow/flow-go/model/encoding/rlp"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -28,44 +26,6 @@ func TestHeaderEncodingJSON(t *testing.T) {
 	decodedID := decoded.ID()
 	assert.Equal(t, headerID, decodedID)
 	assert.Equal(t, *header, decoded)
-}
-
-func TestHeaderFingerprint(t *testing.T) {
-	header := unittest.BlockHeaderFixture()
-	header.LastViewTC = helper.MakeTC()
-	headerID := header.ID()
-	data := header.Fingerprint()
-	var decoded struct {
-		ChainID            flow.ChainID
-		ParentID           flow.Identifier
-		Height             uint64
-		PayloadHash        flow.Identifier
-		Timestamp          uint64
-		View               uint64
-		ParentView         uint64
-		ParentVoterIndices []byte
-		ParentVoterSigData crypto.Signature
-		ProposerID         flow.Identifier
-		LastViewTC         interface{}
-	}
-	rlp.NewMarshaler().MustUnmarshal(data, &decoded)
-	decHeader := &flow.Header{
-		ChainID:            decoded.ChainID,
-		ParentID:           decoded.ParentID,
-		Height:             decoded.Height,
-		PayloadHash:        decoded.PayloadHash,
-		Timestamp:          time.Unix(0, int64(decoded.Timestamp)).UTC(),
-		View:               decoded.View,
-		ParentView:         decoded.ParentView,
-		ParentVoterIndices: decoded.ParentVoterIndices,
-		ParentVoterSigData: decoded.ParentVoterSigData,
-		ProposerID:         decoded.ProposerID,
-		ProposerSigData:    header.ProposerSigData, // since this field is not encoded/decoded, just set it to the original value to pass test
-		LastViewTC:         header.LastViewTC,
-	}
-	decodedID := decHeader.ID()
-	assert.Equal(t, headerID, decodedID)
-	assert.Equal(t, *header, *decHeader)
 }
 
 func TestHeaderEncodingMsgpack(t *testing.T) {
@@ -101,4 +61,13 @@ func TestNonUTCTimestampSameHashAsUTC(t *testing.T) {
 	header.Timestamp = header.Timestamp.In(loc)
 	checkedID := header.ID()
 	assert.Equal(t, headerID, checkedID)
+}
+
+func TestHeaderMalleability(t *testing.T) {
+	header := unittest.BlockHeaderFixture()
+	// Require that LastViewTC (TimeoutCertificate) is not malleable, since its ID is incorporated in Header's ID
+	unittest.RequireEntityNonMalleable(t, helper.MakeTC())
+	// time.Time contains private fields, so we provide a field generator
+	timestampGenerator := func() time.Time { return time.Now().UTC() }
+	unittest.RequireEntityNonMalleable(t, header, unittest.WithFieldGenerator("Timestamp", timestampGenerator))
 }

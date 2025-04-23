@@ -10,6 +10,7 @@ import (
 
 	stateMock "github.com/onflow/flow-go/engine/execution/state/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
@@ -186,6 +187,8 @@ type headerStore struct {
 	byHeight map[uint64]*flow.Header
 }
 
+var _ storage.Headers = (*headerStore)(nil)
+
 func newHeadersWithBlocks(headers []*flow.Header) *headerStore {
 	byID := make(map[flow.Identifier]*flow.Header, len(headers))
 	byHeight := make(map[uint64]*flow.Header, len(headers))
@@ -232,6 +235,10 @@ func (h *headerStore) ByParentID(parentID flow.Identifier) ([]*flow.Header, erro
 	return nil, nil
 }
 
-func (h *headerStore) Store(header *flow.Header) error {
+func (h *headerStore) Store(proposal *flow.ProposalHeader) error {
 	return nil
+}
+
+func (h *headerStore) ProposalByBlockID(blockID flow.Identifier) (*flow.ProposalHeader, error) {
+	return nil, nil
 }

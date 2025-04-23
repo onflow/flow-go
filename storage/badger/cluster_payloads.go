@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	"github.com/onflow/flow-go/storage/badger/transaction"
@@ -18,6 +19,8 @@ type ClusterPayloads struct {
 	db    *badger.DB
 	cache *Cache[flow.Identifier, *cluster.Payload]
 }
+
+var _ storage.ClusterPayloads = (*ClusterPayloads)(nil)
 
 func NewClusterPayloads(cacheMetrics module.CacheMetrics, db *badger.DB) *ClusterPayloads {
 
