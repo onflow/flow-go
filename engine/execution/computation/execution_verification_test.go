@@ -820,10 +820,10 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	}
 
 	receipt := computationResult.ExecutionReceipt
-	receiptSignableID := receipt.UnsignedExecutionReceipt.ID()
+	unsignedReceiptID := receipt.UnsignedExecutionReceipt.ID()
 	valid, err := myIdentity.StakingPubKey.Verify(
 		receipt.ExecutorSignature,
-		receiptSignableID[:],
+		unsignedReceiptID[:],
 		utils.NewExecutionReceiptHasher())
 
 	require.NoError(t, err)

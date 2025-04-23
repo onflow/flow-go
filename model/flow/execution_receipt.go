@@ -34,7 +34,7 @@ func (er *ExecutionReceipt) Checksum() Identifier {
 	return MakeID(er)
 }
 
-// Stub returns a shortened version of receipt, only containing the ResultID instead of the full ExecutionResult.
+// Stub returns a stub of the full ExecutionReceipt, where the ExecutionResult is replaced by its cryptographic hash.
 func (er *ExecutionReceipt) Stub() *ExecutionReceiptStub {
 	return &ExecutionReceiptStub{
 		UnsignedExecutionReceiptStub: er.UnsignedExecutionReceipt.Stub(),
@@ -49,6 +49,7 @@ func (erb UnsignedExecutionReceipt) ID() Identifier {
 	return erb.Stub().ID()
 }
 
+// Stub returns a stub of the UnsignedExecutionReceipt, where the ExecutionResult is replaced by its cryptographic hash.
 func (erb UnsignedExecutionReceipt) Stub() UnsignedExecutionReceiptStub {
 	return UnsignedExecutionReceiptStub{
 		ExecutorID: erb.ExecutorID,
