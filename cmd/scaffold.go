@@ -1236,23 +1236,23 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		return fmt.Errorf("could not initialize max tracker: %w", err)
 	}
 
-	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
-	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB, fnb.BaseConfig.guaranteesCacheSize)
-	seals := bstorage.NewSeals(fnb.Metrics.Cache, fnb.DB)
-	results := bstorage.NewExecutionResults(fnb.Metrics.Cache, fnb.DB)
-	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results, fnb.BaseConfig.receiptsCacheSize)
-	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
-	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts, results)
-	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
-	qcs := store.NewQuorumCertificates(fnb.Metrics.Cache, fnb.ProtocolDB, bstorage.DefaultCacheSize)
-	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
-	collections := bstorage.NewCollections(fnb.DB, transactions)
+	headers := store.NewHeaders(fnb.Metrics.Cache, fnb.ProtocolDB)
+	guarantees := store.NewGuarantees(fnb.Metrics.Cache, fnb.ProtocolDB, fnb.BaseConfig.guaranteesCacheSize)
+	seals := store.NewSeals(fnb.Metrics.Cache, fnb.ProtocolDB)
+	results := store.NewExecutionResults(fnb.Metrics.Cache, fnb.ProtocolDB)
+	receipts := store.NewExecutionReceipts(fnb.Metrics.Cache, fnb.ProtocolDB, results, fnb.BaseConfig.receiptsCacheSize)
+	index := store.NewIndex(fnb.Metrics.Cache, fnb.ProtocolDB)
+	payloads := store.NewPayloads(fnb.ProtocolDB, index, guarantees, seals, receipts, results)
+	blocks := store.NewBlocks(fnb.ProtocolDB, headers, payloads)
+	qcs := store.NewQuorumCertificates(fnb.Metrics.Cache, fnb.ProtocolDB, store.DefaultCacheSize)
+	transactions := store.NewTransactions(fnb.Metrics.Cache, fnb.ProtocolDB)
+	collections := store.NewCollections(fnb.ProtocolDB, transactions)
 	setups := store.NewEpochSetups(fnb.Metrics.Cache, fnb.ProtocolDB)
 	epochCommits := store.NewEpochCommits(fnb.Metrics.Cache, fnb.ProtocolDB)
 	protocolState := store.NewEpochProtocolStateEntries(fnb.Metrics.Cache, setups, epochCommits, fnb.ProtocolDB,
-		bstorage.DefaultEpochProtocolStateCacheSize, bstorage.DefaultProtocolStateIndexCacheSize)
+		store.DefaultEpochProtocolStateCacheSize, store.DefaultProtocolStateIndexCacheSize)
 	protocolKVStores := store.NewProtocolKVStore(fnb.Metrics.Cache, fnb.ProtocolDB,
-		bstorage.DefaultProtocolKVStoreCacheSize, bstorage.DefaultProtocolKVStoreByBlockIDCacheSize)
+		store.DefaultProtocolKVStoreCacheSize, store.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := store.NewVersionBeacons(fnb.ProtocolDB)
 
 	fnb.Storage = Storage{
