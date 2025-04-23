@@ -30,7 +30,7 @@ func NewBaseKeyValueStoreStateMachine(
 
 // Build is a no-op by default. If a state machine needs to persist data, it should override this method.
 func (m *BaseKeyValueStoreStateMachine) Build() ([]storage.BlockIndexingBatchWrite, error) {
-	return []storage.BlockIndexingBatchWrite{}, nil
+	return make([]storage.BlockIndexingBatchWrite, 0), nil
 }
 
 // View returns the view associated with this state machine.
