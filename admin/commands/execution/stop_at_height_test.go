@@ -99,7 +99,11 @@ func TestCommandsSetsValues(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		&flow.Header{Height: 1},
+		&flow.Header{
+			HeaderBody: flow.HeaderBody{
+				Height: 1,
+			},
+		},
 		false,
 		false,
 	)

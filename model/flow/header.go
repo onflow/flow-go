@@ -21,7 +21,7 @@ type ProposalHeader struct {
 	ProposerSigData []byte
 }
 
-type HeaderFields struct {
+type HeaderBody struct {
 	// ChainID is a chain-specific value to prevent replay attacks.
 	ChainID ChainID
 	// ParentID is the ID of this block's parent.
@@ -50,7 +50,7 @@ type HeaderFields struct {
 }
 
 // QuorumCertificate returns quorum certificate that is incorporated in the block.
-func (h *HeaderFields) QuorumCertificate() *QuorumCertificate {
+func (h *HeaderBody) QuorumCertificate() *QuorumCertificate {
 	return &QuorumCertificate{
 		BlockID:       h.ParentID,
 		View:          h.ParentView,
@@ -59,7 +59,8 @@ func (h *HeaderFields) QuorumCertificate() *QuorumCertificate {
 	}
 }
 
-func (h *HeaderFields) EncodeRLP(w io.Writer) error {
+// TODO(malleability, #7309) Remove EncodeRLP after replacing Timestamp (time.Time) with uint64.
+func (h *HeaderBody) EncodeRLP(w io.Writer) error {
 	encodingCanonicalForm := struct {
 		ChainID            ChainID
 		ParentID           Identifier
@@ -91,33 +92,9 @@ func (h *HeaderFields) EncodeRLP(w io.Writer) error {
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
 type Header struct {
-	// ChainID is a chain-specific value to prevent replay attacks.
-	ChainID ChainID
-	// ParentID is the ID of this block's parent.
-	ParentID Identifier
-	// Height is the height of the parent + 1
-	Height uint64
+	HeaderBody
 	// PayloadHash is a hash of the payload of this block.
 	PayloadHash Identifier
-	// Timestamp is the time at which this block was proposed.
-	// The proposer can choose any time, so this should not be trusted as accurate.
-	Timestamp time.Time
-	// View number at which this block was proposed.
-	View uint64
-	// ParentView number at which parent block was proposed.
-	ParentView uint64
-	// ParentVoterIndices is a bitvector that represents all the voters for the parent block.
-	ParentVoterIndices []byte
-	// ParentVoterSigData is an aggregated signature over the parent block. Not a single cryptographic
-	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
-	// A quorum certificate can be extracted from the header.
-	// This field is the SigData field of the extracted quorum certificate.
-	ParentVoterSigData []byte
-	// ProposerID is a proposer identifier for the block
-	ProposerID Identifier
-	// LastViewTC is a timeout certificate for previous view, it can be nil
-	// it has to be present if previous round ended with timeout.
-	LastViewTC *TimeoutCertificate
 }
 
 // QuorumCertificate returns quorum certificate that is incorporated in the block header.
@@ -130,9 +107,9 @@ func (h Header) QuorumCertificate() *QuorumCertificate {
 	}
 }
 
-// TODO: Uliana: remove after PR #7100 will be fixed
-func (h *Header) HeaderFields() HeaderFields {
-	return HeaderFields{
+// TODO: Uliana: remove it after Header will be refactored into HeaderBody and PayloadHash, refactor all usages of HeaderBody() as a method
+func (h *Header) HeaderFields() HeaderBody {
+	return HeaderBody{
 		ChainID:            h.ChainID,
 		ParentID:           h.ParentID,
 		Height:             h.Height,

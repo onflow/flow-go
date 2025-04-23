@@ -41,24 +41,26 @@ func (p UntrustedClusterBlockPayload) Hash() flow.Identifier {
 // Deprecated: Please update cluster.Payload.Collection to use []flow.TransactionBody,
 // then replace instances of this type with cluster.Block
 type UntrustedClusterBlock struct {
-	Header  flow.HeaderFields
+	Header  flow.HeaderBody
 	Payload UntrustedClusterBlockPayload
 }
 
 // ToHeader return flow.Header data for UntrustedClusterBlock.
 func (ub *UntrustedClusterBlock) ToHeader() *flow.Header {
 	return &flow.Header{
-		ChainID:            ub.Header.ChainID,
-		ParentID:           ub.Header.ParentID,
-		Height:             ub.Header.Height,
-		Timestamp:          ub.Header.Timestamp,
-		View:               ub.Header.View,
-		ParentView:         ub.Header.ParentView,
-		ParentVoterIndices: ub.Header.ParentVoterIndices,
-		ParentVoterSigData: ub.Header.ParentVoterSigData,
-		ProposerID:         ub.Header.ProposerID,
-		LastViewTC:         ub.Header.LastViewTC,
-		PayloadHash:        ub.Payload.Hash(),
+		HeaderBody: flow.HeaderBody{
+			ChainID:            ub.Header.ChainID,
+			ParentID:           ub.Header.ParentID,
+			Height:             ub.Header.Height,
+			Timestamp:          ub.Header.Timestamp,
+			View:               ub.Header.View,
+			ParentView:         ub.Header.ParentView,
+			ParentVoterIndices: ub.Header.ParentVoterIndices,
+			ParentVoterSigData: ub.Header.ParentVoterSigData,
+			ProposerID:         ub.Header.ProposerID,
+			LastViewTC:         ub.Header.LastViewTC,
+		},
+		PayloadHash: ub.Payload.Hash(),
 	}
 }
 

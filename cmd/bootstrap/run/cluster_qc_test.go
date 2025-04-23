@@ -23,7 +23,7 @@ func TestGenerateClusterRootQC(t *testing.T) {
 	block.Header.Height = 0
 
 	clusterBlock := cluster.NewBlock(
-		flow.HeaderFields{
+		flow.HeaderBody{
 			ParentID: flow.ZeroID,
 			View:     42,
 		},

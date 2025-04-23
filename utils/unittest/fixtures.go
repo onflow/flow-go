@@ -488,14 +488,16 @@ func HeaderWithView(view uint64) func(*flow.Header) {
 	}
 }
 
-func BlockHeaderFieldsFixture(opts ...func(header *flow.HeaderFields)) *flow.HeaderFields {
+func BlockHeaderFieldsFixture(opts ...func(header *flow.HeaderBody)) *flow.HeaderBody {
 	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
 	header := BlockHeaderFieldsWithParentFixture(&flow.Header{
-		ChainID:  flow.Emulator,
-		ParentID: IdentifierFixture(),
-		Height:   height,
-		View:     view,
+		HeaderBody: flow.HeaderBody{
+			ChainID:  flow.Emulator,
+			ParentID: IdentifierFixture(),
+			Height:   height,
+			View:     view,
+		},
 	})
 
 	for _, opt := range opts {
@@ -509,10 +511,12 @@ func BlockHeaderFixture(opts ...func(header *flow.Header)) *flow.Header {
 	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
 	header := BlockHeaderWithParentFixture(&flow.Header{
-		ChainID:  flow.Emulator,
-		ParentID: IdentifierFixture(),
-		Height:   height,
-		View:     view,
+		HeaderBody: flow.HeaderBody{
+			ChainID:  flow.Emulator,
+			ParentID: IdentifierFixture(),
+			Height:   height,
+			View:     view,
+		},
 	})
 
 	for _, opt := range opts {
@@ -529,10 +533,12 @@ func BlockHeaderFixtureOnChain(
 	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
 	header := BlockHeaderWithParentFixture(&flow.Header{
-		ChainID:  chainID,
-		ParentID: IdentifierFixture(),
-		Height:   height,
-		View:     view,
+		HeaderBody: flow.HeaderBody{
+			ChainID:  chainID,
+			ParentID: IdentifierFixture(),
+			Height:   height,
+			View:     view,
+		},
 	})
 
 	for _, opt := range opts {
@@ -559,21 +565,23 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 		}
 	}
 	return &flow.Header{
-		ChainID:            parent.ChainID,
-		ParentID:           parent.ID(),
-		Height:             height,
-		PayloadHash:        IdentifierFixture(),
-		Timestamp:          time.Now().UTC(),
-		View:               view,
-		ParentView:         parent.View,
-		ParentVoterIndices: SignerIndicesFixture(4),
-		ParentVoterSigData: QCSigDataFixture(),
-		ProposerID:         IdentifierFixture(),
-		LastViewTC:         lastViewTC,
+		HeaderBody: flow.HeaderBody{
+			ChainID:            parent.ChainID,
+			ParentID:           parent.ID(),
+			Height:             height,
+			Timestamp:          time.Now().UTC(),
+			View:               view,
+			ParentView:         parent.View,
+			ParentVoterIndices: SignerIndicesFixture(4),
+			ParentVoterSigData: QCSigDataFixture(),
+			ProposerID:         IdentifierFixture(),
+			LastViewTC:         lastViewTC,
+		},
+		PayloadHash: IdentifierFixture(),
 	}
 }
 
-func BlockHeaderFieldsWithParentFixture(parent *flow.Header) *flow.HeaderFields {
+func BlockHeaderFieldsWithParentFixture(parent *flow.Header) *flow.HeaderBody {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
 	var lastViewTC *flow.TimeoutCertificate
@@ -589,7 +597,7 @@ func BlockHeaderFieldsWithParentFixture(parent *flow.Header) *flow.HeaderFields 
 			SigData:       SignatureFixture(),
 		}
 	}
-	return &flow.HeaderFields{
+	return &flow.HeaderBody{
 		ChainID:            parent.ChainID,
 		ParentID:           parent.ID(),
 		Height:             height,
@@ -624,17 +632,19 @@ func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *fl
 		}
 	}
 	return &flow.Header{
-		ChainID:            parent.ChainID,
-		ParentID:           parent.ID(),
-		Height:             height,
-		PayloadHash:        IdentifierFixture(),
-		Timestamp:          time.Now().UTC(),
-		View:               view,
-		ParentView:         parent.View,
-		ParentVoterIndices: SignerIndicesFixture(4),
-		ParentVoterSigData: QCSigDataWithSoRFixture(source),
-		ProposerID:         IdentifierFixture(),
-		LastViewTC:         lastViewTC,
+		HeaderBody: flow.HeaderBody{
+			ChainID:            parent.ChainID,
+			ParentID:           parent.ID(),
+			Height:             height,
+			Timestamp:          time.Now().UTC(),
+			View:               view,
+			ParentView:         parent.View,
+			ParentVoterIndices: SignerIndicesFixture(4),
+			ParentVoterSigData: QCSigDataWithSoRFixture(source),
+			ProposerID:         IdentifierFixture(),
+			LastViewTC:         lastViewTC,
+		},
+		PayloadHash: IdentifierFixture(),
 	}
 }
 

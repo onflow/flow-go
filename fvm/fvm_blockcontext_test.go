@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
-	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
@@ -1683,7 +1683,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 func TestBlockContext_Random(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
-	header := &flow.Header{Height: 42}
+	header := &flow.Header{HeaderBody: flow.HeaderBody{Height: 42}}
 	source := testutil.EntropyProviderFixture(nil)
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),

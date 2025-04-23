@@ -8,47 +8,60 @@ import (
 
 func Genesis() *Block {
 	header := &flow.Header{
-		View:      0,
-		ChainID:   "cluster",
-		Timestamp: flow.GenesisTime,
-		ParentID:  flow.ZeroID,
+		HeaderBody: flow.HeaderBody{
+			View:      0,
+			ChainID:   "cluster",
+			Timestamp: flow.GenesisTime,
+			ParentID:  flow.ZeroID,
+		},
 	}
 
-	// TODO: Uliana: refactor all usages HeaderFields() after PR #7100 will be fixed
 	return NewBlock(header.HeaderFields(), EmptyPayload(flow.ZeroID))
 }
 
 // Block represents a block in collection node cluster consensus. It contains
 // a standard block header with a payload containing only a single collection.
 type Block struct {
-	Header  *flow.HeaderFields
+	Header  *flow.HeaderBody
 	Payload *Payload
 }
 
+// NewBlock creates a new block in collection node cluster consensus.
+//
+// Parameters:
+// - headerBody: the header fields to use for the block
+// - payload: the payload to associate with the block
 func NewBlock(
-	header flow.HeaderFields,
+	headerBody flow.HeaderBody,
 	payload Payload,
 ) *Block {
 	return &Block{
-		Header:  &header,
+		Header:  &headerBody,
 		Payload: &payload,
 	}
+}
+
+// ID returns a collision-resistant hash of the cluster.Block struct.
+func (b *Block) ID() flow.Identifier {
+	return flow.MakeID(b)
 }
 
 // ToHeader return flow.Header data for cluster.Block
 func (b *Block) ToHeader() *flow.Header {
 	return &flow.Header{
-		ChainID:            b.Header.ChainID,
-		ParentID:           b.Header.ParentID,
-		Height:             b.Header.Height,
-		Timestamp:          b.Header.Timestamp,
-		View:               b.Header.View,
-		ParentView:         b.Header.ParentView,
-		ParentVoterIndices: b.Header.ParentVoterIndices,
-		ParentVoterSigData: b.Header.ParentVoterSigData,
-		ProposerID:         b.Header.ProposerID,
-		LastViewTC:         b.Header.LastViewTC,
-		PayloadHash:        b.Payload.Hash(),
+		HeaderBody: flow.HeaderBody{
+			ChainID:            b.Header.ChainID,
+			ParentID:           b.Header.ParentID,
+			Height:             b.Header.Height,
+			Timestamp:          b.Header.Timestamp,
+			View:               b.Header.View,
+			ParentView:         b.Header.ParentView,
+			ParentVoterIndices: b.Header.ParentVoterIndices,
+			ParentVoterSigData: b.Header.ParentVoterSigData,
+			ProposerID:         b.Header.ProposerID,
+			LastViewTC:         b.Header.LastViewTC,
+		},
+		PayloadHash: b.Payload.Hash(),
 	}
 }
 
@@ -56,9 +69,4 @@ func (b *Block) ToHeader() *flow.Header {
 type BlockProposal struct {
 	Block           *Block
 	ProposerSigData []byte
-}
-
-// ID returns the ID of the underlying block header.
-func (b *Block) ID() flow.Identifier {
-	return flow.MakeID(b)
 }

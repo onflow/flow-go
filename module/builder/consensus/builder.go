@@ -629,10 +629,12 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 
 	// construct default block on top of the provided parent
 	header := &flow.Header{
-		ChainID:     parent.ChainID,
-		ParentID:    parentID,
-		Height:      parent.Height + 1,
-		Timestamp:   timestamp,
+		HeaderBody: flow.HeaderBody{
+			ChainID:   parent.ChainID,
+			ParentID:  parentID,
+			Height:    parent.Height + 1,
+			Timestamp: timestamp,
+		},
 		PayloadHash: flow.ZeroID,
 	}
 
