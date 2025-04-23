@@ -37,17 +37,14 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		}
 		kvState.On("VersionedEncode").Return(expectedVersion, encData, nil).Once()
 
-		deferredUpdate := storagemock.NewDeferredDBUpdate(t)
-		deferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
-		llStorage.On("StoreTx", kvStateID, versionedSnapshot).Return(deferredUpdate.Execute).Once()
+		rw := storagemock.NewReaderBatchWriter(t)
+		llStorage.On("BatchStore", rw, kvStateID, versionedSnapshot).Return(nil).Once()
 
-		// Calling `StoreTx` should return the output of the wrapped low-level storage, which is a deferred database
+		// Calling `BatchStore` should return the output of the wrapped low-level storage, which is a deferred database
 		// update. Conceptually, it is possible that `ProtocolKVStore` wraps the deferred database operation in faulty
 		// code, such that it cannot be executed. Therefore, we execute the top-level deferred database update below
 		// and verify that the deferred database operation returned by the lower-level is actually reached.
-		dbUpdate := store.StoreTx(kvStateID, kvState)
-		err := dbUpdate(&transaction.Tx{})
-		require.NoError(t, err)
+		require.NoError(t, store.BatchStore(rw, kvStateID, kvState))
 	})
 
 	// On the unhappy path, i.e. when the encoding of input `kvState` failed, `ProtocolKVStore` should produce

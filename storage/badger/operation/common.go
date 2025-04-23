@@ -13,37 +13,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// batchWrite will encode the given entity using msgpack and will upsert the resulting
-// binary data in the badger wrote batch under the provided key - if the value already exists
-// in the database it will be overridden.
-// No errors are expected during normal operation.
-func batchWrite(key []byte, entity interface{}) func(writeBatch *badger.WriteBatch) error {
-	return func(writeBatch *badger.WriteBatch) error {
-
-		// update the maximum key size if the inserted key is bigger
-		if uint32(len(key)) > max {
-			max = uint32(len(key))
-			err := SetMax(writeBatch)
-			if err != nil {
-				return fmt.Errorf("could not update max tracker: %w", err)
-			}
-		}
-
-		// serialize the entity data
-		val, err := msgpack.Marshal(entity)
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
-		}
-
-		// persist the entity data into the DB
-		err = writeBatch.Set(key, val)
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not store data: %w", err)
-		}
-		return nil
-	}
-}
-
 // insert will encode the given entity using msgpack and will insert the resulting
 // binary data in the badger DB under the provided key. It will error if the
 // key already exists.
@@ -170,19 +139,6 @@ func remove(key []byte) func(*badger.Txn) error {
 		err = tx.Delete(key)
 		if err != nil {
 			return irrecoverable.NewExceptionf("could not delete item: %w", err)
-		}
-		return nil
-	}
-}
-
-// batchRemove removes entry under a given key in a write-batch.
-// if key doesn't exist, does nothing.
-// No errors are expected during normal operation.
-func batchRemove(key []byte) func(writeBatch *badger.WriteBatch) error {
-	return func(writeBatch *badger.WriteBatch) error {
-		err := writeBatch.Delete(key)
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not batch delete data: %w", err)
 		}
 		return nil
 	}
