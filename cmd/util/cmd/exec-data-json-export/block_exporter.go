@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 )
@@ -36,21 +35,21 @@ type blockSummary struct {
 func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) (flow.StateCommitment, error) {
 
 	// traverse backward from the given block (parent block) and fetch by blockHash
-	db := common.InitStorage(dbPath)
-	defer db.Close()
+	badgerdb := common.InitStorage(dbPath)
+	defer badgerdb.Close()
 
-	sdb := badgerimpl.ToDB(db)
+	db := badgerimpl.ToDB(badgerdb)
 
 	cacheMetrics := &metrics.NoopCollector{}
-	headers := badger.NewHeaders(cacheMetrics, db)
-	index := badger.NewIndex(cacheMetrics, db)
-	guarantees := badger.NewGuarantees(cacheMetrics, db, badger.DefaultCacheSize)
-	seals := badger.NewSeals(cacheMetrics, db)
-	results := badger.NewExecutionResults(cacheMetrics, db)
-	receipts := badger.NewExecutionReceipts(cacheMetrics, db, results, badger.DefaultCacheSize)
-	payloads := badger.NewPayloads(db, index, guarantees, seals, receipts, results)
-	blocks := badger.NewBlocks(db, headers, payloads)
-	commits := store.NewCommits(&metrics.NoopCollector{}, sdb)
+	headers := store.NewHeaders(cacheMetrics, db)
+	index := store.NewIndex(cacheMetrics, db)
+	guarantees := store.NewGuarantees(cacheMetrics, db, store.DefaultCacheSize)
+	seals := store.NewSeals(cacheMetrics, db)
+	results := store.NewExecutionResults(cacheMetrics, db)
+	receipts := store.NewExecutionReceipts(cacheMetrics, db, results, store.DefaultCacheSize)
+	payloads := store.NewPayloads(db, index, guarantees, seals, receipts, results)
+	blocks := store.NewBlocks(db, headers, payloads)
+	commits := store.NewCommits(&metrics.NoopCollector{}, db)
 
 	activeBlockID := blockID
 	outputFile := filepath.Join(outputPath, "blocks.jsonl")

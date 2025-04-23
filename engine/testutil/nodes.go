@@ -253,7 +253,6 @@ func CompleteStateFixture(
 	)
 	require.NoError(t, err)
 
-	all := storage.InitAll(metric, db)
 	mutableState, err := badgerstate.NewFullConsensusState(
 		log,
 		tracer,
