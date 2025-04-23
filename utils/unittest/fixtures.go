@@ -488,10 +488,10 @@ func HeaderWithView(view uint64) func(*flow.Header) {
 	}
 }
 
-func BlockHeaderFieldsFixture(opts ...func(header *flow.HeaderBody)) *flow.HeaderBody {
+func BlockHeaderBodyFixture(opts ...func(header *flow.HeaderBody)) *flow.HeaderBody {
 	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
-	header := BlockHeaderFieldsWithParentFixture(&flow.Header{
+	header := BlockHeaderBodyWithParentFixture(&flow.Header{
 		HeaderBody: flow.HeaderBody{
 			ChainID:  flow.Emulator,
 			ParentID: IdentifierFixture(),
@@ -549,39 +549,13 @@ func BlockHeaderFixtureOnChain(
 }
 
 func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
-	height := parent.Height + 1
-	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
-	var lastViewTC *flow.TimeoutCertificate
-	if view != parent.View+1 {
-		newestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
-			qc.View = parent.View
-		})
-		lastViewTC = &flow.TimeoutCertificate{
-			View:          view - 1,
-			NewestQCViews: []uint64{newestQC.View},
-			NewestQC:      newestQC,
-			SignerIndices: SignerIndicesFixture(4),
-			SigData:       SignatureFixture(),
-		}
-	}
 	return &flow.Header{
-		HeaderBody: flow.HeaderBody{
-			ChainID:            parent.ChainID,
-			ParentID:           parent.ID(),
-			Height:             height,
-			Timestamp:          time.Now().UTC(),
-			View:               view,
-			ParentView:         parent.View,
-			ParentVoterIndices: SignerIndicesFixture(4),
-			ParentVoterSigData: QCSigDataFixture(),
-			ProposerID:         IdentifierFixture(),
-			LastViewTC:         lastViewTC,
-		},
+		HeaderBody:  *BlockHeaderBodyWithParentFixture(parent),
 		PayloadHash: IdentifierFixture(),
 	}
 }
 
-func BlockHeaderFieldsWithParentFixture(parent *flow.Header) *flow.HeaderBody {
+func BlockHeaderBodyWithParentFixture(parent *flow.Header) *flow.HeaderBody {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
 	var lastViewTC *flow.TimeoutCertificate
@@ -660,9 +634,9 @@ func ClusterPayloadFixture(n int) *cluster.Payload {
 
 func ClusterBlockFixture() cluster.Block {
 	payload := ClusterPayloadFixture(3)
-	header := BlockHeaderFieldsFixture()
+	headerBody := BlockHeaderBodyFixture()
 
-	return *cluster.NewBlock(*header, *payload)
+	return *cluster.NewBlock(*headerBody, *payload)
 }
 
 func ClusterBlockChainFixture(n int) []cluster.Block {
@@ -683,30 +657,21 @@ func ClusterBlockChainFixture(n int) []cluster.Block {
 // with respect to the given parent block.
 func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 	payload := ClusterPayloadFixture(3)
-
-	header := BlockHeaderFieldsFixture()
-	header.Height = parent.Header.Height + 1
-	header.View = parent.Header.View + 1
-	header.ChainID = parent.Header.ChainID
-	header.Timestamp = time.Now()
-	header.ParentID = parent.ID()
-	header.ParentView = parent.Header.View
-
-	return *cluster.NewBlock(*header, *payload)
+	return ClusterBlockWithParentAndPayload(parent, *payload)
 }
 
 // ClusterBlockWithParentAndPayload creates a new cluster consensus block that is valid
 // with respect to the given parent block and with given payload.
 func ClusterBlockWithParentAndPayload(parent *cluster.Block, payload cluster.Payload) cluster.Block {
-	header := BlockHeaderFieldsFixture()
-	header.Height = parent.Header.Height + 1
-	header.View = parent.Header.View + 1
-	header.ChainID = parent.Header.ChainID
-	header.Timestamp = time.Now()
-	header.ParentID = parent.ID()
-	header.ParentView = parent.Header.View
+	headerBody := BlockHeaderBodyFixture()
+	headerBody.Height = parent.Header.Height + 1
+	headerBody.View = parent.Header.View + 1
+	headerBody.ChainID = parent.Header.ChainID
+	headerBody.Timestamp = time.Now()
+	headerBody.ParentID = parent.ID()
+	headerBody.ParentView = parent.Header.View
 
-	return *cluster.NewBlock(*header, payload)
+	return *cluster.NewBlock(*headerBody, payload)
 }
 
 func WithCollRef(refID flow.Identifier) func(*flow.CollectionGuarantee) {

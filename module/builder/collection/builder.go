@@ -192,7 +192,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	blockProposal := cluster.BlockProposal{
-		Block:           cluster.NewBlock(proposal.Header.HeaderFields(), *payload),
+		Block:           cluster.NewBlock(proposal.Header.HeaderBody, *payload),
 		ProposerSigData: proposal.ProposerSigData,
 	}
 

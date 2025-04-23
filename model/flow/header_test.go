@@ -69,5 +69,5 @@ func TestHeaderMalleability(t *testing.T) {
 	unittest.RequireEntityNonMalleable(t, helper.MakeTC())
 	// time.Time contains private fields, so we provide a field generator
 	timestampGenerator := func() time.Time { return time.Now().UTC() }
-	unittest.RequireEntityNonMalleable(t, header, unittest.WithFieldGenerator("Timestamp", timestampGenerator))
+	unittest.RequireEntityNonMalleable(t, header, unittest.WithFieldGenerator("HeaderBody.Timestamp", timestampGenerator))
 }

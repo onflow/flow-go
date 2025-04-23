@@ -279,7 +279,7 @@ func (suite *SnapshotSuite) TestPending_Grandchildren() {
 		err = suite.db.View(procedure.RetrieveClusterPayload(blockID, &payload))
 		suite.Require().Nil(err)
 
-		block := model.NewBlock(header.HeaderFields(), payload)
+		block := model.NewBlock(header.HeaderBody, payload)
 
 		// we must have already seen the parent
 		_, seen := parents[header.ParentID]

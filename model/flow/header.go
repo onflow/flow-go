@@ -107,22 +107,6 @@ func (h Header) QuorumCertificate() *QuorumCertificate {
 	}
 }
 
-// TODO: Uliana: remove it after Header will be refactored into HeaderBody and PayloadHash, refactor all usages of HeaderBody() as a method
-func (h *Header) HeaderFields() HeaderBody {
-	return HeaderBody{
-		ChainID:            h.ChainID,
-		ParentID:           h.ParentID,
-		Height:             h.Height,
-		Timestamp:          h.Timestamp,
-		View:               h.View,
-		ParentView:         h.ParentView,
-		ParentVoterIndices: h.ParentVoterIndices,
-		ParentVoterSigData: h.ParentVoterSigData,
-		ProposerID:         h.ProposerID,
-		LastViewTC:         h.LastViewTC,
-	}
-}
-
 // Fingerprint defines custom encoding for the header to calculate its ID.
 // Timestamp is converted from time.Time to unix time (uint64), which is necessary
 // because time.Time is not RLP-encodable (due to having private fields).
