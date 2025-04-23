@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -30,12 +29,11 @@ func TestChunkDataPacks_Store(t *testing.T) {
 func TestChunkDataPack_Remove(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(bdb *badger.DB) {
 		unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
-			// TODO: once transactions and collections are refactored to use the same storage interface,
-			// we can use the same storage.DB for both
-			transactions := badgerstorage.NewTransactions(&metrics.NoopCollector{}, bdb)
-			collections := badgerstorage.NewCollections(bdb, transactions)
+			db := pebbleimpl.ToDB(pdb)
+			transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
+			collections := store.NewCollections(db, transactions)
 			// keep the cache size at 1 to make sure that entries are written and read from storage itself.
-			chunkDataPackStore := store.NewChunkDataPacks(&metrics.NoopCollector{}, pebbleimpl.ToDB(pdb), collections, 1)
+			chunkDataPackStore := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
 
 			chunkDataPacks := unittest.ChunkDataPacksFixture(10)
 			for _, chunkDataPack := range chunkDataPacks {
@@ -66,11 +64,10 @@ func TestChunkDataPack_Remove(t *testing.T) {
 func TestChunkDataPacks_MissingItem(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(bdb *badger.DB) {
 		unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
-			// TODO: once transactions and collections are refactored to use the same storage interface,
-			// we can use the same storage.DB for both
-			transactions := badgerstorage.NewTransactions(&metrics.NoopCollector{}, bdb)
-			collections := badgerstorage.NewCollections(bdb, transactions)
-			store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, pebbleimpl.ToDB(pdb), collections, 1)
+			db := pebbleimpl.ToDB(pdb)
+			transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
+			collections := store.NewCollections(db, transactions)
+			store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
 
 			// attempt to get an invalid
 			_, err := store1.ByChunkID(unittest.IdentifierFixture())
@@ -83,9 +80,10 @@ func TestChunkDataPacks_MissingItem(t *testing.T) {
 // does not result in an error.
 func TestChunkDataPacks_StoreTwice(t *testing.T) {
 	WithChunkDataPacks(t, 2, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *store.ChunkDataPacks, bdb *badger.DB, pdb *pebble.DB) {
-		transactions := badgerstorage.NewTransactions(&metrics.NoopCollector{}, bdb)
-		collections := badgerstorage.NewCollections(bdb, transactions)
-		store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, pebbleimpl.ToDB(pdb), collections, 1)
+		db := pebbleimpl.ToDB(pdb)
+		transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
+		collections := store.NewCollections(db, transactions)
+		store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
 		require.NoError(t, store1.Store(chunkDataPacks))
 
 		for _, c := range chunkDataPacks {
@@ -103,12 +101,11 @@ func TestChunkDataPacks_StoreTwice(t *testing.T) {
 func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*flow.ChunkDataPack, *store.ChunkDataPacks, *badger.DB, *pebble.DB)) {
 	unittest.RunWithBadgerDB(t, func(bdb *badger.DB) {
 		unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
-			// TODO: once transactions and collections are refactored to use the same storage interface,
-			// we can use the same storage.DB for both
-			transactions := badgerstorage.NewTransactions(&metrics.NoopCollector{}, bdb)
-			collections := badgerstorage.NewCollections(bdb, transactions)
+			db := pebbleimpl.ToDB(pdb)
+			transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
+			collections := store.NewCollections(db, transactions)
 			// keep the cache size at 1 to make sure that entries are written and read from storage itself.
-			store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, pebbleimpl.ToDB(pdb), collections, 1)
+			store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
 
 			chunkDataPacks := unittest.ChunkDataPacksFixture(chunks)
 			for _, chunkDataPack := range chunkDataPacks {

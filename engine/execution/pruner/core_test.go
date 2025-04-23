@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
@@ -38,8 +37,8 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			headers := store.NewHeaders(metrics, db)
 			results := store.NewExecutionResults(metrics, db)
 
-			transactions := badgerstorage.NewTransactions(metrics, bdb)
-			collections := badgerstorage.NewCollections(bdb, transactions)
+			transactions := store.NewTransactions(metrics, db)
+			collections := store.NewCollections(db, transactions)
 			chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, 1000)
 
 			lastSealedHeight := 30

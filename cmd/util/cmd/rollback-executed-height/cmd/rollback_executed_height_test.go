@@ -37,12 +37,12 @@ func TestReExecuteBlock(t *testing.T) {
 			// create all modules
 			metrics := &metrics.NoopCollector{}
 
-			headers := bstorage.NewHeaders(metrics, bdb)
-			txResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
+			headers := store.NewHeaders(metrics, db)
+			txResults := store.NewTransactionResults(metrics, db, store.DefaultCacheSize)
 			commits := store.NewCommits(metrics, db)
-			chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), bstorage.NewCollections(bdb, bstorage.NewTransactions(metrics, bdb)), bstorage.DefaultCacheSize)
+			chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), store.NewCollections(db, store.NewTransactions(metrics, db)), store.DefaultCacheSize)
 			results := store.NewExecutionResults(metrics, db)
-			receipts := store.NewExecutionReceipts(metrics, db, results, bstorage.DefaultCacheSize)
+			receipts := store.NewExecutionReceipts(metrics, db, results, store.DefaultCacheSize)
 			myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
 			events := store.NewEvents(metrics, db)
 			serviceEvents := store.NewServiceEvents(metrics, db)
@@ -186,8 +186,8 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
 			events := store.NewEvents(metrics, db)
 			serviceEvents := store.NewServiceEvents(metrics, db)
-			transactions := bstorage.NewTransactions(metrics, bdb)
-			collections := bstorage.NewCollections(bdb, transactions)
+			transactions := store.NewTransactions(metrics, db)
+			collections := store.NewCollections(db, transactions)
 			chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
 
 			err = headers.Store(genesis)

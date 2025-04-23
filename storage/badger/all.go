@@ -23,12 +23,12 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	setups := store.NewEpochSetups(metrics, sdb)
 	epochCommits := store.NewEpochCommits(metrics, sdb)
 	epochProtocolStateEntries := store.NewEpochProtocolStateEntries(metrics, setups, epochCommits, sdb,
-		DefaultEpochProtocolStateCacheSize, store.DefaultProtocolStateIndexCacheSize)
+		store.DefaultEpochProtocolStateCacheSize, store.DefaultProtocolStateIndexCacheSize)
 	protocolKVStore := store.NewProtocolKVStore(metrics, sdb, store.DefaultProtocolKVStoreCacheSize, store.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := store.NewVersionBeacons(sdb)
 
-	transactions := NewTransactions(metrics, db)
-	collections := NewCollections(db, transactions)
+	transactions := store.NewTransactions(metrics, sdb)
+	collections := store.NewCollections(sdb, transactions)
 
 	return &storage.All{
 		Headers:                   headers,

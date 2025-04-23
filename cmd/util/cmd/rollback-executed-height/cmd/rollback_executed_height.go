@@ -78,8 +78,8 @@ func run(*cobra.Command, []string) {
 	headers := badger.NewHeaders(metrics, bdb)
 	events := store.NewEvents(metrics, db)
 	serviceEvents := store.NewServiceEvents(metrics, db)
-	transactions := badger.NewTransactions(metrics, bdb)
-	collections := badger.NewCollections(bdb, transactions)
+	transactions := store.NewTransactions(metrics, db)
+	collections := store.NewCollections(db, transactions)
 	// require the chunk data pack data must exist before returning the storage module
 	chunkDataPacksPebbleDB, err := storagepebble.MustOpenDefaultPebbleDB(
 		log.Logger.With().Str("pebbledb", "cdp").Logger(), flagChunkDataPackDir)

@@ -289,8 +289,10 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		func(_ uint64) mempool.Transactions {
 			return herocache.NewTransactions(1000, node.Log, metrics.NewNoopCollector())
 		})
-	transactions := storage.NewTransactions(node.Metrics, node.PublicDB)
-	collections := storage.NewCollections(node.PublicDB, transactions)
+
+	db := badgerimpl.ToDB(node.PublicDB)
+	transactions := store.NewTransactions(node.Metrics, db)
+	collections := store.NewCollections(db, transactions)
 	clusterPayloads := storage.NewClusterPayloads(node.Metrics, node.PublicDB)
 
 	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Metrics, node.Me, node.ChainID.Chain(), pools, collectioningest.DefaultConfig(),
@@ -531,8 +533,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	node := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
 
 	db := badgerimpl.ToDB(node.PublicDB)
-	transactionsStorage := storage.NewTransactions(node.Metrics, node.PublicDB)
-	collectionsStorage := storage.NewCollections(node.PublicDB, transactionsStorage)
+	transactionsStorage := store.NewTransactions(node.Metrics, db)
+	collectionsStorage := store.NewCollections(db, transactionsStorage)
 	eventsStorage := store.NewEvents(node.Metrics, db)
 	serviceEventsStorage := store.NewServiceEvents(node.Metrics, db)
 	txResultStorage := store.NewTransactionResults(node.Metrics, db, storage.DefaultCacheSize)

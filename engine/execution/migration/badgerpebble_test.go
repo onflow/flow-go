@@ -42,16 +42,16 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		metrics := &metrics.NoopCollector{}
 
 		headers := bstorage.NewHeaders(metrics, bdb)
-		txResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
+		txResults := store.NewTransactionResults(metrics, db, store.DefaultCacheSize)
 		commits := store.NewCommits(metrics, db)
 		results := store.NewExecutionResults(metrics, db)
-		receipts := store.NewExecutionReceipts(metrics, db, results, bstorage.DefaultCacheSize)
+		receipts := store.NewExecutionReceipts(metrics, db, results, store.DefaultCacheSize)
 		myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
 		events := store.NewEvents(metrics, db)
 		serviceEvents := store.NewServiceEvents(metrics, db)
-		transactions := bstorage.NewTransactions(metrics, bdb)
-		collections := bstorage.NewCollections(bdb, transactions)
-		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
+		transactions := store.NewTransactions(metrics, db)
+		collections := store.NewCollections(db, transactions)
+		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, store.DefaultCacheSize)
 
 		err = headers.Store(genesis)
 		require.NoError(t, err)

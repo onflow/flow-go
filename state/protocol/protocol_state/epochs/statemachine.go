@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/common"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // StateMachine implements a low-level interface for state-changing operations on the Epoch state.
@@ -165,7 +164,6 @@ type EpochStateMachine struct {
 	setups               storage.EpochSetups
 	commits              storage.EpochCommits
 	epochProtocolStateDB storage.EpochProtocolStateEntries
-	pendingDbUpdates     *transaction.DeferredBlockPersist
 	pendingDBWrites      []storage.BlockIndexingBatchWrite
 }
 
@@ -226,7 +224,6 @@ func NewEpochStateMachine(
 		setups:               setups,
 		commits:              commits,
 		epochProtocolStateDB: epochProtocolStateDB,
-		pendingDbUpdates:     transaction.NewDeferredBlockPersist(),
 	}, nil
 }
 

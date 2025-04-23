@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 )
@@ -37,7 +37,8 @@ var chunkDataPackCmd = &cobra.Command{
 			}
 
 			metrics := metrics.NewNoopCollector()
-			collections := badgerstorage.NewCollections(bdb, badgerstorage.NewTransactions(metrics, bdb))
+			db := badgerimpl.ToDB(bdb)
+			collections := store.NewCollections(db, store.NewTransactions(metrics, db))
 			chunkDataPacks := store.NewChunkDataPacks(metrics,
 				pebbleimpl.ToDB(pdb), collections, 1)
 
