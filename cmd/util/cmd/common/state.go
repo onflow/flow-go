@@ -17,7 +17,6 @@ func InitProtocolState(db *badger.DB, storages *storage.All) (protocol.State, er
 
 	protocolState, err := protocolbadger.OpenState(
 		metrics,
-		// TODO: use storage db
 		badgerimpl.ToDB(db),
 		storages.Headers,
 		storages.Seals,

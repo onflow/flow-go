@@ -109,8 +109,6 @@ func NewFullConsensusState(
 	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
-	qcs storage.QuorumCertificates,
-	blocks storage.Blocks,
 ) (*ParticipantState, error) {
 	followerState, err := NewFollowerState(
 		logger,

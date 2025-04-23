@@ -435,8 +435,6 @@ func createNode(
 		blockTimer,
 		util.MockReceiptValidator(),
 		util.MockSealValidator(sealsDB),
-		all.QuorumCertificates,
-		all.Blocks,
 	)
 	require.NoError(t, err)
 

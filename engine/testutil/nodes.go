@@ -264,8 +264,6 @@ func CompleteStateFixture(
 		util.MockBlockTimer(),
 		util.MockReceiptValidator(),
 		util.MockSealValidator(s.Seals),
-		all.QuorumCertificates,
-		all.Blocks,
 	)
 	require.NoError(t, err)
 

@@ -85,7 +85,6 @@ func TestMakeFinalValidChain(t *testing.T) {
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
-			// TODO(leo): use generic storage db
 			db:      badgerimpl.ToDB(db),
 			headers: storage.NewHeaders(metrics, db),
 			state:   state,

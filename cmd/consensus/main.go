@@ -297,8 +297,6 @@ func main() {
 				blockTimer,
 				receiptValidator,
 				sealValidator,
-				node.Storage.QuorumCertificates,
-				node.Storage.Blocks,
 			)
 			return err
 		}).

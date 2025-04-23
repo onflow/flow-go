@@ -129,8 +129,6 @@ func TestExtendValid(t *testing.T) {
 			util.MockBlockTimer(),
 			util.MockReceiptValidator(),
 			util.MockSealValidator(all.Seals),
-			all.QuorumCertificates,
-			all.Blocks,
 		)
 		require.NoError(t, err)
 
@@ -885,8 +883,6 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			util.MockBlockTimer(),
 			receiptValidator,
 			sealValidator,
-			all.QuorumCertificates,
-			all.Blocks,
 		)
 		require.NoError(t, err)
 
@@ -2652,8 +2648,6 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 			util.MockBlockTimer(),
 			util.MockReceiptValidator(),
 			sealValidator,
-			all.QuorumCertificates,
-			all.Blocks,
 		)
 		require.NoError(t, err)
 
@@ -3181,8 +3175,6 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 			blockTimer,
 			util.MockReceiptValidator(),
 			util.MockSealValidator(all.Seals),
-			all.QuorumCertificates,
-			all.Blocks,
 		)
 		require.NoError(t, err)
 

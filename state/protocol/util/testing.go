@@ -126,8 +126,6 @@ func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f fu
 			mockTimer,
 			receiptValidator,
 			sealValidator,
-			all.QuorumCertificates,
-			all.Blocks,
 		)
 		require.NoError(t, err)
 		f(db, fullState)
@@ -170,8 +168,6 @@ func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snap
 			mockTimer,
 			receiptValidator,
 			sealValidator,
-			all.QuorumCertificates,
-			all.Blocks,
 		)
 		require.NoError(t, err)
 		f(db, fullState)
@@ -213,8 +209,6 @@ func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Sn
 			mockTimer,
 			validator,
 			sealValidator,
-			all.QuorumCertificates,
-			all.Blocks,
 		)
 		require.NoError(t, err)
 		f(db, fullState)
@@ -294,8 +288,6 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 			mockTimer,
 			receiptValidator,
 			sealValidator,
-			all.QuorumCertificates,
-			all.Blocks,
 		)
 		require.NoError(t, err)
 		f(db, fullState)
@@ -336,8 +328,6 @@ func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot pr
 			mockTimer,
 			receiptValidator,
 			sealValidator,
-			all.QuorumCertificates,
-			all.Blocks,
 		)
 		require.NoError(t, err)
 		mutableProtocolState := protocol_state.NewMutableProtocolState(
@@ -428,8 +418,6 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 			mockTimer,
 			receiptValidator,
 			sealValidator,
-			all.QuorumCertificates,
-			all.Blocks,
 		)
 		require.NoError(t, err)
 
