@@ -239,7 +239,8 @@ func TestSealedIndex(t *testing.T) {
 		require.NoError(t, err)
 
 		metrics := metrics.NewNoopCollector()
-		seals := bstorage.NewSeals(metrics, db)
+		storedb := badgerimpl.ToDB(db)
+		seals := store.NewSeals(metrics, storedb)
 
 		// can only find seal for G
 		_, err = seals.FinalizedSealForBlock(rootHeader.ID())

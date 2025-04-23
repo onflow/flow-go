@@ -32,10 +32,11 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			genesis := blocks[0]
 			require.NoError(t, ps.Bootstrap(genesis, rootResult, rootSeal))
 
+			db := badgerimpl.ToDB(bdb)
 			ctx, cancel := context.WithCancel(context.Background())
 			metrics := metrics.NewNoopCollector()
-			headers := badgerstorage.NewHeaders(metrics, bdb)
-			results := badgerstorage.NewExecutionResults(metrics, bdb)
+			headers := store.NewHeaders(metrics, db)
+			results := store.NewExecutionResults(metrics, db)
 
 			transactions := badgerstorage.NewTransactions(metrics, bdb)
 			collections := badgerstorage.NewCollections(bdb, transactions)
