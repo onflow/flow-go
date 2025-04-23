@@ -219,10 +219,7 @@ func main() {
 		}).
 		AdminCommand("read-range-cluster-blocks", func(conf *cmd.NodeConfig) commands.AdminCommand {
 			clusterPayloads := badger.NewClusterPayloads(&metrics.NoopCollector{}, conf.DB)
-			headers, ok := conf.Storage.Headers.(*badger.Headers)
-			if !ok {
-				panic("fail to initialize admin tool, conf.Storage.Headers can not be casted as badger headers")
-			}
+			headers := badger.NewHeaders(&metrics.NoopCollector{}, conf.DB)
 			return storageCommands.NewReadRangeClusterBlocksCommand(conf.DB, headers, clusterPayloads)
 		}).
 		Module("follower distributor", func(node *cmd.NodeConfig) error {
