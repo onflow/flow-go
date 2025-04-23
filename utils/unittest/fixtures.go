@@ -2181,9 +2181,9 @@ func EpochRecoverFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochRecove
 
 func IndexFixture() *flow.Index {
 	return &flow.Index{
-		CollectionIDs: IdentifierListFixture(5),
-		SealIDs:       IdentifierListFixture(5),
-		ReceiptIDs:    IdentifierListFixture(5),
+		GuaranteeIDs: IdentifierListFixture(5),
+		SealIDs:      IdentifierListFixture(5),
+		ReceiptIDs:   IdentifierListFixture(5),
 	}
 }
 

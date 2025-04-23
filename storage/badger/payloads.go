@@ -105,11 +105,11 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*fl
 		}
 
 		// retrieve guarantees
-		guarantees := make([]*flow.CollectionGuarantee, 0, len(idx.CollectionIDs))
-		for _, collID := range idx.CollectionIDs {
-			guarantee, err := p.guarantees.retrieveTx(collID)(tx)
+		guarantees := make([]*flow.CollectionGuarantee, 0, len(idx.GuaranteeIDs))
+		for _, guaranteeID := range idx.GuaranteeIDs {
+			guarantee, err := p.guarantees.retrieveTx(guaranteeID)(tx)
 			if err != nil {
-				return nil, fmt.Errorf("could not retrieve guarantee (%x): %w", collID, err)
+				return nil, fmt.Errorf("could not retrieve guarantee (%x): %w", guaranteeID, err)
 			}
 			guarantees = append(guarantees, guarantee)
 		}

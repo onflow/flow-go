@@ -54,6 +54,7 @@ const (
 	codeBlockIDToQuorumCertificate  = 45 // index of quorum certificates by block ID
 	codeEpochProtocolStateByBlockID = 46 // index of epoch protocol state entry by block ID
 	codeProtocolKVStoreByBlockID    = 47 // index of protocol KV store entry by block ID
+	codeGuaranteeByCollectionID     = 48 // index of collection guarantee by collection ID
 
 	// codes for indexing multiple identifiers by identifier
 	codeBlockChildren          = 50 // index mapping block ID to children blocks

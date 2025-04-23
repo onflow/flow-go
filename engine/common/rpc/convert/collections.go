@@ -86,10 +86,8 @@ func MessageToFullCollection(m []*entities.Transaction, chain flow.Chain) (*flow
 
 // CollectionGuaranteeToMessage converts a collection guarantee to a protobuf message
 func CollectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.CollectionGuarantee {
-	id := g.ID()
-
 	return &entities.CollectionGuarantee{
-		CollectionId:     id[:],
+		CollectionId:     IdentifierToMessage(g.CollectionID),
 		Signatures:       [][]byte{g.Signature},
 		ReferenceBlockId: IdentifierToMessage(g.ReferenceBlockID),
 		Signature:        g.Signature,

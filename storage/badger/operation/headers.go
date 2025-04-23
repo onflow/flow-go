@@ -43,13 +43,13 @@ func RetrieveExecutedBlock(blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeExecutedBlock), blockID)
 }
 
-// IndexCollectionBlock indexes a block by a collection within that block.
-func IndexCollectionBlock(collID flow.Identifier, blockID flow.Identifier) func(*badger.Txn) error {
+// IndexCollectionGuaranteeBlock indexes a block by a collection guarantee within that block.
+func IndexCollectionGuaranteeBlock(collID flow.Identifier, blockID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeCollectionBlock, collID), blockID)
 }
 
-// LookupCollectionBlock looks up a block by a collection within that block.
-func LookupCollectionBlock(collID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
+// LookupCollectionGuaranteeBlock looks up a block by a collection guarantee within that block.
+func LookupCollectionGuaranteeBlock(collID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCollectionBlock, collID), blockID)
 }
 
