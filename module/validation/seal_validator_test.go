@@ -314,7 +314,7 @@ func (s *SealValidationSuite) TestHighestSeal() {
 		)),
 	)
 	block3.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{block2Receipt.Meta()},
+		Receipts: []*flow.ExecutionReceiptStub{block2Receipt.Stub()},
 		Results:  []*flow.ExecutionResult{&block2Receipt.ExecutionResult},
 	})
 	s.Extend(block3)
@@ -329,7 +329,7 @@ func (s *SealValidationSuite) TestHighestSeal() {
 	)
 	block4 := unittest.BlockWithParentFixture(block3.Header)
 	block4.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{block3Receipt.Meta()},
+		Receipts: []*flow.ExecutionReceiptStub{block3Receipt.Stub()},
 		Results:  []*flow.ExecutionResult{&block3Receipt.ExecutionResult},
 	})
 	s.Extend(block4)
@@ -383,7 +383,7 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 	resultB0 := unittest.ExecutionResultFixture(unittest.WithBlock(blocks[0]), unittest.WithPreviousResult(*s.LatestExecutionResult))
 	receipts := unittest.ReceiptChainFor(blocks, resultB0)
 	blocks[3].SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{receipts[0].Meta(), receipts[1].Meta(), receipts[2].Meta()},
+		Receipts: []*flow.ExecutionReceiptStub{receipts[0].Stub(), receipts[1].Stub(), receipts[2].Stub()},
 		Results:  []*flow.ExecutionResult{&receipts[0].ExecutionResult, &receipts[1].ExecutionResult, &receipts[2].ExecutionResult},
 	})
 	b4 := unittest.BlockWithParentFixture(blocks[3].Header)
@@ -466,7 +466,7 @@ func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
 	for i := 1; i <= 3; i++ { // set payload for blocks A, B, C
 		blocks[i].SetPayload(flow.Payload{
 			Results:  []*flow.ExecutionResult{&receiptChain1[i-1].ExecutionResult, &receiptChain2[i-1].ExecutionResult},
-			Receipts: []*flow.ExecutionReceiptMeta{receiptChain1[i-1].Meta(), receiptChain2[i-1].Meta()},
+			Receipts: []*flow.ExecutionReceiptStub{receiptChain1[i-1].Stub(), receiptChain2[i-1].Stub()},
 		})
 	}
 	blocks[4].SetPayload(flow.Payload{
@@ -657,7 +657,7 @@ func (s *SealValidationSuite) TestExtendSeal_ResultIncorporatedOnDifferentFork()
 	// construct block A1
 	a1 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	a1.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Receipts: []*flow.ExecutionReceiptStub{receipt.Stub()},
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
 	s.Extend(a1)
@@ -758,7 +758,7 @@ func (s *SealValidationSuite) generateBasicTestFork() (*flow.Block, *flow.Block,
 	// construct block B1 and B2
 	b1 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	b1.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Receipts: []*flow.ExecutionReceiptStub{receipt.Stub()},
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
 	b2 := unittest.BlockWithParentFixture(b1.Header)

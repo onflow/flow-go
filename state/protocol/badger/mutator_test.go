@@ -193,7 +193,7 @@ func TestSealedIndex(t *testing.T) {
 		b3Receipt := unittest.ReceiptForBlockFixture(b3)
 		b4 := unittest.BlockWithParentFixture(b3.Header)
 		b4.SetPayload(flow.Payload{
-			Receipts:        []*flow.ExecutionReceiptMeta{b2Receipt.Meta(), b3Receipt.Meta()},
+			Receipts:        []*flow.ExecutionReceiptStub{b2Receipt.Stub(), b3Receipt.Stub()},
 			Results:         []*flow.ExecutionResult{&b2Receipt.ExecutionResult, &b3Receipt.ExecutionResult},
 			ProtocolStateID: rootProtocolStateID,
 		})
@@ -368,7 +368,7 @@ func TestVersionBeaconIndex(t *testing.T) {
 
 		b4 := unittest.BlockWithParentFixture(b3.Header)
 		b4.SetPayload(flow.Payload{
-			Receipts:        []*flow.ExecutionReceiptMeta{b2Receipt.Meta(), b3Receipt.Meta()},
+			Receipts:        []*flow.ExecutionReceiptStub{b2Receipt.Stub(), b3Receipt.Stub()},
 			Results:         []*flow.ExecutionResult{&b2Receipt.ExecutionResult, &b3Receipt.ExecutionResult},
 			ProtocolStateID: rootProtocolStateID,
 		})
@@ -471,7 +471,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 		block1Receipt := unittest.ReceiptForBlockFixture(block1)
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.SetPayload(flow.Payload{
-			Receipts:        []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
+			Receipts:        []*flow.ExecutionReceiptStub{block1Receipt.Stub()},
 			Results:         []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
 			ProtocolStateID: rootProtocolStateID,
 		})
@@ -710,7 +710,7 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 		receipt := unittest.ReceiptForBlockFixture(block2) // receipt for block 2
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.Payload{
-			Receipts:        []*flow.ExecutionReceiptMeta{receipt.Meta()},
+			Receipts:        []*flow.ExecutionReceiptStub{receipt.Stub()},
 			Results:         []*flow.ExecutionResult{&receipt.ExecutionResult},
 			ProtocolStateID: rootProtocolStateID,
 		})
@@ -781,10 +781,10 @@ func TestExtendReceiptsValid(t *testing.T) {
 
 		block5 := unittest.BlockWithParentFixture(block4.Header)
 		block5.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{
-				receipt3a.Meta(),
-				receipt3b.Meta(),
-				receipt3c.Meta(),
+			Receipts: []*flow.ExecutionReceiptStub{
+				receipt3a.Stub(),
+				receipt3b.Stub(),
+				receipt3c.Stub(),
 			},
 			Results: []*flow.ExecutionResult{
 				&receipt3a.ExecutionResult,
@@ -1182,7 +1182,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		// add block 1 receipt to block 3 payload
 		block3 := unittest.BlockWithParentFixture(block1.Header)
 		block3.SetPayload(flow.Payload{
-			Receipts:        []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
+			Receipts:        []*flow.ExecutionReceiptStub{block1Receipt.Stub()},
 			Results:         []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
 			ProtocolStateID: block1.Payload.ProtocolStateID,
 		})
@@ -1196,7 +1196,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		// add block 2 receipt to block 4 payload
 		block4 := unittest.BlockWithParentFixture(block2.Header)
 		block4.SetPayload(flow.Payload{
-			Receipts:        []*flow.ExecutionReceiptMeta{block2Receipt.Meta()},
+			Receipts:        []*flow.ExecutionReceiptStub{block2Receipt.Stub()},
 			Results:         []*flow.ExecutionResult{&block2Receipt.ExecutionResult},
 			ProtocolStateID: block2.Payload.ProtocolStateID,
 		})

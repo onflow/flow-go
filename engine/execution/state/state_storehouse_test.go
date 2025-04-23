@@ -247,8 +247,10 @@ func makeComputationResult(
 	}
 
 	computationResult.ExecutionReceipt = &flow.ExecutionReceipt{
-		ExecutionResult:   *executionResult,
-		Spocks:            make([]crypto.Signature, numberOfChunks),
+		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
+			ExecutionResult: *executionResult,
+			Spocks:          make([]crypto.Signature, numberOfChunks),
+		},
 		ExecutorSignature: crypto.Signature{},
 	}
 	return computationResult
