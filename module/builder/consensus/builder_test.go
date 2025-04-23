@@ -24,6 +24,7 @@ import (
 	storerr "github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -423,7 +424,7 @@ func (bs *BuilderSuite) SetupTest() {
 	// initialize the builder
 	bs.build, err = NewBuilder(
 		noopMetrics,
-		bs.db,
+		badgerimpl.ToDB(bs.db),
 		bs.state,
 		bs.headerDB,
 		bs.sealDB,
@@ -1466,7 +1467,7 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 	var err error
 	bs.build, err = NewBuilder(
 		noopMetrics,
-		bs.db,
+		badgerimpl.ToDB(bs.db),
 		bs.state,
 		bs.headerDB,
 		bs.sealDB,
