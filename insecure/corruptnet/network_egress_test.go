@@ -356,8 +356,8 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 				require.Equal(t, corruptedId.NodeID, receipt.ExecutorID)
 
 				// receipt should have a valid signature from corrupted node
-				signableID := receipt.ExecutionReceiptBody.ID()
-				valid, err := corruptedId.StakingPubKey.Verify(receipt.ExecutorSignature, signableID[:], corruptNetwork.receiptHasher)
+				unsignedReceiptID := receipt.ExecutionReceiptBody.ID()
+				valid, err := corruptedId.StakingPubKey.Verify(receipt.ExecutorSignature, unsignedReceiptID[:], corruptNetwork.receiptHasher)
 				require.NoError(t, err)
 				require.True(t, valid)
 

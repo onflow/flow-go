@@ -9,13 +9,15 @@ import (
 type Spock []byte
 
 // ExecutionReceipt is the full execution receipt, as sent by the Execution Node.
-// Specifically, it contains the detailed execution result.
+// Specifically, it contains the detailed execution result. The `ExecutorSignature`
+// signs the `ExecutionReceiptBody`.
 type ExecutionReceipt struct {
 	ExecutionReceiptBody
 	ExecutorSignature crypto.Signature
 }
 
-// ExecutionReceiptBody contains the fields of the execution receipt that are signed by the executor.
+// ExecutionReceiptBody represents the unsigned execution receipt, whose contents the
+// Execution Node testifies to be correct by its signature.
 type ExecutionReceiptBody struct {
 	ExecutorID Identifier
 	ExecutionResult
@@ -83,9 +85,9 @@ func ExecutionReceiptFromMeta(meta ExecutionReceiptMeta, result ExecutionResult)
 	}
 }
 
-// ID returns a hash over the data in the execution receipt.
+// ID returns cryptographic hash of unsigned execution receipt.
 // This is what is signed by the executor and verified by recipients.
-// It is identical to the ID of the full receipt body.
+// It is identical to the ID of the full receipt's body.
 func (erb ExecutionReceiptMetaBody) ID() Identifier {
 	return MakeID(erb)
 }

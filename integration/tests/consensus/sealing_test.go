@@ -251,11 +251,10 @@ SearchLoop:
 		Spocks:          nil,      // ignored
 	}
 
-	// generates a signature over the execution result
-	signableID := receiptBody.ID()
-	sig, err := ss.exeSK.Sign(signableID[:], exeUtils.NewExecutionReceiptHasher())
+	// create Full Execution Receipt by signing the previously-created receipt's body
+	unsignedReceiptID := receiptBody.ID()
+	sig, err := ss.exeSK.Sign(unsignedReceiptID[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
-
 	receipt := flow.ExecutionReceipt{
 		ExecutionReceiptBody: receiptBody,
 		ExecutorSignature:    sig,
@@ -268,16 +267,15 @@ SearchLoop:
 		Spocks:          nil,       // ignored
 	}
 
-	signableID2 := receiptBody2.ID()
-	sig2, err := ss.exe2SK.Sign(signableID2[:], exeUtils.NewExecutionReceiptHasher())
+	unsignedReceiptID2 := receiptBody2.ID()
+	sig2, err := ss.exe2SK.Sign(unsignedReceiptID2[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
-
 	receipt2 := flow.ExecutionReceipt{
 		ExecutionReceiptBody: receiptBody2,
 		ExecutorSignature:    sig2,
 	}
 
-	valid, err := ss.exe2SK.PublicKey().Verify(receipt2.ExecutorSignature, signableID2[:], exeUtils.NewExecutionReceiptHasher())
+	valid, err := ss.exe2SK.PublicKey().Verify(receipt2.ExecutorSignature, unsignedReceiptID2[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
 	require.True(ss.T(), valid)
 

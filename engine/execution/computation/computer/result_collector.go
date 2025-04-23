@@ -450,7 +450,7 @@ func GenerateExecutionReceipt(
 		ExecutorID:      signer.NodeID(),
 	}
 
-	// generates a signature over the execution result
+	// generates a signature over the execution receipt's body 
 	signableID := body.ID()
 	sig, err := signer.Sign(signableID[:], receiptHasher)
 	if err != nil {
