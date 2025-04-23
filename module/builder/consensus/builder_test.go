@@ -23,7 +23,6 @@ import (
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -419,7 +418,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// setup mock state mutator, we don't need a real once since we are using mocked participant state.
 	bs.stateMutator = protocol.NewMutableProtocolState(bs.T())
-	bs.stateMutator.On("EvolveState", mock.Anything, mock.Anything, mock.Anything).Return(unittest.IdentifierFixture(), transaction.NewDeferredBlockPersist(), nil).Maybe()
+	bs.stateMutator.On("EvolveState", mock.Anything, mock.Anything, mock.Anything).Return(unittest.IdentifierFixture(), []storerr.BlockIndexingBatchWrite{}, nil).Maybe()
 
 	// initialize the builder
 	bs.build, err = NewBuilder(
