@@ -9,8 +9,8 @@ import (
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 )
 
-// Proposal is a block header and the proposer's signature for the block.
-type Proposal struct {
+// ProposalHeader is a block header and the proposer's signature for the block.
+type ProposalHeader struct {
 	Header *Header
 	// ProposerSigData is a signature of the proposer over the new block. Not a single cryptographic
 	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)

@@ -377,7 +377,8 @@ func createNode(
 	tracer := trace.NewNoopTracer()
 
 	headersDB := storage.NewHeaders(metricsCollector, db)
-	guaranteesDB := storage.NewGuarantees(metricsCollector, db, storage.DefaultCacheSize)
+	guaranteesDB := storage.NewGuarantees(metricsCollector, db,
+		storage.DefaultCacheSize, storage.DefaultCacheSize)
 	sealsDB := storage.NewSeals(metricsCollector, db)
 	indexDB := storage.NewIndex(metricsCollector, db)
 	resultsDB := storage.NewExecutionResults(metricsCollector, db)
@@ -626,7 +627,7 @@ func createNode(
 		metricsCollector,
 		build,
 		rootHeader,
-		[]*flow.Proposal{},
+		[]*flow.ProposalHeader{},
 		hotstuffModules,
 		consensus.WithMinTimeout(hotstuffTimeout),
 		func(cfg *consensus.ParticipantConfig) {

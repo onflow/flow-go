@@ -292,9 +292,9 @@ func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal)
 
 	// it should be processed without error
-	err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+	err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
 		OriginID: originID,
-		Message:  messages.NewBlockProposal(proposal),
+		Message:  messages.NewUntrustedProposal(proposal),
 	})
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
@@ -321,9 +321,9 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal)
 
 	// it should be processed without error
-	err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+	err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
 		OriginID: originID,
-		Message:  messages.NewBlockProposal(proposal),
+		Message:  messages.NewUntrustedProposal(proposal),
 	})
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
@@ -339,9 +339,9 @@ func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 	block.Header.View = cs.head.View + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
 	proposal := unittest.ProposalFromBlock(&block)
 
-	err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+	err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
 		OriginID: originID,
-		Message:  messages.NewBlockProposal(proposal),
+		Message:  messages.NewUntrustedProposal(proposal),
 	})
 	require.NoError(cs.T(), err)
 
@@ -383,9 +383,9 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
 		// the expected error should be handled within the Core
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
 			OriginID: originID,
-			Message:  messages.NewBlockProposal(proposal),
+			Message:  messages.NewUntrustedProposal(proposal),
 		})
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
@@ -401,9 +401,9 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(model.ErrViewForUnknownEpoch)
 
 		// the expected error should be handled within the Core
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
 			OriginID: originID,
-			Message:  messages.NewBlockProposal(proposal),
+			Message:  messages.NewUntrustedProposal(proposal),
 		})
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
@@ -420,9 +420,9 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(unexpectedErr)
 
 		// the error should be propagated
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
 			OriginID: originID,
-			Message:  messages.NewBlockProposal(proposal),
+			Message:  messages.NewUntrustedProposal(proposal),
 		})
 		require.ErrorIs(cs.T(), err, unexpectedErr)
 
@@ -471,9 +471,9 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
 		// the expected error should be handled within the Core
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
 			OriginID: originID,
-			Message:  messages.NewBlockProposal(proposal),
+			Message:  messages.NewUntrustedProposal(proposal),
 		})
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
@@ -492,9 +492,9 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewOutdatedExtensionErrorf(""))
 
 		// the expected error should be handled within the Core
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
 			OriginID: originID,
-			Message:  messages.NewBlockProposal(proposal),
+			Message:  messages.NewUntrustedProposal(proposal),
 		})
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
@@ -514,9 +514,9 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		cs.state.On("Extend", mock.Anything, mock.Anything).Return(unexpectedErr)
 
 		// it should be processed without error
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
 			OriginID: originID,
-			Message:  messages.NewBlockProposal(proposal),
+			Message:  messages.NewUntrustedProposal(proposal),
 		})
 		require.ErrorIs(cs.T(), err, unexpectedErr)
 
@@ -600,9 +600,9 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	// process all the descendants
 	for _, proposal := range proposals {
 		// process and make sure no error occurs (as they are unverifiable)
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
 			OriginID: originID,
-			Message:  messages.NewBlockProposal(proposal),
+			Message:  messages.NewUntrustedProposal(proposal),
 		})
 		require.NoError(cs.T(), err, "proposal buffering should pass")
 
@@ -639,9 +639,9 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	cs.voteAggregator.On("AddBlock", mock.Anything).Times(4)
 
 	// process the root proposal
-	err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+	err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
 		OriginID: originID,
-		Message:  messages.NewBlockProposal(missingProposal),
+		Message:  messages.NewUntrustedProposal(missingProposal),
 	})
 	require.NoError(cs.T(), err, "root proposal should pass")
 

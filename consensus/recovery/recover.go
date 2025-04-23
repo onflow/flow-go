@@ -22,7 +22,7 @@ type BlockScanner func(proposal *model.SignedProposal) error
 //     be listed before B, unless B's parent is the latest finalized block)
 //
 // CAUTION: all pending blocks are required to be valid (guaranteed if the block passed the compliance layer)
-func Recover(log zerolog.Logger, pending []*flow.Proposal, scanners ...BlockScanner) error {
+func Recover(log zerolog.Logger, pending []*flow.ProposalHeader, scanners ...BlockScanner) error {
 	log.Info().Int("total", len(pending)).Msgf("recovery started")
 
 	// add all pending blocks to forks

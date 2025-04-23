@@ -235,10 +235,10 @@ func (h *headerStore) ByParentID(parentID flow.Identifier) ([]*flow.Header, erro
 	return nil, nil
 }
 
-func (h *headerStore) Store(proposal *flow.Proposal) error {
+func (h *headerStore) Store(proposal *flow.ProposalHeader) error {
 	return nil
 }
 
-func (h *headerStore) ProposalByBlockID(blockID flow.Identifier) (*flow.Proposal, error) {
+func (h *headerStore) ProposalByBlockID(blockID flow.Identifier) (*flow.ProposalHeader, error) {
 	return nil, nil
 }

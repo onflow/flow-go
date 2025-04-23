@@ -297,7 +297,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.Cluster
 		if !e.core.HandleBlock(&header) {
 			continue
 		}
-		synced := flow.Slashable[*messages.ClusterBlockProposal]{
+		synced := flow.Slashable[*messages.UntrustedClusterProposal]{
 			OriginID: originID,
 			Message:  &proposal,
 		}

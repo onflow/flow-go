@@ -248,12 +248,12 @@ func (f *mockFetcher) FetchCollection(blockID flow.Identifier, height uint64, gu
 	f.Lock()
 	defer f.Unlock()
 
-	if _, ok := f.fetching[guarantee.ID()]; ok {
-		return fmt.Errorf("collection %v is already fetching", guarantee.ID())
+	if _, ok := f.fetching[guarantee.CollectionID]; ok {
+		return fmt.Errorf("collection %v is already fetching", guarantee.CollectionID)
 	}
 
-	f.fetching[guarantee.ID()] = struct{}{}
-	log.Info().Msgf("mockFetcher: fetching collection %v for block %v", guarantee.ID(), height)
+	f.fetching[guarantee.CollectionID] = struct{}{}
+	log.Info().Msgf("mockFetcher: fetching collection %v for block %v", guarantee.CollectionID, height)
 	return nil
 }
 

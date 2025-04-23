@@ -188,8 +188,8 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 	s.Run("to-compliance-engine", func() {
 		block := unittest.ClusterBlockFixture()
 
-		blockProposalMsg := messages.NewClusterBlockProposal(&block, unittest.SignatureFixture())
-		expectedComplianceMsg := flow.Slashable[*messages.ClusterBlockProposal]{
+		blockProposalMsg := messages.NewUntrustedClusterProposal(&block, unittest.SignatureFixture())
+		expectedComplianceMsg := flow.Slashable[*messages.UntrustedClusterProposal]{
 			OriginID: originID,
 			Message:  blockProposalMsg,
 		}
@@ -270,10 +270,10 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	})
 
 	s.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
-		expectedBroadcastMsg := messages.NewClusterBlockProposal(&block, unittest.SignatureFixture())
+		expectedBroadcastMsg := messages.NewUntrustedClusterProposal(&block, unittest.SignatureFixture())
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
-		headerProposal := &flow.Proposal{Header: block.Header, ProposerSigData: expectedBroadcastMsg.ProposerSigData}
+		headerProposal := &flow.ProposalHeader{Header: block.Header, ProposerSigData: expectedBroadcastMsg.ProposerSigData}
 		hotstuffProposal := model.SignedProposalFromFlow(headerProposal)
 		s.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		s.hotstuff.On("SubmitProposal", hotstuffProposal).
@@ -339,7 +339,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		hotstuffProposal := model.SignedProposalFromFlow(proposal)
 		s.voteAggregator.On("AddBlock", hotstuffProposal)
 		s.hotstuff.On("SubmitProposal", hotstuffProposal)
-		expectedBroadcastMsg := messages.NewClusterBlockProposal(&block, proposal.ProposerSigData)
+		expectedBroadcastMsg := messages.NewUntrustedClusterProposal(&block, proposal.ProposerSigData)
 		s.con.On("Publish", expectedBroadcastMsg, s.cluster[1].NodeID, s.cluster[2].NodeID).
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)

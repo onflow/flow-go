@@ -90,15 +90,17 @@ func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineT
 func createContainerBlock(options ...func(result *flow.ExecutionResult, assignments *chunks.AssignmentBuilder)) (*flow.Block, *chunks.Assignment) {
 	result, assignment := vertestutils.CreateExecutionResult(unittest.IdentifierFixture(), options...)
 	receipt := &flow.ExecutionReceipt{
-		ExecutorID:      unittest.IdentifierFixture(),
-		ExecutionResult: *result,
+		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
+			ExecutorID:      unittest.IdentifierFixture(),
+			ExecutionResult: *result,
+		},
 	}
 	// container block
 	header := unittest.BlockHeaderFixture()
 	block := &flow.Block{
 		Header: header,
 		Payload: &flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+			Receipts: []*flow.ExecutionReceiptStub{receipt.Stub()},
 			Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 		},
 	}

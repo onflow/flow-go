@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.BlockProposal`s
+// defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.UntrustedProposal`s
 const defaultBlockQueueCapacity = 10_000
 
 // Engine is a wrapper around `compliance.Core`. The Engine queues inbound messages, relevant
@@ -54,7 +54,7 @@ func NewEngine(
 	core *Core,
 ) (*Engine, error) {
 
-	// Inbound FIFO queue for `messages.BlockProposal`s
+	// Inbound FIFO queue for `messages.UntrustedProposal`s
 	blocksQueue, err := fifoqueue.NewFifoQueue(
 		defaultBlockQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { core.mempoolMetrics.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),
@@ -120,9 +120,9 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 
 		msg, ok := e.pendingBlocks.Pop()
 		if ok {
-			batch := msg.(flow.Slashable[[]*messages.BlockProposal])
+			batch := msg.(flow.Slashable[[]*messages.UntrustedProposal])
 			for _, block := range batch.Message {
-				err := e.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+				err := e.core.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
 					OriginID: batch.OriginID,
 					Message:  block,
 				})
@@ -142,11 +142,11 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 
 // OnBlockProposal feeds a new block proposal into the processing pipeline.
 // Incoming proposals are queued and eventually dispatched by worker.
-func (e *Engine) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) {
+func (e *Engine) OnBlockProposal(proposal flow.Slashable[*messages.UntrustedProposal]) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
-	proposalAsList := flow.Slashable[[]*messages.BlockProposal]{
+	proposalAsList := flow.Slashable[[]*messages.UntrustedProposal]{
 		OriginID: proposal.OriginID,
-		Message:  []*messages.BlockProposal{proposal.Message},
+		Message:  []*messages.UntrustedProposal{proposal.Message},
 	}
 	if e.pendingBlocks.Push(proposalAsList) {
 		e.pendingBlocksNotifier.Notify()
@@ -158,7 +158,7 @@ func (e *Engine) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal
 // OnSyncedBlocks feeds a batch of blocks obtained via sync into the processing pipeline.
 // Blocks in batch aren't required to be in any particular order.
 // Incoming proposals are queued and eventually dispatched by worker.
-func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]) {
+func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.UntrustedProposal]) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlocks)
 	if e.pendingBlocks.Push(blocks) {
 		e.pendingBlocksNotifier.Notify()

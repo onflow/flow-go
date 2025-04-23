@@ -63,7 +63,7 @@ type HotStuffFollowerSuite struct {
 	rootHeader    *flow.Header
 	rootQC        *flow.QuorumCertificate
 	finalized     *flow.Header
-	pending       []*flow.Proposal
+	pending       []*flow.ProposalHeader
 	follower      *hotstuff.FollowerLoop
 	mockConsensus *MockConsensus
 
@@ -109,7 +109,7 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	// we start with the latest finalized block being the root block
 	s.finalized = s.rootHeader
 	// and no pending (unfinalized) block
-	s.pending = []*flow.Proposal{}
+	s.pending = []*flow.ProposalHeader{}
 }
 
 // BeforeTest instantiates and starts Follower

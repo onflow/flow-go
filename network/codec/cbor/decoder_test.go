@@ -17,7 +17,7 @@ import (
 func TestDecoder_Decode(t *testing.T) {
 	c := cbor.NewCodec()
 
-	blockProposal := messages.NewBlockProposal(unittest.ProposalFixture())
+	blockProposal := messages.NewUntrustedProposal(unittest.ProposalFixture())
 
 	t.Run("decodes message successfully", func(t *testing.T) {
 		var buf bytes.Buffer

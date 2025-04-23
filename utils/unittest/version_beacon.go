@@ -34,7 +34,7 @@ func AddVersionBeacon(t *testing.T, beacon *flow.VersionBeacon, state protocol.F
 
 	B := BlockWithParentFixture(A.Header)
 	B.SetPayload(flow.Payload{
-		Receipts:        []*flow.ExecutionReceiptMeta{receiptA.Meta()},
+		Receipts:        []*flow.ExecutionReceiptStub{receiptA.Stub()},
 		Results:         []*flow.ExecutionResult{&receiptA.ExecutionResult},
 		ProtocolStateID: protocolStateID,
 	})

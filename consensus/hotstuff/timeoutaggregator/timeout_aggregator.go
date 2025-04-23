@@ -134,7 +134,10 @@ func (t *TimeoutAggregator) processQueuedTimeoutObjects(ctx context.Context) err
 		t.engineMetrics.MessageHandled(metrics.EngineTimeoutAggregator, metrics.MessageTimeoutObject)
 
 		if err != nil {
-			return fmt.Errorf("could not process pending TO %v: %w", timeoutObject.ID(), err)
+			return fmt.Errorf("could not process pending TO: %s: %w",
+				timeoutObject.String(),
+				err,
+			)
 		}
 
 		t.log.Info().

@@ -147,7 +147,7 @@ func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*messages.BlockProposal)
+		proposal, ok := msg.(*messages.UntrustedProposal)
 		if !ok {
 			continue
 		}
@@ -196,7 +196,7 @@ func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Tim
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*messages.BlockProposal)
+		proposal, ok := msg.(*messages.UntrustedProposal)
 		if !ok {
 			continue
 		}
@@ -239,7 +239,7 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*messages.BlockProposal)
+		proposal, ok := msg.(*messages.UntrustedProposal)
 		if !ok {
 			continue
 		}

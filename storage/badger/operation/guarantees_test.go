@@ -16,11 +16,11 @@ func TestGuaranteeInsertRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		g := unittest.CollectionGuaranteeFixture()
 
-		err := db.Update(InsertGuarantee(g.CollectionID, g))
+		err := db.Update(InsertGuarantee(g.ID(), g))
 		require.NoError(t, err)
 
 		var retrieved flow.CollectionGuarantee
-		err = db.View(RetrieveGuarantee(g.CollectionID, &retrieved))
+		err = db.View(RetrieveGuarantee(g.ID(), &retrieved))
 		require.NoError(t, err)
 
 		assert.Equal(t, g, &retrieved)
@@ -55,7 +55,7 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 		err = db.View(LookupPayloadGuarantees(blockID, &actual))
 		require.NoError(t, err)
 
-		assert.Equal(t, []flow.Identifier{collID1, collID2}, actual)
+		assert.Equal(t, []flow.Identifier(expected), actual)
 	})
 }
 
@@ -81,7 +81,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		// insert block 1
 		err := db.Update(func(tx *badger.Txn) error {
 			for _, guarantee := range set1 {
-				if err := InsertGuarantee(guarantee.CollectionID, guarantee)(tx); err != nil {
+				if err := InsertGuarantee(guarantee.ID(), guarantee)(tx); err != nil {
 					return err
 				}
 			}
@@ -95,7 +95,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		// insert block 2
 		err = db.Update(func(tx *badger.Txn) error {
 			for _, guarantee := range set2 {
-				if err := InsertGuarantee(guarantee.CollectionID, guarantee)(tx); err != nil {
+				if err := InsertGuarantee(guarantee.ID(), guarantee)(tx); err != nil {
 					return err
 				}
 			}
@@ -110,13 +110,13 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 			var actual1 []flow.Identifier
 			err = db.View(LookupPayloadGuarantees(blockID1, &actual1))
 			assert.NoError(t, err)
-			assert.ElementsMatch(t, []flow.Identifier{collID1}, actual1)
+			assert.ElementsMatch(t, []flow.Identifier(ids1), actual1)
 
 			// get block 2
 			var actual2 []flow.Identifier
 			err = db.View(LookupPayloadGuarantees(blockID2, &actual2))
 			assert.NoError(t, err)
-			assert.Equal(t, []flow.Identifier{collID2, collID3, collID4}, actual2)
+			assert.Equal(t, []flow.Identifier(ids2), actual2)
 		})
 	})
 }

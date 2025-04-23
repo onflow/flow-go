@@ -63,10 +63,12 @@ func (c *SlashingViolationsConsumer) OnInvalidVoteDetected(err model.InvalidVote
 func (c *SlashingViolationsConsumer) OnDoubleTimeoutDetected(timeout *model.TimeoutObject, altTimeout *model.TimeoutObject) {
 	c.log.Warn().
 		Bool(logging.KeySuspicious, true).
-		Hex("timeout_creator", timeout.SignerID[:]).
+		Hex("timeout_signer_id", timeout.SignerID[:]).
 		Uint64("timeout_view", timeout.View).
-		Hex("timeout_id1", logging.ID(timeout.ID())).
-		Hex("timeout_id2", logging.ID(altTimeout.ID())).
+		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
+		Hex("alt_signer_id", logging.ID(altTimeout.SignerID)).
+		Uint64("alt_view", altTimeout.View).
+		Uint64("alt_newest_qc_view", altTimeout.NewestQC.View).
 		Msg("OnDoubleTimeoutDetected")
 }
 

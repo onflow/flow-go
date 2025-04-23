@@ -169,7 +169,7 @@ func NewComplianceLayer(
 // OnBlockProposal queues *untrusted* proposals for further processing and notifies the Engine's
 // internal workers. This method is intended for fresh proposals received directly from leaders.
 // It can ingest synced blocks as well, but is less performant compared to method `OnSyncedBlocks`.
-func (e *ComplianceEngine) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) {
+func (e *ComplianceEngine) OnBlockProposal(proposal flow.Slashable[*messages.UntrustedProposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
 	// queue proposal
 	if e.pendingProposals.Push(proposal) {
@@ -181,7 +181,7 @@ func (e *ComplianceEngine) OnBlockProposal(proposal flow.Slashable[*messages.Blo
 // efficient for batches of continuously connected blocks (honest nodes supply finalized blocks
 // in suitable sequences where possible). Nevertheless, the method tolerates blocks in arbitrary
 // order (less efficient), making it robust against byzantine nodes.
-func (e *ComplianceEngine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]) {
+func (e *ComplianceEngine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.UntrustedProposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlocks)
 	// The synchronization engine feeds the follower with batches of blocks. The field `Slashable.OriginID`
 	// states which node forwarded the batch to us. Each block contains its proposer and signature.
@@ -210,8 +210,8 @@ func (e *ComplianceEngine) OnFinalizedBlock(block *model.Block) {
 // notifying us about fresh proposals directly from the consensus leaders.
 func (e *ComplianceEngine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *messages.BlockProposal:
-		e.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+	case *messages.UntrustedProposal:
+		e.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
 			OriginID: originID,
 			Message:  msg,
 		})
@@ -267,7 +267,7 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		// Priority 1: ingest fresh proposals
 		msg, ok := e.pendingProposals.Pop()
 		if ok {
-			proposalMsg := msg.(flow.Slashable[*messages.BlockProposal])
+			proposalMsg := msg.(flow.Slashable[*messages.UntrustedProposal])
 			proposal := proposalMsg.Message.ToInternal()
 			log := e.log.With().
 				Hex("origin_id", proposalMsg.OriginID[:]).
@@ -289,7 +289,7 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 			return nil
 		}
 
-		batch := msg.(flow.Slashable[[]*messages.BlockProposal])
+		batch := msg.(flow.Slashable[[]*messages.UntrustedProposal])
 		if len(batch.Message) < 1 {
 			continue
 		}

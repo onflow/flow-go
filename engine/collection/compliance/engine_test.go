@@ -170,9 +170,9 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 			cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 			// execute the block submission
-			cs.engine.OnClusterBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+			cs.engine.OnClusterBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
 				OriginID: unittest.IdentifierFixture(),
-				Message:  messages.ClusterBlockProposalFrom(proposal),
+				Message:  messages.UntrustedClusterProposalFromInternal(proposal),
 			})
 		}
 		wg.Done()
@@ -187,9 +187,9 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
-		cs.engine.OnClusterBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+		cs.engine.OnClusterBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
 			OriginID: unittest.IdentifierFixture(),
-			Message:  messages.ClusterBlockProposalFrom(proposal),
+			Message:  messages.UntrustedClusterProposalFromInternal(proposal),
 		})
 		wg.Done()
 	}()

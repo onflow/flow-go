@@ -104,7 +104,7 @@ func (s *EngineSuite) TestProcessSyncedBlock() {
 		close(done)
 	}).Once()
 
-	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
+	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.UntrustedProposal]{
 		OriginID: originID,
 		Message:  flowBlockProposalsToMessage(proposal),
 	})
@@ -122,7 +122,7 @@ func (s *EngineSuite) TestProcessGossipedBlock() {
 		close(done)
 	}).Once()
 
-	err := s.engine.Process(channels.ReceiveBlocks, originID, messages.NewBlockProposal(proposal))
+	err := s.engine.Process(channels.ReceiveBlocks, originID, messages.NewUntrustedProposal(proposal))
 	require.NoError(s.T(), err)
 
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
@@ -139,9 +139,9 @@ func (s *EngineSuite) TestProcessBlockFromComplianceInterface() {
 		close(done)
 	}).Once()
 
-	s.engine.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+	s.engine.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
 		OriginID: originID,
-		Message:  messages.NewBlockProposal(proposal),
+		Message:  messages.NewUntrustedProposal(proposal),
 	})
 
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
@@ -169,7 +169,7 @@ func (s *EngineSuite) TestProcessBatchOfDisconnectedBlocks() {
 		wg.Done()
 	}).Return(nil).Once()
 
-	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
+	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.UntrustedProposal]{
 		OriginID: originID,
 		Message:  flowBlockProposalsToMessage(blocks...),
 	})
@@ -207,7 +207,7 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	}).Return().Once()
 	s.engine.engMetrics = metricsMock
 
-	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
+	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.UntrustedProposal]{
 		OriginID: unittest.IdentifierFixture(),
 		Message:  flowBlockProposalsToMessage(proposal),
 	})
@@ -222,10 +222,10 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 }
 
 // flowBlockProposalsToMessage is a helper function to transform types.
-func flowBlockProposalsToMessage(proposals ...*flow.BlockProposal) []*messages.BlockProposal {
-	result := make([]*messages.BlockProposal, 0, len(proposals))
+func flowBlockProposalsToMessage(proposals ...*flow.BlockProposal) []*messages.UntrustedProposal {
+	result := make([]*messages.UntrustedProposal, 0, len(proposals))
 	for _, prop := range proposals {
-		result = append(result, messages.NewBlockProposal(prop))
+		result = append(result, messages.NewUntrustedProposal(prop))
 	}
 	return result
 }

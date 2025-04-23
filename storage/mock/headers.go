@@ -161,23 +161,23 @@ func (_m *Headers) Exists(blockID flow.Identifier) (bool, error) {
 }
 
 // ProposalByBlockID provides a mock function with given fields: blockID
-func (_m *Headers) ProposalByBlockID(blockID flow.Identifier) (*flow.Proposal, error) {
+func (_m *Headers) ProposalByBlockID(blockID flow.Identifier) (*flow.ProposalHeader, error) {
 	ret := _m.Called(blockID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ProposalByBlockID")
 	}
 
-	var r0 *flow.Proposal
+	var r0 *flow.ProposalHeader
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.Proposal, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.ProposalHeader, error)); ok {
 		return rf(blockID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Proposal); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ProposalHeader); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Proposal)
+			r0 = ret.Get(0).(*flow.ProposalHeader)
 		}
 	}
 
@@ -191,7 +191,7 @@ func (_m *Headers) ProposalByBlockID(blockID flow.Identifier) (*flow.Proposal, e
 }
 
 // Store provides a mock function with given fields: proposal
-func (_m *Headers) Store(proposal *flow.Proposal) error {
+func (_m *Headers) Store(proposal *flow.ProposalHeader) error {
 	ret := _m.Called(proposal)
 
 	if len(ret) == 0 {
@@ -199,7 +199,7 @@ func (_m *Headers) Store(proposal *flow.Proposal) error {
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Proposal) error); ok {
+	if rf, ok := ret.Get(0).(func(*flow.ProposalHeader) error); ok {
 		r0 = rf(proposal)
 	} else {
 		r0 = ret.Error(0)

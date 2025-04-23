@@ -341,21 +341,21 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	originID := unittest.IdentifierFixture()
 	res := &messages.BlockResponse{
 		Nonce:  nonce,
-		Blocks: []messages.BlockProposal{},
+		Blocks: []messages.UntrustedProposal{},
 	}
 
 	// add one block that should be processed
 	processable := unittest.ProposalFixture()
 	ss.core.On("HandleBlock", processable.Block.Header).Return(true)
-	res.Blocks = append(res.Blocks, *messages.NewBlockProposal(processable))
+	res.Blocks = append(res.Blocks, *messages.NewUntrustedProposal(processable))
 
 	// add one block that should not be processed
 	unprocessable := unittest.ProposalFixture()
 	ss.core.On("HandleBlock", unprocessable.Block.Header).Return(false)
-	res.Blocks = append(res.Blocks, *messages.NewBlockProposal(unprocessable))
+	res.Blocks = append(res.Blocks, *messages.NewUntrustedProposal(unprocessable))
 
 	ss.comp.On("OnSyncedBlocks", mock.Anything).Run(func(args mock.Arguments) {
-		res := args.Get(0).(flow.Slashable[[]*messages.BlockProposal])
+		res := args.Get(0).(flow.Slashable[[]*messages.UntrustedProposal])
 		converted := res.Message[0].ToInternal()
 		ss.Assert().Equal(processable.Block.Header, converted.Block.Header)
 		ss.Assert().Equal(processable.Block.Payload, converted.Block.Payload)

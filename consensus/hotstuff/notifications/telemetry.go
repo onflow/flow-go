@@ -177,7 +177,7 @@ func (t *TelemetryConsumer) OnOwnVote(blockID flow.Identifier, view uint64, _ []
 		Msg("OnOwnVote")
 }
 
-func (t *TelemetryConsumer) OnOwnProposal(proposal *flow.Proposal, targetPublicationTime time.Time) {
+func (t *TelemetryConsumer) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicationTime time.Time) {
 	step := t.pathHandler.NextStep().
 		Uint64("block_view", proposal.Header.View).
 		Hex("block_id", logging.ID(proposal.Header.ID())).

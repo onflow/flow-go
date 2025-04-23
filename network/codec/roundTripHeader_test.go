@@ -23,12 +23,12 @@ import (
 func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 	block := unittest.BlockFixture()
 	proposal := unittest.ProposalFromBlock(&block)
-	message := messages.NewBlockProposal(proposal)
+	message := messages.NewUntrustedProposal(proposal)
 	encoded, err := codec.Encode(message)
 	assert.NoError(t, err)
 	decodedInterface, err := codec.Decode(encoded)
 	assert.NoError(t, err)
-	decoded := decodedInterface.(*messages.BlockProposal)
+	decoded := decodedInterface.(*messages.UntrustedProposal)
 	decodedBlock := decoded.Block.ToInternal()
 	// compare LastViewTC separately, because it is a pointer field
 	if decodedBlock.Header.LastViewTC == nil {

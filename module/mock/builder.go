@@ -13,23 +13,23 @@ type Builder struct {
 }
 
 // BuildOn provides a mock function with given fields: parentID, setter, sign
-func (_m *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) ([]byte, error)) (*flow.Proposal, error) {
+func (_m *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) ([]byte, error)) (*flow.ProposalHeader, error) {
 	ret := _m.Called(parentID, setter, sign)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BuildOn")
 	}
 
-	var r0 *flow.Proposal
+	var r0 *flow.ProposalHeader
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, func(*flow.Header) error, func(*flow.Header) ([]byte, error)) (*flow.Proposal, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, func(*flow.Header) error, func(*flow.Header) ([]byte, error)) (*flow.ProposalHeader, error)); ok {
 		return rf(parentID, setter, sign)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier, func(*flow.Header) error, func(*flow.Header) ([]byte, error)) *flow.Proposal); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, func(*flow.Header) error, func(*flow.Header) ([]byte, error)) *flow.ProposalHeader); ok {
 		r0 = rf(parentID, setter, sign)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Proposal)
+			r0 = ret.Get(0).(*flow.ProposalHeader)
 		}
 	}
 

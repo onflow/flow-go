@@ -164,7 +164,7 @@ SearchLoop:
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*messages.BlockProposal)
+		proposal, ok := msg.(*messages.UntrustedProposal)
 		if !ok {
 			continue
 		}
@@ -245,35 +245,37 @@ SearchLoop:
 	ss.T().Logf("execution result generated (result: %x)\n", result.ID())
 
 	// create the execution receipt for the only execution node
-	receipt := flow.ExecutionReceipt{
-		ExecutorID:        ss.exeID, // our fake execution node
-		ExecutionResult:   result,   // result for target block
-		Spocks:            nil,      // ignored
-		ExecutorSignature: crypto.Signature{},
+	receiptBody := flow.UnsignedExecutionReceipt{
+		ExecutorID:      ss.exeID, // our fake execution node
+		ExecutionResult: result,   // result for target block
+		Spocks:          nil,      // ignored
 	}
 
-	// generates a signature over the execution result
-	id := receipt.ID()
-	sig, err := ss.exeSK.Sign(id[:], exeUtils.NewExecutionReceiptHasher())
+	// create Full Execution Receipt by signing the previously-created receipt's body
+	unsignedReceiptID := receiptBody.ID()
+	sig, err := ss.exeSK.Sign(unsignedReceiptID[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
-
-	receipt.ExecutorSignature = sig
+	receipt := flow.ExecutionReceipt{
+		UnsignedExecutionReceipt: receiptBody,
+		ExecutorSignature:        sig,
+	}
 
 	// keep trying to send 2 matching execution receipt to the first consensus node
-	receipt2 := flow.ExecutionReceipt{
-		ExecutorID:        ss.exe2ID, // our fake execution node
-		ExecutionResult:   result,    // result for target block
-		Spocks:            nil,       // ignored
-		ExecutorSignature: crypto.Signature{},
+	receiptBody2 := flow.UnsignedExecutionReceipt{
+		ExecutorID:      ss.exe2ID, // our fake execution node
+		ExecutionResult: result,    // result for target block
+		Spocks:          nil,       // ignored
 	}
 
-	id = receipt2.ID()
-	sig2, err := ss.exe2SK.Sign(id[:], exeUtils.NewExecutionReceiptHasher())
+	unsignedReceiptID2 := receiptBody2.ID()
+	sig2, err := ss.exe2SK.Sign(unsignedReceiptID2[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
+	receipt2 := flow.ExecutionReceipt{
+		UnsignedExecutionReceipt: receiptBody2,
+		ExecutorSignature:        sig2,
+	}
 
-	receipt2.ExecutorSignature = sig2
-
-	valid, err := ss.exe2SK.PublicKey().Verify(receipt2.ExecutorSignature, id[:], exeUtils.NewExecutionReceiptHasher())
+	valid, err := ss.exe2SK.PublicKey().Verify(receipt2.ExecutorSignature, unsignedReceiptID2[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
 	require.True(ss.T(), valid)
 
@@ -352,7 +354,7 @@ SealingLoop:
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*messages.BlockProposal)
+		proposal, ok := msg.(*messages.UntrustedProposal)
 		if !ok {
 			continue
 		}

@@ -54,7 +54,7 @@ func (_m *Consumer) OnLocalTimeout(currentView uint64) {
 }
 
 // OnOwnProposal provides a mock function with given fields: proposal, targetPublicationTime
-func (_m *Consumer) OnOwnProposal(proposal *flow.Proposal, targetPublicationTime time.Time) {
+func (_m *Consumer) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicationTime time.Time) {
 	_m.Called(proposal, targetPublicationTime)
 }
 

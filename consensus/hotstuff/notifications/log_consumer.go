@@ -210,10 +210,12 @@ func (lc *LogConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal 
 func (lc *LogConsumer) OnDoubleTimeoutDetected(timeout *model.TimeoutObject, alt *model.TimeoutObject) {
 	lc.log.Warn().
 		Str(logging.KeySuspicious, "true").
+		Hex("timeout_signer_id", logging.ID(timeout.SignerID)).
 		Uint64("timeout_view", timeout.View).
-		Hex("signer_id", logging.ID(timeout.SignerID)).
-		Hex("timeout_id", logging.ID(timeout.ID())).
-		Hex("alt_id", logging.ID(alt.ID())).
+		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
+		Hex("alt_signer_id", logging.ID(alt.SignerID)).
+		Uint64("alt_view", alt.View).
+		Uint64("alt_newest_qc_view", alt.NewestQC.View).
 		Msg("double timeout detected")
 }
 
@@ -281,7 +283,7 @@ func (lc *LogConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 	log.Debug().Msg("publishing HotStuff timeout object")
 }
 
-func (lc *LogConsumer) OnOwnProposal(proposal *flow.Proposal, targetPublicationTime time.Time) {
+func (lc *LogConsumer) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicationTime time.Time) {
 	header := proposal.Header
 	lc.log.Debug().
 		Str("chain_id", header.ChainID.String()).

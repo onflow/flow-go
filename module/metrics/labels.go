@@ -56,6 +56,7 @@ const (
 	ResourceIndex                                            = "index"
 	ResourceIdentity                                         = "identity"
 	ResourceGuarantee                                        = "guarantee"
+	ResourceGuaranteeByCollectionID                          = "guarantee_by_collection_id"
 	ResourceResult                                           = "result"
 	ResourceResultApprovals                                  = "result_approvals"
 	ResourceChunkLocators                                    = "chunk_locators"

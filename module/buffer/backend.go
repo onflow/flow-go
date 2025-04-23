@@ -9,7 +9,7 @@ import (
 // item represents an item in the cache: a block header, payload, and the ID
 // of the node that sent it to us. The payload is generic.
 type item struct {
-	header  flow.Slashable[*flow.Proposal]
+	header  flow.Slashable[*flow.ProposalHeader]
 	payload interface{}
 }
 
@@ -33,7 +33,7 @@ func newBackend() *backend {
 
 // add adds the item to the cache, returning false if it already exists and
 // true otherwise.
-func (b *backend) add(block flow.Slashable[*flow.Proposal], payload interface{}) bool {
+func (b *backend) add(block flow.Slashable[*flow.ProposalHeader], payload interface{}) bool {
 
 	b.mu.Lock()
 	defer b.mu.Unlock()

@@ -112,7 +112,7 @@ func NewCore(
 // OnBlockProposal handles incoming block proposals.
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
-func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.BlockProposal]) error {
+func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedProposal]) error {
 	proposal := flow.Slashable[*flow.BlockProposal]{
 		OriginID: proposalMsg.OriginID,
 		Message:  proposalMsg.Message.ToInternal(),
