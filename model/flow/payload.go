@@ -14,7 +14,7 @@ type Payload struct {
 	// Seals must be internally connected, containing no seals with duplicate block IDs or heights.
 	// Seals may be empty. It presents a set, i.e. there is no protocol-defined ordering.
 	Seals    []*Seal
-	Receipts ExecutionReceiptMetaList
+	Receipts ExecutionReceiptStubList
 	Results  ExecutionResultList
 	// ProtocolStateID is the root hash of protocol state. Per convention, this is the resulting
 	// state after applying all identity-changing operations potentially contained in the block.

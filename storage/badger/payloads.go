@@ -58,7 +58,7 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 					return err
 				}
 			}
-			fullReceipts = append(fullReceipts, flow.ExecutionReceiptFromMeta(*meta, *result))
+			fullReceipts = append(fullReceipts, flow.ExecutionReceiptFromStub(*meta, *result))
 		}
 
 		// make sure all payload guarantees are stored
@@ -125,13 +125,13 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*fl
 		}
 
 		// retrieve receipts
-		receipts := make([]*flow.ExecutionReceiptMeta, 0, len(idx.ReceiptIDs))
+		receipts := make([]*flow.ExecutionReceiptStub, 0, len(idx.ReceiptIDs))
 		for _, recID := range idx.ReceiptIDs {
 			receipt, err := p.receipts.byID(recID)(tx)
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve receipt %x: %w", recID, err)
 			}
-			receipts = append(receipts, receipt.Meta())
+			receipts = append(receipts, receipt.Stub())
 		}
 
 		// retrieve results

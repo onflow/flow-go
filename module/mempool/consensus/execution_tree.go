@@ -183,7 +183,7 @@ func (et *ExecutionTree) reachableReceipts(vertex forest.Vertex, blockFilter mem
 
 	// add all Execution Receipts for result to `receipts` provided they pass the receiptFilter
 	for _, recMeta := range receiptsForResult.receipts {
-		receipt := flow.ExecutionReceiptFromMeta(*recMeta, *receiptsForResult.result)
+		receipt := flow.ExecutionReceiptFromStub(*recMeta, *receiptsForResult.result)
 		if !receiptFilter(receipt) {
 			continue
 		}
