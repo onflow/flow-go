@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -104,7 +103,6 @@ func NewFullConsensusState(
 	logger zerolog.Logger,
 	tracer module.Tracer,
 	consumer protocol.Consumer,
-	db *badger.DB,
 	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
