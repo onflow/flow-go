@@ -31,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	state "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 )
@@ -380,28 +379,29 @@ func (c *Container) Connect() error {
 }
 
 func (c *Container) OpenState() (*state.State, error) {
-	db, err := c.DB()
+	badgerdb, err := c.DB()
 	if err != nil {
 		return nil, err
 	}
+	db := badgerimpl.ToDB(badgerdb)
 
 	metrics := metrics.NewNoopCollector()
-	index := storage.NewIndex(metrics, db)
-	headers := storage.NewHeaders(metrics, db)
-	seals := storage.NewSeals(metrics, db)
-	results := storage.NewExecutionResults(metrics, db)
-	receipts := storage.NewExecutionReceipts(metrics, db, results, storage.DefaultCacheSize)
-	guarantees := storage.NewGuarantees(metrics, db, storage.DefaultCacheSize)
-	payloads := storage.NewPayloads(db, index, guarantees, seals, receipts, results)
-	blocks := storage.NewBlocks(db, headers, payloads)
-	qcs := storage.NewQuorumCertificates(metrics, db, storage.DefaultCacheSize)
-	setups := storage.NewEpochSetups(metrics, db)
-	commits := storage.NewEpochCommits(metrics, db)
-	protocolState := storage.NewEpochProtocolStateEntries(metrics, setups, commits, db,
-		storage.DefaultEpochProtocolStateCacheSize, storage.DefaultProtocolStateIndexCacheSize)
-	protocolKVStates := storage.NewProtocolKVStore(metrics, db,
-		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(db))
+	index := store.NewIndex(metrics, db)
+	headers := store.NewHeaders(metrics, db)
+	seals := store.NewSeals(metrics, db)
+	results := store.NewExecutionResults(metrics, db)
+	receipts := store.NewExecutionReceipts(metrics, db, results, store.DefaultCacheSize)
+	guarantees := store.NewGuarantees(metrics, db, store.DefaultCacheSize)
+	payloads := store.NewPayloads(db, index, guarantees, seals, receipts, results)
+	blocks := store.NewBlocks(db, headers, payloads)
+	qcs := store.NewQuorumCertificates(metrics, db, store.DefaultCacheSize)
+	setups := store.NewEpochSetups(metrics, db)
+	commits := store.NewEpochCommits(metrics, db)
+	protocolState := store.NewEpochProtocolStateEntries(metrics, setups, commits, db,
+		store.DefaultEpochProtocolStateCacheSize, store.DefaultProtocolStateIndexCacheSize)
+	protocolKVStates := store.NewProtocolKVStore(metrics, db,
+		store.DefaultProtocolKVStoreCacheSize, store.DefaultProtocolKVStoreByBlockIDCacheSize)
+	versionBeacons := store.NewVersionBeacons(db)
 
 	return state.OpenState(
 		metrics,
