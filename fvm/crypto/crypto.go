@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -242,19 +243,18 @@ func VerifySignatureFromTransaction(
 		scheme = AuthenticationSchemeFromByte(extensionData[0])
 	}
 	if scheme == INVALID {
-		// TODO: Should we panic here instead?
-		// return false, errors.NewUnknownFailure(fmt.Errorf("authentication scheme %d not found ", scheme))
 		return false, nil
 	}
 
-	reconstructedMessage, err := reconstructMessage(scheme, extensionData, message)
+	reconstructedMessage, err := validateExtensionDataAndReconstructMessage(scheme, extensionData, message)
 	if err != nil {
 		// Log error here?
-
+		// error being swallowed here, but since validateExtensionDataAndReconstructMessage is returning a validation error,
+		// we simply return false currently
 		return false, nil
 	}
 
-	// Prefix has been moved into reconstructMessage, could consider simply using a regular hasher,
+	// Prefix has been moved into validateExtensionDataAndReconstructMessage, could consider simply using a regular hasher,
 	// Leaving this here for now incase we need to add more prefixing in the future
 	hasher, err := NewPrefixedHashing(hashAlgo, "")
 	if err != nil {
@@ -276,7 +276,9 @@ func VerifySignatureFromTransaction(
 	return valid, nil
 }
 
-func reconstructMessage(scheme AuthenticationScheme, extensionData []byte, message []byte) ([]byte, error) {
+// validateExtensionDataAndReconstructMessage reconstructs the message based on the authentication scheme and extension data.
+// will return a coded error of code `ErrCodeInvalidExtensionDataError` if any error occurs
+func validateExtensionDataAndReconstructMessage(scheme AuthenticationScheme, extensionData []byte, message []byte) ([]byte, error) {
 	switch scheme {
 	case PLAIN:
 		if extensionData != nil && len(extensionData) != 1 {
@@ -285,7 +287,7 @@ func reconstructMessage(scheme AuthenticationScheme, extensionData []byte, messa
 		newMessage := make([]byte, 0, len(flow.TransactionTagString)+len(extensionData))
 		newMessage = append(newMessage, flow.TransactionDomainTag[:]...)
 		return append(newMessage, message...), nil
-	case WEBAUTHN:
+	case WEBAUTHN: // See FLIP 264 for more details
 		if len(extensionData) == 0 {
 			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "extension data is empty")
 		}
@@ -329,21 +331,20 @@ func reconstructMessage(scheme AuthenticationScheme, extensionData []byte, messa
 			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "authenticatorData length is less than 37")
 		}
 
-		// rpIdHash, userFlags, sigCounter, extensions
+		// extract rpIdHash, userFlags, sigCounter, extensions
 		rpIdHash, userFlags, _, extensions := decodedWebAuthnData.AuthenticatorData[0:32], decodedWebAuthnData.AuthenticatorData[32:33], decodedWebAuthnData.AuthenticatorData[33:37], decodedWebAuthnData.AuthenticatorData[37:]
 		if bytes.Equal(flow.TransactionDomainTag[:], rpIdHash) {
 			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "authenticatorData rpIdHash error")
 		}
 
+		// validate user flags according to FLIP 264
 		if err := validateFlags(userFlags[0], extensions); err != nil {
 			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "authenticatorData userFlags invalid")
 		}
 
 		clientDataHash := hash.NewSHA2_256().ComputeHash(decodedWebAuthnData.ClientDataJson)
 
-		newMessage := make([]byte, 0, len(decodedWebAuthnData.AuthenticatorData)+len(clientDataHash))
-		newMessage = append(newMessage, decodedWebAuthnData.AuthenticatorData...)
-		return append(newMessage, clientDataHash...), nil
+		return slices.Concat(decodedWebAuthnData.AuthenticatorData, clientDataHash), nil
 	default:
 		return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "signature scheme (%d) type not found", scheme)
 	}
