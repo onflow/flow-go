@@ -488,10 +488,10 @@ func HeaderWithView(view uint64) func(*flow.Header) {
 	}
 }
 
-func BlockHeaderBodyFixture(opts ...func(header *flow.HeaderBody)) *flow.HeaderBody {
+func HeaderBodyFixture(opts ...func(header *flow.HeaderBody)) *flow.HeaderBody {
 	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
-	header := BlockHeaderBodyWithParentFixture(&flow.Header{
+	header := HeaderBodyWithParentFixture(&flow.Header{
 		HeaderBody: flow.HeaderBody{
 			ChainID:  flow.Emulator,
 			ParentID: IdentifierFixture(),
@@ -550,12 +550,12 @@ func BlockHeaderFixtureOnChain(
 
 func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 	return &flow.Header{
-		HeaderBody:  *BlockHeaderBodyWithParentFixture(parent),
+		HeaderBody:  *HeaderBodyWithParentFixture(parent),
 		PayloadHash: IdentifierFixture(),
 	}
 }
 
-func BlockHeaderBodyWithParentFixture(parent *flow.Header) *flow.HeaderBody {
+func HeaderBodyWithParentFixture(parent *flow.Header) *flow.HeaderBody {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
 	var lastViewTC *flow.TimeoutCertificate
@@ -634,7 +634,7 @@ func ClusterPayloadFixture(n int) *cluster.Payload {
 
 func ClusterBlockFixture() cluster.Block {
 	payload := ClusterPayloadFixture(3)
-	headerBody := BlockHeaderBodyFixture()
+	headerBody := HeaderBodyFixture()
 
 	return *cluster.NewBlock(*headerBody, *payload)
 }
@@ -663,7 +663,7 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 // ClusterBlockWithParentAndPayload creates a new cluster consensus block that is valid
 // with respect to the given parent block and with given payload.
 func ClusterBlockWithParentAndPayload(parent *cluster.Block, payload cluster.Payload) cluster.Block {
-	headerBody := BlockHeaderBodyFixture()
+	headerBody := HeaderBodyFixture()
 	headerBody.Height = parent.Header.Height + 1
 	headerBody.View = parent.Header.View + 1
 	headerBody.ChainID = parent.Header.ChainID

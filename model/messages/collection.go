@@ -22,14 +22,13 @@ type CollectionResponse struct {
 // untrusted messages. It exists only to provide a memory-safe structure for
 // decoding messages and should be replaced in the future by updating the core
 // cluster.Payload type.
-// Deprecated: Please update cluster.Payload.Collection to use flow.Collection,
-// then replace instances of this type with cluster.Payload
+// Deprecated: Please replace instances of this type with cluster.Payload
 type UntrustedClusterBlockPayload struct {
 	Collection       flow.Collection
 	ReferenceBlockID flow.Identifier
 }
 
-// Hash returns the hash of the payload.
+// Hash returns a collision-resistant hash of the UntrustedClusterBlockPayload struct.
 func (p UntrustedClusterBlockPayload) Hash() flow.Identifier {
 	return flow.MakeID(p)
 }
@@ -38,8 +37,7 @@ func (p UntrustedClusterBlockPayload) Hash() flow.Identifier {
 // untrusted messages. It exists only to provide a memory-safe structure for
 // decoding messages and should be replaced in the future by updating the core
 // cluster.Block type.
-// Deprecated: Please update cluster.Payload.Collection to use []flow.TransactionBody,
-// then replace instances of this type with cluster.Block
+// Deprecated: Please replace instances of this type with cluster.Block
 type UntrustedClusterBlock struct {
 	Header  flow.HeaderBody
 	Payload UntrustedClusterBlockPayload
@@ -48,18 +46,7 @@ type UntrustedClusterBlock struct {
 // ToHeader return flow.Header data for UntrustedClusterBlock.
 func (ub *UntrustedClusterBlock) ToHeader() *flow.Header {
 	return &flow.Header{
-		HeaderBody: flow.HeaderBody{
-			ChainID:            ub.Header.ChainID,
-			ParentID:           ub.Header.ParentID,
-			Height:             ub.Header.Height,
-			Timestamp:          ub.Header.Timestamp,
-			View:               ub.Header.View,
-			ParentView:         ub.Header.ParentView,
-			ParentVoterIndices: ub.Header.ParentVoterIndices,
-			ParentVoterSigData: ub.Header.ParentVoterSigData,
-			ProposerID:         ub.Header.ProposerID,
-			LastViewTC:         ub.Header.LastViewTC,
-		},
+		HeaderBody:  ub.Header,
 		PayloadHash: ub.Payload.Hash(),
 	}
 }
