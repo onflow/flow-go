@@ -24,7 +24,7 @@ type CollectedClientData struct {
 	Origin    string `json:"origin"`
 }
 
-func (w *WebAuthnExtensionData) GetCollectedClientData() (*CollectedClientData, error) {
+func (w *WebAuthnExtensionData) GetUnmarshalledCollectedClientData() (*CollectedClientData, error) {
 	clientData := new(CollectedClientData)
 	err := json.Unmarshal(w.ClientDataJson, clientData)
 	if err != nil {

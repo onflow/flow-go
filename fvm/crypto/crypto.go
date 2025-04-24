@@ -254,6 +254,8 @@ func VerifySignatureFromTransaction(
 		return false, nil
 	}
 
+	// Prefix has been moved into reconstructMessage, could consider simply using a regular hasher,
+	// Leaving this here for now incase we need to add more prefixing in the future
 	hasher, err := NewPrefixedHashing(hashAlgo, "")
 	if err != nil {
 		return false, errors.NewUnknownFailure(fmt.Errorf(
@@ -278,63 +280,63 @@ func reconstructMessage(scheme AuthenticationScheme, extensionData []byte, messa
 	switch scheme {
 	case PLAIN:
 		if extensionData != nil && len(extensionData) != 1 {
-			return nil, errors.NewValueErrorf("signature scheme is PLAIN, but extension data length is not 1", "signature scheme is PLAIN, but extension data length is not 1")
+			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "signature scheme is PLAIN, but extension data length is not 1")
 		}
 		newMessage := make([]byte, 0, len(flow.TransactionTagString)+len(extensionData))
 		newMessage = append(newMessage, flow.TransactionDomainTag[:]...)
 		return append(newMessage, message...), nil
 	case WEBAUTHN:
 		if len(extensionData) == 0 {
-			return nil, errors.NewValueErrorf("extension data is empty", "extension data is empty")
+			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "extension data is empty")
 		}
 		rlpEncodedWebAuthnData := extensionData[1:]
 		decodedWebAuthnData := &WebAuthnExtensionData{}
 		if err := rlp.DecodeBytes(rlpEncodedWebAuthnData, decodedWebAuthnData); err != nil {
-			return nil, err
+			return nil, errors.WrapCodedError(errors.ErrCodeInvalidExtensionDataError, err, "failed to RLP decode webauthn extension data")
 		}
 
-		clientData, err := decodedWebAuthnData.GetCollectedClientData()
+		clientData, err := decodedWebAuthnData.GetUnmarshalledCollectedClientData()
 		if err != nil {
-			return nil, err
+			return nil, errors.WrapCodedError(errors.ErrCodeInvalidExtensionDataError, err, "failed to get unmarshalled client data")
 		}
 		// do we allow 0x prefix for challenge?
 		challengeHex := clientData.Challenge
 		if len(challengeHex) > 2 && strings.ToLower(challengeHex[:2]) == "0x" {
 			challengeHex = challengeHex[2:]
 		}
-		clientDataChallenge, err := hex.DecodeString(challengeHex)
 
+		clientDataChallenge, err := hex.DecodeString(challengeHex)
 		if err != nil {
-			return nil, err
+			return nil, errors.WrapCodedError(errors.ErrCodeInvalidExtensionDataError, err, "failed to decode challenge")
 		}
 		if !strings.EqualFold(clientData.Type, WebAuthnTypeGet) || len(clientDataChallenge) != WebAuthnChallengeLength || len(clientData.Origin) == 0 {
-			return nil, fmt.Errorf("invalid client data %v", clientData)
+			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "invalid client data")
 		}
+
 		// Validate challenge
 		hasher, err := NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)
 		if err != nil {
-			return nil, errors.NewValueErrorf(err.Error(), "transaction verification failed")
+			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "could not create hasher for challenge validation")
 		}
-		computedChallenge := hasher.ComputeHash(message)
 
+		computedChallenge := hasher.ComputeHash(message)
 		if !computedChallenge.Equal(clientDataChallenge) {
-			return nil, errors.NewValueErrorf("challenge mismatch", "challenge mismatch")
+			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "challenge mismatch")
 		}
 
 		// Validate authenticatorData
 		if len(decodedWebAuthnData.AuthenticatorData) < 37 {
-			return nil, errors.NewValueErrorf("authenticatorData length is less than 37", "authenticatorData length is less than 37")
+			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "authenticatorData length is less than 37")
 		}
 
 		// rpIdHash, userFlags, sigCounter, extensions
 		rpIdHash, userFlags, _, extensions := decodedWebAuthnData.AuthenticatorData[0:32], decodedWebAuthnData.AuthenticatorData[32:33], decodedWebAuthnData.AuthenticatorData[33:37], decodedWebAuthnData.AuthenticatorData[37:]
-
 		if bytes.Equal(flow.TransactionDomainTag[:], rpIdHash) {
-			return nil, errors.NewValueErrorf("authenticatorData rpIdHash error", "authenticatorData rpIdHash error")
+			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "authenticatorData rpIdHash error")
 		}
 
 		if err := validateFlags(userFlags[0], extensions); err != nil {
-			return nil, errors.NewValueErrorf("authenticatorData userFlags invalid", "authenticatorData userFlags invalid")
+			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "authenticatorData userFlags invalid")
 		}
 
 		clientDataHash := hash.NewSHA2_256().ComputeHash(decodedWebAuthnData.ClientDataJson)
@@ -343,7 +345,7 @@ func reconstructMessage(scheme AuthenticationScheme, extensionData []byte, messa
 		newMessage = append(newMessage, decodedWebAuthnData.AuthenticatorData...)
 		return append(newMessage, clientDataHash...), nil
 	default:
-		return nil, errors.NewValueErrorf(fmt.Sprintf("%d", scheme), "signature scheme type not found")
+		return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "signature scheme (%d) type not found", scheme)
 	}
 }
 
