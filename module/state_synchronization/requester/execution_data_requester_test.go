@@ -1,4 +1,4 @@
-package requester_test
+package requester
 
 import (
 	"context"
@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/state/protocol"
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
@@ -45,7 +44,7 @@ type ExecutionDataRequesterSuite struct {
 	datastore   datastore.Batching
 	db          *badger.DB
 	downloader  *exedatamock.Downloader
-	distributor *requester.ExecutionDataDistributor
+	distributor *ExecutionDataDistributor
 
 	run edTestRun
 
@@ -89,7 +88,7 @@ type edTestRun struct {
 
 type testExecutionDataCallback func(*execution_data.BlockExecutionData) (*execution_data.BlockExecutionData, error)
 
-func mockDownloader(edStore map[flow.Identifier]*testExecutionDataServiceEntry) *exedatamock.Downloader {
+func MockDownloader(edStore map[flow.Identifier]*testExecutionDataServiceEntry) *exedatamock.Downloader {
 	downloader := new(exedatamock.Downloader)
 
 	get := func(id flow.Identifier) (*execution_data.BlockExecutionData, error) {
@@ -391,7 +390,7 @@ func generatePauseResume(pauseHeight uint64) (specialBlockGenerator, func()) {
 
 func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun) (state_synchronization.ExecutionDataRequester, *pubsub.FollowerDistributor) {
 	logger := unittest.Logger()
-	metrics := metrics.NewNoopCollector()
+	metricsCollector := metrics.NewNoopCollector()
 
 	headers := synctest.MockBlockHeaderStorage(
 		synctest.WithByID(cfg.blocksByID),
@@ -406,26 +405,26 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	)
 	state := suite.mockProtocolState(cfg.blocksByHeight)
 
-	suite.downloader = mockDownloader(cfg.executionDataEntries)
-	suite.distributor = requester.NewExecutionDataDistributor()
+	suite.downloader = MockDownloader(cfg.executionDataEntries)
+	suite.distributor = NewExecutionDataDistributor()
 
-	heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metrics)
-	cache := cache.NewExecutionDataCache(suite.downloader, headers, seals, results, heroCache)
+	heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
+	edCache := cache.NewExecutionDataCache(suite.downloader, headers, seals, results, heroCache)
 
 	followerDistributor := pubsub.NewFollowerDistributor()
 	processedHeight := store.NewConsumerProgress(badgerimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterBlockHeight)
 	processedNotification := store.NewConsumerProgress(badgerimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterNotification)
 
-	edr, err := requester.New(
+	edr, err := New(
 		logger,
-		metrics,
+		metricsCollector,
 		suite.downloader,
-		cache,
+		edCache,
 		processedHeight,
 		processedNotification,
 		state,
 		headers,
-		requester.ExecutionDataConfig{
+		ExecutionDataConfig{
 			InitialBlockHeight: cfg.startHeight - 1,
 			MaxSearchAhead:     cfg.maxSearchAhead,
 			FetchTimeout:       cfg.fetchTimeout,
@@ -715,8 +714,8 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 		executionDataIDByBlockID: executionDataIDByBlockID,
 		waitTimeout:              time.Second * 5,
 
-		maxSearchAhead: requester.DefaultMaxSearchAhead,
-		fetchTimeout:   requester.DefaultFetchTimeout,
+		maxSearchAhead: DefaultMaxSearchAhead,
+		fetchTimeout:   DefaultFetchTimeout,
 		retryDelay:     1 * time.Millisecond,
 		maxRetryDelay:  15 * time.Millisecond,
 	}
