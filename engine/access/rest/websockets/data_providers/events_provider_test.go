@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -17,8 +18,10 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 // EventsProviderSuite is a test suite for testing the events providers functionality.
@@ -65,9 +68,10 @@ func (s *EventsProviderSuite) SetupTest() {
 // validates that events are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
+	eventGenerator := generator.EventGenerator(generator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
 	events := []flow.Event{
-		unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
-		unittest.EventFixture(flow.EventAccountUpdated, 0, 0, unittest.IdentifierFixture(), 0),
+		eventGenerator.New(),
+		eventGenerator.New(),
 	}
 
 	backendResponses := s.backendEventsResponses(events)
@@ -182,7 +186,23 @@ func (s *EventsProviderSuite) expectedEventsResponses(
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		expectedResponsePayload := models.NewEventResponse(resp, uint64(i))
+		// avoid updating the original response
+		expected := &backend.EventsResponse{
+			Height:         resp.Height,
+			BlockID:        resp.BlockID,
+			BlockTimestamp: resp.BlockTimestamp,
+			Events:         make(flow.EventsList, len(resp.Events)),
+		}
+
+		// events are provided in CCF format, but we expect all event payloads in JSON-CDC format
+		for i, event := range resp.Events {
+			converted, err := convert.CcfEventToJsonEvent(event)
+			s.Require().NoError(err)
+
+			expected.Events[i] = *converted
+		}
+
+		expectedResponsePayload := models.NewEventResponse(expected, uint64(i))
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   EventsTopic,
 			Payload: expectedResponsePayload,
