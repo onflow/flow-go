@@ -43,7 +43,7 @@ func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers
 // extendContext encapsulates all state information required in order to validate a candidate cluster block.
 type extendContext struct {
 	candidate                *cluster.Block // the proposed candidate cluster block
-	finalizedClusterBlock    *cluster.Block // the latest finalized cluster block
+	finalizedClusterBlock    *flow.Header   // the latest finalized cluster block
 	finalizedConsensusHeight uint64         // the latest finalized height on the main chain
 	epochFirstHeight         uint64         // the first height of this cluster's operating epoch
 	epochLastHeight          uint64         // the last height of this cluster's operating epoch (may be unknown)
@@ -59,8 +59,8 @@ func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, er
 
 	err := m.State.db.View(func(tx *badger.Txn) error {
 		// get the latest finalized cluster block and latest finalized consensus height
-		ctx.finalizedClusterBlock = new(cluster.Block)
-		err := procedure.RetrieveLatestFinalizedClusterBlock(candidate.Header.ChainID, ctx.finalizedClusterBlock)(tx)
+		ctx.finalizedClusterBlock = new(flow.Header)
+		err := procedure.RetrieveLatestFinalizedClusterHeader(candidate.Header.ChainID, ctx.finalizedClusterBlock)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized cluster head: %w", err)
 		}
@@ -186,7 +186,7 @@ func (m *MutableState) checkHeaderValidity(candidate *cluster.Block) error {
 func (m *MutableState) checkConnectsToFinalizedState(ctx extendContext) error {
 	header := ctx.candidate.Header
 	finalizedID := ctx.finalizedClusterBlock.ID()
-	finalizedHeight := ctx.finalizedClusterBlock.Header.Height
+	finalizedHeight := ctx.finalizedClusterBlock.Height
 
 	// start with the extending block's parent
 	parentID := header.ParentID
@@ -326,7 +326,7 @@ func (m *MutableState) checkPayloadTransactions(ctx extendContext) error {
 	}
 
 	// first, check for duplicate transactions in the un-finalized ancestry
-	duplicateTxIDs, err := m.checkDupeTransactionsInUnfinalizedAncestry(block, txLookup, ctx.finalizedClusterBlock.Header.Height)
+	duplicateTxIDs, err := m.checkDupeTransactionsInUnfinalizedAncestry(block, txLookup, ctx.finalizedClusterBlock.Height)
 	if err != nil {
 		return fmt.Errorf("could not check for duplicate txs in un-finalized ancestry: %w", err)
 	}
