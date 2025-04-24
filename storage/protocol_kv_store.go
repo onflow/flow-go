@@ -2,7 +2,6 @@ package storage
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // ProtocolKVStore persists different snapshots of key-value stores [KV-stores]. At this level, the API
@@ -13,14 +12,10 @@ import (
 // TODO maybe rename to `ProtocolStateSnapshots` (?) because at this low level, we are not exposing the
 // KV-store, it is just an encoded data blob
 type ProtocolKVStore interface {
-	// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
-	// which persists the given KV-store snapshot as part of a DB tx.
-	// Expected errors of the returned anonymous function:
-	//   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
-	StoreTx(stateID flow.Identifier, data *flow.PSKeyValueStoreData) func(*transaction.Tx) error
+	// BatchStore returns an anonymous function (intended to be executed as part of a badger transaction),
 	BatchStore(rw ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error
 
-	// IndexTx returns an anonymous function intended to be executed as part of a database transaction.
+	// BatchIndex returns an anonymous function intended to be executed as part of a database transaction.
 	// In a nutshell, we want to maintain a map from `blockID` to `stateID`, where `blockID` references the
 	// block that _proposes_ the updated key-value store.
 	// Upon call, the anonymous function persists the specific map entry in the node's database.
@@ -33,7 +28,6 @@ type ProtocolKVStore interface {
 	//
 	// Expected errors during normal operations:
 	//   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
-	IndexTx(blockID flow.Identifier, stateID flow.Identifier) func(*transaction.Tx) error
 	BatchIndex(rw ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error
 
 	// ByID retrieves the KV store snapshot with the given ID.

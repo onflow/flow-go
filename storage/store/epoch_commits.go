@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/storage/operation"
 )
 
@@ -37,10 +36,6 @@ func NewEpochCommits(collector module.CacheMetrics, db storage.DB) *EpochCommits
 	}
 
 	return ec
-}
-
-func (ec *EpochCommits) StoreTx(commit *flow.EpochCommit) func(*transaction.Tx) error {
-	panic("not implemented")
 }
 
 func (ec *EpochCommits) BatchStore(rw storage.ReaderBatchWriter, commit *flow.EpochCommit) error {

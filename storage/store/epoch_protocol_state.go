@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/storage/operation"
 )
 
@@ -112,16 +111,12 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 	}
 }
 
-// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
+// BatchStore returns an anonymous function (intended to be executed as part of a badger transaction),
 // which persists the given epoch protocol state entry as part of a DB tx. Per convention, the identities in
 // the flow.MinEpochStateEntry must be in canonical order for the current and next epoch (if present),
 // otherwise an exception is returned.
 // Expected errors of the returned anonymous function:
 //   - storage.ErrAlreadyExists if a state entry with the given id is already stored
-func (s *EpochProtocolStateEntries) StoreTx(epochProtocolStateEntryID flow.Identifier, epochStateEntry *flow.MinEpochStateEntry) func(*transaction.Tx) error {
-	panic("not implemented")
-}
-
 func (s *EpochProtocolStateEntries) BatchStore(
 	rw storage.ReaderBatchWriter,
 	epochProtocolStateEntryID flow.Identifier,
@@ -153,10 +148,6 @@ func (s *EpochProtocolStateEntries) BatchStore(
 //
 // Expected errors during normal operations:
 //   - storage.ErrAlreadyExists if a state entry for the given blockID has already been indexed
-func (s *EpochProtocolStateEntries) Index(blockID flow.Identifier, epochProtocolStateID flow.Identifier) func(*transaction.Tx) error {
-	panic("not implemented")
-}
-
 func (s *EpochProtocolStateEntries) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) error {
 	return s.byBlockIdCache.PutTx(rw, blockID, epochProtocolStateEntryID)
 }

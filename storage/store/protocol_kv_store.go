@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/storage/operation"
 )
 
@@ -94,14 +93,6 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 	}
 }
 
-// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
-// which persists the given KV-store snapshot as part of a DB tx.
-// Expected errors of the returned anonymous function:
-//   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
-func (s *ProtocolKVStore) StoreTx(stateID flow.Identifier, data *flow.PSKeyValueStoreData) func(*transaction.Tx) error {
-	panic("not implemented")
-}
-
 func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
 	// TOOD: add synchronization, adding lock would cause deadlock during bootstrap
 	// s.storing.Lock()
@@ -123,7 +114,7 @@ func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.
 	})
 }
 
-// IndexTx returns an anonymous function intended to be executed as part of a database transaction.
+// BatchIndex returns an anonymous function intended to be executed as part of a database transaction.
 // In a nutshell, we want to maintain a map from `blockID` to `stateID`, where `blockID` references the
 // block that _proposes_ updated key-value store.
 // Upon call, the anonymous function persists the specific map entry in the node's database.
@@ -136,10 +127,6 @@ func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.
 //
 // Expected errors during normal operations:
 //   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
-func (s *ProtocolKVStore) IndexTx(blockID flow.Identifier, stateID flow.Identifier) func(*transaction.Tx) error {
-	panic("not implemented")
-}
-
 func (s *ProtocolKVStore) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
 	// TODO: add synchronization, adding lock would cause deadlock during bootstrap
 	// s.indexing.Lock()
