@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 )
@@ -84,8 +85,23 @@ func NewEventsDataProvider(
 func (p *EventsDataProvider) Run() error {
 	return run(
 		p.createAndStartSubscription(p.ctx, p.arguments),
-		p.sendResponse,
+		p.handleResponse,
 	)
+}
+
+// handleResponse processes the response from the subscription and sends it to the client's channel.
+// As part of the processing, it converts the event payloads from CCF to JSON-CDC format.
+// This function is not expected to be called concurrently.
+//
+// No errors expected during normal operations.
+func (p *EventsDataProvider) handleResponse(response *backend.EventsResponse) error {
+	// convert events to JSON-CDC format
+	convertedResponse, err := convertEventsResponse(response)
+	if err != nil {
+		return fmt.Errorf("failed to convert events to JSON-CDC format: %w", err)
+	}
+
+	return p.sendResponse(convertedResponse)
 }
 
 // sendResponse processes an event message and sends it to client's channel.
@@ -127,6 +143,43 @@ func (p *EventsDataProvider) createAndStartSubscription(ctx context.Context, arg
 	}
 
 	return p.stateStreamApi.SubscribeEventsFromLatest(ctx, args.Filter)
+}
+
+// convertEventsResponse converts events in the provided EventsResponse from CCF to JSON-CDC format.
+//
+// No errors expected during normal operations.
+func convertEventsResponse(resp *backend.EventsResponse) (*backend.EventsResponse, error) {
+	jsoncdcEvents, err := convertEvents(resp.Events)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert events to JSON-CDC: %w", err)
+	}
+
+	return &backend.EventsResponse{
+		BlockID:        resp.BlockID,
+		Height:         resp.Height,
+		BlockTimestamp: resp.BlockTimestamp,
+		Events:         jsoncdcEvents,
+	}, nil
+}
+
+// convertEvents converts a slice events with CCF encoded payloads into a slice of new events who's
+// payloads are encoded in JSON-CDC format.
+//
+// Note: this function creates a copy of the original events before converting the payload. This
+// is important to ensure the original data structure is not modified, which could impact data held
+// in caches.
+//
+// No errors expected during normal operations.
+func convertEvents(ccfEvents []flow.Event) ([]flow.Event, error) {
+	jsoncdcEvents := make([]flow.Event, len(ccfEvents))
+	for i, ccfEvent := range ccfEvents {
+		converted, err := convert.CcfEventToJsonEvent(ccfEvent)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert event %d: %w", i, err)
+		}
+		jsoncdcEvents[i] = *converted
+	}
+	return jsoncdcEvents, nil
 }
 
 // parseEventsArguments validates and initializes the events arguments.

@@ -83,10 +83,23 @@ func NewAccountStatusesDataProvider(
 func (p *AccountStatusesDataProvider) Run() error {
 	return run(
 		p.createAndStartSubscription(p.ctx, p.arguments),
-		func(response *backend.AccountStatusesResponse) error {
-			return p.sendResponse(response)
-		},
+		p.handleResponse,
 	)
+}
+
+// handleResponse processes the response from the subscription and sends it to the client's channel.
+// As part of the processing, it converts the event payloads from CCF to JSON-CDC format.
+// This function is not expected to be called concurrently.
+//
+// No errors expected during normal operations.
+func (p *AccountStatusesDataProvider) handleResponse(response *backend.AccountStatusesResponse) error {
+	// convert events to JSON-CDC format
+	convertedResponse, err := convertAccountStatusesResponse(response)
+	if err != nil {
+		return fmt.Errorf("failed to convert account status events to JSON-CDC format: %w", err)
+	}
+
+	return p.sendResponse(convertedResponse)
 }
 
 // sendResponse processes an account statuses message and sends it to data provider's channel.
@@ -131,6 +144,27 @@ func (p *AccountStatusesDataProvider) createAndStartSubscription(
 	}
 
 	return p.stateStreamApi.SubscribeAccountStatusesFromLatestBlock(ctx, args.Filter)
+}
+
+// convertAccountStatusesResponse converts events in the provided AccountStatusesResponse from CCF
+// to JSON-CDC format.
+//
+// No errors expected during normal operations.
+func convertAccountStatusesResponse(resp *backend.AccountStatusesResponse) (*backend.AccountStatusesResponse, error) {
+	jsoncdcEvents := make(map[string]flow.EventsList, len(resp.AccountEvents))
+	for eventType, events := range resp.AccountEvents {
+		convertedEvents, err := convertEvents(events)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert %s events to JSON-CDC: %w", eventType, err)
+		}
+		jsoncdcEvents[eventType] = convertedEvents
+	}
+
+	return &backend.AccountStatusesResponse{
+		BlockID:       resp.BlockID,
+		Height:        resp.Height,
+		AccountEvents: jsoncdcEvents,
+	}, nil
 }
 
 // parseAccountStatusesArguments validates and initializes the account statuses arguments.
