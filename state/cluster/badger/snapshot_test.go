@@ -187,6 +187,7 @@ func (suite *SnapshotSuite) TestEmptyCollection() {
 	assert.NoError(t, err)
 	assert.Equal(t, &proposal.Block.Payload.Collection, coll)
 }
+
 func (suite *SnapshotSuite) TestFinalizedBlock() {
 	t := suite.T()
 
@@ -275,18 +276,13 @@ func (suite *SnapshotSuite) TestPending_Grandchildren() {
 		var header flow.Header
 		err := suite.db.View(operation.RetrieveHeader(blockID, &header))
 		suite.Require().Nil(err)
-		var payload model.Payload
-		err = suite.db.View(procedure.RetrieveClusterPayload(blockID, &payload))
-		suite.Require().Nil(err)
-
-		block := model.NewBlock(header.HeaderBody, payload)
 
 		// we must have already seen the parent
 		_, seen := parents[header.ParentID]
 		suite.Assert().True(seen, "pending list contained child (%x) before parent (%x)", blockID, header.ParentID)
 
 		// mark this block as seen
-		parents[block.ID()] = struct{}{}
+		parents[header.ID()] = struct{}{}
 	}
 }
 

@@ -26,7 +26,7 @@ type Headers struct {
 var _ storage.Headers = (*Headers)(nil)
 
 // NewHeaders creates a Headers instance, which stores block headers.
-// It supports storing, caching and retrieving by block ID or the additionally indexed header ID.
+// It supports storing, caching and retrieving by block ID and the additionally indexed by header height.
 func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 	store := func(blockID flow.Identifier, header *flow.Header) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.InsertHeader(blockID, header))

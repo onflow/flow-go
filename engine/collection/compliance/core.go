@@ -110,7 +110,6 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedClu
 		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
 	}()
 
-	// TODO(malleability, #7100) this can probably be improved
 	proposal := flow.Slashable[*cluster.BlockProposal]{
 		OriginID: proposalMsg.OriginID,
 		Message:  proposalMsg.Message.ToInternal(),
