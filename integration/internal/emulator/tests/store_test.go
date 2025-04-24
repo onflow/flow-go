@@ -30,7 +30,7 @@ import (
 	"github.com/onflow/flow-go-sdk/test"
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
-	emulator "github.com/onflow/flow-go/integration/internal/emulator"
+	"github.com/onflow/flow-go/integration/internal/emulator"
 	"github.com/onflow/flow-go/integration/internal/emulator/utils/unittest"
 	"github.com/onflow/flow-go/model/flow"
 	flowgo "github.com/onflow/flow-go/model/flow"
@@ -44,12 +44,16 @@ func TestBlocks(t *testing.T) {
 
 	block1 := &flowgo.Block{
 		Header: &flowgo.Header{
-			Height: 1,
+			HeaderBody: flowgo.HeaderBody{
+				Height: 1,
+			},
 		},
 	}
 	block2 := &flowgo.Block{
 		Header: &flowgo.Header{
-			Height: 2,
+			HeaderBody: flowgo.HeaderBody{
+				Height: 2,
+			},
 		},
 	}
 
