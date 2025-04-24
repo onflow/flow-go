@@ -54,19 +54,6 @@ type MissingCollection struct {
 	Guarantee *flow.CollectionGuarantee
 }
 
-func (m *MissingCollection) ID() flow.Identifier {
-	stub := struct {
-		BlockID               flow.Identifier
-		Height                uint64
-		CollectionGuaranteeID flow.Identifier
-	}{
-		m.BlockID,
-		m.Height,
-		m.Guarantee.ID(),
-	}
-	return flow.MakeID(stub)
-}
-
 // collectionInfo is an internal struct used to keep track of the state of a collection,
 // and the blocks that include the collection
 type collectionInfo struct {
@@ -167,7 +154,7 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 	missingCollections := make([]*MissingCollection, 0, len(block.Payload.Guarantees))
 
 	for _, guarantee := range block.Payload.Guarantees {
-		colID := guarantee.ID()
+		colID := guarantee.CollectionID
 		colInfo, ok := q.collections[colID]
 		if ok {
 			// some other block also includes this collection

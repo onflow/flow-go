@@ -105,7 +105,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	executableBlock := &entity.ExecutableBlock{
 		Block: &block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
-			guarantee.ID(): {
+			guarantee.CollectionID: {
 				Guarantee:    &guarantee,
 				Transactions: transactions,
 			},
@@ -518,7 +518,7 @@ func createTestBlockAndRun(
 	executableBlock := &entity.ExecutableBlock{
 		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
-			guarantee.ID(): {
+			guarantee.CollectionID: {
 				Guarantee:    &guarantee,
 				Transactions: col.Transactions,
 			},

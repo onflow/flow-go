@@ -80,7 +80,7 @@ type Blocks interface {
 	//     to decode an existing database value
 	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
 
-	// IndexBlockForCollections is only to be called for *finalized* blocks. For each
+	// IndexBlockForCollectionGuarantees is only to be called for *finalized* blocks. For each
 	// collection ID, it stores the blockID as the block containing this collection.
 	// While consensus nodes verify that collections are not repeated within the same fork,
 	// each different fork can contain a recent collection once. Therefore, we must wait for
@@ -88,5 +88,5 @@ type Blocks interface {
 	//
 	// Error returns:
 	//   - generic error in case of unexpected failure from the database layer or encoding failure.
-	IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error
+	IndexBlockForCollectionGuarantees(blockID flow.Identifier, collIDs []flow.Identifier) error
 }

@@ -14,13 +14,13 @@ import (
 func TestReceipts_InsertRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		receipt := unittest.ExecutionReceiptFixture()
-		expected := receipt.Meta()
+		expected := receipt.Stub()
 
-		err := db.Update(InsertExecutionReceiptMeta(receipt.ID(), expected))
+		err := db.Update(InsertExecutionReceiptStub(receipt.ID(), expected))
 		require.NoError(t, err)
 
-		var actual flow.ExecutionReceiptMeta
-		err = db.View(RetrieveExecutionReceiptMeta(receipt.ID(), &actual))
+		var actual flow.ExecutionReceiptStub
+		err = db.View(RetrieveExecutionReceiptStub(receipt.ID(), &actual))
 		require.NoError(t, err)
 
 		assert.Equal(t, expected, &actual)
