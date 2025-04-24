@@ -5,7 +5,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type ChainedExecutionResults struct {
@@ -50,19 +49,4 @@ func (c *ChainedExecutionResults) ByBlockID(blockID flow.Identifier) (*flow.Exec
 	}
 
 	return nil, err
-}
-
-func (c *ChainedExecutionResults) ByIDTx(resultID flow.Identifier) func(*transaction.Tx) (*flow.ExecutionResult, error) {
-	return func(tx *transaction.Tx) (*flow.ExecutionResult, error) {
-		result, err := c.first.ByIDTx(resultID)(tx)
-		if err == nil {
-			return result, nil
-		}
-
-		if errors.Is(err, storage.ErrNotFound) {
-			return c.second.ByIDTx(resultID)(tx)
-		}
-
-		return nil, err
-	}
 }
