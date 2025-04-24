@@ -116,9 +116,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/dbops"
-	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -583,14 +580,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		}).
 		Module("transactions and collections storage", func(node *cmd.NodeConfig) error {
 
-			dbStore := node.ProtocolDB
-
-			if dbops.IsPebbleBatch(node.DBOps) {
-				// Create multiDBStore with node.ProtocolDB as primary read-and-write-store,
-				// and node.DB as secondary read-only store.
-				badgerDB := badgerimpl.ToDB(node.DB)
-				dbStore = operation.NewMultiDBStore(node.ProtocolDB, badgerDB)
-			}
+			dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
 
 			transactions := store.NewTransactions(node.Metrics.Cache, dbStore)
 			collections := store.NewCollections(dbStore, transactions)
@@ -886,7 +876,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return nil
 			}).
 			Module("transaction results storage", func(node *cmd.NodeConfig) error {
-				builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
+				dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+				builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, dbStore, bstorage.DefaultCacheSize)
 				return nil
 			}).
 			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -1871,7 +1862,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("events storage", func(node *cmd.NodeConfig) error {
-			builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
+			dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+			builder.events = store.NewEvents(node.Metrics.Cache, dbStore)
 			return nil
 		}).
 		Module("reporter", func(node *cmd.NodeConfig) error {
@@ -1907,7 +1899,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
 			if builder.storeTxResultErrorMessages {
-				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
+				dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, dbStore, bstorage.DefaultCacheSize)
 			}
 
 			return nil
