@@ -3,6 +3,7 @@ package pebbleimpl
 import (
 	"bytes"
 	"fmt"
+	"sync"
 
 	"github.com/cockroachdb/pebble"
 
@@ -14,7 +15,8 @@ type ReaderBatchWriter struct {
 	globalReader storage.Reader
 	batch        *pebble.Batch
 
-	callbacks operation.Callbacks
+	callbacks *operation.Callbacks
+	locks     *operation.Locks
 }
 
 var _ storage.ReaderBatchWriter = (*ReaderBatchWriter)(nil)
@@ -38,6 +40,10 @@ func (b *ReaderBatchWriter) Writer() storage.Writer {
 
 func (b *ReaderBatchWriter) PebbleWriterBatch() *pebble.Batch {
 	return b.batch
+}
+
+func (b *ReaderBatchWriter) Lock(lock *sync.Mutex) {
+	b.locks.Lock(lock, b.callbacks)
 }
 
 // AddCallback adds a callback to execute after the batch has been flush
@@ -94,6 +100,8 @@ func NewReaderBatchWriter(db *pebble.DB) *ReaderBatchWriter {
 	return &ReaderBatchWriter{
 		globalReader: ToReader(db),
 		batch:        db.NewBatch(),
+		callbacks:    operation.NewCallbacks(),
+		locks:        operation.NewLocks(),
 	}
 }
 

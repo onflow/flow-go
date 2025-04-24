@@ -2,6 +2,7 @@ package badgerimpl
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -13,7 +14,8 @@ type ReaderBatchWriter struct {
 	globalReader storage.Reader
 	batch        *badger.WriteBatch
 
-	callbacks operation.Callbacks
+	callbacks *operation.Callbacks
+	locks     *operation.Locks
 }
 
 var _ storage.ReaderBatchWriter = (*ReaderBatchWriter)(nil)
@@ -38,6 +40,10 @@ func (b *ReaderBatchWriter) Writer() storage.Writer {
 // BadgerWriteBatch returns the badger write batch
 func (b *ReaderBatchWriter) BadgerWriteBatch() *badger.WriteBatch {
 	return b.batch
+}
+
+func (b *ReaderBatchWriter) Lock(lock *sync.Mutex) {
+	b.locks.Lock(lock, b.callbacks)
 }
 
 // AddCallback adds a callback to execute after the batch has been flush
@@ -97,6 +103,8 @@ func NewReaderBatchWriter(db *badger.DB) *ReaderBatchWriter {
 	return &ReaderBatchWriter{
 		globalReader: ToReader(db),
 		batch:        db.NewWriteBatch(),
+		callbacks:    operation.NewCallbacks(),
+		locks:        operation.NewLocks(),
 	}
 }
 
