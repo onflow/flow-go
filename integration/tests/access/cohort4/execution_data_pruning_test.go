@@ -18,9 +18,10 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
-
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
@@ -162,9 +163,9 @@ func (s *ExecutionDataPruningSuite) TestHappyPath() {
 	// setup storage objects needed to get the execution data id
 	anDB, err := accessNode.DB()
 	require.NoError(s.T(), err, "could not open db")
-
-	anHeaders := badger.NewHeaders(metrics, anDB)
-	anResults := badger.NewExecutionResults(metrics, anDB)
+	db := badgerimpl.ToDB(anDB)
+	anHeaders := store.NewHeaders(metrics, db)
+	anResults := store.NewExecutionResults(metrics, db)
 
 	// start an execution data service using the Observer Node's execution data db
 
@@ -173,7 +174,7 @@ func (s *ExecutionDataPruningSuite) TestHappyPath() {
 	onDB, err := observerNode.DB()
 	require.NoError(s.T(), err, "could not open db")
 
-	onResults := badger.NewExecutionResults(metrics, onDB)
+	onResults := store.NewExecutionResults(metrics, badgerimpl.ToDB(onDB))
 
 	s.checkResults(anHeaders, anResults, onResults, anEds, onEds)
 }
@@ -233,9 +234,9 @@ func (s *ExecutionDataPruningSuite) waitUntilExecutionDataForBlockIndexed(waitin
 
 // checkResults checks the results of execution data pruning to ensure correctness.
 func (s *ExecutionDataPruningSuite) checkResults(
-	headers *badger.Headers,
-	anResults *badger.ExecutionResults,
-	onResults *badger.ExecutionResults,
+	headers storage.Headers,
+	anResults storage.ExecutionResults,
+	onResults storage.ExecutionResults,
 	anEds execution_data.ExecutionDataStore,
 	onEds execution_data.ExecutionDataStore,
 ) {
