@@ -30,7 +30,6 @@ func NewExecutionDataCache(
 ) *ExecutionDataCache {
 	return &ExecutionDataCache{
 		backend: backend,
-
 		headers: headers,
 		seals:   seals,
 		results: results,
