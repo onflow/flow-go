@@ -2,11 +2,9 @@ package flow
 
 import (
 	"encoding/json"
-	"io"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/onflow/go-ethereum/rlp"
 	"github.com/vmihailenco/msgpack/v4"
 
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
@@ -21,6 +19,7 @@ type ProposalHeader struct {
 	ProposerSigData []byte
 }
 
+// HeaderBody contains all meta-data for a block.
 type HeaderBody struct {
 	// ChainID is a chain-specific value to prevent replay attacks.
 	ChainID ChainID
@@ -47,45 +46,6 @@ type HeaderBody struct {
 	// LastViewTC is a timeout certificate for previous view, it can be nil
 	// it has to be present if previous round ended with timeout.
 	LastViewTC *TimeoutCertificate
-}
-
-// QuorumCertificate returns quorum certificate that is incorporated in the block.
-func (h *HeaderBody) QuorumCertificate() *QuorumCertificate {
-	return &QuorumCertificate{
-		BlockID:       h.ParentID,
-		View:          h.ParentView,
-		SignerIndices: h.ParentVoterIndices,
-		SigData:       h.ParentVoterSigData,
-	}
-}
-
-// TODO(malleability, #7309) Remove EncodeRLP after replacing Timestamp (time.Time) with uint64.
-func (h *HeaderBody) EncodeRLP(w io.Writer) error {
-	encodingCanonicalForm := struct {
-		ChainID            ChainID
-		ParentID           Identifier
-		Height             uint64
-		Timestamp          uint64
-		View               uint64
-		ParentView         uint64
-		ParentVoterIndices []byte
-		ParentVoterSigData []byte
-		ProposerID         Identifier
-		LastViewTCID       Identifier
-	}{
-		ChainID:            h.ChainID,
-		ParentID:           h.ParentID,
-		Height:             h.Height,
-		Timestamp:          uint64(h.Timestamp.UnixNano()),
-		View:               h.View,
-		ParentView:         h.ParentView,
-		ParentVoterIndices: h.ParentVoterIndices,
-		ParentVoterSigData: h.ParentVoterSigData,
-		ProposerID:         h.ProposerID,
-		LastViewTCID:       h.LastViewTC.ID(),
-	}
-
-	return rlp.Encode(w, encodingCanonicalForm)
 }
 
 // Header contains all meta-data for a block, as well as a hash representing

@@ -3,6 +3,10 @@
 package cluster
 
 import (
+	"io"
+
+	"github.com/onflow/go-ethereum/rlp"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -43,38 +47,47 @@ func NewBlock(
 
 // ID returns a collision-resistant hash of the cluster.Block struct.
 func (b *Block) ID() flow.Identifier {
-	// If we just hash of all the fields, we lose the ability to have like a compressed data structure like the header.
-	// The hash of the block is not just the hash of all the fields, It's a two-step process.
-	// We first hash the payload fields, and then with that hash of the payload fields, we hash the header body fields and include the hash of the payload.
-	// And then with that convention, both header and block generate the same hash.
-	return flow.MakeID(
-		// the order of the fields is kept according to the flow.Header Fingerprint()
-		struct {
-			ChainID            flow.ChainID
-			ParentID           flow.Identifier
-			Height             uint64
-			PayloadHash        flow.Identifier
-			Timestamp          uint64
-			View               uint64
-			ParentView         uint64
-			ParentVoterIndices []byte
-			ParentVoterSigData []byte
-			ProposerID         flow.Identifier
-			LastViewTCID       flow.Identifier
-		}{
-			ChainID:            b.Header.ChainID,
-			ParentID:           b.Header.ParentID,
-			Height:             b.Header.Height,
-			Timestamp:          uint64(b.Header.Timestamp.UnixNano()),
-			View:               b.Header.View,
-			ParentView:         b.Header.ParentView,
-			ParentVoterIndices: b.Header.ParentVoterIndices,
-			ParentVoterSigData: b.Header.ParentVoterSigData,
-			ProposerID:         b.Header.ProposerID,
-			LastViewTCID:       b.Header.LastViewTC.ID(),
-			PayloadHash:        b.Payload.Hash(),
-		},
-	)
+	return flow.MakeID(b)
+}
+
+// EncodeRLP defines custom encoding for the cluster.Block to calculate its ID.
+// The hash of the block is not just the hash of all the fields, It's a two-step process.
+// If we just hash of all the fields, we lose the ability to have like a compressed data structure like the header.
+// We first hash the payload fields, and then with that hash of the payload fields, we hash the header body fields and include the hash of the payload.
+// This convention ensures that both the header and the block produce the same hash.
+// The Timestamp is converted from time.Time to Unix time (uint64), which is necessary
+// because time.Time is not RLP-encodable due to its private fields.
+func (b *Block) EncodeRLP(w io.Writer) error {
+	payloadHash := b.Payload.Hash()
+
+	// the order of the fields is kept according to the flow.Header Fingerprint()
+	encodingCanonicalForm := struct {
+		ChainID            flow.ChainID
+		ParentID           flow.Identifier
+		Height             uint64
+		PayloadHash        flow.Identifier
+		Timestamp          uint64
+		View               uint64
+		ParentView         uint64
+		ParentVoterIndices []byte
+		ParentVoterSigData []byte
+		ProposerID         flow.Identifier
+		LastViewTCID       flow.Identifier
+	}{
+		ChainID:            b.Header.ChainID,
+		ParentID:           b.Header.ParentID,
+		Height:             b.Header.Height,
+		PayloadHash:        payloadHash,
+		Timestamp:          uint64(b.Header.Timestamp.UnixNano()),
+		View:               b.Header.View,
+		ParentView:         b.Header.ParentView,
+		ParentVoterIndices: b.Header.ParentVoterIndices,
+		ParentVoterSigData: b.Header.ParentVoterSigData,
+		ProposerID:         b.Header.ProposerID,
+		LastViewTCID:       b.Header.LastViewTC.ID(),
+	}
+
+	return rlp.Encode(w, encodingCanonicalForm)
 }
 
 // ToHeader return flow.Header data for cluster.Block
