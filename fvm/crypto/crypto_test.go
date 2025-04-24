@@ -2,6 +2,7 @@ package crypto_test
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	mrand "math/rand"
@@ -616,6 +617,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 			require.NoError(t, err)
 
 			authNChallenge := hasher.ComputeHash(transactionMessage)
+			authNChallengeBase64Url := base64.URLEncoding.EncodeToString(authNChallenge)
 			validUserFlag := byte(0x01)
 			validClientDataOrigin := "https://testing.com"
 			rpIDHash := unittest.RandomBytes(32)
@@ -625,7 +627,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 			validAuthenticatorData := slices.Concat(rpIDHash, []byte{validUserFlag}, sigCounter)
 			validClientDataJSON := map[string]string{
 				"type":      crypto.WebAuthnTypeGet,
-				"challenge": authNChallenge.Hex(),
+				"challenge": authNChallengeBase64Url,
 				"origin":    validClientDataOrigin,
 			}
 

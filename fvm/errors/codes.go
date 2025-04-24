@@ -50,7 +50,6 @@ const (
 	ErrCodeInvalidProposalSeqNumberError ErrorCode = 1007
 	ErrCodeInvalidPayloadSignatureError  ErrorCode = 1008
 	ErrCodeInvalidEnvelopeSignatureError ErrorCode = 1009
-	ErrCodeInvalidExtensionDataError     ErrorCode = 1010
 
 	// base errors 1050 - 1100
 	// Deprecated: No longer used.

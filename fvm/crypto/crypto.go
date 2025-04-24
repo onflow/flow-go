@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"slices"
@@ -246,11 +247,8 @@ func VerifySignatureFromTransaction(
 		return false, nil
 	}
 
-	reconstructedMessage, err := validateExtensionDataAndReconstructMessage(scheme, extensionData, message)
-	if err != nil {
-		// Log error here?
-		// error being swallowed here, but since validateExtensionDataAndReconstructMessage is returning a validation error,
-		// we simply return false currently
+	extensionDataValid, reconstructedMessage := validateExtensionDataAndReconstructMessage(scheme, extensionData, message)
+	if !extensionDataValid {
 		return false, nil
 	}
 
@@ -277,76 +275,76 @@ func VerifySignatureFromTransaction(
 }
 
 // validateExtensionDataAndReconstructMessage reconstructs the message based on the authentication scheme and extension data.
-// will return a coded error of code `ErrCodeInvalidExtensionDataError` if any error occurs
-func validateExtensionDataAndReconstructMessage(scheme AuthenticationScheme, extensionData []byte, message []byte) ([]byte, error) {
+// simply returns false if the extension data is invalid, could consider adding more visibility into reason of validation failure
+func validateExtensionDataAndReconstructMessage(scheme AuthenticationScheme, extensionData []byte, message []byte) (bool, []byte) {
 	switch scheme {
 	case PLAIN:
 		if extensionData != nil && len(extensionData) != 1 {
-			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "signature scheme is PLAIN, but extension data length is not 1")
+			return false, nil
 		}
 		newMessage := make([]byte, 0, len(flow.TransactionTagString)+len(extensionData))
 		newMessage = append(newMessage, flow.TransactionDomainTag[:]...)
-		return append(newMessage, message...), nil
+		return true, append(newMessage, message...)
 	case WEBAUTHN: // See FLIP 264 for more details
 		if len(extensionData) == 0 {
-			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "extension data is empty")
+			return false, nil
 		}
 		rlpEncodedWebAuthnData := extensionData[1:]
 		decodedWebAuthnData := &WebAuthnExtensionData{}
 		if err := rlp.DecodeBytes(rlpEncodedWebAuthnData, decodedWebAuthnData); err != nil {
-			return nil, errors.WrapCodedError(errors.ErrCodeInvalidExtensionDataError, err, "failed to RLP decode webauthn extension data")
+			return false, nil
 		}
 
 		clientData, err := decodedWebAuthnData.GetUnmarshalledCollectedClientData()
 		if err != nil {
-			return nil, errors.WrapCodedError(errors.ErrCodeInvalidExtensionDataError, err, "failed to get unmarshalled client data")
-		}
-		// do we allow 0x prefix for challenge?
-		challengeHex := clientData.Challenge
-		if len(challengeHex) > 2 && strings.ToLower(challengeHex[:2]) == "0x" {
-			challengeHex = challengeHex[2:]
+			return false, nil
 		}
 
-		clientDataChallenge, err := hex.DecodeString(challengeHex)
+		// base64url decode the challenge, as that's the encoding used client side according to https://www.w3.org/TR/webauthn-3/#dictionary-client-data
+		clientDataChallenge, err := base64.URLEncoding.DecodeString(clientData.Challenge)
 		if err != nil {
-			return nil, errors.WrapCodedError(errors.ErrCodeInvalidExtensionDataError, err, "failed to decode challenge")
+			return false, nil
 		}
+
 		if !strings.EqualFold(clientData.Type, WebAuthnTypeGet) || len(clientDataChallenge) != WebAuthnChallengeLength || len(clientData.Origin) == 0 {
-			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "invalid client data")
+			// invalid client data
+			return false, nil
 		}
 
 		// Validate challenge
 		hasher, err := NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)
 		if err != nil {
-			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "could not create hasher for challenge validation")
+			// could not create hasher for challenge validation, swallowing error here, but should never occur
+			return false, nil
 		}
 
 		computedChallenge := hasher.ComputeHash(message)
 		if !computedChallenge.Equal(clientDataChallenge) {
-			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "challenge mismatch")
+			return false, nil
 		}
 
 		// Validate authenticatorData
 		if len(decodedWebAuthnData.AuthenticatorData) < 37 {
-			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "authenticatorData length is less than 37")
+			return false, nil
 		}
 
 		// extract rpIdHash, userFlags, sigCounter, extensions
 		rpIdHash, userFlags, _, extensions := decodedWebAuthnData.AuthenticatorData[0:32], decodedWebAuthnData.AuthenticatorData[32:33], decodedWebAuthnData.AuthenticatorData[33:37], decodedWebAuthnData.AuthenticatorData[37:]
 		if bytes.Equal(flow.TransactionDomainTag[:], rpIdHash) {
-			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "authenticatorData rpIdHash error")
+			return false, nil
 		}
 
 		// validate user flags according to FLIP 264
 		if err := validateFlags(userFlags[0], extensions); err != nil {
-			return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "authenticatorData userFlags invalid")
+			return false, nil
 		}
 
 		clientDataHash := hash.NewSHA2_256().ComputeHash(decodedWebAuthnData.ClientDataJson)
 
-		return slices.Concat(decodedWebAuthnData.AuthenticatorData, clientDataHash), nil
+		return true, slices.Concat(decodedWebAuthnData.AuthenticatorData, clientDataHash)
 	default:
-		return nil, errors.NewCodedError(errors.ErrCodeInvalidExtensionDataError, "signature scheme (%d) type not found", scheme)
+		// signature scheme type not found
+		return false, nil
 	}
 }
 
