@@ -2,20 +2,13 @@ package pipeline
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
-)
-
-var (
-	// ErrInvalidState indicates the pipeline is in an invalid state
-	ErrInvalidState = errors.New("invalid pipeline state")
-	// ErrPipelineCanceled indicates the pipeline was canceled
-	ErrPipelineCanceled = errors.New("pipeline canceled")
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // State represents the state of the processing pipeline
@@ -24,17 +17,17 @@ type State int
 const (
 	// StateReady is the initial state after instantiation and before downloading has begun
 	StateReady State = iota
-	//StateDownloading represents the state where data download is in progress
+	// StateDownloading represents the state where data download is in progress
 	StateDownloading
-	//StateIndexing represents the state where data is being indexed
+	// StateIndexing represents the state where data is being indexed
 	StateIndexing
-	//StateWaitingPersist represents the state where all data is indexed, but conditions to persist are not met
+	// StateWaitingPersist represents the state where all data is indexed, but conditions to persist are not met
 	StateWaitingPersist
-	//StatePersisting represents the state where the indexed data is being persisted to storage
+	// StatePersisting represents the state where the indexed data is being persisted to storage
 	StatePersisting
-	//StateComplete represents the state where all prior steps completed successfully
+	// StateComplete represents the state where all data is persisted to storage
 	StateComplete
-	//StateCanceled represents the state where processing was aborted
+	// StateCanceled represents the state where processing was aborted
 	StateCanceled
 )
 
@@ -63,7 +56,7 @@ func (s State) String() string {
 // StateUpdate contains state update information
 type StateUpdate struct {
 	// DescendsFromLastPersistedSealed indicates if this pipeline descends from
-	// the last persisted result
+	// the last persisted sealed result
 	DescendsFromLastPersistedSealed bool
 	// ParentState contains the state information from the parent pipeline
 	ParentState State
@@ -73,12 +66,10 @@ type StateUpdate struct {
 type Config struct {
 	// Logger is the logger to use for the pipeline
 	Logger zerolog.Logger
-	// IsSealed indicates if the data is sealed
+	// IsSealed indicates if the pipeline's ExecutionResult is sealed
 	IsSealed bool
-	// ExecutionResultID is a unique identifier for the execution result being processed
-	ExecutionResultID string
-	// BlockID is the identifier of the block being processed
-	BlockID string
+	// ExecutionResultID is the execution result being processed
+	ExecutionResult *flow.ExecutionResult
 	// Core implements the processing logic for the pipeline
 	Core Core
 	// ChildrenStateUpdateChans are channels to send state updates to children
@@ -98,19 +89,18 @@ type Pipeline struct {
 	isSealed           bool
 	descendsFromSealed bool
 	parentState        State
-	executionResultID  string
-	blockID            string
+	executionResult    *flow.ExecutionResult
 
 	core          Core
 	stateNotifier engine.Notifier
 }
 
 // NewPipeline creates a new processing pipeline.
-// The pipeline is always initialized in the Ready state and will begin processing
-// when Run is called.
+// Pipelines must only be created for ExecutionResults that descend from the latest persisted sealed result.
+// The pipeline is initialized in the Ready state.
 func NewPipeline(config Config) *Pipeline {
 	p := &Pipeline{
-		logger:              config.Logger.With().Str("component", "pipeline").Str("executionResultID", config.ExecutionResultID).Logger(),
+		logger:              config.Logger.With().Str("component", "pipeline").Str("execution_result_id", config.ExecutionResult.ExecutionDataID.String()).Str("block_id", config.ExecutionResult.BlockID.String()).Logger(),
 		stateUpdateChan:     make(chan StateUpdate, 10),
 		childrenUpdateChans: config.ChildrenStateUpdateChans,
 		state:               StateReady,
@@ -118,8 +108,7 @@ func NewPipeline(config Config) *Pipeline {
 		descendsFromSealed:  true,
 		stateNotifier:       engine.NewNotifier(),
 		core:                config.Core,
-		executionResultID:   config.ExecutionResultID,
-		blockID:             config.BlockID,
+		executionResult:     config.ExecutionResult,
 	}
 
 	return p
@@ -136,10 +125,10 @@ func NewPipeline(config Config) *Pipeline {
 //
 // Returns an error if any processing step fails or if the context is canceled.
 func (p *Pipeline) Run(ctx context.Context) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctxWithCancel, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
 
-	go p.listenForStateUpdates(ctx, cancel)
+	go p.listenForStateUpdates(ctxWithCancel, cancel)
 
 	notifierChan := p.stateNotifier.Channel()
 
@@ -148,18 +137,15 @@ func (p *Pipeline) Run(ctx context.Context) error {
 
 	for {
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-ctxWithCancel.Done():
+			return context.Cause(ctxWithCancel)
 		case <-notifierChan:
-			processed, err := p.processCurrentState(ctx)
+			processed, err := p.processCurrentState(ctxWithCancel)
 			if err != nil {
 				return err
 			}
 			if !processed {
 				// Terminal state reached
-				if p.GetState() == StateCanceled {
-					return ErrPipelineCanceled
-				}
 				return nil
 			}
 		}
@@ -193,10 +179,10 @@ func (p *Pipeline) SetSealed() {
 // the pipeline should be abandoned (no longer descends from latest sealed)
 func (p *Pipeline) updateState(update StateUpdate) bool {
 	p.mu.Lock()
+	defer p.mu.Unlock()
 	previousDescendsFromLatest := p.descendsFromSealed
 	p.descendsFromSealed = update.DescendsFromLastPersistedSealed
 	p.parentState = update.ParentState
-	p.mu.Unlock()
 
 	return previousDescendsFromLatest && !update.DescendsFromLastPersistedSealed
 }
@@ -204,7 +190,7 @@ func (p *Pipeline) updateState(update StateUpdate) bool {
 // listenForStateUpdates listens for state updates from the parent pipeline
 // and updates internal state accordingly. If the pipeline no longer descends
 // from the latest persisted result, it transitions to the StateCanceled.
-func (p *Pipeline) listenForStateUpdates(ctx context.Context, cancelFunc context.CancelFunc) {
+func (p *Pipeline) listenForStateUpdates(ctx context.Context, cancelFunc context.CancelCauseFunc) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -212,7 +198,7 @@ func (p *Pipeline) listenForStateUpdates(ctx context.Context, cancelFunc context
 		case update := <-p.stateUpdateChan:
 			if shouldAbandon := p.updateState(update); shouldAbandon {
 				p.broadcastStateUpdate()
-				cancelFunc()
+				cancelFunc(fmt.Errorf("abandoning due to parent updates"))
 			} else {
 				// Trigger state check
 				p.stateNotifier.Notify()
@@ -263,7 +249,7 @@ func (p *Pipeline) processCurrentState(ctx context.Context) (bool, error) {
 		// Terminal states
 		return false, nil
 	default:
-		return false, fmt.Errorf("%w: %s", ErrInvalidState, currentState.String())
+		return false, fmt.Errorf("invalid pipeline state: %s", currentState.String())
 	}
 }
 
@@ -275,11 +261,9 @@ func (p *Pipeline) transitionTo(newState State) {
 	p.state = newState
 	p.mu.Unlock()
 
-	p.logger.Info().
-		Str("oldState", oldState.String()).
-		Str("newState", newState.String()).
-		Str("executionResultID", p.executionResultID).
-		Str("blockID", p.blockID).
+	p.logger.Debug().
+		Str("old_state", oldState.String()).
+		Str("new_state", newState.String()).
 		Msg("pipeline state transition")
 
 	// Broadcast state update to children
@@ -306,33 +290,24 @@ func (p *Pipeline) processReady() bool {
 // Returns true to continue processing, false if a terminal state was reached.
 // Returns an error if the download step fails.
 func (p *Pipeline) processDownloading(ctx context.Context) (bool, error) {
-	p.logger.Info().
-		Str("executionResultID", p.executionResultID).
-		Str("blockID", p.blockID).
-		Msg("starting download step")
+	p.logger.Debug().Msg("starting download step")
 
 	if err := p.core.Download(ctx); err != nil {
 		p.logger.Error().
 			Err(err).
-			Str("executionResultID", p.executionResultID).
-			Str("blockID", p.blockID).
 			Msg("download step failed")
 		return false, err
 	}
 
-	p.logger.Info().
-		Str("executionResultID", p.executionResultID).
-		Str("blockID", p.blockID).
-		Msg("download step completed")
+	p.logger.Debug().Msg("download step completed")
 
-	if p.canStartIndexing() {
-		p.transitionTo(StateIndexing)
-		return true, nil
+	if !p.canStartIndexing() {
+		// If we can't transition to indexing after successful download, cancel
+		p.transitionTo(StateCanceled)
+		return false, nil
 	}
-
-	// If we can't transition to indexing after successful download, cancel
-	p.transitionTo(StateCanceled)
-	return false, nil
+	p.transitionTo(StateIndexing)
+	return true, nil
 }
 
 // processIndexing handles the Indexing state.
@@ -340,33 +315,25 @@ func (p *Pipeline) processDownloading(ctx context.Context) (bool, error) {
 // Returns true to continue processing, false if a terminal state was reached.
 // Returns an error if the index step fails.
 func (p *Pipeline) processIndexing(ctx context.Context) (bool, error) {
-	p.logger.Info().
-		Str("executionResultID", p.executionResultID).
-		Str("blockID", p.blockID).
-		Msg("starting index step")
+	p.logger.Debug().Msg("starting index step")
 
 	if err := p.core.Index(ctx); err != nil {
 		p.logger.Error().
 			Err(err).
-			Str("executionResultID", p.executionResultID).
-			Str("blockID", p.blockID).
 			Msg("index step failed")
 		return false, err
 	}
 
-	p.logger.Info().
-		Str("executionResultID", p.executionResultID).
-		Str("blockID", p.blockID).
-		Msg("index step completed")
+	p.logger.Debug().Msg("index step completed")
 
-	if p.canWaitForPersist() {
-		p.transitionTo(StateWaitingPersist)
-		return true, nil
+	if !p.canWaitForPersist() {
+		// If we can't transition to waiting for persist after successful indexing, cancel
+		p.transitionTo(StateCanceled)
+		return false, nil
 	}
 
-	// If we can't transition to waiting for persist after successful indexing, cancel
-	p.transitionTo(StateCanceled)
-	return false, nil
+	p.transitionTo(StateWaitingPersist)
+	return true, nil
 }
 
 // processWaitingPersist handles the WaitingPersist state.
@@ -385,24 +352,16 @@ func (p *Pipeline) processWaitingPersist() bool {
 // Returns true to continue processing, false if a terminal state was reached.
 // Returns an error if the persist step fails.
 func (p *Pipeline) processPersisting(ctx context.Context) (bool, error) {
-	p.logger.Info().
-		Str("executionResultID", p.executionResultID).
-		Str("blockID", p.blockID).
-		Msg("starting persist step")
+	p.logger.Debug().Msg("starting persist step")
 
 	if err := p.core.Persist(ctx); err != nil {
 		p.logger.Error().
 			Err(err).
-			Str("executionResultID", p.executionResultID).
-			Str("blockID", p.blockID).
 			Msg("persist step failed")
 		return false, err
 	}
 
-	p.logger.Info().
-		Str("executionResultID", p.executionResultID).
-		Str("blockID", p.blockID).
-		Msg("persist step completed")
+	p.logger.Debug().Msg("persist step completed")
 	p.transitionTo(StateComplete)
 	return false, nil
 }

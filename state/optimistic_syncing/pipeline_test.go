@@ -29,8 +29,7 @@ func TestPipelineStateTransitions(t *testing.T) {
 	pipeline := NewPipeline(Config{
 		Logger:                   zerolog.Nop(),
 		IsSealed:                 false,
-		ExecutionResultID:        unittest.IdentifierFixture().String(),
-		BlockID:                  unittest.IdentifierFixture().String(),
+		ExecutionResult:          unittest.ExecutionResultFixture(),
 		Core:                     mockCore,
 		ChildrenStateUpdateChans: []chan<- StateUpdate{childrenUpdateChan},
 	})
@@ -104,8 +103,7 @@ func TestPipelineCancellation(t *testing.T) {
 	pipeline := NewPipeline(Config{
 		Logger:                   zerolog.Nop(),
 		IsSealed:                 false,
-		ExecutionResultID:        unittest.IdentifierFixture().String(),
-		BlockID:                  unittest.IdentifierFixture().String(),
+		ExecutionResult:          unittest.ExecutionResultFixture(),
 		Core:                     mockCore,
 		ChildrenStateUpdateChans: []chan<- StateUpdate{childrenUpdateChan},
 	})
@@ -146,7 +144,7 @@ func TestPipelineCancellation(t *testing.T) {
 	// Check for returned error
 	select {
 	case err := <-errChan:
-		assert.Equal(t, ErrPipelineCanceled, err, "Pipeline should return ErrPipelineCanceled")
+		assert.NoError(t, err, "Pipeline should not return error")
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("Timeout waiting for pipeline to return error")
 	}
@@ -168,8 +166,7 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 	pipeline := NewPipeline(Config{
 		Logger:                   zerolog.Nop(),
 		IsSealed:                 false,
-		ExecutionResultID:        unittest.IdentifierFixture().String(),
-		BlockID:                  unittest.IdentifierFixture().String(),
+		ExecutionResult:          unittest.ExecutionResultFixture(),
 		Core:                     mockCore,
 		ChildrenStateUpdateChans: []chan<- StateUpdate{childrenUpdateChan},
 	})
@@ -273,8 +270,7 @@ func TestPipelineErrorHandling(t *testing.T) {
 			pipeline := NewPipeline(Config{
 				Logger:                   zerolog.Nop(),
 				IsSealed:                 true, // Set to true to allow testing persist
-				ExecutionResultID:        unittest.IdentifierFixture().String(),
-				BlockID:                  unittest.IdentifierFixture().String(),
+				ExecutionResult:          unittest.ExecutionResultFixture(),
 				Core:                     mockCore,
 				ChildrenStateUpdateChans: []chan<- StateUpdate{childrenUpdateChan},
 			})
@@ -322,8 +318,7 @@ func TestBroadcastStateUpdate(t *testing.T) {
 	pipeline := NewPipeline(Config{
 		Logger:                   zerolog.Nop(),
 		IsSealed:                 false,
-		ExecutionResultID:        unittest.IdentifierFixture().String(),
-		BlockID:                  unittest.IdentifierFixture().String(),
+		ExecutionResult:          unittest.ExecutionResultFixture(),
 		Core:                     mockCore,
 		ChildrenStateUpdateChans: []chan<- StateUpdate{childrenUpdateChan},
 	})
@@ -401,8 +396,7 @@ func TestMultipleChildren(t *testing.T) {
 	pipeline := NewPipeline(Config{
 		Logger:                   zerolog.Nop(),
 		IsSealed:                 false,
-		ExecutionResultID:        unittest.IdentifierFixture().String(),
-		BlockID:                  unittest.IdentifierFixture().String(),
+		ExecutionResult:          unittest.ExecutionResultFixture(),
 		Core:                     mockCore,
 		ChildrenStateUpdateChans: []chan<- StateUpdate{childUpdateChan1, childUpdateChan2},
 	})
