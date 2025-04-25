@@ -2,7 +2,10 @@ package flow
 
 import (
 	"fmt"
+	"io"
 	"time"
+
+	"github.com/onflow/go-ethereum/rlp"
 )
 
 func Genesis(chainID ChainID) *Block {
@@ -10,21 +13,18 @@ func Genesis(chainID ChainID) *Block {
 	// create the raw content for the genesis block
 	payload := Payload{}
 
-	// create the header
-	header := Header{
-		HeaderBody: HeaderBody{
-			ChainID:   chainID,
-			ParentID:  ZeroID,
-			Height:    0,
-			Timestamp: GenesisTime,
-			View:      0,
-		},
-		PayloadHash: payload.Hash(),
+	// create the headerBody
+	headerBody := HeaderBody{
+		ChainID:   chainID,
+		ParentID:  ZeroID,
+		Height:    0,
+		Timestamp: GenesisTime,
+		View:      0,
 	}
 
 	// combine to block
 	genesis := Block{
-		Header:  &header,
+		Header:  &headerBody,
 		Payload: &payload,
 	}
 
@@ -34,29 +34,81 @@ func Genesis(chainID ChainID) *Block {
 // Block (currently) includes the header, the payload hashes as well as the
 // payload contents.
 type Block struct {
-	Header  *Header
+	Header  *HeaderBody
 	Payload *Payload
+}
+
+// NewBlock creates a new block.
+//
+// Parameters:
+// - headerBody: the header fields to use for the block
+// - payload: the payload to associate with the block
+func NewBlock(
+	headerBody HeaderBody,
+	payload Payload,
+) *Block {
+	return &Block{
+		Header:  &headerBody,
+		Payload: &payload,
+	}
 }
 
 // SetPayload sets the payload and updates the payload hash.
 func (b *Block) SetPayload(payload Payload) {
 	b.Payload = &payload
-	b.Header.PayloadHash = b.Payload.Hash()
+	//b.Header.PayloadHash = b.Payload.Hash()
 }
 
-// Valid will check whether the block is valid bottom-up.
-func (b Block) Valid() bool {
-	return b.Header.PayloadHash == b.Payload.Hash()
+func (b *Block) ID() Identifier {
+	return MakeID(b)
 }
 
-// ID returns the ID of the header.
-func (b Block) ID() Identifier {
-	return b.Header.ID()
+// EncodeRLP defines custom encoding for the Block to calculate its ID.
+// The hash of the block is not just the hash of all the fields, It's a two-step process.
+// If we just hash of all the fields, we lose the ability to have like a compressed data structure like the header.
+// We first hash the payload fields, and then with that hash of the payload fields, we hash the header body fields and include the hash of the payload.
+// This convention ensures that both the header and the block produce the same hash.
+// The Timestamp is converted from time.Time to Unix time (uint64), which is necessary
+// because time.Time is not RLP-encodable due to its private fields.
+func (b *Block) EncodeRLP(w io.Writer) error {
+	payloadHash := b.Payload.Hash()
+
+	// the order of the fields is kept according to the flow.Header Fingerprint()
+	encodingCanonicalForm := struct {
+		ChainID            ChainID
+		ParentID           Identifier
+		Height             uint64
+		PayloadHash        Identifier
+		Timestamp          uint64
+		View               uint64
+		ParentView         uint64
+		ParentVoterIndices []byte
+		ParentVoterSigData []byte
+		ProposerID         Identifier
+		LastViewTCID       Identifier
+	}{
+		ChainID:            b.Header.ChainID,
+		ParentID:           b.Header.ParentID,
+		Height:             b.Header.Height,
+		PayloadHash:        payloadHash,
+		Timestamp:          uint64(b.Header.Timestamp.UnixNano()),
+		View:               b.Header.View,
+		ParentView:         b.Header.ParentView,
+		ParentVoterIndices: b.Header.ParentVoterIndices,
+		ParentVoterSigData: b.Header.ParentVoterSigData,
+		ProposerID:         b.Header.ProposerID,
+		LastViewTCID:       b.Header.LastViewTC.ID(),
+	}
+
+	return rlp.Encode(w, encodingCanonicalForm)
 }
 
-// Checksum returns the checksum of the header.
-func (b Block) Checksum() Identifier {
-	return b.Header.Checksum()
+// ToHeader return flow.Header data for Block.
+func (b *Block) ToHeader() *Header {
+	return &Header{
+		HeaderBody:  *b.Header,
+		PayloadHash: b.Payload.Hash(),
+	}
 }
 
 // BlockStatus represents the status of a block.
@@ -83,7 +135,7 @@ type BlockProposal struct {
 }
 
 func (b *BlockProposal) HeaderProposal() *ProposalHeader {
-	return &ProposalHeader{Header: b.Block.Header, ProposerSigData: b.ProposerSigData}
+	return &ProposalHeader{Header: b.Block.ToHeader(), ProposerSigData: b.ProposerSigData}
 }
 
 // CertifiedBlock holds a certified block, which is a block and a Quorum Certificate [QC] pointing
