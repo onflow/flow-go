@@ -5,11 +5,12 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
+
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/atomic"
 )
 
 func InsertNewEntity(lock *sync.Mutex, rw storage.ReaderBatchWriter, e Entity) error {
