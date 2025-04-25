@@ -517,9 +517,9 @@ func (dr *CadenceValueDiffReporter) diffCadenceSomeValue(
 		return true
 	}
 
-	innerValue := v.InnerValue(vInterpreter, interpreter.EmptyLocationRange)
+	innerValue := v.InnerValue()
 
-	otherInnerValue := otherSome.InnerValue(otherInterpreter, interpreter.EmptyLocationRange)
+	otherInnerValue := otherSome.InnerValue()
 
 	return dr.diffValues(
 		vInterpreter,
@@ -775,8 +775,8 @@ func (dr *CadenceValueDiffReporter) diffCadenceCompositeValue(
 
 	// Compare fields in both composite values
 	for _, fieldName := range sharedFieldNames {
-		fieldValue := v.GetField(vInterpreter, interpreter.EmptyLocationRange, fieldName)
-		otherFieldValue := otherComposite.GetField(otherInterpreter, interpreter.EmptyLocationRange, fieldName)
+		fieldValue := v.GetField(vInterpreter, fieldName)
+		otherFieldValue := otherComposite.GetField(otherInterpreter, fieldName)
 
 		fieldTrace := trace.Append(fmt.Sprintf(".%s", fieldName))
 		fieldHasDifference := dr.diffValues(

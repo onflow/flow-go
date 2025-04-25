@@ -58,6 +58,7 @@ func NewInternalEVMContractValue(
 		nil,
 		nil,
 		nil,
+		nil,
 	)
 }
 
@@ -69,11 +70,18 @@ func newInternalEVMTypeGetLatestBlockFunction(
 		gauge,
 		stdlib.InternalEVMTypeGetLatestBlockFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			inter := invocation.Interpreter
+			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
 
 			latestBlock := handler.LastExecutedBlock()
-			return NewEVMBlockValue(handler, gauge, inter, locationRange, latestBlock)
+
+			return NewEVMBlockValue(
+				handler,
+				gauge,
+				context,
+				locationRange,
+				latestBlock,
+			)
 		},
 	)
 }
@@ -81,7 +89,7 @@ func newInternalEVMTypeGetLatestBlockFunction(
 func NewEVMBlockValue(
 	handler types.ContractHandler,
 	gauge common.MemoryGauge,
-	inter *interpreter.Interpreter,
+	context interpreter.MemberAccessibleContext,
 	locationRange interpreter.LocationRange,
 	block *types.Block,
 ) *interpreter.CompositeValue {
@@ -92,7 +100,7 @@ func NewEVMBlockValue(
 	}
 
 	return interpreter.NewCompositeValue(
-		inter,
+		context,
 		locationRange,
 		loc,
 		stdlib.EVMBlockTypeQualifiedIdentifier,
@@ -105,7 +113,7 @@ func NewEVMBlockValue(
 			{
 				Name: "hash",
 				Value: interpreter.NewStringValue(
-					inter,
+					context,
 					common.NewStringMemoryUsage(len(hash)),
 					func() string {
 						return hash.Hex()
@@ -115,7 +123,7 @@ func NewEVMBlockValue(
 			{
 				Name: "totalSupply",
 				Value: interpreter.NewIntValueFromBigInt(
-					inter,
+					context,
 					common.NewBigIntMemoryUsage(common.BigIntByteLength(block.TotalSupply)),
 					func() *big.Int {
 						return block.TotalSupply
@@ -132,13 +140,13 @@ func NewEVMBlockValue(
 }
 
 func NewEVMAddress(
-	inter *interpreter.Interpreter,
+	context interpreter.MemberAccessibleContext,
 	locationRange interpreter.LocationRange,
 	location common.AddressLocation,
 	address types.Address,
 ) *interpreter.CompositeValue {
 	return interpreter.NewCompositeValue(
-		inter,
+		context,
 		locationRange,
 		location,
 		stdlib.EVMAddressTypeQualifiedIdentifier,
@@ -146,7 +154,7 @@ func NewEVMAddress(
 		[]interpreter.CompositeField{
 			{
 				Name:  stdlib.EVMAddressTypeBytesFieldName,
-				Value: EVMAddressToAddressBytesArrayValue(inter, address),
+				Value: EVMAddressToAddressBytesArrayValue(context, address),
 			},
 		},
 		common.ZeroAddress,
@@ -154,13 +162,13 @@ func NewEVMAddress(
 }
 
 func NewEVMBytes(
-	inter *interpreter.Interpreter,
+	context memberAccessibleArrayCreationContext,
 	locationRange interpreter.LocationRange,
 	location common.AddressLocation,
 	bytes []byte,
 ) *interpreter.CompositeValue {
 	return interpreter.NewCompositeValue(
-		inter,
+		context,
 		locationRange,
 		location,
 		stdlib.EVMBytesTypeQualifiedIdentifier,
@@ -168,7 +176,7 @@ func NewEVMBytes(
 		[]interpreter.CompositeField{
 			{
 				Name:  stdlib.EVMBytesTypeValueFieldName,
-				Value: EVMBytesToBytesArrayValue(inter, bytes),
+				Value: EVMBytesToBytesArrayValue(context, bytes),
 			},
 		},
 		common.ZeroAddress,
@@ -176,13 +184,13 @@ func NewEVMBytes(
 }
 
 func NewEVMBytes4(
-	inter *interpreter.Interpreter,
+	context memberAccessibleArrayCreationContext,
 	locationRange interpreter.LocationRange,
 	location common.AddressLocation,
 	bytes [4]byte,
 ) *interpreter.CompositeValue {
 	return interpreter.NewCompositeValue(
-		inter,
+		context,
 		locationRange,
 		location,
 		stdlib.EVMBytes4TypeQualifiedIdentifier,
@@ -190,7 +198,7 @@ func NewEVMBytes4(
 		[]interpreter.CompositeField{
 			{
 				Name:  stdlib.EVMBytesTypeValueFieldName,
-				Value: EVMBytes4ToBytesArrayValue(inter, bytes),
+				Value: EVMBytes4ToBytesArrayValue(context, bytes),
 			},
 		},
 		common.ZeroAddress,
@@ -198,13 +206,13 @@ func NewEVMBytes4(
 }
 
 func NewEVMBytes32(
-	inter *interpreter.Interpreter,
+	context memberAccessibleArrayCreationContext,
 	locationRange interpreter.LocationRange,
 	location common.AddressLocation,
 	bytes [32]byte,
 ) *interpreter.CompositeValue {
 	return interpreter.NewCompositeValue(
-		inter,
+		context,
 		locationRange,
 		location,
 		stdlib.EVMBytes32TypeQualifiedIdentifier,
@@ -212,7 +220,7 @@ func NewEVMBytes32(
 		[]interpreter.CompositeField{
 			{
 				Name:  stdlib.EVMBytesTypeValueFieldName,
-				Value: EVMBytes32ToBytesArrayValue(inter, bytes),
+				Value: EVMBytes32ToBytesArrayValue(context, bytes),
 			},
 		},
 		common.ZeroAddress,
@@ -220,7 +228,7 @@ func NewEVMBytes32(
 }
 
 func AddressBytesArrayValueToEVMAddress(
-	inter *interpreter.Interpreter,
+	context interpreter.ContainerMutationContext,
 	locationRange interpreter.LocationRange,
 	addressBytesValue *interpreter.ArrayValue,
 ) (
@@ -231,7 +239,7 @@ func AddressBytesArrayValueToEVMAddress(
 
 	var bytes []byte
 	bytes, err = interpreter.ByteArrayValueToByteSlice(
-		inter,
+		context,
 		addressBytesValue,
 		locationRange,
 	)
@@ -257,12 +265,12 @@ func AddressBytesArrayValueToEVMAddress(
 }
 
 func EVMAddressToAddressBytesArrayValue(
-	inter *interpreter.Interpreter,
+	context interpreter.ArrayCreationContext,
 	address types.Address,
 ) *interpreter.ArrayValue {
 	var index int
 	return interpreter.NewArrayValueWithIterator(
-		inter,
+		context,
 		stdlib.EVMAddressBytesStaticType,
 		common.ZeroAddress,
 		types.AddressLength,
@@ -270,7 +278,7 @@ func EVMAddressToAddressBytesArrayValue(
 			if index >= types.AddressLength {
 				return nil
 			}
-			result := interpreter.NewUInt8Value(inter, func() uint8 {
+			result := interpreter.NewUInt8Value(context, func() uint8 {
 				return address[index]
 			})
 			index++
@@ -280,12 +288,12 @@ func EVMAddressToAddressBytesArrayValue(
 }
 
 func EVMBytesToBytesArrayValue(
-	inter *interpreter.Interpreter,
+	context interpreter.ArrayCreationContext,
 	bytes []byte,
 ) *interpreter.ArrayValue {
 	var index int
 	return interpreter.NewArrayValueWithIterator(
-		inter,
+		context,
 		stdlib.EVMBytesValueStaticType,
 		common.ZeroAddress,
 		uint64(len(bytes)),
@@ -293,7 +301,7 @@ func EVMBytesToBytesArrayValue(
 			if index >= len(bytes) {
 				return nil
 			}
-			result := interpreter.NewUInt8Value(inter, func() uint8 {
+			result := interpreter.NewUInt8Value(context, func() uint8 {
 				return bytes[index]
 			})
 			index++
@@ -303,12 +311,12 @@ func EVMBytesToBytesArrayValue(
 }
 
 func EVMBytes4ToBytesArrayValue(
-	inter *interpreter.Interpreter,
+	context interpreter.ArrayCreationContext,
 	bytes [4]byte,
 ) *interpreter.ArrayValue {
 	var index int
 	return interpreter.NewArrayValueWithIterator(
-		inter,
+		context,
 		stdlib.EVMBytes4ValueStaticType,
 		common.ZeroAddress,
 		stdlib.EVMBytes4Length,
@@ -316,7 +324,7 @@ func EVMBytes4ToBytesArrayValue(
 			if index >= stdlib.EVMBytes4Length {
 				return nil
 			}
-			result := interpreter.NewUInt8Value(inter, func() uint8 {
+			result := interpreter.NewUInt8Value(context, func() uint8 {
 				return bytes[index]
 			})
 			index++
@@ -326,12 +334,12 @@ func EVMBytes4ToBytesArrayValue(
 }
 
 func EVMBytes32ToBytesArrayValue(
-	inter *interpreter.Interpreter,
+	context interpreter.ArrayCreationContext,
 	bytes [32]byte,
 ) *interpreter.ArrayValue {
 	var index int
 	return interpreter.NewArrayValueWithIterator(
-		inter,
+		context,
 		stdlib.EVMBytes32ValueStaticType,
 		common.ZeroAddress,
 		stdlib.EVMBytes32Length,
@@ -339,7 +347,7 @@ func EVMBytes32ToBytesArrayValue(
 			if index >= stdlib.EVMBytes32Length {
 				return nil
 			}
-			result := interpreter.NewUInt8Value(inter, func() uint8 {
+			result := interpreter.NewUInt8Value(context, func() uint8 {
 				return bytes[index]
 			})
 			index++
@@ -356,13 +364,16 @@ func newInternalEVMTypeCreateCadenceOwnedAccountFunction(
 		gauge,
 		stdlib.InternalEVMTypeCreateCadenceOwnedAccountFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			inter := invocation.Interpreter
+			context := invocation.InvocationContext
+
 			uuid, ok := invocation.Arguments[0].(interpreter.UInt64Value)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
+
 			address := handler.DeployCOA(uint64(uuid))
-			return EVMAddressToAddressBytesArrayValue(inter, address)
+
+			return EVMAddressToAddressBytesArrayValue(context, address)
 		},
 	)
 }
@@ -376,7 +387,7 @@ func newInternalEVMTypeCodeFunction(
 		gauge,
 		stdlib.InternalEVMTypeCodeFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			inter := invocation.Interpreter
+			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
 
 			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
@@ -384,7 +395,7 @@ func newInternalEVMTypeCodeFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			address, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, addressValue)
+			address, err := AddressBytesArrayValueToEVMAddress(context, locationRange, addressValue)
 			if err != nil {
 				panic(err)
 			}
@@ -392,7 +403,7 @@ func newInternalEVMTypeCodeFunction(
 			const isAuthorized = false
 			account := handler.AccountByAddress(address, isAuthorized)
 
-			return interpreter.ByteSliceToByteArrayValue(inter, account.Code())
+			return interpreter.ByteSliceToByteArrayValue(context, account.Code())
 		},
 	)
 }
@@ -406,7 +417,7 @@ func newInternalEVMTypeNonceFunction(
 		gauge,
 		stdlib.InternalEVMTypeNonceFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			inter := invocation.Interpreter
+			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
 
 			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
@@ -414,7 +425,7 @@ func newInternalEVMTypeNonceFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			address, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, addressValue)
+			address, err := AddressBytesArrayValueToEVMAddress(context, locationRange, addressValue)
 			if err != nil {
 				panic(err)
 			}
@@ -435,13 +446,13 @@ func newInternalEVMTypeCallFunction(
 		gauge,
 		stdlib.InternalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
+			context := invocation.InvocationContext
+			locationRange := invocation.LocationRange
+
 			callArgs, err := parseCallArguments(invocation)
 			if err != nil {
 				panic(err)
 			}
-
-			inter := invocation.Interpreter
-			locationRange := invocation.LocationRange
 
 			// Call
 
@@ -449,7 +460,13 @@ func newInternalEVMTypeCallFunction(
 			account := handler.AccountByAddress(callArgs.from, isAuthorized)
 			result := account.Call(callArgs.to, callArgs.data, callArgs.gasLimit, callArgs.balance)
 
-			return NewResultValue(handler, gauge, inter, locationRange, result)
+			return NewResultValue(
+				handler,
+				gauge,
+				context,
+				locationRange,
+				result,
+			)
 		},
 	)
 }
@@ -462,6 +479,9 @@ func newInternalEVMTypeDryCallFunction(
 		gauge,
 		stdlib.InternalEVMTypeDryCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
+			context := invocation.InvocationContext
+			locationRange := invocation.LocationRange
+
 			callArgs, err := parseCallArguments(invocation)
 			if err != nil {
 				panic(err)
@@ -483,11 +503,9 @@ func newInternalEVMTypeDryCallFunction(
 			}
 
 			// call contract function
-			inter := invocation.Interpreter
-			locationRange := invocation.LocationRange
 
 			res := handler.DryRun(txPayload, callArgs.from)
-			return NewResultValue(handler, gauge, inter, locationRange, res)
+			return NewResultValue(handler, gauge, context, locationRange, res)
 		},
 	)
 }
@@ -502,7 +520,7 @@ func newInternalEVMTypeDepositFunction(
 		gauge,
 		stdlib.InternalEVMTypeDepositFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			inter := invocation.Interpreter
+			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
 
 			// Get from vault
@@ -513,15 +531,14 @@ func newInternalEVMTypeDepositFunction(
 			}
 
 			amountValue, ok := fromValue.GetField(
-				inter,
-				locationRange,
+				context,
 				fungibleTokenVaultTypeBalanceFieldName,
 			).(interpreter.UFix64Value)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			amount := types.NewBalanceFromUFix64(cadence.UFix64(amountValue))
+			amount := types.NewBalanceFromUFix64(cadence.UFix64(amountValue.UFix64Value))
 
 			// Get to address
 
@@ -530,7 +547,7 @@ func newInternalEVMTypeDepositFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			toAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, toAddressValue)
+			toAddress, err := AddressBytesArrayValueToEVMAddress(context, locationRange, toAddressValue)
 			if err != nil {
 				panic(err)
 			}
@@ -560,7 +577,7 @@ func newInternalEVMTypeBalanceFunction(
 		gauge,
 		stdlib.InternalEVMTypeBalanceFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			inter := invocation.Interpreter
+			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
 
 			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
@@ -568,7 +585,7 @@ func newInternalEVMTypeBalanceFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			address, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, addressValue)
+			address, err := AddressBytesArrayValueToEVMAddress(context, locationRange, addressValue)
 			if err != nil {
 				panic(err)
 			}
@@ -590,7 +607,7 @@ func newInternalEVMTypeCodeHashFunction(
 		gauge,
 		stdlib.InternalEVMTypeCodeHashFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			inter := invocation.Interpreter
+			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
 
 			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
@@ -598,7 +615,7 @@ func newInternalEVMTypeCodeHashFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			address, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, addressValue)
+			address, err := AddressBytesArrayValueToEVMAddress(context, locationRange, addressValue)
 			if err != nil {
 				panic(err)
 			}
@@ -606,7 +623,7 @@ func newInternalEVMTypeCodeHashFunction(
 			const isAuthorized = false
 			account := handler.AccountByAddress(address, isAuthorized)
 
-			return interpreter.ByteSliceToByteArrayValue(inter, account.CodeHash())
+			return interpreter.ByteSliceToByteArrayValue(context, account.CodeHash())
 		},
 	)
 }
@@ -619,7 +636,7 @@ func newInternalEVMTypeWithdrawFunction(
 		gauge,
 		stdlib.InternalEVMTypeWithdrawFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			inter := invocation.Interpreter
+			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
 
 			// Get from address
@@ -629,7 +646,7 @@ func newInternalEVMTypeWithdrawFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			fromAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, fromAddressValue)
+			fromAddress, err := AddressBytesArrayValueToEVMAddress(context, locationRange, fromAddressValue)
 			if err != nil {
 				panic(err)
 			}
@@ -659,7 +676,7 @@ func newInternalEVMTypeWithdrawFunction(
 
 			// TODO: improve: maybe call actual constructor
 			return interpreter.NewCompositeValue(
-				inter,
+				context,
 				locationRange,
 				common.NewAddressLocation(gauge, handler.FlowTokenAddress(), "FlowToken"),
 				"FlowToken.Vault",
@@ -692,7 +709,7 @@ func newInternalEVMTypeDeployFunction(
 		gauge,
 		stdlib.InternalEVMTypeDeployFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			inter := invocation.Interpreter
+			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
 
 			// Get from address
@@ -702,7 +719,7 @@ func newInternalEVMTypeDeployFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			fromAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, fromAddressValue)
+			fromAddress, err := AddressBytesArrayValueToEVMAddress(context, locationRange, fromAddressValue)
 			if err != nil {
 				panic(err)
 			}
@@ -714,7 +731,7 @@ func newInternalEVMTypeDeployFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			code, err := interpreter.ByteArrayValueToByteSlice(inter, codeValue, locationRange)
+			code, err := interpreter.ByteArrayValueToByteSlice(context, codeValue, locationRange)
 			if err != nil {
 				panic(err)
 			}
@@ -743,7 +760,7 @@ func newInternalEVMTypeDeployFunction(
 			account := handler.AccountByAddress(fromAddress, isAuthorized)
 			result := account.Deploy(code, gasLimit, amount)
 
-			res := NewResultValue(handler, gauge, inter, locationRange, result)
+			res := NewResultValue(handler, gauge, context, locationRange, result)
 			return res
 		},
 	)
@@ -760,7 +777,7 @@ func newInternalEVMTypeCastToAttoFLOWFunction(
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
-			balance := types.NewBalanceFromUFix64(cadence.UFix64(balanceValue))
+			balance := types.NewBalanceFromUFix64(cadence.UFix64(balanceValue.UFix64Value))
 			return interpreter.UIntValue{BigInt: balance}
 		},
 	)
@@ -783,7 +800,9 @@ func newInternalEVMTypeCastToFLOWFunction(
 			if err != nil {
 				panic(err)
 			}
-			return interpreter.UFix64Value(v)
+			return interpreter.NewUFix64Value(gauge, func() uint64 {
+				return uint64(v)
+			})
 		},
 	)
 }
@@ -810,7 +829,7 @@ func newInternalEVMTypeRunFunction(
 		gauge,
 		stdlib.InternalEVMTypeRunFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			inter := invocation.Interpreter
+			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
 
 			// Get transaction argument
@@ -820,7 +839,7 @@ func newInternalEVMTypeRunFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			transaction, err := interpreter.ByteArrayValueToByteSlice(inter, transactionValue, locationRange)
+			transaction, err := interpreter.ByteArrayValueToByteSlice(context, transactionValue, locationRange)
 			if err != nil {
 				panic(err)
 			}
@@ -832,7 +851,7 @@ func newInternalEVMTypeRunFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			gasFeeCollector, err := interpreter.ByteArrayValueToByteSlice(inter, gasFeeCollectorValue, locationRange)
+			gasFeeCollector, err := interpreter.ByteArrayValueToByteSlice(context, gasFeeCollectorValue, locationRange)
 			if err != nil {
 				panic(err)
 			}
@@ -840,7 +859,7 @@ func newInternalEVMTypeRunFunction(
 			// run transaction
 			result := handler.Run(transaction, types.NewAddressFromBytes(gasFeeCollector))
 
-			return NewResultValue(handler, gauge, inter, locationRange, result)
+			return NewResultValue(handler, gauge, context, locationRange, result)
 		},
 	)
 }
@@ -853,7 +872,7 @@ func newInternalEVMTypeDryRunFunction(
 		gauge,
 		stdlib.InternalEVMTypeDryRunFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			inter := invocation.Interpreter
+			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
 
 			// Get transaction argument
@@ -863,7 +882,7 @@ func newInternalEVMTypeDryRunFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			transaction, err := interpreter.ByteArrayValueToByteSlice(inter, transactionValue, locationRange)
+			transaction, err := interpreter.ByteArrayValueToByteSlice(context, transactionValue, locationRange)
 			if err != nil {
 				panic(err)
 			}
@@ -875,7 +894,7 @@ func newInternalEVMTypeDryRunFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			from, err := interpreter.ByteArrayValueToByteSlice(inter, fromValue, locationRange)
+			from, err := interpreter.ByteArrayValueToByteSlice(context, fromValue, locationRange)
 			if err != nil {
 				panic(err)
 			}
@@ -883,7 +902,7 @@ func newInternalEVMTypeDryRunFunction(
 			// call estimate
 
 			res := handler.DryRun(transaction, types.NewAddressFromBytes(from))
-			return NewResultValue(handler, gauge, inter, locationRange, res)
+			return NewResultValue(handler, gauge, context, locationRange, res)
 		},
 	)
 }
@@ -896,7 +915,7 @@ func newInternalEVMTypeBatchRunFunction(
 		gauge,
 		stdlib.InternalEVMTypeBatchRunFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			inter := invocation.Interpreter
+			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
 
 			// Get transactions batch argument
@@ -910,8 +929,8 @@ func newInternalEVMTypeBatchRunFunction(
 			if batchCount > 0 {
 				transactionBatch = make([][]byte, batchCount)
 				i := 0
-				transactionsBatchValue.Iterate(inter, func(transactionValue interpreter.Value) (resume bool) {
-					t, err := interpreter.ByteArrayValueToByteSlice(inter, transactionValue, locationRange)
+				transactionsBatchValue.Iterate(context, func(transactionValue interpreter.Value) (resume bool) {
+					t, err := interpreter.ByteArrayValueToByteSlice(context, transactionValue, locationRange)
 					if err != nil {
 						panic(err)
 					}
@@ -927,7 +946,7 @@ func newInternalEVMTypeBatchRunFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			gasFeeCollector, err := interpreter.ByteArrayValueToByteSlice(inter, gasFeeCollectorValue, locationRange)
+			gasFeeCollector, err := interpreter.ByteArrayValueToByteSlice(context, gasFeeCollectorValue, locationRange)
 			if err != nil {
 				panic(err)
 			}
@@ -935,11 +954,11 @@ func newInternalEVMTypeBatchRunFunction(
 			// Batch run
 			batchResults := handler.BatchRun(transactionBatch, types.NewAddressFromBytes(gasFeeCollector))
 
-			values := newResultValues(handler, gauge, inter, locationRange, batchResults)
+			values := newResultValues(handler, gauge, context, locationRange, batchResults)
 
 			loc := common.NewAddressLocation(gauge, handler.EVMContractAddress(), stdlib.ContractName)
 			evmResultType := interpreter.NewVariableSizedStaticType(
-				inter,
+				context,
 				interpreter.NewCompositeStaticType(
 					nil,
 					loc,
@@ -953,7 +972,7 @@ func newInternalEVMTypeBatchRunFunction(
 			)
 
 			return interpreter.NewArrayValue(
-				inter,
+				context,
 				locationRange,
 				evmResultType,
 				common.ZeroAddress,
@@ -967,14 +986,23 @@ func newInternalEVMTypeBatchRunFunction(
 func newResultValues(
 	handler types.ContractHandler,
 	gauge common.MemoryGauge,
-	inter *interpreter.Interpreter,
+	context interpreter.MemberAccessibleContext,
 	locationRange interpreter.LocationRange,
 	results []*types.ResultSummary,
 ) []interpreter.Value {
-	values := make([]interpreter.Value, 0)
-	for _, result := range results {
-		res := NewResultValue(handler, gauge, inter, locationRange, result)
-		values = append(values, res)
+	var values []interpreter.Value
+	if len(results) > 0 {
+		values = make([]interpreter.Value, 0, len(results))
+		for _, result := range results {
+			res := NewResultValue(
+				handler,
+				gauge,
+				context,
+				locationRange,
+				result,
+			)
+			values = append(values, res)
+		}
 	}
 	return values
 }
@@ -982,7 +1010,7 @@ func newResultValues(
 func NewResultValue(
 	handler types.ContractHandler,
 	gauge common.MemoryGauge,
-	inter *interpreter.Interpreter,
+	context interpreter.MemberAccessibleContext,
 	locationRange interpreter.LocationRange,
 	result *types.ResultSummary,
 ) *interpreter.CompositeValue {
@@ -997,9 +1025,9 @@ func NewResultValue(
 	deployedContractValue := interpreter.NilOptionalValue
 	if deployedContractAddress != nil {
 		deployedContractValue = interpreter.NewSomeValueNonCopying(
-			inter,
+			context,
 			NewEVMAddress(
-				inter,
+				context,
 				locationRange,
 				evmContractLocation,
 				*deployedContractAddress,
@@ -1011,7 +1039,7 @@ func NewResultValue(
 		{
 			Name: "status",
 			Value: interpreter.NewEnumCaseValue(
-				inter,
+				context,
 				locationRange,
 				&sema.CompositeType{
 					Location:   evmContractLocation,
@@ -1032,7 +1060,8 @@ func NewResultValue(
 		},
 		{
 			Name: "errorMessage",
-			Value: interpreter.NewStringValue(inter,
+			Value: interpreter.NewStringValue(
+				context,
 				common.NewStringMemoryUsage(len(result.ErrorMessage)),
 				func() string {
 					return result.ErrorMessage
@@ -1047,7 +1076,7 @@ func NewResultValue(
 		},
 		{
 			Name:  "data",
-			Value: interpreter.ByteSliceToByteArrayValue(inter, result.ReturnedData),
+			Value: interpreter.ByteSliceToByteArrayValue(context, result.ReturnedData),
 		},
 		{
 			Name:  "deployedContract",
@@ -1056,7 +1085,7 @@ func NewResultValue(
 	}
 
 	return interpreter.NewCompositeValue(
-		inter,
+		context,
 		locationRange,
 		evmContractLocation,
 		stdlib.EVMResultTypeQualifiedIdentifier,
@@ -1167,7 +1196,7 @@ func parseCallArguments(invocation interpreter.Invocation) (
 	*callArguments,
 	error,
 ) {
-	inter := invocation.Interpreter
+	context := invocation.InvocationContext
 	locationRange := invocation.LocationRange
 
 	// Get from address
@@ -1177,7 +1206,7 @@ func parseCallArguments(invocation interpreter.Invocation) (
 		return nil, errors.NewUnreachableError()
 	}
 
-	fromAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, fromAddressValue)
+	fromAddress, err := AddressBytesArrayValueToEVMAddress(context, locationRange, fromAddressValue)
 	if err != nil {
 		return nil, err
 	}
@@ -1189,7 +1218,7 @@ func parseCallArguments(invocation interpreter.Invocation) (
 		return nil, errors.NewUnreachableError()
 	}
 
-	toAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, toAddressValue)
+	toAddress, err := AddressBytesArrayValueToEVMAddress(context, locationRange, toAddressValue)
 	if err != nil {
 		return nil, err
 	}
@@ -1201,7 +1230,7 @@ func parseCallArguments(invocation interpreter.Invocation) (
 		return nil, errors.NewUnreachableError()
 	}
 
-	data, err := interpreter.ByteArrayValueToByteSlice(inter, dataValue, locationRange)
+	data, err := interpreter.ByteArrayValueToByteSlice(context, dataValue, locationRange)
 	if err != nil {
 		return nil, err
 	}
