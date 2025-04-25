@@ -7,14 +7,13 @@ import (
 
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	op "github.com/onflow/flow-go/storage/operation"
 )
 
 type ReaderBatchWriter struct {
 	globalReader storage.Reader
 	batch        *badger.WriteBatch
 
-	callbacks op.Callbacks
+	callbacks operation.Callbacks
 }
 
 var _ storage.ReaderBatchWriter = (*ReaderBatchWriter)(nil)
@@ -58,8 +57,27 @@ func (b *ReaderBatchWriter) Commit() error {
 	return err
 }
 
+// Close releases memory of the batch and no error is returned.
+// This can be called as a defer statement immediately after creating Batch
+// to reduce risk of unbounded memory consumption.
+func (b *ReaderBatchWriter) Close() error {
+	// BadgerDB v2 docs for WriteBatch.Cancel():
+	//
+	// "Cancel function must be called if there's a chance that Flush might not get
+	// called. If neither Flush or Cancel is called, the transaction oracle would
+	// never get a chance to clear out the row commit timestamp map, thus causing an
+	// unbounded memory consumption. Typically, you can call Cancel as a defer
+	// statement right after NewWriteBatch is called.
+	//
+	// Note that any committed writes would still go through despite calling Cancel."
+
+	b.batch.Cancel()
+	return nil
+}
+
 func WithReaderBatchWriter(db *badger.DB, fn func(storage.ReaderBatchWriter) error) error {
 	batch := NewReaderBatchWriter(db)
+	defer batch.Close() // Release memory
 
 	err := fn(batch)
 	if err != nil {

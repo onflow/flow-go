@@ -53,7 +53,8 @@ func TestMultiIterator(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		reader := operation.NewMultiReader(pebbleimpl.ToDB(pdb).Reader(), badgerimpl.ToDB(bdb).Reader())
+		reader, err := operation.NewMultiReader(pebbleimpl.ToDB(pdb).Reader(), badgerimpl.ToDB(bdb).Reader())
+		require.NoError(t, err)
 
 		t.Run("not found, less than lower bound", func(t *testing.T) {
 			startPrefix := []byte{0x00}

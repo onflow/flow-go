@@ -1,0 +1,71 @@
+name: Promote Image to Public Registry
+description: Pull image from private registry and push to public registry
+
+inputs:
+  gcp_credentials:
+    description: 'GCP Credentials JSON'
+    required: true
+  private_registry:
+    description: 'Private container registry URL'
+    required: true
+  private_registry_host:
+    description: 'Private Google Artifact Registry hostname'
+    required: true
+  public_registry:
+    description: 'Public container registry URL'
+    required: true
+  role:
+    description: 'Role to promote'
+    required: true
+  tags:
+    description: 'Comma-separated list of tags to use'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Authenticate with Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ inputs.gcp_credentials }} 
+
+    - name: Set up Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Authenticate with Private Docker Registry
+      run: |
+        gcloud auth configure-docker ${{ inputs.private_registry_host }} 
+      shell: bash
+
+    - name: Pull and Tag Images 
+      shell: bash
+      run: |
+        # Convert comma-separated tags input into an array
+        IFS=',' read -ra TAGS <<< "${{ inputs.tags }}"
+
+        # Loop through each tag and pull the image from the private registry, then tag it for the public registry
+        for TAG in "${TAGS[@]}"; do
+          IMAGE_PRIVATE="${{ inputs.private_registry }}/${{ inputs.role }}:${TAG}"
+          IMAGE_PUBLIC="${{ inputs.public_registry }}/${{ inputs.role }}:${TAG}"
+          echo "Processing ${IMAGE_PRIVATE} -> ${IMAGE_PUBLIC}"
+          docker pull "${IMAGE_PRIVATE}"
+          docker tag "${IMAGE_PRIVATE}" "${IMAGE_PUBLIC}"
+        done
+
+    - name: Authenticate with Public Registry 
+      run: |
+        gcloud auth configure-docker 
+      shell: bash
+
+    - name: Push Images to Public Registry
+      shell: bash
+      run: |
+        # Convert comma-separated tags input into an array
+        IFS=',' read -ra TAGS <<< "${{ inputs.tags }}"
+        # Loop through each tag and push the image to the public registry
+        for TAG in "${TAGS[@]}"; do
+          IMAGE_PUBLIC="${{ inputs.public_registry }}/${{ inputs.role }}:${TAG}"
+          echo "Pushing Image ${IMAGE_PUBLIC} to Public registry"
+          docker push "${IMAGE_PUBLIC}"
+        done
+

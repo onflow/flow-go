@@ -1,7 +1,6 @@
 package operation
 
 import (
-	"bytes"
 	"errors"
 	"io"
 
@@ -20,11 +19,14 @@ var _ storage.Reader = (*multiReader)(nil)
 // - a reader succeeds or
 // - a reader returns an error that is not ErrNotFound
 // If all readers return ErrNotFound, Reader.Get will return ErrNotFound.
-func NewMultiReader(readers ...storage.Reader) storage.Reader {
-	if len(readers) == 1 {
-		return readers[0]
+func NewMultiReader(readers ...storage.Reader) (storage.Reader, error) {
+	if len(readers) == 0 {
+		return nil, errors.New("failed to create multiReader: need at least one reader")
 	}
-	return &multiReader{readers: readers}
+	if len(readers) == 1 {
+		return readers[0], nil
+	}
+	return &multiReader{readers: readers}, nil
 }
 
 // Get gets the value for the given key from one of the readers.
@@ -61,10 +63,6 @@ func (b *multiReader) Get(key []byte) (value []byte, closer io.Closer, err error
 // NewIter returns error if the startPrefix key is greater than the endPrefix key.
 // No errors are expected during normal operation.
 func (b *multiReader) NewIter(startPrefix, endPrefix []byte, ops storage.IteratorOption) (storage.Iterator, error) {
-	if bytes.Compare(startPrefix, endPrefix) > 0 {
-		return nil, errors.New("startPrefix key must be less than or equal to endPrefix key")
-	}
-
 	// Create iterators from readers in reverse order
 	// because we want to iterate legacy databases first
 	// to preserve key orders.
@@ -78,4 +76,21 @@ func (b *multiReader) NewIter(startPrefix, endPrefix []byte, ops storage.Iterato
 	}
 
 	return NewMultiIterator(iterators...)
+}
+
+// NewSeeker returns a new Seeker.
+//
+// Returned new Seeker consists of multiple seekers in reverse order from underlying readers.
+// For example, the first seeker is created from the last underlying reader.
+func (b *multiReader) NewSeeker() (storage.Seeker, error) {
+	seekers := make([]storage.Seeker, len(b.readers))
+	for i, r := range b.readers {
+		seeker, err := r.NewSeeker()
+		if err != nil {
+			return nil, err
+		}
+		seekers[len(b.readers)-1-i] = seeker
+	}
+
+	return NewMultiSeeker(seekers...)
 }
