@@ -94,19 +94,16 @@ func (r *OneshotExecutionDataRequester) processFetchRequest(
 		Str("block_id", blockID.String()).
 		Uint64("height", height).
 		Logger()
-
 	logger.Debug().Msg("processing fetch request")
 
 	start := time.Now()
 	r.metrics.ExecutionDataFetchStarted()
-
 	logger.Debug().Msg("downloading execution data")
 
 	ctx, cancel := context.WithTimeout(parentCtx, fetchTimeout)
 	defer cancel()
 
 	execData, err := r.execDataCache.ByBlockID(ctx, blockID)
-
 	r.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, height)
 
 	if isInvalidBlobError(err) {

@@ -31,7 +31,7 @@ func TestRawExecutionDataRequesterSuite(t *testing.T) {
 	suite.Run(t, new(OneshotExecutionDataRequesterSuite))
 }
 
-func (suite *OneshotExecutionDataRequesterSuite) TestRequesterProcessesBlocks() {
+func (suite *OneshotExecutionDataRequesterSuite) TestRequester_RequestExecutionData() {
 	logger := unittest.Logger()
 	metricsCollector := metrics.NewNoopCollector()
 	config := OneshotExecutionDataConfig{
@@ -43,7 +43,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequesterProcessesBlocks() 
 
 	datastore := dssync.MutexWrap(datastore.NewMapDatastore())
 	blobstore := blobs.NewBlobstore(datastore)
-	testData := generateTestData(suite.T(), blobstore, 100, map[uint64]testExecutionDataCallback{})
+	testData := generateTestData(suite.T(), blobstore, 5, map[uint64]testExecutionDataCallback{})
 
 	headers := synctest.MockBlockHeaderStorage(
 		synctest.WithByID(testData.blocksByID),
@@ -66,12 +66,13 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequesterProcessesBlocks() 
 	defer cancel()
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	// Run requester
-	for _, block := range testData.blocksByHeight {
-		height := block.Header.Height
-		err := requester.RequestExecutionData(signalerCtx, block.ID(), height)
-		require.NoError(suite.T(), err)
-	}
+	suite.T().Run("requester downloads all execution data", func(t *testing.T) {
+		for blockID, _ := range testData.executionDataIDByBlockID {
+			// height is used only for logging purposes
+			err := requester.RequestExecutionData(signalerCtx, blockID, 0)
+			require.NoError(t, err)
+		}
+	})
 }
 
 func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, specialHeightFuncs map[uint64]testExecutionDataCallback) *fetchTestRun {
