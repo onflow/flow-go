@@ -189,18 +189,41 @@ func (c *Cache[V]) Remove(key flow.Identifier) (value V, ok bool) {
 
 // Adjust adjusts the value using the given function if the given identifier can be found.
 // Returns a bool which indicates whether the value was updated as well as the updated value.
-func (c *Cache[V]) Adjust(key flow.Identifier, f func(V) V) (value V, ok bool) {
+//func (c *Cache[V]) Adjust(key flow.Identifier, f func(V) V) (value V, ok bool) {
+//	defer c.logTelemetry()
+//
+//	value, removed := c.Remove(key)
+//	if !removed {
+//		return value, false
+//	}
+//
+//	newValue := f(value)
+//
+//	// TODO(malleability, #7171): Think of a better solution cause of removing and inserting value with same ID https://github.com/onflow/flow-go/issues/7171
+//	c.put(key, newValue)
+//
+//	return newValue, true
+//}
+
+func (c *Cache[V]) Adjust(key flow.Identifier, f func(V) V) (V, bool) {
 	defer c.logTelemetry()
 
-	value, removed := c.Remove(key)
-	if !removed {
+	// 1) locate the slot
+	value, b, s, ok := c.get(key)
+	if !ok {
 		return value, false
 	}
 
+	// 2) compute the new value
 	newValue := f(value)
 
-	// TODO(malleability, #7171): Think of a better solution cause of removing and inserting value with same ID https://github.com/onflow/flow-go/issues/7171
-	c.put(key, newValue)
+	// 3) bump its age (so evictions still see this as “recent”)
+	c.slotCount++
+	c.buckets[b].slots[s].slotAge = c.slotCount
+
+	// 4) update in the underlying pool, in-place
+	idx := c.buckets[b].slots[s].valueIndex
+	c.entities.UpdateAtIndex(idx, newValue)
 
 	return newValue, true
 }

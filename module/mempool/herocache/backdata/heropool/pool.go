@@ -281,6 +281,11 @@ func (p *Pool[K, V]) Remove(sliceIndex EIndex) V {
 	return p.invalidateValueAtIndex(sliceIndex)
 }
 
+// UpdateAtIndex replaces the value at the given pool index.
+func (p *Pool[K, V]) UpdateAtIndex(idx EIndex, newValue V) {
+	p.poolEntities[idx].value = newValue
+}
+
 // invalidateValueAtIndex invalidates the given getSliceIndex in the linked list by
 // removing its corresponding linked-list node from the used linked list, and appending
 // it to the tail of the free list. It also removes the value that the invalidated node is presenting.
