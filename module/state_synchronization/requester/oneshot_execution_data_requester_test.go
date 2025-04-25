@@ -67,7 +67,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequester_RequestExecutionD
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
 	suite.T().Run("requester downloads all execution data", func(t *testing.T) {
-		for blockID, _ := range testData.executionDataIDByBlockID {
+		for blockID := range testData.executionDataIDByBlockID {
 			// height is used only for logging purposes
 			err := requester.RequestExecutionData(signalerCtx, blockID, 0)
 			require.NoError(t, err)
