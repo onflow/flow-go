@@ -155,3 +155,38 @@ func TestByteConversionRoundTrip(t *testing.T) {
 	require.Equal(t, len(ids), len(converted))
 	require.ElementsMatch(t, ids, converted)
 }
+
+func TestHexStringToIdentifier(t *testing.T) {
+	type testcase struct {
+		hex         string
+		expectError string
+	}
+
+	cases := []testcase{{
+		// non-hex characters
+		hex:         "123456789012345678901234567890123456789012345678901234567890123z",
+		expectError: "encoding/hex: invalid byte: U+007A 'z'",
+	}, {
+		// too short
+		hex:         "1234",
+		expectError: "malformed input, expected 64 characters, got 4",
+	}, {
+		// too long
+		hex:         "123456789012345678901234567890123456789012345678901234567890123456",
+		expectError: "malformed input, expected 64 characters, got 66",
+	}, {
+		// just right
+		hex:         "1234567890123456789012345678901234567890123456789012345678901234",
+		expectError: "",
+	}}
+
+	for _, tcase := range cases {
+		id, err := flow.HexStringToIdentifier(tcase.hex)
+		if tcase.expectError != "" {
+			assert.Equal(t, tcase.expectError, err.Error())
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, tcase.hex, id.String())
+		}
+	}
+}
