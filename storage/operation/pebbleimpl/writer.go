@@ -15,8 +15,11 @@ type ReaderBatchWriter struct {
 	globalReader storage.Reader
 	batch        *pebble.Batch
 
+	// for executing callbacks after the batch has been flushed, such as updating caches
 	callbacks *operation.Callbacks
-	locks     *operation.Locks
+
+	// for repreventing re-entrant deadlock
+	locks *operation.Locks
 }
 
 var _ storage.ReaderBatchWriter = (*ReaderBatchWriter)(nil)
@@ -42,6 +45,9 @@ func (b *ReaderBatchWriter) PebbleWriterBatch() *pebble.Batch {
 	return b.batch
 }
 
+// Lock tries to acquire the lock for the batch.
+// if the lock is already acquired by this same batch from other pending db operations,
+// then it will not be blocked and can continue updating the batch, which prevents a re-entrant deadlock.
 func (b *ReaderBatchWriter) Lock(lock *sync.Mutex) {
 	b.locks.Lock(lock, b.callbacks)
 }
