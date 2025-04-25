@@ -4,8 +4,6 @@ import (
 	"context"
 )
 
-// TODO: This interface could be moved elsewhere, if needed
-
 // Core defines the interface for pipeline processing steps.
 // Each implementation should handle an execution data and implement the three-phase processing:
 // download, index, and persist.

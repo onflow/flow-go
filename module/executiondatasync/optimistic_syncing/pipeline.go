@@ -62,27 +62,29 @@ type StateUpdate struct {
 	ParentState State
 }
 
+// StateUpdatePublisher is a function that publishes state updates
+type StateUpdatePublisher func(update StateUpdate)
+
 // Config contains the configuration for the pipeline
 type Config struct {
 	// Logger is the logger to use for the pipeline
 	Logger zerolog.Logger
 	// IsSealed indicates if the pipeline's ExecutionResult is sealed
 	IsSealed bool
-	// ExecutionResultID is the execution result being processed
+	// ExecutionResult is the execution result being processed
 	ExecutionResult *flow.ExecutionResult
 	// Core implements the processing logic for the pipeline
 	Core Core
-	// ChildrenStateUpdateChans are channels to send state updates to children
-	ChildrenStateUpdateChans []chan<- StateUpdate
+	// StateUpdatePublisher is called when the pipeline needs to broadcast state updates
+	StateUpdatePublisher StateUpdatePublisher
 }
 
 // Pipeline represents a generic processing pipeline with state transitions.
 // It processes data through sequential states: Ready -> Downloading -> Indexing ->
 // WaitingPersist -> Persisting -> Complete, with conditions for each transition.
 type Pipeline struct {
-	logger              zerolog.Logger
-	stateUpdateChan     chan StateUpdate
-	childrenUpdateChans []chan<- StateUpdate
+	logger         zerolog.Logger
+	statePublisher StateUpdatePublisher
 
 	mu                 sync.RWMutex
 	state              State
@@ -93,6 +95,7 @@ type Pipeline struct {
 
 	core          Core
 	stateNotifier engine.Notifier
+	cancel        context.CancelCauseFunc
 }
 
 // NewPipeline creates a new processing pipeline.
@@ -100,15 +103,14 @@ type Pipeline struct {
 // The pipeline is initialized in the Ready state.
 func NewPipeline(config Config) *Pipeline {
 	p := &Pipeline{
-		logger:              config.Logger.With().Str("component", "pipeline").Str("execution_result_id", config.ExecutionResult.ExecutionDataID.String()).Str("block_id", config.ExecutionResult.BlockID.String()).Logger(),
-		stateUpdateChan:     make(chan StateUpdate, 10),
-		childrenUpdateChans: config.ChildrenStateUpdateChans,
-		state:               StateReady,
-		isSealed:            config.IsSealed,
-		descendsFromSealed:  true,
-		stateNotifier:       engine.NewNotifier(),
-		core:                config.Core,
-		executionResult:     config.ExecutionResult,
+		logger:             config.Logger.With().Str("component", "pipeline").Str("execution_result_id", config.ExecutionResult.ExecutionDataID.String()).Str("block_id", config.ExecutionResult.BlockID.String()).Logger(),
+		statePublisher:     config.StateUpdatePublisher,
+		state:              StateReady,
+		isSealed:           config.IsSealed,
+		descendsFromSealed: true,
+		stateNotifier:      engine.NewNotifier(),
+		core:               config.Core,
+		executionResult:    config.ExecutionResult,
 	}
 
 	return p
@@ -117,8 +119,7 @@ func NewPipeline(config Config) *Pipeline {
 // Run starts the pipeline processing and blocks until completion or context cancellation.
 //
 // This function handles the progression through the pipeline states, executing the appropriate
-// processing functions at each step. It also listens for state updates from the parent pipeline
-// and cancels processing if the pipeline no longer descends from the latest persisted result.
+// processing functions at each step.
 //
 // When the pipeline reaches a terminal state (StateComplete or StateCanceled), the function returns.
 // The function will also return if the provided context is canceled.
@@ -128,7 +129,9 @@ func (p *Pipeline) Run(ctx context.Context) error {
 	ctxWithCancel, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
 
-	go p.listenForStateUpdates(ctxWithCancel, cancel)
+	p.mu.Lock()
+	p.cancel = cancel
+	p.mu.Unlock()
 
 	notifierChan := p.stateNotifier.Channel()
 
@@ -152,12 +155,6 @@ func (p *Pipeline) Run(ctx context.Context) error {
 	}
 }
 
-// GetStateUpdateChan returns the channel for receiving state updates for this pipeline.
-// This channel can be used to send updates to this pipeline.
-func (p *Pipeline) GetStateUpdateChan() chan StateUpdate {
-	return p.stateUpdateChan
-}
-
 // GetState returns the current state of the pipeline.
 func (p *Pipeline) GetState() State {
 	p.mu.RLock()
@@ -175,9 +172,25 @@ func (p *Pipeline) SetSealed() {
 	p.stateNotifier.Notify()
 }
 
-// updateState updates the internal state from a parent update and returns whether
-// the pipeline should be abandoned (no longer descends from latest sealed)
-func (p *Pipeline) updateState(update StateUpdate) bool {
+// UpdateState updates the pipeline's state based on the provided state update.
+func (p *Pipeline) UpdateState(update StateUpdate) {
+	shouldAbandon := p.handleStateUpdate(update)
+
+	// If we no longer descend from latest, cancel the pipeline
+	if shouldAbandon {
+		p.broadcastStateUpdate()
+		if p.cancel != nil {
+			p.cancel(fmt.Errorf("abandoning due to parent updates"))
+		}
+	} else {
+		// Trigger state check
+		p.stateNotifier.Notify()
+	}
+}
+
+// handleStateUpdate updates the internal state and returns whether the pipeline
+// should be abandoned.
+func (p *Pipeline) handleStateUpdate(update StateUpdate) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	previousDescendsFromLatest := p.descendsFromSealed
@@ -187,31 +200,9 @@ func (p *Pipeline) updateState(update StateUpdate) bool {
 	return previousDescendsFromLatest && !update.DescendsFromLastPersistedSealed
 }
 
-// listenForStateUpdates listens for state updates from the parent pipeline
-// and updates internal state accordingly. If the pipeline no longer descends
-// from the latest persisted result, it transitions to the StateCanceled.
-func (p *Pipeline) listenForStateUpdates(ctx context.Context, cancelFunc context.CancelCauseFunc) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case update := <-p.stateUpdateChan:
-			if shouldAbandon := p.updateState(update); shouldAbandon {
-				p.broadcastStateUpdate()
-				cancelFunc(fmt.Errorf("abandoning due to parent updates"))
-			} else {
-				// Trigger state check
-				p.stateNotifier.Notify()
-			}
-		}
-	}
-}
-
-// broadcastStateUpdate sends a state update to all children pipelines.
-// The update includes the current pipeline state and whether it descends
-// from the latest persisted result.
+// broadcastStateUpdate sends a state update via the state publisher.
 func (p *Pipeline) broadcastStateUpdate() {
-	if len(p.childrenUpdateChans) == 0 {
+	if p.statePublisher == nil {
 		return
 	}
 
@@ -220,12 +211,9 @@ func (p *Pipeline) broadcastStateUpdate() {
 		DescendsFromLastPersistedSealed: p.descendsFromSealed,
 		ParentState:                     p.state,
 	}
-	channels := p.childrenUpdateChans
 	p.mu.RUnlock()
 
-	for _, ch := range channels {
-		ch <- update
-	}
+	p.statePublisher(update)
 }
 
 // processCurrentState handles the current state and transitions to the next state if possible.
