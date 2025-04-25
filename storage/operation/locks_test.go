@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 )
 
 func InsertNewEntity(lock *sync.Mutex, rw storage.ReaderBatchWriter, e Entity) error {
@@ -113,5 +114,47 @@ func TestLockConcurrentInsert(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, entities[i], result)
 		}
+	})
+}
+
+// concurrently inserting the same entity 10 times, should only succeed 1 time,
+// and fail 9 times
+func TestLockConcurrentInsertError(t *testing.T) {
+	t.Parallel()
+
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		var (
+			wg    sync.WaitGroup
+			lock  sync.Mutex
+			count = 10 // number of concurrent inserts
+		)
+
+		entity := Entity{ID: uint64(1)}
+		failedCount := atomic.NewInt32(0)
+
+		wg.Add(count)
+		for i := 0; i < count; i++ {
+			go func() {
+				defer wg.Done()
+				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return InsertNewEntity(&lock, rw, entity)
+				})
+
+				if err != nil {
+					failedCount.Add(1)
+				}
+			}()
+		}
+
+		wg.Wait()
+
+		// Verify the entity was inserted correctly
+		var result Entity
+		err := operation.Retrieve(entity.Key(), &result)(db.Reader())
+		require.NoError(t, err)
+		require.Equal(t, entity, result)
+
+		// and failed 9 times
+		require.Equal(t, int32(9), failedCount.Load(), "expected 9 failed inserts")
 	})
 }
