@@ -1000,9 +1000,7 @@ func min(a, b int) int {
 
 func newReadonlyStorage(regs registers.Registers) *runtime.Storage {
 	ledger := &registers.ReadOnlyLedger{Registers: regs}
-	config := runtime.StorageConfig{
-		StorageFormatV2Enabled: true,
-	}
+	config := runtime.StorageConfig{}
 	return runtime.NewStorage(ledger, nil, config)
 }
 

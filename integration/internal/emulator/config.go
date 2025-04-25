@@ -34,7 +34,6 @@ type config struct {
 	TransactionValidationEnabled  bool
 	ChainID                       flowgo.ChainID
 	AutoMine                      bool
-	AccountStorageFormatV2Enabled bool
 }
 
 const defaultGenesisTokenSupply = "1000000000.0"
@@ -271,13 +270,5 @@ func WithTransactionValidationEnabled(enabled bool) Option {
 func WithChainID(chainID flowgo.ChainID) Option {
 	return func(c *config) {
 		c.ChainID = chainID
-	}
-}
-
-// WithAccountStorageFormatV2Enabled enabled/disables the account storage format V2.
-// The default is false.
-func WithAccountStorageFormatV2Enabled(enabled bool) Option {
-	return func(c *config) {
-		c.AccountStorageFormatV2Enabled = enabled
 	}
 }

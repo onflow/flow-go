@@ -130,9 +130,7 @@ func (b *Blockchain) ReloadBlockchain() (*Blockchain, error) {
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				0,
-				runtime.Config{
-					StorageFormatV2Enabled: b.conf.AccountStorageFormatV2Enabled,
-				}),
+				runtime.Config{}),
 		),
 		fvm.WithEntropyProvider(b.entropyProvider),
 		fvm.WithEVMEnabled(true),

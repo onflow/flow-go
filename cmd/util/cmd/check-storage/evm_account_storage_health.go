@@ -70,7 +70,7 @@ func checkCadenceAtreeRegistersInEVMAccount(
 ) []accountStorageIssue {
 	var issues []accountStorageIssue
 
-	storage := runtime.NewStorage(ledger, nil, runtime.StorageConfig{StorageFormatV2Enabled: true})
+	storage := runtime.NewStorage(ledger, nil, runtime.StorageConfig{})
 
 	inter, err := interpreter.NewInterpreter(
 		nil,
