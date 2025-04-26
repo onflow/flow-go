@@ -23,8 +23,11 @@ func TestChunkDataPack(t *testing.T) {
 		}
 
 		t.Run("Retrieve non-existent", func(t *testing.T) {
+			reader, err := db.Reader()
+			require.NoError(t, err)
+
 			var actual storage.StoredChunkDataPack
-			err := operation.RetrieveChunkDataPack(db.Reader(), expected.ChunkID, &actual)
+			err = operation.RetrieveChunkDataPack(reader, expected.ChunkID, &actual)
 			assert.Error(t, err)
 		})
 
@@ -34,8 +37,11 @@ func TestChunkDataPack(t *testing.T) {
 			})
 			require.NoError(t, err)
 
+			reader, err := db.Reader()
+			require.NoError(t, err)
+
 			var actual storage.StoredChunkDataPack
-			err = operation.RetrieveChunkDataPack(db.Reader(), expected.ChunkID, &actual)
+			err = operation.RetrieveChunkDataPack(reader, expected.ChunkID, &actual)
 			assert.NoError(t, err)
 
 			assert.Equal(t, *expected, actual)
@@ -47,8 +53,11 @@ func TestChunkDataPack(t *testing.T) {
 			})
 			require.NoError(t, err)
 
+			reader, err := db.Reader()
+			require.NoError(t, err)
+
 			var actual storage.StoredChunkDataPack
-			err = operation.RetrieveChunkDataPack(db.Reader(), expected.ChunkID, &actual)
+			err = operation.RetrieveChunkDataPack(reader, expected.ChunkID, &actual)
 			assert.Error(t, err)
 		})
 	})
