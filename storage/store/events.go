@@ -76,7 +76,12 @@ func (e *Events) Store(blockID flow.Identifier, blockEvents []flow.EventsList) e
 // ByBlockID returns the events for the given block ID
 // Note: This method will return an empty slice and no error if no entries for the blockID are found
 func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
-	val, err := e.cache.Get(e.db.Reader(), blockID)
+	reader, err := e.db.Reader()
+	if err != nil {
+		return nil, err
+	}
+
+	val, err := e.cache.Get(reader, blockID)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +194,12 @@ func (e *ServiceEvents) BatchStore(blockID flow.Identifier, events []flow.Event,
 
 // ByBlockID returns the events for the given block ID
 func (e *ServiceEvents) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
-	val, err := e.cache.Get(e.db.Reader(), blockID)
+	reader, err := e.db.Reader()
+	if err != nil {
+		return nil, err
+	}
+
+	val, err := e.cache.Get(reader, blockID)
 	if err != nil {
 		return nil, err
 	}

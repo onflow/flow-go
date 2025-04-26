@@ -47,10 +47,13 @@ func TestMultiSeeker(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		r, err := operation.NewMultiReader(
-			pebbleimpl.ToDB(pdb).Reader(),
-			badgerimpl.ToDB(bdb).Reader(),
-		)
+		preader, err := pebbleimpl.ToDB(pdb).Reader()
+		require.NoError(t, err)
+
+		breader, err := badgerimpl.ToDB(bdb).Reader()
+		require.NoError(t, err)
+
+		r, err := operation.NewMultiReader(preader, breader)
 		require.NoError(t, err)
 
 		t.Run("key below start prefix", func(t *testing.T) {
