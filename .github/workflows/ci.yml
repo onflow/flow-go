@@ -26,6 +26,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build-linter:
+    name: Build Custom Linter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Cache custom linter binary
+        id: cache-linter
+        uses: actions/cache@v3
+        with:
+          # Key should change whenever implementation (tools/structwrite), or compilation config (.custom-gcl.yml) changes
+          # When the key is different, it is a cache miss, and the custom linter binary is recompiled
+          key: custom-linter-${{ env.GO_VERSION }}-${{ runner.os }}-${{ hashFiles('.custom-gcl.yml', 'tools/structwrite/**') }}
+          path: tools/custom-gcl # path defined in .custom-gcl.yml
+          lookup-only: 'true'    # if already cached, don't download here
+      # We install the non-custom golangci-lint binary using the golangci-lint action.
+      # The action is set up to always install and run the linter - there isn't a way to only install.
+      # We provide args to disable all linters which results in the step immediately failing.
+      - name: Install golangci-lint
+        if: steps.cache-linter.outputs.cache-hit != 'true'
+        uses: golangci/golangci-lint-action@v6
+        continue-on-error: true # after installation (what we care about), this step will fail - this line allows workflow to continue
+        with:
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: v1.63
+          args: "--no-config --disable-all" # set args so that no linters are actually run
+      - name: Build custom linter binary
+        if: steps.cache-linter.outputs.cache-hit != 'true'
+        run: |
+          golangci-lint custom
+
   golangci:
     strategy:
       fail-fast: false
@@ -33,6 +69,7 @@ jobs:
         dir: [./, ./integration/, ./insecure/]
     name: Lint
     runs-on: ubuntu-latest
+    needs: build-linter # must wait for custom linter binary to be available
     steps:
     - name: Checkout repo
       uses: actions/checkout@v4
@@ -42,15 +79,34 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
+    - name: Restore custom linter binary from cache
+      id: cache-linter
+      uses: actions/cache@v3
+      with:
+        # key should change whenever your linter code or Go version changes
+        key: custom-linter-${{ env.GO_VERSION }}-${{ runner.os }}-${{ hashFiles('.custom-gcl.yml', 'tools/structwrite/**') }}
+        path: tools/custom-gcl
+        # We are using the cache to share data between the build-linter job and the 3 lint jobs
+        # If there is a cache miss, it likely means either the build-linter job failed or the cache entry was evicted
+        # We expect this to happen very infrequently. If it does happen, the workflow needs to be manually retried.
+        fail-on-cache-miss: 'true'
     - name: Run go generate
       run: go generate ./...
       working-directory: ${{ matrix.dir }}
+    # The golangci-lint action has a configuration where it searches for a binary named
+    # "golangci-lint" in the path rather than downloading.
+    # Below we rename our binary to this expected canonical name, and add it to the path.
+    - name: Rename custom linter binary
+      run: mv ./tools/custom-gcl ./tools/golangci-lint
+    - name: Make custom linter binary executable
+      run: chmod +x ./tools/golangci-lint
+    - name: Add custom linter binary to path
+      run: echo "$(pwd)/tools" >> $GITHUB_PATH
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v6
       with:
-        # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-        version: v1.63
-        args: -v
+        install-mode: 'none' # looks for binary in path rather than downloading
+        args: "-v"
         working-directory: ${{ matrix.dir }}
 
   tidy:

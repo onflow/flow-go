@@ -79,7 +79,12 @@ func (b *Bootstrapper) BootstrapLedger(
 func (b *Bootstrapper) IsBootstrapped(db storage.DB) (flow.StateCommitment, bool, error) {
 	var commit flow.StateCommitment
 
-	err := operation.LookupStateCommitment(db.Reader(), flow.ZeroID, &commit)
+	reader, err := db.Reader()
+	if err != nil {
+		return flow.DummyStateCommitment, false, err
+	}
+
+	err = operation.LookupStateCommitment(reader, flow.ZeroID, &commit)
 	if errors.Is(err, storage.ErrNotFound) {
 		return flow.DummyStateCommitment, false, nil
 	}

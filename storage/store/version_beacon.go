@@ -25,9 +25,14 @@ func NewVersionBeacons(db storage.DB) *VersionBeacons {
 func (r *VersionBeacons) Highest(
 	belowOrEqualTo uint64,
 ) (*flow.SealedVersionBeacon, error) {
+	reader, err := r.db.Reader()
+	if err != nil {
+		return nil, err
+	}
+
 	var beacon flow.SealedVersionBeacon
 
-	err := operation.LookupLastVersionBeaconByHeight(r.db.Reader(), belowOrEqualTo, &beacon)
+	err = operation.LookupLastVersionBeaconByHeight(reader, belowOrEqualTo, &beacon)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, nil

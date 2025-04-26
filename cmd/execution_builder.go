@@ -310,8 +310,11 @@ func (exeNode *ExecutionNode) LoadExecutionMetrics(node *NodeConfig) error {
 	// this is guaranteed to exist because LoadBootstrapper has inserted
 	// the root block as executed block
 	var blockID flow.Identifier
-	reader := node.ProtocolDB.Reader()
-	err := operation.RetrieveExecutedBlock(reader, &blockID)
+	reader, err := node.ProtocolDB.Reader()
+	if err != nil {
+		return err
+	}
+	err = operation.RetrieveExecutedBlock(reader, &blockID)
 	if err != nil {
 		// database has not been bootstrapped yet
 		if errors.Is(err, storageerr.ErrNotFound) {

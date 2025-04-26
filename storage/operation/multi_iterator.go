@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/noop"
 )
 
 // multiIterator represents a logical concatenation of multiple iterators
@@ -26,7 +25,7 @@ var _ storage.Iterator = (*multiIterator)(nil)
 // the second iterator, etc.
 func NewMultiIterator(iterators ...storage.Iterator) (storage.Iterator, error) {
 	if len(iterators) == 0 {
-		return noop.Iterator{}, nil
+		return nil, errors.New("failed to create multiIterator: need at least one iterator")
 	}
 	if len(iterators) == 1 {
 		return iterators[0], nil

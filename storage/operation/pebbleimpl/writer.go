@@ -8,14 +8,13 @@ import (
 
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	op "github.com/onflow/flow-go/storage/operation"
 )
 
 type ReaderBatchWriter struct {
 	globalReader storage.Reader
 	batch        *pebble.Batch
 
-	callbacks op.Callbacks
+	callbacks operation.Callbacks
 }
 
 var _ storage.ReaderBatchWriter = (*ReaderBatchWriter)(nil)
@@ -61,9 +60,21 @@ func (b *ReaderBatchWriter) Commit() error {
 	return err
 }
 
+// Close releases memory of the batch and no error is returned.
+// This can be called as a defer statement immediately after creating Batch
+// to reduce risk of unbounded memory consumption.
+func (b *ReaderBatchWriter) Close() error {
+	// Pebble v2 docs for Batch.Close():
+	//
+	// "Close closes the batch without committing it."
+
+	b.batch.Close()
+	return nil
+}
+
 func WithReaderBatchWriter(db *pebble.DB, fn func(storage.ReaderBatchWriter) error) error {
 	batch := NewReaderBatchWriter(db)
-	defer batch.batch.Close() // Release batch resource
+	defer batch.Close() // Release batch resource
 
 	err := fn(batch)
 	if err != nil {
