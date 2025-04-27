@@ -77,8 +77,11 @@ func TestCache_CachedHit(t *testing.T) {
 			return cache.PutTx(rw, key, val)
 		}))
 
+		reader, err := db.Reader()
+		require.NoError(t, err)
+
 		// retrieving stored item should hit the cache, no db op is called
-		cached, err := cache.Get(db.Reader(), key)
+		cached, err := cache.Get(reader, key)
 		require.NoError(t, err)
 		require.Equal(t, val, cached)
 		require.Equal(t, uint64(0), retrieved.Load()) // no db op
@@ -86,19 +89,28 @@ func TestCache_CachedHit(t *testing.T) {
 		// removing the cached item
 		cache.Remove(key)
 
+		reader, err = db.Reader()
+		require.NoError(t, err)
+
 		// Get the same item, the cached item will miss, and retrieve from db, so db op is called
-		cached, err = cache.Get(db.Reader(), key)
+		cached, err = cache.Get(reader, key)
 		require.NoError(t, err)
 		require.Equal(t, val, cached)
 		require.Equal(t, uint64(1), retrieved.Load()) // hit db
 
+		reader, err = db.Reader()
+		require.NoError(t, err)
+
 		// Get the same item again, hit cache
-		_, err = cache.Get(db.Reader(), key)
+		_, err = cache.Get(reader, key)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), retrieved.Load()) // cache hit
 
+		reader, err = db.Reader()
+		require.NoError(t, err)
+
 		// Query other key will hit db
-		_, err = cache.Get(db.Reader(), unittest.IdentifierFixture())
+		_, err = cache.Get(reader, unittest.IdentifierFixture())
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
@@ -120,13 +132,19 @@ func TestCache_NotFoundReturned(t *testing.T) {
 		// Create a random identifier to use as a key
 		notExist := unittest.IdentifierFixture()
 
+		reader, err := db.Reader()
+		require.NoError(t, err)
+
 		// Try to get the non-existent item from the cache
 		// Assert that the error is storage.ErrNotFound
-		_, err := cache.Get(db.Reader(), notExist)
+		_, err = cache.Get(reader, notExist)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
+		reader, err = db.Reader()
+		require.NoError(t, err)
+
 		// Get the item again, this time the cache should not be used
-		_, err = cache.Get(db.Reader(), notExist)
+		_, err = cache.Get(reader, notExist)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.Equal(t, uint64(2), retrieved.Load()) // retrieved from DB 2 times.
 	})
@@ -167,8 +185,11 @@ func TestCache_ExceptionNotCached(t *testing.T) {
 
 		require.ErrorIs(t, err, storeException)
 
+		reader, err := db.Reader()
+		require.NoError(t, err)
+
 		// assert key value is not cached
-		_, err = cache.Get(db.Reader(), key)
+		_, err = cache.Get(reader, key)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }

@@ -81,8 +81,11 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 			for _, b := range blockIDs {
 				var actualEvents = make([]flow.Event, 0)
 
+				reader, err := db.Reader()
+				require.NoError(t, err)
+
 				// lookup events by block id
-				err := operation.LookupEventsByBlockID(db.Reader(), b, &actualEvents)
+				err = operation.LookupEventsByBlockID(reader, b, &actualEvents)
 
 				expectedEvents := blockMap[b.String()]
 				assertFunc(err, expectedEvents, actualEvents)
@@ -91,13 +94,16 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 
 		t.Run("retrieve events by block ID and transaction ID", func(t *testing.T) {
 			for _, b := range blockIDs {
-				for _, t := range txIDs {
+				for _, tid := range txIDs {
 					var actualEvents = make([]flow.Event, 0)
 
-					//lookup events by block id and transaction id
-					err := operation.RetrieveEvents(db.Reader(), b, t, &actualEvents)
+					reader, err := db.Reader()
+					require.NoError(t, err)
 
-					expectedEvents := txMap[b.String()+"_"+t.String()]
+					//lookup events by block id and transaction id
+					err = operation.RetrieveEvents(reader, b, tid, &actualEvents)
+
+					expectedEvents := txMap[b.String()+"_"+tid.String()]
 					assertFunc(err, expectedEvents, actualEvents)
 				}
 			}
@@ -108,8 +114,11 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 				for _, et := range eTypes {
 					var actualEvents = make([]flow.Event, 0)
 
+					reader, err := db.Reader()
+					require.NoError(t, err)
+
 					//lookup events by block id and transaction id
-					err := operation.LookupEventsByBlockIDEventType(db.Reader(), b, et, &actualEvents)
+					err = operation.LookupEventsByBlockIDEventType(reader, b, et, &actualEvents)
 
 					expectedEvents := typeMap[b.String()+"_"+string(et)]
 					assertFunc(err, expectedEvents, actualEvents)

@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"errors"
 	"sync"
 	"testing"
 
@@ -46,16 +47,36 @@ func TestCollections(t *testing.T) {
 			assert.Equal(t, expectedID, actualID)
 		}
 
+		// remove the collection
+		require.NoError(t, collections.Remove(expected.ID()))
+
+		// check that the collection was indeed removed
+		_, err = collections.LightByID(expected.ID())
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
+
+		// check that the collection was indeed removed from the transaction index
+		for _, tx := range expected.Transactions {
+			_, err = collections.LightByTransactionID(tx)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, storage.ErrNotFound)
+
+			_, err = transactions.ByID(tx)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, storage.ErrNotFound)
+		}
 	})
 }
 
+// verify if a tx belongs to multiple collections, the first collection to be
+// indexed by the tx will be the one that is indexed in storage
 func TestCollections_IndexDuplicateTx(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
 
-		// create two collections which share 1 transaction
+		// create two collections which share 1 transaction (dupTx)
 		col1 := unittest.CollectionFixture(2)
 		col2 := unittest.CollectionFixture(1)
 		dupTx := col1.Transactions[0]  // the duplicated transaction
@@ -81,7 +102,8 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 		_, err = collections.LightByTransactionID(col2Tx.ID())
 		require.NoError(t, err)
 
-		// col2 (not col1) should be indexed by the shared transaction (since col1 was overwritten by col2)
+		// col1 should be indexed by the shared transaction ,
+		// since col1 is the first collection to be indexed by the shared transaction (dupTx)
 		gotLightByDupTxID, err := collections.LightByTransactionID(dupTx.ID())
 		require.NoError(t, err)
 		assert.Equal(t, &col1Light, gotLightByDupTxID)
@@ -96,6 +118,7 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
 
+		// Create two collections sharing the same transaction
 		const numCollections = 100
 
 		// Create collections sharing the same transaction
@@ -141,9 +164,9 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		// Verify that at least one collection is indexed by the shared transaction
+		// Verify that one of the collections is indexed by the shared transaction
 		indexedCollection, err := collections.LightByTransactionID(sharedTx.ID())
 		require.NoError(t, err)
-		assert.NotNil(t, indexedCollection, "Expected at least one collection to be indexed")
+		assert.True(t, indexedCollection.ID() == col1.ID() || indexedCollection.ID() == col2.ID(), "Expected one of the collections to be indexed")
 	})
 }

@@ -130,7 +130,11 @@ func (ch *ChunkDataPacks) byChunkID(chunkID flow.Identifier) (*storage.StoredChu
 }
 
 func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) (*storage.StoredChunkDataPack, error) {
-	val, err := ch.byChunkIDCache.Get(ch.db.Reader(), chunkID)
+	reader, err := ch.db.Reader()
+	if err != nil {
+		return nil, err
+	}
+	val, err := ch.byChunkIDCache.Get(reader, chunkID)
 	if err != nil {
 		return nil, err
 	}

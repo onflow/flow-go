@@ -151,10 +151,10 @@ type ExecutionNode struct {
 	myReceipts      storageerr.MyExecutionReceipts
 	commits         storageerr.Commits
 	commitsReader   storageerr.CommitsReader
+	collections     storageerr.Collections
 
 	chunkDataPackDB        *pebble.DB
 	chunkDataPacks         storageerr.ChunkDataPacks
-	collections            storageerr.Collections
 	providerEngine         exeprovider.ProviderEngine
 	checkerEng             *checker.Engine
 	syncCore               *chainsync.Core
@@ -310,8 +310,11 @@ func (exeNode *ExecutionNode) LoadExecutionMetrics(node *NodeConfig) error {
 	// this is guaranteed to exist because LoadBootstrapper has inserted
 	// the root block as executed block
 	var blockID flow.Identifier
-	reader := node.ProtocolDB.Reader()
-	err := operation.RetrieveExecutedBlock(reader, &blockID)
+	reader, err := node.ProtocolDB.Reader()
+	if err != nil {
+		return err
+	}
+	err = operation.RetrieveExecutedBlock(reader, &blockID)
 	if err != nil {
 		// database has not been bootstrapped yet
 		if errors.Is(err, storageerr.ErrNotFound) {
@@ -348,13 +351,13 @@ func (exeNode *ExecutionNode) LoadExecutionStorage(
 	exeNode.myReceipts = store.NewMyExecutionReceipts(node.Metrics.Cache, db, exeNode.receipts)
 	exeNode.txResults = store.NewTransactionResults(node.Metrics.Cache, db, exeNode.exeConf.transactionResultsCacheSize)
 
-	if dbops.IsBadgerBased(node.dbops) {
+	if dbops.IsBadgerBased(node.DBOps) {
 		// if data are stored in badger, we can use the same storage for all data
 		exeNode.eventsReader = exeNode.events
 		exeNode.commitsReader = exeNode.commits
 		exeNode.resultsReader = exeNode.results
 		exeNode.txResultsReader = exeNode.txResults
-	} else if dbops.IsPebbleBatch(node.dbops) {
+	} else if dbops.IsPebbleBatch(node.DBOps) {
 		// when data are stored in pebble, we need to use chained storage to query data from
 		// both pebble and badger
 		// note the pebble storage is the first argument, and badger storage is the second, so

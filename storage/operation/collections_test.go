@@ -18,8 +18,11 @@ func TestCollections(t *testing.T) {
 		expected := unittest.CollectionFixture(2).Light()
 
 		t.Run("Retrieve nonexistant", func(t *testing.T) {
+			reader, err := db.Reader()
+			require.NoError(t, err)
+
 			var actual flow.LightCollection
-			err := operation.RetrieveCollection(db.Reader(), expected.ID(), &actual)
+			err = operation.RetrieveCollection(reader, expected.ID(), &actual)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, storage.ErrNotFound)
 		})
@@ -30,8 +33,11 @@ func TestCollections(t *testing.T) {
 			})
 			require.NoError(t, err)
 
+			reader, err := db.Reader()
+			require.NoError(t, err)
+
 			var actual flow.LightCollection
-			err = operation.RetrieveCollection(db.Reader(), expected.ID(), &actual)
+			err = operation.RetrieveCollection(reader, expected.ID(), &actual)
 			assert.NoError(t, err)
 
 			assert.Equal(t, expected, actual)
@@ -43,8 +49,11 @@ func TestCollections(t *testing.T) {
 			})
 			require.NoError(t, err)
 
+			reader, err := db.Reader()
+			require.NoError(t, err)
+
 			var actual flow.LightCollection
-			err = operation.RetrieveCollection(db.Reader(), expected.ID(), &actual)
+			err = operation.RetrieveCollection(reader, expected.ID(), &actual)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, storage.ErrNotFound)
 
@@ -67,10 +76,12 @@ func TestCollections(t *testing.T) {
 				return nil
 			})
 
-			var actual flow.LightCollection
-			err := operation.LookupCollectionPayload(db.Reader(), blockID, &actual.Transactions)
-			assert.NoError(t, err)
+			reader, err := db.Reader()
+			require.NoError(t, err)
 
+			var actual flow.LightCollection
+			err = operation.LookupCollectionPayload(reader, blockID, &actual.Transactions)
+			assert.NoError(t, err)
 			assert.Equal(t, expected, actual)
 		})
 
@@ -85,7 +96,10 @@ func TestCollections(t *testing.T) {
 				return nil
 			})
 
-			err := operation.RetrieveCollectionID(db.Reader(), transactionID, &actual)
+			reader, err := db.Reader()
+			require.NoError(t, err)
+
+			err = operation.LookupCollectionByTransaction(reader, transactionID, &actual)
 			assert.NoError(t, err)
 
 			assert.Equal(t, expected, actual)
