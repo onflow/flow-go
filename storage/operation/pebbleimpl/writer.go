@@ -19,7 +19,7 @@ type ReaderBatchWriter struct {
 	callbacks *operation.Callbacks
 
 	// for repreventing re-entrant deadlock
-	locks *operation.Locks
+	locks *operation.BatchLocks
 }
 
 var _ storage.ReaderBatchWriter = (*ReaderBatchWriter)(nil)

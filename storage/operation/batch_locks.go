@@ -2,19 +2,19 @@ package operation
 
 import "sync"
 
-// Locks is a struct that holds the locks acquired by a batch,
+// BatchLocks is a struct that holds the locks acquired by a batch,
 // which is used to prevent re-entrant deadlock.
-type Locks struct {
+type BatchLocks struct {
 	acquiredLocks map[*sync.Mutex]struct{}
 }
 
-func NewLocks() *Locks {
-	return &Locks{
+func NewLocks() *BatchLocks {
+	return &BatchLocks{
 		acquiredLocks: nil, // lazy initialization
 	}
 }
 
-func (l *Locks) Lock(lock *sync.Mutex, callback *Callbacks) {
+func (l *BatchLocks) Lock(lock *sync.Mutex, callback *Callbacks) {
 	// if the lock is already acquired by this same batch from previous db operations,
 	// then it will not be blocked and can continue updating the batch,
 	if l.acquiredLocks != nil {
