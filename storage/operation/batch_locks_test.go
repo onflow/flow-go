@@ -17,7 +17,7 @@ func InsertNewEntity(lock *sync.Mutex, rw storage.ReaderBatchWriter, e Entity) e
 	rw.Lock(lock)
 
 	var item Entity
-	err := operation.Retrieve(e.Key(), &item)(rw.GlobalReader())
+	err := operation.RetrieveByKey(rw.GlobalReader(), e.Key(), &item)
 	if err == nil {
 		return storage.ErrAlreadyExists
 	}
@@ -49,10 +49,10 @@ func TestLockReEntrance(t *testing.T) {
 		}))
 
 		var item Entity
-		require.NoError(t, operation.Retrieve(Entity{ID: 1}.Key(), &item)(db.Reader()))
+		require.NoError(t, operation.RetrieveByKey(db.Reader(), Entity{ID: 1}.Key(), &item))
 		require.Equal(t, Entity{ID: 1}, item)
 
-		require.NoError(t, operation.Retrieve(Entity{ID: 2}.Key(), &item)(db.Reader()))
+		require.NoError(t, operation.RetrieveByKey(db.Reader(), Entity{ID: 2}.Key(), &item))
 		require.Equal(t, Entity{ID: 2}, item)
 	})
 }
@@ -71,10 +71,10 @@ func TestLockSeqential(t *testing.T) {
 		}))
 
 		var item Entity
-		require.NoError(t, operation.Retrieve(Entity{ID: 1}.Key(), &item)(db.Reader()))
+		require.NoError(t, operation.RetrieveByKey(db.Reader(), Entity{ID: 1}.Key(), &item))
 		require.Equal(t, Entity{ID: 1}, item)
 
-		require.NoError(t, operation.Retrieve(Entity{ID: 2}.Key(), &item)(db.Reader()))
+		require.NoError(t, operation.RetrieveByKey(db.Reader(), Entity{ID: 2}.Key(), &item))
 		require.Equal(t, Entity{ID: 2}, item)
 	})
 }
@@ -111,7 +111,7 @@ func TestLockConcurrentInsert(t *testing.T) {
 		// Verify all entities were inserted correctly
 		for i := 0; i < count; i++ {
 			var result Entity
-			err := operation.Retrieve(entities[i].Key(), &result)(db.Reader())
+			err := operation.RetrieveByKey(db.Reader(), entities[i].Key(), &result)
 			require.NoError(t, err)
 			require.Equal(t, entities[i], result)
 		}
@@ -151,7 +151,7 @@ func TestLockConcurrentInsertError(t *testing.T) {
 
 		// Verify the entity was inserted correctly
 		var result Entity
-		err := operation.Retrieve(entity.Key(), &result)(db.Reader())
+		err := operation.RetrieveByKey(db.Reader(), entity.Key(), &result)
 		require.NoError(t, err)
 		require.Equal(t, entity, result)
 
