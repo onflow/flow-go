@@ -4,7 +4,13 @@ import "sync"
 
 // BatchLocks is a struct that holds the locks acquired by a batch,
 // which is used to prevent re-entrant deadlock.
+// BatchLocks is not safe for concurrent use by multiple goroutines.
+// Deprecated: BatchLocks exists to provide deadlock protection as a temporary measure during
+// the course of development of the Pebble database layer -- to be replaced prior to release with
+// a system without reliance on globally unique mutex references. 
 type BatchLocks struct {
+	// CAUTION: this map is keyed by the pointer address of the mutex. Users must ensure
+	// that only one reference exists to the relevant lock.
 	acquiredLocks map[*sync.Mutex]struct{}
 }
 
@@ -32,6 +38,8 @@ func NewBatchLocks() *BatchLocks {
 //     mutex is used to prevent dirty reads.
 //   - callback: A Callbacks collection to which the unlock operation is appended
 //     so that locks are safely released once the batch processing is complete.
+//
+// CAUTION: Since locks are identified by pointer address, callers must ensure that no other references exist for the input lock.
 func (l *BatchLocks) Lock(lock *sync.Mutex, callback *Callbacks) {
 	// if the lock is already acquired by this same batch from previous db operations,
 	// then it will not be blocked and can continue updating the batch,

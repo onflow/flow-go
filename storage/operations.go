@@ -147,6 +147,7 @@ type ReaderBatchWriter interface {
 	// then it will not be blocked and can continue updating the batch, which prevents a re-entrant deadlock.
 	// Note the ReaderBatchWriter is not concurrent-safe, so the caller must ensure that
 	// the batch is not used concurrently by multiple goroutines.
+	// CAUTION: The caller must ensure that no other references exist for the input lock.
 	Lock(*sync.Mutex)
 
 	// AddCallback adds a callback to execute after the batch has been flush
