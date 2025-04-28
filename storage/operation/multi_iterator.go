@@ -25,7 +25,7 @@ var _ storage.Iterator = (*multiIterator)(nil)
 // the second iterator, etc.
 func NewMultiIterator(iterators ...storage.Iterator) (storage.Iterator, error) {
 	if len(iterators) == 0 {
-		return nil, errors.New("failed to create multiIterator: need at least one iterator")
+		panic("failed to create multiIterator: need at least one iterator")
 	}
 	if len(iterators) == 1 {
 		return iterators[0], nil
