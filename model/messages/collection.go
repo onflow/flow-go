@@ -66,7 +66,7 @@ func (ub *UntrustedClusterBlock) ToInternal() *cluster.Block {
 // to the representation used in untrusted messages.
 func UntrustedClusterBlockFromInternal(clusterBlock *cluster.Block) UntrustedClusterBlock {
 	return UntrustedClusterBlock{
-		Header: *clusterBlock.Header,
+		Header: clusterBlock.Header,
 		Payload: UntrustedClusterBlockPayload{
 			ReferenceBlockID: clusterBlock.Payload.ReferenceBlockID,
 			Collection:       clusterBlock.Payload.Collection,

@@ -32,7 +32,7 @@ func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cl
 		Message: &cluster.BlockProposal{
 			Block: cluster.NewBlock(
 				item.header.Message.Header.HeaderBody,
-				*item.payload.(*cluster.Payload),
+				item.payload.(cluster.Payload),
 			),
 			ProposerSigData: item.header.Message.ProposerSigData,
 		},
@@ -54,7 +54,7 @@ func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slas
 			Message: &cluster.BlockProposal{
 				Block: cluster.NewBlock(
 					item.header.Message.Header.HeaderBody,
-					*item.payload.(*cluster.Payload),
+					item.payload.(cluster.Payload),
 				),
 				ProposerSigData: item.header.Message.ProposerSigData,
 			},

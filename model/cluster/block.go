@@ -22,8 +22,8 @@ func Genesis() *Block {
 // Block represents a block in collection node cluster consensus. It contains
 // a standard block header with a payload containing only a single collection.
 type Block struct {
-	Header  *flow.HeaderBody
-	Payload *Payload
+	Header  flow.HeaderBody
+	Payload Payload
 }
 
 // NewBlock creates a new block in collection node cluster consensus.
@@ -36,8 +36,8 @@ func NewBlock(
 	payload Payload,
 ) *Block {
 	return &Block{
-		Header:  &headerBody,
-		Payload: &payload,
+		Header:  headerBody,
+		Payload: payload,
 	}
 }
 
@@ -50,7 +50,7 @@ func (b *Block) ID() flow.Identifier {
 // where the payload is compressed to a hash reference.
 func (b *Block) ToHeader() *flow.Header {
 	return &flow.Header{
-		HeaderBody:  *b.Header,
+		HeaderBody:  b.Header,
 		PayloadHash: b.Payload.Hash(),
 	}
 }
