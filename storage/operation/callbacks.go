@@ -8,9 +8,7 @@ type Callbacks struct {
 }
 
 func NewCallbacks() *Callbacks {
-	return &Callbacks{
-		callbacks: make([]func(error), 0),
-	}
+	return &Callbacks{}
 }
 
 func (b *Callbacks) AddCallback(callback func(error)) {
