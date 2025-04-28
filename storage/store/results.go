@@ -47,7 +47,11 @@ func (r *ExecutionResults) store(rw storage.ReaderBatchWriter, result *flow.Exec
 }
 
 func (r *ExecutionResults) byID(resultID flow.Identifier) (*flow.ExecutionResult, error) {
-	val, err := r.cache.Get(r.db.Reader(), resultID)
+	reader, err := r.db.Reader()
+	if err != nil {
+		return nil, err
+	}
+	val, err := r.cache.Get(reader, resultID)
 	if err != nil {
 		return nil, err
 	}
@@ -55,8 +59,12 @@ func (r *ExecutionResults) byID(resultID flow.Identifier) (*flow.ExecutionResult
 }
 
 func (r *ExecutionResults) byBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error) {
+	reader, err := r.db.Reader()
+	if err != nil {
+		return nil, err
+	}
 	var resultID flow.Identifier
-	err := operation.LookupExecutionResult(r.db.Reader(), blockID, &resultID)
+	err = operation.LookupExecutionResult(reader, blockID, &resultID)
 	if err != nil {
 		return nil, fmt.Errorf("could not lookup execution result ID: %w", err)
 	}
@@ -65,8 +73,13 @@ func (r *ExecutionResults) byBlockID(blockID flow.Identifier) (*flow.ExecutionRe
 
 func (r *ExecutionResults) index(w storage.Writer, blockID, resultID flow.Identifier, force bool) error {
 	if !force {
+		reader, err := r.db.Reader()
+		if err != nil {
+			return err
+		}
+
 		// when not forcing the index, check if the result is already indexed
-		exist, err := operation.ExistExecutionResult(r.db.Reader(), blockID)
+		exist, err := operation.ExistExecutionResult(reader, blockID)
 		if err != nil {
 			return fmt.Errorf("could not check if execution result exists: %w", err)
 		}
@@ -74,7 +87,7 @@ func (r *ExecutionResults) index(w storage.Writer, blockID, resultID flow.Identi
 		// if the result is already indexed, check if the stored result is the same
 		if exist {
 			var storedResultID flow.Identifier
-			err = operation.LookupExecutionResult(r.db.Reader(), blockID, &storedResultID)
+			err = operation.LookupExecutionResult(reader, blockID, &storedResultID)
 			if err != nil {
 				return fmt.Errorf("could not lookup execution result ID: %w", err)
 			}
