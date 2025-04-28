@@ -90,7 +90,8 @@ func (b *Block) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, encodingCanonicalForm)
 }
 
-// ToHeader return flow.Header data for cluster.Block
+// ToHeader converts the block into a compact [flow.Header] representation,
+// where the payload is compressed to a hash reference.
 func (b *Block) ToHeader() *flow.Header {
 	return &flow.Header{
 		HeaderBody:  *b.Header,
