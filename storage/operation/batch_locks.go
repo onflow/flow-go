@@ -7,7 +7,7 @@ import "sync"
 // BatchLocks is not safe for concurrent use by multiple goroutines.
 // Deprecated: BatchLocks exists to provide deadlock protection as a temporary measure during
 // the course of development of the Pebble database layer -- to be replaced prior to release with
-// a system without reliance on globally unique mutex references. 
+// a system without reliance on globally unique mutex references.
 type BatchLocks struct {
 	// CAUTION: this map is keyed by the pointer address of the mutex. Users must ensure
 	// that only one reference exists to the relevant lock.
