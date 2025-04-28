@@ -46,7 +46,6 @@ const (
 	ContractNameBurner                     = "Burner"
 	ContractNameCrypto                     = "Crypto"
 	ContractNameMigration                  = "Migration"
-	ContractNameAccountV2Migration         = "AccountV2Migration"
 
 	// AccountNameEVMStorage is not a contract, but a special account that is used to store EVM state
 	AccountNameEVMStorage = "EVMStorageAccount"
@@ -189,8 +188,7 @@ type SystemContracts struct {
 	Crypto SystemContract
 
 	// Migration contracts
-	Migration          SystemContract
-	AccountV2Migration SystemContract
+	Migration SystemContract
 }
 
 // AsTemplateEnv returns a template environment with all system contracts filled in.
@@ -255,7 +253,6 @@ func (c SystemContracts) All() []SystemContract {
 		c.Crypto,
 
 		c.Migration,
-		c.AccountV2Migration,
 	}
 }
 
@@ -408,8 +405,7 @@ func init() {
 		ContractNameBurner: burnerAddressFunc,
 		ContractNameCrypto: serviceAddressFunc,
 
-		ContractNameMigration:          serviceAddressFunc,
-		ContractNameAccountV2Migration: serviceAddressFunc,
+		ContractNameMigration: serviceAddressFunc,
 	}
 
 	getSystemContractsForChain := func(chainID flow.ChainID) *SystemContracts {
@@ -469,8 +465,7 @@ func init() {
 			Burner: addressOfContract(ContractNameBurner),
 			Crypto: addressOfContract(ContractNameCrypto),
 
-			Migration:          addressOfContract(ContractNameMigration),
-			AccountV2Migration: addressOfContract(ContractNameAccountV2Migration),
+			Migration: addressOfContract(ContractNameMigration),
 		}
 
 		return contracts
