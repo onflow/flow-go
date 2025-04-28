@@ -51,13 +51,8 @@ func ExportDeltaSnapshots(blockID flow.Identifier, dbPath string, outputPath str
 			return nil
 		}
 
-		reader, err := sdb.Reader()
-		if err != nil {
-			return err
-		}
-
 		var snap []*snapshot.ExecutionSnapshot
-		err = operation.RetrieveExecutionStateInteractions(reader, activeBlockID, &snap)
+		err = operation.RetrieveExecutionStateInteractions(sdb.Reader(), activeBlockID, &snap)
 		if err != nil {
 			return fmt.Errorf("could not load delta snapshot: %w", err)
 		}

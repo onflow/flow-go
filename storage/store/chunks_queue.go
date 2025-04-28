@@ -126,13 +126,8 @@ func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
 		return false, err
 	}
 
-	reader, err := q.db.Reader()
-	if err != nil {
-		return false, err
-	}
-
 	// make sure the chunk locator is unique
-	exists, err := operation.ExistChunkLocator(reader, locator.ID())
+	exists, err := operation.ExistChunkLocator(q.db.Reader(), locator.ID())
 	if err != nil {
 		return false, fmt.Errorf("failed to check chunk locator existence: %w", err)
 	}
@@ -169,13 +164,8 @@ func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
 
 // LatestIndex returns the index of the latest chunk locator stored in the queue.
 func (q *ChunksQueue) LatestIndex() (uint64, error) {
-	reader, err := q.db.Reader()
-	if err != nil {
-		return 0, err
-	}
-
 	var latest uint64
-	err = operation.RetrieveJobLatestIndex(reader, JobQueueChunksQueue, &latest)
+	err := operation.RetrieveJobLatestIndex(q.db.Reader(), JobQueueChunksQueue, &latest)
 	if err != nil {
 		return 0, fmt.Errorf("could not retrieve latest index for chunks queue: %w", err)
 	}
@@ -184,9 +174,5 @@ func (q *ChunksQueue) LatestIndex() (uint64, error) {
 
 // AtIndex returns the chunk locator stored at the given index in the queue.
 func (q *ChunksQueue) AtIndex(index uint64) (*chunks.Locator, error) {
-	reader, err := q.db.Reader()
-	if err != nil {
-		return nil, err
-	}
-	return q.chunkLocatorCache.Get(reader, index)
+	return q.chunkLocatorCache.Get(q.db.Reader(), index)
 }

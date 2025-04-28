@@ -484,13 +484,8 @@ func (s *state) GetLastExecutedBlockID(ctx context.Context) (uint64, flow.Identi
 		return height, finalizedID, nil
 	}
 
-	reader, err := s.db.Reader()
-	if err != nil {
-		return 0, flow.ZeroID, err
-	}
-
 	var blockID flow.Identifier
-	err = operation.RetrieveExecutedBlock(reader, &blockID)
+	err := operation.RetrieveExecutedBlock(s.db.Reader(), &blockID)
 	if err != nil {
 		return 0, flow.ZeroID, err
 	}

@@ -18,16 +18,11 @@ func NewMultiDBStore(rwStore storage.DB, rStore storage.DB) storage.DB {
 	}
 }
 
-func (b *multiDBStore) Reader() (storage.Reader, error) {
-	r1, err := b.rwStore.Reader()
-	if err != nil {
-		return nil, err
-	}
-	r2, err := b.r.Reader()
-	if err != nil {
-		return nil, err
-	}
-	return NewMultiReader(r1, r2)
+func (b *multiDBStore) Reader() storage.Reader {
+	return NewMultiReader(
+		b.rwStore.Reader(),
+		b.r.Reader(),
+	)
 }
 
 func (b *multiDBStore) WithReaderBatchWriter(fn func(storage.ReaderBatchWriter) error) error {

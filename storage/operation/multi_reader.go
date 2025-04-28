@@ -19,14 +19,14 @@ var _ storage.Reader = (*multiReader)(nil)
 // - a reader succeeds or
 // - a reader returns an error that is not ErrNotFound
 // If all readers return ErrNotFound, Reader.Get will return ErrNotFound.
-func NewMultiReader(readers ...storage.Reader) (storage.Reader, error) {
+func NewMultiReader(readers ...storage.Reader) storage.Reader {
 	if len(readers) == 0 {
-		return nil, errors.New("failed to create multiReader: need at least one reader")
+		panic("failed to create multiReader: need at least one reader")
 	}
 	if len(readers) == 1 {
-		return readers[0], nil
+		return readers[0]
 	}
-	return &multiReader{readers: readers}, nil
+	return &multiReader{readers: readers}
 }
 
 // Get gets the value for the given key from one of the readers.
