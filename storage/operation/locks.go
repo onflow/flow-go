@@ -10,22 +10,28 @@ type Locks struct {
 
 func NewLocks() *Locks {
 	return &Locks{
-		acquiredLocks: make(map[*sync.Mutex]struct{}),
+		acquiredLocks: nil, // lazy initialization
 	}
 }
 
 func (l *Locks) Lock(lock *sync.Mutex, callback *Callbacks) {
 	// if the lock is already acquired by this same batch from previous db operations,
 	// then it will not be blocked and can continue updating the batch,
-	if _, ok := l.acquiredLocks[lock]; ok {
-		// the batch is already holding the lock
-		// so we can just return and the caller is unblock to continue
-		return
+	if l.acquiredLocks != nil {
+		if _, ok := l.acquiredLocks[lock]; ok {
+			// the batch is already holding the lock
+			// so we can just return and the caller is unblock to continue
+			return
+		}
 	}
 
 	// batch never hold this lock before, then trying to acquire it
 	// this will block until the lock is acquired
 	lock.Lock()
+
+	if l.acquiredLocks == nil {
+		l.acquiredLocks = make(map[*sync.Mutex]struct{})
+	}
 
 	// once we acquire the lock, we need to add it to the acquired locks so that
 	// other operations from this batch can be unblocked

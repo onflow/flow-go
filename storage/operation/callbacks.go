@@ -8,7 +8,9 @@ type Callbacks struct {
 }
 
 func NewCallbacks() *Callbacks {
-	return &Callbacks{}
+	return &Callbacks{
+		callbacks: nil, // lazy initialization
+	}
 }
 
 func (b *Callbacks) AddCallback(callback func(error)) {
