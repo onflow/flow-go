@@ -107,7 +107,7 @@ func NewReaderBatchWriter(db *pebble.DB) *ReaderBatchWriter {
 		globalReader: ToReader(db),
 		batch:        db.NewBatch(),
 		callbacks:    operation.NewCallbacks(),
-		locks:        operation.NewLocks(),
+		locks:        operation.NewBatchLocks(),
 	}
 }
 

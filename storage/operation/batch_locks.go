@@ -8,7 +8,7 @@ type BatchLocks struct {
 	acquiredLocks map[*sync.Mutex]struct{}
 }
 
-func NewLocks() *BatchLocks {
+func NewBatchLocks() *BatchLocks {
 	return &BatchLocks{
 		acquiredLocks: nil, // lazy initialization
 	}

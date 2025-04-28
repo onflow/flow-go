@@ -110,7 +110,7 @@ func NewReaderBatchWriter(db *badger.DB) *ReaderBatchWriter {
 		globalReader: ToReader(db),
 		batch:        db.NewWriteBatch(),
 		callbacks:    operation.NewCallbacks(),
-		locks:        operation.NewLocks(),
+		locks:        operation.NewBatchLocks(),
 	}
 }
 
