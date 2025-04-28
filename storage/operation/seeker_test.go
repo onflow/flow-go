@@ -31,19 +31,17 @@ func TestSeekLE(t *testing.T) {
 		}))
 
 		t.Run("key below start prefix", func(t *testing.T) {
-			seeker, err := r.NewSeeker()
-			require.NoError(t, err)
+			seeker := r.NewSeeker()
 
 			key := operation.MakePrefix(codePrefix, uint64(4))
 			startPrefix := operation.MakePrefix(codePrefix, uint64(5))
 
-			_, err = seeker.SeekLE(startPrefix, key)
+			_, err := seeker.SeekLE(startPrefix, key)
 			require.Error(t, err)
 		})
 
 		t.Run("seek key inside range", func(t *testing.T) {
-			seeker, err := r.NewSeeker()
-			require.NoError(t, err)
+			seeker := r.NewSeeker()
 
 			startPrefix := operation.MakePrefix(codePrefix)
 
@@ -84,8 +82,7 @@ func TestSeekLE(t *testing.T) {
 		})
 
 		t.Run("has key below startPrefix", func(t *testing.T) {
-			seeker, err := r.NewSeeker()
-			require.NoError(t, err)
+			seeker := r.NewSeeker()
 
 			startPrefix := operation.MakePrefix(codePrefix, uint64(6))
 

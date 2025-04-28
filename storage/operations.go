@@ -98,7 +98,7 @@ type Reader interface {
 	NewIter(startPrefix, endPrefix []byte, ops IteratorOption) (Iterator, error)
 
 	// NewSeeker returns a new Seeker.
-	NewSeeker() (Seeker, error)
+	NewSeeker() Seeker
 }
 
 // Writer is an interface for batch writing to a storage backend.

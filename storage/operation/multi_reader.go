@@ -82,14 +82,10 @@ func (b *multiReader) NewIter(startPrefix, endPrefix []byte, ops storage.Iterato
 //
 // Returned new Seeker consists of multiple seekers in reverse order from underlying readers.
 // For example, the first seeker is created from the last underlying reader.
-func (b *multiReader) NewSeeker() (storage.Seeker, error) {
+func (b *multiReader) NewSeeker() storage.Seeker {
 	seekers := make([]storage.Seeker, len(b.readers))
 	for i, r := range b.readers {
-		seeker, err := r.NewSeeker()
-		if err != nil {
-			return nil, err
-		}
-		seekers[len(b.readers)-1-i] = seeker
+		seekers[len(b.readers)-1-i] = r.NewSeeker()
 	}
 
 	return NewMultiSeeker(seekers...)

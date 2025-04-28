@@ -54,8 +54,7 @@ func TestMultiSeeker(t *testing.T) {
 		r := operation.NewMultiReader(preader, breader)
 
 		t.Run("key below start prefix", func(t *testing.T) {
-			seeker, err := r.NewSeeker()
-			require.NoError(t, err)
+			seeker := r.NewSeeker()
 
 			key := operation.MakePrefix(codePrefix, uint64(4))
 			startPrefix := operation.MakePrefix(codePrefix, uint64(5))
@@ -65,8 +64,7 @@ func TestMultiSeeker(t *testing.T) {
 		})
 
 		t.Run("has key below startPrefix", func(t *testing.T) {
-			seeker, err := r.NewSeeker()
-			require.NoError(t, err)
+			seeker := r.NewSeeker()
 
 			startPrefix := operation.MakePrefix(codePrefix, uint64(6))
 
@@ -78,8 +76,7 @@ func TestMultiSeeker(t *testing.T) {
 		})
 
 		t.Run("seek key in first db (Pebble)", func(t *testing.T) {
-			seeker, err := r.NewSeeker()
-			require.NoError(t, err)
+			seeker := r.NewSeeker()
 
 			startPrefix := operation.MakePrefix(codePrefix)
 
@@ -94,8 +91,7 @@ func TestMultiSeeker(t *testing.T) {
 		})
 
 		t.Run("seek key in second db (BadgerDB)", func(t *testing.T) {
-			seeker, err := r.NewSeeker()
-			require.NoError(t, err)
+			seeker := r.NewSeeker()
 
 			startPrefix := operation.MakePrefix(codePrefix)
 
