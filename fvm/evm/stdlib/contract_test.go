@@ -5706,16 +5706,24 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 	t.Parallel()
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	validate := func(
-		proof *types.COAOwnershipProofInContext,
-		onGetAccountKey func(addr runtime.Address, index uint32) (*cadenceStdlib.AccountKey, error),
-		onVerifySignature func(
+	type onGetAccountKeyFunc func(
+		addr runtime.Address,
+		index uint32,
+	) (*cadenceStdlib.AccountKey, error)
+
+	type onVerifySignatureFunc func(
 		signature []byte,
 		tag string,
 		sd,
 		publicKey []byte,
 		signatureAlgorithm runtime.SignatureAlgorithm,
-		hashAlgorithm runtime.HashAlgorithm) (bool, error),
+		hashAlgorithm runtime.HashAlgorithm,
+	) (bool, error)
+
+	validate := func(
+		proof *types.COAOwnershipProofInContext,
+		onGetAccountKey onGetAccountKeyFunc,
+		onVerifySignature onVerifySignatureFunc,
 	) (cadence.Value, error) {
 		handler := &testContractHandler{
 			deployCOA: func(_ uint64) types.Address {
