@@ -99,7 +99,7 @@ type Reader interface {
 	NewIter(startPrefix, endPrefix []byte, ops IteratorOption) (Iterator, error)
 
 	// NewSeeker returns a new Seeker.
-	NewSeeker() (Seeker, error)
+	NewSeeker() Seeker
 }
 
 // Writer is an interface for batch writing to a storage backend.
@@ -160,7 +160,7 @@ type ReaderBatchWriter interface {
 type DB interface {
 	// Reader returns a database-backed reader which reads the latest
 	// committed global database state
-	Reader() (Reader, error)
+	Reader() Reader
 
 	// WithReaderBatchWriter creates a batch writer and allows the caller to perform
 	// atomic batch updates to the database.

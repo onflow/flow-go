@@ -15,14 +15,14 @@ var _ storage.Seeker = (*multiSeeker)(nil)
 
 // NewMultiSeeker returns a Seeker that consists of multiple seekers
 // in the provided order.
-func NewMultiSeeker(seekers ...storage.Seeker) (storage.Seeker, error) {
+func NewMultiSeeker(seekers ...storage.Seeker) storage.Seeker {
 	if len(seekers) == 0 {
-		return nil, errors.New("failed to create multiSeeker: need at least one seeker")
+		panic("failed to create multiSeeker: need at least one seeker")
 	}
 	if len(seekers) == 1 {
-		return seekers[0], nil
+		return seekers[0]
 	}
-	return &multiSeeker{seekers: seekers}, nil
+	return &multiSeeker{seekers: seekers}
 }
 
 // SeekLE (seek less than or equal) returns the largest key in lexicographical

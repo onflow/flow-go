@@ -14,8 +14,8 @@ type dbStore struct {
 	db *pebble.DB
 }
 
-func (b *dbStore) Reader() (storage.Reader, error) {
-	return dbReader{db: b.db}, nil
+func (b *dbStore) Reader() storage.Reader {
+	return dbReader{db: b.db}
 }
 
 func (b *dbStore) WithReaderBatchWriter(fn func(storage.ReaderBatchWriter) error) error {

@@ -96,11 +96,7 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db storage.DB, receip
 
 // storeMyReceipt assembles the operations to retrieve my receipt for the given block ID.
 func (m *MyExecutionReceipts) myReceipt(blockID flow.Identifier) (*flow.ExecutionReceipt, error) {
-	reader, err := m.db.Reader()
-	if err != nil {
-		return nil, err
-	}
-	return m.cache.Get(reader, blockID) // assemble DB operations to retrieve receipt (no execution)
+	return m.cache.Get(m.db.Reader(), blockID) // assemble DB operations to retrieve receipt (no execution)
 }
 
 // BatchStoreMyReceipt stores blockID-to-my-receipt index entry keyed by blockID in a provided batch.
