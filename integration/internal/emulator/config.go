@@ -16,24 +16,24 @@ import (
 
 // config is a set of configuration options for an emulated emulator.
 type config struct {
-	ServiceKey                    *ServiceKey
-	Store                         EmulatorStorage
-	SimpleAddresses               bool
-	GenesisTokenSupply            cadence.UFix64
-	TransactionMaxGasLimit        uint64
-	ScriptGasLimit                uint64
-	TransactionExpiry             uint
-	StorageLimitEnabled           bool
-	TransactionFeesEnabled        bool
-	ExecutionEffortWeights        meter.ExecutionEffortWeights
-	ContractRemovalEnabled        bool
-	MinimumStorageReservation     cadence.UFix64
-	StorageMBPerFLOW              cadence.UFix64
-	Logger                        zerolog.Logger
-	ServerLogger                  zerolog.Logger
-	TransactionValidationEnabled  bool
-	ChainID                       flowgo.ChainID
-	AutoMine                      bool
+	ServiceKey                   *ServiceKey
+	Store                        EmulatorStorage
+	SimpleAddresses              bool
+	GenesisTokenSupply           cadence.UFix64
+	TransactionMaxGasLimit       uint64
+	ScriptGasLimit               uint64
+	TransactionExpiry            uint
+	StorageLimitEnabled          bool
+	TransactionFeesEnabled       bool
+	ExecutionEffortWeights       meter.ExecutionEffortWeights
+	ContractRemovalEnabled       bool
+	MinimumStorageReservation    cadence.UFix64
+	StorageMBPerFLOW             cadence.UFix64
+	Logger                       zerolog.Logger
+	ServerLogger                 zerolog.Logger
+	TransactionValidationEnabled bool
+	ChainID                      flowgo.ChainID
+	AutoMine                     bool
 }
 
 const defaultGenesisTokenSupply = "1000000000.0"
