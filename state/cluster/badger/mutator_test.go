@@ -472,8 +472,7 @@ func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
 	suite.Assert().Nil(err)
 
 	// create a block building on block1 ALSO containing tx1
-	block2 := unittest.ClusterBlockWithParentAndPayload(proposal1.Block, suite.Payload(&tx1))
-	proposal2 := unittest.ClusterProposalFromBlock(&block2)
+	proposal2 := suite.ProposalWithParentAndPayload(proposal1.Block, suite.Payload(&tx1))
 
 	// should be unable to extend block 2, as it contains a dupe transaction
 	err = suite.state.Extend(proposal2)
