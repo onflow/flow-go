@@ -64,6 +64,7 @@ func (sys *SystemContracts) Invoke(
 		spec.FunctionName,
 		arguments,
 		spec.ArgumentTypes,
+		spec.UseVM,
 	)
 	if err != nil {
 		log := sys.logger.Logger()
