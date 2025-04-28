@@ -14,6 +14,24 @@ func NewBatchLocks() *BatchLocks {
 	}
 }
 
+// Lock tries to acquire a given lock on behalf of the batch.
+//
+// If the batch has already acquired this lock earlier (recorded in acquiredLocks),
+// it skips locking again to avoid unnecessary blocking, allowing the caller to proceed immediately.
+//
+// If the lock has not been acquired yet, it blocks until the lock is acquired,
+// and then records the lock in the acquiredLocks map to indicate ownership.
+//
+// It also registers a callback to ensure that when the batch operation is finished,
+// the lock is properly released and removed from acquiredLocks.
+//
+// Parameters:
+//   - lock: The *sync.Mutex to acquire. The common usage of this lock is to prevent
+//     dirty reads so that the batch writes is writing the correct data.
+//     In other words, this Lock method is to prevent re-entrant deadlock, while this lock
+//     mutex is used to prevent dirty reads.
+//   - callback: A Callbacks collection to which the unlock operation is appended
+//     so that locks are safely released once the batch processing is complete.
 func (l *BatchLocks) Lock(lock *sync.Mutex, callback *Callbacks) {
 	// if the lock is already acquired by this same batch from previous db operations,
 	// then it will not be blocked and can continue updating the batch,
