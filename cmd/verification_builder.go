@@ -38,7 +38,6 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/dbops"
 	"github.com/onflow/flow-go/storage/store"
 )
@@ -170,13 +169,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			var err error
 
 			if dbops.IsBadgerTransaction(node.DBOps) {
-				queue := badger.NewChunkQueue(node.DB)
-				ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
-				if err != nil {
-					return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
-				}
-
-				chunkQueue = queue
 				node.Logger.Info().Msgf("chunks queue index has been initialized with badger db transaction updates")
 			} else if dbops.IsBatchUpdate(node.DBOps) {
 				queue := store.NewChunkQueue(node.Metrics.Cache, node.ProtocolDB)
@@ -226,7 +218,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			var approvalStorage storage.ResultApprovals
 			if dbops.IsBadgerTransaction(v.DBOps) {
-				approvalStorage = badger.NewResultApprovals(node.Metrics.Cache, node.DB)
+				return nil, fmt.Errorf("badger transaction is not supported for approval storage")
 			} else if dbops.IsBatchUpdate(v.DBOps) {
 				approvalStorage = store.NewResultApprovals(node.Metrics.Cache, node.ProtocolDB)
 			} else {
