@@ -56,9 +56,8 @@ func NewBlockContext(
 			return getHashByHeight(hashHeight)
 
 		},
-		Random:   prevRandao,
-		Tracer:   tracer,
-		IsPrague: true,
+		Random: prevRandao,
+		Tracer: tracer,
 	}, nil
 }
 

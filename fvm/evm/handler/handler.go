@@ -543,7 +543,6 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		TxCountSoFar:              uint(len(bp.TxHashes)),
 		TotalGasUsedSoFar:         bp.TotalGasUsed,
 		GasFeeCollector:           types.CoinbaseAddress,
-		IsPrague:                  true,
 	}, nil
 }
 
