@@ -64,8 +64,13 @@ func newConsumerProgress(db storage.DB, consumer string) *consumerProgress {
 // ProcessedIndex returns the processed index for the consumer
 // any error would be exception
 func (cp *consumerProgress) ProcessedIndex() (uint64, error) {
+	reader, err := cp.db.Reader()
+	if err != nil {
+		return 0, err
+	}
+
 	var processed uint64
-	err := operation.RetrieveProcessedIndex(cp.db.Reader(), cp.consumer, &processed)
+	err = operation.RetrieveProcessedIndex(reader, cp.consumer, &processed)
 	if err != nil {
 		return 0, fmt.Errorf("failed to retrieve processed index: %w", err)
 	}

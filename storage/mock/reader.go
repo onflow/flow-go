@@ -84,7 +84,7 @@ func (_m *Reader) NewIter(startPrefix []byte, endPrefix []byte, ops storage.Iter
 }
 
 // NewSeeker provides a mock function with given fields:
-func (_m *Reader) NewSeeker() storage.Seeker {
+func (_m *Reader) NewSeeker() (storage.Seeker, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
@@ -92,6 +92,10 @@ func (_m *Reader) NewSeeker() storage.Seeker {
 	}
 
 	var r0 storage.Seeker
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (storage.Seeker, error)); ok {
+		return rf()
+	}
 	if rf, ok := ret.Get(0).(func() storage.Seeker); ok {
 		r0 = rf()
 	} else {
@@ -100,7 +104,13 @@ func (_m *Reader) NewSeeker() storage.Seeker {
 		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // NewReader creates a new instance of Reader. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
