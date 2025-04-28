@@ -66,8 +66,13 @@ func LatestSealedAndExecutedHeight(state protocol.State, db storage.DB) (uint64,
 		return 0, err
 	}
 
+	reader, err := db.Reader()
+	if err != nil {
+		return 0, err
+	}
+
 	var blockID flow.Identifier
-	err = operation.RetrieveExecutedBlock(db.Reader(), &blockID)
+	err = operation.RetrieveExecutedBlock(reader, &blockID)
 	if err != nil {
 		return 0, err
 	}

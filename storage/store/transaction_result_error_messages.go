@@ -98,9 +98,15 @@ func (t *TransactionResultErrorMessages) Exists(blockID flow.Identifier) (bool, 
 	if ok := t.blockCache.IsCached(key); ok {
 		return ok, nil
 	}
+
+	reader, err := t.db.Reader()
+	if err != nil {
+		return false, err
+	}
+
 	// otherwise, check badger store
 	var exists bool
-	err := operation.TransactionResultErrorMessagesExists(t.db.Reader(), blockID, &exists)
+	err = operation.TransactionResultErrorMessagesExists(reader, blockID, &exists)
 	if err != nil {
 		return false, fmt.Errorf("could not check existence: %w", err)
 	}
@@ -149,8 +155,13 @@ func (t *TransactionResultErrorMessages) batchStore(
 // Expected errors during normal operation:
 //   - `storage.ErrNotFound` if no transaction error message is known at given block and transaction id.
 func (t *TransactionResultErrorMessages) ByBlockIDTransactionID(blockID flow.Identifier, transactionID flow.Identifier) (*flow.TransactionResultErrorMessage, error) {
+	reader, err := t.db.Reader()
+	if err != nil {
+		return nil, err
+	}
+
 	key := KeyFromBlockIDTransactionID(blockID, transactionID)
-	transactionResultErrorMessage, err := t.cache.Get(t.db.Reader(), key)
+	transactionResultErrorMessage, err := t.cache.Get(reader, key)
 	if err != nil {
 		return nil, err
 	}
@@ -162,8 +173,13 @@ func (t *TransactionResultErrorMessages) ByBlockIDTransactionID(blockID flow.Ide
 // Expected errors during normal operation:
 //   - `storage.ErrNotFound` if no transaction error message is known at given block and transaction index.
 func (t *TransactionResultErrorMessages) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionResultErrorMessage, error) {
+	reader, err := t.db.Reader()
+	if err != nil {
+		return nil, err
+	}
+
 	key := KeyFromBlockIDIndex(blockID, txIndex)
-	transactionResultErrorMessage, err := t.indexCache.Get(t.db.Reader(), key)
+	transactionResultErrorMessage, err := t.indexCache.Get(reader, key)
 	if err != nil {
 		return nil, err
 	}
@@ -175,8 +191,13 @@ func (t *TransactionResultErrorMessages) ByBlockIDTransactionIndex(blockID flow.
 //
 // No errors are expected during normal operation.
 func (t *TransactionResultErrorMessages) ByBlockID(blockID flow.Identifier) ([]flow.TransactionResultErrorMessage, error) {
+	reader, err := t.db.Reader()
+	if err != nil {
+		return nil, err
+	}
+
 	key := KeyFromBlockID(blockID)
-	transactionResultErrorMessages, err := t.blockCache.Get(t.db.Reader(), key)
+	transactionResultErrorMessages, err := t.blockCache.Get(reader, key)
 	if err != nil {
 		return nil, err
 	}

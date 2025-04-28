@@ -119,8 +119,13 @@ func (tr *LightTransactionResults) BatchStoreBadger(blockID flow.Identifier, tra
 
 // ByBlockIDTransactionID returns the transaction result for the given block ID and transaction ID
 func (tr *LightTransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) (*flow.LightTransactionResult, error) {
+	reader, err := tr.db.Reader()
+	if err != nil {
+		return nil, err
+	}
+
 	key := KeyFromBlockIDTransactionID(blockID, txID)
-	transactionResult, err := tr.cache.Get(tr.db.Reader(), key)
+	transactionResult, err := tr.cache.Get(reader, key)
 	if err != nil {
 		return nil, err
 	}
@@ -129,8 +134,13 @@ func (tr *LightTransactionResults) ByBlockIDTransactionID(blockID flow.Identifie
 
 // ByBlockIDTransactionIndex returns the transaction result for the given blockID and transaction index
 func (tr *LightTransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.LightTransactionResult, error) {
+	reader, err := tr.db.Reader()
+	if err != nil {
+		return nil, err
+	}
+
 	key := KeyFromBlockIDIndex(blockID, txIndex)
-	transactionResult, err := tr.indexCache.Get(tr.db.Reader(), key)
+	transactionResult, err := tr.indexCache.Get(reader, key)
 	if err != nil {
 		return nil, err
 	}
@@ -139,8 +149,13 @@ func (tr *LightTransactionResults) ByBlockIDTransactionIndex(blockID flow.Identi
 
 // ByBlockID gets all transaction results for a block, ordered by transaction index
 func (tr *LightTransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.LightTransactionResult, error) {
+	reader, err := tr.db.Reader()
+	if err != nil {
+		return nil, err
+	}
+
 	key := KeyFromBlockID(blockID)
-	transactionResults, err := tr.blockCache.Get(tr.db.Reader(), key)
+	transactionResults, err := tr.blockCache.Get(reader, key)
 	if err != nil {
 		return nil, err
 	}

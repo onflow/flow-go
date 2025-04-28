@@ -106,8 +106,13 @@ func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *ba
 	// create pebble storage modules
 	pebbleResults, pebbleCommits := createStores(pdb)
 
+	reader, err := pdb.Reader()
+	if err != nil {
+		return err
+	}
+
 	var existingExecuted flow.Identifier
-	err = operation.RetrieveExecutedBlock(pdb.Reader(), &existingExecuted)
+	err = operation.RetrieveExecutedBlock(reader, &existingExecuted)
 	if err == nil {
 		// there is an executed block in pebble, compare if it's newer than the badger one,
 		// if newer, it means EN is storing new results in pebble, in this case, we don't

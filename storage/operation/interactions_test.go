@@ -48,7 +48,10 @@ func TestStateInteractionsInsertCheckRetrieve(t *testing.T) {
 
 		var readInteractions []*snapshot.ExecutionSnapshot
 
-		err = operation.RetrieveExecutionStateInteractions(db.Reader(), blockID, &readInteractions)
+		reader, err := db.Reader()
+		require.NoError(t, err)
+
+		err = operation.RetrieveExecutionStateInteractions(reader, blockID, &readInteractions)
 		require.NoError(t, err)
 
 		assert.Equal(t, interactions, readInteractions)
