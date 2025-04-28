@@ -68,7 +68,11 @@ func (r *ExecutionReceipts) storeTx(rw storage.ReaderBatchWriter, receipt *flow.
 }
 
 func (r *ExecutionReceipts) byID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error) {
-	val, err := r.cache.Get(r.db.Reader(), receiptID)
+	reader, err := r.db.Reader()
+	if err != nil {
+		return nil, err
+	}
+	val, err := r.cache.Get(reader, receiptID)
 	if err != nil {
 		return nil, err
 	}
@@ -76,8 +80,13 @@ func (r *ExecutionReceipts) byID(receiptID flow.Identifier) (*flow.ExecutionRece
 }
 
 func (r *ExecutionReceipts) byBlockID(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
+	reader, err := r.db.Reader()
+	if err != nil {
+		return nil, err
+	}
+
 	var receiptIDs []flow.Identifier
-	err := operation.LookupExecutionReceipts(r.db.Reader(), blockID, &receiptIDs)
+	err = operation.LookupExecutionReceipts(reader, blockID, &receiptIDs)
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {
 		return nil, fmt.Errorf("could not find receipt index for block: %w", err)
 	}

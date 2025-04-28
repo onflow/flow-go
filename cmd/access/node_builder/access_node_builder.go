@@ -579,12 +579,14 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
 		}).
 		Module("transactions and collections storage", func(node *cmd.NodeConfig) error {
-			// TODO: needs to be wrapped with ChainedCollections module, otherwise once we switch
-			// ProtocolDB to pebble based storage, the data previously stored in badger will not be
-			// accessable.
-			transactions := store.NewTransactions(node.Metrics.Cache, node.ProtocolDB)
-			builder.collections = store.NewCollections(node.ProtocolDB, transactions)
+
+			dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+
+			transactions := store.NewTransactions(node.Metrics.Cache, dbStore)
+			collections := store.NewCollections(dbStore, transactions)
 			builder.transactions = transactions
+			builder.collections = collections
+
 			return nil
 		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
@@ -874,7 +876,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return nil
 			}).
 			Module("transaction results storage", func(node *cmd.NodeConfig) error {
-				builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
+				dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+				builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, dbStore, bstorage.DefaultCacheSize)
 				return nil
 			}).
 			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -1859,7 +1862,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("events storage", func(node *cmd.NodeConfig) error {
-			builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
+			dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+			builder.events = store.NewEvents(node.Metrics.Cache, dbStore)
 			return nil
 		}).
 		Module("reporter", func(node *cmd.NodeConfig) error {
@@ -1895,7 +1899,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
 			if builder.storeTxResultErrorMessages {
-				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
+				dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, dbStore, bstorage.DefaultCacheSize)
 			}
 
 			return nil

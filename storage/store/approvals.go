@@ -109,7 +109,12 @@ func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, app
 
 // ByID retrieves a ResultApproval by its ID
 func (r *ResultApprovals) ByID(approvalID flow.Identifier) (*flow.ResultApproval, error) {
-	val, err := r.cache.Get(r.db.Reader(), approvalID)
+	reader, err := r.db.Reader()
+	if err != nil {
+		return nil, err
+	}
+
+	val, err := r.cache.Get(reader, approvalID)
 	if err != nil {
 		return nil, err
 	}
@@ -120,8 +125,13 @@ func (r *ResultApprovals) ByID(approvalID flow.Identifier) (*flow.ResultApproval
 // ResultApprovals store is only used within a verification node, where it is
 // assumed that there is never more than one approval per chunk.
 func (r *ResultApprovals) ByChunk(resultID flow.Identifier, chunkIndex uint64) (*flow.ResultApproval, error) {
+	reader, err := r.db.Reader()
+	if err != nil {
+		return nil, err
+	}
+
 	var approvalID flow.Identifier
-	err := operation.LookupResultApproval(r.db.Reader(), resultID, chunkIndex, &approvalID)
+	err = operation.LookupResultApproval(reader, resultID, chunkIndex, &approvalID)
 	if err != nil {
 		return nil, fmt.Errorf("could not lookup result approval ID: %w", err)
 	}
