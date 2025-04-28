@@ -21,7 +21,7 @@ type ProposalHeader struct {
 
 // HeaderBody contains all block header metadata, except for the payload hash.
 // HeaderBody generally should not be used on its own. It is embedded within [Block] and
-// [Header]: those types should be used in almost all circumstances. 
+// [Header]: those types should be used in almost all circumstances.
 type HeaderBody struct {
 	// ChainID is a chain-specific value to prevent replay attacks.
 	ChainID ChainID
