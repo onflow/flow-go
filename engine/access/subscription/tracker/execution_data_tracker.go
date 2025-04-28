@@ -24,6 +24,8 @@ import (
 const (
 	// maxIndexBlockDiff is the maximum difference between the highest indexed block height and the
 	// provided start height to allow when starting a new stream.
+	// this is used to account for small delays indexing or requests made to different ANs behind a
+	// load balancer. The diff will result in the stream waiting a few blocks before starting.
 	maxIndexBlockDiff = 30
 )
 
