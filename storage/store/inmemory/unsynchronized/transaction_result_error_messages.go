@@ -134,15 +134,20 @@ func (t *TransactionResultErrorMessages) AddToBatch(batch storage.ReaderBatchWri
 	writer := batch.Writer()
 
 	for block, errorMessages := range t.blockStore {
-		decoded, err := store.KeyToBlockID(block)
+		blockID, err := store.KeyToBlockID(block)
 		if err != nil {
 			return fmt.Errorf("could not decode block: %w", err)
 		}
 
 		for _, msg := range errorMessages {
-			err := operation.BatchInsertTransactionResultErrorMessage(writer, decoded, &msg)
+			err := operation.BatchInsertTransactionResultErrorMessage(writer, blockID, &msg)
 			if err != nil {
 				return fmt.Errorf("could not persist transaction result error message: %w", err)
+			}
+
+			err = operation.BatchIndexTransactionResultErrorMessage(writer, blockID, &msg)
+			if err != nil {
+				return fmt.Errorf("could not index transaction result error message: %w", err)
 			}
 		}
 	}

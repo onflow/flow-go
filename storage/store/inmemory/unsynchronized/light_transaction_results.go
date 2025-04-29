@@ -118,15 +118,20 @@ func (l *LightTransactionResults) AddToBatch(batch storage.ReaderBatchWriter) er
 	writer := batch.Writer()
 
 	for block, results := range l.blockStore {
-		decodedBlock, err := store.KeyToBlockID(block)
+		blockID, err := store.KeyToBlockID(block)
 		if err != nil {
 			return fmt.Errorf("could not decode block: %w", err)
 		}
 
-		for _, txResult := range results {
-			err = operation.BatchInsertLightTransactionResult(writer, decodedBlock, &txResult)
+		for index, txResult := range results {
+			err = operation.BatchInsertLightTransactionResult(writer, blockID, &txResult)
 			if err != nil {
 				return fmt.Errorf("could not persist light transaction result: %w", err)
+			}
+
+			err = operation.BatchIndexLightTransactionResult(writer, blockID, uint32(index), &txResult)
+			if err != nil {
+				return fmt.Errorf("could not index light transaction result: %w", err)
 			}
 		}
 	}

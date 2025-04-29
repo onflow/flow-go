@@ -75,19 +75,14 @@ func TestEvents_Persist(t *testing.T) {
 			return eventStore.AddToBatch(rw)
 		}))
 
-		// Encode event key
-		eventCode := byte(102) // taken from operation/prefix.go
-		key := operation.EventPrefix(eventCode, block.ID(), event)
-
 		// Get event
 		reader, err := db.Reader()
 		require.NoError(t, err)
 
-		value, closer, err := reader.Get(key)
-		defer closer.Close()
+		actualEvents := &[]flow.Event{}
+		err = operation.LookupEventsByBlockID(reader, block.ID(), actualEvents)
 		require.NoError(t, err)
-
-		// Ensure event with such a key was stored in DB
-		require.NotEmpty(t, value)
+		require.Len(t, *actualEvents, 1)
+		require.Equal(t, event, (*actualEvents)[0])
 	})
 }

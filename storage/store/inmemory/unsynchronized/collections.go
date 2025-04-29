@@ -144,12 +144,5 @@ func (c *Collections) AddToBatch(batch storage.ReaderBatchWriter) error {
 		}
 	}
 
-	for _, coll := range c.lightCollections {
-		err := operation.UpsertCollection(writer, coll)
-		if err != nil {
-			return fmt.Errorf("could not persist collection: %w", err)
-		}
-	}
-
 	return nil
 }
