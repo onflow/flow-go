@@ -17,12 +17,12 @@ import (
 
 	"github.com/onflow/crypto"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
 	hsmock "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -151,7 +151,7 @@ func (suite *Suite) SetupTest() {
 }
 
 func (suite *Suite) RunTest(
-	f func(handler *access.Handler, db *badger.DB, all *storage.All, en *storage.Execution),
+	f func(handler *rpc.Handler, db *badger.DB, all *storage.All, en *storage.Execution),
 ) {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
 		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
@@ -176,20 +176,20 @@ func (suite *Suite) RunTest(
 		})
 		require.NoError(suite.T(), err)
 
-		handler := access.NewHandler(
+		handler := rpc.NewHandler(
 			suite.backend,
 			suite.chainID.Chain(),
 			suite.finalizedHeaderCache,
 			suite.me,
 			subscription.DefaultMaxGlobalStreams,
-			access.WithBlockSignerDecoder(suite.signerIndicesDecoder),
+			rpc.WithBlockSignerDecoder(suite.signerIndicesDecoder),
 		)
 		f(handler, db, all, en)
 	})
 }
 
 func (suite *Suite) TestSendAndGetTransaction() {
-	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.All, _ *storage.Execution) {
+	suite.RunTest(func(handler *rpc.Handler, _ *badger.DB, _ *storage.All, _ *storage.Execution) {
 		referenceBlock := unittest.BlockHeaderFixture()
 		transaction := unittest.TransactionFixture()
 		transaction.SetReferenceBlockID(referenceBlock.ID())
@@ -242,7 +242,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 }
 
 func (suite *Suite) TestSendExpiredTransaction() {
-	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.All, en *storage.Execution) {
+	suite.RunTest(func(handler *rpc.Handler, _ *badger.DB, _ *storage.All, en *storage.Execution) {
 		referenceBlock := suite.finalizedBlock
 
 		transaction := unittest.TransactionFixture()
@@ -262,7 +262,7 @@ func (suite *Suite) TestSendExpiredTransaction() {
 			Return(referenceBlock, nil).
 			Twice()
 
-		//Advancing final state to expire ref block
+		// Advancing final state to expire ref block
 		suite.finalizedBlock = latestBlock
 
 		req := &accessproto.SendTransactionRequest{
@@ -344,7 +344,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		})
 		require.NoError(suite.T(), err)
 
-		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
+		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
 
 		// Send transaction 1
 		resp, err := handler.SendTransaction(context.Background(), sendReq1)
@@ -381,7 +381,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 }
 
 func (suite *Suite) TestGetBlockByIDAndHeight() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
+	suite.RunTest(func(handler *rpc.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
 
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
@@ -517,7 +517,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 }
 
 func (suite *Suite) TestGetExecutionResultByBlockID() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
+	suite.RunTest(func(handler *rpc.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
 
 		// test block1 get by ID
 		nonexistingID := unittest.IdentifierFixture()
@@ -675,7 +675,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		})
 		require.NoError(suite.T(), err)
 
-		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
+		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
 
 		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetricImpl(
 			suite.log,
@@ -728,7 +728,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		background, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		ctx, _ := irrecoverable.WithSignaler(background)
+		ctx := irrecoverable.NewMockSignalerContext(suite.T(), background)
 		ingestEng.Start(ctx)
 		<-ingestEng.Ready()
 
@@ -863,7 +863,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		})
 		require.NoError(suite.T(), err)
 
-		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
+		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
 
 		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetricImpl(
 			suite.log,
@@ -1102,7 +1102,7 @@ func (suite *Suite) TestExecuteScript() {
 		})
 		require.NoError(suite.T(), err)
 
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
+		handler := rpc.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
 
 		// initialize metrics related storage
 		metrics := metrics.NewNoopCollector()
@@ -1169,7 +1169,7 @@ func (suite *Suite) TestExecuteScript() {
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.IndexFinalizedBlockByHeight(lastBlock.Header.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
-		//update latest sealed block
+		// update latest sealed block
 		suite.sealedBlock = lastBlock.Header
 		// create execution receipts for each of the execution node and the last block
 		executionReceipts := unittest.ReceiptsForBlockFixture(lastBlock, identities.NodeIDs())
@@ -1277,7 +1277,7 @@ func (suite *Suite) TestExecuteScript() {
 // TestAPICallNodeVersionInfo tests the GetNodeVersionInfo query and check response returns correct node version
 // information
 func (suite *Suite) TestAPICallNodeVersionInfo() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
+	suite.RunTest(func(handler *rpc.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
 		req := &accessproto.GetNodeVersionInfoRequest{}
 		resp, err := handler.GetNodeVersionInfo(context.Background(), req)
 		require.NoError(suite.T(), err)
@@ -1298,7 +1298,7 @@ func (suite *Suite) TestAPICallNodeVersionInfo() {
 // field in the response matches the finalized header from cache. It also tests that the LastFinalizedBlock field is
 // updated correctly when a block with a greater height is finalized.
 func (suite *Suite) TestLastFinalizedBlockHeightResult() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
+	suite.RunTest(func(handler *rpc.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
 		block := unittest.BlockWithParentFixture(suite.finalizedBlock)
 		newFinalizedBlock := unittest.BlockWithParentFixture(block.Header)
 

@@ -171,9 +171,10 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
-	fnb.flags.StringVar(&fnb.BaseConfig.pebbleDir, "pebbledir", defaultConfig.pebbleDir, "directory to store the public pebble database (protocol state)")
+	fnb.flags.StringVar(&fnb.BaseConfig.pebbleCheckpointsDir, "pebble-checkpoints-dir", defaultConfig.pebbleCheckpointsDir, "directory to store the checkpoints for the public pebble database (protocol state)")
+	fnb.flags.StringVar(&fnb.BaseConfig.pebbleDir, "pebble-dir", defaultConfig.pebbleDir, "directory to store the public pebble database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
-	fnb.flags.StringVar(&fnb.BaseConfig.dbops, "dbops", defaultConfig.dbops, "database operations to use (badger-transaction, batch-update, pebble-update)")
+	fnb.flags.StringVar(&fnb.BaseConfig.DBOps, "dbops", defaultConfig.DBOps, "database operations to use (badger-transaction, batch-update, pebble-update)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.debugLogLimit, "debug-log-limit", defaultConfig.debugLogLimit, "max number of debug/trace log events per second")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
@@ -1120,9 +1121,6 @@ func (fnb *FlowNodeBuilder) initBadgerDB() error {
 		return fmt.Errorf("could not open public db: %w", err)
 	}
 	fnb.DB = publicDB
-	// set badger db as protocol db
-	// TODO: making it dynamic to switch between badger and pebble
-	fnb.ProtocolDB = badgerimpl.ToDB(publicDB)
 
 	fnb.ShutdownFunc(func() error {
 		if err := publicDB.Close(); err != nil {
@@ -1158,14 +1156,14 @@ func (fnb *FlowNodeBuilder) initPebbleDB() error {
 
 // create protocol db according to the badger or pebble db
 func (fnb *FlowNodeBuilder) initProtocolDB(bdb *badger.DB, pdb *pebble.DB) error {
-	if dbops.IsBadgerBased(fnb.dbops) {
+	if dbops.IsBadgerBased(fnb.DBOps) {
 		fnb.ProtocolDB = badgerimpl.ToDB(bdb)
 		fnb.Logger.Info().Msg("initProtocolDB: using badger protocol db")
-	} else if dbops.IsPebbleBatch(fnb.dbops) {
+	} else if dbops.IsPebbleBatch(fnb.DBOps) {
 		fnb.ProtocolDB = pebbleimpl.ToDB(pdb)
 		fnb.Logger.Info().Msgf("initProtocolDB: using pebble protocol db")
 	} else {
-		return fmt.Errorf(dbops.UsageErrMsg, fnb.dbops)
+		return fmt.Errorf(dbops.UsageErrMsg, fnb.DBOps)
 	}
 	return nil
 }
@@ -2102,6 +2100,9 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 		return storageCommands.NewReadSealsCommand(config.State, config.Storage.Seals, config.Storage.Index)
 	}).AdminCommand("get-latest-identity", func(config *NodeConfig) commands.AdminCommand {
 		return common.NewGetIdentityCommand(config.IdentityProvider)
+	}).AdminCommand("create-pebble-checkpoint", func(config *NodeConfig) commands.AdminCommand {
+		// by default checkpoints will be created under "/data/protocol_pebble_checkpoints"
+		return storageCommands.NewPebbleDBCheckpointCommand(config.pebbleCheckpointsDir, "protocol", config.PebbleDB)
 	})
 }
 

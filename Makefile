@@ -199,15 +199,15 @@ generate-mocks: install-mock-generators
 	mockery --name '.*' --dir="./consensus/hotstuff" --case=underscore --output="./consensus/hotstuff/mocks" --outpkg="mocks"
 	mockery --name '.*' --dir="./engine/access/wrapper" --case=underscore --output="./engine/access/mock" --outpkg="mock"
 	mockery --name 'API' --dir="./access" --case=underscore --output="./access/mock" --outpkg="mock"
-	mockery --name 'Blocks' --dir="./access" --case=underscore --output="./access/mock" --outpkg="mock"
+	mockery --name 'Blocks' --dir="./access/validator" --case=underscore --output="./access/validator/mock" --outpkg="mock"
 	mockery --name 'API' --dir="./engine/protocol" --case=underscore --output="./engine/protocol/mock" --outpkg="mock"
 	mockery --name '.*' --dir="./engine/access/state_stream" --case=underscore --output="./engine/access/state_stream/mock" --outpkg="mock"
-	mockery --name 'BlockTracker' --dir="./engine/access/subscription" --case=underscore --output="./engine/access/subscription/mock"  --outpkg="mock"
+	mockery --name 'BlockTracker' --dir="./engine/access/subscription/tracker" --case=underscore --output="./engine/access/subscription/tracker/mock"  --outpkg="mock"
+	mockery --name 'ExecutionDataTracker' --dir="./engine/access/subscription/tracker" --case=underscore --output="./engine/access/subscription/tracker/mock"  --outpkg="mock"
 	mockery --name 'DataProvider' --dir="./engine/access/rest/websockets/data_providers" --case=underscore --output="./engine/access/rest/websockets/data_providers/mock"  --outpkg="mock"
 	mockery --name 'DataProviderFactory' --dir="./engine/access/rest/websockets/data_providers" --case=underscore --output="./engine/access/rest/websockets/data_providers/mock"  --outpkg="mock"
 	mockery --name 'LinkGenerator' --dir="./engine/access/rest/common/models" --case=underscore --output="./engine/access/rest/common/models/mock"  --outpkg="mock"
 	mockery --name 'WebsocketConnection' --dir="./engine/access/rest/websockets" --case=underscore --output="./engine/access/rest/websockets/mock"  --outpkg="mock"
-	mockery --name 'ExecutionDataTracker' --dir="./engine/access/subscription" --case=underscore --output="./engine/access/subscription/mock"  --outpkg="mock"
 	mockery --name 'ConnectionFactory' --dir="./engine/access/rpc/connection" --case=underscore --output="./engine/access/rpc/connection/mock" --outpkg="mock"
 	mockery --name 'Communicator' --dir="./engine/access/rpc/backend" --case=underscore --output="./engine/access/rpc/backend/mock" --outpkg="mock"
 	mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"
@@ -235,15 +235,19 @@ tidy:
 	cd insecure; go mod tidy -v
 	git diff --exit-code
 
+# Builds a custom version of the golangci-lint binary which includes custom plugins
+tools/custom-gcl: tools/structwrite .custom-gcl.yml
+	golangci-lint custom
+
 .PHONY: lint
-lint: tidy
+lint: tidy tools/custom-gcl
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	golangci-lint run -v ./...
+	./tools/custom-gcl run -v ./...
 
 .PHONY: fix-lint
 fix-lint:
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	golangci-lint run -v --fix ./...
+	./tools/custom-gcl run -v --fix ./...
 
 # Runs unit tests with different list of packages as passed by CI so they run in parallel
 .PHONY: ci

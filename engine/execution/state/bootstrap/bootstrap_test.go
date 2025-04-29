@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"encoding/hex"
+	"fmt"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -42,7 +43,7 @@ func TestBootstrapLedger(t *testing.T) {
 
 		expectedStateCommitment := unittest.GenesisStateCommitment
 
-		if !assert.Equal(t, expectedStateCommitment, stateCommitment) {
+		if !assert.Equal(t, fmt.Sprint(expectedStateCommitment), fmt.Sprint(stateCommitment)) {
 			t.Logf(
 				"Incorrect state commitment: got %s, expected %s",
 				hex.EncodeToString(stateCommitment[:]),
@@ -53,7 +54,7 @@ func TestBootstrapLedger(t *testing.T) {
 }
 
 func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
-	expectedStateCommitmentBytes, _ := hex.DecodeString("e5374ec916225cbe3b511b7d741f05ca1e69b77493e258bb7ec981a102535dfc")
+	expectedStateCommitmentBytes, _ := hex.DecodeString("ef864c71406b34e7937f56cbbf69b6f58bd27f796070def9034411e7a818d727")
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
 
@@ -79,7 +80,7 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		if !assert.Equal(t, expectedStateCommitment, stateCommitment) {
+		if !assert.Equal(t, fmt.Sprint(expectedStateCommitment), fmt.Sprint(stateCommitment)) {
 			t.Logf(
 				"Incorrect state commitment: got %s, expected %s",
 				hex.EncodeToString(stateCommitment[:]),

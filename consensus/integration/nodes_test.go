@@ -226,7 +226,7 @@ func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot
 
 	// create a context which will be used for all nodes
 	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create a function to return which the test case can use to run the nodes for some maximum duration
 	// and gracefully stop after.
@@ -488,7 +488,6 @@ func createNode(
 	// initialize the block builder
 	build, err := builder.NewBuilder(
 		metricsCollector,
-		db,
 		fullState,
 		headersDB,
 		sealsDB,

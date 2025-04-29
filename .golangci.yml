@@ -22,19 +22,27 @@ linters-settings:
     # Disable SA1019 to allow use of deprecated label
     checks: ["all", "-SA1019"]
 
+  custom:
+    structwrite:
+      type: module
+      description: "disallow struct field writes outside constructor"
+      original-url: "github.com/onflow/flow-go/tools/structwrite"
+
 linters:
   enable:
     - goimports
     - gosec
+    - structwrite
 
 issues:
   exclude-rules:
     - path: _test\.go # disable some linters on test files
       linters:
         - unused
+        - structwrite
     # typecheck currently not handling the way we do function inheritance well
     # disabling for now
-    - path: 'cmd/access/node_build/*' 
+    - path: 'cmd/access/node_build/*'
       linters:
         - typecheck
     - path: 'cmd/observer/node_builder/*'

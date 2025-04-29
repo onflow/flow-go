@@ -17,6 +17,8 @@ type dbReader struct {
 	db *badger.DB
 }
 
+var _ storage.Reader = (*dbReader)(nil)
+
 // Get gets the value for the given key. It returns ErrNotFound if the DB
 // does not contain the key.
 // other errors are exceptions
@@ -59,6 +61,11 @@ func (b dbReader) NewIter(startPrefix, endPrefix []byte, ops storage.IteratorOpt
 	}
 
 	return newBadgerIterator(b.db, startPrefix, endPrefix, ops), nil
+}
+
+// NewSeeker returns a new Seeker.
+func (b dbReader) NewSeeker() storage.Seeker {
+	return newBadgerSeeker(b.db)
 }
 
 // ToReader is a helper function to convert a *badger.DB to a Reader

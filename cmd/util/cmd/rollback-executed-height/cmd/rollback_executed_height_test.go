@@ -46,8 +46,6 @@ func TestReExecuteBlock(t *testing.T) {
 			myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
 			events := store.NewEvents(metrics, db)
 			serviceEvents := store.NewServiceEvents(metrics, db)
-			transactions := bstorage.NewTransactions(metrics, bdb)
-			collections := bstorage.NewCollections(bdb, transactions)
 
 			err = headers.Store(genesis)
 			require.NoError(t, err)
@@ -62,7 +60,6 @@ func TestReExecuteBlock(t *testing.T) {
 				commits,
 				nil,
 				headers,
-				collections,
 				chunkDataPacks,
 				results,
 				myReceipts,
@@ -88,7 +85,10 @@ func TestReExecuteBlock(t *testing.T) {
 			require.NoError(t, err)
 
 			batch := db.NewBatch()
+			defer batch.Close()
+
 			chunkBatch := pebbleimpl.ToDB(pdb).NewBatch()
+			defer chunkBatch.Close()
 
 			// remove execution results
 			err = removeForBlockID(
@@ -127,7 +127,10 @@ func TestReExecuteBlock(t *testing.T) {
 			require.NoError(t, err2)
 
 			batch = db.NewBatch()
+			defer batch.Close()
+
 			chunkBatch = pebbleimpl.ToDB(pdb).NewBatch()
+			defer chunkBatch.Close()
 
 			// remove again after flushing
 			err = removeForBlockID(
@@ -200,7 +203,6 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 				commits,
 				nil,
 				headers,
-				collections,
 				chunkDataPacks,
 				results,
 				myReceipts,
@@ -233,7 +235,10 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			require.NoError(t, err)
 
 			batch := db.NewBatch()
+			defer batch.Close()
+
 			chunkBatch := pebbleimpl.ToDB(pdb).NewBatch()
+			defer chunkBatch.Close()
 
 			// remove execution results
 			err = removeForBlockID(
@@ -255,7 +260,10 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			require.NoError(t, err2)
 
 			batch = db.NewBatch()
+			defer batch.Close()
+
 			chunkBatch = pebbleimpl.ToDB(pdb).NewBatch()
+			defer chunkBatch.Close()
 
 			// remove again to test for duplicates handling
 			err = removeForBlockID(

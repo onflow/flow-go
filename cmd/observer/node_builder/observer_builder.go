@@ -13,8 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -52,6 +50,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	subscriptiontracker "github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/engine/common/follower"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/stop"
@@ -109,7 +108,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
-	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -206,7 +204,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
 			CompressorName:            grpcutils.NoCompressor,
 			WebSocketConfig:           websockets.NewDefaultWebsocketConfig(),
-			EnableWebSocketsStreamAPI: false,
+			EnableWebSocketsStreamAPI: true,
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
@@ -823,16 +821,30 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			defaultConfig.registerDBPruneThreshold,
 			fmt.Sprintf("specifies the number of blocks below the latest stored block height to keep in register db. default: %d", defaultConfig.registerDBPruneThreshold))
 
-		flags.DurationVar(&builder.rpcConf.WebSocketConfig.InactivityTimeout,
+		// websockets config
+		flags.DurationVar(
+			&builder.rpcConf.WebSocketConfig.InactivityTimeout,
 			"websocket-inactivity-timeout",
 			defaultConfig.rpcConf.WebSocketConfig.InactivityTimeout,
-			"specifies the duration a WebSocket connection can remain open without any active subscriptions before being automatically closed")
-
+			"the duration a WebSocket connection can remain open without any active subscriptions before being automatically closed",
+		)
+		flags.Uint64Var(
+			&builder.rpcConf.WebSocketConfig.MaxSubscriptionsPerConnection,
+			"websocket-max-subscriptions-per-connection",
+			defaultConfig.rpcConf.WebSocketConfig.MaxSubscriptionsPerConnection,
+			"the maximum number of active WebSocket subscriptions allowed per connection",
+		)
+		flags.Float64Var(
+			&builder.rpcConf.WebSocketConfig.MaxResponsesPerSecond,
+			"websocket-max-responses-per-second",
+			defaultConfig.rpcConf.WebSocketConfig.MaxResponsesPerSecond,
+			fmt.Sprintf("the maximum number of responses that can be sent to a single client per second. Default: %f. if set to 0, no limit is applied to the number of responses per second.", defaultConfig.rpcConf.WebSocketConfig.MaxResponsesPerSecond),
+		)
 		flags.BoolVar(
 			&builder.rpcConf.EnableWebSocketsStreamAPI,
-			"experimental-enable-websockets-stream-api",
+			"websockets-stream-api-enabled",
 			defaultConfig.rpcConf.EnableWebSocketsStreamAPI,
-			"[experimental] enables WebSockets Stream API that operates under /ws endpoint. this flag may change in a future release.",
+			"whether to enable the WebSockets Stream API.",
 		)
 	}).ValidateFlags(func() error {
 		if builder.executionDataSyncEnabled {
@@ -1129,12 +1141,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
-			var db storage.DB
-			if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
-				db = badgerimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*badger.DB))
-			} else {
-				db = pebbleimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*pebble.DB))
-			}
+			db := builder.ExecutionDatastoreManager.DB()
 
 			processedBlockHeight = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			return nil
@@ -1142,12 +1149,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
-			var db storage.DB
-			if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
-				db = badgerimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*badger.DB))
-			} else {
-				db = pebbleimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*pebble.DB))
-			}
+			db := builder.ExecutionDatastoreManager.DB()
+
 			processedNotifications = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
@@ -1537,7 +1540,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			useIndex := builder.executionDataIndexingEnabled &&
 				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
 
-			executionDataTracker := subscription.NewExecutionDataTracker(
+			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
 				builder.Logger,
 				node.State,
 				builder.executionDataConfig.InitialBlockHeight,
@@ -1896,7 +1899,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		broadcaster := engine.NewBroadcaster()
 		// create BlockTracker that will track for new blocks (finalized and sealed) and
 		// handles block-related operations.
-		blockTracker, err := subscription.NewBlockTracker(
+		blockTracker, err := subscriptiontracker.NewBlockTracker(
 			node.State,
 			builder.FinalizedRootBlock.Header.Height,
 			node.Storage.Headers,

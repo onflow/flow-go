@@ -155,7 +155,8 @@ type BaseConfig struct {
 	DynamicStartupSleepInterval time.Duration
 	datadir                     string
 	pebbleDir                   string
-	dbops                       string
+	pebbleCheckpointsDir        string
+	DBOps                       string
 	badgerDB                    *badger.DB
 	pebbleDB                    *pebble.DB
 	secretsdir                  string
@@ -279,7 +280,7 @@ func DefaultBaseConfig() *BaseConfig {
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
 		pebbleDir:        pebbleDir,
-		dbops:            string(dbops.BadgerTransaction), // "badger-transaction" (default) or "batch-update"
+		DBOps:            string(dbops.BadgerTransaction), // "badger-transaction" (default) or "batch-update"
 		badgerDB:         nil,
 		pebbleDB:         nil,
 		secretsdir:       NotSet,

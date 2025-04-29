@@ -8,6 +8,68 @@ import (
 const ExpandableFieldPayload = "payload"
 const ExpandableExecutionResult = "execution_result"
 
+func NewBlock(
+	block *flow.Block,
+	execResult *flow.ExecutionResult,
+	link LinkGenerator,
+	blockStatus flow.BlockStatus,
+	expand map[string]bool,
+) (*Block, error) {
+	self, err := SelfLink(block.ID(), link.BlockLink)
+	if err != nil {
+		return nil, err
+	}
+
+	var result Block
+	result.Header = NewBlockHeader(block.Header)
+
+	// add the payload to the response if it is specified as an expandable field
+	result.Expandable = &BlockExpandable{}
+	if expand[ExpandableFieldPayload] {
+		var payload BlockPayload
+		err := payload.Build(block.Payload)
+		if err != nil {
+			return nil, err
+		}
+		result.Payload = &payload
+	} else {
+		// else add the payload expandable link
+		payloadExpandable, err := link.PayloadLink(block.ID())
+		if err != nil {
+			return nil, err
+		}
+		result.Expandable.Payload = payloadExpandable
+	}
+
+	// execution result might not yet exist
+	if execResult != nil {
+		// add the execution result to the response if it is specified as an expandable field
+		if expand[ExpandableExecutionResult] {
+			var exeResult ExecutionResult
+			err := exeResult.Build(execResult, link)
+			if err != nil {
+				return nil, err
+			}
+			result.ExecutionResult = &exeResult
+		} else {
+			// else add the execution result expandable link
+			executionResultExpandable, err := link.ExecutionResultLink(execResult.ID())
+			if err != nil {
+				return nil, err
+			}
+			result.Expandable.ExecutionResult = executionResultExpandable
+		}
+	}
+
+	result.Links = self
+
+	var status BlockStatus
+	status.Build(blockStatus)
+	result.BlockStatus = &status
+
+	return &result, nil
+}
+
 func (b *Block) Build(
 	block *flow.Block,
 	execResult *flow.ExecutionResult,
@@ -99,6 +161,16 @@ func (b *BlockPayload) Build(payload *flow.Payload) error {
 	return nil
 }
 
+func NewBlockHeader(header *flow.Header) *BlockHeader {
+	return &BlockHeader{
+		Id:                   header.ID().String(),
+		ParentId:             header.ParentID.String(),
+		Height:               util.FromUint(header.Height),
+		Timestamp:            header.Timestamp,
+		ParentVoterSignature: util.ToBase64(header.ParentVoterSigData),
+	}
+}
+
 func (b *BlockHeader) Build(header *flow.Header) {
 	b.Id = header.ID().String()
 	b.ParentId = header.ParentID.String()
@@ -125,21 +197,12 @@ func (b *BlockSeals) Build(seals []*flow.Seal) error {
 }
 
 func (b *BlockSeal) Build(seal *flow.Seal) error {
-	finalState := ""
-	if len(seal.FinalState) > 0 { // todo(sideninja) this is always true?
-		finalStateBytes, err := seal.FinalState.MarshalJSON()
-		if err != nil {
-			return err
-		}
-		finalState = string(finalStateBytes)
-	}
-
 	var aggregatedSigs AggregatedSignatures
 	aggregatedSigs.Build(seal.AggregatedApprovalSigs)
 
 	b.BlockId = seal.BlockID.String()
 	b.ResultId = seal.ResultID.String()
-	b.FinalState = finalState
+	b.FinalState = seal.FinalState.String()
 	b.AggregatedApprovalSignatures = aggregatedSigs
 	return nil
 }
