@@ -77,6 +77,9 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequester_RawRequestExecuti
 
 	err := requester.RequestExecutionData(signalerCtx, blockEd.BlockID, 0)
 	require.NoError(suite.T(), err)
+
+	// Requester doesn't return downloaded execution data. It puts them into the internal cache.
+	// So, here we check if we successfully put the execution data into the cache.
 	require.True(suite.T(), heroCache.Has(blockEd.BlockID))
 }
 
@@ -115,11 +118,15 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequester_RequestExecutionD
 	defer cancel()
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	suite.T().Run("requester downloads all execution data", func(t *testing.T) {
+	suite.T().Run("requester downloads execution data for every block", func(t *testing.T) {
 		for blockID := range testData.executionDataIDByBlockID {
 			// height is used only for logging purposes
 			err := requester.RequestExecutionData(signalerCtx, blockID, 0)
 			require.NoError(t, err)
+
+			// Requester doesn't return downloaded execution data. It puts them into the internal cache.
+			// So, here we check if we successfully put the execution data into the cache.
+			require.True(t, heroCache.Has(blockID))
 		}
 	})
 }
