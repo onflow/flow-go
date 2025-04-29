@@ -19,6 +19,7 @@ var _ storage.Reader = (*multiReader)(nil)
 // - a reader succeeds or
 // - a reader returns an error that is not ErrNotFound
 // If all readers return ErrNotFound, Reader.Get will return ErrNotFound.
+// NewMultiReader panics if 0 readers are provided.
 func NewMultiReader(readers ...storage.Reader) storage.Reader {
 	if len(readers) == 0 {
 		panic("failed to create multiReader: need at least one reader")

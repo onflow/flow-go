@@ -15,6 +15,7 @@ var _ storage.Seeker = (*multiSeeker)(nil)
 
 // NewMultiSeeker returns a Seeker that consists of multiple seekers
 // in the provided order.
+// NewMultiSeeker panics if 0 seekers are provided.
 func NewMultiSeeker(seekers ...storage.Seeker) storage.Seeker {
 	if len(seekers) == 0 {
 		panic("failed to create multiSeeker: need at least one seeker")
