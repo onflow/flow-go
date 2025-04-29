@@ -1,11 +1,10 @@
 package persister
 
 import (
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 // Persister is responsible for persisting minimal critical safety and liveness data for HotStuff:
@@ -15,7 +14,7 @@ import (
 // SafetyData and LivenessData, for each distinct chain ID. This bootstrapping must be complete
 // before constructing a Persister instance with New (otherwise it will return an error).
 type Persister struct {
-	db      *badger.DB
+	db      storage.DB
 	chainID flow.ChainID
 }
 
@@ -27,7 +26,7 @@ var _ hotstuff.PersisterReader = (*Persister)(nil)
 // Persister depends on protocol.State and cluster.State bootstrapping to set initial values for
 // SafetyData and LivenessData, for each distinct chain ID. This bootstrapping must be completed
 // before first using a Persister instance.
-func New(db *badger.DB, chainID flow.ChainID) (*Persister, error) {
+func New(db storage.DB, chainID flow.ChainID) (*Persister, error) {
 	p := &Persister{
 		db:      db,
 		chainID: chainID,
@@ -36,34 +35,42 @@ func New(db *badger.DB, chainID flow.ChainID) (*Persister, error) {
 }
 
 // NewReader returns a new Persister as a PersisterReader type (only read methods accessible).
-func NewReader(db *badger.DB, chainID flow.ChainID) (hotstuff.PersisterReader, error) {
+func NewReader(db storage.DB, chainID flow.ChainID) (hotstuff.PersisterReader, error) {
 	return New(db, chainID)
 }
 
 // GetSafetyData will retrieve last persisted safety data.
 // During normal operations, no errors are expected.
 func (p *Persister) GetSafetyData() (*hotstuff.SafetyData, error) {
+	// TODO: cache
 	var safetyData hotstuff.SafetyData
-	err := p.db.View(operation.RetrieveSafetyData(p.chainID, &safetyData))
+	r, _ := p.db.Reader()
+	err := operation.RetrieveSafetyData(r, p.chainID, &safetyData)
 	return &safetyData, err
 }
 
 // GetLivenessData will retrieve last persisted liveness data.
 // During normal operations, no errors are expected.
 func (p *Persister) GetLivenessData() (*hotstuff.LivenessData, error) {
+	// TODO: cache
 	var livenessData hotstuff.LivenessData
-	err := p.db.View(operation.RetrieveLivenessData(p.chainID, &livenessData))
+	r, _ := p.db.Reader()
+	err := operation.RetrieveLivenessData(r, p.chainID, &livenessData)
 	return &livenessData, err
 }
 
 // PutSafetyData persists the last safety data.
 // During normal operations, no errors are expected.
 func (p *Persister) PutSafetyData(safetyData *hotstuff.SafetyData) error {
-	return operation.RetryOnConflict(p.db.Update, operation.UpdateSafetyData(p.chainID, safetyData))
+	return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return operation.UpsertSafetyData(rw.Writer(), p.chainID, safetyData)
+	})
 }
 
 // PutLivenessData persists the last liveness data.
 // During normal operations, no errors are expected.
 func (p *Persister) PutLivenessData(livenessData *hotstuff.LivenessData) error {
-	return operation.RetryOnConflict(p.db.Update, operation.UpdateLivenessData(p.chainID, livenessData))
+	return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return operation.UpsertLivenessData(rw.Writer(), p.chainID, livenessData)
+	})
 }
