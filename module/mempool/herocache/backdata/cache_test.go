@@ -187,6 +187,52 @@ func TestArrayBackData_RemoveAfterAdjustRandom(t *testing.T) {
 	}
 }
 
+// TestAdjustRefreshesLRU makes sure Adjust bumps the “recently used” order.
+// We add limit+1 entities, adjust the very first one, then add one more to force LRU eviction.
+// The first entity should survive, and the one that was second should get evicted.
+func TestArrayBackData_AdjustAffectsLRU(t *testing.T) {
+	limit := 100_000
+
+	bd := NewCache[*unittest.MockEntity](
+		uint32(limit),
+		8,
+		heropool.LRUEjection,
+		unittest.Logger(),
+		metrics.NewNoopCollector(),
+	)
+
+	entities := unittest.EntityListFixture(uint(limit))
+
+	// adds all entities to backdata
+	testAddEntities(t, bd, entities, heropool.LRUEjection)
+
+	// Adjust the very first one (index 0) to bump its LRU age
+	firstID := entities[0].Identifier
+	_, ok := bd.Adjust(firstID, func(ent *unittest.MockEntity) *unittest.MockEntity {
+		// no payload change just marking as used
+		return ent
+	})
+	require.True(t, ok)
+
+	// add one more to force an LRU eviction
+	extra := &unittest.MockEntity{Identifier: unittest.IdentifierFixture(), Nonce: 999}
+	require.True(t, bd.Add(extra.Identifier, extra))
+
+	// verify that first entity is still there
+	got, gotOK := bd.Get(firstID)
+	require.True(t, gotOK)
+	require.Equal(t, firstID, got.Identifier)
+
+	// but the second entity (the old LRU) has been evicted
+	secondID := entities[1].Identifier
+	_, secondOk := bd.Get(secondID)
+	require.False(t, secondOk)
+
+	// and the new “extra” entity is present
+	_, extraOK := bd.Get(extra.Identifier)
+	require.True(t, extraOK)
+}
+
 // TestArrayBackData_AdjustWitInit evaluates that AdjustWithInit method. It should initialize and then adjust the value of
 // non-existing entity while preserving the integrity of BackData on just adjusting the value of existing entity.
 func TestArrayBackData_AdjustWitInit(t *testing.T) {

@@ -209,6 +209,9 @@ func (c *Cache[V]) Adjust(key flow.Identifier, f func(V) V) (V, bool) {
 	idx := c.buckets[b].slots[s].valueIndex
 	c.entities.UpdateAtIndex(idx, newValue)
 
+	// and refresh its LRU position
+	c.entities.Touch(idx)
+
 	return newValue, true
 }
 
