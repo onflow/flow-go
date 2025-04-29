@@ -230,7 +230,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	for height := ref; height >= ref-4; height-- {
 		block := unittest.ClusterBlockFixture()
 		block.Header.Height = height
-		ss.heights[height] = unittest.ClusterProposalFromBlock(&block)
+		ss.heights[height] = unittest.ClusterProposalFromBlock(block)
 		ss.blockIDs[block.ID()] = ss.heights[height]
 	}
 
@@ -366,7 +366,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		block := unittest.ClusterBlockFixture()
 		block.Header.Height = ss.head.Height - 1
 		req.BlockIDs = []flow.Identifier{block.ID()}
-		proposal := unittest.ClusterProposalFromBlock(&block)
+		proposal := unittest.ClusterProposalFromBlock(block)
 		ss.blockIDs[block.ID()] = proposal
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 			func(args mock.Arguments) {
@@ -390,7 +390,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 			b := unittest.ClusterBlockFixture()
 			b.Header.Height = ss.head.Height - uint64(i)
 			req.BlockIDs[i] = b.ID()
-			ss.blockIDs[b.ID()] = unittest.ClusterProposalFromBlock(&b)
+			ss.blockIDs[b.ID()] = unittest.ClusterProposalFromBlock(b)
 		}
 
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
@@ -427,12 +427,12 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	// add one block that should be processed
 	processable := unittest.ClusterBlockFixture()
 	ss.core.On("HandleBlock", processable.ToHeader()).Return(true)
-	res.Blocks = append(res.Blocks, *messages.NewUntrustedClusterProposal(&processable, unittest.SignatureFixture()))
+	res.Blocks = append(res.Blocks, *messages.NewUntrustedClusterProposal(processable, unittest.SignatureFixture()))
 
 	// add one block that should not be processed
 	unprocessable := unittest.ClusterBlockFixture()
 	ss.core.On("HandleBlock", unprocessable.ToHeader()).Return(false)
-	res.Blocks = append(res.Blocks, *messages.NewUntrustedClusterProposal(&unprocessable, unittest.SignatureFixture()))
+	res.Blocks = append(res.Blocks, *messages.NewUntrustedClusterProposal(unprocessable, unittest.SignatureFixture()))
 
 	ss.comp.On("OnSyncedClusterBlock", mock.Anything).Run(func(args mock.Arguments) {
 		res := args.Get(0).(flow.Slashable[*messages.UntrustedClusterProposal])
