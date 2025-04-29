@@ -26,8 +26,10 @@ type UntrustedClusterBlock cluster.Block
 
 // ToHeader converts the untrusted block into a compact [flow.Header] representation,
 // where the payload is compressed to a hash reference.
+// TODO(malleability immutable, #7277): This conversion should eventually be accompanied by a full validation of the untrusted input.
 func (ub *UntrustedClusterBlock) ToHeader() *flow.Header {
-	return (*cluster.Block)(ub).ToHeader()
+	internal := cluster.NewBlock(ub.Header, ub.Payload)
+	return internal.ToHeader()
 }
 
 // UntrustedClusterProposal represents untrusted signed proposed block in collection node cluster consensus.
@@ -44,7 +46,7 @@ func NewUntrustedClusterProposal(internal cluster.Block, proposerSig []byte) *Un
 }
 
 // ToInternal converts the UntrustedClusterProposal to a trusted internal cluster.BlockProposal.
-// TODO: Validate the untrusted input before converting to trusted internal representation.
+// TODO(malleability immutable, #7277): This conversion should eventually be accompanied by a full validation of the untrusted input.
 func (cbp *UntrustedClusterProposal) ToInternal() *cluster.BlockProposal {
 	return &cluster.BlockProposal{
 		Block:           cluster.NewBlock(cbp.Block.Header, cbp.Block.Payload),
