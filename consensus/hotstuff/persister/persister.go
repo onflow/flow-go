@@ -42,7 +42,6 @@ func NewReader(db storage.DB, chainID flow.ChainID) (hotstuff.PersisterReader, e
 // GetSafetyData will retrieve last persisted safety data.
 // During normal operations, no errors are expected.
 func (p *Persister) GetSafetyData() (*hotstuff.SafetyData, error) {
-	// TODO: cache
 	var safetyData hotstuff.SafetyData
 	r, _ := p.db.Reader()
 	err := operation.RetrieveSafetyData(r, p.chainID, &safetyData)
