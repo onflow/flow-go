@@ -15,7 +15,7 @@ import (
 type Collections struct {
 	db           storage.DB
 	transactions *Transactions
-	indexingByTx sync.Mutex
+	indexingByTx *sync.Mutex
 }
 
 var _ storage.Collections = (*Collections)(nil)
@@ -25,7 +25,7 @@ func NewCollections(db storage.DB, transactions *Transactions) *Collections {
 	c := &Collections{
 		db:           db,
 		transactions: transactions,
-		indexingByTx: sync.Mutex{},
+		indexingByTx: new(sync.Mutex),
 	}
 	return c
 }
