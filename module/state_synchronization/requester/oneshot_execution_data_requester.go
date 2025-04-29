@@ -15,13 +15,23 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// OneshotExecutionDataConfig is a config for the oneshot execution data requester.
+// It contains the retry settings for the execution data fetch.
 type OneshotExecutionDataConfig struct {
-	FetchTimeout    time.Duration
+	// the initial timeout for fetching execution data from the db/network. The timeout is
+	// increased using an incremental backoff until FetchTimeout.
+	FetchTimeout time.Duration
+	// the max timeout for fetching execution data from the db/network.
 	MaxFetchTimeout time.Duration
-	RetryDelay      time.Duration
-	MaxRetryDelay   time.Duration
+	// the initial delay used in the exponential backoff for failed execution data download
+	// retries.
+	RetryDelay time.Duration
+	// the max delay used in the exponential backoff for failed execution data download.
+	MaxRetryDelay time.Duration
 }
 
+// OneshotExecutionDataRequester is a component that requests execution data for a block.
+// It uses a retry mechanism to retry the download execution data if they are not found.
 type OneshotExecutionDataRequester struct {
 	log           zerolog.Logger
 	metrics       module.ExecutionDataRequesterMetrics
@@ -36,13 +46,16 @@ func NewOneshotExecutionDataRequester(
 	config OneshotExecutionDataConfig,
 ) *OneshotExecutionDataRequester {
 	return &OneshotExecutionDataRequester{
-		log:           log.With().Str("component", "raw_execution_data_requester").Logger(),
+		log:           log.With().Str("component", "oneshot_execution_data_requester").Logger(),
 		metrics:       metrics,
 		execDataCache: execDataCache,
 		config:        config,
 	}
 }
 
+// RequestExecutionData requests execution data for a block.
+// It uses a retry mechanism to retry the download execution data if they are not found.
+// Execution data are saved in the execution data cache passed on instantiation.
 func (r *OneshotExecutionDataRequester) RequestExecutionData(
 	ctx irrecoverable.SignalerContext,
 	blockID flow.Identifier,
