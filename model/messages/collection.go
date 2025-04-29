@@ -47,16 +47,14 @@ func NewUntrustedClusterProposal(internal cluster.Block, proposerSig []byte) *Un
 // TODO: Validate the untrusted input before converting to trusted internal representation.
 func (cbp *UntrustedClusterProposal) ToInternal() *cluster.BlockProposal {
 	return &cluster.BlockProposal{
-		Block:           cbp.Block,
+		Block:           cluster.NewBlock(cbp.Block.Header, cbp.Block.Payload),
 		ProposerSigData: cbp.ProposerSigData,
 	}
 }
 
 func UntrustedClusterProposalFromInternal(proposal *cluster.BlockProposal) *UntrustedClusterProposal {
-	return &UntrustedClusterProposal{
-		Block:           proposal.Block,
-		ProposerSigData: proposal.ProposerSigData,
-	}
+	p := UntrustedClusterProposal(*proposal)
+	return &p
 }
 
 // ClusterBlockVote is a vote for a proposed block in collection node cluster
