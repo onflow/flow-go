@@ -66,13 +66,15 @@ func TestBootstrapValid(t *testing.T) {
 		err = db.View(operation.RetrieveHeader(genesisID, &header))
 		require.NoError(t, err)
 
+		storagedb := badgerimpl.ToDB(db)
+
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(genesisID, &sealID))
+		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), genesisID, &sealID)
 		require.NoError(t, err)
 
 		_, seal, err := rootSnapshot.SealedResult()
 		require.NoError(t, err)
-		err = db.View(operation.RetrieveSeal(sealID, seal))
+		err = storageoperation.RetrieveSeal(storagedb.Reader(), sealID, seal)
 		require.NoError(t, err)
 
 		block, err := rootSnapshot.Head()
@@ -538,9 +540,11 @@ func TestExtendMissingParent(t *testing.T) {
 		require.False(t, st.IsInvalidExtensionError(err), err)
 		require.False(t, st.IsOutdatedExtensionError(err), err)
 
+		storagedb := badgerimpl.ToDB(db)
+
 		// verify seal that was contained in candidate block is not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
+		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), extend.ID(), &sealID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
@@ -571,9 +575,11 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		err = state.Extend(context.Background(), &extend)
 		require.Error(t, err)
 
+		storagedb := badgerimpl.ToDB(db)
+
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
+		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), extend.ID(), &sealID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
@@ -641,9 +647,11 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		err = state.Extend(context.Background(), extend)
 		require.Error(t, err)
 
+		storagedb := badgerimpl.ToDB(db)
+
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
+		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), extend.ID(), &sealID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
@@ -2700,9 +2708,11 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 		require.Error(t, err)
 		require.False(t, st.IsInvalidExtensionError(err), err)
 
+		storagedb := badgerimpl.ToDB(db)
+
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
+		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), extend.ID(), &sealID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
@@ -2731,9 +2741,11 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		err = state.ExtendCertified(context.Background(), block2, unittest.CertifyBlock(block2.Header))
 		require.False(t, st.IsInvalidExtensionError(err))
 
+		storagedb := badgerimpl.ToDB(db)
+
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
+		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), block2.ID(), &sealID)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
@@ -2814,9 +2826,11 @@ func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 		err = state.ExtendCertified(context.Background(), block2, unittest.CertifyBlock(block2.Header))
 		require.NoError(t, err)
 
+		storagedb := badgerimpl.ToDB(db)
+
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
+		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), block2.ID(), &sealID)
 		require.NoError(t, err)
 	})
 }
@@ -2847,9 +2861,11 @@ func TestParticipantHeaderExtendBlockNotConnected(t *testing.T) {
 		err = state.Extend(context.Background(), block2)
 		require.True(t, st.IsOutdatedExtensionError(err), err)
 
+		storagedb := badgerimpl.ToDB(db)
+
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
+		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), block2.ID(), &sealID)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
