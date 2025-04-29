@@ -3,7 +3,6 @@ package requester
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
@@ -12,9 +11,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	edmock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -126,95 +123,5 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequester_RequestExecutionD
 		// Requester doesn't return downloaded execution data. It puts them into the internal cache.
 		// So, here we check if we successfully put the execution data into the cache.
 		require.True(suite.T(), heroCache.Has(blockID))
-	}
-}
-
-func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, specialHeightFuncs map[uint64]testExecutionDataCallback) *fetchTestRun {
-	edsEntries := map[flow.Identifier]*testExecutionDataServiceEntry{}
-	blocksByHeight := map[uint64]*flow.Block{}
-	blocksByID := map[flow.Identifier]*flow.Block{}
-	resultsByID := map[flow.Identifier]*flow.ExecutionResult{}
-	resultsByBlockID := map[flow.Identifier]*flow.ExecutionResult{}
-	sealsByBlockID := map[flow.Identifier]*flow.Seal{}
-	executionDataByID := map[flow.Identifier]*execution_data.BlockExecutionData{}
-	executionDataIDByBlockID := map[flow.Identifier]flow.Identifier{}
-
-	sealedCount := blockCount - 4 // seals for blocks 1-96
-	firstSeal := blockCount - sealedCount
-
-	// genesis is block 0, we start syncing from block 1
-	startHeight := uint64(1)
-	endHeight := uint64(blockCount) - 1
-
-	// instantiate ExecutionDataService to generate correct CIDs
-	eds := execution_data.NewExecutionDataStore(blobstore, execution_data.DefaultSerializer)
-
-	var previousBlock *flow.Block
-	var previousResult *flow.ExecutionResult
-	for i := 0; i < blockCount; i++ {
-		var seals []*flow.Header
-
-		if i >= firstSeal {
-			sealedBlock := blocksByHeight[uint64(i-firstSeal+1)]
-			seals = []*flow.Header{
-				sealedBlock.Header, // block 0 doesn't get sealed (it's pre-sealed in the genesis state)
-			}
-
-			sealsByBlockID[sealedBlock.ID()] = unittest.Seal.Fixture(
-				unittest.Seal.WithBlockID(sealedBlock.ID()),
-				unittest.Seal.WithResult(resultsByBlockID[sealedBlock.ID()]),
-			)
-
-			t.Logf("block %d has seals for %d", i, seals[0].Height)
-		}
-
-		height := uint64(i)
-		block := buildBlock(height, previousBlock, seals)
-
-		ed := unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(block.ID()))
-
-		cid, err := eds.Add(context.Background(), ed)
-		require.NoError(t, err)
-
-		result := buildResult(block, cid, previousResult)
-
-		blocksByHeight[height] = block
-		blocksByID[block.ID()] = block
-		resultsByBlockID[block.ID()] = result
-		resultsByID[result.ID()] = result
-
-		// ignore all the data we don't need to verify the test
-		if i > 0 && i <= sealedCount {
-			executionDataByID[block.ID()] = ed
-			edsEntries[cid] = &testExecutionDataServiceEntry{ExecutionData: ed}
-			if fn, has := specialHeightFuncs[height]; has {
-				edsEntries[cid].fn = fn
-			}
-
-			executionDataIDByBlockID[block.ID()] = cid
-		}
-
-		previousBlock = block
-		previousResult = result
-	}
-
-	return &fetchTestRun{
-		sealedCount:              sealedCount,
-		startHeight:              startHeight,
-		endHeight:                endHeight,
-		blocksByHeight:           blocksByHeight,
-		blocksByID:               blocksByID,
-		resultsByBlockID:         resultsByBlockID,
-		resultsByID:              resultsByID,
-		sealsByBlockID:           sealsByBlockID,
-		executionDataByID:        executionDataByID,
-		executionDataEntries:     edsEntries,
-		executionDataIDByBlockID: executionDataIDByBlockID,
-		waitTimeout:              time.Second * 5,
-
-		maxSearchAhead: DefaultMaxSearchAhead,
-		fetchTimeout:   DefaultFetchTimeout,
-		retryDelay:     1 * time.Millisecond,
-		maxRetryDelay:  15 * time.Millisecond,
 	}
 }
