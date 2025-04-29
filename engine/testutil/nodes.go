@@ -607,7 +607,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	rootResult, rootSeal, err := protoState.Sealed().SealedResult()
 	require.NoError(t, err)
 
-	require.Equal(t, fmt.Sprintf("%x", rootSeal.FinalState), fmt.Sprintf("%x", commit))
+	require.Equal(t, fmt.Sprint(rootSeal.FinalState), fmt.Sprint(commit))
 	require.Equal(t, rootSeal.ResultID, rootResult.ID())
 
 	err = bootstrapper.BootstrapExecutionDatabase(db, rootSeal)

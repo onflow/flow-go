@@ -1,5 +1,4 @@
 
-import "AccountV2Migration"
 
 access(all)
 contract Migration {
@@ -27,6 +26,6 @@ contract Migration {
 
     access(contract)
     fun migrate() {
-        AccountV2Migration.migrateNextBatch()
+        // NO-OP
     }
 }

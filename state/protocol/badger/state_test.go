@@ -548,7 +548,9 @@ func TestBootstrapNonRoot(t *testing.T) {
 func TestBootstrap_InvalidIdentities(t *testing.T) {
 	t.Run("duplicate node ID", func(t *testing.T) {
 		participants := unittest.CompleteIdentitySet()
-		dupeIDIdentity := unittest.IdentityFixture(unittest.WithNodeID(participants[0].NodeID))
+		// Make sure the duplicate node ID is not a consensus node, otherwise this will form an invalid DKGIDMapping
+		// See [flow.EpochCommit] for details.
+		dupeIDIdentity := unittest.IdentityFixture(unittest.WithNodeID(participants[0].NodeID), unittest.WithRole(flow.RoleVerification))
 		participants = append(participants, dupeIDIdentity)
 
 		root := unittest.RootSnapshotFixture(participants)

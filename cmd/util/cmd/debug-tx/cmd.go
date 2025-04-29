@@ -3,7 +3,10 @@ package debug_tx
 import (
 	"cmp"
 	"context"
+	"encoding/csv"
 	"encoding/hex"
+	"fmt"
+	"os"
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
@@ -29,7 +32,6 @@ var (
 	flagAccessAddress       string
 	flagExecutionAddress    string
 	flagChain               string
-	flagTx                  string
 	flagComputeLimit        uint64
 	flagProposalKeySeq      uint64
 	flagUseExecutionDataAPI bool
@@ -58,9 +60,6 @@ func init() {
 	Cmd.Flags().StringVar(&flagExecutionAddress, "execution-address", "", "address of the execution node")
 	_ = Cmd.MarkFlagRequired("execution-address")
 
-	Cmd.Flags().StringVar(&flagTx, "tx", "", "transaction ID")
-	_ = Cmd.MarkFlagRequired("tx")
-
 	Cmd.Flags().Uint64Var(&flagComputeLimit, "compute-limit", 9999, "transaction compute limit")
 
 	Cmd.Flags().Uint64Var(&flagProposalKeySeq, "proposal-key-seq", 0, "proposal key sequence number")
@@ -70,15 +69,12 @@ func init() {
 	Cmd.Flags().BoolVar(&flagDumpRegisters, "dump-registers", false, "dump registers")
 }
 
-func run(*cobra.Command, []string) {
+func run(_ *cobra.Command, args []string) {
+
+	log.Info().Msgf("Starting transaction debugger ... %v", args)
 
 	chainID := flow.ChainID(flagChain)
 	chain := chainID.Chain()
-
-	txID, err := flow.HexStringToIdentifier(flagTx)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to parse transaction ID")
-	}
 
 	config, err := grpcclient.NewFlowClientConfig(flagAccessAddress, "", flow.ZeroID, true)
 	if err != nil {
@@ -90,7 +86,18 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("failed to create client")
 	}
 
-	log.Info().Msg("Fetching transaction result ...")
+	for _, rawTxID := range args {
+		txID, err := flow.HexStringToIdentifier(rawTxID)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to parse transaction ID")
+		}
+
+		runTransactionID(txID, flowClient, chain)
+	}
+}
+
+func runTransactionID(txID flow.Identifier, flowClient *client.Client, chain flow.Chain) {
+	log.Info().Msgf("Fetching transaction result for %s ...", txID)
 
 	txResult, err := flowClient.GetTransactionResult(context.Background(), sdk.Identifier(txID))
 	if err != nil {
@@ -254,7 +261,8 @@ func runTransaction(
 		log.Info().Msg("Transaction succeeded")
 	}
 
-	for _, updatedRegister := range resultSnapshot.UpdatedRegisters() {
+	updatedRegisters := resultSnapshot.UpdatedRegisters()
+	for _, updatedRegister := range updatedRegisters {
 		blockSnapshot.Set(
 			updatedRegister.Key,
 			updatedRegister.Value,
@@ -262,30 +270,84 @@ func runTransaction(
 	}
 
 	if dumpRegisters {
-		log.Info().Msg("Read registers:")
-		readRegisterIDs := resultSnapshot.ReadRegisterIDs()
-		sortRegisters(readRegisterIDs)
-		for _, registerID := range readRegisterIDs {
-			log.Info().Msgf("\t%s", registerID)
-		}
+		dumpReadRegisters(txID, resultSnapshot.ReadRegisterIDs())
+		dumpUpdatedRegisters(txID, updatedRegisters)
+	}
+}
 
-		log.Info().Msg("Written registers:")
-		for _, updatedRegister := range resultSnapshot.UpdatedRegisters() {
-			log.Info().Msgf(
-				"\t%s, %s",
-				updatedRegister.Key,
-				hex.EncodeToString(updatedRegister.Value),
-			)
+func dumpReadRegisters(txID flow.Identifier, readRegisterIDs []flow.RegisterID) {
+	filename := fmt.Sprintf("%s.reads.csv", txID)
+	file, err := os.Create(filename)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("Failed to create reads file: %s", filename)
+	}
+	defer file.Close()
+
+	sortRegisterIDs(readRegisterIDs)
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	err = writer.Write([]string{"RegisterID"})
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to write header")
+	}
+
+	for _, readRegisterID := range readRegisterIDs {
+		err = writer.Write([]string{
+			readRegisterID.String(),
+		})
+		if err != nil {
+			log.Fatal().Err(err).Msgf("Failed to write read register: %s", readRegisterID)
 		}
 	}
 }
 
-func sortRegisters(registerIDs []flow.RegisterID) {
+func dumpUpdatedRegisters(txID flow.Identifier, updatedRegisters []flow.RegisterEntry) {
+	filename := fmt.Sprintf("%s.updates.csv", txID)
+	file, err := os.Create(filename)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("Failed to create writes file: %s", filename)
+	}
+	defer file.Close()
+
+	sortRegisterEntries(updatedRegisters)
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	err = writer.Write([]string{"RegisterID", "Value"})
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to write header")
+	}
+
+	for _, updatedRegister := range updatedRegisters {
+		err = writer.Write([]string{
+			updatedRegister.Key.String(),
+			hex.EncodeToString(updatedRegister.Value),
+		})
+		if err != nil {
+			log.Fatal().Err(err).Msgf("Failed to write updated register: %s", updatedRegister)
+		}
+	}
+}
+
+func compareRegisterIDs(a flow.RegisterID, b flow.RegisterID) int {
+	return cmp.Or(
+		cmp.Compare(a.Owner, b.Owner),
+		cmp.Compare(a.Key, b.Key),
+	)
+}
+
+func sortRegisterIDs(registerIDs []flow.RegisterID) {
 	slices.SortFunc(registerIDs, func(a, b flow.RegisterID) int {
-		return cmp.Or(
-			cmp.Compare(a.Owner, b.Owner),
-			cmp.Compare(a.Key, b.Key),
-		)
+		return compareRegisterIDs(a, b)
+	})
+}
+
+func sortRegisterEntries(registerEntries []flow.RegisterEntry) {
+	slices.SortFunc(registerEntries, func(a, b flow.RegisterEntry) int {
+		return compareRegisterIDs(a.Key, b.Key)
 	})
 }
 
