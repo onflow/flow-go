@@ -45,6 +45,7 @@ type FollowerState struct {
 
 	// locks
 	indexingNewBlock *sync.Mutex
+	finalizing       *sync.Mutex
 }
 
 var _ protocol.FollowerState = (*FollowerState)(nil)
@@ -91,6 +92,7 @@ func NewFollowerState(
 		),
 
 		indexingNewBlock: &sync.Mutex{},
+		finalizing:       &sync.Mutex{},
 	}
 	return followerState, nil
 }
@@ -768,7 +770,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		}
 
 		if isFirstBlockOfEpoch(parentEpochState, finalizingEpochState) {
-			err = operation.InsertEpochFirstHeight(rw, currentEpochSetup.Counter, header.Height)
+			err = operation.InsertEpochFirstHeight(m.finalizing, rw, currentEpochSetup.Counter, header.Height)
 			if err != nil {
 				return fmt.Errorf("could not insert epoch first block height: %w", err)
 			}

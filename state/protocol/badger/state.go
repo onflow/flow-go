@@ -3,6 +3,7 @@ package badger
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -165,10 +166,6 @@ func Bootstrap(
 			return fmt.Errorf("could not bootstrap spork info: %w", err)
 		}
 
-		// bootstrap dynamic protocol state
-		if err != nil {
-			return fmt.Errorf("could not retrieve protocol state for root snapshot: %w", err)
-		}
 		err = bootstrapProtocolState(rw, segment, root.Params(), epochProtocolStateSnapshots, protocolKVStoreSnapshots, setups, commits, !config.SkipNetworkAddressValidation)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap protocol state: %w", err)
@@ -439,6 +436,7 @@ func bootstrapStatePointers(rw storage.ReaderBatchWriter, root protocol.Snapshot
 	}
 
 	w := rw.Writer()
+	bootstrapping := &sync.Mutex{}
 	// insert initial views for HotStuff
 	err = operation.UpsertSafetyData(w, highest.Header.ChainID, safetyData)
 	if err != nil {
@@ -473,7 +471,7 @@ func bootstrapStatePointers(rw storage.ReaderBatchWriter, root protocol.Snapshot
 	}
 
 	// insert first-height indices for epochs which begin within the sealing segment
-	err = indexEpochHeights(rw, segment)
+	err = indexEpochHeights(bootstrapping, rw, segment)
 	if err != nil {
 		return fmt.Errorf("could not index epoch heights: %w", err)
 	}
@@ -599,13 +597,13 @@ func bootstrapSporkInfo(rw storage.ReaderBatchWriter, root protocol.Snapshot) er
 // We index the FirstHeight for every epoch where the transition occurs within the sealing segment of the root snapshot,
 // or for the first epoch of a spork if the snapshot is a spork root snapshot (1 block sealing segment).
 // No errors are expected during normal operation.
-func indexEpochHeights(rw storage.ReaderBatchWriter, segment *flow.SealingSegment) error {
+func indexEpochHeights(lock *sync.Mutex, rw storage.ReaderBatchWriter, segment *flow.SealingSegment) error {
 	// CASE 1: For spork root snapshots, there is exactly one block B and one epoch E.
 	// Index `E.counter → B.Height`.
 	if segment.IsSporkRoot() {
 		counter := segment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
 		firstHeight := segment.Highest().Header.Height
-		err := operation.InsertEpochFirstHeight(rw, counter, firstHeight)
+		err := operation.InsertEpochFirstHeight(lock, rw, counter, firstHeight)
 		if err != nil {
 			return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, counter, err)
 		}
@@ -623,7 +621,7 @@ func indexEpochHeights(rw storage.ReaderBatchWriter, segment *flow.SealingSegmen
 		thisBlockEpochCounter := segment.ProtocolStateEntries[block.Payload.ProtocolStateID].EpochEntry.EpochCounter()
 		if lastBlockEpochCounter != thisBlockEpochCounter {
 			firstHeight := block.Header.Height
-			err := operation.InsertEpochFirstHeight(rw, thisBlockEpochCounter, firstHeight)
+			err := operation.InsertEpochFirstHeight(lock, rw, thisBlockEpochCounter, firstHeight)
 			if err != nil {
 				return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, thisBlockEpochCounter, err)
 			}

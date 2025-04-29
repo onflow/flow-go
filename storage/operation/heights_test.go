@@ -79,9 +79,10 @@ func TestEpochFirstBlockIndex_InsertRetrieve(t *testing.T) {
 		err := operation.RetrieveEpochFirstHeight(db.Reader(), epoch, &retrieved)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
+		lock := &sync.Mutex{}
 		// can insert
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertEpochFirstHeight(rw, epoch, height)
+			return operation.InsertEpochFirstHeight(lock, rw, epoch, height)
 		})
 		require.NoError(t, err)
 
@@ -96,7 +97,7 @@ func TestEpochFirstBlockIndex_InsertRetrieve(t *testing.T) {
 
 		// insert existent key errors
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertEpochFirstHeight(rw, epoch, height)
+			return operation.InsertEpochFirstHeight(lock, rw, epoch, height)
 		})
 		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 	})
