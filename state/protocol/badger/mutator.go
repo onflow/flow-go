@@ -189,6 +189,8 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 			return fmt.Errorf("failed to determine the lastest sealed block in fork: %w", err)
 		}
 
+		// TODO: we might not need the deferred db updates, because the candidate passed into
+		// the Extend method has already been fully constructed.
 		// evolve protocol state and verify consistency with commitment included in
 		dbUpdates, err := m.evolveProtocolState(ctx, candidate, rw)
 		if err != nil {

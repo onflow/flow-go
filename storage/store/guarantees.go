@@ -17,6 +17,7 @@ type Guarantees struct {
 func NewGuarantees(collector module.CacheMetrics, db storage.DB, cacheSize uint) *Guarantees {
 
 	store := func(rw storage.ReaderBatchWriter, collID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
+		// insert when not found
 		return operation.UnsafeInsertGuarantee(rw.Writer(), collID, guarantee)
 	}
 
@@ -38,7 +39,6 @@ func NewGuarantees(collector module.CacheMetrics, db storage.DB, cacheSize uint)
 }
 
 func (g *Guarantees) storeTx(rw storage.ReaderBatchWriter, guarantee *flow.CollectionGuarantee) error {
-	// TODO: check if guarnatee exists
 	return g.cache.PutTx(rw, guarantee.ID(), guarantee)
 }
 

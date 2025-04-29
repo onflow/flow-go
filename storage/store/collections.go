@@ -155,10 +155,9 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 	//   is used in the code base to index collection by transaction.
 	collectionID := collection.ID()
 
-	c.indexingByTx.Lock()
-	defer c.indexingByTx.Unlock()
-
 	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		rw.Lock(c.indexingByTx)
+
 		err := operation.UpsertCollection(rw.Writer(), collection)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
