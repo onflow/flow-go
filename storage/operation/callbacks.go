@@ -1,10 +1,12 @@
 package operation
 
-import "sync"
-
+// Callbacks represents a collection of callbacks to be executed.
+// Callbacks are not concurrent safe.
+// Since Callbacks is only used in ReaderBatchWriter, which
+// isn't concurrent safe, there isn't a need to add locking
+// overhead to Callbacks.
 type Callbacks struct {
-	sync.RWMutex // protect callbacks
-	callbacks    []func(error)
+	callbacks []func(error)
 }
 
 func NewCallbacks() *Callbacks {
@@ -14,16 +16,10 @@ func NewCallbacks() *Callbacks {
 }
 
 func (b *Callbacks) AddCallback(callback func(error)) {
-	b.Lock()
-	defer b.Unlock()
-
 	b.callbacks = append(b.callbacks, callback)
 }
 
 func (b *Callbacks) NotifyCallbacks(err error) {
-	b.RLock()
-	defer b.RUnlock()
-
 	for _, callback := range b.callbacks {
 		callback(err)
 	}
