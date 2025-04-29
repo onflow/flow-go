@@ -149,7 +149,7 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not get root qc: %w", err)
 		}
-		err = qcs.BatchStore(qc, rw)
+		err = qcs.BatchStore(rw, qc)
 		if err != nil {
 			return fmt.Errorf("could not insert root qc: %w", err)
 		}
@@ -323,7 +323,7 @@ func bootstrapSealingSegment(
 		if err != nil {
 			return fmt.Errorf("could not index SealingSegment extra block (id=%x): %w", blockID, err)
 		}
-		err = qcs.BatchStore(block.Header.QuorumCertificate(), rw)
+		err = qcs.BatchStore(rw, block.Header.QuorumCertificate())
 		if err != nil {
 			return fmt.Errorf("could not store qc for SealingSegment extra block (id=%x): %w", blockID, err)
 		}
@@ -346,7 +346,7 @@ func bootstrapSealingSegment(
 		if err != nil {
 			return fmt.Errorf("could not index SealingSegment block (id=%x): %w", blockID, err)
 		}
-		err = qcs.BatchStore(block.Header.QuorumCertificate(), rw)
+		err = qcs.BatchStore(rw, block.Header.QuorumCertificate())
 		if err != nil {
 			return fmt.Errorf("could not store qc for SealingSegment block (id=%x): %w", blockID, err)
 		}
