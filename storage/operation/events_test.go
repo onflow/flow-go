@@ -91,13 +91,13 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 
 		t.Run("retrieve events by block ID and transaction ID", func(t *testing.T) {
 			for _, b := range blockIDs {
-				for _, t := range txIDs {
+				for _, tid := range txIDs {
 					var actualEvents = make([]flow.Event, 0)
 
 					//lookup events by block id and transaction id
-					err := operation.RetrieveEvents(db.Reader(), b, t, &actualEvents)
+					err := operation.RetrieveEvents(db.Reader(), b, tid, &actualEvents)
 
-					expectedEvents := txMap[b.String()+"_"+t.String()]
+					expectedEvents := txMap[b.String()+"_"+tid.String()]
 					assertFunc(err, expectedEvents, actualEvents)
 				}
 			}
