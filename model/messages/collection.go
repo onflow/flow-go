@@ -27,11 +27,11 @@ type UntrustedClusterBlock cluster.Block
 // ToHeader converts the untrusted block into a compact [flow.Header] representation,
 // where the payload is compressed to a hash reference.
 func (ub *UntrustedClusterBlock) ToHeader() *flow.Header {
-	return (*cluster.Block)(ub).ToHeader()
+	return ub.ToInternal().ToHeader()
 }
 
 // ToInternal returns the internal representation of the type.
-// TODO: Validate the untrusted input before converting to trusted internal representation.
+// TODO(malleability immutable, #7277): This conversion should eventually be accompanied by a full validation of the untrusted input.
 func (ub *UntrustedClusterBlock) ToInternal() *cluster.Block {
 	return cluster.NewBlock(ub.Header, ub.Payload)
 }
