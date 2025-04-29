@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	statepkg "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
@@ -115,7 +116,7 @@ func Bootstrap(
 		return nil, fmt.Errorf("expected empty database")
 	}
 
-	if err := IsValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
+	if err := datastore.IsValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
 		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
 	}
 
@@ -195,12 +196,12 @@ func Bootstrap(
 		return nil, fmt.Errorf("bootstrapping failed: %w", err)
 	}
 
-	instanceParams, err := ReadInstanceParams(db, headers, seals)
+	instanceParams, err := datastore.ReadInstanceParams(db, headers, seals)
 	if err != nil {
 		return nil, fmt.Errorf("could not read instance params: %w", err)
 	}
 
-	params := &Params{
+	params := &datastore.Params{
 		GlobalParams:   root.Params(),
 		InstanceParams: instanceParams,
 	}
@@ -652,15 +653,15 @@ func OpenState(
 	if !isBootstrapped {
 		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
-	globalParams, err := ReadGlobalParams(db)
+	globalParams, err := datastore.ReadGlobalParams(db)
 	if err != nil {
 		return nil, fmt.Errorf("could not read global params: %w", err)
 	}
-	instanceParams, err := ReadInstanceParams(db, headers, seals)
+	instanceParams, err := datastore.ReadInstanceParams(db, headers, seals)
 	if err != nil {
 		return nil, fmt.Errorf("could not read instance params: %w", err)
 	}
-	params := &Params{
+	params := &datastore.Params{
 		GlobalParams:   globalParams,
 		InstanceParams: instanceParams,
 	}

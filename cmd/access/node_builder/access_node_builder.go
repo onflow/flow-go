@@ -114,6 +114,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
+	statedatastore "github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
@@ -1652,7 +1653,7 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 
 	builder.EnqueueTracer()
 	builder.PreInit(cmd.DynamicStartPreInit)
-	builder.ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange)
+	builder.ValidateRootSnapshot(statedatastore.ValidRootSnapshotContainsEntityExpiryRange)
 
 	return nil
 }

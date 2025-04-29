@@ -78,6 +78,7 @@ import (
 	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
@@ -1467,7 +1468,7 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 	var err error
 
 	// validate the root snapshot QCs
-	err = badgerState.IsValidRootSnapshotQCs(rootSnapshot)
+	err = datastore.IsValidRootSnapshotQCs(rootSnapshot)
 	if err != nil {
 		return fmt.Errorf("failed to validate root snapshot QCs: %w", err)
 	}

@@ -65,6 +65,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -201,7 +202,7 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
-		ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange).
+		ValidateRootSnapshot(datastore.ValidRootSnapshotContainsEntityExpiryRange).
 		PostInit(func(nodeConfig *cmd.NodeConfig) error {
 			// TODO(EFM, #6794): This function is introduced to implement a backward-compatible upgrade from v1 to v2.
 			// Remove this once we complete the network upgrade.
