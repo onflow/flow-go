@@ -32,10 +32,10 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the badger dababase")
 	_ = rootCmd.MarkPersistentFlagRequired("datadir")
 
-	rootCmd.PersistentFlags().StringVar(&flagPebbleDir, "pebble-dir", "/var/flow/data/protocol-pebble", "directory to the pebble dababase")
+	rootCmd.PersistentFlags().StringVar(&flagPebbleDir, "pebble-dir", "", "directory to the pebble dababase")
 
-	rootCmd.Flags().StringVar(&flagChain, "chain", "", "Chain name, e.g. flow-mainnet, flow-testnet")
-	_ = rootCmd.MarkFlagRequired("chain")
+	rootCmd.PersistentFlags().StringVar(&flagChain, "chain", "", "Chain name, e.g. flow-mainnet, flow-testnet")
+	_ = rootCmd.MarkPersistentFlagRequired("chain")
 
 	cobra.OnInitialize(initConfig)
 }

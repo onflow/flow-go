@@ -92,12 +92,16 @@ func WithStorage(dirs DBDirs, f func(storage.DB) error) error {
 		}
 
 		defer db.Close()
+
+		log.Info().Msgf("using pebble db at %s", dirs.Pebbledir)
 		return f(pebbleimpl.ToDB(db))
 	}
 
 	if dirs.Datadir != "" {
 		db := InitStorage(dirs.Datadir)
 		defer db.Close()
+
+		log.Info().Msgf("using badger db at %s", dirs.Datadir)
 		return f(badgerimpl.ToDB(db))
 	}
 
