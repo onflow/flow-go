@@ -1,6 +1,9 @@
 package common
 
 import (
+	"fmt"
+
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog/log"
 
@@ -9,8 +12,17 @@ import (
 	storagebadger "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
 )
+
+// DBDirs is a struct that holds the datadir and pebble-dir
+// this struct help prevents mistakes from passing the wrong dir, such as pass pebbledir as datadir
+type DBDirs struct {
+	Datadir   string
+	Pebbledir string
+}
 
 func InitStorage(datadir string) *badger.DB {
 	return InitStorageWithTruncate(datadir, false)
@@ -64,4 +76,65 @@ func InitExecutionStorages(bdb *badger.DB) *storage.Execution {
 		TransactionResults: transactionResults,
 		Events:             events,
 	}
+}
+
+// WithStorage runs the given function with the storage dependending on the flags
+// only one flag (datadir / pebble-dir) is allowed to be set
+func WithStorage(dirs DBDirs, f func(storage.DB) error) error {
+	if dirs.Pebbledir != "" {
+		if dirs.Datadir != "" {
+			log.Warn().Msg("both --datadir and --pebble-dir are set, using --pebble-dir")
+		}
+
+		db, err := pebblestorage.MustOpenDefaultPebbleDB(log.Logger, dirs.Pebbledir)
+		if err != nil {
+			return err
+		}
+
+		defer db.Close()
+		return f(pebbleimpl.ToDB(db))
+	}
+
+	if dirs.Datadir != "" {
+		db := InitStorage(dirs.Datadir)
+		defer db.Close()
+		return f(badgerimpl.ToDB(db))
+	}
+
+	return fmt.Errorf("must specify either --datadir or --pebble-dir")
+}
+
+// InitBadgerAndPebble initializes the badger and pebble storages
+func InitBadgerAndPebble(dirs DBDirs) (bdb *badger.DB, pdb *pebble.DB, err error) {
+	if dirs.Datadir == "" {
+		return nil, nil, fmt.Errorf("must specify --datadir")
+	}
+
+	if dirs.Pebbledir == "" {
+		return nil, nil, fmt.Errorf("must specify --pebble-dir")
+	}
+
+	pdb, err = pebblestorage.MustOpenDefaultPebbleDB(
+		log.Logger.With().Str("pebbledb", "protocol").Logger(), dirs.Pebbledir)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	bdb = InitStorage(dirs.Datadir)
+
+	return bdb, pdb, nil
+}
+
+// WithBadgerAndPebble runs the given function with the badger and pebble storages
+// it ensures that the storages are closed after the function is done
+func WithBadgerAndPebble(dirs DBDirs, f func(*badger.DB, *pebble.DB) error) error {
+	bdb, pdb, err := InitBadgerAndPebble(dirs)
+	if err != nil {
+		return err
+	}
+
+	defer bdb.Close()
+	defer pdb.Close()
+
+	return f(bdb, pdb)
 }
