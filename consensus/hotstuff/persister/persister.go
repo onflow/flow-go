@@ -43,8 +43,7 @@ func NewReader(db storage.DB, chainID flow.ChainID) (hotstuff.PersisterReader, e
 // During normal operations, no errors are expected.
 func (p *Persister) GetSafetyData() (*hotstuff.SafetyData, error) {
 	var safetyData hotstuff.SafetyData
-	r, _ := p.db.Reader()
-	err := operation.RetrieveSafetyData(r, p.chainID, &safetyData)
+	err := operation.RetrieveSafetyData(p.db.Reader(), p.chainID, &safetyData)
 	return &safetyData, err
 }
 
@@ -52,8 +51,7 @@ func (p *Persister) GetSafetyData() (*hotstuff.SafetyData, error) {
 // During normal operations, no errors are expected.
 func (p *Persister) GetLivenessData() (*hotstuff.LivenessData, error) {
 	var livenessData hotstuff.LivenessData
-	r, _ := p.db.Reader()
-	err := operation.RetrieveLivenessData(r, p.chainID, &livenessData)
+	err := operation.RetrieveLivenessData(p.db.Reader(), p.chainID, &livenessData)
 	return &livenessData, err
 }
 
