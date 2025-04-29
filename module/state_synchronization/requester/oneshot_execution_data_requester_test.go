@@ -7,6 +7,7 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -15,10 +16,12 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	edmock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
+	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -29,6 +32,52 @@ type OneshotExecutionDataRequesterSuite struct {
 func TestRawExecutionDataRequesterSuite(t *testing.T) {
 	t.Parallel()
 	suite.Run(t, new(OneshotExecutionDataRequesterSuite))
+}
+
+func (suite *OneshotExecutionDataRequesterSuite) TestRequester_RawRequestExecutionData() {
+	logger := unittest.Logger()
+	metricsCollector := metrics.NewNoopCollector()
+	config := OneshotExecutionDataConfig{
+		FetchTimeout:    DefaultFetchTimeout,
+		MaxFetchTimeout: DefaultMaxFetchTimeout,
+		RetryDelay:      DefaultRetryDelay,
+		MaxRetryDelay:   DefaultMaxRetryDelay,
+	}
+
+	headers := new(storagemock.Headers)
+	seals := new(storagemock.Seals)
+	seal := unittest.Seal.Fixture()
+	seals.
+		On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).
+		Return(seal, nil).
+		Once()
+
+	results := new(storagemock.ExecutionResults)
+	result := unittest.ExecutionResultFixture()
+	results.
+		On("ByID", mock.AnythingOfType("flow.Identifier")).
+		Return(result, nil).
+		Once()
+
+	blockEd := unittest.BlockExecutionDataFixture()
+	heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
+
+	downloader := new(edmock.Downloader)
+	downloader.
+		On("Get", mock.Anything, mock.AnythingOfType("flow.Identifier")).
+		Return(blockEd, nil).
+		Once()
+
+	edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
+	requester := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, config)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
+
+	err := requester.RequestExecutionData(signalerCtx, blockEd.BlockID, 0)
+	require.NoError(suite.T(), err)
+	require.True(suite.T(), heroCache.Has(blockEd.BlockID))
 }
 
 func (suite *OneshotExecutionDataRequesterSuite) TestRequester_RequestExecutionData() {
