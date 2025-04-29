@@ -66,19 +66,13 @@ func TestCollection_Persist(t *testing.T) {
 			return collections.AddToBatch(rw)
 		}))
 
-		// Encode key
-		collCode := byte(35) // taken from operation/prefix.go
-		key := operation.MakePrefix(collCode, collection.ID())
-
 		// Get light transaction
 		reader, err := db.Reader()
 		require.NoError(t, err)
 
-		value, closer, err := reader.Get(key)
-		defer closer.Close()
+		var actualCollection flow.LightCollection
+		err = operation.RetrieveCollection(reader, collection.ID(), &actualCollection)
 		require.NoError(t, err)
-
-		// Ensure value with such a key was stored in DB
-		require.NotEmpty(t, value)
+		require.Equal(t, collection.Light(), actualCollection)
 	})
 }

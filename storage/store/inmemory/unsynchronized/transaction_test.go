@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
@@ -40,19 +41,13 @@ func TestTransactions_Persist(t *testing.T) {
 			return txStore.AddToBatch(rw)
 		}))
 
-		// Encode key
-		txCode := byte(34) // taken from operation/prefix.go
-		key := operation.MakePrefix(txCode, tx.ID())
-
 		// Get light transaction
 		reader, err := db.Reader()
 		require.NoError(t, err)
 
-		value, closer, err := reader.Get(key)
-		defer closer.Close()
+		var actualTx flow.TransactionBody
+		err = operation.RetrieveTransaction(reader, tx.ID(), &actualTx)
 		require.NoError(t, err)
-
-		// Ensure value with such a key was stored in DB
-		require.NotEmpty(t, value)
+		require.Equal(t, tx, actualTx)
 	})
 }

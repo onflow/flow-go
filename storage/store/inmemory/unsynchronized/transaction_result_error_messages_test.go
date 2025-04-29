@@ -76,19 +76,13 @@ func TestTransactionResultErrorMessages_Persist(t *testing.T) {
 			return store.AddToBatch(rw)
 		}))
 
-		// Encode key
-		txErrorMessageCode := byte(110) // taken from operation/prefix.go
-		key := operation.MakePrefix(txErrorMessageCode, block.ID(), errorMessages[0].TransactionID)
-
 		// Get stored error message value
 		reader, err := db.Reader()
 		require.NoError(t, err)
 
-		value, closer, err := reader.Get(key)
-		defer closer.Close()
+		var actualTxResultErrorMessages []flow.TransactionResultErrorMessage
+		err = operation.LookupTransactionResultErrorMessagesByBlockIDUsingIndex(reader, block.ID(), &actualTxResultErrorMessages)
 		require.NoError(t, err)
-
-		// Ensure value with such a key was stored in DB
-		require.NotEmpty(t, value)
+		assert.Equal(t, errorMessages, actualTxResultErrorMessages)
 	})
 }
