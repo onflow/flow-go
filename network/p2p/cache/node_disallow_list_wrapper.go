@@ -22,19 +22,18 @@ func (s IdentifierSet) Contains(id flow.Identifier) bool {
 	return found
 }
 
-// NodeDisallowListingWrapper is a wrapper for an `module.IdentityProvider` instance, where the
+// NodeDisallowListWrapper is a wrapper for an `module.IdentityProvider` instance, where the
 // wrapper overrides the `Ejected` flag to true for all NodeIDs in a `disallowList`.
 // To avoid modifying the source of the identities, the wrapper creates shallow copies
 // of the identities (whenever necessary) and modifies the `Ejected` flag only in
 // the copy.
-// The `NodeDisallowListingWrapper` internally represents the `disallowList` as a map, to enable
+// The `NodeDisallowListWrapper` internally represents the `disallowList` as a map, to enable
 // performant lookup. However, the exported API works with `flow.IdentifierList` for
 // disallowList, as this is a broadly supported data structure which lends itself better
 // to config or command-line inputs.
 // When a node is disallow-listed, the networking layer connection to that node is closed and no
 // incoming or outgoing connections are established with that node.
-// TODO: terminology change - rename `blocklist` to `disallowList` everywhere to be consistent with the code.
-type NodeDisallowListingWrapper struct {
+type NodeDisallowListWrapper struct {
 	m                     sync.RWMutex
 	nodeDisallowListStore storage.NodeDisallowList
 
@@ -50,7 +49,7 @@ type NodeDisallowListingWrapper struct {
 	updateConsumerOracle func() network.DisallowListNotificationConsumer
 }
 
-var _ module.IdentityProvider = (*NodeDisallowListingWrapper)(nil)
+var _ module.IdentityProvider = (*NodeDisallowListWrapper)(nil)
 
 // NewNodeDisallowListWrapper wraps the given `IdentityProvider`. The disallow-list is
 // loaded from the database (or assumed to be empty if no database entry is present).
@@ -58,7 +57,7 @@ func NewNodeDisallowListWrapper(
 	identityProvider module.IdentityProvider,
 	db storage.DB,
 	updateConsumerOracle func() network.DisallowListNotificationConsumer,
-) (*NodeDisallowListingWrapper, error) {
+) (*NodeDisallowListWrapper, error) {
 	nodeDisallowListStore := store.NewNodeDisallowList(db)
 
 	var disallowList map[flow.Identifier]struct{}
@@ -67,7 +66,7 @@ func NewNodeDisallowListWrapper(
 		return nil, fmt.Errorf("failed to read set of disallowed node IDs from data base: %w", err)
 	}
 
-	return &NodeDisallowListingWrapper{
+	return &NodeDisallowListWrapper{
 		nodeDisallowListStore: nodeDisallowListStore,
 		identityProvider:      identityProvider,
 		disallowList:          disallowList,
@@ -89,7 +88,7 @@ func NewNodeDisallowListWrapper(
 // Returns:
 // - error: if the update fails, e.g., due to a database error. Any returned error is irrecoverable and the caller
 // should abort the process.
-func (w *NodeDisallowListingWrapper) Update(disallowList flow.IdentifierList) error {
+func (w *NodeDisallowListWrapper) Update(disallowList flow.IdentifierList) error {
 	b := disallowList.Lookup() // converts slice to map
 
 	w.m.Lock()
@@ -109,12 +108,12 @@ func (w *NodeDisallowListingWrapper) Update(disallowList flow.IdentifierList) er
 
 // ClearDisallowList purges the set of blocked node IDs. Convenience function
 // equivalent to w.Update(nil). No errors are expected during normal operations.
-func (w *NodeDisallowListingWrapper) ClearDisallowList() error {
+func (w *NodeDisallowListWrapper) ClearDisallowList() error {
 	return w.Update(nil)
 }
 
 // GetDisallowList returns the set of blocked node IDs.
-func (w *NodeDisallowListingWrapper) GetDisallowList() flow.IdentifierList {
+func (w *NodeDisallowListWrapper) GetDisallowList() flow.IdentifierList {
 	w.m.RLock()
 	defer w.m.RUnlock()
 
@@ -129,7 +128,7 @@ func (w *NodeDisallowListingWrapper) GetDisallowList() flow.IdentifierList {
 // protocol that pass the provided filter. Caution, this includes ejected nodes.
 // Please check the `Ejected` flag in the returned identities (or provide a
 // filter for removing ejected nodes).
-func (w *NodeDisallowListingWrapper) Identities(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
+func (w *NodeDisallowListWrapper) Identities(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 	identities := w.identityProvider.Identities(filter)
 	if len(identities) == 0 {
 		return identities
@@ -161,7 +160,7 @@ func (w *NodeDisallowListingWrapper) Identities(filter flow.IdentityFilter[flow.
 // true if and only if Identity has been found, i.e. `Identity` is not nil.
 // Caution: function returns include ejected nodes. Please check the `Ejected`
 // flag in the identity.
-func (w *NodeDisallowListingWrapper) ByNodeID(identifier flow.Identifier) (*flow.Identity, bool) {
+func (w *NodeDisallowListWrapper) ByNodeID(identifier flow.Identifier) (*flow.Identity, bool) {
 	identity, b := w.identityProvider.ByNodeID(identifier)
 	return w.setEjectedIfBlocked(identity), b
 }
@@ -170,7 +169,7 @@ func (w *NodeDisallowListingWrapper) ByNodeID(identifier flow.Identifier) (*flow
 // Shortcuts:
 //   - If the node's identity is nil, there is nothing to do because we don't generate identities here.
 //   - If the node is already ejected, we don't have to check the disallowList.
-func (w *NodeDisallowListingWrapper) setEjectedIfBlocked(identity *flow.Identity) *flow.Identity {
+func (w *NodeDisallowListWrapper) setEjectedIfBlocked(identity *flow.Identity) *flow.Identity {
 	if identity == nil || identity.IsEjected() {
 		return identity
 	}
@@ -197,7 +196,7 @@ func (w *NodeDisallowListingWrapper) setEjectedIfBlocked(identity *flow.Identity
 // true if and only if Identity has been found, i.e. `Identity` is not nil.
 // Caution: function returns include ejected nodes. Please check the `Ejected`
 // flag in the identity.
-func (w *NodeDisallowListingWrapper) ByPeerID(p peer.ID) (*flow.Identity, bool) {
+func (w *NodeDisallowListWrapper) ByPeerID(p peer.ID) (*flow.Identity, bool) {
 	identity, b := w.identityProvider.ByPeerID(p)
 	return w.setEjectedIfBlocked(identity), b
 }
