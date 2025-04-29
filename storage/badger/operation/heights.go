@@ -12,14 +12,6 @@ func RetrieveRootHeight(height *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeFinalizedRootHeight), height)
 }
 
-func InsertSealedRootHeight(height uint64) func(*badger.Txn) error {
-	return insert(makePrefix(codeSealedRootHeight), height)
-}
-
-func RetrieveSealedRootHeight(height *uint64) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeSealedRootHeight), height)
-}
-
 func InsertFinalizedHeight(height uint64) func(*badger.Txn) error {
 	return insert(makePrefix(codeFinalizedHeight), height)
 }
@@ -30,18 +22,6 @@ func UpdateFinalizedHeight(height uint64) func(*badger.Txn) error {
 
 func RetrieveFinalizedHeight(height *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeFinalizedHeight), height)
-}
-
-func InsertSealedHeight(height uint64) func(*badger.Txn) error {
-	return insert(makePrefix(codeSealedHeight), height)
-}
-
-func UpdateSealedHeight(height uint64) func(*badger.Txn) error {
-	return update(makePrefix(codeSealedHeight), height)
-}
-
-func RetrieveSealedHeight(height *uint64) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeSealedHeight), height)
 }
 
 // InsertEpochFirstHeight inserts the height of the first block in the given epoch.
@@ -70,22 +50,4 @@ func RetrieveEpochLastHeight(epoch uint64, height *uint64) func(*badger.Txn) err
 		*height = nextEpochFirstHeight - 1
 		return nil
 	}
-}
-
-// InsertLastCompleteBlockHeightIfNotExists inserts the last full block height if it is not already set.
-// Calling this function multiple times is a no-op and returns no expected errors.
-func InsertLastCompleteBlockHeightIfNotExists(height uint64) func(*badger.Txn) error {
-	return SkipDuplicates(InsertLastCompleteBlockHeight(height))
-}
-
-func InsertLastCompleteBlockHeight(height uint64) func(*badger.Txn) error {
-	return insert(makePrefix(codeLastCompleteBlockHeight), height)
-}
-
-func UpdateLastCompleteBlockHeight(height uint64) func(*badger.Txn) error {
-	return update(makePrefix(codeLastCompleteBlockHeight), height)
-}
-
-func RetrieveLastCompleteBlockHeight(height *uint64) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeLastCompleteBlockHeight), height)
 }
