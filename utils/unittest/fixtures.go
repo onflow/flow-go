@@ -285,7 +285,7 @@ func ProposalFromBlock(block *flow.Block) *flow.BlockProposal {
 	}
 }
 
-func ClusterProposalFromBlock(block *cluster.Block) *cluster.BlockProposal {
+func ClusterProposalFromBlock(block cluster.Block) *cluster.BlockProposal {
 	return &cluster.BlockProposal{
 		Block:           block,
 		ProposerSigData: SignatureFixture(),
@@ -636,7 +636,7 @@ func ClusterBlockFixture() cluster.Block {
 	payload := ClusterPayloadFixture(3)
 	headerBody := HeaderBodyFixture()
 
-	return *cluster.NewBlock(*headerBody, *payload)
+	return cluster.NewBlock(*headerBody, *payload)
 }
 
 func ClusterBlockChainFixture(n int) []cluster.Block {
@@ -645,7 +645,7 @@ func ClusterBlockChainFixture(n int) []cluster.Block {
 	parent := ClusterBlockFixture()
 
 	for i := 0; i < n; i++ {
-		block := ClusterBlockWithParent(&parent)
+		block := ClusterBlockWithParent(parent)
 		clusterBlocks = append(clusterBlocks, block)
 		parent = block
 	}
@@ -655,14 +655,14 @@ func ClusterBlockChainFixture(n int) []cluster.Block {
 
 // ClusterBlockWithParent creates a new cluster consensus block that is valid
 // with respect to the given parent block.
-func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
+func ClusterBlockWithParent(parent cluster.Block) cluster.Block {
 	payload := ClusterPayloadFixture(3)
 	return ClusterBlockWithParentAndPayload(parent, *payload)
 }
 
 // ClusterBlockWithParentAndPayload creates a new cluster consensus block that is valid
 // with respect to the given parent block and with given payload.
-func ClusterBlockWithParentAndPayload(parent *cluster.Block, payload cluster.Payload) cluster.Block {
+func ClusterBlockWithParentAndPayload(parent cluster.Block, payload cluster.Payload) cluster.Block {
 	headerBody := HeaderBodyFixture()
 	headerBody.Height = parent.Header.Height + 1
 	headerBody.View = parent.Header.View + 1
@@ -671,7 +671,7 @@ func ClusterBlockWithParentAndPayload(parent *cluster.Block, payload cluster.Pay
 	headerBody.ParentID = parent.ID()
 	headerBody.ParentView = parent.Header.View
 
-	return *cluster.NewBlock(*headerBody, payload)
+	return cluster.NewBlock(*headerBody, payload)
 }
 
 func WithCollRef(refID flow.Identifier) func(*flow.CollectionGuarantee) {
