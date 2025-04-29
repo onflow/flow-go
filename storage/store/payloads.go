@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"fmt"
+	"maps"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -60,9 +61,7 @@ func (p *Payloads) storeTx(rw storage.ReaderBatchWriter, blockID flow.Identifier
 		fullReceipts = append(fullReceipts, flow.ExecutionReceiptFromMeta(*meta, *result))
 	}
 
-	for resultID, result := range resultsByID {
-		storingResults[resultID] = result
-	}
+	maps.Copy(storingResults, resultsByID)
 
 	// make sure all payload guarantees are stored
 	for _, guarantee := range payload.Guarantees {
