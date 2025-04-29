@@ -21,7 +21,7 @@ func TestQuorumCertificates_StoreTx(t *testing.T) {
 		qc := unittest.QuorumCertificateFixture()
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchStore(qc, rw)
+			return store.BatchStore(rw, qc)
 		})
 		require.NoError(t, err)
 
@@ -45,12 +45,12 @@ func TestQuorumCertificates_StoreTx_OtherQC(t *testing.T) {
 		})
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return s.BatchStore(qc, rw)
+			return s.BatchStore(rw, qc)
 		})
 		require.NoError(t, err)
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return s.BatchStore(otherQC, rw)
+			return s.BatchStore(rw, otherQC)
 		})
 		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 
