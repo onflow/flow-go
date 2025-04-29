@@ -1,11 +1,9 @@
 package unsynchronized
 
 import (
-	"sync"
 	"encoding/binary"
 	"fmt"
-
-	"go.uber.org/atomic"
+	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -79,16 +77,14 @@ func (r *Registers) Store(registers flow.RegisterEntries, height uint64) error {
 }
 
 func (r *Registers) AddToBatch(batch storage.ReaderBatchWriter) error {
-	for height, entry := range r.store {
-		for id, value := range entry {
-			encodedHeight := make([]byte, 8)
-			binary.BigEndian.PutUint64(encodedHeight, height)
-			key := append(encodedHeight, id.Bytes()...)
+	for id, value := range r.store {
+		encodedHeight := make([]byte, 8)
+		binary.BigEndian.PutUint64(encodedHeight, r.blockHeight)
+		key := append(encodedHeight, id.Bytes()...)
 
-			err := operation.UpsertByKey(batch.Writer(), key, value)
-			if err != nil {
-				return fmt.Errorf("could not persist register entry: %w", err)
-			}
+		err := operation.UpsertByKey(batch.Writer(), key, value)
+		if err != nil {
+			return fmt.Errorf("could not persist register entry: %w", err)
 		}
 	}
 

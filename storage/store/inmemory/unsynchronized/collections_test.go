@@ -71,7 +71,9 @@ func TestCollection_Persist(t *testing.T) {
 		key := operation.MakePrefix(collCode, collection.ID())
 
 		// Get light transaction
-		reader := db.Reader()
+		reader, err := db.Reader()
+		require.NoError(t, err)
+
 		value, closer, err := reader.Get(key)
 		defer closer.Close()
 		require.NoError(t, err)

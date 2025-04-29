@@ -58,7 +58,9 @@ func TestLightTransactionResults_Persist(t *testing.T) {
 		key := operation.MakePrefix(lightTransactionResultCode, block.ID(), txResults[0].TransactionID)
 
 		// Get light tx result
-		reader := db.Reader()
+		reader, err := db.Reader()
+		require.NoError(t, err)
+
 		value, closer, err := reader.Get(key)
 		defer closer.Close()
 		require.NoError(t, err)

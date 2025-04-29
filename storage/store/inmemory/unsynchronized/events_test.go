@@ -80,7 +80,9 @@ func TestEvents_Persist(t *testing.T) {
 		key := operation.EventPrefix(eventCode, block.ID(), event)
 
 		// Get event
-		reader := db.Reader()
+		reader, err := db.Reader()
+		require.NoError(t, err)
+
 		value, closer, err := reader.Get(key)
 		defer closer.Close()
 		require.NoError(t, err)

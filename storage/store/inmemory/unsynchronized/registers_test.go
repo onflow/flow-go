@@ -66,7 +66,7 @@ func TestRegisters_Persist(t *testing.T) {
 		}
 
 		// Persist registers
-		err := registers.Store(entries, 1)
+		err := registers.Store(entries, height)
 		require.NoError(t, err)
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return registers.AddToBatch(rw)
@@ -78,7 +78,9 @@ func TestRegisters_Persist(t *testing.T) {
 		key := append(encodedHeight, entries[0].Key.Bytes()...)
 
 		// Get value
-		reader := db.Reader()
+		reader, err := db.Reader()
+		require.NoError(t, err)
+
 		value, closer, err := reader.Get(key)
 		defer closer.Close()
 		require.NoError(t, err)
