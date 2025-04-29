@@ -10,6 +10,11 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 )
 
+// ReaderBatchWriter is for reading and writing to a storage backend.
+// It is useful for performing a related sequence of reads and writes, after which you would like
+// to modify some non-database state if the sequence completed successfully (via AddCallback).
+// If you are not using AddCallback, avoid using ReaderBatchWriter: use Reader and Writer directly.
+// ReaderBatchWriter is not safe for concurrent use.
 type ReaderBatchWriter struct {
 	globalReader storage.Reader
 	batch        *pebble.Batch
