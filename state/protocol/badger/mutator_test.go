@@ -38,6 +38,7 @@ import (
 	stoerr "github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	storageoperation "github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -53,7 +54,8 @@ func TestBootstrapValid(t *testing.T) {
 		require.NoError(t, err)
 
 		var sealed uint64
-		err = db.View(operation.RetrieveSealedHeight(&sealed))
+		bdb := badgerimpl.ToDB(db)
+		err = storageoperation.RetrieveSealedHeight(bdb.Reader(), &sealed)
 		require.NoError(t, err)
 
 		var genesisID flow.Identifier

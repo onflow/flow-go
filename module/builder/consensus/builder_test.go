@@ -22,8 +22,10 @@ import (
 	realproto "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	badgeroperation "github.com/onflow/flow-go/storage/badger/operation"
 	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -250,18 +252,21 @@ func (bs *BuilderSuite) SetupTest() {
 	// set up temporary database for tests
 	bs.db, bs.dir = unittest.TempBadgerDB(bs.T())
 
-	err := bs.db.Update(operation.InsertFinalizedHeight(final.Header.Height))
+	err := bs.db.Update(badgeroperation.InsertFinalizedHeight(final.Header.Height))
 	bs.Require().NoError(err)
-	err = bs.db.Update(operation.IndexBlockHeight(final.Header.Height, bs.finalID))
-	bs.Require().NoError(err)
-
-	err = bs.db.Update(operation.InsertRootHeight(13))
+	err = bs.db.Update(badgeroperation.IndexBlockHeight(final.Header.Height, bs.finalID))
 	bs.Require().NoError(err)
 
-	err = bs.db.Update(operation.InsertSealedHeight(first.Header.Height))
+	err = bs.db.Update(badgeroperation.InsertRootHeight(13))
 	bs.Require().NoError(err)
-	err = bs.db.Update(operation.IndexBlockHeight(first.Header.Height, first.ID()))
+
 	bs.Require().NoError(err)
+	err = bs.db.Update(badgeroperation.IndexBlockHeight(first.Header.Height, first.ID()))
+	bs.Require().NoError(err)
+	db := badgerimpl.ToDB(bs.db)
+	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storerr.ReaderBatchWriter) error {
+		return operation.UpsertSealedHeight(rw.Writer(), first.Header.Height)
+	}))
 
 	bs.sentinel = 1337
 
