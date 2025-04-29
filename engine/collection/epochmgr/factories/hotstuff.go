@@ -3,7 +3,6 @@ package factories
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus"
@@ -32,7 +31,7 @@ type HotStuffMetricsFunc func(chainID flow.ChainID) module.HotstuffMetrics
 type HotStuffFactory struct {
 	baseLogger     zerolog.Logger
 	me             module.Local
-	db             *badger.DB
+	db             storage.DB
 	protoState     protocol.State
 	engineMetrics  module.EngineMetrics
 	mempoolMetrics module.MempoolMetrics
@@ -43,7 +42,7 @@ type HotStuffFactory struct {
 func NewHotStuffFactory(
 	log zerolog.Logger,
 	me module.Local,
-	db *badger.DB,
+	db storage.DB,
 	protoState protocol.State,
 	engineMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
