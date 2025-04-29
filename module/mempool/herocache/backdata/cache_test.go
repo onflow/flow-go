@@ -52,7 +52,8 @@ func TestArrayBackData_SingleBucket(t *testing.T) {
 func TestArrayBackData_Adjust(t *testing.T) {
 	limit := 100_000
 
-	bd := NewCache[*unittest.MockEntity](uint32(limit),
+	bd := NewCache[*unittest.MockEntity](
+		uint32(limit),
 		8,
 		heropool.LRUEjection,
 		unittest.Logger(),
@@ -72,11 +73,11 @@ func TestArrayBackData_Adjust(t *testing.T) {
 	require.Equal(t, entities[entityIndex].Identifier, oldEntityID)
 	require.Equal(t, entities[entityIndex], oldEntity)
 
-	// picks a new identifier for the entity and makes sure it is different than its current one.
+	// picks a new identifier for the entity and makes sure it is different from its current one.
 	newEntityID := unittest.IdentifierFixture()
 	require.NotEqual(t, oldEntityID, newEntityID)
 
-	// adjusts old entity to a new entity with a new identifier
+	// adjusts old entity to a new entity
 	newEntity, ok := bd.Adjust(oldEntity.Identifier, func(entity *unittest.MockEntity) *unittest.MockEntity {
 		require.True(t, ok)
 		// oldEntity must be passed to func parameter of adjust.
@@ -123,6 +124,67 @@ func TestArrayBackData_Adjust(t *testing.T) {
 
 	// adjustment must be idempotent for size
 	require.Equal(t, bd.Size(), uint(limit))
+}
+
+// TestRemoveAfterAdjustRandom ensures that when you Adjust a random entry in a full cache,
+// Remove returns the updated entity, the cache size drops by one, and all other entries remain.
+func TestArrayBackData_RemoveAfterAdjustRandom(t *testing.T) {
+	limit := 100_000
+
+	bd := NewCache[*unittest.MockEntity](
+		uint32(limit),
+		8,
+		heropool.LRUEjection,
+		unittest.Logger(),
+		metrics.NewNoopCollector(),
+	)
+
+	entities := unittest.EntityListFixture(uint(limit))
+
+	// adds all entities to backdata
+	testAddEntities(t, bd, entities, heropool.LRUEjection)
+
+	// pick one at random and Adjust it
+	entityIndex := rand.Int() % limit
+	original, ok := bd.Get(entities[entityIndex].Identifier)
+	require.True(t, ok)
+
+	// adjusts old entity to a new entity
+	updatedEntity, ok := bd.Adjust(original.Identifier, func(ent *unittest.MockEntity) *unittest.MockEntity {
+		require.True(t, ok)
+
+		require.Equal(t, original.Identifier, ent.Identifier)
+		return &unittest.MockEntity{
+			Identifier: ent.Identifier,
+			Nonce:      ent.Nonce + 7,
+		}
+	})
+	require.True(t, ok)
+	require.Equal(t, original.Identifier, updatedEntity.Identifier)
+	require.Equal(t, original.Nonce+7, updatedEntity.Nonce)
+
+	// remove that same key
+	removed, ok := bd.Remove(original.Identifier)
+	require.True(t, ok)
+	require.Equal(t, updatedEntity, removed)
+
+	// cache size must have dropped by one
+	require.Equal(t, uint(limit-1), bd.Size())
+
+	// the removed key is gone:
+	_, exists := bd.Get(original.Identifier)
+	require.False(t, exists)
+	require.False(t, bd.Has(original.Identifier))
+
+	// all other entities should still be retrievable, with their original nonces
+	for i, e := range entities {
+		if i == entityIndex {
+			continue
+		}
+		got, ok := bd.Get(e.Identifier)
+		require.True(t, ok, "entity at index %d must still be present", i)
+		require.Equal(t, e, got, "entity %d must be unchanged", i)
+	}
 }
 
 // TestArrayBackData_AdjustWitInit evaluates that AdjustWithInit method. It should initialize and then adjust the value of
@@ -173,7 +235,7 @@ func TestArrayBackData_AdjustWitInit(t *testing.T) {
 		return &unittest.MockEntity{Identifier: oldEntityID, Nonce: 2}
 	})
 
-	// adjustment must be successful, and identifier must be updated.
+	// adjustment must be successful, and identifier must  be updated.
 	require.True(t, ok)
 	require.Equal(t, oldEntityID, newEntity.Identifier)
 	require.Equal(t, uint64(2), newEntity.Nonce)
