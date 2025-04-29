@@ -14,7 +14,7 @@ import (
 //
 // TODO: TEMPORARY manual override for adding node IDs to list of ejected nodes, applies to networking layer only
 func PurgeNodeDisallowList(w storage.Writer) error {
-	err := RemoveByKey(w, MakePrefix(blockedNodeIDs))
+	err := RemoveByKey(w, MakePrefix(disallowedNodeIDs))
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("unexpected error while purging disallow list: %w", err)
 	}
@@ -27,7 +27,7 @@ func PurgeNodeDisallowList(w storage.Writer) error {
 //
 // TODO: TEMPORARY manual override for adding node IDs to list of ejected nodes, applies to networking layer only
 func PersistNodeDisallowList(w storage.Writer, disallowList map[flow.Identifier]struct{}) error {
-	return UpsertByKey(w, MakePrefix(blockedNodeIDs), disallowList)
+	return UpsertByKey(w, MakePrefix(disallowedNodeIDs), disallowList)
 }
 
 // RetrieveNodeDisallowList reads the set of disallowed node IDs from the database.
@@ -35,5 +35,5 @@ func PersistNodeDisallowList(w storage.Writer, disallowList map[flow.Identifier]
 //
 // TODO: TEMPORARY manual override for adding node IDs to list of ejected nodes, applies to networking layer only
 func RetrieveNodeDisallowList(r storage.Reader, disallowList *map[flow.Identifier]struct{}) error {
-	return RetrieveByKey(r, MakePrefix(blockedNodeIDs), disallowList)
+	return RetrieveByKey(r, MakePrefix(disallowedNodeIDs), disallowList)
 }
