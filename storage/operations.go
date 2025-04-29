@@ -128,6 +128,7 @@ type Writer interface {
 // It is useful for performing a related sequence of reads and writes, after which you would like
 // to modify some non-database state if the sequence completed successfully (via AddCallback).
 // If you are not using AddCallback, avoid using ReaderBatchWriter: use Reader and Writer directly.
+// ReaderBatchWriter is not safe for concurrent use.
 type ReaderBatchWriter interface {
 	// GlobalReader returns a database-backed reader which reads the latest committed global database state ("read-committed isolation").
 	// This reader will not read writes written to ReaderBatchWriter.Writer until the write batch is committed.
