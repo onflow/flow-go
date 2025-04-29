@@ -51,7 +51,6 @@ func (p *Persister) GetSafetyData() (*hotstuff.SafetyData, error) {
 // GetLivenessData will retrieve last persisted liveness data.
 // During normal operations, no errors are expected.
 func (p *Persister) GetLivenessData() (*hotstuff.LivenessData, error) {
-	// TODO: cache
 	var livenessData hotstuff.LivenessData
 	r, _ := p.db.Reader()
 	err := operation.RetrieveLivenessData(r, p.chainID, &livenessData)
