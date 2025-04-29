@@ -30,44 +30,31 @@ func (ub *UntrustedClusterBlock) ToHeader() *flow.Header {
 	return (*cluster.Block)(ub).ToHeader()
 }
 
-// ToInternal returns the internal representation of the type.
-// TODO: Validate the untrusted input before converting to trusted internal representation.
-func (ub *UntrustedClusterBlock) ToInternal() *cluster.Block {
-	return cluster.NewBlock(ub.Header, ub.Payload)
-}
+// UntrustedClusterProposal represents untrusted signed proposed block in collection node cluster consensus.
+// This type exists only to explicitly differentiate between trusted and untrusted instances of a cluster block proposal.
+// This differentiation is currently largely unused, but eventually untrusted models should use
+// a different type (like this one), until such time as they are fully validated.
+type UntrustedClusterProposal cluster.BlockProposal
 
-// UntrustedClusterBlockFromInternal converts the internal cluster.Block representation
-// to the representation used in untrusted messages.
-func UntrustedClusterBlockFromInternal(clusterBlock *cluster.Block) UntrustedClusterBlock {
-	return UntrustedClusterBlock(*clusterBlock)
-}
-
-// UntrustedClusterProposal is a proposal for a block in collection node cluster
-// consensus. The header contains information about consensus state and the
-// payload contains the proposed collection (may be empty).
-type UntrustedClusterProposal struct {
-	Block           UntrustedClusterBlock
-	ProposerSigData []byte
-}
-
-func NewUntrustedClusterProposal(internal *cluster.Block, proposerSig []byte) *UntrustedClusterProposal {
+func NewUntrustedClusterProposal(internal cluster.Block, proposerSig []byte) *UntrustedClusterProposal {
 	return &UntrustedClusterProposal{
-		Block:           UntrustedClusterBlockFromInternal(internal),
+		Block:           internal,
 		ProposerSigData: proposerSig,
 	}
 }
 
 // ToInternal converts the UntrustedClusterProposal to a trusted internal cluster.BlockProposal.
+// TODO: Validate the untrusted input before converting to trusted internal representation.
 func (cbp *UntrustedClusterProposal) ToInternal() *cluster.BlockProposal {
 	return &cluster.BlockProposal{
-		Block:           cbp.Block.ToInternal(),
+		Block:           cbp.Block,
 		ProposerSigData: cbp.ProposerSigData,
 	}
 }
 
 func UntrustedClusterProposalFromInternal(proposal *cluster.BlockProposal) *UntrustedClusterProposal {
 	return &UntrustedClusterProposal{
-		Block:           UntrustedClusterBlockFromInternal(proposal.Block),
+		Block:           proposal.Block,
 		ProposerSigData: proposal.ProposerSigData,
 	}
 }

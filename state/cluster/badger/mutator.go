@@ -104,14 +104,14 @@ func (m *MutableState) Extend(proposal *cluster.BlockProposal) error {
 	defer parentSpan.End()
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckHeader)
-	err := m.checkHeaderValidity(candidate)
+	err := m.checkHeaderValidity(&candidate)
 	span.End()
 	if err != nil {
 		return fmt.Errorf("error checking header validity: %w", err)
 	}
 
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendGetExtendCtx)
-	extendCtx, err := m.getExtendCtx(candidate)
+	extendCtx, err := m.getExtendCtx(&candidate)
 	span.End()
 	if err != nil {
 		return fmt.Errorf("error gettting extend context data: %w", err)
