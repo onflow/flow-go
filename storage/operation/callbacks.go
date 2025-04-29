@@ -9,6 +9,12 @@ type Callbacks struct {
 	callbacks []func(error)
 }
 
+func NewCallbacks() *Callbacks {
+	return &Callbacks{
+		callbacks: nil, // lazy initialization
+	}
+}
+
 func (b *Callbacks) AddCallback(callback func(error)) {
 	b.callbacks = append(b.callbacks, callback)
 }
