@@ -23,6 +23,7 @@ var _ storage.Iterator = (*multiIterator)(nil)
 // multiple iterators in the provided sequence.  The returned iterator
 // iterates items in the first iterator, and then iterates items in
 // the second iterator, etc.
+// NewMultiIterator panics if 0 iterators are provided.
 func NewMultiIterator(iterators ...storage.Iterator) (storage.Iterator, error) {
 	if len(iterators) == 0 {
 		panic("failed to create multiIterator: need at least one iterator")
