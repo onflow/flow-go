@@ -61,9 +61,12 @@ func TestExecute(t *testing.T) {
 
 		// expect all blocks are pruned
 		for _, b := range bs {
+			reader, err := pdb.Reader()
+			require.NoError(t, err)
+
 			// verify they are pruned
 			var c storage.StoredChunkDataPack
-			err := operation.RetrieveChunkDataPack(pdb.Reader(), b, &c)
+			err = operation.RetrieveChunkDataPack(reader, b, &c)
 			require.True(t, errors.Is(err, storage.ErrNotFound), "expected ErrNotFound but got %v", err)
 		}
 	})
@@ -118,18 +121,25 @@ func TestExecuteCanBeResumed(t *testing.T) {
 
 		// expect all blocks are pruned
 		for i, b := range bs {
+
 			// verify they are pruned
 			var c storage.StoredChunkDataPack
 
 			if i < 3 {
+				reader, err := pdb.Reader()
+				require.NoError(t, err)
+
 				// the first 3 blocks in the first batch are pruned
-				err := operation.RetrieveChunkDataPack(pdb.Reader(), b, &c)
+				err = operation.RetrieveChunkDataPack(reader, b, &c)
 				require.True(t, errors.Is(err, storage.ErrNotFound), "expected ErrNotFound for block %v but got %v", i, err)
 				continue
 			}
 
 			// verify the remaining blocks are not pruned yet
-			require.NoError(t, operation.RetrieveChunkDataPack(pdb.Reader(), b, &c))
+			reader, err := pdb.Reader()
+			require.NoError(t, err)
+
+			require.NoError(t, operation.RetrieveChunkDataPack(reader, b, &c))
 		}
 
 		// now resume the pruning
@@ -146,9 +156,12 @@ func TestExecuteCanBeResumed(t *testing.T) {
 
 		// verify all blocks are pruned
 		for _, b := range bs {
+			reader, err := pdb.Reader()
+			require.NoError(t, err)
+
 			var c storage.StoredChunkDataPack
 			// the first 5 blocks are pruned
-			err := operation.RetrieveChunkDataPack(pdb.Reader(), b, &c)
+			err = operation.RetrieveChunkDataPack(reader, b, &c)
 			require.True(t, errors.Is(err, storage.ErrNotFound), "expected ErrNotFound but got %v", err)
 		}
 	})

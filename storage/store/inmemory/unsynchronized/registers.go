@@ -1,6 +1,7 @@
 package unsynchronized
 
 import (
+	"sync"
 	"encoding/binary"
 	"fmt"
 
@@ -11,60 +12,67 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 )
 
-type RegisterEntries map[flow.RegisterID]flow.RegisterValue
-type HeightToRegisterEntries map[uint64]RegisterEntries
-
+// Registers is a simple in-memory implementation of the RegisterIndex interface.
+// It stores registers for a single block height.
 type Registers struct {
-	firstHeight  uint64
-	latestHeight atomic.Uint64
-	store        HeightToRegisterEntries
-}
-
-func NewRegisters(firstHeight uint64) *Registers {
-	return &Registers{
-		firstHeight:  firstHeight,
-		latestHeight: atomic.Uint64{},
-		store:        make(HeightToRegisterEntries),
-	}
+	blockHeight uint64
+	lock        sync.RWMutex
+	store       map[flow.RegisterID]flow.RegisterValue
 }
 
 var _ storage.RegisterIndex = (*Registers)(nil)
 
-func (r *Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
-	h, ok := r.store[height]
-	if !ok {
-		return flow.RegisterValue{}, storage.ErrNotFound
+func NewRegisters(blockHeight uint64) *Registers {
+	return &Registers{
+		blockHeight: blockHeight,
+		store:       make(map[flow.RegisterID]flow.RegisterValue),
 	}
-
-	val, ok := h[ID]
-	if !ok {
-		return flow.RegisterValue{}, storage.ErrNotFound
-	}
-
-	return val, nil
 }
 
+// Get returns a register by the register ID at a storage's block height.
+//
+// Expected errors:
+// - storage.ErrNotFound if the register does not exist in this storage object
+// - storage.ErrHeightNotIndexed if the given height does not match the storage's block height
+func (r *Registers) Get(registerID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
+	if r.blockHeight != height {
+		return flow.RegisterValue{}, storage.ErrHeightNotIndexed
+	}
+
+	if reg, ok := r.store[registerID]; ok {
+		return reg, nil
+	}
+
+	return flow.RegisterValue{}, storage.ErrNotFound
+}
+
+// LatestHeight returns the latest indexed height.
 func (r *Registers) LatestHeight() uint64 {
-	return r.latestHeight.Load()
+	return r.blockHeight
 }
 
+// FirstHeight returns the first indexed height found in the store.
 func (r *Registers) FirstHeight() uint64 {
-	return r.firstHeight
+	return r.blockHeight
 }
 
-func (r *Registers) Store(entries flow.RegisterEntries, height uint64) error {
-	if height > r.latestHeight.Load() {
-		r.latestHeight.Store(height)
+// Store stores a batch of register entries at the storage's block height.
+//
+// Expected errors:
+// - storage.ErrHeightNotIndexed if the given height does not match the storage's block height.
+func (r *Registers) Store(registers flow.RegisterEntries, height uint64) error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	if r.blockHeight != height {
+		return storage.ErrHeightNotIndexed
 	}
 
-	// Ensure the map for the given height exists
-	if _, exists := r.store[height]; !exists {
-		r.store[height] = make(RegisterEntries)
-	}
-
-	// Store entries
-	for _, entry := range entries {
-		r.store[height][entry.Key] = entry.Value
+	for _, reg := range registers {
+		r.store[reg.Key] = reg.Value
 	}
 
 	return nil

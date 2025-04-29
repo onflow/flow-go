@@ -13,42 +13,44 @@ import (
 )
 
 func TestRegisters_HappyPath(t *testing.T) {
-	firstHeight := uint64(1)
-	registers := NewRegisters(firstHeight)
+	height := uint64(42)
+	registers := NewRegisters(height)
 
-	// Ensure initial heights are correct
-	require.Equal(t, firstHeight, registers.FirstHeight())
-	require.Equal(t, uint64(0), registers.LatestHeight())
+	require.Equal(t, height, registers.FirstHeight())
+	require.Equal(t, height, registers.LatestHeight())
 
-	// Define register entries
-	entries := flow.RegisterEntries{unittest.RegisterEntryFixture(), unittest.RegisterEntryFixture()}
-	entries[0].Key = flow.RegisterID{
-		Owner: "owner1",
-		Key:   "key1",
-	}
-	entries[1].Key = flow.RegisterID{
-		Owner: "owner2",
-		Key:   "key2",
-	}
+	// Prepare register entries
+	entry1 := unittest.RegisterEntryFixture()
+	entry1.Key = flow.RegisterID{Owner: "owner1", Key: "key1"}
 
-	// Store entries at height 1
-	err := registers.Store(entries, 1)
+	entry2 := unittest.RegisterEntryFixture()
+	entry2.Key = flow.RegisterID{Owner: "owner2", Key: "key2"}
+
+	entries := flow.RegisterEntries{entry1, entry2}
+
+	// Store entries (height is ignored)
+	err := registers.Store(entries, height)
 	require.NoError(t, err)
 
-	// Verify latest height is updated
-	require.Equal(t, uint64(1), registers.LatestHeight())
-
-	// Retrieve stored value
-	val, err := registers.Get(entries[0].Key, 1)
+	// Retrieve both entries
+	got1, err := registers.Get(entry1.Key, height)
 	require.NoError(t, err)
-	require.Equal(t, entries[0].Value, val)
+	require.Equal(t, entry1.Value, got1)
 
-	// Ensure retrieving a non-existent height returns an error
-	_, err = registers.Get(unittest.RegisterIDFixture(), 2)
-	require.ErrorIs(t, err, storage.ErrNotFound)
+	got2, err := registers.Get(entry2.Key, height)
+	require.NoError(t, err)
+	require.Equal(t, entry2.Value, got2)
 
-	// Ensure retrieving a non-existent register ID returns an error
-	_, err = registers.Get(unittest.RegisterIDFixture(), 1)
+	// Try retrieving at the wrong height
+	_, err = registers.Get(entry1.Key, height+1)
+	require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
+
+	// Try storing at the wrong height
+	err = registers.Store(entries, height+1)
+	require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
+
+	// Try getting a non-existent key
+	_, err = registers.Get(unittest.RegisterIDFixture(), height)
 	require.ErrorIs(t, err, storage.ErrNotFound)
 }
 

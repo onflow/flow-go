@@ -29,8 +29,11 @@ func TestUpsertAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 			})
 			require.NoError(t, err)
 
+			reader, err := db.Reader()
+			require.NoError(t, err)
+
 			var actualUploadStatus bool
-			err = operation.GetComputationResultUploadStatus(db.Reader(), expectedId, &actualUploadStatus)
+			err = operation.GetComputationResultUploadStatus(reader, expectedId, &actualUploadStatus)
 			require.NoError(t, err)
 
 			assert.Equal(t, testUploadStatusVal, actualUploadStatus)
@@ -42,8 +45,11 @@ func TestUpsertAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 			})
 			require.NoError(t, err)
 
+			reader, err = db.Reader()
+			require.NoError(t, err)
+
 			// check if value is updated
-			err = operation.GetComputationResultUploadStatus(db.Reader(), expectedId, &actualUploadStatus)
+			err = operation.GetComputationResultUploadStatus(reader, expectedId, &actualUploadStatus)
 			require.NoError(t, err)
 
 			assert.Equal(t, testUploadStatusVal, actualUploadStatus)
@@ -64,8 +70,11 @@ func TestRemoveComputationResultUploadStatus(t *testing.T) {
 			})
 			require.NoError(t, err)
 
+			reader, err := db.Reader()
+			require.NoError(t, err)
+
 			var actualUploadStatus bool
-			err = operation.GetComputationResultUploadStatus(db.Reader(), expectedId, &actualUploadStatus)
+			err = operation.GetComputationResultUploadStatus(reader, expectedId, &actualUploadStatus)
 			require.NoError(t, err)
 
 			assert.Equal(t, testUploadStatusVal, actualUploadStatus)
@@ -75,7 +84,10 @@ func TestRemoveComputationResultUploadStatus(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			err = operation.GetComputationResultUploadStatus(db.Reader(), expectedId, &actualUploadStatus)
+			reader, err = db.Reader()
+			require.NoError(t, err)
+
+			err = operation.GetComputationResultUploadStatus(reader, expectedId, &actualUploadStatus)
 			assert.NotNil(t, err)
 		})
 	})
@@ -99,9 +111,12 @@ func TestListComputationResults(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			reader, err := db.Reader()
+			require.NoError(t, err)
+
 			// Get the list of IDs of stored ComputationResult
 			crIDs := make([]flow.Identifier, 0)
-			err := operation.GetBlockIDsByStatus(db.Reader(), &crIDs, true)
+			err = operation.GetBlockIDsByStatus(reader, &crIDs, true)
 			require.NoError(t, err)
 			crIDsStrMap := make(map[string]bool, 0)
 			for _, crID := range crIDs {

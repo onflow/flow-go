@@ -68,6 +68,16 @@ func DefaultIteratorOptions() IteratorOption {
 	}
 }
 
+// Seeker is an interface for seeking a key within a range.
+type Seeker interface {
+	// SeekLE (seek less than or equal) returns the largest key in lexicographical
+	// order within inclusive range of [startPrefix, key].
+	// This function returns an error if specified key is less than startPrefix.
+	// This function returns storage.ErrNotFound if a key that matches
+	// the specified criteria is not found.
+	SeekLE(startPrefix, key []byte) ([]byte, error)
+}
+
 type Reader interface {
 	// Get gets the value for the given key. It returns ErrNotFound if the DB
 	// does not contain the key.
@@ -86,6 +96,9 @@ type Reader interface {
 	//   - have a prefix equal to the endPrefix OR
 	//   - have a prefix that is lexicographically between startPrefix and endPrefix
 	NewIter(startPrefix, endPrefix []byte, ops IteratorOption) (Iterator, error)
+
+	// NewSeeker returns a new Seeker.
+	NewSeeker() (Seeker, error)
 }
 
 // Writer is an interface for batch writing to a storage backend.
@@ -138,7 +151,7 @@ type ReaderBatchWriter interface {
 type DB interface {
 	// Reader returns a database-backed reader which reads the latest
 	// committed global database state
-	Reader() Reader
+	Reader() (Reader, error)
 
 	// WithReaderBatchWriter creates a batch writer and allows the caller to perform
 	// atomic batch updates to the database.
@@ -157,6 +170,11 @@ type Batch interface {
 
 	// Commit applies the batched updates to the database.
 	Commit() error
+
+	// Close releases memory of the batch.
+	// This can be called as a defer statement immediately after creating Batch
+	// to reduce risk of unbounded memory consumption.
+	Close() error
 }
 
 // OnlyWriter is an adapter to convert a function that takes a Writer
