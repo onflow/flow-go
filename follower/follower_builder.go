@@ -440,9 +440,13 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of the disallow-listed nodes to true
-		builder.IdentityProvider, err = cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
-			return builder.NetworkUnderlay
-		})
+		builder.IdentityProvider, err = cache.NewNodeDisallowListWrapper(
+			idCache,
+			node.ProtocolDB,
+			func() network.DisallowListNotificationConsumer {
+				return builder.NetworkUnderlay
+			},
+		)
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
 		}
