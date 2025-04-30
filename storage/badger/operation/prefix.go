@@ -105,7 +105,7 @@ const (
 	codeIndexResultApprovalByChunk         = 204
 
 	// TEMPORARY codes
-	blockedNodeIDs = 205 // manual override for adding node IDs to list of ejected nodes, applies to networking layer only
+	disallowedNodeIDs = 205 // manual override for adding node IDs to list of ejected nodes, applies to networking layer only
 
 	// internal failure information that should be preserved across restarts
 	codeExecutionFork                   = 254

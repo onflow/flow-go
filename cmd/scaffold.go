@@ -1295,7 +1295,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 			},
 		)
 		if err != nil {
-			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
+			return fmt.Errorf("could not initialize NodeDisallowListWrapper: %w", err)
 		}
 		node.IdentityProvider = disallowListWrapper
 
