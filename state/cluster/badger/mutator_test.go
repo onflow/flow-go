@@ -214,7 +214,7 @@ func (suite *MutatorSuite) TestBootstrap_InvalidParentHash() {
 
 func (suite *MutatorSuite) TestBootstrap_InvalidPayload() {
 	// this is invalid because genesis collection should be empty
-	suite.genesis.Payload = unittest.ClusterPayloadFixture(2)
+	suite.genesis.Payload = *unittest.ClusterPayloadFixture(2)
 
 	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Assert().Error(err)
@@ -335,7 +335,7 @@ func (suite *MutatorSuite) TestExtend_Success() {
 	var extended model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(proposal.Block.ID(), &extended))
 	suite.Assert().Nil(err)
-	suite.Assert().Equal(*proposal.Block.Payload, *extended.Payload)
+	suite.Assert().Equal(proposal.Block.Payload, extended.Payload)
 
 	// the block should be indexed by its parent
 	var childIDs flow.IdentifierList
@@ -472,11 +472,10 @@ func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
 	suite.Assert().Nil(err)
 
 	// create a block building on block1 ALSO containing tx1
-	block2 := unittest.ClusterBlockWithParentAndPayload(proposal1.Block, suite.Payload(&tx1))
-	proposal2 := unittest.ClusterProposalFromBlock(&block2)
+	proposal2 := suite.ProposalWithParentAndPayload(proposal1.Block, suite.Payload(&tx1))
 
 	// should be unable to extend block 2, as it contains a dupe transaction
-	err = suite.state.Extend(proposal2)
+	err = suite.state.Extend(&proposal2)
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }

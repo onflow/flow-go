@@ -282,7 +282,7 @@ func (suite *SnapshotSuite) TestPending_Grandchildren() {
 		suite.Assert().True(seen, "pending list contained child (%x) before parent (%x)", blockID, header.ParentID)
 
 		// mark this block as seen
-		parents[header.ID()] = struct{}{}
+		parents[blockID] = struct{}{}
 	}
 }
 

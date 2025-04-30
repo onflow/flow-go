@@ -30,7 +30,7 @@ func InsertClusterBlock(proposal *cluster.BlockProposal) func(*badger.Txn) error
 		}
 
 		// insert the block payload
-		err = InsertClusterPayload(blockID, proposal.Block.Payload)(tx)
+		err = InsertClusterPayload(blockID, &proposal.Block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert payload: %w", err)
 		}

@@ -19,7 +19,9 @@ type ProposalHeader struct {
 	ProposerSigData []byte
 }
 
-// HeaderBody contains all meta-data for a block.
+// HeaderBody contains all block header metadata, except for the payload hash.
+// HeaderBody generally should not be used on its own. It is embedded within [Block] and
+// [Header]: those types should be used in almost all circumstances.
 type HeaderBody struct {
 	// ChainID is a chain-specific value to prevent replay attacks.
 	ChainID ChainID
@@ -48,9 +50,10 @@ type HeaderBody struct {
 	LastViewTC *TimeoutCertificate
 }
 
-// Header contains all meta-data for a block, as well as a hash representing
-// the combined payload of the entire block. It is what consensus nodes agree
-// on after validating the contents against the payload hash.
+// Header contains all meta-data for a block, as well as a hash of the block payload.
+// Headers are used when the metadata about a block is needed, but the payload is not.
+// Because [Header] includes the payload hash for the block, and the block ID is Merkle-ized
+// with the Payload field as a Merkle tree node, the block ID can be computed from the [Header].
 type Header struct {
 	HeaderBody
 	// PayloadHash is a hash of the payload of this block.

@@ -18,60 +18,28 @@ type CollectionResponse struct {
 	Nonce      uint64 // so that we aren't deduplicated by the network layer
 }
 
-// UntrustedClusterBlockPayload is a duplicate of cluster.Payload used within
-// untrusted messages. It exists only to provide a memory-safe structure for
-// decoding messages and should be replaced in the future by updating the core
-// cluster.Payload type.
-// Deprecated: Please replace instances of this type with cluster.Payload
-type UntrustedClusterBlockPayload struct {
-	Collection       flow.Collection
-	ReferenceBlockID flow.Identifier
-}
+// UntrustedClusterBlock represents untrusted cluster block models received over the network.
+// This type exists only to explicitly differentiate between trusted and untrusted instances of a cluster block.
+// This differentiation is currently largely unused, but eventually untrusted models should use
+// a different type (like this one), until such time as they are fully validated.
+type UntrustedClusterBlock cluster.Block
 
-// Hash returns a collision-resistant hash of the UntrustedClusterBlockPayload struct.
-func (p UntrustedClusterBlockPayload) Hash() flow.Identifier {
-	return flow.MakeID(p)
-}
-
-// UntrustedClusterBlock is a duplicate of cluster.Block used within
-// untrusted messages. It exists only to provide a memory-safe structure for
-// decoding messages and should be replaced in the future by updating the core
-// cluster.Block type.
-// Deprecated: Please replace instances of this type with cluster.Block
-type UntrustedClusterBlock struct {
-	Header  flow.HeaderBody
-	Payload UntrustedClusterBlockPayload
-}
-
-// ToHeader return flow.Header data for UntrustedClusterBlock.
+// ToHeader converts the untrusted block into a compact [flow.Header] representation,
+// where the payload is compressed to a hash reference.
 func (ub *UntrustedClusterBlock) ToHeader() *flow.Header {
-	return &flow.Header{
-		HeaderBody:  ub.Header,
-		PayloadHash: ub.Payload.Hash(),
-	}
+	return ub.ToInternal().ToHeader()
 }
 
 // ToInternal returns the internal representation of the type.
+// TODO(malleability immutable, #7277): This conversion should eventually be accompanied by a full validation of the untrusted input.
 func (ub *UntrustedClusterBlock) ToInternal() *cluster.Block {
-	return cluster.NewBlock(
-		ub.Header,
-		cluster.Payload{
-			ReferenceBlockID: ub.Payload.ReferenceBlockID,
-			Collection:       ub.Payload.Collection,
-		},
-	)
+	return cluster.NewBlock(ub.Header, ub.Payload)
 }
 
 // UntrustedClusterBlockFromInternal converts the internal cluster.Block representation
 // to the representation used in untrusted messages.
 func UntrustedClusterBlockFromInternal(clusterBlock *cluster.Block) UntrustedClusterBlock {
-	return UntrustedClusterBlock{
-		Header: *clusterBlock.Header,
-		Payload: UntrustedClusterBlockPayload{
-			ReferenceBlockID: clusterBlock.Payload.ReferenceBlockID,
-			Collection:       clusterBlock.Payload.Collection,
-		},
-	}
+	return UntrustedClusterBlock(*clusterBlock)
 }
 
 // UntrustedClusterProposal is a proposal for a block in collection node cluster
@@ -89,6 +57,7 @@ func NewUntrustedClusterProposal(internal *cluster.Block, proposerSig []byte) *U
 	}
 }
 
+// ToInternal converts the UntrustedClusterProposal to a trusted internal cluster.BlockProposal.
 func (cbp *UntrustedClusterProposal) ToInternal() *cluster.BlockProposal {
 	return &cluster.BlockProposal{
 		Block:           cbp.Block.ToInternal(),

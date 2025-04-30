@@ -43,7 +43,7 @@ func (b *ClusterBlocks) storeTx(proposal *cluster.BlockProposal) func(*transacti
 		if err != nil {
 			return fmt.Errorf("could not store header: %w", err)
 		}
-		err = b.payloads.storeTx(blockID, proposal.Block.Payload)(tx)
+		err = b.payloads.storeTx(blockID, &proposal.Block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store payload: %w", err)
 		}
