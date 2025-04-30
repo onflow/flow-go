@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -17,20 +16,28 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p/cache"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type NodeDisallowListWrapperTestSuite struct {
 	suite.Suite
-	DB       *badger.DB
+	DB       storage.DB
 	provider *mocks.IdentityProvider
 
 	wrapper        *cache.NodeDisallowListingWrapper
 	updateConsumer *mocknetwork.DisallowListNotificationConsumer
 }
 
+func newNodeDisallowListWrapperTestSuite(db storage.DB) *NodeDisallowListWrapperTestSuite {
+	return &NodeDisallowListWrapperTestSuite{
+		DB: db,
+	}
+}
+
 func (s *NodeDisallowListWrapperTestSuite) SetupTest() {
-	s.DB, _ = unittest.TempBadgerDB(s.T())
 	s.provider = new(mocks.IdentityProvider)
 
 	var err error
@@ -41,8 +48,14 @@ func (s *NodeDisallowListWrapperTestSuite) SetupTest() {
 	require.NoError(s.T(), err)
 }
 
-func TestNodeDisallowListWrapperTestSuite(t *testing.T) {
-	suite.Run(t, new(NodeDisallowListWrapperTestSuite))
+func TestNodeDisallowListWrapperWithBadgerTestSuite(t *testing.T) {
+	bdb, _ := unittest.TempBadgerDB(t)
+	suite.Run(t, newNodeDisallowListWrapperTestSuite(badgerimpl.ToDB(bdb)))
+}
+
+func TestNodeDisallowListWrapperWithPebbleTestSuite(t *testing.T) {
+	pdb, _ := unittest.TempPebbleDB(t)
+	suite.Run(t, newNodeDisallowListWrapperTestSuite(pebbleimpl.ToDB(pdb)))
 }
 
 // TestHonestNode verifies:
