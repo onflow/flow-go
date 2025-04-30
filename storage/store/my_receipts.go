@@ -84,10 +84,7 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db storage.DB, receip
 	}
 
 	remove := func(rw storage.ReaderBatchWriter, blockID flow.Identifier) error {
-		indexingMyReceipt.Lock()
-		rw.AddCallback(func(error) {
-			indexingMyReceipt.Unlock()
-		})
+		rw.Lock(indexingMyReceipt)
 		return operation.RemoveOwnExecutionReceipt(rw.Writer(), blockID)
 	}
 
