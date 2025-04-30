@@ -172,3 +172,25 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 		})
 	})
 }
+
+func TestMyExecutionReceiptsStorageMultipleStoreInSameBatch(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		metrics := metrics.NewNoopCollector()
+		results := store.NewExecutionResults(metrics, db)
+		receipts := store.NewExecutionReceipts(metrics, db, results, 100)
+		myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
+
+		block := unittest.BlockFixture()
+		receipt1 := unittest.ReceiptForBlockFixture(&block)
+		receipt2 := unittest.ReceiptForBlockFixture(&block)
+
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			err := myReceipts.BatchStoreMyReceipt(receipt1, rw)
+			if err != nil {
+				return err
+			}
+			return myReceipts.BatchStoreMyReceipt(receipt2, rw)
+		})
+		require.NoError(t, err)
+	})
+}

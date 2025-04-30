@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -17,20 +16,28 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p/cache"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type NodeDisallowListWrapperTestSuite struct {
 	suite.Suite
-	DB       *badger.DB
+	DB       storage.DB
 	provider *mocks.IdentityProvider
 
-	wrapper        *cache.NodeDisallowListingWrapper
+	wrapper        *cache.NodeDisallowListWrapper
 	updateConsumer *mocknetwork.DisallowListNotificationConsumer
 }
 
+func newNodeDisallowListWrapperTestSuite(db storage.DB) *NodeDisallowListWrapperTestSuite {
+	return &NodeDisallowListWrapperTestSuite{
+		DB: db,
+	}
+}
+
 func (s *NodeDisallowListWrapperTestSuite) SetupTest() {
-	s.DB, _ = unittest.TempBadgerDB(s.T())
 	s.provider = new(mocks.IdentityProvider)
 
 	var err error
@@ -41,8 +48,14 @@ func (s *NodeDisallowListWrapperTestSuite) SetupTest() {
 	require.NoError(s.T(), err)
 }
 
-func TestNodeDisallowListWrapperTestSuite(t *testing.T) {
-	suite.Run(t, new(NodeDisallowListWrapperTestSuite))
+func TestNodeDisallowListWrapperWithBadgerTestSuite(t *testing.T) {
+	bdb, _ := unittest.TempBadgerDB(t)
+	suite.Run(t, newNodeDisallowListWrapperTestSuite(badgerimpl.ToDB(bdb)))
+}
+
+func TestNodeDisallowListWrapperWithPebbleTestSuite(t *testing.T) {
+	pdb, _ := unittest.TempPebbleDB(t)
+	suite.Run(t, newNodeDisallowListWrapperTestSuite(pebbleimpl.ToDB(pdb)))
 }
 
 // TestHonestNode verifies:
@@ -94,12 +107,12 @@ func (s *NodeDisallowListWrapperTestSuite) TestHonestNode() {
 //     we expect the wrapper to nevertheless handle this case to increase its
 //     generality.
 func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
-	blocklist := unittest.IdentityListFixture(11)
+	disallowlist := unittest.IdentityListFixture(11)
 	s.updateConsumer.On("OnDisallowListNotification", &network.DisallowListingUpdate{
-		FlowIds: blocklist.NodeIDs(),
+		FlowIds: disallowlist.NodeIDs(),
 		Cause:   network.DisallowListedCauseAdmin,
 	}).Return().Once()
-	err := s.wrapper.Update(blocklist.NodeIDs())
+	err := s.wrapper.Update(disallowlist.NodeIDs())
 	require.NoError(s.T(), err)
 
 	index := atomic.NewInt32(0)
@@ -107,7 +120,7 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 		expectedfound := b
 
 		s.Run(fmt.Sprintf("IdentityProvider.ByNodeID returning (<non-nil identity>, %v)", expectedfound), func() {
-			originalIdentity := blocklist[index.Inc()]
+			originalIdentity := disallowlist[index.Inc()]
 			s.provider.On("ByNodeID", originalIdentity.NodeID).Return(originalIdentity, expectedfound)
 
 			var expectedIdentity = *originalIdentity                                         // expected Identity is a copy of the original
@@ -122,7 +135,7 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 		})
 
 		s.Run(fmt.Sprintf("IdentityProvider.ByPeerID returning (<non-nil identity>, %v)", expectedfound), func() {
-			originalIdentity := blocklist[index.Inc()]
+			originalIdentity := disallowlist[index.Inc()]
 			peerID := (peer.ID)(originalIdentity.NodeID.String())
 			s.provider.On("ByPeerID", peerID).Return(originalIdentity, expectedfound)
 
@@ -139,9 +152,9 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 	}
 
 	s.Run("Identities", func() {
-		blocklistLookup := blocklist.Lookup()
+		disallowlistLookup := disallowlist.Lookup()
 		honestIdentities := unittest.IdentityListFixture(8)
-		combinedIdentities := honestIdentities.Union(blocklist)
+		combinedIdentities := honestIdentities.Union(disallowlist)
 		combinedIdentities, err = combinedIdentities.Shuffle()
 		require.NoError(s.T(), err)
 		numIdentities := len(combinedIdentities)
@@ -153,7 +166,7 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 
 		require.Equal(s.T(), numIdentities, len(identities)) // expected number resulting identities have the
 		for _, i := range identities {
-			_, isBlocked := blocklistLookup[i.NodeID]
+			_, isBlocked := disallowlistLookup[i.NodeID]
 			require.Equal(s.T(), isBlocked, i.IsEjected())
 		}
 
@@ -167,9 +180,9 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 	// this tests the edge case where the  Identities func is invoked with the p2p.NotEjectedFilter. Block listed
 	// nodes are expected to be filtered from the identity list returned after setting the ejected field.
 	s.Run("Identities(p2p.NotEjectedFilter) should not return block listed nodes", func() {
-		blocklistLookup := blocklist.Lookup()
+		disallowlistLookup := disallowlist.Lookup()
 		honestIdentities := unittest.IdentityListFixture(8)
-		combinedIdentities := honestIdentities.Union(blocklist)
+		combinedIdentities := honestIdentities.Union(disallowlist)
 		combinedIdentities, err = combinedIdentities.Shuffle()
 		require.NoError(s.T(), err)
 		numIdentities := len(combinedIdentities)
@@ -180,7 +193,7 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 
 		require.Equal(s.T(), len(honestIdentities), len(identities)) // expected only honest nodes to be returned
 		for _, i := range identities {
-			_, isBlocked := blocklistLookup[i.NodeID]
+			_, isBlocked := disallowlistLookup[i.NodeID]
 			require.False(s.T(), isBlocked)
 			require.False(s.T(), i.IsEjected())
 		}
