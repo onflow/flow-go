@@ -173,7 +173,7 @@ func (suite *BuilderSuite) TearDownTest() {
 }
 
 func (suite *BuilderSuite) InsertBlock(block model.Block) {
-	err := suite.db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(&block)))
+	err := suite.db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
 	suite.Assert().NoError(err)
 }
 
@@ -419,13 +419,13 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 	tx3 := mempoolTransactions[2] // in no block
 
 	// build first fork on top of genesis
-	block1 := unittest.ClusterBlockWithParentAndPayload(suite.genesis, suite.Payload(tx1))
+	block1 := unittest.ClusterBlockWithParentAndPayload(*suite.genesis, suite.Payload(tx1))
 
 	// insert block on fork 1
 	suite.InsertBlock(block1)
 
 	// build second fork on top of genesis
-	block2 := unittest.ClusterBlockWithParentAndPayload(suite.genesis, suite.Payload(tx2))
+	block2 := unittest.ClusterBlockWithParentAndPayload(*suite.genesis, suite.Payload(tx2))
 
 	// insert block on fork 2
 	suite.InsertBlock(block2)
@@ -458,13 +458,13 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 
 	// build a block containing tx1 on genesis
 	finalizedPayload := suite.Payload(tx1)
-	finalizedBlock := unittest.ClusterBlockWithParentAndPayload(suite.genesis, finalizedPayload)
+	finalizedBlock := unittest.ClusterBlockWithParentAndPayload(*suite.genesis, finalizedPayload)
 	suite.InsertBlock(finalizedBlock)
 	t.Logf("finalized: height=%d id=%s txs=%s parent_id=%s\t\n", finalizedBlock.Header.Height, finalizedBlock.ID(), finalizedPayload.Collection.Light(), finalizedBlock.Header.ParentID)
 
 	// build a block containing tx2 on the first block
 	unFinalizedPayload := suite.Payload(tx2)
-	unFinalizedBlock := unittest.ClusterBlockWithParentAndPayload(&finalizedBlock, unFinalizedPayload)
+	unFinalizedBlock := unittest.ClusterBlockWithParentAndPayload(finalizedBlock, unFinalizedPayload)
 	suite.InsertBlock(unFinalizedBlock)
 	t.Logf("finalized: height=%d id=%s txs=%s parent_id=%s\t\n", unFinalizedBlock.Header.Height, unFinalizedBlock.ID(), unFinalizedPayload.Collection.Light(), unFinalizedBlock.Header.ParentID)
 
@@ -503,13 +503,13 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 	t.Logf("tx1: %s\ntx2: %s\ntx3: %s", tx1.ID(), tx2.ID(), tx3.ID())
 
 	// build a block containing tx1 on genesis - will be finalized
-	finalizedBlock := unittest.ClusterBlockWithParentAndPayload(suite.genesis, suite.Payload(tx1))
+	finalizedBlock := unittest.ClusterBlockWithParentAndPayload(*suite.genesis, suite.Payload(tx1))
 
 	suite.InsertBlock(finalizedBlock)
 	t.Logf("finalized: id=%s\tparent_id=%s\theight=%d\n", finalizedBlock.ID(), finalizedBlock.Header.ParentID, finalizedBlock.Header.Height)
 
 	// build a block containing tx2 ALSO on genesis - will be invalidated
-	invalidatedBlock := unittest.ClusterBlockWithParentAndPayload(suite.genesis, suite.Payload(tx2))
+	invalidatedBlock := unittest.ClusterBlockWithParentAndPayload(*suite.genesis, suite.Payload(tx2))
 	suite.InsertBlock(invalidatedBlock)
 	t.Logf("invalidated: id=%s\tparent_id=%s\theight=%d\n", invalidatedBlock.ID(), invalidatedBlock.Header.ParentID, invalidatedBlock.Header.Height)
 
@@ -578,7 +578,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 		}
 
 		// create a block containing the transaction
-		block := unittest.ClusterBlockWithParentAndPayload(&head, suite.Payload(&tx))
+		block := unittest.ClusterBlockWithParentAndPayload(head, suite.Payload(&tx))
 		suite.InsertBlock(block)
 
 		// reset the valid head if we aren't building a conflicting fork
@@ -1075,8 +1075,8 @@ func benchmarkBuildOn(b *testing.B, size int) {
 	// create a block history to test performance against
 	final := suite.genesis
 	for i := 0; i < size; i++ {
-		block := unittest.ClusterBlockWithParent(final)
-		err := suite.db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(&block)))
+		block := unittest.ClusterBlockWithParent(*final)
+		err := suite.db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
 		require.NoError(b, err)
 
 		// finalize the block 80% of the time, resulting in a fork-rate of 20%

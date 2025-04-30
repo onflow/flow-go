@@ -16,7 +16,8 @@ func Genesis() *Block {
 		},
 	}
 
-	return NewBlock(header.HeaderBody, EmptyPayload(flow.ZeroID))
+	block := NewBlock(header.HeaderBody, EmptyPayload(flow.ZeroID))
+	return &block
 }
 
 // Block represents a block in collection node cluster consensus. It contains
@@ -34,8 +35,8 @@ type Block struct {
 func NewBlock(
 	headerBody flow.HeaderBody,
 	payload Payload,
-) *Block {
-	return &Block{
+) Block {
+	return Block{
 		Header:  headerBody,
 		Payload: payload,
 	}
@@ -57,6 +58,6 @@ func (b *Block) ToHeader() *flow.Header {
 
 // BlockProposal represents a signed proposed block in collection node cluster consensus.
 type BlockProposal struct {
-	Block           *Block
+	Block           Block
 	ProposerSigData []byte
 }
