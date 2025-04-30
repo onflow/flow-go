@@ -1,18 +1,16 @@
 package cache
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 // IdentifierSet represents a set of node IDs (operator-defined) whose communication should be blocked.
@@ -37,8 +35,8 @@ func (s IdentifierSet) Contains(id flow.Identifier) bool {
 // incoming or outgoing connections are established with that node.
 // TODO: terminology change - rename `blocklist` to `disallowList` everywhere to be consistent with the code.
 type NodeDisallowListingWrapper struct {
-	m  sync.RWMutex
-	db *badger.DB
+	m                     sync.RWMutex
+	nodeDisallowListStore storage.NodeDisallowList
 
 	identityProvider module.IdentityProvider
 	disallowList     IdentifierSet // `IdentifierSet` is a map, hence efficient O(1) lookup
@@ -58,19 +56,22 @@ var _ module.IdentityProvider = (*NodeDisallowListingWrapper)(nil)
 // loaded from the database (or assumed to be empty if no database entry is present).
 func NewNodeDisallowListWrapper(
 	identityProvider module.IdentityProvider,
-	db *badger.DB,
-	updateConsumerOracle func() network.DisallowListNotificationConsumer) (*NodeDisallowListingWrapper, error) {
+	db storage.DB,
+	updateConsumerOracle func() network.DisallowListNotificationConsumer,
+) (*NodeDisallowListingWrapper, error) {
+	nodeDisallowListStore := store.NewNodeDisallowList(db)
 
-	disallowList, err := retrieveDisallowList(db)
+	var disallowList map[flow.Identifier]struct{}
+	err := nodeDisallowListStore.Retrieve(&disallowList)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read set of disallowed node IDs from data base: %w", err)
 	}
 
 	return &NodeDisallowListingWrapper{
-		db:                   db,
-		identityProvider:     identityProvider,
-		disallowList:         disallowList,
-		updateConsumerOracle: updateConsumerOracle,
+		nodeDisallowListStore: nodeDisallowListStore,
+		identityProvider:      identityProvider,
+		disallowList:          disallowList,
+		updateConsumerOracle:  updateConsumerOracle,
 	}, nil
 }
 
@@ -93,7 +94,7 @@ func (w *NodeDisallowListingWrapper) Update(disallowList flow.IdentifierList) er
 
 	w.m.Lock()
 	defer w.m.Unlock()
-	err := persistDisallowList(b, w.db)
+	err := w.nodeDisallowListStore.Store(b)
 	if err != nil {
 		return fmt.Errorf("failed to persist set of blocked nodes to the data base: %w", err)
 	}
@@ -199,26 +200,4 @@ func (w *NodeDisallowListingWrapper) setEjectedIfBlocked(identity *flow.Identity
 func (w *NodeDisallowListingWrapper) ByPeerID(p peer.ID) (*flow.Identity, bool) {
 	identity, b := w.identityProvider.ByPeerID(p)
 	return w.setEjectedIfBlocked(identity), b
-}
-
-// persistDisallowList writes the given disallowList to the database. To avoid legacy
-// entries in the database, we prune the entire data base entry if `disallowList` is
-// empty. No errors are expected during normal operations.
-func persistDisallowList(disallowList IdentifierSet, db *badger.DB) error {
-	if len(disallowList) == 0 {
-		return db.Update(operation.PurgeBlocklist())
-	}
-	return db.Update(operation.PersistBlocklist(disallowList))
-}
-
-// retrieveDisallowList reads the set of blocked nodes from the data base.
-// In case no database entry exists, an empty set (nil map) is returned.
-// No errors are expected during normal operations.
-func retrieveDisallowList(db *badger.DB) (IdentifierSet, error) {
-	var blocklist map[flow.Identifier]struct{}
-	err := db.View(operation.RetrieveBlocklist(&blocklist))
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
-		return nil, fmt.Errorf("unexpected error reading set of blocked nodes from data base: %w", err)
-	}
-	return blocklist, nil
 }
