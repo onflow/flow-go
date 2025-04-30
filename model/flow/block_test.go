@@ -3,6 +3,7 @@ package flow_test
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -104,4 +105,18 @@ func TestBlock_Status(t *testing.T) {
 	for status, value := range statuses {
 		assert.Equal(t, status.String(), value)
 	}
+}
+
+// TestBlockMalleability checks that flow.Block is not malleable: any change in its data
+// should result in a different ID.
+func TestBlockMalleability(t *testing.T) {
+	block := unittest.FullBlockFixture()
+	unittest.RequireEntityNonMalleable(
+		t,
+		&block,
+		unittest.WithFieldGenerator("Header.Timestamp", func() time.Time { return time.Now().UTC() }),
+		unittest.WithFieldGenerator("Payload.Collection", func() flow.Collection {
+			return unittest.CollectionFixture(3)
+		}),
+	)
 }

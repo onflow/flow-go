@@ -12,7 +12,9 @@ import (
 // should result in a different ID.
 func TestClusterBlockMalleability(t *testing.T) {
 	block := unittest.ClusterBlockFixture()
-	unittest.RequireEntityNonMalleable(t, &block,
+	unittest.RequireEntityNonMalleable(
+		t,
+		&block,
 		unittest.WithFieldGenerator("Header.Timestamp", func() time.Time { return time.Now().UTC() }),
 		unittest.WithFieldGenerator("Payload.Collection", func() flow.Collection {
 			return unittest.CollectionFixture(3)
