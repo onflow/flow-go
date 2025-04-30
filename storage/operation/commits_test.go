@@ -20,11 +20,8 @@ func TestStateCommitments(t *testing.T) {
 			return operation.IndexStateCommitment(rw.Writer(), id, expected)
 		}))
 
-		reader, err := db.Reader()
-		require.NoError(t, err)
-
 		var actual flow.StateCommitment
-		err = operation.LookupStateCommitment(reader, id, &actual)
+		err := operation.LookupStateCommitment(db.Reader(), id, &actual)
 		require.Nil(t, err)
 		require.Equal(t, expected, actual)
 	})

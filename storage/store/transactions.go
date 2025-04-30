@@ -56,11 +56,7 @@ func (t *Transactions) storeTx(rw storage.ReaderBatchWriter, flowTx *flow.Transa
 }
 
 func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
-	reader, err := t.db.Reader()
-	if err != nil {
-		return nil, err
-	}
-	return t.cache.Get(reader, txID)
+	return t.cache.Get(t.db.Reader(), txID)
 }
 
 // RemoveBatch removes a transaction by fingerprint.

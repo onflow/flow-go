@@ -71,58 +71,40 @@ func TestResults_IndexByServiceEvents(t *testing.T) {
 		}))
 
 		t.Run("retrieve exact height match", func(t *testing.T) {
-			reader, err := db.Reader()
-			require.NoError(t, err)
-
 			var actualVB flow.SealedVersionBeacon
-			err = operation.LookupLastVersionBeaconByHeight(reader, height1, &actualVB)
+			err := operation.LookupLastVersionBeaconByHeight(db.Reader(), height1, &actualVB)
 			require.NoError(t, err)
 			require.Equal(t, vb1, actualVB)
 
-			reader, err = db.Reader()
-			require.NoError(t, err)
-
-			err = operation.LookupLastVersionBeaconByHeight(reader, height2, &actualVB)
+			err = operation.LookupLastVersionBeaconByHeight(db.Reader(), height2, &actualVB)
 			require.NoError(t, err)
 			require.Equal(t, vb2, actualVB)
 
-			reader, err = db.Reader()
-			require.NoError(t, err)
-
-			err = operation.LookupLastVersionBeaconByHeight(reader, height3, &actualVB)
+			err = operation.LookupLastVersionBeaconByHeight(db.Reader(), height3, &actualVB)
 			require.NoError(t, err)
 			require.Equal(t, vb3, actualVB)
 		})
 
 		t.Run("finds highest but not higher than given", func(t *testing.T) {
-			reader, err := db.Reader()
-			require.NoError(t, err)
-
 			var actualVB flow.SealedVersionBeacon
 
-			err = operation.LookupLastVersionBeaconByHeight(reader, height3-1, &actualVB)
+			err := operation.LookupLastVersionBeaconByHeight(db.Reader(), height3-1, &actualVB)
 			require.NoError(t, err)
 			require.Equal(t, vb2, actualVB)
 		})
 
 		t.Run("finds highest", func(t *testing.T) {
-			reader, err := db.Reader()
-			require.NoError(t, err)
-
 			var actualVB flow.SealedVersionBeacon
 
-			err = operation.LookupLastVersionBeaconByHeight(reader, height3+1, &actualVB)
+			err := operation.LookupLastVersionBeaconByHeight(db.Reader(), height3+1, &actualVB)
 			require.NoError(t, err)
 			require.Equal(t, vb3, actualVB)
 		})
 
 		t.Run("height below lowest entry returns nothing", func(t *testing.T) {
-			reader, err := db.Reader()
-			require.NoError(t, err)
-
 			var actualVB flow.SealedVersionBeacon
 
-			err = operation.LookupLastVersionBeaconByHeight(reader, height1-1, &actualVB)
+			err := operation.LookupLastVersionBeaconByHeight(db.Reader(), height1-1, &actualVB)
 			require.ErrorIs(t, err, storage.ErrNotFound)
 		})
 	})

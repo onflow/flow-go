@@ -3,6 +3,7 @@ package pebbleimpl
 import (
 	"bytes"
 	"fmt"
+	"sync"
 
 	"github.com/cockroachdb/pebble"
 
@@ -10,11 +11,20 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 )
 
+// ReaderBatchWriter is for reading and writing to a storage backend.
+// It is useful for performing a related sequence of reads and writes, after which you would like
+// to modify some non-database state if the sequence completed successfully (via AddCallback).
+// If you are not using AddCallback, avoid using ReaderBatchWriter: use Reader and Writer directly.
+// ReaderBatchWriter is not safe for concurrent use.
 type ReaderBatchWriter struct {
 	globalReader storage.Reader
 	batch        *pebble.Batch
 
-	callbacks operation.Callbacks
+	// for executing callbacks after the batch has been flushed, such as updating caches
+	callbacks *operation.Callbacks
+
+	// for repreventing re-entrant deadlock
+	locks *operation.BatchLocks
 }
 
 var _ storage.ReaderBatchWriter = (*ReaderBatchWriter)(nil)
@@ -38,6 +48,14 @@ func (b *ReaderBatchWriter) Writer() storage.Writer {
 
 func (b *ReaderBatchWriter) PebbleWriterBatch() *pebble.Batch {
 	return b.batch
+}
+
+// Lock tries to acquire the lock for the batch.
+// if the lock is already acquired by this same batch from other pending db operations,
+// then it will not be blocked and can continue updating the batch, which prevents a re-entrant deadlock.
+// CAUTION: The caller must ensure that no other references exist for the input lock.
+func (b *ReaderBatchWriter) Lock(lock *sync.Mutex) {
+	b.locks.Lock(lock, b.callbacks)
 }
 
 // AddCallback adds a callback to execute after the batch has been flush
@@ -94,6 +112,8 @@ func NewReaderBatchWriter(db *pebble.DB) *ReaderBatchWriter {
 	return &ReaderBatchWriter{
 		globalReader: ToReader(db),
 		batch:        db.NewBatch(),
+		callbacks:    operation.NewCallbacks(),
+		locks:        operation.NewBatchLocks(),
 	}
 }
 

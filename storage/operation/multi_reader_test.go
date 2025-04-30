@@ -48,14 +48,11 @@ func TestMultiReader(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		preader, err := pebbleimpl.ToDB(pdb).Reader()
-		require.NoError(t, err)
+		preader := pebbleimpl.ToDB(pdb).Reader()
 
-		breader, err := badgerimpl.ToDB(bdb).Reader()
-		require.NoError(t, err)
+		breader := badgerimpl.ToDB(bdb).Reader()
 
-		reader, err := operation.NewMultiReader(preader, breader)
-		require.NoError(t, err)
+		reader := operation.NewMultiReader(preader, breader)
 
 		t.Run("not found", func(t *testing.T) {
 			value, closer, err := reader.Get(notFoundKey)
