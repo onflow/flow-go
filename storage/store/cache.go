@@ -172,11 +172,6 @@ func (c *Cache[K, V]) RemoveTx(rw storage.ReaderBatchWriter, key K) error {
 	return nil
 }
 
-func (c *Cache[K, V]) RemoveByPredicate(pred func(key K) bool) {
-	keys := c.cache.Keys()
-	for _, key := range keys {
-		if pred(key) {
-			c.cache.Remove(key)
-		}
-	}
+func (c *Cache[K, V]) RemoveFunc(del func(key K) bool) {
+	_ = c.cache.RemoveFunc(del)
 }

@@ -220,8 +220,7 @@ func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batc
 	storage.OnCommitSucceed(batch, func() {
 		keyPrefix := KeyFromBlockID(blockID)
 
-		// TODO: optimize range removal from cache.
-		tr.cache.RemoveByPredicate(func(key string) bool {
+		tr.cache.RemoveFunc(func(key string) bool {
 			return strings.HasPrefix(key, keyPrefix)
 		})
 	})
