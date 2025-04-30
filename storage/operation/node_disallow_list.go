@@ -1,7 +1,6 @@
 package operation
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -15,7 +14,7 @@ import (
 // TODO: TEMPORARY manual override for adding node IDs to list of ejected nodes, applies to networking layer only
 func PurgeNodeDisallowList(w storage.Writer) error {
 	err := RemoveByKey(w, MakePrefix(blockedNodeIDs))
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+	if err != nil {
 		return fmt.Errorf("unexpected error while purging disallow list: %w", err)
 	}
 	return nil
