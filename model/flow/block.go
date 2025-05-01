@@ -62,7 +62,7 @@ func (b Block) Checksum() Identifier {
 
 // ToHeader converts the block into a compact [flow.Header] representation,
 // where the payload is compressed to a hash reference.
-func (b Block) ToHeader() *Header {
+func (b *Block) ToHeader() *Header {
 	return &Header{
 		HeaderBody:  b.Header,
 		PayloadHash: b.Payload.Hash(),

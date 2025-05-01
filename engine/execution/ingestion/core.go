@@ -358,7 +358,7 @@ func (e *Core) onBlockExecuted(
 		return fmt.Errorf("unexpected error while marking block as executed: %w", err)
 	}
 
-	e.stopControl.OnBlockExecuted(block.Block.Header)
+	e.stopControl.OnBlockExecuted(block.Block.ToHeader())
 
 	// notify event consumer so that the event consumer can do tasks
 	// such as broadcasting or uploading the result
@@ -469,7 +469,7 @@ func (e *Core) executeConcurrently(executables []*entity.ExecutableBlock) {
 }
 
 func (e *Core) execute(ctx context.Context, executable *entity.ExecutableBlock) error {
-	if !e.stopControl.ShouldExecuteBlock(executable.Block.Header.ID(), executable.Block.Header.Height) {
+	if !e.stopControl.ShouldExecuteBlock(executable.Block.ID(), executable.Block.Header.Height) {
 		return nil
 	}
 
