@@ -77,11 +77,8 @@ func TestTransactionResultErrorMessages_Persist(t *testing.T) {
 		}))
 
 		// Get stored error message value
-		reader, err := db.Reader()
-		require.NoError(t, err)
-
 		var actualTxResultErrorMessages []flow.TransactionResultErrorMessage
-		err = operation.LookupTransactionResultErrorMessagesByBlockIDUsingIndex(reader, block.ID(), &actualTxResultErrorMessages)
+		err = operation.LookupTransactionResultErrorMessagesByBlockIDUsingIndex(db.Reader(), block.ID(), &actualTxResultErrorMessages)
 		require.NoError(t, err)
 		assert.Equal(t, errorMessages, actualTxResultErrorMessages)
 	})

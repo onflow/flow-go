@@ -67,11 +67,8 @@ func TestCollection_Persist(t *testing.T) {
 		}))
 
 		// Get light transaction
-		reader, err := db.Reader()
-		require.NoError(t, err)
-
 		var actualCollection flow.LightCollection
-		err = operation.RetrieveCollection(reader, collection.ID(), &actualCollection)
+		err = operation.RetrieveCollection(db.Reader(), collection.ID(), &actualCollection)
 		require.NoError(t, err)
 		require.Equal(t, collection.Light(), actualCollection)
 	})

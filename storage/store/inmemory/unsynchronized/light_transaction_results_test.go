@@ -55,11 +55,8 @@ func TestLightTransactionResults_Persist(t *testing.T) {
 		}))
 
 		// Get light tx result
-		reader, err := db.Reader()
-		require.NoError(t, err)
-
 		var actualTxResults []flow.LightTransactionResult
-		err = operation.LookupLightTransactionResultsByBlockIDUsingIndex(reader, block.ID(), &actualTxResults)
+		err = operation.LookupLightTransactionResultsByBlockIDUsingIndex(db.Reader(), block.ID(), &actualTxResults)
 		require.NoError(t, err)
 		assert.Equal(t, txResults, actualTxResults)
 	})

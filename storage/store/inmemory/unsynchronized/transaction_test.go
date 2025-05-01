@@ -42,11 +42,8 @@ func TestTransactions_Persist(t *testing.T) {
 		}))
 
 		// Get light transaction
-		reader, err := db.Reader()
-		require.NoError(t, err)
-
 		var actualTx flow.TransactionBody
-		err = operation.RetrieveTransaction(reader, tx.ID(), &actualTx)
+		err = operation.RetrieveTransaction(db.Reader(), tx.ID(), &actualTx)
 		require.NoError(t, err)
 		require.Equal(t, tx, actualTx)
 	})
