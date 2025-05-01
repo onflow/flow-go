@@ -28,9 +28,9 @@ func (suite *Suite) TestTransactionRetry() {
 	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
-	suite.snapshot.On("Head").Return(headBlock.Header, nil)
+	suite.snapshot.On("Head").Return(headBlock.ToHeader(), nil)
 	snapshotAtBlock := new(protocol.Snapshot)
-	snapshotAtBlock.On("Head").Return(block.Header, nil)
+	snapshotAtBlock.On("Head").Return(block.ToHeader(), nil)
 	suite.state.On("AtBlockID", block.ID()).Return(snapshotAtBlock, nil)
 
 	// collection storage returns a not found error
