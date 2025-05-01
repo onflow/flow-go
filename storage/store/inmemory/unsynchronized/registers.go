@@ -88,6 +88,7 @@ func (r *Registers) AddToBatch(db *pebble.DB) error {
 			return fmt.Errorf("could not persist register: %w", err)
 		}
 	}
+	batch.Commit(pebble.Sync)
 
 	return nil
 }
