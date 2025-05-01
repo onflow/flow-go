@@ -88,45 +88,7 @@ func (c *CollectionExecutedMetricImpl) CollectionExecuted(light flow.LightCollec
 
 // BlockFinalized tracks finalized metric for block
 func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
-	// TODO: lookup actual finalization time by looking at the block finalizing `b`
-	now := time.Now().UTC()
 	blockID := block.ID()
-
-	// mark all transactions as finalized
-	// TODO: sample to reduce performance overhead
-	for _, g := range block.Payload.Guarantees {
-		l, err := c.collections.LightByID(g.CollectionID)
-		if errors.Is(err, storage.ErrNotFound) {
-			c.collectionsToMarkFinalized.Add(g.CollectionID, now)
-			continue
-		} else if err != nil {
-			c.log.Warn().Err(err).Str("collection_id", g.CollectionID.String()).
-				Msg("could not track tx finalized metric: finalized collection not found locally")
-			continue
-		}
-
-		for _, t := range l.Transactions {
-			c.accessMetrics.TransactionFinalized(t, now)
-			err = c.blockTransactions.Append(blockID, t)
-
-			if err != nil {
-				c.log.Warn().Err(err).Msg("could not append finalized tx to track sealed transactions")
-				continue
-			}
-		}
-	}
-
-	// Process block seals
-	for _, s := range block.Payload.Seals {
-		transactions, found := c.blockTransactions.Get(s.BlockID)
-
-		if found {
-			for _, t := range transactions {
-				c.accessMetrics.TransactionSealed(t, now)
-			}
-			c.blockTransactions.Remove(s.BlockID)
-		}
-	}
 
 	if ti, found := c.blocksToMarkExecuted.ByID(blockID); found {
 		c.blockExecuted(block, ti)
