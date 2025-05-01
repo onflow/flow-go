@@ -115,8 +115,8 @@ func TestBlockMalleability(t *testing.T) {
 		t,
 		&block,
 		unittest.WithFieldGenerator("Header.Timestamp", func() time.Time { return time.Now().UTC() }),
-		unittest.WithFieldGenerator("Payload.Collection", func() flow.Collection {
-			return unittest.CollectionFixture(3)
+		unittest.WithFieldGenerator("Payload.Results", func() flow.ExecutionResultList {
+			return flow.ExecutionResultList{unittest.ExecutionResultFixture()}
 		}),
 	)
 }
