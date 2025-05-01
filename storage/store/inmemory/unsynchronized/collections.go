@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
@@ -14,6 +16,7 @@ type Collections struct {
 	// that we write data only once and it happens before the future reads.
 	// We decided to leave a mutex for some time during active development.
 	// It'll be removed in the future.
+	log                            zerolog.Logger
 	lock                           sync.RWMutex
 	collections                    map[flow.Identifier]*flow.Collection
 	lightCollections               map[flow.Identifier]*flow.LightCollection
@@ -22,8 +25,9 @@ type Collections struct {
 
 var _ storage.Collections = (*Collections)(nil)
 
-func NewCollections() *Collections {
+func NewCollections(logger zerolog.Logger) *Collections {
 	return &Collections{
+		log:                            logger,
 		collections:                    make(map[flow.Identifier]*flow.Collection),
 		lightCollections:               make(map[flow.Identifier]*flow.LightCollection),
 		transactionIDToLightCollection: make(map[flow.Identifier]*flow.LightCollection),
@@ -134,6 +138,9 @@ func (c *Collections) Remove(collID flow.Identifier) error {
 // AddToBatch adds all the in-memory storages to the given batch.
 // It is used for the batching writes to the DB.
 func (c *Collections) AddToBatch(batch storage.ReaderBatchWriter) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	writer := batch.Writer()
 
 	for _, coll := range c.collections {
@@ -141,6 +148,33 @@ func (c *Collections) AddToBatch(batch storage.ReaderBatchWriter) error {
 		err := operation.UpsertCollection(writer, &light)
 		if err != nil {
 			return fmt.Errorf("could not persist collection: %w", err)
+		}
+
+		for _, tx := range coll.Transactions {
+			txID := tx.ID()
+			collID := coll.ID()
+
+			var differentColTxIsIn flow.Identifier
+			err := operation.LookupCollectionByTransaction(batch.GlobalReader(), txID, &differentColTxIsIn)
+			if err == nil {
+				// collection nodes have ensured that a transaction can only belong to one collection
+				// so if transaction is already indexed by a collection, check if it's the same collection.
+				if collID != differentColTxIsIn {
+					c.log.Warn().Msgf(
+						"sanity check failed: transaction %v in collection %v is already indexed by a different collection %v",
+						txID,
+						collID,
+						differentColTxIsIn,
+					)
+				}
+				continue
+			}
+
+			// the lock acquired above ensures we are the only process indexing collection by transaction
+			err = operation.UnsafeIndexCollectionByTransaction(writer, txID, collID)
+			if err != nil {
+				return fmt.Errorf("could not index collection by transaction ID: %w", err)
+			}
 		}
 	}
 

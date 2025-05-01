@@ -13,7 +13,7 @@ import (
 )
 
 func TestCollection_HappyCase(t *testing.T) {
-	collections := NewCollections()
+	collections := NewCollections(unittest.Logger())
 
 	collection := unittest.CollectionFixture(3)
 
@@ -36,7 +36,7 @@ func TestCollection_HappyCase(t *testing.T) {
 }
 
 func TestLightByTransactionID_HappyCase(t *testing.T) {
-	collections := NewCollections()
+	collections := NewCollections(unittest.Logger())
 	lightCollection := &flow.LightCollection{
 		Transactions: []flow.Identifier{unittest.IdentifierFixture(), unittest.IdentifierFixture()},
 	}
@@ -56,7 +56,7 @@ func TestLightByTransactionID_HappyCase(t *testing.T) {
 
 func TestCollection_Persist(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		collections := NewCollections()
+		collections := NewCollections(unittest.Logger())
 		collection := unittest.CollectionFixture(3)
 
 		// Store collection

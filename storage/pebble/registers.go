@@ -73,7 +73,7 @@ func (s *Registers) Get(
 	if height < firstHeight {
 		return nil, fmt.Errorf("height %d not indexed, indexed range: [%d-%d], %w", height, firstHeight, latestHeight, storage.ErrHeightNotIndexed)
 	}
-	key := newLookupKey(height, reg)
+	key := NewLookupKey(height, reg)
 	return s.lookupRegister(key.Bytes())
 }
 
@@ -129,7 +129,7 @@ func (s *Registers) Store(
 	defer batch.Close()
 
 	for _, entry := range entries {
-		encoded := newLookupKey(height, entry.Key).Bytes()
+		encoded := NewLookupKey(height, entry.Key).Bytes()
 
 		err := batch.Set(encoded, entry.Value, nil)
 		if err != nil {

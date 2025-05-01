@@ -79,10 +79,10 @@ func TestEvents_Persist(t *testing.T) {
 		reader, err := db.Reader()
 		require.NoError(t, err)
 
-		actualEvents := &[]flow.Event{}
-		err = operation.LookupEventsByBlockID(reader, block.ID(), actualEvents)
+		actualEvents := make([]flow.Event, 0)
+		err = operation.LookupEventsByBlockID(reader, block.ID(), &actualEvents)
 		require.NoError(t, err)
-		require.Len(t, *actualEvents, 1)
-		require.Equal(t, event, (*actualEvents)[0])
+		require.Len(t, actualEvents, 1)
+		require.Equal(t, event, actualEvents[0])
 	})
 }
