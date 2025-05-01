@@ -57,26 +57,26 @@ func (suite *ReadProtocolStateBlocksSuite) SetupTest() {
 
 	genesis := unittest.GenesisFixture()
 	blocks = append(blocks, genesis)
-	sealed := unittest.BlockWithParentFixture(genesis.Header)
+	sealed := unittest.BlockWithParentFixture(genesis.ToHeader())
 	blocks = append(blocks, sealed)
-	final := unittest.BlockWithParentFixture(sealed.Header)
+	final := unittest.BlockWithParentFixture(sealed.ToHeader())
 	blocks = append(blocks, final)
-	final = unittest.BlockWithParentFixture(final.Header)
+	final = unittest.BlockWithParentFixture(final.ToHeader())
 	blocks = append(blocks, final)
-	final = unittest.BlockWithParentFixture(final.Header)
+	final = unittest.BlockWithParentFixture(final.ToHeader())
 	blocks = append(blocks, final)
 
 	suite.allBlocks = blocks
 	suite.sealed = sealed
 	suite.final = final
 
-	suite.state.On("Final").Return(createSnapshot(final.Header))
-	suite.state.On("Sealed").Return(createSnapshot(sealed.Header))
+	suite.state.On("Final").Return(createSnapshot(final.ToHeader()))
+	suite.state.On("Sealed").Return(createSnapshot(sealed.ToHeader()))
 	suite.state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) protocol.Snapshot {
 			for _, block := range blocks {
 				if block.ID() == blockID {
-					return createSnapshot(block.Header)
+					return createSnapshot(block.ToHeader())
 				}
 			}
 			return invalid.NewSnapshot(fmt.Errorf("invalid block ID: %v", blockID))
@@ -86,7 +86,7 @@ func (suite *ReadProtocolStateBlocksSuite) SetupTest() {
 		func(height uint64) protocol.Snapshot {
 			if int(height) < len(blocks) {
 				block := blocks[height]
-				return createSnapshot(block.Header)
+				return createSnapshot(block.ToHeader())
 			}
 			return invalid.NewSnapshot(fmt.Errorf("invalid height: %v", height))
 		},

@@ -54,7 +54,7 @@ func (suite *ReadResultsSuite) SetupTest() {
 	blocks = append(blocks, genesis)
 	results = append(results, genesisResult)
 
-	sealed := unittest.BlockWithParentFixture(genesis.Header)
+	sealed := unittest.BlockWithParentFixture(genesis.ToHeader())
 	sealedResult := unittest.ExecutionResultFixture(
 		unittest.WithBlock(sealed),
 		unittest.WithPreviousResult(*genesisResult),
@@ -62,7 +62,7 @@ func (suite *ReadResultsSuite) SetupTest() {
 	blocks = append(blocks, sealed)
 	results = append(results, sealedResult)
 
-	final := unittest.BlockWithParentFixture(sealed.Header)
+	final := unittest.BlockWithParentFixture(sealed.ToHeader())
 	finalResult := unittest.ExecutionResultFixture(
 		unittest.WithBlock(final),
 		unittest.WithPreviousResult(*sealedResult),
@@ -70,7 +70,7 @@ func (suite *ReadResultsSuite) SetupTest() {
 	blocks = append(blocks, final)
 	results = append(results, finalResult)
 
-	final = unittest.BlockWithParentFixture(final.Header)
+	final = unittest.BlockWithParentFixture(final.ToHeader())
 	finalResult = unittest.ExecutionResultFixture(
 		unittest.WithBlock(final),
 		unittest.WithPreviousResult(*finalResult),
@@ -78,7 +78,7 @@ func (suite *ReadResultsSuite) SetupTest() {
 	blocks = append(blocks, final)
 	results = append(results, finalResult)
 
-	final = unittest.BlockWithParentFixture(final.Header)
+	final = unittest.BlockWithParentFixture(final.ToHeader())
 	finalResult = unittest.ExecutionResultFixture(
 		unittest.WithBlock(final),
 		unittest.WithPreviousResult(*finalResult),
@@ -93,13 +93,13 @@ func (suite *ReadResultsSuite) SetupTest() {
 	suite.finalResult = finalResult
 	suite.sealedResult = sealedResult
 
-	suite.state.On("Final").Return(createSnapshot(suite.T(), final.Header))
-	suite.state.On("Sealed").Return(createSnapshot(suite.T(), sealed.Header))
+	suite.state.On("Final").Return(createSnapshot(suite.T(), final.ToHeader()))
+	suite.state.On("Sealed").Return(createSnapshot(suite.T(), sealed.ToHeader()))
 	suite.state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) protocol.Snapshot {
 			for _, block := range blocks {
 				if block.ID() == blockID {
-					return createSnapshot(suite.T(), block.Header)
+					return createSnapshot(suite.T(), block.ToHeader())
 				}
 			}
 			return invalid.NewSnapshot(fmt.Errorf("invalid block ID: %v", blockID))
@@ -109,7 +109,7 @@ func (suite *ReadResultsSuite) SetupTest() {
 		func(height uint64) protocol.Snapshot {
 			if int(height) < len(blocks) {
 				block := blocks[height]
-				return createSnapshot(suite.T(), block.Header)
+				return createSnapshot(suite.T(), block.ToHeader())
 			}
 			return invalid.NewSnapshot(fmt.Errorf("invalid height: %v", height))
 		},
