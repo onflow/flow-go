@@ -16,25 +16,24 @@ import (
 
 // config is a set of configuration options for an emulated emulator.
 type config struct {
-	ServiceKey                    *ServiceKey
-	Store                         EmulatorStorage
-	SimpleAddresses               bool
-	GenesisTokenSupply            cadence.UFix64
-	TransactionMaxGasLimit        uint64
-	ScriptGasLimit                uint64
-	TransactionExpiry             uint
-	StorageLimitEnabled           bool
-	TransactionFeesEnabled        bool
-	ExecutionEffortWeights        meter.ExecutionEffortWeights
-	ContractRemovalEnabled        bool
-	MinimumStorageReservation     cadence.UFix64
-	StorageMBPerFLOW              cadence.UFix64
-	Logger                        zerolog.Logger
-	ServerLogger                  zerolog.Logger
-	TransactionValidationEnabled  bool
-	ChainID                       flowgo.ChainID
-	AutoMine                      bool
-	AccountStorageFormatV2Enabled bool
+	ServiceKey                   *ServiceKey
+	Store                        EmulatorStorage
+	SimpleAddresses              bool
+	GenesisTokenSupply           cadence.UFix64
+	TransactionMaxGasLimit       uint64
+	ScriptGasLimit               uint64
+	TransactionExpiry            uint
+	StorageLimitEnabled          bool
+	TransactionFeesEnabled       bool
+	ExecutionEffortWeights       meter.ExecutionEffortWeights
+	ContractRemovalEnabled       bool
+	MinimumStorageReservation    cadence.UFix64
+	StorageMBPerFLOW             cadence.UFix64
+	Logger                       zerolog.Logger
+	ServerLogger                 zerolog.Logger
+	TransactionValidationEnabled bool
+	ChainID                      flowgo.ChainID
+	AutoMine                     bool
 }
 
 const defaultGenesisTokenSupply = "1000000000.0"
@@ -271,13 +270,5 @@ func WithTransactionValidationEnabled(enabled bool) Option {
 func WithChainID(chainID flowgo.ChainID) Option {
 	return func(c *config) {
 		c.ChainID = chainID
-	}
-}
-
-// WithAccountStorageFormatV2Enabled enabled/disables the account storage format V2.
-// The default is false.
-func WithAccountStorageFormatV2Enabled(enabled bool) Option {
-	return func(c *config) {
-		c.AccountStorageFormatV2Enabled = enabled
 	}
 }

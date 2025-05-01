@@ -77,7 +77,7 @@ unittest-main:
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
-    go install github.com/vektra/mockery/v2@v2.43.2; \
+    go install github.com/vektra/mockery/v2@v2.53.3; \
     go install github.com/golang/mock/mockgen@v1.6.0;
 
 .PHONY: install-tools
