@@ -23,6 +23,8 @@ import (
 //     there are two special cases for (2):
 //     - if the parent block is zero, then we don't need to add this index.
 //     - if the parent block doesn't exist, then we will insert the child index instead of updating
+//
+// TODO(7355): lockctx
 func IndexNewBlock(indexing *sync.Mutex, rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
 	indexing.Lock()
 	rw.AddCallback(func(error) {

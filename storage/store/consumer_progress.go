@@ -12,6 +12,7 @@ import (
 // ConsumerProgressInitializer is a helper to initialize the consumer progress index in storage
 // It prevents the consumer from being used before initialization
 type ConsumerProgressInitializer struct {
+	// TODO(7355): lockctx
 	initing  sync.Mutex
 	progress *consumerProgress
 }

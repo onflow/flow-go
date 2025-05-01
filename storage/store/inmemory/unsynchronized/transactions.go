@@ -12,6 +12,7 @@ type Transactions struct {
 	// that we write data only once and it happens before the future reads.
 	// We decided to leave a mutex for some time during active development.
 	// It'll be removed later on.
+	// TODO(7355): lockctx
 	lock  sync.RWMutex
 	store map[flow.Identifier]*flow.TransactionBody
 }

@@ -13,6 +13,7 @@ type Events struct {
 	// that we write data only once and it happens before the future reads.
 	// We decided to leave a mutex for some time during active development.
 	// It'll be removed in the future.
+	// TODO(7355): lockctx
 	lock            sync.RWMutex
 	blockIdToEvents map[flow.Identifier][]flow.Event
 }

@@ -77,6 +77,7 @@ func RetrieveEpochLastHeight(r storage.Reader, epoch uint64, height *uint64) err
 	return nil
 }
 
+// TODO(7355): lockctx
 func InsertLastCompleteBlockHeightIfNotExists(inserting *sync.Mutex, rw storage.ReaderBatchWriter, height uint64) error {
 	inserting.Lock()
 	rw.AddCallback(func(err error) {

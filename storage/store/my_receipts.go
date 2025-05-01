@@ -22,6 +22,7 @@ type MyExecutionReceipts struct {
 	cache           *Cache[flow.Identifier, *flow.ExecutionReceipt]
 	// preventing dirty reads when checking if a different my receipt has been
 	// indexed for the same block
+	// TODO(7355): lockctx
 	indexingMyReceipt *sync.Mutex
 }
 

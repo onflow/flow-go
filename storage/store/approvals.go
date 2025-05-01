@@ -21,8 +21,9 @@ import (
 //     *only safe* for Verification Nodes when tracking their own approvals (for the same ExecutionResult,
 //     a Verifier will always produce the same approval)
 type ResultApprovals struct {
-	db       storage.DB
-	cache    *Cache[flow.Identifier, *flow.ResultApproval]
+	db    storage.DB
+	cache *Cache[flow.Identifier, *flow.ResultApproval]
+	// TODO(7355): lockctx
 	indexing *sync.Mutex // preventing concurrent indexing of approvals
 }
 
