@@ -124,7 +124,7 @@ func (et *ExecutionTreeTestSuite) addReceipts2ReceiptsForest(receipts map[string
 	}
 	for name, rcpt := range receipts {
 		block := blockById[rcpt.ExecutionResult.BlockID]
-		_, err := et.Forest.AddReceipt(rcpt, block.Header)
+		_, err := et.Forest.AddReceipt(rcpt, block.ToHeader())
 		if err != nil {
 			et.FailNow("failed to add receipt '%s'", name)
 		}
@@ -144,20 +144,20 @@ func (et *ExecutionTreeTestSuite) Test_AddReceipt() {
 	receipt := unittest.ReceiptForBlockFixture(&block)
 
 	// add should succeed and increase size
-	added, err := et.Forest.AddReceipt(receipt, block.Header)
+	added, err := et.Forest.AddReceipt(receipt, block.ToHeader())
 	assert.NoError(et.T(), err)
 	assert.True(et.T(), added)
 	assert.Equal(et.T(), uint(1), et.Forest.Size())
 
 	// adding different receipt for same result
 	receipt2 := unittest.ExecutionReceiptFixture(unittest.WithResult(&receipt.ExecutionResult))
-	added, err = et.Forest.AddReceipt(receipt2, block.Header)
+	added, err = et.Forest.AddReceipt(receipt2, block.ToHeader())
 	assert.NoError(et.T(), err)
 	assert.True(et.T(), added)
 	assert.Equal(et.T(), uint(2), et.Forest.Size())
 
 	// repeated addition should be idempotent
-	added, err = et.Forest.AddReceipt(receipt, block.Header)
+	added, err = et.Forest.AddReceipt(receipt, block.ToHeader())
 	assert.NoError(et.T(), err)
 	assert.False(et.T(), added)
 	assert.Equal(et.T(), uint(2), et.Forest.Size())
@@ -170,7 +170,7 @@ func (et *ExecutionTreeTestSuite) Test_AddResult_Detached() {
 	miscBlock := makeBlockWithHeight(101)
 	miscResult := unittest.ExecutionResultFixture(unittest.WithBlock(miscBlock))
 
-	err := et.Forest.AddResult(miscResult, miscBlock.Header)
+	err := et.Forest.AddResult(miscResult, miscBlock.ToHeader())
 	assert.NoError(et.T(), err)
 	collectedReceipts, err := et.Forest.ReachableReceipts(miscResult.ID(), anyBlock(), anyReceipt())
 	assert.NoError(et.T(), err)
@@ -201,7 +201,7 @@ func (et *ExecutionTreeTestSuite) Test_AddResult_Bridge() {
 	et.Assert().True(reflect.DeepEqual(expected, et.receiptSet(collectedReceipts, receipts)))
 
 	// after we added r[C12], tree search should reach r[C13] and hence include the corresponding receipt ER[r[C13]]
-	err = et.Forest.AddResult(results["r[C12]"], blocks["C12"].Header)
+	err = et.Forest.AddResult(results["r[C12]"], blocks["C12"].ToHeader())
 	assert.NoError(et.T(), err)
 	collectedReceipts, err = et.Forest.ReachableReceipts(results["r[B10]"].ID(), blockFilter, anyReceipt())
 	assert.NoError(et.T(), err)
@@ -388,7 +388,7 @@ func makeBlockWithHeight(height uint64) *flow.Block {
 }
 
 func makeChildBlock(parent *flow.Block) *flow.Block {
-	return unittest.BlockWithParentFixture(parent.Header)
+	return unittest.BlockWithParentFixture(parent.ToHeader())
 }
 
 func (et *ExecutionTreeTestSuite) receiptSet(selected []*flow.ExecutionReceipt, receipts map[string]*flow.ExecutionReceipt) map[string]struct{} {

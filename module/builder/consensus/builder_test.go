@@ -93,7 +93,7 @@ type BuilderSuite struct {
 }
 
 func (bs *BuilderSuite) storeBlock(block *flow.Block) {
-	bs.headers[block.ID()] = block.Header
+	bs.headers[block.ID()] = block.ToHeader()
 	bs.blocks[block.ID()] = block
 	bs.index[block.ID()] = block.Payload.Index()
 	bs.blockChildren[block.Header.ParentID] = append(bs.blockChildren[block.Header.ParentID], block.ID())
@@ -108,7 +108,7 @@ func (bs *BuilderSuite) storeBlock(block *flow.Block) {
 // and the result are combined in an IncorporatedResultSeal which is a candidate
 // for the seals mempool.
 func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block, candidateSealForParent bool) *flow.Block {
-	block := unittest.BlockWithParentFixture(parentBlock.Header)
+	block := unittest.BlockWithParentFixture(parentBlock.ToHeader())
 
 	// Create a receipt for a result of the parentBlock block,
 	// and add it to the payload. The corresponding IncorporatedResult will be used to
@@ -278,11 +278,11 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.state.On("Extend", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		proposal := args.Get(1).(*flow.BlockProposal)
 		bs.Assert().Equal(bs.sentinel, proposal.Block.Header.View)
-		bs.assembled = proposal.Block.Payload
+		bs.assembled = &proposal.Block.Payload
 	}).Return(nil)
 	bs.state.On("Final").Return(func() realproto.Snapshot {
 		if block, ok := bs.blocks[bs.finalID]; ok {
-			snapshot := unittest.StateSnapshotForKnownBlock(block.Header, nil)
+			snapshot := unittest.StateSnapshotForKnownBlock(block.ToHeader(), nil)
 			snapshot.On("Descendants").Return(bs.blockChildren[bs.finalID], nil)
 			return snapshot
 		}
@@ -673,7 +673,7 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 
 	// create blocks B1 to B4:
 	b1 := bs.createAndRecordBlock(bs.blocks[bs.parentID], true)
-	bchain := unittest.ChainFixtureFrom(3, b1.Header) // creates blocks b2, b3, b4
+	bchain := unittest.ChainFixtureFrom(3, b1.ToHeader()) // creates blocks b2, b3, b4
 	b4 := bchain[2]
 
 	// Incorporate result for block B1 into payload of block B4
@@ -686,7 +686,7 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 		})
 
 	// add blocks B2, B3, B4, A5 to the mocked storage layer (block b0 and b1 are already added):
-	a5 := unittest.BlockWithParentFixture(b4.Header)
+	a5 := unittest.BlockWithParentFixture(b4.ToHeader())
 	for _, b := range append(bchain, a5) {
 		bs.storeBlock(b)
 	}
@@ -709,7 +709,7 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 	})
 
 	bs.T().Run("Build on top of B5 and check that seals for B1 is included", func(t *testing.T) {
-		b5 := unittest.BlockWithParentFixture(b4.Header) // creating block b5
+		b5 := unittest.BlockWithParentFixture(b4.ToHeader()) // creating block b5
 		bs.storeBlock(b5)
 		bs.sealDB.On("HighestInFork", b5.ID()).Return(b0seal, nil)
 
@@ -827,7 +827,7 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 
 	blockF := bs.blocks[bs.finalID]
 	blocks := []*flow.Block{blockF}
-	blocks = append(blocks, unittest.ChainFixtureFrom(4, blockF.Header)...)              // elements  [F, A, B, C, D]
+	blocks = append(blocks, unittest.ChainFixtureFrom(4, blockF.ToHeader())...)          // elements  [F, A, B, C, D]
 	receiptChain1 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[F]_1, Result[A]_1, Result[B]_1, ...]
 	receiptChain2 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[F]_2, Result[A]_2, Result[B]_2, ...]
 
@@ -975,10 +975,10 @@ func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() 
 	bs.recPool.On("ReachableReceipts", b1Seal.ResultID, mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			blockFilter := args[1].(mempoolAPIs.BlockFilter)
-			for _, h := range []*flow.Header{b1.Header, b2.Header, b3.Header, b4.Header, b5.Header} {
+			for _, h := range []*flow.Header{b1.ToHeader(), b2.ToHeader(), b3.ToHeader(), b4.ToHeader(), b5.ToHeader()} {
 				assert.True(bs.T(), blockFilter(h))
 			}
-			for _, h := range []*flow.Header{bs.blocks[bs.finalID].Header, x1.Header, y2.Header, a6.Header, c3.Header, c4.Header, d4.Header} {
+			for _, h := range []*flow.Header{bs.blocks[bs.finalID].ToHeader(), x1.ToHeader(), y2.ToHeader(), a6.ToHeader(), c3.ToHeader(), c4.ToHeader(), d4.ToHeader()} {
 				assert.False(bs.T(), blockFilter(h))
 			}
 		}).Return([]*flow.ExecutionReceipt{}, nil).Once()
@@ -1127,7 +1127,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_AsProvidedByReceiptForest() {
 func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
 	// make blocks S, A, B, C
 	parentReceipt := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
-	blockSABC := unittest.ChainFixtureFrom(4, bs.blocks[bs.parentID].Header)
+	blockSABC := unittest.ChainFixtureFrom(4, bs.blocks[bs.parentID].ToHeader())
 	resultS := unittest.ExecutionResultFixture(unittest.WithBlock(blockSABC[0]), unittest.WithPreviousResult(*bs.resultForBlock[bs.parentID]))
 	receiptSABC := unittest.ReceiptChainFor(blockSABC, resultS)
 	blockSABC[0].Payload.Receipts = []*flow.ExecutionReceiptStub{parentReceipt.Stub()}
@@ -1150,13 +1150,13 @@ func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromStub(*meta, *result)
-			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].Header)
+			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
 			bs.NoError(err)
 		}
 	}
 	// for receipts _not_ included in blocks, add only receipt for A and C but NOT B
-	_, _ = bs.build.recPool.AddReceipt(receiptSABC[1], blockSABC[1].Header)
-	_, _ = bs.build.recPool.AddReceipt(receiptSABC[3], blockSABC[3].Header)
+	_, _ = bs.build.recPool.AddReceipt(receiptSABC[1], blockSABC[1].ToHeader())
+	_, _ = bs.build.recPool.AddReceipt(receiptSABC[3], blockSABC[3].ToHeader())
 
 	_, err := bs.build.BuildOn(blockSABC[3].ID(), bs.setter, bs.sign)
 	bs.Require().NoError(err)
@@ -1188,7 +1188,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 	recA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA1))
 	resA2 := unittest.ExecutionResultFixture(unittest.WithBlock(A), unittest.WithPreviousResult(recP.ExecutionResult))
 	recA2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA2))
-	B := unittest.BlockWithParentFixture(A.Header)
+	B := unittest.BlockWithParentFixture(A.ToHeader())
 	B.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceiptStub{recA1.Stub(), recA2.Stub()},
 		Results:  []*flow.ExecutionResult{&recA1.ExecutionResult, &recA2.ExecutionResult},
@@ -1204,7 +1204,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromStub(*meta, *result)
-			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].Header)
+			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
 			bs.NoError(err)
 		}
 	}
@@ -1218,8 +1218,8 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 	recB2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resB2))
 
 	// Add recB1 and recB2 to the mempool for inclusion in the next candidate
-	_, _ = bs.build.recPool.AddReceipt(recB1, B.Header)
-	_, _ = bs.build.recPool.AddReceipt(recB2, B.Header)
+	_, _ = bs.build.recPool.AddReceipt(recB1, B.ToHeader())
+	_, _ = bs.build.recPool.AddReceipt(recB2, B.ToHeader())
 
 	_, err := bs.build.BuildOn(B.ID(), bs.setter, bs.sign)
 	bs.Require().NoError(err)
@@ -1261,7 +1261,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 	// B is a block that builds on A containing a valid receipt for A
 	resA1 := unittest.ExecutionResultFixture(unittest.WithBlock(A), unittest.WithPreviousResult(recP.ExecutionResult))
 	recA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA1))
-	B := unittest.BlockWithParentFixture(A.Header)
+	B := unittest.BlockWithParentFixture(A.ToHeader())
 	B.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceiptStub{recA1.Stub()},
 		Results:  []*flow.ExecutionResult{&recA1.ExecutionResult},
@@ -1271,7 +1271,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 	// different from the receipt contained in B
 	resA2 := unittest.ExecutionResultFixture(unittest.WithBlock(A), unittest.WithPreviousResult(recP.ExecutionResult))
 	recA2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA2))
-	C := unittest.BlockWithParentFixture(A.Header)
+	C := unittest.BlockWithParentFixture(A.ToHeader())
 	C.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceiptStub{recA2.Stub()},
 		Results:  []*flow.ExecutionResult{&recA2.ExecutionResult},
@@ -1288,7 +1288,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromStub(*meta, *result)
-			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].Header)
+			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
 			bs.NoError(err)
 		}
 	}
@@ -1300,9 +1300,9 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 	resB2 := unittest.ExecutionResultFixture(unittest.WithBlock(B), unittest.WithPreviousResult(recA2.ExecutionResult))
 	recB2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resB2))
 
-	_, err := bs.build.recPool.AddReceipt(recB1, B.Header)
+	_, err := bs.build.recPool.AddReceipt(recB1, B.ToHeader())
 	bs.Require().NoError(err)
-	_, err = bs.build.recPool.AddReceipt(recB2, B.Header)
+	_, err = bs.build.recPool.AddReceipt(recB2, B.ToHeader())
 	bs.Require().NoError(err)
 
 	_, err = bs.build.BuildOn(B.ID(), bs.setter, bs.sign)
@@ -1329,7 +1329,7 @@ func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 	// B is a block that builds on A containing a valid receipt for A
 	resA1 := unittest.ExecutionResultFixture(unittest.WithBlock(A), unittest.WithPreviousResult(recP.ExecutionResult))
 	recA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA1))
-	B := unittest.BlockWithParentFixture(A.Header)
+	B := unittest.BlockWithParentFixture(A.ToHeader())
 	B.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceiptStub{recA1.Stub()},
 		Results:  []*flow.ExecutionResult{&recA1.ExecutionResult},
@@ -1345,7 +1345,7 @@ func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromStub(*meta, *result)
-			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].Header)
+			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
 			bs.NoError(err)
 		}
 	}
@@ -1382,12 +1382,12 @@ func (bs *BuilderSuite) TestIntegration_ResultAlreadyIncorporated() {
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromStub(*meta, *result)
-			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].Header)
+			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
 			bs.NoError(err)
 		}
 	}
 
-	_, err := bs.build.recPool.AddReceipt(recP_B, bs.blocks[recP_B.ExecutionResult.BlockID].Header)
+	_, err := bs.build.recPool.AddReceipt(recP_B, bs.blocks[recP_B.ExecutionResult.BlockID].ToHeader())
 	bs.NoError(err)
 
 	_, err = bs.build.BuildOn(A.ID(), bs.setter, bs.sign)
@@ -1430,13 +1430,13 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 	recA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA1))
 	resA2 := unittest.ExecutionResultFixture(unittest.WithBlock(A), unittest.WithPreviousResult(recP.ExecutionResult))
 	recA2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA2))
-	B := unittest.BlockWithParentFixture(A.Header)
+	B := unittest.BlockWithParentFixture(A.ToHeader())
 	B.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceiptStub{recA1.Stub(), recA2.Stub()},
 		Results:  []*flow.ExecutionResult{&recA1.ExecutionResult, &recA2.ExecutionResult},
 	})
 
-	C := unittest.BlockWithParentFixture(B.Header)
+	C := unittest.BlockWithParentFixture(B.ToHeader())
 
 	bs.storeBlock(A)
 	bs.storeBlock(B)
@@ -1499,9 +1499,9 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 	recC := unittest.ExecutionReceiptFixture(unittest.WithResult(resC))
 
 	// Add recB1 and recB2 to the mempool for inclusion in the next candidate
-	_, _ = bs.build.recPool.AddReceipt(recB1, B.Header)
-	_, _ = bs.build.recPool.AddReceipt(recB2, B.Header)
-	_, _ = bs.build.recPool.AddReceipt(recC, C.Header)
+	_, _ = bs.build.recPool.AddReceipt(recB1, B.ToHeader())
+	_, _ = bs.build.recPool.AddReceipt(recB2, B.ToHeader())
+	_, _ = bs.build.recPool.AddReceipt(recC, C.ToHeader())
 
 	_, err = bs.build.BuildOn(C.ID(), bs.setter, bs.sign)
 	bs.Require().NoError(err)

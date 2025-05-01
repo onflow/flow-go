@@ -178,7 +178,7 @@ func (suite *ExecutionDataReaderSuite) TestAtIndex() {
 		suite.reset()
 		suite.runTest(func() {
 			// add a new block without an execution result
-			newBlock := unittest.BlockWithParentFixture(suite.block.Header)
+			newBlock := unittest.BlockWithParentFixture(suite.block.ToHeader())
 			suite.blocksByHeight[newBlock.Header.Height] = newBlock
 
 			job, err := suite.reader.AtIndex(newBlock.Header.Height)
