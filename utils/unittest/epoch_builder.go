@@ -226,7 +226,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
 	// insert block C with a receipt for block B, and a seal for the receipt in
 	// block B if there was one
-	C := BlockWithParentFixture(B.Header)
+	C := BlockWithParentFixture(B.ToHeader())
 	var sealsForA []*flow.Seal
 	if receiptA != nil {
 		sealsForA = []*flow.Seal{
@@ -244,7 +244,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
 	// build block D
 	// D contains a seal for block B and a receipt for block C
-	D := BlockWithParentFixture(C.Header)
+	D := BlockWithParentFixture(C.ToHeader())
 	sealForB := Seal.Fixture(
 		Seal.WithResult(&receiptB.ExecutionResult),
 	)
@@ -270,7 +270,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
 	// build block E
 	// E contains a seal for C and a receipt for D
-	E := BlockWithParentFixture(D.Header)
+	E := BlockWithParentFixture(D.ToHeader())
 	sealForC := Seal.Fixture(
 		Seal.WithResult(&receiptC.ExecutionResult),
 	)
@@ -286,7 +286,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	// build block F
 	// F contains a seal for block D and the EpochCommit event, as well as a
 	// receipt for block E
-	F := BlockWithParentFixture(E.Header)
+	F := BlockWithParentFixture(E.ToHeader())
 	sealForD := Seal.Fixture(
 		Seal.WithResult(&receiptD.ExecutionResult),
 	)
@@ -360,7 +360,6 @@ func (builder *EpochBuilder) addBlock(block *flow.Block) {
 	require.False(builder.t, dbUpdates.IsEmpty())
 
 	block.Payload.ProtocolStateID = updatedStateId
-	block.Header.PayloadHash = block.Payload.Hash()
 	blockID := block.ID()
 	for _, state := range builder.states {
 		err = state.ExtendCertified(context.Background(), NewCertifiedBlock(block))
@@ -387,7 +386,7 @@ func (builder *EpochBuilder) AddBlocksWithSeals(n int, counter uint64) *EpochBui
 
 		receiptB := ReceiptForBlockFixture(b)
 
-		block := BlockWithParentFixture(b.Header)
+		block := BlockWithParentFixture(b.ToHeader())
 		seal := Seal.Fixture(
 			Seal.WithResult(b.Payload.Results[0]),
 		)

@@ -175,7 +175,7 @@ func (c *Cache) AddBlocks(batch []*flow.BlockProposal) (certifiedBatch []flow.Ce
 
 	certifiedBatch = make([]flow.CertifiedBlock, 0, len(batch)-1)
 	for i, proposal := range batch[:len(batch)-1] {
-		certifiedBlock, err := flow.NewCertifiedBlock(proposal, batch[i+1].Block.Header.QuorumCertificate())
+		certifiedBlock, err := flow.NewCertifiedBlock(proposal, batch[i+1].Block.ToHeader().QuorumCertificate())
 		if err != nil {
 			return nil, fmt.Errorf("could not construct certified block: %w", err)
 		}
@@ -185,7 +185,7 @@ func (c *Cache) AddBlocks(batch []*flow.BlockProposal) (certifiedBatch []flow.Ce
 
 	// report equivocations
 	for _, pair := range bc.equivocatingBlocks {
-		c.notifier.OnDoubleProposeDetected(model.BlockFromFlow(pair[0].Block.Header), model.BlockFromFlow(pair[1].Block.Header))
+		c.notifier.OnDoubleProposeDetected(model.BlockFromFlow(pair[0].Block.ToHeader()), model.BlockFromFlow(pair[1].Block.ToHeader()))
 	}
 
 	if len(certifiedBatch) < 1 {

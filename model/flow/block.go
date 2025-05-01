@@ -49,13 +49,20 @@ func (b *Block) SetPayload(payload Payload) {
 }
 
 // ID returns a collision-resistant hash of the Block struct.
-func (b *Block) ID() Identifier {
+func (b Block) ID() Identifier {
 	return b.ToHeader().ID()
+}
+
+// Checksum returns the checksum of the header.
+// Deprecated: This is needed temporarily until further malleability is done, because many components assume Block implements Entity
+// TODO(malleability): remove this function
+func (b Block) Checksum() Identifier {
+	return b.ToHeader().Checksum()
 }
 
 // ToHeader converts the block into a compact [flow.Header] representation,
 // where the payload is compressed to a hash reference.
-func (b *Block) ToHeader() *Header {
+func (b Block) ToHeader() *Header {
 	return &Header{
 		HeaderBody:  b.Header,
 		PayloadHash: b.Payload.Hash(),

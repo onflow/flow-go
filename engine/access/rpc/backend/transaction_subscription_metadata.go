@@ -176,7 +176,7 @@ func (tm *transactionSubscriptionMetadata) refreshBlock() error {
 		return fmt.Errorf("failed to lookup block containing collection: %w", err)
 	}
 
-	tm.blockWithTx = block.Header
+	tm.blockWithTx = block.ToHeader()
 	tm.txResult.BlockID = block.ID()
 	tm.txResult.BlockHeight = block.Header.Height
 	return nil

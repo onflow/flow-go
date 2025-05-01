@@ -62,7 +62,7 @@ func (p *Params) EpochFallbackTriggered() (bool, error) {
 }
 
 func (p *Params) FinalizedRoot() *flow.Header {
-	return p.state.root.Header
+	return p.state.root.ToHeader()
 }
 
 func (p *Params) SealedRoot() *flow.Header {
@@ -100,10 +100,10 @@ func (ps *ProtocolState) AtHeight(height uint64) protocol.Snapshot {
 	snapshot := new(protocolmock.Snapshot)
 	block, ok := ps.heights[height]
 	if ok {
-		snapshot.On("Head").Return(block.Header, nil)
+		snapshot.On("Head").Return(block.ToHeader(), nil)
 		mocked := snapshot.On("Descendants")
 		mocked.RunFn = func(args mock.Arguments) {
-			pendings := pending(ps, block.Header.ID())
+			pendings := pending(ps, block.ID())
 			mocked.ReturnArguments = mock.Arguments{pendings, nil}
 		}
 
