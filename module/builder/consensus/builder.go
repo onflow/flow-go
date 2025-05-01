@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/operation"
 )
 
 // Builder is the builder for consensus block payloads. Upon providing a payload
@@ -24,7 +23,6 @@ import (
 type Builder struct {
 	metrics              module.MempoolMetrics
 	tracer               module.Tracer
-	db                   storage.DB
 	state                protocol.ParticipantState
 	seals                storage.Seals
 	headers              storage.Headers
@@ -42,7 +40,6 @@ type Builder struct {
 // NewBuilder creates a new block builder.
 func NewBuilder(
 	metrics module.MempoolMetrics,
-	db storage.DB,
 	state protocol.ParticipantState,
 	headers storage.Headers,
 	seals storage.Seals,
@@ -79,7 +76,6 @@ func NewBuilder(
 
 	b := &Builder{
 		metrics:              metrics,
-		db:                   db,
 		tracer:               tracer,
 		state:                state,
 		headers:              headers,
@@ -278,13 +274,9 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 		limit = 0
 	}
 
-	// look up the root height so we don't look too far back
-	// initially this is the genesis block height (aka 0).
-	var rootHeight uint64
-	err = operation.RetrieveRootHeight(b.db.Reader(), &rootHeight)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root block height: %w", err)
-	}
+	// the finalized root height is the height where we bootstrapped from.
+	// we should not include guarantees that are older than the finalized root
+	rootHeight := b.state.Params().FinalizedRoot().Height
 	if limit < rootHeight {
 		limit = rootHeight
 	}

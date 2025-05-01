@@ -1,6 +1,8 @@
 package store
 
 import (
+	"sync"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -15,9 +17,10 @@ type Index struct {
 }
 
 func NewIndex(collector module.CacheMetrics, db storage.DB) *Index {
+	indexing := &sync.Mutex{}
 
 	store := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, index *flow.Index) error {
-		return procedure.InsertIndex(rw, blockID, index)
+		return procedure.InsertIndex(indexing, rw, blockID, index)
 	}
 
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.Index, error) {

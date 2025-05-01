@@ -490,7 +490,6 @@ func createNode(
 	// initialize the block builder
 	build, err := builder.NewBuilder(
 		metricsCollector,
-		db,
 		fullState,
 		headersDB,
 		sealsDB,

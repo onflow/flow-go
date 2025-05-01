@@ -3,6 +3,7 @@ package badger
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -10,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	statepkg "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
@@ -114,7 +116,7 @@ func Bootstrap(
 		return nil, fmt.Errorf("expected empty database")
 	}
 
-	if err := IsValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
+	if err := datastore.IsValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
 		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
 	}
 
@@ -148,7 +150,7 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not get root qc: %w", err)
 		}
-		err = qcs.BatchStore(qc, rw)
+		err = qcs.BatchStore(rw, qc)
 		if err != nil {
 			return fmt.Errorf("could not insert root qc: %w", err)
 		}
@@ -165,10 +167,6 @@ func Bootstrap(
 			return fmt.Errorf("could not bootstrap spork info: %w", err)
 		}
 
-		// bootstrap dynamic protocol state
-		if err != nil {
-			return fmt.Errorf("could not retrieve protocol state for root snapshot: %w", err)
-		}
 		err = bootstrapProtocolState(rw, segment, root.Params(), epochProtocolStateSnapshots, protocolKVStoreSnapshots, setups, commits, !config.SkipNetworkAddressValidation)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap protocol state: %w", err)
@@ -198,12 +196,12 @@ func Bootstrap(
 		return nil, fmt.Errorf("bootstrapping failed: %w", err)
 	}
 
-	instanceParams, err := ReadInstanceParams(db, headers, seals)
+	instanceParams, err := datastore.ReadInstanceParams(db, headers, seals)
 	if err != nil {
 		return nil, fmt.Errorf("could not read instance params: %w", err)
 	}
 
-	params := &Params{
+	params := &datastore.Params{
 		GlobalParams:   root.Params(),
 		InstanceParams: instanceParams,
 	}
@@ -326,7 +324,7 @@ func bootstrapSealingSegment(
 		if err != nil {
 			return fmt.Errorf("could not index SealingSegment extra block (id=%x): %w", blockID, err)
 		}
-		err = qcs.BatchStore(block.Header.QuorumCertificate(), rw)
+		err = qcs.BatchStore(rw, block.Header.QuorumCertificate())
 		if err != nil {
 			return fmt.Errorf("could not store qc for SealingSegment extra block (id=%x): %w", blockID, err)
 		}
@@ -349,7 +347,7 @@ func bootstrapSealingSegment(
 		if err != nil {
 			return fmt.Errorf("could not index SealingSegment block (id=%x): %w", blockID, err)
 		}
-		err = qcs.BatchStore(block.Header.QuorumCertificate(), rw)
+		err = qcs.BatchStore(rw, block.Header.QuorumCertificate())
 		if err != nil {
 			return fmt.Errorf("could not store qc for SealingSegment block (id=%x): %w", blockID, err)
 		}
@@ -439,6 +437,7 @@ func bootstrapStatePointers(rw storage.ReaderBatchWriter, root protocol.Snapshot
 	}
 
 	w := rw.Writer()
+	bootstrapping := &sync.Mutex{}
 	// insert initial views for HotStuff
 	err = operation.UpsertSafetyData(w, highest.Header.ChainID, safetyData)
 	if err != nil {
@@ -473,7 +472,7 @@ func bootstrapStatePointers(rw storage.ReaderBatchWriter, root protocol.Snapshot
 	}
 
 	// insert first-height indices for epochs which begin within the sealing segment
-	err = indexEpochHeights(rw, segment)
+	err = indexEpochHeights(bootstrapping, rw, segment)
 	if err != nil {
 		return fmt.Errorf("could not index epoch heights: %w", err)
 	}
@@ -599,13 +598,13 @@ func bootstrapSporkInfo(rw storage.ReaderBatchWriter, root protocol.Snapshot) er
 // We index the FirstHeight for every epoch where the transition occurs within the sealing segment of the root snapshot,
 // or for the first epoch of a spork if the snapshot is a spork root snapshot (1 block sealing segment).
 // No errors are expected during normal operation.
-func indexEpochHeights(rw storage.ReaderBatchWriter, segment *flow.SealingSegment) error {
+func indexEpochHeights(lock *sync.Mutex, rw storage.ReaderBatchWriter, segment *flow.SealingSegment) error {
 	// CASE 1: For spork root snapshots, there is exactly one block B and one epoch E.
 	// Index `E.counter → B.Height`.
 	if segment.IsSporkRoot() {
 		counter := segment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
 		firstHeight := segment.Highest().Header.Height
-		err := operation.InsertEpochFirstHeight(rw, counter, firstHeight)
+		err := operation.InsertEpochFirstHeight(lock, rw, counter, firstHeight)
 		if err != nil {
 			return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, counter, err)
 		}
@@ -623,7 +622,7 @@ func indexEpochHeights(rw storage.ReaderBatchWriter, segment *flow.SealingSegmen
 		thisBlockEpochCounter := segment.ProtocolStateEntries[block.Payload.ProtocolStateID].EpochEntry.EpochCounter()
 		if lastBlockEpochCounter != thisBlockEpochCounter {
 			firstHeight := block.Header.Height
-			err := operation.InsertEpochFirstHeight(rw, thisBlockEpochCounter, firstHeight)
+			err := operation.InsertEpochFirstHeight(lock, rw, thisBlockEpochCounter, firstHeight)
 			if err != nil {
 				return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, thisBlockEpochCounter, err)
 			}
@@ -654,15 +653,15 @@ func OpenState(
 	if !isBootstrapped {
 		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
-	globalParams, err := ReadGlobalParams(db)
+	globalParams, err := datastore.ReadGlobalParams(db)
 	if err != nil {
 		return nil, fmt.Errorf("could not read global params: %w", err)
 	}
-	instanceParams, err := ReadInstanceParams(db, headers, seals)
+	instanceParams, err := datastore.ReadInstanceParams(db, headers, seals)
 	if err != nil {
 		return nil, fmt.Errorf("could not read instance params: %w", err)
 	}
-	params := &Params{
+	params := &datastore.Params{
 		GlobalParams:   globalParams,
 		InstanceParams: instanceParams,
 	}

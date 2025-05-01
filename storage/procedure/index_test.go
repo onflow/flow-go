@@ -1,6 +1,7 @@
 package procedure
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -16,8 +17,9 @@ func TestInsertRetrieveIndex(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		index := unittest.IndexFixture()
 
+		lock := &sync.Mutex{}
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return InsertIndex(rw, blockID, index)
+			return InsertIndex(lock, rw, blockID, index)
 		})
 		require.NoError(t, err)
 

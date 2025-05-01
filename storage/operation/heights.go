@@ -44,8 +44,9 @@ func RetrieveSealedHeight(r storage.Reader, height *uint64) error {
 // The first block of an epoch E is the finalized block with view >= E.FirstView.
 // Although we don't store the final height of an epoch, it can be inferred from this index.
 // Returns storage.ErrAlreadyExists if the height has already been indexed.
-// TODO: add concurrency control
-func InsertEpochFirstHeight(rw storage.ReaderBatchWriter, epoch, height uint64) error {
+func InsertEpochFirstHeight(lock *sync.Mutex, rw storage.ReaderBatchWriter, epoch, height uint64) error {
+	rw.Lock(lock)
+
 	var exisingHeight uint64
 	err := RetrieveEpochFirstHeight(rw.GlobalReader(), epoch, &exisingHeight)
 	if err == nil {

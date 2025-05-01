@@ -17,7 +17,7 @@ type QuorumCertificates struct {
 }
 
 // BatchStore provides a mock function with given fields: _a0, _a1
-func (_m *QuorumCertificates) BatchStore(_a0 *flow.QuorumCertificate, _a1 storage.ReaderBatchWriter) error {
+func (_m *QuorumCertificates) BatchStore(_a0 storage.ReaderBatchWriter, _a1 *flow.QuorumCertificate) error {
 	ret := _m.Called(_a0, _a1)
 
 	if len(ret) == 0 {
@@ -25,7 +25,7 @@ func (_m *QuorumCertificates) BatchStore(_a0 *flow.QuorumCertificate, _a1 storag
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.QuorumCertificate, storage.ReaderBatchWriter) error); ok {
+	if rf, ok := ret.Get(0).(func(storage.ReaderBatchWriter, *flow.QuorumCertificate) error); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)

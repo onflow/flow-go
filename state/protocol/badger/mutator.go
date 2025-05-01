@@ -45,6 +45,7 @@ type FollowerState struct {
 
 	// locks
 	indexingNewBlock *sync.Mutex
+	finalizing       *sync.Mutex
 }
 
 var _ protocol.FollowerState = (*FollowerState)(nil)
@@ -91,6 +92,7 @@ func NewFollowerState(
 		),
 
 		indexingNewBlock: &sync.Mutex{},
+		finalizing:       &sync.Mutex{},
 	}
 	return followerState, nil
 }
@@ -187,6 +189,8 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 			return fmt.Errorf("failed to determine the lastest sealed block in fork: %w", err)
 		}
 
+		// TODO: we might not need the deferred db updates, because the candidate passed into
+		// the Extend method has already been fully constructed.
 		// evolve protocol state and verify consistency with commitment included in
 		dbUpdates, err := m.evolveProtocolState(ctx, candidate, rw)
 		if err != nil {
@@ -374,7 +378,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 	//  - the QC for the parent has not been stored before (otherwise, we already emitted the notification) and
 	//  - the parent block's height is larger than the finalized root height (the root block is already considered processed)
 	// Thereby, we reduce duplicated `BlockProcessable` notifications.
-	err = m.qcs.BatchStore(qc, rw)
+	err = m.qcs.BatchStore(rw, qc)
 	if err != nil {
 		if !errors.Is(err, storage.ErrAlreadyExists) {
 			return fmt.Errorf("could not store incorporated qc: %w", err)
@@ -400,7 +404,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 
 	// STEP 5c: if we are given a certifyingQC, store it and queue a `BlockProcessable` notification for the candidate block
 	if certifyingQC != nil {
-		err = m.qcs.BatchStore(certifyingQC, rw)
+		err = m.qcs.BatchStore(rw, certifyingQC)
 		if err != nil {
 			return fmt.Errorf("could not store certifying qc: %w", err)
 		}
@@ -768,7 +772,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		}
 
 		if isFirstBlockOfEpoch(parentEpochState, finalizingEpochState) {
-			err = operation.InsertEpochFirstHeight(rw, currentEpochSetup.Counter, header.Height)
+			err = operation.InsertEpochFirstHeight(m.finalizing, rw, currentEpochSetup.Counter, header.Height)
 			if err != nil {
 				return fmt.Errorf("could not insert epoch first block height: %w", err)
 			}

@@ -1,0 +1,159 @@
+name: Build & Promote Docker Images to Public Registry 
+on:
+  workflow_dispatch:
+    inputs:
+      secure-build:
+        description: "Execute secure build for private dependencies. If set to true, the tag must be present on the private repo."
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      tag:
+        description: 'Git tag to build, tag, and push docker image'
+        required: true
+        type: string
+
+env:
+  GO_VERSION: "1.23"
+  PRIVATE_REGISTRY_HOST: us-central1-docker.pkg.dev
+
+jobs:
+  # This job is responsible for building docker images using flow-go and pushing them to the private registry.
+  # It uses a matrix strategy to handle the builds for different roles in parallel.
+  # The environment is set to 'container builds' that provides the necessary secrets for pushing to the pirvate registry.
+  public-build:
+    if: ${{ github.event.inputs.secure-build == 'false' }}
+    name: Execute public repo build & push to private artifact registry 
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # We specify all of the potential build commands for each role. 
+        # This allows us to build and push all images in parallel, reducing the overall build time.
+        # The matrix is defined to include all roles & image types that we want to build and push.
+        # These commands are targets defined in the Makefile of the repository.
+        build_command:
+          # access Build Commands
+          - docker-build-access-with-adx docker-push-access-with-adx 
+          - docker-build-access-without-adx docker-push-access-without-adx 
+          - docker-build-access-without-netgo-without-adx docker-push-access-without-netgo-without-adx 
+          - docker-cross-build-access-arm docker-push-access-arm 
+
+          # collection Build Commands
+          - docker-build-collection-with-adx docker-push-collection-with-adx 
+          - docker-build-collection-without-adx docker-push-collection-without-adx 
+          - docker-build-collection-without-netgo-without-adx docker-push-collection-without-netgo-without-adx 
+          - docker-cross-build-collection-arm docker-push-collection-arm 
+
+          # consensus Build Commands
+          - docker-build-consensus-with-adx docker-push-consensus-with-adx 
+          - docker-build-consensus-without-adx docker-push-consensus-without-adx 
+          - docker-build-consensus-without-netgo-without-adx docker-push-consensus-without-netgo-without-adx 
+          - docker-cross-build-consensus-arm docker-push-consensus-arm 
+
+          # execution Build Commands
+          - docker-build-execution-with-adx docker-push-execution-with-adx 
+          - docker-build-execution-without-adx docker-push-execution-without-adx 
+          - docker-build-execution-without-netgo-without-adx docker-push-execution-without-netgo-without-adx 
+          - docker-cross-build-execution-arm docker-push-execution-arm 
+
+          # observer Build Commands
+          - docker-build-observer-with-adx docker-push-observer-with-adx 
+          - docker-build-observer-without-adx docker-push-observer-without-adx 
+          - docker-build-observer-without-netgo-without-adx docker-push-observer-without-netgo-without-adx 
+          - docker-cross-build-observer-arm docker-push-observer-arm 
+
+          # verification Build Commands
+          - docker-build-verification-with-adx docker-push-verification-with-adx 
+          - docker-build-verification-without-adx docker-push-verification-without-adx 
+          - docker-build-verification-without-netgo-without-adx docker-push-verification-without-netgo-without-adx 
+          - docker-cross-build-verification-arm docker-push-verification-arm 
+
+    environment: container builds 
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Checkout Public flow-go repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          repository: onflow/flow-go
+          ref: ${{ inputs.tag }}
+
+      - name: Authenticate with Docker Registry
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS_FOR_PRIVATE_REGISTRY }}
+
+      - name: Setup Google Cloud Authentication
+        run: gcloud auth configure-docker ${{ env.PRIVATE_REGISTRY_HOST }}
+
+      - name: Execute ${{ matrix.build_command }} command to build and push images
+        env:
+          IMAGE_TAG: ${{ inputs.tag }}
+          CONTAINER_REGISTRY: ${{ vars.PRIVATE_REGISTRY }}
+        run: |
+          make ${{ matrix.build_command }} CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
+
+  secure-build:
+    # This job is responsible for executing secure builds for private dependencies & pushing them to the private registry.
+    # It uses a matrix strategy to handle the builds for different roles in parallel.
+    # The environment is set to 'secure builds' to ensure that the builds are gated and only approved images are deployed.
+    # The job is triggered only if the 'secure-build' input is set to 'true'.
+    # The job uses an action to execute a cross-repo workflow that builds and pushes the images to the private registry.
+    name: Execute secure build & push to private registry
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.secure-build == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [access, collection, consensus, execution, observer, verification]
+    environment: secure builds 
+    steps:
+      - uses: convictional/trigger-workflow-and-wait@v1.6.1
+        with:
+          client_payload: '{"role": "${{ matrix.role }}", "tag": "${{ inputs.tag }}"}'
+          github_token: ${{ secrets.SECURE_BUILDS_TOKEN }}
+          github_user: ${{ secrets.SECURE_BUILDS_TOKEN_USER }}  
+          owner: 'onflow'
+          repo: ${{ secrets.SECURE_BUILDS_REPO }}  
+          ref: master-private 
+          workflow_file_name: 'secure_build.yml'
+
+  promote-images:
+    # This job promotes container images for various roles from a private registry to a public registry.
+    # It uses a matrix strategy to handle the promotion of images for different roles in parallel.
+    # The environments defined for each role are used to gate the promotion process.
+    # This ensures that only approved images are deployed to the public registry.
+    name: Promote Images to Public Registry
+    runs-on: ubuntu-latest
+    needs: [public-build, secure-build]
+    # This job will only run if the previous jobs were successful and not cancelled.
+    # It checks the results of both the public and secure builds to ensure that at least one of them succeeded.
+    if: |
+      ${{ !cancelled() }} &&
+      ${{ needs.public-build.result != 'failure' || needs.secure-build.result != 'failure' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [access, collection, consensus, execution, observer, verification]
+    environment: ${{ matrix.role }} image promotion to public registry 
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Promote ${{ matrix.role }} 
+        uses: ./actions/promote-images
+        with:
+          gcp_credentials: ${{ secrets.PUBLIC_REGISTRY_PROMOTION_SECRET }}
+          private_registry: ${{ vars.PRIVATE_REGISTRY }}
+          private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
+          public_registry: ${{ vars.PUBLIC_REGISTRY }}
+          role: ${{ matrix.role }} 
+          tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
+

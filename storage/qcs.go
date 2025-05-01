@@ -17,7 +17,7 @@ type QuorumCertificates interface {
 
 	// BatchStore stores a Quorum Certificate as part of database batch update. QC is indexed by QC.BlockID.
 	// * storage.ErrAlreadyExists if a different QC for blockID is already stored
-	BatchStore(*flow.QuorumCertificate, ReaderBatchWriter) error
+	BatchStore(ReaderBatchWriter, *flow.QuorumCertificate) error
 
 	// ByBlockID returns QC that certifies block referred by blockID.
 	// * storage.ErrNotFound if no QC for blockID doesn't exist.

@@ -78,6 +78,7 @@ import (
 	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
@@ -174,7 +175,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.pebbleCheckpointsDir, "pebble-checkpoints-dir", defaultConfig.pebbleCheckpointsDir, "directory to store the checkpoints for the public pebble database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.pebbleDir, "pebble-dir", defaultConfig.pebbleDir, "directory to store the public pebble database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
-	fnb.flags.StringVar(&fnb.BaseConfig.dbops, "dbops", defaultConfig.dbops, "database operations to use (badger-transaction, batch-update, pebble-update)")
+	fnb.flags.StringVar(&fnb.BaseConfig.DBOps, "dbops", defaultConfig.DBOps, "database operations to use (badger-transaction, batch-update, pebble-update)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.debugLogLimit, "debug-log-limit", defaultConfig.debugLogLimit, "max number of debug/trace log events per second")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
@@ -1156,14 +1157,14 @@ func (fnb *FlowNodeBuilder) initPebbleDB() error {
 
 // create protocol db according to the badger or pebble db
 func (fnb *FlowNodeBuilder) initProtocolDB(bdb *badger.DB, pdb *pebble.DB) error {
-	if dbops.IsBadgerBased(fnb.dbops) {
+	if dbops.IsBadgerBased(fnb.DBOps) {
 		fnb.ProtocolDB = badgerimpl.ToDB(bdb)
 		fnb.Logger.Info().Msg("initProtocolDB: using badger protocol db")
-	} else if dbops.IsPebbleBatch(fnb.dbops) {
+	} else if dbops.IsPebbleBatch(fnb.DBOps) {
 		fnb.ProtocolDB = pebbleimpl.ToDB(pdb)
 		fnb.Logger.Info().Msgf("initProtocolDB: using pebble protocol db")
 	} else {
-		return fmt.Errorf(dbops.UsageErrMsg, fnb.dbops)
+		return fmt.Errorf(dbops.UsageErrMsg, fnb.DBOps)
 	}
 	return nil
 }
@@ -1467,7 +1468,7 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 	var err error
 
 	// validate the root snapshot QCs
-	err = badgerState.IsValidRootSnapshotQCs(rootSnapshot)
+	err = datastore.IsValidRootSnapshotQCs(rootSnapshot)
 	if err != nil {
 		return fmt.Errorf("failed to validate root snapshot QCs: %w", err)
 	}

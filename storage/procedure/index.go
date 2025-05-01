@@ -2,14 +2,16 @@ package procedure
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 )
 
-// TODO: add synchronization
-func InsertIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, index *flow.Index) error {
+func InsertIndex(lock *sync.Mutex, rw storage.ReaderBatchWriter, blockID flow.Identifier, index *flow.Index) error {
+	rw.Lock(lock)
+
 	w := rw.Writer()
 	// TODO: Check if the blockID is already indexed
 	err := operation.UnsafeIndexPayloadGuarantees(w, blockID, index.CollectionIDs)

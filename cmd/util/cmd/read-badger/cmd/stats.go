@@ -47,6 +47,7 @@ var statsCmd = &cobra.Command{
 			numWorkers = 256
 		}
 		log.Info().Msgf("getting stats for %s db at %s with %v workers0", flagDBType, flagDatadir, numWorkers)
+
 		stats, err := operation.SummarizeKeysByFirstByteConcurrent(log.Logger, sdb.Reader(), numWorkers)
 		if err != nil {
 			return fmt.Errorf("failed to get stats: %w", err)

@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -36,8 +37,8 @@ type ProtocolKVStore struct {
 	// `byBlockIdCache` will contain an entry for every block. We want to be able to cover a broad interval of views
 	// without cache misses, so a cache size of roughly 1000 entries is reasonable.
 	byBlockIdCache *Cache[flow.Identifier, flow.Identifier]
-	// storing        *sync.Mutex
-	// indexing       *sync.Mutex
+	storing        *sync.Mutex
+	indexing       *sync.Mutex
 }
 
 var _ storage.ProtocolKVStore = (*ProtocolKVStore)(nil)
@@ -79,9 +80,9 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 	}
 
 	return &ProtocolKVStore{
-		db: db,
-		// storing: new(sync.Mutex),
-		// indexing: new(sync.Mutex),
+		db:       db,
+		storing:  new(sync.Mutex),
+		indexing: new(sync.Mutex),
 		cache: newCache(collector, metrics.ResourceProtocolKVStore,
 			withLimit[flow.Identifier, *flow.PSKeyValueStoreData](kvStoreCacheSize),
 			withStore(storeByStateID),
@@ -94,11 +95,7 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 }
 
 func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
-	// TOOD: add synchronization, adding lock would cause deadlock during bootstrap
-	// s.storing.Lock()
-	// rw.AddCallback(func(error) {
-	// 	s.storing.Unlock()
-	// })
+	rw.Lock(s.storing)
 
 	_, err := s.ByID(stateID)
 	if err == nil {
@@ -128,11 +125,7 @@ func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.
 // Expected errors during normal operations:
 //   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
 func (s *ProtocolKVStore) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
-	// TODO: add synchronization, adding lock would cause deadlock during bootstrap
-	// s.indexing.Lock()
-	// rw.AddCallback(func(error) {
-	// 	s.indexing.Unlock()
-	// })
+	rw.Lock(s.indexing)
 
 	_, err := s.byBlockIdCache.Get(s.db.Reader(), blockID)
 	if err == nil {
