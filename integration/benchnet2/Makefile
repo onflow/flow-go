@@ -34,8 +34,8 @@ endif
 
 # assumes there is a checked out version of flow-go in a "flow-go" sub-folder at this level so that the bootstrap executable
 # for the checked out version will be run in the sub folder but the bootstrap folder will be created here (outside of the checked out flow-go in the sub folder)
-gen-bootstrap: clone-flow
-	cd flow-go/cmd/bootstrap && go run . genconfig \
+gen-bootstrap: 
+	cd flow-go-bootstrap/cmd/bootstrap && go run . genconfig \
 		--address-format "%s%d-${NETWORK_ID}.${NAMESPACE}:3569" \
 		--access $(ACCESS) \
 		--collection $(COLLECTION) \
@@ -45,13 +45,13 @@ gen-bootstrap: clone-flow
 		--weight 100 \
 		-o ./ \
 		--config ../../../bootstrap/conf/node-config.json
-	cd flow-go/cmd/bootstrap && go run . keygen \
+	cd flow-go-bootstrap/cmd/bootstrap && go run . keygen \
 		--machine-account \
 		--config ../../../bootstrap/conf/node-config.json \
 		-o ../../../bootstrap/keys
 	echo {} > ./bootstrap/conf/partner-stakes.json
 	mkdir ./bootstrap/partner-nodes
-	cd flow-go/cmd/bootstrap && go run . rootblock  \
+	cd flow-go-bootstrap/cmd/bootstrap && go run . rootblock  \
 		--root-chain bench \
 		--root-height 0 \
 		--root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
@@ -69,7 +69,7 @@ gen-bootstrap: clone-flow
 		--partner-dir ../../../bootstrap/partner-nodes \
 		--partner-weights ../../../bootstrap/conf/partner-stakes.json \
 		--internal-priv-dir ../../../bootstrap/keys/private-root-information
-	cd flow-go/cmd/bootstrap && go run . finalize \
+	cd flow-go-bootstrap/cmd/bootstrap && go run . finalize \
 		--config ../../../bootstrap/conf/node-config.json \
 		-o ../../../bootstrap/  \
 		--partner-dir ../../../bootstrap/partner-nodes \
@@ -124,7 +124,7 @@ helm-deploy: download-values-file
 
 k8s-delete:
 	helm delete ${NETWORK_ID} --namespace ${NAMESPACE}
-	kubectl delete pvc -l networkId=${NETWORK_ID} --namespace ${NAMESPACE}
+	kubectl delete pvc -l network=${NETWORK_ID} --namespace ${NAMESPACE}
 
 delete-configuration:
 	gsutil rm gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}.tar
@@ -133,10 +133,5 @@ delete-configuration:
 k8s-pod-health: validate
 	kubectl get pods --namespace ${NAMESPACE}
 
-clone-flow: clean-flow 
-	# this cloned repo will be used for generating bootstrap info specific to that tag / version
-	git clone https://github.com/onflow/flow-go.git
-	cd flow-go && git checkout $(REF_FOR_BOOTSTRAP)
-	
 clean-flow:
 	rm -rf flow-go
