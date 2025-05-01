@@ -2859,7 +2859,7 @@ func TestEVM(t *testing.T) {
 		fvm.WithChain(flow.Emulator.Chain()),
 		fvm.WithEVMEnabled(true),
 		fvm.WithBlocks(blocks),
-		fvm.WithBlockHeader(block1.Header),
+		fvm.WithBlockHeader(block1.ToHeader()),
 		fvm.WithCadenceLogging(true),
 	}
 
