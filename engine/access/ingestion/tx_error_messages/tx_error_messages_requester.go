@@ -24,6 +24,8 @@ type TransactionErrorMessagesRequesterConfig struct {
 	MaxRetryDelay time.Duration
 }
 
+// TransactionErrorMessagesRequester is a thin wrapper over a TxErrorMessagesCore that manages the retrieval
+// of transaction error messages with retry and backoff configurations.
 type TransactionErrorMessagesRequester struct {
 	core   *TxErrorMessagesCore
 	config *TransactionErrorMessagesRequesterConfig
