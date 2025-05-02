@@ -284,8 +284,8 @@ func (e *ExecutionDataTrackerImpl) checkStartHeight(height uint64) (uint64, erro
 	// allow for a small difference between the highest indexed height and the provided height to
 	// account for small delays indexing or requests made to different ANs behind a load balancer.
 	// this will just result in the stream waiting a few blocks before starting.
-	if height > highestHeight && height-highestHeight > maxIndexBlockDiff {
-		return 0, status.Errorf(codes.InvalidArgument, "start height %d is higher than highest indexed height %d", height, highestHeight)
+	if height > highestHeight + maxIndexBlockDiff {
+		return 0, status.Errorf(codes.InvalidArgument, "start height %d is higher than highest indexed height %d (maxIndexBlockDiff: %d)", height, highestHeight, maxIndexBlockDiff)
 	}
 
 	return height, nil
