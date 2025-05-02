@@ -756,7 +756,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	//   This value could actually stay the same if it has no seals in
 	//   its payload, in which case the parent's seal is the same.
 	// * set the epoch fallback flag, if it is triggered
-	// err = badgeroperation.RetryOnConflict(m.db.Update, func(tx *badger.Txn) error {
 	err = m.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		err = operation.IndexBlockHeight(rw, header.Height, blockID)
 		if err != nil {
