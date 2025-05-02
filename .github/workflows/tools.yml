@@ -1,76 +1,59 @@
-# This workflow is used to build and upload the node bootstrapping tools
-name: Build Tools
+name: CI
 
 on:
+# Workflow dispatch for now, while we're testing environments
+  # push:
+  #   tags:
+  #     - '*'
+  #     - "!daily-*"
   workflow_dispatch:
     inputs:
       tag:
         description: 'Tag/commit'
         required: true
         type: string
-      promote:
-        description: 'Promote to official boot-tools?'
-        required: false
-        type: boolean
+
 
 env:
   GO_VERSION: "1.23"
 
 jobs:
-  build-publish:
-    name: Build boot tools
+  docker-push:
+    name: Push to container registry
     runs-on: ubuntu-latest
+    environment: Production Docker Registry
     steps:
-    - name: Print all input variables
-      run: echo '${{ toJson(inputs) }}' | jq
-    - id: auth
-      uses: google-github-actions/auth@v1
-      with:
-        credentials_json: ${{ secrets.GCR_SERVICE_KEY }}
-    - name: Set up Google Cloud SDK
-      uses: google-github-actions/setup-gcloud@v1
-      with:
-        project_id: flow
     - name: Setup Go
       uses: actions/setup-go@v5
+      timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
       with:
         go-version: ${{ env.GO_VERSION }}
     - name: Checkout repo
       uses: actions/checkout@v4
       with:
-        # to accurately get the version tag
-        fetch-depth: 0
         ref: ${{ inputs.tag }}
-    - name: Build and upload boot-tools
+    # Provide Google Service Account credentials to Github Action, allowing interaction with the Google Container Registry
+    # Logging in as github-actions@dl-flow.iam.gserviceaccount.com
+    - id: auth
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
+    - name: Set up Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+    - name: Authenticate docker with gcloud
+      run: |
+        gcloud auth configure-docker
+    - name: Docker build
       env:
         CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
       run: |
-        make tool-bootstrap tool-transit
-        mkdir boot-tools
-        mv bootstrap transit boot-tools/
-        sha256sum boot-tools/bootstrap > boot-tools/bootstrap.sha256sum
-        cat boot-tools/bootstrap.sha256sum
-        sha256sum boot-tools/transit > boot-tools/transit.sha256sum
-        cat boot-tools/transit.sha256sum
-        tar -czf boot-tools.tar ./boot-tools/
-        gsutil cp boot-tools.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/boot-tools.tar
-    - name: Build and upload util
-      env:
-        CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
+        make docker-build-flow-with-adx
+        make docker-build-flow-without-adx
+        make docker-build-flow-without-netgo-without-adx
+        make docker-cross-build-flow-arm
+    - name: Docker push
       run: |
-        make tool-util
-        sha256sum util > util.sha256sum
-        cat util.sha256sum
-        tar -czf util.tar util util.sha256sum
-        gsutil cp util.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/util.tar
-    - name: Promote boot-tools
-      run: |
-        if [[ "${{ inputs.promote }}" = true ]]; then
-          echo "promoting boot-tools.tar"
-          gsutil cp boot-tools.tar gs://flow-genesis-bootstrap/boot-tools.tar
-          SUMMARY=$'# Tool Build and Upload Summary \n Your tools were uploaded to the following GCS objects \n * Boot Tools gs://flow-genesis-bootstrap/boot-tools.tar \n * Util util.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/util.tar'
-        else
-          echo "not promoting boot-tools.tar"
-          SUMMARY=$'# Tool Build and Upload Summary \n Your tools were uploaded to the following GCS objects \n * Boot Tools gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/boot-tools.tar \n * Util util.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/util.tar'
-        fi
-        echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY
+        make docker-push-flow-with-adx
+        make docker-push-flow-without-adx
+        make docker-push-flow-without-netgo-without-adx
+        make docker-push-flow-arm
