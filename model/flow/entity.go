@@ -1,5 +1,11 @@
 package flow
 
+import (
+	"fmt"
+	"io"
+	"sync/atomic"
+)
+
 type IDEntity interface {
 	// ID returns a unique id for this entity using a hash of the immutable
 	// fields of the entity.
@@ -49,4 +55,41 @@ func Deduplicate[T IDEntity](entities []T) []T {
 	}
 
 	return result
+}
+
+// TODO docs
+type idCache struct {
+	id *atomic.Pointer[Identifier]
+}
+
+func newIDCache() idCache {
+	return idCache{
+		id: new(atomic.Pointer[Identifier]),
+	}
+}
+
+func (cache *idCache) EncodeRLP(w io.Writer) error {
+	return nil
+}
+
+// getID ...
+func (cache *idCache) getID(computeID func() Identifier) Identifier {
+	// if ID is already computed and cached, return it
+	v := cache.id.Load()
+	if v != nil {
+		return *v
+	}
+
+	// compute the ID and attempt to store it
+	computedID := computeID()
+	if cache.id.CompareAndSwap(nil, &computedID) {
+		// we won the race and stored the value
+		return computedID
+	}
+	// another goroutine stored it first - sanity check that values are consistent
+	storedID := *cache.id.Load()
+	if computedID != storedID {
+		panic(fmt.Sprintf("idCache: multiple ID computations yielded inconsistent results: %x != %x", computedID, storedID))
+	}
+	return computedID
 }
