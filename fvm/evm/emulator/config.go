@@ -19,8 +19,8 @@ var (
 
 var (
 	PreviewnetPragueActivation = uint64(0)          // already on Prague for PreviewNet
-	TestnetPragueActivation    = uint64(1746039600) // Wednesday, April 30, 2025 7:00:00 PM GMT
-	MainnetPragueActivation    = uint64(1746612311) // Wed May 07 10:05:11 2025 UTC
+	TestnetPragueActivation    = uint64(1748977200) // Tue Jun 03 2025 19:00:00 GMT+0000
+	MainnetPragueActivation    = uint64(1748977200) // Tue Jun 03 2025 19:00:00 GMT+0000
 )
 
 // Config aggregates all the configuration (chain, evm, block, tx, ...)
