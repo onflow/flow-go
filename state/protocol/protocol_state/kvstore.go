@@ -70,8 +70,6 @@ type KVStoreMutator interface {
 	SetEpochExtensionViewCount(viewCount uint64) error
 }
 
-type DeferredOp func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error
-
 // OrthogonalStoreStateMachine represents a state machine that exclusively evolves its state P.
 // The state's specific type P is kept as a generic. Generally, P is the type corresponding
 // to one specific key in the Key-Value store.
