@@ -2145,6 +2145,12 @@ func WithParticipants(participants flow.IdentitySkeletonList) func(*flow.EpochSe
 	}
 }
 
+func WithAssignments(assignments flow.AssignmentList) func(*flow.EpochSetup) {
+	return func(setup *flow.EpochSetup) {
+		setup.Assignments = assignments
+	}
+}
+
 func SetupWithCounter(counter uint64) func(*flow.EpochSetup) {
 	return func(setup *flow.EpochSetup) {
 		setup.Counter = counter
@@ -2232,12 +2238,7 @@ func WithDKGFromParticipants(participants flow.IdentitySkeletonList) func(*flow.
 }
 
 func WithClusterQCsFromAssignments(assignments flow.AssignmentList) func(*flow.EpochCommit) {
-	qcs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(assignments))
-	for _, assignment := range assignments {
-		qcWithSignerIndex := QuorumCertificateWithSignerIDsFixture()
-		qcWithSignerIndex.SignerIDs = assignment
-		qcs = append(qcs, qcWithSignerIndex)
-	}
+	qcs := QuorumCertificatesFromAssignments(assignments)
 	return func(commit *flow.EpochCommit) {
 		commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(qcs)
 	}
@@ -2332,7 +2333,17 @@ func BootstrapFixtureWithChainID(
 		WithDKGFromParticipants(participants.ToSkeleton()),
 	)
 
-	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
+	return BootstrapFixtureWithSetupAndCommit(root.Header, setup, commit)
+}
+
+// BootstrapFixtureWithSetupAndCommit generates all the artifacts necessary to bootstrap the
+// protocol state using the provided epoch setup and commit.
+func BootstrapFixtureWithSetupAndCommit(
+	header flow.HeaderBody,
+	setup *flow.EpochSetup,
+	commit *flow.EpochCommit,
+) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+	safetyParams, err := protocol.DefaultEpochSafetyParams(header.ChainID)
 	if err != nil {
 		panic(err)
 	}
@@ -2341,8 +2352,9 @@ func BootstrapFixtureWithChainID(
 	if err != nil {
 		panic(err)
 	}
-	root.SetPayload(flow.Payload{ProtocolStateID: rootProtocolState.ID()})
-	stateCommit := GenesisStateCommitmentByChainID(chainID)
+
+	root := flow.NewBlock(header, flow.Payload{ProtocolStateID: rootProtocolState.ID()})
+	stateCommit := GenesisStateCommitmentByChainID(header.ChainID)
 
 	result := BootstrapExecutionResultFixture(root, stateCommit)
 	result.ServiceEvents = []flow.ServiceEvent{

@@ -18,7 +18,6 @@ import (
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/prg"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -221,22 +220,29 @@ func TestClusters(t *testing.T) {
 	collectors := unittest.IdentityListFixture(nCollectors, unittest.WithRole(flow.RoleCollection))
 	identities := append(unittest.IdentityListFixture(4, unittest.WithAllRolesExcept(flow.RoleCollection)), collectors...)
 
-	root, result, seal := unittest.BootstrapFixture(identities)
-	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
-	setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
-	commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
-	setup.Assignments = unittest.ClusterAssignment(uint(nClusters), collectors.ToSkeleton())
-	clusterQCs := unittest.QuorumCertificatesFromAssignments(setup.Assignments)
-	commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(clusterQCs)
+	// bootstrap the protocol state
+	chainID := flow.Emulator
+	rootHeader := flow.Genesis(chainID).Header
+
+	counter := uint64(1)
+	setup := unittest.EpochSetupFixture(
+		unittest.WithParticipants(identities.ToSkeleton()),
+		unittest.SetupWithCounter(counter),
+		unittest.WithFirstView(rootHeader.View),
+		unittest.WithFinalView(rootHeader.View+100_000),
+		unittest.WithAssignments(unittest.ClusterAssignment(uint(nClusters), collectors.ToSkeleton())),
+	)
+	commit := unittest.EpochCommitFixture(
+		unittest.CommitWithCounter(counter),
+		unittest.WithClusterQCsFromAssignments(setup.Assignments),
+		unittest.WithDKGFromParticipants(participants.ToSkeleton()),
+		unittest.WithClusterQCsFromAssignments(setup.Assignments),
+	)
+
+	root, result, seal := unittest.BootstrapFixtureWithSetupAndCommit(rootHeader, setup, commit)
 	seal.ResultID = result.ID()
-	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
-	require.NoError(t, err)
-	rootProtocolState, err := kvstore.NewDefaultKVStore(
-		safetyParams.FinalizationSafetyThreshold,
-		safetyParams.EpochExtensionViewCount,
-		inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID())
-	require.NoError(t, err)
-	root.Payload.ProtocolStateID = rootProtocolState.ID()
+
+	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 
@@ -703,9 +709,9 @@ func TestSealingSegment(t *testing.T) {
 			segment, err := snapshot.SealingSegment()
 			require.NoError(t, err)
 
-			assert.Equal(t, lastBlock.Header, segment.Highest().Header)
-			assert.Equal(t, lastBlock.Header, segment.Finalized().Header)
-			assert.Equal(t, lastSealedBlock.Header, segment.Sealed().Header)
+			assert.Equal(t, lastBlock.ToHeader(), segment.Highest().ToHeader())
+			assert.Equal(t, lastBlock.ToHeader(), segment.Finalized().ToHeader())
+			assert.Equal(t, lastSealedBlock.ToHeader(), segment.Sealed().ToHeader())
 
 			// there are DefaultTransactionExpiry number of blocks in total
 			unittest.AssertEqualBlockSequences(t, blocks[:flow.DefaultTransactionExpiry], segment.ExtraBlocks)
@@ -783,8 +789,8 @@ func TestSealingSegment(t *testing.T) {
 
 			segment, err := snapshot.SealingSegment()
 			require.NoError(t, err)
-			assert.Equal(t, lastBlock.Header, segment.Highest().Header)
-			assert.Equal(t, block4.Header, segment.Sealed().Header)
+			assert.Equal(t, lastBlock.ToHeader(), segment.Highest().ToHeader())
+			assert.Equal(t, block4.ToHeader(), segment.Sealed().ToHeader())
 			root := rootSnapshot.Encodable().SealingSegment.Sealed()
 			unittest.AssertEqualBlockSequences(t, []*flow.Block{root, block1, block2, block3}, segment.ExtraBlocks)
 			assert.Len(t, segment.ExecutionResults, 2)
