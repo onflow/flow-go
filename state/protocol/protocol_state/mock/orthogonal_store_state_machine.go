@@ -14,7 +14,7 @@ type OrthogonalStoreStateMachine[P interface{}] struct {
 	mock.Mock
 }
 
-// Build provides a mock function with given fields:
+// Build provides a mock function with no fields
 func (_m *OrthogonalStoreStateMachine[P]) Build() ([]storage.BlockIndexingBatchWrite, error) {
 	ret := _m.Called()
 
