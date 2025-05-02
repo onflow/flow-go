@@ -253,7 +253,7 @@ func (b *Blockchain) PendingBlockView() uint64 {
 	return b.pendingBlock.view
 }
 
-// PendingBlockTimestamp returns the Timestamp of the pending block.
+// PendingBlockTimestamp returns the Timestamp of the pending block (Unix time in milliseconds).
 func (b *Blockchain) PendingBlockTimestamp() uint64 {
 	return b.pendingBlock.Block().Header.Timestamp
 }
