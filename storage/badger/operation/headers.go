@@ -23,9 +23,9 @@ func IndexFinalizedBlockByHeight(height uint64, blockID flow.Identifier) func(*b
 	return insert(makePrefix(codeHeightToBlock, height), blockID)
 }
 
-// IndexCertifiedBlockByView indexes the view of a block.
-// HotStuff guarantees that there is at most one certified block. Caution: this does not hold for
-// uncertified proposals, as byzantine actors might produce multiple proposals for the same block.
+// IndexCertifiedBlockByView indexes a block by its view.
+// HotStuff guarantees that there is at most one certified block per view. Caution: this does not hold for
+// uncertified proposals, as a byzantine leader might produce multiple proposals for the same view.
 // Hence, only certified blocks (i.e. blocks that have received a QC) can be indexed!
 func IndexCertifiedBlockByView(view uint64, blockID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeCertifiedBlockByView, view), blockID)
