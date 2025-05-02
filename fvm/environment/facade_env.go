@@ -356,7 +356,7 @@ func (env *facadeEnvironment) RecoverProgram(program *ast.Program, location comm
 }
 
 func (env *facadeEnvironment) ValidateAccountCapabilitiesGet(
-	_ *interpreter.Interpreter,
+	_ interpreter.AccountCapabilityGetValidationContext,
 	_ interpreter.LocationRange,
 	_ interpreter.AddressValue,
 	_ interpreter.PathValue,
@@ -375,7 +375,7 @@ func (env *facadeEnvironment) ValidateAccountCapabilitiesGet(
 }
 
 func (env *facadeEnvironment) ValidateAccountCapabilitiesPublish(
-	_ *interpreter.Interpreter,
+	_ interpreter.AccountCapabilityPublishValidationContext,
 	_ interpreter.LocationRange,
 	_ interpreter.AddressValue,
 	_ interpreter.PathValue,
