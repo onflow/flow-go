@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
@@ -136,6 +137,72 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 
 	core := s.initCore()
 	err := core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
+	require.NoError(s.T(), err)
+
+	// Verify that the mock expectations for storing the error messages were met.
+	s.txErrorMessages.AssertExpectations(s.T())
+	s.proto.state.AssertExpectations(s.T())
+
+	// 2. Now simulate the second try when the error messages already exist in storage.
+	// Mock the txErrorMessages storage to confirm that error messages exist.
+	s.txErrorMessages.On("Exists", blockId).
+		Return(true, nil).Once()
+	s.proto.state.On("AtBlockID", blockId).Return(s.proto.snapshot).Once()
+	err = core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
+	require.NoError(s.T(), err)
+
+	// Verify that the mock expectations for storing the error messages were not met.
+	s.txErrorMessages.AssertExpectations(s.T())
+	s.execClient.AssertExpectations(s.T())
+	s.proto.state.AssertExpectations(s.T())
+}
+
+func (s *TxErrorMessagesCoreSuite) TestTransactionErrorMessagesRequester_HappyPath() {
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
+
+	block := unittest.BlockWithParentFixture(s.finalizedBlock)
+	blockId := block.ID()
+
+	s.connFactory.On("GetExecutionAPIClient", mock.Anything).Return(s.execClient, &mockCloser{}, nil)
+
+	// Mock the protocol snapshot to return fixed execution node IDs.
+	setupReceiptsForBlock(s.receipts, block, s.enNodeIDs.NodeIDs()[0])
+	s.proto.snapshot.On("Identities", mock.Anything).Return(s.enNodeIDs, nil)
+	s.proto.state.On("AtBlockID", blockId).Return(s.proto.snapshot).Once()
+
+	// Create mock transaction results with a mix of failed and non-failed transactions.
+	resultsByBlockID := mockTransactionResultsByBlock(5)
+
+	// Prepare a request to fetch transaction error messages by block ID from execution nodes.
+	exeEventReq := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
+		BlockId: blockId[:],
+	}
+
+	s.execClient.On("GetTransactionErrorMessagesByBlockID", mock.Anything, exeEventReq).
+		Return(createTransactionErrorMessagesResponse(resultsByBlockID), nil).
+		Once()
+
+	// 1. Mock the txErrorMessages storage to confirm that error messages do not exist yet.
+	s.txErrorMessages.On("Exists", blockId).
+		Return(false, nil).Once()
+
+	// Prepare the expected transaction error messages that should be stored.
+	expectedStoreTxErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
+
+	// Mock the storage of the fetched error messages into the protocol database.
+	s.txErrorMessages.On("Store", blockId, expectedStoreTxErrorMessages).
+		Return(nil).Once()
+
+	core := s.initCore()
+	config := &TransactionErrorMessagesRequesterConfig{
+		FetchTimeout:    10 * time.Second,
+		MaxFetchTimeout: 10 * time.Minute,
+		RetryDelay:      1 * time.Second,
+		MaxRetryDelay:   5 * time.Minute,
+	}
+	requester := NewTransactionErrorMessagesRequester(core, config)
+
+	err := requester.RequestTransactionErrorMessagesByBlockID(irrecoverableCtx, blockId)
 	require.NoError(s.T(), err)
 
 	// Verify that the mock expectations for storing the error messages were met.
