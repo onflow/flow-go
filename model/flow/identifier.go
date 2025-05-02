@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"reflect"
 
 	"github.com/ipfs/go-cid"
@@ -262,4 +263,14 @@ func IdsToBytes(identifiers []Identifier) [][]byte {
 	}
 
 	return byteIds
+}
+
+type cachedID Identifier
+
+// EncodeRLP overrides RLP encoding to always contribute 0 bytes for this type.
+// Since this type is used as a cached field, and is not a canonical part of the
+// data structure it appears in, we want the outer structure's encoding to be
+// the same regardless of what the value of the cached ID is.
+func (id cachedID) EncodeRLP(w io.Writer) error {
+	return nil
 }

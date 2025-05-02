@@ -61,14 +61,22 @@ func (c Collection) Fingerprint() []byte {
 //structwrite:immutable - mutations allowed only within the constructor
 type LightCollection struct {
 	Transactions []Identifier
+	cachedID     cachedID
 }
 
 func NewLightCollection(txIDs []Identifier) LightCollection {
-	return LightCollection{Transactions: txIDs}
+	lc := LightCollection{
+		Transactions: txIDs,
+	}
+	lc.cachedID = cachedID(lc.ID())
+	return lc
 }
 
 func (lc LightCollection) ID() Identifier {
-	return MakeID(lc)
+	if Identifier(lc.cachedID) == ZeroID {
+		return MakeID(lc)
+	}
+	return Identifier(lc.cachedID)
 }
 
 func (lc LightCollection) Checksum() Identifier {
