@@ -316,7 +316,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 		Int("guarantees_count", len(payload.Guarantees)).
 		Int("seals_count", len(payload.Seals)).
 		Int("receipts_count", len(payload.Receipts)).
-		Time("timestamp", time.UnixMilli(int64(header.Timestamp))).
+		Time("timestamp", time.UnixMilli(int64(header.Timestamp)).UTC()).
 		Hex("signers", header.ParentVoterIndices).
 		//Dur("delay", delay).
 		Logger()

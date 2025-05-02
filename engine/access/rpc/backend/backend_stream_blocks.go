@@ -279,7 +279,7 @@ func (b *backendSubscribeBlocks) getBlockDigestResponse(blockStatus flow.BlockSt
 			Uint64("height", height).
 			Msgf("sending lightweight block info")
 
-		return flow.NewBlockDigest(header.ID(), header.Height, time.UnixMilli(int64(header.Timestamp))), nil
+		return flow.NewBlockDigest(header.ID(), header.Height, time.UnixMilli(int64(header.Timestamp)).UTC()), nil
 	}
 }
 

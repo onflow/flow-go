@@ -94,7 +94,7 @@ func (b *SDKAdapter) GetBlockHeaderByHeight(
 		ID:        sdk.Identifier(block.ID()),
 		ParentID:  sdk.Identifier(block.Header.ParentID),
 		Height:    block.Header.Height,
-		Timestamp: time.UnixMilli(int64(block.Header.Timestamp)),
+		Timestamp: time.UnixMilli(int64(block.Header.Timestamp)).UTC(),
 	}
 	return &blockHeader, sdk.BlockStatusSealed, nil
 }
@@ -116,7 +116,7 @@ func (b *SDKAdapter) GetBlockHeaderByID(
 		ID:        sdk.Identifier(block.ID()),
 		ParentID:  sdk.Identifier(block.Header.ParentID),
 		Height:    block.Header.Height,
-		Timestamp: time.UnixMilli(int64(block.Header.Timestamp)),
+		Timestamp: time.UnixMilli(int64(block.Header.Timestamp)).UTC(),
 	}
 	return &blockHeader, sdk.BlockStatusSealed, nil
 }
@@ -139,7 +139,7 @@ func (b *SDKAdapter) GetLatestBlock(
 			ID:        sdk.Identifier(flowBlock.ID()),
 			ParentID:  sdk.Identifier(flowBlock.Header.ParentID),
 			Height:    flowBlock.Header.Height,
-			Timestamp: time.UnixMilli(int64(flowBlock.Header.Timestamp)),
+			Timestamp: time.UnixMilli(int64(flowBlock.Header.Timestamp)).UTC(),
 		},
 		BlockPayload: convertBlockPayload(flowBlock.Payload),
 	}
@@ -164,7 +164,7 @@ func (b *SDKAdapter) GetBlockByHeight(
 			ID:        sdk.Identifier(flowBlock.ID()),
 			ParentID:  sdk.Identifier(flowBlock.Header.ParentID),
 			Height:    flowBlock.Header.Height,
-			Timestamp: time.UnixMilli(int64(flowBlock.Header.Timestamp)),
+			Timestamp: time.UnixMilli(int64(flowBlock.Header.Timestamp)).UTC(),
 		},
 		BlockPayload: convertBlockPayload(flowBlock.Payload),
 	}
@@ -189,7 +189,7 @@ func (b *SDKAdapter) GetBlockByID(
 			ID:        sdk.Identifier(flowBlock.ID()),
 			ParentID:  sdk.Identifier(flowBlock.Header.ParentID),
 			Height:    flowBlock.Header.Height,
-			Timestamp: time.UnixMilli(int64(flowBlock.Header.Timestamp)),
+			Timestamp: time.UnixMilli(int64(flowBlock.Header.Timestamp)).UTC(),
 		},
 		BlockPayload: convertBlockPayload(flowBlock.Payload),
 	}

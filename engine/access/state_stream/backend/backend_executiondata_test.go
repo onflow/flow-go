@@ -307,7 +307,7 @@ func generateMockEvents(header *flow.Header, eventCount int) flow.BlockEvents {
 	return flow.BlockEvents{
 		BlockID:        header.ID(),
 		BlockHeight:    header.Height,
-		BlockTimestamp: time.UnixMilli(int64(header.Timestamp)),
+		BlockTimestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
 		Events:         events,
 	}
 }
