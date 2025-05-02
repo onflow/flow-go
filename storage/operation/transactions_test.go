@@ -23,20 +23,14 @@ func TestTransactions(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		reader, err := db.Reader()
-		require.NoError(t, err)
-
 		// verify can be retrieved
 		var actual flow.Transaction
-		err = operation.RetrieveTransaction(reader, expected.ID(), &actual.TransactionBody)
+		err = operation.RetrieveTransaction(db.Reader(), expected.ID(), &actual.TransactionBody)
 		require.NoError(t, err)
 		assert.Equal(t, expected, actual)
 
-		reader, err = db.Reader()
-		require.NoError(t, err)
-
 		// retrieve non exist
-		err = operation.RetrieveTransaction(reader, unittest.IdentifierFixture(), &actual.TransactionBody)
+		err = operation.RetrieveTransaction(db.Reader(), unittest.IdentifierFixture(), &actual.TransactionBody)
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
@@ -46,11 +40,8 @@ func TestTransactions(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		reader, err = db.Reader()
-		require.NoError(t, err)
-
 		// verify has been deleted
-		err = operation.RetrieveTransaction(reader, expected.ID(), &actual.TransactionBody)
+		err = operation.RetrieveTransaction(db.Reader(), expected.ID(), &actual.TransactionBody)
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 

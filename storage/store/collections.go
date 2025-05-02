@@ -68,12 +68,7 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 		collection flow.Collection
 	)
 
-	reader, err := c.db.Reader()
-	if err != nil {
-		return nil, err
-	}
-
-	err = operation.RetrieveCollection(reader, colID, &light)
+	err := operation.RetrieveCollection(c.db.Reader(), colID, &light)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve collection: %w", err)
 	}
@@ -92,14 +87,9 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 
 // LightByID retrieves a light collection by its ID.
 func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, error) {
-	reader, err := c.db.Reader()
-	if err != nil {
-		return nil, err
-	}
-
 	var collection flow.LightCollection
 
-	err = operation.RetrieveCollection(reader, colID, &collection)
+	err := operation.RetrieveCollection(c.db.Reader(), colID, &collection)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve collection: %w", err)
 	}
@@ -201,19 +191,14 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 
 // LightByTransactionID retrieves a light collection by a transaction ID.
 func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCollection, error) {
-	reader, err := c.db.Reader()
-	if err != nil {
-		return nil, err
-	}
-
 	collID := &flow.Identifier{}
-	err = operation.LookupCollectionByTransaction(reader, txID, collID)
+	err := operation.LookupCollectionByTransaction(c.db.Reader(), txID, collID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve collection id: %w", err)
 	}
 
 	var collection flow.LightCollection
-	err = operation.RetrieveCollection(reader, *collID, &collection)
+	err = operation.RetrieveCollection(c.db.Reader(), *collID, &collection)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve collection: %w", err)
 	}

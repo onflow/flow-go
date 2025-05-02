@@ -19,14 +19,15 @@ var _ storage.Reader = (*multiReader)(nil)
 // - a reader succeeds or
 // - a reader returns an error that is not ErrNotFound
 // If all readers return ErrNotFound, Reader.Get will return ErrNotFound.
-func NewMultiReader(readers ...storage.Reader) (storage.Reader, error) {
+// NewMultiReader panics if 0 readers are provided.
+func NewMultiReader(readers ...storage.Reader) storage.Reader {
 	if len(readers) == 0 {
-		return nil, errors.New("failed to create multiReader: need at least one reader")
+		panic("failed to create multiReader: need at least one reader")
 	}
 	if len(readers) == 1 {
-		return readers[0], nil
+		return readers[0]
 	}
-	return &multiReader{readers: readers}, nil
+	return &multiReader{readers: readers}
 }
 
 // Get gets the value for the given key from one of the readers.
@@ -82,14 +83,10 @@ func (b *multiReader) NewIter(startPrefix, endPrefix []byte, ops storage.Iterato
 //
 // Returned new Seeker consists of multiple seekers in reverse order from underlying readers.
 // For example, the first seeker is created from the last underlying reader.
-func (b *multiReader) NewSeeker() (storage.Seeker, error) {
+func (b *multiReader) NewSeeker() storage.Seeker {
 	seekers := make([]storage.Seeker, len(b.readers))
 	for i, r := range b.readers {
-		seeker, err := r.NewSeeker()
-		if err != nil {
-			return nil, err
-		}
-		seekers[len(b.readers)-1-i] = seeker
+		seekers[len(b.readers)-1-i] = r.NewSeeker()
 	}
 
 	return NewMultiSeeker(seekers...)
