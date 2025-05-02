@@ -104,6 +104,7 @@ var verifyPayersBalanceForTransactionExecutionSpec = ContractFunctionSpec{
 		sema.UInt64Type,
 		sema.UInt64Type,
 	},
+	UseVM: true,
 }
 
 // CheckPayerBalanceAndGetMaxTxFees executes the verifyPayersBalanceForTransactionExecution
@@ -145,6 +146,7 @@ var deductTransactionFeeSpec = ContractFunctionSpec{
 		sema.UInt64Type,
 		sema.UInt64Type,
 	},
+	UseVM: true,
 }
 
 // DeductTransactionFees executes the fee deduction function
@@ -217,6 +219,7 @@ var accountAvailableBalanceSpec = ContractFunctionSpec{
 	ArgumentTypes: []sema.Type{
 		&sema.AddressType{},
 	},
+	UseVM: true,
 }
 
 // AccountAvailableBalance executes the get available balance contract on the
@@ -243,6 +246,7 @@ var accountBalanceInvocationSpec = ContractFunctionSpec{
 			sema.AccountType,
 		),
 	},
+	UseVM: true,
 }
 
 // AccountBalance executes the get available balance contract on the service
@@ -265,6 +269,7 @@ var accountStorageCapacitySpec = ContractFunctionSpec{
 	ArgumentTypes: []sema.Type{
 		&sema.AddressType{},
 	},
+	UseVM: true,
 }
 
 // AccountStorageCapacity executes the get storage capacity contract on the
