@@ -7,6 +7,7 @@ import (
 	"github.com/vmihailenco/msgpack/v4"
 
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
+	"github.com/onflow/flow-go/model/fingerprint"
 )
 
 // ProposalHeader is a block header and the proposer's signature for the block.
@@ -60,6 +61,36 @@ func (h Header) QuorumCertificate() *QuorumCertificate {
 	}
 }
 
+// Fingerprint defines custom encoding for the header to calculate its ID.
+// The hash of the LastViewTC is used instead of directly encoding the Header.
+func (h Header) Fingerprint() []byte {
+	return fingerprint.Fingerprint(struct {
+		ChainID            ChainID
+		ParentID           Identifier
+		Height             uint64
+		PayloadHash        Identifier
+		Timestamp          uint64
+		View               uint64
+		ParentView         uint64
+		ParentVoterIndices []byte
+		ParentVoterSigData []byte
+		ProposerID         Identifier
+		LastViewTCID       Identifier
+	}{
+		ChainID:            h.ChainID,
+		ParentID:           h.ParentID,
+		Height:             h.Height,
+		PayloadHash:        h.PayloadHash,
+		Timestamp:          h.Timestamp,
+		View:               h.View,
+		ParentView:         h.ParentView,
+		ParentVoterIndices: h.ParentVoterIndices,
+		ParentVoterSigData: h.ParentVoterSigData,
+		ProposerID:         h.ProposerID,
+		LastViewTCID:       h.LastViewTC.ID(),
+	})
+}
+
 // ID returns a unique ID to singularly identify the header and its block
 // within the flow system.
 func (h Header) ID() Identifier {
@@ -67,6 +98,7 @@ func (h Header) ID() Identifier {
 }
 
 // Checksum returns the checksum of the header.
+// TODO(malleability): remove this function
 func (h Header) Checksum() Identifier {
 	return MakeID(h)
 }
