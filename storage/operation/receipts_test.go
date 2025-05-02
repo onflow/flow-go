@@ -23,11 +23,8 @@ func TestReceipts_InsertRetrieve(t *testing.T) {
 		})
 		require.Nil(t, err)
 
-		reader, err := db.Reader()
-		require.NoError(t, err)
-
 		var actual flow.ExecutionReceiptMeta
-		err = operation.RetrieveExecutionReceiptMeta(reader, receipt.ID(), &actual)
+		err = operation.RetrieveExecutionReceiptMeta(db.Reader(), receipt.ID(), &actual)
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, &actual)
@@ -45,11 +42,8 @@ func TestReceipts_Index(t *testing.T) {
 		})
 		require.Nil(t, err)
 
-		reader, err := db.Reader()
-		require.NoError(t, err)
-
 		var actual flow.Identifier
-		err = operation.LookupOwnExecutionReceipt(reader, blockID, &actual)
+		err = operation.LookupOwnExecutionReceipt(db.Reader(), blockID, &actual)
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)
@@ -69,11 +63,8 @@ func TestReceipts_MultiIndex(t *testing.T) {
 			return nil
 		}))
 
-		reader, err := db.Reader()
-		require.NoError(t, err)
-
 		var actual []flow.Identifier
-		err = operation.LookupExecutionReceipts(reader, blockID, &actual)
+		err := operation.LookupExecutionReceipts(db.Reader(), blockID, &actual)
 		require.Nil(t, err)
 
 		assert.ElementsMatch(t, expected, actual)

@@ -48,12 +48,7 @@ var statsCmd = &cobra.Command{
 		}
 		log.Info().Msgf("getting stats for %s db at %s with %v workers0", flagDBType, flagDatadir, numWorkers)
 
-		reader, err := sdb.Reader()
-		if err != nil {
-			return fmt.Errorf("failed to get reader: %w", err)
-		}
-
-		stats, err := operation.SummarizeKeysByFirstByteConcurrent(log.Logger, reader, numWorkers)
+		stats, err := operation.SummarizeKeysByFirstByteConcurrent(log.Logger, sdb.Reader(), numWorkers)
 		if err != nil {
 			return fmt.Errorf("failed to get stats: %w", err)
 		}
