@@ -908,6 +908,7 @@ func WithPreviousResult(prevResult flow.ExecutionResult) func(*flow.ExecutionRes
 func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	chunks := 1 // tailing chunk is always system chunk
 	var previousResultID flow.Identifier
+	chunks += len(block.Payload.Guarantees)
 	blockID := block.ID()
 
 	return func(result *flow.ExecutionResult) {
@@ -2234,6 +2235,12 @@ func WithDKGFromParticipants(participants flow.IdentitySkeletonList) func(*flow.
 			commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, KeyFixture(crypto.BLSBLS12381).PublicKey())
 			commit.DKGIndexMap[nodeID] = index
 		}
+	}
+}
+
+func WithClusterQCs(qcs []flow.ClusterQCVoteData) func(*flow.EpochCommit) {
+	return func(commit *flow.EpochCommit) {
+		commit.ClusterQCs = qcs
 	}
 }
 

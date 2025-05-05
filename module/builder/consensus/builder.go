@@ -663,7 +663,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	block := flow.NewBlock(header.HeaderBody, payload)
 
 	// sign the proposal
-	sig, err := sign(header)
+	sig, err := sign(block.ToHeader())
 	if err != nil {
 		return nil, fmt.Errorf("could not sign the block: %w", err)
 	}

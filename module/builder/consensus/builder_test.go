@@ -1128,10 +1128,13 @@ func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
 	// make blocks S, A, B, C
 	parentReceipt := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
 	blockSABC := unittest.ChainFixtureFrom(4, bs.blocks[bs.parentID].ToHeader())
-	resultS := unittest.ExecutionResultFixture(unittest.WithBlock(blockSABC[0]), unittest.WithPreviousResult(*bs.resultForBlock[bs.parentID]))
-	receiptSABC := unittest.ReceiptChainFor(blockSABC, resultS)
+
+	// fully create blockSABC[0]
 	blockSABC[0].Payload.Receipts = []*flow.ExecutionReceiptStub{parentReceipt.Stub()}
 	blockSABC[0].Payload.Results = []*flow.ExecutionResult{&parentReceipt.ExecutionResult}
+
+	resultS := unittest.ExecutionResultFixture(unittest.WithBlock(blockSABC[0]), unittest.WithPreviousResult(*bs.resultForBlock[bs.parentID]))
+	receiptSABC := unittest.ReceiptChainFor(blockSABC, resultS)
 	blockSABC[1].Payload.Receipts = []*flow.ExecutionReceiptStub{receiptSABC[0].Stub()}
 	blockSABC[1].Payload.Results = []*flow.ExecutionResult{&receiptSABC[0].ExecutionResult}
 	blockSABC[2].Payload.Receipts = []*flow.ExecutionReceiptStub{}
