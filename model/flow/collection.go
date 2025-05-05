@@ -61,22 +61,26 @@ func (c Collection) Fingerprint() []byte {
 //structwrite:immutable - mutations allowed only within the constructor
 type LightCollection struct {
 	Transactions []Identifier
-	idCache
+	cachedID     idCache
 }
 
 func NewLightCollection(txIDs []Identifier) LightCollection {
-	return LightCollection{
+	lc := LightCollection{
 		Transactions: txIDs,
-		idCache:      newIDCache(),
 	}
+	lc.cachedID = newIDCache(lc.UncachedID)
+	return lc
 }
 
-func (lc LightCollection) uncachedID() Identifier {
+// UncachedID computes and returns the canonical ID of the LightCollection, bypassing the ID cache.
+func (lc LightCollection) UncachedID() Identifier {
 	return MakeID(lc)
 }
 
+// ID computes and returns the canonical ID of the LightCollection,
+// or returns a cached version if the ID has ever been computed before.
 func (lc LightCollection) ID() Identifier {
-	return lc.idCache.getID(lc.uncachedID)
+	return lc.cachedID.getID()
 }
 
 func (lc LightCollection) Checksum() Identifier {
