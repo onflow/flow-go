@@ -5,6 +5,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// UnsafeInsertGuarantee inserts a collection guarantee into the database.
+// It's called unsafe because it doesn't check if a different guarantee was already inserted
+// for the same collection ID.
 func UnsafeInsertGuarantee(w storage.Writer, collID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 	return UpsertByKey(w, MakePrefix(codeGuarantee, collID), guarantee)
 }
