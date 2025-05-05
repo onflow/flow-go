@@ -2,9 +2,6 @@ package convert
 
 import (
 	"fmt"
-	"time"
-
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
@@ -18,7 +15,6 @@ func BlockHeaderToMessage(
 ) (*entities.BlockHeader, error) {
 	id := h.ID()
 
-	t := timestamppb.New(time.UnixMilli(int64(h.Timestamp)).UTC())
 	var lastViewTC *entities.TimeoutCertificate
 	if h.LastViewTC != nil {
 		newestQC := h.LastViewTC.NewestQC
@@ -42,7 +38,7 @@ func BlockHeaderToMessage(
 		ParentId:           h.ParentID[:],
 		Height:             h.Height,
 		PayloadHash:        h.PayloadHash[:],
-		Timestamp:          t,
+		Timestamp:          BlockTimestamp2ProtobufTime(h.Timestamp),
 		View:               h.View,
 		ParentView:         h.ParentView,
 		ParentVoterIndices: h.ParentVoterIndices,
