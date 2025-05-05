@@ -143,7 +143,7 @@ func bootstrapVM(t *testing.T, chain flow.Chain) (*fvm.VirtualMachine, fvm.Conte
 		fvm.WithContractDeploymentRestricted(false),
 		fvm.WithEntropyProvider(source),
 		fvm.WithBlocks(blocks),
-		fvm.WithBlockHeader(block1.Header),
+		fvm.WithBlockHeader(block1.ToHeader()),
 	)
 
 	ctx := fvm.NewContext(opts...)

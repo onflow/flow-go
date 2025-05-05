@@ -96,19 +96,17 @@ func (b *pendingBlock) Block() *flowgo.Block {
 		}
 	}
 
-	return &flowgo.Block{
-		Header: &flowgo.Header{
-			HeaderBody: flowgo.HeaderBody{
-				Height:    b.height,
-				View:      b.view,
-				ParentID:  b.parentID,
-				Timestamp: b.timestamp,
-			},
+	return flowgo.NewBlock(
+		flowgo.HeaderBody{
+			Height:    b.height,
+			View:      b.view,
+			ParentID:  b.parentID,
+			Timestamp: b.timestamp,
 		},
-		Payload: &flowgo.Payload{
+		flowgo.Payload{
 			Guarantees: guarantees,
 		},
-	}
+	)
 }
 
 func (b *pendingBlock) Collections() []*flowgo.LightCollection {

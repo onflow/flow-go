@@ -615,7 +615,7 @@ func (b *Blockchain) executeBlock() ([]*TransactionResult, error) {
 		return results, nil
 	}
 
-	header := b.pendingBlock.Block().Header
+	header := b.pendingBlock.Block().ToHeader()
 	blockContext := b.setFVMContextFromHeader(header)
 
 	// cannot execute a block that has already executed
@@ -643,7 +643,7 @@ func (b *Blockchain) ExecuteNextTransaction() (*TransactionResult, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	header := b.pendingBlock.Block().Header
+	header := b.pendingBlock.Block().ToHeader()
 	blockContext := b.setFVMContextFromHeader(header)
 	return b.executeNextTransaction(blockContext)
 }
@@ -818,7 +818,7 @@ func (b *Blockchain) ExecuteScript(
 		return nil, err
 	}
 
-	return b.executeScriptAtBlockID(script, arguments, latestBlock.Header.ID())
+	return b.executeScriptAtBlockID(script, arguments, latestBlock.ID())
 }
 
 func (b *Blockchain) ExecuteScriptAtBlockID(script []byte, arguments [][]byte, id flowgo.Identifier) (*ScriptResult, error) {
@@ -844,7 +844,7 @@ func (b *Blockchain) executeScriptAtBlockID(script []byte, arguments [][]byte, i
 
 	blockContext := fvm.NewContextFromParent(
 		b.vmCtx,
-		fvm.WithBlockHeader(requestedBlock.Header),
+		fvm.WithBlockHeader(requestedBlock.ToHeader()),
 	)
 
 	scriptProc := fvm.Script(script).WithArguments(arguments...)
@@ -894,7 +894,7 @@ func (b *Blockchain) ExecuteScriptAtBlockHeight(
 		return nil, err
 	}
 
-	return b.executeScriptAtBlockID(script, arguments, requestedBlock.Header.ID())
+	return b.executeScriptAtBlockID(script, arguments, requestedBlock.ID())
 }
 
 func convertToSealedResults(
@@ -1036,7 +1036,7 @@ func (b *Blockchain) executeSystemChunkTransaction() error {
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithRandomSourceHistoryCallAllowed(true),
-		fvm.WithBlockHeader(b.pendingBlock.Block().Header),
+		fvm.WithBlockHeader(b.pendingBlock.Block().ToHeader()),
 		fvm.WithAccountStorageLimit(false),
 	)
 
