@@ -21,8 +21,9 @@ func TestTimeoutCertificateID_Malleability(t *testing.T) {
 // TestTimeoutCertificate_Equals verifies the correctness of the Equals method on TimeoutCertificates.
 // It checks that TimeoutCertificates are considered equal if and only if all fields match.
 func TestTimeoutCertificate_Equals(t *testing.T) {
-	// Create two TimeoutCertificates with random but different values.
-	tc1, tc2 := helper.MakeTC(), helper.MakeTC()
+	// Create two TimeoutCertificates with random but different values. Note: random selection for `SignerIndices` has limited variability
+	// and yields sometimes the same value for both tc1 and tc2. Therefore, we explicitly set different values for `SignerIndices`.
+	tc1, tc2 := helper.MakeTC(helper.WithTCSigners([]byte{74, 0})), helper.MakeTC(helper.WithTCSigners([]byte{37, 0}))
 	require.False(t, tc1.Equals(tc2), "Initially, all fields are different, so the objects should not be equal")
 
 	// List of mutations to apply on tc1 to gradually make it equal to tc2
