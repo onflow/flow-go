@@ -139,7 +139,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Times(len(locators))
 
 	// the chunks belong to an unsealed block.
-	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
+	mockBlockSealingStatus(s.state, s.headers, block.ToHeader(), false)
 
 	// mocks resources on fetcher engine side.
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
@@ -200,7 +200,7 @@ func TestChunkResponse_RemovingStatusFails(t *testing.T) {
 	// creates a result with specified 2 chunks and a single assigned chunk to this fetcher engine.
 	block, result, statuses, _, collMap := completeChunkStatusListFixture(t, 2, 1)
 	_, _, agrees, _ := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
-	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
+	mockBlockSealingStatus(s.state, s.headers, block.ToHeader(), false)
 
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 	mockBlocksStorage(s.blocks, s.headers, block)
@@ -237,7 +237,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	// also the chunk belongs to an unsealed block.
 	block, result, statuses, locators, collMap := completeChunkStatusListFixture(t, 2, 1)
 	_, _, agrees, disagrees := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
-	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
+	mockBlockSealingStatus(s.state, s.headers, block.ToHeader(), false)
 	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Times(len(locators))
 
 	// mocks resources on fetcher engine side.
@@ -479,7 +479,7 @@ func TestSkipChunkOfSealedBlock(t *testing.T) {
 	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
 	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Once()
 
-	mockBlockSealingStatus(s.state, s.headers, block.Header, true)
+	mockBlockSealingStatus(s.state, s.headers, block.ToHeader(), true)
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 
 	// expects processing notifier being invoked upon sealed chunk detected,
@@ -921,7 +921,7 @@ func verifiableChunkFixture(t *testing.T,
 	// TODO: add end state
 	return &verification.VerifiableChunkData{
 		Chunk:             chunk,
-		Header:            block.Header,
+		Header:            block.ToHeader(),
 		Result:            result,
 		ChunkDataPack:     chunkDataPack,
 		TransactionOffset: offsetForChunk,

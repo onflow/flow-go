@@ -131,7 +131,7 @@ func TestExecutionStateWithStorehouse(t *testing.T) {
 
 		// block 11 is the block to be executed
 		block11 := finalized.BlockAtHeight(11)
-		header11 := block11.Header
+		header11 := block11.ToHeader()
 		sc10 := flow.StateCommitment(l.InitialState())
 
 		reg1 := unittest.MakeOwnerReg("fruit", "apple")

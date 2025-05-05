@@ -336,10 +336,7 @@ func ExecutionResultFixture(t *testing.T,
 			Guarantees:      guarantees,
 			ProtocolStateID: protocolStateID,
 		}
-		referenceBlock = flow.Block{
-			Header: refBlkHeader.HeaderBody,
-		}
-		referenceBlock.SetPayload(payload)
+		referenceBlock = *flow.NewBlock(refBlkHeader.HeaderBody, payload)
 
 		executableBlock := &entity.ExecutableBlock{
 			Block:               &referenceBlock,

@@ -442,7 +442,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.Equal(suite.T(), expectedMessage, actual)
 		}
 
-		suite.finalSnapshot.On("Head").Return(block1.Header, nil)
+		suite.finalSnapshot.On("Head").Return(block1.ToHeader(), nil)
 		suite.Run("get header 1 by ID", func() {
 			// get header by ID
 			id := block1.ID()
@@ -786,7 +786,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		suite.state.On("Params").Return(suite.params)
 		suite.state.On("Final").Return(finalSnapshot)
 		suite.state.On("Sealed").Return(suite.sealedSnapshot)
-		sealedBlock := unittest.GenesisFixture().Header
+		sealedBlock := unittest.GenesisFixture().ToHeader()
 		// specifically for this test we will consider that sealed block is far behind finalized, so we get EXECUTED status
 		suite.sealedSnapshot.On("Head").Return(sealedBlock, nil)
 
@@ -936,7 +936,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		}
 		err = db.Update(operation.IndexBlockHeight(block.Header.Height, block.ID()))
 		require.NoError(suite.T(), err)
-		finalSnapshot.On("Head").Return(block.Header, nil)
+		finalSnapshot.On("Head").Return(block.ToHeader(), nil)
 
 		processExecutionReceipts(block, collection, enNodeIDs, originID, ingestEng)
 		processExecutionReceipts(blockNegative, collectionNegative, enNodeIDs, originID, ingestEng)
@@ -1358,7 +1358,7 @@ func (suite *Suite) createChain() (*flow.BlockProposal, *flow.Collection) {
 	snap := new(protocol.Snapshot)
 	snap.On("Epochs").Return(epochs).Maybe()
 	snap.On("Params").Return(suite.params).Maybe()
-	snap.On("Head").Return(block.Header, nil).Maybe()
+	snap.On("Head").Return(block.ToHeader(), nil).Maybe()
 
 	suite.state.On("AtBlockID", refBlockID).Return(snap)
 

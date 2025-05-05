@@ -56,7 +56,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 
 	s.sealsDB = &storage.Seals{}
 
-	s.rootHeader = unittest.GenesisFixture().Header
+	s.rootHeader = unittest.GenesisFixture().ToHeader()
 	params := new(mockstate.Params)
 	s.State.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(s.ParentBlock, nil)).Maybe()
 	s.State.On("Params").Return(params)
@@ -378,7 +378,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 
 		previousResult := s.IncorporatedResult.Result
 		for blockIndex, block := range fork {
-			s.Blocks[block.ID()] = block.Header
+			s.Blocks[block.ID()] = block.ToHeader()
 			s.IdentitiesCache[block.ID()] = s.AuthorizedVerifiers
 
 			// create and incorporate result for every block in fork except first one
@@ -406,7 +406,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Once()
 
 	// block B_1 becomes finalized
-	finalized := forks[0][0].Header
+	finalized := forks[0][0].ToHeader()
 	s.MarkFinalized(finalized)
 	err := s.core.ProcessFinalizedBlock(finalized.ID())
 	require.NoError(s.T(), err)
@@ -445,12 +445,12 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnproces
 		forks[forkIndex] = unittest.ChainFixtureFrom(forkIndex+3, s.Block)
 		fork := forks[forkIndex]
 		for _, block := range fork {
-			s.Blocks[block.ID()] = block.Header
+			s.Blocks[block.ID()] = block.ToHeader()
 			s.IdentitiesCache[block.ID()] = s.AuthorizedVerifiers
 		}
 	}
 
-	finalized := forks[1][0].Header
+	finalized := forks[1][0].ToHeader()
 
 	s.MarkFinalized(finalized)
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(s.ParentBlock))
@@ -534,10 +534,10 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	parentBlock := s.ParentBlock
 	for i := 0; i < n; i++ {
 		block := unittest.BlockWithParentFixture(parentBlock)
-		s.Blocks[block.ID()] = block.Header
+		s.Blocks[block.ID()] = block.ToHeader()
 		s.IdentitiesCache[block.ID()] = s.AuthorizedVerifiers
 		unsealedFinalizedBlocks = append(unsealedFinalizedBlocks, *block)
-		parentBlock = block.Header
+		parentBlock = block.ToHeader()
 	}
 
 	// progress latest sealed and latest finalized:
@@ -546,7 +546,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 
 	// add an unfinalized block; it shouldn't require an approval request
 	unfinalizedBlock := unittest.BlockWithParentFixture(parentBlock)
-	s.Blocks[unfinalizedBlock.ID()] = unfinalizedBlock.Header
+	s.Blocks[unfinalizedBlock.ID()] = unfinalizedBlock.ToHeader()
 
 	// we will assume that all chunks are assigned to the same two verifiers.
 	verifiers := make([]flow.Identifier, 0)
@@ -617,7 +617,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	// start delivering finalization events
 	lastProcessedIndex := 0
 	for ; lastProcessedIndex < int(s.core.sealingConfigsGetter.ApprovalRequestsThresholdConst()); lastProcessedIndex++ {
-		finalized := unsealedFinalizedBlocks[lastProcessedIndex].Header
+		finalized := unsealedFinalizedBlocks[lastProcessedIndex].ToHeader()
 		s.MarkFinalized(finalized)
 		err := s.core.ProcessFinalizedBlock(finalized.ID())
 		require.NoError(s.T(), err)
@@ -628,7 +628,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	// process two more blocks, this will trigger requesting approvals for lastSealed + 1 height
 	// but they will be in blackout period
 	for i := 0; i < 2; i++ {
-		finalized := unsealedFinalizedBlocks[lastProcessedIndex].Header
+		finalized := unsealedFinalizedBlocks[lastProcessedIndex].ToHeader()
 		s.MarkFinalized(finalized)
 		err := s.core.ProcessFinalizedBlock(finalized.ID())
 		require.NoError(s.T(), err)
@@ -645,7 +645,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 		Return(nil).Times(chunkCount)
 
 	// process next block
-	finalized := unsealedFinalizedBlocks[lastProcessedIndex].Header
+	finalized := unsealedFinalizedBlocks[lastProcessedIndex].ToHeader()
 	s.MarkFinalized(finalized)
 	err = s.core.ProcessFinalizedBlock(finalized.ID())
 	require.NoError(s.T(), err)
@@ -678,14 +678,13 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	rootSnapshot := unittest.StateSnapshotForKnownBlock(s.rootHeader, nil)
 	s.Snapshots[s.rootHeader.ID()] = rootSnapshot
 	rootSnapshot.On("SealingSegment").Return(
-		&flow.SealingSegment{Blocks: []*flow.BlockProposal{{
-			Block: &flow.Block{
-				Header:  s.rootHeader,
-				Payload: &flow.Payload{},
+		&flow.SealingSegment{Blocks: []*flow.BlockProposal{
+			{
+				Block: flow.NewBlock(s.rootHeader.HeaderBody, flow.Payload{}),
+				// By convention, root block has no proposer signature - implementation has to handle this edge case
+				ProposerSigData: nil,
 			},
-			// By convention, root block has no proposer signature - implementation has to handle this edge case
-			ProposerSigData: nil}},
-		}, nil)
+		}}, nil)
 
 	s.sealsDB.On("HighestInFork", s.IncorporatedBlock.ID()).Return(
 		unittest.Seal.Fixture(
@@ -721,7 +720,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 			result.BlockID = block.Header.ParentID
 
 			// update caches
-			s.Blocks[blockID] = block.Header
+			s.Blocks[blockID] = block.ToHeader()
 			s.IdentitiesCache[blockID] = s.AuthorizedVerifiers
 			blockChildren = append(blockChildren, blockID)
 
@@ -815,21 +814,22 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	finalSnapShot.On("Descendants").Return(nil, nil)
 	// set up sealing segment
 	finalSnapShot.On("SealingSegment").Return(
-		&flow.SealingSegment{Blocks: []*flow.BlockProposal{
-			{Block: &flow.Block{
-				Header:  s.Block,
-				Payload: &candidatePayload,
+		&flow.SealingSegment{
+			Blocks: []*flow.BlockProposal{
+				{
+					Block: flow.NewBlock(s.Block.HeaderBody, candidatePayload),
+					// By convention, root block has no proposer signature - implementation has to handle this edge case
+					ProposerSigData: nil,
+				},
+				{
+					Block:           flow.NewBlock(s.ParentBlock.HeaderBody, flow.Payload{}),
+					ProposerSigData: unittest.SignatureFixture(),
+				},
+				{
+					Block:           flow.NewBlock(s.IncorporatedBlock.HeaderBody, incorporatedBlockPayload),
+					ProposerSigData: unittest.SignatureFixture(),
+				},
 			},
-				// By convention, root block has no proposer signature - implementation has to handle this edge case
-				ProposerSigData: nil},
-			{Block: &flow.Block{
-				Header:  s.ParentBlock,
-				Payload: &flow.Payload{},
-			}, ProposerSigData: unittest.SignatureFixture()},
-			{Block: &flow.Block{
-				Header:  s.IncorporatedBlock,
-				Payload: &incorporatedBlockPayload,
-			}, ProposerSigData: unittest.SignatureFixture()}},
 		}, nil)
 	s.State.On("Final").Return(finalSnapShot)
 
