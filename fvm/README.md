@@ -86,7 +86,7 @@ an immutable object, and any changes to a context must be made by spawning
 a new child context.
 
 ```go
-vm := fvm.New(runtime.NewInterpreterRuntime())
+vm := fvm.New(runtime.NewRuntime())
 
 globalCtx := fvm.NewContext()
 

@@ -59,8 +59,8 @@ func (b dbReader) NewIter(startPrefix, endPrefix []byte, ops storage.IteratorOpt
 }
 
 // NewSeeker returns a new Seeker.
-func (b dbReader) NewSeeker() (storage.Seeker, error) {
-	return newPebbleSeeker(b.db), nil
+func (b dbReader) NewSeeker() storage.Seeker {
+	return newPebbleSeeker(b.db)
 }
 
 // ToReader is a helper function to convert a *pebble.DB to a Reader

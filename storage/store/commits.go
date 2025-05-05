@@ -65,11 +65,7 @@ func (c *Commits) BatchStore(blockID flow.Identifier, commit flow.StateCommitmen
 }
 
 func (c *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
-	reader, err := c.db.Reader()
-	if err != nil {
-		return flow.DummyStateCommitment, nil
-	}
-	return c.retrieveTx(reader, blockID)
+	return c.retrieveTx(c.db.Reader(), blockID)
 }
 
 func (c *Commits) RemoveByBlockID(blockID flow.Identifier) error {

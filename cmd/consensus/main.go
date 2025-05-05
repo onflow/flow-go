@@ -761,7 +761,6 @@ func main() {
 			var build module.Builder
 			build, err = builder.NewBuilder(
 				node.Metrics.Mempool,
-				node.DB,
 				mutableState,
 				node.Storage.Headers,
 				node.Storage.Seals,

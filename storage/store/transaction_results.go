@@ -178,13 +178,8 @@ func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionRes
 
 // ByBlockIDTransactionID returns the runtime transaction result for the given block ID and transaction ID
 func (tr *TransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) (*flow.TransactionResult, error) {
-	reader, err := tr.db.Reader()
-	if err != nil {
-		return nil, err
-	}
-
 	key := KeyFromBlockIDTransactionID(blockID, txID)
-	transactionResult, err := tr.cache.Get(reader, key)
+	transactionResult, err := tr.cache.Get(tr.db.Reader(), key)
 	if err != nil {
 		return nil, err
 	}
@@ -193,13 +188,8 @@ func (tr *TransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, tx
 
 // ByBlockIDTransactionIndex returns the runtime transaction result for the given block ID and transaction index
 func (tr *TransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionResult, error) {
-	reader, err := tr.db.Reader()
-	if err != nil {
-		return nil, err
-	}
-
 	key := KeyFromBlockIDIndex(blockID, txIndex)
-	transactionResult, err := tr.indexCache.Get(reader, key)
+	transactionResult, err := tr.indexCache.Get(tr.db.Reader(), key)
 	if err != nil {
 		return nil, err
 	}
@@ -208,13 +198,8 @@ func (tr *TransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier,
 
 // ByBlockID gets all transaction results for a block, ordered by transaction index
 func (tr *TransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.TransactionResult, error) {
-	reader, err := tr.db.Reader()
-	if err != nil {
-		return nil, err
-	}
-
 	key := KeyFromBlockID(blockID)
-	transactionResults, err := tr.blockCache.Get(reader, key)
+	transactionResults, err := tr.blockCache.Get(tr.db.Reader(), key)
 	if err != nil {
 		return nil, err
 	}
