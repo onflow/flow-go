@@ -13,39 +13,39 @@ import (
 // TestBlockTimestamp_Validate tests that validation accepts valid time and rejects invalid
 func TestBlockTimestamp_Validate(t *testing.T) {
 	t.Parallel()
-	builder, err := NewBlockTimer(10*time.Millisecond, 1*time.Second)
+	builder, err := NewBlockTimer(10, 1000)
 	require.NoError(t, err)
 	t.Run("parentTime + minInterval + 1", func(t *testing.T) {
-		parentTime := time.Now().UTC()
-		blockTime := parentTime.Add(builder.minInterval + time.Millisecond)
-		require.NoError(t, builder.Validate(uint64(parentTime.UnixMilli()), uint64(blockTime.UnixMilli())))
+		parentTime := uint64(time.Now().UnixMilli())
+		blockTime := parentTime + builder.minInterval + 1
+		require.NoError(t, builder.Validate(parentTime, blockTime))
 	})
 	t.Run("parentTime + minInterval", func(t *testing.T) {
-		parentTime := time.Now().UTC()
-		blockTime := parentTime.Add(builder.minInterval)
-		require.NoError(t, builder.Validate(uint64(parentTime.UnixMilli()), uint64(blockTime.UnixMilli())))
+		parentTime := uint64(time.Now().UnixMilli())
+		blockTime := parentTime + builder.minInterval
+		require.NoError(t, builder.Validate(parentTime, blockTime))
 	})
 	t.Run("parentTime + minInterval - 1", func(t *testing.T) {
-		parentTime := time.Now().UTC()
-		blockTime := parentTime.Add(builder.minInterval - time.Millisecond)
-		err := builder.Validate(uint64(parentTime.UnixMilli()), uint64(blockTime.UnixMilli()))
+		parentTime := uint64(time.Now().UnixMilli())
+		blockTime := parentTime + builder.minInterval - 1
+		err := builder.Validate(parentTime, blockTime)
 		require.Error(t, err)
 		require.True(t, protocol.IsInvalidBlockTimestampError(err))
 	})
 	t.Run("parentTime + maxInterval - 1", func(t *testing.T) {
-		parentTime := time.Now().UTC()
-		blockTime := parentTime.Add(builder.maxInterval - time.Millisecond)
-		require.NoError(t, builder.Validate(uint64(parentTime.UnixMilli()), uint64(blockTime.UnixMilli())))
+		parentTime := uint64(time.Now().UnixMilli())
+		blockTime := parentTime + builder.maxInterval - 1
+		require.NoError(t, builder.Validate(parentTime, blockTime))
 	})
 	t.Run("parentTime + maxInterval", func(t *testing.T) {
-		parentTime := time.Now().UTC()
-		blockTime := parentTime.Add(builder.maxInterval)
-		require.NoError(t, builder.Validate(uint64(parentTime.UnixMilli()), uint64(blockTime.UnixMilli())))
+		parentTime := uint64(time.Now().UnixMilli())
+		blockTime := parentTime + builder.maxInterval
+		require.NoError(t, builder.Validate(parentTime, blockTime))
 	})
 	t.Run("parentTime + maxInterval + 1", func(t *testing.T) {
-		parentTime := time.Now().UTC()
-		blockTime := parentTime.Add(builder.maxInterval + time.Millisecond)
-		err := builder.Validate(uint64(parentTime.UnixMilli()), uint64(blockTime.UnixMilli()))
+		parentTime := uint64(time.Now().UnixMilli())
+		blockTime := parentTime + builder.maxInterval + 1
+		err := builder.Validate(parentTime, blockTime)
 		require.Error(t, err)
 		require.True(t, protocol.IsInvalidBlockTimestampError(err))
 	})
@@ -54,11 +54,11 @@ func TestBlockTimestamp_Validate(t *testing.T) {
 // TestBlockTimestamp_Build tests that builder correctly generates new block time
 func TestBlockTimestamp_Build(t *testing.T) {
 	t.Parallel()
-	minInterval := 100 * time.Millisecond
-	maxInterval := 10 * time.Second
-	deltas := []time.Duration{0, minInterval, maxInterval}
+	const minInterval uint64 = 100    // milliseconds
+	const maxInterval uint64 = 10_000 // milliseconds
+	deltas := []uint64{0, minInterval, maxInterval}
 
-	// this test tries to cover next scenarious in generic way:
+	// this test tries to cover next scenarios in generic way:
 	// now = parent - 1
 	// now = parent
 	// now = parent + 1
@@ -74,16 +74,16 @@ func TestBlockTimestamp_Build(t *testing.T) {
 			builder, err := NewBlockTimer(minInterval, maxInterval)
 			require.NoError(t, err)
 
-			parentTime := time.Now().UTC()
+			parentTime := uint64(time.Now().UnixMilli())
 
 			// now = parentTime + delta + {-1, 0, +1}
 			for i := -1; i <= 1; i++ {
 				builder.generator = func() uint64 {
-					return uint64(parentTime.Add(duration + time.Millisecond*time.Duration(i)).UnixMilli())
+					return parentTime + duration + uint64(i)
 				}
 
-				blockTime := builder.Build(uint64(parentTime.UnixMilli()))
-				require.NoError(t, builder.Validate(uint64(parentTime.UnixMilli()), blockTime))
+				blockTime := builder.Build(parentTime)
+				require.NoError(t, builder.Validate(parentTime, blockTime))
 			}
 		})
 	}

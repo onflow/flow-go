@@ -20,15 +20,16 @@ type timestampGenerator = func() uint64
 // if t < τ + minInterval, the proposer sets Timestamp := τ + minInterval
 // if τ + maxInterval < t, the proposer sets Timestamp := τ + maxInterval
 type BlockTimestamp struct {
-	minInterval time.Duration
-	maxInterval time.Duration
+	minInterval uint64
+	maxInterval uint64
 	generator   timestampGenerator
 }
 
 var DefaultBlockTimer = NewNoopBlockTimer()
 
 // NewBlockTimer creates new block timer with specific intervals and time.Now as generator
-func NewBlockTimer(minInterval, maxInterval time.Duration) (*BlockTimestamp, error) {
+// Intervals are measured in milliseconds
+func NewBlockTimer(minInterval, maxInterval uint64) (*BlockTimestamp, error) {
 	if minInterval >= maxInterval {
 		return nil, fmt.Errorf("invariant minInterval < maxInterval is not satisfied, %d >= %d", minInterval, maxInterval)
 	}
@@ -47,8 +48,8 @@ func NewBlockTimer(minInterval, maxInterval time.Duration) (*BlockTimestamp, err
 func (b BlockTimestamp) Build(parentTimestamp uint64) uint64 {
 	// calculate the timestamp and cutoffs
 	timestamp := b.generator()
-	from := parentTimestamp + uint64(b.minInterval.Milliseconds())
-	to := parentTimestamp + uint64(b.maxInterval.Milliseconds())
+	from := parentTimestamp + b.minInterval
+	to := parentTimestamp + b.maxInterval
 
 	// adjust timestamp if outside of cutoffs
 	if timestamp < from {
@@ -57,7 +58,6 @@ func (b BlockTimestamp) Build(parentTimestamp uint64) uint64 {
 	if timestamp > to {
 		timestamp = to
 	}
-
 	return timestamp
 }
 
@@ -68,8 +68,8 @@ func (b BlockTimestamp) Build(parentTimestamp uint64) uint64 {
 //   - model.ErrInvalidBlockTimestamp - timestamp is invalid
 //   - nil - success
 func (b BlockTimestamp) Validate(parentTimestamp, currentTimestamp uint64) error {
-	from := parentTimestamp + uint64(b.minInterval.Milliseconds())
-	to := parentTimestamp + uint64(b.maxInterval.Milliseconds())
+	from := parentTimestamp + b.minInterval
+	to := parentTimestamp + b.maxInterval
 	if currentTimestamp < from || currentTimestamp > to {
 		return protocol.NewInvalidBlockTimestamp("timestamp %v is not within interval [%v; %v]", currentTimestamp, from, to)
 	}
