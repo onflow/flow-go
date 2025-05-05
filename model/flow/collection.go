@@ -1,6 +1,10 @@
 package flow
 
-import "github.com/onflow/flow-go/model/fingerprint"
+import (
+	"github.com/fxamacker/cbor/v2"
+
+	"github.com/onflow/flow-go/model/fingerprint"
+)
 
 // Collection is set of transactions.
 type Collection struct {
@@ -81,6 +85,18 @@ func (lc LightCollection) UncachedID() Identifier {
 // or returns a cached version if the ID has ever been computed before.
 func (lc LightCollection) ID() Identifier {
 	return lc.cachedID.getID()
+}
+
+// UnmarshalCBOR populates the ID cache field (otherwise uses default CBOR unmarshaling behaviour).
+func (lc *LightCollection) UnmarshalCBOR(bytes []byte) error {
+	type alias LightCollection
+	lca := (*alias)(lc)
+	err := cbor.Unmarshal(bytes, &lca)
+	if err != nil {
+		return err
+	}
+	lc.cachedID = newIDCache(lc.UncachedID)
+	return nil
 }
 
 func (lc LightCollection) Checksum() Identifier {

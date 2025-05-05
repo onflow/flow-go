@@ -3,7 +3,9 @@ package flow_test
 import (
 	"testing"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/encoding/rlp"
 	"github.com/onflow/flow-go/model/fingerprint"
@@ -46,4 +48,19 @@ func BenchmarkLightCollectionID(b *testing.B) {
 			_ = col.UncachedID()
 		}
 	})
+}
+
+// TestLightCollectionCBOR tests that unmarshalled instances have a instantiated cache field.
+func TestLightCollectionCBOR(t *testing.T) {
+	col := unittest.CollectionFixture(2).Light()
+	colID := col.ID()
+	encoded, err := cbor.Marshal(col)
+	require.NoError(t, err)
+
+	var decoded flow.LightCollection
+	err = cbor.Unmarshal(encoded, &decoded)
+	require.NoError(t, err)
+
+	decodedID := decoded.ID()
+	assert.Equal(t, colID, decodedID)
 }
