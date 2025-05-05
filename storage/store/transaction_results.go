@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"strings"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -217,13 +216,31 @@ func (tr *TransactionResults) RemoveByBlockID(blockID flow.Identifier) error {
 
 // BatchRemoveByBlockID batch removes transaction results by block ID
 func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.ReaderBatchWriter) error {
-	storage.OnCommitSucceed(batch, func() {
-		keyPrefix := KeyFromBlockID(blockID)
+	// TODO: Remove records from tr.cache by prefix (blockID) and optimize removal.
+	//
+	// Currently, tr.cache can be out of sync with underlying database
+	// when transaction results are removed by this functions.
+	//
+	// Even though cache.RemoveFunc() is maybe fast enough for
+	// a 1000-item cache, using 10K-item cache size and pruning
+	// multiple blocks in one batch can slow down commit phase
+	// unless we optimize for that use case.
+	//
+	// To unblock PR onflow/flow-go#7324 which has several fixes,
+	// remove-by-prefix optimization will be tracked in separate issue/PR.
+	//
+	// Code fix (below) and test are commented out (not deleted) because
+	// we can use the code as a quick stop-gap fix if needed, and
+	// we can reuse the test even if a new (faster) approach is implemented.
+	/*
+		storage.OnCommitSucceed(batch, func() {
+			keyPrefix := KeyFromBlockID(blockID)
 
-		tr.cache.RemoveFunc(func(key string) bool {
-			return strings.HasPrefix(key, keyPrefix)
+			tr.cache.RemoveFunc(func(key string) bool {
+				return strings.HasPrefix(key, keyPrefix)
+			})
 		})
-	})
+	*/
 
 	return operation.BatchRemoveTransactionResultsByBlockID(blockID, batch)
 }
