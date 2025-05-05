@@ -4,11 +4,11 @@ import (
 	"math/rand"
 	"testing"
 
-	clone "github.com/huandu/go-clone/generic" //nolint:goimports
+	clone "github.com/huandu/go-clone/generic"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
 )
 
 // TestQuorumCertificateID_Malleability confirms that the QuorumCertificate struct, which implements

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	clone "github.com/huandu/go-clone/generic" //nolint:goimports
+	clone "github.com/huandu/go-clone/generic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
