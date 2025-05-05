@@ -21,6 +21,7 @@ func RunWithStorages(t *testing.T, fn func(*testing.T, storage.Reader, WithWrite
 	RunWithPebble(t, fn)
 }
 
+// TODO: add utilities for instantiating lock manager in these?
 func RunWithDB(t *testing.T, fn func(*testing.T, storage.DB)) {
 	t.Run("BadgerStorage", func(t *testing.T) {
 		unittest.RunWithBadgerDB(t, func(db *badger.DB) {

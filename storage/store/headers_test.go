@@ -3,6 +3,8 @@ package store_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/storage/store"
@@ -16,18 +18,24 @@ import (
 
 func TestHeaderStoreRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		mgr := lockctx.NewManager(storage.Locks(), storage.Policy())
+		lctx := mgr.NewContext()
+		err := lctx.AcquireLock(storage.LockFinalizeBlock)
+		require.NoError(t, err)
+		defer lctx.Release()
+
 		metrics := metrics.NewNoopCollector()
 		headers := store.NewHeaders(metrics, db)
 
 		block := unittest.BlockFixture()
 
 		// store header
-		err := headers.Store(block.Header)
+		err = headers.Store(block.Header)
 		require.NoError(t, err)
 
 		// index the header
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexBlockHeight(rw, block.Header.Height, block.ID())
+			return operation.IndexBlockHeight(lctx, rw, block.Header.Height, block.ID())
 		})
 		require.NoError(t, err)
 

@@ -24,12 +24,6 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 		return operation.InsertHeader(rw.Writer(), blockID, header)
 	}
 
-	// CAUTION: should only be used to index FINALIZED blocks by their
-	// respective height
-	storeHeight := func(rw storage.ReaderBatchWriter, height uint64, id flow.Identifier) error {
-		return operation.IndexBlockHeight(rw, height, id)
-	}
-
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.Header, error) {
 		var header flow.Header
 		err := operation.RetrieveHeader(r, blockID, &header)
@@ -51,7 +45,6 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 
 		heightCache: newCache(collector, metrics.ResourceFinalizedHeight,
 			withLimit[uint64, flow.Identifier](4*flow.DefaultTransactionExpiry),
-			withStore(storeHeight),
 			withRetrieve(retrieveHeight)),
 	}
 
