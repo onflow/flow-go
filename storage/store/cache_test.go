@@ -175,44 +175,63 @@ func TestCache_ExceptionNotCached(t *testing.T) {
 }
 
 func BenchmarkCacheRemoveFunc(b *testing.B) {
-	size := 1000
-
-	cache := newCache(
-		metrics.NewNoopCollector(),
-		metrics.ResourceTransactionResults,
-		withLimit[string, struct{}](uint(size)),
-		withStore(noopStore[string, struct{}]),
-		withRetrieve(noRetrieve[string, struct{}]),
-	)
-
-	count := 10_000
-	blockIDs := make([]flow.Identifier, count)
-	for i := range len(blockIDs) {
-		blockIDs[i] = unittest.IdentifierFixture()
+	benchmarks := []struct {
+		name      string
+		cacheSize int
+	}{
+		{name: "cache limit 1,000", cacheSize: 1_000},
+		{name: "cache limit 5,000", cacheSize: 5_000},
+		{name: "cache limit 6,000", cacheSize: 6_000},
+		{name: "cache limit 7,000", cacheSize: 7_000},
+		{name: "cache limit 8,000", cacheSize: 8_000},
+		{name: "cache limit 9,000", cacheSize: 9_000},
+		{name: "cache limit 9,500", cacheSize: 9_500},
+		{name: "cache limit 10,000", cacheSize: 10_000},
 	}
 
-	txCountPerBlock := 5
-	txIDs := make([]flow.Identifier, count*txCountPerBlock)
-	for i := range len(txIDs) {
-		txIDs[i] = unittest.IdentifierFixture()
-	}
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
 
-	for i, blockID := range blockIDs {
-		for _, txID := range txIDs[i*txCountPerBlock] {
-			key := fmt.Sprintf("%x%x", blockID, txID)
-			cache.Insert(key, struct{}{})
-		}
-	}
+			cache := newCache(
+				metrics.NewNoopCollector(),
+				metrics.ResourceTransactionResults,
+				withLimit[string, struct{}](uint(bm.cacheSize)),
+				withStore(noopStore[string, struct{}]),
+				withRetrieve(noRetrieve[string, struct{}]),
+			)
 
-	i := 0
-	for range b.N {
-		if i >= len(blockIDs) {
-			i = 0
-		}
-		keyPrefix := KeyFromBlockID(blockIDs[i])
-		cache.RemoveFunc(func(key string) bool {
-			return strings.HasPrefix(key, keyPrefix)
+			count := bm.cacheSize
+			blockIDs := make([]flow.Identifier, count)
+			for i := range len(blockIDs) {
+				blockIDs[i] = unittest.IdentifierFixture()
+			}
+
+			const txCountPerBlock = 5
+			txIDs := make([]flow.Identifier, count*txCountPerBlock)
+			for i := range len(txIDs) {
+				txIDs[i] = unittest.IdentifierFixture()
+			}
+
+			for i, blockID := range blockIDs {
+				for _, txID := range txIDs[i*txCountPerBlock] {
+					key := fmt.Sprintf("%x%x", blockID, txID)
+					cache.Insert(key, struct{}{})
+				}
+			}
+
+			b.ResetTimer()
+
+			i := 0
+			for range b.N {
+				if i >= len(blockIDs) {
+					i = 0
+				}
+				keyPrefix := KeyFromBlockID(blockIDs[i])
+				cache.RemoveFunc(func(key string) bool {
+					return strings.HasPrefix(key, keyPrefix)
+				})
+				i++
+			}
 		})
-		i++
 	}
 }
