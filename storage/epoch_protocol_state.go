@@ -11,8 +11,7 @@ type EpochProtocolStateEntries interface {
 	// which persists the given epoch sub-state as part of a DB tx. Per convention, the identities in
 	// the Protocol State must be in canonical order for the current and next epoch (if present),
 	// otherwise an exception is returned.
-	// Expected errors of the returned anonymous function:
-	//   - storage.ErrAlreadyExists if an epoch sub-state with the given id is already stored
+	// No errors are expected during normal operation.
 	BatchStore(rw ReaderBatchWriter, epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.MinEpochStateEntry) error
 
 	// BatchIndex returns an anonymous function that is intended to be executed as part of a database transaction.
@@ -27,8 +26,7 @@ type EpochProtocolStateEntries interface {
 	//   - CAUTION: The protocol state requires confirmation by a QC and will only become active at the child block,
 	//     _after_ validating the QC.
 	//
-	// Expected errors during normal operations:
-	//   - storage.ErrAlreadyExists if a epoch sub-state for the given blockID has already been indexed
+	// No errors are expected during normal operation.
 	BatchIndex(rw ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateID flow.Identifier) error
 
 	// ByID returns the flow.RichEpochStateEntry by its ID.

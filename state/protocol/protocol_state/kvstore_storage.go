@@ -14,8 +14,7 @@ import (
 // supported by the current software version. There might be serialized snapshots with legacy versions
 // in the database that are not supported anymore by this software version.
 type ProtocolKVStore interface {
-	// BatchStore returns an anonymous function (intended to be executed as part of a database transaction),
-	// which persists the given KV-store snapshot as part of a DB tx. Per convention, all implementations
+	// BatchStore writes the given KV-store snapshot to the input write batch. Per convention, all implementations
 	// of `protocol.KVStoreReader` should be able to successfully encode their state into a data blob.
 	// If the encoding fails, the anonymous function returns an error upon call.
 	//
@@ -23,10 +22,9 @@ type ProtocolKVStore interface {
 	//   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
 	BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, kvStore protocol.KVStoreReader) error
 
-	// BatchIndex returns an anonymous function intended to be executed as part of a database transaction.
+	// BatchIndex writes the blockID->stateID index to the input write batch.
 	// In a nutshell, we want to maintain a map from `blockID` to `stateID`, where `blockID` references the
 	// block that _proposes_ the updated key-value store.
-	// Upon call, the anonymous function persists the specific map entry in the node's database.
 	// Protocol convention:
 	//   - Consider block B, whose ingestion might potentially lead to an updated KV store. For example,
 	//     the KV store changes if we seal some execution results emitting specific service events.

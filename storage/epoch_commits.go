@@ -7,6 +7,7 @@ import (
 type EpochCommits interface {
 
 	// BatchStore allows us to store a new epoch commit in a DB batch update while updating the cache.
+	// No errors are expected during normal operation.
 	BatchStore(rw ReaderBatchWriter, commit *flow.EpochCommit) error
 
 	// ByID will return the EpochCommit event by its ID.

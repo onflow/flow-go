@@ -38,10 +38,6 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		rw := storagemock.NewReaderBatchWriter(t)
 		llStorage.On("BatchStore", rw, kvStateID, versionedSnapshot).Return(nil).Once()
 
-		// Calling `BatchStore` should return the output of the wrapped low-level storage, which is a deferred database
-		// update. Conceptually, it is possible that `ProtocolKVStore` wraps the deferred database operation in faulty
-		// code, such that it cannot be executed. Therefore, we execute the top-level deferred database update below
-		// and verify that the deferred database operation returned by the lower-level is actually reached.
 		require.NoError(t, store.BatchStore(rw, kvStateID, kvState))
 	})
 
@@ -71,10 +67,6 @@ func TestProtocolKVStore_IndexTx(t *testing.T) {
 		rw := storagemock.NewReaderBatchWriter(t)
 		llStorage.On("BatchIndex", rw, blockID, stateID).Return(nil).Once()
 
-		// Calling `BatchIndex` should return the output of the wrapped low-level storage, which is a deferred database
-		// update. Conceptually, it is possible that `ProtocolKVStore` wraps the deferred database operation in faulty
-		// code, such that it cannot be executed. Therefore, we execute the top-level deferred database update below
-		// and verify that the deferred database operation returned by the lower-level is actually reached.
 		require.NoError(t, store.BatchIndex(rw, blockID, stateID))
 	})
 

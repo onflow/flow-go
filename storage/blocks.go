@@ -13,10 +13,15 @@ type Blocks interface {
 
 	// StoreTx allows us to store a new block, including its payload & header, as part of a DB transaction, while
 	// still going through the caching layer.
-	// deprecating
+	// Deprecated: to be removed alongside Badger DB
 	StoreTx(block *flow.Block) func(*transaction.Tx) error
 
 	BatchStore(rw ReaderBatchWriter, block *flow.Block) error
+
+	// BatchStoreWithStoringResults stores multiple blocks as a batch.
+	// The additional storingResults parameter helps verify that each receipt in the block
+	// refers to a known result. This check is essential during bootstrapping
+	// when multiple blocks are stored together in a batch.
 	BatchStoreWithStoringResults(rw ReaderBatchWriter, block *flow.Block, storingResults map[flow.Identifier]*flow.ExecutionResult) error
 
 	// ByID returns the block with the given hash. It is available for

@@ -20,7 +20,6 @@ var _ protocol.Params = (*Params)(nil)
 // InstanceParams implements the interface protocol.InstanceParams. All functions
 // are served on demand directly from the database, _without_ any caching.
 type InstanceParams struct {
-	db storage.DB
 	// finalizedRoot marks the cutoff of the history this node knows about. It is the block at the tip
 	// of the root snapshot used to bootstrap this node - all newer blocks are synced from the network.
 	finalizedRoot *flow.Header
@@ -35,9 +34,7 @@ var _ protocol.InstanceParams = (*InstanceParams)(nil)
 // ReadInstanceParams reads the instance parameters from the database and returns them as in-memory representation.
 // No errors are expected during normal operation.
 func ReadInstanceParams(db storage.DB, headers storage.Headers, seals storage.Seals) (*InstanceParams, error) {
-	params := &InstanceParams{
-		db: db,
-	}
+	params := &InstanceParams{}
 
 	// in next section we will read data from the database and cache them,
 	// as they are immutable for the runtime of the node.

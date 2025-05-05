@@ -30,6 +30,7 @@ func NewProtocolKVStore(protocolStateSnapshots storage.ProtocolKVStore) *Protoco
 	}
 }
 
+// BatchStore stores the protocol state key value data with the given stateID.into the database
 func (p *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, kvStore protocol.KVStoreReader) error {
 	version, data, err := kvStore.VersionedEncode()
 	if err != nil {

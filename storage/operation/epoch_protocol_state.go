@@ -7,7 +7,6 @@ import (
 
 // InsertEpochProtocolState inserts an epoch protocol state entry by ID.
 // Error returns:
-//   - storage.ErrAlreadyExists if the key already exists in the database.
 //   - generic error in case of unexpected failure from the database layer or encoding failure.
 func InsertEpochProtocolState(w storage.Writer, entryID flow.Identifier, entry *flow.MinEpochStateEntry) error {
 	return UpsertByKey(w, MakePrefix(codeEpochProtocolState, entryID), entry)
@@ -23,7 +22,6 @@ func RetrieveEpochProtocolState(r storage.Reader, entryID flow.Identifier, entry
 
 // IndexEpochProtocolState indexes an epoch protocol state entry by block ID.
 // Error returns:
-//   - storage.ErrAlreadyExists if the key already exists in the database.
 //   - generic error in case of unexpected failure from the database layer or encoding failure.
 func IndexEpochProtocolState(w storage.Writer, blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) error {
 	return UpsertByKey(w, MakePrefix(codeEpochProtocolStateByBlockID, blockID), epochProtocolStateEntryID)

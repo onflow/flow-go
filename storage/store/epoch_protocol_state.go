@@ -115,8 +115,7 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 // which persists the given epoch protocol state entry as part of a DB tx. Per convention, the identities in
 // the flow.MinEpochStateEntry must be in canonical order for the current and next epoch (if present),
 // otherwise an exception is returned.
-// Expected errors of the returned anonymous function:
-//   - storage.ErrAlreadyExists if a state entry with the given id is already stored
+// No errors are expected during normal operation.
 func (s *EpochProtocolStateEntries) BatchStore(
 	rw storage.ReaderBatchWriter,
 	epochProtocolStateEntryID flow.Identifier,
@@ -146,8 +145,7 @@ func (s *EpochProtocolStateEntries) BatchStore(
 //   - CAUTION: The protocol state requires confirmation by a QC and will only become active at the child block,
 //     _after_ validating the QC.
 //
-// Expected errors during normal operations:
-//   - storage.ErrAlreadyExists if a state entry for the given blockID has already been indexed
+// No errors are expected during normal operation.
 func (s *EpochProtocolStateEntries) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) error {
 	return s.byBlockIdCache.PutTx(rw, blockID, epochProtocolStateEntryID)
 }

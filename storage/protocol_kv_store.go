@@ -12,7 +12,7 @@ import (
 // TODO maybe rename to `ProtocolStateSnapshots` (?) because at this low level, we are not exposing the
 // KV-store, it is just an encoded data blob
 type ProtocolKVStore interface {
-	// BatchStore returns an anonymous function (intended to be executed as part of a badger transaction),
+	// BatchStore stores the protocol state key value data with the given stateID.into the database
 	BatchStore(rw ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error
 
 	// BatchIndex returns an anonymous function intended to be executed as part of a database transaction.

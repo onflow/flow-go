@@ -39,6 +39,7 @@ func NewEpochSetups(collector module.CacheMetrics, db storage.DB) *EpochSetups {
 	return es
 }
 
+// No errors are expected during normal operation.
 func (es *EpochSetups) BatchStore(rw storage.ReaderBatchWriter, setup *flow.EpochSetup) error {
 	return es.cache.PutTx(rw, setup.ID(), setup)
 }

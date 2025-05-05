@@ -7,6 +7,7 @@ import (
 type EpochSetups interface {
 
 	// BatchStore allows us to store a new epoch setup in a DB batch update while going through the cache.
+	// No errors are expected during normal operation.
 	BatchStore(rw ReaderBatchWriter, setup *flow.EpochSetup) error
 
 	// ByID will return the EpochSetup event by its ID.
