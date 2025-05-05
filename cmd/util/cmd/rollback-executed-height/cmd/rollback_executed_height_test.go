@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/testutil"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -47,7 +48,8 @@ func TestReExecuteBlock(t *testing.T) {
 			events := store.NewEvents(metrics, db)
 			serviceEvents := store.NewServiceEvents(metrics, db)
 
-			err = headers.Store(genesis)
+			// By convention, root block has no proposer signature - implementation has to handle this edge case
+			err = headers.Store(&flow.ProposalHeader{Header: genesis, ProposerSigData: nil})
 			require.NoError(t, err)
 
 			getLatestFinalized := func() (uint64, error) {
@@ -77,7 +79,7 @@ func TestReExecuteBlock(t *testing.T) {
 			computationResult := testutil.ComputationResultFixture(t)
 			header := computationResult.Block.Header
 
-			err = headers.Store(header)
+			err = headers.Store(unittest.ProposalFromHeader(header))
 			require.NoError(t, err)
 
 			// save execution results
@@ -184,7 +186,8 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			collections := bstorage.NewCollections(bdb, transactions)
 			chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
 
-			err = headers.Store(genesis)
+			// By convention, root block has no proposer signature - implementation has to handle this edge case
+			err = headers.Store(&flow.ProposalHeader{Header: genesis, ProposerSigData: nil})
 			require.NoError(t, err)
 
 			getLatestFinalized := func() (uint64, error) {
@@ -217,7 +220,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 				&unittest.GenesisStateCommitment)
 			header := executableBlock.Block.Header
 
-			err = headers.Store(header)
+			err = headers.Store(unittest.ProposalFromHeader(header))
 			require.NoError(t, err)
 
 			computationResult := testutil.ComputationResultFixture(t)

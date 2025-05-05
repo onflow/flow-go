@@ -233,9 +233,9 @@ func FullBlockFixture() flow.Block {
 		ExecutionResultFixture(),
 		ExecutionResultFixture(),
 	}
-	payload.Receipts = []*flow.ExecutionReceiptMeta{
-		ExecutionReceiptFixture(WithResult(payload.Results[0])).Meta(),
-		ExecutionReceiptFixture(WithResult(payload.Results[1])).Meta(),
+	payload.Receipts = []*flow.ExecutionReceiptStub{
+		ExecutionReceiptFixture(WithResult(payload.Results[0])).Stub(),
+		ExecutionReceiptFixture(WithResult(payload.Results[1])).Stub(),
 	}
 	payload.ProtocolStateID = IdentifierFixture()
 
@@ -250,24 +250,46 @@ func FullBlockFixture() flow.Block {
 
 func BlockFixtures(number int) []*flow.Block {
 	blocks := make([]*flow.Block, 0, number)
-	for ; number > 0; number-- {
+	for range number {
 		block := BlockFixture()
 		blocks = append(blocks, &block)
 	}
 	return blocks
 }
 
-func ProposalFixture() *messages.BlockProposal {
+func ProposalFixtures(number int) []*flow.BlockProposal {
+	proposals := make([]*flow.BlockProposal, 0, number)
+	for range number {
+		proposal := ProposalFixture()
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
+func ProposalFixture() *flow.BlockProposal {
 	block := BlockFixture()
 	return ProposalFromBlock(&block)
 }
 
-func ProposalFromBlock(block *flow.Block) *messages.BlockProposal {
-	return messages.NewBlockProposal(block)
+func ProposalFromHeader(header *flow.Header) *flow.ProposalHeader {
+	return &flow.ProposalHeader{
+		Header:          header,
+		ProposerSigData: SignatureFixture(),
+	}
 }
 
-func ClusterProposalFromBlock(block *cluster.Block) *messages.ClusterBlockProposal {
-	return messages.NewClusterBlockProposal(block)
+func ProposalFromBlock(block *flow.Block) *flow.BlockProposal {
+	return &flow.BlockProposal{
+		Block:           block,
+		ProposerSigData: SignatureFixture(),
+	}
+}
+
+func ClusterProposalFromBlock(block *cluster.Block) *cluster.BlockProposal {
+	return &cluster.BlockProposal{
+		Block:           block,
+		ProposerSigData: SignatureFixture(),
+	}
 }
 
 func BlockchainFixture(length int) []*flow.Block {
@@ -319,7 +341,7 @@ func WithAllTheFixins(payload *flow.Payload) {
 			WithResult(ExecutionResultFixture(WithServiceEvents(3))),
 			WithSpocks(SignaturesFixture(3)),
 		)
-		payload.Receipts = flow.ExecutionReceiptMetaList{receipt.Meta()}
+		payload.Receipts = flow.ExecutionReceiptStubList{receipt.Stub()}
 		payload.Results = flow.ExecutionResultList{&receipt.ExecutionResult}
 	}
 	payload.ProtocolStateID = IdentifierFixture()
@@ -340,7 +362,7 @@ func WithGuarantees(guarantees ...*flow.CollectionGuarantee) func(*flow.Payload)
 func WithReceipts(receipts ...*flow.ExecutionReceipt) func(*flow.Payload) {
 	return func(payload *flow.Payload) {
 		for _, receipt := range receipts {
-			payload.Receipts = append(payload.Receipts, receipt.Meta())
+			payload.Receipts = append(payload.Receipts, receipt.Stub())
 			payload.Results = append(payload.Results, &receipt.ExecutionResult)
 		}
 	}
@@ -356,7 +378,7 @@ func WithProtocolStateID(stateID flow.Identifier) func(payload *flow.Payload) {
 func WithReceiptsAndNoResults(receipts ...*flow.ExecutionReceipt) func(*flow.Payload) {
 	return func(payload *flow.Payload) {
 		for _, receipt := range receipts {
-			payload.Receipts = append(payload.Receipts, receipt.Meta())
+			payload.Receipts = append(payload.Receipts, receipt.Stub())
 		}
 	}
 }
@@ -530,7 +552,6 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 		ParentVoterIndices: SignerIndicesFixture(4),
 		ParentVoterSigData: QCSigDataFixture(),
 		ProposerID:         IdentifierFixture(),
-		ProposerSigData:    SignatureFixture(),
 		LastViewTC:         lastViewTC,
 	}
 }
@@ -566,7 +587,6 @@ func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *fl
 		ParentVoterIndices: SignerIndicesFixture(4),
 		ParentVoterSigData: QCSigDataWithSoRFixture(source),
 		ProposerID:         IdentifierFixture(),
-		ProposerSigData:    SignatureFixture(),
 		LastViewTC:         lastViewTC,
 	}
 }
@@ -832,9 +852,11 @@ func WithSpocks(spocks []crypto.Signature) func(*flow.ExecutionReceipt) {
 
 func ExecutionReceiptFixture(opts ...func(*flow.ExecutionReceipt)) *flow.ExecutionReceipt {
 	receipt := &flow.ExecutionReceipt{
-		ExecutorID:        IdentifierFixture(),
-		ExecutionResult:   *ExecutionResultFixture(),
-		Spocks:            nil,
+		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
+			ExecutorID:      IdentifierFixture(),
+			ExecutionResult: *ExecutionResultFixture(),
+			Spocks:          nil,
+		},
 		ExecutorSignature: SignatureFixture(),
 	}
 
@@ -2015,6 +2037,23 @@ func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
 	return qc
 }
 
+func CertifiedByChild(block *flow.Block, child *flow.Block) *flow.CertifiedBlock {
+	return &flow.CertifiedBlock{
+		Proposal:     &flow.BlockProposal{Block: block, ProposerSigData: SignatureFixture()},
+		CertifyingQC: child.Header.QuorumCertificate(),
+	}
+}
+
+func NewCertifiedBlock(block *flow.Block) *flow.CertifiedBlock {
+	return &flow.CertifiedBlock{
+		Proposal: &flow.BlockProposal{
+			Block:           block,
+			ProposerSigData: SignatureFixture(),
+		},
+		CertifyingQC: CertifyBlock(block.Header),
+	}
+}
+
 func QuorumCertificatesFixtures(
 	n uint,
 	opts ...func(*flow.QuorumCertificate),
@@ -2179,9 +2218,9 @@ func EpochRecoverFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochRecove
 
 func IndexFixture() *flow.Index {
 	return &flow.Index{
-		CollectionIDs: IdentifierListFixture(5),
-		SealIDs:       IdentifierListFixture(5),
-		ReceiptIDs:    IdentifierListFixture(5),
+		GuaranteeIDs: IdentifierListFixture(5),
+		SealIDs:      IdentifierListFixture(5),
+		ReceiptIDs:   IdentifierListFixture(5),
 	}
 }
 
@@ -2389,6 +2428,15 @@ func ChainFixtureFrom(count int, parent *flow.Header) []*flow.Block {
 	}
 
 	return blocks
+}
+
+// ProposalChainFixtureFrom creates a chain of blocks and wraps each one in a BlockProposal.
+func ProposalChainFixtureFrom(count int, parent *flow.Header) []*flow.BlockProposal {
+	proposals := make([]*flow.BlockProposal, 0, count)
+	for _, block := range ChainFixtureFrom(count, parent) {
+		proposals = append(proposals, ProposalFromBlock(block))
+	}
+	return proposals
 }
 
 func ReceiptChainFor(

@@ -8,21 +8,22 @@ import (
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/unittest"
-
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestGuaranteeStoreRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := badgerstorage.NewGuarantees(metrics, db, 1000)
+		store := badgerstorage.NewGuarantees(metrics, db, 1000, 1000)
 
 		// abiturary guarantees
 		expected := unittest.CollectionGuaranteeFixture()
 
 		// retrieve guarantee without stored
-		_, err := store.ByCollectionID(expected.ID())
+		_, err := store.ByCollectionID(expected.CollectionID)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+		_, err = store.ByID(expected.ID())
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// store guarantee
@@ -30,7 +31,11 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		// retreive by coll idx
-		actual, err := store.ByCollectionID(expected.ID())
+		actual, err := store.ByID(expected.ID())
+		require.NoError(t, err)
+		require.Equal(t, expected, actual)
+
+		actual, err = store.ByCollectionID(expected.CollectionID)
 		require.NoError(t, err)
 		require.Equal(t, expected, actual)
 	})

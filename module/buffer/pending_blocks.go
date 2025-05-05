@@ -16,43 +16,49 @@ func NewPendingBlocks() *PendingBlocks {
 	return b
 }
 
-func (b *PendingBlocks) Add(block flow.Slashable[*flow.Block]) bool {
-	return b.backend.add(flow.Slashable[*flow.Header]{
+func (b *PendingBlocks) Add(block flow.Slashable[*flow.BlockProposal]) bool {
+	return b.backend.add(flow.Slashable[*flow.ProposalHeader]{
 		OriginID: block.OriginID,
-		Message:  block.Message.Header,
-	}, block.Message.Payload)
+		Message:  block.Message.HeaderProposal(),
+	}, block.Message.Block.Payload)
 }
 
-func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*flow.Block], bool) {
+func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*flow.BlockProposal], bool) {
 	item, ok := b.backend.byID(blockID)
 	if !ok {
-		return flow.Slashable[*flow.Block]{}, false
+		return flow.Slashable[*flow.BlockProposal]{}, false
 	}
 
-	block := flow.Slashable[*flow.Block]{
+	block := flow.Slashable[*flow.BlockProposal]{
 		OriginID: item.header.OriginID,
-		Message: &flow.Block{
-			Header:  item.header.Message,
-			Payload: item.payload.(*flow.Payload),
+		Message: &flow.BlockProposal{
+			Block: &flow.Block{
+				Header:  item.header.Message.Header,
+				Payload: item.payload.(*flow.Payload),
+			},
+			ProposerSigData: item.header.Message.ProposerSigData,
 		},
 	}
 
 	return block, true
 }
 
-func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.Block], bool) {
+func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.BlockProposal], bool) {
 	items, ok := b.backend.byParentID(parentID)
 	if !ok {
 		return nil, false
 	}
 
-	blocks := make([]flow.Slashable[*flow.Block], 0, len(items))
+	blocks := make([]flow.Slashable[*flow.BlockProposal], 0, len(items))
 	for _, item := range items {
-		block := flow.Slashable[*flow.Block]{
+		block := flow.Slashable[*flow.BlockProposal]{
 			OriginID: item.header.OriginID,
-			Message: &flow.Block{
-				Header:  item.header.Message,
-				Payload: item.payload.(*flow.Payload),
+			Message: &flow.BlockProposal{
+				Block: &flow.Block{
+					Header:  item.header.Message.Header,
+					Payload: item.payload.(*flow.Payload),
+				},
+				ProposerSigData: item.header.Message.ProposerSigData,
 			},
 		}
 		blocks = append(blocks, block)

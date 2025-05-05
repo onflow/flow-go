@@ -376,14 +376,14 @@ func (t *TransactionsLocalDataProvider) LookupCollectionIDInBlock(
 	txID flow.Identifier,
 ) (flow.Identifier, error) {
 	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := t.collections.LightByID(guarantee.ID())
+		collection, err := t.collections.LightByID(guarantee.CollectionID)
 		if err != nil {
-			return flow.ZeroID, fmt.Errorf("failed to get collection %s in indexed block: %w", guarantee.ID(), err)
+			return flow.ZeroID, fmt.Errorf("failed to get collection %s in indexed block: %w", guarantee.CollectionID, err)
 		}
 
 		for _, collectionTxID := range collection.Transactions {
 			if collectionTxID == txID {
-				return guarantee.ID(), nil
+				return guarantee.CollectionID, nil
 			}
 		}
 	}
@@ -395,13 +395,13 @@ func (t *TransactionsLocalDataProvider) LookupCollectionIDInBlock(
 func (t *TransactionsLocalDataProvider) buildTxIDToCollectionIDMapping(block *flow.Block) (map[flow.Identifier]flow.Identifier, error) {
 	txToCollectionID := make(map[flow.Identifier]flow.Identifier)
 	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := t.collections.LightByID(guarantee.ID())
+		collection, err := t.collections.LightByID(guarantee.CollectionID)
 		if err != nil {
 			// if the tx result is in storage, the collection must be too.
-			return nil, fmt.Errorf("failed to get collection %s in indexed block: %w", guarantee.ID(), err)
+			return nil, fmt.Errorf("failed to get collection %s in indexed block: %w", guarantee.CollectionID, err)
 		}
 		for _, txID := range collection.Transactions {
-			txToCollectionID[txID] = guarantee.ID()
+			txToCollectionID[txID] = guarantee.CollectionID
 		}
 	}
 

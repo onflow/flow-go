@@ -377,7 +377,8 @@ func createNode(
 	tracer := trace.NewNoopTracer()
 
 	headersDB := storage.NewHeaders(metricsCollector, db)
-	guaranteesDB := storage.NewGuarantees(metricsCollector, db, storage.DefaultCacheSize)
+	guaranteesDB := storage.NewGuarantees(metricsCollector, db,
+		storage.DefaultCacheSize, storage.DefaultCacheSize)
 	sealsDB := storage.NewSeals(metricsCollector, db)
 	indexDB := storage.NewIndex(metricsCollector, db)
 	resultsDB := storage.NewExecutionResults(metricsCollector, db)
@@ -389,7 +390,7 @@ func createNode(
 	commitsDB := storage.NewEpochCommits(metricsCollector, db)
 	protocolStateDB := storage.NewEpochProtocolStateEntries(metricsCollector, setupsDB, commitsDB, db,
 		storage.DefaultEpochProtocolStateCacheSize, storage.DefaultProtocolStateIndexCacheSize)
-	protocokKVStoreDB := storage.NewProtocolKVStore(metricsCollector, db,
+	protocolKVStoreDB := storage.NewProtocolKVStore(metricsCollector, db,
 		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeaconDB := store.NewVersionBeacons(badgerimpl.ToDB(db))
 	protocolStateEvents := events.NewDistributor()
@@ -412,7 +413,7 @@ func createNode(
 		setupsDB,
 		commitsDB,
 		protocolStateDB,
-		protocokKVStoreDB,
+		protocolKVStoreDB,
 		versionBeaconDB,
 		rootSnapshot,
 	)
@@ -476,7 +477,7 @@ func createNode(
 	mutableProtocolState := protocol_state.NewMutableProtocolState(
 		log,
 		protocolStateDB,
-		protocokKVStoreDB,
+		protocolKVStoreDB,
 		state.Params(),
 		headersDB,
 		resultsDB,
@@ -626,7 +627,7 @@ func createNode(
 		metricsCollector,
 		build,
 		rootHeader,
-		[]*flow.Header{},
+		[]*flow.ProposalHeader{},
 		hotstuffModules,
 		consensus.WithMinTimeout(hotstuffTimeout),
 		func(cfg *consensus.ParticipantConfig) {

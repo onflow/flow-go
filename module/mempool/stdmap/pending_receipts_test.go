@@ -54,7 +54,7 @@ func TestPendingReceipts(t *testing.T) {
 		rs[0] = parent
 		for i := 1; i < n; i++ {
 			rs[i] = unittest.ExecutionReceiptFixture(func(receipt *flow.ExecutionReceipt) {
-				receipt.ExecutionResult.PreviousResultID = parent.ID()
+				receipt.ExecutionResult.PreviousResultID = parent.ExecutionResult.ID()
 				parent = receipt
 			})
 		}

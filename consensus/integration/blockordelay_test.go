@@ -26,7 +26,7 @@ func blockNodesFirstMessages(n uint64, denyList ...*Node) BlockOrDelayFunc {
 	return func(channel channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		// filter only consensus messages
 		switch event.(type) {
-		case *messages.BlockProposal:
+		case *messages.UntrustedProposal:
 		case *messages.BlockVote:
 		case *messages.BlockResponse:
 		case *messages.TimeoutObject:

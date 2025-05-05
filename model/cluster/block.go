@@ -31,6 +31,12 @@ type Block struct {
 	Payload *Payload
 }
 
+// BlockProposal represents a signed proposed block in collection node cluster consensus.
+type BlockProposal struct {
+	Block           *Block
+	ProposerSigData []byte
+}
+
 // ID returns the ID of the underlying block header.
 func (b Block) ID() flow.Identifier {
 	return b.Header.ID()

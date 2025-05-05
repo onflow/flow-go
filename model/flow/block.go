@@ -74,12 +74,32 @@ func (s BlockStatus) String() string {
 	return [...]string{"BLOCK_UNKNOWN", "BLOCK_FINALIZED", "BLOCK_SEALED"}[s]
 }
 
-// CertifiedBlock holds a certified block, which is a block and a QC that is pointing to
-// the block. A QC is the aggregated form of votes from a supermajority of HotStuff and
-// therefore proves validity of the block. A certified block satisfies:
+// BlockProposal is a signed proposal that includes the block payload, in addition to the required header and signature.
+type BlockProposal struct {
+	Block           *Block
+	ProposerSigData []byte
+}
+
+func (b *BlockProposal) HeaderProposal() *ProposalHeader {
+	return &ProposalHeader{Header: b.Block.Header, ProposerSigData: b.ProposerSigData}
+}
+
+// CertifiedBlock holds a certified block, which is a block and a Quorum Certificate [QC] pointing
+// to the block. A QC is the aggregated form of votes from a supermajority of HotStuff and therefore
+// proves validity of the block. A certified block satisfies:
 // Block.View == QC.View and Block.BlockID == QC.BlockID
+//
+// Conceptually, blocks must always be signed by the proposer. Once a block is certified, the
+// proposer's signature is included in the QC and does not need to be provided individually anymore.
+// Therefore, from the protocol perspective, the canonical data structures are either a block proposal
+// (including the proposer's signature) or a certified block (including a QC for the block).
+// Though, for simplicity, we just extend the BlockProposal structure to represent a certified block,
+// including proof that the proposer has signed their block twice. Thereby it is easy to convert
+// a [CertifiedBlock] into a [BlockProposal], which otherwise would not be possible because the QC only
+// contains an aggregated signature (including the proposer's signature), which cannot be separated
+// into individual signatures.
 type CertifiedBlock struct {
-	Block        *Block
+	Proposal     *BlockProposal
 	CertifyingQC *QuorumCertificate
 }
 
@@ -87,14 +107,14 @@ type CertifiedBlock struct {
 // requirements and errors otherwise:
 //
 //	Block.View == QC.View and Block.BlockID == QC.BlockID
-func NewCertifiedBlock(block *Block, qc *QuorumCertificate) (CertifiedBlock, error) {
-	if block.Header.View != qc.View {
-		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", block.Header.View, qc.View)
+func NewCertifiedBlock(proposal *BlockProposal, qc *QuorumCertificate) (CertifiedBlock, error) {
+	if proposal.Block.Header.View != qc.View {
+		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", proposal.Block.Header.View, qc.View)
 	}
-	if block.ID() != qc.BlockID {
-		return CertifiedBlock{}, fmt.Errorf("block's ID (%v) should equal the block referenced by the qc (%d)", block.ID(), qc.BlockID)
+	if proposal.Block.ID() != qc.BlockID {
+		return CertifiedBlock{}, fmt.Errorf("block's ID (%v) should equal the block referenced by the qc (%d)", proposal.Block.ID(), qc.BlockID)
 	}
-	return CertifiedBlock{Block: block, CertifyingQC: qc}, nil
+	return CertifiedBlock{Proposal: proposal, CertifyingQC: qc}, nil
 }
 
 // BlockID returns a unique identifier for the block (the ID signed to produce a block vote).
@@ -111,7 +131,7 @@ func (b *CertifiedBlock) View() uint64 {
 
 // Height returns height of the block.
 func (b *CertifiedBlock) Height() uint64 {
-	return b.Block.Header.Height
+	return b.Proposal.Block.Header.Height
 }
 
 // BlockDigest holds lightweight block information which includes only the block's id, height and timestamp

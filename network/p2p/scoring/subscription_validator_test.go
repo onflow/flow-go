@@ -253,7 +253,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	outgoingMessageScope, err := message.NewOutgoingScope(
 		ids.NodeIDs(),
 		channels.TopicFromChannel(channels.PushBlocks, sporkId),
-		unittest.ProposalFixture(),
+		messages.NewUntrustedProposal(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
@@ -289,7 +289,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	outgoingMessageScope, err = message.NewOutgoingScope(
 		ids.NodeIDs(),
 		channels.TopicFromChannel(channels.PushBlocks, sporkId),
-		unittest.ProposalFixture(),
+		messages.NewUntrustedProposal(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)

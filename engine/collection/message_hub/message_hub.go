@@ -210,10 +210,10 @@ func (h *MessageHub) sendOwnMessages(ctx context.Context) error {
 
 		msg, ok := h.ownOutboundProposals.Pop()
 		if ok {
-			block := msg.(*flow.Header)
-			err := h.sendOwnProposal(block)
+			proposal := msg.(*flow.ProposalHeader)
+			err := h.sendOwnProposal(proposal)
 			if err != nil {
-				return fmt.Errorf("could not process queued block %v: %w", block.ID(), err)
+				return fmt.Errorf("could not process queued proposal %v: %w", proposal.Header.ID(), err)
 			}
 			continue
 		}
@@ -300,7 +300,8 @@ func (h *MessageHub) sendOwnVote(packed *packedVote) error {
 
 // sendOwnProposal propagates the block proposal to the consensus committee by broadcasting to all other cluster participants (excluding myself)
 // No errors are expected during normal operations.
-func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
+func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
+	header := proposal.Header
 	// first, check that we are the proposer of the block
 	if header.ProposerID != h.me.NodeID() {
 		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
@@ -332,13 +333,17 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 	}
 
 	// create the proposal message for the collection
-	proposal := messages.NewClusterBlockProposal(&cluster.Block{
-		Header:  header,
-		Payload: payload,
-	})
+	cbp := &cluster.BlockProposal{
+		Block: &cluster.Block{
+			Header:  header,
+			Payload: payload,
+		},
+		ProposerSigData: proposal.ProposerSigData,
+	}
+	proposalMsg := messages.UntrustedClusterProposalFromInternal(cbp)
 
 	// broadcast the proposal to consensus nodes
-	err = h.con.Publish(proposal, recipients.NodeIDs()...)
+	err = h.con.Publish(proposalMsg, recipients.NodeIDs()...)
 	if err != nil {
 		if !errors.Is(err, network.EmptyTargetList) {
 			log.Err(err).Msg("could not send proposal message")
@@ -393,7 +398,7 @@ func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
 // OnOwnProposal directly forwards proposal to HotStuff core logic(skipping compliance engine as we assume our
 // own proposals to be correct) and queues proposal for subsequent propagation to all consensus participants (including this node).
 // The proposal will only be placed in the queue, after the specified delay (or dropped on shutdown signal).
-func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
+func (h *MessageHub) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicationTime time.Time) {
 	go func() {
 		select {
 		case <-time.After(time.Until(targetPublicationTime)):
@@ -422,8 +427,8 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime 
 // No errors are expected during normal operations.
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *messages.ClusterBlockProposal:
-		h.compliance.OnClusterBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+	case *messages.UntrustedClusterProposal:
+		h.compliance.OnClusterBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
 			OriginID: originID,
 			Message:  msg,
 		})

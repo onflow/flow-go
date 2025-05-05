@@ -163,7 +163,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	approverID := unittest.IdentifierFixture()
 	for _, receipt := range receipts {
 		for j := 0; j < numApprovalsPerReceipt; j++ {
-			approval := unittest.ResultApprovalFixture(unittest.WithExecutionResultID(receipt.ID()),
+			approval := unittest.ResultApprovalFixture(unittest.WithExecutionResultID(receipt.ExecutionResult.ID()),
 				unittest.WithApproverID(approverID))
 			responseApproval := &messages.ApprovalResponse{
 				Approval: *approval,

@@ -22,12 +22,13 @@ import (
 // next developer who wants to add a new serialization format :-)
 func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 	block := unittest.BlockFixture()
-	message := messages.NewBlockProposal(&block)
+	proposal := unittest.ProposalFromBlock(&block)
+	message := messages.NewUntrustedProposal(proposal)
 	encoded, err := codec.Encode(message)
 	assert.NoError(t, err)
 	decodedInterface, err := codec.Decode(encoded)
 	assert.NoError(t, err)
-	decoded := decodedInterface.(*messages.BlockProposal)
+	decoded := decodedInterface.(*messages.UntrustedProposal)
 	decodedBlock := decoded.Block.ToInternal()
 	// compare LastViewTC separately, because it is a pointer field
 	if decodedBlock.Header.LastViewTC == nil {

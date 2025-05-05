@@ -41,13 +41,13 @@ func (snap EncodableSnapshot) LatestSeal() (*flow.Seal, error) {
 	// Since seals are included in increasing height order, the latest seal must be in the
 	// first block (by height descending) which contains any seals.
 	for i := len(snap.SealingSegment.Blocks) - 1; i >= 0; i-- {
-		block := snap.SealingSegment.Blocks[i]
-		for _, seal := range block.Payload.Seals {
+		proposal := snap.SealingSegment.Blocks[i]
+		for _, seal := range proposal.Block.Payload.Seals {
 			if seal.ID() == latestSealID {
 				return seal, nil
 			}
 		}
-		if len(block.Payload.Seals) > 0 {
+		if len(proposal.Block.Payload.Seals) > 0 {
 			// We encountered a block with some seals, but not the latest seal.
 			// This can only occur in a structurally invalid SealingSegment.
 			return nil, fmt.Errorf("LatestSeal: sanity check failed: no latest seal")
@@ -70,8 +70,8 @@ func (snap EncodableSnapshot) LatestSealedResult() (*flow.ExecutionResult, error
 	// For both spork root and mid-spork snapshots, the latest sealing result must
 	// either appear in a block payload or in the ExecutionResults field.
 	for i := len(snap.SealingSegment.Blocks) - 1; i >= 0; i-- {
-		block := snap.SealingSegment.Blocks[i]
-		for _, result := range block.Payload.Results {
+		proposal := snap.SealingSegment.Blocks[i]
+		for _, result := range proposal.Block.Payload.Results {
 			if latestSeal.ResultID == result.ID() {
 				return result, nil
 			}

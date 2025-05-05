@@ -23,3 +23,9 @@ func TestCollectionID_Malleability(t *testing.T) {
 		return unittest.TransactionBodyFixture()
 	}))
 }
+
+// TestCollectionGuaranteeID_Malleability confirms that the CollectionGuarantee struct, which implements
+// the [flow.IDEntity] interface, is resistant to tampering.
+func TestCollectionGuaranteeID_Malleability(t *testing.T) {
+	unittest.RequireEntityNonMalleable(t, unittest.CollectionGuaranteeFixture())
+}

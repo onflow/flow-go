@@ -1,6 +1,7 @@
 package model
 
 import (
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -55,14 +56,38 @@ func (p *SignedProposal) ProposerVote() *Vote {
 	return &vote
 }
 
-// SignedProposalFromFlow turns a flow header into a hotstuff block type.
-func SignedProposalFromFlow(header *flow.Header) *SignedProposal {
+// SignedProposalFromFlow turns a flow header proposal into a hotstuff block type.
+// Since not all header fields are exposed to HotStuff, this conversion is not reversible.
+func SignedProposalFromFlow(p *flow.ProposalHeader) *SignedProposal {
 	proposal := SignedProposal{
 		Proposal: Proposal{
-			Block:      BlockFromFlow(header),
-			LastViewTC: header.LastViewTC,
+			Block:      BlockFromFlow(p.Header),
+			LastViewTC: p.Header.LastViewTC,
 		},
-		SigData: header.ProposerSigData,
+		SigData: p.ProposerSigData,
+	}
+	return &proposal
+}
+
+// TODO(malleability, #7311) clean up conversion functions and/or proposal types here
+func SignedProposalFromBlock(p *flow.BlockProposal) *SignedProposal {
+	proposal := SignedProposal{
+		Proposal: Proposal{
+			Block:      BlockFromFlow(p.Block.Header),
+			LastViewTC: p.Block.Header.LastViewTC,
+		},
+		SigData: p.ProposerSigData,
+	}
+	return &proposal
+}
+
+func SignedProposalFromClusterBlock(p *cluster.BlockProposal) *SignedProposal {
+	proposal := SignedProposal{
+		Proposal: Proposal{
+			Block:      BlockFromFlow(p.Block.Header),
+			LastViewTC: p.Block.Header.LastViewTC,
+		},
+		SigData: p.ProposerSigData,
 	}
 	return &proposal
 }

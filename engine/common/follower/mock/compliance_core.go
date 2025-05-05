@@ -36,7 +36,7 @@ func (_m *ComplianceCore) Done() <-chan struct{} {
 }
 
 // OnBlockRange provides a mock function with given fields: originID, connectedRange
-func (_m *ComplianceCore) OnBlockRange(originID flow.Identifier, connectedRange []*flow.Block) error {
+func (_m *ComplianceCore) OnBlockRange(originID flow.Identifier, connectedRange []*flow.BlockProposal) error {
 	ret := _m.Called(originID, connectedRange)
 
 	if len(ret) == 0 {
@@ -44,7 +44,7 @@ func (_m *ComplianceCore) OnBlockRange(originID flow.Identifier, connectedRange 
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []*flow.Block) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, []*flow.BlockProposal) error); ok {
 		r0 = rf(originID, connectedRange)
 	} else {
 		r0 = ret.Error(0)

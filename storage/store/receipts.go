@@ -28,7 +28,7 @@ func NewExecutionReceipts(collector module.CacheMetrics, db storage.DB, results 
 		if err != nil {
 			return fmt.Errorf("could not store result: %w", err)
 		}
-		err = operation.InsertExecutionReceiptMeta(rw.Writer(), receiptID, receipt.Meta())
+		err = operation.InsertExecutionReceiptStub(rw.Writer(), receiptID, receipt.Stub())
 		if err != nil {
 			return fmt.Errorf("could not store receipt metadata: %w", err)
 		}
@@ -40,8 +40,8 @@ func NewExecutionReceipts(collector module.CacheMetrics, db storage.DB, results 
 	}
 
 	retrieve := func(r storage.Reader, receiptID flow.Identifier) (*flow.ExecutionReceipt, error) {
-		var meta flow.ExecutionReceiptMeta
-		err := operation.RetrieveExecutionReceiptMeta(r, receiptID, &meta)
+		var meta flow.ExecutionReceiptStub
+		err := operation.RetrieveExecutionReceiptStub(r, receiptID, &meta)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve receipt meta: %w", err)
 		}
@@ -49,7 +49,7 @@ func NewExecutionReceipts(collector module.CacheMetrics, db storage.DB, results 
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve result: %w", err)
 		}
-		return flow.ExecutionReceiptFromMeta(meta, *result), nil
+		return flow.ExecutionReceiptFromStub(meta, *result), nil
 	}
 
 	return &ExecutionReceipts{

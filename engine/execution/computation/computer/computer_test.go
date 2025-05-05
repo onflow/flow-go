@@ -1616,7 +1616,7 @@ func generateBlockWithVisitor(
 		collection := generateCollection(transactionCount, addressGenerator, visitor)
 		collections[i] = collection
 		guarantees[i] = collection.Guarantee
-		completeCollections[collection.Guarantee.ID()] = collection
+		completeCollections[collection.Guarantee.CollectionID] = collection
 	}
 
 	block := flow.Block{
