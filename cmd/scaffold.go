@@ -15,6 +15,7 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
+	"github.com/jordanschalm/lockctx"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -1222,6 +1223,13 @@ func (fnb *FlowNodeBuilder) initSecretsDB() error {
 		return nil
 	})
 
+	return nil
+}
+
+// initStorageLockManager initializes the lock manager used by the storage layer.
+// This manager must be a process-wide singleton.
+func (fnb *FlowNodeBuilder) initStorageLockManager() error {
+	fnb.StorageLockMgr = lockctx.NewManager(storage.Locks(), storage.Policy())
 	return nil
 }
 
