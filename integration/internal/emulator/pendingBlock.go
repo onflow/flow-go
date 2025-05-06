@@ -98,10 +98,12 @@ func (b *pendingBlock) Block() *flowgo.Block {
 
 	return &flowgo.Block{
 		Header: &flowgo.Header{
-			Height:    b.height,
-			View:      b.view,
-			ParentID:  b.parentID,
-			Timestamp: uint64(b.timestamp.UnixMilli()),
+			HeaderBody: flowgo.HeaderBody{
+				Height:    b.height,
+				View:      b.view,
+				ParentID:  b.parentID,
+				Timestamp: uint64(b.timestamp.UnixMilli()),
+			},
 		},
 		Payload: &flowgo.Payload{
 			Guarantees: guarantees,

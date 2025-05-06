@@ -112,15 +112,17 @@ func WithLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*model.Proposal) {
 func SignedProposalToFlow(proposal *model.SignedProposal) *flow.ProposalHeader {
 	block := proposal.Block
 	header := &flow.Header{
-		ParentID:           block.QC.BlockID,
-		PayloadHash:        block.PayloadHash,
-		Timestamp:          block.Timestamp,
-		View:               block.View,
-		ParentView:         block.QC.View,
-		ParentVoterIndices: block.QC.SignerIndices,
-		ParentVoterSigData: block.QC.SigData,
-		ProposerID:         block.ProposerID,
-		LastViewTC:         proposal.LastViewTC,
+		HeaderBody: flow.HeaderBody{
+			ParentID:           block.QC.BlockID,
+			Timestamp:          block.Timestamp,
+			View:               block.View,
+			ParentView:         block.QC.View,
+			ParentVoterIndices: block.QC.SignerIndices,
+			ParentVoterSigData: block.QC.SigData,
+			ProposerID:         block.ProposerID,
+			LastViewTC:         proposal.LastViewTC,
+		},
+		PayloadHash: block.PayloadHash,
 	}
 
 	return &flow.ProposalHeader{

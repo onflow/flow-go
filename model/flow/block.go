@@ -12,12 +12,14 @@ func Genesis(chainID ChainID) *Block {
 
 	// create the header
 	header := Header{
-		ChainID:     chainID,
-		ParentID:    ZeroID,
-		Height:      0,
+		HeaderBody: HeaderBody{
+			ChainID:   chainID,
+			ParentID:  ZeroID,
+			Height:    0,
+			Timestamp: uint64(GenesisTime.UnixMilli()),
+			View:      0,
+		},
 		PayloadHash: payload.Hash(),
-		Timestamp:   uint64(GenesisTime.UnixMilli()),
-		View:        0,
 	}
 
 	// combine to block

@@ -18,18 +18,16 @@ type ProposalHeader struct {
 	ProposerSigData []byte
 }
 
-// Header contains all meta-data for a block, as well as a hash representing
-// the combined payload of the entire block. It is what consensus nodes agree
-// on after validating the contents against the payload hash.
-type Header struct {
+// HeaderBody contains all block header metadata, except for the payload hash.
+// HeaderBody generally should not be used on its own. It is embedded within [Block] and
+// [Header]: those types should be used in almost all circumstances.
+type HeaderBody struct {
 	// ChainID is a chain-specific value to prevent replay attacks.
 	ChainID ChainID
 	// ParentID is the ID of this block's parent.
 	ParentID Identifier
 	// Height is the height of the parent + 1
 	Height uint64
-	// PayloadHash is a hash of the payload of this block.
-	PayloadHash Identifier
 	// Timestamp is the time at which this block was proposed, in Unix milliseconds.
 	// The proposer can choose any time, so this should not be trusted as accurate.
 	Timestamp uint64
@@ -49,6 +47,16 @@ type Header struct {
 	// LastViewTC is a timeout certificate for previous view, it can be nil
 	// it has to be present if previous round ended with timeout.
 	LastViewTC *TimeoutCertificate
+}
+
+// Header contains all meta-data for a block, as well as a hash of the block payload.
+// Headers are used when the metadata about a block is needed, but the payload is not.
+// Because [Header] includes the payload hash for the block, and the block ID is Merkle-ized
+// with the Payload field as a Merkle tree node, the block ID can be computed from the [Header].
+type Header struct {
+	HeaderBody
+	// PayloadHash is a hash of the payload of this block.
+	PayloadHash Identifier
 }
 
 // QuorumCertificate returns quorum certificate that is incorporated in the block header.

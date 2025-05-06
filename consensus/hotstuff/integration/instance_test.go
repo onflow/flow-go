@@ -199,12 +199,14 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				return nil
 			}
 			header := &flow.Header{
-				ChainID:     "chain",
-				ParentID:    parentID,
-				ParentView:  parent.View,
-				Height:      parent.Height + 1,
+				HeaderBody: flow.HeaderBody{
+					ChainID:    "chain",
+					ParentID:   parentID,
+					ParentView: parent.View,
+					Height:     parent.Height + 1,
+					Timestamp:  uint64(time.Now().UnixMilli()),
+				},
 				PayloadHash: unittest.IdentifierFixture(),
-				Timestamp:   uint64(time.Now().UnixMilli()),
 			}
 			require.NoError(t, setter(header))
 			sig, err := sign(header)

@@ -27,7 +27,7 @@ type SnapshotSuite struct {
 	db    *badger.DB
 	dbdir string
 
-	genesis      *model.Block
+	genesis      model.Block
 	chainID      flow.ChainID
 	epochCounter uint64
 
@@ -40,7 +40,7 @@ type SnapshotSuite struct {
 func (suite *SnapshotSuite) SetupTest() {
 	var err error
 
-	suite.genesis = model.Genesis()
+	suite.genesis = *model.Genesis()
 	suite.chainID = suite.genesis.Header.ChainID
 
 	suite.dbdir = unittest.TempDir(suite.T())
@@ -72,7 +72,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	)
 	suite.Require().NoError(err)
 
-	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
+	clusterStateRoot, err := NewStateRoot(&suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Require().NoError(err)
 	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
 	suite.Require().NoError(err)
@@ -109,17 +109,15 @@ func (suite *SnapshotSuite) Payload(transactions ...*flow.TransactionBody) model
 	return model.PayloadFromTransactions(minRefID, transactions...)
 }
 
-// ProposalWithParent returns a valid block proposal with the given parent.
-func (suite *SnapshotSuite) ProposalWithParent(parent *model.Block) model.BlockProposal {
-	block := unittest.ClusterBlockWithParent(parent)
-	payload := suite.Payload()
-	block.SetPayload(payload)
-	return *unittest.ClusterProposalFromBlock(&block)
+// ProposalWithParentAndPayload returns a valid block proposal with the given parent and payload.
+func (suite *SnapshotSuite) ProposalWithParentAndPayload(parent model.Block, payload model.Payload) model.BlockProposal {
+	block := unittest.ClusterBlockWithParentAndPayload(parent, payload)
+	return *unittest.ClusterProposalFromBlock(block)
 }
 
 // Proposal returns a valid cluster block proposal with genesis as parent.
 func (suite *SnapshotSuite) Proposal() model.BlockProposal {
-	return suite.ProposalWithParent(suite.genesis)
+	return suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload())
 }
 
 func (suite *SnapshotSuite) InsertBlock(proposal model.BlockProposal) {
@@ -136,9 +134,9 @@ func (suite *SnapshotSuite) InsertSubtree(parent model.Block, depth, fanout int)
 	}
 
 	for i := 0; i < fanout; i++ {
-		proposal := suite.ProposalWithParent(&parent)
+		proposal := suite.ProposalWithParentAndPayload(parent, suite.Payload())
 		suite.InsertBlock(proposal)
-		suite.InsertSubtree(*proposal.Block, depth-1, fanout)
+		suite.InsertSubtree(proposal.Block, depth-1, fanout)
 	}
 }
 
@@ -172,15 +170,14 @@ func (suite *SnapshotSuite) TestAtBlockID() {
 	// ensure head is correct
 	head, err := snapshot.Head()
 	assert.NoError(t, err)
-	assert.Equal(t, suite.genesis.ID(), head.ID())
+	assert.Equal(t, suite.genesis.ToHeader().ID(), head.ID())
 }
 
 func (suite *SnapshotSuite) TestEmptyCollection() {
 	t := suite.T()
 
 	// create a block with an empty collection
-	proposal := suite.ProposalWithParent(suite.genesis)
-	proposal.Block.SetPayload(model.EmptyPayload(flow.ZeroID))
+	proposal := suite.ProposalWithParentAndPayload(suite.genesis, model.EmptyPayload(flow.ZeroID))
 	suite.InsertBlock(proposal)
 
 	snapshot := suite.state.AtBlockID(proposal.Block.ID())
@@ -205,7 +202,7 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	assert.NoError(t, err)
 
 	// create a second un-finalized on top of the finalized block (height=2)
-	unFinalizedProposal2 := suite.ProposalWithParent(finalizedProposal1.Block)
+	unFinalizedProposal2 := suite.ProposalWithParentAndPayload(finalizedProposal1.Block, suite.Payload())
 	err = suite.state.Extend(&unFinalizedProposal2)
 	assert.NoError(t, err)
 
@@ -224,7 +221,7 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	// ensure head is correct
 	head, err := snapshot.Head()
 	assert.NoError(t, err)
-	assert.Equal(t, finalizedProposal1.Block.ID(), head.ID())
+	assert.Equal(t, finalizedProposal1.Block.ToHeader().ID(), head.ID())
 }
 
 // test that no pending blocks are returned when there are none
@@ -246,7 +243,7 @@ func (suite *SnapshotSuite) TestPending_WithPendingBlocks() {
 	parent := suite.genesis
 	pendings := make([]flow.Identifier, 0, 10)
 	for i := 0; i < 10; i++ {
-		next := suite.ProposalWithParent(parent)
+		next := suite.ProposalWithParentAndPayload(parent, suite.Payload())
 		suite.InsertBlock(next)
 		pendings = append(pendings, next.Block.ID())
 	}
@@ -261,7 +258,7 @@ func (suite *SnapshotSuite) TestPending_WithPendingBlocks() {
 func (suite *SnapshotSuite) TestPending_Grandchildren() {
 
 	// create 3 levels of children
-	suite.InsertSubtree(*suite.genesis, 3, 3)
+	suite.InsertSubtree(suite.genesis, 3, 3)
 
 	pending, err := suite.state.Final().Pending()
 	suite.Require().Nil(err)
@@ -282,10 +279,10 @@ func (suite *SnapshotSuite) TestPending_Grandchildren() {
 
 		// we must have already seen the parent
 		_, seen := parents[header.ParentID]
-		suite.Assert().True(seen, "pending list contained child (%x) before parent (%x)", header.ID(), header.ParentID)
+		suite.Assert().True(seen, "pending list contained child (%x) before parent (%x)", blockID, header.ParentID)
 
 		// mark this block as seen
-		parents[header.ID()] = struct{}{}
+		parents[blockID] = struct{}{}
 	}
 }
 

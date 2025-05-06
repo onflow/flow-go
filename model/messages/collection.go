@@ -18,86 +18,45 @@ type CollectionResponse struct {
 	Nonce      uint64 // so that we aren't deduplicated by the network layer
 }
 
-// UntrustedClusterBlockPayload is a duplicate of cluster.Payload used within
-// untrusted messages. It exists only to provide a memory-safe structure for
-// decoding messages and should be replaced in the future by updating the core
-// cluster.Payload type.
-// Deprecated: Please update cluster.Payload.Collection to use []flow.TransactionBody,
-// then replace instances of this type with cluster.Payload
-type UntrustedClusterBlockPayload struct {
-	Collection       []flow.TransactionBody
-	ReferenceBlockID flow.Identifier
+// UntrustedClusterBlock represents untrusted cluster block models received over the network.
+// This type exists only to explicitly differentiate between trusted and untrusted instances of a cluster block.
+// This differentiation is currently largely unused, but eventually untrusted models should use
+// a different type (like this one), until such time as they are fully validated.
+type UntrustedClusterBlock cluster.Block
+
+// ToHeader converts the untrusted block into a compact [flow.Header] representation,
+// where the payload is compressed to a hash reference.
+// TODO(malleability immutable, #7277): This conversion should eventually be accompanied by a full validation of the untrusted input.
+func (ub *UntrustedClusterBlock) ToHeader() *flow.Header {
+	internal := cluster.NewBlock(ub.Header, ub.Payload)
+	return internal.ToHeader()
 }
 
-// UntrustedClusterBlock is a duplicate of cluster.Block used within
-// untrusted messages. It exists only to provide a memory-safe structure for
-// decoding messages and should be replaced in the future by updating the core
-// cluster.Block type.
-// Deprecated: Please update cluster.Payload.Collection to use []flow.TransactionBody,
-// then replace instances of this type with cluster.Block
-type UntrustedClusterBlock struct {
-	Header  flow.Header
-	Payload UntrustedClusterBlockPayload
-}
+// UntrustedClusterProposal represents untrusted signed proposed block in collection node cluster consensus.
+// This type exists only to explicitly differentiate between trusted and untrusted instances of a cluster block proposal.
+// This differentiation is currently largely unused, but eventually untrusted models should use
+// a different type (like this one), until such time as they are fully validated.
+type UntrustedClusterProposal cluster.BlockProposal
 
-// ToInternal returns the internal representation of the type.
-func (ub *UntrustedClusterBlock) ToInternal() *cluster.Block {
-	block := &cluster.Block{
-		Header: &ub.Header,
-		Payload: &cluster.Payload{
-			ReferenceBlockID: ub.Payload.ReferenceBlockID,
-		},
-	}
-	for _, tx := range ub.Payload.Collection {
-		tx := tx
-		block.Payload.Collection.Transactions = append(block.Payload.Collection.Transactions, &tx)
-	}
-	return block
-}
-
-// UntrustedClusterBlockFromInternal converts the internal cluster.Block representation
-// to the representation used in untrusted messages.
-func UntrustedClusterBlockFromInternal(clusterBlock *cluster.Block) UntrustedClusterBlock {
-	block := UntrustedClusterBlock{
-		Header: *clusterBlock.Header,
-		Payload: UntrustedClusterBlockPayload{
-			ReferenceBlockID: clusterBlock.Payload.ReferenceBlockID,
-			Collection:       make([]flow.TransactionBody, 0, clusterBlock.Payload.Collection.Len()),
-		},
-	}
-	for _, tx := range clusterBlock.Payload.Collection.Transactions {
-		block.Payload.Collection = append(block.Payload.Collection, *tx)
-	}
-	return block
-}
-
-// UntrustedClusterProposal is a proposal for a block in collection node cluster
-// consensus. The header contains information about consensus state and the
-// payload contains the proposed collection (may be empty).
-type UntrustedClusterProposal struct {
-	Block           UntrustedClusterBlock
-	ProposerSigData []byte
-}
-
-func NewUntrustedClusterProposal(internal *cluster.Block, proposerSig []byte) *UntrustedClusterProposal {
+func NewUntrustedClusterProposal(internal cluster.Block, proposerSig []byte) *UntrustedClusterProposal {
 	return &UntrustedClusterProposal{
-		Block:           UntrustedClusterBlockFromInternal(internal),
+		Block:           internal,
 		ProposerSigData: proposerSig,
 	}
 }
 
+// ToInternal converts the UntrustedClusterProposal to a trusted internal cluster.BlockProposal.
+// TODO(malleability immutable, #7277): This conversion should eventually be accompanied by a full validation of the untrusted input.
 func (cbp *UntrustedClusterProposal) ToInternal() *cluster.BlockProposal {
 	return &cluster.BlockProposal{
-		Block:           cbp.Block.ToInternal(),
+		Block:           cluster.NewBlock(cbp.Block.Header, cbp.Block.Payload),
 		ProposerSigData: cbp.ProposerSigData,
 	}
 }
 
 func UntrustedClusterProposalFromInternal(proposal *cluster.BlockProposal) *UntrustedClusterProposal {
-	return &UntrustedClusterProposal{
-		Block:           UntrustedClusterBlockFromInternal(proposal.Block),
-		ProposerSigData: proposal.ProposerSigData,
-	}
+	p := UntrustedClusterProposal(*proposal)
+	return &p
 }
 
 // ClusterBlockVote is a vote for a proposed block in collection node cluster

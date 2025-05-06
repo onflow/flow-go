@@ -7,43 +7,55 @@ import (
 )
 
 func Genesis() *Block {
-	header := &flow.Header{
+	headerBody := flow.HeaderBody{
 		View:      0,
 		ChainID:   "cluster",
 		Timestamp: uint64(flow.GenesisTime.UnixMilli()),
 		ParentID:  flow.ZeroID,
 	}
 
-	payload := EmptyPayload(flow.ZeroID)
-
-	block := &Block{
-		Header: header,
-	}
-	block.SetPayload(payload)
-
-	return block
+	block := NewBlock(headerBody, EmptyPayload(flow.ZeroID))
+	return &block
 }
 
 // Block represents a block in collection node cluster consensus. It contains
 // a standard block header with a payload containing only a single collection.
 type Block struct {
-	Header  *flow.Header
-	Payload *Payload
+	Header  flow.HeaderBody
+	Payload Payload
+}
+
+// NewBlock creates a new block in collection node cluster consensus.
+//
+// Parameters:
+// - headerBody: the header fields to use for the block
+// - payload: the payload to associate with the block
+func NewBlock(
+	headerBody flow.HeaderBody,
+	payload Payload,
+) Block {
+	return Block{
+		Header:  headerBody,
+		Payload: payload,
+	}
+}
+
+// ID returns a collision-resistant hash of the cluster.Block struct.
+func (b *Block) ID() flow.Identifier {
+	return b.ToHeader().ID()
+}
+
+// ToHeader converts the block into a compact [flow.Header] representation,
+// where the payload is compressed to a hash reference.
+func (b *Block) ToHeader() *flow.Header {
+	return &flow.Header{
+		HeaderBody:  b.Header,
+		PayloadHash: b.Payload.Hash(),
+	}
 }
 
 // BlockProposal represents a signed proposed block in collection node cluster consensus.
 type BlockProposal struct {
-	Block           *Block
+	Block           Block
 	ProposerSigData []byte
-}
-
-// ID returns the ID of the underlying block header.
-func (b Block) ID() flow.Identifier {
-	return b.Header.ID()
-}
-
-// SetPayload sets the payload and payload hash.
-func (b *Block) SetPayload(payload Payload) {
-	b.Payload = &payload
-	b.Header.PayloadHash = payload.Hash()
 }

@@ -1621,9 +1621,11 @@ func generateBlockWithVisitor(
 
 	block := flow.Block{
 		Header: &flow.Header{
-			Timestamp: uint64(flow.GenesisTime.UnixMilli()),
-			Height:    42,
-			View:      42,
+			HeaderBody: flow.HeaderBody{
+				Timestamp: uint64(flow.GenesisTime.UnixMilli()),
+				Height:    42,
+				View:      42,
+			},
 		},
 		Payload: &flow.Payload{
 			Guarantees: guarantees,
