@@ -125,8 +125,8 @@ func NewPipeline(config Config) *Pipeline {
 // The function will also return if the provided context is canceled.
 //
 // Returns an error if any processing step fails or if the context is canceled.
-func (p *Pipeline) Run(ctx context.Context) error {
-	ctxWithCancel, cancel := context.WithCancelCause(ctx)
+func (p *Pipeline) Run(parentCtx context.Context) error {
+	ctx, cancel := context.WithCancelCause(parentCtx)
 	defer cancel(nil)
 
 	p.mu.Lock()
@@ -162,7 +162,7 @@ func (p *Pipeline) GetState() State {
 	return p.state
 }
 
-// SetSealed marks the data as sealed, which enable transitioning from StateWaitingPersist to StatePersisting.
+// SetSealed marks the data as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.
 func (p *Pipeline) SetSealed() {
 	p.mu.Lock()
 	p.isSealed = true
@@ -174,17 +174,21 @@ func (p *Pipeline) SetSealed() {
 
 // UpdateState updates the pipeline's state based on the provided state update.
 func (p *Pipeline) UpdateState(update StateUpdate) {
-	shouldAbandon := p.handleStateUpdate(update)
+	shouldAbort := p.handleStateUpdate(update)
 
-	// If we no longer descend from latest, cancel the pipeline
-	if shouldAbandon {
-		p.broadcastStateUpdate()
-		if p.cancel != nil {
-			p.cancel(fmt.Errorf("abandoning due to parent updates"))
-		}
-	} else {
+	if !shouldAbandon {
 		// Trigger state check
 		p.stateNotifier.Notify()
+		return
+	}
+	
+	// If we no longer descend from latest, cancel the pipeline
+	p.broadcastStateUpdate()
+	
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if p.cancel != nil {
+		p.cancel(fmt.Errorf("abandoning due to parent updates"))
 	}
 }
 

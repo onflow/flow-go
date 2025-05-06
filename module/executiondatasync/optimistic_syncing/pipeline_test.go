@@ -300,7 +300,7 @@ func TestPipelineErrorHandling(t *testing.T) {
 			}
 
 			// Create a mock core with the specified setup
-			mockCore := new(osmock.Core)
+			mockCore := osmock.NewCore(t)
 			tc.setupMock(mockCore)
 
 			// Create a pipeline
