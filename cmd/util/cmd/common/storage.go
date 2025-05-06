@@ -17,8 +17,8 @@ import (
 	"github.com/onflow/flow-go/storage/store"
 )
 
-// DBDirs is a struct that holds the datadir and pebble-dir
-// this struct help prevents mistakes from passing the wrong dir, such as pass pebbledir as datadir
+// DBDirs is a struct that holds the datadir (location of badger database) and pebbledir (location of pebble database) .
+// This struct helps to prevent mistakes, such confusing pebbledir and datadir.
 type DBDirs struct {
 	Datadir   string
 	Pebbledir string
