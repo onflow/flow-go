@@ -2,7 +2,6 @@ package store
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -175,62 +174,150 @@ func TestCache_ExceptionNotCached(t *testing.T) {
 }
 
 func BenchmarkCacheRemoveFunc(b *testing.B) {
+	const txCountPerBlock = 5
+
 	benchmarks := []struct {
-		name      string
-		cacheSize int
+		name        string
+		cacheSize   int
+		removeCount int
 	}{
-		{name: "cache limit 1,000", cacheSize: 1_000},
-		{name: "cache limit 5,000", cacheSize: 5_000},
-		{name: "cache limit 6,000", cacheSize: 6_000},
-		{name: "cache limit 7,000", cacheSize: 7_000},
-		{name: "cache limit 8,000", cacheSize: 8_000},
-		{name: "cache limit 9,000", cacheSize: 9_000},
-		{name: "cache limit 9,500", cacheSize: 9_500},
-		{name: "cache limit 10,000", cacheSize: 10_000},
+		{name: "cache size 1,000, remove count 25", cacheSize: 1_000, removeCount: 25},
+		{name: "cache size 2,000, remove count 25", cacheSize: 2_000, removeCount: 25},
+		{name: "cache size 3,000, remove count 25", cacheSize: 3_000, removeCount: 25},
+		{name: "cache size 4,000, remove count 25", cacheSize: 4_000, removeCount: 25},
+		{name: "cache size 5,000, remove count 25", cacheSize: 5_000, removeCount: 25},
+		{name: "cache size 6,000, remove count 25", cacheSize: 6_000, removeCount: 25},
+		{name: "cache size 7,000, remove count 25", cacheSize: 7_000, removeCount: 25},
+		{name: "cache size 8,000, remove count 25", cacheSize: 8_000, removeCount: 25},
+		{name: "cache size 9,000, remove count 25", cacheSize: 9_000, removeCount: 25},
+		{name: "cache size 10,000, remove count 25", cacheSize: 10_000, removeCount: 25},
+		{name: "cache size 20,000, remove count 25", cacheSize: 20_000, removeCount: 25},
 	}
 
 	for _, bm := range benchmarks {
 		b.Run(bm.name, func(b *testing.B) {
+			blockCount := bm.cacheSize/txCountPerBlock + 1
 
-			cache := newCache(
-				metrics.NewNoopCollector(),
-				metrics.ResourceTransactionResults,
-				withLimit[string, struct{}](uint(bm.cacheSize)),
-				withStore(noopStore[string, struct{}]),
-				withRetrieve(noRetrieve[string, struct{}]),
-			)
-
-			count := bm.cacheSize
-			blockIDs := make([]flow.Identifier, count)
+			blockIDs := make([]flow.Identifier, blockCount)
 			for i := range len(blockIDs) {
 				blockIDs[i] = unittest.IdentifierFixture()
 			}
 
-			const txCountPerBlock = 5
-			txIDs := make([]flow.Identifier, count*txCountPerBlock)
+			txIDs := make([]flow.Identifier, blockCount*txCountPerBlock)
 			for i := range len(txIDs) {
 				txIDs[i] = unittest.IdentifierFixture()
 			}
 
-			for i, blockID := range blockIDs {
-				for _, txID := range txIDs[i*txCountPerBlock] {
-					key := fmt.Sprintf("%x%x", blockID, txID)
-					cache.Insert(key, struct{}{})
+			prefixCount := bm.removeCount / txCountPerBlock
+			removePrefixes := make(map[string]bool)
+			for blockIDIndex := len(blockIDs) - 1; len(removePrefixes) < prefixCount; blockIDIndex-- {
+				blockID := blockIDs[blockIDIndex]
+				removePrefixes[KeyFromBlockID(blockID)] = true
+			}
+
+			for range b.N {
+				b.StopTimer()
+
+				cache := newCache(
+					metrics.NewNoopCollector(),
+					metrics.ResourceTransactionResults,
+					withLimit[string, struct{}](uint(bm.cacheSize)),
+					withStore(noopStore[string, struct{}]),
+					withRetrieve(noRetrieve[string, struct{}]),
+				)
+
+				for i, blockID := range blockIDs {
+					for _, txID := range txIDs[i*txCountPerBlock : (i+1)*txCountPerBlock] {
+						key := fmt.Sprintf("%x%x", blockID, txID)
+						cache.Insert(key, struct{}{})
+					}
+				}
+
+				b.StartTimer()
+
+				cache.RemoveFunc(func(key string) bool {
+					keyPrefix := key[:64]
+					return removePrefixes[keyPrefix]
+				})
+			}
+		})
+	}
+}
+
+func BenchmarkCacheRemove(b *testing.B) {
+	const txCountPerBlock = 5
+
+	benchmarks := []struct {
+		name        string
+		cacheSize   int
+		removeCount int
+	}{
+		{name: "cache size 1,000, remove count 25", cacheSize: 1_000, removeCount: 25},
+		{name: "cache size 2,000, remove count 25", cacheSize: 2_000, removeCount: 25},
+		{name: "cache size 3,000, remove count 25", cacheSize: 3_000, removeCount: 25},
+		{name: "cache size 4,000, remove count 25", cacheSize: 4_000, removeCount: 25},
+		{name: "cache size 5,000, remove count 25", cacheSize: 5_000, removeCount: 25},
+		{name: "cache size 6,000, remove count 25", cacheSize: 6_000, removeCount: 25},
+		{name: "cache size 7,000, remove count 25", cacheSize: 7_000, removeCount: 25},
+		{name: "cache size 8,000, remove count 25", cacheSize: 8_000, removeCount: 25},
+		{name: "cache size 9,000, remove count 25", cacheSize: 9_000, removeCount: 25},
+		{name: "cache size 10,000, remove count 25", cacheSize: 10_000, removeCount: 25},
+		{name: "cache size 20,000, remove count 25", cacheSize: 20_000, removeCount: 25},
+	}
+
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			blockCount := bm.cacheSize/txCountPerBlock + 1
+
+			blockIDs := make([]flow.Identifier, blockCount)
+			for i := range len(blockIDs) {
+				blockIDs[i] = unittest.IdentifierFixture()
+			}
+
+			txIDs := make([]flow.Identifier, blockCount*txCountPerBlock)
+			for i := range len(txIDs) {
+				txIDs[i] = unittest.IdentifierFixture()
+			}
+
+			removeIDs := make([]string, 0, bm.removeCount)
+
+			blockIDIndex := len(blockIDs) - 1
+			txIDIndex := len(txIDs) - 1
+			for len(removeIDs) < bm.removeCount {
+				blockID := blockIDs[blockIDIndex]
+				blockIDIndex--
+
+				for range txCountPerBlock {
+					key := fmt.Sprintf("%x%x", blockID, txIDs[txIDIndex])
+					removeIDs = append(removeIDs, key)
+
+					txIDIndex--
 				}
 			}
 
-			b.ResetTimer()
-
-			i := 0
 			for range b.N {
-				if i >= len(blockIDs) {
-					i = 0
+				b.StopTimer()
+
+				cache := newCache(
+					metrics.NewNoopCollector(),
+					metrics.ResourceTransactionResults,
+					withLimit[string, struct{}](uint(bm.cacheSize)),
+					withStore(noopStore[string, struct{}]),
+					withRetrieve(noRetrieve[string, struct{}]),
+				)
+
+				for i, blockID := range blockIDs {
+					for _, txID := range txIDs[i*txCountPerBlock : (i+1)*txCountPerBlock] {
+						key := fmt.Sprintf("%x%x", blockID, txID)
+						cache.Insert(key, struct{}{})
+					}
 				}
-				keyPrefix := KeyFromBlockID(blockIDs[i])
-				cache.RemoveFunc(func(key string) bool {
-					return strings.HasPrefix(key, keyPrefix)
-				})
-				i++
+
+				b.StartTimer()
+
+				for _, id := range removeIDs {
+					cache.Remove(id)
+				}
 			}
 		})
 	}
