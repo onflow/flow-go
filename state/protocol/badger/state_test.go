@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	testmock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -38,7 +37,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 	})
 
 	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, _ *bprotocol.State) {
-		lockManager := lockctx.NewManager(storage.Locks(), storage.Policy())
+		lockManager := storage.NewTestingLockManager()
 		// expect the final view metric to be set to current epoch's final view
 		epoch, err := rootSnapshot.Epochs().Current()
 		require.NoError(t, err)
@@ -113,7 +112,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 	})
 
 	protoutil.RunWithBootstrapState(t, committedPhaseSnapshot, func(db *badger.DB, _ *bprotocol.State) {
-		lockManager := lockctx.NewManager(storage.Locks(), storage.Policy())
+		lockManager := storage.NewTestingLockManager()
 
 		complianceMetrics := new(mock.ComplianceMetrics)
 
@@ -726,7 +725,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 	dir := unittest.TempDir(t)
 	defer os.RemoveAll(dir)
 	db := unittest.BadgerDB(t, dir)
-	lockManager := lockctx.NewManager(storage.Locks(), storage.Policy())
+	lockManager := storage.NewTestingLockManager()
 	defer db.Close()
 	all := bstorage.InitAll(metrics, db)
 	state, err := bprotocol.Bootstrap(

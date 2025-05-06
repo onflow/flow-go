@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -93,7 +92,7 @@ func TestBootstrapValid(t *testing.T) {
 // * BlockProcessable is emitted when a block's child is inserted
 func TestExtendValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		lockManager := lockctx.NewManager(storage.Locks(), storage.Policy())
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -840,7 +839,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		lockManager := lockctx.NewManager(storage.Locks(), storage.Policy())
+		lockManager := storage.NewTestingLockManager()
 
 		// set up state and mock ComplianceMetrics object
 		metrics := mockmodule.NewComplianceMetrics(t)
@@ -2586,7 +2585,7 @@ func TestEpochTargetDuration(t *testing.T) {
 
 func TestExtendInvalidSealsInBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		lockManager := lockctx.NewManager(storage.Locks(), storage.Policy())
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -3156,7 +3155,7 @@ func TestCacheAtomicity(t *testing.T) {
 // TestHeaderInvalidTimestamp tests that extending header with invalid timestamp results in sentinel error
 func TestHeaderInvalidTimestamp(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		lockManager := lockctx.NewManager(storage.Locks(), storage.Policy())
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()

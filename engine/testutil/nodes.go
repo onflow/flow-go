@@ -12,7 +12,6 @@ import (
 	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -234,7 +233,7 @@ func CompleteStateFixture(
 	publicDBDir := filepath.Join(dataDir, "protocol")
 	secretsDBDir := filepath.Join(dataDir, "secrets")
 	db := unittest.TypedBadgerDB(t, publicDBDir, storagebadger.InitPublic)
-	lockManager := lockctx.NewManager(storage.Locks(), storage.Policy())
+	lockManager := storage.NewTestingLockManager()
 	s := storagebadger.InitAll(metric, db)
 	secretsDB := unittest.TypedBadgerDB(t, secretsDBDir, storagebadger.InitSecret)
 	consumer := events.NewDistributor()

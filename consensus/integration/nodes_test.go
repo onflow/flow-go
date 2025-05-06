@@ -379,7 +379,7 @@ func createNode(
 	metricsCollector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	db := badgerimpl.ToDB(badgerdb)
-	lockManager := lockctx.NewManager(fstorage.Locks(), fstorage.Policy())
+	lockManager := fstorage.NewTestingLockManager()
 
 	headersDB := store.NewHeaders(metricsCollector, db)
 	guaranteesDB := store.NewGuarantees(metricsCollector, db, store.DefaultCacheSize)

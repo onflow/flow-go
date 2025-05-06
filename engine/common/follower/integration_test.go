@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -52,7 +51,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		tracer := trace.NewNoopTracer()
 		log := unittest.Logger()
 		consumer := events.NewNoop()
-		lockManager := lockctx.NewManager(storage.Locks(), storage.Policy())
+		lockManager := storage.NewTestingLockManager()
 		all := bstorage.InitAll(metrics, db)
 
 		// bootstrap root snapshot

@@ -441,7 +441,7 @@ func RunWithTypedPebbleDB(
 }
 
 func LockManagerWithContext(t *testing.T, locks ...string) (lockctx.Manager, lockctx.Context) {
-	lockManager := lockctx.NewManager(storage.Locks(), storage.Policy())
+	lockManager := storage.NewTestingLockManager()
 	lctx := lockManager.NewContext()
 	for _, lock := range locks {
 		err := lctx.AcquireLock(lock)

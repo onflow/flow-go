@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -74,7 +73,7 @@ func (suite *BuilderSuite) SetupTest() {
 
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
-	lockManager := lockctx.NewManager(storage.Locks(), storage.Policy())
+	lockManager := storage.NewTestingLockManager()
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
