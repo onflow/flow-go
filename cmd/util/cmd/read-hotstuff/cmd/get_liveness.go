@@ -21,11 +21,7 @@ func init() {
 }
 
 func runGetLivenessData(*cobra.Command, []string) {
-	err := common.WithStorage(common.DBDirs{
-		Datadir:   flagDatadir,
-		Pebbledir: flagPebbleDir,
-	}, func(db storage.DB) error {
-
+	err := common.WithStorage(flagDBs, func(db storage.DB) error {
 		chainID := flow.ChainID(flagChain)
 		reader, err := persister.NewReader(db, chainID)
 		if err != nil {
@@ -34,8 +30,6 @@ func runGetLivenessData(*cobra.Command, []string) {
 
 		log.Info().
 			Str("chain", flagChain).
-			Str("datadir", flagDatadir).
-			Str("pebbledir", flagPebbleDir).
 			Msg("getting hotstuff liveness data")
 
 		livenessData, err := reader.GetLivenessData()

@@ -24,6 +24,76 @@ type DBDirs struct {
 	Pebbledir string
 }
 
+type UsedDB int
+
+const (
+	UsedDBBadger UsedDB = iota
+	UsedDBPebble
+)
+
+func (usedDB UsedDB) String() string {
+	switch usedDB {
+	case UsedDBBadger:
+		return "badger"
+	case UsedDBPebble:
+		return "pebble"
+	default:
+		return "unknown"
+	}
+}
+
+// DBDirs is a struct that holds the used datadir and pebble-dir
+// this struct help prevents mistakes from passing the wrong dir, such as pass pebbledir as datadir
+type TwoDBDirs struct {
+	BadgerDir string
+	PebbleDir string
+}
+
+// OneDBDir is a struct that holds the used database dir
+type OneDBDir struct {
+	UseDB UsedDB
+	DBDir string
+}
+
+func ParseOneDBUsedDir(flags DBFlags) (OneDBDir, error) {
+	if flags.UseDB == "pebble" {
+		if flags.PebbleDir == "" {
+			return OneDBDir{}, fmt.Errorf("--pebble-dir is required when using pebble db")
+		}
+		return OneDBDir{
+			UseDB: UsedDBPebble,
+			DBDir: flags.PebbleDir,
+		}, nil
+	}
+
+	if flags.UseDB == "badger" {
+		if flags.BadgerDir == "" {
+			return OneDBDir{}, fmt.Errorf("--datadir is required when using badger db")
+		}
+		return OneDBDir{
+			UseDB: UsedDBBadger,
+			DBDir: flags.BadgerDir,
+		}, nil
+	}
+
+	return OneDBDir{}, fmt.Errorf("unknown database type: %s", flags.UseDB)
+}
+
+func ParseTwoDBDirs(flags DBFlags) (TwoDBDirs, error) {
+	if flags.BadgerDir == "" {
+		return TwoDBDirs{}, fmt.Errorf("--datadir is required when using badger db")
+	}
+
+	if flags.PebbleDir == "" {
+		return TwoDBDirs{}, fmt.Errorf("--pebble-dir is required when using pebble db")
+	}
+
+	return TwoDBDirs{
+		BadgerDir: flags.BadgerDir,
+		PebbleDir: flags.PebbleDir,
+	}, nil
+}
+
 func InitStorage(datadir string) *badger.DB {
 	return InitStorageWithTruncate(datadir, false)
 }
@@ -80,58 +150,56 @@ func InitExecutionStorages(bdb *badger.DB) *storage.Execution {
 
 // WithStorage runs the given function with the storage depending on the flags.
 // Only one flag (datadir / pebble-dir) is allowed to be set
-func WithStorage(dirs DBDirs, f func(storage.DB) error) error {
-	if dirs.Pebbledir != "" {
-		if dirs.Datadir != "" {
-			log.Warn().Msg("both --datadir and --pebble-dir are set, using --pebble-dir")
-		}
+func WithStorage(flags DBFlags, f func(storage.DB) error) error {
+	usedDir, err := ParseOneDBUsedDir(flags)
+	if err != nil {
+		return fmt.Errorf("could not parse db flags: %w", err)
+	}
 
-		db, err := pebblestorage.MustOpenDefaultPebbleDB(log.Logger, dirs.Pebbledir)
+	log.Info().Msgf("using %s db at %s", usedDir.UseDB, usedDir.DBDir)
+
+	if usedDir.UseDB == UsedDBPebble {
+		db, err := pebblestorage.MustOpenDefaultPebbleDB(log.Logger, usedDir.DBDir)
 		if err != nil {
 			return err
 		}
 
 		defer db.Close()
 
-		log.Info().Msgf("using pebble db at %s", dirs.Pebbledir)
 		return f(pebbleimpl.ToDB(db))
 	}
 
-	if dirs.Datadir != "" {
-		db := InitStorage(dirs.Datadir)
+	if usedDir.UseDB == UsedDBBadger {
+		db := InitStorage(usedDir.DBDir)
 		defer db.Close()
 
-		log.Info().Msgf("using badger db at %s", dirs.Datadir)
 		return f(badgerimpl.ToDB(db))
 	}
 
-	return fmt.Errorf("must specify either --datadir or --pebble-dir")
+	return fmt.Errorf("unexpected error")
 }
 
 // InitBadgerAndPebble initializes the badger and pebble storages
-func InitBadgerAndPebble(dirs DBDirs) (bdb *badger.DB, pdb *pebble.DB, err error) {
-	if dirs.Datadir == "" {
-		return nil, nil, fmt.Errorf("must specify --datadir")
-	}
-
-	if dirs.Pebbledir == "" {
-		return nil, nil, fmt.Errorf("must specify --pebble-dir")
-	}
-
+func InitBadgerAndPebble(dirs TwoDBDirs) (bdb *badger.DB, pdb *pebble.DB, err error) {
 	pdb, err = pebblestorage.MustOpenDefaultPebbleDB(
-		log.Logger.With().Str("pebbledb", "protocol").Logger(), dirs.Pebbledir)
+		log.Logger.With().Str("pebbledb", "protocol").Logger(), dirs.PebbleDir)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	bdb = InitStorage(dirs.Datadir)
+	bdb = InitStorage(dirs.BadgerDir)
 
 	return bdb, pdb, nil
 }
 
 // WithBadgerAndPebble runs the given function with the badger and pebble storages
 // it ensures that the storages are closed after the function is done
-func WithBadgerAndPebble(dirs DBDirs, f func(*badger.DB, *pebble.DB) error) error {
+func WithBadgerAndPebble(flags DBFlags, f func(*badger.DB, *pebble.DB) error) error {
+	dirs, err := ParseTwoDBDirs(flags)
+	if err != nil {
+		return err
+	}
+
 	bdb, pdb, err := InitBadgerAndPebble(dirs)
 	if err != nil {
 		return err

@@ -29,7 +29,18 @@ var clusterBlocksCmd = &cobra.Command{
 	Short: "get cluster blocks",
 	Run: func(cmd *cobra.Command, args []string) {
 		metrics := metrics.NewNoopCollector()
-		db := common.InitStorage(flagDatadir)
+		datadir, err := common.ParseOneDBUsedDir(flagDBs)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not parse db dir")
+		}
+
+		if datadir.UseDB != common.UsedDBBadger {
+			log.Fatal().Msgf("only badger db is supported, got: %s", datadir.UseDB)
+		}
+
+		db := common.InitStorage(datadir.DBDir)
+		defer db.Close()
+
 		headers := badger.NewHeaders(metrics, db)
 		clusterPayloads := badger.NewClusterPayloads(metrics, db)
 

@@ -10,6 +10,7 @@ import (
 
 // InitStorages initializes the badger storages
 func InitStorages() (*storage.All, *badger.DB) {
+	usedDir := common.ParseOneDBUsedDir(flagDBs)
 	db := common.InitStorage(flagDatadir)
 	storages := common.InitStorages(db)
 	return storages, db
@@ -18,27 +19,20 @@ func InitStorages() (*storage.All, *badger.DB) {
 // WithStorage runs the given function with the storage dependending on the flags
 // only one flag (datadir / pebble-dir) is allowed to be set
 func WithStorage(f func(storage.DB) error) error {
-	return common.WithStorage(
-		common.DBDirs{
-			Datadir:   flagDatadir,
-			Pebbledir: flagPebbleDir,
-		}, f)
+	return common.WithStorage(flagDBs, f)
 }
 
 // InitBadgerAndPebble initializes the badger and pebble storages
 func InitBadgerAndPebble() (bdb *badger.DB, pdb *pebble.DB, err error) {
-	return common.InitBadgerAndPebble(common.DBDirs{
-		Datadir:   flagDatadir,
-		Pebbledir: flagPebbleDir,
-	})
+	dbDirs, err := common.ParseTwoDBDirs(flagDBs)
+	if err != nil {
+		return nil, nil, err
+	}
+	return common.InitBadgerAndPebble(dbDirs)
 }
 
 // WithBadgerAndPebble runs the given function with the badger and pebble storages
 // it ensures that the storages are closed after the function is done
 func WithBadgerAndPebble(f func(*badger.DB, *pebble.DB) error) error {
-	return common.WithBadgerAndPebble(
-		common.DBDirs{
-			Datadir:   flagDatadir,
-			Pebbledir: flagPebbleDir,
-		}, f)
+	return common.WithBadgerAndPebble(flagDBs, f)
 }

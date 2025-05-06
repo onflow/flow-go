@@ -148,7 +148,16 @@ func (r *Reader) IsExecuted(blockID flow.Identifier) (bool, error) {
 }
 
 func run(*cobra.Command, []string) {
-	db := common.InitStorage(flagDatadir)
+	datadir, err := common.ParseOneDBUsedDir(flagDB)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not parse db dir")
+	}
+
+	if datadir.UseDB != common.UsedDBBadger {
+		log.Fatal().Msgf("only badger db is supported, got: %s", datadir.UseDB)
+	}
+
+	db := common.InitStorage(datadir.DBDir)
 	defer db.Close()
 
 	storages := common.InitStorages(db)

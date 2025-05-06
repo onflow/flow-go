@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var (
-	flagDatadir string
+	flagDB common.DBFlags
 )
 
 var rootCmd = &cobra.Command{
@@ -27,8 +28,7 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the badger dababase")
-	_ = rootCmd.MarkPersistentFlagRequired("datadir")
+	flagDB = common.InitWithDBFlags(rootCmd)
 
 	cobra.OnInitialize(initConfig)
 }

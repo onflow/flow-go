@@ -21,10 +21,7 @@ func init() {
 }
 
 func runGetSafetyData(*cobra.Command, []string) {
-	err := common.WithStorage(common.DBDirs{
-		Datadir:   flagDatadir,
-		Pebbledir: flagPebbleDir,
-	}, func(db storage.DB) error {
+	err := common.WithStorage(flagDBs, func(db storage.DB) error {
 
 		chainID := flow.ChainID(flagChain)
 		reader, err := persister.NewReader(db, chainID)
@@ -34,8 +31,6 @@ func runGetSafetyData(*cobra.Command, []string) {
 
 		log.Info().
 			Str("chain", flagChain).
-			Str("datadir", flagDatadir).
-			Str("pebbledir", flagPebbleDir).
 			Msg("getting hotstuff safety data")
 
 		livenessData, err := reader.GetSafetyData()
