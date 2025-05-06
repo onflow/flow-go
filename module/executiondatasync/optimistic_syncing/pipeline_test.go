@@ -32,13 +32,7 @@ func TestPipelineStateTransitions(t *testing.T) {
 	mockCore.On("Persist", mock.Anything).Return(nil)
 
 	// Create a pipeline
-	pipeline := NewPipeline(Config{
-		Logger:               zerolog.Nop(),
-		IsSealed:             false,
-		ExecutionResult:      unittest.ExecutionResultFixture(),
-		Core:                 mockCore,
-		StateUpdatePublisher: publisher,
-	})
+	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
 
 	// Start the pipeline in a goroutine
 	ctx, cancel := context.WithCancel(context.Background())
@@ -109,13 +103,7 @@ func TestPipelineCancellation(t *testing.T) {
 	}).Return(nil)
 
 	// Create a pipeline
-	pipeline := NewPipeline(Config{
-		Logger:               zerolog.Nop(),
-		IsSealed:             false,
-		ExecutionResult:      unittest.ExecutionResultFixture(),
-		Core:                 mockCore,
-		StateUpdatePublisher: publisher,
-	})
+	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
 
 	// Start the pipeline
 	ctx, cancel := context.WithCancel(context.Background())
@@ -197,13 +185,7 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 	mockCore.On("Persist", mock.Anything).Return(nil)
 
 	// Create a pipeline
-	pipeline := NewPipeline(Config{
-		Logger:               zerolog.Nop(),
-		IsSealed:             false,
-		ExecutionResult:      unittest.ExecutionResultFixture(),
-		Core:                 mockCore,
-		StateUpdatePublisher: publisher,
-	})
+	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
 
 	// Start the pipeline
 	ctx, cancel := context.WithCancel(context.Background())
@@ -304,13 +286,7 @@ func TestPipelineErrorHandling(t *testing.T) {
 			tc.setupMock(mockCore)
 
 			// Create a pipeline
-			pipeline := NewPipeline(Config{
-				Logger:               zerolog.Nop(),
-				IsSealed:             true, // Set to true to allow testing persist
-				ExecutionResult:      unittest.ExecutionResultFixture(),
-				Core:                 mockCore,
-				StateUpdatePublisher: publisher,
-			})
+			pipeline := NewPipeline(zerolog.Nop(), true, unittest.ExecutionResultFixture(), mockCore, publisher)
 
 			// Start the pipeline
 			ctx, cancel := context.WithCancel(context.Background())
@@ -359,16 +335,9 @@ func TestBroadcastStateUpdate(t *testing.T) {
 	// Create mock core
 	mockCore := osmock.NewCore(t)
 	mockCore.On("Download", mock.Anything).Return(nil)
-	mockCore.On("Index", mock.Anything).Return(nil)
 
 	// Create a pipeline
-	pipeline := NewPipeline(Config{
-		Logger:               zerolog.Nop(),
-		IsSealed:             false,
-		ExecutionResult:      unittest.ExecutionResultFixture(),
-		Core:                 mockCore,
-		StateUpdatePublisher: publisher,
-	})
+	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
 
 	// Start the pipeline
 	ctx, cancel := context.WithCancel(context.Background())
@@ -396,6 +365,11 @@ func TestBroadcastStateUpdate(t *testing.T) {
 		DescendsFromLastPersistedSealed: false, // No longer descends
 		ParentState:                     StateReady,
 	})
+
+	// Wait for an update to be sent to children
+	update = waitForAnyStateUpdate(t, updateChan)
+	// Check that the update has the correct flag
+	assert.False(t, update.DescendsFromLastPersistedSealed, "Initial update should indicate descends=false")
 
 	// Check for completion
 	select {

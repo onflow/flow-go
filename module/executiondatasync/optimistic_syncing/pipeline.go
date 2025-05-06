@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -65,20 +66,6 @@ type StateUpdate struct {
 // StateUpdatePublisher is a function that publishes state updates
 type StateUpdatePublisher func(update StateUpdate)
 
-// Config contains the configuration for the pipeline
-type Config struct {
-	// Logger is the logger to use for the pipeline
-	Logger zerolog.Logger
-	// IsSealed indicates if the pipeline's ExecutionResult is sealed
-	IsSealed bool
-	// ExecutionResult is the execution result being processed
-	ExecutionResult *flow.ExecutionResult
-	// Core implements the processing logic for the pipeline
-	Core Core
-	// StateUpdatePublisher is called when the pipeline needs to broadcast state updates
-	StateUpdatePublisher StateUpdatePublisher
-}
-
 // Pipeline represents a generic processing pipeline with state transitions.
 // It processes data through sequential states: Ready -> Downloading -> Indexing ->
 // WaitingPersist -> Persisting -> Complete, with conditions for each transition.
@@ -101,16 +88,32 @@ type Pipeline struct {
 // NewPipeline creates a new processing pipeline.
 // Pipelines must only be created for ExecutionResults that descend from the latest persisted sealed result.
 // The pipeline is initialized in the Ready state.
-func NewPipeline(config Config) *Pipeline {
+//
+// Parameters:
+//   - logger: the logger to use for the pipeline
+//   - isSealed: indicates if the pipeline's ExecutionResult is sealed
+//   - executionResult: processed execution result
+//   - core: implements the processing logic for the pipeline
+//   - stateUpdatePublisher: called when the pipeline needs to broadcast state updates
+//
+// Returns:
+//   - new pipeline object
+func NewPipeline(
+	logger zerolog.Logger,
+	isSealed bool,
+	executionResult *flow.ExecutionResult,
+	core Core,
+	stateUpdatePublisher StateUpdatePublisher,
+) *Pipeline {
 	p := &Pipeline{
-		logger:             config.Logger.With().Str("component", "pipeline").Str("execution_result_id", config.ExecutionResult.ExecutionDataID.String()).Str("block_id", config.ExecutionResult.BlockID.String()).Logger(),
-		statePublisher:     config.StateUpdatePublisher,
+		logger:             logger.With().Str("component", "pipeline").Str("execution_result_id", executionResult.ExecutionDataID.String()).Str("block_id", executionResult.BlockID.String()).Logger(),
+		statePublisher:     stateUpdatePublisher,
 		state:              StateReady,
-		isSealed:           config.IsSealed,
+		isSealed:           isSealed,
 		descendsFromSealed: true,
 		stateNotifier:      engine.NewNotifier(),
-		core:               config.Core,
-		executionResult:    config.ExecutionResult,
+		core:               core,
+		executionResult:    executionResult,
 	}
 
 	return p
@@ -140,11 +143,21 @@ func (p *Pipeline) Run(parentCtx context.Context) error {
 
 	for {
 		select {
-		case <-ctxWithCancel.Done():
-			return context.Cause(ctxWithCancel)
+		case <-parentCtx.Done():
+			return nil
 		case <-notifierChan:
-			processed, err := p.processCurrentState(ctxWithCancel)
+			processed, err := p.processCurrentState(ctx)
 			if err != nil {
+				ctxErr := context.Cause(ctx)
+				if errors.Is(ctxErr, context.Canceled) {
+					return nil
+				}
+
+				parentCtxErr := context.Cause(parentCtx)
+				if errors.Is(parentCtxErr, context.Canceled) {
+					return nil
+				}
+
 				return err
 			}
 			if !processed {
@@ -174,17 +187,15 @@ func (p *Pipeline) SetSealed() {
 
 // UpdateState updates the pipeline's state based on the provided state update.
 func (p *Pipeline) UpdateState(update StateUpdate) {
-	shouldAbort := p.handleStateUpdate(update)
-
-	if !shouldAbandon {
+	if shouldAbort := p.handleStateUpdate(update); !shouldAbort {
 		// Trigger state check
 		p.stateNotifier.Notify()
 		return
 	}
-	
-	// If we no longer descend from latest, cancel the pipeline
+
+	// If we no longer descend from the latest, cancel the pipeline
 	p.broadcastStateUpdate()
-	
+
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	if p.cancel != nil {
