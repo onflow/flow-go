@@ -9,11 +9,13 @@ import (
 
 func DefaultRoot() *flow.Header {
 	header := &flow.Header{
-		ChainID:     "chain",
-		ParentID:    flow.ZeroID,
-		Height:      0,
+		HeaderBody: flow.HeaderBody{
+			ChainID:   "chain",
+			ParentID:  flow.ZeroID,
+			Height:    0,
+			Timestamp: time.Now().UTC(),
+		},
 		PayloadHash: unittest.IdentifierFixture(),
-		Timestamp:   time.Now().UTC(),
 	}
 	return header
 }

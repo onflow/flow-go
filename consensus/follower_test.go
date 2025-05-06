@@ -91,11 +91,13 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	parentID, err := flow.HexStringToIdentifier("aa7693d498e9a087b1cadf5bfe9a1ff07829badc1915c210e482f369f9a00a70")
 	require.NoError(s.T(), err)
 	s.rootHeader = &flow.Header{
-		ParentID:   parentID,
-		Timestamp:  time.Now().UTC(),
-		Height:     21053,
-		View:       52078,
-		ParentView: 52077,
+		HeaderBody: flow.HeaderBody{
+			ParentID:   parentID,
+			Timestamp:  time.Now().UTC(),
+			Height:     21053,
+			View:       52078,
+			ParentView: 52077,
+		},
 	}
 
 	signerIndices, err := signature.EncodeSignersToIndices(identities.NodeIDs(), identities.NodeIDs()[:3])

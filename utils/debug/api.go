@@ -27,10 +27,12 @@ func GetExecutionAPIBlockHeader(
 	}
 
 	return &flow.Header{
-		ChainID:   flow.ChainID(resp.Block.ChainId),
-		ParentID:  flow.Identifier(resp.Block.ParentId),
-		Height:    resp.Block.Height,
-		Timestamp: resp.Block.Timestamp.AsTime(),
+		HeaderBody: flow.HeaderBody{
+			ChainID:   flow.ChainID(resp.Block.ChainId),
+			ParentID:  flow.Identifier(resp.Block.ParentId),
+			Height:    resp.Block.Height,
+			Timestamp: resp.Block.Timestamp.AsTime(),
+		},
 	}, nil
 }
 
@@ -52,9 +54,11 @@ func GetAccessAPIBlockHeader(
 	}
 
 	return &flow.Header{
-		ChainID:   flow.ChainID(resp.Block.ChainId),
-		ParentID:  flow.Identifier(resp.Block.ParentId),
-		Height:    resp.Block.Height,
-		Timestamp: resp.Block.Timestamp.AsTime(),
+		HeaderBody: flow.HeaderBody{
+			ChainID:   flow.ChainID(resp.Block.ChainId),
+			ParentID:  flow.Identifier(resp.Block.ParentId),
+			Height:    resp.Block.Height,
+			Timestamp: resp.Block.Timestamp.AsTime(),
+		},
 	}, nil
 }

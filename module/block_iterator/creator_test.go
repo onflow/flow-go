@@ -19,14 +19,14 @@ import (
 // TestCanSkipIfThereIsNoBlockToIterate: skip iterationg if there is no block to iterate
 
 func TestCanIterate(t *testing.T) {
-	root := &flow.Header{Height: 0}
+	root := &flow.Header{HeaderBody: flow.HeaderBody{Height: 0}}
 	// Create mock blocks
 	blocks := []*flow.Header{
-		{Height: 1},
-		{Height: 2},
-		{Height: 3},
-		{Height: 4},
-		{Height: 5},
+		{HeaderBody: flow.HeaderBody{Height: 1}},
+		{HeaderBody: flow.HeaderBody{Height: 2}},
+		{HeaderBody: flow.HeaderBody{Height: 3}},
+		{HeaderBody: flow.HeaderBody{Height: 4}},
+		{HeaderBody: flow.HeaderBody{Height: 5}},
 	}
 
 	// Mock getBlockIDByHeight function
@@ -90,9 +90,9 @@ func TestCanIterate(t *testing.T) {
 
 	// Additional blocks to be added later
 	additionalBlocks := []*flow.Header{
-		{Height: 6},
-		{Height: 7},
-		{Height: 8},
+		{HeaderBody: flow.HeaderBody{Height: 6}},
+		{HeaderBody: flow.HeaderBody{Height: 7}},
+		{HeaderBody: flow.HeaderBody{Height: 8}},
 	}
 	visitedBlocks = make([]flow.Identifier, 0, len(additionalBlocks))
 
@@ -137,14 +137,14 @@ func TestCanIterate(t *testing.T) {
 
 func TestCanResume(t *testing.T) {
 
-	root := &flow.Header{Height: 0}
+	root := &flow.Header{HeaderBody: flow.HeaderBody{Height: 0}}
 	// Create mock blocks
 	blocks := []*flow.Header{
-		{Height: 1},
-		{Height: 2},
-		{Height: 3},
-		{Height: 4},
-		{Height: 5},
+		{HeaderBody: flow.HeaderBody{Height: 1}},
+		{HeaderBody: flow.HeaderBody{Height: 2}},
+		{HeaderBody: flow.HeaderBody{Height: 3}},
+		{HeaderBody: flow.HeaderBody{Height: 4}},
+		{HeaderBody: flow.HeaderBody{Height: 5}},
 	}
 
 	// Mock getBlockIDByHeight function
@@ -195,9 +195,9 @@ func TestCanResume(t *testing.T) {
 
 	// Additional blocks to be added later
 	additionalBlocks := []*flow.Header{
-		{Height: 6},
-		{Height: 7},
-		{Height: 8},
+		{HeaderBody: flow.HeaderBody{Height: 6}},
+		{HeaderBody: flow.HeaderBody{Height: 7}},
+		{HeaderBody: flow.HeaderBody{Height: 8}},
 	}
 
 	// Update blocks so that the latest block is updated, and getBlockIDByHeight
@@ -240,11 +240,11 @@ func TestCanResume(t *testing.T) {
 func TestCanSkipViewsIfNotIndexed(t *testing.T) {
 	// Create mock blocks with some indexed and some not
 	blocks := []*flow.Header{
-		{View: 1},
-		{View: 2},
-		{View: 3},
-		{View: 5},
-		{View: 7},
+		{HeaderBody: flow.HeaderBody{View: 1}},
+		{HeaderBody: flow.HeaderBody{View: 2}},
+		{HeaderBody: flow.HeaderBody{View: 3}},
+		{HeaderBody: flow.HeaderBody{View: 5}},
+		{HeaderBody: flow.HeaderBody{View: 7}},
 	}
 
 	// Mock getBlockIDByHeight function
@@ -262,7 +262,7 @@ func TestCanSkipViewsIfNotIndexed(t *testing.T) {
 	progress := &mockProgress{}
 
 	// Mock getRoot and latest functions
-	root := &flow.Header{View: 0}
+	root := &flow.Header{HeaderBody: flow.HeaderBody{View: 0}}
 	latest := func() (*flow.Header, error) {
 		return blocks[len(blocks)-1], nil
 	}
@@ -312,7 +312,7 @@ func TestCanSkipViewsIfNotIndexed(t *testing.T) {
 
 func TestCanSkipIfThereIsNoBlockToIterate(t *testing.T) {
 	// Set up root block
-	root := &flow.Header{Height: 10}
+	root := &flow.Header{HeaderBody: flow.HeaderBody{Height: 10}}
 
 	// Mock getBlockIDByHeight function
 	getBlockIDByHeight := func(height uint64) (flow.Identifier, error) {
