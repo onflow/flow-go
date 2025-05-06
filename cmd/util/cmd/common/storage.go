@@ -94,6 +94,19 @@ func ParseTwoDBDirs(flags DBFlags) (TwoDBDirs, error) {
 	}, nil
 }
 
+func InitBadgerStorage(flags DBFlags) (*badger.DB, error) {
+	datadir, err := ParseOneDBUsedDir(flags)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse db dir: %w", err)
+	}
+
+	if datadir.UseDB != UsedDBBadger {
+		return nil, fmt.Errorf("only badger db is supported, got: %s", datadir.UseDB)
+	}
+
+	return InitStorage(datadir.DBDir), nil
+}
+
 func InitStorage(datadir string) *badger.DB {
 	return InitStorageWithTruncate(datadir, false)
 }

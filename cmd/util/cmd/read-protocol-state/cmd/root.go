@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	flagDB common.DBFlags
+	flagDBs common.DBFlags
 )
 
 var rootCmd = &cobra.Command{
@@ -28,7 +28,7 @@ func Execute() {
 }
 
 func init() {
-	flagDB = common.InitWithDBFlags(rootCmd)
+	flagDBs = common.InitWithDBFlags(rootCmd)
 
 	cobra.OnInitialize(initConfig)
 }

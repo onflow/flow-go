@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/storage"
@@ -10,8 +11,12 @@ import (
 
 // InitStorages initializes the badger storages
 func InitStorages() (*storage.All, *badger.DB) {
-	usedDir := common.ParseOneDBUsedDir(flagDBs)
-	db := common.InitStorage(flagDatadir)
+	usedDir, err := common.ParseOneDBUsedDir(flagDBs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not parse db flag")
+	}
+
+	db := common.InitStorage(usedDir.DBDir)
 	storages := common.InitStorages(db)
 	return storages, db
 }
