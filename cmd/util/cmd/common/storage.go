@@ -162,7 +162,6 @@ func InitExecutionStorages(bdb *badger.DB) *storage.Execution {
 }
 
 // WithStorage runs the given function with the storage depending on the flags.
-// Only one flag (datadir / pebble-dir) is allowed to be set
 func WithStorage(flags DBFlags, f func(storage.DB) error) error {
 	usedDir, err := ParseOneDBUsedDir(flags)
 	if err != nil {
@@ -174,7 +173,7 @@ func WithStorage(flags DBFlags, f func(storage.DB) error) error {
 	if usedDir.UseDB == UsedDBPebble {
 		db, err := pebblestorage.MustOpenDefaultPebbleDB(log.Logger, usedDir.DBDir)
 		if err != nil {
-			return err
+			return fmt.Errorf("can not open pebble db at %v: %w", usedDir.DBDir, err)
 		}
 
 		defer db.Close()
