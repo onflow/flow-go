@@ -196,7 +196,7 @@ func loadRegistersByAccount() *registers.ByAccount {
 		log.Info().Msgf("Reading trie %s", flagStateCommitment)
 
 		stateCommitment := util.ParseStateCommitment(flagStateCommitment)
-		payloads, err = util.ReadTrie(flagState, stateCommitment)
+		payloads, err = util.ReadTrieForPayloads(flagState, stateCommitment)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to read state")
 		}
