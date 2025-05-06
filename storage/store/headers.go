@@ -20,6 +20,7 @@ type Headers struct {
 
 func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 
+	// TODO: the current cache structure doesn't work well to pass in auxiliary info like the lock context
 	store := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
 		return operation.InsertHeader(rw.Writer(), blockID, header)
 	}
