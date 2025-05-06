@@ -6,6 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -30,14 +32,15 @@ type cachedLatest struct {
 }
 
 type State struct {
-	metrics module.ComplianceMetrics
-	db      storage.DB
-	headers storage.Headers
-	blocks  storage.Blocks
-	qcs     storage.QuorumCertificates
-	results storage.ExecutionResults
-	seals   storage.Seals
-	epoch   struct {
+	metrics     module.ComplianceMetrics
+	db          storage.DB
+	lockManager lockctx.Manager
+	headers     storage.Headers
+	blocks      storage.Blocks
+	qcs         storage.QuorumCertificates
+	results     storage.ExecutionResults
+	seals       storage.Seals
+	epoch       struct {
 		setups  storage.EpochSetups
 		commits storage.EpochCommits
 	}
@@ -89,6 +92,7 @@ func SkipNetworkAddressValidation(conf *BootstrapConfig) {
 func Bootstrap(
 	metrics module.ComplianceMetrics,
 	db storage.DB,
+	lockManager lockctx.Manager,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
@@ -102,6 +106,16 @@ func Bootstrap(
 	root protocol.Snapshot,
 	options ...BootstrapConfigOptions,
 ) (*State, error) {
+	lctx := lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockInsertBlock)
+	if err != nil {
+		return nil, err
+	}
+	err = lctx.AcquireLock(storage.LockFinalizeBlock)
+	if err != nil {
+		return nil, err
+	}
 
 	config := defaultBootstrapConfig()
 	for _, opt := range options {
@@ -140,7 +154,7 @@ func Bootstrap(
 		// bootstrap the sealing segment
 		// creating sealed root block with the rootResult
 		// creating finalized root block with lastFinalized
-		err = bootstrapSealingSegment(rw, blocks, qcs, segment, lastFinalized, rootSeal)
+		err = bootstrapSealingSegment(lctx, rw, blocks, qcs, segment, lastFinalized, rootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap sealing chain segment blocks: %w", err)
 		}
@@ -209,6 +223,7 @@ func Bootstrap(
 	return newState(
 		metrics,
 		db,
+		lockManager,
 		headers,
 		seals,
 		results,
@@ -274,6 +289,7 @@ func bootstrapProtocolState(
 // bootstrapSealingSegment inserts all blocks and associated metadata for the
 // protocol state root snapshot to disk.
 func bootstrapSealingSegment(
+	lctx lockctx.Proof,
 	rw storage.ReaderBatchWriter,
 	blocks storage.Blocks,
 	qcs storage.QuorumCertificates,
@@ -320,7 +336,7 @@ func bootstrapSealingSegment(
 		if err != nil {
 			return fmt.Errorf("could not insert SealingSegment extra block: %w", err)
 		}
-		err = operation.IndexBlockHeight(rw, height, blockID)
+		err = operation.IndexBlockHeight(lctx, rw, height, blockID)
 		if err != nil {
 			return fmt.Errorf("could not index SealingSegment extra block (id=%x): %w", blockID, err)
 		}
@@ -343,7 +359,7 @@ func bootstrapSealingSegment(
 		if err != nil {
 			return fmt.Errorf("could not insert SealingSegment block: %w", err)
 		}
-		err = operation.IndexBlockHeight(rw, height, blockID)
+		err = operation.IndexBlockHeight(lctx, rw, height, blockID)
 		if err != nil {
 			return fmt.Errorf("could not index SealingSegment block (id=%x): %w", blockID, err)
 		}
@@ -635,6 +651,7 @@ func indexEpochHeights(lock *sync.Mutex, rw storage.ReaderBatchWriter, segment *
 func OpenState(
 	metrics module.ComplianceMetrics,
 	db storage.DB,
+	lockManager lockctx.Manager,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
@@ -669,6 +686,7 @@ func OpenState(
 	state, err := newState(
 		metrics,
 		db,
+		lockManager,
 		headers,
 		seals,
 		results,
@@ -773,6 +791,7 @@ func (state *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
 func newState(
 	metrics module.ComplianceMetrics,
 	db storage.DB,
+	lockManager lockctx.Manager,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
@@ -786,13 +805,14 @@ func newState(
 	params protocol.Params,
 ) (*State, error) {
 	state := &State{
-		metrics: metrics,
-		db:      db,
-		headers: headers,
-		results: results,
-		seals:   seals,
-		blocks:  blocks,
-		qcs:     qcs,
+		metrics:     metrics,
+		db:          db,
+		lockManager: lockManager,
+		headers:     headers,
+		results:     results,
+		seals:       seals,
+		blocks:      blocks,
+		qcs:         qcs,
 		epoch: struct {
 			setups  storage.EpochSetups
 			commits storage.EpochCommits

@@ -680,6 +680,13 @@ func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow
 // Hence, the parent of `blockID` has to be the last finalized block.
 // No errors are expected during normal operations.
 func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) error {
+	lctx := m.lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockFinalizeBlock)
+	if err != nil {
+		return err
+	}
+
 	// preliminaries: start tracer and retrieve full block
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorFinalize)
 	defer span.End()
@@ -757,7 +764,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	//   its payload, in which case the parent's seal is the same.
 	// * set the epoch fallback flag, if it is triggered
 	err = m.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		err = operation.IndexBlockHeight(rw, header.Height, blockID)
+		err = operation.IndexBlockHeight(lctx, rw, header.Height, blockID)
 		if err != nil {
 			return fmt.Errorf("could not insert number mapping: %w", err)
 		}

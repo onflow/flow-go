@@ -1367,6 +1367,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 		state, err := badgerState.OpenState(
 			fnb.Metrics.Compliance,
 			fnb.ProtocolDB,
+			fnb.StorageLockMgr,
 			fnb.Storage.Headers,
 			fnb.Storage.Seals,
 			fnb.Storage.Results,
@@ -1416,6 +1417,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 		fnb.State, err = badgerState.Bootstrap(
 			fnb.Metrics.Compliance,
 			fnb.ProtocolDB,
+			fnb.StorageLockMgr,
 			fnb.Storage.Headers,
 			fnb.Storage.Seals,
 			fnb.Storage.Results,

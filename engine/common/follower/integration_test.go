@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -28,6 +29,7 @@ import (
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/util"
+	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -50,12 +52,14 @@ func TestFollowerHappyPath(t *testing.T) {
 		tracer := trace.NewNoopTracer()
 		log := unittest.Logger()
 		consumer := events.NewNoop()
+		lockManager := lockctx.NewManager(storage.Locks(), storage.Policy())
 		all := bstorage.InitAll(metrics, db)
 
 		// bootstrap root snapshot
 		state, err := pbadger.Bootstrap(
 			metrics,
 			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,

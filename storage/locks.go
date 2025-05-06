@@ -14,5 +14,7 @@ func Locks() []string {
 }
 
 func Policy() lockctx.Policy {
-	return lockctx.NewDAGPolicyBuilder().Build()
+	return lockctx.NewDAGPolicyBuilder().
+		Add(LockInsertBlock, LockFinalizeBlock).
+		Build()
 }
