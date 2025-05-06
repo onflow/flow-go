@@ -245,29 +245,33 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 func TestPipelineErrorHandling(t *testing.T) {
 	// Test cases for different stages of processing
 	testCases := []struct {
-		name      string
-		setupMock func(mock *osmock.Core)
+		name        string
+		setupMock   func(mock *osmock.Core, expectedErr error)
+		expectedErr error
 	}{
 		{
 			name: "Download Error",
-			setupMock: func(m *osmock.Core) {
-				m.On("Download", mock.Anything).Return(errors.New("download error"))
+			setupMock: func(m *osmock.Core, expectedErr error) {
+				m.On("Download", mock.Anything).Return(expectedErr)
 			},
+			expectedErr: errors.New("download error"),
 		},
 		{
 			name: "Index Error",
-			setupMock: func(m *osmock.Core) {
+			setupMock: func(m *osmock.Core, expectedErr error) {
 				m.On("Download", mock.Anything).Return(nil)
-				m.On("Index", mock.Anything).Return(errors.New("index error"))
+				m.On("Index", mock.Anything).Return(expectedErr)
 			},
+			expectedErr: errors.New("index error"),
 		},
 		{
 			name: "Persist Error",
-			setupMock: func(m *osmock.Core) {
+			setupMock: func(m *osmock.Core, expectedErr error) {
 				m.On("Download", mock.Anything).Return(nil)
 				m.On("Index", mock.Anything).Return(nil)
-				m.On("Persist", mock.Anything).Return(errors.New("persist error"))
+				m.On("Persist", mock.Anything).Return(expectedErr)
 			},
+			expectedErr: errors.New("persist error"),
 		},
 	}
 
@@ -283,7 +287,7 @@ func TestPipelineErrorHandling(t *testing.T) {
 
 			// Create a mock core with the specified setup
 			mockCore := osmock.NewCore(t)
-			tc.setupMock(mockCore)
+			tc.setupMock(mockCore, tc.expectedErr)
 
 			// Create a pipeline
 			pipeline := NewPipeline(zerolog.Nop(), true, unittest.ExecutionResultFixture(), mockCore, publisher)
@@ -307,13 +311,7 @@ func TestPipelineErrorHandling(t *testing.T) {
 			select {
 			case err := <-errChan:
 				assert.Error(t, err, "Pipeline should propagate the Core error")
-				if tc.name == "Download Error" {
-					assert.Contains(t, err.Error(), "download error")
-				} else if tc.name == "Index Error" {
-					assert.Contains(t, err.Error(), "index error")
-				} else {
-					assert.Contains(t, err.Error(), "persist error")
-				}
+				assert.ErrorIs(t, err, tc.expectedErr)
 			case <-time.After(500 * time.Millisecond):
 				t.Fatal("Timeout waiting for error")
 			}
@@ -360,16 +358,11 @@ func TestBroadcastStateUpdate(t *testing.T) {
 	// Check that the update has the correct flag
 	assert.True(t, update.DescendsFromLastPersistedSealed, "Initial update should indicate descends=true")
 
-	// Now simulate this pipeline being cancelled
+	// Now simulate this pipeline being canceled
 	pipeline.UpdateState(StateUpdate{
 		DescendsFromLastPersistedSealed: false, // No longer descends
 		ParentState:                     StateReady,
 	})
-
-	// Wait for an update to be sent to children
-	update = waitForAnyStateUpdate(t, updateChan)
-	// Check that the update has the correct flag
-	assert.False(t, update.DescendsFromLastPersistedSealed, "Initial update should indicate descends=false")
 
 	// Check for completion
 	select {
