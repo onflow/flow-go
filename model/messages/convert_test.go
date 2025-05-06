@@ -21,7 +21,7 @@ func TestBlockProposal(t *testing.T) {
 
 func TestClusterBlockProposal(t *testing.T) {
 	block := unittest.ClusterBlockFixture()
-	proposal := unittest.ClusterProposalFromBlock(&block)
+	proposal := unittest.ClusterProposalFromBlock(block)
 	proposalMsg := messages.UntrustedClusterProposalFromInternal(proposal)
 	converted := proposalMsg.ToInternal()
 	assert.Equal(t, proposal, converted)
@@ -42,7 +42,7 @@ func TestBlockResponse(t *testing.T) {
 func TestClusterBlockResponse(t *testing.T) {
 	b1 := unittest.ClusterBlockFixture()
 	b2 := unittest.ClusterBlockFixture()
-	expected := []*cluster.BlockProposal{unittest.ClusterProposalFromBlock(&b1), unittest.ClusterProposalFromBlock(&b2)}
+	expected := []*cluster.BlockProposal{unittest.ClusterProposalFromBlock(b1), unittest.ClusterProposalFromBlock(b2)}
 	res := messages.ClusterBlockResponse{
 		Blocks: []messages.UntrustedClusterProposal{
 			*messages.UntrustedClusterProposalFromInternal(expected[0]),

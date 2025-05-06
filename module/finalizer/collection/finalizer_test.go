@@ -25,7 +25,7 @@ func TestFinalizer(t *testing.T) {
 		// reference block on the main consensus chain
 		refBlock := unittest.ClusterBlockFixture()
 		// genesis block for the cluster chain
-		genesis := model.Genesis()
+		genesis := *model.Genesis()
 
 		metrics := metrics.NewNoopCollector()
 
@@ -46,7 +46,7 @@ func TestFinalizer(t *testing.T) {
 
 		// a helper function to bootstrap with the genesis block
 		bootstrap := func() {
-			stateRoot, err := cluster.NewStateRoot(genesis, unittest.QuorumCertificateFixture(), 0)
+			stateRoot, err := cluster.NewStateRoot(&genesis, unittest.QuorumCertificateFixture(), 0)
 			require.NoError(t, err)
 			state, err = cluster.Bootstrap(db, stateRoot)
 			require.NoError(t, err)
@@ -56,7 +56,7 @@ func TestFinalizer(t *testing.T) {
 
 		// a helper function to insert a block
 		insert := func(block model.Block) {
-			err := db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(&block)))
+			err := db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
 			assert.NoError(t, err)
 		}
 
@@ -201,7 +201,7 @@ func TestFinalizer(t *testing.T) {
 			insert(block1)
 
 			// create a block containing tx2 on top of block1
-			block2 := unittest.ClusterBlockWithParentAndPayload(&block1, model.PayloadFromTransactions(refBlock.ID(), &tx2))
+			block2 := unittest.ClusterBlockWithParentAndPayload(block1, model.PayloadFromTransactions(refBlock.ID(), &tx2))
 			insert(block2)
 
 			// both blocks should be passed to pusher
@@ -254,7 +254,7 @@ func TestFinalizer(t *testing.T) {
 			insert(block1)
 
 			// create a block containing tx2 on top of block1
-			block2 := unittest.ClusterBlockWithParentAndPayload(&block1, model.PayloadFromTransactions(refBlock.ID(), &tx2))
+			block2 := unittest.ClusterBlockWithParentAndPayload(block1, model.PayloadFromTransactions(refBlock.ID(), &tx2))
 			insert(block2)
 
 			// block should be passed to pusher

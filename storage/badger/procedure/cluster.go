@@ -62,7 +62,7 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 		}
 
 		// overwrite block
-		*block = *cluster.NewBlock(header.HeaderBody, payload)
+		*block = cluster.NewBlock(header.HeaderBody, payload)
 
 		return nil
 	}

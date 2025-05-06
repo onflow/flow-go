@@ -31,7 +31,7 @@ func TestGenerateClusterRootQC(t *testing.T) {
 	)
 
 	orderedParticipants := model.ToIdentityList(participants).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
-	_, err := GenerateClusterRootQC(participants, orderedParticipants, clusterBlock)
+	_, err := GenerateClusterRootQC(participants, orderedParticipants, &clusterBlock)
 	require.NoError(t, err)
 }
 

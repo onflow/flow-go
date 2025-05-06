@@ -31,6 +31,7 @@ func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) *c
 		ParentVoterSigData: nil,
 		ProposerID:         flow.ZeroID,
 	}
+	block := cluster.NewBlock(headerBody, rootBlockPayload)
 
-	return cluster.NewBlock(headerBody, rootBlockPayload)
+	return &block
 }
