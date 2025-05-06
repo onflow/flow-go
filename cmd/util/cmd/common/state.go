@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
@@ -14,10 +15,12 @@ import (
 
 func InitProtocolState(db *badger.DB, storages *storage.All) (protocol.State, error) {
 	metrics := &metrics.NoopCollector{}
+	lockManager := lockctx.NewManager(storage.Locks(), storage.Policy())
 
 	protocolState, err := protocolbadger.OpenState(
 		metrics,
 		badgerimpl.ToDB(db),
+		lockManager,
 		storages.Headers,
 		storages.Seals,
 		storages.Results,
