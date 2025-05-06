@@ -16,6 +16,7 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
@@ -28,6 +29,7 @@ import (
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/topology"
+	"github.com/onflow/flow-go/storage"
 )
 
 type SkipReason int
@@ -436,6 +438,16 @@ func RunWithTypedPebbleDB(
 		}()
 		f(db)
 	})
+}
+
+func LockManagerWithContext(t *testing.T, locks ...string) (lockctx.Manager, lockctx.Context) {
+	lockManager := lockctx.NewManager(storage.Locks(), storage.Policy())
+	lctx := lockManager.NewContext()
+	for _, lock := range locks {
+		err := lctx.AcquireLock(lock)
+		require.NoError(t, err)
+	}
+	return lockManager, lctx
 }
 
 func Concurrently(n int, f func(int)) {

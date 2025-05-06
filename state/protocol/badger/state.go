@@ -3,7 +3,6 @@ package badger
 import (
 	"errors"
 	"fmt"
-	"sync"
 	"sync/atomic"
 
 	"github.com/jordanschalm/lockctx"
@@ -170,7 +169,7 @@ func Bootstrap(
 		}
 
 		// initialize the current protocol state height/view pointers
-		err = bootstrapStatePointers(rw, root)
+		err = bootstrapStatePointers(lctx, rw, root)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap height/view pointers: %w", err)
 		}
@@ -408,7 +407,7 @@ func bootstrapSealingSegment(
 
 // bootstrapStatePointers instantiates special pointers used to by the protocol
 // state to keep track of special block heights and views.
-func bootstrapStatePointers(rw storage.ReaderBatchWriter, root protocol.Snapshot) error {
+func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, root protocol.Snapshot) error {
 	segment, err := root.SealingSegment()
 	if err != nil {
 		return fmt.Errorf("could not get sealing segment: %w", err)
@@ -453,7 +452,6 @@ func bootstrapStatePointers(rw storage.ReaderBatchWriter, root protocol.Snapshot
 	}
 
 	w := rw.Writer()
-	bootstrapping := &sync.Mutex{}
 	// insert initial views for HotStuff
 	err = operation.UpsertSafetyData(w, highest.Header.ChainID, safetyData)
 	if err != nil {
@@ -474,11 +472,11 @@ func bootstrapStatePointers(rw storage.ReaderBatchWriter, root protocol.Snapshot
 	if err != nil {
 		return fmt.Errorf("could not insert sealed root height: %w", err)
 	}
-	err = operation.UpsertFinalizedHeight(w, highest.Header.Height)
+	err = operation.UpsertFinalizedHeight(lctx, w, highest.Header.Height)
 	if err != nil {
 		return fmt.Errorf("could not insert finalized height: %w", err)
 	}
-	err = operation.UpsertSealedHeight(w, lowest.Header.Height)
+	err = operation.UpsertSealedHeight(lctx, w, lowest.Header.Height)
 	if err != nil {
 		return fmt.Errorf("could not insert sealed height: %w", err)
 	}
@@ -488,7 +486,7 @@ func bootstrapStatePointers(rw storage.ReaderBatchWriter, root protocol.Snapshot
 	}
 
 	// insert first-height indices for epochs which begin within the sealing segment
-	err = indexEpochHeights(bootstrapping, rw, segment)
+	err = indexEpochHeights(lctx, rw, segment)
 	if err != nil {
 		return fmt.Errorf("could not index epoch heights: %w", err)
 	}
@@ -614,13 +612,13 @@ func bootstrapSporkInfo(rw storage.ReaderBatchWriter, root protocol.Snapshot) er
 // We index the FirstHeight for every epoch where the transition occurs within the sealing segment of the root snapshot,
 // or for the first epoch of a spork if the snapshot is a spork root snapshot (1 block sealing segment).
 // No errors are expected during normal operation.
-func indexEpochHeights(lock *sync.Mutex, rw storage.ReaderBatchWriter, segment *flow.SealingSegment) error {
+func indexEpochHeights(lctx lockctx.Proof, rw storage.ReaderBatchWriter, segment *flow.SealingSegment) error {
 	// CASE 1: For spork root snapshots, there is exactly one block B and one epoch E.
 	// Index `E.counter → B.Height`.
 	if segment.IsSporkRoot() {
 		counter := segment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
 		firstHeight := segment.Highest().Header.Height
-		err := operation.InsertEpochFirstHeight(lock, rw, counter, firstHeight)
+		err := operation.InsertEpochFirstHeight(lctx, rw, counter, firstHeight)
 		if err != nil {
 			return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, counter, err)
 		}
@@ -638,7 +636,7 @@ func indexEpochHeights(lock *sync.Mutex, rw storage.ReaderBatchWriter, segment *
 		thisBlockEpochCounter := segment.ProtocolStateEntries[block.Payload.ProtocolStateID].EpochEntry.EpochCounter()
 		if lastBlockEpochCounter != thisBlockEpochCounter {
 			firstHeight := block.Header.Height
-			err := operation.InsertEpochFirstHeight(lock, rw, thisBlockEpochCounter, firstHeight)
+			err := operation.InsertEpochFirstHeight(lctx, rw, thisBlockEpochCounter, firstHeight)
 			if err != nil {
 				return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, thisBlockEpochCounter, err)
 			}

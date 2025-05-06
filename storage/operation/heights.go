@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -24,7 +26,14 @@ func RetrieveSealedRootHeight(r storage.Reader, height *uint64) error {
 	return RetrieveByKey(r, MakePrefix(codeSealedRootHeight), height)
 }
 
-func UpsertFinalizedHeight(w storage.Writer, height uint64) error {
+// UpsertFinalizedHeight upserts the finalized height index, overwriting the current value.
+// Updates to this index must strictly increase the finalized height.
+// To enforce this, the caller must hold [storage.LockFinalizeBlock].
+// TODO: read prior sealed here as well, for additional safety?
+func UpsertFinalizedHeight(lctx lockctx.Proof, w storage.Writer, height uint64) error {
+	if !lctx.HoldsLock(storage.LockFinalizeBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockFinalizeBlock)
+	}
 	return UpsertByKey(w, MakePrefix(codeFinalizedHeight), height)
 }
 
@@ -32,7 +41,14 @@ func RetrieveFinalizedHeight(r storage.Reader, height *uint64) error {
 	return RetrieveByKey(r, MakePrefix(codeFinalizedHeight), height)
 }
 
-func UpsertSealedHeight(w storage.Writer, height uint64) error {
+// UpsertSealedHeight upserts the sealed height index, overwriting the current value.
+// Updates to this index must strictly increase the sealed height.
+// To enforce this, the caller must hold [storage.LockFinalizeBlock].
+// TODO: read prior sealed here as well, for additional safety?
+func UpsertSealedHeight(lctx lockctx.Proof, w storage.Writer, height uint64) error {
+	if !lctx.HoldsLock(storage.LockFinalizeBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockFinalizeBlock)
+	}
 	return UpsertByKey(w, MakePrefix(codeSealedHeight), height)
 }
 
@@ -43,16 +59,18 @@ func RetrieveSealedHeight(r storage.Reader, height *uint64) error {
 // InsertEpochFirstHeight inserts the height of the first block in the given epoch.
 // The first block of an epoch E is the finalized block with view >= E.FirstView.
 // Although we don't store the final height of an epoch, it can be inferred from this index.
+// The caller must hold [storage.LockFinalizeBlock]. This function enforces each index is written exactly once.
 // Returns storage.ErrAlreadyExists if the height has already been indexed.
-func InsertEpochFirstHeight(lock *sync.Mutex, rw storage.ReaderBatchWriter, epoch, height uint64) error {
-	rw.Lock(lock)
+func InsertEpochFirstHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, epoch, height uint64) error {
+	if !lctx.HoldsLock(storage.LockFinalizeBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockFinalizeBlock)
+	}
 
-	var exisingHeight uint64
-	err := RetrieveEpochFirstHeight(rw.GlobalReader(), epoch, &exisingHeight)
+	var existingHeight uint64
+	err := RetrieveEpochFirstHeight(rw.GlobalReader(), epoch, &existingHeight)
 	if err == nil {
 		return storage.ErrAlreadyExists
 	}
-
 	if !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("failed to check existing epoch first height: %w", err)
 	}

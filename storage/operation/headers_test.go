@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,13 +66,10 @@ func TestBlockHeightIndexLookup(t *testing.T) {
 		height := uint64(1337)
 		expected := flow.Identifier{0x01, 0x02, 0x03}
 
-		mgr := lockctx.NewManager(storage.Locks(), storage.Policy())
-		lctx := mgr.NewContext()
-		err := lctx.AcquireLock(storage.LockFinalizeBlock)
-		require.NoError(t, err)
+		_, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
 		defer lctx.Release()
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.IndexBlockHeight(lctx, rw, height, expected)
 		})
 		require.NoError(t, err)

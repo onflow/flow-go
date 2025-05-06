@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -42,10 +42,6 @@ type FollowerState struct {
 	consumer      protocol.Consumer
 	blockTimer    protocol.BlockTimer
 	protocolState protocol.MutableProtocolState
-
-	// locks
-	indexingNewBlock *sync.Mutex
-	finalizing       *sync.Mutex
 }
 
 var _ protocol.FollowerState = (*FollowerState)(nil)
@@ -90,9 +86,6 @@ func NewFollowerState(
 			state.epoch.setups,
 			state.epoch.commits,
 		),
-
-		indexingNewBlock: &sync.Mutex{},
-		finalizing:       &sync.Mutex{},
 	}
 	return followerState, nil
 }
@@ -156,6 +149,13 @@ func NewFullConsensusState(
 //
 // No errors are expected during normal operations.
 func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate) error {
+	lctx := m.lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockInsertBlock)
+	if err != nil {
+		return err
+	}
+
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
 	defer span.End()
 
@@ -176,7 +176,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 
 	return m.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		// check if the block header is a valid extension of parent block
-		err = m.headerExtend(ctx, candidate, certifyingQC, rw)
+		err = m.headerExtend(ctx, lctx, candidate, certifyingQC, rw)
 		if err != nil {
 			// since we have a QC for this block, it cannot be an invalid extension
 			return fmt.Errorf("unexpected invalid block (id=%x) with certifying qc (id=%x): %s",
@@ -231,6 +231,13 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 //   - state.InvalidExtensionError if the candidate block is invalid
 func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) error {
+	lctx := m.lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockInsertBlock)
+	if err != nil {
+		return err
+	}
+
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
 	defer span.End()
 
@@ -243,7 +250,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 	return m.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 
 		// check if the block header is a valid extension of parent block
-		err = m.headerExtend(ctx, candidate, nil, rw)
+		err = m.headerExtend(ctx, lctx, candidate, nil, rw)
 		if err != nil {
 			return fmt.Errorf("header not compliant with chain state: %w", err)
 		}
@@ -320,7 +327,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 //
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the candidate block is invalid
-func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate, rw storage.ReaderBatchWriter) error {
+func (m *FollowerState) headerExtend(ctx context.Context, lctx lockctx.Proof, candidate *flow.Block, certifyingQC *flow.QuorumCertificate, rw storage.ReaderBatchWriter) error {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckHeader)
 	defer span.End()
 	blockID := candidate.ID()
@@ -397,7 +404,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 	if err != nil {
 		return fmt.Errorf("could not store candidate block: %w", err)
 	}
-	err = procedure.IndexNewBlock(m.indexingNewBlock, rw, blockID, candidate.Header.ParentID)
+	err = procedure.IndexNewBlock(lctx, rw, blockID, candidate.Header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not index new block: %w", err)
 	}
@@ -768,17 +775,17 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		if err != nil {
 			return fmt.Errorf("could not insert number mapping: %w", err)
 		}
-		err = operation.UpsertFinalizedHeight(rw.Writer(), header.Height)
+		err = operation.UpsertFinalizedHeight(lctx, rw.Writer(), header.Height)
 		if err != nil {
 			return fmt.Errorf("could not update finalized height: %w", err)
 		}
-		err = operation.UpsertSealedHeight(rw.Writer(), sealed.Height)
+		err = operation.UpsertSealedHeight(lctx, rw.Writer(), sealed.Height)
 		if err != nil {
 			return fmt.Errorf("could not update sealed height: %w", err)
 		}
 
 		if isFirstBlockOfEpoch(parentEpochState, finalizingEpochState) {
-			err = operation.InsertEpochFirstHeight(m.finalizing, rw, currentEpochSetup.Counter, header.Height)
+			err = operation.InsertEpochFirstHeight(lctx, rw, currentEpochSetup.Counter, header.Height)
 			if err != nil {
 				return fmt.Errorf("could not insert epoch first block height: %w", err)
 			}
