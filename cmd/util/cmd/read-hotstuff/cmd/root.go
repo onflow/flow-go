@@ -11,7 +11,6 @@ import (
 )
 
 var (
-	flagDBs   common.DBFlags
 	flagChain string
 )
 
@@ -30,7 +29,7 @@ func Execute() {
 }
 
 func init() {
-	flagDBs = common.InitWithDBFlags(rootCmd)
+	common.InitWithDBFlags(rootCmd)
 
 	rootCmd.PersistentFlags().StringVar(&flagChain, "chain", "", "Chain name, e.g. flow-mainnet, flow-testnet")
 	_ = rootCmd.MarkPersistentFlagRequired("chain")

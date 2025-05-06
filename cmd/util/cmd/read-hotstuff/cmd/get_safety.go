@@ -21,6 +21,7 @@ func init() {
 }
 
 func runGetSafetyData(*cobra.Command, []string) {
+	flagDBs := common.ReadDBFlags()
 	err := common.WithStorage(flagDBs, func(db storage.DB) error {
 
 		chainID := flow.ChainID(flagChain)

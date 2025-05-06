@@ -47,6 +47,7 @@ func init() {
 }
 
 func runSnapshot(*cobra.Command, []string) {
+	flagDBs := common.ReadDBFlags()
 	db, err := common.InitBadgerStorage(flagDBs)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not init badger db")

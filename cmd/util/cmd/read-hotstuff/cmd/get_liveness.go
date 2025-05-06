@@ -21,6 +21,7 @@ func init() {
 }
 
 func runGetLivenessData(*cobra.Command, []string) {
+	flagDBs := common.ReadDBFlags()
 	err := common.WithStorage(flagDBs, func(db storage.DB) error {
 		chainID := flow.ChainID(flagChain)
 		reader, err := persister.NewReader(db, chainID)

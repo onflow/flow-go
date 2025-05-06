@@ -24,7 +24,7 @@ const DefaultDB = "badger" // "badger|pebble"
 
 // InitWithDBFlags initializes the command with the database flags
 // and sets the default values for the flags
-func InitWithDBFlags(cmd *cobra.Command) DBFlags {
+func InitWithDBFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVarP(&flagBadgerDir, "datadir", "d", DefaultBadgerDir,
 		fmt.Sprintf("directory to the badger dababase, default: %s", DefaultBadgerDir))
 	// datadir flag does not have to be required, because...
@@ -34,7 +34,9 @@ func InitWithDBFlags(cmd *cobra.Command) DBFlags {
 		fmt.Sprintf("directory to the pebble dababase, default: %s", DefaultPebbleDir))
 
 	cmd.PersistentFlags().StringVar(&flagUseDB, "use-db", DefaultDB, "the database type to use, --badger (default) or --pebble")
+}
 
+func ReadDBFlags() DBFlags {
 	return DBFlags{
 		BadgerDir: flagBadgerDir,
 		PebbleDir: flagPebbleDir,

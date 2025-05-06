@@ -10,10 +10,6 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 )
 
-var (
-	flagDBs common.DBFlags
-)
-
 var rootCmd = &cobra.Command{
 	Use:   "read-protocol-state",
 	Short: "read storage data",
@@ -29,7 +25,7 @@ func Execute() {
 }
 
 func init() {
-	flagDBs = common.InitWithDBFlags(rootCmd)
+	common.InitWithDBFlags(rootCmd)
 
 	cobra.OnInitialize(initConfig)
 }
