@@ -13,7 +13,6 @@ type TransactionResultErrorMessages struct {
 	// TODO: A mutex isn't strictly necessary here since, by design, data is written only once
 	// before any future reads. However, we're keeping it temporarily during active development
 	// for safety and debugging purposes. It will be removed once the implementation is finalized.
-	// TODO(7355): lockctx
 	lock       sync.RWMutex
 	store      map[string]*flow.TransactionResultErrorMessage
 	indexStore map[string]*flow.TransactionResultErrorMessage

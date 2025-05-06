@@ -12,7 +12,6 @@ type Collections struct {
 	// that we write data only once and it happens before the future reads.
 	// We decided to leave a mutex for some time during active development.
 	// It'll be removed in the future.
-	// TODO(7355): lockctx
 	lock                           sync.RWMutex
 	collections                    map[flow.Identifier]*flow.Collection
 	lightCollections               map[flow.Identifier]*flow.LightCollection
