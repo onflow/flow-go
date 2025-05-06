@@ -78,8 +78,8 @@ func InitExecutionStorages(bdb *badger.DB) *storage.Execution {
 	}
 }
 
-// WithStorage runs the given function with the storage dependending on the flags
-// only one flag (datadir / pebble-dir) is allowed to be set
+// WithStorage runs the given function with the storage depending on the flags.
+// Only one flag (datadir / pebble-dir) is allowed to be set
 func WithStorage(dirs DBDirs, f func(storage.DB) error) error {
 	if dirs.Pebbledir != "" {
 		if dirs.Datadir != "" {
