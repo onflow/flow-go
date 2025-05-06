@@ -3,6 +3,7 @@ package common
 import (
 	"fmt"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -37,6 +38,12 @@ func InitWithDBFlags(cmd *cobra.Command) {
 }
 
 func ReadDBFlags() DBFlags {
+	log.Info().
+		Str("datadir", flagBadgerDir).
+		Str("pebble-dir", flagPebbleDir).
+		Str("use-db", flagUseDB).
+		Msgf("read initialized db flags")
+
 	return DBFlags{
 		BadgerDir: flagBadgerDir,
 		PebbleDir: flagPebbleDir,
