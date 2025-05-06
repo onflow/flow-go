@@ -28,8 +28,7 @@ func RetrieveSealedRootHeight(r storage.Reader, height *uint64) error {
 
 // UpsertFinalizedHeight upserts the finalized height index, overwriting the current value.
 // Updates to this index must strictly increase the finalized height.
-// To enforce this, the caller must hold [storage.LockFinalizeBlock].
-// TODO: read prior sealed here as well, for additional safety?
+// To enforce this, the caller must check the current finalized height while holding [storage.LockFinalizeBlock].
 func UpsertFinalizedHeight(lctx lockctx.Proof, w storage.Writer, height uint64) error {
 	if !lctx.HoldsLock(storage.LockFinalizeBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockFinalizeBlock)
@@ -43,8 +42,7 @@ func RetrieveFinalizedHeight(r storage.Reader, height *uint64) error {
 
 // UpsertSealedHeight upserts the sealed height index, overwriting the current value.
 // Updates to this index must strictly increase the sealed height.
-// To enforce this, the caller must hold [storage.LockFinalizeBlock].
-// TODO: read prior sealed here as well, for additional safety?
+// To enforce this, the caller must check the current sealed height while holding [storage.LockFinalizeBlock].
 func UpsertSealedHeight(lctx lockctx.Proof, w storage.Writer, height uint64) error {
 	if !lctx.HoldsLock(storage.LockFinalizeBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockFinalizeBlock)

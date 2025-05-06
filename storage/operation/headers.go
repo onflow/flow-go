@@ -18,11 +18,15 @@ func RetrieveHeader(r storage.Reader, blockID flow.Identifier, header *flow.Head
 	return RetrieveByKey(r, MakePrefix(codeHeader, blockID), header)
 }
 
-// IndexBlockHeight indexes the height of a block. It should only be called on finalized blocks.
+// IndexBlockHeight indexes the height of a block. It must only be called on finalized blocks.
+// This function guarantees that the index is only inserted once for each height.
+// The caller must acquire the [storage.LockFinalizeBlock] lock.
+// Returns [storage.ErrAlreadyExists] if an ID has already been finalized for this height.
 func IndexBlockHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, height uint64, blockID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockFinalizeBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockFinalizeBlock)
 	}
+
 	var existingID flow.Identifier
 	err := RetrieveByKey(rw.GlobalReader(), MakePrefix(codeHeightToBlock, height), &existingID)
 	if err == nil {
