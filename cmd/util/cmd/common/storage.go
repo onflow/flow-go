@@ -55,6 +55,8 @@ type OneDBDir struct {
 	DBDir string
 }
 
+// ParseOneDBUsedDir validates the database flags and
+// return a single database dir depending on the UseDB flag, which determine the database type
 func ParseOneDBUsedDir(flags DBFlags) (OneDBDir, error) {
 	if flags.UseDB == "pebble" {
 		if flags.PebbleDir == "" {
@@ -79,6 +81,7 @@ func ParseOneDBUsedDir(flags DBFlags) (OneDBDir, error) {
 	return OneDBDir{}, fmt.Errorf("unknown database type: %s", flags.UseDB)
 }
 
+// ParseTwoDBDirs requires both badger and pebble dirs are defined in flags
 func ParseTwoDBDirs(flags DBFlags) (TwoDBDirs, error) {
 	if flags.BadgerDir == "" {
 		return TwoDBDirs{}, fmt.Errorf("--datadir is required when using badger db")
