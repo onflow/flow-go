@@ -93,7 +93,7 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 	})
 }
 
-// TestBootstrapLedger_TokenTransfer bootstraps a ledger with:
+// TestBootstrapLedger_EmptyTransaction bootstraps a ledger with:
 // - transaction fees
 // - storage fees
 // - minimum account balance
@@ -103,7 +103,7 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 // - account storage check
 // - transaction fee deduction
 // This tests that the state commitment has not changed for the bookkeeping parts of the transaction.
-func TestBootstrapLedger_TokenTransfer(t *testing.T) {
+func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
 	expectedStateCommitmentBytes, _ := hex.DecodeString("df1937164702f557d7457f8fdd6040a81dfbcbdbfb93ec187c3bf1cac414f5c0")
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
@@ -141,7 +141,6 @@ func TestBootstrapLedger_TokenTransfer(t *testing.T) {
 		ctx := fvm.NewContext(
 			fvm.WithChain(chain),
 			fvm.WithTransactionFeesEnabled(true),
-			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithAuthorizationChecksEnabled(false),
@@ -149,6 +148,7 @@ func TestBootstrapLedger_TokenTransfer(t *testing.T) {
 
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
+		// create an empty transaction
 		txBody := flow.NewTransactionBody().
 			SetScript([]byte(`
 				transaction() {
@@ -164,7 +164,7 @@ func TestBootstrapLedger_TokenTransfer(t *testing.T) {
 		require.NoError(t, output.Err)
 
 		// make sure we have the expected events
-		require.Len(t, output.Events, 5)
+		// all of these events are emitted by the fee deduction
 		eventNames := make([]string, 0, len(output.Events))
 		for _, event := range output.Events {
 			eventNames = append(eventNames, string(event.Type))
@@ -176,13 +176,14 @@ func TestBootstrapLedger_TokenTransfer(t *testing.T) {
 			"A.f233dcee88fe0abe.FungibleToken.Deposited",
 			"A.f919ee77447b7497.FlowFees.FeesDeducted",
 		}
-		require.ElementsMatch(t, expectedEventNames, eventNames)
+		require.Equal(t, expectedEventNames, eventNames)
 
 		stateCommitment, _, _, err = state.CommitDelta(
 			ls,
 			executionSnapshot,
 			storehouse.NewExecutingBlockSnapshot(storageSnapshot, stateCommitment),
 		)
+		require.NoError(t, err)
 
 		if !assert.Equal(t, fmt.Sprint(expectedStateCommitment), fmt.Sprint(stateCommitment)) {
 			t.Logf(
