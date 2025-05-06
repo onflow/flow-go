@@ -219,7 +219,6 @@ var accountAvailableBalanceSpec = ContractFunctionSpec{
 	ArgumentTypes: []sema.Type{
 		&sema.AddressType{},
 	},
-	UseVM: true,
 }
 
 // AccountAvailableBalance executes the get available balance contract on the
@@ -235,7 +234,7 @@ func (sys *SystemContracts) AccountAvailableBalance(
 	)
 }
 
-var accountBalanceInvocationSpec = ContractFunctionSpec{
+var accountBalanceSpec = ContractFunctionSpec{
 	AddressFromChain: ServiceAddress,
 	LocationName:     systemcontracts.ContractNameServiceAccount,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_defaultTokenBalance,
@@ -246,7 +245,6 @@ var accountBalanceInvocationSpec = ContractFunctionSpec{
 			sema.AccountType,
 		),
 	},
-	UseVM: true,
 }
 
 // AccountBalance executes the get available balance contract on the service
@@ -255,7 +253,7 @@ func (sys *SystemContracts) AccountBalance(
 	address flow.Address,
 ) (cadence.Value, error) {
 	return sys.Invoke(
-		accountBalanceInvocationSpec,
+		accountBalanceSpec,
 		[]cadence.Value{
 			cadence.BytesToAddress(address.Bytes()),
 		},
@@ -269,7 +267,6 @@ var accountStorageCapacitySpec = ContractFunctionSpec{
 	ArgumentTypes: []sema.Type{
 		&sema.AddressType{},
 	},
-	UseVM: true,
 }
 
 // AccountStorageCapacity executes the get storage capacity contract on the
