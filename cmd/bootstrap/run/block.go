@@ -18,5 +18,6 @@ func GenerateRootHeader(chainID flow.ChainID, parentID flow.Identifier, height u
 			ParentVoterSigData: nil,
 			ProposerID:         flow.ZeroID,
 		},
+		PayloadHash: flow.ZeroID,
 	}
 }
