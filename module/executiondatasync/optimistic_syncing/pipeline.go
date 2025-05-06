@@ -127,7 +127,9 @@ func NewPipeline(
 // When the pipeline reaches a terminal state (StateComplete or StateCanceled), the function returns.
 // The function will also return if the provided context is canceled.
 //
-// Returns an error if any processing step fails or if the context is canceled.
+// Returns an error if any processing step fails with an irrecoverable error.
+// Returns nil if processing completes successfully, reaches a terminal state,
+// or if either the parent or pipeline context is canceled.
 func (p *Pipeline) Run(parentCtx context.Context) error {
 	ctx, cancel := context.WithCancelCause(parentCtx)
 	defer cancel(nil)
@@ -148,14 +150,16 @@ func (p *Pipeline) Run(parentCtx context.Context) error {
 		case <-notifierChan:
 			processed, err := p.processCurrentState(ctx)
 			if err != nil {
-				ctxErr := context.Cause(ctx)
-				if errors.Is(ctxErr, context.Canceled) {
-					return nil
-				}
+				if errors.Is(err, context.Canceled) {
+					if ctxErr := context.Cause(ctx); ctxErr == nil || errors.Is(ctxErr, context.Canceled) {
+						return nil
+					}
 
-				parentCtxErr := context.Cause(parentCtx)
-				if errors.Is(parentCtxErr, context.Canceled) {
-					return nil
+					if parentCtxErr := context.Cause(parentCtx); parentCtxErr == nil || errors.Is(parentCtxErr, context.Canceled) {
+						return nil
+					}
+
+					return err
 				}
 
 				return err
