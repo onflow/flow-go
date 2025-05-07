@@ -244,7 +244,7 @@ func (e *EpochStateMachine) Build() ([]storage.BlockIndexingBatchWrite, error) {
 
 	if hasChanges {
 		e.pendingDBWrites = append(e.pendingDBWrites, func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-			return e.epochProtocolStateDB.BatchStore(rw, updatedStateID, updatedEpochState.MinEpochStateEntry)
+			return e.epochProtocolStateDB.BatchStore(rw.Writer(), updatedStateID, updatedEpochState.MinEpochStateEntry)
 		})
 	}
 	e.EvolvingState.SetEpochStateID(updatedStateID)

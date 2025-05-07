@@ -566,7 +566,7 @@ func bootstrapEpochForProtocolStateEntry(
 	}
 
 	// insert epoch protocol state entry, which references above service events
-	err := epochProtocolStateSnapshots.BatchStore(rw, richEntry.ID(), richEntry.MinEpochStateEntry)
+	err := epochProtocolStateSnapshots.BatchStore(rw.Writer(), richEntry.ID(), richEntry.MinEpochStateEntry)
 	if err != nil {
 		return fmt.Errorf("could not store epoch protocol state entry: %w", err)
 	}
