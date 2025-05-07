@@ -24,6 +24,15 @@ func Locks() []string {
 // We use a policy defined by a directed acyclic graph, where nodes are named locks.
 // A directed edge between two nodes A, B means: I can acquire B next after acquiring A.
 // When no edges are added, each lock context may acquire at most one lock.
+//
+// For example, the bootstrapping logic both inserts and finalizes block. So it needs to
+// acquire both LockInsertBlock and LockFinalizeBlock. To allow this, we add the directed
+// edge LockInsertBlock -> LockFinalizeBlock with `Add(LockInsertBlock, LockFinalizeBlock)`.
+// This means:
+//   - a context can acquire either LockInsertBlock or LockFinalizeBlock first (always true)
+//   - a context holding LockInsertBlock can acquire LockFinalizeBlock next (allowed by the edge)
+//   - a context holding LockFinalizeBlock cannot acquire LockInsertBlock next (disallowed, because the edge is directed)
+//
 // This function will panic if a policy is created which does not prevent deadlocks.
 func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
