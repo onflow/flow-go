@@ -650,7 +650,7 @@ func ClusterBlockWithParentAndPayload(parent cluster.Block, payload cluster.Payl
 	headerBody.Height = parent.Header.Height + 1
 	headerBody.View = parent.Header.View + 1
 	headerBody.ChainID = parent.Header.ChainID
-	headerBody.Timestamp = time.Now()
+	headerBody.Timestamp = time.Now().UTC()
 	headerBody.ParentID = parent.ID()
 	headerBody.ParentView = parent.Header.View
 
