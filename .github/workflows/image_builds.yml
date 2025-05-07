@@ -154,8 +154,8 @@ jobs:
       ${{ needs.public-build.result != 'failure' || needs.secure-build.result != 'failure' }}
     strategy:
       fail-fast: false
-      # Only run the promotion job if the docker_image_tag matches the git_ref. This will only support tags
-      matrix: ${{ inputs.docker_image_tag == inputs.git_ref && fromJson('{"role": ["access", "collection", "consensus", "execution", "observer", "verification"]}') || fromJson('[]') }}
+      matrix: 
+        role: ${{ inputs.docker_image_tag == inputs.git_ref && 'access,collection,consensus,execution,observer,verification' || '' }}
     environment: ${{ matrix.role }} image promotion to public registry 
     steps:
       - name: Checkout repo
