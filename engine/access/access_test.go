@@ -390,8 +390,13 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		block2 := unittest.BlockFixture()
 		block2.Header.Height = 2
 
-		require.NoError(suite.T(), all.Blocks.Store(&block1))
-		require.NoError(suite.T(), all.Blocks.Store(&block2))
+		bdb := badgerimpl.ToDB(db)
+		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return all.Blocks.BatchStore(rw, &block1)
+		}))
+		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return all.Blocks.BatchStore(rw, &block2)
+		}))
 
 		// the follower logic should update height index on the block storage when a block is finalized
 		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
@@ -719,7 +724,10 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
-		err = all.Blocks.Store(block)
+		bdb := badgerimpl.ToDB(db)
+		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return all.Blocks.BatchStore(rw, block)
+		}))
 		require.NoError(suite.T(), err)
 
 		err = db.Update(operation.IndexBlockHeight(block.Header.Height, block.ID()))
