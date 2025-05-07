@@ -85,9 +85,10 @@ jobs:
 
     environment: container builds 
     steps:
-      - name: Pass 
+      - name: Input 
         run: |
-          echo "Pass" 
+          echo "Public Release:${{ inputs.is_public_release }}" 
+          exit 1
       # - name: Checkout Public flow-go repo
       #   uses: actions/checkout@v3
       #   with:
