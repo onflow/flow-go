@@ -27,7 +27,7 @@ func TestProtocolStateStorage(t *testing.T) {
 		protocolStateID := expected.ID()
 		blockID := unittest.IdentifierFixture()
 
-		// s protocol state and auxiliary info
+		// store protocol state and auxiliary info
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			// s epoch events to be able to retrieve them later
 			err := setups.BatchStore(rw, expected.PreviousEpochSetup)
@@ -43,7 +43,7 @@ func TestProtocolStateStorage(t *testing.T) {
 			err = commits.BatchStore(rw, expected.NextEpochCommit)
 			require.NoError(t, err)
 
-			err = s.BatchStore(rw, protocolStateID, expected.MinEpochStateEntry)
+			err = s.BatchStore(rw.Writer(), protocolStateID, expected.MinEpochStateEntry)
 			require.NoError(t, err)
 			return s.BatchIndex(rw, blockID, protocolStateID)
 		})
@@ -78,7 +78,7 @@ func TestProtocolStateStoreInvalidProtocolState(t *testing.T) {
 		invalid.CurrentEpoch.ActiveIdentities[0], invalid.CurrentEpoch.ActiveIdentities[1] = invalid.CurrentEpoch.ActiveIdentities[1], invalid.CurrentEpoch.ActiveIdentities[0]
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return s.BatchStore(rw, invalid.ID(), invalid)
+			return s.BatchStore(rw.Writer(), invalid.ID(), invalid)
 		})
 		require.Error(t, err)
 
@@ -87,7 +87,7 @@ func TestProtocolStateStoreInvalidProtocolState(t *testing.T) {
 		invalid.NextEpoch.ActiveIdentities[0], invalid.NextEpoch.ActiveIdentities[1] = invalid.NextEpoch.ActiveIdentities[1], invalid.NextEpoch.ActiveIdentities[0]
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return s.BatchStore(rw, invalid.ID(), invalid)
+			return s.BatchStore(rw.Writer(), invalid.ID(), invalid)
 		})
 		require.Error(t, err)
 	})
@@ -127,7 +127,7 @@ func TestProtocolStateMergeParticipants(t *testing.T) {
 			err = commits.BatchStore(rw, stateEntry.CurrentEpochCommit)
 			require.NoError(t, err)
 
-			return s.BatchStore(rw, protocolStateID, stateEntry.MinEpochStateEntry)
+			return s.BatchStore(rw.Writer(), protocolStateID, stateEntry.MinEpochStateEntry)
 		})
 		require.NoError(t, err)
 
@@ -165,7 +165,7 @@ func TestProtocolStateRootSnapshot(t *testing.T) {
 			err = commits.BatchStore(rw, expected.CurrentEpochCommit)
 			require.NoError(t, err)
 
-			err = s.BatchStore(rw, protocolStateID, expected.MinEpochStateEntry)
+			err = s.BatchStore(rw.Writer(), protocolStateID, expected.MinEpochStateEntry)
 			require.NoError(t, err)
 			return s.BatchIndex(rw, blockID, protocolStateID)
 		})
