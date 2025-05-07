@@ -1045,14 +1045,14 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
-	block := unittest.BlockFixture()
-	block.Header.Height = 2
-	headBlock := unittest.BlockFixture(
+	block := unittest.BlockFixture(
 		unittest.WithPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(
 				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...),
 		)),
 	)
+	block.Header.Height = 2
+	headBlock := unittest.BlockFixture()
 	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
 
 	suite.snapshot.
