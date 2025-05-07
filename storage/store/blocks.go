@@ -28,6 +28,7 @@ func NewBlocks(db storage.DB, headers *Headers, payloads *Payloads) *Blocks {
 	return b
 }
 
+// TODO: to be removed
 func (b *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
 	panic("StoreTx is deprecated, use BatchStore instead")
 }
@@ -62,13 +63,6 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) (*flow.Block, error) {
 		Payload: payload,
 	}
 	return block, nil
-}
-
-// Store ...
-func (b *Blocks) Store(block *flow.Block) error {
-	return b.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return b.BatchStore(rw, block)
-	})
 }
 
 // ByID ...

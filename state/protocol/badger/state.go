@@ -284,7 +284,7 @@ func bootstrapSealingSegment(
 	w := rw.Writer()
 	storingResults := make(map[flow.Identifier]*flow.ExecutionResult, len(segment.ExecutionResults))
 	for _, result := range segment.ExecutionResults {
-		err := operation.InsertExecutionResult(rw.Writer(), result)
+		err := operation.InsertExecutionResult(w, result)
 		if err != nil {
 			return fmt.Errorf("could not insert execution result: %w", err)
 		}
