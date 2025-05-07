@@ -153,8 +153,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: 
-        # The matrix will only be created if the dokcer_image_tag & git_ref match. This ensures that only valid tags that must be semantic versioned are promoted.
-        role: ${{ inputs.docker_image_tag == inputs.git_ref && fromJson('["access", "collection", "consensus", "execution", "observer", "verification"]') || fromJson('[]') }}
+        role: ${{ inputs.docker_image_tag == inputs.git_ref && fromJson('["access", "collection", "consensus", "execution", "observer", "verification"]') || fromJson('["none"]') }}
     environment: ${{ matrix.role }} image promotion to public registry 
     steps:
       - name: Checkout repo
