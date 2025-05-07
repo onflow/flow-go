@@ -52,66 +52,68 @@ jobs:
         build_command:
           # access Build Commands
           - docker-build-access-with-adx docker-push-access-with-adx 
-          # - docker-build-access-without-adx docker-push-access-without-adx 
-          # - docker-build-access-without-netgo-without-adx docker-push-access-without-netgo-without-adx 
-          # - docker-cross-build-access-arm docker-push-access-arm 
-          #
-          # # collection Build Commands
-          # - docker-build-collection-with-adx docker-push-collection-with-adx 
-          # - docker-build-collection-without-adx docker-push-collection-without-adx 
-          # - docker-build-collection-without-netgo-without-adx docker-push-collection-without-netgo-without-adx 
-          # - docker-cross-build-collection-arm docker-push-collection-arm 
-          #
-          # # consensus Build Commands
-          # - docker-build-consensus-with-adx docker-push-consensus-with-adx 
-          # - docker-build-consensus-without-adx docker-push-consensus-without-adx 
-          # - docker-build-consensus-without-netgo-without-adx docker-push-consensus-without-netgo-without-adx 
-          # - docker-cross-build-consensus-arm docker-push-consensus-arm 
-          #
-          # # execution Build Commands
-          # - docker-build-execution-with-adx docker-push-execution-with-adx 
-          # - docker-build-execution-without-adx docker-push-execution-without-adx 
-          # - docker-build-execution-without-netgo-without-adx docker-push-execution-without-netgo-without-adx 
-          # - docker-cross-build-execution-arm docker-push-execution-arm 
-          #
-          # # observer Build Commands
-          # - docker-build-observer-with-adx docker-push-observer-with-adx 
-          # - docker-build-observer-without-adx docker-push-observer-without-adx 
-          # - docker-build-observer-without-netgo-without-adx docker-push-observer-without-netgo-without-adx 
-          # - docker-cross-build-observer-arm docker-push-observer-arm 
-          #
-          # # verification Build Commands
-          # - docker-build-verification-with-adx docker-push-verification-with-adx 
-          # - docker-build-verification-without-adx docker-push-verification-without-adx 
-          # - docker-build-verification-without-netgo-without-adx docker-push-verification-without-netgo-without-adx 
-          # - docker-cross-build-verification-arm docker-push-verification-arm 
+          - docker-build-access-without-adx docker-push-access-without-adx 
+          - docker-build-access-without-netgo-without-adx docker-push-access-without-netgo-without-adx 
+          - docker-cross-build-access-arm docker-push-access-arm 
+
+          # collection Build Commands
+          - docker-build-collection-with-adx docker-push-collection-with-adx 
+          - docker-build-collection-without-adx docker-push-collection-without-adx 
+          - docker-build-collection-without-netgo-without-adx docker-push-collection-without-netgo-without-adx 
+          - docker-cross-build-collection-arm docker-push-collection-arm 
+
+          # consensus Build Commands
+          - docker-build-consensus-with-adx docker-push-consensus-with-adx 
+          - docker-build-consensus-without-adx docker-push-consensus-without-adx 
+          - docker-build-consensus-without-netgo-without-adx docker-push-consensus-without-netgo-without-adx 
+          - docker-cross-build-consensus-arm docker-push-consensus-arm 
+
+          # execution Build Commands
+          - docker-build-execution-with-adx docker-push-execution-with-adx 
+          - docker-build-execution-without-adx docker-push-execution-without-adx 
+          - docker-build-execution-without-netgo-without-adx docker-push-execution-without-netgo-without-adx 
+          - docker-cross-build-execution-arm docker-push-execution-arm 
+
+          # observer Build Commands
+          - docker-build-observer-with-adx docker-push-observer-with-adx 
+          - docker-build-observer-without-adx docker-push-observer-without-adx 
+          - docker-build-observer-without-netgo-without-adx docker-push-observer-without-netgo-without-adx 
+          - docker-cross-build-observer-arm docker-push-observer-arm 
+
+          # verification Build Commands
+          - docker-build-verification-with-adx docker-push-verification-with-adx 
+          - docker-build-verification-without-adx docker-push-verification-without-adx 
+          - docker-build-verification-without-netgo-without-adx docker-push-verification-without-netgo-without-adx 
+          - docker-cross-build-verification-arm docker-push-verification-arm 
 
     environment: container builds 
     steps:
-      - name: Pass 
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Checkout Public flow-go repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          repository: onflow/flow-go
+          ref: ${{ inputs.git_ref }}
+
+      - name: Authenticate with Docker Registry
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS_FOR_PRIVATE_REGISTRY }}
+
+      - name: Setup Google Cloud Authentication
+        run: gcloud auth configure-docker ${{ env.PRIVATE_REGISTRY_HOST }}
+
+      - name: Execute ${{ matrix.build_command }} command to build and push images
+        env:
+          IMAGE_TAG: ${{ inputs.docker_image_tag }}
+          CONTAINER_REGISTRY: ${{ vars.PRIVATE_REGISTRY }}
         run: |
-          echo "Pass"
-      # - name: Checkout Public flow-go repo
-      #   uses: actions/checkout@v3
-      #   with:
-      #     fetch-depth: 0
-      #     repository: onflow/flow-go
-      #     ref: ${{ inputs.git_ref }}
-      #
-      # - name: Authenticate with Docker Registry
-      #   uses: google-github-actions/auth@v1
-      #   with:
-      #     credentials_json: ${{ secrets.GCP_CREDENTIALS_FOR_PRIVATE_REGISTRY }}
-      #
-      # - name: Setup Google Cloud Authentication
-      #   run: gcloud auth configure-docker ${{ env.PRIVATE_REGISTRY_HOST }}
-      #
-      # - name: Execute ${{ matrix.build_command }} command to build and push images
-      #   env:
-      #     IMAGE_TAG: ${{ inputs.docker_image_tag }}
-      #     CONTAINER_REGISTRY: ${{ vars.PRIVATE_REGISTRY }}
-      #   run: |
-      #     make ${{ matrix.build_command }} CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
+          make ${{ matrix.build_command }} CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
 
   secure-build:
     # This job is responsible for executing secure builds for private dependencies & pushing them to the private registry.
