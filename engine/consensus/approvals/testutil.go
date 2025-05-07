@@ -72,8 +72,7 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 	s.IncorporatedBlock = unittest.BlockHeaderWithParentFixture(s.Block)
 
 	// compose incorporated result
-	incorporatedResult := flow.NewIncorporatedResult(s.IncorporatedBlock.ID(), result)
-	s.IncorporatedResult = incorporatedResult
+	s.IncorporatedResult = flow.NewIncorporatedResult(s.IncorporatedBlock.ID(), result) // nolint:structwrite TODO(7376): linter bug here - remove this after fixing bug
 }
 
 // BaseAssignmentCollectorTestSuite is a base suite for testing assignment collectors, contains mocks for all
