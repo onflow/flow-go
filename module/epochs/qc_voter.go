@@ -101,7 +101,7 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.TentativeEpoc
 	// create the canonical root block for our cluster
 	root := clusterstate.CanonicalRootBlock(counter, cluster)
 	// create a signable hotstuff model
-	signable := hotmodel.GenesisBlockFromFlow(root.Header)
+	signable := hotmodel.GenesisBlockFromFlow(root.ToHeader())
 
 	vote, err := voter.signer.CreateVote(signable)
 	if err != nil {

@@ -26,10 +26,10 @@ func TestClusterBlocksByHeight(t *testing.T) {
 
 		// store a chain of blocks
 		for _, block := range blocks {
-			err := db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(&block)))
+			err := db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
 			require.NoError(t, err)
 
-			err = db.Update(procedure.FinalizeClusterBlock(block.Header.ID()))
+			err = db.Update(procedure.FinalizeClusterBlock(block.ID()))
 			require.NoError(t, err)
 		}
 

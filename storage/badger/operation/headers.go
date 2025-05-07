@@ -6,10 +6,18 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func InsertHeader(headerID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
-	return insert(makePrefix(codeHeader, headerID), header)
+// InsertHeader inserts a header by block ID.
+// Error returns:
+//   - storage.ErrAlreadyExists if the key already exists in the database.
+//   - generic error in case of unexpected failure from the database layer or encoding failure.
+func InsertHeader(blockID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
+	return insert(makePrefix(codeHeader, blockID), header)
 }
 
+// RetrieveHeader retrieves a header by block ID.
+// Error returns:
+//   - storage.ErrNotFound if the key does not exist in the database
+//   - generic error in case of unexpected failure from the database layer
 func RetrieveHeader(blockID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeHeader, blockID), header)
 }

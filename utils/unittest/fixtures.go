@@ -285,7 +285,7 @@ func ProposalFromBlock(block *flow.Block) *flow.BlockProposal {
 	}
 }
 
-func ClusterProposalFromBlock(block *cluster.Block) *cluster.BlockProposal {
+func ClusterProposalFromBlock(block cluster.Block) *cluster.BlockProposal {
 	return &cluster.BlockProposal{
 		Block:           block,
 		ProposerSigData: SignatureFixture(),
@@ -488,14 +488,35 @@ func HeaderWithView(view uint64) func(*flow.Header) {
 	}
 }
 
+func HeaderBodyFixture(opts ...func(header *flow.HeaderBody)) *flow.HeaderBody {
+	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
+	view := height + uint64(rand.Intn(1000))
+	header := HeaderBodyWithParentFixture(&flow.Header{
+		HeaderBody: flow.HeaderBody{
+			ChainID:  flow.Emulator,
+			ParentID: IdentifierFixture(),
+			Height:   height,
+			View:     view,
+		},
+	})
+
+	for _, opt := range opts {
+		opt(header)
+	}
+
+	return header
+}
+
 func BlockHeaderFixture(opts ...func(header *flow.Header)) *flow.Header {
 	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
 	header := BlockHeaderWithParentFixture(&flow.Header{
-		ChainID:  flow.Emulator,
-		ParentID: IdentifierFixture(),
-		Height:   height,
-		View:     view,
+		HeaderBody: flow.HeaderBody{
+			ChainID:  flow.Emulator,
+			ParentID: IdentifierFixture(),
+			Height:   height,
+			View:     view,
+		},
 	})
 
 	for _, opt := range opts {
@@ -512,10 +533,12 @@ func BlockHeaderFixtureOnChain(
 	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
 	header := BlockHeaderWithParentFixture(&flow.Header{
-		ChainID:  chainID,
-		ParentID: IdentifierFixture(),
-		Height:   height,
-		View:     view,
+		HeaderBody: flow.HeaderBody{
+			ChainID:  chainID,
+			ParentID: IdentifierFixture(),
+			Height:   height,
+			View:     view,
+		},
 	})
 
 	for _, opt := range opts {
@@ -526,6 +549,13 @@ func BlockHeaderFixtureOnChain(
 }
 
 func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
+	return &flow.Header{
+		HeaderBody:  *HeaderBodyWithParentFixture(parent),
+		PayloadHash: IdentifierFixture(),
+	}
+}
+
+func HeaderBodyWithParentFixture(parent *flow.Header) *flow.HeaderBody {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
 	var lastViewTC *flow.TimeoutCertificate
@@ -541,11 +571,10 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 			SigData:       SignatureFixture(),
 		}
 	}
-	return &flow.Header{
+	return &flow.HeaderBody{
 		ChainID:            parent.ChainID,
 		ParentID:           parent.ID(),
 		Height:             height,
-		PayloadHash:        IdentifierFixture(),
 		Timestamp:          time.Now().UTC(),
 		View:               view,
 		ParentView:         parent.View,
@@ -577,17 +606,19 @@ func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *fl
 		}
 	}
 	return &flow.Header{
-		ChainID:            parent.ChainID,
-		ParentID:           parent.ID(),
-		Height:             height,
-		PayloadHash:        IdentifierFixture(),
-		Timestamp:          time.Now().UTC(),
-		View:               view,
-		ParentView:         parent.View,
-		ParentVoterIndices: SignerIndicesFixture(4),
-		ParentVoterSigData: QCSigDataWithSoRFixture(source),
-		ProposerID:         IdentifierFixture(),
-		LastViewTC:         lastViewTC,
+		HeaderBody: flow.HeaderBody{
+			ChainID:            parent.ChainID,
+			ParentID:           parent.ID(),
+			Height:             height,
+			Timestamp:          time.Now().UTC(),
+			View:               view,
+			ParentView:         parent.View,
+			ParentVoterIndices: SignerIndicesFixture(4),
+			ParentVoterSigData: QCSigDataWithSoRFixture(source),
+			ProposerID:         IdentifierFixture(),
+			LastViewTC:         lastViewTC,
+		},
+		PayloadHash: IdentifierFixture(),
 	}
 }
 
@@ -602,15 +633,10 @@ func ClusterPayloadFixture(n int) *cluster.Payload {
 }
 
 func ClusterBlockFixture() cluster.Block {
-
 	payload := ClusterPayloadFixture(3)
-	header := BlockHeaderFixture()
-	header.PayloadHash = payload.Hash()
+	headerBody := HeaderBodyFixture()
 
-	return cluster.Block{
-		Header:  header,
-		Payload: payload,
-	}
+	return cluster.NewBlock(*headerBody, *payload)
 }
 
 func ClusterBlockChainFixture(n int) []cluster.Block {
@@ -619,7 +645,7 @@ func ClusterBlockChainFixture(n int) []cluster.Block {
 	parent := ClusterBlockFixture()
 
 	for i := 0; i < n; i++ {
-		block := ClusterBlockWithParent(&parent)
+		block := ClusterBlockWithParent(parent)
 		clusterBlocks = append(clusterBlocks, block)
 		parent = block
 	}
@@ -629,25 +655,23 @@ func ClusterBlockChainFixture(n int) []cluster.Block {
 
 // ClusterBlockWithParent creates a new cluster consensus block that is valid
 // with respect to the given parent block.
-func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
-
+func ClusterBlockWithParent(parent cluster.Block) cluster.Block {
 	payload := ClusterPayloadFixture(3)
+	return ClusterBlockWithParentAndPayload(parent, *payload)
+}
 
-	header := BlockHeaderFixture()
-	header.Height = parent.Header.Height + 1
-	header.View = parent.Header.View + 1
-	header.ChainID = parent.Header.ChainID
-	header.Timestamp = time.Now()
-	header.ParentID = parent.ID()
-	header.ParentView = parent.Header.View
-	header.PayloadHash = payload.Hash()
+// ClusterBlockWithParentAndPayload creates a new cluster consensus block that is valid
+// with respect to the given parent block and with given payload.
+func ClusterBlockWithParentAndPayload(parent cluster.Block, payload cluster.Payload) cluster.Block {
+	headerBody := HeaderBodyFixture()
+	headerBody.Height = parent.Header.Height + 1
+	headerBody.View = parent.Header.View + 1
+	headerBody.ChainID = parent.Header.ChainID
+	headerBody.Timestamp = time.Now()
+	headerBody.ParentID = parent.ID()
+	headerBody.ParentView = parent.Header.View
 
-	block := cluster.Block{
-		Header:  header,
-		Payload: payload,
-	}
-
-	return block
+	return cluster.NewBlock(*headerBody, payload)
 }
 
 func WithCollRef(refID flow.Identifier) func(*flow.CollectionGuarantee) {

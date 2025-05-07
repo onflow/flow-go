@@ -192,10 +192,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	blockProposal := cluster.BlockProposal{
-		Block: &cluster.Block{
-			Header:  proposal.Header,
-			Payload: payload,
-		},
+		Block:           cluster.NewBlock(proposal.Header.HeaderBody, *payload),
 		ProposerSigData: proposal.ProposerSigData,
 	}
 
@@ -503,11 +500,13 @@ func (b *Builder) buildHeader(
 ) (*flow.ProposalHeader, error) {
 
 	header := &flow.Header{
-		ChainID:     ctx.parent.ChainID,
-		ParentID:    ctx.parentID,
-		Height:      ctx.parent.Height + 1,
+		HeaderBody: flow.HeaderBody{
+			ChainID:   ctx.parent.ChainID,
+			ParentID:  ctx.parentID,
+			Height:    ctx.parent.Height + 1,
+			Timestamp: time.Now().UTC(),
+		},
 		PayloadHash: payload.Hash(),
-		Timestamp:   time.Now().UTC(),
 
 		// NOTE: we rely on the HotStuff-provided setter to set the other
 		// fields, which are related to signatures and HotStuff internals

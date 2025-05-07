@@ -41,7 +41,7 @@ func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 	err = operation.RetryOnConflict(state.db.Update, func(tx *badger.Txn) error {
 		chainID := genesis.Header.ChainID
 		// insert the block - by protocol convention, the genesis block does not have a proposer signature, which must be handled by the implementation
-		err := procedure.InsertClusterBlock(&clustermodel.BlockProposal{Block: genesis, ProposerSigData: nil})(tx)
+		err := procedure.InsertClusterBlock(&clustermodel.BlockProposal{Block: *genesis, ProposerSigData: nil})(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
