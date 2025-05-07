@@ -13,6 +13,7 @@ type Blocks interface {
 	// Deprecated: to be removed alongside Badger DB
 	StoreTx(block *flow.Block) func(*transaction.Tx) error
 
+	// BatchStore stores a valid block in a batch.
 	BatchStore(rw ReaderBatchWriter, block *flow.Block) error
 
 	// BatchStoreWithStoringResults stores multiple blocks as a batch.
@@ -33,6 +34,6 @@ type Blocks interface {
 	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
 
 	// IndexBlockForCollections indexes the block each collection was
-	// included in.
+	// included in. This should not be called when finalizing a block
 	IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error
 }

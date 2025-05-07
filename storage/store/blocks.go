@@ -33,11 +33,18 @@ func (b *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
 	panic("StoreTx is deprecated, use BatchStore instead")
 }
 
+// BatchStore stores a valid block in a batch.
 func (b *Blocks) BatchStore(rw storage.ReaderBatchWriter, block *flow.Block) error {
+	// require LockInsertBlock
 	return b.BatchStoreWithStoringResults(rw, block, make(map[flow.Identifier]*flow.ExecutionResult))
 }
 
+// BatchStoreWithStoringResults stores multiple blocks as a batch.
+// The additional storingResults parameter helps verify that each receipt in the block
+// refers to a known result. This check is essential during bootstrapping
+// when multiple blocks are stored together in a batch.
 func (b *Blocks) BatchStoreWithStoringResults(rw storage.ReaderBatchWriter, block *flow.Block, storingResults map[flow.Identifier]*flow.ExecutionResult) error {
+	// require LockInsertBlock
 	err := b.headers.storeTx(rw, block.Header)
 	if err != nil {
 		return fmt.Errorf("could not store header %v: %w", block.Header.ID(), err)
@@ -65,12 +72,14 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) (*flow.Block, error) {
 	return block, nil
 }
 
-// ByID ...
+// ByID returns the block with the given hash. It is available for
+// finalized and ambiguous blocks.
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	return b.retrieveTx(blockID)
 }
 
-// ByHeight ...
+// ByHeight returns the block at the given height. It is only available
+// for finalized blocks.
 func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	blockID, err := b.headers.retrieveIdByHeightTx(height)
 	if err != nil {
@@ -79,7 +88,7 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	return b.retrieveTx(blockID)
 }
 
-// ByCollectionID ...
+// ByCollectionID returns the block for the given collection ID.
 func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	var blockID flow.Identifier
 	err := operation.LookupCollectionBlock(b.db.Reader(), collID, &blockID)
@@ -89,7 +98,8 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	return b.ByID(blockID)
 }
 
-// IndexBlockForCollections ...
+// IndexBlockForCollections indexes the block each collection was
+// included in. This should not be called when finalizing a block
 func (b *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error {
 	return b.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		for _, collID := range collIDs {
