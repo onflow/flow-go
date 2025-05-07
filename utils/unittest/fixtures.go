@@ -191,9 +191,22 @@ func AccountFixture() (*flow.Account, error) {
 	}, nil
 }
 
-func BlockFixture() flow.Block {
+// WithPayload sets the payload for the block.
+// It returns a new instance of the request with the specified payload.
+func WithPayload(payload flow.Payload) func(*flow.Block) {
+	return func(b *flow.Block) {
+		b.Payload = payload
+	}
+}
+
+// BlockFixture initializes and returns a new flow.Block instance.
+func BlockFixture(opts ...func(*flow.Block)) flow.Block {
 	header := BlockHeaderFixture()
-	return *BlockWithParentFixture(header)
+	block := BlockWithParentFixture(header)
+	for _, opt := range opts {
+		opt(block)
+	}
+	return *block
 }
 
 func ChainBlockFixture(n int) []*flow.Block {

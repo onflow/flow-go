@@ -76,18 +76,19 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
-	block := unittest.BlockFixture()
-	// Height needs to be at least DefaultTransactionExpiry before we start doing retries
-	block.Header.Height = flow.DefaultTransactionExpiry + 1
+
 	refBlock := unittest.BlockFixture()
 	refBlock.Header.Height = 2
 	transactionBody.SetReferenceBlockID(refBlock.ID())
 
-	block.SetPayload(
-		unittest.PayloadFixture(
+	block := unittest.BlockFixture(
+		unittest.WithPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(
-				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
-
+				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...),
+		)),
+	)
+	// Height needs to be at least DefaultTransactionExpiry before we start doing retries
+	block.Header.Height = flow.DefaultTransactionExpiry + 1
 	light := collection.Light()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	// transaction storage returns the corresponding transaction

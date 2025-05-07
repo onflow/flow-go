@@ -99,9 +99,9 @@ func (suite *SealingSegmentSuite) SetupTest() {
 
 // BlockFixture returns a Block fixture with the default protocol state ID.
 func (suite *SealingSegmentSuite) BlockFixture() flow.Block {
-	block := unittest.BlockFixture()
-	block.SetPayload(suite.PayloadFixture())
-	return block
+	return unittest.BlockFixture(
+		unittest.WithPayload(suite.PayloadFixture()),
+	)
 }
 
 // PayloadFixture returns a Payload fixture with the default protocol state ID.
@@ -124,11 +124,12 @@ func (suite *SealingSegmentSuite) ProtocolStateEntryWrapperFixture() *flow.Proto
 // FirstBlock returns a first block which contains a seal and receipt referencing
 // priorBlock (this is the simplest case for a sealing segment).
 func (suite *SealingSegmentSuite) FirstBlock() *flow.Block {
-	block := suite.BlockFixture()
-	block.SetPayload(suite.PayloadFixture(
-		unittest.WithSeals(suite.priorSeal),
-		unittest.WithReceipts(suite.priorReceipt),
-	))
+	block := unittest.BlockFixture(
+		unittest.WithPayload(suite.PayloadFixture(
+			unittest.WithSeals(suite.priorSeal),
+			unittest.WithReceipts(suite.priorReceipt),
+		)),
+	)
 	suite.addSeal(block.ID(), suite.priorSeal)
 	return &block
 }
@@ -156,8 +157,12 @@ func (suite *SealingSegmentSuite) AddBlocks(blocks ...*flow.Block) {
 func (suite *SealingSegmentSuite) TestBuild_MissingResultFromReceipt() {
 
 	// B1 contains a receipt (but no result) and seal for a prior block
-	block1 := suite.BlockFixture()
-	block1.SetPayload(suite.PayloadFixture(unittest.WithReceiptsAndNoResults(suite.priorReceipt), unittest.WithSeals(suite.priorSeal)))
+	block1 := unittest.BlockFixture(
+		unittest.WithPayload(suite.PayloadFixture(
+			unittest.WithReceiptsAndNoResults(suite.priorReceipt),
+			unittest.WithSeals(suite.priorSeal),
+		)),
+	)
 
 	receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
 	block2 := unittest.BlockWithParentAndPayload(
@@ -458,8 +463,12 @@ func (suite *SealingSegmentSuite) TestBuild_HighestAncestorContainsWrongSeal() {
 // commit to a different protocol state ID (PS2).
 // B1(R*,S*) <- B2(R1,PS2) <- B3(S1,PS2)
 func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_Blocks() {
-	block1 := suite.BlockFixture()
-	block1.SetPayload(suite.PayloadFixture(unittest.WithReceipts(suite.priorReceipt), unittest.WithSeals(suite.priorSeal)))
+	block1 := unittest.BlockFixture(
+		unittest.WithPayload(suite.PayloadFixture(
+			unittest.WithReceipts(suite.priorReceipt),
+			unittest.WithSeals(suite.priorSeal),
+		)),
+	)
 
 	protocolStateID2 := unittest.IdentifierFixture()
 	suite.addProtocolStateEntry(protocolStateID2, suite.ProtocolStateEntryWrapperFixture())
@@ -496,8 +505,12 @@ func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_Blocks() {
 // Extra blocks EB1 and EB2 commit to a different protocol state ID (PS2).
 // EB2(PS2) <- EB1 <- B1(R*,S*) <- B2(R1) <- B3(S1)
 func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_ExtraBlocks() {
-	block1 := suite.BlockFixture()
-	block1.SetPayload(suite.PayloadFixture(unittest.WithReceipts(suite.priorReceipt), unittest.WithSeals(suite.priorSeal)))
+	block1 := unittest.BlockFixture(
+		unittest.WithPayload(suite.PayloadFixture(
+			unittest.WithReceipts(suite.priorReceipt),
+			unittest.WithSeals(suite.priorSeal),
+		)),
+	)
 
 	receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
 	block2 := unittest.BlockWithParentAndPayload(
@@ -516,9 +529,12 @@ func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_ExtraBlocks(
 	protocolStateID2 := unittest.IdentifierFixture()
 	suite.addProtocolStateEntry(protocolStateID2, suite.ProtocolStateEntryWrapperFixture())
 
-	extraBlock1 := suite.BlockFixture()
+	extraBlock1 := unittest.BlockFixture(
+		unittest.WithPayload(unittest.PayloadFixture(
+			unittest.WithProtocolStateID(protocolStateID2),
+		)),
+	)
 	extraBlock1.Header.Height = block1.Header.Height - 1
-	extraBlock1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID2)))
 	err := suite.builder.AddExtraBlock(unittest.ProposalFromBlock(&extraBlock1))
 	require.NoError(suite.T(), err)
 
@@ -571,7 +587,7 @@ func TestAddBlock_StorageError(t *testing.T) {
 	t.Run("missing result", func(t *testing.T) {
 		// create a receipt to include in the first block, whose result is not in storage
 		missingReceipt := unittest.ExecutionReceiptFixture()
-		block1 := unittest.BlockFixture()
+
 		exception := fmt.Errorf("")
 		sealLookup := func(flow.Identifier) (*flow.Seal, error) { return unittest.Seal.Fixture(), nil }
 		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, exception }
@@ -579,11 +595,12 @@ func TestAddBlock_StorageError(t *testing.T) {
 			return &flow.ProtocolStateEntryWrapper{}, nil
 		}
 		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
-
-		block1.SetPayload(unittest.PayloadFixture(
-			unittest.WithReceiptsAndNoResults(missingReceipt),
-			unittest.WithSeals(unittest.Seal.Fixture(unittest.Seal.WithResult(&missingReceipt.ExecutionResult))),
-		))
+		block1 := unittest.BlockFixture(
+			unittest.WithPayload(unittest.PayloadFixture(
+				unittest.WithReceiptsAndNoResults(missingReceipt),
+				unittest.WithSeals(unittest.Seal.Fixture(unittest.Seal.WithResult(&missingReceipt.ExecutionResult))),
+			)),
+		)
 
 		err := builder.AddBlock(unittest.ProposalFromBlock(&block1))
 		require.ErrorIs(t, err, exception)
@@ -597,8 +614,9 @@ func TestAddBlock_StorageError(t *testing.T) {
 		protocolStateEntryLookup := func(flow.Identifier) (*flow.ProtocolStateEntryWrapper, error) {
 			return &flow.ProtocolStateEntryWrapper{}, nil
 		}
-		block1 := unittest.BlockFixture()
-		block1.SetPayload(flow.EmptyPayload())
+		block1 := unittest.BlockFixture(
+			unittest.WithPayload(flow.EmptyPayload()),
+		)
 		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
 
 		err := builder.AddBlock(unittest.ProposalFromBlock(&block1))
@@ -610,8 +628,9 @@ func TestAddBlock_StorageError(t *testing.T) {
 		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return unittest.ExecutionResultFixture(), nil }
 		sealLookup := func(flow.Identifier) (*flow.Seal, error) { return unittest.Seal.Fixture(), nil }
 		protocolStateEntryLookup := func(flow.Identifier) (*flow.ProtocolStateEntryWrapper, error) { return nil, exception }
-		block1 := unittest.BlockFixture()
-		block1.SetPayload(flow.EmptyPayload())
+		block1 := unittest.BlockFixture(
+			unittest.WithPayload(flow.EmptyPayload()),
+		)
 		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
 
 		err := builder.AddBlock(unittest.ProposalFromBlock(&block1))

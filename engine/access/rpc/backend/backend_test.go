@@ -1047,12 +1047,13 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	transactionBody := collection.Transactions[0]
 	block := unittest.BlockFixture()
 	block.Header.Height = 2
-	headBlock := unittest.BlockFixture()
-	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
-	block.SetPayload(
-		unittest.PayloadFixture(
+	headBlock := unittest.BlockFixture(
+		unittest.WithPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(
-				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
+				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...),
+		)),
+	)
+	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
 
 	suite.snapshot.
 		On("Head").
@@ -1263,11 +1264,12 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
 	// block which will eventually contain the transaction
-	block := unittest.BlockFixture()
-	block.SetPayload(
-		unittest.PayloadFixture(
+	block := unittest.BlockFixture(
+		unittest.WithPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(
-				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
+				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...),
+		)),
+	)
 	blockID := block.ID()
 
 	// reference block to which the transaction points to
@@ -1744,11 +1746,12 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
 	// block which will eventually contain the transaction
-	block := unittest.BlockFixture()
-	block.SetPayload(
-		unittest.PayloadFixture(
+	block := unittest.BlockFixture(
+		unittest.WithPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(
-				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
+				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...),
+		)),
+	)
 	blockId := block.ID()
 
 	// reference block to which the transaction points to

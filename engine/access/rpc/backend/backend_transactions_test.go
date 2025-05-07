@@ -1267,11 +1267,12 @@ func (suite *Suite) assertTransactionResultResponse(
 // instead of requesting it from the Execution Node.
 func (suite *Suite) TestTransactionResultFromStorage() {
 	// Create fixtures for block, transaction, and collection
-	block := unittest.BlockFixture()
 	transaction := unittest.TransactionFixture()
 	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
 	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
-	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
+	block := unittest.BlockFixture(
+		unittest.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+	)
 	txId := transaction.ID()
 	blockId := block.ID()
 
@@ -1357,11 +1358,12 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 // and returns it from storage instead of requesting from the Execution Node.
 func (suite *Suite) TestTransactionByIndexFromStorage() {
 	// Create fixtures for block, transaction, and collection
-	block := unittest.BlockFixture()
 	transaction := unittest.TransactionFixture()
 	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
 	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
-	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
+	block := unittest.BlockFixture(
+		unittest.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+	)
 	blockId := block.ID()
 	txId := transaction.ID()
 	txIndex := rand.Uint32()
@@ -1443,10 +1445,11 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 // by block ID from storage instead of requesting from the Execution Node.
 func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	// Create fixtures for the block and collection
-	block := unittest.BlockFixture()
 	col := unittest.CollectionFixture(2)
 	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
-	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
+	block := unittest.BlockFixture(
+		unittest.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+	)
 	blockId := block.ID()
 
 	// Mock the behavior of the blocks, collections and light transaction results objects
