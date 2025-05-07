@@ -151,7 +151,7 @@ jobs:
     if: |
       ${{ !cancelled() }} &&
       ${{ needs.public-build.result != 'failure' || needs.secure-build.result != 'failure' }} &&
-      ${{ inputs.is_public_release == 'true' }} 
+      ${{ inputs.is_public_release != 'false' }} 
     steps:
       - name: Check Tag Match
         if: ${{ inputs.docker_image_tag != inputs.git_ref }}
