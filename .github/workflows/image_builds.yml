@@ -137,6 +137,16 @@ jobs:
           ref: sre/jp/354/add-docker-tag-input 
           workflow_file_name: 'secure_build.yml'
 
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    needs: [public-build, secure-build]
+    # The job will only pass if the 'docker_image_tag' input matches the 'git_ref' input.
+    if: |
+      ${{ !cancelled() }} &&
+      ${{ inputs.docker_image_tag == inputs.git_ref }} &&
+      ${{ needs.public-build.result != 'failure' || needs.secure-build.result != 'failure' }}
+    steps: []
   promote-images:
     # This job promotes container images for various roles from a private registry to a public registry.
     # It uses a matrix strategy to handle the promotion of images for different roles in parallel.
@@ -144,16 +154,15 @@ jobs:
     # This ensures that only approved images are deployed to the public registry.
     name: Promote Images to Public Registry
     runs-on: ubuntu-latest
-    needs: [public-build, secure-build]
+    needs: [validate-release]
+    # The job is triggered only if the 'docker_image_tag' input matches the 'git_ref' input.
     # This job will only run if the previous jobs were successful and not cancelled.
     # It checks the results of both the public and secure builds to ensure that at least one of them succeeded.
     if: |
-      ${{ !cancelled() }} &&
-      ${{ needs.public-build.result != 'failure' || needs.secure-build.result != 'failure' }}
     strategy:
       fail-fast: false
-      matrix: 
-        role: ${{ inputs.docker_image_tag == inputs.git_ref && fromJson('["access", "collection", "consensus", "execution", "observer", "verification"]') || fromJson('["none"]') }}
+      matrix:
+        role: [access, collection, consensus, execution, observer, verification]
     environment: ${{ matrix.role }} image promotion to public registry 
     steps:
       - name: Checkout repo
