@@ -10,8 +10,13 @@ on:
         options:
           - "false"
           - "true"
-      tag:
-        description: 'Git tag to build, tag, and push docker image'
+      git_ref:
+        description: 'Git ref to be built (tag, branch, commit sha).'
+        required: true
+        type: string
+
+      docker_image_tag:
+        description: 'Docker image tag to be used for the build. Should be a valid semantic version, and to be promoted, this must match the git_ref.'
         required: true
         type: string
 
@@ -83,7 +88,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: onflow/flow-go
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.git_ref }}
 
       - name: Authenticate with Docker Registry
         uses: google-github-actions/auth@v1
@@ -95,7 +100,7 @@ jobs:
 
       - name: Execute ${{ matrix.build_command }} command to build and push images
         env:
-          IMAGE_TAG: ${{ inputs.tag }}
+          IMAGE_TAG: ${{ inputs.docker_image_tag }}
           CONTAINER_REGISTRY: ${{ vars.PRIVATE_REGISTRY }}
         run: |
           make ${{ matrix.build_command }} CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
@@ -124,7 +129,7 @@ jobs:
 
       - uses: convictional/trigger-workflow-and-wait@v1.6.1
         with:
-          client_payload: '{"role": "${{ matrix.role }}", "tag": "${{ inputs.tag }}"}'
+          client_payload: '{"role": "${{ matrix.role }}", "docker_image_tag": "${{ inputs.docker_image_tag }}", "git_ref": "${{ inputs.git_ref }}"}'
           github_token: ${{ steps.app-token.outputs.token }}
           owner: 'onflow'
           repo: ${{ secrets.SECURE_BUILDS_REPO }}  
@@ -139,10 +144,12 @@ jobs:
     name: Promote Images to Public Registry
     runs-on: ubuntu-latest
     needs: [public-build, secure-build]
+    # The job is triggered only if the 'docker_image_tag' input matches the 'git_ref' input.
     # This job will only run if the previous jobs were successful and not cancelled.
     # It checks the results of both the public and secure builds to ensure that at least one of them succeeded.
     if: |
       ${{ !cancelled() }} &&
+      ${{ inputs.docker_image_tag == inputs.git_ref }} &&
       ${{ needs.public-build.result != 'failure' || needs.secure-build.result != 'failure' }}
     strategy:
       fail-fast: false
@@ -161,5 +168,5 @@ jobs:
           private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
           public_registry: ${{ vars.PUBLIC_REGISTRY }}
           role: ${{ matrix.role }} 
-          tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
+          tags: "${{ inputs.docker_image_tag }},${{ inputs.docker_image_tag }}-without-adx,${{ inputs.docker_image_tag }}-without-netgo-without-adx,${{ inputs.docker_image_tag }}-arm"
 
