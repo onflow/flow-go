@@ -149,8 +149,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [public-build, secure-build]
     # The job will only pass if the 'docker_image_tag' input matches the 'git_ref' input.
-    if: |
-      ${{ inputs.is_public_release == 'true' }} 
+    if: inputs.is_public_release == 'true' && !cancelled() && needs.public-build.result != 'failure' || needs.secure-build.result != 'failure'
     steps:
       - name: Check Tag Match
         if: ${{ inputs.docker_image_tag != inputs.git_ref }}
