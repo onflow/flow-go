@@ -432,8 +432,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	resultsDB := store.NewExecutionResults(node.Metrics, db)
 	receiptsDB := store.NewExecutionReceipts(node.Metrics, db, resultsDB, storage.DefaultCacheSize)
 
-	guarantees, err := stdmap.NewGuarantees(1000)
-	require.NoError(t, err)
+	guarantees := stdmap.NewGuarantees(1000)
 
 	receipts := consensusMempools.NewExecutionTree()
 
@@ -921,7 +920,7 @@ func createFollowerCore(
 ) (module.HotStuffFollower, *confinalizer.Finalizer) {
 	finalizer := confinalizer.NewFinalizer(node.PublicDB, node.Headers, followerState, trace.NewNoopTracer())
 
-	pending := make([]*flow.Header, 0)
+	pending := make([]*flow.ProposalHeader, 0)
 
 	// creates a consensus follower with noop consumer as the notifier
 	followerCore, err := consensus.NewFollower(

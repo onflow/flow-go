@@ -93,7 +93,9 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 
 	block := flow.Block{
 		Header: &flow.Header{
-			View: 26,
+			HeaderBody: flow.HeaderBody{
+				View: 26,
+			},
 		},
 		Payload: &flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
@@ -103,7 +105,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	executableBlock := &entity.ExecutableBlock{
 		Block: &block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
-			guarantee.ID(): {
+			guarantee.CollectionID: {
 				Guarantee:    &guarantee,
 				Transactions: transactions,
 			},
@@ -276,7 +278,9 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
 		block1 = &flow.Block{
 			Header: &flow.Header{
-				View: 1,
+				HeaderBody: flow.HeaderBody{
+					View: 1,
+				},
 			},
 			Payload: &flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{},
@@ -500,9 +504,11 @@ func createTestBlockAndRun(
 
 	block := &flow.Block{
 		Header: &flow.Header{
-			ParentID:  parentBlock.ID(),
-			View:      parentBlock.Header.Height + 1,
-			Timestamp: time.Now(),
+			HeaderBody: flow.HeaderBody{
+				ParentID:  parentBlock.ID(),
+				View:      parentBlock.Header.Height + 1,
+				Timestamp: time.Now(),
+			},
 		},
 		Payload: &flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
@@ -512,7 +518,7 @@ func createTestBlockAndRun(
 	executableBlock := &entity.ExecutableBlock{
 		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
-			guarantee.ID(): {
+			guarantee.CollectionID: {
 				Guarantee:    &guarantee,
 				Transactions: col.Transactions,
 			},

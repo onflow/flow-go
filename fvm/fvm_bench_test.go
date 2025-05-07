@@ -270,7 +270,7 @@ func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*
 	executableBlock.StartState = &b.activeStateCommitment
 
 	derivedBlockData := b.derivedChainData.GetOrCreateDerivedBlockData(
-		executableBlock.ID(),
+		executableBlock.BlockID(),
 		executableBlock.ParentID())
 
 	computationResult, err := b.blockComputer.ExecuteBlock(
@@ -521,7 +521,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			// not interested in the system transaction
 			for _, txRes := range results[0 : len(results)-1] {
 				require.Empty(b, txRes.ErrorMessage)
-				totalInteractionUsed += logE.InteractionUsed[txRes.ID().String()]
+				totalInteractionUsed += logE.InteractionUsed[txRes.TransactionID.String()]
 				totalComputationUsed += txRes.ComputationUsed
 			}
 			b.ReportMetric(float64(totalInteractionUsed/uint64(transactionsPerBlock)), "interactions")

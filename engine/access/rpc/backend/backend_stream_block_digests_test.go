@@ -82,7 +82,7 @@ func (s *BackendBlockDigestSuite) requireBlockDigests(v interface{}, expectedBlo
 	actualBlock, ok := v.(*flow.BlockDigest)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
-	s.Require().Equal(expectedBlock.Header.ID(), actualBlock.ID())
+	s.Require().Equal(expectedBlock.Header.ID(), actualBlock.BlockID)
 	s.Require().Equal(expectedBlock.Header.Height, actualBlock.Height)
 	s.Require().Equal(expectedBlock.Header.Timestamp, actualBlock.Timestamp)
 }

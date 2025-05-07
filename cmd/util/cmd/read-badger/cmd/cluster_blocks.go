@@ -52,7 +52,7 @@ var clusterBlocksCmd = &cobra.Command{
 			}
 
 			log.Info().Msgf("getting cluster block by id: %v", clusterBlockID)
-			clusterBlock, err := clusterBlocks.ByID(clusterBlockID)
+			clusterBlock, err := clusterBlocks.ProposalByID(clusterBlockID)
 			if err != nil {
 				log.Error().Err(err).Msgf("could not get cluster block with id: %v", clusterBlockID)
 				return
@@ -64,13 +64,13 @@ var clusterBlocksCmd = &cobra.Command{
 
 		if flagClusterBlockID != "" {
 			log.Info().Msgf("getting cluster block by height: %v", flagHeight)
-			clusterBlock, err := clusterBlocks.ByHeight(flagHeight)
+			clusterBlock, err := clusterBlocks.ProposalByHeight(flagHeight)
 			if err != nil {
 				log.Error().Err(err).Msgf("could not get cluster block with height: %v", flagHeight)
 				return
 			}
 
-			log.Info().Msgf("block id: %v", clusterBlock.ID())
+			log.Info().Msgf("block id: %v", clusterBlock.Block.ID())
 			common.PrettyPrint(clusterBlock)
 			return
 		}

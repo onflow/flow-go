@@ -112,7 +112,7 @@ func NewBuilder(
 // However, it will pass through all errors returned by `setter` and `sign`.
 // Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
 // and handle them accordingly when handling errors returned from BuildOn.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) ([]byte, error)) (*flow.ProposalHeader, error) {
 
 	// since we don't know the blockID when building the block we track the
 	// time indirectly and insert the span directly at the end
@@ -138,7 +138,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	// assemble the block proposal
-	proposal, err := b.createProposal(parentID,
+	blockProposal, err := b.createProposal(parentID,
 		insertableGuarantees,
 		insertableSeals,
 		insertableReceipts,
@@ -148,15 +148,15 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
 
-	span, ctx := b.tracer.StartBlockSpan(context.Background(), proposal.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
+	span, ctx := b.tracer.StartBlockSpan(context.Background(), blockProposal.Block.Header.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
 	defer span.End()
 
-	err = b.state.Extend(ctx, proposal)
+	err = b.state.Extend(ctx, blockProposal)
 	if err != nil {
 		return nil, fmt.Errorf("could not extend state with built proposal: %w", err)
 	}
 
-	return proposal.Header, nil
+	return blockProposal.HeaderProposal(), nil
 }
 
 // repopulateExecutionTree restores latest state of execution tree mempool based on local chain state information.
@@ -299,8 +299,8 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 			return fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 		}
 
-		for _, collID := range index.CollectionIDs {
-			receiptLookup[collID] = struct{}{}
+		for _, guaranteeID := range index.GuaranteeIDs {
+			receiptLookup[guaranteeID] = struct{}{}
 		}
 
 		return nil
@@ -320,10 +320,8 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 			break
 		}
 
-		collID := guarantee.ID()
-
 		// skip collections that are already included in a block on the fork
-		_, duplicated := receiptLookup[collID]
+		_, duplicated := receiptLookup[guarantee.ID()]
 		if duplicated {
 			continue
 		}
@@ -422,7 +420,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 			// enforce condition (0): candidate seals are only constructed once sufficient
 			// approvals have been collected. Hence, any incorporated result for which we
 			// find a candidate seal satisfies condition (0)
-			irSeal, ok := b.sealPool.ByID(incorporatedResult.ID())
+			irSeal, ok := b.sealPool.Get(incorporatedResult.ID())
 			if !ok {
 				continue
 			}
@@ -486,12 +484,12 @@ func connectingSeal(sealsForNextBlock []*flow.IncorporatedResultSeal, lastSealed
 }
 
 type InsertableReceipts struct {
-	receipts []*flow.ExecutionReceiptMeta
+	receipts []*flow.ExecutionReceiptStub
 	results  []*flow.ExecutionResult
 }
 
 // getInsertableReceipts constructs:
-//   - (i)  the meta information of the ExecutionReceipts (i.e. ExecutionReceiptMeta)
+//   - (i)  the meta information of the ExecutionReceipts (i.e. ExecutionReceiptStub)
 //     that should be inserted in the next payload
 //   - (ii) the ExecutionResults the receipts from step (i) commit to
 //     (deduplicated w.r.t. the block under construction as well as ancestor blocks)
@@ -571,7 +569,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 	return insertables, nil
 }
 
-// toInsertables separates the provided receipts into ExecutionReceiptMeta and
+// toInsertables separates the provided receipts into ExecutionReceiptStub and
 // ExecutionResult. Results that are in includedResults are skipped.
 // We also limit the number of receipts to maxReceiptCount.
 func toInsertables(receipts []*flow.ExecutionReceipt, includedResults map[flow.Identifier]struct{}, maxReceiptCount uint) *InsertableReceipts {
@@ -583,11 +581,11 @@ func toInsertables(receipts []*flow.ExecutionReceipt, includedResults map[flow.I
 		count = maxReceiptCount
 	}
 
-	filteredReceipts := make([]*flow.ExecutionReceiptMeta, 0, count)
+	filteredReceipts := make([]*flow.ExecutionReceiptStub, 0, count)
 
 	for i := uint(0); i < count; i++ {
 		receipt := receipts[i]
-		meta := receipt.Meta()
+		meta := receipt.Stub()
 		resultID := meta.ResultID
 		if _, inserted := includedResults[resultID]; !inserted {
 			results = append(results, &receipt.ExecutionResult)
@@ -610,8 +608,8 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	seals []*flow.Seal,
 	insertableReceipts *InsertableReceipts,
 	setter func(*flow.Header) error,
-	sign func(*flow.Header) error,
-) (*flow.Block, error) {
+	sign func(*flow.Header) ([]byte, error),
+) (*flow.BlockProposal, error) {
 
 	parent, err := b.headers.ByBlockID(parentID)
 	if err != nil {
@@ -622,10 +620,12 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 
 	// construct default block on top of the provided parent
 	header := &flow.Header{
-		ChainID:     parent.ChainID,
-		ParentID:    parentID,
-		Height:      parent.Height + 1,
-		Timestamp:   timestamp,
+		HeaderBody: flow.HeaderBody{
+			ChainID:   parent.ChainID,
+			ParentID:  parentID,
+			Height:    parent.Height + 1,
+			Timestamp: timestamp,
+		},
 		PayloadHash: flow.ZeroID,
 	}
 
@@ -643,10 +643,10 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		return nil, fmt.Errorf("evolving protocol state failed: %w", err)
 	}
 
-	proposal := &flow.Block{
+	block := &flow.Block{
 		Header: header,
 	}
-	proposal.SetPayload(flow.Payload{
+	block.SetPayload(flow.Payload{
 		Guarantees:      guarantees,
 		Seals:           seals,
 		Receipts:        insertableReceipts.receipts,
@@ -655,9 +655,13 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	})
 
 	// sign the proposal
-	err = sign(header)
+	sig, err := sign(header)
 	if err != nil {
-		return nil, fmt.Errorf("could not sign the proposal: %w", err)
+		return nil, fmt.Errorf("could not sign the block: %w", err)
+	}
+	proposal := &flow.BlockProposal{
+		Block:           block,
+		ProposerSigData: sig,
 	}
 
 	return proposal, nil

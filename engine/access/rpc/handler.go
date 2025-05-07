@@ -1369,7 +1369,7 @@ func (h *Handler) SubscribeBlockDigestsFromLatest(request *accessproto.Subscribe
 func (h *Handler) handleBlockDigestsResponse(send sendSubscribeBlockDigestsResponseFunc) func(*flow.BlockDigest) error {
 	return func(blockDigest *flow.BlockDigest) error {
 		err := send(&accessproto.SubscribeBlockDigestsResponse{
-			BlockId:        convert.IdentifierToMessage(blockDigest.ID()),
+			BlockId:        convert.IdentifierToMessage(blockDigest.BlockID),
 			BlockHeight:    blockDigest.Height,
 			BlockTimestamp: timestamppb.New(blockDigest.Timestamp),
 		})

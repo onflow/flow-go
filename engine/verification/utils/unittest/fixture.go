@@ -308,7 +308,7 @@ func ExecutionResultFixture(t *testing.T,
 		require.NoError(t, err)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
-		completeColls[guarantee.ID()] = &entity.CompleteCollection{
+		completeColls[guarantee.CollectionID] = &entity.CompleteCollection{
 			Guarantee:    guarantee,
 			Transactions: collection.Transactions,
 		}
@@ -326,7 +326,7 @@ func ExecutionResultFixture(t *testing.T,
 			collections = append(collections, &collection)
 			guarantees = append(guarantees, guarantee)
 
-			completeColls[guarantee.ID()] = &entity.CompleteCollection{
+			completeColls[guarantee.CollectionID] = &entity.CompleteCollection{
 				Guarantee:    guarantee,
 				Transactions: collection.Transactions,
 			}
@@ -447,8 +447,10 @@ func ExecutionReceiptsFromParentBlockFixture(t *testing.T,
 		// makes several copies of the same result
 		for cp := 0; cp < builder.executorCount; cp++ {
 			allReceipts = append(allReceipts, &flow.ExecutionReceipt{
-				ExecutorID:      builder.executorIDs[cp],
-				ExecutionResult: *result,
+				UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
+					ExecutorID:      builder.executorIDs[cp],
+					ExecutionResult: *result,
+				},
 			})
 
 			allData = append(allData, data)

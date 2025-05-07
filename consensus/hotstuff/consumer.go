@@ -321,7 +321,7 @@ type CommunicatorConsumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time)
+	OnOwnProposal(proposal *flow.ProposalHeader, targetPublicationTime time.Time)
 }
 
 // FollowerConsumer consumes outbound notifications produced by consensus followers.

@@ -11,18 +11,24 @@ import (
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
-// Header contains all meta-data for a block, as well as a hash representing
-// the combined payload of the entire block. It is what consensus nodes agree
-// on after validating the contents against the payload hash.
-type Header struct {
+// ProposalHeader is a block header and the proposer's signature for the block.
+type ProposalHeader struct {
+	Header *Header
+	// ProposerSigData is a signature of the proposer over the new block. Not a single cryptographic
+	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
+	ProposerSigData []byte
+}
+
+// HeaderBody contains all block header metadata, except for the payload hash.
+// HeaderBody generally should not be used on its own. It is embedded within [Block] and
+// [Header]: those types should be used in almost all circumstances.
+type HeaderBody struct {
 	// ChainID is a chain-specific value to prevent replay attacks.
 	ChainID ChainID
 	// ParentID is the ID of this block's parent.
 	ParentID Identifier
 	// Height is the height of the parent + 1
 	Height uint64
-	// PayloadHash is a hash of the payload of this block.
-	PayloadHash Identifier
 	// Timestamp is the time at which this block was proposed.
 	// The proposer can choose any time, so this should not be trusted as accurate.
 	Timestamp time.Time
@@ -39,17 +45,36 @@ type Header struct {
 	ParentVoterSigData []byte
 	// ProposerID is a proposer identifier for the block
 	ProposerID Identifier
-	// ProposerSigData is a signature of the proposer over the new block. Not a single cryptographic
-	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
-	ProposerSigData []byte
 	// LastViewTC is a timeout certificate for previous view, it can be nil
 	// it has to be present if previous round ended with timeout.
 	LastViewTC *TimeoutCertificate
 }
 
-// Body returns the immutable part of the block header.
-func (h Header) Body() interface{} {
-	return struct {
+// Header contains all meta-data for a block, as well as a hash of the block payload.
+// Headers are used when the metadata about a block is needed, but the payload is not.
+// Because [Header] includes the payload hash for the block, and the block ID is Merkle-ized
+// with the Payload field as a Merkle tree node, the block ID can be computed from the [Header].
+type Header struct {
+	HeaderBody
+	// PayloadHash is a hash of the payload of this block.
+	PayloadHash Identifier
+}
+
+// QuorumCertificate returns quorum certificate that is incorporated in the block header.
+func (h Header) QuorumCertificate() *QuorumCertificate {
+	return &QuorumCertificate{
+		BlockID:       h.ParentID,
+		View:          h.ParentView,
+		SignerIndices: h.ParentVoterIndices,
+		SigData:       h.ParentVoterSigData,
+	}
+}
+
+// Fingerprint defines custom encoding for the header to calculate its ID.
+// Timestamp is converted from time.Time to unix time (uint64), which is necessary
+// because time.Time is not RLP-encodable (due to having private fields).
+func (h Header) Fingerprint() []byte {
+	return fingerprint.Fingerprint(struct {
 		ChainID            ChainID
 		ParentID           Identifier
 		Height             uint64
@@ -73,21 +98,7 @@ func (h Header) Body() interface{} {
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerID:         h.ProposerID,
 		LastViewTCID:       h.LastViewTC.ID(),
-	}
-}
-
-// QuorumCertificate returns quorum certificate that is incorporated in the block header.
-func (h Header) QuorumCertificate() *QuorumCertificate {
-	return &QuorumCertificate{
-		BlockID:       h.ParentID,
-		View:          h.ParentView,
-		SignerIndices: h.ParentVoterIndices,
-		SigData:       h.ParentVoterSigData,
-	}
-}
-
-func (h Header) Fingerprint() []byte {
-	return fingerprint.Fingerprint(h.Body())
+	})
 }
 
 // ID returns a unique ID to singularly identify the header and its block

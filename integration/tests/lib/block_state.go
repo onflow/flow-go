@@ -70,7 +70,7 @@ func (bs *BlockState) WaitForHalt(t *testing.T, requiredDurationWithoutProgress,
 	t.Logf("successfully observed progress halt for %s after %s of waiting", requiredDurationWithoutProgress, time.Since(start))
 }
 
-func (bs *BlockState) Add(t *testing.T, msg *messages.BlockProposal) {
+func (bs *BlockState) Add(t *testing.T, msg *messages.UntrustedProposal) {
 	b := msg.Block.ToInternal()
 	bs.Lock()
 	defer bs.Unlock()

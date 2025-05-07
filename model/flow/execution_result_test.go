@@ -11,6 +11,16 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestExecutionResultID_Malleability confirms that the ExecutionResult struct, which implements
+// the [flow.IDEntity] interface, is resistant to tampering.
+func TestExecutionResultID_Malleability(t *testing.T) {
+	unittest.RequireEntityNonMalleable(t,
+		unittest.ExecutionResultFixture(),
+		unittest.WithFieldGenerator("ServiceEvents", func() []flow.ServiceEvent {
+			return unittest.ServiceEventsFixture(3)
+		}))
+}
+
 // TestExecutionResultGroupBy tests the GroupBy method of ExecutionResultList:
 // * grouping should preserve order and multiplicity of elements
 // * group for unknown identifier should be empty

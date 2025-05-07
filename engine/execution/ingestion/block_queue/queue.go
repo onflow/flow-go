@@ -54,10 +54,6 @@ type MissingCollection struct {
 	Guarantee *flow.CollectionGuarantee
 }
 
-func (m *MissingCollection) ID() flow.Identifier {
-	return m.Guarantee.ID()
-}
-
 // collectionInfo is an internal struct used to keep track of the state of a collection,
 // and the blocks that include the collection
 type collectionInfo struct {
@@ -158,7 +154,7 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 	missingCollections := make([]*MissingCollection, 0, len(block.Payload.Guarantees))
 
 	for _, guarantee := range block.Payload.Guarantees {
-		colID := guarantee.ID()
+		colID := guarantee.CollectionID
 		colInfo, ok := q.collections[colID]
 		if ok {
 			// some other block also includes this collection
@@ -280,7 +276,7 @@ func (q *BlockQueue) handleKnownBlock(executable *entity.ExecutableBlock, parent
 	// there is no need to create the executable block again, since it's already created.
 	if executable.StartState == nil && parentFinalState != nil {
 		q.log.Warn().
-			Str("blockID", executable.ID().String()).
+			Str("blockID", executable.BlockID().String()).
 			Uint64("height", executable.Block.Header.Height).
 			Hex("parentID", executable.Block.Header.ParentID[:]).
 			Msg("edge case: receiving block with no parent commitment, but its parent block actually has been executed")
@@ -288,7 +284,7 @@ func (q *BlockQueue) handleKnownBlock(executable *entity.ExecutableBlock, parent
 		executables, err := q.onBlockExecuted(executable.Block.Header.ParentID, *parentFinalState)
 		if err != nil {
 			return nil, nil, fmt.Errorf("receiving block %v with parent commitment %v, but parent block %v already exists with no commitment, fail to call mark parent as executed: %w",
-				executable.ID(), *parentFinalState, executable.Block.Header.ParentID, err)
+				executable.BlockID(), *parentFinalState, executable.Block.Header.ParentID, err)
 		}
 
 		// we already have this block, its collection must have been fetched, so we only return the
@@ -302,7 +298,7 @@ func (q *BlockQueue) handleKnownBlock(executable *entity.ExecutableBlock, parent
 	// and we can simply ignore this call.
 	if executable.StartState != nil && parentFinalState == nil {
 		q.log.Warn().
-			Str("blockID", executable.ID().String()).
+			Str("blockID", executable.BlockID().String()).
 			Uint64("height", executable.Block.Header.Height).
 			Hex("parentID", executable.Block.Header.ParentID[:]).
 			Msg("edge case: receiving block with no parent commitment, but its parent block actually has been executed")
@@ -313,11 +309,11 @@ func (q *BlockQueue) handleKnownBlock(executable *entity.ExecutableBlock, parent
 	if *executable.StartState != *parentFinalState {
 		return nil, nil,
 			fmt.Errorf("block %s has already been executed with a different parent final state, %v != %v",
-				executable.ID(), *executable.StartState, parentFinalState)
+				executable.BlockID(), *executable.StartState, parentFinalState)
 	}
 
 	q.log.Warn().
-		Str("blockID", executable.ID().String()).
+		Str("blockID", executable.BlockID().String()).
 		Uint64("height", executable.Block.Header.Height).
 		Msg("edge case: OnBlockExecuted is called with the same arguments again")
 	return nil, nil, nil
@@ -388,7 +384,7 @@ func (q *BlockQueue) checkIfChildBlockBecomeExecutable(
 	for _, childBlock := range blocksAtNextHeight {
 		// a child block at the next height must have the same parent ID
 		// as the current block
-		isChild := childBlock.Block.Header.ParentID == block.ID()
+		isChild := childBlock.Block.Header.ParentID == block.BlockID()
 		if !isChild {
 			continue
 		}
@@ -442,7 +438,7 @@ func (q *BlockQueue) GetMissingCollections(blockID flow.Identifier) (
 
 func missingCollectionForBlock(block *entity.ExecutableBlock, guarantee *flow.CollectionGuarantee) *MissingCollection {
 	return &MissingCollection{
-		BlockID:   block.ID(),
+		BlockID:   block.BlockID(),
 		Height:    block.Block.Header.Height,
 		Guarantee: guarantee,
 	}

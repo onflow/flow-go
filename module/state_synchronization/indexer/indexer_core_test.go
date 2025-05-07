@@ -191,14 +191,10 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 
 	i.useDefaultHeights()
 
-	collectionsToMarkFinalized, err := stdmap.NewTimes(100)
-	require.NoError(i.t, err)
-	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
-	require.NoError(i.t, err)
-	blocksToMarkExecuted, err := stdmap.NewTimes(100)
-	require.NoError(i.t, err)
-	blockTransactions, err := stdmap.NewIdentifierMap(100)
-	require.NoError(i.t, err)
+	collectionsToMarkFinalized := stdmap.NewTimes(100)
+	collectionsToMarkExecuted := stdmap.NewTimes(100)
+	blocksToMarkExecuted := stdmap.NewTimes(100)
+	blockTransactions := stdmap.NewIdentifierMap(100)
 
 	log := zerolog.New(os.Stdout)
 	blocks := storagemock.NewBlocks(i.t)

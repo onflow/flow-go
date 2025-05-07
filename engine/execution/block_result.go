@@ -155,7 +155,7 @@ func NewEmptyBlockAttestationResult(
 		BlockExecutionResult:         blockExecutionResult,
 		collectionAttestationResults: make([]CollectionAttestationResult, 0, colSize),
 		BlockExecutionData: &execution_data.BlockExecutionData{
-			BlockID: blockExecutionResult.ID(),
+			BlockID: blockExecutionResult.BlockID(),
 			ChunkExecutionDatas: make(
 				[]*execution_data.ChunkExecutionData,
 				0,

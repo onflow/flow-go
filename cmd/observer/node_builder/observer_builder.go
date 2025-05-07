@@ -276,7 +276,7 @@ type ObserverServiceBuilder struct {
 	FollowerDistributor  *pubsub.FollowerDistributor
 	Committee            hotstuff.DynamicCommittee
 	Finalized            *flow.Header
-	Pending              []*flow.Header
+	Pending              []*flow.ProposalHeader
 	FollowerCore         module.HotStuffFollower
 	ExecutionIndexer     *indexer.Indexer
 	ExecutionIndexerCore *indexer.IndexerCore
@@ -1714,12 +1714,7 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	builder.Module("transaction metrics", func(node *cmd.NodeConfig) error {
-		var err error
-		builder.TransactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
-		if err != nil {
-			return err
-		}
-
+		builder.TransactionTimings = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
 		builder.TransactionMetrics = metrics.NewTransactionCollector(
 			node.Logger,
 			builder.TransactionTimings,

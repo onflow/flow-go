@@ -93,7 +93,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	// assign 4 nodes to the verification role
 	bc.Approvers = IdentityListFixture(4, WithRole(flow.RoleVerification))
 	for _, verifier := range bc.Approvers {
-		bc.Identities[verifier.ID()] = verifier
+		bc.Identities[verifier.NodeID] = verifier
 	}
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP BLOCKS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
@@ -463,13 +463,6 @@ func ApprovalFor(result *flow.ExecutionResult, chunkIdx uint64, approverID flow.
 		WithApproverID(approverID),
 		WithChunk(chunkIdx),
 	)
-}
-
-func EntityWithID(expectedID flow.Identifier) interface{} {
-	return mock.MatchedBy(
-		func(entity flow.Entity) bool {
-			return expectedID == entity.ID()
-		})
 }
 
 // subgraphFixture represents a subgraph of the blockchain:

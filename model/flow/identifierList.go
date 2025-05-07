@@ -49,7 +49,7 @@ func (il IdentifierList) Strings() []string {
 // ID returns a cryptographic commitment to the list of identifiers.
 // Since an IdentifierList has no mutable fields, it is equal to the checksum.
 func (il IdentifierList) ID() Identifier {
-	return il.Checksum()
+	return MakeID(il)
 }
 
 // Checksum returns a cryptographic commitment to the list of identifiers.

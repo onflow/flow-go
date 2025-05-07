@@ -127,14 +127,10 @@ func (s *Suite) SetupTest() {
 	s.receipts = new(storage.ExecutionReceipts)
 	s.transactions = new(storage.Transactions)
 	s.results = new(storage.ExecutionResults)
-	collectionsToMarkFinalized, err := stdmap.NewTimes(100)
-	require.NoError(s.T(), err)
-	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
-	require.NoError(s.T(), err)
-	blocksToMarkExecuted, err := stdmap.NewTimes(100)
-	require.NoError(s.T(), err)
-	blockTransactions, err := stdmap.NewIdentifierMap(100)
-	require.NoError(s.T(), err)
+	collectionsToMarkFinalized := stdmap.NewTimes(100)
+	collectionsToMarkExecuted := stdmap.NewTimes(100)
+	blocksToMarkExecuted := stdmap.NewTimes(100)
+	blockTransactions := stdmap.NewIdentifierMap(100)
 
 	s.proto.state.On("Identity").Return(s.obsIdentity, nil)
 	s.proto.state.On("Params").Return(s.proto.params)
@@ -172,6 +168,7 @@ func (s *Suite) SetupTest() {
 	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	s.proto.params.On("FinalizedRoot").Return(header, nil)
 
+	var err error
 	s.collectionExecutedMetric, err = indexer.NewCollectionExecutedMetricImpl(
 		s.log,
 		metrics.NewNoopCollector(),
@@ -284,7 +281,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	}
 
 	// expect that the block storage is indexed with each of the collection guarantee
-	s.blocks.On("IndexBlockForCollections", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
+	s.blocks.On("IndexBlockForCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 	for _, seal := range block.Payload.Seals {
 		s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
 	}
@@ -357,7 +354,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 
 	// expected all new blocks after last block processed
 	for _, block := range blocks {
-		s.blocks.On("IndexBlockForCollections", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
+		s.blocks.On("IndexBlockForCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 
 		for _, cg := range block.Payload.Guarantees {
 			s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Run(func(args mock.Arguments) {
@@ -382,7 +379,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	}
 
 	s.headers.AssertExpectations(s.T())
-	s.blocks.AssertNumberOfCalls(s.T(), "IndexBlockForCollections", newBlocksCount)
+	s.blocks.AssertNumberOfCalls(s.T(), "IndexBlockForCollectionGuarantees", newBlocksCount)
 	s.request.AssertNumberOfCalls(s.T(), "EntityByID", expectedEntityByIDCalls)
 	s.results.AssertNumberOfCalls(s.T(), "Index", expectedIndexCalls)
 }
@@ -431,7 +428,7 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 	// we should store the light collection and index its transactions
 	s.collections.On("StoreLightAndIndexByTransaction", &light).Return(nil).Once()
 	block := &flow.Block{
-		Header:  &flow.Header{Height: 0},
+		Header:  &flow.Header{HeaderBody: flow.HeaderBody{Height: 0}},
 		Payload: &flow.Payload{Guarantees: []*flow.CollectionGuarantee{}},
 	}
 	s.blocks.On("ByID", mock.Anything).Return(block, nil)
@@ -570,7 +567,7 @@ func (s *Suite) TestRequestMissingCollections() {
 		// simulate some db i/o contention
 		After(time.Millisecond * time.Duration(rand.Intn(5)))
 
-	// setup the requester engine mock
+	// set up the requester engine mock
 	// entityByID should be called once per collection
 	for _, c := range collIDs {
 		s.request.On("EntityByID", c, mock.Anything).Return()

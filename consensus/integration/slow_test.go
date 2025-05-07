@@ -105,7 +105,7 @@ func TestTimeoutRebroadcast(t *testing.T) {
 	blockedTimeoutObjectsTracker := make(map[flow.Identifier]map[uint64]uint64)
 	hub.WithFilter(func(channelID channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		switch m := event.(type) {
-		case *messages.BlockProposal:
+		case *messages.UntrustedProposal:
 			return m.Block.Header.View == 5, 0 // drop proposals only for view 5
 		case *messages.TimeoutObject:
 			// drop first timeout object for every sender for every view

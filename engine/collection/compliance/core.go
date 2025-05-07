@@ -104,18 +104,19 @@ func NewCore(
 
 // OnBlockProposal handles incoming block proposals.
 // No errors are expected during normal operation.
-func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.ClusterBlockProposal]) error {
+func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedClusterProposal]) error {
 	startTime := time.Now()
 	defer func() {
 		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
 	}()
 
-	block := flow.Slashable[*cluster.Block]{
-		OriginID: proposal.OriginID,
-		Message:  proposal.Message.Block.ToInternal(),
+	proposal := flow.Slashable[*cluster.BlockProposal]{
+		OriginID: proposalMsg.OriginID,
+		Message:  proposalMsg.Message.ToInternal(),
 	}
-	header := block.Message.Header
-	blockID := header.ID()
+	header := proposal.Message.Block.Header
+	payload := proposal.Message.Block.Payload
+	blockID := proposal.Message.Block.ID()
 	finalHeight := c.finalizedHeight.Value()
 	finalView := c.finalizedView.Value()
 
@@ -124,21 +125,22 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.ClusterBlockPro
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", blockID[:]).
-		Hex("ref_block_id", block.Message.Payload.ReferenceBlockID[:]).
-		Hex("collection_id", logging.Entity(block.Message.Payload.Collection)).
-		Int("tx_count", block.Message.Payload.Collection.Len()).
+		Hex("ref_block_id", payload.ReferenceBlockID[:]).
+		Hex("collection_id", logging.Entity(payload.Collection)).
+		Int("tx_count", payload.Collection.Len()).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("proposer", header.ProposerID[:]).
 		Time("timestamp", header.Timestamp).
 		Logger()
 	if log.Debug().Enabled() {
+		payloadHash := payload.Hash()
 		log = log.With().
 			Uint64("finalized_height", finalHeight).
 			Uint64("finalized_view", finalView).
 			Str("chain_id", header.ChainID.String()).
-			Hex("payload_hash", header.PayloadHash[:]).
+			Hex("payload_hash", payloadHash[:]).
 			Hex("parent_signer_indices", header.ParentVoterIndices).
-			Strs("tx_ids", flow.IdentifierList(block.Message.Payload.Collection.Light().Transactions).Strings()).
+			Strs("tx_ids", flow.IdentifierList(payload.Collection.Light().Transactions).Strings()).
 			Logger()
 	}
 	log.Info().Msg("block proposal received")
@@ -196,7 +198,7 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.ClusterBlockPro
 	_, found := c.pending.ByID(header.ParentID)
 	if found {
 		// add the block to the cache
-		_ = c.pending.Add(block)
+		_ = c.pending.Add(proposal)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
 		return nil
@@ -210,7 +212,7 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.ClusterBlockPro
 		return fmt.Errorf("could not check parent exists: %w", err)
 	}
 	if !exists {
-		_ = c.pending.Add(block)
+		_ = c.pending.Add(proposal)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
 		c.sync.RequestBlock(header.ParentID, header.Height-1)
@@ -223,7 +225,7 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.ClusterBlockPro
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	err = c.processBlockAndDescendants(block)
+	err = c.processBlockAndDescendants(proposal)
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -236,9 +238,9 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.ClusterBlockPro
 // its pending descendants. By induction, any child block of a
 // valid proposal is itself connected to the finalized state and can be
 // processed as well.
-func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Block]) error {
-	header := proposal.Message.Header
-	blockID := header.ID()
+func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.BlockProposal]) error {
+	header := proposal.Message.Block.Header
+	blockID := proposal.Message.Block.ID()
 	log := c.log.With().
 		Str("block_id", blockID.String()).
 		Uint64("block_height", header.Height).
@@ -262,7 +264,7 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Block
 			})
 
 			// notify VoteAggregator about the invalid block
-			err = c.voteAggregator.InvalidBlock(model.SignedProposalFromFlow(header))
+			err = c.voteAggregator.InvalidBlock(model.SignedProposalFromClusterBlock(proposal.Message))
 			if err != nil {
 				if mempool.IsBelowPrunedThresholdError(err) {
 					log.Warn().Msg("received invalid block, but is below pruned threshold")
@@ -303,23 +305,24 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Block
 //   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
 //   - model.InvalidProposalError if the block proposal is invalid
 //   - engine.UnverifiableInputError if the proposal cannot be validated
-func (c *Core) processBlockProposal(proposal *cluster.Block) error {
-	header := proposal.Header
-	blockID := header.ID()
+func (c *Core) processBlockProposal(proposal *cluster.BlockProposal) error {
+	header := proposal.Block.Header
+	blockID := proposal.Block.ID()
+	payloadHash := proposal.Block.Payload.Hash()
 	log := c.log.With().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
-		Hex("payload_hash", header.PayloadHash[:]).
+		Hex("payload_hash", payloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Logger()
 	log.Debug().Msg("processing block proposal")
 
-	hotstuffProposal := model.SignedProposalFromFlow(header)
+	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 	err := c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
 		if model.IsInvalidProposalError(err) {
@@ -344,7 +347,7 @@ func (c *Core) processBlockProposal(proposal *cluster.Block) error {
 			return engine.NewOutdatedInputErrorf("outdated extension of cluster state: %w", err)
 		} else if state.IsUnverifiableExtensionError(err) {
 			return engine.NewUnverifiableInputError("unverifiable extension of cluster state (block_id: %x, height: %d): %w",
-				header.ID(), header.Height, err)
+				blockID, header.Height, err)
 		} else {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return fmt.Errorf("unexpected exception while extending cluster state with block %x at height %d: %w", blockID, header.Height, err)

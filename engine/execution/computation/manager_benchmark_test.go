@@ -275,7 +275,7 @@ func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colN
 
 		collections[c] = collection
 		guarantees[c] = guarantee
-		completeCollections[guarantee.ID()] = &entity.CompleteCollection{
+		completeCollections[guarantee.CollectionID] = &entity.CompleteCollection{
 			Guarantee:    guarantee,
 			Transactions: transactions,
 		}
@@ -283,8 +283,10 @@ func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colN
 
 	block := flow.Block{
 		Header: &flow.Header{
-			ParentID: parentBlock.ID(),
-			View:     parentBlock.Header.Height + 1,
+			HeaderBody: flow.HeaderBody{
+				ParentID: parentBlock.ID(),
+				View:     parentBlock.Header.Height + 1,
+			},
 		},
 		Payload: &flow.Payload{
 			Guarantees: guarantees,

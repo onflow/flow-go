@@ -30,7 +30,7 @@ type indexerTest struct {
 	registers     *storagemock.RegisterIndex
 	indexTest     *indexCoreTest
 	worker        *Indexer
-	executionData *mempool.ExecutionData
+	executionData *mempool.Mempool[flow.Identifier, *execution_data.BlockExecutionDataEntity]
 	t             *testing.T
 }
 
@@ -59,7 +59,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 		useDefaultTransactionResults().
 		initIndexer()
 
-	executionData := mempool.NewExecutionData(t)
+	executionData := &mempool.Mempool[flow.Identifier, *execution_data.BlockExecutionDataEntity]{}
 	exeCache := cache.NewExecutionDataCache(
 		mock.NewExecutionDataStore(t),
 		indexerCoreTest.indexer.headers,
@@ -90,9 +90,9 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 	return test
 }
 
-func (w *indexerTest) setBlockDataByID(f func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool)) {
+func (w *indexerTest) setBlockDataGet(f func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool)) {
 	w.executionData.
-		On("ByID", mocks.AnythingOfType("flow.Identifier")).
+		On("Get", mocks.AnythingOfType("flow.Identifier")).
 		Return(f)
 }
 
@@ -176,7 +176,7 @@ func TestIndexer_Success(t *testing.T) {
 	lastIndexedIndex := 5
 	test := newIndexerTest(t, blocks, lastIndexedIndex)
 
-	test.setBlockDataByID(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
+	test.setBlockDataGet(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
 		trie := trieUpdateFixture(t)
 		collection := unittest.CollectionFixture(0)
 		ed := &execution_data.BlockExecutionData{
@@ -220,7 +220,7 @@ func TestIndexer_Failure(t *testing.T) {
 	lastIndexedIndex := 5
 	test := newIndexerTest(t, blocks, lastIndexedIndex)
 
-	test.setBlockDataByID(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
+	test.setBlockDataGet(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
 		trie := trieUpdateFixture(t)
 		collection := unittest.CollectionFixture(0)
 		ed := &execution_data.BlockExecutionData{

@@ -12,51 +12,25 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type eventWrapper struct {
-	TxID             []byte
-	Index            uint32
-	Type             string
-	TransactionIndex uint32
-	Payload          []byte
-}
-
-func wrapEvent(e flow.Event) eventWrapper {
-	return eventWrapper{
-		TxID:             e.TransactionID[:],
-		Index:            e.EventIndex,
-		Type:             string(e.Type),
-		TransactionIndex: e.TransactionIndex,
-		Payload:          e.Payload,
-	}
-}
-
+// TestEventFingerprint verifies that the Fingerprint function produces
+// a consistent RLP-encoded representation of an Event. It ensures that
+// decoding the fingerprint results in a correctly ordered structure.
 func TestEventFingerprint(t *testing.T) {
 	evt := unittest.EventFixture(flow.EventAccountCreated, 13, 12, unittest.IdentifierFixture(), 32)
 
 	data := fingerprint.Fingerprint(evt)
-	var decoded eventWrapper
+	var decoded flow.Event
 	rlp.NewMarshaler().MustUnmarshal(data, &decoded)
-	assert.Equal(t, wrapEvent(evt), decoded)
+	assert.Equal(t, evt, decoded)
 }
 
-func TestEventID(t *testing.T) {
-
-	// EventID was historically calculated from just TxID and eventIndex which are enough to uniquely identify it in a system
-	// This test ensures we don't break this promise while introducing proper fingerprinting (which accounts for all the fields)
-
+// TestEventMalleability checks that Event is not malleable: any change in its data
+// should result in a different ID.
+func TestEventMalleability(t *testing.T) {
 	txID := unittest.IdentifierFixture()
-	evtA := unittest.EventFixture(flow.EventAccountUpdated, 21, 37, txID, 2)
-	evtB := unittest.EventFixture(flow.EventAccountCreated, 0, 37, txID, 22)
+	event := unittest.EventFixture(flow.EventAccountUpdated, 21, 37, txID, 2)
 
-	evtC := unittest.EventFixture(evtA.Type, evtA.TransactionIndex, evtA.EventIndex+1, txID, 2)
-	evtC.Payload = evtA.Payload
-
-	a := evtA.ID()
-	b := evtB.ID()
-	c := evtC.ID()
-
-	assert.Equal(t, a, b)
-	assert.NotEqual(t, a, c)
+	unittest.RequireEntityNonMalleable(t, &event)
 }
 
 func TestEventsList(t *testing.T) {
@@ -113,7 +87,7 @@ func TestEventsMerkleRootHash(t *testing.T) {
 		TransactionID:    [flow.IdentifierLen]byte{1, 2, 3},
 	}
 
-	expectedRootHashHex := "355446d7b2b9653403abe28ccc405f46c059d2059cb7863f4964c401ee1aa83b"
+	expectedRootHashHex := "c53a6592de573a24547b616172abd9131651d6b7d829e5694a25fa183db7ae01"
 
 	ABHash, err := flow.EventsMerkleRootHash([]flow.Event{eventA, eventB})
 	assert.NoError(t, err)

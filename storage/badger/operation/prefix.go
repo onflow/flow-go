@@ -40,7 +40,7 @@ const (
 	codeExecutionResult      = 36
 	codeResultApproval       = 37
 	codeChunk                = 38
-	codeExecutionReceiptMeta = 39 // NOTE: prior to Mainnet25, this erroneously had the same value as codeExecutionResult (36)
+	codeExecutionReceiptStub = 39 // NOTE: prior to Mainnet25, this erroneously had the same value as codeExecutionResult (36)
 
 	// codes for indexing single identifier by identifier/integer
 	codeHeightToBlock               = 40 // index mapping height to block ID
@@ -51,6 +51,8 @@ const (
 	codeBlockIDToQuorumCertificate  = 45 // index of quorum certificates by block ID
 	codeEpochProtocolStateByBlockID = 46 // index of epoch protocol state entry by block ID
 	codeProtocolKVStoreByBlockID    = 47 // index of protocol KV store entry by block ID
+	codeBlockIDToProposalSignature  = 48 // index of proposer signatures by block ID
+	codeGuaranteeByCollectionID     = 49 // index of collection guarantee by collection ID
 
 	// codes for indexing multiple identifiers by identifier
 	codeBlockChildren          = 50 // index mapping block ID to children blocks

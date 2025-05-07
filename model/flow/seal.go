@@ -1,7 +1,5 @@
 package flow
 
-import "encoding/json"
-
 // A Seal is produced when an Execution Result (referenced by `ResultID`) for
 // particular block (referenced by `BlockID`) is committed into the chain.
 // A Seal for a block B can be included in the payload B's descendants. Only
@@ -41,35 +39,10 @@ type Seal struct {
 	AggregatedApprovalSigs []AggregatedSignature // one AggregatedSignature per chunk
 }
 
-func (s Seal) Body() interface{} {
-	return struct {
-		BlockID                Identifier
-		ResultID               Identifier
-		FinalState             StateCommitment
-		AggregatedApprovalSigs []AggregatedSignature
-	}{
-		BlockID:                s.BlockID,
-		ResultID:               s.ResultID,
-		FinalState:             s.FinalState,
-		AggregatedApprovalSigs: s.AggregatedApprovalSigs,
-	}
-}
-
 func (s Seal) ID() Identifier {
-	return MakeID(s.Body())
+	return MakeID(s)
 }
 
 func (s Seal) Checksum() Identifier {
 	return MakeID(s)
-}
-
-func (s Seal) MarshalJSON() ([]byte, error) {
-	type Alias Seal
-	return json.Marshal(struct {
-		Alias
-		ID string
-	}{
-		Alias: Alias(s),
-		ID:    s.ID().String(),
-	})
 }

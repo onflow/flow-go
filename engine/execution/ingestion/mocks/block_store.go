@@ -78,7 +78,7 @@ func (bs *MockBlockStore) MarkExecuted(computationResult *execution.ComputationR
 func (bs *MockBlockStore) CreateBlockAndMockResult(t *testing.T, block *entity.ExecutableBlock) *execution.ComputationResult {
 	bs.Lock()
 	defer bs.Unlock()
-	blockID := block.ID()
+	blockID := block.BlockID()
 	_, exist := bs.ResultByBlock[blockID]
 	require.False(t, exist, "block %s already exists", blockID)
 

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"bytes"
 	"fmt"
 	"time"
 
@@ -56,43 +57,35 @@ type TimeoutObject struct {
 	// `TimeoutObject` periodically  based on some internal heuristic. Each time we attempt a re-broadcast,
 	// the `TimeoutTick` is incremented. Incrementing the field prevents de-duplicated within the network layer,
 	// which in turn guarantees quick delivery of the `TimeoutObject` after GST and facilitates recovery.
-	// This field is not part of timeout object ID. Thereby, two timeouts are identical if only they differ
-	// by their TimeoutTick value.
 	TimeoutTick uint64
 }
 
-// ID returns the TimeoutObject's identifier
-func (t *TimeoutObject) ID() flow.Identifier {
-	body := struct {
-		View         uint64
-		NewestQCID   flow.Identifier
-		LastViewTCID flow.Identifier
-		SignerID     flow.Identifier
-		SigData      crypto.Signature
-	}{
-		View:         t.View,
-		NewestQCID:   t.NewestQC.ID(),
-		LastViewTCID: t.LastViewTC.ID(),
-		SignerID:     t.SignerID,
-		SigData:      t.SigData,
-	}
-	return flow.MakeID(body)
+// Equals returns true if the TimeoutObject is equal to the provided other TimeoutObject.
+// It compares View, NewestQC, LastViewTC, SignerID and SigData and is used for de-duplicate TimeoutObjects in the cache.
+// It excludes TimeoutTick: two TimeoutObjects with different TimeoutTick values can be considered equal.
+func (t *TimeoutObject) Equals(other *TimeoutObject) bool {
+	return t.View == other.View &&
+		t.NewestQC.ID() == other.NewestQC.ID() &&
+		t.LastViewTC.ID() == other.LastViewTC.ID() &&
+		t.SignerID == other.SignerID &&
+		bytes.Equal(t.SigData, other.SigData)
 }
 
+// String returns a partial string representation of the TimeoutObject,
+// including the signer ID, view, and the newest QC view.
 func (t *TimeoutObject) String() string {
 	return fmt.Sprintf(
-		"View: %d, HighestQC.View: %d, LastViewTC: %v, TimeoutTick: %d",
+		"Signer ID: %s, View: %d, NewestQC.View: %d",
+		t.SignerID.String(),
 		t.View,
 		t.NewestQC.View,
-		t.LastViewTC,
-		t.TimeoutTick,
 	)
 }
 
-// LogContext returns a `zerolog.Contex` including the most important properties of the TC:
-//   - view number that this TC is for
+// LogContext returns a `zerolog.Context` including the most important properties of the TO:
 //   - view and ID of the block that the included QC points to
 //   - number of times a re-broadcast of this timeout was attempted
+//   - view number that this TO is for
 //   - [optional] if the TC also includes a TC for the prior view, i.e. `LastViewTC` ≠ nil:
 //     the new of `LastViewTC` and the view that `LastViewTC.NewestQC` is for
 func (t *TimeoutObject) LogContext(logger zerolog.Logger) zerolog.Context {

@@ -211,9 +211,9 @@ func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
 		suite.T().Logf("ghost recv: %T", msg)
 
 		switch val := msg.(type) {
-		case *messages.ClusterBlockProposal:
-			block := val.Block.ToInternal()
-			blocks = append(blocks, *block)
+		case *messages.UntrustedClusterProposal:
+			internalClusterProposal := val.ToInternal()
+			blocks = append(blocks, internalClusterProposal.Block)
 			if len(blocks) == int(n) {
 				return blocks
 			}
@@ -260,8 +260,9 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 		require.Nil(suite.T(), err, "could not read next message")
 
 		switch val := msg.(type) {
-		case *messages.ClusterBlockProposal:
-			block := val.Block.ToInternal()
+		case *messages.UntrustedClusterProposal:
+			internalClusterProposal := val.ToInternal()
+			block := internalClusterProposal.Block
 			header := block.Header
 			collection := block.Payload.Collection
 			suite.T().Logf("got collection from %v height=%d col_id=%x size=%d", originID, header.Height, collection.ID(), collection.Len())

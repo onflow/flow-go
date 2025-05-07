@@ -201,7 +201,7 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 		ExecutionResult: result,
 		BlockHeight:     blockHeight,
 	}
-	added := e.pendingChunks.Add(status)
+	added := e.pendingChunks.Add(status.ChunkLocatorID(), status)
 	if !added {
 		return false, blockHeight, nil
 	}
@@ -243,7 +243,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response *verific
 	e.metrics.OnChunkDataPackArrivedAtFetcher()
 
 	// make sure we still need it
-	status, exists := e.pendingChunks.Get(response.Index, response.ResultID)
+	status, exists := e.pendingChunks.Get(response.Locator.ID())
 	if !exists {
 		lg.Debug().Msg("could not fetch pending status from mempool, dropping chunk data")
 		return
@@ -293,18 +293,20 @@ func (e *Engine) handleChunkDataPackWithTracing(
 	ctx context.Context,
 	originID flow.Identifier,
 	status *verification.ChunkStatus,
-	chunkDataPack *flow.ChunkDataPack) (bool, error) {
-
+	chunkDataPack *flow.ChunkDataPack,
+) (bool, error) {
 	// make sure the chunk data pack is valid
 	err := e.validateChunkDataPackWithTracing(ctx, status.ChunkIndex, originID, chunkDataPack, status.ExecutionResult)
 	if err != nil {
-		return false, NewChunkDataPackValidationError(originID,
+		return false, NewChunkDataPackValidationError(
+			originID,
 			status.ExecutionResult.ID(),
 			status.ChunkIndex,
 			chunkDataPack.ID(),
 			chunkDataPack.ChunkID,
 			chunkDataPack.Collection.ID(),
-			err)
+			err,
+		)
 	}
 
 	processed, err := e.handleValidatedChunkDataPack(ctx, status, chunkDataPack)
@@ -322,7 +324,7 @@ func (e *Engine) handleValidatedChunkDataPack(ctx context.Context,
 	status *verification.ChunkStatus,
 	chunkDataPack *flow.ChunkDataPack) (bool, error) {
 
-	removed := e.pendingChunks.Remove(status.ChunkIndex, status.ExecutionResult.ID())
+	removed := e.pendingChunks.Remove(status.ChunkLocatorID())
 	if !removed {
 		// we deduplicate the chunk data responses at this point, reaching here means a
 		// duplicate chunk data response is under process concurrently, so we give up
@@ -476,7 +478,7 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkIndex uint64, resultID flow.Iden
 		Logger()
 
 	// we need to report that the job has been finished eventually
-	status, exists := e.pendingChunks.Get(chunkIndex, resultID)
+	status, exists := e.pendingChunks.Get(chunks.ChunkLocatorID(resultID, chunkIndex))
 	if !exists {
 		lg.Debug().
 			Msg("could not fetch pending status for sealed chunk from mempool, dropping chunk data")
@@ -487,7 +489,7 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkIndex uint64, resultID flow.Iden
 	lg = lg.With().
 		Uint64("block_height", status.BlockHeight).
 		Hex("result_id", logging.ID(status.ExecutionResult.ID())).Logger()
-	removed := e.pendingChunks.Remove(chunkIndex, resultID)
+	removed := e.pendingChunks.Remove(chunkLocatorID)
 
 	e.chunkConsumerNotifier.Notify(chunkLocatorID)
 	lg.Info().
