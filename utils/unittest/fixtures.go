@@ -227,18 +227,7 @@ func RechainBlocks(blocks []*flow.Block) {
 
 func FullBlockFixture() flow.Block {
 	block := BlockFixture()
-
-	var payload flow.Payload
-	payload.Seals = Seal.Fixtures(10)
-	payload.Results = []*flow.ExecutionResult{
-		ExecutionResultFixture(),
-		ExecutionResultFixture(),
-	}
-	payload.Receipts = []*flow.ExecutionReceiptStub{
-		ExecutionReceiptFixture(WithResult(payload.Results[0])).Stub(),
-		ExecutionReceiptFixture(WithResult(payload.Results[1])).Stub(),
-	}
-	payload.ProtocolStateID = IdentifierFixture()
+	payload := PayloadFixture(WithAllTheFixins)
 
 	return *flow.NewBlock(block.Header, payload)
 }
@@ -389,6 +378,12 @@ func WithExecutionResults(results ...*flow.ExecutionResult) func(*flow.Payload) 
 
 func BlockWithParentFixture(parent *flow.Header) *flow.Block {
 	payload := PayloadFixture()
+	return BlockWithParentAndPayload(parent, payload)
+}
+
+// BlockWithParentAndPayload creates a new block that is valid
+// with respect to the given parent block and with given payload.
+func BlockWithParentAndPayload(parent *flow.Header, payload flow.Payload) *flow.Block {
 	headerBody := HeaderBodyWithParentFixture(parent)
 	return flow.NewBlock(*headerBody, payload)
 }
@@ -436,7 +431,6 @@ func BlockWithParentAndProposerFixture(
 }
 
 func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Block {
-	block := BlockWithParentFixture(parent)
 	payload := flow.Payload{
 		Guarantees: nil,
 	}
@@ -450,8 +444,7 @@ func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Bl
 		}
 	}
 
-	block.SetPayload(payload)
-	return block
+	return BlockWithParentAndPayload(parent, payload)
 }
 
 func GenesisFixture() *flow.Block {
@@ -676,7 +669,6 @@ func AddCollectionsToBlock(block *flow.Block, collections []*flow.Collection) {
 	}
 
 	block.Payload.Guarantees = gs
-	block.SetPayload(block.Payload)
 }
 
 func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flow.CollectionGuarantee {
