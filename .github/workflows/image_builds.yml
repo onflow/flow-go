@@ -172,7 +172,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       !cancelled() && 
-      (needs.validate-release.result != 'failure')
+      (needs.validate-release.result != 'failure' && needs.validate-release.result != 'skipped')
     needs: [validate-release]
     # This job will only run if the previous jobs were successful and not cancelled.
     # It checks the results of both the public and secure builds to ensure that at least one of them succeeded.
