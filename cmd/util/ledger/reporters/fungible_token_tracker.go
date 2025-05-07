@@ -204,9 +204,8 @@ func (r *FungibleTokenTracker) iterateChildren(tr trace, addr flow.Address, valu
 		if _, ok := r.vaultTypeIDs[typeIDStr]; ok {
 			b := uint64(compValue.GetField(
 				inter,
-				interpreter.EmptyLocationRange,
 				"balance",
-			).(interpreter.UFix64Value))
+			).(interpreter.UFix64Value).UFix64Value)
 			if b > 0 {
 				r.rw.Write(TokenDataPoint{
 					Path:    tr.String(),

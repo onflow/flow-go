@@ -1613,7 +1613,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 				assert.Len(t, output.Events, 3)
-				assert.Len(t, state.UpdatedRegisterIDs(), 12)
+				assert.Len(t, state.UpdatedRegisterIDs(), 13)
 				assert.Equal(
 					t,
 					flow.EventType("A.f8d6e0586b0a20c7.EVM.TransactionExecuted"),
