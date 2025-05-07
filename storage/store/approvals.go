@@ -3,7 +3,8 @@ package store
 import (
 	"errors"
 	"fmt"
-	"sync"
+
+	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -21,15 +22,14 @@ import (
 //     *only safe* for Verification Nodes when tracking their own approvals (for the same ExecutionResult,
 //     a Verifier will always produce the same approval)
 type ResultApprovals struct {
-	db    storage.DB
-	cache *Cache[flow.Identifier, *flow.ResultApproval]
-	// TODO(7355): lockctx
-	indexing *sync.Mutex // preventing concurrent indexing of approvals
+	db          storage.DB
+	cache       *Cache[flow.Identifier, *flow.ResultApproval]
+	lockManager lockctx.Manager
 }
 
 var _ storage.ResultApprovals = (*ResultApprovals)(nil)
 
-func NewResultApprovals(collector module.CacheMetrics, db storage.DB) *ResultApprovals {
+func NewResultApprovals(collector module.CacheMetrics, db storage.DB, lockManager lockctx.Manager) *ResultApprovals {
 	store := func(rw storage.ReaderBatchWriter, key flow.Identifier, val *flow.ResultApproval) error {
 		return operation.InsertResultApproval(rw.Writer(), val)
 	}
@@ -41,12 +41,12 @@ func NewResultApprovals(collector module.CacheMetrics, db storage.DB) *ResultApp
 	}
 
 	return &ResultApprovals{
-		db: db,
+		lockManager: lockManager,
+		db:          db,
 		cache: newCache(collector, metrics.ResourceResultApprovals,
 			withLimit[flow.Identifier, *flow.ResultApproval](flow.DefaultTransactionExpiry+100),
 			withStore(store),
 			withRetrieve(retrieve)),
-		indexing: new(sync.Mutex),
 	}
 }
 
@@ -72,20 +72,22 @@ func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, app
 	// The lock guarantees that no other thread can concurrently update the index. Thereby confirming that no value
 	// is already stored for the given key (resultID, chunkIndex) and then updating the index (or aborting) is
 	// synchronized into one atomic operation.
-	r.indexing.Lock()
-	defer r.indexing.Unlock()
+	lctx := r.lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockIndexResultApproval)
+	if err != nil {
+		return err
+	}
 
-	err := r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+	err = r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		var storedApprovalID flow.Identifier
 		err := operation.LookupResultApproval(rw.GlobalReader(), resultID, chunkIndex, &storedApprovalID)
 		if err != nil {
 			if !errors.Is(err, storage.ErrNotFound) {
 				return fmt.Errorf("could not lookup result approval ID: %w", err)
 			}
-
 			// no approval found, index the approval
-
-			return operation.UnsafeIndexResultApproval(rw.Writer(), resultID, chunkIndex, approvalID)
+			return operation.IndexResultApproval(lctx, rw.Writer(), resultID, chunkIndex, approvalID)
 		}
 
 		// an approval is already indexed, double check if it is the same
@@ -93,12 +95,10 @@ func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, app
 		// store is only used within Verification nodes, and it is impossible
 		// for a Verification node to compute different approvals for the same
 		// chunk.
-
 		if storedApprovalID != approvalID {
 			return fmt.Errorf("attempting to store conflicting approval (result: %v, chunk index: %d): storing: %v, stored: %v. %w",
 				resultID, chunkIndex, approvalID, storedApprovalID, storage.ErrDataMismatch)
 		}
-
 		return nil
 	})
 

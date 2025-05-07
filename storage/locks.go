@@ -13,11 +13,17 @@ const (
 	LockInsertBlock = "lock_insert_block"
 	// LockFinalizeBlock protects the entire block finalization process (Finalize)
 	LockFinalizeBlock = "lock_finalize_block"
+	// LockIndexResultApproval protects indexing result approvals by approval and chunk.
+	LockIndexResultApproval = "lock_index_result_approval"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
 func Locks() []string {
-	return []string{LockInsertBlock, LockFinalizeBlock}
+	return []string{
+		LockInsertBlock,
+		LockFinalizeBlock,
+		LockIndexResultApproval,
+	}
 }
 
 // makeLockPolicy constructs the policy used by the storage layer to prevent deadlocks.

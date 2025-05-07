@@ -19,6 +19,8 @@ type Index struct {
 func NewIndex(collector module.CacheMetrics, db storage.DB) *Index {
 	indexing := &sync.Mutex{}
 
+	// TODO(7355): lockctx - we should be passing a lockctx but it is challenging to implement lockctx here because
+	//             the Cache's store function doesn't allow passing in the context...
 	store := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, index *flow.Index) error {
 		return procedure.InsertIndex(indexing, rw, blockID, index)
 	}

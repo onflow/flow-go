@@ -17,7 +17,7 @@ import (
 func TestApprovalStoreAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := store.NewResultApprovals(metrics, db)
+		store := store.NewResultApprovals(metrics, db, storage.NewTestingLockManager())
 
 		approval := unittest.ResultApprovalFixture()
 		err := store.Store(approval)
@@ -39,7 +39,7 @@ func TestApprovalStoreAndRetrieve(t *testing.T) {
 func TestApprovalStoreTwice(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := store.NewResultApprovals(metrics, db)
+		store := store.NewResultApprovals(metrics, db, storage.NewTestingLockManager())
 
 		approval := unittest.ResultApprovalFixture()
 		err := store.Store(approval)
@@ -59,7 +59,7 @@ func TestApprovalStoreTwice(t *testing.T) {
 func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := store.NewResultApprovals(metrics, db)
+		store := store.NewResultApprovals(metrics, db, storage.NewTestingLockManager())
 
 		approval1 := unittest.ResultApprovalFixture()
 		approval2 := unittest.ResultApprovalFixture()
@@ -86,7 +86,7 @@ func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := store.NewResultApprovals(metrics, db)
+		store := store.NewResultApprovals(metrics, db, storage.NewTestingLockManager())
 
 		approval1 := unittest.ResultApprovalFixture()
 		approval2 := unittest.ResultApprovalFixture()

@@ -10,7 +10,8 @@ import (
 )
 
 func InsertIndex(lock *sync.Mutex, rw storage.ReaderBatchWriter, blockID flow.Identifier, index *flow.Index) error {
-	// TODO(7355): lockctx
+	// TODO(7355): lockctx - it is challenging to implement lockctx here because
+	//             the Cache's store function doesn't allow passing in the context...
 	rw.Lock(lock)
 
 	w := rw.Writer()

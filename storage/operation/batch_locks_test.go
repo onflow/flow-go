@@ -14,7 +14,7 @@ import (
 )
 
 func InsertNewEntity(lock *sync.Mutex, rw storage.ReaderBatchWriter, e Entity) error {
-	// TODO(7355): lockctx
+	// TODO(7355): lockctx - can remove this file, and batch_locks.go, and remove the Lock method from ReaderBatchWriter
 	rw.Lock(lock)
 
 	var item Entity

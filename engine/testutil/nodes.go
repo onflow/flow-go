@@ -199,6 +199,7 @@ func GenericNodeWithStateFixture(t testing.TB,
 		Tracer:             tracer,
 		PublicDB:           stateFixture.PublicDB,
 		SecretsDB:          stateFixture.SecretsDB,
+		LockManager:        stateFixture.LockManager,
 		Headers:            stateFixture.Storage.Headers,
 		Guarantees:         stateFixture.Storage.Guarantees,
 		Seals:              stateFixture.Storage.Seals,
@@ -276,6 +277,7 @@ func CompleteStateFixture(
 		DBDir:          dataDir,
 		ProtocolEvents: consumer,
 		State:          mutableState,
+		LockManager:    lockManager,
 	}
 }
 
@@ -1031,7 +1033,7 @@ func VerificationNode(t testing.TB,
 
 		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Log)
 
-		approvalStorage := store.NewResultApprovals(node.Metrics, badgerimpl.ToDB(node.PublicDB))
+		approvalStorage := store.NewResultApprovals(node.Metrics, badgerimpl.ToDB(node.PublicDB), node.LockManager)
 
 		node.VerifierEngine, err = verifier.New(node.Log,
 			collector,

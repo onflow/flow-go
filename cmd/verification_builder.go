@@ -228,7 +228,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			if dbops.IsBadgerTransaction(v.DBOps) {
 				approvalStorage = badger.NewResultApprovals(node.Metrics.Cache, node.DB)
 			} else if dbops.IsBatchUpdate(v.DBOps) {
-				approvalStorage = store.NewResultApprovals(node.Metrics.Cache, node.ProtocolDB)
+				approvalStorage = store.NewResultApprovals(node.Metrics.Cache, node.ProtocolDB, node.StorageLockMgr)
 			} else {
 				return nil, fmt.Errorf("invalid db opts type: %v", v.DBOps)
 			}

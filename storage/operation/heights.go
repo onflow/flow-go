@@ -94,7 +94,9 @@ func RetrieveEpochLastHeight(r storage.Reader, epoch uint64, height *uint64) err
 	return nil
 }
 
-// TODO(7355): lockctx
+// TODO(7355): If we're going to use this function, we should add a managed lock for it.
+// But it is currently only used in tests and it looks like where this was previous used
+// was replaced by an in-memory counter: https://github.com/onflow/flow-go/blob/d27f7b74b8cf987f3120f0700cba73bb95391a21/engine/access/ingestion/engine.go#L103
 func InsertLastCompleteBlockHeightIfNotExists(inserting *sync.Mutex, rw storage.ReaderBatchWriter, height uint64) error {
 	inserting.Lock()
 	rw.AddCallback(func(err error) {
