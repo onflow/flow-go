@@ -333,7 +333,8 @@ func TestSealingSegment(t *testing.T) {
 	t.Run("non-root", func(t *testing.T) {
 		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
 			// build a block to seal
-			block1 := unittest.BlockWithParentAndPayload(head,
+			block1 := unittest.BlockWithParentAndPayload(
+				head,
 				unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
 			)
 			buildFinalizedBlock(t, state, block1)
@@ -353,10 +354,10 @@ func TestSealingSegment(t *testing.T) {
 			block3 := unittest.BlockWithParentProtocolState(block2)
 
 			seals := []*flow.Seal{seal1}
-			block3.SetPayload(flow.Payload{
+			block3.Payload = flow.Payload{
 				Seals:           seals,
 				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.Header, seals),
-			})
+			}
 			buildFinalizedBlock(t, state, block3)
 
 			segment, err := state.AtBlockID(block3.ID()).SealingSegment()
@@ -382,7 +383,6 @@ func TestSealingSegment(t *testing.T) {
 	// Expected sealing segment: [B1, ..., BN], extra blocks: [ROOT]
 	t.Run("long sealing segment", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
-
 			// build a block to seal
 			block1 := unittest.BlockWithParentAndPayload(
 				head,
@@ -399,10 +399,10 @@ func TestSealingSegment(t *testing.T) {
 				if i == 0 {
 					// Repetitions of the same receipt in one fork would be a protocol violation.
 					// Hence, we include the result only once in the direct child of B1.
-					next.SetPayload(unittest.PayloadFixture(
+					next.Payload = unittest.PayloadFixture(
 						unittest.WithReceipts(receipt1),
 						unittest.WithProtocolStateID(parent.Payload.ProtocolStateID),
-					))
+					)
 				}
 				buildFinalizedBlock(t, state, next)
 				parent = next
@@ -1117,14 +1117,15 @@ func TestLatestSealedResult(t *testing.T) {
 				head,
 				unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
 			)
-
-			block2 := unittest.BlockWithParentProtocolState(block1)
-
 			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
-			block2.SetPayload(unittest.PayloadFixture(
-				unittest.WithReceipts(receipt1),
-				unittest.WithProtocolStateID(rootProtocolStateID),
-			))
+
+			block2 := unittest.BlockWithParentAndPayload(
+				block1.ToHeader(),
+				unittest.PayloadFixture(
+					unittest.WithReceipts(receipt1),
+					unittest.WithProtocolStateID(rootProtocolStateID),
+				),
+			)
 			block3 := unittest.BlockWithParentAndPayload(
 				block2.ToHeader(),
 				unittest.PayloadFixture(

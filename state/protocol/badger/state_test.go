@@ -355,10 +355,10 @@ func TestBootstrapNonRoot(t *testing.T) {
 
 			seals := []*flow.Seal{seal1}
 			block3 := unittest.BlockWithParentFixture(block2.ToHeader())
-			block3.SetPayload(flow.Payload{
+			block3.Payload = flow.Payload{
 				Seals:           seals,
 				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.Header, seals),
-			})
+			}
 			buildFinalizedBlock(t, state, block3)
 
 			child := unittest.BlockWithParentProtocolState(block3)
@@ -406,10 +406,10 @@ func TestBootstrapNonRoot(t *testing.T) {
 
 			seals := []*flow.Seal{seal1}
 			block3 := unittest.BlockWithParentFixture(block2.ToHeader())
-			block3.SetPayload(flow.Payload{
+			block3.Payload = flow.Payload{
 				Seals:           seals,
 				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.Header, seals),
-			})
+			}
 			buildFinalizedBlock(t, state, block3)
 
 			child := unittest.BlockWithParentProtocolState(block3)
