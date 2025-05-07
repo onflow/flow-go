@@ -528,8 +528,10 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHei
 		suite.Require().NoError(err)
 
 		// create a new block with root block as parent
-		newBlock := unittest.BlockWithParentFixture(rootBlock)
-		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		newBlock := unittest.BlockWithParentAndPayload(
+			rootBlock,
+			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+		)
 		ctx := context.Background()
 		// add new block to the chain state
 		err = state.Extend(ctx, unittest.ProposalFromBlock(newBlock))
@@ -567,10 +569,14 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalize
 		suite.Require().NoError(err)
 
 		// create a new block with root block as parent
-		finalizedBlock := unittest.BlockWithParentFixture(rootBlock)
-		finalizedBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-		orphanBlock := unittest.BlockWithParentFixture(rootBlock)
-		orphanBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		finalizedBlock := unittest.BlockWithParentAndPayload(
+			rootBlock,
+			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+		)
+		orphanBlock := unittest.BlockWithParentAndPayload(
+			rootBlock,
+			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+		)
 		ctx := context.Background()
 
 		// add new block to the chain state
@@ -618,8 +624,10 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockID
 		suite.Require().NoError(err)
 
 		// create a new block with root block as parent
-		newBlock := unittest.BlockWithParentFixture(rootBlock)
-		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		newBlock := unittest.BlockWithParentAndPayload(
+			rootBlock,
+			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+		)
 		ctx := context.Background()
 		// add new block to the chain state
 		err = state.Extend(ctx, unittest.ProposalFromBlock(newBlock))
@@ -778,8 +786,10 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
 		// create a new block with root block as parent
-		newBlock := unittest.BlockWithParentFixture(rootBlock)
-		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		newBlock := unittest.BlockWithParentAndPayload(
+			rootBlock,
+			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+		)
 		ctx := context.Background()
 		// add new block to the chain state
 		err = state.Extend(ctx, unittest.ProposalFromBlock(newBlock))

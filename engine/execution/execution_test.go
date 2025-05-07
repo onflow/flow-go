@@ -283,7 +283,7 @@ func deployContractBlock(
 		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
 	block.Header.ParentVoterIndices = voterIndices
-	block.SetPayload(flow.Payload{
+	block.Payload = flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
 			{
 				CollectionID:     col.ID(),
@@ -293,7 +293,7 @@ func deployContractBlock(
 			},
 		},
 		ProtocolStateID: parent.Payload.ProtocolStateID,
-	})
+	}
 
 	// make proposal
 	proposal := messages.NewUntrustedProposal(unittest.ProposalFromBlock(&block))

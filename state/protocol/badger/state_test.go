@@ -388,8 +388,10 @@ func TestBootstrapNonRoot(t *testing.T) {
 	// ROOT <- B1 <- B2(R1) <- B3(S1) <- CHILD
 	t.Run("in EFM", func(t *testing.T) {
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
-			block1 := unittest.BlockWithParentFixture(rootBlock)
-			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+			block1 := unittest.BlockWithParentAndPayload(
+				rootBlock,
+				unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+			)
 			buildFinalizedBlock(t, state, block1)
 
 			invalidEpochSetup := unittest.EpochSetupFixture()

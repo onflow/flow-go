@@ -679,11 +679,10 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 	// Incorporate result for block B1 into payload of block B4
 	resultB1 := bs.resultForBlock[b1.ID()]
 	receiptB1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultB1))
-	b4.SetPayload(
-		flow.Payload{
-			Results:  []*flow.ExecutionResult{&receiptB1.ExecutionResult},
-			Receipts: []*flow.ExecutionReceiptStub{receiptB1.Stub()},
-		})
+	b4.Payload = flow.Payload{
+		Results:  []*flow.ExecutionResult{&receiptB1.ExecutionResult},
+		Receipts: []*flow.ExecutionReceiptStub{receiptB1.Stub()},
+	}
 
 	// add blocks B2, B3, B4, A5 to the mocked storage layer (block b0 and b1 are already added):
 	a5 := unittest.BlockWithParentFixture(b4.ToHeader())
@@ -832,16 +831,16 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 	receiptChain2 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[F]_2, Result[A]_2, Result[B]_2, ...]
 
 	for i := 1; i <= 3; i++ { // set payload for blocks A, B, C
-		blocks[i].SetPayload(flow.Payload{
+		blocks[i].Payload = flow.Payload{
 			Results:  []*flow.ExecutionResult{&receiptChain1[i-1].ExecutionResult, &receiptChain2[i-1].ExecutionResult},
 			Receipts: []*flow.ExecutionReceiptStub{receiptChain1[i-1].Stub(), receiptChain2[i-1].Stub()},
-		})
+		}
 	}
 	sealedResult := receiptChain1[0].ExecutionResult
 	sealF := unittest.Seal.Fixture(unittest.Seal.WithResult(&sealedResult))
-	blocks[4].SetPayload(flow.Payload{ // set payload for block D
+	blocks[4].Payload = flow.Payload{ // set payload for block D
 		Seals: []*flow.Seal{sealF},
-	})
+	}
 	for i := 0; i <= 4; i++ {
 		// we need to run this several times, as in each iteration as we have _multiple_ execution chains.
 		// In each iteration, we only mange to reconnect one additional height
@@ -1179,11 +1178,13 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 
 	// A is a block containing a valid receipt for block P
 	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
-	A := unittest.BlockWithParentFixture(bs.headers[bs.parentID])
-	A.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptStub{recP.Stub()},
-		Results:  []*flow.ExecutionResult{&recP.ExecutionResult},
-	})
+	A := unittest.BlockWithParentAndPayload(
+		bs.headers[bs.parentID],
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{recP.Stub()},
+			Results:  []*flow.ExecutionResult{&recP.ExecutionResult},
+		},
+	)
 
 	// B is a block containing two valid receipts, with different results, for
 	// block A
@@ -1191,11 +1192,13 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 	recA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA1))
 	resA2 := unittest.ExecutionResultFixture(unittest.WithBlock(A), unittest.WithPreviousResult(recP.ExecutionResult))
 	recA2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA2))
-	B := unittest.BlockWithParentFixture(A.ToHeader())
-	B.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptStub{recA1.Stub(), recA2.Stub()},
-		Results:  []*flow.ExecutionResult{&recA1.ExecutionResult, &recA2.ExecutionResult},
-	})
+	B := unittest.BlockWithParentAndPayload(
+		A.ToHeader(),
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{recA1.Stub(), recA2.Stub()},
+			Results:  []*flow.ExecutionResult{&recA1.ExecutionResult, &recA2.ExecutionResult},
+		},
+	)
 
 	bs.storeBlock(A)
 	bs.storeBlock(B)
@@ -1255,30 +1258,36 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferentForks() {
 	// A is a block containing a valid receipt for block P
 	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
-	A := unittest.BlockWithParentFixture(bs.headers[bs.parentID])
-	A.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptStub{recP.Stub()},
-		Results:  []*flow.ExecutionResult{&recP.ExecutionResult},
-	})
+	A := unittest.BlockWithParentAndPayload(
+		bs.headers[bs.parentID],
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{recP.Stub()},
+			Results:  []*flow.ExecutionResult{&recP.ExecutionResult},
+		},
+	)
 
 	// B is a block that builds on A containing a valid receipt for A
 	resA1 := unittest.ExecutionResultFixture(unittest.WithBlock(A), unittest.WithPreviousResult(recP.ExecutionResult))
 	recA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA1))
-	B := unittest.BlockWithParentFixture(A.ToHeader())
-	B.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptStub{recA1.Stub()},
-		Results:  []*flow.ExecutionResult{&recA1.ExecutionResult},
-	})
+	B := unittest.BlockWithParentAndPayload(
+		A.ToHeader(),
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{recA1.Stub()},
+			Results:  []*flow.ExecutionResult{&recA1.ExecutionResult},
+		},
+	)
 
 	// C is another block that builds on A containing a valid receipt for A but
 	// different from the receipt contained in B
 	resA2 := unittest.ExecutionResultFixture(unittest.WithBlock(A), unittest.WithPreviousResult(recP.ExecutionResult))
 	recA2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA2))
-	C := unittest.BlockWithParentFixture(A.ToHeader())
-	C.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptStub{recA2.Stub()},
-		Results:  []*flow.ExecutionResult{&recA2.ExecutionResult},
-	})
+	C := unittest.BlockWithParentAndPayload(
+		A.ToHeader(),
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{recA2.Stub()},
+			Results:  []*flow.ExecutionResult{&recA2.ExecutionResult},
+		},
+	)
 
 	bs.storeBlock(A)
 	bs.storeBlock(B)
@@ -1323,20 +1332,23 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 	// A is a block containing a valid receipt for block P
 	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
-	A := unittest.BlockWithParentFixture(bs.headers[bs.parentID])
-	A.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptStub{recP.Stub()},
-		Results:  []*flow.ExecutionResult{&recP.ExecutionResult},
-	})
+	A := unittest.BlockWithParentAndPayload(
+		bs.headers[bs.parentID],
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{recP.Stub()},
+			Results:  []*flow.ExecutionResult{&recP.ExecutionResult},
+		},
+	)
 
 	// B is a block that builds on A containing a valid receipt for A
 	resA1 := unittest.ExecutionResultFixture(unittest.WithBlock(A), unittest.WithPreviousResult(recP.ExecutionResult))
 	recA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA1))
-	B := unittest.BlockWithParentFixture(A.ToHeader())
-	B.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptStub{recA1.Stub()},
-		Results:  []*flow.ExecutionResult{&recA1.ExecutionResult},
-	})
+	B := unittest.BlockWithParentAndPayload(
+		A.ToHeader(),
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{recA1.Stub()},
+			Results:  []*flow.ExecutionResult{&recA1.ExecutionResult},
+		})
 
 	bs.storeBlock(A)
 	bs.storeBlock(B)
@@ -1368,11 +1380,13 @@ func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 func (bs *BuilderSuite) TestIntegration_ResultAlreadyIncorporated() {
 	// A is a block containing a valid receipt for block P
 	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
-	A := unittest.BlockWithParentFixture(bs.headers[bs.parentID])
-	A.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptStub{recP.Stub()},
-		Results:  []*flow.ExecutionResult{&recP.ExecutionResult},
-	})
+	A := unittest.BlockWithParentAndPayload(
+		bs.headers[bs.parentID],
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{recP.Stub()},
+			Results:  []*flow.ExecutionResult{&recP.ExecutionResult},
+		},
+	)
 
 	recP_B := unittest.ExecutionReceiptFixture(unittest.WithResult(&recP.ExecutionResult))
 
@@ -1421,11 +1435,13 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 	// setup initial state
 	// A is a block containing a valid receipt for block P
 	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
-	A := unittest.BlockWithParentFixture(bs.headers[bs.parentID])
-	A.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptStub{recP.Stub()},
-		Results:  []*flow.ExecutionResult{&recP.ExecutionResult},
-	})
+	A := unittest.BlockWithParentAndPayload(
+		bs.headers[bs.parentID],
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{recP.Stub()},
+			Results:  []*flow.ExecutionResult{&recP.ExecutionResult},
+		},
+	)
 
 	// B is a block containing two valid receipts, with different results, for
 	// block A
@@ -1433,11 +1449,13 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 	recA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA1))
 	resA2 := unittest.ExecutionResultFixture(unittest.WithBlock(A), unittest.WithPreviousResult(recP.ExecutionResult))
 	recA2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA2))
-	B := unittest.BlockWithParentFixture(A.ToHeader())
-	B.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptStub{recA1.Stub(), recA2.Stub()},
-		Results:  []*flow.ExecutionResult{&recA1.ExecutionResult, &recA2.ExecutionResult},
-	})
+	B := unittest.BlockWithParentAndPayload(
+		A.ToHeader(),
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{recA1.Stub(), recA2.Stub()},
+			Results:  []*flow.ExecutionResult{&recA1.ExecutionResult, &recA2.ExecutionResult},
+		},
+	)
 
 	C := unittest.BlockWithParentFixture(B.ToHeader())
 

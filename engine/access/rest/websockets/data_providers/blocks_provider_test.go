@@ -59,11 +59,13 @@ func (s *BlocksProviderSuite) SetupTest() {
 	parent := s.rootBlock.ToHeader()
 
 	for i := 0; i < blockCount; i++ {
-		block := unittest.BlockWithParentFixture(parent)
 		transaction := unittest.TransactionFixture()
 		col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
 		guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
-		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
+		block := unittest.BlockWithParentAndPayload(
+			parent,
+			unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
+		)
 		// update for next iteration
 		parent = block.ToHeader()
 		s.blocks = append(s.blocks, block)
