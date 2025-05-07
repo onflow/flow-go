@@ -23,9 +23,11 @@ on:
 
       is_public_release:
         description: 'Is this a release for public consumption? This is used to determine if the images should be promoted to the public registry.'
-        default: false
+        default: "false"
         required: true
-        type: boolean 
+        options:
+          - "false"
+          - "true"
 
 env:
   GO_VERSION: "1.23"
