@@ -157,6 +157,7 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 	collectionID := collection.ID()
 
 	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		// TODO(7355): lockctx
 		rw.Lock(c.indexingByTx)
 
 		err := operation.UpsertCollection(rw.Writer(), collection)

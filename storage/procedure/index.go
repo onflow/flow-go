@@ -10,6 +10,7 @@ import (
 )
 
 func InsertIndex(lock *sync.Mutex, rw storage.ReaderBatchWriter, blockID flow.Identifier, index *flow.Index) error {
+	// TODO(7355): lockctx
 	rw.Lock(lock)
 
 	w := rw.Writer()
