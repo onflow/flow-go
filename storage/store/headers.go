@@ -148,9 +148,9 @@ func (h *Headers) FindHeaders(filter func(header *flow.Header) bool) ([]flow.Hea
 
 // RollbackExecutedBlock update the executed block header to the given header.
 // only useful for execution node to roll back executed block height
+// This method is not concurrent safe, the caller should make sure to call
+// this method in a single thread.
 func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
-	// adding lock
-
 	var blockID flow.Identifier
 	err := operation.RetrieveExecutedBlock(h.db.Reader(), &blockID)
 	if err != nil {
