@@ -149,16 +149,22 @@ jobs:
     runs-on: ubuntu-latest
     needs: [public-build, secure-build]
     # The job will only pass if the 'docker_image_tag' input matches the 'git_ref' input.
-    if: inputs.is_public_release == true
     steps:
-      - name: Check Tag Match
-        if: ${{ inputs.docker_image_tag != inputs.git_ref }}
+      - name: Check if public release
         run: |
-          echo "Release is not valid. The docker_image_tag: ${{ inputs.docker_image_tag }} does not match git_ref: ${{ inputs.git_ref }} ."
-          exit 1
-      - name: Validate release
+          if [ "${{ inputs.is_public_release }}" == "true" ]; then
+            echo "This is a public release. Proceeding with validation."
+          else
+            echo "This is not a public release. Skipping validation."
+            exit 78
+          fi
+      - name: Validate git ref matches docker tag 
         run: |
-          echo "Release validation passed. Proceeding to promote images." 
+          if [ "${{ inputs.docker_image_tag }}" != "${{ inputs.git_ref }}" ]; then
+            echo "The docker_image_tag: ${{ inputs.docker_image_tag }} does not match git_ref: ${{ inputs.git_ref }} ."
+            exit 1
+          fi 
+          echo "Release is valid. The docker_image_tag: ${{ inputs.docker_image_tag }} matches git_ref: ${{ inputs.git_ref }} ."
 
   promote-images:
     # This job promotes container images for various roles from a private registry to a public registry.
