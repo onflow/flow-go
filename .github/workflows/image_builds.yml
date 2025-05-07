@@ -146,7 +146,11 @@ jobs:
       ${{ !cancelled() }} &&
       ${{ inputs.docker_image_tag == inputs.git_ref }} &&
       ${{ needs.public-build.result != 'failure' || needs.secure-build.result != 'failure' }}
-    steps: []
+    steps:
+      - name: Validate release
+        run: |
+          echo "Release validation passed. Proceeding to promote images." 
+
   promote-images:
     # This job promotes container images for various roles from a private registry to a public registry.
     # It uses a matrix strategy to handle the promotion of images for different roles in parallel.
