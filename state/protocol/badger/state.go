@@ -105,6 +105,9 @@ func Bootstrap(
 	root protocol.Snapshot,
 	options ...BootstrapConfigOptions,
 ) (*State, error) {
+	// we acquire both [storage.LockInsertBlock] and [storage.LockFinalizeBlock] because
+	// the bootstrapping process inserts and finalizes blocks (all blocks within the
+	// trusted root snapshot are presumed to be finalized)
 	lctx := lockManager.NewContext()
 	defer lctx.Release()
 	err := lctx.AcquireLock(storage.LockInsertBlock)
