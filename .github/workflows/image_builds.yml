@@ -21,6 +21,12 @@ on:
         required: true
         type: string
 
+      is_public_release:
+        description: 'Is this a release for public consumption? This is used to determine if the images should be promoted to the public registry.'
+        default: false
+        required: true
+        type: boolean 
+
 env:
   GO_VERSION: "1.23"
   PRIVATE_REGISTRY_HOST: us-central1-docker.pkg.dev
@@ -144,9 +150,14 @@ jobs:
     # The job will only pass if the 'docker_image_tag' input matches the 'git_ref' input.
     if: |
       ${{ !cancelled() }} &&
-      ${{ inputs.docker_image_tag == inputs.git_ref }} &&
-      ${{ needs.public-build.result != 'failure' || needs.secure-build.result != 'failure' }}
+      ${{ needs.public-build.result != 'failure' || needs.secure-build.result != 'failure' }} &&
+      ${{ inputs.is_public_release == 'true' }} 
     steps:
+      - name: Check Tag Match
+        if: ${{ inputs.docker_image_tag != inputs.git_ref }}
+        run: |
+          echo "Release is not valid. The docker_image_tag: ${{ inputs.docker_image_tag }} does not match git_ref: ${{ inputs.git_ref }} ."
+          exit 1
       - name: Validate release
         run: |
           echo "Release validation passed. Proceeding to promote images." 
