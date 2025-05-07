@@ -43,11 +43,6 @@ func NewBlock(
 	}
 }
 
-// SetPayload sets the payload and updates the payload hash.
-func (b *Block) SetPayload(payload Payload) {
-	b.Payload = payload
-}
-
 // ID returns a collision-resistant hash of the Block struct.
 func (b Block) ID() Identifier {
 	return b.ToHeader().ID()
