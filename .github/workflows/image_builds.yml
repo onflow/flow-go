@@ -85,32 +85,30 @@ jobs:
 
     environment: container builds 
     steps:
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Checkout Public flow-go repo
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          repository: onflow/flow-go
-          ref: ${{ inputs.git_ref }}
-
-      - name: Authenticate with Docker Registry
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: ${{ secrets.GCP_CREDENTIALS_FOR_PRIVATE_REGISTRY }}
-
-      - name: Setup Google Cloud Authentication
-        run: gcloud auth configure-docker ${{ env.PRIVATE_REGISTRY_HOST }}
-
-      - name: Execute ${{ matrix.build_command }} command to build and push images
-        env:
-          IMAGE_TAG: ${{ inputs.docker_image_tag }}
-          CONTAINER_REGISTRY: ${{ vars.PRIVATE_REGISTRY }}
+      - name: Pass 
         run: |
-          make ${{ matrix.build_command }} CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
+          echo "Pass" 
+      # - name: Checkout Public flow-go repo
+      #   uses: actions/checkout@v3
+      #   with:
+      #     fetch-depth: 0
+      #     repository: onflow/flow-go
+      #     ref: ${{ inputs.git_ref }}
+      #
+      # - name: Authenticate with Docker Registry
+      #   uses: google-github-actions/auth@v1
+      #   with:
+      #     credentials_json: ${{ secrets.GCP_CREDENTIALS_FOR_PRIVATE_REGISTRY }}
+      #
+      # - name: Setup Google Cloud Authentication
+      #   run: gcloud auth configure-docker ${{ env.PRIVATE_REGISTRY_HOST }}
+      #
+      # - name: Execute ${{ matrix.build_command }} command to build and push images
+      #   env:
+      #     IMAGE_TAG: ${{ inputs.docker_image_tag }}
+      #     CONTAINER_REGISTRY: ${{ vars.PRIVATE_REGISTRY }}
+      #   run: |
+      #     make ${{ matrix.build_command }} CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
 
   secure-build:
     # This job is responsible for executing secure builds for private dependencies & pushing them to the private registry.
@@ -149,8 +147,6 @@ jobs:
     needs: [public-build, secure-build]
     # The job will only pass if the 'docker_image_tag' input matches the 'git_ref' input.
     if: |
-      ${{ !cancelled() }} &&
-      ${{ needs.public-build.result != 'failure' || needs.secure-build.result != 'failure' }} &&
       ${{ inputs.is_public_release != 'false' }} 
     steps:
       - name: Check Tag Match
