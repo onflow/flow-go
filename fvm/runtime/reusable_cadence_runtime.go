@@ -27,8 +27,10 @@ var randomSourceFunctionType = &sema.FunctionType{
 
 type ReusableCadenceRuntime struct {
 	runtime.Runtime
-	TxRuntimeEnv     runtime.Environment
-	ScriptRuntimeEnv runtime.Environment
+
+	TxRuntimeEnv            runtime.Environment
+	ScriptRuntimeEnv        runtime.Environment
+	VMContractInvocationEnv runtime.Environment
 
 	fvmEnv Environment
 }
@@ -38,9 +40,10 @@ func NewReusableCadenceRuntime(
 	config runtime.Config,
 ) *ReusableCadenceRuntime {
 	reusable := &ReusableCadenceRuntime{
-		Runtime:          rt,
-		TxRuntimeEnv:     runtime.NewBaseInterpreterEnvironment(config),
-		ScriptRuntimeEnv: runtime.NewScriptInterpreterEnvironment(config),
+		Runtime:                 rt,
+		TxRuntimeEnv:            runtime.NewBaseInterpreterEnvironment(config),
+		ScriptRuntimeEnv:        runtime.NewScriptInterpreterEnvironment(config),
+		VMContractInvocationEnv: runtime.NewBaseVMEnvironment(config),
 	}
 
 	reusable.declareRandomSourceHistory()
@@ -128,10 +131,18 @@ func (reusable *ReusableCadenceRuntime) InvokeContractFunction(
 	functionName string,
 	arguments []cadence.Value,
 	argumentTypes []sema.Type,
+	useVM bool,
 ) (
 	cadence.Value,
 	error,
 ) {
+	var environment runtime.Environment
+	if useVM {
+		environment = reusable.VMContractInvocationEnv
+	} else {
+		environment = reusable.TxRuntimeEnv
+	}
+
 	return reusable.Runtime.InvokeContractFunction(
 		contractLocation,
 		functionName,
@@ -139,7 +150,8 @@ func (reusable *ReusableCadenceRuntime) InvokeContractFunction(
 		argumentTypes,
 		runtime.Context{
 			Interface:   reusable.fvmEnv,
-			Environment: reusable.TxRuntimeEnv,
+			Environment: environment,
+			UseVM:       useVM,
 		},
 	)
 }
