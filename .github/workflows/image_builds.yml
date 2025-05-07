@@ -10,6 +10,7 @@ on:
         options:
           - "false"
           - "true"
+
       git_ref:
         description: 'Git ref to be built (tag, branch, commit sha).'
         required: true
@@ -133,7 +134,7 @@ jobs:
           github_token: ${{ steps.app-token.outputs.token }}
           owner: 'onflow'
           repo: ${{ secrets.SECURE_BUILDS_REPO }}  
-          ref: master-private 
+          ref: sre/jp/354/add-docker-tag-input 
           workflow_file_name: 'secure_build.yml'
 
   promote-images:
