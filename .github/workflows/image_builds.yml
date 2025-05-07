@@ -170,8 +170,10 @@ jobs:
     # This ensures that only approved images are deployed to the public registry.
     name: Promote Images to Public Registry
     runs-on: ubuntu-latest
+    if: |
+      !cancelled() && 
+      (needs.validate-release.result != 'failure')
     needs: [validate-release]
-    # The job is triggered only if the 'docker_image_tag' input matches the 'git_ref' input.
     # This job will only run if the previous jobs were successful and not cancelled.
     # It checks the results of both the public and secure builds to ensure that at least one of them succeeded.
     strategy:
