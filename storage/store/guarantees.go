@@ -50,12 +50,6 @@ func (g *Guarantees) retrieveTx(collID flow.Identifier) (*flow.CollectionGuarant
 	return val, nil
 }
 
-func (g *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
-	return g.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return g.storeTx(rw, guarantee)
-	})
-}
-
 func (g *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
 	return g.retrieveTx(collID)
 }
