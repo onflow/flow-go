@@ -151,7 +151,7 @@ jobs:
     if: |
       !cancelled() && 
       github.event.inputs.is_public_release == 'true' &&
-      needs.public-build.result != 'failure' || needs.secure-build.result != 'failure'
+      (needs.public-build.result != 'failure' || needs.secure-build.result != 'failure')
     steps:
       - name: Validate git ref matches docker tag 
         run: |
