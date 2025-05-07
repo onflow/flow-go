@@ -79,12 +79,6 @@ func (h *Headers) retrieveIdByHeightTx(height uint64) (flow.Identifier, error) {
 	return blockID, nil
 }
 
-func (h *Headers) Store(header *flow.Header) error {
-	return h.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return h.storeTx(rw, header)
-	})
-}
-
 func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 	return h.retrieveTx(blockID)
 }
