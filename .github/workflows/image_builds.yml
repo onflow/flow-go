@@ -25,6 +25,7 @@ on:
         description: 'Is this a release for public consumption? This is used to determine if the images should be promoted to the public registry.'
         default: "false"
         required: true
+        type: choice
         options:
           - "false"
           - "true"
