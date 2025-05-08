@@ -45,15 +45,15 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecutionData() {
 	}
 
 	suite.Run("Happy path. Raw setup", func() {
-		headers := new(storagemock.Headers)
-		seals := new(storagemock.Seals)
+		headers := storagemock.NewHeaders(suite.T())
+		seals := storagemock.NewSeals(suite.T())
 		seal := unittest.Seal.Fixture()
 		seals.
 			On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).
 			Return(seal, nil).
 			Once()
 
-		results := new(storagemock.ExecutionResults)
+		results := storagemock.NewExecutionResults(suite.T())
 		result := unittest.ExecutionResultFixture()
 		results.
 			On("ByID", mock.AnythingOfType("flow.Identifier")).
@@ -63,7 +63,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecutionData() {
 		blockEd := unittest.BlockExecutionDataFixture()
 		heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
 
-		downloader := new(edmock.Downloader)
+		downloader := edmock.NewDownloader(suite.T())
 		downloader.
 			On("Get", mock.Anything, mock.AnythingOfType("flow.Identifier")).
 			Return(blockEd, nil).
@@ -128,22 +128,22 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 		MaxRetryDelay:   DefaultMaxRetryDelay,
 	}
 
-	headers := new(storagemock.Headers)
-	seals := new(storagemock.Seals)
+	headers := storagemock.NewHeaders(suite.T())
+	seals := storagemock.NewSeals(suite.T())
 	seal := unittest.Seal.Fixture()
 	seals.
 		On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).
 		Return(seal, nil)
 
 	blockEd := unittest.BlockExecutionDataFixture()
-	downloader := new(edmock.Downloader)
+	downloader := edmock.NewDownloader(suite.T())
 	downloader.
 		On("Get", mock.Anything, mock.AnythingOfType("flow.Identifier")).
 		Return(blockEd, nil)
 
 	suite.Run("blob not found error", func() {
 		// first time return blob not found error to test retry mechanism
-		results := new(storagemock.ExecutionResults)
+		results := storagemock.NewExecutionResults(suite.T())
 		expectedError := execution_data.BlobNotFoundError{}
 		results.
 			On("ByID", mock.AnythingOfType("flow.Identifier")).
@@ -172,7 +172,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 	})
 
 	suite.Run("execution data not found in storage", func() {
-		results := new(storagemock.ExecutionResults)
+		results := storagemock.NewExecutionResults(suite.T())
 		expectedError := storage.ErrNotFound
 		results.
 			On("ByID", mock.AnythingOfType("flow.Identifier")).
@@ -193,7 +193,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 	})
 
 	suite.Run("malformed data error", func() {
-		results := new(storagemock.ExecutionResults)
+		results := storagemock.NewExecutionResults(suite.T())
 		expectedError := execution_data.NewMalformedDataError(fmt.Errorf("malformed data"))
 		results.
 			On("ByID", mock.AnythingOfType("flow.Identifier")).
@@ -214,7 +214,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 	})
 
 	suite.Run("blob size limit exceed error", func() {
-		results := new(storagemock.ExecutionResults)
+		results := storagemock.NewExecutionResults(suite.T())
 		expectedError := execution_data.BlobSizeLimitExceededError{}
 		results.
 			On("ByID", mock.AnythingOfType("flow.Identifier")).
