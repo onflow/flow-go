@@ -795,6 +795,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 		unittest.WithReceipts(unittest.ExecutionReceiptFixture()), // receipt referencing pre-root block
 		unittest.WithSeals(unittest.Seal.Fixture()),               // seal referencing pre-root block
 	)
+	payloads.On("ByBlockID", s.Block.ID()).Return(&candidatePayload, nil)
 
 	assigner.On("Assign", s.IncorporatedResult.Result, mock.Anything).Return(s.ChunksAssignment, nil)
 
@@ -814,6 +815,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 		unittest.WithReceipts(
 			unittest.ExecutionReceiptFixture(
 				unittest.WithResult(s.IncorporatedResult.Result))))
+	payloads.On("ByBlockID", s.IncorporatedBlock.ID()).Return(&incorporatedBlockPayload, nil)
 
 	// create blocks for SealingSegment setup
 	parent := flow.NewBlock(s.ParentBlock.HeaderBody, flow.Payload{})
@@ -824,11 +826,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	s.ParentBlock = parent.ToHeader()
 	s.IncorporatedBlock = incorporated.ToHeader()
 
-	// setup payloads storage
-	payloads.On("ByBlockID", s.IncorporatedBlock.ID()).Return(&incorporatedBlockPayload, nil)
-	payloads.On("ByBlockID", s.Block.ID()).Return(&candidatePayload, nil)
-
-	// update storage according to new block ID
+	// update storage
 	s.Blocks[s.ParentBlock.ID()] = s.ParentBlock
 	s.Blocks[s.Block.ID()] = s.Block
 	s.Blocks[s.IncorporatedBlock.ID()] = s.IncorporatedBlock
