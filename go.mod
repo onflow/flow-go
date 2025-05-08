@@ -105,6 +105,7 @@ require (
 	github.com/holiman/uint256 v1.3.2
 	github.com/huandu/go-clone/generic v1.7.2
 	github.com/ipfs/boxo v0.17.1-0.20240131173518-89bceff34bf1
+	github.com/jordanschalm/lockctx v0.0.0-20250412215529-226f85c10956
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.4
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/flow-evm-bridge v0.1.0
@@ -213,7 +214,6 @@ require (
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/jbenet/goprocess v0.1.4 // indirect
-	github.com/jordanschalm/lockctx v0.0.0-20250412215529-226f85c10956 // indirect
 	github.com/k0kubun/pp v3.0.1+incompatible // indirect
 	github.com/kevinburke/go-bindata v3.24.0+incompatible // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
