@@ -28,7 +28,7 @@ func UntrustedBlockFromInternal(block *flow.Block) UntrustedBlock {
 	return UntrustedBlock(*block)
 }
 
-// TODO(Uliana): update UntrustedProposal in follow up PR, use the same approach as for UntrustedClusterProposal.
+// TODO(malleability): update UntrustedProposal in follow up PR, use the same approach as for UntrustedClusterProposal.
 // UntrustedProposal is part of the consensus protocol and represents the leader
 // of a consensus round pushing a new proposal to the network.
 type UntrustedProposal struct {

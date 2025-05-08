@@ -51,7 +51,6 @@ type ClusterSwitchoverTestCase struct {
 // NewClusterSwitchoverTestCase constructs a new cluster switchover test case
 // given the configuration, creating all dependencies and mock nodes.
 func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) *ClusterSwitchoverTestCase {
-
 	tc := &ClusterSwitchoverTestCase{
 		t:    t,
 		conf: conf,

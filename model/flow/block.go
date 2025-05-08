@@ -3,6 +3,8 @@ package flow
 import (
 	"fmt"
 	"time"
+
+	"github.com/vmihailenco/msgpack/v4"
 )
 
 func Genesis(chainID ChainID) *Block {
@@ -26,6 +28,12 @@ func Genesis(chainID ChainID) *Block {
 type Block struct {
 	Header  HeaderBody
 	Payload Payload
+}
+
+// TODO: SetPayload will be removed in the follow up PR.
+// SetPayload sets the payload and updates the payload hash.
+func (b *Block) SetPayload(payload Payload) {
+	b.Payload = payload
 }
 
 // NewBlock creates a new block.
@@ -57,11 +65,35 @@ func (b Block) Checksum() Identifier {
 
 // ToHeader converts the block into a compact [flow.Header] representation,
 // where the payload is compressed to a hash reference.
-func (b *Block) ToHeader() *Header {
+func (b Block) ToHeader() *Header {
 	return &Header{
 		HeaderBody:  b.Header,
 		PayloadHash: b.Payload.Hash(),
 	}
+}
+
+// TODO(malleability): remove MarshalMsgpack when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
+func (b Block) MarshalMsgpack() ([]byte, error) {
+	if b.Header.Timestamp.Location() != time.UTC {
+		b.Header.Timestamp = b.Header.Timestamp.UTC()
+	}
+
+	type Encodable Block
+	return msgpack.Marshal(Encodable(b))
+}
+
+// TODO(malleability): remove UnmarshalMsgpack when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
+func (b *Block) UnmarshalMsgpack(data []byte) error {
+	type Decodable Block
+	decodable := Decodable(*b)
+	err := msgpack.Unmarshal(data, &decodable)
+	*b = Block(decodable)
+
+	if b.Header.Timestamp.Location() != time.UTC {
+		b.Header.Timestamp = b.Header.Timestamp.UTC()
+	}
+
+	return err
 }
 
 // BlockStatus represents the status of a block.
@@ -81,6 +113,7 @@ func (s BlockStatus) String() string {
 	return [...]string{"BLOCK_UNKNOWN", "BLOCK_FINALIZED", "BLOCK_SEALED"}[s]
 }
 
+// TODO(malleability): update fields for BlockProposal with non-pointers in the follow up PR.
 // BlockProposal is a signed proposal that includes the block payload, in addition to the required header and signature.
 type BlockProposal struct {
 	Block           *Block
