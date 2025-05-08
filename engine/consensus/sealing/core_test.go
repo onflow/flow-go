@@ -787,13 +787,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 		unittest.Seal.Fixture(
 			unittest.Seal.WithBlock(s.ParentBlock)), nil)
 
-	// the incorporated block contains the result for the sealing candidate block
-	incorporatedBlockPayload := unittest.PayloadFixture(
-		unittest.WithReceipts(
-			unittest.ExecutionReceiptFixture(
-				unittest.WithResult(s.IncorporatedResult.Result))))
-	payloads.On("ByBlockID", s.IncorporatedBlock.ID()).Return(&incorporatedBlockPayload, nil)
-
 	// the sealing candidate block (S) is the lowest block in the segment under consideration here
 	// initially, this block would represent the lowest block in a node's root sealing segment,
 	// meaning that all earlier blocks are not known. In this case we should ignore results and seals
@@ -802,9 +795,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 		unittest.WithReceipts(unittest.ExecutionReceiptFixture()), // receipt referencing pre-root block
 		unittest.WithSeals(unittest.Seal.Fixture()),               // seal referencing pre-root block
 	)
-	payloads.On("ByBlockID", s.Block.ID()).Return(&candidatePayload, nil)
-
-	s.IdentitiesCache[s.IncorporatedBlock.ID()] = s.AuthorizedVerifiers
 
 	assigner.On("Assign", s.IncorporatedResult.Result, mock.Anything).Return(s.ChunksAssignment, nil)
 
@@ -812,21 +802,56 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	s.Snapshots[s.rootHeader.ID()] = finalSnapShot
 	// root snapshot has no pending children
 	finalSnapShot.On("Descendants").Return(nil, nil)
+
+	// create candidate block for SealingSegment setup
+	block := flow.NewBlock(s.Block.HeaderBody, candidatePayload)
+
+	// update block id for result according to new block id
+	s.IncorporatedResult.Result.BlockID = block.ID()
+
+	// the incorporated block contains the result for the sealing candidate block
+	incorporatedBlockPayload := unittest.PayloadFixture(
+		unittest.WithReceipts(
+			unittest.ExecutionReceiptFixture(
+				unittest.WithResult(s.IncorporatedResult.Result))))
+
+	// create blocks for SealingSegment setup
+	parent := flow.NewBlock(s.ParentBlock.HeaderBody, flow.Payload{})
+	incorporated := flow.NewBlock(s.IncorporatedBlock.HeaderBody, incorporatedBlockPayload)
+
+	// update headers according to new payload hash
+	s.Block = block.ToHeader()
+	s.ParentBlock = parent.ToHeader()
+	s.IncorporatedBlock = incorporated.ToHeader()
+
+	// setup payloads storage
+	payloads.On("ByBlockID", s.IncorporatedBlock.ID()).Return(&incorporatedBlockPayload, nil)
+	payloads.On("ByBlockID", s.Block.ID()).Return(&candidatePayload, nil)
+
+	// update storage according to new block ID
+	s.Blocks[s.ParentBlock.ID()] = s.ParentBlock
+	s.Blocks[s.Block.ID()] = s.Block
+	s.Blocks[s.IncorporatedBlock.ID()] = s.IncorporatedBlock
+
+	// update cache
+	s.IdentitiesCache[s.IncorporatedResult.Result.BlockID] = s.AuthorizedVerifiers
+	s.IdentitiesCache[s.IncorporatedBlock.ID()] = s.AuthorizedVerifiers
+
 	// set up sealing segment
 	finalSnapShot.On("SealingSegment").Return(
 		&flow.SealingSegment{
 			Blocks: []*flow.BlockProposal{
 				{
-					Block: flow.NewBlock(s.Block.HeaderBody, candidatePayload),
+					Block: block,
 					// By convention, root block has no proposer signature - implementation has to handle this edge case
 					ProposerSigData: nil,
 				},
 				{
-					Block:           flow.NewBlock(s.ParentBlock.HeaderBody, flow.Payload{}),
+					Block:           parent,
 					ProposerSigData: unittest.SignatureFixture(),
 				},
 				{
-					Block:           flow.NewBlock(s.IncorporatedBlock.HeaderBody, incorporatedBlockPayload),
+					Block:           incorporated,
 					ProposerSigData: unittest.SignatureFixture(),
 				},
 			},
