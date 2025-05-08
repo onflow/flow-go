@@ -184,9 +184,13 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 		}
 
 		// find the last seal at the parent block
-		_, err = m.lastSealed(candidate, rw)
+		latestSeal, err := m.lastSealed(candidate)
 		if err != nil {
 			return fmt.Errorf("failed to determine the lastest sealed block in fork: %w", err)
+		}
+		err = operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, latestSeal.ID())
+		if err != nil {
+			return fmt.Errorf("could not index latest seal: %w", err)
 		}
 
 		// TODO: we might not need the deferred db updates, because the candidate passed into
@@ -277,7 +281,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 		}
 
 		// check if the seals in the payload is a valid extension of the finalized state
-		_, dbUpdatesFromSealExtend, err := m.sealExtend(ctx, candidate, rw)
+		_, dbUpdatesFromSealExtend, err := m.sealExtend(ctx, lctx, candidate)
 		if err != nil {
 			return fmt.Errorf("payload seal(s) not compliant with chain state: %w", err)
 		}
@@ -566,7 +570,7 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 // operation for indexing the latest seal as of the candidate block and returns the latest seal.
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the candidate block has invalid seals
-func (m *ParticipantState) sealExtend(ctx context.Context, candidate *flow.Block, rw storage.ReaderBatchWriter) (*flow.Seal, []storage.BlockIndexingBatchWrite, error) {
+func (m *ParticipantState) sealExtend(ctx context.Context, lctx lockctx.Proof, candidate *flow.Block) (*flow.Seal, []storage.BlockIndexingBatchWrite, error) {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckSeals)
 	defer span.End()
 
@@ -577,7 +581,7 @@ func (m *ParticipantState) sealExtend(ctx context.Context, candidate *flow.Block
 
 	return lastSeal, []storage.BlockIndexingBatchWrite{
 		func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-			return operation.IndexLatestSealAtBlock(rw.Writer(), blockID, lastSeal.ID())
+			return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, lastSeal.ID())
 		},
 	}, nil
 }
@@ -611,9 +615,7 @@ func (m *ParticipantState) receiptExtend(ctx context.Context, candidate *flow.Bl
 	return nil
 }
 
-// lastSealed determines the highest sealed block from the fork with head `candidate`.
-// It queues a deferred database operation for indexing the latest seal as of the candidate block.
-// and returns the latest seal.
+// lastSealed returns the highest sealed block from the fork with head `candidate`.
 //
 // For instance, here is the chain state: block 100 is the head, block 97 is finalized,
 // and 95 is the last sealed block at the state of block 100.
@@ -621,9 +623,8 @@ func (m *ParticipantState) receiptExtend(ctx context.Context, candidate *flow.Bl
 // Now, if block 101 is extending block 100, and its payload has a seal for 96, then it will
 // be the last sealed for block 101.
 // No errors are expected during normal operation.
-func (m *FollowerState) lastSealed(candidate *flow.Block, rw storage.ReaderBatchWriter) (latestSeal *flow.Seal, err error) {
+func (m *FollowerState) lastSealed(candidate *flow.Block) (latestSeal *flow.Seal, err error) {
 	payload := candidate.Payload
-	blockID := candidate.ID()
 
 	// If the candidate blocks' payload has no seals, the latest seal in this fork remains unchanged, i.e. latest seal as of the
 	// parent is also the latest seal as of the candidate block. Otherwise, we take the latest seal included in the candidate block.
@@ -648,10 +649,6 @@ func (m *FollowerState) lastSealed(candidate *flow.Block, rw storage.ReaderBatch
 		latestSeal = ordered[len(ordered)-1]
 	}
 
-	err = operation.IndexLatestSealAtBlock(rw.Writer(), blockID, latestSeal.ID())
-	if err != nil {
-		return nil, fmt.Errorf("could not index latest seal: %w", err)
-	}
 	return latestSeal, nil
 }
 

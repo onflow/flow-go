@@ -5,7 +5,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// InsertBlockChildren insert an index to lookup the direct child of a block by its ID
+// UpsertBlockChildren insert an index to lookup the direct child of a block by its ID
 func UpsertBlockChildren(w storage.Writer, blockID flow.Identifier, childrenIDs flow.IdentifierList) error {
 	return UpsertByKey(w, MakePrefix(codeBlockChildren, blockID), childrenIDs)
 }

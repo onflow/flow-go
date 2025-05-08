@@ -385,7 +385,7 @@ func bootstrapSealingSegment(
 		if !ok {
 			return fmt.Errorf("sanity check fail: missing latest seal for sealing segment block (id=%s)", blockID)
 		}
-		err = operation.IndexLatestSealAtBlock(w, blockID, latestSealID)
+		err = operation.IndexLatestSealAtBlock(lctx, w, blockID, latestSealID)
 		if err != nil {
 			return fmt.Errorf("could not index block seal: %w", err)
 		}
