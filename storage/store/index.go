@@ -1,7 +1,7 @@
 package store
 
 import (
-	"sync"
+	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -17,12 +17,8 @@ type Index struct {
 }
 
 func NewIndex(collector module.CacheMetrics, db storage.DB) *Index {
-	indexing := &sync.Mutex{}
-
-	// TODO(7355): lockctx - we should be passing a lockctx but it is challenging to implement lockctx here because
-	//             the Cache's store function doesn't allow passing in the context...
-	store := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, index *flow.Index) error {
-		return procedure.InsertIndex(indexing, rw, blockID, index)
+	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, index *flow.Index) error {
+		return procedure.InsertIndex(lctx, rw, blockID, index)
 	}
 
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.Index, error) {
@@ -35,21 +31,15 @@ func NewIndex(collector module.CacheMetrics, db storage.DB) *Index {
 		db: db,
 		cache: newCache(collector, metrics.ResourceIndex,
 			withLimit[flow.Identifier, *flow.Index](flow.DefaultTransactionExpiry+100),
-			withStore(store),
+			withStoreWithLock(storeWithLock),
 			withRetrieve(retrieve)),
 	}
 
 	return p
 }
 
-func (i *Index) storeTx(rw storage.ReaderBatchWriter, blockID flow.Identifier, index *flow.Index) error {
-	return i.cache.PutTx(rw, blockID, index)
-}
-
-func (i *Index) Store(blockID flow.Identifier, index *flow.Index) error {
-	return i.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return i.storeTx(rw, blockID, index)
-	})
+func (i *Index) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, index *flow.Index) error {
+	return i.cache.PutWithLockTx(lctx, rw, blockID, index)
 }
 
 func (i *Index) ByBlockID(blockID flow.Identifier) (*flow.Index, error) {
