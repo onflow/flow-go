@@ -1,8 +1,16 @@
 package crypto
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"slices"
+	"strings"
+
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/onflow/crypto/hash"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Consolidation of WebAuthn related constants, types and functions
@@ -10,6 +18,7 @@ import (
 // and used in crypto.go
 
 const WebAuthnChallengeLength = 32
+const WebAuthnExtensionDataMinimumLength = 37
 const WebAuthnTypeGet = "webauthn.get"
 
 type WebAuthnExtensionData struct {
@@ -63,4 +72,67 @@ func validateFlags(flags byte, extensions []byte) error {
 
 	// If all checks pass, return nil
 	return nil
+}
+
+func validateWebAuthNExtensionData(extensionData []byte, message []byte) (bool, []byte) {
+	// See FLIP 264 for more details
+	if len(extensionData) == 0 {
+		return false, nil
+	}
+	rlpEncodedWebAuthnData := extensionData[1:]
+	decodedWebAuthnData := &WebAuthnExtensionData{}
+	if err := rlp.DecodeBytes(rlpEncodedWebAuthnData, decodedWebAuthnData); err != nil {
+		return false, nil
+	}
+
+	clientData, err := decodedWebAuthnData.GetUnmarshalledCollectedClientData()
+	if err != nil {
+		return false, nil
+	}
+
+	// base64url decode the challenge, as that's the encoding used client side according to https://www.w3.org/TR/webauthn-3/#dictionary-client-data
+	clientDataChallenge, err := base64.URLEncoding.DecodeString(clientData.Challenge)
+	if err != nil {
+		return false, nil
+	}
+
+	if !strings.EqualFold(clientData.Type, WebAuthnTypeGet) || len(clientDataChallenge) != WebAuthnChallengeLength || len(clientData.Origin) == 0 {
+		// invalid client data
+		return false, nil
+	}
+
+	// Validate challenge
+	hasher, err := NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)
+	if err != nil {
+		// could not create hasher for challenge validation, swallowing error here, but should never occur
+		panic(err)
+	}
+
+	computedChallenge := hasher.ComputeHash(message)
+	if !computedChallenge.Equal(clientDataChallenge) {
+		return false, nil
+	}
+
+	// Validate authenticatorData
+	if len(decodedWebAuthnData.AuthenticatorData) < WebAuthnExtensionDataMinimumLength {
+		return false, nil
+	}
+
+	// extract rpIdHash, userFlags, sigCounter, extensions
+	rpIdHash := decodedWebAuthnData.AuthenticatorData[:WebAuthnChallengeLength]
+	userFlags := decodedWebAuthnData.AuthenticatorData[WebAuthnChallengeLength : WebAuthnChallengeLength+1]
+	// _ := decodedWebAuthnData.AuthenticatorData[WebAuthnChallengeLength+1:WebAuthnExtensionDataMinimumLength]
+	extensions := decodedWebAuthnData.AuthenticatorData[WebAuthnExtensionDataMinimumLength:]
+	if bytes.Equal(flow.TransactionDomainTag[:], rpIdHash) {
+		return false, nil
+	}
+
+	// validate user flags according to FLIP 264
+	if err := validateFlags(userFlags[0], extensions); err != nil {
+		return false, nil
+	}
+
+	clientDataHash := hash.NewSHA2_256().ComputeHash(decodedWebAuthnData.ClientDataJson)
+
+	return true, slices.Concat(decodedWebAuthnData.AuthenticatorData, clientDataHash)
 }

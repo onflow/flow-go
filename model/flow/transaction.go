@@ -454,24 +454,24 @@ func (p ProposalKey) ByteSize() int {
 
 // A TransactionSignature is a signature associated with a specific account key.
 type TransactionSignature struct {
-	Address     Address
-	SignerIndex int
-	KeyIndex    uint32
-	Signature   []byte
-	Info        []byte
+	Address       Address
+	SignerIndex   int
+	KeyIndex      uint32
+	Signature     []byte
+	ExtensionData []byte
 }
 
 // String returns the string representation of a transaction signature.
 func (s TransactionSignature) String() string {
 	return fmt.Sprintf("Address: %s. SignerIndex: %d. KeyID: %d. Signature: %s. Info: %s",
-		s.Address, s.SignerIndex, s.KeyIndex, s.Signature, s.Info)
+		s.Address, s.SignerIndex, s.KeyIndex, s.Signature, s.ExtensionData)
 }
 
 // ByteSize returns the byte size of the transaction signature
 func (s TransactionSignature) ByteSize() int {
 	signerIndexLen := 8
 	keyIDLen := 8
-	return len(s.Address) + signerIndexLen + keyIDLen + len(s.Signature) + len(s.Info)
+	return len(s.Address) + signerIndexLen + keyIDLen + len(s.Signature) + len(s.ExtensionData)
 }
 
 func (s TransactionSignature) Fingerprint() []byte {
@@ -479,17 +479,18 @@ func (s TransactionSignature) Fingerprint() []byte {
 }
 
 // checks if the scheme is plain authentication scheme.
-// While the expectation is that s.Info == []byte{0} if it is not nil,
+// While the expectation is that s.ExtensionData == []byte{0} if it is not nil,
 // We don't check it here, as this is simply checking if the scheme is plain,
 // and not the validity of the info field
 func (s TransactionSignature) isPlainAuthenticationScheme() bool {
 	// len check covers nil case
-	return len(s.Info) == 0 || s.Info[0] == 0
+	return len(s.ExtensionData) == 0 || s.ExtensionData[0] == 0
 }
 
 func (s TransactionSignature) canonicalForm() interface{} {
 	// int is not RLP-serializable, therefore s.SignerIndex and s.KeyIndex are converted to uint
 	if s.isPlainAuthenticationScheme() {
+		// This is the legacy cononical form, mainly here for backward compatibility
 		return struct {
 			SignerIndex uint
 			KeyID       uint
@@ -501,15 +502,15 @@ func (s TransactionSignature) canonicalForm() interface{} {
 		}
 	}
 	return struct {
-		SignerIndex uint
-		KeyID       uint
-		Signature   []byte
-		Info        []byte
+		SignerIndex   uint
+		KeyID         uint
+		Signature     []byte
+		ExtensionData []byte
 	}{
-		SignerIndex: uint(s.SignerIndex),
-		KeyID:       uint(s.KeyIndex),
-		Signature:   s.Signature,
-		Info:        s.Info,
+		SignerIndex:   uint(s.SignerIndex),
+		KeyID:         uint(s.KeyIndex),
+		Signature:     s.Signature,
+		ExtensionData: s.ExtensionData,
 	}
 }
 
