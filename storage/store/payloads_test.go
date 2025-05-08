@@ -16,22 +16,25 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 
-		index := store.NewIndex(metrics, db)
-		seals := store.NewSeals(metrics, db)
-		guarantees := store.NewGuarantees(metrics, db, store.DefaultCacheSize)
-		results := store.NewExecutionResults(metrics, db)
-		receipts := store.NewExecutionReceipts(metrics, db, results, store.DefaultCacheSize)
-		s := store.NewPayloads(db, index, guarantees, seals, receipts, results)
+		all := store.InitAll(metrics, db)
+		payloads := all.Payloads
+		blocks := all.Blocks
 
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.PayloadFixture(unittest.WithAllTheFixins)
+		block := unittest.BlockWithParentFixture(unittest.BlockHeaderWithHeight(10))
+		block.SetPayload(expected)
 
-		// s payload
-		err := s.Store(blockID, &expected)
+		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		defer lctx.Release()
+
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return blocks.BatchStore(lctx, rw, block)
+		})
 		require.NoError(t, err)
 
 		// fetch payload
-		payload, err := s.ByBlockID(blockID)
+		payload, err := payloads.ByBlockID(blockID)
 		require.NoError(t, err)
 		require.Equal(t, &expected, payload)
 	})

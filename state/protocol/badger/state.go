@@ -334,7 +334,7 @@ func bootstrapSealingSegment(
 	for _, block := range segment.ExtraBlocks {
 		blockID := block.ID()
 		height := block.Header.Height
-		err := blocks.BatchStoreWithStoringResults(rw, block, storingResults)
+		err := blocks.BatchStoreWithStoringResults(lctx, rw, block, storingResults)
 		if err != nil {
 			return fmt.Errorf("could not insert SealingSegment extra block: %w", err)
 		}
@@ -357,7 +357,7 @@ func bootstrapSealingSegment(
 		blockID := block.ID()
 		height := block.Header.Height
 
-		err := blocks.BatchStoreWithStoringResults(rw, block, storingResults)
+		err := blocks.BatchStoreWithStoringResults(lctx, rw, block, storingResults)
 		if err != nil {
 			return fmt.Errorf("could not insert SealingSegment block: %w", err)
 		}
