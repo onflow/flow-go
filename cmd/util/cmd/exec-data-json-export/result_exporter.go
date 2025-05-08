@@ -11,7 +11,8 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 type result struct {
@@ -26,12 +27,13 @@ type result struct {
 func ExportResults(blockID flow.Identifier, dbPath string, outputPath string) error {
 
 	// traverse backward from the given block (parent block) and fetch by blockHash
-	db := common.InitStorage(dbPath)
-	defer db.Close()
+	badgerdb := common.InitStorage(dbPath)
+	defer badgerdb.Close()
+	db := badgerimpl.ToDB(badgerdb)
 
 	cacheMetrics := &metrics.NoopCollector{}
-	headers := badger.NewHeaders(cacheMetrics, db)
-	results := badger.NewExecutionResults(cacheMetrics, db)
+	headers := store.NewHeaders(cacheMetrics, db)
+	results := store.NewExecutionResults(cacheMetrics, db)
 	activeBlockID := blockID
 
 	outputFile := filepath.Join(outputPath, "results.jsonl")
