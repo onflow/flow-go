@@ -35,4 +35,12 @@ func TestLightTransactionResults_HappyPath(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, retrievedTxs, len(txResults))
 	assert.Equal(t, txResults, retrievedTxs)
+
+	// Extract structured data
+	data := ltx.Data()
+	assert.Len(t, data, 1)
+
+	retrievedLtx := data[block.ID()]
+	assert.Len(t, retrievedLtx, len(txResults))
+	assert.Equal(t, txResults, retrievedLtx)
 }
