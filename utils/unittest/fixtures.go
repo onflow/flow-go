@@ -1100,7 +1100,7 @@ func IdentifierFixture() flow.Identifier {
 func SignerIndicesFixture(n int) []byte {
 	indices := bitutils.MakeBitVector(10)
 	for i := 0; i < n; i++ {
-		bitutils.SetBit(indices, 1)
+		bitutils.SetBit(indices, i)
 	}
 	return indices
 }
