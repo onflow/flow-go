@@ -343,7 +343,7 @@ func validateExtensionDataAndReconstructMessage(scheme AuthenticationScheme, ext
 
 		return true, slices.Concat(decodedWebAuthnData.AuthenticatorData, clientDataHash)
 	default:
-		// signature scheme type not found
+		// authentication scheme not found
 		return false, nil
 	}
 }
