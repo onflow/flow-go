@@ -458,34 +458,58 @@ type TransactionSignature struct {
 	SignerIndex int
 	KeyIndex    uint32
 	Signature   []byte
+	Info        []byte
 }
 
 // String returns the string representation of a transaction signature.
 func (s TransactionSignature) String() string {
-	return fmt.Sprintf("Address: %s. SignerIndex: %d. KeyID: %d. Signature: %s",
-		s.Address, s.SignerIndex, s.KeyIndex, s.Signature)
+	return fmt.Sprintf("Address: %s. SignerIndex: %d. KeyID: %d. Signature: %s. Info: %s",
+		s.Address, s.SignerIndex, s.KeyIndex, s.Signature, s.Info)
 }
 
 // ByteSize returns the byte size of the transaction signature
 func (s TransactionSignature) ByteSize() int {
 	signerIndexLen := 8
 	keyIDLen := 8
-	return len(s.Address) + signerIndexLen + keyIDLen + len(s.Signature)
+	return len(s.Address) + signerIndexLen + keyIDLen + len(s.Signature) + len(s.Info)
 }
 
 func (s TransactionSignature) Fingerprint() []byte {
 	return fingerprint.Fingerprint(s.canonicalForm())
 }
 
+// checks if the scheme is plain authentication scheme.
+// While the expectation is that s.Info == []byte{0} if it is not nil,
+// We don't check it here, as this is simply checking if the scheme is plain,
+// and not the validity of the info field
+func (s TransactionSignature) isPlainAuthenticationScheme() bool {
+	// len check covers nil case
+	return len(s.Info) == 0 || s.Info[0] == 0
+}
+
 func (s TransactionSignature) canonicalForm() interface{} {
+	// int is not RLP-serializable, therefore s.SignerIndex and s.KeyIndex are converted to uint
+	if s.isPlainAuthenticationScheme() {
+		return struct {
+			SignerIndex uint
+			KeyID       uint
+			Signature   []byte
+		}{
+			SignerIndex: uint(s.SignerIndex),
+			KeyID:       uint(s.KeyIndex),
+			Signature:   s.Signature,
+		}
+	}
 	return struct {
 		SignerIndex uint
 		KeyID       uint
 		Signature   []byte
+		Info        []byte
 	}{
-		SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
-		KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
+		SignerIndex: uint(s.SignerIndex),
+		KeyID:       uint(s.KeyIndex),
 		Signature:   s.Signature,
+		Info:        s.Info,
 	}
 }
 

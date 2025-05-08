@@ -1,9 +1,14 @@
 package crypto
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"slices"
+	"strings"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
@@ -215,6 +220,7 @@ func VerifySignatureFromTransaction(
 	message []byte,
 	pk crypto.PublicKey,
 	hashAlgo hash.HashingAlgorithm,
+	extensionData []byte,
 ) (bool, error) {
 
 	// check ECDSA compatibilites
@@ -232,12 +238,29 @@ func VerifySignatureFromTransaction(
 			hashAlgo.String(), "is not supported in transactions"))
 	}
 
-	hasher, err := NewPrefixedHashing(hashAlgo, flow.TransactionTagString)
-	if err != nil {
-		return false, errors.NewValueErrorf(err.Error(), "transaction verification failed")
+	// Default to PlAIN scheme if extension data is nil or empty
+	scheme := PLAIN
+	if len(extensionData) > 0 {
+		scheme = AuthenticationSchemeFromByte(extensionData[0])
+	}
+	if scheme == INVALID {
+		return false, nil
 	}
 
-	valid, err := pk.Verify(signature, message, hasher)
+	extensionDataValid, reconstructedMessage := validateExtensionDataAndReconstructMessage(scheme, extensionData, message)
+	if !extensionDataValid {
+		return false, nil
+	}
+
+	// Prefix has been moved into validateExtensionDataAndReconstructMessage, could consider simply using a regular hasher,
+	// Leaving this here for now incase we need to add more prefixing in the future
+	hasher, err := NewPrefixedHashing(hashAlgo, "")
+	if err != nil {
+		return false, errors.NewUnknownFailure(fmt.Errorf(
+			hashAlgo.String(), "is not supported in transactions"))
+	}
+
+	valid, err := pk.Verify(signature, reconstructedMessage, hasher)
 	if err != nil {
 		// All inputs are guaranteed to be valid at this stage.
 		// The check for crypto.InvalidInputs is only a sanity check
@@ -249,6 +272,80 @@ func VerifySignatureFromTransaction(
 	}
 
 	return valid, nil
+}
+
+// validateExtensionDataAndReconstructMessage reconstructs the message based on the authentication scheme and extension data.
+// simply returns false if the extension data is invalid, could consider adding more visibility into reason of validation failure
+func validateExtensionDataAndReconstructMessage(scheme AuthenticationScheme, extensionData []byte, message []byte) (bool, []byte) {
+	switch scheme {
+	case PLAIN:
+		if extensionData != nil && len(extensionData) != 1 {
+			return false, nil
+		}
+		newMessage := make([]byte, 0, len(flow.TransactionTagString)+len(extensionData))
+		newMessage = append(newMessage, flow.TransactionDomainTag[:]...)
+		return true, append(newMessage, message...)
+	case WEBAUTHN: // See FLIP 264 for more details
+		if len(extensionData) == 0 {
+			return false, nil
+		}
+		rlpEncodedWebAuthnData := extensionData[1:]
+		decodedWebAuthnData := &WebAuthnExtensionData{}
+		if err := rlp.DecodeBytes(rlpEncodedWebAuthnData, decodedWebAuthnData); err != nil {
+			return false, nil
+		}
+
+		clientData, err := decodedWebAuthnData.GetUnmarshalledCollectedClientData()
+		if err != nil {
+			return false, nil
+		}
+
+		// base64url decode the challenge, as that's the encoding used client side according to https://www.w3.org/TR/webauthn-3/#dictionary-client-data
+		clientDataChallenge, err := base64.URLEncoding.DecodeString(clientData.Challenge)
+		if err != nil {
+			return false, nil
+		}
+
+		if strings.Compare(clientData.Type, WebAuthnTypeGet) != 0 || len(clientDataChallenge) != WebAuthnChallengeLength {
+			// invalid client data
+			return false, nil
+		}
+
+		// Validate challenge
+		hasher, err := NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)
+		if err != nil {
+			// could not create hasher for challenge validation, swallowing error here, but should never occur
+			return false, nil
+		}
+
+		computedChallenge := hasher.ComputeHash(message)
+		if !computedChallenge.Equal(clientDataChallenge) {
+			return false, nil
+		}
+
+		// Validate authenticatorData
+		if len(decodedWebAuthnData.AuthenticatorData) < 37 {
+			return false, nil
+		}
+
+		// extract rpIdHash, userFlags, sigCounter, extensions
+		rpIdHash, userFlags, _, extensions := decodedWebAuthnData.AuthenticatorData[0:32], decodedWebAuthnData.AuthenticatorData[32:33], decodedWebAuthnData.AuthenticatorData[33:37], decodedWebAuthnData.AuthenticatorData[37:]
+		if bytes.Equal(flow.TransactionDomainTag[:], rpIdHash) {
+			return false, nil
+		}
+
+		// validate user flags according to FLIP 264
+		if err := validateFlags(userFlags[0], extensions); err != nil {
+			return false, nil
+		}
+
+		clientDataHash := hash.NewSHA2_256().ComputeHash(decodedWebAuthnData.ClientDataJson)
+
+		return true, slices.Concat(decodedWebAuthnData.AuthenticatorData, clientDataHash)
+	default:
+		// authentication scheme not found
+		return false, nil
+	}
 }
 
 // VerifyPOP verifies a proof of possession (PoP) for the receiver public key; currently only works for BLS
