@@ -504,7 +504,7 @@ func (b *Builder) buildHeader(
 			ChainID:   ctx.parent.ChainID,
 			ParentID:  ctx.parentID,
 			Height:    ctx.parent.Height + 1,
-			Timestamp: time.Now().UTC(),
+			Timestamp: uint64(time.Now().UnixMilli()),
 		},
 		PayloadHash: payload.Hash(),
 

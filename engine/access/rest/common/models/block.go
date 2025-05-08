@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -166,7 +168,7 @@ func NewBlockHeader(header *flow.Header) *BlockHeader {
 		Id:                   header.ID().String(),
 		ParentId:             header.ParentID.String(),
 		Height:               util.FromUint(header.Height),
-		Timestamp:            header.Timestamp,
+		Timestamp:            time.UnixMilli(int64(header.Timestamp)).UTC(),
 		ParentVoterSignature: util.ToBase64(header.ParentVoterSigData),
 	}
 }
@@ -175,7 +177,7 @@ func (b *BlockHeader) Build(header *flow.Header) {
 	b.Id = header.ID().String()
 	b.ParentId = header.ParentID.String()
 	b.Height = util.FromUint(header.Height)
-	b.Timestamp = header.Timestamp
+	b.Timestamp = time.UnixMilli(int64(header.Timestamp)).UTC()
 	b.ParentVoterSignature = util.ToBase64(header.ParentVoterSigData)
 }
 

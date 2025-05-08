@@ -419,7 +419,7 @@ func createNode(
 	)
 	require.NoError(t, err)
 
-	blockTimer, err := blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second)
+	blockTimer, err := blocktimer.NewBlockTimer(1, 90_000)
 	require.NoError(t, err)
 
 	fullState, err := bprotocol.NewFullConsensusState(

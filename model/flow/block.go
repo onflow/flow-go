@@ -16,7 +16,7 @@ func Genesis(chainID ChainID) *Block {
 			ChainID:   chainID,
 			ParentID:  ZeroID,
 			Height:    0,
-			Timestamp: GenesisTime,
+			Timestamp: uint64(GenesisTime.UnixMilli()),
 			View:      0,
 		},
 		PayloadHash: payload.Hash(),

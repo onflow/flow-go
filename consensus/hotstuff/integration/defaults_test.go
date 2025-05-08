@@ -13,7 +13,7 @@ func DefaultRoot() *flow.Header {
 			ChainID:   "chain",
 			ParentID:  flow.ZeroID,
 			Height:    0,
-			Timestamp: time.Now().UTC(),
+			Timestamp: uint64(time.Now().UnixMilli()),
 		},
 		PayloadHash: unittest.IdentifierFixture(),
 	}
