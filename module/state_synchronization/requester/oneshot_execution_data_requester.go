@@ -59,12 +59,7 @@ func NewOneshotExecutionDataRequester(
 // The function logs each retry attempt and emits metrics for retries and fetch durations.
 // The block height is used only for logging and metric purposes.
 //
-// - Returns a terminal error if fetching fails due to non-retryable issues.
-//
-// Expected errors during normal operations:
-// - storage.ErrNotFound if a seal or execution result is not available for the block
-// - MalformedDataError if some level of the blob tree cannot be properly deserialized
-// - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
+// Returns a terminal error if fetching fails due to non-retryable issues.
 func (r *OneshotExecutionDataRequester) RequestExecutionData(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -114,6 +109,7 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 // - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
 // - MalformedDataError if some level of the blob tree cannot be properly deserialized
 // - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
+// - context.DeadlineExceeded if fetching time exceeded fetchTimeout duration
 func (r *OneshotExecutionDataRequester) processFetchRequest(
 	parentCtx context.Context,
 	blockID flow.Identifier,
