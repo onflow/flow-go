@@ -195,10 +195,8 @@ func (s *TxErrorMessagesCoreSuite) TestTransactionErrorMessagesRequester_HappyPa
 
 	core := s.initCore()
 	config := &TransactionErrorMessagesRequesterConfig{
-		FetchTimeout:    10 * time.Second,
-		MaxFetchTimeout: 10 * time.Minute,
-		RetryDelay:      1 * time.Second,
-		MaxRetryDelay:   5 * time.Minute,
+		RetryDelay:    1 * time.Second,
+		MaxRetryDelay: 5 * time.Minute,
 	}
 	requester := NewTransactionErrorMessagesRequester(core, config)
 
