@@ -73,12 +73,6 @@ func (h *Headers) retrieveIdByHeightTx(height uint64) (flow.Identifier, error) {
 	return blockID, nil
 }
 
-func (h *Headers) Store(header *flow.Header) error {
-	return h.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return h.storeTx(rw, header)
-	})
-}
-
 func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 	return h.retrieveTx(blockID)
 }
@@ -142,9 +136,9 @@ func (h *Headers) FindHeaders(filter func(header *flow.Header) bool) ([]flow.Hea
 
 // RollbackExecutedBlock update the executed block header to the given header.
 // only useful for execution node to roll back executed block height
+// This method is not concurrent safe, the caller should make sure to call
+// this method in a single thread.
 func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
-	// adding lock
-
 	var blockID flow.Identifier
 	err := operation.RetrieveExecutedBlock(h.db.Reader(), &blockID)
 	if err != nil {

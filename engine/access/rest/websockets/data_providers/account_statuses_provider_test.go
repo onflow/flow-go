@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -18,8 +19,10 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 // AccountStatusesProviderSuite is a test suite for testing the account statuses providers functionality.
@@ -66,10 +69,15 @@ func (s *AccountStatusesProviderSuite) SetupTest() {
 // validates that events are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_HappyPath() {
+	eventGenerator := generator.EventGenerator(generator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
 	events := []flow.Event{
-		unittest.EventFixture(state_stream.CoreEventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
-		unittest.EventFixture(state_stream.CoreEventAccountKeyAdded, 0, 0, unittest.IdentifierFixture(), 0),
+		eventGenerator.New(),
+		eventGenerator.New(),
 	}
+
+	// use account status events
+	events[0].Type = state_stream.CoreEventAccountCreated
+	events[1].Type = state_stream.CoreEventAccountKeyAdded
 
 	backendResponses := s.backendAccountStatusesResponses(events)
 
@@ -190,7 +198,25 @@ func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendR
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		expectedResponsePayload := models.NewAccountStatusesResponse(resp, uint64(i))
+		// avoid updating the original response
+		expected := &backend.AccountStatusesResponse{
+			Height:        resp.Height,
+			BlockID:       resp.BlockID,
+			AccountEvents: make(map[string]flow.EventsList, len(resp.AccountEvents)),
+		}
+
+		// events are provided in CCF format, but we expect all event payloads in JSON-CDC format
+		for eventType, events := range resp.AccountEvents {
+			convertedEvents := make([]flow.Event, len(events))
+			for j, event := range events {
+				converted, err := convert.CcfEventToJsonEvent(event)
+				s.Require().NoError(err)
+				convertedEvents[j] = *converted
+			}
+			expected.AccountEvents[eventType] = convertedEvents
+		}
+
+		expectedResponsePayload := models.NewAccountStatusesResponse(expected, uint64(i))
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   AccountStatusesTopic,
 			Payload: expectedResponsePayload,

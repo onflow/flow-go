@@ -8,14 +8,12 @@ import (
 // Blocks represents persistent storage for blocks.
 type Blocks interface {
 
-	// Store will atomically store a block with all its dependencies.
-	Store(block *flow.Block) error
-
 	// StoreTx allows us to store a new block, including its payload & header, as part of a DB transaction, while
 	// still going through the caching layer.
 	// Deprecated: to be removed alongside Badger DB
 	StoreTx(block *flow.Block) func(*transaction.Tx) error
 
+	// BatchStore stores a valid block in a batch.
 	BatchStore(rw ReaderBatchWriter, block *flow.Block) error
 
 	// BatchStoreWithStoringResults stores multiple blocks as a batch.
@@ -36,6 +34,6 @@ type Blocks interface {
 	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
 
 	// IndexBlockForCollections indexes the block each collection was
-	// included in.
+	// included in. This should not be called when finalizing a block
 	IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error
 }

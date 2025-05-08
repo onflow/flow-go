@@ -20,12 +20,16 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		defer lctx.Release()
 
 		metrics := metrics.NewNoopCollector()
-		headers := store.NewHeaders(metrics, db)
+		all := store.InitAll(metrics, db)
+		headers := all.Headers
+		blocks := all.Blocks
 
 		block := unittest.BlockFixture()
 
-		// store header
-		err := headers.Store(block.Header)
+		// store block which will also store header
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return blocks.BatchStore(rw, &block)
+		})
 		require.NoError(t, err)
 
 		// index the header

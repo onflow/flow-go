@@ -33,7 +33,9 @@ func NewPayloads(db storage.DB, index *Index, guarantees *Guarantees, seals *Sea
 	return p
 }
 
-// TODO(leo): rename to BatchStore, add to interface
+// storeTx stores the payloads and their components in the database.
+// it takes a map of storingResults to ensure the receipt to be stored contains a known result,
+// which is either already stored in the database or is going to be stored in the same batch.
 func (p *Payloads) storeTx(rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *flow.Payload, storingResults map[flow.Identifier]*flow.ExecutionResult) error {
 	// For correct payloads, the execution result is part of the payload or it's already stored
 	// in storage. If execution result is not present in either of those places, we error.
@@ -52,7 +54,7 @@ func (p *Payloads) storeTx(rw storage.ReaderBatchWriter, blockID flow.Identifier
 				result, err = p.results.ByID(meta.ResultID)
 				if err != nil {
 					if errors.Is(err, storage.ErrNotFound) {
-						err = fmt.Errorf("invalid payload referencing unknown execution result %v, err: %w", meta.ResultID, err)
+						return fmt.Errorf("invalid payload referencing unknown execution result %v, err: %w", meta.ResultID, err)
 					}
 					return err
 				}

@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs/mock"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
-	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -113,10 +112,6 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 	require.NoError(s.T(), err)
 }
 
-func noopBatchWrite(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-	return nil
-}
-
 // TestBuild_HappyPath tests that hierarchical epoch state machine maintains index of epoch states and commits
 // as well as stores updated epoch state in respective storage when there were updates made to the epoch state.
 // This test also ensures that updated state ID is committed in the KV store.
@@ -133,7 +128,9 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	s.happyPathStateMachine.On("ProcessEpochSetup", epochSetup).Return(true, nil).Once()
 	s.happyPathStateMachine.On("ProcessEpochCommit", epochCommit).Return(true, nil).Once()
 
+	w := storagemock.NewWriter(s.T())
 	rw := storagemock.NewReaderBatchWriter(s.T())
+	rw.On("Writer").Return(w).Once() // called by epochStateDB.BatchStore
 	// prepare a DB update for epoch setup
 	s.setupsDB.On("BatchStore", rw, epochSetup).Return(nil).Once()
 
@@ -145,7 +142,7 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 
 	// prepare a DB update for epoch state
 	s.epochStateDB.On("BatchIndex", rw, s.candidate.ID(), updatedStateID).Return(nil).Once()
-	s.epochStateDB.On("BatchStore", rw, updatedStateID, updatedState.MinEpochStateEntry).Return(nil).Once()
+	s.epochStateDB.On("BatchStore", w, updatedStateID, updatedState.MinEpochStateEntry).Return(nil).Once()
 	s.mutator.On("SetEpochStateID", updatedStateID).Return(nil).Once()
 
 	dbUpdates, err := s.stateMachine.Build()
@@ -551,7 +548,10 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	dbOps, err := stateMachine.Build()
 	require.NoError(s.T(), err)
 
+	w := storagemock.NewWriter(s.T())
 	rw := storagemock.NewReaderBatchWriter(s.T())
+	rw.On("Writer").Return(w).Once() // called by epochStateDB.BatchStore
+
 	// Provide the blockID and execute the resulting `DBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
 	blockID := s.candidate.ID()

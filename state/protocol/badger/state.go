@@ -302,7 +302,7 @@ func bootstrapSealingSegment(
 	w := rw.Writer()
 	storingResults := make(map[flow.Identifier]*flow.ExecutionResult, len(segment.ExecutionResults))
 	for _, result := range segment.ExecutionResults {
-		err := operation.InsertExecutionResult(rw.Writer(), result)
+		err := operation.InsertExecutionResult(w, result)
 		if err != nil {
 			return fmt.Errorf("could not insert execution result: %w", err)
 		}
@@ -583,7 +583,7 @@ func bootstrapEpochForProtocolStateEntry(
 	}
 
 	// insert epoch protocol state entry, which references above service events
-	err := epochProtocolStateSnapshots.BatchStore(rw, richEntry.ID(), richEntry.MinEpochStateEntry)
+	err := epochProtocolStateSnapshots.BatchStore(rw.Writer(), richEntry.ID(), richEntry.MinEpochStateEntry)
 	if err != nil {
 		return fmt.Errorf("could not store epoch protocol state entry: %w", err)
 	}

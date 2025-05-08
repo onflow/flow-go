@@ -7,17 +7,15 @@ import (
 // EpochProtocolStateEntries represents persistent, fork-aware storage for the Epoch-related
 // sub-state of the overall of the overall Protocol State (KV Store).
 type EpochProtocolStateEntries interface {
-	// BatchStore returns an anonymous function (intended to be executed as part of a badger transaction),
-	// which persists the given epoch sub-state as part of a DB tx. Per convention, the identities in
-	// the Protocol State must be in canonical order for the current and next epoch (if present),
+	// BatchStore returns persists the given epoch protocol state entry as part of a DB batch. Per convention, the identities in
+	// the flow.MinEpochStateEntry must be in canonical order for the current and next epoch (if present),
 	// otherwise an exception is returned.
 	// No errors are expected during normal operation.
-	BatchStore(rw ReaderBatchWriter, epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.MinEpochStateEntry) error
+	BatchStore(w Writer, epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.MinEpochStateEntry) error
 
-	// BatchIndex returns an anonymous function that is intended to be executed as part of a database transaction.
-	// In a nutshell, we want to maintain a map from `blockID` to `epochProtocolStateID`, where `blockID` references the
-	// block that _proposes_ the epoch sub-state.
-	// Upon call, the anonymous function persists the specific map entry in the node's database.
+	// BatchIndex persists the specific map entry in the node's database.
+	// In a nutshell, we want to maintain a map from `blockID` to `epochStateEntry`, where `blockID` references the
+	// block that _proposes_ the referenced epoch protocol state entry.
 	// Protocol convention:
 	//   - Consider block B, whose ingestion might potentially lead to an updated protocol state. For example,
 	//     the protocol state changes if we seal some execution results emitting service events.

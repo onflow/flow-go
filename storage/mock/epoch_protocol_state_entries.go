@@ -32,17 +32,17 @@ func (_m *EpochProtocolStateEntries) BatchIndex(rw storage.ReaderBatchWriter, bl
 	return r0
 }
 
-// BatchStore provides a mock function with given fields: rw, epochProtocolStateID, epochProtocolStateEntry
-func (_m *EpochProtocolStateEntries) BatchStore(rw storage.ReaderBatchWriter, epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.MinEpochStateEntry) error {
-	ret := _m.Called(rw, epochProtocolStateID, epochProtocolStateEntry)
+// BatchStore provides a mock function with given fields: w, epochProtocolStateID, epochProtocolStateEntry
+func (_m *EpochProtocolStateEntries) BatchStore(w storage.Writer, epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.MinEpochStateEntry) error {
+	ret := _m.Called(w, epochProtocolStateID, epochProtocolStateEntry)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchStore")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(storage.ReaderBatchWriter, flow.Identifier, *flow.MinEpochStateEntry) error); ok {
-		r0 = rf(rw, epochProtocolStateID, epochProtocolStateEntry)
+	if rf, ok := ret.Get(0).(func(storage.Writer, flow.Identifier, *flow.MinEpochStateEntry) error); ok {
+		r0 = rf(w, epochProtocolStateID, epochProtocolStateEntry)
 	} else {
 		r0 = ret.Error(0)
 	}

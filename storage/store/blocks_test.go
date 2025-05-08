@@ -20,7 +20,9 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		block := unittest.FullBlockFixture()
 		block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
 
-		err := blocks.Store(&block)
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return blocks.BatchStore(rw, &block)
+		})
 		require.NoError(t, err)
 
 		retrieved, err := blocks.ByID(block.ID())
