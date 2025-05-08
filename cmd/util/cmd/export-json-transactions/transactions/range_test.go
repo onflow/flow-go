@@ -60,13 +60,15 @@ func TestFindBlockTransactions(t *testing.T) {
 		state.On("AtHeight", uint64(5)).Return(snap5, nil)
 
 		// store into database
+		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		defer lctx.Release()
 		require.NoError(t, badgerimpl.ToDB(db).WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			err := storages.Blocks.BatchStore(rw, &b1)
+			err := storages.Blocks.BatchStore(lctx, rw, &b1)
 			if err != nil {
 				return err
 			}
 
-			return storages.Blocks.BatchStore(rw, &b2)
+			return storages.Blocks.BatchStore(lctx, rw, &b2)
 		}))
 
 		require.NoError(t, collections.Store(&col1.Collection))
