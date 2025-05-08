@@ -362,12 +362,12 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 					}
 
 					ok, err := crypto.VerifySignatureFromTransaction(signature, data, sk.PublicKey(), h, nil)
-
 					if _, shouldBeOk := correctCombinations[s][h]; shouldBeOk {
 						require.NoError(t, err)
 						require.True(t, ok)
 					} else {
 						require.Error(t, err)
+						require.ErrorContains(t, err, "is not supported in transactions")
 						require.False(t, ok)
 					}
 				})
@@ -433,7 +433,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 		h := hash.SHA2_256
 		s := onflowCrypto.ECDSAP256
 
-		transactionBody := transactionBodyScafold{
+		transactionBody := transactionBodyScaffold{
 			flow.TransactionBody{
 				Script: []byte("some script"),
 				Arguments: [][]byte{
@@ -468,17 +468,15 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 				},
 			}}
 
-		transactionMessage := transactionBody.EnvelopeMessage()
-
 		t.Run("plain authentication schemes", func(t *testing.T) {
 			cases := []struct {
-				payloadInfo                            []byte
-				expectedEnvelopeSignatureCanonicalForm func(tb transactionBodyScafold) []byte
+				payloadExtensionData                   []byte
+				expectedEnvelopeSignatureCanonicalForm func(tb transactionBodyScaffold) []byte
 				require                                func(t *testing.T, sigOk bool, err error)
 			}{
 				{
-					payloadInfo: nil,
-					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScafold) []byte {
+					payloadExtensionData: nil,
+					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScaffold) []byte {
 						return fingerprint.Fingerprint(struct {
 							Payload           interface{}
 							PayloadSignatures interface{}
@@ -504,8 +502,8 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 					},
 				},
 				{
-					payloadInfo: []byte{},
-					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScafold) []byte {
+					payloadExtensionData: []byte{},
+					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScaffold) []byte {
 						return fingerprint.Fingerprint(struct {
 							Payload           interface{}
 							PayloadSignatures interface{}
@@ -530,8 +528,8 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 						require.True(t, sigOk)
 					},
 				}, {
-					payloadInfo: []byte{0x0},
-					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScafold) []byte {
+					payloadExtensionData: []byte{0x0},
+					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScaffold) []byte {
 						return fingerprint.Fingerprint(struct {
 							Payload           interface{}
 							PayloadSignatures interface{}
@@ -540,15 +538,15 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 							[]interface{}{
 								// NON-expected canonical form of payload signature
 								struct {
-									SignerIndex uint
-									KeyID       uint
-									Signature   []byte
-									Info        []byte
+									SignerIndex   uint
+									KeyID         uint
+									Signature     []byte
+									ExtensionData []byte
 								}{
-									SignerIndex: uint(tb.PayloadSignatures[0].SignerIndex),
-									KeyID:       uint(tb.PayloadSignatures[0].KeyIndex),
-									Signature:   tb.PayloadSignatures[0].Signature,
-									Info:        []byte{0x0},
+									SignerIndex:   uint(tb.PayloadSignatures[0].SignerIndex),
+									KeyID:         uint(tb.PayloadSignatures[0].KeyIndex),
+									Signature:     tb.PayloadSignatures[0].Signature,
+									ExtensionData: []byte{0x0},
 								},
 							},
 						})
@@ -558,8 +556,8 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 						require.False(t, sigOk)
 					},
 				}, {
-					payloadInfo: []byte{0x0},
-					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScafold) []byte {
+					payloadExtensionData: []byte{0x0},
+					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScaffold) []byte {
 						return fingerprint.Fingerprint(struct {
 							Payload           interface{}
 							PayloadSignatures interface{}
@@ -588,7 +586,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 
 			for _, c := range cases {
 
-				t.Run(fmt.Sprintf("auth scheme (payloadInfo): %v", c.payloadInfo), func(t *testing.T) {
+				t.Run(fmt.Sprintf("auth scheme (payloadExtensionData): %v", c.payloadExtensionData), func(t *testing.T) {
 					seed := make([]byte, seedLength)
 					_, err := rand.Read(seed)
 					require.NoError(t, err)
@@ -598,6 +596,9 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 					hasher, err := crypto.NewPrefixedHashing(h, flow.TransactionTagString)
 					require.NoError(t, err)
 
+					transactionBody.PayloadSignatures[0].ExtensionData = c.payloadExtensionData
+					transactionMessage := transactionBody.EnvelopeMessage()
+
 					sig, err := sk.Sign(transactionMessage, hasher)
 					require.NoError(t, err)
 					signature := sig.Bytes()
@@ -605,7 +606,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 					// generate expected envelope data
 					expectedEnvelopeMessage := c.expectedEnvelopeSignatureCanonicalForm(transactionBody)
 
-					ok, err := crypto.VerifySignatureFromTransaction(signature, expectedEnvelopeMessage, sk.PublicKey(), h, nil)
+					ok, err := crypto.VerifySignatureFromTransaction(signature, expectedEnvelopeMessage, sk.PublicKey(), h, c.payloadExtensionData)
 					c.require(t, ok, err)
 				})
 
@@ -616,6 +617,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 			hasher, err := crypto.NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)
 			require.NoError(t, err)
 
+			transactionMessage := transactionBody.EnvelopeMessage()
 			authNChallenge := hasher.ComputeHash(transactionMessage)
 			authNChallengeBase64Url := base64.URLEncoding.EncodeToString(authNChallenge)
 			validUserFlag := byte(0x01)
@@ -764,7 +766,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 			}{
 				{
 					description: "invalid scheme (0x02)",
-					scheme:      crypto.INVALID,
+					scheme:      crypto.InvalidScheme,
 					require: func(t *testing.T, sigOk bool, err error) {
 						require.NoError(t, err)
 						require.False(t, sigOk)
@@ -790,6 +792,8 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 
 					hasher, err := crypto.NewPrefixedHashing(h, flow.TransactionTagString)
 					require.NoError(t, err)
+
+					transactionMessage := transactionBody.EnvelopeMessage()
 
 					sig, err := sk.Sign(transactionMessage, hasher)
 					require.NoError(t, err)
@@ -982,7 +986,7 @@ type transactionBodyScaffold struct {
 }
 
 // For not, this is taken directly from model/flow/transaction.go
-func (tb *transactionBodyScafold) payloadCanonicalForm() interface{} {
+func (tb *transactionBodyScaffold) payloadCanonicalForm() interface{} {
 	authorizers := make([][]byte, len(tb.Authorizers))
 	for i, auth := range tb.Authorizers {
 		authorizers[i] = auth.Bytes()
