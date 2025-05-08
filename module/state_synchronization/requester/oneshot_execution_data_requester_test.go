@@ -2,10 +2,11 @@ package requester
 
 import (
 	"context"
-	"errors"
+	"fmt"
+	"testing"
+
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
-	"testing"
 
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
@@ -193,7 +194,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 
 	suite.Run("malformed data error", func() {
 		results := new(storagemock.ExecutionResults)
-		expectedError := execution_data.NewMalformedDataError(errors.New("malformed data"))
+		expectedError := execution_data.NewMalformedDataError(fmt.Errorf("malformed data"))
 		results.
 			On("ByID", mock.AnythingOfType("flow.Identifier")).
 			Return(nil, expectedError).
