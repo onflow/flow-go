@@ -977,7 +977,7 @@ func TestVerifySignatureFromRuntime_error_handling_produces_valid_utf8_for_inval
 	require.Equal(t, errorString, unmarshalledString)
 }
 
-type transactionBodyScafold struct {
+type transactionBodyScaffold struct {
 	flow.TransactionBody
 }
 
