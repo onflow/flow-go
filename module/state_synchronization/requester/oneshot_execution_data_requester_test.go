@@ -2,6 +2,9 @@ package requester
 
 import (
 	"context"
+	"errors"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/storage"
 	"testing"
 
 	"github.com/ipfs/go-datastore"
@@ -14,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	edmock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
@@ -31,7 +33,91 @@ func TestRawExecutionDataRequesterSuite(t *testing.T) {
 	suite.Run(t, new(OneshotExecutionDataRequesterSuite))
 }
 
-func (suite *OneshotExecutionDataRequesterSuite) TestRequester_RawRequestExecutionData() {
+func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecutionData() {
+	logger := unittest.Logger()
+	metricsCollector := metrics.NewNoopCollector()
+	config := OneshotExecutionDataConfig{
+		FetchTimeout:    DefaultFetchTimeout,
+		MaxFetchTimeout: DefaultMaxFetchTimeout,
+		RetryDelay:      DefaultRetryDelay,
+		MaxRetryDelay:   DefaultMaxRetryDelay,
+	}
+
+	suite.Run("Happy path. Raw setup", func() {
+		headers := new(storagemock.Headers)
+		seals := new(storagemock.Seals)
+		seal := unittest.Seal.Fixture()
+		seals.
+			On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).
+			Return(seal, nil).
+			Once()
+
+		results := new(storagemock.ExecutionResults)
+		result := unittest.ExecutionResultFixture()
+		results.
+			On("ByID", mock.AnythingOfType("flow.Identifier")).
+			Return(result, nil).
+			Once()
+
+		blockEd := unittest.BlockExecutionDataFixture()
+		heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
+
+		downloader := new(edmock.Downloader)
+		downloader.
+			On("Get", mock.Anything, mock.AnythingOfType("flow.Identifier")).
+			Return(blockEd, nil).
+			Once()
+
+		edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
+		requester := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, config)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		err := requester.RequestExecutionData(ctx, blockEd.BlockID, 0)
+		require.NoError(suite.T(), err)
+
+		// Requester doesn't return downloaded execution data. It puts them into the internal cache.
+		// So, here we check if we successfully put the execution data into the cache.
+		require.True(suite.T(), heroCache.Has(blockEd.BlockID))
+	})
+
+	suite.Run("Happy path. Full storages setup", func() {
+		datastore := dssync.MutexWrap(datastore.NewMapDatastore())
+		blobstore := blobs.NewBlobstore(datastore)
+		testData := generateTestData(suite.T(), blobstore, 5, map[uint64]testExecutionDataCallback{})
+
+		headers := synctest.MockBlockHeaderStorage(
+			synctest.WithByID(testData.blocksByID),
+			synctest.WithByHeight(testData.blocksByHeight),
+			synctest.WithBlockIDByHeight(testData.blocksByHeight),
+		)
+		results := synctest.MockResultsStorage(
+			synctest.WithResultByID(testData.resultsByID),
+		)
+		seals := synctest.MockSealsStorage(
+			synctest.WithSealsByBlockID(testData.sealsByBlockID),
+		)
+
+		downloader := MockDownloader(testData.executionDataEntries)
+		heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
+		edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
+		requester := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, config)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		for blockID := range testData.executionDataIDByBlockID {
+			// height is used only for logging purposes
+			err := requester.RequestExecutionData(ctx, blockID, 0)
+			require.NoError(suite.T(), err)
+
+			// Requester doesn't return downloaded execution data. It puts them into the internal cache.
+			// So, here we check if we successfully put the execution data into the cache.
+			require.True(suite.T(), heroCache.Has(blockID))
+		}
+	})
+}
+
+func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheReturnsError() {
 	logger := unittest.Logger()
 	metricsCollector := metrics.NewNoopCollector()
 	config := OneshotExecutionDataConfig{
@@ -46,82 +132,104 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequester_RawRequestExecuti
 	seal := unittest.Seal.Fixture()
 	seals.
 		On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).
-		Return(seal, nil).
-		Once()
-
-	results := new(storagemock.ExecutionResults)
-	result := unittest.ExecutionResultFixture()
-	results.
-		On("ByID", mock.AnythingOfType("flow.Identifier")).
-		Return(result, nil).
-		Once()
+		Return(seal, nil)
 
 	blockEd := unittest.BlockExecutionDataFixture()
-	heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
-
 	downloader := new(edmock.Downloader)
 	downloader.
 		On("Get", mock.Anything, mock.AnythingOfType("flow.Identifier")).
-		Return(blockEd, nil).
-		Once()
+		Return(blockEd, nil)
 
-	edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
-	requester := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, config)
+	suite.Run("blob not found error", func() {
+		// first time return blob not found error to test retry mechanism
+		results := new(storagemock.ExecutionResults)
+		expectedError := execution_data.BlobNotFoundError{}
+		results.
+			On("ByID", mock.AnythingOfType("flow.Identifier")).
+			Return(nil, &expectedError).
+			Once()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
+		// eventually return an execution result
+		expectedResult := unittest.ExecutionResultFixture()
+		results.
+			On("ByID", mock.AnythingOfType("flow.Identifier")).
+			Return(expectedResult, nil).
+			Once()
 
-	err := requester.RequestExecutionData(signalerCtx, blockEd.BlockID, 0)
-	require.NoError(suite.T(), err)
+		heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
+		edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
+		requester := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, config)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	// Requester doesn't return downloaded execution data. It puts them into the internal cache.
-	// So, here we check if we successfully put the execution data into the cache.
-	require.True(suite.T(), heroCache.Has(blockEd.BlockID))
-}
-
-func (suite *OneshotExecutionDataRequesterSuite) TestRequester_RequestExecutionData() {
-	logger := unittest.Logger()
-	metricsCollector := metrics.NewNoopCollector()
-	config := OneshotExecutionDataConfig{
-		FetchTimeout:    DefaultFetchTimeout,
-		MaxFetchTimeout: DefaultMaxFetchTimeout,
-		RetryDelay:      DefaultRetryDelay,
-		MaxRetryDelay:   DefaultMaxRetryDelay,
-	}
-
-	datastore := dssync.MutexWrap(datastore.NewMapDatastore())
-	blobstore := blobs.NewBlobstore(datastore)
-	testData := generateTestData(suite.T(), blobstore, 5, map[uint64]testExecutionDataCallback{})
-
-	headers := synctest.MockBlockHeaderStorage(
-		synctest.WithByID(testData.blocksByID),
-		synctest.WithByHeight(testData.blocksByHeight),
-		synctest.WithBlockIDByHeight(testData.blocksByHeight),
-	)
-	results := synctest.MockResultsStorage(
-		synctest.WithResultByID(testData.resultsByID),
-	)
-	seals := synctest.MockSealsStorage(
-		synctest.WithSealsByBlockID(testData.sealsByBlockID),
-	)
-
-	downloader := MockDownloader(testData.executionDataEntries)
-	heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
-	edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
-	requester := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, config)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
-
-	for blockID := range testData.executionDataIDByBlockID {
-		// height is used only for logging purposes
-		err := requester.RequestExecutionData(signalerCtx, blockID, 0)
+		err := requester.RequestExecutionData(ctx, blockEd.BlockID, 0)
 		require.NoError(suite.T(), err)
 
 		// Requester doesn't return downloaded execution data. It puts them into the internal cache.
-		// So, here we check if we successfully put the execution data into the cache.
-		require.True(suite.T(), heroCache.Has(blockID))
-	}
+		// Make sure execution data got into cache eventually.
+		require.True(suite.T(), heroCache.Has(blockEd.BlockID))
+	})
+
+	suite.Run("execution data not found in storage", func() {
+		results := new(storagemock.ExecutionResults)
+		expectedError := storage.ErrNotFound
+		results.
+			On("ByID", mock.AnythingOfType("flow.Identifier")).
+			Return(nil, expectedError).
+			Once()
+
+		heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
+		edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
+		requester := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, config)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		err := requester.RequestExecutionData(ctx, blockEd.BlockID, 0)
+		require.ErrorIs(suite.T(), err, expectedError)
+
+		// Requester doesn't return downloaded execution data. It puts them into the internal cache.
+		require.False(suite.T(), heroCache.Has(blockEd.BlockID))
+	})
+
+	suite.Run("malformed data error", func() {
+		results := new(storagemock.ExecutionResults)
+		expectedError := execution_data.NewMalformedDataError(errors.New("malformed data"))
+		results.
+			On("ByID", mock.AnythingOfType("flow.Identifier")).
+			Return(nil, expectedError).
+			Once()
+
+		heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
+		edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
+		requester := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, config)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		err := requester.RequestExecutionData(ctx, blockEd.BlockID, 0)
+		require.ErrorIs(suite.T(), err, expectedError)
+
+		// Requester doesn't return downloaded execution data. It puts them into the internal cache.
+		require.False(suite.T(), heroCache.Has(blockEd.BlockID))
+	})
+
+	suite.Run("blob size limit exceed error", func() {
+		results := new(storagemock.ExecutionResults)
+		expectedError := execution_data.BlobSizeLimitExceededError{}
+		results.
+			On("ByID", mock.AnythingOfType("flow.Identifier")).
+			Return(nil, &expectedError).
+			Once()
+
+		heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
+		edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
+		requester := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, config)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		err := requester.RequestExecutionData(ctx, blockEd.BlockID, 0)
+		require.ErrorIs(suite.T(), err, &expectedError)
+
+		// Requester doesn't return downloaded execution data. It puts them into the internal cache.
+		require.False(suite.T(), heroCache.Has(blockEd.BlockID))
+	})
 }

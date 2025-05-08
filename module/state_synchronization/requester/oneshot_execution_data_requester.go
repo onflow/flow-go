@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -53,13 +52,23 @@ func NewOneshotExecutionDataRequester(
 	}
 }
 
-// RequestExecutionData requests execution data for a block.
-// It uses a retry mechanism to retry the download execution data if they are not found.
+// RequestExecutionData requests execution data for a given block from the execution data cache.
+// It performs a fetch using a retry mechanism with exponential backoff if execution data not found.
 // Execution data are saved in the execution data cache passed on instantiation.
+//
+// The function logs each retry attempt and emits metrics for retries and fetch durations.
+// The block height is used only for logging and metric purposes.
+//
+// - Returns a terminal error if fetching fails due to non-retryable issues.
+//
+// Expected errors during normal operations:
+// - storage.ErrNotFound if a seal or execution result is not available for the block
+// - MalformedDataError if some level of the blob tree cannot be properly deserialized
+// - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
 func (r *OneshotExecutionDataRequester) RequestExecutionData(
-	ctx irrecoverable.SignalerContext,
+	ctx context.Context,
 	blockID flow.Identifier,
-	height uint64, // TODO: do we even need it? we use it only for logging tho. and I'm not sure we have it in our case
+	height uint64,
 ) error {
 	backoff := retry.NewExponential(r.config.RetryDelay)
 	backoff = retry.WithCappedDuration(r.config.MaxRetryDelay, backoff)
@@ -87,18 +96,26 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 		// download execution data for the block
 		fetchTimeout, _ := timeout.Next()
 		err := r.processFetchRequest(ctx, blockID, height, fetchTimeout)
-
-		// don't retry if the blob was invalid
-		if isInvalidBlobError(err) {
-			return err
+		if isBlobNotFoundError(err) || errors.Is(err, context.DeadlineExceeded) {
+			return retry.RetryableError(err)
 		}
 
-		return retry.RetryableError(err)
+		return err
 	})
 }
 
+// processFetchRequest performs the actual fetch of execution data for the given block within the provided timeout.
+//
+// It wraps the fetch with metrics tracking and contextual logging. The execution data is retrieved
+// from the execution data cache based on the block ID.
+//
+// Expected errors during normal operations:
+// - storage.ErrNotFound if a seal or execution result is not available for the block
+// - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
+// - MalformedDataError if some level of the blob tree cannot be properly deserialized
+// - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
 func (r *OneshotExecutionDataRequester) processFetchRequest(
-	parentCtx irrecoverable.SignalerContext,
+	parentCtx context.Context,
 	blockID flow.Identifier,
 	height uint64,
 	fetchTimeout time.Duration,
@@ -118,24 +135,8 @@ func (r *OneshotExecutionDataRequester) processFetchRequest(
 
 	execData, err := r.execDataCache.ByBlockID(ctx, blockID)
 	r.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, height)
-
-	if isInvalidBlobError(err) {
-		// This means an execution result was sealed with an invalid execution data id (invalid data).
-		// Eventually, verification nodes will verify that the execution data is valid, and not sign the receipt
-		logger.Error().Err(err).Msg("HALTING REQUESTER: invalid execution data found")
-		return err
-	}
-
-	// Some or all of the blob was missing or corrupt. retry
-	if isBlobNotFoundError(err) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-		logger.Error().Err(err).Msg("failed to get execution data for block")
-		return err
-	}
-
-	// Any other error is unexpected
 	if err != nil {
-		logger.Error().Err(err).Msg("unexpected error fetching execution data")
-		parentCtx.Throw(err)
+		return err
 	}
 
 	logger.Info().
