@@ -2148,6 +2148,10 @@ func (fnb *FlowNodeBuilder) onStart() error {
 		return err
 	}
 
+	if err := fnb.initStorageLockManager(); err != nil {
+		return err
+	}
+
 	// we always initialize both badger and pebble databases
 	// even if we only use one of them, this simplify the code and checks
 	if err := fnb.initBadgerDB(); err != nil {
