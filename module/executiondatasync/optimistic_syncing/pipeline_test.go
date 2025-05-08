@@ -333,6 +333,7 @@ func TestBroadcastStateUpdate(t *testing.T) {
 	// Create mock core
 	mockCore := osmock.NewCore(t)
 	mockCore.On("Download", mock.Anything).Return(nil)
+	mockCore.On("Index", mock.Anything).Return(nil)
 
 	// Create a pipeline
 	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
@@ -353,7 +354,7 @@ func TestBroadcastStateUpdate(t *testing.T) {
 	})
 
 	// Wait for an update to be sent to children
-	update := waitForAnyStateUpdate(t, updateChan)
+	update := waitForStateUpdate(t, updateChan, StateWaitingPersist)
 
 	// Check that the update has the correct flag
 	assert.True(t, update.DescendsFromLastPersistedSealed, "Initial update should indicate descends=true")
@@ -364,7 +365,7 @@ func TestBroadcastStateUpdate(t *testing.T) {
 		ParentState:                     StateReady,
 	})
 
-	// Check for completion
+	// Wait for the pipeline to complete
 	select {
 	case err := <-errChan:
 		if err != nil {
@@ -377,20 +378,23 @@ func TestBroadcastStateUpdate(t *testing.T) {
 		t.Fatal("Timeout waiting for pipeline to complete")
 	}
 
-	// Check for state updates with descendsFromSealed=false
-	found := false
-	timeout := time.After(100 * time.Millisecond)
+	// Verify the pipeline transitioned to canceled state
+	assert.Equal(t, StateCanceled, pipeline.GetState(), "Pipeline should be in canceled state")
 
-	for !found {
+	// Drain the update channel to check if any updates indicate descended=false
+	// This approach uses a timeout to prevent hanging
+	canceledUpdateFound := false
+	drainTimeout := time.After(100 * time.Millisecond)
+
+	for !canceledUpdateFound {
 		select {
 		case update := <-updateChan:
-			if !update.DescendsFromLastPersistedSealed {
-				found = true
+			if !update.DescendsFromLastPersistedSealed && update.ParentState == StateCanceled {
+				canceledUpdateFound = true
 			}
-		case <-timeout:
-			// It's ok if we don't find it - the pipeline might have been canceled before broadcasting
-			t.Log("No update with descendsFromSealed=false found within timeout")
-			break
+		case <-drainTimeout:
+			t.Log("No update with descendsFromSealed=false and state=canceled found within timeout")
+			return
 		}
 	}
 }
@@ -410,18 +414,5 @@ func waitForStateUpdate(t *testing.T, updateChan <-chan StateUpdate, expectedSta
 			t.Fatalf("Timed out waiting for state update to %s", expectedState)
 			return StateUpdate{} // Never reached, just to satisfy compiler
 		}
-	}
-}
-
-// Helper function to wait for any state update
-func waitForAnyStateUpdate(t *testing.T, updateChan <-chan StateUpdate) StateUpdate {
-	timeoutChan := time.After(500 * time.Millisecond)
-
-	select {
-	case update := <-updateChan:
-		return update
-	case <-timeoutChan:
-		t.Fatal("Timed out waiting for any state update")
-		return StateUpdate{} // Never reached, just to satisfy compiler
 	}
 }

@@ -147,6 +147,12 @@ func (p *Pipeline) Run(parentCtx context.Context) error {
 		select {
 		case <-parentCtx.Done():
 			return nil
+		case <-ctx.Done():
+			cause := context.Cause(ctx)
+			if cause != nil && !errors.Is(cause, context.Canceled) {
+				return cause
+			}
+			return nil
 		case <-notifierChan:
 			processed, err := p.processCurrentState(ctx)
 			if err != nil {
@@ -198,7 +204,7 @@ func (p *Pipeline) UpdateState(update StateUpdate) {
 	}
 
 	// If we no longer descend from the latest, cancel the pipeline
-	p.broadcastStateUpdate()
+	p.transitionTo(StateCanceled)
 
 	p.mu.RLock()
 	defer p.mu.RUnlock()
