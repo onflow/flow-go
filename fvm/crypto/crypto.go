@@ -306,7 +306,7 @@ func validateExtensionDataAndReconstructMessage(scheme AuthenticationScheme, ext
 			return false, nil
 		}
 
-		if !strings.EqualFold(clientData.Type, WebAuthnTypeGet) || len(clientDataChallenge) != WebAuthnChallengeLength || len(clientData.Origin) == 0 {
+		if strings.Compare(clientData.Type, WebAuthnTypeGet) != 0 || len(clientDataChallenge) != WebAuthnChallengeLength {
 			// invalid client data
 			return false, nil
 		}
