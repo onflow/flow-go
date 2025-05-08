@@ -82,7 +82,7 @@ func TestFollowerHappyPath(t *testing.T) {
 			mockTimer,
 		)
 		require.NoError(t, err)
-		finalizer := moduleconsensus.NewFinalizer(badgerimpl.ToDB(db), all.Headers, followerState, tracer)
+		finalizer := moduleconsensus.NewFinalizer(badgerimpl.ToDB(db).Reader(), all.Headers, followerState, tracer)
 		rootHeader, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		rootQC, err := rootSnapshot.QuorumCertificate()
