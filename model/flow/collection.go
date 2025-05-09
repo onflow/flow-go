@@ -95,7 +95,7 @@ func (lc *LightCollection) UnmarshalCBOR(bytes []byte) error {
 	if err != nil {
 		return err
 	}
-	lc.cachedID = newIDCache(lc.UncachedID)
+	lc.cachedID = newIDCache(lc.UncachedID) //nolint:structwrite
 	return nil
 }
 

@@ -469,14 +469,14 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 	finalizedBlock := unittest.ClusterBlockWithParent(suite.genesis)
 	finalizedBlock.SetPayload(finalizedPayload)
 	suite.InsertBlock(finalizedBlock)
-	t.Logf("finalized: height=%d id=%s txs=%s parent_id=%s\t\n", finalizedBlock.Header.Height, finalizedBlock.ID(), finalizedPayload.Collection.Light(), finalizedBlock.Header.ParentID)
+	t.Logf("finalized: height=%d id=%s txs=%v parent_id=%s\t\n", finalizedBlock.Header.Height, finalizedBlock.ID(), finalizedPayload.Collection.Light(), finalizedBlock.Header.ParentID)
 
 	// build a block containing tx2 on the first block
 	unFinalizedPayload := suite.Payload(tx2)
 	unFinalizedBlock := unittest.ClusterBlockWithParent(&finalizedBlock)
 	unFinalizedBlock.SetPayload(unFinalizedPayload)
 	suite.InsertBlock(unFinalizedBlock)
-	t.Logf("finalized: height=%d id=%s txs=%s parent_id=%s\t\n", unFinalizedBlock.Header.Height, unFinalizedBlock.ID(), unFinalizedPayload.Collection.Light(), unFinalizedBlock.Header.ParentID)
+	t.Logf("finalized: height=%d id=%s txs=%v parent_id=%s\t\n", unFinalizedBlock.Header.Height, unFinalizedBlock.ID(), unFinalizedPayload.Collection.Light(), unFinalizedBlock.Header.ParentID)
 
 	// finalize first block
 	suite.FinalizeBlock(finalizedBlock)
