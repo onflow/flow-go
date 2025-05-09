@@ -1,0 +1,143 @@
+package migration
+
+import (
+	"encoding/binary"
+	"fmt"
+	"sync"
+
+	"github.com/cockroachdb/pebble"
+	"github.com/dgraph-io/badger/v2"
+)
+
+type MigrationConfig struct {
+	BatchByteSize     int // the size of each batch to write to pebble
+	ReaderWorkerCount int // the number of workers to read from badger
+	WriterWorkerCount int // the number of workers to write to the pebble
+
+	// number of prefix bytes used to assign iterator workload
+	// e.g, if the number is 1, it means the first byte of the key is used to divide into 256 key space,
+	// and each worker will be assigned to iterate all keys with the same first byte.
+	// Since keys are not evenly distributed, especially some table under a certain prefix byte may have
+	// a lot more data than others, we might choose to use 2 or 3 bytes to divide the key space, so that
+	// the redaer worker can concurrently iterate keys with the same prefix bytes (same table).
+	ReaderShardPrefixBytes int
+}
+
+type KVPair struct {
+	Key   []byte
+	Value []byte
+}
+
+func generatePrefixes(n int) [][]byte {
+	if n == 0 {
+		return [][]byte{{}}
+	}
+	var results [][]byte
+	base := 1 << (8 * n)
+	for i := 0; i < base; i++ {
+		buf := make([]byte, n)
+		switch n {
+		case 1:
+			buf[0] = byte(i)
+		case 2:
+			binary.BigEndian.PutUint16(buf, uint16(i))
+		case 3:
+			buf[0] = byte(i >> 16)
+			buf[1] = byte(i >> 8)
+			buf[2] = byte(i)
+		default:
+			panic("unsupported prefix byte length")
+		}
+		results = append(results, buf)
+	}
+	return results
+}
+
+func readerWorker(wg *sync.WaitGroup, db *badger.DB, jobs <-chan []byte, kvChan chan<- KVPair) {
+	defer wg.Done()
+	for prefix := range jobs {
+		err := db.View(func(txn *badger.Txn) error {
+			it := txn.NewIterator(badger.DefaultIteratorOptions)
+			defer it.Close()
+			for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+				item := it.Item()
+				key := item.KeyCopy(nil)
+				val, err := item.ValueCopy(nil)
+				if err != nil {
+					return err
+				}
+				kvChan <- KVPair{Key: key, Value: val}
+			}
+			return nil
+		})
+		if err != nil {
+			fmt.Printf("Reader error for prefix %x: %v\n", prefix, err)
+		}
+	}
+}
+
+func writerWorker(wg *sync.WaitGroup, db *pebble.DB, kvChan <-chan KVPair, batchSize int) {
+	defer wg.Done()
+	batch := db.NewBatch()
+	var size int
+
+	flush := func() {
+		if err := batch.Commit(nil); err != nil {
+			fmt.Printf("Writer error committing batch: %v\n", err)
+		}
+		batch = db.NewBatch()
+		size = 0
+	}
+
+	for kv := range kvChan {
+		if err := batch.Set(kv.Key, kv.Value, nil); err != nil {
+			fmt.Printf("Writer error: %v\n", err)
+			continue
+		}
+		size += len(kv.Key) + len(kv.Value)
+		if size >= batchSize {
+			flush()
+		}
+	}
+	if size > 0 {
+		flush()
+	}
+}
+
+func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg MigrationConfig) error {
+	// Step 1: Generate key prefixes for sharding
+	prefixes := generatePrefixes(cfg.ReaderShardPrefixBytes)
+
+	// Step 2: Start reader workers
+	// Job queue for prefix scan tasks
+	prefixJobs := make(chan []byte, len(prefixes))
+	for _, prefix := range prefixes {
+		prefixJobs <- prefix
+	}
+	close(prefixJobs)
+
+	kvChan := make(chan KVPair, 1000)
+
+	// Reader worker pool
+	var readerWg sync.WaitGroup
+	for i := 0; i < cfg.ReaderWorkerCount; i++ {
+		readerWg.Add(1)
+		go readerWorker(&readerWg, badgerDB, prefixJobs, kvChan)
+	}
+
+	// Step 3: Start writer workers
+	var writerWg sync.WaitGroup
+	for i := 0; i < cfg.WriterWorkerCount; i++ {
+		writerWg.Add(1)
+		go writerWorker(&writerWg, pebbleDB, kvChan, cfg.BatchByteSize)
+	}
+
+	// Wait for all readers to finish, then close writer channel
+	go func() {
+		readerWg.Wait()
+		close(kvChan)
+	}()
+
+	writerWg.Wait()
+	return nil
+}
