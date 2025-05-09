@@ -110,7 +110,6 @@ func (l *LightTransactionResults) Data() []flow.LightTransactionResult {
 	return out
 }
 
-
 // BatchStore inserts a batch of transaction result into a batch.
 // This method is not implemented and will always return an error.
 func (l *LightTransactionResults) BatchStore(flow.Identifier, []flow.LightTransactionResult, storage.ReaderBatchWriter) error {
