@@ -35,6 +35,20 @@ func RunWithDB(t *testing.T, fn func(*testing.T, storage.DB)) {
 	})
 }
 
+// RunFuncsWithNewPebbleDBHandle runs provided functions with
+// new database handles of the same underlying database.
+// Each provided function will receive a new (different) DB handle.
+// This can be used to test database persistence.
+func RunFuncsWithNewDBHandle(t *testing.T, fn ...func(*testing.T, storage.DB)) {
+	t.Run("BadgerStorage", func(t *testing.T) {
+		unittest.RunFuncsWithNewBadgerDBHandle(t, fn...)
+	})
+
+	t.Run("PebbleStorage", func(t *testing.T) {
+		unittest.RunFuncsWithNewPebbleDBHandle(t, fn...)
+	})
+}
+
 func RunWithBadger(t *testing.T, fn func(*testing.T, storage.Reader, WithWriter)) {
 	t.Run("BadgerStorage", func(t *testing.T) {
 		unittest.RunWithBadgerDB(t, runWithBadger(func(r storage.Reader, wr WithWriter) {
