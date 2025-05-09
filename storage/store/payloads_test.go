@@ -20,17 +20,17 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		payloads := all.Payloads
 		blocks := all.Blocks
 
-		blockID := unittest.IdentifierFixture()
 		expected := unittest.PayloadFixture(unittest.WithAllTheFixins)
 		block := unittest.BlockWithParentFixture(unittest.BlockHeaderWithHeight(10))
 		block.SetPayload(expected)
+		require.Equal(t, &expected, block.Payload)
+		blockID := block.ID()
 
 		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
-		defer lctx.Release()
-
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return blocks.BatchStore(lctx, rw, block)
 		})
+		lctx.Release()
 		require.NoError(t, err)
 
 		// fetch payload
