@@ -28,7 +28,7 @@ type KVPair struct {
 	Value []byte
 }
 
-func generatePrefixes(n int) [][]byte {
+func GeneratePrefixes(n int) [][]byte {
 	if n == 0 {
 		return [][]byte{{}}
 	}
@@ -104,9 +104,24 @@ func writerWorker(wg *sync.WaitGroup, db *pebble.DB, kvChan <-chan KVPair, batch
 	}
 }
 
+// CopyFromBadgerToPebble migrates all key-value pairs from a BadgerDB instance to a PebbleDB instance.
+//
+// The migration is performed in parallel using a configurable number of reader and writer workers.
+// Reader workers iterate over the BadgerDB by sharded key prefixes (based on ReaderShardPrefixBytes)
+// and send key-value pairs to a shared channel. Writer workers consume from this channel and write
+// batched entries into PebbleDB.
+//
+// Configuration is provided via MigrationConfig:
+//   - BatchByteSize: maximum size in bytes for a single Pebble write batch.
+//   - ReaderWorkerCount: number of concurrent workers reading from Badger.
+//   - WriterWorkerCount: number of concurrent workers writing to Pebble.
+//   - ReaderShardPrefixBytes: number of bytes used to shard the keyspace for parallel iteration.
+//
+// The function blocks until all keys are migrated and written successfully.
+// It returns an error if any part of the process fails.
 func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg MigrationConfig) error {
 	// Step 1: Generate key prefixes for sharding
-	prefixes := generatePrefixes(cfg.ReaderShardPrefixBytes)
+	prefixes := GeneratePrefixes(cfg.ReaderShardPrefixBytes)
 
 	// Step 2: Start reader workers
 	// Job queue for prefix scan tasks
