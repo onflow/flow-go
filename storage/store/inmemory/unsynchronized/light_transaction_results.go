@@ -99,23 +99,14 @@ func (l *LightTransactionResults) Store(blockID flow.Identifier, transactionResu
 }
 
 // Data returns a copy of the cached light transaction results grouped by block ID.
-func (l *LightTransactionResults) Data() map[flow.Identifier][]flow.LightTransactionResult {
+func (l *LightTransactionResults) Data() []flow.LightTransactionResult {
 	l.lock.RLock()
 	defer l.lock.RUnlock()
 
-	out := make(map[flow.Identifier][]flow.LightTransactionResult, len(l.blockStore))
-	for key, results := range l.blockStore {
-		blockID, err := store.KeyToBlockID(key)
-		if err != nil {
-			// shouldn't happen in practice
-			panic("malformed key")
-		}
-
-		resultsCopy := make([]flow.LightTransactionResult, len(results))
-		copy(resultsCopy, results)
-		out[blockID] = resultsCopy
+	out := make([]flow.LightTransactionResult, 0, len(l.blockStore))
+	for _, results := range l.blockStore {
+		out = append(out, results...)
 	}
-
 	return out
 }
 

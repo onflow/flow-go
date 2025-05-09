@@ -50,4 +50,10 @@ func TestRegisters_HappyPath(t *testing.T) {
 	// Try getting a non-existent key
 	_, err = registers.Get(unittest.RegisterIDFixture(), height)
 	require.ErrorIs(t, err, storage.ErrNotFound)
+
+	// Extract registers
+	data := registers.Data()
+	require.Len(t, data, len(entries))
+	require.Equal(t, entry1.Value, data[entry1.Key])
+	require.Equal(t, entry2.Value, data[entry2.Key])
 }

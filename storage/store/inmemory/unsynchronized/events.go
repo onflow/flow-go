@@ -116,16 +116,14 @@ func (e *Events) Store(blockID flow.Identifier, blockEvents []flow.EventsList) e
 	return nil
 }
 
-// Events returns a copy of the cached blockID -> events map as EventsList.
-func (e *Events) Events() map[flow.Identifier]flow.EventsList {
+// Data returns a copy of the cached blockID -> events map as EventsList.
+func (e *Events) Data() flow.EventsList {
 	e.lock.RLock()
 	defer e.lock.RUnlock()
 
-	out := make(map[flow.Identifier]flow.EventsList, len(e.blockIdToEvents))
-	for id, events := range e.blockIdToEvents {
-		eventsCopy := make(flow.EventsList, len(events))
-		copy(eventsCopy, events)
-		out[id] = eventsCopy
+	out := make(flow.EventsList, 0, len(e.blockIdToEvents))
+	for _, events := range e.blockIdToEvents {
+		out = append(out, events...)
 	}
 	return out
 }

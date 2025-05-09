@@ -25,7 +25,7 @@ func TestTransactions_HappyPath(t *testing.T) {
 	require.Equal(t, &tx, retrievedTx, "retrieved transaction should match the stored transaction")
 
 	// Extract structured data
-	retrievedTxs := txStore.Data()
-	require.Len(t, retrievedTxs, 1)
-	require.Equal(t, retrievedTxs[tx.ID()], tx)
+	extractedTxs := txStore.Data()
+	require.Len(t, extractedTxs, 1)
+	require.Equal(t, extractedTxs[0], tx)
 }
