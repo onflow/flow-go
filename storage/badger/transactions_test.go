@@ -1,23 +1,23 @@
-package badger_test
+package store_test
 
 import (
+	"errors"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 func TestTransactionStoreRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := badgerstorage.NewTransactions(metrics, db)
+		store := store.NewTransactions(metrics, db)
 
 		// store a transaction in db
 		expected := unittest.TransactionFixture()
@@ -36,12 +36,39 @@ func TestTransactionStoreRetrieve(t *testing.T) {
 }
 
 func TestTransactionRetrieveWithoutStore(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := badgerstorage.NewTransactions(metrics, db)
+		store := store.NewTransactions(metrics, db)
 
 		// attempt to get a invalid transaction
 		_, err := store.ByID(unittest.IdentifierFixture())
-		assert.ErrorIs(t, err, storage.ErrNotFound)
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
+	})
+}
+
+func TestTransactionRemove(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		metrics := metrics.NewNoopCollector()
+		store := store.NewTransactions(metrics, db)
+
+		// Create and store a transaction
+		expected := unittest.TransactionFixture()
+		err := store.Store(&expected.TransactionBody)
+		require.NoError(t, err)
+
+		// Ensure it exists
+		tx, err := store.ByID(expected.ID())
+		require.NoError(t, err)
+		assert.Equal(t, &expected.TransactionBody, tx)
+
+		// Remove it
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return store.RemoveBatch(rw, expected.ID())
+		})
+		require.NoError(t, err)
+
+		// Ensure it no longer exists
+		_, err = store.ByID(expected.ID())
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})
 }

@@ -3,12 +3,12 @@ package integration_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/gammazero/workerpool"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
@@ -58,7 +58,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/state/protocol/util"
-	storage "github.com/onflow/flow-go/storage/badger"
+	fstorage "github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -138,7 +138,8 @@ func (p *ConsensusParticipants) Update(epochCounter uint64, data *run.Participan
 }
 
 type Node struct {
-	db                *badger.DB
+	db                fstorage.DB
+	dbCloser          io.Closer
 	dbDir             string
 	index             int
 	log               zerolog.Logger
@@ -151,7 +152,7 @@ type Node struct {
 	timeoutAggregator hotstuff.TimeoutAggregator
 	messageHub        *message_hub.MessageHub
 	state             *bprotocol.ParticipantState
-	headers           *storage.Headers
+	headers           fstorage.Headers
 	net               *Network
 }
 
@@ -372,26 +373,27 @@ func createNode(
 	epochLookup module.EpochLookup,
 ) *Node {
 
-	db, dbDir := unittest.TempBadgerDB(t)
+	badgerdb, dbDir := unittest.TempBadgerDB(t)
 	metricsCollector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
+	db := badgerimpl.ToDB(badgerdb)
 
-	headersDB := storage.NewHeaders(metricsCollector, db)
-	guaranteesDB := storage.NewGuarantees(metricsCollector, db, storage.DefaultCacheSize)
-	sealsDB := storage.NewSeals(metricsCollector, db)
-	indexDB := storage.NewIndex(metricsCollector, db)
-	resultsDB := storage.NewExecutionResults(metricsCollector, db)
-	receiptsDB := storage.NewExecutionReceipts(metricsCollector, db, resultsDB, storage.DefaultCacheSize)
-	payloadsDB := storage.NewPayloads(db, indexDB, guaranteesDB, sealsDB, receiptsDB, resultsDB)
-	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
-	qcsDB := storage.NewQuorumCertificates(metricsCollector, db, storage.DefaultCacheSize)
-	setupsDB := storage.NewEpochSetups(metricsCollector, db)
-	commitsDB := storage.NewEpochCommits(metricsCollector, db)
-	protocolStateDB := storage.NewEpochProtocolStateEntries(metricsCollector, setupsDB, commitsDB, db,
-		storage.DefaultEpochProtocolStateCacheSize, storage.DefaultProtocolStateIndexCacheSize)
-	protocokKVStoreDB := storage.NewProtocolKVStore(metricsCollector, db,
-		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeaconDB := store.NewVersionBeacons(badgerimpl.ToDB(db))
+	headersDB := store.NewHeaders(metricsCollector, db)
+	guaranteesDB := store.NewGuarantees(metricsCollector, db, store.DefaultCacheSize)
+	sealsDB := store.NewSeals(metricsCollector, db)
+	indexDB := store.NewIndex(metricsCollector, db)
+	resultsDB := store.NewExecutionResults(metricsCollector, db)
+	receiptsDB := store.NewExecutionReceipts(metricsCollector, db, resultsDB, store.DefaultCacheSize)
+	payloadsDB := store.NewPayloads(db, indexDB, guaranteesDB, sealsDB, receiptsDB, resultsDB)
+	blocksDB := store.NewBlocks(db, headersDB, payloadsDB)
+	qcsDB := store.NewQuorumCertificates(metricsCollector, db, store.DefaultCacheSize)
+	setupsDB := store.NewEpochSetups(metricsCollector, db)
+	commitsDB := store.NewEpochCommits(metricsCollector, db)
+	protocolStateDB := store.NewEpochProtocolStateEntries(metricsCollector, setupsDB, commitsDB, db,
+		store.DefaultEpochProtocolStateCacheSize, store.DefaultProtocolStateIndexCacheSize)
+	protocokKVStoreDB := store.NewProtocolKVStore(metricsCollector, db,
+		store.DefaultProtocolKVStoreCacheSize, store.DefaultProtocolKVStoreByBlockIDCacheSize)
+	versionBeaconDB := store.NewVersionBeacons(db)
 	protocolStateEvents := events.NewDistributor()
 
 	localID := identity.ID()
@@ -552,7 +554,7 @@ func createNode(
 
 	signer := verification.NewCombinedSigner(me, beaconKeyStore)
 
-	persist, err := persister.New(db, rootHeader.ChainID)
+	persist, err := persister.New(badgerdb, rootHeader.ChainID)
 	require.NoError(t, err)
 
 	livenessData, err := persist.GetLivenessData()
@@ -706,6 +708,7 @@ func createNode(
 
 	hotstuffDistributor.AddConsumer(messageHub)
 
+	node.dbCloser = badgerdb
 	node.compliance = comp
 	node.sync = sync
 	node.state = fullState
@@ -723,7 +726,7 @@ func createNode(
 
 func cleanupNodes(nodes []*Node) {
 	for _, n := range nodes {
-		_ = n.db.Close()
+		_ = n.dbCloser.Close()
 		_ = os.RemoveAll(n.dbDir)
 	}
 }

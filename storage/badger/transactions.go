@@ -1,68 +1,65 @@
-package badger
+package store
 
 import (
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 // Transactions ...
 type Transactions struct {
-	db    *badger.DB
+	db    storage.DB
 	cache *Cache[flow.Identifier, *flow.TransactionBody]
 }
 
+var _ storage.Transactions = (*Transactions)(nil)
+
 // NewTransactions ...
-func NewTransactions(cacheMetrics module.CacheMetrics, db *badger.DB) *Transactions {
-	store := func(txID flow.Identifier, flowTX *flow.TransactionBody) func(*transaction.Tx) error {
-		return transaction.WithTx(operation.SkipDuplicates(operation.InsertTransaction(txID, flowTX)))
+func NewTransactions(cacheMetrics module.CacheMetrics, db storage.DB) *Transactions {
+	store := func(rw storage.ReaderBatchWriter, txID flow.Identifier, flowTX *flow.TransactionBody) error {
+		return operation.UpsertTransaction(rw.Writer(), txID, flowTX)
 	}
 
-	retrieve := func(txID flow.Identifier) func(tx *badger.Txn) (*flow.TransactionBody, error) {
-		return func(tx *badger.Txn) (*flow.TransactionBody, error) {
-			var flowTx flow.TransactionBody
-			err := operation.RetrieveTransaction(txID, &flowTx)(tx)
-			return &flowTx, err
-		}
+	retrieve := func(r storage.Reader, txID flow.Identifier) (*flow.TransactionBody, error) {
+		var flowTx flow.TransactionBody
+		err := operation.RetrieveTransaction(r, txID, &flowTx)
+		return &flowTx, err
+	}
+
+	remove := func(rw storage.ReaderBatchWriter, txID flow.Identifier) error {
+		return operation.RemoveTransaction(rw.Writer(), txID)
 	}
 
 	t := &Transactions{
 		db: db,
-		cache: newCache[flow.Identifier, *flow.TransactionBody](cacheMetrics, metrics.ResourceTransaction,
+		cache: newCache(cacheMetrics, metrics.ResourceTransaction,
 			withLimit[flow.Identifier, *flow.TransactionBody](flow.DefaultTransactionExpiry+100),
 			withStore(store),
-			withRetrieve(retrieve)),
+			withRemove[flow.Identifier, *flow.TransactionBody](remove),
+			withRetrieve(retrieve),
+		),
 	}
 
 	return t
 }
 
-// Store ...
 func (t *Transactions) Store(flowTx *flow.TransactionBody) error {
-	return operation.RetryOnConflictTx(t.db, transaction.Update, t.storeTx(flowTx))
+	return t.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return t.storeTx(rw, flowTx)
+	})
 }
 
-// ByID ...
+func (t *Transactions) storeTx(rw storage.ReaderBatchWriter, flowTx *flow.TransactionBody) error {
+	return t.cache.PutTx(rw, flowTx.ID(), flowTx)
+}
+
 func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
-	tx := t.db.NewTransaction(false)
-	defer tx.Discard()
-	return t.retrieveTx(txID)(tx)
+	return t.cache.Get(t.db.Reader(), txID)
 }
 
-func (t *Transactions) storeTx(flowTx *flow.TransactionBody) func(*transaction.Tx) error {
-	return t.cache.PutTx(flowTx.ID(), flowTx)
-}
-
-func (t *Transactions) retrieveTx(txID flow.Identifier) func(*badger.Txn) (*flow.TransactionBody, error) {
-	return func(tx *badger.Txn) (*flow.TransactionBody, error) {
-		val, err := t.cache.Get(txID)(tx)
-		if err != nil {
-			return nil, err
-		}
-		return val, err
-	}
+// RemoveBatch removes a transaction by fingerprint.
+func (t *Transactions) RemoveBatch(rw storage.ReaderBatchWriter, txID flow.Identifier) error {
+	return t.cache.RemoveTx(rw, txID)
 }

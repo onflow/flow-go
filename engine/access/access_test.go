@@ -290,8 +290,9 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create storage
 		metrics := metrics.NewNoopCollector()
-		transactions := bstorage.NewTransactions(metrics, db)
-		collections := bstorage.NewCollections(db, transactions)
+		storedb := badgerimpl.ToDB(db)
+		transactions := store.NewTransactions(metrics, storedb)
+		collections := store.NewCollections(storedb, transactions)
 
 		// create collection node cluster
 		count := 2
@@ -635,8 +636,9 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// initialize storage
 		metrics := metrics.NewNoopCollector()
-		transactions := bstorage.NewTransactions(metrics, db)
-		collections := bstorage.NewCollections(db, transactions)
+		storedb := badgerimpl.ToDB(db)
+		transactions := store.NewTransactions(metrics, storedb)
+		collections := store.NewCollections(storedb, transactions)
 		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
 		collectionsToMarkExecuted, err := stdmap.NewTimes(100)
@@ -822,8 +824,9 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		// initialize storage
 		metrics := metrics.NewNoopCollector()
-		transactions := bstorage.NewTransactions(metrics, db)
-		collections := bstorage.NewCollections(db, transactions)
+		storedb := badgerimpl.ToDB(db)
+		transactions := store.NewTransactions(metrics, storedb)
+		collections := store.NewCollections(storedb, transactions)
 		err = collections.Store(collectionNegative)
 		require.NoError(suite.T(), err)
 		collectionsToMarkFinalized, err := stdmap.NewTimes(100)

@@ -78,6 +78,7 @@ import (
 	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
@@ -1236,24 +1237,24 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		return fmt.Errorf("could not initialize max tracker: %w", err)
 	}
 
-	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
-	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB, fnb.BaseConfig.guaranteesCacheSize)
-	seals := bstorage.NewSeals(fnb.Metrics.Cache, fnb.DB)
-	results := bstorage.NewExecutionResults(fnb.Metrics.Cache, fnb.DB)
-	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results, fnb.BaseConfig.receiptsCacheSize)
-	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
-	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts, results)
-	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
-	qcs := bstorage.NewQuorumCertificates(fnb.Metrics.Cache, fnb.DB, bstorage.DefaultCacheSize)
-	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
-	collections := bstorage.NewCollections(fnb.DB, transactions)
-	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
-	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
-	protocolState := bstorage.NewEpochProtocolStateEntries(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
-		bstorage.DefaultEpochProtocolStateCacheSize, bstorage.DefaultProtocolStateIndexCacheSize)
-	protocolKVStores := bstorage.NewProtocolKVStore(fnb.Metrics.Cache, fnb.DB,
-		bstorage.DefaultProtocolKVStoreCacheSize, bstorage.DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(fnb.DB))
+	headers := store.NewHeaders(fnb.Metrics.Cache, fnb.ProtocolDB)
+	guarantees := store.NewGuarantees(fnb.Metrics.Cache, fnb.ProtocolDB, fnb.BaseConfig.guaranteesCacheSize)
+	seals := store.NewSeals(fnb.Metrics.Cache, fnb.ProtocolDB)
+	results := store.NewExecutionResults(fnb.Metrics.Cache, fnb.ProtocolDB)
+	receipts := store.NewExecutionReceipts(fnb.Metrics.Cache, fnb.ProtocolDB, results, fnb.BaseConfig.receiptsCacheSize)
+	index := store.NewIndex(fnb.Metrics.Cache, fnb.ProtocolDB)
+	payloads := store.NewPayloads(fnb.ProtocolDB, index, guarantees, seals, receipts, results)
+	blocks := store.NewBlocks(fnb.ProtocolDB, headers, payloads)
+	qcs := store.NewQuorumCertificates(fnb.Metrics.Cache, fnb.ProtocolDB, store.DefaultCacheSize)
+	transactions := store.NewTransactions(fnb.Metrics.Cache, fnb.ProtocolDB)
+	collections := store.NewCollections(fnb.ProtocolDB, transactions)
+	setups := store.NewEpochSetups(fnb.Metrics.Cache, fnb.ProtocolDB)
+	epochCommits := store.NewEpochCommits(fnb.Metrics.Cache, fnb.ProtocolDB)
+	protocolState := store.NewEpochProtocolStateEntries(fnb.Metrics.Cache, setups, epochCommits, fnb.ProtocolDB,
+		store.DefaultEpochProtocolStateCacheSize, store.DefaultProtocolStateIndexCacheSize)
+	protocolKVStores := store.NewProtocolKVStore(fnb.Metrics.Cache, fnb.ProtocolDB,
+		store.DefaultProtocolKVStoreCacheSize, store.DefaultProtocolKVStoreByBlockIDCacheSize)
+	versionBeacons := store.NewVersionBeacons(fnb.ProtocolDB)
 
 	fnb.Storage = Storage{
 		Headers:                   headers,
@@ -1348,7 +1349,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 func (fnb *FlowNodeBuilder) initState() error {
 	fnb.ProtocolEvents = events.NewDistributor()
 
-	isBootStrapped, err := badgerState.IsBootstrapped(fnb.DB)
+	isBootStrapped, err := badgerState.IsBootstrapped(fnb.ProtocolDB)
 	if err != nil {
 		return fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
 	}
@@ -1357,7 +1358,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 		fnb.Logger.Info().Msg("opening already bootstrapped protocol state")
 		state, err := badgerState.OpenState(
 			fnb.Metrics.Compliance,
-			fnb.DB,
+			fnb.ProtocolDB,
 			fnb.Storage.Headers,
 			fnb.Storage.Seals,
 			fnb.Storage.Results,
@@ -1406,7 +1407,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 
 		fnb.State, err = badgerState.Bootstrap(
 			fnb.Metrics.Compliance,
-			fnb.DB,
+			fnb.ProtocolDB,
 			fnb.Storage.Headers,
 			fnb.Storage.Seals,
 			fnb.Storage.Results,
@@ -1471,7 +1472,7 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 	var err error
 
 	// validate the root snapshot QCs
-	err = badgerState.IsValidRootSnapshotQCs(rootSnapshot)
+	err = datastore.IsValidRootSnapshotQCs(rootSnapshot)
 	if err != nil {
 		return fmt.Errorf("failed to validate root snapshot QCs: %w", err)
 	}
