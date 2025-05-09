@@ -326,7 +326,7 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment extra block (id=%x): %w", blockID, err)
 			}
-			err = qcs.StoreTx(proposal.Block.Header.QuorumCertificate())(tx)
+			err = qcs.StoreTx(proposal.Block.ToHeader().QuorumCertificate())(tx)
 			if err != nil {
 				return fmt.Errorf("could not store qc for SealingSegment extra block (id=%x): %w", blockID, err)
 			}
@@ -344,7 +344,7 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment block (id=%x): %w", blockID, err)
 			}
-			err = qcs.StoreTx(proposal.Block.Header.QuorumCertificate())(tx)
+			err = qcs.StoreTx(proposal.Block.ToHeader().QuorumCertificate())(tx)
 			if err != nil {
 				return fmt.Errorf("could not store qc for SealingSegment block (id=%x): %w", blockID, err)
 			}
@@ -422,8 +422,8 @@ func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error 
 		if rootQC.View != highest.Header.View {
 			return fmt.Errorf("root QC's view %d does not match the highest block in sealing segment (view %d)", rootQC.View, highest.Header.View)
 		}
-		if rootQC.BlockID != highest.Header.ID() {
-			return fmt.Errorf("root QC is for block %v, which does not match the highest block %v in sealing segment", rootQC.BlockID, highest.Header.ID())
+		if rootQC.BlockID != highest.ID() {
+			return fmt.Errorf("root QC is for block %v, which does not match the highest block %v in sealing segment", rootQC.BlockID, highest.ID())
 		}
 
 		livenessData := &hotstuff.LivenessData{

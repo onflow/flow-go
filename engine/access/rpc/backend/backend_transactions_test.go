@@ -984,7 +984,7 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 		block := unittest.BlockWithParentFixture(lastBlock)
 		blockID := block.ID()
 		suite.state.On("AtBlockID", blockID).Return(
-			unittest.StateSnapshotForKnownBlock(block.Header, identities.Lookup()), nil).Once()
+			unittest.StateSnapshotForKnownBlock(block.ToHeader(), identities.Lookup()), nil).Once()
 
 		// block storage returns the corresponding block
 		suite.blocks.
@@ -1094,7 +1094,7 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 	// Set up the state and snapshot mocks
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
-	suite.snapshot.On("Head", mock.Anything).Return(block.Header, nil).Once()
+	suite.snapshot.On("Head", mock.Anything).Return(block.ToHeader(), nil).Once()
 
 	// create a mock index reporter
 	reporter := syncmock.NewIndexReporter(suite.T())
@@ -1131,7 +1131,7 @@ func (suite *Suite) TestGetSystemTransactionResult_BlockNotFound() {
 		block := unittest.BlockWithParentFixture(lastBlock)
 		blockID := block.ID()
 		suite.state.On("AtBlockID", blockID).Return(
-			unittest.StateSnapshotForKnownBlock(block.Header, identities.Lookup()), nil).Once()
+			unittest.StateSnapshotForKnownBlock(block.ToHeader(), identities.Lookup()), nil).Once()
 
 		// block storage returns the ErrNotFound error
 		suite.blocks.
@@ -1175,7 +1175,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 		block := unittest.BlockWithParentFixture(lastBlock)
 		blockID := block.ID()
 		suite.state.On("AtBlockID", blockID).Return(
-			unittest.StateSnapshotForKnownBlock(block.Header, identities.Lookup()), nil).Once()
+			unittest.StateSnapshotForKnownBlock(block.ToHeader(), identities.Lookup()), nil).Once()
 
 		// block storage returns the corresponding block
 		suite.blocks.
@@ -1311,7 +1311,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-	suite.snapshot.On("Head", mock.Anything).Return(block.Header, nil)
+	suite.snapshot.On("Head", mock.Anything).Return(block.ToHeader(), nil)
 
 	// create a mock index reporter
 	reporter := syncmock.NewIndexReporter(suite.T())
@@ -1398,7 +1398,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-	suite.snapshot.On("Head", mock.Anything).Return(block.Header, nil)
+	suite.snapshot.On("Head", mock.Anything).Return(block.ToHeader(), nil)
 
 	// create a mock index reporter
 	reporter := syncmock.NewIndexReporter(suite.T())
@@ -1491,7 +1491,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-	suite.snapshot.On("Head", mock.Anything).Return(block.Header, nil)
+	suite.snapshot.On("Head", mock.Anything).Return(block.ToHeader(), nil)
 
 	// create a mock index reporter
 	reporter := syncmock.NewIndexReporter(suite.T())

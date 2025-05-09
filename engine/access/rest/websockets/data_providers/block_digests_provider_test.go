@@ -40,7 +40,7 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_HappyPath() {
 		s.validBlockDigestsArgumentsTestCases(),
 		func(dataChan chan interface{}) {
 			for _, block := range s.blocks {
-				dataChan <- flow.NewBlockDigest(block.Header.ID(), block.Header.Height, block.Header.Timestamp)
+				dataChan <- flow.NewBlockDigest(block.ID(), block.Header.Height, block.Header.Timestamp)
 			}
 		},
 		s.requireBlockDigest,
@@ -52,7 +52,7 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_HappyPath() {
 func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []testType {
 	expectedResponses := make([]interface{}, len(s.blocks))
 	for i, b := range s.blocks {
-		blockDigest := flow.NewBlockDigest(b.Header.ID(), b.Header.Height, b.Header.Timestamp)
+		blockDigest := flow.NewBlockDigest(b.ID(), b.Header.Height, b.Header.Timestamp)
 		blockDigestPayload := models.NewBlockDigest(blockDigest)
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   BlockDigestsTopic,

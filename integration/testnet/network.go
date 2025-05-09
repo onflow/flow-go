@@ -1216,18 +1216,19 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		DKGParticipantKeys: dkg.PubKeyShares,
 		DKGIndexMap:        dkgIndexMap,
 	}
-	root := &flow.Block{
-		Header: rootHeader,
-	}
+
 	rootProtocolState, err := networkConf.KVStoreFactory(
 		inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit).ID(),
 	)
 	if err != nil {
 		return nil, err
 	}
-	root.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(
-		rootProtocolState.ID(),
-	)))
+
+	root := flow.NewBlock(
+		rootHeader.HeaderBody,
+		unittest.PayloadFixture(unittest.WithProtocolStateID(
+			rootProtocolState.ID(),
+		)))
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {
@@ -1257,7 +1258,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
-		fvm.WithRootBlock(root.Header),
+		fvm.WithRootBlock(root.ToHeader()),
 		fvm.WithEpochConfig(epochConfig),
 		fvm.WithIdentities(participants),
 	)

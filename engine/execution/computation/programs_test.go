@@ -91,19 +91,17 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		Signature:    nil,
 	}
 
-	block := flow.Block{
-		Header: &flow.Header{
-			HeaderBody: flow.HeaderBody{
-				View: 26,
-			},
+	block := flow.NewBlock(
+		flow.HeaderBody{
+			View: 26,
 		},
-		Payload: &flow.Payload{
+		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
 		},
-	}
+	)
 
 	executableBlock := &entity.ExecutableBlock{
-		Block: &block,
+		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.CollectionID: {
 				Guarantee:    &guarantee,
@@ -184,7 +182,7 @@ type blockProvider struct {
 func (b blockProvider) ByHeightFrom(height uint64, _ *flow.Header) (*flow.Header, error) {
 	block, has := b.blocks[height]
 	if has {
-		return block.Header, nil
+		return block.ToHeader(), nil
 	}
 	return nil, fmt.Errorf("block for height (%d) is not available", height)
 }
@@ -210,7 +208,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	vm := fvm.NewVirtualMachine()
 	execCtx := fvm.NewContext(
 		fvm.WithEVMEnabled(true),
-		fvm.WithBlockHeader(block.Header),
+		fvm.WithBlockHeader(block.ToHeader()),
 		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: &block}}),
 		fvm.WithChain(chain))
 
@@ -276,16 +274,14 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	)
 
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
-		block1 = &flow.Block{
-			Header: &flow.Header{
-				HeaderBody: flow.HeaderBody{
-					View: 1,
-				},
+		block1 = flow.NewBlock(
+			flow.HeaderBody{
+				View: 1,
 			},
-			Payload: &flow.Payload{
+			flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{},
 			},
-		}
+		)
 		block1Snapshot = snapshotTree
 		executableBlock := &entity.ExecutableBlock{
 			Block:      block1,
@@ -502,18 +498,16 @@ func createTestBlockAndRun(
 		Signature:    nil,
 	}
 
-	block := &flow.Block{
-		Header: &flow.Header{
-			HeaderBody: flow.HeaderBody{
-				ParentID:  parentBlock.ID(),
-				View:      parentBlock.Header.Height + 1,
-				Timestamp: time.Now(),
-			},
+	block := flow.NewBlock(
+		flow.HeaderBody{
+			ParentID:  parentBlock.ID(),
+			View:      parentBlock.Header.Height + 1,
+			Timestamp: time.Now(),
 		},
-		Payload: &flow.Payload{
+		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
 		},
-	}
+	)
 
 	executableBlock := &entity.ExecutableBlock{
 		Block: block,

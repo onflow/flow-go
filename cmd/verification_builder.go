@@ -380,7 +380,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Headers,
 				final,
 				followerDistributor,
-				node.FinalizedRootBlock.Header,
+				node.FinalizedRootBlock.ToHeader(),
 				node.RootQC,
 				finalized,
 				pending,

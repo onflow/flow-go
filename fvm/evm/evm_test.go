@@ -2739,7 +2739,7 @@ func TestCadenceArch(t *testing.T) {
 				height := uint64(1)
 				block1 := unittest.BlockFixture()
 				block1.Header.Height = height
-				ctx.BlockHeader = block1.Header
+				ctx.BlockHeader = block1.ToHeader()
 				ctx.EntropyProvider = testutil.EntropyProviderFixture(entropy) // fix the entropy
 
 				txBody := flow.NewTransactionBody().
@@ -2781,7 +2781,7 @@ func TestCadenceArch(t *testing.T) {
 				// we fake progressing to new block height since random beacon does the check the
 				// current height (2) is bigger than the height requested (1)
 				block1.Header.Height = 2
-				ctx.BlockHeader = block1.Header
+				ctx.BlockHeader = block1.ToHeader()
 
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
@@ -2836,7 +2836,7 @@ func TestCadenceArch(t *testing.T) {
 				height := uint64(1)
 				block1 := unittest.BlockFixture()
 				block1.Header.Height = height
-				ctx.BlockHeader = block1.Header
+				ctx.BlockHeader = block1.ToHeader()
 
 				txBody := flow.NewTransactionBody().
 					SetScript([]byte(fmt.Sprintf(`
@@ -2877,7 +2877,7 @@ func TestCadenceArch(t *testing.T) {
 				// we fake progressing to new block height since random beacon does the check the
 				// current height (2) is bigger than the height requested (1)
 				block1.Header.Height = 2
-				ctx.BlockHeader = block1.Header
+				ctx.BlockHeader = block1.ToHeader()
 
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
@@ -3364,7 +3364,7 @@ func RunWithNewEnvironment(
 
 				opts := []fvm.Option{
 					fvm.WithChain(chain),
-					fvm.WithBlockHeader(block1.Header),
+					fvm.WithBlockHeader(block1.ToHeader()),
 					fvm.WithAuthorizationChecksEnabled(false),
 					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 					fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),

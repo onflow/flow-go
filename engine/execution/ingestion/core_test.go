@@ -88,7 +88,7 @@ func createCore(t *testing.T, blocks []*flow.Block) (
 	execState.On("GetHighestFinalizedExecuted").Return(blocks[0].Header.Height, nil)
 
 	// root block is executed
-	consumer := newMockConsumer(blocks[0].Header.ID())
+	consumer := newMockConsumer(blocks[0].ID())
 
 	execState.On("StateCommitmentByBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) (flow.StateCommitment, error) {
@@ -134,7 +134,7 @@ func makeBlocksAndCollections(t *testing.T) ([]*flow.Block, []*flow.Collection) 
 	col0, col1 := cs[0], cs[1]
 
 	genesis := unittest.GenesisFixture()
-	blocks := unittest.ChainFixtureFrom(4, genesis.Header)
+	blocks := unittest.ChainFixtureFrom(4, genesis.ToHeader())
 
 	bs := append([]*flow.Block{genesis}, blocks...)
 	unittest.AddCollectionsToBlock(bs[2], []*flow.Collection{col0})

@@ -344,10 +344,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	// - proposer ID is conveyed over the network message
 	// - the payload hash is deduced from the payload
 	blockProposal := messages.NewUntrustedProposal(&flow.BlockProposal{
-		Block: &flow.Block{
-			Header:  header,
-			Payload: payload,
-		},
+		Block:           flow.NewBlock(header.HeaderBody, *payload),
 		ProposerSigData: proposal.ProposerSigData,
 	})
 
@@ -371,7 +368,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 // provideProposal is used when we want to broadcast a local block to the rest  of the
 // network (non-consensus nodes).
 func (h *MessageHub) provideProposal(proposal *messages.UntrustedProposal, recipients flow.IdentityList) {
-	header := proposal.Block.Header
+	header := proposal.Block.ToHeader()
 	blockID := header.ID()
 	log := h.log.With().
 		Uint64("block_view", header.View).

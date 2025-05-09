@@ -50,14 +50,14 @@ func NewMockBlockStore(t *testing.T) *MockBlockStore {
 	return &MockBlockStore{
 		ResultByBlock: byBlock,
 		Executed:      executed,
-		RootBlock:     rootBlock.Block.Header,
+		RootBlock:     rootBlock.Block.ToHeader(),
 	}
 }
 
 func (bs *MockBlockStore) MarkExecuted(computationResult *execution.ComputationResult) error {
 	bs.Lock()
 	defer bs.Unlock()
-	blockID := computationResult.ExecutableBlock.Block.Header.ID()
+	blockID := computationResult.ExecutableBlock.Block.ID()
 	_, executed := bs.Executed[blockID]
 	if executed {
 		return fmt.Errorf("block %s already executed", blockID)

@@ -77,7 +77,7 @@ func TestReExecuteBlock(t *testing.T) {
 			require.NotNil(t, es)
 
 			computationResult := testutil.ComputationResultFixture(t)
-			header := computationResult.Block.Header
+			header := computationResult.Block.ToHeader()
 
 			err = headers.Store(unittest.ProposalFromHeader(header))
 			require.NoError(t, err)
@@ -218,7 +218,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 				nil,
 				genesis,
 				&unittest.GenesisStateCommitment)
-			header := executableBlock.Block.Header
+			header := executableBlock.Block.ToHeader()
 
 			err = headers.Store(unittest.ProposalFromHeader(header))
 			require.NoError(t, err)

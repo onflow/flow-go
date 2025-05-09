@@ -117,8 +117,9 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedPro
 		OriginID: proposalMsg.OriginID,
 		Message:  proposalMsg.Message.ToInternal(),
 	}
-	header := proposal.Message.Block.Header
-	blockID := header.ID()
+	block := proposal.Message.Block
+	header := block.ToHeader()
+	blockID := block.ID()
 	finalHeight := c.finalizedHeight.Value()
 	finalView := c.finalizedView.Value()
 
@@ -245,8 +246,9 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedPro
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
 func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*flow.BlockProposal]) error {
-	header := proposal.Message.Block.Header
-	blockID := header.ID()
+	block := proposal.Message.Block
+	header := block.ToHeader()
+	blockID := block.ID()
 
 	log := c.log.With().
 		Str("block_id", blockID.String()).
@@ -318,8 +320,9 @@ func (c *Core) processBlockProposal(proposal *flow.BlockProposal) error {
 		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
 	}()
 
-	header := proposal.Block.Header
-	blockID := header.ID()
+	block := proposal.Block
+	header := block.ToHeader()
+	blockID := block.ID()
 
 	span, ctx := c.tracer.StartBlockSpan(context.Background(), blockID, trace.ConCompProcessBlockProposal)
 	span.SetAttributes(

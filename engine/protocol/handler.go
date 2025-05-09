@@ -186,7 +186,7 @@ func (h *Handler) GetBlockByID(
 }
 
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool) (*access.BlockResponse, error) {
-	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(block.Header)
+	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(block.ToHeader())
 	if err != nil {
 		return nil, err // the block was retrieved from local storage - so no errors are expected
 	}

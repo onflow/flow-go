@@ -30,7 +30,7 @@ func (a *PublicAssignmentTestSuite) SetupTest(n int) (*flow.Header, *protocol.Sn
 
 	// setup protocol state
 	block, snapshot, state, _ := unittest.FinalizedProtocolStateWithParticipants(participants)
-	head := block.Header
+	head := block.ToHeader()
 
 	return head, snapshot, state
 }

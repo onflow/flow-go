@@ -245,7 +245,7 @@ func (b *Blockchain) ServiceKey() ServiceKey {
 
 // PendingBlockID returns the ID of the pending block.
 func (b *Blockchain) PendingBlockID() flowgo.Identifier {
-	return b.pendingBlock.BlockID
+	return b.pendingBlock.Block().ID()
 }
 
 // PendingBlockView returns the view of the pending block.
@@ -572,7 +572,7 @@ func (b *Blockchain) addTransaction(tx flowgo.TransactionBody) error {
 
 	// If index > 0, pending block has begun execution (cannot add more transactions)
 	if b.pendingBlock.ExecutionStarted() {
-		return &PendingBlockMidExecutionError{BlockID: b.pendingBlock.BlockID}
+		return &PendingBlockMidExecutionError{BlockID: b.pendingBlock.Block().ID()}
 	}
 
 	if b.pendingBlock.ContainsTransaction(tx.ID()) {
@@ -615,13 +615,13 @@ func (b *Blockchain) executeBlock() ([]*TransactionResult, error) {
 		return results, nil
 	}
 
-	header := b.pendingBlock.Block().Header
+	header := b.pendingBlock.Block().ToHeader()
 	blockContext := b.setFVMContextFromHeader(header)
 
 	// cannot execute a block that has already executed
 	if b.pendingBlock.ExecutionComplete() {
 		return results, &PendingBlockTransactionsExhaustedError{
-			BlockID: b.pendingBlock.BlockID,
+			BlockID: b.pendingBlock.Block().ID(),
 		}
 	}
 
@@ -643,7 +643,7 @@ func (b *Blockchain) ExecuteNextTransaction() (*TransactionResult, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	header := b.pendingBlock.Block().Header
+	header := b.pendingBlock.Block().ToHeader()
 	blockContext := b.setFVMContextFromHeader(header)
 	return b.executeNextTransaction(blockContext)
 }
@@ -654,7 +654,7 @@ func (b *Blockchain) executeNextTransaction(ctx fvm.Context) (*TransactionResult
 	// check if there are remaining txs to be executed
 	if b.pendingBlock.ExecutionComplete() {
 		return nil, &PendingBlockTransactionsExhaustedError{
-			BlockID: b.pendingBlock.BlockID,
+			BlockID: b.pendingBlock.Block().ID(),
 		}
 	}
 
@@ -695,18 +695,18 @@ func (b *Blockchain) CommitBlock() (*flowgo.Block, error) {
 func (b *Blockchain) commitBlock() (*flowgo.Block, error) {
 	// pending block cannot be committed before execution starts (unless empty)
 	if !b.pendingBlock.ExecutionStarted() && !b.pendingBlock.Empty() {
-		return nil, &PendingBlockCommitBeforeExecutionError{BlockID: b.pendingBlock.BlockID}
+		return nil, &PendingBlockCommitBeforeExecutionError{BlockID: b.pendingBlock.Block().ID()}
 	}
 
 	// pending block cannot be committed before execution completes
 	if b.pendingBlock.ExecutionStarted() && !b.pendingBlock.ExecutionComplete() {
-		return nil, &PendingBlockMidExecutionError{BlockID: b.pendingBlock.BlockID}
+		return nil, &PendingBlockMidExecutionError{BlockID: b.pendingBlock.Block().ID()}
 	}
 
 	block := b.pendingBlock.Block()
 	collections := b.pendingBlock.Collections()
 	transactions := b.pendingBlock.Transactions()
-	transactionResults, err := convertToSealedResults(b.pendingBlock.TransactionResults(), b.pendingBlock.BlockID, b.pendingBlock.height)
+	transactionResults, err := convertToSealedResults(b.pendingBlock.TransactionResults(), b.pendingBlock.Block().ID(), b.pendingBlock.height)
 	if err != nil {
 		return nil, err
 	}
@@ -818,7 +818,7 @@ func (b *Blockchain) ExecuteScript(
 		return nil, err
 	}
 
-	return b.executeScriptAtBlockID(script, arguments, latestBlock.Header.ID())
+	return b.executeScriptAtBlockID(script, arguments, latestBlock.ID())
 }
 
 func (b *Blockchain) ExecuteScriptAtBlockID(script []byte, arguments [][]byte, id flowgo.Identifier) (*ScriptResult, error) {
@@ -844,7 +844,7 @@ func (b *Blockchain) executeScriptAtBlockID(script []byte, arguments [][]byte, i
 
 	blockContext := fvm.NewContextFromParent(
 		b.vmCtx,
-		fvm.WithBlockHeader(requestedBlock.Header),
+		fvm.WithBlockHeader(requestedBlock.ToHeader()),
 	)
 
 	scriptProc := fvm.Script(script).WithArguments(arguments...)
@@ -894,7 +894,7 @@ func (b *Blockchain) ExecuteScriptAtBlockHeight(
 		return nil, err
 	}
 
-	return b.executeScriptAtBlockID(script, arguments, requestedBlock.Header.ID())
+	return b.executeScriptAtBlockID(script, arguments, requestedBlock.ID())
 }
 
 func convertToSealedResults(
@@ -1036,7 +1036,7 @@ func (b *Blockchain) executeSystemChunkTransaction() error {
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithRandomSourceHistoryCallAllowed(true),
-		fvm.WithBlockHeader(b.pendingBlock.Block().Header),
+		fvm.WithBlockHeader(b.pendingBlock.Block().ToHeader()),
 		fvm.WithAccountStorageLimit(false),
 	)
 

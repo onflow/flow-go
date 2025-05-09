@@ -140,7 +140,7 @@ func (b *SDKAdapter) GetLatestBlock(
 			Height:    flowBlock.Header.Height,
 			Timestamp: flowBlock.Header.Timestamp,
 		},
-		BlockPayload: convertBlockPayload(flowBlock.Payload),
+		BlockPayload: convertBlockPayload(&flowBlock.Payload),
 	}
 	return &block, sdk.BlockStatusSealed, nil
 }
@@ -165,7 +165,7 @@ func (b *SDKAdapter) GetBlockByHeight(
 			Height:    flowBlock.Header.Height,
 			Timestamp: flowBlock.Header.Timestamp,
 		},
-		BlockPayload: convertBlockPayload(flowBlock.Payload),
+		BlockPayload: convertBlockPayload(&flowBlock.Payload),
 	}
 	return &block, sdk.BlockStatusSealed, nil
 }
@@ -190,7 +190,7 @@ func (b *SDKAdapter) GetBlockByID(
 			Height:    flowBlock.Header.Height,
 			Timestamp: flowBlock.Header.Timestamp,
 		},
-		BlockPayload: convertBlockPayload(flowBlock.Payload),
+		BlockPayload: convertBlockPayload(&flowBlock.Payload),
 	}
 	return &block, sdk.BlockStatusSealed, nil
 }

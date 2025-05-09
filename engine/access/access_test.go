@@ -442,7 +442,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.Equal(suite.T(), expectedMessage, actual)
 		}
 
-		suite.finalSnapshot.On("Head").Return(block1.Header, nil)
+		suite.finalSnapshot.On("Head").Return(block1.ToHeader(), nil)
 		suite.Run("get header 1 by ID", func() {
 			// get header by ID
 			id := block1.ID()
@@ -453,7 +453,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			resp, err := handler.GetBlockHeaderByID(context.Background(), req)
 
 			// assert it is indeed block1
-			assertHeaderResp(resp, err, block1.Header)
+			assertHeaderResp(resp, err, block1.ToHeader())
 		})
 
 		suite.Run("get block 1 by ID", func() {
@@ -490,7 +490,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 			resp, err := handler.GetBlockHeaderByHeight(context.Background(), req)
 
-			assertHeaderResp(resp, err, block2.Header)
+			assertHeaderResp(resp, err, block2.ToHeader())
 		})
 
 		suite.Run("get block 2 by height", func() {
@@ -722,7 +722,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		err = db.Update(operation.IndexBlockHeight(block.Header.Height, block.ID()))
 		require.NoError(suite.T(), err)
 
-		suite.sealedBlock = block.Header
+		suite.sealedBlock = block.ToHeader()
 
 		background, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -786,7 +786,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		suite.state.On("Params").Return(suite.params)
 		suite.state.On("Final").Return(finalSnapshot)
 		suite.state.On("Sealed").Return(suite.sealedSnapshot)
-		sealedBlock := unittest.GenesisFixture().Header
+		sealedBlock := unittest.GenesisFixture().ToHeader()
 		// specifically for this test we will consider that sealed block is far behind finalized, so we get EXECUTED status
 		suite.sealedSnapshot.On("Head").Return(sealedBlock, nil)
 
@@ -936,7 +936,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		}
 		err = db.Update(operation.IndexBlockHeight(block.Header.Height, block.ID()))
 		require.NoError(suite.T(), err)
-		finalSnapshot.On("Head").Return(block.Header, nil)
+		finalSnapshot.On("Head").Return(block.ToHeader(), nil)
 
 		processExecutionReceipts(block, collection, enNodeIDs, originID, ingestEng)
 		processExecutionReceipts(blockNegative, collectionNegative, enNodeIDs, originID, ingestEng)
@@ -1158,14 +1158,14 @@ func (suite *Suite) TestExecuteScript() {
 		prevProposal := unittest.ProposalFromBlock(prevBlock)
 
 		// create a block and a seal pointing to that block
-		lastBlock := unittest.BlockWithParentFixture(prevBlock.Header)
+		lastBlock := unittest.BlockWithParentFixture(prevBlock.ToHeader())
 		lastProposal := unittest.ProposalFromBlock(lastBlock)
 		err = all.Blocks.Store(lastProposal)
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
 		// update latest sealed block
-		suite.sealedBlock = lastBlock.Header
+		suite.sealedBlock = lastBlock.ToHeader()
 		// create execution receipts for each of the execution node and the last block
 		executionReceipts := unittest.ReceiptsForBlockFixture(lastBlock, identities.NodeIDs())
 		// notify the ingest engine about the receipts
@@ -1296,7 +1296,7 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 	suite.RunTest(func(handler *rpc.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
 		block := unittest.BlockWithParentFixture(suite.finalizedBlock)
 		proposal := unittest.ProposalFromBlock(block)
-		newFinalizedBlock := unittest.BlockWithParentFixture(block.Header)
+		newFinalizedBlock := unittest.BlockWithParentFixture(block.ToHeader())
 
 		// store new block
 		require.NoError(suite.T(), all.Blocks.Store(proposal))
@@ -1323,7 +1323,7 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 		resp, err := handler.GetBlockHeaderByID(context.Background(), req)
 		assertFinalizedBlockHeader(resp, err)
 
-		suite.finalizedBlock = newFinalizedBlock.Header
+		suite.finalizedBlock = newFinalizedBlock.ToHeader()
 
 		resp, err = handler.GetBlockHeaderByID(context.Background(), req)
 		assertFinalizedBlockHeader(resp, err)
@@ -1358,7 +1358,7 @@ func (suite *Suite) createChain() (*flow.BlockProposal, *flow.Collection) {
 	snap := new(protocol.Snapshot)
 	snap.On("Epochs").Return(epochs).Maybe()
 	snap.On("Params").Return(suite.params).Maybe()
-	snap.On("Head").Return(block.Header, nil).Maybe()
+	snap.On("Head").Return(block.ToHeader(), nil).Maybe()
 
 	suite.state.On("AtBlockID", refBlockID).Return(snap)
 

@@ -256,7 +256,7 @@ func createRootQC(t *testing.T, root *flow.Block, participantData *run.Participa
 // createRootBlockData creates genesis block with first epoch and real data node identities.
 // This function requires all participants to pass DKG process.
 func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
-	root := unittest.GenesisFixture()
+	rootHeader := unittest.GenesisFixture().Header
 	consensusParticipants := participantData.Identities()
 
 	// add other roles to create a complete identity list
@@ -273,8 +273,8 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	setup := unittest.EpochSetupFixture(
 		unittest.WithParticipants(participants.ToSkeleton()),
 		unittest.SetupWithCounter(counter),
-		unittest.WithFirstView(root.Header.View),
-		unittest.WithFinalView(root.Header.View+1000),
+		unittest.WithFirstView(rootHeader.View),
+		unittest.WithFinalView(rootHeader.View+1000),
 	)
 	commit := unittest.EpochCommitFixture(
 		unittest.CommitWithCounter(counter),
@@ -287,11 +287,11 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	)
 
 	epochProtocolStateID := inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID()
-	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
+	safetyParams, err := protocol.DefaultEpochSafetyParams(rootHeader.ChainID)
 	require.NoError(t, err)
 	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochProtocolStateID)
 	require.NoError(t, err)
-	root.SetPayload(flow.Payload{ProtocolStateID: rootProtocolState.ID()})
+	root := flow.NewBlock(rootHeader, flow.Payload{ProtocolStateID: rootProtocolState.ID()})
 	result := unittest.BootstrapExecutionResultFixture(root, unittest.GenesisStateCommitment)
 	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
 
