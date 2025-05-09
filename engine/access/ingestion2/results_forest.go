@@ -21,8 +21,7 @@ const (
 )
 
 type Pipeline interface {
-	Initialize(core pipeline.Core) error
-	Run(context.Context) error
+	Run(context.Context, pipeline.Core) error
 	GetState() pipeline.State
 	SetSealed()
 	OnParentStateUpdated(pipeline.State)
@@ -121,11 +120,7 @@ func (f *ResultsForest) pipelineManagerLoop(ctx irrecoverable.SignalerContext, r
 						defer wg.Done()
 
 						core := pipeline.NewCore()
-						if err := container.pipeline.Initialize(core); err != nil {
-							ctx.Throw(fmt.Errorf("pipeline initialization failed (result: %s): %w", container.resultID, err))
-						}
-
-						if err := container.pipeline.Run(ctx); err != nil {
+						if err := container.pipeline.Run(ctx, core); err != nil {
 							ctx.Throw(fmt.Errorf("pipeline execution failed (result: %s): %w", container.resultID, err))
 						}
 					}()

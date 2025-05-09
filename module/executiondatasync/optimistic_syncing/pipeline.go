@@ -66,15 +66,6 @@ func NewPipeline(
 	return p
 }
 
-func (p *Pipeline) Initialize(core Core) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.state = StateReady
-	p.core = core
-	return nil
-}
-
 // Run starts the pipeline processing and blocks until completion or context cancellation.
 //
 // This function handles the progression through the pipeline states, executing the appropriate
@@ -86,12 +77,14 @@ func (p *Pipeline) Initialize(core Core) error {
 // Returns an error if any processing step fails with an irrecoverable error.
 // Returns nil if processing completes successfully, reaches a terminal state,
 // or if either the parent or pipeline context is canceled.
-func (p *Pipeline) Run(parentCtx context.Context) error {
+func (p *Pipeline) Run(parentCtx context.Context, core Core) error {
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
 
 	p.mu.Lock()
 	p.cancelFn = cancel
+	p.state = StateReady
+	p.core = core
 	p.mu.Unlock()
 
 	notifierChan := p.stateNotifier.Channel()
