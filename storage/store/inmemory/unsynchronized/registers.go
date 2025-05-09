@@ -73,13 +73,13 @@ func (r *Registers) Store(registers flow.RegisterEntries, height uint64) error {
 	return nil
 }
 
-func (r *Registers) Data() map[flow.RegisterID]flow.RegisterValue {
+func (r *Registers) Data() []flow.RegisterEntry {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
-	out := make(map[flow.RegisterID]flow.RegisterValue, len(r.store))
+	out := make([]flow.RegisterEntry, 0, len(r.store))
 	for k, v := range r.store {
-		out[k] = v
+		out = append(out, flow.RegisterEntry{Key: k, Value: v})
 	}
 	return out
 }
