@@ -104,10 +104,16 @@ func NewEmbedsNonWritable() EmbedsNonWritable {
 }
 
 func (w *EmbedsNonWritable) SetA() {
+	// disallowed because A is promoted by embedding from a mutation-protected type
 	w.A = 1 // want "write to NonWritable field outside constructor"
 }
 
-func NonEmbedsWritableConstructLiteral() {
+func (w *EmbedsNonWritable) SetB() {
+	// allowed because B is not promoted from the embedded mutation-protected type
+	w.B = 1
+}
+
+func EmbedsWritableConstructLiteral() {
 	nw := EmbedsNonWritable{}
 	nw = EmbedsNonWritable{B: 2}
 	nw = EmbedsNonWritable{NonWritable: NonWritable{A: 1}}       // want "construction of NonWritable outside constructor"
@@ -115,6 +121,96 @@ func NonEmbedsWritableConstructLiteral() {
 	nwp := &EmbedsNonWritable{}
 	nwp = &EmbedsNonWritable{B: 2}
 	nwp = &EmbedsNonWritable{NonWritable: NonWritable{A: 1}} // want "construction of NonWritable outside constructor"
+	_ = nw
+	_ = nwp
+}
+
+// ContainsNonWritableField is not configured for linting, but has a field which is mutation-protected.
+type ContainsNonWritableField struct {
+	NonWritableField NonWritable
+	B                int
+}
+
+func (w *ContainsNonWritableField) SetA() {
+	// disallowed because we are writing the mutation-protected type
+	w.NonWritableField.A = 1 // want "write to NonWritable field outside constructor"
+}
+
+// SetNonWritableField sets a field which has a mutation-protected type, but is a field
+// of a non-mutation-protected type. This is allowed.
+func (w *ContainsNonWritableField) SetNonWritableField() {
+	// allowed because we are not mutating the mutation-protected type (we are mutating ContainsNonWritableField)
+	w.NonWritableField = *NewNonWritable()
+}
+
+func (w *ContainsNonWritableField) SetB() {
+	// allowed because B is not promoted from the embedded mutation-protected type
+	w.B = 1
+}
+
+func ContainsNonWritableFieldConstructLiteral() {
+	nw := ContainsNonWritableField{}
+	nw = ContainsNonWritableField{B: 2}
+	nw = ContainsNonWritableField{NonWritableField: NonWritable{A: 1}}       // want "construction of NonWritable outside constructor"
+	nw = ContainsNonWritableField{B: 2, NonWritableField: NonWritable{A: 1}} // want "construction of NonWritable outside constructor"
+	nwp := &ContainsNonWritableField{}
+	nwp = &ContainsNonWritableField{B: 2}
+	nwp = &ContainsNonWritableField{NonWritableField: NonWritable{A: 1}} // want "construction of NonWritable outside constructor"
+	_ = nw
+	_ = nwp
+}
+
+// ContainsDeeplyNestedNonWritableField is not configured for linting, but has a (deeply nested) field which is mutation-protected.
+type ContainsDeeplyNestedNonWritableField struct {
+	DeeplyNestedNonWritableField struct {
+		L1 struct {
+			NonWritableField NonWritable
+		}
+	}
+	B int
+}
+
+// SetNonWritableField sets a field which has a mutation-protected type, but is a field
+// of a non-mutation-protected type. This is allowed.
+func (w *ContainsDeeplyNestedNonWritableField) SetNonWritableField() {
+	// allowed because we are not mutating the mutation-protected type (we are mutating ContainsNonWritableField)
+	w.DeeplyNestedNonWritableField.L1.NonWritableField = *NewNonWritable()
+	// can set the middle nested layer for the same reason
+	w.DeeplyNestedNonWritableField.L1 = struct {
+		NonWritableField NonWritable
+	}{
+		NonWritableField: *NewNonWritable(),
+	}
+}
+
+func (w *ContainsDeeplyNestedNonWritableField) SetB() {
+	// allowed because B is not promoted from the embedded mutation-protected type
+	w.B = 1
+}
+
+func ContainsDeeplyNestedNonWritableFieldConstructLiteral() {
+	nw := ContainsDeeplyNestedNonWritableField{}
+	nw = ContainsDeeplyNestedNonWritableField{B: 2}
+	nw = ContainsDeeplyNestedNonWritableField{
+		DeeplyNestedNonWritableField: struct {
+			L1 struct{ NonWritableField NonWritable }
+		}{L1: struct {
+			NonWritableField NonWritable
+		}{
+			NonWritableField: NonWritable{A: 1}, // want "construction of NonWritable outside constructor"
+		}},
+	}
+	nwp := &ContainsDeeplyNestedNonWritableField{}
+	nwp = &ContainsDeeplyNestedNonWritableField{B: 2}
+	nwp = &ContainsDeeplyNestedNonWritableField{
+		DeeplyNestedNonWritableField: struct {
+			L1 struct{ NonWritableField NonWritable }
+		}{L1: struct {
+			NonWritableField NonWritable
+		}{
+			NonWritableField: NonWritable{A: 1}, // want "construction of NonWritable outside constructor"
+		}},
+	}
 	_ = nw
 	_ = nwp
 }

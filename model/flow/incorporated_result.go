@@ -2,6 +2,8 @@ package flow
 
 // IncorporatedResult is a wrapper around an ExecutionResult which contains the
 // ID of the first block on its fork in which it was incorporated.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type IncorporatedResult struct {
 	// IncorporatedBlockID is the ID of the first block on its fork where a
 	// receipt for this result was incorporated. Within a fork, multiple blocks
@@ -12,6 +14,8 @@ type IncorporatedResult struct {
 	// Result is the ExecutionResult contained in the ExecutionReceipt that was
 	// incorporated in the payload of IncorporatedBlockID.
 	Result *ExecutionResult
+
+	cachedID idCache
 }
 
 func NewIncorporatedResult(incorporatedBlockID Identifier, result *ExecutionResult) *IncorporatedResult {
@@ -21,10 +25,15 @@ func NewIncorporatedResult(incorporatedBlockID Identifier, result *ExecutionResu
 	}
 }
 
+// UncachedID computes and returns the canonical ID of the IncorporatedResult, bypassing the ID cache.
+func (ir IncorporatedResult) UncachedID() Identifier {
+	return MakeID([2]Identifier{ir.IncorporatedBlockID, ir.Result.ID()})
+}
+
 // ID implements flow.Entity.ID for IncorporatedResult to make it capable of
 // being stored directly in mempools and storage.
 func (ir *IncorporatedResult) ID() Identifier {
-	return MakeID([2]Identifier{ir.IncorporatedBlockID, ir.Result.ID()})
+	return ir.cachedID.getID()
 }
 
 // CheckSum implements flow.Entity.CheckSum for IncorporatedResult to make it
