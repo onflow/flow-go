@@ -23,7 +23,7 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 
 		block := unittest.BlockFixture()
 
-		manager, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
+		manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		// store block which will also store header
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return blocks.BatchStore(lctx, rw, &block)
