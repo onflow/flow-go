@@ -1,4 +1,4 @@
-package migration_test
+package migration
 
 import (
 	"math/rand"
@@ -8,11 +8,30 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/storage/migration"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func runMigrationTestCase(t *testing.T, testData map[string]string, cfg migration.MigrationConfig) {
+func TestGeneratePrefixes(t *testing.T) {
+	t.Run("OneBytePrefix", func(t *testing.T) {
+		prefixes := GeneratePrefixes(1)
+		require.Len(t, prefixes, 256)
+		require.Equal(t, []byte{0x00}, prefixes[0])
+		require.Equal(t, []byte{0x01}, prefixes[1])
+		require.Equal(t, []byte{0xfe}, prefixes[254])
+		require.Equal(t, []byte{0xff}, prefixes[255])
+	})
+
+	t.Run("TwoBytePrefix", func(t *testing.T) {
+		prefixes := GeneratePrefixes(2)
+		require.Len(t, prefixes, 65536)
+		require.Equal(t, []byte{0x00, 0x00}, prefixes[0])
+		require.Equal(t, []byte{0x00, 0x01}, prefixes[1])
+		require.Equal(t, []byte{0xff, 0xfe}, prefixes[65534])
+		require.Equal(t, []byte{0xff, 0xff}, prefixes[65535])
+	})
+}
+
+func runMigrationTestCase(t *testing.T, testData map[string]string, cfg MigrationConfig) {
 	unittest.RunWithBadgerDBAndPebbleDB(t, func(badgerDB *badger.DB, pebbleDB *pebble.DB) {
 		// Load Badger with test data
 		require.NoError(t, badgerDB.Update(func(txn *badger.Txn) error {
@@ -25,7 +44,7 @@ func runMigrationTestCase(t *testing.T, testData map[string]string, cfg migratio
 		}))
 
 		// Run migration
-		err := migration.CopyFromBadgerToPebble(badgerDB, pebbleDB, cfg)
+		err := CopyFromBadgerToPebble(badgerDB, pebbleDB, cfg)
 		require.NoError(t, err)
 
 		// Validate each key
@@ -69,7 +88,7 @@ func TestMigrationWithSimpleData(t *testing.T) {
 		"dog":    "animal",
 		"egg":    "protein",
 	}
-	cfg := migration.MigrationConfig{
+	cfg := MigrationConfig{
 		BatchByteSize:          1024,
 		ReaderWorkerCount:      2,
 		WriterWorkerCount:      2,
@@ -81,7 +100,7 @@ func TestMigrationWithSimpleData(t *testing.T) {
 // Randomized data to simulate fuzzing
 func TestMigrationWithFuzzyData(t *testing.T) {
 	data := generateRandomKVData(500, 10, 50)
-	cfg := migration.MigrationConfig{
+	cfg := MigrationConfig{
 		BatchByteSize:          2048,
 		ReaderWorkerCount:      4,
 		WriterWorkerCount:      2,
@@ -93,7 +112,7 @@ func TestMigrationWithFuzzyData(t *testing.T) {
 // Fuzzy data with 2-byte prefix shard config
 func TestMigrationWithFuzzyDataAndPrefix2(t *testing.T) {
 	data := generateRandomKVData(500, 10, 50)
-	cfg := migration.MigrationConfig{
+	cfg := MigrationConfig{
 		BatchByteSize:          2048,
 		ReaderWorkerCount:      8,
 		WriterWorkerCount:      4,
