@@ -29,7 +29,7 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the badger dababase")
-	_ = rootCmd.MarkPersistentFlagRequired("data-dir")
+	_ = rootCmd.MarkPersistentFlagRequired("datadir")
 
 	rootCmd.PersistentFlags().StringVar(&flagPebbleDir, "pebble-dir", "/var/flow/data/protocol-pebble", "directory to the pebble dababase")
 
