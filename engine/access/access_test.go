@@ -738,6 +738,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return all.Blocks.BatchStore(lctx, rw, block)
 		}))
+		lctx.Release()
 		require.NoError(suite.T(), err)
 
 		fctx := manager.NewContext()
@@ -815,16 +816,17 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		bdb := badgerimpl.ToDB(db)
 		manager, lctx := unittest.LockManagerWithContext(suite.T(), storage.LockInsertBlock)
-		defer lctx.Release()
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return all.Blocks.BatchStore(lctx, rw, block)
 		}))
+		lctx.Release()
+
 		lctx2 := manager.NewContext()
-		defer lctx2.Release()
 		require.NoError(suite.T(), lctx2.AcquireLock(storage.LockInsertBlock))
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return all.Blocks.BatchStore(lctx2, rw, blockNegative)
 		}))
+		lctx2.Release()
 
 		suite.state.On("AtBlockID", blockId).Return(suite.sealedSnapshot)
 
@@ -971,10 +973,11 @@ func (suite *Suite) TestGetTransactionResult() {
 			}
 		}
 		fctx2 := manager.NewContext()
-		defer fctx2.Release()
+		require.NoError(suite.T(), fctx2.AcquireLock(storage.LockFinalizeBlock))
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.IndexBlockHeight(fctx2, rw, block.Header.Height, block.ID())
 		}))
+		fctx2.Release()
 		finalSnapshot.On("Head").Return(block.Header, nil)
 
 		processExecutionReceipts(block, collection, enNodeIDs, originID, ingestEng)
