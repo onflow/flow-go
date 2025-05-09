@@ -75,7 +75,7 @@ type idCache struct {
 }
 
 // newIDCache returns a new idCache.
-// Caller is responsible for ensure that computeID always returns the same ID
+// Caller is responsible for ensuring that computeID always returns the same ID
 // (should be a deterministic hashing function over an immutable data structure).
 func newIDCache(computeID func() Identifier) idCache {
 	return idCache{
