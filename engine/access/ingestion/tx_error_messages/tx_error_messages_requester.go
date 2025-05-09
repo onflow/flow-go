@@ -1,0 +1,61 @@
+package tx_error_messages
+
+import (
+	"context"
+	"time"
+
+	"github.com/sethvargo/go-retry"
+
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
+)
+
+// TransactionErrorMessagesRequesterConfig contains the retry settings for the tx error messages fetch.
+type TransactionErrorMessagesRequesterConfig struct {
+	// the initial delay used in the exponential backoff for failed tx error messages download
+	// retries.
+	RetryDelay time.Duration
+	// the max delay used in the exponential backoff for failed tx error messages download.
+	MaxRetryDelay time.Duration
+}
+
+// TransactionErrorMessagesRequester is a thin wrapper over a TxErrorMessagesCore that manages the retrieval
+// of transaction error messages with retry and backoff configurations.
+type TransactionErrorMessagesRequester struct {
+	core   *TxErrorMessagesCore
+	config *TransactionErrorMessagesRequesterConfig
+}
+
+func NewTransactionErrorMessagesRequester(
+	core *TxErrorMessagesCore,
+	config *TransactionErrorMessagesRequesterConfig,
+) *TransactionErrorMessagesRequester {
+	return &TransactionErrorMessagesRequester{
+		core:   core,
+		config: config,
+	}
+}
+
+func (r *TransactionErrorMessagesRequester) RequestTransactionErrorMessagesByBlockID(
+	ctx irrecoverable.SignalerContext,
+	blockID flow.Identifier,
+) error {
+	backoff := retry.NewExponential(r.config.RetryDelay)
+	backoff = retry.WithCappedDuration(r.config.MaxRetryDelay, backoff)
+	backoff = retry.WithJitterPercent(15, backoff)
+
+	attempt := 0
+	return retry.Do(ctx, backoff, func(context.Context) error {
+		if attempt > 0 {
+			r.core.log.Debug().
+				Str("block_id", blockID.String()).
+				Uint64("attempt", uint64(attempt)).
+				Msgf("retrying download")
+		}
+		attempt++
+
+		err := r.core.HandleTransactionResultErrorMessages(ctx, blockID)
+
+		return retry.RetryableError(err)
+	})
+}
