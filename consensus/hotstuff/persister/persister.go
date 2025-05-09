@@ -11,6 +11,9 @@ import (
 
 // Persister is responsible for persisting minimal critical safety and liveness data for HotStuff:
 // specifically [hotstuff.LivenessData] and [hotstuff.SafetyData].
+// Persister depends on protocol.State and cluster.State bootstrapping to set initial values for
+// SafetyData and LivenessData, for each distinct chain ID. This bootstrapping must be complete
+// before constructing a Persister instance with New (otherwise it will return an error).
 type Persister struct {
 	db      storage.DB
 	chainID flow.ChainID
@@ -20,6 +23,9 @@ var _ hotstuff.Persister = (*Persister)(nil)
 var _ hotstuff.PersisterReader = (*Persister)(nil)
 
 // New creates a new Persister.
+// Persister depends on protocol.State and cluster.State bootstrapping to set initial values for
+// SafetyData and LivenessData, for each distinct chain ID. This bootstrapping must be completed
+// before first using a Persister instance.
 func New(db storage.DB, chainID flow.ChainID) (*Persister, error) {
 	err := ensureSafetyDataAndLivenessDataAreBootstrapped(db, chainID)
 	if err != nil {
@@ -39,8 +45,6 @@ func New(db storage.DB, chainID flow.ChainID) (*Persister, error) {
 // data. For a node, the SafetyData and LivenessData is among the most safety-critical data. We require
 // the protocol.State's or cluster.State's bootstrapping logic to properly initialize these values in the
 // database.
-// It is highly recommended that components using the Persister read the current SafetyData
-// and/or LivenessData (depending on what they need) within their constructor as a sanity check.
 func ensureSafetyDataAndLivenessDataAreBootstrapped(db storage.DB, chainID flow.ChainID) error {
 	var safetyData hotstuff.SafetyData
 	err := operation.RetrieveSafetyData(db.Reader(), chainID, &safetyData)

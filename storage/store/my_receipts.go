@@ -39,10 +39,7 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db storage.DB, receip
 		// the lock would not cause any deadlock, if
 		// 1) there is no other lock in the batch operation.
 		// 2) or there is other lock in the batch operation, but the locks are acquired and released in the same order.
-		indexingMyReceipt.Lock()
-		rw.AddCallback(func(error) {
-			indexingMyReceipt.Unlock()
-		})
+		rw.Lock(indexingMyReceipt)
 
 		// assemble DB operations to store receipt (no execution)
 		err := receipts.BatchStore(receipt, rw)
