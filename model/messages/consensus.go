@@ -12,40 +12,28 @@ type UntrustedBlock flow.Block
 
 // ToHeader converts the untrusted block into a compact [flow.Header] representation,
 // where the payload is compressed to a hash reference.
+// TODO(malleability immutable): This conversion should eventually be accompanied by a full validation of the untrusted input.
 func (ub *UntrustedBlock) ToHeader() *flow.Header {
-	return ub.ToInternal().ToHeader()
+	internal := flow.NewBlock(ub.Header, ub.Payload)
+	return internal.ToHeader()
 }
 
-// ToInternal returns the internal representation of the type.
-// TODO(malleability immutable, #7278): This conversion should eventually be accompanied by a full validation of the untrusted input.
-func (ub *UntrustedBlock) ToInternal() *flow.Block {
-	return flow.NewBlock(ub.Header, ub.Payload)
-}
-
-// UntrustedBlockFromInternal converts the internal flow.Block representation
-// to the representation used in untrusted messages.
-func UntrustedBlockFromInternal(block *flow.Block) UntrustedBlock {
-	return UntrustedBlock(*block)
-}
-
-// TODO(malleability): update UntrustedProposal in follow up PR, use the same approach as for UntrustedClusterProposal.
 // UntrustedProposal is part of the consensus protocol and represents the leader
 // of a consensus round pushing a new proposal to the network.
-type UntrustedProposal struct {
-	Block           UntrustedBlock
-	ProposerSigData []byte
-}
+// This differentiation is currently largely unused, but eventually untrusted models should use
+// a different type (like this one), until such time as they are fully validated
+type UntrustedProposal flow.BlockProposal
 
 func NewUntrustedProposal(internal *flow.BlockProposal) *UntrustedProposal {
-	return &UntrustedProposal{
-		Block:           UntrustedBlockFromInternal(internal.Block),
-		ProposerSigData: internal.ProposerSigData,
-	}
+	p := UntrustedProposal(*internal)
+	return &p
 }
 
+// ToInternal converts the UntrustedProposal to a trusted internal flow.BlockProposal.
+// TODO(malleability immutable): This conversion should eventually be accompanied by a full validation of the untrusted input.
 func (msg *UntrustedProposal) ToInternal() *flow.BlockProposal {
 	return &flow.BlockProposal{
-		Block:           msg.Block.ToInternal(),
+		Block:           *flow.NewBlock(msg.Block.Header, msg.Block.Payload),
 		ProposerSigData: msg.ProposerSigData,
 	}
 }
