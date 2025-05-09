@@ -38,7 +38,6 @@ const MaxViewIncrease = 3
 
 // A pendingBlock contains the pending state required to form a new block.
 type pendingBlock struct {
-	BlockID   flowgo.Identifier
 	height    uint64
 	view      uint64
 	parentID  flowgo.Identifier
@@ -79,8 +78,6 @@ func newPendingBlock(
 		events: make([]flowgo.Event, 0),
 		index:  0,
 	}
-
-	pb.BlockID = pb.Block().ID()
 
 	return pb
 }
@@ -141,9 +138,6 @@ func (b *pendingBlock) Finalize() *snapshot.ExecutionSnapshot {
 func (b *pendingBlock) AddTransaction(tx flowgo.TransactionBody) {
 	b.transactionIDs = append(b.transactionIDs, tx.ID())
 	b.transactions[tx.ID()] = &tx
-	// Update cached BlockID since adding a transaction modifies the block's payload,
-	// resulting in a new block ID based on the updated content.
-	b.BlockID = b.Block().ID()
 }
 
 // ContainsTransaction checks if a transaction is included in the pending block.
