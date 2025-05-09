@@ -100,24 +100,23 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 
 	return &EpochProtocolStateEntries{
 		db: db,
-		cache: newCache[flow.Identifier, *flow.RichEpochStateEntry](collector, metrics.ResourceProtocolState,
+		cache: newCache(collector, metrics.ResourceProtocolState,
 			withLimit[flow.Identifier, *flow.RichEpochStateEntry](stateCacheSize),
 			withStore(noopStore[flow.Identifier, *flow.RichEpochStateEntry]),
 			withRetrieve(retrieveByEntryID)),
-		byBlockIdCache: newCache[flow.Identifier, flow.Identifier](collector, metrics.ResourceProtocolStateByBlockID,
+		byBlockIdCache: newCache(collector, metrics.ResourceProtocolStateByBlockID,
 			withLimit[flow.Identifier, flow.Identifier](stateByBlockIDCacheSize),
 			withStore(storeByBlockID),
 			withRetrieve(retrieveByBlockID)),
 	}
 }
 
-// BatchStore returns an anonymous function (intended to be executed as part of a badger transaction),
-// which persists the given epoch protocol state entry as part of a DB tx. Per convention, the identities in
+// BatchStore returns persists the given epoch protocol state entry as part of a DB batch. Per convention, the identities in
 // the flow.MinEpochStateEntry must be in canonical order for the current and next epoch (if present),
 // otherwise an exception is returned.
 // No errors are expected during normal operation.
 func (s *EpochProtocolStateEntries) BatchStore(
-	rw storage.ReaderBatchWriter,
+	w storage.Writer,
 	epochProtocolStateEntryID flow.Identifier,
 	epochStateEntry *flow.MinEpochStateEntry,
 ) error {
@@ -130,13 +129,12 @@ func (s *EpochProtocolStateEntries) BatchStore(
 	}
 
 	// happy path: return anonymous function, whose future execution (as part of a transaction) will store the state entry.
-	return operation.InsertEpochProtocolState(rw.Writer(), epochProtocolStateEntryID, epochStateEntry)
+	return operation.InsertEpochProtocolState(w, epochProtocolStateEntryID, epochStateEntry)
 }
 
-// Index returns an anonymous function that is intended to be executed as part of a database transaction.
+// BatchIndex persists the specific map entry in the node's database.
 // In a nutshell, we want to maintain a map from `blockID` to `epochStateEntry`, where `blockID` references the
 // block that _proposes_ the referenced epoch protocol state entry.
-// Upon call, the anonymous function persists the specific map entry in the node's database.
 // Protocol convention:
 //   - Consider block B, whose ingestion might potentially lead to an updated protocol state. For example,
 //     the protocol state changes if we seal some execution results emitting service events.

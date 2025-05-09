@@ -67,7 +67,7 @@ func newExecutionStateExtractor(
 }
 
 func (e *executionStateExtractor) extract() (bool, []*ledger.Payload, error) {
-	payloads, err := util.ReadTrie(e.dir, e.stateCommitment)
+	payloads, err := util.ReadTrieForPayloads(e.dir, e.stateCommitment)
 	if err != nil {
 		return false, nil, err
 	}

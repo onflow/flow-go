@@ -15,25 +15,25 @@ import (
 // Finalizer is a simple wrapper around our temporary state to clean up after a
 // block has been fully finalized to the persistent protocol state.
 type Finalizer struct {
-	db      storage.DB
-	headers storage.Headers
-	state   protocol.FollowerState
-	cleanup CleanupFunc
-	tracer  module.Tracer
+	dbReader storage.Reader
+	headers  storage.Headers
+	state    protocol.FollowerState
+	cleanup  CleanupFunc
+	tracer   module.Tracer
 }
 
 // NewFinalizer creates a new finalizer for the temporary state.
-func NewFinalizer(db storage.DB,
+func NewFinalizer(dbReader storage.Reader,
 	headers storage.Headers,
 	state protocol.FollowerState,
 	tracer module.Tracer,
 	options ...func(*Finalizer)) *Finalizer {
 	f := &Finalizer{
-		db:      db,
-		state:   state,
-		headers: headers,
-		cleanup: CleanupNothing(),
-		tracer:  tracer,
+		dbReader: dbReader,
+		state:    state,
+		headers:  headers,
+		cleanup:  CleanupNothing(),
+		tracer:   tracer,
 	}
 	for _, option := range options {
 		option(f)
@@ -59,10 +59,8 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	// one of two things: if it conflicts with the block already finalized at
 	// that height, it's an invalid operation. Otherwise, it is a no-op.
 
-	r := f.db.Reader()
-
 	var finalized uint64
-	err := operation.RetrieveFinalizedHeight(r, &finalized)
+	err := operation.RetrieveFinalizedHeight(f.dbReader, &finalized)
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
@@ -89,7 +87,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	// back to the last finalized block, this is also an invalid call.
 
 	var finalID flow.Identifier
-	err = operation.LookupBlockHeight(r, finalized, &finalID)
+	err = operation.LookupBlockHeight(f.dbReader, finalized, &finalID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized header: %w", err)
 	}

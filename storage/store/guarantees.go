@@ -29,7 +29,7 @@ func NewGuarantees(collector module.CacheMetrics, db storage.DB, cacheSize uint)
 
 	g := &Guarantees{
 		db: db,
-		cache: newCache[flow.Identifier, *flow.CollectionGuarantee](collector, metrics.ResourceGuarantee,
+		cache: newCache(collector, metrics.ResourceGuarantee,
 			withLimit[flow.Identifier, *flow.CollectionGuarantee](cacheSize),
 			withStore(store),
 			withRetrieve(retrieve)),
@@ -48,12 +48,6 @@ func (g *Guarantees) retrieveTx(collID flow.Identifier) (*flow.CollectionGuarant
 		return nil, err
 	}
 	return val, nil
-}
-
-func (g *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
-	return g.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return g.storeTx(rw, guarantee)
-	})
 }
 
 func (g *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {

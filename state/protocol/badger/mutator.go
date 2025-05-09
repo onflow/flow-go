@@ -404,7 +404,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, lctx lockctx.Proof, ca
 	}
 
 	// STEP 5b: Store candidate block and index it as a child of its parent (needed for recovery to traverse unfinalized blocks)
-	err = m.blocks.BatchStore(rw, candidate) // insert the block into the database AND cache
+	err = m.blocks.BatchStore(lctx, rw, candidate) // insert the block into the database AND cache
 	if err != nil {
 		return fmt.Errorf("could not store candidate block: %w", err)
 	}

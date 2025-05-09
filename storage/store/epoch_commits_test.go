@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestEpochCommitStoreAndRetrieve tests that a commit can be sd, retrieved and attempted to be sd again without an error
+// TestEpochCommitStoreAndRetrieve tests that a commit can be sd, retrieved and attempted to be stored again without an error
 func TestEpochCommitStoreAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()

@@ -85,11 +85,11 @@ func TestMakeFinalValidChain(t *testing.T) {
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
-			db:      badgerimpl.ToDB(db),
-			headers: storage.NewHeaders(metrics, db),
-			state:   state,
-			tracer:  trace.NewNoopTracer(),
-			cleanup: LogCleanup(&list),
+			dbReader: badgerimpl.ToDB(db).Reader(),
+			headers:  storage.NewHeaders(metrics, db),
+			state:    state,
+			tracer:   trace.NewNoopTracer(),
+			cleanup:  LogCleanup(&list),
 		}
 		err = fin.MakeFinal(lastID)
 		require.NoError(t, err)
@@ -141,11 +141,11 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
-			db:      badgerimpl.ToDB(db),
-			headers: storage.NewHeaders(metrics, db),
-			state:   state,
-			tracer:  trace.NewNoopTracer(),
-			cleanup: LogCleanup(&list),
+			dbReader: badgerimpl.ToDB(db).Reader(),
+			headers:  storage.NewHeaders(metrics, db),
+			state:    state,
+			tracer:   trace.NewNoopTracer(),
+			cleanup:  LogCleanup(&list),
 		}
 		err = fin.MakeFinal(pending.ID())
 		require.Error(t, err)
@@ -189,11 +189,11 @@ func TestMakeFinalDuplicate(t *testing.T) {
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
-			db:      badgerimpl.ToDB(db),
-			headers: storage.NewHeaders(metrics, db),
-			state:   state,
-			tracer:  trace.NewNoopTracer(),
-			cleanup: LogCleanup(&list),
+			dbReader: badgerimpl.ToDB(db).Reader(),
+			headers:  storage.NewHeaders(metrics, db),
+			state:    state,
+			tracer:   trace.NewNoopTracer(),
+			cleanup:  LogCleanup(&list),
 		}
 		err = fin.MakeFinal(final.ID())
 		require.NoError(t, err)

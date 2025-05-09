@@ -8,6 +8,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	lockctx "github.com/jordanschalm/lockctx"
 	flow "github.com/onflow/flow-go/model/flow"
 	storage "github.com/onflow/flow-go/storage"
 	transaction "github.com/onflow/flow-go/storage/badger/transaction"
@@ -37,31 +38,31 @@ func (m *MockBlocks) EXPECT() *MockBlocksMockRecorder {
 }
 
 // BatchStore mocks base method.
-func (m *MockBlocks) BatchStore(arg0 storage.ReaderBatchWriter, arg1 *flow.Block) error {
+func (m *MockBlocks) BatchStore(arg0 lockctx.Proof, arg1 storage.ReaderBatchWriter, arg2 *flow.Block) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BatchStore", arg0, arg1)
+	ret := m.ctrl.Call(m, "BatchStore", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // BatchStore indicates an expected call of BatchStore.
-func (mr *MockBlocksMockRecorder) BatchStore(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockBlocksMockRecorder) BatchStore(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStore", reflect.TypeOf((*MockBlocks)(nil).BatchStore), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStore", reflect.TypeOf((*MockBlocks)(nil).BatchStore), arg0, arg1, arg2)
 }
 
 // BatchStoreWithStoringResults mocks base method.
-func (m *MockBlocks) BatchStoreWithStoringResults(arg0 storage.ReaderBatchWriter, arg1 *flow.Block, arg2 map[flow.Identifier]*flow.ExecutionResult) error {
+func (m *MockBlocks) BatchStoreWithStoringResults(arg0 lockctx.Proof, arg1 storage.ReaderBatchWriter, arg2 *flow.Block, arg3 map[flow.Identifier]*flow.ExecutionResult) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BatchStoreWithStoringResults", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "BatchStoreWithStoringResults", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // BatchStoreWithStoringResults indicates an expected call of BatchStoreWithStoringResults.
-func (mr *MockBlocksMockRecorder) BatchStoreWithStoringResults(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockBlocksMockRecorder) BatchStoreWithStoringResults(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStoreWithStoringResults", reflect.TypeOf((*MockBlocks)(nil).BatchStoreWithStoringResults), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStoreWithStoringResults", reflect.TypeOf((*MockBlocks)(nil).BatchStoreWithStoringResults), arg0, arg1, arg2, arg3)
 }
 
 // ByCollectionID mocks base method.
@@ -121,20 +122,6 @@ func (m *MockBlocks) IndexBlockForCollections(arg0 flow.Identifier, arg1 []flow.
 func (mr *MockBlocksMockRecorder) IndexBlockForCollections(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IndexBlockForCollections", reflect.TypeOf((*MockBlocks)(nil).IndexBlockForCollections), arg0, arg1)
-}
-
-// Store mocks base method.
-func (m *MockBlocks) Store(arg0 *flow.Block) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Store", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Store indicates an expected call of Store.
-func (mr *MockBlocksMockRecorder) Store(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockBlocks)(nil).Store), arg0)
 }
 
 // StoreTx mocks base method.
@@ -249,20 +236,6 @@ func (mr *MockHeadersMockRecorder) Exists(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Exists", reflect.TypeOf((*MockHeaders)(nil).Exists), arg0)
 }
 
-// Store mocks base method.
-func (m *MockHeaders) Store(arg0 *flow.Header) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Store", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Store indicates an expected call of Store.
-func (mr *MockHeadersMockRecorder) Store(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockHeaders)(nil).Store), arg0)
-}
-
 // MockPayloads is a mock of Payloads interface.
 type MockPayloads struct {
 	ctrl     *gomock.Controller
@@ -299,20 +272,6 @@ func (m *MockPayloads) ByBlockID(arg0 flow.Identifier) (*flow.Payload, error) {
 func (mr *MockPayloadsMockRecorder) ByBlockID(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByBlockID", reflect.TypeOf((*MockPayloads)(nil).ByBlockID), arg0)
-}
-
-// Store mocks base method.
-func (m *MockPayloads) Store(arg0 flow.Identifier, arg1 *flow.Payload) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Store", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Store indicates an expected call of Store.
-func (mr *MockPayloadsMockRecorder) Store(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockPayloads)(nil).Store), arg0, arg1)
 }
 
 // MockCollections is a mock of Collections interface.

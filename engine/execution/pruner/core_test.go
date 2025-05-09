@@ -34,8 +34,10 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			db := badgerimpl.ToDB(bdb)
 			ctx, cancel := context.WithCancel(context.Background())
 			metrics := metrics.NewNoopCollector()
-			headers := store.NewHeaders(metrics, db)
-			results := store.NewExecutionResults(metrics, db)
+			all := store.InitAll(metrics, db)
+			headers := all.Headers
+			blockstore := all.Blocks
+			results := all.Results
 
 			transactions := store.NewTransactions(metrics, db)
 			collections := store.NewCollections(db, transactions)
@@ -46,14 +48,24 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			// indexed by height
 			chunks := make([]*verification.VerifiableChunkData, lastFinalizedHeight+2)
 			parentID := genesis.ID()
-			require.NoError(t, headers.Store(genesis.Header))
+			manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return blockstore.BatchStore(lctx, rw, genesis)
+			}))
+			lctx.Release()
+
 			for i := 1; i <= lastFinalizedHeight; i++ {
 				chunk, block := unittest.VerifiableChunkDataFixture(0, func(header *flow.Header) {
 					header.Height = uint64(i)
 					header.ParentID = parentID
 				})
 				chunks[i] = chunk // index by height
-				require.NoError(t, headers.Store(chunk.Header))
+				lctx := manager.NewContext()
+				require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
+				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return blockstore.BatchStore(lctx, rw, block)
+				}))
+				lctx.Release()
 				require.NoError(t, bdb.Update(operation.IndexBlockHeight(chunk.Header.Height, chunk.Header.ID())))
 				require.NoError(t, results.Store(chunk.Result))
 				require.NoError(t, results.Index(chunk.Result.BlockID, chunk.Result.ID()))
