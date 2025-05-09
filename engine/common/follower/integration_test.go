@@ -157,7 +157,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		// ensure sequential block views - that way we can easily know which block will be finalized after the test
 		for i, proposal := range flowBlocks {
 			proposal.Block.Header.View = proposal.Block.Header.Height
-			proposal.Block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+			proposal.Block.Payload = unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID))
 			if i > 0 {
 				proposal.Block.Header.ParentView = flowBlocks[i-1].Block.Header.View
 				proposal.Block.Header.ParentID = flowBlocks[i-1].Block.ID()
