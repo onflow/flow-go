@@ -46,11 +46,7 @@ func LightCollectionToMessage(c *flow.LightCollection) (*entities.Collection, er
 
 // MessageToLightCollection converts a protobuf message to a light collection
 func MessageToLightCollection(m *entities.Collection) (*flow.LightCollection, error) {
-	txIDs := make([]flow.Identifier, 0, len(m.TransactionIds))
-	for _, txId := range m.TransactionIds {
-		txIDs = append(txIDs, MessageToIdentifier(txId))
-	}
-
+	txIDs := MessagesToIdentifiers(m.TransactionIds)
 	lightCollection := flow.NewLightCollection(txIDs)
 	return &lightCollection, nil
 }
