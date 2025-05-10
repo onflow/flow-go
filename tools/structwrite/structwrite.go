@@ -251,20 +251,26 @@ func (p *PluginStructWrite) isMutationProtected(fullyQualifiedTypeName string) b
 func (p *PluginStructWrite) containsTrackedStruct(selExpr *ast.SelectorExpr, pass *analysis.Pass) (*types.Named, bool) {
 	// Handle promoted fields (embedding)
 	if sel := pass.TypesInfo.Selections[selExpr]; sel != nil && sel.Kind() == types.FieldVal {
+		// Traverse the selector’s index path and detect writes *inside* a
+		// mutation‑protected type (including promoted/embedded sub‑fields).
+		indices := sel.Index()
 		typ := sel.Recv()
-		for _, idx := range sel.Index() {
+		for i, idx := range indices {
 			structType, ok := deref(typ).Underlying().(*types.Struct)
 			if !ok || idx >= structType.NumFields() {
-				break
+				break // not a struct or invalid index—stop walking
 			}
 			field := structType.Field(idx)
-			typ = field.Type()
+			typ = field.Type() // advance to the field’s type for the next hop
 
-			if named, ok := deref(typ).(*types.Named); ok {
-				fullyQualified := named.String()
-				if p.isMutationProtected(fullyQualified) {
-					return named, true
+			if named, ok := deref(typ).(*types.Named); ok && p.isMutationProtected(named.String()) {
+				// If there are more indices *after* the protected type, the write is
+				// targeting one of its sub‑fields (or a promoted field) → forbid.
+				if i < len(indices)-1 {
+					return named, true // “write to NonWritable field outside constructor”
 				}
+				// Otherwise (i == last index) we’re assigning the protected value
+				// itself (e.g. w.NonWritableField = …) → allowed.
 			}
 		}
 	}
