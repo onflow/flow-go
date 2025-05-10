@@ -15,14 +15,14 @@ func MaxUint16(a, b uint16) uint16 {
 	return b
 }
 
-// Uint16ToBinary converst a uint16 to a byte slice (big endian)
+// Uint16ToBinary converts an uint16 to a byte slice (big endian)
 func Uint16ToBinary(integer uint16) []byte {
 	b := make([]byte, 2)
 	binary.BigEndian.PutUint16(b, integer)
 	return b
 }
 
-// Uint64ToBinary converst a uint64 to a byte slice (big endian)
+// Uint64ToBinary converts an uint64 to a byte slice (big endian)
 func Uint64ToBinary(integer uint64) []byte {
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, integer)
