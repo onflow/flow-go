@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/module/util"
 )
 
 type MigrationConfig struct {
@@ -53,9 +56,12 @@ func GeneratePrefixes(n int) [][]byte {
 	return results
 }
 
-func readerWorker(wg *sync.WaitGroup, db *badger.DB, jobs <-chan []byte, kvChan chan<- KVPair) {
+func readerWorker(lgProgress func(int), wg *sync.WaitGroup, db *badger.DB, jobs <-chan []byte, kvChan chan<- KVPair) {
 	defer wg.Done()
+
 	for prefix := range jobs {
+		defer lgProgress(1)
+
 		err := db.View(func(txn *badger.Txn) error {
 			it := txn.NewIterator(badger.DefaultIteratorOptions)
 			defer it.Close()
@@ -68,6 +74,7 @@ func readerWorker(wg *sync.WaitGroup, db *badger.DB, jobs <-chan []byte, kvChan 
 				}
 				kvChan <- KVPair{Key: key, Value: val}
 			}
+
 			return nil
 		})
 		if err != nil {
@@ -134,10 +141,15 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 	kvChan := make(chan KVPair, 1000)
 
 	// Reader worker pool
+	lg := util.LogProgress(
+		log.Logger,
+		util.DefaultLogProgressConfig("migration keys from badger to pebble", len(prefixes)),
+	)
+
 	var readerWg sync.WaitGroup
 	for i := 0; i < cfg.ReaderWorkerCount; i++ {
 		readerWg.Add(1)
-		go readerWorker(&readerWg, badgerDB, prefixJobs, kvChan)
+		go readerWorker(lg, &readerWg, badgerDB, prefixJobs, kvChan)
 	}
 
 	// Step 3: Start writer workers
