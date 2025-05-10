@@ -3,7 +3,9 @@ package flow_test
 import (
 	"testing"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/encoding/rlp"
 	"github.com/onflow/flow-go/model/fingerprint"
@@ -20,4 +22,45 @@ func TestLightCollectionFingerprint(t *testing.T) {
 	decodedID := decoded.ID()
 	assert.Equal(t, colID, decodedID)
 	assert.Equal(t, col.Light(), decoded)
+}
+
+// TestLightCollectionID is a basic check that the ID function is deterministic.
+func TestLightCollectionID(t *testing.T) {
+	col := unittest.CollectionFixture(2).Light()
+	uncached := col.UncachedID()
+	id := col.ID()
+	id2 := col.ID()
+	assert.Equal(t, uncached, id)
+	assert.Equal(t, id, id2)
+}
+
+// BenchmarkLightCollectionID compares the cached and uncached ID functions.
+func BenchmarkLightCollectionID(b *testing.B) {
+	col := unittest.CollectionFixture(20).Light()
+
+	b.Run("cached", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = col.ID()
+		}
+	})
+	b.Run("uncached", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = col.UncachedID()
+		}
+	})
+}
+
+// TestLightCollectionCBOR tests that unmarshalled instances have a instantiated cache field.
+func TestLightCollectionCBOR(t *testing.T) {
+	col := unittest.CollectionFixture(2).Light()
+	colID := col.ID()
+	encoded, err := cbor.Marshal(col)
+	require.NoError(t, err)
+
+	var decoded flow.LightCollection
+	err = cbor.Unmarshal(encoded, &decoded)
+	require.NoError(t, err)
+
+	decodedID := decoded.ID()
+	assert.Equal(t, colID, decodedID)
 }
