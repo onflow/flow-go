@@ -98,6 +98,18 @@ func (l *LightTransactionResults) Store(blockID flow.Identifier, transactionResu
 	return nil
 }
 
+// Data returns a copy of the cached light transaction results grouped by block ID.
+func (l *LightTransactionResults) Data() []flow.LightTransactionResult {
+	l.lock.RLock()
+	defer l.lock.RUnlock()
+
+	out := make([]flow.LightTransactionResult, 0, len(l.blockStore))
+	for _, results := range l.blockStore {
+		out = append(out, results...)
+	}
+	return out
+}
+
 // BatchStore inserts a batch of transaction result into a batch.
 // This method is not implemented and will always return an error.
 func (l *LightTransactionResults) BatchStore(flow.Identifier, []flow.LightTransactionResult, storage.ReaderBatchWriter) error {
