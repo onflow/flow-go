@@ -18,7 +18,7 @@ import (
 	dkgmod "github.com/onflow/flow-go/module/dkg"
 )
 
-var errClientDisabled = fmt.Errorf("dkg client artifically disabled for tests")
+var errClientDisabled = fmt.Errorf("dkg client artificially disabled for tests")
 
 // DKGClientWrapper implements the DKGContractClient interface , and provides a
 // mechanism to simulate a situations where the DKG node cannot access the DKG
