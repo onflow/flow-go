@@ -1,4 +1,4 @@
-package requester_test
+package requester
 
 import (
 	"context"
@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/state/protocol"
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
@@ -45,7 +44,7 @@ type ExecutionDataRequesterSuite struct {
 	datastore   datastore.Batching
 	db          *badger.DB
 	downloader  *exedatamock.Downloader
-	distributor *requester.ExecutionDataDistributor
+	distributor *ExecutionDataDistributor
 
 	run edTestRun
 
@@ -89,7 +88,7 @@ type edTestRun struct {
 
 type testExecutionDataCallback func(*execution_data.BlockExecutionData) (*execution_data.BlockExecutionData, error)
 
-func mockDownloader(edStore map[flow.Identifier]*testExecutionDataServiceEntry) *exedatamock.Downloader {
+func MockDownloader(edStore map[flow.Identifier]*testExecutionDataServiceEntry) *exedatamock.Downloader {
 	downloader := new(exedatamock.Downloader)
 
 	get := func(id flow.Identifier) (*execution_data.BlockExecutionData, error) {
@@ -180,7 +179,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterProcessesBlocks() {
 				suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
 				suite.blobstore = blobs.NewBlobstore(suite.datastore)
 
-				testData := suite.generateTestData(run.blockCount, run.specialBlocks(run.blockCount))
+				testData := generateTestData(suite.T(), suite.blobstore, run.blockCount, run.specialBlocks(run.blockCount))
 				edr, fd := suite.prepareRequesterTest(testData)
 				fetchedExecutionData := suite.runRequesterTest(edr, fd, testData)
 
@@ -198,7 +197,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterResumesAfterRestart() {
 	suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
 	suite.blobstore = blobs.NewBlobstore(suite.datastore)
 
-	testData := suite.generateTestData(suite.run.blockCount, suite.run.specialBlocks(suite.run.blockCount))
+	testData := generateTestData(suite.T(), suite.blobstore, suite.run.blockCount, suite.run.specialBlocks(suite.run.blockCount))
 
 	test := func(stopHeight, resumeHeight uint64) {
 		testData.fetchedExecutionData = nil
@@ -247,7 +246,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterCatchesUp() {
 		suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
 		suite.blobstore = blobs.NewBlobstore(suite.datastore)
 
-		testData := suite.generateTestData(suite.run.blockCount, suite.run.specialBlocks(suite.run.blockCount))
+		testData := generateTestData(suite.T(), suite.blobstore, suite.run.blockCount, suite.run.specialBlocks(suite.run.blockCount))
 
 		// start processing with all seals available
 		edr, fd := suite.prepareRequesterTest(testData)
@@ -273,7 +272,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterPausesAndResumes() {
 		// until the resume() is called.
 		generate, resume := generatePauseResume(pauseHeight)
 
-		testData := suite.generateTestData(suite.run.blockCount, generate(suite.run.blockCount))
+		testData := generateTestData(suite.T(), suite.blobstore, suite.run.blockCount, generate(suite.run.blockCount))
 		testData.maxSearchAhead = maxSearchAhead
 		testData.waitTimeout = time.Second * 10
 
@@ -303,7 +302,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterHalts() {
 
 		// generate a block that will return a malformed blob error. causing the requester to halt
 		generate, expectedErr := generateBlocksWithHaltingError(suite.run.blockCount)
-		testData := suite.generateTestData(suite.run.blockCount, generate(suite.run.blockCount))
+		testData := generateTestData(suite.T(), suite.blobstore, suite.run.blockCount, generate(suite.run.blockCount))
 
 		// start processing with all seals available
 		edr, followerDistributor := suite.prepareRequesterTest(testData)
@@ -391,7 +390,7 @@ func generatePauseResume(pauseHeight uint64) (specialBlockGenerator, func()) {
 
 func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun) (state_synchronization.ExecutionDataRequester, *pubsub.FollowerDistributor) {
 	logger := unittest.Logger()
-	metrics := metrics.NewNoopCollector()
+	metricsCollector := metrics.NewNoopCollector()
 
 	headers := synctest.MockBlockHeaderStorage(
 		synctest.WithByID(cfg.blocksByID),
@@ -406,26 +405,26 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	)
 	state := suite.mockProtocolState(cfg.blocksByHeight)
 
-	suite.downloader = mockDownloader(cfg.executionDataEntries)
-	suite.distributor = requester.NewExecutionDataDistributor()
+	suite.downloader = MockDownloader(cfg.executionDataEntries)
+	suite.distributor = NewExecutionDataDistributor()
 
-	heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metrics)
-	cache := cache.NewExecutionDataCache(suite.downloader, headers, seals, results, heroCache)
+	heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
+	edCache := cache.NewExecutionDataCache(suite.downloader, headers, seals, results, heroCache)
 
 	followerDistributor := pubsub.NewFollowerDistributor()
 	processedHeight := store.NewConsumerProgress(badgerimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterBlockHeight)
 	processedNotification := store.NewConsumerProgress(badgerimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterNotification)
 
-	edr, err := requester.New(
+	edr, err := New(
 		logger,
-		metrics,
+		metricsCollector,
 		suite.downloader,
-		cache,
+		edCache,
 		processedHeight,
 		processedNotification,
 		state,
 		headers,
-		requester.ExecutionDataConfig{
+		ExecutionDataConfig{
 			InitialBlockHeight: cfg.startHeight - 1,
 			MaxSearchAhead:     cfg.maxSearchAhead,
 			FetchTimeout:       cfg.fetchTimeout,
@@ -632,7 +631,7 @@ func (r *fetchTestRun) IsLastSeal(blockID flow.Identifier) bool {
 	return lastSeal == r.blocksByID[blockID].ID()
 }
 
-func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, specialHeightFuncs map[uint64]testExecutionDataCallback) *fetchTestRun {
+func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, specialHeightFuncs map[uint64]testExecutionDataCallback) *fetchTestRun {
 	edsEntries := map[flow.Identifier]*testExecutionDataServiceEntry{}
 	blocksByHeight := map[uint64]*flow.Block{}
 	blocksByID := map[flow.Identifier]*flow.Block{}
@@ -650,7 +649,7 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 	endHeight := uint64(blockCount) - 1
 
 	// instantiate ExecutionDataService to generate correct CIDs
-	eds := execution_data.NewExecutionDataStore(suite.blobstore, execution_data.DefaultSerializer)
+	eds := execution_data.NewExecutionDataStore(blobstore, execution_data.DefaultSerializer)
 
 	var previousBlock *flow.Block
 	var previousResult *flow.ExecutionResult
@@ -668,7 +667,7 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 				unittest.Seal.WithResult(resultsByBlockID[sealedBlock.ID()]),
 			)
 
-			suite.T().Logf("block %d has seals for %d", i, seals[0].Height)
+			t.Logf("block %d has seals for %d", i, seals[0].Height)
 		}
 
 		height := uint64(i)
@@ -677,7 +676,7 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 		ed := unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(block.ID()))
 
 		cid, err := eds.Add(context.Background(), ed)
-		require.NoError(suite.T(), err)
+		require.NoError(t, err)
 
 		result := buildResult(block, cid, previousResult)
 
@@ -715,8 +714,8 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 		executionDataIDByBlockID: executionDataIDByBlockID,
 		waitTimeout:              time.Second * 5,
 
-		maxSearchAhead: requester.DefaultMaxSearchAhead,
-		fetchTimeout:   requester.DefaultFetchTimeout,
+		maxSearchAhead: DefaultMaxSearchAhead,
+		fetchTimeout:   DefaultFetchTimeout,
 		retryDelay:     1 * time.Millisecond,
 		maxRetryDelay:  15 * time.Millisecond,
 	}
