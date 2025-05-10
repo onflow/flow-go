@@ -148,7 +148,11 @@ func (r *Reader) IsExecuted(blockID flow.Identifier) (bool, error) {
 }
 
 func run(*cobra.Command, []string) {
-	db := common.InitStorage(flagDatadir)
+	flagDBs := common.ReadDBFlags()
+	db, err := common.InitBadgerStorage(flagDBs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not init badger db")
+	}
 	defer db.Close()
 
 	storages := common.InitStorages(db)
