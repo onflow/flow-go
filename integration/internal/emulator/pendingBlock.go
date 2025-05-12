@@ -38,7 +38,6 @@ const MaxViewIncrease = 3
 
 // A pendingBlock contains the pending state required to form a new block.
 type pendingBlock struct {
-	BlockID   flowgo.Identifier
 	height    uint64
 	view      uint64
 	parentID  flowgo.Identifier
@@ -79,8 +78,6 @@ func newPendingBlock(
 		events: make([]flowgo.Event, 0),
 		index:  0,
 	}
-
-	pb.BlockID = pb.Block().ID()
 
 	return pb
 }
