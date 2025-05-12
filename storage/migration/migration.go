@@ -56,7 +56,13 @@ func GeneratePrefixes(n int) [][]byte {
 	return results
 }
 
-func readerWorker(lgProgress func(int), wg *sync.WaitGroup, db *badger.DB, jobs <-chan []byte, kvChan chan<- KVPair) {
+func readerWorker(
+	lgProgress func(int),
+	wg *sync.WaitGroup,
+	db *badger.DB,
+	jobs <-chan []byte,
+	kvChan chan<- KVPair,
+) error {
 	defer wg.Done()
 
 	for prefix := range jobs {
@@ -77,38 +83,46 @@ func readerWorker(lgProgress func(int), wg *sync.WaitGroup, db *badger.DB, jobs 
 
 			return nil
 		})
+
 		if err != nil {
-			fmt.Printf("Reader error for prefix %x: %v\n", prefix, err)
+			return fmt.Errorf("Reader error for prefix %x: %v\n", prefix, err)
 		}
 	}
+
+	return nil
 }
 
-func writerWorker(wg *sync.WaitGroup, db *pebble.DB, kvChan <-chan KVPair, batchSize int) {
+func writerWorker(wg *sync.WaitGroup, db *pebble.DB, kvChan <-chan KVPair, batchSize int) error {
 	defer wg.Done()
 	batch := db.NewBatch()
 	var size int
 
-	flush := func() {
+	flush := func() error {
 		if err := batch.Commit(nil); err != nil {
-			fmt.Printf("Writer error committing batch: %v\n", err)
+			return fmt.Errorf("fail to commit batch: %w", err)
 		}
 		batch = db.NewBatch()
 		size = 0
+		return nil
 	}
 
 	for kv := range kvChan {
 		if err := batch.Set(kv.Key, kv.Value, nil); err != nil {
-			fmt.Printf("Writer error: %v\n", err)
-			continue
+			return fmt.Errorf("fail to set key value for key %x: %w", kv.Key, err)
 		}
 		size += len(kv.Key) + len(kv.Value)
 		if size >= batchSize {
-			flush()
+			if err := flush(); err != nil {
+				return err
+			}
 		}
 	}
 	if size > 0 {
-		flush()
+		if err := flush(); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // CopyFromBadgerToPebble migrates all key-value pairs from a BadgerDB instance to a PebbleDB instance.
@@ -146,17 +160,26 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 		util.DefaultLogProgressConfig("migration keys from badger to pebble", len(prefixes)),
 	)
 
+	// Error collection
+	errChan := make(chan error, cfg.ReaderWorkerCount+cfg.WriterWorkerCount)
+
 	var readerWg sync.WaitGroup
 	for i := 0; i < cfg.ReaderWorkerCount; i++ {
 		readerWg.Add(1)
-		go readerWorker(lg, &readerWg, badgerDB, prefixJobs, kvChan)
+		go func() {
+			err := readerWorker(lg, &readerWg, badgerDB, prefixJobs, kvChan)
+			errChan <- err
+		}()
 	}
 
 	// Step 3: Start writer workers
 	var writerWg sync.WaitGroup
 	for i := 0; i < cfg.WriterWorkerCount; i++ {
 		writerWg.Add(1)
-		go writerWorker(&writerWg, pebbleDB, kvChan, cfg.BatchByteSize)
+		go func() {
+			err := writerWorker(&writerWg, pebbleDB, kvChan, cfg.BatchByteSize)
+			errChan <- err
+		}()
 	}
 
 	// Wait for all readers to finish, then close writer channel
@@ -166,5 +189,14 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 	}()
 
 	writerWg.Wait()
+
+	// Check for errors
+	close(errChan)
+	for err := range errChan {
+		if err != nil {
+			return fmt.Errorf("error: %w", err)
+		}
+	}
+
 	return nil
 }
