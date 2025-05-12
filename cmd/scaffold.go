@@ -285,7 +285,7 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 		var hotstuffViewFunc func() (uint64, error)
 		// Setup consensus nodes to report their HotStuff view
 		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
-			hotstuffReader, err := persister.NewReader(node.DB, node.RootChainID)
+			hotstuffReader, err := persister.NewReader(node.ProtocolDB, node.RootChainID)
 			if err != nil {
 				return nil, err
 			}
