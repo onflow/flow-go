@@ -140,6 +140,7 @@ func TestBatchWriteArgumentCanBeModified(t *testing.T) {
 		// Retrieve value with original key.
 		retreivedValue, closer, err := db.Reader().Get([]byte{0x01})
 		defer closer.Close()
+		require.NoError(t, err)
 		require.Equal(t, []byte{0x02}, retreivedValue)
 	})
 }
