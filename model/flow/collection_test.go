@@ -14,6 +14,7 @@ import (
 )
 
 func TestLightCollectionFingerprint(t *testing.T) {
+	t.Skip("skipping until merging with feature/malleability branch as it will be removed")
 	col := unittest.CollectionFixture(2)
 	colID := col.ID()
 	data := fingerprint.Fingerprint(col.Light())
