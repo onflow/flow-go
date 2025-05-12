@@ -2,6 +2,7 @@ package flow
 
 import (
 	"github.com/fxamacker/cbor/v2"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/model/fingerprint"
 )
@@ -95,7 +96,18 @@ func (lc *LightCollection) UnmarshalCBOR(bytes []byte) error {
 	if err != nil {
 		return err
 	}
-	lc.cachedID = newIDCache(lc.UncachedID)
+	lc.cachedID = newIDCache(lc.UncachedID) //nolint:structwrite
+	return nil
+}
+
+func (lc *LightCollection) UnmarshalMsgpack(bytes []byte) error {
+	type alias LightCollection
+	lca := (*alias)(lc)
+	err := msgpack.Unmarshal(bytes, &lca)
+	if err != nil {
+		return err
+	}
+	lc.cachedID = newIDCache(lc.UncachedID) //nolint:structwrite
 	return nil
 }
 
