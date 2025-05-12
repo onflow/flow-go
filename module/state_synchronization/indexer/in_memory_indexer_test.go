@@ -21,20 +21,22 @@ import (
 )
 
 func TestNewInMemoryIndexer(t *testing.T) {
-	blockHeight := uint64(42)
-
-	indexer := createInMemoryIndexer(blockHeight)
+	header := unittest.BlockHeaderFixture()
+	block := unittest.BlockWithParentFixture(header)
+	exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
+	indexer := createInMemoryIndexer(exeResult, header)
 
 	assert.NotNil(t, indexer)
-	assert.Equal(t, blockHeight, indexer.registers.LatestHeight())
+	assert.Equal(t, header.Height, indexer.registers.LatestHeight())
 }
 
 func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
-	blockID := unittest.IdentifierFixture()
-	blockHeight := uint64(42)
-
 	t.Run("Index Single Chunk and Single Register", func(t *testing.T) {
-		indexer := createInMemoryIndexer(blockHeight)
+		header := unittest.BlockHeaderFixture()
+		block := unittest.BlockWithParentFixture(header)
+		blockID := block.ID()
+		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
+		indexer := createInMemoryIndexer(exeResult, header)
 
 		trie := createTestTrieUpdate(t)
 		collection := unittest.CollectionFixture(0)
@@ -62,7 +64,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 			id, err := convert.LedgerKeyToRegisterID(k)
 			require.NoError(t, err)
 
-			value, err := indexer.RegisterValue(id, blockHeight)
+			value, err := indexer.registers.Get(id, header.Height)
 			require.NoError(t, err)
 
 			// Compare byte slices directly instead of comparing types
@@ -71,7 +73,11 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 	})
 
 	t.Run("Index Multiple Chunks and Merge Same Register Updates", func(t *testing.T) {
-		indexer := createInMemoryIndexer(blockHeight)
+		header := unittest.BlockHeaderFixture()
+		block := unittest.BlockWithParentFixture(header)
+		blockID := block.ID()
+		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
+		indexer := createInMemoryIndexer(exeResult, header)
 
 		tries := []*ledger.TrieUpdate{createTestTrieUpdate(t), createTestTrieUpdate(t)}
 		// Make sure we have two register updates that are updating the same value
@@ -104,14 +110,18 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Verify register was indexed
-		value, err := indexer.RegisterValue(testRegisterID, blockHeight)
+		value, err := indexer.registers.Get(testRegisterID, header.Height)
 		require.NoError(t, err)
 		// Compare byte slices directly
 		assert.ElementsMatch(t, []byte(testValue.Value()), value, "Register values should match")
 	})
 
 	t.Run("Index Events", func(t *testing.T) {
-		indexer := createInMemoryIndexer(blockHeight)
+		header := unittest.BlockHeaderFixture()
+		block := unittest.BlockWithParentFixture(header)
+		blockID := block.ID()
+		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
+		indexer := createInMemoryIndexer(exeResult, header)
 
 		expectedEvents := unittest.EventsFixture(20)
 		collection := unittest.CollectionFixture(0)
@@ -156,7 +166,11 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 	})
 
 	t.Run("Index Tx Results", func(t *testing.T) {
-		indexer := createInMemoryIndexer(blockHeight)
+		header := unittest.BlockHeaderFixture()
+		block := unittest.BlockWithParentFixture(header)
+		blockID := block.ID()
+		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
+		indexer := createInMemoryIndexer(exeResult, header)
 
 		expectedResults := unittest.LightTransactionResultsFixture(20)
 		collection := unittest.CollectionFixture(0)
@@ -201,7 +215,11 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 	})
 
 	t.Run("Index Collections", func(t *testing.T) {
-		indexer := createInMemoryIndexer(blockHeight)
+		header := unittest.BlockHeaderFixture()
+		block := unittest.BlockWithParentFixture(header)
+		blockID := block.ID()
+		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
+		indexer := createInMemoryIndexer(exeResult, header)
 
 		// Create collections and store them directly first
 		expectedCollections := unittest.CollectionListFixture(2)
@@ -257,7 +275,11 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 	})
 
 	t.Run("Index AllTheThings", func(t *testing.T) {
-		indexer := createInMemoryIndexer(blockHeight)
+		header := unittest.BlockHeaderFixture()
+		block := unittest.BlockWithParentFixture(header)
+		blockID := block.ID()
+		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
+		indexer := createInMemoryIndexer(exeResult, header)
 
 		expectedEvents := unittest.EventsFixture(20)
 		expectedResults := unittest.LightTransactionResultsFixture(20)
@@ -337,57 +359,25 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 
 		// Check each register has the correct value
 		for id, expectedValue := range payloads {
-			value, err := indexer.RegisterValue(id, blockHeight)
+			value, err := indexer.registers.Get(id, header.Height)
 			require.NoError(t, err)
 			assert.ElementsMatch(t, expectedValue, value, "Register values should match")
 		}
 	})
 }
 
-func TestInMemoryIndexer_RegisterValue(t *testing.T) {
-	blockHeight := uint64(42)
-	indexer := createInMemoryIndexer(blockHeight)
-
-	// Create test register entries
-	regOwnerAddress := unittest.RandomAddressFixture()
-	regOwner := string(regOwnerAddress.Bytes())
-	regKey := "code"
-	registerID := flow.RegisterID{Owner: regOwner, Key: regKey}
-
-	// Create and store a payload
-	testValue := []byte("test value")
-	payload := createTestLedgerPayload(regOwner, regKey, testValue)
-
-	// Index the register
-	err := indexer.indexRegisters(map[ledger.Path]*ledger.Payload{
-		ledger.DummyPath: payload,
-	}, blockHeight)
-	require.NoError(t, err)
-
-	// Retrieve the value
-	value, err := indexer.RegisterValue(registerID, blockHeight)
-	require.NoError(t, err)
-	assert.ElementsMatch(t, testValue, value, "Register values should match")
-
-	// Test retrieval of non-existent register
-	nonExistentID := flow.RegisterID{Owner: "nonexistent", Key: "nonexistent"}
-	value, err = indexer.RegisterValue(nonExistentID, blockHeight)
-	require.NoError(t, err)
-	assert.Nil(t, value)
-}
-
 // Helper functions
 
-func createInMemoryIndexer(blockHeight uint64) *InMemoryIndexer {
-	return NewInMemoryIndexer(InMemoryIndexerConfig{
-		Log:          zerolog.Nop(),
-		Metrics:      metrics.NewNoopCollector(),
-		Registers:    unsynchronized.NewRegisters(blockHeight),
-		Events:       unsynchronized.NewEvents(),
-		Collections:  unsynchronized.NewCollections(),
-		Transactions: unsynchronized.NewTransactions(),
-		Results:      unsynchronized.NewLightTransactionResults(),
-	})
+func createInMemoryIndexer(executionResult *flow.ExecutionResult, header *flow.Header) *InMemoryIndexer {
+	return NewInMemoryIndexer(zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		unsynchronized.NewRegisters(header.Height),
+		unsynchronized.NewEvents(),
+		unsynchronized.NewCollections(),
+		unsynchronized.NewTransactions(),
+		unsynchronized.NewLightTransactionResults(),
+		executionResult,
+		header)
 }
 
 func createTestTrieWithPayloads(payloads []*ledger.Payload) *ledger.TrieUpdate {
