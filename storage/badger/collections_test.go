@@ -31,7 +31,8 @@ func TestCollections(t *testing.T) {
 		require.NoError(t, err)
 
 		// check if the light collection was indeed persisted
-		assert.Equal(t, &expected, actual)
+		assert.Equal(t, expected.Transactions, actual.Transactions)
+		assert.Equal(t, expected.ID(), actual.ID())
 
 		expectedID := expected.ID()
 
@@ -73,7 +74,8 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 		// should be able to retrieve col2 by ID
 		gotLightByCol2ID, err := collections.LightByID(col2.ID())
 		require.NoError(t, err)
-		assert.Equal(t, &col2Light, gotLightByCol2ID)
+		assert.Equal(t, col2Light.Transactions, gotLightByCol2ID.Transactions)
+		assert.Equal(t, col2Light.ID(), gotLightByCol2ID.ID())
 
 		// should be able to retrieve col2 by the transaction which only appears in col2
 		_, err = collections.LightByTransactionID(col2Tx.ID())
@@ -82,6 +84,7 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 		// col1 (not col2) should be indexed by the shared transaction (since col1 was inserted first)
 		gotLightByDupTxID, err := collections.LightByTransactionID(dupTx.ID())
 		require.NoError(t, err)
-		assert.Equal(t, &col1Light, gotLightByDupTxID)
+		assert.Equal(t, col1Light.Transactions, gotLightByDupTxID.Transactions)
+		assert.Equal(t, col1Light.ID(), gotLightByDupTxID.ID())
 	})
 }
