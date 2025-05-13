@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"fmt"
 )
 
 // Core defines the interface for pipeline processing steps.
@@ -16,4 +17,29 @@ type Core interface {
 
 	// Persist stores the indexed data in permanent storage.
 	Persist(ctx context.Context) error
+
+	// Abort performs any necessary cleanup in case of failure.
+	Abort(ctx context.Context) error
+}
+
+type CoreImpl struct{}
+
+func NewCore() *CoreImpl {
+	return &CoreImpl{}
+}
+
+func (c *CoreImpl) Download(ctx context.Context) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (c *CoreImpl) Index(ctx context.Context) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (c *CoreImpl) Persist(ctx context.Context) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (c *CoreImpl) Abort(ctx context.Context) error {
+	return fmt.Errorf("not implemented")
 }
