@@ -107,7 +107,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	)
 
 	executableBlock := &entity.ExecutableBlock{
-		Block: block,
+		Block: &block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.CollectionID: {
 				Guarantee:    &guarantee,
@@ -802,7 +802,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 	)
 
 	executableBlock := &entity.ExecutableBlock{
-		Block: block,
+		Block: &block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.CollectionID: {
 				Guarantee:    &guarantee,

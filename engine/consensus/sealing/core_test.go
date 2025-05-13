@@ -680,7 +680,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	rootSnapshot.On("SealingSegment").Return(
 		&flow.SealingSegment{Blocks: []*flow.BlockProposal{
 			{
-				Block: *flow.NewBlock(s.rootHeader.HeaderBody, flow.Payload{}),
+				Block: flow.NewBlock(s.rootHeader.HeaderBody, flow.Payload{}),
 				// By convention, root block has no proposer signature - implementation has to handle this edge case
 				ProposerSigData: nil,
 			},
@@ -840,16 +840,16 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 		&flow.SealingSegment{
 			Blocks: []*flow.BlockProposal{
 				{
-					Block: *block,
+					Block: block,
 					// By convention, root block has no proposer signature - implementation has to handle this edge case
 					ProposerSigData: nil,
 				},
 				{
-					Block:           *parent,
+					Block:           parent,
 					ProposerSigData: unittest.SignatureFixture(),
 				},
 				{
-					Block:           *incorporated,
+					Block:           incorporated,
 					ProposerSigData: unittest.SignatureFixture(),
 				},
 			},

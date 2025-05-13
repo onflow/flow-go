@@ -429,7 +429,7 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 	// we should store the light collection and index its transactions
 	s.collections.On("StoreLightAndIndexByTransaction", &light).Return(nil).Once()
 	block := flow.NewBlock(flow.HeaderBody{Height: 0}, flow.Payload{Guarantees: []*flow.CollectionGuarantee{}})
-	s.blocks.On("ByID", mock.Anything).Return(block, nil)
+	s.blocks.On("ByID", mock.Anything).Return(&block, nil)
 
 	// for each transaction in the collection, we should store it
 	needed := make(map[flow.Identifier]struct{})

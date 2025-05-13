@@ -21,7 +21,8 @@ func Genesis(chainID ChainID) *Block {
 	}
 
 	// combine to block
-	return NewBlock(headerBody, payload)
+	block := NewBlock(headerBody, payload)
+	return &block
 }
 
 // Block (currently) includes the all block header metadata and the payload content.
@@ -38,8 +39,8 @@ type Block struct {
 func NewBlock(
 	headerBody HeaderBody,
 	payload Payload,
-) *Block {
-	return &Block{
+) Block {
+	return Block{
 		Header:  headerBody,
 		Payload: payload,
 	}

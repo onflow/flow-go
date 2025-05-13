@@ -668,7 +668,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		return nil, fmt.Errorf("could not sign the block: %w", err)
 	}
 	proposal := &flow.BlockProposal{
-		Block:           *block,
+		Block:           block,
 		ProposerSigData: sig,
 	}
 

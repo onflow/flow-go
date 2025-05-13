@@ -293,7 +293,7 @@ func withNextEpoch(
 	rootBlockPayload := rootBlock.Payload
 	rootBlockPayload.ProtocolStateID = rootKVStore.ID()
 
-	rootBlock = *flow.NewBlock(rootBlock.Header, rootBlockPayload)
+	rootBlock = flow.NewBlock(rootBlock.Header, rootBlockPayload)
 	// rootBlock is not pointer, so we need to update Snapshot
 	encodableSnapshot.SealingSegment.Blocks[0].Block = rootBlock
 

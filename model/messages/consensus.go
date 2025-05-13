@@ -33,7 +33,7 @@ func NewUntrustedProposal(internal *flow.BlockProposal) *UntrustedProposal {
 // TODO(malleability immutable): This conversion should eventually be accompanied by a full validation of the untrusted input.
 func (msg *UntrustedProposal) ToInternal() *flow.BlockProposal {
 	return &flow.BlockProposal{
-		Block:           *flow.NewBlock(msg.Block.Header, msg.Block.Payload),
+		Block:           flow.NewBlock(msg.Block.Header, msg.Block.Payload),
 		ProposerSigData: msg.ProposerSigData,
 	}
 }

@@ -242,7 +242,7 @@ func FullBlockFixture() flow.Block {
 	block := BlockFixture()
 	payload := PayloadFixture(WithAllTheFixins)
 
-	return *flow.NewBlock(block.Header, payload)
+	return flow.NewBlock(block.Header, payload)
 }
 
 func BlockFixtures(number int) []*flow.Block {
@@ -398,20 +398,23 @@ func BlockWithParentFixture(parent *flow.Header) *flow.Block {
 // with respect to the given parent block and with given payload.
 func BlockWithParentAndPayload(parent *flow.Header, payload flow.Payload) *flow.Block {
 	headerBody := HeaderBodyWithParentFixture(parent)
-	return flow.NewBlock(*headerBody, payload)
+	block := flow.NewBlock(*headerBody, payload)
+	return &block
 }
 
 func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
 	payload := PayloadFixture(WithProtocolStateID(parent.Payload.ProtocolStateID))
 	headerBody := HeaderBodyWithParentFixture(parent.ToHeader())
-	return flow.NewBlock(*headerBody, payload)
+	block := flow.NewBlock(*headerBody, payload)
+	return &block
 }
 
 func BlockWithGuaranteesFixture(guarantees []*flow.CollectionGuarantee) *flow.Block {
 	payload := PayloadFixture(WithGuarantees(guarantees...))
 	headerBody := HeaderBodyFixture()
 
-	return flow.NewBlock(*headerBody, payload)
+	block := flow.NewBlock(*headerBody, payload)
+	return &block
 }
 
 func WithoutGuarantee(payload *flow.Payload) {
@@ -1644,7 +1647,7 @@ func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.HeaderBody
 		Result:        &result,
 		ChunkDataPack: chunkDataPack,
 		EndState:      endState,
-	}, block
+	}, &block
 }
 
 // ChunkDataResponseMsgFixture creates a chunk data response message with a single-transaction collection, and random chunk ID.
@@ -2368,7 +2371,7 @@ func BootstrapFixtureWithSetupAndCommit(
 	root := flow.NewBlock(header, flow.Payload{ProtocolStateID: rootProtocolState.ID()})
 	stateCommit := GenesisStateCommitmentByChainID(header.ChainID)
 
-	result := BootstrapExecutionResultFixture(root, stateCommit)
+	result := BootstrapExecutionResultFixture(&root, stateCommit)
 	result.ServiceEvents = []flow.ServiceEvent{
 		setup.ServiceEvent(),
 		commit.ServiceEvent(),
@@ -2376,7 +2379,7 @@ func BootstrapFixtureWithSetupAndCommit(
 
 	seal := Seal.Fixture(Seal.WithResult(result))
 
-	return root, result, seal
+	return &root, result, seal
 }
 
 // RootSnapshotFixture returns a snapshot representing a root chain state, for

@@ -81,42 +81,42 @@ func TestBlocks(t *testing.T) {
 	})
 
 	t.Run("should be able to insert block", func(t *testing.T) {
-		err := store.StoreBlock(context.Background(), block1)
+		err := store.StoreBlock(context.Background(), &block1)
 		assert.NoError(t, err)
 	})
 
 	// insert block 1
-	err := store.StoreBlock(context.Background(), block1)
+	err := store.StoreBlock(context.Background(), &block1)
 	assert.NoError(t, err)
 
 	t.Run("should be able to get inserted block", func(t *testing.T) {
 		t.Run("BlockByHeight", func(t *testing.T) {
 			block, err := store.BlockByHeight(context.Background(), block1.Header.Height)
 			assert.NoError(t, err)
-			assert.Equal(t, block1, block)
+			assert.Equal(t, &block1, block)
 		})
 
 		t.Run("BlockByID", func(t *testing.T) {
 			block, err := store.BlockByID(context.Background(), block1.ID())
 			assert.NoError(t, err)
-			assert.Equal(t, block1, block)
+			assert.Equal(t, &block1, block)
 		})
 
 		t.Run("LatestBlock", func(t *testing.T) {
 			block, err := store.LatestBlock(context.Background())
 			assert.NoError(t, err)
-			assert.Equal(t, *block1, block)
+			assert.Equal(t, block1, block)
 		})
 	})
 
 	// insert block 2
-	err = store.StoreBlock(context.Background(), block2)
+	err = store.StoreBlock(context.Background(), &block2)
 	assert.NoError(t, err)
 
 	t.Run("Latest block should update", func(t *testing.T) {
 		block, err := store.LatestBlock(context.Background())
 		assert.NoError(t, err)
-		assert.Equal(t, *block2, block)
+		assert.Equal(t, block2, block)
 	})
 }
 

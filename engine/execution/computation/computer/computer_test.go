@@ -1631,7 +1631,7 @@ func generateBlockWithVisitor(
 	)
 
 	return &entity.ExecutableBlock{
-		Block:               block,
+		Block:               &block,
 		CompleteCollections: completeCollections,
 		StartState:          unittest.StateCommitmentPointerFixture(),
 	}
