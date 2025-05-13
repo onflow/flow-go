@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -17,8 +18,6 @@ type ResultApprovals interface {
 
 	// Store stores a ResultApproval by its ID.
 	// No errors are expected during normal operations.
-	Store(result *flow.ResultApproval) error
-
 	// Index indexes a ResultApproval by result ID and chunk index.
 	//
 	// CAUTION: the Flow protocol requires multiple approvals for the same chunk from different verification
@@ -32,7 +31,7 @@ type ResultApprovals interface {
 	// for the same key (resultID, chunkIndex) this method returns an exception, as this should never happen for
 	// a correct Verification Node indexing its own approvals.
 	// No errors are expected during normal operations.
-	Index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error
+	Store(lctx lockctx.Proof, result *flow.ResultApproval) error
 
 	// ByID retrieves a ResultApproval by its ID.
 	// Returns [storage.ErrNotFound] if no Approval with the given ID has been stored.

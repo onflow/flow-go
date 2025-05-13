@@ -241,7 +241,9 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.State,
 				node.Me,
 				chunkVerifier,
-				approvalStorage)
+				approvalStorage,
+				node.StorageLockMgr,
+			)
 			return verifierEng, err
 		}).
 		Component("chunk consumer, requester, and fetcher engines", func(node *NodeConfig) (module.ReadyDoneAware, error) {
