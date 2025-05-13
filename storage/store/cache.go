@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
 )
 
-// nolint:unused
 func withLimit[K comparable, V any](limit uint) func(*Cache[K, V]) {
 	return func(c *Cache[K, V]) {
 		c.limit = limit
@@ -19,21 +19,30 @@ func withLimit[K comparable, V any](limit uint) func(*Cache[K, V]) {
 
 type storeFunc[K comparable, V any] func(rw storage.ReaderBatchWriter, key K, val V) error
 
+type storeWithLockFunc[K comparable, V any] func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, key K, val V) error
+
 const DefaultCacheSize = uint(1000)
 
-// nolint:unused
 func withStore[K comparable, V any](store storeFunc[K, V]) func(*Cache[K, V]) {
 	return func(c *Cache[K, V]) {
 		c.store = store
 	}
 }
 
-// nolint:unused
+func withStoreWithLock[K comparable, V any](store storeWithLockFunc[K, V]) func(*Cache[K, V]) {
+	return func(c *Cache[K, V]) {
+		c.storeWithLock = store
+	}
+}
+
 func noStore[K comparable, V any](_ storage.ReaderBatchWriter, _ K, _ V) error {
 	return fmt.Errorf("no store function for cache put available")
 }
 
-// nolint: unused
+func noStoreWithLock[K comparable, V any](_ lockctx.Proof, _ storage.ReaderBatchWriter, _ K, _ V) error {
+	return fmt.Errorf("no store function for cache put with lock available")
+}
+
 func noopStore[K comparable, V any](_ storage.ReaderBatchWriter, _ K, _ V) error {
 	return nil
 }
@@ -52,39 +61,37 @@ func noRemove[K comparable](_ storage.ReaderBatchWriter, _ K) error {
 
 type retrieveFunc[K comparable, V any] func(r storage.Reader, key K) (V, error)
 
-// nolint:unused
 func withRetrieve[K comparable, V any](retrieve retrieveFunc[K, V]) func(*Cache[K, V]) {
 	return func(c *Cache[K, V]) {
 		c.retrieve = retrieve
 	}
 }
 
-// nolint:unused
 func noRetrieve[K comparable, V any](_ storage.Reader, _ K) (V, error) {
 	var nullV V
 	return nullV, fmt.Errorf("no retrieve function for cache get available")
 }
 
 type Cache[K comparable, V any] struct {
-	metrics module.CacheMetrics
-	// nolint:unused
-	limit    uint
-	store    storeFunc[K, V]
-	retrieve retrieveFunc[K, V]
-	remove   removeFunc[K]
-	resource string
-	cache    *lru.Cache[K, V]
+	metrics       module.CacheMetrics
+	limit         uint
+	store         storeFunc[K, V]
+	storeWithLock storeWithLockFunc[K, V]
+	retrieve      retrieveFunc[K, V]
+	remove        removeFunc[K]
+	resource      string
+	cache         *lru.Cache[K, V]
 }
 
-// nolint:unused
 func newCache[K comparable, V any](collector module.CacheMetrics, resourceName string, options ...func(*Cache[K, V])) *Cache[K, V] {
 	c := Cache[K, V]{
-		metrics:  collector,
-		limit:    1000,
-		store:    noStore[K, V],
-		retrieve: noRetrieve[K, V],
-		remove:   noRemove[K],
-		resource: resourceName,
+		metrics:       collector,
+		limit:         1000,
+		store:         noStore[K, V],
+		storeWithLock: noStoreWithLock[K, V],
+		retrieve:      noRetrieve[K, V],
+		remove:        noRemove[K],
+		resource:      resourceName,
 	}
 	for _, option := range options {
 		option(&c)
@@ -152,6 +159,19 @@ func (c *Cache[K, V]) PutTx(rw storage.ReaderBatchWriter, key K, resource V) err
 	})
 
 	err := c.store(rw, key, resource)
+	if err != nil {
+		return fmt.Errorf("could not store resource: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Cache[K, V]) PutWithLockTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, key K, resource V) error {
+	storage.OnCommitSucceed(rw, func() {
+		c.Insert(key, resource)
+	})
+
+	err := c.storeWithLock(lctx, rw, key, resource)
 	if err != nil {
 		return fmt.Errorf("could not store resource: %w", err)
 	}
