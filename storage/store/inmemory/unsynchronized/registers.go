@@ -1,10 +1,14 @@
 package unsynchronized
 
 import (
+	"fmt"
 	"sync"
+
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 )
 
 // Registers is a simple in-memory implementation of the RegisterIndex interface.
@@ -68,6 +72,25 @@ func (r *Registers) Store(registers flow.RegisterEntries, height uint64) error {
 
 	for _, reg := range registers {
 		r.store[reg.Key] = reg.Value
+	}
+
+	return nil
+}
+
+func (r *Registers) AddToBatch(db *pebble.DB) error {
+	batch := db.NewBatch()
+	defer batch.Close()
+
+	for id, value := range r.store {
+		key := pebblestorage.NewLookupKey(r.blockHeight, id)
+		err := batch.Set(key.Bytes(), value, nil)
+		if err != nil {
+			return fmt.Errorf("could not persist register: %w", err)
+		}
+	}
+	err := batch.Commit(pebble.Sync)
+	if err != nil {
+		return fmt.Errorf("could not commit register batch: %w", err)
 	}
 
 	return nil

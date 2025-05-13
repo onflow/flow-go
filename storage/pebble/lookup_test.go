@@ -15,7 +15,7 @@ func Test_lookupKey_Bytes(t *testing.T) {
 	t.Parallel()
 
 	expectedHeight := uint64(777)
-	key := newLookupKey(expectedHeight, flow.RegisterID{Owner: "owner", Key: "key"})
+	key := NewLookupKey(expectedHeight, flow.RegisterID{Owner: "owner", Key: "key"})
 
 	// Test prefix
 	require.Equal(t, byte(codeRegister), key.Bytes()[0])
@@ -56,7 +56,7 @@ func Test_decodeKey_Bytes(t *testing.T) {
 	for _, c := range cases {
 		owner, key := c.owner, c.key
 
-		lookupKey := newLookupKey(height, flow.RegisterID{Owner: owner, Key: key})
+		lookupKey := NewLookupKey(height, flow.RegisterID{Owner: owner, Key: key})
 		decodedHeight, decodedReg, err := lookupKeyToRegisterID(lookupKey.Bytes())
 		require.NoError(t, err)
 
@@ -98,7 +98,7 @@ func Test_decodeKey_fail(t *testing.T) {
 }
 
 func Test_prefix_error(t *testing.T) {
-	correctKey := newLookupKey(uint64(0), flow.RegisterID{Owner: "owner", Key: "key"})
+	correctKey := NewLookupKey(uint64(0), flow.RegisterID{Owner: "owner", Key: "key"})
 	incorrectKey := firstHeightKey
 	_, _, err := lookupKeyToRegisterID(correctKey.Bytes())
 	require.NoError(t, err)

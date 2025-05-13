@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -109,4 +110,31 @@ func (l *LightTransactionResults) BatchStore(flow.Identifier, []flow.LightTransa
 // This method is not implemented and will always return an error.
 func (l *LightTransactionResults) BatchStoreBadger(flow.Identifier, []flow.LightTransactionResult, storage.BatchStorage) error {
 	return fmt.Errorf("not implemented")
+}
+
+// AddToBatch adds all the in-memory storages to the given batch.
+// It is used for the batching writes to the DB.
+func (l *LightTransactionResults) AddToBatch(batch storage.ReaderBatchWriter) error {
+	writer := batch.Writer()
+
+	for block, results := range l.blockStore {
+		blockID, err := store.KeyToBlockID(block)
+		if err != nil {
+			return fmt.Errorf("could not decode block: %w", err)
+		}
+
+		for index, txResult := range results {
+			err = operation.BatchInsertLightTransactionResult(writer, blockID, &txResult)
+			if err != nil {
+				return fmt.Errorf("could not persist light transaction result: %w", err)
+			}
+
+			err = operation.BatchIndexLightTransactionResult(writer, blockID, uint32(index), &txResult)
+			if err != nil {
+				return fmt.Errorf("could not index light transaction result: %w", err)
+			}
+		}
+	}
+
+	return nil
 }
