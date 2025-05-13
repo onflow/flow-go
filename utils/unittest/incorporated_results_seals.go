@@ -11,10 +11,13 @@ func (f *incorporatedResultSealFactory) Fixture(opts ...func(*flow.IncorporatedR
 	header := BlockHeaderFixture()
 	incorporatedBlockID := header.ID()
 
-	ir := IncorporatedResult.Fixture(
-		IncorporatedResult.WithResult(result),
-		IncorporatedResult.WithIncorporatedBlockID(incorporatedBlockID),
-	)
+	//ir := IncorporatedResult.Fixture(
+	//	IncorporatedResult.WithResult(result),
+	//	IncorporatedResult.WithIncorporatedBlockID(incorporatedBlockID),
+	//)
+
+	ir := flow.NewIncorporatedResult(incorporatedBlockID, result)
+
 	seal := Seal.Fixture(Seal.WithResult(result))
 
 	irSeal := &flow.IncorporatedResultSeal{
