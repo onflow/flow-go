@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/rand"
 	"os"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -478,7 +479,13 @@ func (s *Suite) TestOnCollectionDuplicate() {
 	light := collection.Light()
 
 	// we should store the light collection and index its transactions
-	s.collections.On("StoreLightAndIndexByTransaction", &light).Return(storerr.ErrAlreadyExists).Once()
+	s.collections.On(
+		"StoreLightAndIndexByTransaction",
+		mock.MatchedBy(func(lc *flow.LightCollection) bool {
+			return reflect.DeepEqual(lc.Transactions, light.Transactions) &&
+				lc.ID() == light.ID()
+		}),
+	).Return(storerr.ErrAlreadyExists).Once()
 
 	// for each transaction in the collection, we should store it
 	needed := make(map[flow.Identifier]struct{})

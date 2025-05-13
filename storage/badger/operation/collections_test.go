@@ -29,7 +29,9 @@ func TestCollections(t *testing.T) {
 			err = db.View(RetrieveCollection(expected.ID(), &actual))
 			assert.NoError(t, err)
 
-			assert.Equal(t, expected, actual)
+			assert.Equal(t, expected.Transactions, actual.Transactions)
+			assert.Equal(t, expected.ID(), actual.ID())
+
 		})
 
 		t.Run("Remove", func(t *testing.T) {
@@ -57,7 +59,8 @@ func TestCollections(t *testing.T) {
 			err := db.View(LookupCollectionPayload(blockID, &actual.Transactions))
 			assert.NoError(t, err)
 
-			assert.Equal(t, expected, actual)
+			assert.Equal(t, expected.Transactions, actual.Transactions)
+			assert.Equal(t, expected.UncachedID(), actual.UncachedID())
 		})
 
 		t.Run("Index and lookup by transaction ID", func(t *testing.T) {
