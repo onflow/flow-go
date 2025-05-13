@@ -893,7 +893,8 @@ func (suite *Suite) TestGetCollection() {
 	suite.transactions.AssertExpectations(suite.T())
 	suite.checkResponse(actual, err)
 
-	suite.Equal(expected, *actual)
+	suite.Equal(expected.Transactions, actual.Transactions)
+	suite.Equal(expected.ID(), actual.ID())
 	suite.assertAllExpectations()
 }
 

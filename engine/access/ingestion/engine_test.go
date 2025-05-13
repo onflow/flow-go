@@ -397,7 +397,13 @@ func (s *Suite) TestOnCollection() {
 	light := collection.Light()
 
 	// we should store the light collection and index its transactions
-	s.collections.On("StoreLightAndIndexByTransaction", &light).Return(nil).Once()
+	s.collections.On(
+		"StoreLightAndIndexByTransaction",
+		mock.MatchedBy(func(lc *flow.LightCollection) bool {
+			return reflect.DeepEqual(lc.Transactions, light.Transactions) &&
+				lc.ID() == light.ID()
+		}),
+	).Return(nil).Once()
 
 	// for each transaction in the collection, we should store it
 	needed := make(map[flow.Identifier]struct{})
