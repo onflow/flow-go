@@ -64,6 +64,7 @@ func (sys *SystemContracts) Invoke(
 		spec.FunctionName,
 		arguments,
 		spec.ArgumentTypes,
+		spec.UseVM,
 	)
 	if err != nil {
 		log := sys.logger.Logger()
@@ -103,6 +104,7 @@ var verifyPayersBalanceForTransactionExecutionSpec = ContractFunctionSpec{
 		sema.UInt64Type,
 		sema.UInt64Type,
 	},
+	UseVM: true,
 }
 
 // CheckPayerBalanceAndGetMaxTxFees executes the verifyPayersBalanceForTransactionExecution
@@ -144,6 +146,7 @@ var deductTransactionFeeSpec = ContractFunctionSpec{
 		sema.UInt64Type,
 		sema.UInt64Type,
 	},
+	UseVM: true,
 }
 
 // DeductTransactionFees executes the fee deduction function
@@ -231,7 +234,7 @@ func (sys *SystemContracts) AccountAvailableBalance(
 	)
 }
 
-var accountBalanceInvocationSpec = ContractFunctionSpec{
+var accountBalanceSpec = ContractFunctionSpec{
 	AddressFromChain: ServiceAddress,
 	LocationName:     systemcontracts.ContractNameServiceAccount,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_defaultTokenBalance,
@@ -250,7 +253,7 @@ func (sys *SystemContracts) AccountBalance(
 	address flow.Address,
 ) (cadence.Value, error) {
 	return sys.Invoke(
-		accountBalanceInvocationSpec,
+		accountBalanceSpec,
 		[]cadence.Value{
 			cadence.BytesToAddress(address.Bytes()),
 		},
