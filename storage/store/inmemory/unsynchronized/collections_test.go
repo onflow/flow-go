@@ -35,19 +35,19 @@ func TestCollection_HappyCase(t *testing.T) {
 
 func TestLightByTransactionID_HappyCase(t *testing.T) {
 	collections := NewCollections()
-	lightCollection := &flow.LightCollection{
-		Transactions: []flow.Identifier{unittest.IdentifierFixture(), unittest.IdentifierFixture()},
-	}
+	lightCollection := flow.NewLightCollection([]flow.Identifier{unittest.IdentifierFixture(), unittest.IdentifierFixture()})
 
-	err := collections.StoreLightAndIndexByTransaction(lightCollection)
+	err := collections.StoreLightAndIndexByTransaction(&lightCollection)
 	require.NoError(t, err)
 
 	// Fetch by transaction ID and validate
 	retrieved, err := collections.LightByTransactionID(lightCollection.Transactions[0])
 	require.NoError(t, err)
-	require.Equal(t, lightCollection, retrieved)
+	require.Equal(t, lightCollection.Transactions, retrieved.Transactions)
+	require.Equal(t, lightCollection.ID(), retrieved.ID())
 
 	retrieved, err = collections.LightByTransactionID(lightCollection.Transactions[1])
 	require.NoError(t, err)
-	require.Equal(t, lightCollection, retrieved)
+	require.Equal(t, lightCollection.Transactions, retrieved.Transactions)
+	require.Equal(t, lightCollection.ID(), retrieved.ID())
 }
