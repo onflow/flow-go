@@ -14,46 +14,37 @@ var _ storage.TransactionResultErrorMessages = (*TransactionResultErrorMessages)
 
 type TransactionResultErrorMessages struct {
 	db         storage.DB
-	cache      *Cache[string, flow.TransactionResultErrorMessage]
-	indexCache *Cache[string, flow.TransactionResultErrorMessage]
-	blockCache *Cache[string, []flow.TransactionResultErrorMessage]
+	cache      *Cache[TwoIdentifier, flow.TransactionResultErrorMessage]       // Key: blockID + txID
+	indexCache *Cache[IdentifierAndUint32, flow.TransactionResultErrorMessage] // Key: blockID + txIndex
+	blockCache *Cache[flow.Identifier, []flow.TransactionResultErrorMessage]   // Key: blockID
 }
 
 func NewTransactionResultErrorMessages(collector module.CacheMetrics, db storage.DB, transactionResultsCacheSize uint) *TransactionResultErrorMessages {
-	retrieve := func(r storage.Reader, key string) (flow.TransactionResultErrorMessage, error) {
-		var txResultErrMsg flow.TransactionResultErrorMessage
-		blockID, txID, err := KeyToBlockIDTransactionID(key)
-		if err != nil {
-			return flow.TransactionResultErrorMessage{}, fmt.Errorf("could not convert key: %w", err)
-		}
+	retrieve := func(r storage.Reader, key TwoIdentifier) (flow.TransactionResultErrorMessage, error) {
+		blockID, txID := KeyToBlockIDTransactionID(key)
 
-		err = operation.RetrieveTransactionResultErrorMessage(r, blockID, txID, &txResultErrMsg)
+		var txResultErrMsg flow.TransactionResultErrorMessage
+		err := operation.RetrieveTransactionResultErrorMessage(r, blockID, txID, &txResultErrMsg)
 		if err != nil {
 			return flow.TransactionResultErrorMessage{}, err
 		}
 		return txResultErrMsg, nil
 	}
-	retrieveIndex := func(r storage.Reader, key string) (flow.TransactionResultErrorMessage, error) {
-		var txResultErrMsg flow.TransactionResultErrorMessage
-		blockID, txIndex, err := KeyToBlockIDIndex(key)
-		if err != nil {
-			return flow.TransactionResultErrorMessage{}, fmt.Errorf("could not convert index key: %w", err)
-		}
 
-		err = operation.RetrieveTransactionResultErrorMessageByIndex(r, blockID, txIndex, &txResultErrMsg)
+	retrieveIndex := func(r storage.Reader, key IdentifierAndUint32) (flow.TransactionResultErrorMessage, error) {
+		blockID, txIndex := KeyToBlockIDIndex(key)
+
+		var txResultErrMsg flow.TransactionResultErrorMessage
+		err := operation.RetrieveTransactionResultErrorMessageByIndex(r, blockID, txIndex, &txResultErrMsg)
 		if err != nil {
 			return flow.TransactionResultErrorMessage{}, err
 		}
 		return txResultErrMsg, nil
 	}
-	retrieveForBlock := func(r storage.Reader, key string) ([]flow.TransactionResultErrorMessage, error) {
+
+	retrieveForBlock := func(r storage.Reader, blockID flow.Identifier) ([]flow.TransactionResultErrorMessage, error) {
 		var txResultErrMsg []flow.TransactionResultErrorMessage
-		blockID, err := KeyToBlockID(key)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert index key: %w", err)
-		}
-
-		err = operation.LookupTransactionResultErrorMessagesByBlockIDUsingIndex(r, blockID, &txResultErrMsg)
+		err := operation.LookupTransactionResultErrorMessagesByBlockIDUsingIndex(r, blockID, &txResultErrMsg)
 		if err != nil {
 			return nil, err
 		}
@@ -62,19 +53,19 @@ func NewTransactionResultErrorMessages(collector module.CacheMetrics, db storage
 
 	return &TransactionResultErrorMessages{
 		db: db,
-		cache: newCache[string, flow.TransactionResultErrorMessage](collector, metrics.ResourceTransactionResultErrorMessages,
-			withLimit[string, flow.TransactionResultErrorMessage](transactionResultsCacheSize),
-			withStore(noopStore[string, flow.TransactionResultErrorMessage]),
+		cache: newCache(collector, metrics.ResourceTransactionResultErrorMessages,
+			withLimit[TwoIdentifier, flow.TransactionResultErrorMessage](transactionResultsCacheSize),
+			withStore(noopStore[TwoIdentifier, flow.TransactionResultErrorMessage]),
 			withRetrieve(retrieve),
 		),
-		indexCache: newCache[string, flow.TransactionResultErrorMessage](collector, metrics.ResourceTransactionResultErrorMessagesIndices,
-			withLimit[string, flow.TransactionResultErrorMessage](transactionResultsCacheSize),
-			withStore(noopStore[string, flow.TransactionResultErrorMessage]),
+		indexCache: newCache(collector, metrics.ResourceTransactionResultErrorMessagesIndices,
+			withLimit[IdentifierAndUint32, flow.TransactionResultErrorMessage](transactionResultsCacheSize),
+			withStore(noopStore[IdentifierAndUint32, flow.TransactionResultErrorMessage]),
 			withRetrieve(retrieveIndex),
 		),
-		blockCache: newCache[string, []flow.TransactionResultErrorMessage](collector, metrics.ResourceTransactionResultErrorMessagesIndices,
-			withLimit[string, []flow.TransactionResultErrorMessage](transactionResultsCacheSize),
-			withStore(noopStore[string, []flow.TransactionResultErrorMessage]),
+		blockCache: newCache(collector, metrics.ResourceTransactionResultErrorMessagesIndices,
+			withLimit[flow.Identifier, []flow.TransactionResultErrorMessage](transactionResultsCacheSize),
+			withStore(noopStore[flow.Identifier, []flow.TransactionResultErrorMessage]),
 			withRetrieve(retrieveForBlock),
 		),
 	}
@@ -94,8 +85,7 @@ func (t *TransactionResultErrorMessages) Store(blockID flow.Identifier, transact
 // No errors are expected during normal operation.
 func (t *TransactionResultErrorMessages) Exists(blockID flow.Identifier) (bool, error) {
 	// if the block is in the cache, return true
-	key := KeyFromBlockID(blockID)
-	if ok := t.blockCache.IsCached(key); ok {
+	if ok := t.blockCache.IsCached(blockID); ok {
 		return ok, nil
 	}
 
@@ -139,8 +129,7 @@ func (t *TransactionResultErrorMessages) batchStore(
 			t.indexCache.Insert(keyIndex, result)
 		}
 
-		key := KeyFromBlockID(blockID)
-		t.blockCache.Insert(key, transactionResultErrorMessages)
+		t.blockCache.Insert(blockID, transactionResultErrorMessages)
 	})
 	return nil
 }
@@ -176,8 +165,7 @@ func (t *TransactionResultErrorMessages) ByBlockIDTransactionIndex(blockID flow.
 //
 // No errors are expected during normal operation.
 func (t *TransactionResultErrorMessages) ByBlockID(blockID flow.Identifier) ([]flow.TransactionResultErrorMessage, error) {
-	key := KeyFromBlockID(blockID)
-	transactionResultErrorMessages, err := t.blockCache.Get(t.db.Reader(), key)
+	transactionResultErrorMessages, err := t.blockCache.Get(t.db.Reader(), blockID)
 	if err != nil {
 		return nil, err
 	}

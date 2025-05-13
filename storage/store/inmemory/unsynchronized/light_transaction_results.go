@@ -14,18 +14,18 @@ type LightTransactionResults struct {
 	// before any future reads. However, we're keeping it temporarily during active development
 	// for safety and debugging purposes. It will be removed once the implementation is finalized.
 	lock       sync.RWMutex
-	store      map[string]*flow.LightTransactionResult
-	indexStore map[string]*flow.LightTransactionResult
-	blockStore map[string][]flow.LightTransactionResult
+	store      map[store.TwoIdentifier]*flow.LightTransactionResult       // Key: blockID + txID
+	indexStore map[store.IdentifierAndUint32]*flow.LightTransactionResult // Key: blockID + txIndex
+	blockStore map[flow.Identifier][]flow.LightTransactionResult          // key: blockID
 }
 
 var _ storage.LightTransactionResults = (*LightTransactionResults)(nil)
 
 func NewLightTransactionResults() *LightTransactionResults {
 	return &LightTransactionResults{
-		store:      make(map[string]*flow.LightTransactionResult),
-		indexStore: make(map[string]*flow.LightTransactionResult),
-		blockStore: make(map[string][]flow.LightTransactionResult),
+		store:      make(map[store.TwoIdentifier]*flow.LightTransactionResult),
+		indexStore: make(map[store.IdentifierAndUint32]*flow.LightTransactionResult),
+		blockStore: make(map[flow.Identifier][]flow.LightTransactionResult),
 	}
 }
 
@@ -68,11 +68,10 @@ func (l *LightTransactionResults) ByBlockIDTransactionIndex(blockID flow.Identif
 // Expected errors during normal operation:
 //   - `storage.ErrNotFound` if light transaction results at given blockID weren't found.
 func (l *LightTransactionResults) ByBlockID(id flow.Identifier) ([]flow.LightTransactionResult, error) {
-	key := store.KeyFromBlockID(id)
 	l.lock.RLock()
 	defer l.lock.RUnlock()
 
-	val, ok := l.blockStore[key]
+	val, ok := l.blockStore[id]
 	if !ok {
 		return nil, storage.ErrNotFound
 	}
@@ -83,11 +82,10 @@ func (l *LightTransactionResults) ByBlockID(id flow.Identifier) ([]flow.LightTra
 // Store inserts a transaction results into a storage
 // No errors are expected during normal operation.
 func (l *LightTransactionResults) Store(blockID flow.Identifier, transactionResults []flow.LightTransactionResult) error {
-	key := store.KeyFromBlockID(blockID)
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
-	l.blockStore[key] = transactionResults
+	l.blockStore[blockID] = transactionResults
 	for i, txResult := range transactionResults {
 		txIDKey := store.KeyFromBlockIDTransactionID(blockID, txResult.TransactionID)
 		txIndexKey := store.KeyFromBlockIDIndex(blockID, uint32(i))
