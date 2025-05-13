@@ -28,9 +28,6 @@ import (
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/topology"
-	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
-	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 )
 
 type SkipReason int
@@ -350,26 +347,6 @@ func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
 	})
 }
 
-// RunFuncsWithNewBadgerDBHandle runs provided functions with
-// new BadgerDB handles of the same underlying database.
-// Each provided function will receive a new (different) DB handle.
-// This can be used to test database persistence.
-func RunFuncsWithNewBadgerDBHandle(t *testing.T, fs ...func(*testing.T, storage.DB)) {
-	RunWithTempDir(t, func(dir string) {
-		// Run provided functions with new DB handles of the same underlying database.
-		for _, f := range fs {
-			// Open BadgerDB
-			db := BadgerDB(t, dir)
-
-			// Run provided function
-			f(t, badgerimpl.ToDB(db))
-
-			// Close BadgerDB
-			assert.NoError(t, db.Close())
-		}
-	})
-}
-
 // RunWithTypedBadgerDB creates a Badger DB that is passed to f and closed
 // after f returns. The extra create parameter allows passing in a database
 // constructor function which instantiates a database with a particular type
@@ -416,27 +393,6 @@ func RunWithPebbleDB(t testing.TB, f func(*pebble.DB)) {
 			assert.NoError(t, db.Close())
 		}()
 		f(db)
-	})
-}
-
-// RunFuncsWithNewPebbleDBHandle runs provided functions with
-// new Pebble handles of the same underlying database.
-// Each provided function will receive a new (different) DB handle.
-// This can be used to test database persistence.
-func RunFuncsWithNewPebbleDBHandle(t *testing.T, fs ...func(*testing.T, storage.DB)) {
-	RunWithTempDir(t, func(dir string) {
-		// Run provided f with new DB handle to test database persistence.
-		for _, f := range fs {
-			// Open Pebble
-			db, err := pebble.Open(dir, &pebble.Options{})
-			require.NoError(t, err)
-
-			// Call provided function
-			f(t, pebbleimpl.ToDB(db))
-
-			// Close Pebble
-			assert.NoError(t, db.Close())
-		}
 	})
 }
 
