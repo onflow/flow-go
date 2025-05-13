@@ -62,9 +62,7 @@ func (s *CacheSuite) TestBlocksEquivocation() {
 
 	equivocatedBlocks, _, _ := unittest.ChainFixture(len(blocks) - 1)
 	equivocatedProposals := make([]*flow.BlockProposal, 0, len(equivocatedBlocks))
-	for _, block := range equivocatedBlocks {
-		equivocatedProposals = append(equivocatedProposals, unittest.ProposalFromBlock(block))
-	}
+
 	// we will skip genesis block as it will be the same
 	for i := 1; i < len(equivocatedBlocks); i++ {
 		block := equivocatedBlocks[i]
@@ -75,6 +73,8 @@ func (s *CacheSuite) TestBlocksEquivocation() {
 		block.Header.ParentView = equivocatedBlocks[i-1].Header.View
 		s.consumer.On("OnDoubleProposeDetected",
 			model.BlockFromFlow(blocks[i].Block.ToHeader()), model.BlockFromFlow(block.ToHeader())).Return().Once()
+
+		equivocatedProposals = append(equivocatedProposals, unittest.ProposalFromBlock(block))
 	}
 	_, err = s.cache.AddBlocks(equivocatedProposals)
 	require.NoError(s.T(), err)

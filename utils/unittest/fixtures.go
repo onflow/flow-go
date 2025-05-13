@@ -277,7 +277,7 @@ func ProposalFromHeader(header *flow.Header) *flow.ProposalHeader {
 
 func ProposalFromBlock(block *flow.Block) *flow.BlockProposal {
 	return &flow.BlockProposal{
-		Block:           block,
+		Block:           *block,
 		ProposerSigData: SignatureFixture(),
 	}
 }
@@ -2040,7 +2040,7 @@ func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
 
 func CertifiedByChild(block *flow.Block, child *flow.Block) *flow.CertifiedBlock {
 	return &flow.CertifiedBlock{
-		Proposal:     &flow.BlockProposal{Block: block, ProposerSigData: SignatureFixture()},
+		Proposal:     &flow.BlockProposal{Block: *block, ProposerSigData: SignatureFixture()},
 		CertifyingQC: child.ToHeader().QuorumCertificate(),
 	}
 }
@@ -2048,7 +2048,7 @@ func CertifiedByChild(block *flow.Block, child *flow.Block) *flow.CertifiedBlock
 func NewCertifiedBlock(block *flow.Block) *flow.CertifiedBlock {
 	return &flow.CertifiedBlock{
 		Proposal: &flow.BlockProposal{
-			Block:           block,
+			Block:           *block,
 			ProposerSigData: SignatureFixture(),
 		},
 		CertifyingQC: CertifyBlock(block.ToHeader()),

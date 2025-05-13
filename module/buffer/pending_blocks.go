@@ -32,7 +32,7 @@ func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*flow.Bloc
 	block := flow.Slashable[*flow.BlockProposal]{
 		OriginID: item.header.OriginID,
 		Message: &flow.BlockProposal{
-			Block:           flow.NewBlock(item.header.Message.Header.HeaderBody, item.payload.(flow.Payload)),
+			Block:           *flow.NewBlock(item.header.Message.Header.HeaderBody, item.payload.(flow.Payload)),
 			ProposerSigData: item.header.Message.ProposerSigData,
 		},
 	}
@@ -51,7 +51,7 @@ func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*
 		block := flow.Slashable[*flow.BlockProposal]{
 			OriginID: item.header.OriginID,
 			Message: &flow.BlockProposal{
-				Block:           flow.NewBlock(item.header.Message.Header.HeaderBody, item.payload.(flow.Payload)),
+				Block:           *flow.NewBlock(item.header.Message.Header.HeaderBody, item.payload.(flow.Payload)),
 				ProposerSigData: item.header.Message.ProposerSigData,
 			},
 		}
