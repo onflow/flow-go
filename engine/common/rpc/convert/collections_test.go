@@ -35,7 +35,7 @@ func TestConvertCollection(t *testing.T) {
 	})
 
 	var msg *entities.Collection
-	lightCollection := flow.LightCollection{Transactions: txIDs}
+	lightCollection := flow.NewLightCollection(txIDs)
 
 	t.Run("convert light collection to message", func(t *testing.T) {
 		var err error

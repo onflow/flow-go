@@ -33,8 +33,9 @@ func TestCollections(t *testing.T) {
 			var actual flow.LightCollection
 			err = operation.RetrieveCollection(db.Reader(), expected.ID(), &actual)
 			assert.NoError(t, err)
+			assert.Equal(t, expected.Transactions, actual.Transactions)
+			assert.Equal(t, expected.ID(), actual.ID())
 
-			assert.Equal(t, expected, actual)
 		})
 
 		t.Run("Remove", func(t *testing.T) {
@@ -70,7 +71,8 @@ func TestCollections(t *testing.T) {
 			var actual flow.LightCollection
 			err := operation.LookupCollectionPayload(db.Reader(), blockID, &actual.Transactions)
 			assert.NoError(t, err)
-			assert.Equal(t, expected, actual)
+			assert.Equal(t, expected.Transactions, actual.Transactions)
+			assert.Equal(t, expected.UncachedID(), actual.UncachedID())
 		})
 
 		t.Run("Index and lookup by transaction ID", func(t *testing.T) {

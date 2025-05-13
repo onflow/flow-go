@@ -19,10 +19,13 @@ type IncorporatedResult struct {
 }
 
 func NewIncorporatedResult(incorporatedBlockID Identifier, result *ExecutionResult) *IncorporatedResult {
-	return &IncorporatedResult{
+	ir := &IncorporatedResult{
 		IncorporatedBlockID: incorporatedBlockID,
 		Result:              result,
 	}
+	ir.cachedID = newIDCache(ir.UncachedID)
+
+	return ir
 }
 
 // UncachedID computes and returns the canonical ID of the IncorporatedResult, bypassing the ID cache.
