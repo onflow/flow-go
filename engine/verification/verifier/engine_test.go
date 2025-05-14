@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -103,7 +104,9 @@ func (suite *VerifierEngineTestSuite) getTestNewEngine() *verifier.Engine {
 		suite.state,
 		suite.me,
 		suite.chunkVerifier,
-		suite.approvals)
+		suite.approvals,
+		storage.NewTestingLockManager(),
+	)
 	require.NoError(suite.T(), err)
 
 	suite.net.AssertExpectations(suite.T())
