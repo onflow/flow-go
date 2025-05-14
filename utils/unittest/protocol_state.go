@@ -91,10 +91,13 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState 
 	require.NoError(t, err)
 	require.False(t, dbUpdates.IsEmpty())
 
-	block3.Payload = flow.Payload{
-		Seals:           seals,
-		ProtocolStateID: updatedStateId,
-	}
+	block3 = flow.NewBlock(
+		block3.Header,
+		flow.Payload{
+			Seals:           seals,
+			ProtocolStateID: updatedStateId,
+		},
+	)
 	err = st.Extend(context.Background(), ProposalFromBlock(block3))
 	require.NoError(t, err)
 

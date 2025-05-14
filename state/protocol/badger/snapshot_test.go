@@ -351,13 +351,16 @@ func TestSealingSegment(t *testing.T) {
 			buildFinalizedBlock(t, state, block2)
 
 			// build a block sealing block1
-			block3 := unittest.BlockWithParentProtocolState(block2)
+			headerBody3 := unittest.HeaderBodyWithParentFixture(block2.ToHeader())
 
 			seals := []*flow.Seal{seal1}
-			block3.Payload = flow.Payload{
-				Seals:           seals,
-				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.Header, seals),
-			}
+			block3 := flow.NewBlock(
+				headerBody3,
+				flow.Payload{
+					Seals:           seals,
+					ProtocolStateID: calculateExpectedStateId(t, mutableState)(headerBody3, seals),
+				},
+			)
 			buildFinalizedBlock(t, state, block3)
 
 			segment, err := state.AtBlockID(block3.ID()).SealingSegment()
@@ -399,9 +402,12 @@ func TestSealingSegment(t *testing.T) {
 				if i == 0 {
 					// Repetitions of the same receipt in one fork would be a protocol violation.
 					// Hence, we include the result only once in the direct child of B1.
-					next.Payload = unittest.PayloadFixture(
-						unittest.WithReceipts(receipt1),
-						unittest.WithProtocolStateID(parent.Payload.ProtocolStateID),
+					next = flow.NewBlock(
+						next.Header,
+						unittest.PayloadFixture(
+							unittest.WithReceipts(receipt1),
+							unittest.WithProtocolStateID(parent.Payload.ProtocolStateID),
+						),
 					)
 				}
 				buildFinalizedBlock(t, state, next)

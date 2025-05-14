@@ -390,10 +390,13 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 	// B3's payload contains results and receipts for B0, B1, B2
 	resultB0 := unittest.ExecutionResultFixture(unittest.WithBlock(blocks[0]), unittest.WithPreviousResult(*s.LatestExecutionResult))
 	receipts := unittest.ReceiptChainFor(blocks, resultB0)
-	blocks[3].Payload = flow.Payload{
-		Receipts: []*flow.ExecutionReceiptStub{receipts[0].Stub(), receipts[1].Stub(), receipts[2].Stub()},
-		Results:  []*flow.ExecutionResult{&receipts[0].ExecutionResult, &receipts[1].ExecutionResult, &receipts[2].ExecutionResult},
-	}
+	blocks[3] = flow.NewBlock(
+		blocks[3].Header,
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{receipts[0].Stub(), receipts[1].Stub(), receipts[2].Stub()},
+			Results:  []*flow.ExecutionResult{&receipts[0].ExecutionResult, &receipts[1].ExecutionResult, &receipts[2].ExecutionResult},
+		},
+	)
 	b4 := unittest.BlockWithParentFixture(blocks[3].ToHeader())
 	blocks = append(blocks, b4)
 
@@ -478,14 +481,20 @@ func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
 	receiptChain2 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[S]_2, Result[A]_2, Result[B]_2, ...]
 
 	for i := 1; i <= 3; i++ { // set payload for blocks A, B, C
-		blocks[i].Payload = flow.Payload{
-			Results:  []*flow.ExecutionResult{&receiptChain1[i-1].ExecutionResult, &receiptChain2[i-1].ExecutionResult},
-			Receipts: []*flow.ExecutionReceiptStub{receiptChain1[i-1].Stub(), receiptChain2[i-1].Stub()},
-		}
+		blocks[i] = flow.NewBlock(
+			blocks[i].Header,
+			flow.Payload{
+				Results:  []*flow.ExecutionResult{&receiptChain1[i-1].ExecutionResult, &receiptChain2[i-1].ExecutionResult},
+				Receipts: []*flow.ExecutionReceiptStub{receiptChain1[i-1].Stub(), receiptChain2[i-1].Stub()},
+			},
+		)
 	}
-	blocks[4].Payload = flow.Payload{
-		Seals: []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&receiptChain1[0].ExecutionResult))},
-	}
+	blocks[4] = flow.NewBlock(
+		blocks[4].Header,
+		flow.Payload{
+			Seals: []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&receiptChain1[0].ExecutionResult))},
+		},
+	)
 	for i := 0; i <= 4; i++ {
 		// we need to run this several times, as in each iteration as we have _multiple_ execution chains.
 		// In each iteration, we only mange to reconnect one additional height
@@ -579,9 +588,12 @@ func (s *SealValidationSuite) TestExtendSealDuplicate() {
 	// <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- B3{S(R(B1)), S(R(B1))}
 	s.T().Run("Duplicate seal in same payload", func(t *testing.T) {
 		_, _, b3, _, sealB1 := s.generateBasicTestFork()
-		b3.Payload = flow.Payload{
-			Seals: []*flow.Seal{sealB1, sealB1},
-		}
+		b3 = flow.NewBlock(
+			b3.Header,
+			flow.Payload{
+				Seals: []*flow.Seal{sealB1, sealB1},
+			},
+		)
 
 		// we expect an error because block 3 contains duplicate seals within its payload
 		_, err := s.sealValidator.Validate(b3)
@@ -645,9 +657,12 @@ func (s *SealValidationSuite) TestExtendSeal_DifferentIncorporatedResult() {
 		unittest.WithPreviousResult(*s.LatestExecutionResult),
 	)
 	seal := unittest.Seal.Fixture(unittest.Seal.WithResult(differentResult))
-	newBlock.Payload = flow.Payload{
-		Seals: []*flow.Seal{seal},
-	}
+	newBlock = flow.NewBlock(
+		newBlock.Header,
+		flow.Payload{
+			Seals: []*flow.Seal{seal},
+		},
+	)
 
 	// Should fail because ER0a is different than ER0b, although they
 	// reference the same block. Technically the fork does not contain an

@@ -49,7 +49,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			// By convention, root block has no proposer signature - implementation has to handle this edge case
 			require.NoError(t, headers.Store(&flow.ProposalHeader{Header: genesis.ToHeader(), ProposerSigData: nil}))
 			for i := 1; i <= lastFinalizedHeight; i++ {
-				chunk, block := unittest.VerifiableChunkDataFixture(0, func(headerBody *flow.HeaderBody) {
+				chunk, block := unittest.VerifiableChunkDataFixture(0, func(headerBody flow.HeaderBody) {
 					headerBody.Height = uint64(i)
 					headerBody.ParentID = parentID
 				})

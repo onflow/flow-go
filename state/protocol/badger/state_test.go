@@ -354,11 +354,14 @@ func TestBootstrapNonRoot(t *testing.T) {
 			buildFinalizedBlock(t, state, block2)
 
 			seals := []*flow.Seal{seal1}
-			block3 := unittest.BlockWithParentFixture(block2.ToHeader())
-			block3.Payload = flow.Payload{
-				Seals:           seals,
-				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.Header, seals),
-			}
+			headerBody3 := unittest.HeaderBodyWithParentFixture(block2.ToHeader())
+			block3 := flow.NewBlock(
+				headerBody3,
+				flow.Payload{
+					Seals:           seals,
+					ProtocolStateID: calculateExpectedStateId(t, mutableState)(headerBody3, seals),
+				},
+			)
 			buildFinalizedBlock(t, state, block3)
 
 			child := unittest.BlockWithParentProtocolState(block3)
@@ -405,11 +408,14 @@ func TestBootstrapNonRoot(t *testing.T) {
 			buildFinalizedBlock(t, state, block2)
 
 			seals := []*flow.Seal{seal1}
-			block3 := unittest.BlockWithParentFixture(block2.ToHeader())
-			block3.Payload = flow.Payload{
-				Seals:           seals,
-				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.Header, seals),
-			}
+			headerBody3 := unittest.HeaderBodyWithParentFixture(block2.ToHeader())
+			block3 := flow.NewBlock(
+				headerBody3,
+				flow.Payload{
+					Seals:           seals,
+					ProtocolStateID: calculateExpectedStateId(t, mutableState)(headerBody3, seals),
+				},
+			)
 			buildFinalizedBlock(t, state, block3)
 
 			child := unittest.BlockWithParentProtocolState(block3)
