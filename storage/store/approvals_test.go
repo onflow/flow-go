@@ -19,11 +19,9 @@ func TestApprovalStoreAndRetrieve(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		store := store.NewResultApprovals(metrics, db)
 
+		lockManager := storage.NewTestingLockManager()
 		approval := unittest.ResultApprovalFixture()
 		err := store.Store(approval)
-		require.NoError(t, err)
-
-		err = store.Index(approval.Body.ExecutionResultID, approval.Body.ChunkIndex, approval.ID())
 		require.NoError(t, err)
 
 		byID, err := store.ByID(approval.ID())
@@ -45,13 +43,7 @@ func TestApprovalStoreTwice(t *testing.T) {
 		err := store.Store(approval)
 		require.NoError(t, err)
 
-		err = store.Index(approval.Body.ExecutionResultID, approval.Body.ChunkIndex, approval.ID())
-		require.NoError(t, err)
-
 		err = store.Store(approval)
-		require.NoError(t, err)
-
-		err = store.Index(approval.Body.ExecutionResultID, approval.Body.ChunkIndex, approval.ID())
 		require.NoError(t, err)
 	})
 }
@@ -67,16 +59,9 @@ func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 		err := store.Store(approval1)
 		require.NoError(t, err)
 
-		err = store.Index(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex, approval1.ID())
-		require.NoError(t, err)
-
 		// we can store a different approval, but we can't index a different
 		// approval for the same chunk.
 		err = store.Store(approval2)
-		require.NoError(t, err)
-
-		err = store.Index(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex, approval2.ID())
-		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrDataMismatch)
 	})
 }
@@ -100,20 +85,14 @@ func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			err := store.Store(approval1)
-			require.NoError(t, err)
-
-			firstIndexErr = store.Index(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex, approval1.ID())
+			firstIndexErr = store.Store(approval1)
 		}()
 
 		// Second goroutine stores and tries to index the second approval for the same chunk.
 		go func() {
 			defer wg.Done()
 
-			err := store.Store(approval2)
-			require.NoError(t, err)
-
-			secondIndexErr = store.Index(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex, approval2.ID())
+			secondIndexErr = store.Store(approval2)
 		}()
 
 		// Wait for both goroutines to finish
