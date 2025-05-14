@@ -3,7 +3,9 @@
 package mock
 
 import (
+	lockctx "github.com/jordanschalm/lockctx"
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -72,35 +74,17 @@ func (_m *ResultApprovals) ByID(approvalID flow.Identifier) (*flow.ResultApprova
 	return r0, r1
 }
 
-// Index provides a mock function with given fields: resultID, chunkIndex, approvalID
-func (_m *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error {
-	ret := _m.Called(resultID, chunkIndex, approvalID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Index")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, uint64, flow.Identifier) error); ok {
-		r0 = rf(resultID, chunkIndex, approvalID)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// Store provides a mock function with given fields: result
-func (_m *ResultApprovals) Store(result *flow.ResultApproval) error {
-	ret := _m.Called(result)
+// Store provides a mock function with given fields: lctx, result
+func (_m *ResultApprovals) Store(lctx lockctx.Proof, result *flow.ResultApproval) error {
+	ret := _m.Called(lctx, result)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Store")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.ResultApproval) error); ok {
-		r0 = rf(result)
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, *flow.ResultApproval) error); ok {
+		r0 = rf(lctx, result)
 	} else {
 		r0 = ret.Error(0)
 	}
