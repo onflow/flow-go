@@ -20,8 +20,11 @@ func TestApprovalStoreAndRetrieve(t *testing.T) {
 		store := store.NewResultApprovals(metrics, db)
 
 		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		defer lctx.Release()
+		require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
 		approval := unittest.ResultApprovalFixture()
-		err := store.Store(approval)
+		err := store.Store(lctx, approval)
 		require.NoError(t, err)
 
 		byID, err := store.ByID(approval.ID())
@@ -39,11 +42,15 @@ func TestApprovalStoreTwice(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		store := store.NewResultApprovals(metrics, db)
 
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		defer lctx.Release()
+		require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
 		approval := unittest.ResultApprovalFixture()
-		err := store.Store(approval)
+		err := store.Store(lctx, approval)
 		require.NoError(t, err)
 
-		err = store.Store(approval)
+		err = store.Store(lctx, approval)
 		require.NoError(t, err)
 	})
 }
@@ -56,12 +63,16 @@ func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 		approval1 := unittest.ResultApprovalFixture()
 		approval2 := unittest.ResultApprovalFixture()
 
-		err := store.Store(approval1)
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		defer lctx.Release()
+		require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
+		err := store.Store(lctx, approval1)
 		require.NoError(t, err)
 
 		// we can store a different approval, but we can't index a different
 		// approval for the same chunk.
-		err = store.Store(approval2)
+		err = store.Store(lctx, approval2)
 		require.ErrorIs(t, err, storage.ErrDataMismatch)
 	})
 }
@@ -73,6 +84,7 @@ func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		store := store.NewResultApprovals(metrics, db)
 
+		lockManager := storage.NewTestingLockManager()
 		approval1 := unittest.ResultApprovalFixture()
 		approval2 := unittest.ResultApprovalFixture()
 
@@ -85,14 +97,22 @@ func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			firstIndexErr = store.Store(approval1)
+			lctx := lockManager.NewContext()
+			defer lctx.Release()
+			require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
+
+			firstIndexErr = store.Store(lctx, approval1)
 		}()
 
 		// Second goroutine stores and tries to index the second approval for the same chunk.
 		go func() {
 			defer wg.Done()
 
-			secondIndexErr = store.Store(approval2)
+			lctx := lockManager.NewContext()
+			defer lctx.Release()
+			require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
+
+			secondIndexErr = store.Store(lctx, approval2)
 		}()
 
 		// Wait for both goroutines to finish
