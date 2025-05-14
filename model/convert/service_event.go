@@ -670,12 +670,10 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	}
 
 	// create the service event
+	epochRecover := flow.NewEpochRecover(setup, commit)
 	serviceEvent := &flow.ServiceEvent{
-		Type: flow.ServiceEventRecover,
-		Event: &flow.EpochRecover{
-			EpochSetup:  setup,
-			EpochCommit: commit,
-		},
+		Type:  flow.ServiceEventRecover,
+		Event: &epochRecover,
 	}
 
 	return serviceEvent, nil

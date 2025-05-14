@@ -208,8 +208,8 @@ func EpochRecoverFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochRe
 	event := EventFixture(events.EpochRecover.EventType(), 1, 1, IdentifierFixture(), 0)
 	event.Payload = EpochRecoverFixtureCCF(randomSource)
 
-	expected := &flow.EpochRecover{
-		EpochSetup: flow.EpochSetup{
+	expected := flow.NewEpochRecover(
+		flow.EpochSetup{
 			Counter:            1,
 			FirstView:          100,
 			FinalView:          200,
@@ -288,7 +288,7 @@ func EpochRecoverFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochRe
 				},
 			},
 		},
-		EpochCommit: flow.EpochCommit{
+		flow.EpochCommit{
 			Counter: 1,
 			ClusterQCs: []flow.ClusterQCVoteData{
 				{
@@ -314,9 +314,9 @@ func EpochRecoverFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochRe
 				flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000011"): 0,
 			},
 		},
-	}
+	)
 
-	return event, expected
+	return event, &expected
 }
 
 // VersionBeaconFixtureByChainID returns a VersionTable service event as a Cadence event

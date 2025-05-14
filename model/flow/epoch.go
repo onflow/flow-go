@@ -199,9 +199,18 @@ func (setup *EpochSetup) EqualTo(other *EpochSetup) bool {
 // EpochRecover service event is emitted when network is in Epoch Fallback Mode(EFM) in an attempt to return to happy path.
 // It contains data from EpochSetup, and EpochCommit events to so replicas can create a committed epoch from which they
 // can continue operating on the happy path.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type EpochRecover struct {
 	EpochSetup  EpochSetup
 	EpochCommit EpochCommit
+}
+
+func NewEpochRecover(setup EpochSetup, commit EpochCommit) EpochRecover {
+	return EpochRecover{
+		EpochSetup:  setup,
+		EpochCommit: commit,
+	}
 }
 
 func (er *EpochRecover) ServiceEvent() ServiceEvent {
