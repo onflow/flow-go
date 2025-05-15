@@ -152,6 +152,8 @@ type EpochSetup struct {
 	TargetEndTime      uint64               // desired real-world end time for the epoch in UNIX time [seconds]
 }
 
+// NewEpochSetup creates a new instance of EpochSetup.
+// Construction EpochSetup allowed only within the constructor.
 func NewEpochSetup(
 	counter uint64,
 	firstView uint64,
@@ -236,6 +238,8 @@ type EpochRecover struct {
 	EpochCommit EpochCommit
 }
 
+// NewEpochRecover creates a new instance of EpochRecover.
+// Construction EpochRecover allowed only within the constructor.
 func NewEpochRecover(setup EpochSetup, commit EpochCommit) EpochRecover {
 	return EpochRecover{
 		EpochSetup:  setup,
@@ -308,6 +312,8 @@ type EpochCommit struct {
 	DKGIndexMap DKGIndexMap
 }
 
+// NewEpochCommit creates a new instance of EpochCommit.
+// Construction EpochCommit allowed only within the constructor.
 func NewEpochCommit(
 	counter uint64,
 	clusterQCs []ClusterQCVoteData,
