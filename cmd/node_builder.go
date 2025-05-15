@@ -282,7 +282,7 @@ func DefaultBaseConfig() *BaseConfig {
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
 		pebbleDir:        pebbleDir,
-		DBOps:            string(dbops.BadgerTransaction), // "badger-transaction" (default) or "batch-update"
+		DBOps:            string(dbops.BadgerBatch), // "badger-batch" (default) or "pebble-batch"
 		badgerDB:         nil,
 		pebbleDB:         nil,
 		secretsdir:       NotSet,
