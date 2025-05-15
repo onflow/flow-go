@@ -44,6 +44,7 @@ func newProposalSignatures(collector module.CacheMetrics, db *badger.DB) *propos
 	}
 }
 
+//nolint:unused // Separate proposal signature storage on hold until mainnet27
 func (h *proposalSignatures) storeTx(blockID flow.Identifier, sig []byte) func(*transaction.Tx) error {
 	return h.cache.PutTx(blockID, sig)
 }

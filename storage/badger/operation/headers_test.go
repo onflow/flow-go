@@ -26,15 +26,16 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 			PayloadHash: flow.Identifier{0x22},
 		}
 		blockID := expected.ID()
+		expectedProposal := unittest.ProposalFromHeader(expected)
 
-		err := db.Update(InsertHeader(expected.ID(), expected))
+		err := db.Update(InsertHeader(expected.ID(), expectedProposal))
 		require.NoError(t, err)
 
-		var actual flow.Header
+		var actual flow.ProposalHeader
 		err = db.View(RetrieveHeader(blockID, &actual))
 		require.NoError(t, err)
 
-		assert.Equal(t, *expected, actual)
+		assert.Equal(t, *expectedProposal, actual)
 	})
 }
 
