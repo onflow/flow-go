@@ -338,9 +338,9 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	// ChunkExecutionData. Create the collection here using the transaction body from the
 	// transactions list
 	if systemChunk {
-		cedCollection = &flow.Collection{
-			Transactions: []*flow.TransactionBody{transactions[0].Transaction},
-		}
+		collection := flow.NewCollection([]*flow.TransactionBody{transactions[0].Transaction})
+		cedCollection = &collection
+
 	}
 
 	// 2. build our chunk's chunk execution data using the locally calculated values, and calculate
