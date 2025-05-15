@@ -2140,7 +2140,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.State,
 				channels.RequestCollections,
 				filter.HasRole[flow.Identity](flow.RoleCollection),
-				func() flow.Entity { return &flow.Collection{} },
+				func() flow.Entity { return flow.NewCollection(nil) },
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
