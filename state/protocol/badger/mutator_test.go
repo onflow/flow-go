@@ -560,16 +560,18 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		require.NoError(t, err)
 
 		// create another block with the same height and view, that is coming after
-		extend.Header.ParentID = extend.ID()
-		extend.Header.Height = 1
-		extend.Header.View = 2
+		extendHeaderBody2 := extend.Header
+		extendHeaderBody2.ParentID = extend.ID()
+		extendHeaderBody2.Height = 1
+		extendHeaderBody2.View = 2
 
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(&extend))
+		extend2 := flow.NewBlock(extendHeaderBody2, extend.Payload)
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(extend2))
 		require.Error(t, err)
 
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
+		err = db.View(operation.LookupLatestSealAtBlock(extend2.ID(), &sealID))
 		require.Error(t, err)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
