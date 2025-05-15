@@ -88,7 +88,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 					sender,
 					m.Block.Header.Height,
 					m.Block.Header.View,
-					m.Block.ID())
+					m.Block.ToInternal().ID())
 			case *flow.ResultApproval:
 				tst.ApprovalState.Add(sender, m)
 				t.Logf("%v result approval received from %s for execution result ID %x and chunk index %v\n",
