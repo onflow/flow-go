@@ -221,22 +221,27 @@ func withNextEpoch(
 	currEpochSetup.FinalView = currEpochSetup.FirstView + curEpochViews - 1
 
 	// Construct events for next epoch
-	nextEpochSetup := &flow.EpochSetup{
-		Counter:      currEpochSetup.Counter + 1,
-		FirstView:    currEpochSetup.FinalView + 1,
-		FinalView:    currEpochSetup.FinalView + 1 + 10_000,
-		RandomSource: unittest.SeedFixture(flow.EpochSetupRandomSourceLength),
-		Participants: nextEpochIdentities.ToSkeleton(),
-		Assignments:  unittest.ClusterAssignment(1, nextEpochIdentities.ToSkeleton()),
-	}
+	nextEpochSetup := flow.NewEpochSetup(
+		currEpochSetup.Counter+1,
+		currEpochSetup.FinalView+1,
+		0,
+		0,
+		0,
+		currEpochSetup.FinalView+1+10_000,
+		nextEpochIdentities.ToSkeleton(),
+		unittest.ClusterAssignment(1, nextEpochIdentities.ToSkeleton()),
+		unittest.SeedFixture(flow.EpochSetupRandomSourceLength),
+		0,
+		0,
+	)
 	dkgIndexMap, dkgParticipantKeys := nextEpochParticipantData.DKGData()
-	nextEpochCommit := &flow.EpochCommit{
-		Counter:            nextEpochSetup.Counter,
-		ClusterQCs:         currEpochCommit.ClusterQCs,
-		DKGParticipantKeys: dkgParticipantKeys,
-		DKGGroupKey:        nextEpochParticipantData.DKGGroupKey,
-		DKGIndexMap:        dkgIndexMap,
-	}
+	nextEpochCommit := flow.NewEpochCommit(
+		nextEpochSetup.Counter,
+		currEpochCommit.ClusterQCs,
+		nextEpochParticipantData.DKGGroupKey,
+		dkgParticipantKeys,
+		dkgIndexMap,
+	)
 
 	// Construct the new min epoch state entry
 	minEpochStateEntry := &flow.MinEpochStateEntry{
@@ -261,7 +266,7 @@ func withNextEpoch(
 		rootProtocolState.EpochEntry.PreviousEpochSetup,
 		rootProtocolState.EpochEntry.PreviousEpochCommit,
 		currEpochSetup, currEpochCommit,
-		nextEpochSetup, nextEpochCommit)
+		&nextEpochSetup, &nextEpochCommit)
 	require.NoError(t, err)
 	// Re-construct epoch protocol state with modified events (constructs ActiveIdentity fields)
 	epochRichProtocolState, err := flow.NewRichEpochStateEntry(epochStateEntry)

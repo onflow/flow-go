@@ -45,20 +45,18 @@ func constructRootEpochEvents(
 	dkgData dkg.ThresholdKeySet,
 	dkgIndexMap flow.DKGIndexMap,
 ) (*flow.EpochSetup, *flow.EpochCommit) {
-
-	epochSetup := &flow.EpochSetup{
-		Counter:            flagEpochCounter,
-		FirstView:          firstView,
-		FinalView:          firstView + flagNumViewsInEpoch - 1,
-		DKGPhase1FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase - 1,
-		DKGPhase2FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*2 - 1,
-		DKGPhase3FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 - 1,
-		Participants:       participants.Sort(flow.Canonical[flow.Identity]).ToSkeleton(),
-		Assignments:        assignments,
-		RandomSource:       GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
-		TargetDuration:     flagEpochTimingDuration,
-		TargetEndTime:      rootEpochTargetEndTime(),
-	}
+	epochSetup := flow.NewEpochSetup(
+		flagEpochCounter,
+		firstView,
+		firstView+flagNumViewsInStakingAuction+flagNumViewsInDKGPhase-1,
+		firstView+flagNumViewsInStakingAuction+flagNumViewsInDKGPhase*2-1,
+		firstView+flagNumViewsInStakingAuction+flagNumViewsInDKGPhase*3-1,
+		firstView+flagNumViewsInEpoch-1,
+		participants.Sort(flow.Canonical[flow.Identity]).ToSkeleton(), assignments,
+		GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
+		flagEpochTimingDuration,
+		rootEpochTargetEndTime(),
+	)
 
 	qcsWithSignerIDs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clusterQCs))
 	for i, clusterQC := range clusterQCs {
@@ -75,14 +73,14 @@ func constructRootEpochEvents(
 		})
 	}
 
-	epochCommit := &flow.EpochCommit{
-		Counter:            flagEpochCounter,
-		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
-		DKGGroupKey:        dkgData.PubGroupKey,
-		DKGParticipantKeys: dkgData.PubKeyShares,
-		DKGIndexMap:        dkgIndexMap,
-	}
-	return epochSetup, epochCommit
+	epochCommit := flow.NewEpochCommit(
+		flagEpochCounter,
+		flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
+		dkgData.PubGroupKey,
+		dkgData.PubKeyShares,
+		dkgIndexMap,
+	)
+	return &epochSetup, &epochCommit
 }
 
 func parseChainID(chainID string) flow.ChainID {

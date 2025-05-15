@@ -225,23 +225,35 @@ func TestWithWhiteboard(t *testing.T) {
 	// we arbitrarily use 999 as the current epoch counter
 	currentCounter := uint64(999)
 
-	currentEpochSetup := flow.EpochSetup{
-		Counter:            currentCounter,
-		DKGPhase1FinalView: 150,
-		DKGPhase2FinalView: 200,
-		DKGPhase3FinalView: 250,
-		FinalView:          300,
-		Participants:       conIdentities.ToSkeleton(),
-		RandomSource:       unittest.EpochSetupRandomSourceFixture(),
-	}
+	currentEpochSetup := flow.NewEpochSetup(
+		currentCounter,
+		0,
+		150,
+		200,
+		250,
+		300,
+		conIdentities.ToSkeleton(),
+		nil,
+		unittest.EpochSetupRandomSourceFixture(),
+		0,
+		0,
+	)
 
 	// create the EpochSetup that will trigger the next DKG run with all the
 	// desired parameters
-	nextEpochSetup := flow.EpochSetup{
-		Counter:      currentCounter + 1,
-		Participants: conIdentities.ToSkeleton(),
-		RandomSource: unittest.EpochSetupRandomSourceFixture(),
-	}
+	nextEpochSetup := flow.NewEpochSetup(
+		currentCounter+1,
+		0,
+		0,
+		0,
+		0,
+		0,
+		conIdentities.ToSkeleton(),
+		nil,
+		unittest.EpochSetupRandomSourceFixture(),
+		0,
+		0,
+	)
 
 	nodes := createNodes(
 		t,
