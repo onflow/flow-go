@@ -50,4 +50,9 @@ func TestLightTransactionResultErrorMessages_HappyPath(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, retrievedErrorMessages, len(errorMessages))
 	assert.Equal(t, errorMessages, retrievedErrorMessages)
+
+	// Extract structured data
+	messages := storage.Data()
+	require.Len(t, messages, len(errorMessages))
+	require.ElementsMatch(t, messages, errorMessages)
 }
