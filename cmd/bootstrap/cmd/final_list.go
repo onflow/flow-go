@@ -63,7 +63,10 @@ func finalList(cmd *cobra.Command, args []string) {
 	registeredNodes := readStakingContractDetails()
 
 	// merge internal and partner node infos (from local files)
-	localNodes := mergeNodeInfos(internalNodes, partnerNodes)
+	localNodes, err := mergeNodeInfos(internalNodes, partnerNodes)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to merge node infos")
+	}
 
 	// reconcile nodes from staking contract nodes
 	validateNodes(localNodes, registeredNodes)

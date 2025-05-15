@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/concurrentmap"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -37,7 +38,7 @@ func TestWorkerPool_SingleEvent_SingleWorker(t *testing.T) {
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(pool.WorkerLogic()).
 		Build()
@@ -74,7 +75,7 @@ func TestWorkerBuilder_UnhappyPaths(t *testing.T) {
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(pool.WorkerLogic()).
 		Build()
@@ -115,7 +116,7 @@ func TestWorkerPool_TwoWorkers_ConcurrentEvents(t *testing.T) {
 	}
 
 	q := queue.NewHeroStore(uint32(size), unittest.Logger(), metrics.NewNoopCollector())
-	distributedEvents := unittest.NewProtectedMap[string, struct{}]()
+	distributedEvents := concurrentmap.New[string, struct{}]()
 	allEventsDistributed := sync.WaitGroup{}
 	allEventsDistributed.Add(size)
 
@@ -137,7 +138,7 @@ func TestWorkerPool_TwoWorkers_ConcurrentEvents(t *testing.T) {
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(pool.WorkerLogic()).
 		AddWorker(pool.WorkerLogic()).

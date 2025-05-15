@@ -10,8 +10,8 @@ import (
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/legacy/entities"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -30,7 +30,7 @@ func MessageToTransaction(m *entitiesproto.Transaction, chain flow.Chain) (flow.
 		if err != nil {
 			return *t, err
 		}
-		t.SetProposalKey(proposalAddress, uint64(proposalKey.GetKeyId()), proposalKey.GetSequenceNumber())
+		t.SetProposalKey(proposalAddress, proposalKey.GetKeyId(), proposalKey.GetSequenceNumber())
 	}
 
 	payer := m.GetPayer()
@@ -55,7 +55,7 @@ func MessageToTransaction(m *entitiesproto.Transaction, chain flow.Chain) (flow.
 		if err != nil {
 			return *t, err
 		}
-		t.AddPayloadSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
+		t.AddPayloadSignature(addr, sig.GetKeyId(), sig.GetSignature())
 	}
 
 	for _, sig := range m.GetEnvelopeSignatures() {
@@ -63,7 +63,7 @@ func MessageToTransaction(m *entitiesproto.Transaction, chain flow.Chain) (flow.
 		if err != nil {
 			return *t, err
 		}
-		t.AddEnvelopeSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
+		t.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature())
 	}
 
 	t.SetScript(m.GetScript())
@@ -119,7 +119,7 @@ func TransactionToMessage(tb flow.TransactionBody) *entitiesproto.Transaction {
 	}
 }
 
-func TransactionResultToMessage(result access.TransactionResult) *accessproto.TransactionResultResponse {
+func TransactionResultToMessage(result accessmodel.TransactionResult) *accessproto.TransactionResultResponse {
 	return &accessproto.TransactionResultResponse{
 		Status:       entitiesproto.TransactionStatus(result.Status),
 		StatusCode:   uint32(result.StatusCode),

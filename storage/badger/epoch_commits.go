@@ -56,11 +56,6 @@ func (ec *EpochCommits) retrieveTx(commitID flow.Identifier) func(tx *badger.Txn
 	}
 }
 
-// TODO: can we remove this method? Its not contained in the interface.
-func (ec *EpochCommits) Store(commit *flow.EpochCommit) error {
-	return operation.RetryOnConflictTx(ec.db, transaction.Update, ec.StoreTx(commit))
-}
-
 // ByID will return the EpochCommit event by its ID.
 // Error returns:
 // * storage.ErrNotFound if no EpochCommit with the ID exists

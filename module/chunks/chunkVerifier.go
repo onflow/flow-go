@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
@@ -36,7 +37,7 @@ func NewChunkVerifier(vm fvm.VM, vmCtx fvm.Context, logger zerolog.Logger) *Chun
 	return &ChunkVerifier{
 		vm:             vm,
 		vmCtx:          vmCtx,
-		systemChunkCtx: computer.SystemChunkContext(vmCtx),
+		systemChunkCtx: computer.SystemChunkContext(vmCtx, metrics.NewNoopCollector()),
 		logger:         logger.With().Str("component", "chunk_verifier").Logger(),
 	}
 }
@@ -58,13 +59,7 @@ func (fcv *ChunkVerifier) Verify(
 		ctx = fvm.NewContextFromParent(
 			fcv.systemChunkCtx,
 			fvm.WithBlockHeader(vc.Header),
-			// `protocol.Snapshot` implements `EntropyProvider` interface
-			// Note that `Snapshot` possible errors for RandomSource() are:
-			// - storage.ErrNotFound if the QC is unknown.
-			// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
-			// However, at this stage, snapshot reference block should be known and the QC should also be known,
-			// so no error is expected in normal operations, as required by `EntropyProvider`.
-			fvm.WithEntropyProvider(vc.Snapshot),
+			fvm.WithProtocolStateSnapshot(vc.Snapshot),
 		)
 
 		txBody, err := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain)
@@ -79,13 +74,7 @@ func (fcv *ChunkVerifier) Verify(
 		ctx = fvm.NewContextFromParent(
 			fcv.vmCtx,
 			fvm.WithBlockHeader(vc.Header),
-			// `protocol.Snapshot` implements `EntropyProvider` interface
-			// Note that `Snapshot` possible errors for RandomSource() are:
-			// - storage.ErrNotFound if the QC is unknown.
-			// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
-			// However, at this stage, snapshot reference block should be known and the QC should also be known,
-			// so no error is expected in normal operations, as required by `EntropyProvider`.
-			fvm.WithEntropyProvider(vc.Snapshot),
+			fvm.WithProtocolStateSnapshot(vc.Snapshot),
 		)
 
 		transactions = make(
@@ -290,14 +279,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID, events)
 	}
 
-	if systemChunk {
-		equal, err := result.ServiceEvents.EqualTo(serviceEvents)
-		if err != nil {
-			return nil, fmt.Errorf("error while comparing service events: %w", err)
-		}
-		if !equal {
-			return nil, chmodels.CFInvalidServiceSystemEventsEmitted(result.ServiceEvents, serviceEvents, chIndex, execResID)
-		}
+	serviceEventsInChunk := result.ServiceEventsByChunk(chunk.Index)
+	equal, err := serviceEventsInChunk.EqualTo(serviceEvents)
+	if err != nil {
+		return nil, fmt.Errorf("error while comparing service events: %w", err)
+	}
+	if !equal {
+		return nil, chmodels.CFInvalidServiceSystemEventsEmitted(serviceEventsInChunk, serviceEvents, chIndex, execResID)
 	}
 
 	// Applying chunk updates to the partial trie.	This returns the expected

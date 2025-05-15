@@ -11,25 +11,39 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/addresses"
+	"github.com/onflow/flow-go/cmd/util/cmd/atree_inlined_status"
 	bootstrap_execution_state_payloads "github.com/onflow/flow-go/cmd/util/cmd/bootstrap-execution-state-payloads"
+	check_storage "github.com/onflow/flow-go/cmd/util/cmd/check-storage"
 	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
 	checkpoint_trie_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-trie-stats"
+	debug_script "github.com/onflow/flow-go/cmd/util/cmd/debug-script"
+	debug_tx "github.com/onflow/flow-go/cmd/util/cmd/debug-tx"
+	diff_states "github.com/onflow/flow-go/cmd/util/cmd/diff-states"
 	epochs "github.com/onflow/flow-go/cmd/util/cmd/epochs/cmd"
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
 	edbs "github.com/onflow/flow-go/cmd/util/cmd/execution-data-blobstore/cmd"
 	extract "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract"
+	evm_state_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-evm-state"
 	ledger_json_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-json-execution-state"
 	export_json_transactions "github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions"
 	extractpayloads "github.com/onflow/flow-go/cmd/util/cmd/extract-payloads-by-address"
+	find_inconsistent_result "github.com/onflow/flow-go/cmd/util/cmd/find-inconsistent-result"
+	find_trie_root "github.com/onflow/flow-go/cmd/util/cmd/find-trie-root"
+	generate_authorization_fixes "github.com/onflow/flow-go/cmd/util/cmd/generate-authorization-fixes"
+	"github.com/onflow/flow-go/cmd/util/cmd/leaders"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
 	read_protocol_state "github.com/onflow/flow-go/cmd/util/cmd/read-protocol-state/cmd"
 	index_er "github.com/onflow/flow-go/cmd/util/cmd/reindex/cmd"
 	rollback_executed_height "github.com/onflow/flow-go/cmd/util/cmd/rollback-executed-height/cmd"
+	run_script "github.com/onflow/flow-go/cmd/util/cmd/run-script"
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
+	system_addresses "github.com/onflow/flow-go/cmd/util/cmd/system-addresses"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
+	verify_evm_offchain_replay "github.com/onflow/flow-go/cmd/util/cmd/verify-evm-offchain-replay"
+	verify_execution_result "github.com/onflow/flow-go/cmd/util/cmd/verify_execution_result"
 	"github.com/onflow/flow-go/cmd/util/cmd/version"
 	"github.com/onflow/flow-go/module/profiler"
 )
@@ -72,7 +86,10 @@ func init() {
 	rootCmd.PersistentFlags().DurationVar(&flagProfilerInterval, "profiler-interval", 1*time.Minute, "the interval between auto-profiler runs")
 	rootCmd.PersistentFlags().DurationVar(&flagProfilerDuration, "profiler-duration", 10*time.Second, "the duration to run the auto-profile for")
 
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	log.Logger = log.Output(zerolog.ConsoleWriter{
+		Out:        os.Stderr,
+		TimeFormat: time.TimeOnly,
+	})
 
 	cobra.OnInitialize(initConfig)
 
@@ -90,6 +107,7 @@ func addCommands() {
 	rootCmd.AddCommand(read_badger.RootCmd)
 	rootCmd.AddCommand(read_protocol_state.RootCmd)
 	rootCmd.AddCommand(ledger_json_exporter.Cmd)
+	rootCmd.AddCommand(leaders.Cmd)
 	rootCmd.AddCommand(epochs.RootCmd)
 	rootCmd.AddCommand(edbs.RootCmd)
 	rootCmd.AddCommand(index_er.RootCmd)
@@ -101,6 +119,19 @@ func addCommands() {
 	rootCmd.AddCommand(addresses.Cmd)
 	rootCmd.AddCommand(bootstrap_execution_state_payloads.Cmd)
 	rootCmd.AddCommand(extractpayloads.Cmd)
+	rootCmd.AddCommand(find_inconsistent_result.Cmd)
+	rootCmd.AddCommand(diff_states.Cmd)
+	rootCmd.AddCommand(atree_inlined_status.Cmd)
+	rootCmd.AddCommand(find_trie_root.Cmd)
+	rootCmd.AddCommand(run_script.Cmd)
+	rootCmd.AddCommand(system_addresses.Cmd)
+	rootCmd.AddCommand(check_storage.Cmd)
+	rootCmd.AddCommand(debug_tx.Cmd)
+	rootCmd.AddCommand(debug_script.Cmd)
+	rootCmd.AddCommand(generate_authorization_fixes.Cmd)
+	rootCmd.AddCommand(evm_state_exporter.Cmd)
+	rootCmd.AddCommand(verify_execution_result.Cmd)
+	rootCmd.AddCommand(verify_evm_offchain_replay.Cmd)
 }
 
 func initConfig() {

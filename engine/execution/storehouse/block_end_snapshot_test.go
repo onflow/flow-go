@@ -1,7 +1,6 @@
 package storehouse_test
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 
@@ -57,13 +56,11 @@ func TestBlockEndSnapshot(t *testing.T) {
 
 		// verify getting the correct error
 		_, err = snapshot.Get(heightNotIndexed.Key)
-		require.Error(t, err)
-		require.True(t, errors.Is(err, storage.ErrHeightNotIndexed))
+		require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 
 		// verify result is not cached
 		_, err = snapshot.Get(heightNotIndexed.Key)
-		require.Error(t, err)
-		require.True(t, errors.Is(err, storage.ErrHeightNotIndexed))
+		require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 
 		// test getting storage.ErrNotExecuted error
 		heightNotExecuted := unittest.MakeOwnerReg("height not executed", "height not executed")
@@ -83,8 +80,7 @@ func TestBlockEndSnapshot(t *testing.T) {
 
 		// first time should return error
 		_, err = snapshot.Get(heightNotExecuted.Key)
-		require.Error(t, err)
-		require.True(t, errors.Is(err, storehouse.ErrNotExecuted))
+		require.ErrorIs(t, err, storehouse.ErrNotExecuted)
 
 		// second time should return value
 		value, err = snapshot.Get(heightNotExecuted.Key)

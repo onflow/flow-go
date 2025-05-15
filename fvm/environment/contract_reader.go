@@ -3,9 +3,10 @@ package environment
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/ast"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/ast"
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/stdlib"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/tracing"
@@ -15,21 +16,23 @@ import (
 
 // ContractReader provide read access to contracts.
 type ContractReader struct {
-	tracer tracing.TracerSpan
-	meter  Meter
-
-	accounts Accounts
+	tracer                tracing.TracerSpan
+	meter                 Meter
+	accounts              Accounts
+	cryptoContractAddress common.Address
 }
 
 func NewContractReader(
 	tracer tracing.TracerSpan,
 	meter Meter,
 	accounts Accounts,
+	cryptoContractAddress common.Address,
 ) *ContractReader {
 	return &ContractReader{
-		tracer:   tracer,
-		meter:    meter,
-		accounts: accounts,
+		tracer:                tracer,
+		meter:                 meter,
+		accounts:              accounts,
+		cryptoContractAddress: cryptoContractAddress,
 	}
 }
 
@@ -69,12 +72,37 @@ func (reader *ContractReader) ResolveLocation(
 		return nil, fmt.Errorf("resolve location failed: %w", err)
 	}
 
+	return ResolveLocation(
+		identifiers,
+		location,
+		reader.accounts.GetContractNames,
+		reader.cryptoContractAddress,
+	)
+}
+
+func ResolveLocation(
+	identifiers []ast.Identifier,
+	location common.Location,
+	getContractNames func(flow.Address) ([]string, error),
+	cryptoContractAddress common.Address,
+) ([]runtime.ResolvedLocation, error) {
+
 	addressLocation, isAddress := location.(common.AddressLocation)
 
 	// if the location is not an address location, e.g. an identifier location
-	// (`import Crypto`), then return a single resolved location which declares
-	// all identifiers.
+	// then return a single resolved location which declares all identifiers.
 	if !isAddress {
+
+		// if the location is the Crypto contract,
+		// translate it to the address of the Crypto contract on the chain
+
+		if location == stdlib.CryptoContractLocation {
+			location = common.AddressLocation{
+				Address: cryptoContractAddress,
+				Name:    string(stdlib.CryptoContractLocation),
+			}
+		}
+
 		return []runtime.ResolvedLocation{
 			{
 				Location:    location,
@@ -87,9 +115,13 @@ func (reader *ContractReader) ResolveLocation(
 	// and no specific identifiers where requested in the import statement,
 	// then fetch all identifiers at this address
 	if len(identifiers) == 0 {
+		if getContractNames == nil {
+			return nil, fmt.Errorf("no identifiers provided")
+		}
+
 		address := flow.ConvertAddress(addressLocation.Address)
 
-		contractNames, err := reader.accounts.GetContractNames(address)
+		contractNames, err := getContractNames(address)
 		if err != nil {
 			return nil, fmt.Errorf("resolving location failed: %w", err)
 		}

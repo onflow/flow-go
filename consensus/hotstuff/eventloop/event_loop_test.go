@@ -52,7 +52,7 @@ func (s *EventLoopTestSuite) SetupTest() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(s.T(), ctx)
 
 	s.eventLoop.Start(signalerCtx)
 	unittest.RequireCloseBefore(s.T(), s.eventLoop.Ready(), 100*time.Millisecond, "event loop not started")
@@ -75,7 +75,7 @@ func (s *EventLoopTestSuite) TestReadyDone() {
 
 // Test_SubmitQC tests that submitted proposal is eventually sent to event handler for processing
 func (s *EventLoopTestSuite) Test_SubmitProposal() {
-	proposal := helper.MakeProposal()
+	proposal := helper.MakeSignedProposal()
 	processed := atomic.NewBool(false)
 	s.eh.On("OnReceiveProposal", proposal).Run(func(args mock.Arguments) {
 		processed.Store(true)
@@ -207,7 +207,7 @@ func TestEventLoop_Timeout(t *testing.T) {
 	eh.On("TimeoutChannel").Return(time.After(100 * time.Millisecond))
 
 	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	eventLoop.Start(signalerCtx)
 
 	unittest.RequireCloseBefore(t, eventLoop.Ready(), 100*time.Millisecond, "event loop not stopped")
@@ -229,7 +229,7 @@ func TestEventLoop_Timeout(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for !processed.Load() {
-			eventLoop.SubmitProposal(helper.MakeProposal())
+			eventLoop.SubmitProposal(helper.MakeSignedProposal())
 		}
 	}()
 
@@ -258,20 +258,20 @@ func TestReadyDoneWithStartTime(t *testing.T) {
 	require.NoError(t, err)
 
 	done := make(chan struct{})
-	eh.On("OnReceiveProposal", mock.AnythingOfType("*model.Proposal")).Run(func(args mock.Arguments) {
+	eh.On("OnReceiveProposal", mock.AnythingOfType("*model.SignedProposal")).Run(func(args mock.Arguments) {
 		require.True(t, time.Now().After(startTime))
 		close(done)
 	}).Return(nil).Once()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	eventLoop.Start(signalerCtx)
 
 	unittest.RequireCloseBefore(t, eventLoop.Ready(), 100*time.Millisecond, "event loop not started")
 
 	parentBlock := unittest.BlockHeaderFixture()
 	block := unittest.BlockHeaderWithParentFixture(parentBlock)
-	eventLoop.SubmitProposal(model.ProposalFromFlow(block))
+	eventLoop.SubmitProposal(model.SignedProposalFromFlow(block))
 
 	unittest.RequireCloseBefore(t, done, startTimeDuration+100*time.Millisecond, "proposal wasn't received")
 	cancel()

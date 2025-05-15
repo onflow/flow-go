@@ -12,10 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
-	runtimeCommon "github.com/onflow/cadence/runtime/common"
+	runtimeCommon "github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -23,7 +22,8 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -39,7 +39,7 @@ func TestExtractExecutionState(t *testing.T) {
 
 		withDirs(t, func(datadir, execdir, outdir string) {
 			db := common.InitStorage(datadir)
-			commits := badger.NewCommits(metr, db)
+			commits := store.NewCommits(metr, badgerimpl.ToDB(db))
 
 			_, err := commits.ByBlockID(unittest.IdentifierFixture())
 			require.Error(t, err)
@@ -50,7 +50,7 @@ func TestExtractExecutionState(t *testing.T) {
 
 		withDirs(t, func(datadir, execdir, outdir string) {
 			db := common.InitStorage(datadir)
-			commits := badger.NewCommits(metr, db)
+			commits := store.NewCommits(metr, badgerimpl.ToDB(db))
 
 			blockID := unittest.IdentifierFixture()
 			stateCommitment := unittest.StateCommitmentFixture()
@@ -66,27 +66,12 @@ func TestExtractExecutionState(t *testing.T) {
 
 	t.Run("empty WAL doesn't find anything", func(t *testing.T) {
 		withDirs(t, func(datadir, execdir, outdir string) {
-			opts := migrations.Options{
-				NWorker:              10,
-				ChainID:              flow.Emulator,
-				EVMContractChange:    migrations.EVMContractChangeNone,
-				BurnerContractChange: migrations.BurnerContractChangeDeploy,
-				VerboseErrorOutput:   true,
-			}
+			extractor := newExecutionStateExtractor(zerolog.Nop(), execdir, unittest.StateCommitmentFixture())
 
-			err := extractExecutionState(
-				zerolog.Nop(),
-				execdir,
-				unittest.StateCommitmentFixture(),
-				outdir,
-				10,
-				false,
-				"",
-				nil,
-				false,
-				opts,
-			)
+			partialState, payloads, err := extractor.extract()
 			require.Error(t, err)
+			require.False(t, partialState)
+			require.Equal(t, 0, len(payloads))
 		})
 	})
 
@@ -100,7 +85,7 @@ func TestExtractExecutionState(t *testing.T) {
 			)
 
 			db := common.InitStorage(datadir)
-			commits := badger.NewCommits(metr, db)
+			commits := store.NewCommits(metr, badgerimpl.ToDB(db))
 
 			// generate some oldLedger data
 			size := 10
@@ -406,10 +391,22 @@ func TestExtractPayloadsFromExecutionState(t *testing.T) {
 			// Verify exported payloads.
 			partialState, payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputPayloadFileName)
 			require.NoError(t, err)
-			require.Equal(t, len(selectedKeysValues), len(payloadsFromFile))
 			require.True(t, partialState)
 
+			nonGlobalPayloads := make([]*ledger.Payload, 0, len(selectedKeysValues))
 			for _, payloadFromFile := range payloadsFromFile {
+				key, err := payloadFromFile.Key()
+				require.NoError(t, err)
+
+				owner := key.KeyParts[0].Value
+				if len(owner) > 0 {
+					nonGlobalPayloads = append(nonGlobalPayloads, payloadFromFile)
+				}
+			}
+
+			require.Equal(t, len(selectedKeysValues), len(nonGlobalPayloads))
+
+			for _, payloadFromFile := range nonGlobalPayloads {
 				k, err := payloadFromFile.Key()
 				require.NoError(t, err)
 

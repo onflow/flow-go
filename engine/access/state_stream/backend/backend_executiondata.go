@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -30,7 +31,7 @@ type ExecutionDataBackend struct {
 	getExecutionData GetExecutionDataFunc
 
 	subscriptionHandler  *subscription.SubscriptionHandler
-	executionDataTracker subscription.ExecutionDataTracker
+	executionDataTracker tracker.ExecutionDataTracker
 }
 
 func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
@@ -43,7 +44,7 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, bl
 
 	if err != nil {
 		// need custom not found handler due to blob not found error
-		if errors.Is(err, storage.ErrNotFound) || execution_data.IsBlobNotFoundError(err) {
+		if errors.Is(err, storage.ErrNotFound) || execution_data.IsBlobNotFoundError(err) || errors.Is(err, subscription.ErrBlockNotReady) {
 			return nil, status.Errorf(codes.NotFound, "could not find execution data: %v", err)
 		}
 

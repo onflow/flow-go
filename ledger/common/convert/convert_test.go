@@ -17,11 +17,11 @@ func TestLedgerKeyToRegisterID(t *testing.T) {
 	key := ledger.Key{
 		KeyParts: []ledger.KeyPart{
 			{
-				Type:  convert.KeyPartOwner,
+				Type:  ledger.KeyPartOwner,
 				Value: []byte(expectedRegisterID.Owner),
 			},
 			{
-				Type:  convert.KeyPartKey,
+				Type:  ledger.KeyPartKey,
 				Value: []byte("key"),
 			},
 		},
@@ -30,17 +30,25 @@ func TestLedgerKeyToRegisterID(t *testing.T) {
 	registerID, err := convert.LedgerKeyToRegisterID(key)
 	require.NoError(t, err)
 	require.Equal(t, expectedRegisterID, registerID)
+
+	p := ledger.NewPayload(key, ledger.Value("value"))
+
+	address, err := p.Address()
+
+	require.NoError(t, err)
+	require.Equal(t, registerID.Owner, flow.AddressToRegisterOwner(address))
+	require.Equal(t, registerID.Owner, string(address[:]))
 }
 
 func TestLedgerKeyToRegisterID_Global(t *testing.T) {
 	key := ledger.Key{
 		KeyParts: []ledger.KeyPart{
 			{
-				Type:  convert.KeyPartOwner,
+				Type:  ledger.KeyPartOwner,
 				Value: []byte(""),
 			},
 			{
-				Type:  convert.KeyPartKey,
+				Type:  ledger.KeyPartKey,
 				Value: []byte("uuid"),
 			},
 		},
@@ -50,6 +58,14 @@ func TestLedgerKeyToRegisterID_Global(t *testing.T) {
 	registerID, err := convert.LedgerKeyToRegisterID(key)
 	require.NoError(t, err)
 	require.Equal(t, expectedRegisterID, registerID)
+
+	p := ledger.NewPayload(key, ledger.Value("value"))
+
+	address, err := p.Address()
+
+	require.NoError(t, err)
+	require.Equal(t, registerID.Owner, flow.AddressToRegisterOwner(address))
+	require.NotEqual(t, registerID.Owner, string(address[:]))
 }
 
 func TestLedgerKeyToRegisterID_Error(t *testing.T) {
@@ -60,7 +76,7 @@ func TestLedgerKeyToRegisterID_Error(t *testing.T) {
 				Value: []byte("owner"),
 			},
 			{
-				Type:  convert.KeyPartKey,
+				Type:  ledger.KeyPartKey,
 				Value: []byte("key"),
 			},
 		},
@@ -76,13 +92,13 @@ func TestRegisterIDToLedgerKey(t *testing.T) {
 	expectedKey := ledger.Key{
 		KeyParts: []ledger.KeyPart{
 			{
-				Type: convert.KeyPartOwner,
+				Type: ledger.KeyPartOwner,
 				// Note: the owner field is extended to address length during NewRegisterID
 				// so we have to do the same here
 				Value: []byte(registerID.Owner),
 			},
 			{
-				Type:  convert.KeyPartKey,
+				Type:  ledger.KeyPartKey,
 				Value: []byte("key"),
 			},
 		},
@@ -97,11 +113,11 @@ func TestRegisterIDToLedgerKey_Global(t *testing.T) {
 	expectedKey := ledger.Key{
 		KeyParts: []ledger.KeyPart{
 			{
-				Type:  convert.KeyPartOwner,
+				Type:  ledger.KeyPartOwner,
 				Value: []byte(""),
 			},
 			{
-				Type:  convert.KeyPartKey,
+				Type:  ledger.KeyPartKey,
 				Value: []byte("uuid"),
 			},
 		},
@@ -118,8 +134,8 @@ func TestPayloadToRegister(t *testing.T) {
 		p := ledger.NewPayload(
 			ledger.NewKey(
 				[]ledger.KeyPart{
-					ledger.NewKeyPart(convert.KeyPartOwner, []byte(expected.Owner)),
-					ledger.NewKeyPart(convert.KeyPartKey, []byte(expected.Key)),
+					ledger.NewKeyPart(ledger.KeyPartOwner, []byte(expected.Owner)),
+					ledger.NewKeyPart(ledger.KeyPartKey, []byte(expected.Key)),
 				},
 			),
 			value,
@@ -135,8 +151,8 @@ func TestPayloadToRegister(t *testing.T) {
 		p := ledger.NewPayload(
 			ledger.NewKey(
 				[]ledger.KeyPart{
-					ledger.NewKeyPart(convert.KeyPartOwner, []byte("")),
-					ledger.NewKeyPart(convert.KeyPartKey, []byte("uuid")),
+					ledger.NewKeyPart(ledger.KeyPartOwner, []byte("")),
+					ledger.NewKeyPart(ledger.KeyPartKey, []byte("uuid")),
 				},
 			),
 			value,

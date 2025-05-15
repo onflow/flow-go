@@ -74,7 +74,8 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagNumViewsInEpoch = 100_000
 		flagNumViewsInStakingAuction = 50_000
 		flagNumViewsInDKGPhase = 2_000
-		flagEpochCommitSafetyThreshold = 1_000
+		flagFinalizationSafetyThreshold = 1_000
+		flagEpochExtensionViewCount = 100_000
 		flagUseDefaultEpochTargetEndTime = true
 		flagEpochTimingRefCounter = 0
 		flagEpochTimingRefTimestamp = 0
@@ -188,4 +189,31 @@ func checkClusterConstraint(clusters flow.ClusterList, partnersInfo []model.Node
 		}
 	}
 	return true
+}
+
+func TestMergeNodeInfos(t *testing.T) {
+	partnersLen := 7
+	internalLen := 22
+	partners := unittest.NodeInfosFixture(partnersLen, unittest.WithRole(flow.RoleCollection))
+	internals := unittest.NodeInfosFixture(internalLen, unittest.WithRole(flow.RoleCollection))
+
+	// Check if there is no overlap, then should pass
+	merged, err := mergeNodeInfos(partners, internals)
+	require.NoError(t, err)
+	require.Len(t, merged, partnersLen+internalLen)
+
+	// Check if internals and partners have overlap, then should fail
+	internalAndPartnersHaveOverlap := append(partners, internals[0])
+	_, err = mergeNodeInfos(internalAndPartnersHaveOverlap, internals)
+	require.Error(t, err)
+
+	// Check if partners have overlap, then should fail
+	partnersHaveOverlap := append(partners, partners[0])
+	_, err = mergeNodeInfos(partnersHaveOverlap, internals)
+	require.Error(t, err)
+
+	// Check if internals have overlap, then should fail
+	internalsHaveOverlap := append(internals, internals[0])
+	_, err = mergeNodeInfos(partners, internalsHaveOverlap)
+	require.Error(t, err)
 }

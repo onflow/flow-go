@@ -3,6 +3,7 @@ DOCKER_REGISTRY := us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet
 CONFIGURATION_BUCKET := flow-benchnet-automation
 
 # default values that callers can override when calling target
+# Node role counts
 ACCESS = 1
 COLLECTION = 2
 VALID_COLLECTION := $(shell test $(COLLECTION) -ge 2; echo $$?)
@@ -11,6 +12,11 @@ VALID_CONSENSUS := $(shell test $(CONSENSUS) -ge 2; echo $$?)
 EXECUTION = 2
 VALID_EXECUTION := $(shell test $(EXECUTION) -ge 2; echo $$?)
 VERIFICATION = 1
+# Epoch config
+EPOCH_LEN = 5000
+EPOCH_STAKING_PHASE_LEN = 500
+DKG_PHASE_LEN = 1000
+EPOCH_EXTENSION_LEN = 600
 
 validate:
 ifeq ($(strip $(VALID_EXECUTION)), 1)
@@ -28,8 +34,8 @@ endif
 
 # assumes there is a checked out version of flow-go in a "flow-go" sub-folder at this level so that the bootstrap executable
 # for the checked out version will be run in the sub folder but the bootstrap folder will be created here (outside of the checked out flow-go in the sub folder)
-gen-bootstrap: clone-flow
-	cd flow-go/cmd/bootstrap && go run . genconfig \
+gen-bootstrap: 
+	cd flow-go-bootstrap/cmd/bootstrap && go run . genconfig \
 		--address-format "%s%d-${NETWORK_ID}.${NAMESPACE}:3569" \
 		--access $(ACCESS) \
 		--collection $(COLLECTION) \
@@ -39,30 +45,31 @@ gen-bootstrap: clone-flow
 		--weight 100 \
 		-o ./ \
 		--config ../../../bootstrap/conf/node-config.json
-	cd flow-go/cmd/bootstrap && go run . keygen \
+	cd flow-go-bootstrap/cmd/bootstrap && go run . keygen \
 		--machine-account \
 		--config ../../../bootstrap/conf/node-config.json \
 		-o ../../../bootstrap/keys
 	echo {} > ./bootstrap/conf/partner-stakes.json
 	mkdir ./bootstrap/partner-nodes
-	cd flow-go/cmd/bootstrap && go run . rootblock  \
+	cd flow-go-bootstrap/cmd/bootstrap && go run . rootblock  \
 		--root-chain bench \
 		--root-height 0 \
 		--root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
 		--epoch-counter 0 \
-		--epoch-length 5000 \
-		--epoch-staking-phase-length 500 \
-		--epoch-dkg-phase-length 1000 \
+		--epoch-length $(EPOCH_LEN) \
+		--epoch-staking-phase-length $(EPOCH_STAKING_PHASE_LEN) \
+		--epoch-dkg-phase-length $(DKG_PHASE_LEN) \
+		--epoch-extension-view-count=$(EPOCH_EXTENSION_LEN) \
 		--collection-clusters 1 \
 		--protocol-version=0 \
-		--epoch-commit-safety-threshold=500 \
+		--finalization-safety-threshold=100 \
 		--use-default-epoch-timing \
 		--config ../../../bootstrap/conf/node-config.json \
 		-o ../../../bootstrap/ \
 		--partner-dir ../../../bootstrap/partner-nodes \
 		--partner-weights ../../../bootstrap/conf/partner-stakes.json \
 		--internal-priv-dir ../../../bootstrap/keys/private-root-information
-	cd flow-go/cmd/bootstrap && go run . finalize \
+	cd flow-go-bootstrap/cmd/bootstrap && go run . finalize \
 		--config ../../../bootstrap/conf/node-config.json \
 		-o ../../../bootstrap/  \
 		--partner-dir ../../../bootstrap/partner-nodes \
@@ -117,7 +124,7 @@ helm-deploy: download-values-file
 
 k8s-delete:
 	helm delete ${NETWORK_ID} --namespace ${NAMESPACE}
-	kubectl delete pvc -l networkId=${NETWORK_ID} --namespace ${NAMESPACE}
+	kubectl delete pvc -l network=${NETWORK_ID} --namespace ${NAMESPACE}
 
 delete-configuration:
 	gsutil rm gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}.tar
@@ -126,10 +133,5 @@ delete-configuration:
 k8s-pod-health: validate
 	kubectl get pods --namespace ${NAMESPACE}
 
-clone-flow: clean-flow 
-	# this cloned repo will be used for generating bootstrap info specific to that tag / version
-	git clone https://github.com/onflow/flow-go.git
-	cd flow-go && git checkout $(REF_FOR_BOOTSTRAP)
-	
 clean-flow:
 	rm -rf flow-go

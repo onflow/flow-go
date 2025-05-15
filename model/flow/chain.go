@@ -82,7 +82,7 @@ func (c ChainID) getChainCodeWord() uint64 {
 }
 
 type chainImpl interface {
-	newAddressGeneratorAtIndex(index uint64) AddressGenerator
+	NewAddressGeneratorAtIndex(index uint64) AddressGenerator
 	// IsValid returns true if a given address is a valid account address on a given chain,
 	// and false otherwise.
 	//
@@ -102,7 +102,7 @@ type chainImpl interface {
 // where addresses are simply the index of the account.
 type monotonicImpl struct{}
 
-func (m *monotonicImpl) newAddressGeneratorAtIndex(index uint64) AddressGenerator {
+func (m *monotonicImpl) NewAddressGeneratorAtIndex(index uint64) AddressGenerator {
 	return &MonotonicAddressGenerator{
 		index: index,
 	}
@@ -131,7 +131,7 @@ type linearCodeImpl struct {
 	chainID ChainID
 }
 
-func (l *linearCodeImpl) newAddressGeneratorAtIndex(index uint64) AddressGenerator {
+func (l *linearCodeImpl) NewAddressGeneratorAtIndex(index uint64) AddressGenerator {
 	return &linearCodeAddressGenerator{
 		index:         index,
 		chainCodeWord: l.chainID.getChainCodeWord(),
@@ -262,6 +262,7 @@ func (c ChainID) String() string {
 // Chain is the interface for address generation implementations.
 type Chain interface {
 	NewAddressGenerator() AddressGenerator
+	NewAddressGeneratorAtIndex(index uint64) AddressGenerator
 	AddressAtIndex(index uint64) (Address, error)
 	ServiceAddress() Address
 	BytesToAddressGenerator(b []byte) AddressGenerator
@@ -271,13 +272,12 @@ type Chain interface {
 	ChainID() ChainID
 	// required for tests
 	zeroAddress() Address
-	newAddressGeneratorAtIndex(index uint64) AddressGenerator
 }
 
 // NewAddressGenerator returns a new AddressGenerator with an
 // initialized index.
 func (id *addressedChain) NewAddressGenerator() AddressGenerator {
-	return id.newAddressGeneratorAtIndex(0)
+	return id.NewAddressGeneratorAtIndex(0)
 }
 
 // AddressAtIndex returns the index-th generated account address.
@@ -285,7 +285,7 @@ func (id *addressedChain) AddressAtIndex(index uint64) (Address, error) {
 	if index > maxIndex {
 		return EmptyAddress, fmt.Errorf("index must be less or equal to %x", maxIndex)
 	}
-	return id.newAddressGeneratorAtIndex(index).CurrentAddress(), nil
+	return id.NewAddressGeneratorAtIndex(index).CurrentAddress(), nil
 }
 
 // ServiceAddress returns the root (first) generated account address.
@@ -307,7 +307,7 @@ func (id *addressedChain) BytesToAddressGenerator(b []byte) AddressGenerator {
 	bytes := slices.EnsureByteSliceSize(b, addressIndexLength)
 
 	index := uint48(bytes[:])
-	return id.newAddressGeneratorAtIndex(index)
+	return id.NewAddressGeneratorAtIndex(index)
 }
 
 // ChainID returns the chain ID of the chain.

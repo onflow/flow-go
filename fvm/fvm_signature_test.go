@@ -27,6 +27,12 @@ var createMessage = func(m string) (signableMessage []byte, message cadence.Arra
 	return signableMessage, message
 }
 
+var uint8ArrayArrayType = cadence.NewVariableSizedArrayType(
+	cadence.NewVariableSizedArrayType(
+		cadence.UInt8Type,
+	),
+)
+
 func TestKeyListSignature(t *testing.T) {
 
 	t.Parallel()
@@ -57,7 +63,7 @@ func TestKeyListSignature(t *testing.T) {
 			"SHA3_256",
 			func(tag string) hash.Hasher {
 				hasher, err := fvmCrypto.NewPrefixedHashing(hash.SHA3_256, tag)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				return hasher
 			},
 		},
@@ -65,7 +71,7 @@ func TestKeyListSignature(t *testing.T) {
 			"SHA2_256",
 			func(tag string) hash.Hasher {
 				hasher, err := fvmCrypto.NewPrefixedHashing(hash.SHA2_256, tag)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				return hasher
 			},
 		},
@@ -73,7 +79,7 @@ func TestKeyListSignature(t *testing.T) {
 			"KECCAK_256",
 			func(tag string) hash.Hasher {
 				hasher, err := fvmCrypto.NewPrefixedHashing(hash.Keccak_256, tag)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				return hasher
 			},
 		},
@@ -552,12 +558,8 @@ func TestBLSMultiSignature(t *testing.T) {
 
 					script := fvm.Script(code).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
-							Values: signatures,
-							ArrayType: &cadence.VariableSizedArrayType{
-								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type,
-								},
-							},
+							Values:    signatures,
+							ArrayType: uint8ArrayArrayType,
 						}),
 					)
 
@@ -584,12 +586,8 @@ func TestBLSMultiSignature(t *testing.T) {
 
 					script := fvm.Script(code).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
-							Values: signatures,
-							ArrayType: &cadence.VariableSizedArrayType{
-								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type,
-								},
-							},
+							Values:    signatures,
+							ArrayType: uint8ArrayArrayType,
 						}),
 					)
 
@@ -607,12 +605,8 @@ func TestBLSMultiSignature(t *testing.T) {
 					signatures := []cadence.Value{}
 					script := fvm.Script(code).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
-							Values: signatures,
-							ArrayType: &cadence.VariableSizedArrayType{
-								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type,
-								},
-							},
+							Values:    signatures,
+							ArrayType: uint8ArrayArrayType,
 						}),
 					)
 
@@ -677,12 +671,8 @@ func TestBLSMultiSignature(t *testing.T) {
 
 					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
-							Values: publicKeys,
-							ArrayType: &cadence.VariableSizedArrayType{
-								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type,
-								},
-							},
+							Values:    publicKeys,
+							ArrayType: uint8ArrayArrayType,
 						}),
 					)
 
@@ -711,12 +701,8 @@ func TestBLSMultiSignature(t *testing.T) {
 
 						script := fvm.Script(code(signatureAlgorithm)).WithArguments(
 							jsoncdc.MustEncode(cadence.Array{
-								Values: publicKeys,
-								ArrayType: &cadence.VariableSizedArrayType{
-									ElementType: &cadence.VariableSizedArrayType{
-										ElementType: cadence.UInt8Type,
-									},
-								},
+								Values:    publicKeys,
+								ArrayType: uint8ArrayArrayType,
 							}),
 						)
 
@@ -731,12 +717,8 @@ func TestBLSMultiSignature(t *testing.T) {
 					var publicKeys []cadence.Value
 					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
-							Values: publicKeys,
-							ArrayType: &cadence.VariableSizedArrayType{
-								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type,
-								},
-							},
+							Values:    publicKeys,
+							ArrayType: uint8ArrayArrayType,
 						}),
 					)
 
@@ -811,20 +793,12 @@ func TestBLSMultiSignature(t *testing.T) {
 
 				script := fvm.Script(code).WithArguments(
 					jsoncdc.MustEncode(cadence.Array{ // keys
-						Values: publicKeys,
-						ArrayType: &cadence.VariableSizedArrayType{
-							ElementType: &cadence.VariableSizedArrayType{
-								ElementType: cadence.UInt8Type,
-							},
-						},
+						Values:    publicKeys,
+						ArrayType: uint8ArrayArrayType,
 					}),
 					jsoncdc.MustEncode(cadence.Array{ // signatures
-						Values: signatures,
-						ArrayType: &cadence.VariableSizedArrayType{
-							ElementType: &cadence.VariableSizedArrayType{
-								ElementType: cadence.UInt8Type,
-							},
-						},
+						Values:    signatures,
+						ArrayType: uint8ArrayArrayType,
 					}),
 					jsoncdc.MustEncode(cadenceMessage),
 					jsoncdc.MustEncode(cadence.String(tag)),

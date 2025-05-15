@@ -133,17 +133,17 @@ func (info *blockInfo) GetBlockAtHeight(
 			"get block at height failed: %w", err)
 	}
 
-	if info.blocks == nil {
-		return runtime.Block{}, false, errors.NewOperationNotSupportedError(
-			"GetBlockAtHeight")
-	}
-
 	if info.blockHeader != nil && height == info.blockHeader.Height {
 		return runtimeBlockFromHeader(info.blockHeader), true, nil
 	}
 
 	if height+uint64(flow.DefaultTransactionExpiry) < info.blockHeader.Height {
 		return runtime.Block{}, false, nil
+	}
+
+	if info.blocks == nil {
+		return runtime.Block{}, false, errors.NewOperationNotSupportedError(
+			"GetBlockAtHeight")
 	}
 
 	header, err := info.blocks.ByHeightFrom(height, info.blockHeader)

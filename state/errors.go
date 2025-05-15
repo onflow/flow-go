@@ -19,10 +19,6 @@ type InvalidExtensionError struct {
 	error
 }
 
-func NewInvalidExtensionError(msg string) error {
-	return NewInvalidExtensionErrorf(msg)
-}
-
 func NewInvalidExtensionErrorf(msg string, args ...interface{}) error {
 	return InvalidExtensionError{
 		error: fmt.Errorf(msg, args...),
@@ -44,10 +40,6 @@ func IsInvalidExtensionError(err error) bool {
 // take more state queries.
 type OutdatedExtensionError struct {
 	error
-}
-
-func NewOutdatedExtensionError(msg string) error {
-	return NewOutdatedExtensionErrorf(msg)
 }
 
 func NewOutdatedExtensionErrorf(msg string, args ...interface{}) error {

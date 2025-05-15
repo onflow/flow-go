@@ -1,7 +1,6 @@
 package procedure_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -71,7 +70,7 @@ func TestIndexZeroParent(t *testing.T) {
 		// zero id should have no children
 		var retrievedIDs flow.IdentifierList
 		err = db.View(procedure.LookupBlockChildren(flow.ZeroID, &retrievedIDs))
-		require.True(t, errors.Is(err, storage.ErrNotFound))
+		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 

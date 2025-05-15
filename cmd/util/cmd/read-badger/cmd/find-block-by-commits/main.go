@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -80,7 +81,7 @@ func FindBlockIDByCommits(
 
 func toStateCommitments(commitsStr string) ([]flow.StateCommitment, error) {
 	commitSlice := strings.Split(commitsStr, ",")
-	commits := make([]flow.StateCommitment, len(commitSlice))
+	commits := make([]flow.StateCommitment, 0, len(commitSlice))
 	for _, c := range commitSlice {
 		commit, err := toStateCommitment(c)
 		if err != nil {
@@ -123,10 +124,12 @@ func run(*cobra.Command, []string) {
 		}
 	}()
 
+	en := common.InitExecutionStorages(db)
+
 	_, err = FindBlockIDByCommits(
 		log.Logger,
 		storage.Headers,
-		storage.Commits,
+		en.Commits,
 		stateCommitments,
 		flagStartHeight,
 		flagEndHeight,

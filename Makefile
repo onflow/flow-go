@@ -26,7 +26,7 @@ IMAGE_TAG_ARM := $(IMAGE_TAG)-arm
 # Name of the cover profile
 COVER_PROFILE := coverage.txt
 # Disable go sum database lookup for private repos
-GOPRIVATE=github.com/dapperlabs/*
+GOPRIVATE=github.com/onflow/*-internal
 # OS
 UNAME := $(shell uname)
 
@@ -77,7 +77,7 @@ unittest-main:
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
-    go install github.com/vektra/mockery/v2@v2.21.4; \
+    go install github.com/vektra/mockery/v2@v2.53.3; \
     go install github.com/golang/mock/mockgen@v1.6.0;
 
 .PHONY: install-tools
@@ -101,7 +101,7 @@ go-math-rand-check:
 	#   - "onflow/crypto/random" for deterministic randomness
 	grep --include=\*.go \
 	--exclude=*test* --exclude=*helper* --exclude=*example* --exclude=*fixture* --exclude=*benchmark* --exclude=*profiler* \
-    --exclude-dir=*test* --exclude-dir=*helper* --exclude-dir=*example* --exclude-dir=*fixture* --exclude-dir=*benchmark* --exclude-dir=*profiler* -rnw '"math/rand"'; \
+    --exclude-dir=*test* --exclude-dir=*helper* --exclude-dir=*example* --exclude-dir=*fixture* --exclude-dir=*benchmark* --exclude-dir=*profiler* --exclude-dir=*emulator* -rnw '"math/rand"'; \
     if [ $$? -ne 1 ]; then \
        echo "[Error] Go production code should not use math/rand package"; exit 1; \
     fi
@@ -138,8 +138,8 @@ endif
 
 .PHONY: generate-openapi
 generate-openapi:
-	swagger-codegen generate -l go -i https://raw.githubusercontent.com/onflow/flow/master/openapi/access.yaml -D packageName=models,modelDocs=false,models -o engine/access/rest/models;
-	go fmt ./engine/access/rest/models
+	swagger-codegen generate -l go -i https://raw.githubusercontent.com/onflow/flow/master/openapi/access.yaml -D packageName=models,modelDocs=false,models -o engine/access/rest/http/models;
+	go fmt ./engine/access/rest/http/models
 
 .PHONY: generate
 generate: generate-proto generate-mocks generate-fvm-env-wrappers
@@ -159,6 +159,7 @@ generate-mocks: install-mock-generators
 	CGO_CFLAGS=$(CRYPTO_FLAG) mockgen -destination=network/mocknetwork/mock_network.go -package=mocknetwork github.com/onflow/flow-go/network EngineRegistry
 	mockery --name=ExecutionDataStore --dir=module/executiondatasync/execution_data --case=underscore --output="./module/executiondatasync/execution_data/mock" --outpkg="mock"
 	mockery --name=Downloader --dir=module/executiondatasync/execution_data --case=underscore --output="./module/executiondatasync/execution_data/mock" --outpkg="mock"
+	mockery --name='.*' --dir=integration/benchmark/mocksiface --case=underscore --output="integration/benchmark/mock" --outpkg="mock"
 	mockery --name '(ExecutionDataRequester|IndexReporter)' --dir=module/state_synchronization --case=underscore --output="./module/state_synchronization/mock" --outpkg="state_synchronization"
 	mockery --name 'ExecutionState' --dir=engine/execution/state --case=underscore --output="engine/execution/state/mock" --outpkg="mock"
 	mockery --name 'BlockComputer' --dir=engine/execution/computation/computer --case=underscore --output="engine/execution/computation/computer/mock" --outpkg="mock"
@@ -198,13 +199,17 @@ generate-mocks: install-mock-generators
 	mockery --name '.*' --dir="./consensus/hotstuff" --case=underscore --output="./consensus/hotstuff/mocks" --outpkg="mocks"
 	mockery --name '.*' --dir="./engine/access/wrapper" --case=underscore --output="./engine/access/mock" --outpkg="mock"
 	mockery --name 'API' --dir="./access" --case=underscore --output="./access/mock" --outpkg="mock"
+	mockery --name 'Blocks' --dir="./access/validator" --case=underscore --output="./access/validator/mock" --outpkg="mock"
 	mockery --name 'API' --dir="./engine/protocol" --case=underscore --output="./engine/protocol/mock" --outpkg="mock"
 	mockery --name '.*' --dir="./engine/access/state_stream" --case=underscore --output="./engine/access/state_stream/mock" --outpkg="mock"
-	mockery --name 'BlockTracker' --dir="./engine/access/subscription" --case=underscore --output="./engine/access/subscription/mock"  --outpkg="mock"
-	mockery --name 'ExecutionDataTracker' --dir="./engine/access/subscription" --case=underscore --output="./engine/access/subscription/mock"  --outpkg="mock"
+	mockery --name 'BlockTracker' --dir="./engine/access/subscription/tracker" --case=underscore --output="./engine/access/subscription/tracker/mock"  --outpkg="mock"
+	mockery --name 'ExecutionDataTracker' --dir="./engine/access/subscription/tracker" --case=underscore --output="./engine/access/subscription/tracker/mock"  --outpkg="mock"
+	mockery --name 'DataProvider' --dir="./engine/access/rest/websockets/data_providers" --case=underscore --output="./engine/access/rest/websockets/data_providers/mock"  --outpkg="mock"
+	mockery --name 'DataProviderFactory' --dir="./engine/access/rest/websockets/data_providers" --case=underscore --output="./engine/access/rest/websockets/data_providers/mock"  --outpkg="mock"
+	mockery --name 'LinkGenerator' --dir="./engine/access/rest/common/models" --case=underscore --output="./engine/access/rest/common/models/mock"  --outpkg="mock"
+	mockery --name 'WebsocketConnection' --dir="./engine/access/rest/websockets" --case=underscore --output="./engine/access/rest/websockets/mock"  --outpkg="mock"
 	mockery --name 'ConnectionFactory' --dir="./engine/access/rpc/connection" --case=underscore --output="./engine/access/rpc/connection/mock" --outpkg="mock"
 	mockery --name 'Communicator' --dir="./engine/access/rpc/backend" --case=underscore --output="./engine/access/rpc/backend/mock" --outpkg="mock"
-
 	mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"
 	mockery --name 'ExecForkActor' --structname 'ExecForkActorMock' --dir=module/mempool/consensus/mock/ --case=underscore --output="./module/mempool/consensus/mock/" --outpkg="mock"
 	mockery --name '.*' --dir=engine/verification/fetcher/ --case=underscore --output="./engine/verification/fetcher/mock" --outpkg="mockfetcher"
@@ -212,6 +217,7 @@ generate-mocks: install-mock-generators
 	mockery --name 'Storage' --dir=module/executiondatasync/tracker --case=underscore --output="module/executiondatasync/tracker/mock" --outpkg="mocktracker"
 	mockery --name 'ScriptExecutor' --dir=module/execution --case=underscore --output="module/execution/mock" --outpkg="mock"
 	mockery --name 'StorageSnapshot' --dir=fvm/storage/snapshot --case=underscore --output="fvm/storage/snapshot/mock" --outpkg="mock"
+	mockery --name 'Core' --dir=module/executiondatasync/optimistic_syncing --case=underscore --output="module/executiondatasync/optimistic_syncing/mock" --outpkg="mock"
 
 	#temporarily make insecure/ a non-module to allow mockery to create mocks
 	mv insecure/go.mod insecure/go2.mod
@@ -230,15 +236,19 @@ tidy:
 	cd insecure; go mod tidy -v
 	git diff --exit-code
 
+# Builds a custom version of the golangci-lint binary which includes custom plugins
+tools/custom-gcl: tools/structwrite .custom-gcl.yml
+	golangci-lint custom
+
 .PHONY: lint
-lint: tidy
+lint: tidy tools/custom-gcl
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	golangci-lint run -v ./...
+	./tools/custom-gcl run -v ./...
 
 .PHONY: fix-lint
 fix-lint:
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	golangci-lint run -v --fix ./...
+	./tools/custom-gcl run -v --fix ./...
 
 # Runs unit tests with different list of packages as passed by CI so they run in parallel
 .PHONY: ci
@@ -538,6 +548,14 @@ docker-native-build-access-corrupt:
 		-t "$(CONTAINER_REGISTRY)/access-corrupted:$(IMAGE_TAG)" .
 	./insecure/cmd/mods_restore.sh
 
+# build a binary to run on bare metal without using docker.
+# binary is written to file ./bin/app
+.PHONY: docker-native-build-access-binary
+docker-native-build-access-binary: docker-native-build-access
+	docker create --name extract "$(CONTAINER_REGISTRY)/access:latest"
+	docker cp extract:/bin/app ./flow_access_node
+	docker rm extract
+
 .PHONY: docker-native-build-observer
 docker-native-build-observer:
 	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/observer --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
@@ -592,6 +610,7 @@ docker-native-build-ghost-debug:
 PHONY: docker-build-bootstrap
 docker-build-bootstrap:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/bootstrap --build-arg GOARCH=$(GOARCH) --build-arg VERSION=$(IMAGE_TAG) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/bootstrap:latest" \
 		-t "$(CONTAINER_REGISTRY)/bootstrap:$(IMAGE_TAG)" .
@@ -604,6 +623,7 @@ tool-bootstrap: docker-build-bootstrap
 docker-build-bootstrap-transit:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/bootstrap/transit --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(VERSION) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --no-cache \
 	    --target production  \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY \
 		-t "$(CONTAINER_REGISTRY)/bootstrap-transit:latest" \
 		-t "$(CONTAINER_REGISTRY)/bootstrap-transit:$(IMAGE_TAG)" .
 
@@ -653,7 +673,7 @@ docker-push-collection-without-adx:
 docker-push-collection-without-netgo-without-adx:
 	docker push "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
 
-.PHONY: docker-push-collection-arm 
+.PHONY: docker-push-collection-arm
 docker-push-collection-arm:
 	docker push "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG_ARM)"
 
@@ -673,7 +693,7 @@ docker-push-consensus-without-adx:
 docker-push-consensus-without-netgo-without-adx:
 	docker push "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
 
-.PHONY: docker-push-consensus-arm 
+.PHONY: docker-push-consensus-arm
 docker-push-consensus-arm:
 	docker push "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_ARM)"
 
@@ -697,7 +717,7 @@ docker-push-execution-without-adx:
 docker-push-execution-without-netgo-without-adx:
 	docker push "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
 
-.PHONY: docker-push-execution-arm 
+.PHONY: docker-push-execution-arm
 docker-push-execution-arm:
 	docker push "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_ARM)"
 
@@ -721,7 +741,7 @@ docker-push-verification-corrupt:
 docker-push-verification-without-netgo-without-adx:
 	docker push "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
 
-.PHONY: docker-push-verification-arm 
+.PHONY: docker-push-verification-arm
 docker-push-verification-arm:
 	docker push "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG_ARM)"
 
@@ -745,7 +765,7 @@ docker-push-access-corrupt:
 docker-push-access-without-netgo-without-adx:
 	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
 
-.PHONY: docker-push-access-arm 
+.PHONY: docker-push-access-arm
 docker-push-access-arm:
 	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG_ARM)"
 
@@ -766,7 +786,7 @@ docker-push-observer-without-adx:
 docker-push-observer-without-netgo-without-adx:
 	docker push "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
 
-.PHONY: docker-push-observer-arm 
+.PHONY: docker-push-observer-arm
 docker-push-observer-arm:
 	docker push "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG_ARM)"
 
@@ -847,7 +867,8 @@ docker-all-tools: tool-util tool-remove-execution-fork
 
 PHONY: docker-build-util
 docker-build-util:
-	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/util --build-arg GOARCH=$(GOARCH) --build-arg VERSION=$(IMAGE_TAG) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/util --build-arg GOARCH=$(GOARCH) --build-arg VERSION=$(IMAGE_TAG) --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
 		-t "$(CONTAINER_REGISTRY)/util:latest"  \
 		-t "$(CONTAINER_REGISTRY)/util:$(IMAGE_TAG)" .
 

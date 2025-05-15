@@ -3,12 +3,15 @@ package migrations
 import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+type Contract struct {
+	Name string
+	Code []byte
+}
 
 func NewDeploymentMigration(
 	chainID flow.ChainID,
@@ -16,7 +19,7 @@ func NewDeploymentMigration(
 	authorizer flow.Address,
 	expectedWriteAddresses map[flow.Address]struct{},
 	logger zerolog.Logger,
-) ledger.Migration {
+) RegistersMigration {
 
 	script := []byte(`
       transaction(name: String, code: String) {
@@ -37,24 +40,5 @@ func NewDeploymentMigration(
 		chainID,
 		logger,
 		expectedWriteAddresses,
-	)
-}
-
-func NewBurnerDeploymentMigration(
-	chainID flow.ChainID,
-	logger zerolog.Logger,
-) ledger.Migration {
-	address := BurnerAddressForChain(chainID)
-	return NewDeploymentMigration(
-		chainID,
-		Contract{
-			Name: "Burner",
-			Code: coreContracts.Burner(),
-		},
-		address,
-		map[flow.Address]struct{}{
-			address: {},
-		},
-		logger,
 	)
 }

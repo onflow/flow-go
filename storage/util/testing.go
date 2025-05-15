@@ -11,12 +11,27 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 )
 
-func StorageLayer(_ testing.TB, db *badger.DB) *storage.All {
+func ExecutionStorageLayer(_ testing.TB, bdb *badger.DB) *storage.Execution {
 	metrics := metrics.NewNoopCollector()
-	all := bstorage.InitAll(metrics, db)
-	return all
+
+	db := badgerimpl.ToDB(bdb)
+
+	results := store.NewExecutionResults(metrics, db)
+	receipts := store.NewExecutionReceipts(metrics, db, results, bstorage.DefaultCacheSize)
+	commits := store.NewCommits(metrics, db)
+	transactionResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
+	events := store.NewEvents(metrics, db)
+	return &storage.Execution{
+		Results:            results,
+		Receipts:           receipts,
+		Commits:            commits,
+		TransactionResults: transactionResults,
+		Events:             events,
+	}
 }
 
 func CreateFiles(t *testing.T, dir string, names ...string) {

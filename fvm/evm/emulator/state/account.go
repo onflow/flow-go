@@ -1,8 +1,7 @@
 package state
 
 import (
-	"math/big"
-
+	"github.com/holiman/uint256"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	"github.com/onflow/go-ethereum/rlp"
@@ -15,7 +14,7 @@ type Account struct {
 	// address
 	Address gethCommon.Address
 	// balance of the address
-	Balance *big.Int
+	Balance *uint256.Int
 	// nonce of the address
 	Nonce uint64
 	// hash of the code
@@ -29,7 +28,7 @@ type Account struct {
 // NewAccount constructs a new account
 func NewAccount(
 	address gethCommon.Address,
-	balance *big.Int,
+	balance *uint256.Int,
 	nonce uint64,
 	codeHash gethCommon.Hash,
 	collectionID []byte,
@@ -43,8 +42,14 @@ func NewAccount(
 	}
 }
 
+// HasCode returns true if account has code
 func (a *Account) HasCode() bool {
 	return a.CodeHash != gethTypes.EmptyCodeHash
+}
+
+// HasStoredValues returns true if account has stored values
+func (a *Account) HasStoredValues() bool {
+	return len(a.CollectionID) != 0
 }
 
 // Encode encodes the account

@@ -1,7 +1,6 @@
 package signature
 
 import (
-	"errors"
 	"math/rand"
 	"sync"
 	"testing"
@@ -174,8 +173,7 @@ func (rs *randomBeaconSuite) TestInvalidSignature() {
 	share[4] ^= 1
 	// Verify
 	err = follower.Verify(index, share)
-	assert.Error(rs.T(), err)
-	assert.True(rs.T(), errors.Is(err, model.ErrInvalidSignature))
+	assert.ErrorIs(rs.T(), err, model.ErrInvalidSignature)
 	// restore share
 	share[4] ^= 1
 
@@ -183,8 +181,7 @@ func (rs *randomBeaconSuite) TestInvalidSignature() {
 	otherIndex := (index + 1) % len(rs.pkShares) // otherIndex is different than index
 	// VerifyShare
 	err = follower.Verify(otherIndex, share)
-	assert.Error(rs.T(), err)
-	assert.True(rs.T(), errors.Is(err, model.ErrInvalidSignature))
+	assert.ErrorIs(rs.T(), err, model.ErrInvalidSignature)
 }
 
 func (rs *randomBeaconSuite) TestConstructorErrors() {

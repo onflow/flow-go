@@ -3,6 +3,9 @@ package state
 import (
 	"encoding/binary"
 	"fmt"
+
+	gethCommon "github.com/onflow/go-ethereum/common"
+	"github.com/onflow/go-ethereum/rlp"
 )
 
 // CodeContainer contains codes and keeps
@@ -76,4 +79,25 @@ func (cc *CodeContainer) Encode() []byte {
 	binary.BigEndian.PutUint64(encoded[:8], cc.refCount)
 	copy(encoded[8:], cc.code)
 	return encoded
+}
+
+// CodeInContext captures a code in its context
+type CodeInContext struct {
+	Hash      gethCommon.Hash
+	Code      []byte
+	RefCounts uint64
+}
+
+// Encoded returns the encoded content of the code in context
+func (cic *CodeInContext) Encode() ([]byte, error) {
+	return rlp.EncodeToBytes(cic)
+}
+
+// CodeInContextFromEncoded constructs a code in context from the encoded data
+func CodeInContextFromEncoded(encoded []byte) (*CodeInContext, error) {
+	if len(encoded) == 0 {
+		return nil, nil
+	}
+	cic := &CodeInContext{}
+	return cic, rlp.DecodeBytes(encoded, cic)
 }

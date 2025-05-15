@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/provider"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
+	exepruner "github.com/onflow/flow-go/engine/execution/pruner"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
@@ -25,35 +26,38 @@ import (
 
 // ExecutionConfig contains the configs for starting up execution nodes
 type ExecutionConfig struct {
-	rpcConf                              rpc.Config
-	triedir                              string
-	executionDataDir                     string
-	registerDir                          string
-	mTrieCacheSize                       uint32
-	transactionResultsCacheSize          uint
-	checkpointDistance                   uint
-	checkpointsToKeep                    uint
-	chunkDataPackDir                     string
-	chunkDataPackCacheSize               uint
-	chunkDataPackRequestsCacheSize       uint32
-	requestInterval                      time.Duration
-	extensiveLog                         bool
-	pauseExecution                       bool
-	chunkDataPackQueryTimeout            time.Duration
-	chunkDataPackDeliveryTimeout         time.Duration
-	enableBlockDataUpload                bool
-	gcpBucketName                        string
-	s3BucketName                         string
-	apiRatelimits                        map[string]int
-	apiBurstlimits                       map[string]int
-	executionDataAllowedPeers            string
-	executionDataPrunerHeightRangeTarget uint64
-	executionDataPrunerThreshold         uint64
-	blobstoreRateLimit                   int
-	blobstoreBurstLimit                  int
-	chunkDataPackRequestWorkers          uint
-	maxGracefulStopDuration              time.Duration
-	importCheckpointWorkerCount          int
+	rpcConf                               rpc.Config
+	triedir                               string
+	executionDataDir                      string
+	registerDir                           string
+	mTrieCacheSize                        uint32
+	transactionResultsCacheSize           uint
+	checkpointDistance                    uint
+	checkpointsToKeep                     uint
+	chunkDataPackDir                      string
+	chunkDataPackCheckpointsDir           string
+	chunkDataPackCacheSize                uint
+	chunkDataPackRequestsCacheSize        uint32
+	requestInterval                       time.Duration
+	extensiveLog                          bool
+	pauseExecution                        bool
+	chunkDataPackQueryTimeout             time.Duration
+	chunkDataPackDeliveryTimeout          time.Duration
+	enableBlockDataUpload                 bool
+	gcpBucketName                         string
+	s3BucketName                          string
+	apiRatelimits                         map[string]int
+	apiBurstlimits                        map[string]int
+	executionDataAllowedPeers             string
+	executionDataPrunerHeightRangeTarget  uint64
+	executionDataPrunerThreshold          uint64
+	blobstoreRateLimit                    int
+	blobstoreBurstLimit                   int
+	chunkDataPackRequestWorkers           uint
+	maxGracefulStopDuration               time.Duration
+	importCheckpointWorkerCount           int
+	transactionExecutionMetricsEnabled    bool
+	transactionExecutionMetricsBufferSize uint
 
 	computationConfig        computation.ComputationConfig
 	receiptRequestWorkers    uint   // common provider engine workers
@@ -63,10 +67,15 @@ type ExecutionConfig struct {
 	// It works around an issue where some collection nodes are not configured with enough
 	// this works around an issue where some collection nodes are not configured with enough
 	// file descriptors causing connection failures.
-	onflowOnlyLNs            bool
-	enableStorehouse         bool
-	enableChecker            bool
-	enableNewIngestionEngine bool
+	onflowOnlyLNs    bool
+	enableStorehouse bool
+	enableChecker    bool
+	publicAccessID   string
+
+	pruningConfigThreshold           uint64
+	pruningConfigBatchSize           uint
+	pruningConfigSleepAfterCommit    time.Duration
+	pruningConfigSleepAfterIteration time.Duration
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -87,6 +96,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&exeConf.computationConfig.CadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
 	flags.IntVar(&exeConf.computationConfig.MaxConcurrency, "computer-max-concurrency", 1, "set to greater than 1 to enable concurrent transaction execution")
 	flags.StringVar(&exeConf.chunkDataPackDir, "chunk-data-pack-dir", filepath.Join(datadir, "chunk_data_packs"), "directory to use for storing chunk data packs")
+	flags.StringVar(&exeConf.chunkDataPackCheckpointsDir, "chunk-data-pack-checkpoints-dir", filepath.Join(datadir, "chunk_data_packs_checkpoints_dir"), "directory to use storing chunk data packs pebble database checkpoints for querying while the node is running")
 	flags.UintVar(&exeConf.chunkDataPackCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for chunk data packs")
 	flags.Uint32Var(&exeConf.chunkDataPackRequestsCacheSize, "chdp-request-queue", mempool.DefaultChunkDataPackRequestQueueSize, "queue size for chunk data pack requests")
 	flags.DurationVar(&exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
@@ -117,12 +127,21 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.IntVar(&exeConf.blobstoreBurstLimit, "blobstore-burst-limit", 0, "outgoing burst limit for Execution Data blobstore")
 	flags.DurationVar(&exeConf.maxGracefulStopDuration, "max-graceful-stop-duration", stop.DefaultMaxGracefulStopDuration, "the maximum amount of time stop control will wait for ingestion engine to gracefully shutdown before crashing")
 	flags.IntVar(&exeConf.importCheckpointWorkerCount, "import-checkpoint-worker-count", 10, "number of workers to import checkpoint file during bootstrap")
+	flags.BoolVar(&exeConf.transactionExecutionMetricsEnabled, "tx-execution-metrics", true, "enable collection of transaction execution metrics")
+	flags.UintVar(&exeConf.transactionExecutionMetricsBufferSize, "tx-execution-metrics-buffer-size", 200, "buffer size for transaction execution metrics. The buffer size is the number of blocks that are kept in memory by the metrics provider engine")
 
 	flags.BoolVar(&exeConf.onflowOnlyLNs, "temp-onflow-only-lns", false, "do not use unless required. forces node to only request collections from onflow collection nodes")
 	flags.BoolVar(&exeConf.enableStorehouse, "enable-storehouse", false, "enable storehouse to store registers on disk, default is false")
 	flags.BoolVar(&exeConf.enableChecker, "enable-checker", true, "enable checker to check the correctness of the execution result, default is true")
-	flags.BoolVar(&exeConf.enableNewIngestionEngine, "enable-new-ingestion-engine", false, "enable new ingestion engine, default is false")
+	// deprecated. Retain it to prevent nodes that previously had this configuration from crashing.
+	var deprecatedEnableNewIngestionEngine bool
+	flags.BoolVar(&deprecatedEnableNewIngestionEngine, "enable-new-ingestion-engine", true, "enable new ingestion engine, default is true")
+	flags.StringVar(&exeConf.publicAccessID, "public-access-id", "", "public access ID for the node")
 
+	flags.Uint64Var(&exeConf.pruningConfigThreshold, "pruning-config-threshold", exepruner.DefaultConfig.Threshold, "the number of blocks that we want to keep in the database, default 30 days")
+	flags.UintVar(&exeConf.pruningConfigBatchSize, "pruning-config-batch-size", exepruner.DefaultConfig.BatchSize, "the batch size is the number of blocks that we want to delete in one batch, default 1200")
+	flags.DurationVar(&exeConf.pruningConfigSleepAfterCommit, "pruning-config-sleep-after-commit", exepruner.DefaultConfig.SleepAfterEachBatchCommit, "sleep time after each batch commit, default 1s")
+	flags.DurationVar(&exeConf.pruningConfigSleepAfterIteration, "pruning-config-sleep-after-iteration", exepruner.DefaultConfig.SleepAfterEachIteration, "sleep time after each iteration, default max int64")
 }
 
 func (exeConf *ExecutionConfig) ValidateFlags() error {

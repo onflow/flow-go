@@ -8,6 +8,7 @@ import (
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	httpmetrics "github.com/slok/go-http-metrics/metrics"
 
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -468,19 +469,37 @@ type EngineMetrics interface {
 	OutboundMessageDropped(engine string, messages string)
 }
 
+// ComplianceMetrics reports metrics about the compliance layer, which processes, finalizes,
+// and seals blocks and tracks data in the Protocol State.
 type ComplianceMetrics interface {
+	// FinalizedHeight reports the latest finalized height known to this node.
 	FinalizedHeight(height uint64)
+	// EpochTransitionHeight reports the height of the most recently finalized epoch transition.
 	EpochTransitionHeight(height uint64)
+	// SealedHeight reports the latest block that has a finalized seal known to this node.
 	SealedHeight(height uint64)
+	// BlockFinalized reports information about data contained within finalized blocks.
 	BlockFinalized(*flow.Block)
+	// BlockSealed reports information about data contained within blocks with a finalized seal.
+	// When a new block is finalized, this method is called for every seal in the finalized block,
+	// in the order the seals are listed.
+	// CAUTION: within a block, seals can be included in any permutation (not necessarily in order
+	// of increasing height).
 	BlockSealed(*flow.Block)
+	// CurrentEpochCounter reports the current epoch counter.
 	CurrentEpochCounter(counter uint64)
+	// CurrentEpochPhase reports the current epoch phase.
 	CurrentEpochPhase(phase flow.EpochPhase)
+	// CurrentEpochFinalView reports the final view of the current epoch, including epoch extensions.
 	CurrentEpochFinalView(view uint64)
-	CurrentDKGPhase1FinalView(view uint64)
-	CurrentDKGPhase2FinalView(view uint64)
-	CurrentDKGPhase3FinalView(view uint64)
-	EpochEmergencyFallbackTriggered()
+	// CurrentDKGPhaseViews reports the final view of each DKG phase for the current epoch.
+	CurrentDKGPhaseViews(phase1FinalView, phase2FinalView, phase3FinalView uint64)
+	// EpochFallbackModeTriggered reports that EFM is triggered.
+	EpochFallbackModeTriggered()
+	// EpochFallbackModeExited reports that EFM is no longer triggered.
+	EpochFallbackModeExited()
+	// ProtocolStateVersion reports the version of the latest finalized protocol state.
+	ProtocolStateVersion(version uint64)
 }
 
 type CleanerMetrics interface {
@@ -581,9 +600,16 @@ type CruiseCtlMetrics interface {
 	// ControllerOutput measures the output of the cruise control PID controller.
 	// Concretely, this is the quantity to subtract from the baseline view duration.
 	ControllerOutput(duration time.Duration)
+
+	// ProposalPublicationDelay measures the effective delay the controller imposes on publishing
+	// the node's own proposals, with all limits of authority applied.
+	// Note: Technically, our metrics capture the publication delay relative to when the publication delay was
+	// last requested. Currently, only the EventHandler requests a publication delay, exactly once per proposal.
+	ProposalPublicationDelay(duration time.Duration)
 }
 
 type CollectionMetrics interface {
+	TransactionValidationMetrics
 	// TransactionIngested is called when a new transaction is ingested by the
 	// node. It increments the total count of ingested transactions and starts
 	// a tx->col span for the transaction.
@@ -816,6 +842,15 @@ type RuntimeMetrics interface {
 	RuntimeTransactionProgramsCacheHit()
 }
 
+type EVMMetrics interface {
+	// SetNumberOfDeployedCOAs sets the total number of deployed COAs
+	SetNumberOfDeployedCOAs(count uint64)
+	// EVMTransactionExecuted reports the gas used when executing an evm transaction
+	EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool)
+	// EVMBlockExecuted reports the block size, total gas used and total supply when executing an evm block
+	EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow float64)
+}
+
 type ProviderMetrics interface {
 	// ChunkDataPackRequestProcessed is executed every time a chunk data pack request is picked up for processing at execution node.
 	// It increases the request processed counter by one.
@@ -875,6 +910,7 @@ type AccessMetrics interface {
 	RestMetrics
 	GRPCConnectionPoolMetrics
 	TransactionMetrics
+	TransactionValidationMetrics
 	BackendScriptsMetrics
 
 	// UpdateExecutionReceiptMaxHeight is called whenever we store an execution receipt from a block from a newer height
@@ -891,8 +927,30 @@ type ExecutionResultStats struct {
 	EventSize                       int
 	NumberOfRegistersTouched        int
 	NumberOfBytesWrittenToRegisters int
-	NumberOfCollections             int
-	NumberOfTransactions            int
+}
+
+type BlockExecutionResultStats struct {
+	CollectionExecutionResultStats
+	NumberOfCollections int
+}
+
+type CollectionExecutionResultStats struct {
+	ExecutionResultStats
+	NumberOfTransactions int
+}
+
+type TransactionExecutionResultStats struct {
+	ExecutionResultStats
+	NumberOfTxnConflictRetries int
+	Failed                     bool
+	SystemTransaction          bool
+	ComputationIntensities     meter.MeteredComputationIntensities
+}
+
+type TransactionExecutionResultInfo struct {
+	TransactionID flow.Identifier
+	BlockID       flow.Identifier
+	BlockHeight   uint64
 }
 
 func (stats *ExecutionResultStats) Merge(other ExecutionResultStats) {
@@ -902,13 +960,23 @@ func (stats *ExecutionResultStats) Merge(other ExecutionResultStats) {
 	stats.EventSize += other.EventSize
 	stats.NumberOfRegistersTouched += other.NumberOfRegistersTouched
 	stats.NumberOfBytesWrittenToRegisters += other.NumberOfBytesWrittenToRegisters
-	stats.NumberOfCollections += other.NumberOfCollections
+}
+
+func (stats *CollectionExecutionResultStats) Add(other TransactionExecutionResultStats) {
+	stats.ExecutionResultStats.Merge(other.ExecutionResultStats)
+	stats.NumberOfTransactions += 1
+}
+
+func (stats *BlockExecutionResultStats) Add(other CollectionExecutionResultStats) {
+	stats.CollectionExecutionResultStats.Merge(other.ExecutionResultStats)
 	stats.NumberOfTransactions += other.NumberOfTransactions
+	stats.NumberOfCollections += 1
 }
 
 type ExecutionMetrics interface {
 	LedgerMetrics
 	RuntimeMetrics
+	EVMMetrics
 	ProviderMetrics
 	WALMetrics
 
@@ -929,8 +997,14 @@ type ExecutionMetrics interface {
 	// ExecutionLastFinalizedExecutedBlockHeight reports last finalized and executed block height
 	ExecutionLastFinalizedExecutedBlockHeight(height uint64)
 
+	// ExecutionLastChunkDataPackPrunedHeight reports last chunk data pack pruned height
+	ExecutionLastChunkDataPackPrunedHeight(height uint64)
+
+	// ExecutionTargetChunkDataPackPrunedHeight reports the target height for chunk data pack to be pruned
+	ExecutionTargetChunkDataPackPrunedHeight(height uint64)
+
 	// ExecutionBlockExecuted reports the total time and computation spent on executing a block
-	ExecutionBlockExecuted(dur time.Duration, stats ExecutionResultStats)
+	ExecutionBlockExecuted(dur time.Duration, stats BlockExecutionResultStats)
 
 	// ExecutionBlockExecutionEffortVectorComponent reports the unweighted effort of given ComputationKind at block level
 	ExecutionBlockExecutionEffortVectorComponent(string, uint)
@@ -939,17 +1013,10 @@ type ExecutionMetrics interface {
 	ExecutionBlockCachedPrograms(programs int)
 
 	// ExecutionCollectionExecuted reports the total time and computation spent on executing a collection
-	ExecutionCollectionExecuted(dur time.Duration, stats ExecutionResultStats)
+	ExecutionCollectionExecuted(dur time.Duration, stats CollectionExecutionResultStats)
 
 	// ExecutionTransactionExecuted reports stats on executing a single transaction
-	ExecutionTransactionExecuted(
-		dur time.Duration,
-		numTxnConflictRetries int,
-		compUsed uint64,
-		memoryUsed uint64,
-		eventCounts int,
-		eventSize int,
-		failed bool)
+	ExecutionTransactionExecuted(dur time.Duration, stats TransactionExecutionResultStats, info TransactionExecutionResultInfo)
 
 	// ExecutionChunkDataPackGenerated reports stats on chunk data pack generation
 	ExecutionChunkDataPackGenerated(proofSize, numberOfTransactions int)
@@ -959,9 +1026,6 @@ type ExecutionMetrics interface {
 
 	// ExecutionCollectionRequestSent reports when a request for a collection is sent to a collection node
 	ExecutionCollectionRequestSent()
-
-	// Unused
-	ExecutionCollectionRequestRetried()
 
 	// ExecutionSync reports when the state syncing is triggered or stopped.
 	ExecutionSync(syncing bool)
@@ -1017,6 +1081,10 @@ type TransactionMetrics interface {
 	// works if the transaction was earlier added as received.
 	TransactionFinalized(txID flow.Identifier, when time.Time)
 
+	// TransactionSealed reports the time spent between the transaction being received and sealed. Reporting only
+	// works if the transaction was earlier added as received.
+	TransactionSealed(txID flow.Identifier, when time.Time)
+
 	// TransactionExecuted reports the time spent between the transaction being received and executed. Reporting only
 	// works if the transaction was earlier added as received.
 	TransactionExecuted(txID flow.Identifier, when time.Time)
@@ -1026,6 +1094,15 @@ type TransactionMetrics interface {
 
 	// TransactionSubmissionFailed should be called whenever we try to submit a transaction and it fails
 	TransactionSubmissionFailed()
+}
+
+type TransactionValidationMetrics interface {
+	// TransactionValidated tracks number of successfully validated transactions
+	TransactionValidated()
+	// TransactionValidationFailed tracks number of validation failed transactions with reason
+	TransactionValidationFailed(reason string)
+	// TransactionValidationSkipped tracks number of skipped transaction validations
+	TransactionValidationSkipped()
 }
 
 type PingMetrics interface {

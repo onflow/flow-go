@@ -461,9 +461,16 @@ func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerConte
 	return newConduit, nil
 }
 
-func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.SignalerContext, channel channels.Channel, ds datastore.Batching, opts []network.BlobServiceOption) (network.BlobService,
-	error) {
-	bs := blob.NewBlobService(n.libP2PNode.Host(), n.libP2PNode.Routing(), channel.String(), ds, n.bitswapMetrics, n.logger, opts...)
+func (n *Network) handleRegisterBlobServiceRequest(
+	parent irrecoverable.SignalerContext,
+	channel channels.Channel,
+	ds datastore.Batching,
+	opts []network.BlobServiceOption,
+) (network.BlobService, error) {
+	bs, err := blob.NewBlobService(n.libP2PNode.Host(), n.libP2PNode.Routing(), channel.String(), ds, n.bitswapMetrics, n.logger, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("could not create blob service: %w", err)
+	}
 
 	// start the blob service using the network's context
 	bs.Start(parent)
@@ -914,7 +921,7 @@ func (n *Network) handleIncomingStream(s libp2pnet.Stream) {
 	// qualify the logger with local and remote address
 	log := p2putils.StreamLogger(n.logger, s)
 
-	log.Info().Msg("incoming stream received")
+	log.Debug().Msg("incoming stream received")
 
 	success := false
 

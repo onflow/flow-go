@@ -13,6 +13,9 @@ on:
         required: false
         type: boolean
 
+env:
+  GO_VERSION: "1.23"
+
 jobs:
   build-publish:
     name: Build boot tools
@@ -29,26 +32,36 @@ jobs:
       with:
         project_id: flow
     - name: Setup Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
-        go-version: "1.20"
+        go-version: ${{ env.GO_VERSION }}
     - name: Checkout repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         # to accurately get the version tag
         fetch-depth: 0
         ref: ${{ inputs.tag }}
     - name: Build and upload boot-tools
+      env:
+        CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
       run: |
         make tool-bootstrap tool-transit
         mkdir boot-tools
         mv bootstrap transit boot-tools/
+        sha256sum boot-tools/bootstrap > boot-tools/bootstrap.sha256sum
+        cat boot-tools/bootstrap.sha256sum
+        sha256sum boot-tools/transit > boot-tools/transit.sha256sum
+        cat boot-tools/transit.sha256sum
         tar -czf boot-tools.tar ./boot-tools/
         gsutil cp boot-tools.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/boot-tools.tar
     - name: Build and upload util
+      env:
+        CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
       run: |
         make tool-util
-        tar -czf util.tar util
+        sha256sum util > util.sha256sum
+        cat util.sha256sum
+        tar -czf util.tar util util.sha256sum
         gsutil cp util.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/util.tar
     - name: Promote boot-tools
       run: |

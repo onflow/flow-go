@@ -70,7 +70,7 @@ func (e FieldsError) Error() string {
 func TestTypeCheck(t *testing.T) {
 	var err error
 	err = NoFieldError
-	require.True(t, errors.Is(err, NoFieldError))
+	require.ErrorIs(t, err, NoFieldError)
 
 	err = FieldsError{
 		Field1: "field1 missing",

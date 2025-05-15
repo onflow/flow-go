@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -30,7 +29,7 @@ type IndexerCore struct {
 	collections  storage.Collections
 	transactions storage.Transactions
 	results      storage.LightTransactionResults
-	batcher      bstorage.BatchBuilder
+	protocolDB   storage.DB
 
 	collectionExecutedMetric module.CollectionExecutedMetric
 
@@ -44,7 +43,7 @@ type IndexerCore struct {
 func New(
 	log zerolog.Logger,
 	metrics module.ExecutionStateIndexerMetrics,
-	batcher bstorage.BatchBuilder,
+	protocolDB storage.DB,
 	registers storage.RegisterIndex,
 	headers storage.Headers,
 	events storage.Events,
@@ -66,7 +65,7 @@ func New(
 	return &IndexerCore{
 		log:              log,
 		metrics:          metrics,
-		batcher:          batcher,
+		protocolDB:       protocolDB,
 		registers:        registers,
 		headers:          headers,
 		collections:      collections,
@@ -145,7 +144,8 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			results = append(results, chunk.TransactionResults...)
 		}
 
-		batch := bstorage.NewBatch(c.batcher)
+		batch := c.protocolDB.NewBatch()
+		defer batch.Close()
 
 		err := c.events.BatchStore(data.BlockID, []flow.EventsList{events}, batch)
 		if err != nil {
@@ -157,7 +157,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			return fmt.Errorf("could not index transaction results at height %d: %w", header.Height, err)
 		}
 
-		batch.Flush()
+		err = batch.Commit()
 		if err != nil {
 			return fmt.Errorf("batch flush error: %w", err)
 		}
@@ -287,9 +287,10 @@ func (c *IndexerCore) updateProgramCache(header *flow.Header, events []flow.Even
 
 	tx.AddInvalidator(&accessInvalidator{
 		programs: &programInvalidator{
-			invalidated: updatedContracts,
+			invalidated:   updatedContracts,
+			invalidateAll: hasAuthorizedTransaction(collections, c.serviceAddress),
 		},
-		meterParamOverrides: &meterParamOverridesInvalidator{
+		executionParameters: &executionParametersInvalidator{
 			invalidateAll: hasAuthorizedTransaction(collections, c.serviceAddress),
 		},
 	})
@@ -325,7 +326,7 @@ func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, 
 	return c.registers.Store(regEntries, height)
 }
 
-// HandleCollection handles the response of the a collection request made earlier when a block was received.
+// HandleCollection handles the response of the collection request made earlier when a block was received.
 // No errors expected during normal operations.
 func HandleCollection(
 	collection *flow.Collection,

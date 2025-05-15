@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/util"
 )
 
 // defaultVoteAggregatorWorkers number of workers to dispatch events for vote aggregators
@@ -38,11 +39,11 @@ type VoteAggregator struct {
 	hotstuffMetrics            module.HotstuffMetrics
 	engineMetrics              module.EngineMetrics
 	notifier                   hotstuff.VoteAggregationViolationConsumer
-	lowestRetainedView         counters.StrictMonotonousCounter // lowest view, for which we still process votes
+	lowestRetainedView         counters.StrictMonotonicCounter // lowest view, for which we still process votes
 	collectors                 hotstuff.VoteCollectors
 	queuedMessagesNotifier     engine.Notifier
 	finalizationEventsNotifier engine.Notifier
-	finalizedView              counters.StrictMonotonousCounter // cache the last finalized view to queue up the pruning work, and unblock the caller who's delivering the finalization event.
+	finalizedView              counters.StrictMonotonicCounter // cache the last finalized view to queue up the pruning work, and unblock the caller who's delivering the finalization event.
 	queuedVotes                *fifoqueue.FifoQueue
 	queuedBlocks               *fifoqueue.FifoQueue
 }
@@ -79,8 +80,8 @@ func NewVoteAggregator(
 		hotstuffMetrics:            hotstuffMetrics,
 		engineMetrics:              engineMetrics,
 		notifier:                   notifier,
-		lowestRetainedView:         counters.NewMonotonousCounter(lowestRetainedView),
-		finalizedView:              counters.NewMonotonousCounter(lowestRetainedView),
+		lowestRetainedView:         counters.NewMonotonicCounter(lowestRetainedView),
+		finalizedView:              counters.NewMonotonicCounter(lowestRetainedView),
 		collectors:                 collectors,
 		queuedVotes:                queuedVotes,
 		queuedBlocks:               queuedBlocks,
@@ -99,24 +100,36 @@ func NewVoteAggregator(
 			aggregator.queuedMessagesProcessingLoop(ctx)
 		})
 	}
-	componentBuilder.AddWorker(func(_ irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	componentBuilder.AddWorker(func(parentCtx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		// create new context which is not connected to parent
 		// we need to ensure that our internal workers stop before asking
 		// vote collectors to stop. We want to avoid delivering events to already stopped vote collectors
 		ctx, cancel := context.WithCancel(context.Background())
-		signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+		signalerCtx, errCh := irrecoverable.WithSignaler(ctx)
+
 		// start vote collectors
 		collectors.Start(signalerCtx)
-		<-collectors.Ready()
 
-		ready()
+		// Handle the component lifecycle in a separate goroutine so we can capture any errors
+		// thrown during initialization in the main goroutine.
+		go func() {
+			if err := util.WaitClosed(parentCtx, collectors.Ready()); err == nil {
+				// only signal ready when collectors are ready, but always handle shutdown
+				ready()
+			}
 
-		// wait for internal workers to stop
-		wg.Wait()
-		// signal vote collectors to stop
-		cancel()
-		// wait for it to stop
-		<-collectors.Done()
+			// wait for internal workers to stop, then signal vote collectors to stop
+			wg.Wait()
+			cancel()
+		}()
+
+		// since we are breaking the connection between parentCtx and signalerCtx, we need to
+		// explicitly rethrow any errors from signalerCtx to parentCtx, otherwise they are dropped.
+		// Handle errors in the main worker goroutine to guarantee that they are rethrown to the parent
+		// before the component is marked done.
+		if err := util.WaitError(errCh, collectors.Done()); err != nil {
+			parentCtx.Throw(err)
+		}
 	})
 	componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		ready()
@@ -156,7 +169,7 @@ func (va *VoteAggregator) processQueuedMessages(ctx context.Context) error {
 
 		msg, ok := va.queuedBlocks.Pop()
 		if ok {
-			block := msg.(*model.Proposal)
+			block := msg.(*model.SignedProposal)
 			err := va.processQueuedBlock(block)
 			if err != nil {
 				return fmt.Errorf("could not process pending block %v: %w", block.Block.BlockID, err)
@@ -200,7 +213,7 @@ func (va *VoteAggregator) processQueuedVote(vote *model.Vote) error {
 			vote.View, err)
 	}
 	if created {
-		va.log.Info().Uint64("view", vote.View).Msg("vote collector is created by processing vote")
+		va.log.Debug().Uint64("view", vote.View).Msg("vote collector is created by processing vote")
 	}
 
 	err = collector.AddVote(vote)
@@ -209,7 +222,7 @@ func (va *VoteAggregator) processQueuedVote(vote *model.Vote) error {
 			vote.View, vote.BlockID, err)
 	}
 
-	va.log.Info().
+	va.log.Debug().
 		Uint64("view", vote.View).
 		Hex("block_id", vote.BlockID[:]).
 		Str("vote_id", vote.ID().String()).
@@ -224,7 +237,7 @@ func (va *VoteAggregator) processQueuedVote(vote *model.Vote) error {
 // including the proposer's signature. Otherwise, VoteAggregator might crash or exhibit undefined
 // behaviour.
 // No errors are expected during normal operation.
-func (va *VoteAggregator) processQueuedBlock(block *model.Proposal) error {
+func (va *VoteAggregator) processQueuedBlock(block *model.SignedProposal) error {
 	// check if the block is for a view that has already been pruned (and is thus stale)
 	if block.Block.View < va.lowestRetainedView.Value() {
 		return nil
@@ -238,7 +251,7 @@ func (va *VoteAggregator) processQueuedBlock(block *model.Proposal) error {
 		return fmt.Errorf("could not get or create collector for block %v: %w", block.Block.BlockID, err)
 	}
 	if created {
-		va.log.Info().
+		va.log.Debug().
 			Uint64("view", block.Block.View).
 			Hex("block_id", block.Block.BlockID[:]).
 			Msg("vote collector is created by processing block")
@@ -255,7 +268,7 @@ func (va *VoteAggregator) processQueuedBlock(block *model.Proposal) error {
 		return fmt.Errorf("could not process block: %v, %w", block.Block.BlockID, err)
 	}
 
-	va.log.Info().
+	va.log.Debug().
 		Uint64("view", block.Block.View).
 		Hex("block_id", block.Block.BlockID[:]).
 		Msg("block has been processed successfully")
@@ -293,7 +306,7 @@ func (va *VoteAggregator) AddVote(vote *model.Vote) {
 // CAUTION: we expect that the input block's validity has been confirmed prior to calling AddBlock,
 // including the proposer's signature. Otherwise, VoteAggregator might crash or exhibit undefined
 // behaviour.
-func (va *VoteAggregator) AddBlock(block *model.Proposal) {
+func (va *VoteAggregator) AddBlock(block *model.SignedProposal) {
 	// It's ok to silently drop blocks in case our processing pipeline is full.
 	// It means that we are probably catching up.
 	if ok := va.queuedBlocks.Push(block); ok {
@@ -306,7 +319,7 @@ func (va *VoteAggregator) AddBlock(block *model.Proposal) {
 // InvalidBlock notifies the VoteAggregator about an invalid proposal, so that it
 // can process votes for the invalid block and slash the voters.
 // No errors are expected during normal operations
-func (va *VoteAggregator) InvalidBlock(proposal *model.Proposal) error {
+func (va *VoteAggregator) InvalidBlock(proposal *model.SignedProposal) error {
 	slashingVoteConsumer := func(vote *model.Vote) {
 		if proposal.Block.BlockID == vote.BlockID {
 			va.notifier.OnVoteForInvalidBlockDetected(vote, proposal)

@@ -5,19 +5,25 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime/pprof"
 	"strings"
 
-	runtimeCommon "github.com/onflow/cadence/runtime/common"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	common2 "github.com/onflow/flow-go/cmd/util/common"
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 var (
@@ -29,6 +35,7 @@ var (
 	flagChain                              string
 	flagNWorker                            int
 	flagNoMigration                        bool
+	flagMigration                          string
 	flagNoReport                           bool
 	flagValidateMigration                  bool
 	flagAllowPartialStateFromPayloads      bool
@@ -48,6 +55,10 @@ var (
 	flagMaxAccountSize                     uint64
 	flagFixSlabsWithBrokenReferences       bool
 	flagFilterUnreferencedSlabs            bool
+	flagCPUProfile                         string
+	flagReportMetrics                      bool
+	flagCacheStaticTypeMigrationResults    bool
+	flagCacheEntitlementsMigrationResults  bool
 )
 
 var Cmd = &cobra.Command{
@@ -79,6 +90,8 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagNoMigration, "no-migration", false,
 		"don't migrate the state")
+
+	Cmd.Flags().StringVar(&flagMigration, "migration", "", "migration name")
 
 	Cmd.Flags().BoolVar(&flagNoReport, "no-report", false,
 		"don't report the state")
@@ -159,10 +172,39 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagFilterUnreferencedSlabs, "filter-unreferenced-slabs", false,
 		"filter unreferenced slabs")
+
+	Cmd.Flags().StringVar(&flagCPUProfile, "cpu-profile", "",
+		"enable CPU profiling")
+
+	Cmd.Flags().BoolVar(&flagReportMetrics, "report-metrics", false,
+		"report migration metrics")
+
+	Cmd.Flags().BoolVar(&flagCacheStaticTypeMigrationResults, "cache-static-type-migration", false,
+		"cache static type migration results")
+
+	Cmd.Flags().BoolVar(&flagCacheEntitlementsMigrationResults, "cache-entitlements-migration", false,
+		"cache entitlements migration results")
 }
 
 func run(*cobra.Command, []string) {
-	var stateCommitment flow.StateCommitment
+	if flagCPUProfile != "" {
+		f, err := os.Create(flagCPUProfile)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not create CPU profile")
+		}
+
+		err = pprof.StartCPUProfile(f)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not start CPU profile")
+		}
+
+		defer pprof.StopCPUProfile()
+	}
+
+	err := os.MkdirAll(flagOutputDir, 0755)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("cannot create output directory %s", flagOutputDir)
+	}
 
 	if len(flagBlockHash) > 0 && len(flagStateCommitment) > 0 {
 		log.Fatal().Msg("cannot run the command with both block hash and state commitment as inputs, only one of them should be provided")
@@ -186,6 +228,8 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Msg("Both --validate and --diff are enabled, please specify only one (or none) of these")
 	}
 
+	var stateCommitment flow.StateCommitment
+
 	if len(flagBlockHash) > 0 {
 		blockID, err := flow.HexStringToIdentifier(flagBlockHash)
 		if err != nil {
@@ -198,7 +242,7 @@ func run(*cobra.Command, []string) {
 		defer db.Close()
 
 		cache := &metrics.NoopCollector{}
-		commits := badger.NewCommits(cache, db)
+		commits := store.NewCommits(cache, badgerimpl.ToDB(db))
 
 		stateCommitment, err = commits.ByBlockID(blockID)
 		if err != nil {
@@ -255,32 +299,17 @@ func run(*cobra.Command, []string) {
 		}
 	}
 
-	var exportedAddresses []runtimeCommon.Address
+	var exportPayloadsForOwners map[string]struct{}
 
 	if len(flagOutputPayloadByAddresses) > 0 {
-
-		addresses := strings.Split(flagOutputPayloadByAddresses, ",")
-
-		for _, hexAddr := range addresses {
-			b, err := hex.DecodeString(strings.TrimSpace(hexAddr))
-			if err != nil {
-				log.Fatal().Err(err).Msgf("cannot hex decode address %s for payload export", strings.TrimSpace(hexAddr))
-			}
-
-			addr, err := runtimeCommon.BytesToAddress(b)
-			if err != nil {
-				log.Fatal().Err(err).Msgf("cannot decode address %x for payload export", b)
-			}
-
-			exportedAddresses = append(exportedAddresses, addr)
+		var err error
+		exportPayloadsForOwners, err = common2.ParseOwners(strings.Split(flagOutputPayloadByAddresses, ","))
+		if err != nil {
+			log.Fatal().Err(err).Msgf("failed to parse addresses")
 		}
 	}
 
-	// err := ensureCheckpointFileExist(flagExecutionStateDir)
-	// if err != nil {
-	// 	log.Fatal().Err(err).Msgf("cannot ensure checkpoint file exist in folder %v", flagExecutionStateDir)
-	// }
-
+	// Validate chain ID
 	chain := flow.ChainID(flagChain).Chain()
 
 	if flagNoReport {
@@ -325,17 +354,23 @@ func run(*cobra.Command, []string) {
 			hex.EncodeToString(stateCommitment[:]),
 			flagExecutionStateDir,
 		)
+
+		err := ensureCheckpointFileExist(flagExecutionStateDir)
+		if err != nil {
+			log.Error().Err(err).Msgf("cannot ensure checkpoint file exist in folder %v", flagExecutionStateDir)
+		}
+
 	}
 
 	var outputMsg string
 	if len(flagOutputPayloadFileName) > 0 {
 		// Output is payload file
-		if len(exportedAddresses) == 0 {
+		if len(exportPayloadsForOwners) == 0 {
 			outputMsg = fmt.Sprintf("exporting all payloads to %s", flagOutputPayloadFileName)
 		} else {
 			outputMsg = fmt.Sprintf(
-				"exporting payloads by addresses %v to %s",
-				flagOutputPayloadByAddresses,
+				"exporting payloads for owners %v to %s",
+				common2.OwnersToString(exportPayloadsForOwners),
 				flagOutputPayloadFileName,
 			)
 		}
@@ -350,92 +385,147 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("state extraction plan: %s, %s", inputMsg, outputMsg)
 
-	chainID := chain.ChainID()
-	// TODO:
-	evmContractChange := migrations.EVMContractChangeNone
+	// Extract state and create checkpoint files without migration.
+	if flagNoMigration &&
+		len(flagInputPayloadFileName) == 0 &&
+		len(flagOutputPayloadFileName) == 0 {
 
-	var burnerContractChange migrations.BurnerContractChange
-	switch chainID {
-	case flow.Emulator:
-		burnerContractChange = migrations.BurnerContractChangeDeploy
-	case flow.Testnet, flow.Mainnet:
-		burnerContractChange = migrations.BurnerContractChangeUpdate
-	}
-
-	stagedContracts, err := migrations.StagedContractsFromCSV(flagStagedContractsFile)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("error loading staged contracts: %s", err.Error())
-	}
-
-	opts := migrations.Options{
-		NWorker:                           flagNWorker,
-		DiffMigrations:                    flagDiffMigration,
-		LogVerboseDiff:                    flagLogVerboseDiff,
-		CheckStorageHealthBeforeMigration: flagCheckStorageHealthBeforeMigration,
-		ChainID:                           chainID,
-		EVMContractChange:                 evmContractChange,
-		BurnerContractChange:              burnerContractChange,
-		StagedContracts:                   stagedContracts,
-		Prune:                             flagPrune,
-		MaxAccountSize:                    flagMaxAccountSize,
-		VerboseErrorOutput:                flagVerboseErrorOutput,
-		FixSlabsWithBrokenReferences:      chainID == flow.Testnet && flagFixSlabsWithBrokenReferences,
-		FilterUnreferencedSlabs:           flagFilterUnreferencedSlabs,
-	}
-
-	if len(flagInputPayloadFileName) > 0 {
-		err = extractExecutionStateFromPayloads(
+		exportedState, err := extractStateToCheckpointWithoutMigration(
 			log.Logger,
 			flagExecutionStateDir,
 			flagOutputDir,
+			stateCommitment)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("error extracting state for commitment %s", stateCommitment)
+		}
+
+		reportExtraction(stateCommitment, exportedState)
+		return
+	}
+
+	var extractor extractor
+	if len(flagInputPayloadFileName) > 0 {
+		extractor = newPayloadFileExtractor(log.Logger, flagInputPayloadFileName)
+	} else {
+		extractor = newExecutionStateExtractor(log.Logger, flagExecutionStateDir, stateCommitment)
+	}
+
+	// Extract payloads.
+
+	payloadsFromPartialState, payloads, err := extractor.extract()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("error extracting payloads: %s", err.Error())
+	}
+
+	log.Info().Msgf("extracted %d payloads", len(payloads))
+
+	// Migrate payloads.
+
+	if !flagNoMigration {
+		var migs []migrations.NamedMigration
+
+		switch flagMigration {
+		case "add-migrationmainnet-keys":
+			migs = append(migs, addMigrationMainnetKeysMigration(log.Logger, flagOutputDir, flagNWorker, chain.ChainID())...)
+		default:
+			log.Fatal().Msgf("unknown migration: %s", flagMigration)
+		}
+
+		migration := newMigration(log.Logger, migs, flagNWorker)
+
+		payloads, err = migration(payloads)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("error migrating payloads: %s", err.Error())
+		}
+
+		log.Info().Msgf("migrated %d payloads", len(payloads))
+	}
+
+	// Export migrated payloads.
+
+	var exporter exporter
+	if len(flagOutputPayloadFileName) > 0 {
+		exporter = newPayloadFileExporter(
+			log.Logger,
 			flagNWorker,
-			!flagNoMigration,
-			flagInputPayloadFileName,
 			flagOutputPayloadFileName,
-			exportedAddresses,
+			exportPayloadsForOwners,
 			flagSortPayloads,
-			opts,
 		)
 	} else {
-		err = extractExecutionState(
+		exporter = newCheckpointFileExporter(
 			log.Logger,
-			flagExecutionStateDir,
-			stateCommitment,
 			flagOutputDir,
-			flagNWorker,
-			!flagNoMigration,
-			flagOutputPayloadFileName,
-			exportedAddresses,
-			flagSortPayloads,
-			opts,
 		)
 	}
 
+	log.Info().Msgf("exporting %d payloads", len(payloads))
+
+	exportedState, err := exporter.export(payloadsFromPartialState, payloads)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("error extracting the execution state: %s", err.Error())
+		log.Fatal().Err(err).Msgf("error exporting migrated payloads: %s", err.Error())
 	}
+
+	log.Info().Msgf("exported %d payloads", len(payloads))
+
+	reportExtraction(stateCommitment, exportedState)
 }
 
-// func ensureCheckpointFileExist(dir string) error {
-// 	checkpoints, err := wal.Checkpoints(dir)
-// 	if err != nil {
-// 		return fmt.Errorf("could not find checkpoint files: %v", err)
-// 	}
-//
-// 	if len(checkpoints) != 0 {
-// 		log.Info().Msgf("found checkpoint %v files: %v", len(checkpoints), checkpoints)
-// 		return nil
-// 	}
-//
-// 	has, err := wal.HasRootCheckpoint(dir)
-// 	if err != nil {
-// 		return fmt.Errorf("could not check has root checkpoint: %w", err)
-// 	}
-//
-// 	if has {
-// 		log.Info().Msg("found root checkpoint file")
-// 		return nil
-// 	}
-//
-// 	return fmt.Errorf("no checkpoint file was found, no root checkpoint file was found")
-// }
+func reportExtraction(loadedState flow.StateCommitment, exportedState ledger.State) {
+	// Create export reporter.
+	reporter := reporters.NewExportReporter(
+		log.Logger,
+		func() flow.StateCommitment { return loadedState },
+	)
+
+	err := reporter.Report(nil, exportedState)
+	if err != nil {
+		log.Error().Err(err).Msgf("can not generate report for migrated state: %v", exportedState)
+	}
+
+	log.Info().Msgf(
+		"New state commitment for the exported state is: %s (base64: %s)",
+		exportedState.String(),
+		exportedState.Base64(),
+	)
+}
+
+func extractStateToCheckpointWithoutMigration(
+	logger zerolog.Logger,
+	executionStateDir string,
+	outputDir string,
+	stateCommitment flow.StateCommitment,
+) (ledger.State, error) {
+	// Load state for given state commitment
+	newTrie, err := util.ReadTrie(executionStateDir, stateCommitment)
+	if err != nil {
+		return ledger.DummyState, fmt.Errorf("failed to load state: %w", err)
+	}
+
+	// Create checkpoint files
+	return createCheckpoint(logger, newTrie, outputDir, bootstrap.FilenameWALRootCheckpoint)
+}
+
+func ensureCheckpointFileExist(dir string) error {
+	checkpoints, err := wal.Checkpoints(dir)
+	if err != nil {
+		return fmt.Errorf("could not find checkpoint files: %v", err)
+	}
+
+	if len(checkpoints) != 0 {
+		log.Info().Msgf("found checkpoint %v files: %v", len(checkpoints), checkpoints)
+		return nil
+	}
+
+	has, err := wal.HasRootCheckpoint(dir)
+	if err != nil {
+		return fmt.Errorf("could not check has root checkpoint: %w", err)
+	}
+
+	if has {
+		log.Info().Msg("found root checkpoint file")
+		return nil
+	}
+
+	return fmt.Errorf("no checkpoint file was found, no root checkpoint file was found in %v, check the --execution-state-dir flag", dir)
+}

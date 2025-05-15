@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/sema"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -36,7 +36,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		executor := proc.NewExecutor(context, txnState)
 		err := fvm.Run(executor)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		require.Error(t, executor.Output().Err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -62,7 +62,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		executor := proc.NewExecutor(context, txnState)
 		err := fvm.Run(executor)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		require.Error(t, executor.Output().Err)
 
 		require.NotContains(t, buffer.String(), "programs")

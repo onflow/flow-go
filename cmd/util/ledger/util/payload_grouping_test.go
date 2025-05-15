@@ -10,8 +10,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence/runtime/common"
-
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -54,13 +52,13 @@ func TestGroupPayloadsByAccountCompareResults(t *testing.T) {
 	groups1 := util.GroupPayloadsByAccount(log, tmp1, 0)
 	groups2 := util.GroupPayloadsByAccount(log, tmp2, runtime.NumCPU())
 
-	groups3 := map[common.Address][]*ledger.Payload{}
+	groups3 := map[flow.Address][]*ledger.Payload{}
 	for _, payload := range payloads {
 		key, err := payload.Key()
 		require.NoError(t, err)
 		registerID, err := convert.LedgerKeyToRegisterID(key)
 		require.NoError(t, err)
-		address, err := common.BytesToAddress([]byte(registerID.Owner))
+		address := flow.BytesToAddress([]byte(registerID.Owner))
 		require.NoError(t, err)
 		if _, ok := groups3[address]; !ok {
 			groups3[address] = []*ledger.Payload{}

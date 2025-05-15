@@ -1,9 +1,9 @@
 package state_test
 
 import (
-	"math/big"
 	"testing"
 
+	"github.com/holiman/uint256"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethCrypto "github.com/onflow/go-ethereum/crypto"
@@ -31,14 +31,14 @@ func TestBaseView(t *testing.T) {
 			view,
 			addr1,
 			false,
-			big.NewInt(0),
+			uint256.NewInt(0),
 			uint64(0),
 			nil,
 			gethCommon.Hash{},
 		)
 
 		// create an account with code
-		newBal := big.NewInt(10)
+		newBal := uint256.NewInt(10)
 		newNonce := uint64(5)
 		newCode := []byte("some code")
 		newCodeHash := gethCommon.Hash{1, 2}
@@ -76,7 +76,7 @@ func TestBaseView(t *testing.T) {
 
 		// test update account
 
-		newBal = big.NewInt(12)
+		newBal = uint256.NewInt(12)
 		newNonce = uint64(6)
 		newCode = []byte("some new code")
 		newCodeHash = gethCommon.Hash{2, 3}
@@ -121,7 +121,7 @@ func TestBaseView(t *testing.T) {
 			view,
 			addr1,
 			false,
-			big.NewInt(0),
+			uint256.NewInt(0),
 			uint64(0),
 			nil,
 			gethCommon.Hash{},
@@ -138,7 +138,7 @@ func TestBaseView(t *testing.T) {
 			view,
 			addr1,
 			false,
-			big.NewInt(0),
+			uint256.NewInt(0),
 			uint64(0),
 			nil,
 			gethCommon.Hash{},
@@ -171,7 +171,7 @@ func TestBaseView(t *testing.T) {
 		require.Error(t, err)
 
 		// account should have code to have slots
-		err = view.CreateAccount(addr1, big.NewInt(10), 0, []byte("ABC"), gethCommon.Hash{1, 2, 3})
+		err = view.CreateAccount(addr1, uint256.NewInt(10), 0, []byte("ABC"), gethCommon.Hash{1, 2, 3})
 		require.NoError(t, err)
 
 		err = view.UpdateSlot(slot1, newValue)
@@ -202,7 +202,7 @@ func TestBaseView(t *testing.T) {
 
 		dest, bal := view.HasSelfDestructed(gethCommon.Address{})
 		require.Equal(t, false, dest)
-		require.Equal(t, new(big.Int), bal)
+		require.Equal(t, new(uint256.Int), bal)
 		require.Equal(t, false, view.IsCreated(gethCommon.Address{}))
 		require.Equal(t, uint64(0), view.GetRefund())
 		require.Equal(t, gethCommon.Hash{}, view.GetTransientState(types.SlotAddress{}))
@@ -218,7 +218,7 @@ func TestBaseView(t *testing.T) {
 		view, err := state.NewBaseView(ledger, rootAddr)
 		require.NoError(t, err)
 
-		bal := new(big.Int)
+		bal := new(uint256.Int)
 		nonce := uint64(0)
 
 		addr1 := testutils.RandomCommonAddress(t)
@@ -302,13 +302,177 @@ func TestBaseView(t *testing.T) {
 		require.Equal(t, uint64(1), view.NumberOfAccounts())
 	})
 
+	t.Run("test account iterator", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
+		view, err := state.NewBaseView(ledger, rootAddr)
+		require.NoError(t, err)
+
+		accountCounts := 10
+		nonces := make(map[gethCommon.Address]uint64)
+		balances := make(map[gethCommon.Address]*uint256.Int)
+		codeHashes := make(map[gethCommon.Address]gethCommon.Hash)
+		for i := 0; i < accountCounts; i++ {
+			addr := testutils.RandomCommonAddress(t)
+			balance := testutils.RandomUint256Int(1000)
+			nonce := testutils.RandomBigInt(1000).Uint64()
+			code := testutils.RandomData(t)
+			codeHash := testutils.RandomCommonHash(t)
+
+			err = view.CreateAccount(addr, balance, nonce, code, codeHash)
+			require.NoError(t, err)
+
+			nonces[addr] = nonce
+			balances[addr] = balance
+			codeHashes[addr] = codeHash
+		}
+		err = view.Commit()
+		require.NoError(t, err)
+
+		ai, err := view.AccountIterator()
+		require.NoError(t, err)
+
+		counter := 0
+		for {
+			acc, err := ai.Next()
+			require.NoError(t, err)
+			if acc == nil {
+				break
+			}
+			require.Equal(t, nonces[acc.Address], acc.Nonce)
+			delete(nonces, acc.Address)
+			require.Equal(t, balances[acc.Address].Uint64(), acc.Balance.Uint64())
+			delete(balances, acc.Address)
+			require.Equal(t, codeHashes[acc.Address], acc.CodeHash)
+			delete(codeHashes, acc.Address)
+			counter += 1
+		}
+
+		require.Equal(t, accountCounts, counter)
+	})
+
+	t.Run("test code iterator", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
+		view, err := state.NewBaseView(ledger, rootAddr)
+		require.NoError(t, err)
+
+		codeCounts := 10
+		codeByCodeHash := make(map[gethCommon.Hash][]byte)
+		refCountByCodeHash := make(map[gethCommon.Hash]uint64)
+		for i := 0; i < codeCounts; i++ {
+
+			code := testutils.RandomData(t)
+			codeHash := testutils.RandomCommonHash(t)
+			refCount := 0
+			// we add each code couple of times through different accounts
+			for j := 1; j <= i+1; j++ {
+				addr := testutils.RandomCommonAddress(t)
+				balance := testutils.RandomUint256Int(1000)
+				nonce := testutils.RandomBigInt(1000).Uint64()
+				err = view.CreateAccount(addr, balance, nonce, code, codeHash)
+				require.NoError(t, err)
+				refCount += 1
+			}
+			codeByCodeHash[codeHash] = code
+			refCountByCodeHash[codeHash] = uint64(refCount)
+		}
+		err = view.Commit()
+		require.NoError(t, err)
+
+		ci, err := view.CodeIterator()
+		require.NoError(t, err)
+
+		counter := 0
+		for {
+			cic, err := ci.Next()
+			require.NoError(t, err)
+			if cic == nil {
+				break
+			}
+			require.Equal(t, codeByCodeHash[cic.Hash], cic.Code)
+			delete(codeByCodeHash, cic.Hash)
+			require.Equal(t, refCountByCodeHash[cic.Hash], cic.RefCounts)
+			delete(refCountByCodeHash, cic.Hash)
+			counter += 1
+		}
+
+		require.Equal(t, codeCounts, counter)
+	})
+
+	t.Run("test account storage iterator", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
+		view, err := state.NewBaseView(ledger, rootAddr)
+		require.NoError(t, err)
+
+		addr := testutils.RandomCommonAddress(t)
+		code := []byte("code")
+		balance := testutils.RandomUint256Int(1000)
+		nonce := testutils.RandomBigInt(1000).Uint64()
+		codeHash := gethCrypto.Keccak256Hash(code)
+		err = view.CreateAccount(addr, balance, nonce, code, codeHash)
+		require.NoError(t, err)
+
+		slotCounts := 10
+		values := make(map[gethCommon.Hash]gethCommon.Hash)
+
+		for i := 0; i < slotCounts; i++ {
+			key := testutils.RandomCommonHash(t)
+			value := testutils.RandomCommonHash(t)
+
+			err = view.UpdateSlot(
+				types.SlotAddress{
+					Address: addr,
+					Key:     key,
+				}, value)
+			require.NoError(t, err)
+			values[key] = value
+		}
+		err = view.Commit()
+		require.NoError(t, err)
+
+		asi, err := view.AccountStorageIterator(addr)
+		require.NoError(t, err)
+
+		counter := 0
+		for {
+			slot, err := asi.Next()
+			require.NoError(t, err)
+			if slot == nil {
+				break
+			}
+			require.Equal(t, addr, slot.Address)
+			require.Equal(t, values[slot.Key], slot.Value)
+			delete(values, slot.Key)
+			counter += 1
+		}
+
+		require.Equal(t, slotCounts, counter)
+
+		// test non existing address
+		addr2 := testutils.RandomCommonAddress(t)
+		_, err = view.AccountStorageIterator(addr2)
+		require.Error(t, err)
+
+		// test address without storage
+		err = view.CreateAccount(addr2, balance, nonce, code, codeHash)
+		require.NoError(t, err)
+
+		err = view.Commit()
+		require.NoError(t, err)
+
+		_, err = view.AccountStorageIterator(addr2)
+		require.Error(t, err)
+	})
+
 }
 
 func checkAccount(t *testing.T,
 	view *state.BaseView,
 	addr gethCommon.Address,
 	exists bool,
-	balance *big.Int,
+	balance *uint256.Int,
 	nonce uint64,
 	code []byte,
 	codeHash gethCommon.Hash,

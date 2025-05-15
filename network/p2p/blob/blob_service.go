@@ -36,6 +36,11 @@ import (
 	ipld "github.com/ipfs/go-ipld-format"
 )
 
+const (
+	// DefaultReprovideInterval is the default interval at which DHT provider entries are refreshed
+	DefaultReprovideInterval = 12 * time.Hour
+)
+
 type blobService struct {
 	prefix string
 	component.Component
@@ -67,7 +72,14 @@ func WithBitswapOptions(opts ...bitswap.Option) network.BlobServiceOption {
 	}
 }
 
-// WithHashOnRead sets whether or not the blobstore will rehash the blob data on read
+// WithParentBlobService configures the blob service to use the parent's blockstore
+func WithParentBlobService(parent network.BlobService) network.BlobServiceOption {
+	return func(bs network.BlobService) {
+		bs.(*blobService).blockStore = parent.(*blobService).blockStore
+	}
+}
+
+// WithHashOnRead sets whether the blobstore will rehash the blob data on read
 // When set, calls to GetBlob will fail with an error if the hash of the data in storage does not
 // match its CID
 func WithHashOnRead(enabled bool) network.BlobServiceOption {
@@ -96,14 +108,22 @@ func NewBlobService(
 	metrics module.BitswapMetrics,
 	logger zerolog.Logger,
 	opts ...network.BlobServiceOption,
-) *blobService {
+) (*blobService, error) {
 	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
+	blockStore, err := blockstore.CachedBlockstore(
+		context.Background(),
+		blockstore.NewBlockstore(ds),
+		blockstore.DefaultCacheOpts(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cached blockstore: %w", err)
+	}
 	bs := &blobService{
 		prefix: prefix,
 		config: &BlobServiceConfig{
-			ReprovideInterval: 12 * time.Hour,
+			ReprovideInterval: DefaultReprovideInterval,
 		},
-		blockStore: blockstore.NewBlockstore(ds),
+		blockStore: blockStore,
 	}
 
 	for _, opt := range opts {
@@ -174,7 +194,7 @@ func NewBlobService(
 
 	bs.Component = cm
 
-	return bs
+	return bs, nil
 }
 
 func (bs *blobService) TriggerReprovide(ctx context.Context) error {

@@ -155,7 +155,11 @@ func (e *Core) validateExpiry(guarantee *flow.CollectionGuarantee) error {
 func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	// get the clusters to assign the guarantee and check if the guarantor is part of it
 	snapshot := e.state.AtBlockID(guarantee.ReferenceBlockID)
-	cluster, err := snapshot.Epochs().Current().ClusterByChainID(guarantee.ChainID)
+	epoch, err := snapshot.Epochs().Current()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch: %w", err)
+	}
+	cluster, err := epoch.ClusterByChainID(guarantee.ChainID)
 	// reference block not found
 	if errors.Is(err, state.ErrUnknownSnapshotReference) {
 		return engine.NewUnverifiableInputError(

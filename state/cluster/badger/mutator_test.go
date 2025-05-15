@@ -30,7 +30,6 @@ import (
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
-	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -64,7 +63,7 @@ func (suite *MutatorSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	log := zerolog.Nop()
-	all := util.StorageLayer(suite.T(), suite.db)
+	all := storage.InitAll(metrics, suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	// just bootstrap with a genesis block, we'll use this as reference
@@ -75,10 +74,17 @@ func (suite *MutatorSuite) SetupTest() {
 
 	seal.ResultID = result.ID()
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
-	genesis.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(inmem.ProtocolStateFromEpochServiceEvents(
-		result.ServiceEvents[0].Event.(*flow.EpochSetup),
-		result.ServiceEvents[1].Event.(*flow.EpochCommit),
-	).ID()).ID()
+	safetyParams, err := protocol.DefaultEpochSafetyParams(genesis.Header.ChainID)
+	require.NoError(suite.T(), err)
+	rootProtocolState, err := kvstore.NewDefaultKVStore(
+		safetyParams.FinalizationSafetyThreshold,
+		safetyParams.EpochExtensionViewCount,
+		inmem.EpochProtocolStateFromServiceEvents(
+			result.ServiceEvents[0].Event.(*flow.EpochSetup),
+			result.ServiceEvents[1].Event.(*flow.EpochCommit),
+		).ID())
+	require.NoError(suite.T(), err)
+	genesis.Payload.ProtocolStateID = rootProtocolState.ID()
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(genesis, result, seal, qc)
 	require.NoError(suite.T(), err)
 	suite.epochCounter = rootSnapshot.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
@@ -94,7 +100,7 @@ func (suite *MutatorSuite) SetupTest() {
 		all.QuorumCertificates,
 		all.Setups,
 		all.EpochCommits,
-		all.EpochProtocolState,
+		all.EpochProtocolStateEntries,
 		all.ProtocolKVStore,
 		all.VersionBeacons,
 		rootSnapshot,
@@ -104,7 +110,8 @@ func (suite *MutatorSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	suite.mutableProtocolState = protocol_state.NewMutableProtocolState(
-		all.EpochProtocolState,
+		log,
+		all.EpochProtocolStateEntries,
 		all.ProtocolKVStore,
 		state.Params(),
 		all.Headers,

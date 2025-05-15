@@ -10,13 +10,13 @@ import (
 	"go.uber.org/atomic"
 	"golang.org/x/time/rate"
 
-	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/ratelimit"
 	"github.com/onflow/flow-go/engine/collection/ingest"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var _ access.RateLimiter = (*ingest.AddressRateLimiter)(nil)
+var _ ratelimit.RateLimiter = (*ingest.AddressRateLimiter)(nil)
 
 func TestLimiterAddRemoveAddress(t *testing.T) {
 	t.Parallel()

@@ -47,7 +47,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		// no stopping has started yet, block below stop height
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
-		require.True(t, sc.ShouldExecuteBlock(header))
+		require.True(t, sc.ShouldExecuteBlock(header.ID(), header.Height))
 
 		stop2 := StopParameters{StopBeforeHeight: 37}
 		err = sc.SetStopParameters(stop2)
@@ -55,7 +55,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		// block at stop height, it should be skipped
 		header = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(37))
-		require.False(t, sc.ShouldExecuteBlock(header))
+		require.False(t, sc.ShouldExecuteBlock(header.ID(), header.Height))
 
 		// cannot set new stop height after stopping has started
 		err = sc.SetStopParameters(StopParameters{StopBeforeHeight: 2137})

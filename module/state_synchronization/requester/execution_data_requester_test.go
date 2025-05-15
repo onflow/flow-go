@@ -33,7 +33,8 @@ import (
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/state/protocol"
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -412,8 +413,8 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	cache := cache.NewExecutionDataCache(suite.downloader, headers, seals, results, heroCache)
 
 	followerDistributor := pubsub.NewFollowerDistributor()
-	processedHeight := bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
-	processedNotification := bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterNotification)
+	processedHeight := store.NewConsumerProgress(badgerimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterBlockHeight)
+	processedNotification := store.NewConsumerProgress(badgerimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterNotification)
 
 	edr, err := requester.New(
 		logger,
@@ -796,13 +797,13 @@ func (m *mockSnapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) 
 func (m *mockSnapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 	return nil, nil, nil
 }
-func (m *mockSnapshot) Commit() (flow.StateCommitment, error)                      { return flow.DummyStateCommitment, nil }
-func (m *mockSnapshot) SealingSegment() (*flow.SealingSegment, error)              { return nil, nil }
-func (m *mockSnapshot) Descendants() ([]flow.Identifier, error)                    { return nil, nil }
-func (m *mockSnapshot) RandomSource() ([]byte, error)                              { return nil, nil }
-func (m *mockSnapshot) Phase() (flow.EpochPhase, error)                            { return flow.EpochPhaseUndefined, nil }
-func (m *mockSnapshot) Epochs() protocol.EpochQuery                                { return nil }
-func (m *mockSnapshot) Params() protocol.GlobalParams                              { return nil }
-func (m *mockSnapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) { return nil, nil }
-func (m *mockSnapshot) ProtocolState() (protocol.KVStoreReader, error)             { return nil, nil }
-func (m *mockSnapshot) VersionBeacon() (*flow.SealedVersionBeacon, error)          { return nil, nil }
+func (m *mockSnapshot) Commit() (flow.StateCommitment, error)                    { return flow.DummyStateCommitment, nil }
+func (m *mockSnapshot) SealingSegment() (*flow.SealingSegment, error)            { return nil, nil }
+func (m *mockSnapshot) Descendants() ([]flow.Identifier, error)                  { return nil, nil }
+func (m *mockSnapshot) RandomSource() ([]byte, error)                            { return nil, nil }
+func (m *mockSnapshot) EpochPhase() (flow.EpochPhase, error)                     { return flow.EpochPhaseUndefined, nil }
+func (m *mockSnapshot) Epochs() protocol.EpochQuery                              { return nil }
+func (m *mockSnapshot) Params() protocol.GlobalParams                            { return nil }
+func (m *mockSnapshot) EpochProtocolState() (protocol.EpochProtocolState, error) { return nil, nil }
+func (m *mockSnapshot) ProtocolState() (protocol.KVStoreReader, error)           { return nil, nil }
+func (m *mockSnapshot) VersionBeacon() (*flow.SealedVersionBeacon, error)        { return nil, nil }

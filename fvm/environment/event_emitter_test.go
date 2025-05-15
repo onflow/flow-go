@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/cadence/stdlib"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func Test_IsServiceEvent(t *testing.T) {
@@ -164,6 +165,7 @@ func createTestEventEmitterWithLimit(chain flow.ChainID, address flow.Address, e
 		))
 
 	return environment.NewEventEmitter(
+		unittest.Logger(),
 		tracing.NewTracerSpan(),
 		environment.NewMeter(txnState),
 		chain.Chain(),
@@ -175,9 +177,8 @@ func createTestEventEmitterWithLimit(chain flow.ChainID, address flow.Address, e
 			},
 		},
 		environment.EventEmitterParams{
-			ServiceEventCollectionEnabled: false,
-			EventCollectionByteSizeLimit:  eventEmitLimit,
-			EventEncoder:                  environment.NewCadenceEventEncoder(),
+			EventCollectionByteSizeLimit: eventEmitLimit,
+			EventEncoder:                 environment.NewCadenceEventEncoder(),
 		},
 	)
 }

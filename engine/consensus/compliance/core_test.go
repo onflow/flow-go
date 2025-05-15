@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	consensus "github.com/onflow/flow-go/engine/consensus/mock"
@@ -285,7 +286,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 	// store the data for retrieval
 	cs.headerDB[block.Header.ParentID] = cs.head
 
-	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 	cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal)
@@ -314,7 +315,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.headerDB[parent.ID()] = parent.Header
 	cs.headerDB[ancestor.ID()] = ancestor.Header
 
-	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 	cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal)
@@ -363,7 +364,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 	parent := unittest.BlockWithParentFixture(ancestor.Header)
 	block := unittest.BlockWithParentFixture(parent.Header)
 	proposal := unittest.ProposalFromBlock(block)
-	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = parent.Header
@@ -445,7 +446,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 	parent := unittest.BlockWithParentFixture(ancestor.Header)
 	block := unittest.BlockWithParentFixture(parent.Header)
 	proposal := unittest.ProposalFromBlock(block)
-	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = parent.Header
@@ -458,7 +459,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		// make sure we fail to extend the state
 		*cs.state = protocol.ParticipantState{}
 		cs.state.On("Final").Return(func() protint.Snapshot { return cs.snapshot })
-		sentinelErr := state.NewInvalidExtensionError("")
+		sentinelErr := state.NewInvalidExtensionErrorf("")
 		cs.state.On("Extend", mock.Anything, mock.Anything).Return(sentinelErr)
 		cs.proposalViolationNotifier.On("OnInvalidBlockDetected", mock.Anything).Run(func(args mock.Arguments) {
 			err := args.Get(0).(flow.Slashable[model.InvalidProposalError])
@@ -488,7 +489,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		// make sure we fail to extend the state
 		*cs.state = protocol.ParticipantState{}
 		cs.state.On("Final").Return(func() protint.Snapshot { return cs.snapshot })
-		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewOutdatedExtensionError(""))
+		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewOutdatedExtensionErrorf(""))
 
 		// the expected error should be handled within the Core
 		err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
@@ -551,7 +552,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
 	for _, block := range []*flow.Block{parent, block1, block2, block3} {
-		hotstuffProposal := model.ProposalFromFlow(block.Header)
+		hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
@@ -601,7 +602,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 		require.NoError(cs.T(), err, "proposal buffering should pass")
 
 		// make sure no block is forwarded to hotstuff
-		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", model.ProposalFromFlow(&proposal.Block.Header))
+		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", model.SignedProposalFromFlow(&proposal.Block.Header))
 	}
 
 	// check that we submit each proposal in a valid order
@@ -618,7 +619,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	}
 	cs.hotstuff.On("SubmitProposal", mock.Anything).Times(4).Run(
 		func(args mock.Arguments) {
-			proposal := args.Get(0).(*model.Proposal)
+			proposal := args.Get(0).(*model.SignedProposal)
 			header := proposal.Block
 			if calls == 0 {
 				// first header processed must be the common parent
@@ -626,7 +627,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 			}
 			// mark the proposal as processed
 			delete(unprocessed, header.BlockID)
-			cs.headerDB[header.BlockID] = model.ProposalToFlow(proposal)
+			cs.headerDB[header.BlockID] = helper.SignedProposalToFlow(proposal)
 			calls++
 		},
 	)

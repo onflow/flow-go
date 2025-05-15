@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/sema"
-	cadenceRLP "github.com/onflow/cadence/runtime/stdlib/rlp"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/sema"
+	cadenceRLP "github.com/onflow/cadence/stdlib/rlp"
 	"github.com/onflow/go-ethereum/rlp"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -131,8 +131,8 @@ func (proof *COAOwnershipProofInContext) ToCadenceValues() []cadence.Value {
 // COAOwnershipProof is a proof that a flow account
 // controls a COA resource. To do so, the flow
 // account (Address is address of this account)
-// provides signatures (with proper total weights) over an arbitary data input
-// set by proof requester. KeyIndicies captures,
+// provides signatures (with proper total weights) over an arbitrary data input
+// set by proof requester. KeyIndices captures,
 // which account keys has been used for signatures.
 // Beside signatures, it provides the CapabilityPath
 // where the resource EVMAddress capability is stored.
@@ -153,8 +153,8 @@ func COAOwnershipProofSignatureCountFromEncoded(data []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	// first encoded item is KeyIndicies
-	// so reading number of elements in the key indicies
+	// first encoded item is KeyIndices
+	// so reading number of elements in the key indices
 	// should return the count without the need to fully decode
 	KeyIndices, _, err := cadenceRLP.DecodeList(encodedItems[0], 0)
 	return len(KeyIndices), err

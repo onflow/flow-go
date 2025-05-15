@@ -3,6 +3,8 @@ package dkg
 import (
 	"sync"
 
+	"github.com/onflow/flow-go/module"
+
 	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -16,6 +18,8 @@ type WhiteboardClient struct {
 	nodeID     flow.Identifier
 	whiteboard *whiteboard
 }
+
+var _ module.DKGContractClient = (*WhiteboardClient)(nil)
 
 // NewWhiteboardClient instantiates a new WhiteboardClient with a reference to
 // an existing whiteboard object.
@@ -44,10 +48,17 @@ func (wc *WhiteboardClient) ReadBroadcast(fromIndex uint, referenceBlock flow.Id
 	return msgs, nil
 }
 
-// SubmitResult implements the DKGContractClient interface. It publishes the
+// SubmitParametersAndResult implements the DKGContractClient interface. It publishes the
 // DKG results under the node's ID.
-func (wc *WhiteboardClient) SubmitResult(groupKey crypto.PublicKey, pubKeys []crypto.PublicKey) error {
-	wc.whiteboard.submit(wc.nodeID, groupKey, pubKeys)
+func (wc *WhiteboardClient) SubmitParametersAndResult(indexMap flow.DKGIndexMap, groupKey crypto.PublicKey, pubKeys []crypto.PublicKey) error {
+	wc.whiteboard.submit(wc.nodeID, groupKey, pubKeys, indexMap)
+	return nil
+}
+
+// SubmitEmptyResult implements the DKGContractClient interface. It publishes the
+// empty DKG result under the node's ID.
+func (wc *WhiteboardClient) SubmitEmptyResult() error {
+	wc.whiteboard.submit(wc.nodeID, nil, nil, nil)
 	return nil
 }
 
@@ -68,6 +79,7 @@ type whiteboard struct {
 type result struct {
 	groupKey crypto.PublicKey
 	pubKeys  []crypto.PublicKey
+	indexMap flow.DKGIndexMap
 }
 
 // Fingerprint implements the Fingerprinter interface used by MakeID
@@ -99,11 +111,16 @@ func (w *whiteboard) read(fromIndex uint) []messages.BroadcastDKGMessage {
 	return w.messages[fromIndex:]
 }
 
-func (w *whiteboard) submit(nodeID flow.Identifier, groupKey crypto.PublicKey, pubKeys []crypto.PublicKey) {
+func (w *whiteboard) submit(
+	nodeID flow.Identifier,
+	groupKey crypto.PublicKey,
+	pubKeys []crypto.PublicKey,
+	indexMap flow.DKGIndexMap,
+) {
 	w.Lock()
 	defer w.Unlock()
 
-	result := result{groupKey: groupKey, pubKeys: pubKeys}
+	result := result{groupKey: groupKey, pubKeys: pubKeys, indexMap: indexMap}
 	resultHash := flow.MakeID(result)
 
 	w.results[resultHash] = result

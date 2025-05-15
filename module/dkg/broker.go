@@ -59,7 +59,7 @@ type Broker struct {
 	log                       zerolog.Logger
 	unit                      *engine.Unit
 	dkgInstanceID             string                            // unique identifier of the current dkg run (prevent replay attacks)
-	committee                 flow.IdentitySkeletonList         // identities of DKG members
+	committee                 flow.IdentitySkeletonList         // identities of DKG members in canonical order
 	me                        module.Local                      // used for signing broadcast messages
 	myIndex                   int                               // index of this instance in the committee
 	dkgContractClients        []module.DKGContractClient        // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
@@ -81,6 +81,7 @@ var _ module.DKGBroker = (*Broker)(nil)
 
 // NewBroker instantiates a new epoch-specific broker capable of communicating
 // with other nodes via a network engine and dkg smart-contract.
+// No errors are expected during normal operations.
 func NewBroker(
 	log zerolog.Logger,
 	dkgInstanceID string,
@@ -90,11 +91,15 @@ func NewBroker(
 	dkgContractClients []module.DKGContractClient,
 	tunnel *BrokerTunnel,
 	opts ...BrokerOpt,
-) *Broker {
+) (*Broker, error) {
 
 	config := DefaultBrokerConfig()
 	for _, apply := range opts {
 		apply(&config)
+	}
+
+	if !committee.Sorted(flow.Canonical[flow.IdentitySkeleton]) {
+		return nil, fmt.Errorf("DKG broker expects that participants are sorted in canonical order")
 	}
 
 	b := &Broker{
@@ -114,7 +119,7 @@ func NewBroker(
 
 	go b.listen()
 
-	return b
+	return b, nil
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -204,18 +209,38 @@ func (b *Broker) Broadcast(data []byte) {
 }
 
 // SubmitResult publishes the result of the DKG protocol to the smart contract.
+// This function should be passed the beacon keys (group key, participant keys) resulting from the DKG process.
+// If the DKG process failed, no beacon keys will exist. In that case, we pass in nil here for both arguments.
+//
+// If non-nil arguments are provided, we submit a non-empty ResultSubmission to the DKG smart contract,
+// indicating that we completed the DKG successfully and essentially "voting for" our result.
+// If nil arguments are provided, we submit an empty ResultSubmission to the DKG smart contract,
+// indicating that we completed the DKG unsuccessfully.
 func (b *Broker) SubmitResult(groupKey crypto.PublicKey, pubKeys []crypto.PublicKey) error {
 
-	// If the DKG failed locally, we will get a nil key vector here. We need to convert
-	// the nil slice to a slice of nil keys before submission.
+	// If the DKG failed locally, we will get a nil group key and nil participant key vector here.
+	// There are two different transaction templates for submitting either a happy-path and failure-path result.
+	// We use SubmitResult to submit a successful result and SubmitEmptyResult to communicate that we completed the DKG without a result.
 	//
 	// In general, if pubKeys does not have one key per participant, we cannot submit
 	// a valid result - therefore we submit a nil vector (indicating that we have
 	// completed the process, but we know that we don't have a valid result).
-	if len(pubKeys) != len(b.committee) {
-		b.log.Warn().Msgf("submitting dkg result with incomplete key vector (len=%d, expected=%d)", len(pubKeys), len(b.committee))
-		// create a key vector with one nil entry for each committee member
-		pubKeys = make([]crypto.PublicKey, len(b.committee))
+	var submitResult func(client module.DKGContractClient) error
+	if len(pubKeys) == len(b.committee) && groupKey != nil {
+		indexMap := make(flow.DKGIndexMap, len(pubKeys))
+		// build a map of node IDs to indices in the key vector,
+		// this logic expects that committee is sorted in canonical order!
+		for i, participant := range b.committee {
+			indexMap[participant.NodeID] = i
+		}
+		submitResult = func(client module.DKGContractClient) error {
+			return client.SubmitParametersAndResult(indexMap, groupKey, pubKeys)
+		}
+	} else {
+		b.log.Warn().Msgf("submitting empty dkg result because I completed the DKG unsuccessfully")
+		submitResult = func(client module.DKGContractClient) error {
+			return client.SubmitEmptyResult()
+		}
 	}
 
 	backoff := retry.NewExponential(b.config.RetryInitialWait)
@@ -228,10 +253,9 @@ func (b *Broker) SubmitResult(groupKey crypto.PublicKey, pubKeys []crypto.Public
 		b.log.Warn().Msgf("submit result: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 	}
 	backoff = retrymiddleware.AfterConsecutiveFailures(b.config.RetryMaxConsecutiveFailures, backoff, onMaxConsecutiveRetries)
-
 	attempts := 1
 	err := retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
-		err := dkgContractClient.SubmitResult(groupKey, pubKeys)
+		err := submitResult(dkgContractClient)
 		if err != nil {
 			b.log.Error().Err(err).Msgf("error submitting DKG result, retrying (attempt %d)", attempts)
 			attempts++

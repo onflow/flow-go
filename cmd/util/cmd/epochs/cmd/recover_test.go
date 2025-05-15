@@ -2,15 +2,17 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"testing"
 
-	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/model/flow"
-
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/cadence"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -26,17 +28,30 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		require.NoError(t, err)
 
 		allNodeIds := make(flow.IdentityList, 0)
-		for _, node := range internalNodes {
+		allNodeIdsCdc := make(map[cadence.String]*flow.Identity)
+		for _, node := range append(internalNodes, partnerNodes...) {
 			allNodeIds = append(allNodeIds, node.Identity())
-		}
-		for _, node := range partnerNodes {
-			allNodeIds = append(allNodeIds, node.Identity())
+			allNodeIdsCdc[cadence.String(node.Identity().NodeID.String())] = node.Identity()
 		}
 
 		// create a root snapshot
 		rootSnapshot := unittest.RootSnapshotFixture(allNodeIds)
-
 		snapshotFn := func() *inmem.Snapshot { return rootSnapshot }
+
+		// get expected dkg information
+		currentEpoch, err := rootSnapshot.Epochs().Current()
+		require.NoError(t, err)
+		currentEpochDKG, err := currentEpoch.DKG()
+		require.NoError(t, err)
+		expectedDKGPubKeys := make(map[cadence.String]struct{})
+		expectedDKGGroupKey := cadence.String(hex.EncodeToString(currentEpochDKG.GroupKey().Encode()))
+		for _, id := range allNodeIds {
+			if id.GetRole() == flow.RoleConsensus {
+				dkgPubKey, keyShareErr := currentEpochDKG.KeyShare(id.GetNodeID())
+				require.NoError(t, keyShareErr)
+				expectedDKGPubKeys[cadence.String(hex.EncodeToString(dkgPubKey.Encode()))] = struct{}{}
+			}
+		}
 
 		// run command with overwritten stdout
 		stdout := bytes.NewBuffer(nil)
@@ -45,9 +60,10 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		flagInternalNodePrivInfoDir = internalPrivDir
 		flagNodeConfigJson = configPath
 		flagCollectionClusters = 2
-		flagNumViewsInEpoch = 4000
-		flagNumViewsInStakingAuction = 100
 		flagEpochCounter = 2
+		flagRootChainID = flow.Localnet.String()
+		flagNumViewsInStakingAuction = 100
+		flagNumViewsInEpoch = 4000
 
 		generateRecoverEpochTxArgs(snapshotFn)(generateRecoverEpochTxArgsCmd, nil)
 
@@ -55,9 +71,62 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		var outputTxArgs []interface{}
 		err = json.NewDecoder(stdout).Decode(&outputTxArgs)
 		require.NoError(t, err)
-		// compare to expected values
-		expectedArgs := extractRecoverEpochArgs(rootSnapshot)
-		unittest.VerifyCdcArguments(t, expectedArgs[:len(expectedArgs)-1], outputTxArgs[:len(expectedArgs)-1])
-		// @TODO validate cadence values for generated cluster assignments and clusters
+
+		// verify each argument
+		decodedValues := unittest.InterfafceToCdcValues(t, outputTxArgs)
+		currEpoch, err := rootSnapshot.Epochs().Current()
+		require.NoError(t, err)
+		finalView := currEpoch.FinalView()
+		currEpochTargetEndTime := currEpoch.TargetEndTime()
+
+		// epoch counter
+		require.Equal(t, cadence.NewUInt64(flagEpochCounter), decodedValues[0])
+		// epoch start view
+		require.Equal(t, cadence.NewUInt64(finalView+1), decodedValues[1])
+		// staking phase end view
+		require.Equal(t, cadence.NewUInt64(finalView+flagNumViewsInStakingAuction), decodedValues[2])
+		// epoch end view
+		require.Equal(t, cadence.NewUInt64(finalView+flagNumViewsInEpoch), decodedValues[3])
+		// target duration
+		require.Equal(t, cadence.NewUInt64(flagRecoveryEpochTargetDuration), decodedValues[4])
+		// target end time
+		require.Equal(t, cadence.NewUInt64(currEpochTargetEndTime+flagRecoveryEpochTargetDuration), decodedValues[5])
+		// clusters: we cannot guarantee order of the cluster when we generate the test fixtures
+		// so, we ensure each cluster member is part of the full set of node ids
+		for _, cluster := range decodedValues[6].(cadence.Array).Values {
+			for _, nodeId := range cluster.(cadence.Array).Values {
+				_, ok := allNodeIdsCdc[nodeId.(cadence.String)]
+				require.True(t, ok)
+			}
+		}
+		// qcVoteData: we cannot guarantee order of the cluster when we generate the test fixtures
+		// so, we ensure each voter id that participated in a qc vote exists and is a collection node
+		for _, voteData := range decodedValues[7].(cadence.Array).Values {
+			fields := cadence.FieldsMappedByName(voteData.(cadence.Struct))
+			for _, voterId := range fields["voterIDs"].(cadence.Array).Values {
+				id, ok := allNodeIdsCdc[voterId.(cadence.String)]
+				require.True(t, ok)
+				require.Equal(t, flow.RoleCollection, id.Role)
+			}
+		}
+		// dkg pub keys
+		for _, dkgPubKey := range decodedValues[8].(cadence.Array).Values {
+			_, ok := expectedDKGPubKeys[dkgPubKey.(cadence.String)]
+			require.True(t, ok)
+		}
+		// dkg group key
+		require.Equal(t, expectedDKGGroupKey, decodedValues[9].(cadence.String))
+		// dkg index map
+		for _, pair := range decodedValues[10].(cadence.Dictionary).Pairs {
+			_, ok := allNodeIdsCdc[pair.Key.(cadence.String)]
+			require.True(t, ok)
+		}
+		// node ids
+		for _, nodeId := range decodedValues[11].(cadence.Array).Values {
+			_, ok := allNodeIdsCdc[nodeId.(cadence.String)]
+			require.True(t, ok)
+		}
+		// unsafeAllowOverWrite
+		require.Equal(t, cadence.NewBool(false), decodedValues[12])
 	})
 }

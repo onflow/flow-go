@@ -10,6 +10,7 @@ import (
 )
 
 type CollectionCollector struct {
+	module.TransactionValidationMetrics
 	tracer               module.Tracer
 	transactionsIngested prometheus.Counter       // tracks the number of ingested transactions
 	finalizedHeight      *prometheus.GaugeVec     // tracks the finalized height
@@ -17,11 +18,13 @@ type CollectionCollector struct {
 	guarantees           *prometheus.HistogramVec // counts the number/size of FINALIZED collections
 }
 
+var _ module.CollectionMetrics = (*CollectionCollector)(nil)
+
 func NewCollectionCollector(tracer module.Tracer) *CollectionCollector {
 
 	cc := &CollectionCollector{
-		tracer: tracer,
-
+		TransactionValidationMetrics: NewTransactionValidationCollector(),
+		tracer:                       tracer,
 		transactionsIngested: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: namespaceCollection,
 			Name:      "ingested_transactions_total",

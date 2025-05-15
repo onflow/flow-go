@@ -175,6 +175,42 @@ func TestEpochCommit_EqualTo(t *testing.T) {
 		require.True(t, a.EqualTo(b))
 		require.True(t, b.EqualTo(a))
 	})
+
+	t.Run("DKGData different length", func(t *testing.T) {
+
+		a := &flow.EpochCommit{DKGIndexMap: flow.DKGIndexMap{flow.HashToID([]byte{1}): 1}}
+		b := &flow.EpochCommit{DKGIndexMap: flow.DKGIndexMap{}}
+
+		require.False(t, a.EqualTo(b))
+		require.False(t, b.EqualTo(a))
+	})
+
+	t.Run("DKGData different data", func(t *testing.T) {
+
+		a := &flow.EpochCommit{DKGIndexMap: flow.DKGIndexMap{flow.HashToID([]byte{1}): 1}}
+		b := &flow.EpochCommit{DKGIndexMap: flow.DKGIndexMap{flow.HashToID([]byte{1}): 2}}
+
+		require.False(t, a.EqualTo(b))
+		require.False(t, b.EqualTo(a))
+	})
+
+	t.Run("DKGData different data - zero value", func(t *testing.T) {
+
+		a := &flow.EpochCommit{DKGIndexMap: flow.DKGIndexMap{flow.HashToID([]byte{1}): 0}}
+		b := &flow.EpochCommit{DKGIndexMap: flow.DKGIndexMap{flow.HashToID([]byte{2}): 1}}
+
+		require.False(t, a.EqualTo(b))
+		require.False(t, b.EqualTo(a))
+	})
+
+	t.Run("DKGData  same data", func(t *testing.T) {
+
+		a := &flow.EpochCommit{DKGIndexMap: flow.DKGIndexMap{flow.HashToID([]byte{1, 2, 3}): 1}}
+		b := &flow.EpochCommit{DKGIndexMap: flow.DKGIndexMap{flow.HashToID([]byte{1, 2, 3}): 1}}
+
+		require.True(t, a.EqualTo(b))
+		require.True(t, b.EqualTo(a))
+	})
 }
 
 func TestEpochSetup_EqualTo(t *testing.T) {

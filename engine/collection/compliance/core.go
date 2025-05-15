@@ -43,8 +43,8 @@ type Core struct {
 	headers                   storage.Headers
 	state                     clusterkv.MutableState
 	// track latest finalized view/height - used to efficiently drop outdated or too-far-ahead blocks
-	finalizedView     counters.StrictMonotonousCounter
-	finalizedHeight   counters.StrictMonotonousCounter
+	finalizedView     counters.StrictMonotonicCounter
+	finalizedHeight   counters.StrictMonotonicCounter
 	pending           module.PendingClusterBlockBuffer // pending block cache
 	sync              module.BlockRequester
 	hotstuff          module.HotStuff
@@ -121,23 +121,25 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.ClusterBlockPro
 
 	log := c.log.With().
 		Hex("origin_id", proposal.OriginID[:]).
-		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", blockID[:]).
-		Hex("parent_id", header.ParentID[:]).
 		Hex("ref_block_id", block.Message.Payload.ReferenceBlockID[:]).
 		Hex("collection_id", logging.Entity(block.Message.Payload.Collection)).
 		Int("tx_count", block.Message.Payload.Collection.Len()).
-		Time("timestamp", header.Timestamp).
+		Hex("parent_id", header.ParentID[:]).
 		Hex("proposer", header.ProposerID[:]).
-		Hex("parent_signer_indices", header.ParentVoterIndices).
-		Uint64("finalized_height", finalHeight).
-		Uint64("finalized_view", finalView).
+		Time("timestamp", header.Timestamp).
 		Logger()
 	if log.Debug().Enabled() {
-		log = log.With().Strs("tx_ids",
-			flow.IdentifierList(block.Message.Payload.Collection.Light().Transactions).Strings()).Logger()
+		log = log.With().
+			Uint64("finalized_height", finalHeight).
+			Uint64("finalized_view", finalView).
+			Str("chain_id", header.ChainID.String()).
+			Hex("payload_hash", header.PayloadHash[:]).
+			Hex("parent_signer_indices", header.ParentVoterIndices).
+			Strs("tx_ids", flow.IdentifierList(block.Message.Payload.Collection.Light().Transactions).Strings()).
+			Logger()
 	}
 	log.Info().Msg("block proposal received")
 
@@ -260,7 +262,7 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Block
 			})
 
 			// notify VoteAggregator about the invalid block
-			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(header))
+			err = c.voteAggregator.InvalidBlock(model.SignedProposalFromFlow(header))
 			if err != nil {
 				if mempool.IsBelowPrunedThresholdError(err) {
 					log.Warn().Msg("received invalid block, but is below pruned threshold")
@@ -315,9 +317,9 @@ func (c *Core) processBlockProposal(proposal *cluster.Block) error {
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Logger()
-	log.Info().Msg("processing block proposal")
+	log.Debug().Msg("processing block proposal")
 
-	hotstuffProposal := model.ProposalFromFlow(header)
+	hotstuffProposal := model.SignedProposalFromFlow(header)
 	err := c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
 		if model.IsInvalidProposalError(err) {
@@ -355,7 +357,7 @@ func (c *Core) processBlockProposal(proposal *cluster.Block) error {
 
 	// submit the model to hotstuff for processing
 	// TODO replace with pubsub https://github.com/dapperlabs/flow-go/issues/6395
-	log.Info().Msg("forwarding block proposal to hotstuff")
+	log.Debug().Msg("forwarding block proposal to hotstuff")
 	c.hotstuff.SubmitProposal(hotstuffProposal)
 
 	return nil

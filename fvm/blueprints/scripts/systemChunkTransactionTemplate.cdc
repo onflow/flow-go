@@ -1,6 +1,8 @@
-import FlowEpoch from "FlowEpoch"
-import NodeVersionBeacon from "NodeVersionBeacon"
-import RandomBeaconHistory from "RandomBeaconHistory"
+import "FlowEpoch"
+import "NodeVersionBeacon"
+import "RandomBeaconHistory"
+import "EVM"
+import Migration from "Migration"
 
 transaction {
     prepare(serviceAccount: auth(BorrowValue) &Account) {
@@ -17,5 +19,13 @@ transaction {
             .borrow<&RandomBeaconHistory.Heartbeat>(from: RandomBeaconHistory.HeartbeatStoragePath)
             ?? panic("Couldn't borrow RandomBeaconHistory.Heartbeat Resource")
         randomBeaconHistoryHeartbeat.heartbeat(randomSourceHistory: randomSourceHistory())
+
+        let evmHeartbeat = serviceAccount.storage
+            .borrow<&EVM.Heartbeat>(from: /storage/EVMHeartbeat)
+        evmHeartbeat?.heartbeat()
+
+        let migrationAdmin = serviceAccount.storage
+            .borrow<&Migration.Admin>(from: Migration.adminStoragePath)
+        migrationAdmin?.migrate()
     }
 }

@@ -1,52 +1,89 @@
 package chunks
 
 import (
+	"errors"
+	"fmt"
+
+	"golang.org/x/exp/maps"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Assignment is assignment map of the chunks to the list of the verifier nodes
+var ErrUnknownChunkIndex = errors.New("verifier assignment for invalid chunk requested")
+
+// Assignment is an immutable list that, for each chunk (in order of chunk.Index),
+// records the set of verifier nodes that are assigned to verify that chunk.
+// Assignments are only constructed using AssignmentBuilder, and cannot be modified after construction.
 type Assignment struct {
-	// TODO: use a slice here instead of a map, which will be more performant
-	verifiersForChunk map[uint64]map[flow.Identifier]struct{}
+	verifiersForChunk []map[flow.Identifier]struct{}
 }
 
-func NewAssignment() *Assignment {
-	return &Assignment{
-		verifiersForChunk: make(map[uint64]map[flow.Identifier]struct{}),
+// AssignmentBuilder is a helper for constructing a single new Assignment,
+// and should be discarded after calling `Build()`.
+// AssignmentBuilder is not safe for concurrent use by multiple goroutines.
+type AssignmentBuilder struct {
+	verifiersForChunk []map[flow.Identifier]struct{}
+}
+
+func NewAssignmentBuilder() *AssignmentBuilder {
+	return &AssignmentBuilder{
+		verifiersForChunk: make([]map[flow.Identifier]struct{}, 0, 1),
 	}
 }
 
-// Verifiers returns the list of verifier nodes assigned to a chunk
-func (a *Assignment) Verifiers(chunk *flow.Chunk) flow.IdentifierList {
-	v := make([]flow.Identifier, 0)
-	for id := range a.verifiersForChunk[chunk.Index] {
-		v = append(v, id)
+// Build constructs and returns the immutable assignment. The AssignmentBuilder
+// should be discarded after this call, and further method calls will panic.
+func (a *AssignmentBuilder) Build() *Assignment {
+	if a.verifiersForChunk == nil {
+		panic("method `AssignmentBuilder.Build` has previously been called - do not reuse AssignmentBuilder")
 	}
-	return v
+	assignment := &Assignment{verifiersForChunk: a.verifiersForChunk}
+	a.verifiersForChunk = nil // revoke builder's reference, to prevent modification of assignment
+	return assignment
+}
+
+// Verifiers returns the list of verifier nodes assigned to a chunk. The protocol mandates
+// that for each chunk in a block, a verifier assignment exists (though it may be empty) and
+// that each block must at least have one chunk.
+// Errors: ErrUnknownChunkIndex if the chunk index is not present in the assignment
+func (a *Assignment) Verifiers(chunkIdx uint64) (map[flow.Identifier]struct{}, error) {
+	if chunkIdx >= uint64(len(a.verifiersForChunk)) {
+		return nil, ErrUnknownChunkIndex
+	}
+	assignedVerifiers := a.verifiersForChunk[chunkIdx]
+	// return a copy to prevent modification
+	return maps.Clone(assignedVerifiers), nil
 }
 
 // HasVerifier checks if a chunk is assigned to the given verifier
-// TODO: method should probably error if chunk has unknown index
-func (a *Assignment) HasVerifier(chunk *flow.Chunk, identifier flow.Identifier) bool {
-	assignedVerifiers, found := a.verifiersForChunk[chunk.Index]
-	if !found {
-		// is verifier assigned to this chunk?
-		// No, because we only assign verifiers to existing chunks
-		return false
+// Errors: ErrUnknownChunkIndex if the chunk index is not present in the assignment
+func (a *Assignment) HasVerifier(chunkIdx uint64, identifier flow.Identifier) (bool, error) {
+	if chunkIdx >= uint64(len(a.verifiersForChunk)) {
+		return false, ErrUnknownChunkIndex
 	}
+	assignedVerifiers := a.verifiersForChunk[chunkIdx]
 	_, isAssigned := assignedVerifiers[identifier]
-	return isAssigned
+	return isAssigned, nil
 }
 
-// Add records the list of verifier nodes as the assigned verifiers of the chunk
-// it returns an error if the list of verifiers is empty or contains duplicate ids
-func (a *Assignment) Add(chunk *flow.Chunk, verifiers flow.IdentifierList) {
-	// sorts verifiers list based on their identifier
-	v := make(map[flow.Identifier]struct{})
-	for _, id := range verifiers {
-		v[id] = struct{}{}
+// Add records the list of verifier nodes as the assigned verifiers of the chunk.
+// Requires chunks to be added in order of their Index (starting at 0 and increasing
+// by 1 with each addition); otherwise an exception is returned.
+func (a *AssignmentBuilder) Add(chunkIdx uint64, verifiers flow.IdentifierList) error {
+	if a.verifiersForChunk == nil {
+		panic("method `AssignmentBuilder.Build` has previously been called - do not reuse AssignmentBuilder")
 	}
-	a.verifiersForChunk[chunk.Index] = v
+	if chunkIdx != uint64(len(a.verifiersForChunk)) {
+		return fmt.Errorf("chunk added out of order, got index %v but expecting %v", chunkIdx, len(a.verifiersForChunk))
+	}
+	// Formally, the flow protocol mandates that the same verifier is not assigned
+	// repeatedly to the same chunk (as this would weaken the protocol's security).
+	vs := verifiers.Lookup()
+	if len(vs) != len(verifiers) {
+		return fmt.Errorf("repeated assignment of the same verifier to the same chunk is a violation of protocol rules")
+	}
+	a.verifiersForChunk = append(a.verifiersForChunk, vs)
+	return nil
 }
 
 // ByNodeID returns the indices of all chunks assigned to the given verifierID
@@ -57,7 +94,7 @@ func (a *Assignment) ByNodeID(verifierID flow.Identifier) []uint64 {
 	for chunkIdx, assignedVerifiers := range a.verifiersForChunk {
 		_, isAssigned := assignedVerifiers[verifierID]
 		if isAssigned {
-			chunks = append(chunks, chunkIdx)
+			chunks = append(chunks, uint64(chunkIdx))
 		}
 	}
 	return chunks
@@ -68,8 +105,6 @@ func (a *Assignment) Len() int {
 	return len(a.verifiersForChunk)
 }
 
-// AssignmentDataPack
-//
 // AssignmentDataPack provides a storable representation of chunk assignments on
 // mempool
 type AssignmentDataPack struct {

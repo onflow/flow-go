@@ -8,11 +8,14 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/routes"
+	"github.com/onflow/flow-go/engine/access/rest/router"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
+	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 const (
@@ -27,24 +30,43 @@ const (
 )
 
 type Config struct {
-	ListenAddress string
-	WriteTimeout  time.Duration
-	ReadTimeout   time.Duration
-	IdleTimeout   time.Duration
+	ListenAddress  string
+	WriteTimeout   time.Duration
+	ReadTimeout    time.Duration
+	IdleTimeout    time.Duration
+	MaxRequestSize int64
 }
 
 // NewServer returns an HTTP server initialized with the REST API handler
-func NewServer(serverAPI access.API,
+func NewServer(
+	ctx irrecoverable.SignalerContext,
+	serverAPI access.API,
 	config Config,
 	logger zerolog.Logger,
 	chain flow.Chain,
 	restCollector module.RestMetrics,
 	stateStreamApi state_stream.API,
 	stateStreamConfig backend.Config,
+	enableNewWebsocketsStreamAPI bool,
+	wsConfig websockets.Config,
 ) (*http.Server, error) {
-	builder := routes.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain)
+	builder := router.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain, config.MaxRequestSize)
 	if stateStreamApi != nil {
-		builder.AddWsRoutes(stateStreamApi, chain, stateStreamConfig)
+		builder.AddLegacyWebsocketsRoutes(stateStreamApi, chain, stateStreamConfig, config.MaxRequestSize)
+	}
+
+	dataProviderFactory := dp.NewDataProviderFactory(
+		logger,
+		stateStreamApi,
+		serverAPI,
+		chain,
+		stateStreamConfig.EventFilterConfig,
+		stateStreamConfig.HeartbeatInterval,
+		builder.LinkGenerator,
+	)
+
+	if enableNewWebsocketsStreamAPI {
+		builder.AddWebsocketsRoute(ctx, chain, wsConfig, config.MaxRequestSize, dataProviderFactory)
 	}
 
 	c := cors.New(cors.Options{

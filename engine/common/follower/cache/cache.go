@@ -50,7 +50,7 @@ type Cache struct {
 	byParent map[flow.Identifier]BlocksByID // lookup of blocks by their parentID, for finding a block's known children
 
 	notifier   hotstuff.ProposalViolationConsumer // equivocations will be reported using this notifier
-	lowestView counters.StrictMonotonousCounter   // lowest view that the cache accepts blocks for
+	lowestView counters.StrictMonotonicCounter    // lowest view that the cache accepts blocks for
 }
 
 // Peek performs lookup of cached block by blockID.

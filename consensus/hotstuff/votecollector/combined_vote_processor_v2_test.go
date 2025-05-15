@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
+	"golang.org/x/exp/slices"
 	"pgregory.net/rapid"
 
 	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
@@ -19,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/safetyrules"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
@@ -56,7 +58,7 @@ func (s *CombinedVoteProcessorV2TestSuite) SetupTest() {
 
 	s.reconstructor = &mockhotstuff.RandomBeaconReconstructor{}
 	s.packer = &mockhotstuff.Packer{}
-	s.proposal = helper.MakeProposal()
+	s.proposal = helper.MakeSignedProposal()
 
 	s.minRequiredShares = 9 // we require 9 RB shares to reconstruct signature
 	s.rbSharesTotal = 0
@@ -782,7 +784,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	epochCounter := uint64(3)
 	epochLookup := &modulemock.EpochLookup{}
 	view := uint64(20)
-	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
+	epochLookup.On("EpochForView", view).Return(epochCounter, nil)
 
 	// all committee members run DKG
 	dkgData, err := bootstrapDKG.RandomBeaconKG(11, unittest.RandomBytes(32))
@@ -796,6 +798,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	stakingSigners := unittest.IdentityListFixture(3)
 	beaconSigners := unittest.IdentityListFixture(8)
 	allIdentities := append(stakingSigners, beaconSigners...)
+	slices.SortFunc(allIdentities, flow.Canonical[flow.Identity]) // sort in place to avoid taking a copy.
 	require.Equal(t, len(dkgData.PubKeyShares), len(allIdentities))
 	dkgParticipants := make(map[flow.Identifier]flow.DKGParticipant)
 	// fill dkg participants data
@@ -811,7 +814,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
 		keys := &storagemock.SafeBeaconKeys{}
-		// there is no DKG key for this epoch
+		// there is no Random Beacon key for this epoch
 		keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(nil, false, nil)
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
@@ -822,18 +825,19 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		signers[identity.NodeID] = verification.NewCombinedSigner(me, beaconSignerStore)
 	}
 
+	dkgIndexMap := make(flow.DKGIndexMap)
 	for _, identity := range beaconSigners {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
 		participantData := dkgParticipants[identity.NodeID]
-
 		dkgKey := encodable.RandomBeaconPrivKey{
 			PrivateKey: dkgData.PrivKeyShares[participantData.Index],
 		}
+		dkgIndexMap[identity.NodeID] = int(participantData.Index)
 
 		keys := &storagemock.SafeBeaconKeys{}
-		// there is DKG key for this epoch
+		// there is Random Beacon key for this epoch
 		keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(dkgKey, true, nil)
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
@@ -844,24 +848,27 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		signers[identity.NodeID] = verification.NewCombinedSigner(me, beaconSignerStore)
 	}
 
-	leader := stakingSigners[0]
+	leader := allIdentities[0]
 
 	block := helper.MakeBlock(helper.WithBlockView(view),
-		helper.WithBlockProposer(leader.NodeID))
+		helper.WithBlockProposer(leader.NodeID),
+		helper.WithBlockQC(helper.MakeQC(helper.WithQCView(view-1))))
+	proposal := helper.MakeProposal(helper.WithBlock(block))
 
-	inmemDKG, err := inmem.DKGFromEncodable(inmem.EncodableDKG{
-		GroupKey: encodable.RandomBeaconPubKey{
-			PublicKey: dkgData.PubGroupKey,
-		},
-		Participants: dkgParticipants,
+	inmemDKG := inmem.NewDKG(nil, &flow.EpochCommit{
+		DKGGroupKey:        dkgData.PubGroupKey,
+		DKGParticipantKeys: dkgData.PubKeyShares,
+		DKGIndexMap:        dkgIndexMap,
 	})
-	require.NoError(t, err)
 
 	committee := &mockhotstuff.DynamicCommittee{}
+	committee.On("LeaderForView", block.View).Return(leader.NodeID, nil).Maybe()
 	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.ToSkeleton().TotalWeight()), nil)
 	committee.On("IdentitiesByEpoch", block.View).Return(allIdentities.ToSkeleton(), nil)
 	committee.On("IdentitiesByBlock", block.BlockID).Return(allIdentities, nil)
+	committee.On("IdentityByBlock", block.BlockID, leader.NodeID).Return(leader, nil)
 	committee.On("DKG", block.View).Return(inmemDKG, nil)
+	committee.On("Self").Return(leader.NodeID)
 
 	votes := make([]*model.Vote, 0, len(allIdentities))
 
@@ -874,7 +881,19 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	}
 
 	// create and sign proposal
-	proposal, err := signers[leader.NodeID].CreateProposal(block)
+	persist := mockhotstuff.NewPersister(t)
+	safetyData := &hotstuff.SafetyData{
+		LockedOneChainView:      block.View - 1,
+		HighestAcknowledgedView: block.View - 1,
+	}
+	persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
+	persist.On("PutSafetyData", mock.Anything).Return(nil)
+	safetyRules, err := safetyrules.New(signers[leader.NodeID], persist, committee)
+	require.NoError(t, err)
+	vote, err := safetyRules.SignOwnProposal(proposal)
+	require.NoError(t, err)
+	signedProposal := helper.MakeSignedProposal(helper.WithProposal(proposal), helper.WithSigData(vote.SigData))
+
 	require.NoError(t, err)
 
 	qcCreated := false
@@ -893,7 +912,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	}
 
 	voteProcessorFactory := NewCombinedVoteProcessorFactory(committee, onQCCreated)
-	voteProcessor, err := voteProcessorFactory.Create(unittest.Logger(), proposal)
+	voteProcessor, err := voteProcessorFactory.Create(unittest.Logger(), signedProposal)
 	require.NoError(t, err)
 
 	// process votes by new leader, this will result in producing new QC

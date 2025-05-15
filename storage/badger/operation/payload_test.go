@@ -16,11 +16,11 @@ func TestSealInsertCheckRetrieve(t *testing.T) {
 		expected := unittest.Seal.Fixture()
 
 		err := db.Update(InsertSeal(expected.ID(), expected))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var actual flow.Seal
 		err = db.View(RetrieveSeal(expected.ID(), &actual))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, expected, &actual)
 	})
@@ -48,11 +48,11 @@ func TestSealIndexAndLookup(t *testing.T) {
 			}
 			return nil
 		})
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var actual []flow.Identifier
 		err = db.View(LookupPayloadSeals(blockID, &actual))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, expected, actual)
 	})

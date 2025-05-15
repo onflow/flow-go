@@ -9,9 +9,8 @@ import (
 	"strings"
 
 	"github.com/onflow/atree"
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -27,15 +26,20 @@ type AccountsAtreeLedger struct {
 }
 
 func NewAccountsAtreeLedger(accounts environment.Accounts) *AccountsAtreeLedger {
-	return &AccountsAtreeLedger{Accounts: accounts}
+	return &AccountsAtreeLedger{
+		Accounts: accounts,
+	}
 }
 
 var _ atree.Ledger = &AccountsAtreeLedger{}
 
 func (a *AccountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
+	if common.Address(owner) == common.ZeroAddress {
+		return nil, nil
+	}
+
 	registerID := newRegisterID(owner, key)
-	v, err := a.Accounts.GetValue(
-		registerID)
+	v, err := a.Accounts.GetValue(registerID)
 	if err != nil {
 		return nil, fmt.Errorf("getting value failed: %w", err)
 	}
@@ -60,57 +64,13 @@ func (a *AccountsAtreeLedger) ValueExists(owner, key []byte) (exists bool, err e
 	return len(v) > 0, nil
 }
 
-// AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
-func (a *AccountsAtreeLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	v, err := a.Accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
+// AllocateSlabIndex allocates new storage index under the owner accounts to store a new register
+func (a *AccountsAtreeLedger) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
+	v, err := a.Accounts.AllocateSlabIndex(flow.BytesToAddress(owner))
 	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf("storage index allocation failed: %w", err)
+		return atree.SlabIndex{}, fmt.Errorf("storage index allocation failed: %w", err)
 	}
 	return v, nil
-}
-
-type PayloadsReadonlyLedger struct {
-	Snapshot snapshot.MigrationSnapshot
-
-	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
-	SetValueFunc             func(owner, key, value []byte) (err error)
-}
-
-var _ atree.Ledger = &PayloadsReadonlyLedger{}
-
-func (p *PayloadsReadonlyLedger) GetValue(owner, key []byte) (value []byte, err error) {
-	registerID := newRegisterID(owner, key)
-	v, err := p.Snapshot.Get(registerID)
-	if err != nil {
-		return nil, fmt.Errorf("getting value failed: %w", err)
-	}
-	return v, nil
-}
-
-func (p *PayloadsReadonlyLedger) SetValue(owner, key, value []byte) (err error) {
-	if p.SetValueFunc != nil {
-		return p.SetValueFunc(owner, key, value)
-	}
-
-	panic("SetValue not expected to be called")
-}
-
-func (p *PayloadsReadonlyLedger) ValueExists(owner, key []byte) (bool, error) {
-	registerID := newRegisterID(owner, key)
-	exists := p.Snapshot.Exists(registerID)
-	return exists, nil
-}
-
-func (p *PayloadsReadonlyLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	if p.AllocateStorageIndexFunc != nil {
-		return p.AllocateStorageIndexFunc(owner)
-	}
-
-	panic("AllocateStorageIndex not expected to be called")
-}
-
-func NewPayloadsReadonlyLedger(snapshot snapshot.MigrationSnapshot) *PayloadsReadonlyLedger {
-	return &PayloadsReadonlyLedger{Snapshot: snapshot}
 }
 
 // IsServiceLevelAddress returns true if the given address is the service level address.
@@ -118,8 +78,6 @@ func NewPayloadsReadonlyLedger(snapshot snapshot.MigrationSnapshot) *PayloadsRea
 func IsServiceLevelAddress(address common.Address) bool {
 	return address == common.ZeroAddress
 }
-
-var _ atree.Ledger = &PayloadsReadonlyLedger{}
 
 func PayloadsFromEmulatorSnapshot(snapshotPath string) ([]*ledger.Payload, error) {
 	db, err := sql.Open("sqlite", snapshotPath)
@@ -247,7 +205,7 @@ type PayloadMetaInfo struct {
 type PayloadsLedger struct {
 	Payloads map[flow.RegisterID]*ledger.Payload
 
-	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
+	AllocateSlabIndexFunc func(owner []byte) (atree.SlabIndex, error)
 }
 
 var _ atree.Ledger = &PayloadsLedger{}
@@ -280,10 +238,10 @@ func (p *PayloadsLedger) ValueExists(owner, key []byte) (exists bool, err error)
 	return ok, nil
 }
 
-func (p *PayloadsLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	if p.AllocateStorageIndexFunc != nil {
-		return p.AllocateStorageIndexFunc(owner)
+func (p *PayloadsLedger) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
+	if p.AllocateSlabIndexFunc != nil {
+		return p.AllocateSlabIndexFunc(owner)
 	}
 
-	panic("AllocateStorageIndex not expected to be called")
+	panic("AllocateSlabIndex not expected to be called")
 }

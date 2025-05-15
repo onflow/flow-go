@@ -43,14 +43,14 @@ func ParseEvent(eventType flow.EventType) (*ParsedEvent, error) {
 		}
 
 	case "A":
-		if len(parts) == 4 {
+		if len(parts) >= 4 {
 			return &ParsedEvent{
 				Type:         AccountEventType,
 				EventType:    eventType,
 				Address:      parts[1],
 				Contract:     fmt.Sprintf("A.%s.%s", parts[1], parts[2]),
 				ContractName: parts[2],
-				Name:         parts[3],
+				Name:         parts[len(parts)-1],
 			}, nil
 		}
 	}

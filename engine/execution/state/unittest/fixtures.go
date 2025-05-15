@@ -42,7 +42,7 @@ func ComputationResultForBlockFixture(
 	completeBlock *entity.ExecutableBlock,
 ) *execution.ComputationResult {
 	collections := completeBlock.Collections()
-	computationResult := execution.NewEmptyComputationResult(completeBlock)
+	computationResult := execution.NewEmptyComputationResult(completeBlock, flow.NewChunk)
 
 	numberOfChunks := len(collections) + 1
 	ceds := make([]*execution_data.ChunkExecutionData, numberOfChunks)
@@ -69,11 +69,13 @@ func ComputationResultForBlockFixture(
 
 	_, serviceEventEpochCommitProtocol := unittest.EpochCommitFixtureByChainID(flow.Localnet)
 	_, serviceEventEpochSetupProtocol := unittest.EpochSetupFixtureByChainID(flow.Localnet)
+	_, serviceEventEpochRecoverProtocol := unittest.EpochRecoverFixtureByChainID(flow.Localnet)
 	_, serviceEventVersionBeaconProtocol := unittest.VersionBeaconFixtureByChainID(flow.Localnet)
 
 	convertedServiceEvents := flow.ServiceEventList{
 		serviceEventEpochCommitProtocol.ServiceEvent(),
 		serviceEventEpochSetupProtocol.ServiceEvent(),
+		serviceEventEpochRecoverProtocol.ServiceEvent(),
 		serviceEventVersionBeaconProtocol.ServiceEvent(),
 	}
 

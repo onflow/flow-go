@@ -174,7 +174,7 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentitySkeletonList, sigData
 			if protocol.IsIdentityNotFound(err) {
 				return model.NewInvalidSignerErrorf("%v is not a random beacon participant: %w", signerID, err)
 			}
-			return fmt.Errorf("unexpected error retrieving dkg key share for signer %v: %w", signerID, err)
+			return fmt.Errorf("unexpected error retrieving Random Beacon key share for signer %v: %w", signerID, err)
 		}
 		beaconPubKeys = append(beaconPubKeys, keyShare)
 	}

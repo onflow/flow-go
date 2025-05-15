@@ -88,12 +88,12 @@ func (s *MessageHubSuite) SetupTest() {
 	s.compliance = mockcollection.NewCompliance(s.T())
 
 	// set up proto state mock
-	protoEpoch := &protocol.Epoch{}
+	protoEpoch := &protocol.CommittedEpoch{}
 	clusters := flow.ClusterList{s.cluster.ToSkeleton()}
 	protoEpoch.On("Clustering").Return(clusters, nil)
 
 	protoQuery := &protocol.EpochQuery{}
-	protoQuery.On("Current").Return(protoEpoch)
+	protoQuery.On("Current").Return(protoEpoch, nil)
 
 	protoSnapshot := &protocol.Snapshot{}
 	protoSnapshot.On("Epochs").Return(protoQuery)
@@ -273,7 +273,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 		expectedBroadcastMsg := messages.NewClusterBlockProposal(&block)
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
-		hotstuffProposal := model.ProposalFromFlow(block.Header)
+		hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 		s.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		s.hotstuff.On("SubmitProposal", hotstuffProposal).
 			Run(func(args mock.Arguments) { close(submitted) }).
@@ -334,7 +334,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		s.payloads.On("ByBlockID", proposal.Header.ID()).Return(proposal.Payload, nil)
 
 		// unset chain and height to make sure they are correctly reconstructed
-		hotstuffProposal := model.ProposalFromFlow(proposal.Header)
+		hotstuffProposal := model.SignedProposalFromFlow(proposal.Header)
 		s.voteAggregator.On("AddBlock", hotstuffProposal)
 		s.hotstuff.On("SubmitProposal", hotstuffProposal)
 		expectedBroadcastMsg := messages.NewClusterBlockProposal(&proposal)

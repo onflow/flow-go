@@ -2,8 +2,10 @@ package state
 
 import (
 	"fmt"
+	"math"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -37,6 +39,10 @@ type StateParameters struct {
 
 	maxKeySizeAllowed   uint64
 	maxValueSizeAllowed uint64
+}
+
+type ExecutionParameters struct {
+	meter.MeterParameters
 }
 
 func DefaultParameters() StateParameters {
@@ -103,10 +109,23 @@ func NewExecutionState(
 	snapshot snapshot.StorageSnapshot,
 	params StateParameters,
 ) *ExecutionState {
+	return NewExecutionStateWithSpockStateHasher(
+		snapshot,
+		params,
+		DefaultSpockSecretHasher,
+	)
+}
+
+// NewExecutionStateWithSpockStateHasher constructs a new state with a custom hasher
+func NewExecutionStateWithSpockStateHasher(
+	snapshot snapshot.StorageSnapshot,
+	params StateParameters,
+	getHasher func() hash.Hasher,
+) *ExecutionState {
 	m := meter.NewMeter(params.MeterParameters)
 	return &ExecutionState{
 		finalized:        false,
-		spockState:       newSpockState(snapshot),
+		spockState:       newSpockState(snapshot, getHasher),
 		meter:            m,
 		limitsController: newLimitsController(params),
 	}
@@ -115,19 +134,19 @@ func NewExecutionState(
 // NewChildWithMeterParams generates a new child state using the provide meter
 // parameters.
 func (state *ExecutionState) NewChildWithMeterParams(
-	params meter.MeterParameters,
+	params ExecutionParameters,
 ) *ExecutionState {
 	return &ExecutionState{
 		finalized:        false,
 		spockState:       state.spockState.NewChild(),
-		meter:            meter.NewMeter(params),
+		meter:            meter.NewMeter(params.MeterParameters),
 		limitsController: state.limitsController,
 	}
 }
 
 // NewChild generates a new child state using the parent's meter parameters.
 func (state *ExecutionState) NewChild() *ExecutionState {
-	return state.NewChildWithMeterParams(state.meter.MeterParameters)
+	return state.NewChildWithMeterParams(state.ExecutionParameters())
 }
 
 // InteractionUsed returns the amount of ledger interaction (total ledger byte read + total ledger byte written)
@@ -219,6 +238,20 @@ func (state *ExecutionState) ComputationAvailable(kind common.ComputationKind, i
 		return state.meter.ComputationAvailable(kind, intensity)
 	}
 	return true
+}
+
+// ComputationRemaining returns the available computation capacity without metering
+func (state *ExecutionState) ComputationRemaining(kind common.ComputationKind) uint {
+	if state.finalized {
+		// if state is finalized return 0
+		return 0
+	}
+
+	if state.enforceLimits {
+		return state.meter.ComputationRemaining(kind)
+	}
+
+	return math.MaxUint
 }
 
 // TotalComputationUsed returns total computation used
@@ -321,6 +354,12 @@ func (state *ExecutionState) checkSize(
 			state.maxValueSizeAllowed)
 	}
 	return nil
+}
+
+func (state *ExecutionState) ExecutionParameters() ExecutionParameters {
+	return ExecutionParameters{
+		MeterParameters: state.meter.MeterParameters,
+	}
 }
 
 func (state *ExecutionState) readSetSize() int {

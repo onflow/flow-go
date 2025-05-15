@@ -33,8 +33,9 @@ const (
 )
 
 type collectionInfo struct {
-	blockId    flow.Identifier
-	blockIdStr string
+	blockId     flow.Identifier
+	blockIdStr  string
+	blockHeight uint64
 
 	collectionIndex int
 	*entity.CompleteCollection
@@ -114,11 +115,11 @@ type blockComputer struct {
 	spockHasher           hash.Hasher
 	receiptHasher         hash.Hasher
 	colResCons            []result.ExecutedCollectionConsumer
-	protocolState         protocol.State
+	protocolState         protocol.SnapshotExecutionSubsetProvider
 	maxConcurrency        int
 }
 
-func SystemChunkContext(vmCtx fvm.Context) fvm.Context {
+func SystemChunkContext(vmCtx fvm.Context, metrics module.ExecutionMetrics) fvm.Context {
 	return fvm.NewContextFromParent(
 		vmCtx,
 		fvm.WithContractDeploymentRestricted(false),
@@ -126,11 +127,12 @@ func SystemChunkContext(vmCtx fvm.Context) fvm.Context {
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithTransactionFeesEnabled(false),
-		fvm.WithServiceEventCollectionEnabled(),
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
 		fvm.WithMemoryAndInteractionLimitsDisabled(),
 		// only the system transaction is allowed to call the block entropy provider
 		fvm.WithRandomSourceHistoryCallAllowed(true),
+		fvm.WithMetricsReporter(metrics),
+		fvm.WithAccountStorageLimit(false),
 	)
 }
 
@@ -145,7 +147,7 @@ func NewBlockComputer(
 	signer module.Local,
 	executionDataProvider provider.Provider,
 	colResCons []result.ExecutedCollectionConsumer,
-	state protocol.State,
+	state protocol.SnapshotExecutionSubsetProvider,
 	maxConcurrency int,
 ) (BlockComputer, error) {
 	if maxConcurrency < 1 {
@@ -158,7 +160,7 @@ func NewBlockComputer(
 		return nil, fmt.Errorf("program cache writes are not allowed in scripts on Execution nodes")
 	}
 
-	systemChunkCtx := SystemChunkContext(vmCtx)
+	systemChunkCtx := SystemChunkContext(vmCtx, metrics)
 	vmCtx = fvm.NewContextFromParent(
 		vmCtx,
 		fvm.WithMetricsReporter(metrics),
@@ -219,13 +221,7 @@ func (e *blockComputer) queueTransactionRequests(
 	collectionCtx := fvm.NewContextFromParent(
 		e.vmCtx,
 		fvm.WithBlockHeader(blockHeader),
-		// `protocol.Snapshot` implements `EntropyProvider` interface
-		// Note that `Snapshot` possible errors for RandomSource() are:
-		// - storage.ErrNotFound if the QC is unknown.
-		// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
-		// However, at this stage, snapshot reference block should be known and the QC should also be known,
-		// so no error is expected in normal operations, as required by `EntropyProvider`.
-		fvm.WithEntropyProvider(e.protocolState.AtBlockID(blockId)),
+		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(blockId)),
 	)
 
 	for idx, collection := range rawCollections {
@@ -239,6 +235,7 @@ func (e *blockComputer) queueTransactionRequests(
 		collectionInfo := collectionInfo{
 			blockId:             blockId,
 			blockIdStr:          blockIdStr,
+			blockHeight:         blockHeader.Height,
 			collectionIndex:     idx,
 			CompleteCollection:  collection,
 			isSystemTransaction: false,
@@ -254,19 +251,12 @@ func (e *blockComputer) queueTransactionRequests(
 				i == len(collection.Transactions)-1)
 			txnIndex += 1
 		}
-
 	}
 
 	systemCtx := fvm.NewContextFromParent(
 		e.systemChunkCtx,
 		fvm.WithBlockHeader(blockHeader),
-		// `protocol.Snapshot` implements `EntropyProvider` interface
-		// Note that `Snapshot` possible errors for RandomSource() are:
-		// - storage.ErrNotFound if the QC is unknown.
-		// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
-		// However, at this stage, snapshot reference block should be known and the QC should also be known,
-		// so no error is expected in normal operations, as required by `EntropyProvider`.
-		fvm.WithEntropyProvider(e.protocolState.AtBlockID(blockId)),
+		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(blockId)),
 	)
 	systemCollectionLogger := systemCtx.Logger.With().
 		Str("block_id", blockIdStr).
@@ -279,6 +269,7 @@ func (e *blockComputer) queueTransactionRequests(
 	systemCollectionInfo := collectionInfo{
 		blockId:         blockId,
 		blockIdStr:      blockIdStr,
+		blockHeight:     blockHeader.Height,
 		collectionIndex: len(rawCollections),
 		CompleteCollection: &entity.CompleteCollection{
 			Transactions: []*flow.TransactionBody{systemTxnBody},
@@ -302,6 +293,26 @@ func numberOfTransactionsInBlock(collections []*entity.CompleteCollection) int {
 	}
 
 	return numTxns
+}
+
+// selectChunkConstructorForProtocolVersion selects a [flow.Chunk] constructor to
+// use when constructing the [flow.ExecutionResult] for the input block. We select
+// based on the protocol version at the input block. When we process the version upgrade
+// event to protocol version 2, we begin populating the new [flow.ChunkBody.ServiceEventCount]
+// field.
+// Deprecated:
+// TODO(mainnet27, #6773): remove this function https://github.com/onflow/flow-go/issues/6773
+func (e *blockComputer) selectChunkConstructorForProtocolVersion(blockID flow.Identifier) (flow.ChunkConstructor, error) {
+	ps, err := e.protocolState.AtBlockID(blockID).ProtocolState()
+	if err != nil {
+		return nil, err
+	}
+	version := ps.GetProtocolStateVersion()
+	if version < 2 {
+		return flow.NewChunk_ProtocolVersion1, nil
+	} else {
+		return flow.NewChunk, nil
+	}
 }
 
 func (e *blockComputer) executeBlock(
@@ -341,6 +352,13 @@ func (e *blockComputer) executeBlock(
 
 	numTxns := numberOfTransactionsInBlock(rawCollections)
 
+	// We temporarily support chunk models associated with both protocol versions 1 and 2.
+	// TODO(mainnet27, #6773): remove this https://github.com/onflow/flow-go/issues/6773
+	versionedChunkConstructor, err := e.selectChunkConstructorForProtocolVersion(blockId)
+	if err != nil {
+		return nil, fmt.Errorf("could not select chunk constructor for current protocol version: %w", err)
+	}
+
 	collector := newResultCollector(
 		e.tracer,
 		blockSpan,
@@ -355,6 +373,7 @@ func (e *blockComputer) executeBlock(
 		numTxns,
 		e.colResCons,
 		baseSnapshot,
+		versionedChunkConstructor,
 	)
 	defer collector.Stop()
 

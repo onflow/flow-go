@@ -27,6 +27,9 @@ func init() {
 	SnapshotCmd.Flags().Uint64Var(&flagHeight, "height", 0,
 		"Block height")
 
+	SnapshotCmd.Flags().StringVar(&flagBlockID, "block-id", "",
+		"Block ID (hex-encoded, 64 characters)")
+
 	SnapshotCmd.Flags().BoolVar(&flagFinal, "final", false,
 		"get finalized block")
 
@@ -44,7 +47,11 @@ func init() {
 }
 
 func runSnapshot(*cobra.Command, []string) {
-	db := common.InitStorage(flagDatadir)
+	flagDBs := common.ReadDBFlags()
+	db, err := common.InitBadgerStorage(flagDBs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not init badger db")
+	}
 	defer db.Close()
 
 	storages := common.InitStorages(db)
@@ -58,6 +65,10 @@ func runSnapshot(*cobra.Command, []string) {
 	if flagHeight > 0 {
 		log.Info().Msgf("get snapshot by height: %v", flagHeight)
 		snapshot = state.AtHeight(flagHeight)
+	} else if flagBlockID != "" {
+		log.Info().Msgf("get snapshot by block ID: %v", flagBlockID)
+		blockID := flow.MustHexStringToIdentifier(flagBlockID)
+		snapshot = state.AtBlockID(blockID)
 	} else if flagFinal {
 		log.Info().Msgf("get last finalized snapshot")
 		snapshot = state.Final()

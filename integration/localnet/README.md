@@ -343,8 +343,8 @@ fun main(address: Address): UFix64 {
 Create new cadence contract file from [this template.](https://github.com/onflow/flow-core-contracts/blob/master/transactions/flowToken/transfer_tokens.cdc)
 Make sure that contract imports have values that match your cli config, following the CLI configuration chapter above it should look like:
 ```
-import FungibleToken from "cadence/contracts/FungibleToken.cdc"
-import FlowToken from "cadence/contracts/FlowToken.cdc"
+import "FungibleToken"
+import "FlowToken"
 ```
 Send the transaction with this contract to localnet:
 ```

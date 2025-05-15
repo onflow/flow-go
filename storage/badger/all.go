@@ -5,6 +5,8 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
@@ -19,38 +21,30 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	qcs := NewQuorumCertificates(metrics, db, DefaultCacheSize)
 	setups := NewEpochSetups(metrics, db)
 	epochCommits := NewEpochCommits(metrics, db)
-	protocolState := NewProtocolState(metrics, setups, epochCommits, db,
-		DefaultProtocolStateCacheSize, DefaultProtocolStateByBlockIDCacheSize)
+	epochProtocolStateEntries := NewEpochProtocolStateEntries(metrics, setups, epochCommits, db,
+		DefaultEpochProtocolStateCacheSize, DefaultProtocolStateIndexCacheSize)
 	protocolKVStore := NewProtocolKVStore(metrics, db, DefaultProtocolKVStoreCacheSize, DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeacons := NewVersionBeacons(db)
+	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(db))
 
-	commits := NewCommits(metrics, db)
 	transactions := NewTransactions(metrics, db)
-	transactionResults := NewTransactionResults(metrics, db, 10000)
 	collections := NewCollections(db, transactions)
-	events := NewEvents(metrics, db)
-	chunkDataPacks := NewChunkDataPacks(metrics, db, collections, 1000)
 
 	return &storage.All{
-		Headers:            headers,
-		Guarantees:         guarantees,
-		Seals:              seals,
-		Index:              index,
-		Payloads:           payloads,
-		Blocks:             blocks,
-		QuorumCertificates: qcs,
-		Setups:             setups,
-		EpochCommits:       epochCommits,
-		EpochProtocolState: protocolState,
-		ProtocolKVStore:    protocolKVStore,
-		VersionBeacons:     versionBeacons,
-		Results:            results,
-		Receipts:           receipts,
-		ChunkDataPacks:     chunkDataPacks,
-		Commits:            commits,
-		Transactions:       transactions,
-		TransactionResults: transactionResults,
-		Collections:        collections,
-		Events:             events,
+		Headers:                   headers,
+		Guarantees:                guarantees,
+		Seals:                     seals,
+		Index:                     index,
+		Payloads:                  payloads,
+		Blocks:                    blocks,
+		QuorumCertificates:        qcs,
+		Setups:                    setups,
+		EpochCommits:              epochCommits,
+		EpochProtocolStateEntries: epochProtocolStateEntries,
+		ProtocolKVStore:           protocolKVStore,
+		VersionBeacons:            versionBeacons,
+		Results:                   results,
+		Receipts:                  receipts,
+		Transactions:              transactions,
+		Collections:               collections,
 	}
 }

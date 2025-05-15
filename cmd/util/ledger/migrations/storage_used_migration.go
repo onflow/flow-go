@@ -4,148 +4,143 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+
+	"github.com/onflow/cadence/common"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
-	"github.com/onflow/cadence/runtime/common"
-
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/fvm/environment"
-	fvm "github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// AccountUsageMigrator iterates through each payload, and calculate the storage usage
-// and update the accounts status with the updated storage usage
-type AccountUsageMigrator struct {
+// AccountUsageMigration iterates through each payload, and calculate the storage usage
+// and update the accounts status with the updated storage usage. It also upgrades the
+// account status registers to the latest version.
+type AccountUsageMigration struct {
 	log zerolog.Logger
+	rw  reporters.ReportWriter
 }
 
-var _ AccountBasedMigration = &AccountUsageMigrator{}
+var _ AccountBasedMigration = &AccountUsageMigration{}
 
-func (m *AccountUsageMigrator) InitMigration(
+func NewAccountUsageMigration(rw reporters.ReportWriterFactory) *AccountUsageMigration {
+	return &AccountUsageMigration{
+		rw: rw.ReportWriter("account-usage-migration"),
+	}
+}
+
+func (m *AccountUsageMigration) InitMigration(
 	log zerolog.Logger,
-	_ []*ledger.Payload,
+	_ *registers.ByAccount,
 	_ int,
 ) error {
-	m.log = log.With().Str("component", "AccountUsageMigrator").Logger()
+	m.log = log.With().Str("component", "AccountUsageMigration").Logger()
 	return nil
 }
 
-const oldAccountStatusSize = 25
-
-func (m *AccountUsageMigrator) Close() error {
+func (m *AccountUsageMigration) Close() error {
 	return nil
 }
 
-func (m *AccountUsageMigrator) MigrateAccount(
+func (m *AccountUsageMigration) MigrateAccount(
 	_ context.Context,
 	address common.Address,
-	payloads []*ledger.Payload,
-) ([]*ledger.Payload, error) {
+	accountRegisters *registers.AccountRegisters,
+) error {
 
 	var status *environment.AccountStatus
-	var statusIndex int
-	actualSize := uint64(0)
-	for i, payload := range payloads {
-		key, err := payload.Key()
-		if err != nil {
-			return nil, err
-		}
-		if isAccountKey(key) {
-			statusIndex = i
-			status, err = environment.AccountStatusFromBytes(payload.Value())
+	var statusValue []byte
+	actualUsed := uint64(0)
+
+	// Find the account status register,
+	// and calculate the storage usage
+	err := accountRegisters.ForEach(func(owner, key string, value []byte) error {
+
+		if key == flow.AccountStatusKey {
+			statusValue = value
+
+			var err error
+			status, err = environment.AccountStatusFromBytes(value)
 			if err != nil {
-				return nil, fmt.Errorf("could not parse account status: %w", err)
+				return fmt.Errorf("could not parse account status: %w", err)
 			}
-
 		}
 
-		size, err := payloadSize(key, payload)
-		if err != nil {
-			return nil, err
-		}
-		actualSize += size
+		actualUsed += uint64(environment.RegisterSize(
+			flow.RegisterID{
+				Owner: owner,
+				Key:   key,
+			},
+			value,
+		))
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf(
+			"could not iterate through registers of account %s: %w",
+			address.HexWithPrefix(),
+			err,
+		)
 	}
 
 	if status == nil {
-		return nil, fmt.Errorf("could not find account status for account %v", address.Hex())
+		log.Error().
+			Str("account", address.HexWithPrefix()).
+			Msgf("could not find account status register")
+		return fmt.Errorf("could not find account status register")
 	}
 
-	isOldVersionOfStatusRegister := len(payloads[statusIndex].Value()) == oldAccountStatusSize
+	// reading the status will upgrade the status to the latest version, so it might
+	// have a different size than the one in the register
+	newStatusValue := status.ToBytes()
+	statusSizeDiff := len(newStatusValue) - len(statusValue)
 
-	same := m.compareUsage(isOldVersionOfStatusRegister, status, actualSize)
-	if same {
-		// there is no problem with the usage, return
-		return payloads, nil
+	// the status size diff should be added to the actual size
+	if statusSizeDiff < 0 {
+		if uint64(-statusSizeDiff) > actualUsed {
+			log.Error().
+				Str("account", address.HexWithPrefix()).
+				Msgf("account storage used would be negative")
+			return fmt.Errorf("account storage used would be negative")
+		}
+
+		actualUsed = actualUsed - uint64(-statusSizeDiff)
+	} else if statusSizeDiff > 0 {
+		actualUsed = actualUsed + uint64(statusSizeDiff)
 	}
 
-	if isOldVersionOfStatusRegister {
-		// size will grow by 8 bytes because of the on-the-fly
-		// migration of account status in AccountStatusFromBytes
-		actualSize += 8
+	currentUsed := status.StorageUsed()
+
+	// update storage used if the actual size is different from the size in the status register
+	// or if the status size is different.
+	if actualUsed != currentUsed || statusSizeDiff != 0 {
+		// update storage used
+		status.SetStorageUsed(actualUsed)
+
+		err = accountRegisters.Set(
+			string(address[:]),
+			flow.AccountStatusKey,
+			status.ToBytes(),
+		)
+		if err != nil {
+			return fmt.Errorf("could not update account status register: %w", err)
+		}
+
+		m.rw.Write(accountUsageMigrationReportData{
+			AccountAddress: address,
+			OldStorageUsed: currentUsed,
+			NewStorageUsed: actualUsed,
+		})
 	}
 
-	// update storage used
-	status.SetStorageUsed(actualSize)
-
-	newValue := status.ToBytes()
-	newPayload, err := newPayloadWithValue(payloads[statusIndex], newValue)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create new payload with value: %w", err)
-	}
-
-	payloads[statusIndex] = newPayload
-
-	return payloads, nil
+	return nil
 }
 
-func (m *AccountUsageMigrator) compareUsage(
-	isOldVersionOfStatusRegister bool,
-	status *environment.AccountStatus,
-	actualSize uint64,
-) bool {
-	oldSize := status.StorageUsed()
-	if isOldVersionOfStatusRegister {
-		// size will be reported as 8 bytes larger than the actual size due to on-the-fly
-		// migration of account status in AccountStatusFromBytes
-		oldSize -= 8
-	}
-
-	if oldSize != actualSize {
-		m.log.Warn().
-			Uint64("old_size", oldSize).
-			Uint64("new_size", actualSize).
-			Msg("account storage used usage mismatch")
-		return false
-	}
-	return true
-}
-
-// newPayloadWithValue returns a new payload with the key from the given payload, and
-// the value from the argument
-func newPayloadWithValue(payload *ledger.Payload, value ledger.Value) (*ledger.Payload, error) {
-	key, err := payload.Key()
-	if err != nil {
-		return nil, err
-	}
-	newPayload := ledger.NewPayload(key, value)
-	return newPayload, nil
-}
-
-func registerSize(id flow.RegisterID, p *ledger.Payload) int {
-	return fvm.RegisterSize(id, p.Value())
-}
-
-func payloadSize(key ledger.Key, payload *ledger.Payload) (uint64, error) {
-	id, err := convert.LedgerKeyToRegisterID(key)
-	if err != nil {
-		return 0, err
-	}
-
-	return uint64(registerSize(id, payload)), nil
-}
-
-func isAccountKey(key ledger.Key) bool {
-	return string(key.KeyParts[1].Value) == flow.AccountStatusKey
+type accountUsageMigrationReportData struct {
+	AccountAddress common.Address
+	OldStorageUsed uint64
+	NewStorageUsed uint64
 }

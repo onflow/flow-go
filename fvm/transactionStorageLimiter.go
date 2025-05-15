@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/fvm/environment"

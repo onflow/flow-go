@@ -1,18 +1,20 @@
 package sealing
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
@@ -36,6 +38,7 @@ type SealingEngineSuite struct {
 
 	// Sealing Engine
 	engine *Engine
+	cancel context.CancelFunc
 }
 
 func (s *SealingEngineSuite) SetupTest() {
@@ -58,7 +61,7 @@ func (s *SealingEngineSuite) SetupTest() {
 
 	s.engine = &Engine{
 		log:           unittest.Logger(),
-		unit:          engine.NewUnit(),
+		workerPool:    workerpool.New(defaultAssignmentCollectorsWorkerPoolCapacity),
 		core:          s.core,
 		me:            me,
 		engineMetrics: metrics,
@@ -75,10 +78,22 @@ func (s *SealingEngineSuite) SetupTest() {
 	err = s.engine.setupMessageHandler(unittest.NewSealingConfigs(RequiredApprovalsForSealConstructionTestingValue))
 	require.NoError(s.T(), err)
 
-	<-s.engine.Ready()
+	// setup ComponentManager and start the engine
+	s.engine.Component = s.engine.buildComponentManager()
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(s.T(), context.Background())
+	s.cancel = cancel
+	s.engine.Start(ctx)
+	unittest.AssertClosesBefore(s.T(), s.engine.Ready(), 10*time.Millisecond)
 }
 
-// TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
+func (s *SealingEngineSuite) TearDownTest() {
+	if s.cancel != nil {
+		s.cancel()
+		unittest.AssertClosesBefore(s.T(), s.engine.Done(), 10*time.Millisecond)
+	}
+}
+
+// TestOnFinalizedBlock tests if finalized block gets processed when sent through [Engine].
 // Tests the whole processing pipeline.
 func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 
@@ -95,7 +110,7 @@ func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 	s.core.AssertExpectations(s.T())
 }
 
-// TestOnBlockIncorporated tests if incorporated block gets processed when send through `Engine`.
+// TestOnBlockIncorporated tests if incorporated block gets processed when sent through [Engine].
 // Tests the whole processing pipeline.
 func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 	parentBlock := unittest.BlockHeaderFixture()
@@ -201,15 +216,11 @@ func (s *SealingEngineSuite) TestApprovalInvalidOrigin() {
 	s.core.AssertNumberOfCalls(s.T(), "ProcessApproval", 0)
 }
 
-// TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
+// TestProcessUnsupportedMessageType tests that Process correctly handles a case where invalid message type
 // was submitted from network layer.
 func (s *SealingEngineSuite) TestProcessUnsupportedMessageType() {
 	invalidEvent := uint64(42)
 	err := s.engine.Process("ch", unittest.IdentifierFixture(), invalidEvent)
 	// shouldn't result in error since byzantine inputs are expected
 	require.NoError(s.T(), err)
-	// in case of local processing error cannot be consumed since all inputs are trusted
-	err = s.engine.ProcessLocal(invalidEvent)
-	require.Error(s.T(), err)
-	require.True(s.T(), engine.IsIncompatibleInputTypeError(err))
 }

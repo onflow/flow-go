@@ -2,11 +2,12 @@ package types
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/sema"
 	gethCommon "github.com/onflow/go-ethereum/common"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -14,13 +15,13 @@ import (
 
 // FlowEVMSpecialAddressPrefixLen captures the number of prefix bytes with constant values for special accounts (extended precompiles and COAs).
 //
-// The prefix length should insure a high-enough level of security against finding a preimage using the hash
+// The prefix length should insure a high-enough level of security against finding a pre-image using the hash
 // function used for EVM addresses generation (Keccak256). This is required to avoid finding an EVM address
 // that is also a valid FlowEVM address.
 // The target (minimal) security in this case is the security level provided by EVM addresses.
 // Since EVM addresses are 160-bits long, they offer only 80 bits of security (collision resistance
 // offers the lowest level).
-// A preimage resistance of 80 bits requires the prefix to be at least 80-bits long (i.e 10 bytes).
+// A pre-image resistance of 80 bits requires the prefix to be at least 80-bits long (i.e 10 bytes).
 // When used as a prefix in EVM addresses (20-bytes long), a prefix length of 12 bytes
 // leaves a variable part of 8 bytes (64 bits).
 const FlowEVMSpecialAddressPrefixLen = 12
@@ -36,6 +37,8 @@ var (
 	FlowEVMExtendedPrecompileAddressPrefix = [FlowEVMSpecialAddressPrefixLen]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
 	// Prefix for the COA addresses
 	FlowEVMCOAAddressPrefix = [FlowEVMSpecialAddressPrefixLen]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}
+	// Coinbase address
+	CoinbaseAddress = Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0}
 )
 
 // Address is an EVM-compatible address
@@ -76,7 +79,7 @@ func NewAddressFromBytes(inp []byte) Address {
 	return Address(gethCommon.BytesToAddress(inp))
 }
 
-const CadenceOwnedAccountCreatedTypeAddressBytesFieldName = "addressBytes"
+const CadenceOwnedAccountCreatedTypeAddressFieldName = "address"
 
 func COAAddressFromFlowCOACreatedEvent(evmContractAddress flow.Address, event flow.Event) (Address, error) {
 	// check the type first
@@ -95,19 +98,19 @@ func COAAddressFromFlowCOACreatedEvent(evmContractAddress flow.Address, event fl
 		return Address{}, fmt.Errorf("event data is not a cadence event")
 	}
 
-	addressBytesValue := cadence.SearchFieldByName(
+	addressValue := cadence.SearchFieldByName(
 		cadenceEvent,
-		CadenceOwnedAccountCreatedTypeAddressBytesFieldName,
+		CadenceOwnedAccountCreatedTypeAddressFieldName,
 	)
 
-	addressBytesArray, ok := addressBytesValue.(cadence.Array)
+	addressString, ok := addressValue.(cadence.String)
 	if !ok {
-		return Address{}, fmt.Errorf("addressBytes is not an array")
+		return Address{}, fmt.Errorf("address is not a string")
 	}
 
-	addressBytes := make([]byte, AddressLength)
-	for i, v := range addressBytesArray.Values {
-		addressBytes[i] = byte(v.(cadence.UInt8))
+	addressBytes, err := hex.DecodeString(string(addressString))
+	if err != nil {
+		return Address{}, err
 	}
 
 	return NewAddressFromBytes(addressBytes), nil

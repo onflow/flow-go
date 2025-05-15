@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 // Core contains the central business logic for the main consensus' compliance engine.
@@ -46,8 +45,8 @@ type Core struct {
 	payloads                  storage.Payloads
 	state                     protocol.ParticipantState
 	// track latest finalized view/height - used to efficiently drop outdated or too-far-ahead blocks
-	finalizedView     counters.StrictMonotonousCounter
-	finalizedHeight   counters.StrictMonotonousCounter
+	finalizedView     counters.StrictMonotonicCounter
+	finalizedHeight   counters.StrictMonotonicCounter
 	pending           module.PendingBlockBuffer // pending block cache
 	sync              module.BlockRequester
 	hotstuff          module.HotStuff
@@ -133,19 +132,23 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal])
 
 	log := c.log.With().
 		Hex("origin_id", proposal.OriginID[:]).
-		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
-		Hex("block_id", logging.Entity(header)).
+		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
-		Hex("payload_hash", header.PayloadHash[:]).
-		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Hex("parent_signer_indices", header.ParentVoterIndices).
-		Str("traceID", traceID). // traceID is used to connect logs to traces
-		Uint64("finalized_height", finalHeight).
-		Uint64("finalized_view", finalView).
+		Time("timestamp", header.Timestamp).
 		Logger()
+	if log.Debug().Enabled() {
+		log = log.With().
+			Uint64("finalized_height", finalHeight).
+			Uint64("finalized_view", finalView).
+			Str("chain_id", header.ChainID.String()).
+			Hex("payload_hash", header.PayloadHash[:]).
+			Hex("parent_signer_indices", header.ParentVoterIndices).
+			Str("traceID", traceID). // traceID is used to connect logs to traces
+			Logger()
+	}
 	log.Info().Msg("block proposal received")
 
 	// drop proposals below the finalized threshold
@@ -271,7 +274,7 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*flow.Block]) 
 			})
 
 			// notify VoteAggregator about the invalid block
-			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(header))
+			err = c.voteAggregator.InvalidBlock(model.SignedProposalFromFlow(header))
 			if err != nil {
 				if mempool.IsBelowPrunedThresholdError(err) {
 					log.Warn().Msg("received invalid block, but is below pruned threshold")
@@ -327,7 +330,7 @@ func (c *Core) processBlockProposal(proposal *flow.Block) error {
 	)
 	defer span.End()
 
-	hotstuffProposal := model.ProposalFromFlow(header)
+	hotstuffProposal := model.SignedProposalFromFlow(header)
 	err := c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
 		if model.IsInvalidProposalError(err) {
@@ -341,7 +344,7 @@ func (c *Core) processBlockProposal(proposal *flow.Block) error {
 			//    1. the proposer maliciously created the block for a view very far in the future (it's invalid)
 			//      -> in this case we can disregard the block
 			//    2. no blocks have been finalized within the epoch commitment deadline, and the epoch ended
-			//       (breaking a critical assumption - see EpochCommitSafetyThreshold in protocol.Params for details)
+			//       (breaking a critical assumption - see FinalizationSafetyThreshold in protocol.Params for details)
 			//      -> in this case, the network has encountered a critical failure
 			//  - we assume in general that Case 2 will not happen, therefore this must be Case 1 - an invalid block
 			return engine.NewUnverifiableInputError("unverifiable proposal with view from unknown epoch: %w", err)
@@ -360,7 +363,7 @@ func (c *Core) processBlockProposal(proposal *flow.Block) error {
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Logger()
-	log.Info().Msg("processing block proposal")
+	log.Debug().Msg("processing block proposal")
 
 	// see if the block is a valid extension of the protocol state
 	block := &flow.Block{
@@ -387,7 +390,7 @@ func (c *Core) processBlockProposal(proposal *flow.Block) error {
 
 	// submit the model to hotstuff for processing
 	// TODO replace with pubsub https://github.com/dapperlabs/flow-go/issues/6395
-	log.Info().Msg("forwarding block proposal to hotstuff")
+	log.Debug().Msg("forwarding block proposal to hotstuff")
 	c.hotstuff.SubmitProposal(hotstuffProposal)
 
 	return nil

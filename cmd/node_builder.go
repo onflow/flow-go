@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/onflow/crypto"
@@ -26,14 +27,19 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/dbops"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 const NotSet = "not set"
 
 type BuilderFunc func(nodeConfig *NodeConfig) error
-type ReadyDoneFactory func(node *NodeConfig) (module.ReadyDoneAware, error)
+
+// ReadyDoneFactory is a function that returns a ReadyDoneAware component or an error if
+// the factory cannot create the component
+type ReadyDoneFactory[Input any] func(input Input) (module.ReadyDoneAware, error)
 
 // NodeBuilder declares the initialization methods needed to bootstrap up a Flow node
 type NodeBuilder interface {
@@ -73,7 +79,7 @@ type NodeBuilder interface {
 	// The ReadyDoneFactory may return either a `Component` or `ReadyDoneAware` instance.
 	// In both cases, the object is started according to its interface when the node is run,
 	// and the node will wait for the component to exit gracefully.
-	Component(name string, f ReadyDoneFactory) NodeBuilder
+	Component(name string, f ReadyDoneFactory[*NodeConfig]) NodeBuilder
 
 	// DependableComponent adds a new component to the node that conforms to the ReadyDoneAware
 	// interface. The builder will wait until all of the components in the dependencies list are ready
@@ -86,7 +92,7 @@ type NodeBuilder interface {
 	// IMPORTANT: Dependable components are started in parallel with no guaranteed run order, so all
 	// dependencies must be initialized outside of the ReadyDoneFactory, and their `Ready()` method
 	// MUST be idempotent.
-	DependableComponent(name string, f ReadyDoneFactory, dependencies *DependencyList) NodeBuilder
+	DependableComponent(name string, f ReadyDoneFactory[*NodeConfig], dependencies *DependencyList) NodeBuilder
 
 	// RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
 	// interface, and calls the provided error handler when an irrecoverable error is encountered.
@@ -94,7 +100,7 @@ type NodeBuilder interface {
 	// can/should be independently restarted when an irrecoverable error is encountered.
 	//
 	// Any irrecoverable errors thrown by the component will be passed to the provided error handler.
-	RestartableComponent(name string, f ReadyDoneFactory, errorHandler component.OnError) NodeBuilder
+	RestartableComponent(name string, f ReadyDoneFactory[*NodeConfig], errorHandler component.OnError) NodeBuilder
 
 	// ShutdownFunc adds a callback function that is called after all components have exited.
 	// All shutdown functions are called regardless of errors returned by previous callbacks. Any
@@ -148,6 +154,11 @@ type BaseConfig struct {
 	DynamicStartupEpoch         string
 	DynamicStartupSleepInterval time.Duration
 	datadir                     string
+	pebbleDir                   string
+	pebbleCheckpointsDir        string
+	DBOps                       string
+	badgerDB                    *badger.DB
+	pebbleDB                    *pebble.DB
 	secretsdir                  string
 	secretsDBEnabled            bool
 	InsecureSecretsDB           bool
@@ -161,7 +172,6 @@ type BaseConfig struct {
 	MetricsEnabled              bool
 	guaranteesCacheSize         uint
 	receiptsCacheSize           uint
-	db                          *badger.DB
 	HeroCacheMetricsEnable      bool
 	SyncCoreConfig              chainsync.Config
 	CodecFactory                func() network.Codec
@@ -172,6 +182,13 @@ type BaseConfig struct {
 
 	// FlowConfig Flow configuration.
 	FlowConfig config.FlowConfig
+
+	// DhtSystemEnabled configures whether the DHT system is enabled on Access and Execution nodes.
+	DhtSystemEnabled bool
+
+	// BitswapReprovideEnabled configures whether the Bitswap reprovide mechanism is enabled.
+	// This is only meaningful to Access and Execution nodes.
+	BitswapReprovideEnabled bool
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -188,6 +205,8 @@ type NodeConfig struct {
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
 	DB                *badger.DB
+	PebbleDB          *pebble.DB
+	ProtocolDB        storage.DB
 	SecretsDB         *badger.DB
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
@@ -235,7 +254,7 @@ type StateExcerptAtBoot struct {
 	SealedRootBlock     *flow.Block             // The last sealed block when bootstrapped.
 	RootQC              *flow.QuorumCertificate // QC for Finalized Root Block
 	RootResult          *flow.ExecutionResult   // Result for SealedRootBlock
-	RootSeal            *flow.Seal              //Seal for RootResult
+	RootSeal            *flow.Seal              // Seal for RootResult
 	RootChainID         flow.ChainID
 	SporkID             flow.Identifier
 	LastFinalizedHeader *flow.Header // last finalized header when the node boots up
@@ -243,6 +262,7 @@ type StateExcerptAtBoot struct {
 
 func DefaultBaseConfig() *BaseConfig {
 	datadir := "/data/protocol"
+	pebbleDir := "/data/protocol-pebble"
 
 	// NOTE: if the codec used in the network component is ever changed any code relying on
 	// the message format specific to the codec must be updated. i.e: the AuthorizedSenderValidator.
@@ -259,6 +279,10 @@ func DefaultBaseConfig() *BaseConfig {
 		ObserverMode:     false,
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
+		pebbleDir:        pebbleDir,
+		DBOps:            string(dbops.BadgerTransaction), // "badger-transaction" (default) or "batch-update"
+		badgerDB:         nil,
+		pebbleDB:         nil,
 		secretsdir:       NotSet,
 		secretsDBEnabled: true,
 		level:            "info",
@@ -280,26 +304,28 @@ func DefaultBaseConfig() *BaseConfig {
 			Duration: 10 * time.Second,
 		},
 
-		HeroCacheMetricsEnable: false,
-		SyncCoreConfig:         chainsync.DefaultConfig(),
-		CodecFactory:           codecFactory,
-		ComplianceConfig:       compliance.DefaultConfig(),
+		HeroCacheMetricsEnable:  false,
+		SyncCoreConfig:          chainsync.DefaultConfig(),
+		CodecFactory:            codecFactory,
+		ComplianceConfig:        compliance.DefaultConfig(),
+		DhtSystemEnabled:        true,
+		BitswapReprovideEnabled: true,
 	}
 }
 
 // DependencyList is a slice of ReadyDoneAware implementations that are used by DependableComponent
 // to define the list of dependencies that must be ready before starting the component.
 type DependencyList struct {
-	components []module.ReadyDoneAware
+	Components []module.ReadyDoneAware
 }
 
 func NewDependencyList(components ...module.ReadyDoneAware) *DependencyList {
 	return &DependencyList{
-		components: components,
+		Components: components,
 	}
 }
 
 // Add adds a new ReadyDoneAware implementation to the list of dependencies.
 func (d *DependencyList) Add(component module.ReadyDoneAware) {
-	d.components = append(d.components, component)
+	d.Components = append(d.Components, component)
 }

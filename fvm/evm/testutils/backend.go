@@ -6,23 +6,27 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/cadence/stdlib"
+	"github.com/rs/zerolog"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
-var TestFlowEVMRootAddress = flow.BytesToAddress([]byte("FlowEVM"))
+var TestFlowEVMRootAddress = flow.Address{1, 2, 3, 4}
 var TestComputationLimit = uint(100_000_000)
 
 func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(flow.Address)) {
@@ -40,6 +44,9 @@ func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 		TestBlockInfo:               getSimpleBlockStore(),
 		TestRandomGenerator:         getSimpleRandomGenerator(),
 		TestContractFunctionInvoker: &TestContractFunctionInvoker{},
+		TestTracer:                  &TestTracer{},
+		TestMetricsReporter:         &TestMetricsReporter{},
+		TestLoggerProvider:          &TestLoggerProvider{},
 	}
 	f(tb)
 }
@@ -53,12 +60,20 @@ func ConvertToCadence(data []byte) []cadence.Value {
 }
 
 func fullKey(owner, key []byte) string {
-	return string(owner) + "~" + string(key)
+	return fmt.Sprintf("%x~%s", owner, key)
 }
 
 func GetSimpleValueStore() *TestValueStore {
-	data := make(map[string][]byte)
-	allocator := make(map[string]uint64)
+	return GetSimpleValueStorePopulated(
+		make(map[string][]byte),
+		make(map[string]uint64),
+	)
+}
+
+func GetSimpleValueStorePopulated(
+	data map[string][]byte,
+	allocator map[string]uint64,
+) *TestValueStore {
 	bytesRead := 0
 	bytesWritten := 0
 	return &TestValueStore{
@@ -80,7 +95,7 @@ func GetSimpleValueStore() *TestValueStore {
 			bytesRead += len(fk) + len(value)
 			return len(value) > 0, nil
 		},
-		AllocateStorageIndexFunc: func(owner []byte) (atree.StorageIndex, error) {
+		AllocateSlabIndexFunc: func(owner []byte) (atree.SlabIndex, error) {
 			index := allocator[string(owner)]
 			// TODO: figure out why it result in a collision
 			if index == 0 {
@@ -91,7 +106,7 @@ func GetSimpleValueStore() *TestValueStore {
 			binary.BigEndian.PutUint64(data[:], index)
 			bytesRead += len(owner) + 8
 			bytesWritten += len(owner) + 8
-			return atree.StorageIndex(data), nil
+			return atree.SlabIndex(data), nil
 		},
 		TotalStorageSizeFunc: func() int {
 			size := 0
@@ -116,6 +131,33 @@ func GetSimpleValueStore() *TestValueStore {
 			bytesRead = 0
 			bytesWritten = 0
 		},
+
+		CloneFunc: func() *TestValueStore {
+			// clone data
+			newData := make(map[string][]byte)
+			for k, v := range data {
+				newData[k] = v
+			}
+			newAllocator := make(map[string]uint64)
+			for k, v := range allocator {
+				newAllocator[k] = v
+			}
+			// clone allocator
+			return GetSimpleValueStorePopulated(newData, newAllocator)
+		},
+
+		DumpFunc: func() (map[string][]byte, map[string]uint64) {
+			// clone data
+			newData := make(map[string][]byte)
+			for k, v := range data {
+				newData[k] = v
+			}
+			newAllocator := make(map[string]uint64)
+			for k, v := range allocator {
+				newAllocator[k] = v
+			}
+			return newData, newAllocator
+		},
 	}
 }
 
@@ -123,12 +165,15 @@ func getSimpleEventEmitter() *testEventEmitter {
 	events := make(flow.EventsList, 0)
 	return &testEventEmitter{
 		emitEvent: func(event cadence.Event) error {
-			payload, err := jsoncdc.Encode(event)
+			payload, err := ccf.Encode(event)
 			if err != nil {
 				return err
 			}
-
-			events = append(events, flow.Event{Type: flow.EventType(event.EventType.QualifiedIdentifier), Payload: payload})
+			eventType := flow.EventType(event.EventType.ID())
+			events = append(events, flow.Event{
+				Type:    eventType,
+				Payload: payload,
+			})
 			return nil
 		},
 		events: func() flow.EventsList {
@@ -185,6 +230,9 @@ type TestBackend struct {
 	*TestRandomGenerator
 	*TestContractFunctionInvoker
 	*testUUIDGenerator
+	*TestTracer
+	*TestMetricsReporter
+	*TestLoggerProvider
 }
 
 var _ types.Backend = &TestBackend{}
@@ -208,15 +256,17 @@ func (tb *TestBackend) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 }
 
 type TestValueStore struct {
-	GetValueFunc             func(owner, key []byte) ([]byte, error)
-	SetValueFunc             func(owner, key, value []byte) error
-	ValueExistsFunc          func(owner, key []byte) (bool, error)
-	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
-	TotalStorageSizeFunc     func() int
-	TotalBytesReadFunc       func() int
-	TotalBytesWrittenFunc    func() int
-	TotalStorageItemsFunc    func() int
-	ResetStatsFunc           func()
+	GetValueFunc          func(owner, key []byte) ([]byte, error)
+	SetValueFunc          func(owner, key, value []byte) error
+	ValueExistsFunc       func(owner, key []byte) (bool, error)
+	AllocateSlabIndexFunc func(owner []byte) (atree.SlabIndex, error)
+	TotalStorageSizeFunc  func() int
+	TotalBytesReadFunc    func() int
+	TotalBytesWrittenFunc func() int
+	TotalStorageItemsFunc func() int
+	ResetStatsFunc        func()
+	CloneFunc             func() *TestValueStore
+	DumpFunc              func() (map[string][]byte, map[string]uint64)
 }
 
 var _ environment.ValueStore = &TestValueStore{}
@@ -242,11 +292,11 @@ func (vs *TestValueStore) ValueExists(owner, key []byte) (bool, error) {
 	return vs.ValueExistsFunc(owner, key)
 }
 
-func (vs *TestValueStore) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	if vs.AllocateStorageIndexFunc == nil {
+func (vs *TestValueStore) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
+	if vs.AllocateSlabIndexFunc == nil {
 		panic("method not set")
 	}
-	return vs.AllocateStorageIndexFunc(owner)
+	return vs.AllocateSlabIndexFunc(owner)
 }
 
 func (vs *TestValueStore) TotalBytesRead() int {
@@ -282,6 +332,20 @@ func (vs *TestValueStore) ResetStats() {
 		panic("method not set")
 	}
 	vs.ResetStatsFunc()
+}
+
+func (vs *TestValueStore) Clone() *TestValueStore {
+	if vs.CloneFunc == nil {
+		panic("method not set")
+	}
+	return vs.CloneFunc()
+}
+
+func (vs *TestValueStore) Dump() (map[string][]byte, map[string]uint64) {
+	if vs.DumpFunc == nil {
+		panic("method not set")
+	}
+	return vs.DumpFunc()
 }
 
 type testMeter struct {
@@ -496,4 +560,72 @@ func (t *testUUIDGenerator) GenerateUUID() (uint64, error) {
 		panic("generateUUID method is not set")
 	}
 	return t.generateUUID()
+}
+
+type TestTracer struct {
+	StartChildSpanFunc func(trace.SpanName, ...otelTrace.SpanStartOption) tracing.TracerSpan
+}
+
+var _ environment.Tracer = &TestTracer{}
+
+func (tt *TestTracer) StartChildSpan(
+	name trace.SpanName,
+	options ...otelTrace.SpanStartOption,
+) tracing.TracerSpan {
+	// if not set we use noop tracer
+	if tt.StartChildSpanFunc == nil {
+		return tracing.NewMockTracerSpan()
+	}
+	return tt.StartChildSpanFunc(name, options...)
+}
+
+func (tt *TestTracer) ExpectedSpan(t *testing.T, expected trace.SpanName) {
+	tt.StartChildSpanFunc = func(
+		sn trace.SpanName,
+		sso ...otelTrace.SpanStartOption,
+	) tracing.TracerSpan {
+		require.Equal(t, expected, sn)
+		return tracing.NewMockTracerSpan()
+	}
+}
+
+type TestMetricsReporter struct {
+	SetNumberOfDeployedCOAsFunc func(uint64)
+	EVMTransactionExecutedFunc  func(uint64, bool, bool)
+	EVMBlockExecutedFunc        func(int, uint64, float64)
+}
+
+var _ environment.EVMMetricsReporter = &TestMetricsReporter{}
+
+func (tmr *TestMetricsReporter) SetNumberOfDeployedCOAs(count uint64) {
+	// call the method if available otherwise skip
+	if tmr.SetNumberOfDeployedCOAsFunc != nil {
+		tmr.SetNumberOfDeployedCOAsFunc(count)
+	}
+}
+
+func (tmr *TestMetricsReporter) EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool) {
+	// call the method if available otherwise skip
+	if tmr.EVMTransactionExecutedFunc != nil {
+		tmr.EVMTransactionExecutedFunc(gasUsed, isDirectCall, failed)
+	}
+}
+
+func (tmr *TestMetricsReporter) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow float64) {
+	// call the method if available otherwise skip
+	if tmr.EVMBlockExecutedFunc != nil {
+		tmr.EVMBlockExecutedFunc(txCount, totalGasUsed, totalSupplyInFlow)
+	}
+}
+
+type TestLoggerProvider struct {
+	LoggerFunc func() zerolog.Logger
+}
+
+func (tlp *TestLoggerProvider) Logger() zerolog.Logger {
+	// call the method if not available return noop logger
+	if tlp.LoggerFunc != nil {
+		return tlp.LoggerFunc()
+	}
+	return zerolog.Nop()
 }

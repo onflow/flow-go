@@ -24,11 +24,12 @@ var createAndSetupNodeTxScript string
 //go:embed templates/remove-node.cdc
 var removeNodeTxScript string
 
-//go:embed templates/set-protocol-state-version.cdc
+//go:embed "templates/set-protocol-state-version.cdc"
 var setProtocolStateVersionScript string
 
 func LocalnetEnv() templates.Environment {
 	return templates.Environment{
+		EpochAddress:             "f8d6e0586b0a20c7",
 		IDTableAddress:           "f8d6e0586b0a20c7",
 		FungibleTokenAddress:     "ee82856bf20e2aa6",
 		FlowTokenAddress:         "0ae53cb6e3f42a79",
@@ -161,7 +162,7 @@ func MakeCreateAndSetupNodeTx(
 func MakeAdminRemoveNodeTx(
 	env templates.Environment,
 	adminAccount *sdk.Account,
-	adminAccountKeyID int,
+	adminAccountKeyID uint32,
 	latestBlockID sdk.Identifier,
 	nodeID flow.Identifier,
 ) (*sdk.Transaction, error) {
@@ -188,12 +189,13 @@ func MakeAdminRemoveNodeTx(
 func MakeSetProtocolStateVersionTx(
 	env templates.Environment,
 	adminAccount *sdk.Account,
-	adminAccountKeyID int,
+	adminAccountKeyID uint32,
 	latestBlockID sdk.Identifier,
 	newProtocolVersion uint64,
 	activeViewDiff uint64,
 ) (*sdk.Transaction, error) {
 	accountKey := adminAccount.Keys[adminAccountKeyID]
+
 	tx := sdk.NewTransaction().
 		SetScript([]byte(templates.ReplaceAddresses(setProtocolStateVersionScript, env))).
 		SetComputeLimit(9999).
@@ -214,7 +216,7 @@ func MakeSetProtocolStateVersionTx(
 	return tx, nil
 }
 
-// submitSmokeTestTransaction will submit a create account transaction to smoke test network
+// CreateFlowAccount will submit a create account transaction to smoke test network
 // This ensures a single transaction can be sealed by the network.
 func CreateFlowAccount(ctx context.Context, client *testnet.Client) (sdk.Address, error) {
 	fullAccountKey := sdk.NewAccountKey().
@@ -234,4 +236,31 @@ func CreateFlowAccount(ctx context.Context, client *testnet.Client) (sdk.Address
 	}
 
 	return addr, nil
+}
+
+// MakeRecoverEpochTx makes an admin transaction to recover the network when it is in EFM mode.
+func MakeRecoverEpochTx(
+	env templates.Environment,
+	adminAccount *sdk.Account,
+	adminAccountKeyID uint32,
+	latestBlockID sdk.Identifier,
+	args []cadence.Value,
+) (*sdk.Transaction, error) {
+	accountKey := adminAccount.Keys[adminAccountKeyID]
+	tx := sdk.NewTransaction().
+		SetScript(templates.GenerateRecoverEpochScript(env)).
+		SetComputeLimit(9999).
+		SetReferenceBlockID(latestBlockID).
+		SetProposalKey(adminAccount.Address, adminAccountKeyID, accountKey.SequenceNumber).
+		SetPayer(adminAccount.Address).
+		AddAuthorizer(adminAccount.Address)
+
+	for _, arg := range args {
+		err := tx.AddArgument(arg)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return tx, nil
 }

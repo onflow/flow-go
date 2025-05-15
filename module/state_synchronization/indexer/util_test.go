@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/cadence/stdlib"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -58,10 +58,10 @@ func TestFindContractUpdates(t *testing.T) {
 }
 
 func contractUpdatedFixture(t *testing.T, address common.Address, contractName string) flow.Event {
-	contractUpdateEventType := &cadence.EventType{
-		Location:            stdlib.AccountContractAddedEventType.Location,
-		QualifiedIdentifier: stdlib.AccountContractAddedEventType.QualifiedIdentifier(),
-		Fields: []cadence.Field{
+	contractUpdateEventType := cadence.NewEventType(
+		stdlib.AccountContractAddedEventType.Location,
+		stdlib.AccountContractAddedEventType.QualifiedIdentifier(),
+		[]cadence.Field{
 			{
 				Identifier: "address",
 				Type:       cadence.AddressType,
@@ -75,7 +75,8 @@ func contractUpdatedFixture(t *testing.T, address common.Address, contractName s
 				Type:       cadence.StringType,
 			},
 		},
-	}
+		nil,
+	)
 
 	contractString, err := cadence.NewString(contractName)
 	require.NoError(t, err)

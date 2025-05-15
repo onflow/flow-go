@@ -58,7 +58,6 @@ func NewRootQCVoter(
 	state protocol.State,
 	contractClients []module.QCContractClient,
 ) *RootQCVoter {
-
 	voter := &RootQCVoter{
 		log:               log.With().Str("module", "root_qc_voter").Logger(),
 		me:                me,
@@ -71,19 +70,18 @@ func NewRootQCVoter(
 	return voter
 }
 
-// Vote handles the full procedure of generating a vote, submitting it to the
-// epoch smart contract, and verifying submission.
-// It is safe to run multiple times within a single setup phase.
+// Vote handles the full procedure of generating a vote, submitting it to the epoch
+// smart contract, and verifying submission. This logic should run as part of the Epoch
+// Setup Phase, i.e. at a time when the next epoch has not yet been committed. Hence,
+// this function takes the [protocol.TentativeEpoch] information as input.
+// It is safe to run `Vote` multiple times within a single Epoch Setup Phase.
+// CAUTION: epoch transition might not happen as described by [protocol.TentativeEpoch].
 //
 // Error returns:
-//   - ErrWontVote if we fail to vote for a benign reason
+//   - epochs.ClusterQCNoVoteError if we fail to vote for a benign reason
 //   - generic error in case of critical unexpected failure
-func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error {
-
-	counter, err := epoch.Counter()
-	if err != nil {
-		return fmt.Errorf("could not get epoch counter: %w", err)
-	}
+func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.TentativeEpoch) error {
+	counter := epoch.Counter()
 	clusters, err := epoch.Clustering()
 	if err != nil {
 		return fmt.Errorf("could not get clustering: %w", err)
@@ -123,10 +121,10 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 	}
 	backoff = retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, backoff, onMaxConsecutiveRetries)
 
-	err = retry.Do(ctx, backoff, func(ctx context.Context) error {
+	castVote := func(ctx context.Context) error {
 		// check that we're still in the setup phase, if we're not we can't
 		// submit a vote anyway and must exit this process
-		phase, err := voter.state.Final().Phase()
+		phase, err := voter.state.Final().EpochPhase()
 		if err != nil {
 			return fmt.Errorf("unexpected error - unable to get current epoch phase: %w", err)
 		} else if phase != flow.EpochPhaseSetup {
@@ -170,8 +168,9 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		// update our last successful client index for future calls
 		voter.updateLastSuccessfulClient(clientIndex)
 		return nil
-	})
-	if network.IsTransientError(err) || errors.Is(err, errTransactionReverted) || errors.Is(err, errTransactionReverted) {
+	}
+	err = retry.Do(ctx, backoff, castVote)
+	if network.IsTransientError(err) || errors.Is(err, errTransactionReverted) || errors.Is(err, context.Canceled) {
 		return NewClusterQCNoVoteErrorf("exceeded retry limit without successfully submitting our vote: %w", err)
 	}
 	return err

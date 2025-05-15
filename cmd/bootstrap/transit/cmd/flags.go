@@ -9,6 +9,7 @@ var (
 	flagAccessAddress string
 	flagNodeRole      string
 	flagTimeout       time.Duration
+	flagConcurrency   int64
 
 	flagWrapID   string // wrap ID
 	flagVoteFile string

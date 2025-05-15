@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -15,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 )
 
 func ProcedureStateParameters(
@@ -50,74 +55,80 @@ func getBasicMeterParameters(
 	return params
 }
 
-// getBodyMeterParameters returns the set of meter parameters used for
-// transaction/script body execution.
-func getBodyMeterParameters(
+// getExecutionParameters returns the set of meter parameters used for
+// transaction/script body execution and the minimum required version as defined by the
+// NodeVersionBeacon contract.
+func getExecutionParameters(
+	log zerolog.Logger,
 	ctx Context,
 	proc Procedure,
 	txnState storage.TransactionPreparer,
-) (
-	meter.MeterParameters,
-	error,
-) {
-	procParams := getBasicMeterParameters(ctx, proc)
+) (state.ExecutionParameters, *snapshot.ExecutionSnapshot, error) {
+	meterParams := getBasicMeterParameters(ctx, proc)
 
-	overrides, err := txnState.GetMeterParamOverrides(
+	executionParams, executionParamsStateRead, err := txnState.GetStateExecutionParameters(
 		txnState,
-		NewMeterParamOverridesComputer(ctx, txnState))
+		NewExecutionParametersComputer(log, ctx, txnState))
 	if err != nil {
-		return procParams, err
+		return state.ExecutionParameters{
+			MeterParameters: meterParams,
+		}, nil, err
 	}
 
-	if overrides.ComputationWeights != nil {
-		procParams = procParams.WithComputationWeights(
-			overrides.ComputationWeights)
+	if executionParams.ComputationWeights != nil {
+		meterParams = meterParams.WithComputationWeights(
+			executionParams.ComputationWeights)
 	}
 
-	if overrides.MemoryWeights != nil {
-		procParams = procParams.WithMemoryWeights(overrides.MemoryWeights)
+	if executionParams.MemoryWeights != nil {
+		meterParams = meterParams.WithMemoryWeights(executionParams.MemoryWeights)
 	}
 
-	if overrides.MemoryLimit != nil {
-		procParams = procParams.WithMemoryLimit(*overrides.MemoryLimit)
+	if executionParams.MemoryLimit != nil {
+		meterParams = meterParams.WithMemoryLimit(*executionParams.MemoryLimit)
 	}
 
 	// NOTE: The memory limit (and interaction limit) may be overridden by the
 	// environment.  We need to ignore the override in that case.
 	if proc.ShouldDisableMemoryAndInteractionLimits(ctx) {
-		procParams = procParams.WithMemoryLimit(math.MaxUint64).
+		meterParams = meterParams.WithMemoryLimit(math.MaxUint64).
 			WithStorageInteractionLimit(math.MaxUint64)
 	}
 
-	return procParams, nil
+	return state.ExecutionParameters{
+		MeterParameters: meterParams,
+	}, executionParamsStateRead, nil
 }
 
-type MeterParamOverridesComputer struct {
+type ExecutionParametersComputer struct {
+	log      zerolog.Logger
 	ctx      Context
 	txnState storage.TransactionPreparer
 }
 
-func NewMeterParamOverridesComputer(
+func NewExecutionParametersComputer(
+	log zerolog.Logger,
 	ctx Context,
 	txnState storage.TransactionPreparer,
-) MeterParamOverridesComputer {
-	return MeterParamOverridesComputer{
+) ExecutionParametersComputer {
+	return ExecutionParametersComputer{
+		log:      log,
 		ctx:      ctx,
 		txnState: txnState,
 	}
 }
 
-func (computer MeterParamOverridesComputer) Compute(
+func (computer ExecutionParametersComputer) Compute(
 	_ state.NestedTransactionPreparer,
 	_ struct{},
 ) (
-	derived.MeterParamOverrides,
+	derived.StateExecutionParameters,
 	error,
 ) {
-	var overrides derived.MeterParamOverrides
+	var overrides derived.StateExecutionParameters
 	var err error
 	computer.txnState.RunWithAllLimitsDisabled(func() {
-		overrides, err = computer.getMeterParamOverrides()
+		overrides, err = computer.getExecutionParameters()
 	})
 
 	if err != nil {
@@ -129,14 +140,18 @@ func (computer MeterParamOverridesComputer) Compute(
 	return overrides, nil
 }
 
-func (computer MeterParamOverridesComputer) getMeterParamOverrides() (
-	derived.MeterParamOverrides,
+func (computer ExecutionParametersComputer) getExecutionParameters() (
+	derived.StateExecutionParameters,
 	error,
 ) {
-	// Check that the service account exists because all the settings are
-	// stored in it
-	serviceAddress := computer.ctx.Chain.ServiceAddress()
-	service := common.Address(serviceAddress)
+	sc := systemcontracts.SystemContractsForChain(computer.ctx.Chain.ChainID())
+
+	// The execution parameters are stored in the ExecutionParametersAccount. This is
+	// just the service account for all networks except mainnet and testnet.
+	// For mainnet and testnet, the execution parameters are stored in a separate
+	// account, so that they are separated from the frequently changing data on the
+	// service account.
+	service := common.Address(sc.ExecutionParametersAccount.Address)
 
 	env := environment.NewScriptEnv(
 		context.Background(),
@@ -144,7 +159,7 @@ func (computer MeterParamOverridesComputer) getMeterParamOverrides() (
 		computer.ctx.EnvironmentParams,
 		computer.txnState)
 
-	overrides := derived.MeterParamOverrides{}
+	overrides := derived.StateExecutionParameters{}
 
 	// set the property if no error, but if the error is a fatal error then
 	// return it

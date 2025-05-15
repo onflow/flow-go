@@ -21,11 +21,13 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
@@ -61,7 +63,7 @@ type SameGRPCPortTestSuite struct {
 	metrics              *metrics.NoopCollector
 	rpcEng               *rpc.Engine
 	stateStreamEng       *statestreambackend.Engine
-	executionDataTracker subscription.ExecutionDataTracker
+	executionDataTracker tracker.ExecutionDataTracker
 
 	// storage
 	blocks       *storagemock.Blocks
@@ -138,6 +140,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		UnsecureGRPCListenAddr: unittest.DefaultAddress,
 		SecureGRPCListenAddr:   unittest.DefaultAddress,
 		HTTPListenAddr:         unittest.DefaultAddress,
+		WebSocketConfig:        websockets.NewDefaultWebsocketConfig(),
 	}
 
 	blockCount := 5
@@ -153,7 +156,6 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	}
 
 	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
 	params.On("SporkRootBlockHeight").Return(rootBlock.Header.Height, nil)
 	params.On("SealedRoot").Return(rootBlock.Header, nil)
 
@@ -215,6 +217,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.unsecureGrpcServer,
 		nil,
 		stateStreamConfig,
+		nil,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
@@ -249,9 +252,9 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		subscription.DefaultSendBufferSize,
 	)
 
-	eventIndexer := index.NewEventsIndex(suite.events)
+	eventIndexer := index.NewEventsIndex(index.NewReporter(), suite.events)
 
-	suite.executionDataTracker = subscription.NewExecutionDataTracker(
+	suite.executionDataTracker = tracker.NewExecutionDataTracker(
 		suite.log,
 		suite.state,
 		rootBlock.Header.Height,

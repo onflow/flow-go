@@ -22,10 +22,12 @@ const (
 	// TODO: port this load type from old code
 	// ConstExecCostLoadType LoadType = "const-exec" // for an empty transactions with various tx arguments
 
-	TokenTransferLoadType LoadType = "token-transfer"
-	AddKeysLoadType       LoadType = "add-keys"
-	EVMTransferLoadType   LoadType = "evm-transfer"
-	CreateAccount         LoadType = "create-account"
+	TokenTransferLoadType      LoadType = "token-transfer"
+	TokenTransferMultiLoadType LoadType = "token-transfer-multi"
+	AddKeysLoadType            LoadType = "add-keys"
+	EVMTransferLoadType        LoadType = "evm-transfer"
+	CreateAccount              LoadType = "create-account"
+	EVMBatchTransferLoadType   LoadType = "evm-batch-transfer"
 )
 
 type LoadContext struct {
@@ -85,10 +87,14 @@ func CreateLoadType(log zerolog.Logger, t LoadType) Load {
 		return ExecDataHeavyLoad
 	case TokenTransferLoadType:
 		return NewTokenTransferLoad()
+	case TokenTransferMultiLoadType:
+		return NewTokenTransferMultiLoad()
 	case AddKeysLoadType:
 		return NewAddKeysLoad()
 	case EVMTransferLoadType:
 		return NewEVMTransferLoad(log)
+	case EVMBatchTransferLoadType:
+		return NewEVMBatchTransferLoad(log)
 	case CreateAccount:
 		return NewCreateAccountLoad()
 	default:

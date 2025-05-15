@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-multierror"
+	cadenceErr "github.com/onflow/cadence/errors"
 	"github.com/onflow/cadence/runtime"
-	cadenceErr "github.com/onflow/cadence/runtime/errors"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/sema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 

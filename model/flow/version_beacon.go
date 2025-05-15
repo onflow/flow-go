@@ -171,7 +171,7 @@ func (v *VersionBeacon) String() string {
 // SafetyThreshold is a protocol parameter set so that it is overwhelmingly likely that
 // block `B` is finalized (ergo the protocol version switch at the specified view `E.ActiveView`)
 // within any stretch of SafetyThreshold-many views.
-// TODO: This concept mirrors `EpochCommitSafetyThreshold` and `versionBoundaryFreezePeriod`
+// TODO: This concept mirrors `FinalizationSafetyThreshold` and `versionBoundaryFreezePeriod`
 // These parameters should be consolidated.
 //
 // Otherwise, the node software stops processing blocks, until it is manually updated

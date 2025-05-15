@@ -193,7 +193,7 @@ func (e *ComplianceEngine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.Bloc
 
 // OnFinalizedBlock informs the compliance layer about finalization of a new block. It does not block
 // and asynchronously executes the internal pruning logic. We accept inputs out of order, and only act
-// on inputs with strictly monotonously increasing views.
+// on inputs with strictly monotonicly increasing views.
 //
 // Implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages

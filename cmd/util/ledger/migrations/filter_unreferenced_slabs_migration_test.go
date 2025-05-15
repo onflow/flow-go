@@ -3,21 +3,61 @@ package migrations
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/onflow/atree"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+type testReportWriterFactory struct {
+	lock          sync.Mutex
+	reportWriters map[string]*testReportWriter
+}
+
+func (f *testReportWriterFactory) ReportWriter(dataNamespace string) reporters.ReportWriter {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	if f.reportWriters == nil {
+		f.reportWriters = make(map[string]*testReportWriter)
+	}
+	reportWriter := &testReportWriter{}
+	if _, ok := f.reportWriters[dataNamespace]; ok {
+		panic(fmt.Sprintf("report writer already exists for namespace %s", dataNamespace))
+	}
+	f.reportWriters[dataNamespace] = reportWriter
+	return reportWriter
+}
+
+type testReportWriter struct {
+	lock    sync.Mutex
+	entries []any
+}
+
+var _ reporters.ReportWriter = &testReportWriter{}
+
+func (r *testReportWriter) Write(entry any) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	r.entries = append(r.entries, entry)
+}
+
+func (r *testReportWriter) Close() {}
 
 func TestFilterUnreferencedSlabs(t *testing.T) {
 	t.Parallel()
@@ -26,6 +66,8 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 
 	const chainID = flow.Emulator
 	chain := chainID.Chain()
+
+	const nWorker = 2
 
 	testFlowAddress, err := chain.AddressAtIndex(1_000_000)
 	require.NoError(t, err)
@@ -37,8 +79,8 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 	payloadsLedger := util.NewPayloadsLedger(payloads)
 
 	storageIndices := map[string]uint64{}
-	payloadsLedger.AllocateStorageIndexFunc = func(owner []byte) (atree.StorageIndex, error) {
-		var index atree.StorageIndex
+	payloadsLedger.AllocateSlabIndexFunc = func(owner []byte) (atree.SlabIndex, error) {
+		var index atree.SlabIndex
 
 		storageIndices[string(owner)]++
 
@@ -50,7 +92,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		return index, nil
 	}
 
-	storage := runtime.NewStorage(payloadsLedger, nil)
+	storage := runtime.NewStorage(payloadsLedger, nil, runtime.StorageConfig{})
 
 	// {Int: Int}
 	dict1StaticType := interpreter.NewDictionaryStaticType(
@@ -75,7 +117,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		testAddress,
 	)
 
-	// Storage another dictionary, with a nested array, in the account.
+	// Store another dictionary, with a nested array, in the account.
 	// It is not referenced through a storage map though.
 
 	arrayStaticType := interpreter.NewVariableSizedStaticType(nil, interpreter.PrimitiveStaticTypeInt)
@@ -93,21 +135,31 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		testAddress,
 	)
 
-	dict2.InsertWithoutTransfer(
-		inter, interpreter.EmptyLocationRange,
-		interpreter.NewUnmeteredIntValueFromInt64(2),
-		interpreter.NewArrayValue(
-			inter,
-			interpreter.EmptyLocationRange,
-			arrayStaticType,
-			testAddress,
-			interpreter.NewUnmeteredIntValueFromInt64(3),
-		),
+	// Ensure the array is large enough to be stored in a separate slab
+	arrayCount := 100
+	arrayValues := make([]interpreter.Value, arrayCount)
+	for i := 0; i < arrayCount; i++ {
+		arrayValues[i] = interpreter.NewUnmeteredIntValueFromInt64(int64(i))
+	}
+
+	array := interpreter.NewArrayValue(
+		inter,
+		interpreter.EmptyLocationRange,
+		arrayStaticType,
+		common.ZeroAddress,
+		arrayValues...,
 	)
 
-	storageMap := storage.GetStorageMap(
+	dict2.Insert(
+		inter, interpreter.EmptyLocationRange,
+		interpreter.NewUnmeteredIntValueFromInt64(2),
+		array,
+	)
+
+	storageMap := storage.GetDomainStorageMap(
+		inter,
 		testAddress,
-		common.PathDomainStorage.Identifier(),
+		common.StorageDomainPathStorage,
 		true,
 	)
 
@@ -120,16 +172,25 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		dict1,
 	)
 
-	err = storage.Commit(inter, false)
+	err = storage.NondeterministicCommit(inter, false)
 	require.NoError(t, err)
 
 	oldPayloads := make([]*ledger.Payload, 0, len(payloads))
 
 	for _, payload := range payloadsLedger.Payloads {
+		if len(payload.Value()) == 0 {
+			// Don't count empty slabs as result of inlining.
+			continue
+		}
 		oldPayloads = append(oldPayloads, payload)
 	}
 
-	const totalSlabCount = 5
+	// Storage has 4 non-empty payloads:
+	// - storage map
+	// - dict1
+	// - dict2
+	// - nested array in dict2
+	const totalSlabCount = 4
 
 	require.Len(t, oldPayloads, totalSlabCount)
 
@@ -140,12 +201,19 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 
 	log := zerolog.New(zerolog.NewTestWriter(t))
 
-	err = migration.InitMigration(log, nil, 0)
+	registersByAccount, err := registers.NewByAccountFromPayloads(oldPayloads)
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	err = migration.InitMigration(log, registersByAccount, 1)
+	require.NoError(t, err)
 
-	newPayloads, err := migration.MigrateAccount(ctx, testAddress, oldPayloads)
+	accountRegisters := registersByAccount.AccountRegisters(string(testAddress[:]))
+
+	err = migration.MigrateAccount(
+		context.Background(),
+		testAddress,
+		accountRegisters,
+	)
 	require.NoError(t, err)
 
 	err = migration.Close()
@@ -161,6 +229,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		string([]byte{flow.SlabIndexPrefix, 0, 0, 0, 0, 0, 0, 0, 3}): {},
 	}
 
+	newPayloads := registersByAccount.DestructIntoPayloads(nWorker)
 	assert.Len(t, newPayloads, totalSlabCount-len(expectedKeys))
 
 	expectedFilteredPayloads := make([]*ledger.Payload, 0, len(expectedKeys))
@@ -189,7 +258,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		},
 		writer.entries,
 	)
-	assert.Equal(t,
+	assert.ElementsMatch(t,
 		expectedFilteredPayloads,
 		migration.filteredPayloads,
 	)
@@ -197,5 +266,8 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 	readIsPartial, readFilteredPayloads, err := util.ReadPayloadFile(log, migration.payloadsFile)
 	require.NoError(t, err)
 	assert.True(t, readIsPartial)
-	assert.Equal(t, expectedFilteredPayloads, readFilteredPayloads)
+	assert.ElementsMatch(t,
+		expectedFilteredPayloads,
+		readFilteredPayloads,
+	)
 }

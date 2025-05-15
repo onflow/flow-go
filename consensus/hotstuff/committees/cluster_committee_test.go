@@ -24,7 +24,7 @@ type ClusterSuite struct {
 	state    *protocolmock.State
 	snap     *protocolmock.Snapshot
 	cluster  *protocolmock.Cluster
-	epoch    *protocolmock.Epoch
+	epoch    *protocolmock.CommittedEpoch
 	payloads *storagemock.ClusterPayloads
 
 	members flow.IdentityList
@@ -43,7 +43,7 @@ func (suite *ClusterSuite) SetupTest() {
 	suite.state = new(protocolmock.State)
 	suite.snap = new(protocolmock.Snapshot)
 	suite.cluster = new(protocolmock.Cluster)
-	suite.epoch = new(protocolmock.Epoch)
+	suite.epoch = new(protocolmock.CommittedEpoch)
 	suite.payloads = new(storagemock.ClusterPayloads)
 
 	suite.members = unittest.IdentityListFixture(5, unittest.WithRole(flow.RoleCollection))
@@ -56,7 +56,7 @@ func (suite *ClusterSuite) SetupTest() {
 	suite.cluster.On("Members").Return(suite.members.ToSkeleton())
 	suite.cluster.On("RootBlock").Return(suite.root)
 	suite.epoch.On("Counter").Return(counter, nil)
-	suite.epoch.On("RandomSource").Return(unittest.SeedFixture(prg.RandomSourceLength), nil)
+	suite.epoch.On("RandomSource").Return(unittest.SeedFixture(prg.RandomSourceLength))
 
 	var err error
 	suite.com, err = NewClusterCommittee(

@@ -54,7 +54,7 @@ func (s *DynamicEpochTransitionSuite) SetupTest() {
 	s.StakingAuctionLen = 50
 	s.DKGPhaseLen = 50
 	s.EpochLen = 250
-	s.EpochCommitSafetyThreshold = 20
+	s.FinalizationSafetyThreshold = 20
 
 	// run the generic setup, which starts up the network
 	s.BaseSuite.SetupTest()
@@ -136,7 +136,7 @@ func (s *DynamicEpochTransitionSuite) StakeNode(ctx context.Context, env templat
 		machineAccountAddr = accounts[1]
 	}
 
-	result = s.SubmitSetApprovedListTx(ctx, env, append(s.net.Identities().NodeIDs(), nodeID)...)
+	result = s.SubmitSetApprovedListTx(ctx, env, append(s.Net.Identities().NodeIDs(), nodeID)...)
 	require.NoError(s.T(), result.Error)
 
 	// ensure we are still in staking auction
@@ -272,7 +272,7 @@ func (s *DynamicEpochTransitionSuite) ExecuteReadApprovedNodesScript(ctx context
 
 // getTestContainerName returns a name for a test container in the form of ${role}_${nodeID}_test
 func (s *DynamicEpochTransitionSuite) getTestContainerName(role flow.Role) string {
-	i := len(s.net.ContainersByRole(role, false)) + 1
+	i := len(s.Net.ContainersByRole(role, false)) + 1
 	return fmt.Sprintf("%s_test_%d", role, i)
 }
 
@@ -295,8 +295,8 @@ func (s *DynamicEpochTransitionSuite) assertNodeApprovedAndProposed(ctx context.
 	require.Containsf(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected new node to be in proposed table: %x", info.NodeID)
 }
 
-// newTestContainerOnNetwork configures a new container on the suites network
-func (s *DynamicEpochTransitionSuite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperationInfo) *testnet.Container {
+// NewTestContainerOnNetwork configures a new container on the suites network
+func (s *DynamicEpochTransitionSuite) NewTestContainerOnNetwork(role flow.Role, info *StakedNodeOperationInfo) *testnet.Container {
 	containerConfigs := []func(config *testnet.NodeConfig){
 		testnet.WithLogLevel(zerolog.WarnLevel),
 		testnet.WithID(info.NodeID),
@@ -305,27 +305,27 @@ func (s *DynamicEpochTransitionSuite) newTestContainerOnNetwork(role flow.Role, 
 	nodeConfig := testnet.NewNodeConfig(role, containerConfigs...)
 	testContainerConfig, err := testnet.NewContainerConfig(info.ContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
 	require.NoError(s.T(), err)
-	err = testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
+	err = testContainerConfig.WriteKeyFiles(s.Net.BootstrapDir, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
 	require.NoError(s.T(), err)
 
 	//add our container to the network
-	err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
+	err = s.Net.AddNode(s.T(), s.Net.BootstrapDir, testContainerConfig)
 	require.NoError(s.T(), err, "failed to add container to network")
 
 	// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
 	if role == flow.RoleConsensus || role == flow.RoleCollection {
 		// ghost containers don't participate in the network skip any SN/LN ghost containers
-		nodeContainer := s.net.ContainerByID(testContainerConfig.NodeID)
+		nodeContainer := s.Net.ContainerByID(testContainerConfig.NodeID)
 		nodeContainer.AddFlag("insecure-access-api", "false")
 
 		accessNodeIDS := make([]string, 0)
-		for _, c := range s.net.ContainersByRole(flow.RoleAccess, false) {
+		for _, c := range s.Net.ContainersByRole(flow.RoleAccess, false) {
 			accessNodeIDS = append(accessNodeIDS, c.Config.NodeID.String())
 		}
 		nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 	}
 
-	return s.net.ContainerByID(info.NodeID)
+	return s.Net.ContainerByID(info.NodeID)
 }
 
 // StakeNewNode will stake a new node, and create the corresponding docker container for that node
@@ -337,37 +337,19 @@ func (s *DynamicEpochTransitionSuite) StakeNewNode(ctx context.Context, env temp
 	s.assertNodeApprovedAndProposed(ctx, env, info)
 
 	// add a new container to the network with the info used to stake our node
-	testContainer := s.newTestContainerOnNetwork(role, info)
+	testContainer := s.NewTestContainerOnNetwork(role, info)
 
 	return info, testContainer
-}
-
-// AwaitFinalizedView polls until it observes that the latest finalized block has a view
-// greater than or equal to the input view. This is used to wait until when an epoch
-// transition must have happened.
-func (s *DynamicEpochTransitionSuite) AwaitFinalizedView(ctx context.Context, view uint64, waitFor, tick time.Duration) {
-	require.Eventually(s.T(), func() bool {
-		sealed := s.getLatestFinalizedHeader(ctx)
-		return sealed.View >= view
-	}, waitFor, tick)
-}
-
-// getLatestFinalizedHeader retrieves the latest finalized block, as reported in LatestSnapshot.
-func (s *DynamicEpochTransitionSuite) getLatestFinalizedHeader(ctx context.Context) *flow.Header {
-	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
-	require.NoError(s.T(), err)
-	finalized, err := snapshot.Head()
-	require.NoError(s.T(), err)
-	return finalized
 }
 
 // AssertInEpochPhase checks if we are in the phase of the given epoch.
 func (s *DynamicEpochTransitionSuite) AssertInEpochPhase(ctx context.Context, expectedEpoch uint64, expectedPhase flow.EpochPhase) {
 	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
-	actualEpoch, err := snapshot.Epochs().Current().Counter()
+	epoch, err := snapshot.Epochs().Current()
 	require.NoError(s.T(), err)
-	actualPhase, err := snapshot.Phase()
+	actualEpoch := epoch.Counter()
+	actualPhase, err := snapshot.EpochPhase()
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), expectedPhase, actualPhase, "not in correct phase")
 	require.Equal(s.T(), expectedEpoch, actualEpoch, "not in correct epoch")
@@ -377,20 +359,10 @@ func (s *DynamicEpochTransitionSuite) AssertInEpochPhase(ctx context.Context, ex
 	s.TimedLogf("asserted in epoch %d, phase %s, finalized height/view: %d/%d", expectedEpoch, expectedPhase, head.Height, head.View)
 }
 
-// AssertInEpoch requires actual epoch counter is equal to counter provided.
-func (s *DynamicEpochTransitionSuite) AssertInEpoch(ctx context.Context, expectedEpoch uint64) {
-	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
-	require.NoError(s.T(), err)
-	actualEpoch, err := snapshot.Epochs().Current().Counter()
-	require.NoError(s.T(), err)
-	require.Equalf(s.T(), expectedEpoch, actualEpoch, "expected to be in epoch %d got %d", expectedEpoch, actualEpoch)
-}
-
 // AssertNodeNotParticipantInEpoch asserts that the given node ID does not exist
 // in the epoch's identity table.
-func (s *DynamicEpochTransitionSuite) AssertNodeNotParticipantInEpoch(epoch protocol.Epoch, nodeID flow.Identifier) {
-	identities, err := epoch.InitialIdentities()
-	require.NoError(s.T(), err)
+func (s *DynamicEpochTransitionSuite) AssertNodeNotParticipantInEpoch(epoch protocol.TentativeEpoch, nodeID flow.Identifier) {
+	identities := epoch.InitialIdentities()
 	require.NotContains(s.T(), identities.NodeIDs(), nodeID)
 }
 
@@ -454,7 +426,7 @@ func (s *DynamicEpochTransitionSuite) AssertNetworkHealthyAfterANChange(ctx cont
 
 	// get snapshot directly from new AN and compare head with head from the
 	// snapshot that was used to bootstrap the node
-	client, err := s.net.ContainerByName(info.ContainerName).TestnetClient()
+	client, err := s.Net.ContainerByName(info.ContainerName).TestnetClient()
 	require.NoError(s.T(), err)
 
 	// overwrite Client to point to the new AN (since we have stopped the initial AN at this point)
@@ -514,7 +486,7 @@ func (s *DynamicEpochTransitionSuite) RunTestEpochJoinAndLeave(role flow.Role, c
 
 	// replace access_2, avoid replacing access_1 the container used for Client connections
 	if role == flow.RoleAccess {
-		containerToReplace = s.net.ContainerByName("access_2")
+		containerToReplace = s.Net.ContainerByName("access_2")
 		require.NotNil(s.T(), containerToReplace)
 	} else {
 		// grab the first container of this node role type, this is the container we will replace
@@ -554,8 +526,9 @@ func (s *DynamicEpochTransitionSuite) RunTestEpochJoinAndLeave(role flow.Role, c
 	testContainer.WriteRootSnapshot(rootSnapshot)
 	testContainer.Container.Start(s.Ctx)
 
-	epoch1FinalView, err := rootSnapshot.Epochs().Current().FinalView()
+	epoch1, err := rootSnapshot.Epochs().Current()
 	require.NoError(s.T(), err)
+	epoch1FinalView := epoch1.FinalView()
 
 	// wait for at least the first block of the next epoch to be sealed before we pause our container to replace
 	s.TimedLogf("waiting for epoch transition (finalized view %d) before pausing container", epoch1FinalView+1)
@@ -563,7 +536,9 @@ func (s *DynamicEpochTransitionSuite) RunTestEpochJoinAndLeave(role flow.Role, c
 	s.TimedLogf("observed finalized view %d -> pausing container", epoch1FinalView+1)
 
 	// make sure container to replace is not a member of epoch 2
-	s.AssertNodeNotParticipantInEpoch(rootSnapshot.Epochs().Next(), containerToReplace.Config.NodeID)
+	nextEpoch, err := rootSnapshot.Epochs().NextUnsafe()
+	require.NoError(s.T(), err)
+	s.AssertNodeNotParticipantInEpoch(nextEpoch, containerToReplace.Config.NodeID)
 
 	// assert transition to second epoch happened as expected
 	// if counter is still 0, epoch emergency fallback was triggered and we can fail early

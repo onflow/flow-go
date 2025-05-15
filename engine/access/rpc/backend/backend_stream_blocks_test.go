@@ -17,7 +17,8 @@ import (
 	"github.com/onflow/flow-go/engine"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
+	"github.com/onflow/flow-go/engine/access/subscription/tracker"
+	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -38,8 +39,8 @@ type BackendBlocksSuite struct {
 
 	blocks           *storagemock.Blocks
 	headers          *storagemock.Headers
-	blockTracker     *subscriptionmock.BlockTracker
-	blockTrackerReal subscription.BlockTracker
+	blockTracker     *trackermock.BlockTracker
+	blockTrackerReal tracker.BlockTracker
 
 	connectionFactory *connectionmock.ConnectionFactory
 
@@ -74,7 +75,6 @@ func (s *BackendBlocksSuite) SetupTest() {
 
 	params := new(protocol.Params)
 	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
 	params.On("SporkRootBlockHeight").Return(header.Height, nil)
 	params.On("SealedRoot").Return(header, nil)
 	s.state.On("Params").Return(params)
@@ -83,7 +83,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 	s.headers = new(storagemock.Headers)
 	s.chainID = flow.Testnet
 	s.connectionFactory = connectionmock.NewConnectionFactory(s.T())
-	s.blockTracker = subscriptionmock.NewBlockTracker(s.T())
+	s.blockTracker = trackermock.NewBlockTracker(s.T())
 
 	s.broadcaster = engine.NewBroadcaster()
 
@@ -136,7 +136,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	// create real block tracker to use GetStartHeight from it, instead of mocking
-	s.blockTrackerReal, err = subscription.NewBlockTracker(
+	s.blockTrackerReal, err = tracker.NewBlockTracker(
 		s.state,
 		s.rootBlock.Header.Height,
 		s.headers,
@@ -148,15 +148,14 @@ func (s *BackendBlocksSuite) SetupTest() {
 // backendParams returns the Params configuration for the backend.
 func (s *BackendBlocksSuite) backendParams() Params {
 	return Params{
-		State:                    s.state,
-		Blocks:                   s.blocks,
-		Headers:                  s.headers,
-		ChainID:                  s.chainID,
-		MaxHeightRange:           DefaultMaxHeightRange,
-		SnapshotHistoryLimit:     DefaultSnapshotHistoryLimit,
-		AccessMetrics:            metrics.NewNoopCollector(),
-		Log:                      s.log,
-		TxErrorMessagesCacheSize: 1000,
+		State:                s.state,
+		Blocks:               s.blocks,
+		Headers:              s.headers,
+		ChainID:              s.chainID,
+		MaxHeightRange:       DefaultMaxHeightRange,
+		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
+		AccessMetrics:        metrics.NewNoopCollector(),
+		Log:                  s.log,
 		SubscriptionHandler: subscription.NewSubscriptionHandler(
 			s.log,
 			s.broadcaster,

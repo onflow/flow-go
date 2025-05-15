@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/verification"
+	"github.com/onflow/flow-go/model/verification/convert"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
@@ -34,7 +35,6 @@ import (
 // to the verifier engine.
 type Engine struct {
 	// common
-	unit  *engine.Unit
 	state protocol.State // used to verify the origin ID of chunk data response, and sealing status.
 
 	// monitoring
@@ -72,7 +72,6 @@ func New(
 	stopAtHeight uint64,
 ) *Engine {
 	e := &Engine{
-		unit:          engine.NewUnit(),
 		metrics:       metrics,
 		tracer:        tracer,
 		log:           log.With().Str("engine", "fetcher").Logger(),
@@ -104,16 +103,12 @@ func (e *Engine) Ready() <-chan struct{} {
 	if e.chunkConsumerNotifier == nil {
 		e.log.Fatal().Msg("missing chunk consumer notifier callback in verification fetcher engine")
 	}
-	return e.unit.Ready(func() {
-		<-e.requester.Ready()
-	})
+	return e.requester.Ready()
 }
 
 // Done terminates the engine and returns a channel that is closed when the termination is done
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(func() {
-		<-e.requester.Done()
-	})
+	return e.requester.Done()
 }
 
 // ProcessAssignedChunk is the entry point of fetcher engine.
@@ -169,7 +164,8 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 // processAssignedChunkWithTracing encapsulates the logic of processing assigned chunk with tracing enabled.
 func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow.ExecutionResult, chunkLocatorID flow.Identifier) (bool, uint64, error) {
 
-	span, _ := e.tracer.StartBlockSpan(e.unit.Ctx(), result.BlockID, trace.VERProcessAssignedChunk)
+	// We don't have any existing information and don't need cancellation, so use a background (empty) context
+	span, _ := e.tracer.StartBlockSpan(context.Background(), result.BlockID, trace.VERProcessAssignedChunk)
 	span.SetAttributes(attribute.Int("collection_index", int(chunk.CollectionIndex)))
 	defer span.End()
 
@@ -259,7 +255,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response *verific
 		Uint64("block_height", status.BlockHeight).
 		Hex("result_id", logging.ID(resultID)).
 		Uint64("chunk_index", status.ChunkIndex).
-		Bool("system_chunk", IsSystemChunk(status.ChunkIndex, status.ExecutionResult)).
+		Bool("system_chunk", convert.IsSystemChunk(status.ChunkIndex, status.ExecutionResult)).
 		Logger()
 
 	span, ctx := e.tracer.StartBlockSpan(context.Background(), status.ExecutionResult.BlockID, trace.VERFetcherHandleChunkDataPack)
@@ -413,7 +409,7 @@ func (e Engine) validateCollectionID(
 	result *flow.ExecutionResult,
 	chunk *flow.Chunk) error {
 
-	if IsSystemChunk(chunk.Index, result) {
+	if convert.IsSystemChunk(chunk.Index, result) {
 		return e.validateSystemChunkCollection(chunkDataPack)
 	}
 
@@ -550,29 +546,13 @@ func (e *Engine) makeVerifiableChunkData(chunk *flow.Chunk,
 	chunkDataPack *flow.ChunkDataPack,
 ) (*verification.VerifiableChunkData, error) {
 
-	// system chunk is the last chunk
-	isSystemChunk := IsSystemChunk(chunk.Index, result)
-
-	endState, err := EndStateCommitment(result, chunk.Index, isSystemChunk)
-	if err != nil {
-		return nil, fmt.Errorf("could not compute end state of chunk: %w", err)
-	}
-
-	transactionOffset, err := TransactionOffsetForChunk(result.Chunks, chunk.Index)
-	if err != nil {
-		return nil, fmt.Errorf("cannot compute transaction offset for chunk: %w", err)
-	}
-
-	return &verification.VerifiableChunkData{
-		IsSystemChunk:     isSystemChunk,
-		Chunk:             chunk,
-		Header:            header,
-		Snapshot:          snapshot,
-		Result:            result,
-		ChunkDataPack:     chunkDataPack,
-		EndState:          endState,
-		TransactionOffset: transactionOffset,
-	}, nil
+	return convert.FromChunkDataPack(
+		chunk,
+		chunkDataPack,
+		header,
+		snapshot,
+		result,
+	)
 }
 
 // requestChunkDataPack creates and dispatches a chunk data pack request to the requester engine.
@@ -660,43 +640,4 @@ func executorsOf(receipts []*flow.ExecutionReceipt, resultID flow.Identifier) (f
 	}
 
 	return agrees, disagrees
-}
-
-// EndStateCommitment computes the end state of the given chunk.
-func EndStateCommitment(result *flow.ExecutionResult, chunkIndex uint64, systemChunk bool) (flow.StateCommitment, error) {
-	var endState flow.StateCommitment
-	if systemChunk {
-		var err error
-		// last chunk in a result is the system chunk and takes final state commitment
-		endState, err = result.FinalStateCommitment()
-		if err != nil {
-			return flow.DummyStateCommitment, fmt.Errorf("can not read final state commitment, likely a bug:%w", err)
-		}
-	} else {
-		// any chunk except last takes the subsequent chunk's start state
-		endState = result.Chunks[chunkIndex+1].StartState
-	}
-
-	return endState, nil
-}
-
-// TransactionOffsetForChunk calculates transaction offset for a given chunk which is the index of the first
-// transaction of this chunk within the whole block
-func TransactionOffsetForChunk(chunks flow.ChunkList, chunkIndex uint64) (uint32, error) {
-	if int(chunkIndex) > len(chunks)-1 {
-		return 0, fmt.Errorf("chunk list out of bounds, len %d asked for chunk %d", len(chunks), chunkIndex)
-	}
-	var offset uint32 = 0
-	for i := 0; i < int(chunkIndex); i++ {
-		offset += uint32(chunks[i].NumberOfTransactions)
-	}
-	return offset, nil
-}
-
-// IsSystemChunk returns true if `chunkIndex` points to a system chunk in `result`.
-// Otherwise, it returns false.
-// In the current version, a chunk is a system chunk if it is the last chunk of the
-// execution result.
-func IsSystemChunk(chunkIndex uint64, result *flow.ExecutionResult) bool {
-	return chunkIndex == uint64(len(result.Chunks)-1)
 }

@@ -224,3 +224,13 @@ func TestSamples(t *testing.T) {
 		assert.Equal(t, constant, fullSlice)
 	})
 }
+
+func TestRandomString(t *testing.T) {
+	t.Run("basic random string", func(t *testing.T) {
+		length := 32
+		str, err := GenerateRandomString(length)
+		require.NoError(t, err)
+		t.Logf("string: %s", str)
+		require.Equal(t, length, len(str))
+	})
+}

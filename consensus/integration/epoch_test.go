@@ -64,8 +64,9 @@ func TestStaticEpochTransition(t *testing.T) {
 	rootSnapshot := createRootSnapshot(t, participantsData)
 	consensusParticipants := NewConsensusParticipants(participantsData)
 
-	firstEpochCounter, err := rootSnapshot.Epochs().Current().Counter()
+	firstEpoch, err := rootSnapshot.Epochs().Current()
 	require.NoError(t, err)
+	firstEpochCounter := firstEpoch.Counter()
 
 	// set up next epoch beginning in 4 views, with same identities as first epoch
 	nextEpochIdentities, err := rootSnapshot.Identities(filter.Any)
@@ -85,9 +86,9 @@ func TestStaticEpochTransition(t *testing.T) {
 
 	// confirm that we have transitioned to the new epoch
 	pstate := nodes[0].state
-	afterCounter, err := pstate.Final().Epochs().Current().Counter()
+	secondEpoch, err := pstate.Final().Epochs().Current()
 	require.NoError(t, err)
-	assert.Equal(t, firstEpochCounter+1, afterCounter)
+	assert.Equal(t, firstEpochCounter+1, secondEpoch.Counter())
 
 	cleanupNodes(nodes)
 }
@@ -102,8 +103,9 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 	rootSnapshot := createRootSnapshot(t, firstEpochConsensusParticipants)
 	consensusParticipants := NewConsensusParticipants(firstEpochConsensusParticipants)
 
-	firstEpochCounter, err := rootSnapshot.Epochs().Current().Counter()
+	firstEpoch, err := rootSnapshot.Epochs().Current()
 	require.NoError(t, err)
+	firstEpochCounter := firstEpoch.Counter()
 
 	// set up next epoch with 1 new consensus nodes and 2 consensus nodes from first epoch
 	// 1 consensus node is removed after the first epoch
@@ -117,7 +119,7 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 		newIdentity,
 	)
 
-	// generate new identities for next epoch, it will generate new DKG keys for random beacon participants
+	// generate new identities for next epoch, it will generate new Random Beacon keys for random beacon participants
 	nextEpochParticipantData := completeConsensusIdentities(t, privateNodeInfos[1:])
 	rootSnapshot = withNextEpoch(t, rootSnapshot, nextEpochIdentities, nextEpochParticipantData, consensusParticipants, 4, func(block *flow.Block) *flow.QuorumCertificate {
 		return createRootQC(t, block, firstEpochConsensusParticipants)
@@ -134,9 +136,9 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 
 	// confirm that we have transitioned to the new epoch
 	pstate := nodes[0].state
-	afterCounter, err := pstate.Final().Epochs().Current().Counter()
+	secondEpoch, err := pstate.Final().Epochs().Current()
 	require.NoError(t, err)
-	assert.Equal(t, firstEpochCounter+1, afterCounter)
+	assert.Equal(t, firstEpochCounter+1, secondEpoch.Counter())
 
 	cleanupNodes(nodes)
 }
@@ -150,8 +152,9 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 	rootSnapshot := createRootSnapshot(t, firstEpochConsensusParticipants)
 	consensusParticipants := NewConsensusParticipants(firstEpochConsensusParticipants)
 
-	firstEpochCounter, err := rootSnapshot.Epochs().Current().Counter()
+	firstEpoch, err := rootSnapshot.Epochs().Current()
 	require.NoError(t, err)
+	firstEpochCounter := firstEpoch.Counter()
 
 	// prepare a next epoch with a completely different consensus committee
 	// (no overlapping consensus nodes)
@@ -179,15 +182,16 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 
 	// confirm that we have transitioned to the new epoch
 	pstate := nodes[0].state
-	afterCounter, err := pstate.Final().Epochs().Current().Counter()
+	secondEpoch, err := pstate.Final().Epochs().Current()
 	require.NoError(t, err)
-	assert.Equal(t, firstEpochCounter+1, afterCounter)
+	assert.Equal(t, firstEpochCounter+1, secondEpoch.Counter())
 
 	cleanupNodes(nodes)
 }
 
 // withNextEpoch adds a valid next epoch with the given identities to the input
 // snapshot. Also sets the length of the first (current) epoch to curEpochViews.
+// NOTE: the input initial snapshot must be a spork root snapshot.
 //
 // We make the first (current) epoch start in committed phase so we can transition
 // to the next epoch upon reaching the appropriate view without any further changes
@@ -205,15 +209,16 @@ func withNextEpoch(
 
 	// convert to encodable representation for simple modification
 	encodableSnapshot := snapshot.Encodable()
+	rootResult, rootSeal, err := snapshot.SealedResult()
+	require.NoError(t, err)
+	require.Len(t, encodableSnapshot.SealingSegment.Blocks, 1, "function `withNextEpoch` only works for spork-root/genesis snapshots")
 
 	rootProtocolState := encodableSnapshot.SealingSegment.LatestProtocolStateEntry()
-	epochProtocolState := rootProtocolState.EpochEntry
-	currEpochSetup := epochProtocolState.CurrentEpochSetup
-	currEpochCommit := epochProtocolState.CurrentEpochCommit
+	currEpochSetup := rootProtocolState.EpochEntry.CurrentEpochSetup
+	currEpochCommit := rootProtocolState.EpochEntry.CurrentEpochCommit
 
 	// Set current epoch length
 	currEpochSetup.FinalView = currEpochSetup.FirstView + curEpochViews - 1
-	epochProtocolState.CurrentEpoch.SetupID = currEpochSetup.ID()
 
 	// Construct events for next epoch
 	nextEpochSetup := &flow.EpochSetup{
@@ -224,27 +229,53 @@ func withNextEpoch(
 		Participants: nextEpochIdentities.ToSkeleton(),
 		Assignments:  unittest.ClusterAssignment(1, nextEpochIdentities.ToSkeleton()),
 	}
+	dkgIndexMap, dkgParticipantKeys := nextEpochParticipantData.DKGData()
 	nextEpochCommit := &flow.EpochCommit{
 		Counter:            nextEpochSetup.Counter,
 		ClusterQCs:         currEpochCommit.ClusterQCs,
-		DKGParticipantKeys: nextEpochParticipantData.PublicBeaconKeys(),
-		DKGGroupKey:        nextEpochParticipantData.GroupKey,
+		DKGParticipantKeys: dkgParticipantKeys,
+		DKGGroupKey:        nextEpochParticipantData.DKGGroupKey,
+		DKGIndexMap:        dkgIndexMap,
 	}
-	epochProtocolState.NextEpoch = &flow.EpochStateContainer{
-		SetupID:          nextEpochSetup.ID(),
-		CommitID:         nextEpochCommit.ID(),
-		ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
+
+	// Construct the new min epoch state entry
+	minEpochStateEntry := &flow.MinEpochStateEntry{
+		PreviousEpoch: rootProtocolState.EpochEntry.PreviousEpoch,
+		CurrentEpoch: flow.EpochStateContainer{
+			SetupID:          currEpochSetup.ID(),
+			CommitID:         currEpochCommit.ID(),
+			ActiveIdentities: rootProtocolState.EpochEntry.CurrentEpoch.ActiveIdentities,
+			EpochExtensions:  rootProtocolState.EpochEntry.CurrentEpoch.EpochExtensions,
+		},
+		NextEpoch: &flow.EpochStateContainer{
+			SetupID:          nextEpochSetup.ID(),
+			CommitID:         nextEpochCommit.ID(),
+			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
+		},
+		EpochFallbackTriggered: false,
 	}
-	// Re-construct epoch protocol state with modified events (constructs ActiveIdentity fields)
-	epochProtocolState, err := flow.NewRichProtocolStateEntry(
-		epochProtocolState.ProtocolStateEntry,
-		epochProtocolState.PreviousEpochSetup, epochProtocolState.PreviousEpochCommit,
+
+	// Construct the new epoch protocol state entry
+	epochStateEntry, err := flow.NewEpochStateEntry(
+		minEpochStateEntry,
+		rootProtocolState.EpochEntry.PreviousEpochSetup,
+		rootProtocolState.EpochEntry.PreviousEpochCommit,
 		currEpochSetup, currEpochCommit,
 		nextEpochSetup, nextEpochCommit)
 	require.NoError(t, err)
+	// Re-construct epoch protocol state with modified events (constructs ActiveIdentity fields)
+	epochRichProtocolState, err := flow.NewRichEpochStateEntry(epochStateEntry)
+	require.NoError(t, err)
+
+	originalRootKVStore, err := snapshot.ProtocolState()
+	require.NoError(t, err)
 
 	// Store the modified epoch protocol state entry and corresponding KV store entry
-	rootKVStore := kvstore.NewDefaultKVStore(epochProtocolState.ID())
+	rootKVStore, err := kvstore.NewDefaultKVStore(
+		originalRootKVStore.GetFinalizationSafetyThreshold(),
+		originalRootKVStore.GetEpochExtensionViewCount(),
+		epochRichProtocolState.ID())
+	require.NoError(t, err)
 	protocolVersion, encodedKVStore, err := rootKVStore.VersionedEncode()
 	require.NoError(t, err)
 	encodableSnapshot.SealingSegment.ProtocolStateEntries = map[flow.Identifier]*flow.ProtocolStateEntryWrapper{
@@ -253,21 +284,23 @@ func withNextEpoch(
 				Version: protocolVersion,
 				Data:    encodedKVStore,
 			},
-			EpochEntry: epochProtocolState,
+			EpochEntry: epochRichProtocolState,
 		},
 	}
 
 	// Since we modified the root protocol state, we need to update the root block's ProtocolStateID field.
+	// rootBlock is a pointer, so mutations apply to Snapshot
 	rootBlock := encodableSnapshot.SealingSegment.Blocks[0]
 	rootBlockPayload := rootBlock.Payload
 	rootBlockPayload.ProtocolStateID = rootKVStore.ID()
 	rootBlock.SetPayload(*rootBlockPayload)
 	// Since we changed the root block, we need to update the QC, root result, and root seal.
-	encodableSnapshot.LatestResult.BlockID = rootBlock.ID()
-	encodableSnapshot.LatestSeal.ResultID = encodableSnapshot.LatestResult.ID()
-	encodableSnapshot.LatestSeal.BlockID = rootBlock.ID()
+	// rootResult and rootSeal are pointers, so mutations apply to Snapshot
+	rootResult.BlockID = rootBlock.ID()
+	rootSeal.ResultID = rootResult.ID()
+	rootSeal.BlockID = rootBlock.ID()
 	encodableSnapshot.SealingSegment.LatestSeals = map[flow.Identifier]flow.Identifier{
-		rootBlock.ID(): encodableSnapshot.LatestSeal.ID(),
+		rootBlock.ID(): rootSeal.ID(),
 	}
 	encodableSnapshot.QuorumCertificate = createQC(rootBlock)
 

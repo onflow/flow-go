@@ -3,6 +3,7 @@ package pebble
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/pkg/errors"
@@ -15,17 +16,21 @@ import (
 // Registers library that implements pebble storage for registers
 // given a pebble instance with root block and root height populated
 type Registers struct {
-	db           *pebble.DB
-	firstHeight  uint64
-	latestHeight *atomic.Uint64
+	db             *pebble.DB
+	firstHeight    uint64
+	latestHeight   *atomic.Uint64
+	pruneThreshold uint64
 }
+
+// PruningDisabled represents the absence of a pruning threshold.
+const PruningDisabled = math.MaxUint64
 
 var _ storage.RegisterIndex = (*Registers)(nil)
 
 // NewRegisters takes a populated pebble instance with LatestHeight and FirstHeight set.
 // return storage.ErrNotBootstrapped if they those two keys are unavailable as it implies a uninitialized state
 // return other error if database is in a corrupted state
-func NewRegisters(db *pebble.DB) (*Registers, error) {
+func NewRegisters(db *pebble.DB, pruneThreshold uint64) (*Registers, error) {
 	// check height keys and populate cache. These two variables will have been set
 	firstHeight, latestHeight, err := ReadHeightsFromBootstrappedDB(db)
 	if err != nil {
@@ -33,11 +38,17 @@ func NewRegisters(db *pebble.DB) (*Registers, error) {
 		return nil, fmt.Errorf("unable to initialize register storage, latest height unavailable in db: %w", err)
 	}
 
+	// If no pruning threshold is provided, disable pruning.
+	if pruneThreshold == 0 {
+		pruneThreshold = PruningDisabled
+	}
+
 	// All registers between firstHeight and lastHeight have been indexed
 	return &Registers{
-		db:           db,
-		firstHeight:  firstHeight,
-		latestHeight: atomic.NewUint64(latestHeight),
+		db:             db,
+		firstHeight:    firstHeight,
+		latestHeight:   atomic.NewUint64(latestHeight),
+		pruneThreshold: pruneThreshold,
 	}, nil
 }
 
@@ -53,12 +64,14 @@ func (s *Registers) Get(
 	reg flow.RegisterID,
 	height uint64,
 ) (flow.RegisterValue, error) {
-	latestHeight := s.latestHeight.Load()
-	if height > latestHeight || height < s.firstHeight {
-		return nil, errors.Wrap(
-			storage.ErrHeightNotIndexed,
-			fmt.Sprintf("height %d not indexed, indexed range is [%d-%d]", height, s.firstHeight, latestHeight),
-		)
+	latestHeight := s.LatestHeight()
+	if height > latestHeight {
+		return nil, fmt.Errorf("height %d not indexed, latestHeight: %d, %w", height, latestHeight, storage.ErrHeightNotIndexed)
+	}
+
+	firstHeight := s.calculateFirstHeight(latestHeight)
+	if height < firstHeight {
+		return nil, fmt.Errorf("height %d not indexed, indexed range: [%d-%d], %w", height, firstHeight, latestHeight, storage.ErrHeightNotIndexed)
 	}
 	key := newLookupKey(height, reg)
 	return s.lookupRegister(key.Bytes())
@@ -132,6 +145,7 @@ func (s *Registers) Store(
 	if err != nil {
 		return fmt.Errorf("failed to commit batch: %w", err)
 	}
+
 	s.latestHeight.Store(height)
 
 	return nil
@@ -144,7 +158,30 @@ func (s *Registers) LatestHeight() uint64 {
 
 // FirstHeight first indexed height found in the store, typically root block for the spork
 func (s *Registers) FirstHeight() uint64 {
-	return s.firstHeight
+	return s.calculateFirstHeight(s.LatestHeight())
+}
+
+// calculateFirstHeight calculates the first indexed height that is stored in the register index, based on the
+// latest height and the configured pruning threshold. If the latest height is below the pruning threshold, the
+// first indexed height will be the same as the initial height when the store was initialized. If the pruning
+// threshold has been exceeded, the first indexed height is adjusted accordingly.
+//
+// Parameters:
+// - latestHeight: the most recent height of complete registers available.
+//
+// Returns:
+// - The first indexed height, either as the initialized height or adjusted for pruning.
+func (s *Registers) calculateFirstHeight(latestHeight uint64) uint64 {
+	if latestHeight < s.pruneThreshold {
+		return s.firstHeight
+	}
+
+	pruneHeight := latestHeight - s.pruneThreshold
+	if pruneHeight < s.firstHeight {
+		return s.firstHeight
+	}
+
+	return pruneHeight
 }
 
 func firstStoredHeight(db *pebble.DB) (uint64, error) {

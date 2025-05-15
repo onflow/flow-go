@@ -18,6 +18,12 @@ import (
 
 // DefaultSerializer is the default implementation for an Execution Data serializer.
 // It is configured to use cbor encoding with LZ4 compression.
+//
+// CAUTION: this encoding should only be used for encoding/decoding data within a node.
+// If used for decoding data that is shared between nodes, it makes the recipient VULNERABLE
+// to RESOURCE EXHAUSTION ATTACKS, where a byzantine sender could include garbage data in the
+// encoding, which would not be noticed by the recipient because the garbage data is dropped
+// at the decoding step - yet, it consumes the recipient's networking bandwidth.
 var DefaultSerializer Serializer
 
 func init() {

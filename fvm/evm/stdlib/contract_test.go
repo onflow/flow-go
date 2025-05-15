@@ -1,30 +1,56 @@
 package stdlib_test
 
 import (
+	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/sema"
-	cadenceStdlib "github.com/onflow/cadence/runtime/stdlib"
-	"github.com/onflow/cadence/runtime/tests/utils"
+	"github.com/onflow/cadence/sema"
+	cadenceStdlib "github.com/onflow/cadence/stdlib"
+	. "github.com/onflow/cadence/test_utils/common_utils"
+	. "github.com/onflow/cadence/test_utils/runtime_utils"
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	coreContractstemplates "github.com/onflow/flow-core-contracts/lib/go/templates"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
 	"github.com/onflow/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/impl"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+func newLocationResolver(
+	cryptoContractAddress flow.Address,
+) func(
+	identifiers []runtime.Identifier,
+	location runtime.Location,
+) ([]runtime.ResolvedLocation, error) {
+	cryptoContractAddress2 := common.Address(cryptoContractAddress)
+	return func(
+		identifiers []runtime.Identifier,
+		location runtime.Location,
+	) ([]runtime.ResolvedLocation, error) {
+		return environment.ResolveLocation(
+			identifiers,
+			location,
+			nil,
+			cryptoContractAddress2,
+		)
+	}
+}
 
 type testContractHandler struct {
 	flowTokenAddress     common.Address
@@ -36,6 +62,7 @@ type testContractHandler struct {
 	batchRun             func(txs [][]byte, coinbase types.Address) []*types.ResultSummary
 	generateResourceUUID func() uint64
 	dryRun               func(tx []byte, from types.Address) *types.ResultSummary
+	commitBlockProposal  func()
 }
 
 var _ types.ContractHandler = &testContractHandler{}
@@ -97,6 +124,13 @@ func (t *testContractHandler) GenerateResourceUUID() uint64 {
 		panic("unexpected GenerateResourceUUID")
 	}
 	return t.generateResourceUUID()
+}
+
+func (t *testContractHandler) CommitBlockProposal() {
+	if t.commitBlockProposal == nil {
+		panic("unexpected CommitBlockProposal")
+	}
+	t.commitBlockProposal()
 }
 
 type testFlowAccount struct {
@@ -181,6 +215,16 @@ func (t *testFlowAccount) Call(address types.Address, data types.Data, limit typ
 	return t.call(address, data, limit, balance)
 }
 
+func requireEqualEventAddress(t *testing.T, event cadence.Event, address types.Address) {
+	actual := cadence.SearchFieldByName(event, types.CadenceOwnedAccountCreatedTypeAddressFieldName)
+	strippedHex := strings.TrimPrefix(address.String(), "0x")
+	expected, err := cadence.NewString(strippedHex)
+	if err != nil {
+		require.NoError(t, err)
+	}
+	require.Equal(t, expected, actual)
+}
+
 func deployContracts(
 	t *testing.T,
 	rt runtime.Runtime,
@@ -200,6 +244,7 @@ func deployContracts(
 		NonFungibleTokenAddress:           contractsAddressHex,
 		MetadataViewsAddress:              contractsAddressHex,
 		FungibleTokenMetadataViewsAddress: contractsAddressHex,
+		CryptoAddress:                     contractsAddressHex,
 	}
 
 	contracts := []struct {
@@ -207,6 +252,10 @@ func deployContracts(
 		code     []byte
 		deployTx []byte
 	}{
+		{
+			name: "Crypto",
+			code: coreContracts.Crypto(),
+		},
 		{
 			name: "ViewResolver",
 			code: coreContracts.ViewResolver(),
@@ -287,9 +336,15 @@ func deployContracts(
 func newEVMTransactionEnvironment(handler types.ContractHandler, contractAddress flow.Address) runtime.Environment {
 	transactionEnvironment := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
+	internalEVMValue := impl.NewInternalEVMContractValue(
+		nil,
+		handler,
+		contractAddress,
+	)
+
 	stdlib.SetupEnvironment(
 		transactionEnvironment,
-		handler,
+		internalEVMValue,
 		contractAddress,
 	)
 
@@ -299,9 +354,15 @@ func newEVMTransactionEnvironment(handler types.ContractHandler, contractAddress
 func newEVMScriptEnvironment(handler types.ContractHandler, contractAddress flow.Address) runtime.Environment {
 	scriptEnvironment := runtime.NewScriptInterpreterEnvironment(runtime.Config{})
 
+	internalEVMValue := impl.NewInternalEVMContractValue(
+		nil,
+		handler,
+		contractAddress,
+	)
+
 	stdlib.SetupEnvironment(
 		scriptEnvironment,
-		handler,
+		internalEVMValue,
 		contractAddress,
 	)
 
@@ -319,7 +380,7 @@ func TestEVMEncodeABI(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -339,7 +400,7 @@ func TestEVMEncodeABI(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -421,6 +482,785 @@ func TestEVMEncodeABI(t *testing.T) {
 	assert.Equal(t, computation, uint(len(cdcBytes)))
 }
 
+func TestEVMEncodeABIByteTypes(t *testing.T) {
+
+	t.Parallel()
+
+	handler := &testContractHandler{}
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+	rt := runtime.NewRuntime(runtime.Config{})
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	computation := uint(0)
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: newLocationResolver(contractsAddress),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
+			if compKind == environment.ComputationKindEVMEncodeABI {
+				computation += intensity
+			}
+			return nil
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	t.Run("ABI encode into `bytes` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): [UInt8] {
+            let bytes: EVM.EVMBytes = EVM.EVMBytes(value: [5, 10, 15, 20, 25])
+            return EVM.encodeABI([bytes])
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		abiBytes := []byte{
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x20, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x5, 0x5,
+			0xa, 0xf, 0x14, 0x19, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0,
+		}
+		expected := "00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000005050a0f1419000000000000000000000000000000000000000000000000000000"
+		assert.Equal(
+			t,
+			expected,
+			hex.EncodeToString(abiBytes),
+		)
+		cdcBytes := make([]cadence.Value, 0)
+		for _, bt := range abiBytes {
+			cdcBytes = append(cdcBytes, cadence.UInt8(bt))
+		}
+		encodedABI := cadence.NewArray(
+			cdcBytes,
+		).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+		assert.Equal(t,
+			encodedABI,
+			result,
+		)
+		assert.Equal(t, computation, uint(len(cdcBytes)))
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode into `bytes[]` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): [UInt8] {
+            let bytesArray: [EVM.EVMBytes] = [
+              EVM.EVMBytes(value: [5]),
+              EVM.EVMBytes(value: [10])
+            ]
+            return EVM.encodeABI([bytesArray])
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		abiBytes := []byte{
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x20, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x40,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x80, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x1, 0x5, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0xa, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0,
+		}
+		expected := "00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001050000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010a00000000000000000000000000000000000000000000000000000000000000"
+		assert.Equal(
+			t,
+			expected,
+			hex.EncodeToString(abiBytes),
+		)
+		cdcBytes := make([]cadence.Value, 0)
+		for _, bt := range abiBytes {
+			cdcBytes = append(cdcBytes, cadence.UInt8(bt))
+		}
+		encodedABI := cadence.NewArray(
+			cdcBytes,
+		).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+		assert.Equal(t,
+			encodedABI,
+			result,
+		)
+		assert.Equal(t, computation, uint(len(cdcBytes)))
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode into `bytes4` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): [UInt8] {
+            let bytes: EVM.EVMBytes4 = EVM.EVMBytes4(value: [5, 10, 15, 20])
+            return EVM.encodeABI([bytes])
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		abiBytes := []byte{
+			0x5, 0xa, 0xf, 0x14, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		}
+		expected := "050a0f1400000000000000000000000000000000000000000000000000000000"
+		assert.Equal(
+			t,
+			expected,
+			hex.EncodeToString(abiBytes),
+		)
+		cdcBytes := make([]cadence.Value, 0)
+		for _, bt := range abiBytes {
+			cdcBytes = append(cdcBytes, cadence.UInt8(bt))
+		}
+		encodedABI := cadence.NewArray(
+			cdcBytes,
+		).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+		assert.Equal(t,
+			encodedABI,
+			result,
+		)
+		assert.Equal(t, computation, uint(len(cdcBytes)))
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode into `bytes4[]` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): [UInt8] {
+            let bytesArray: [EVM.EVMBytes4] = [
+              EVM.EVMBytes4(value: [5, 10, 15, 20]),
+              EVM.EVMBytes4(value: [25, 30, 35, 40])
+            ]
+            return EVM.encodeABI([bytesArray])
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		abiBytes := []byte{
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x20, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x2, 0x5, 0xa, 0xf, 0x14, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x19, 0x1e, 0x23, 0x28, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		}
+		expected := "00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002050a0f1400000000000000000000000000000000000000000000000000000000191e232800000000000000000000000000000000000000000000000000000000"
+		assert.Equal(
+			t,
+			expected,
+			hex.EncodeToString(abiBytes),
+		)
+		cdcBytes := make([]cadence.Value, 0)
+		for _, bt := range abiBytes {
+			cdcBytes = append(cdcBytes, cadence.UInt8(bt))
+		}
+		encodedABI := cadence.NewArray(
+			cdcBytes,
+		).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+		assert.Equal(t,
+			encodedABI,
+			result,
+		)
+		assert.Equal(t, computation, uint(len(cdcBytes)))
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode into `bytes32` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): [UInt8] {
+            let bytes: EVM.EVMBytes32 = EVM.EVMBytes32(
+              value: [
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+                31, 32
+              ]
+            )
+            return EVM.encodeABI([bytes])
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		abiBytes := []byte{
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc,
+			0xd, 0xe, 0xf, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+			0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20,
+		}
+		expected := "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+		assert.Equal(
+			t,
+			expected,
+			hex.EncodeToString(abiBytes),
+		)
+		cdcBytes := make([]cadence.Value, 0)
+		for _, bt := range abiBytes {
+			cdcBytes = append(cdcBytes, cadence.UInt8(bt))
+		}
+		encodedABI := cadence.NewArray(
+			cdcBytes,
+		).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+		assert.Equal(t,
+			encodedABI,
+			result,
+		)
+		assert.Equal(t, computation, uint(len(cdcBytes)))
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode into `bytes32[]` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): [UInt8] {
+            let bytesA: EVM.EVMBytes32 = EVM.EVMBytes32(
+              value: [
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+                31, 32
+              ]
+            )
+            let bytesB: EVM.EVMBytes32 = EVM.EVMBytes32(
+              value: [
+                32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19,
+                18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3,
+                2, 1
+              ]
+            )
+            let bytesArray: [EVM.EVMBytes32] = [bytesA, bytesB]
+            return EVM.encodeABI([bytesArray])
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		abiBytes := []byte{
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x20, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2, 0x1,
+			0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe,
+			0xf, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
+			0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x20, 0x1f, 0x1e, 0x1d,
+			0x1c, 0x1b, 0x1a, 0x19, 0x18, 0x17, 0x16, 0x15, 0x14, 0x13, 0x12,
+			0x11, 0x10, 0xf, 0xe, 0xd, 0xc, 0xb, 0xa, 0x9, 0x8, 0x7, 0x6, 0x5,
+			0x4, 0x3, 0x2, 0x1,
+		}
+		expected := "000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000020102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20201f1e1d1c1b1a191817161514131211100f0e0d0c0b0a090807060504030201"
+		assert.Equal(
+			t,
+			expected,
+			hex.EncodeToString(abiBytes),
+		)
+		cdcBytes := make([]cadence.Value, 0)
+		for _, bt := range abiBytes {
+			cdcBytes = append(cdcBytes, cadence.UInt8(bt))
+		}
+		encodedABI := cadence.NewArray(
+			cdcBytes,
+		).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+		assert.Equal(t,
+			encodedABI,
+			result,
+		)
+		assert.Equal(t, computation, uint(len(cdcBytes)))
+
+		// Reset computation
+		computation = uint(0)
+	})
+}
+
+func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
+
+	t.Parallel()
+
+	handler := &testContractHandler{}
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+	rt := runtime.NewRuntime(runtime.Config{})
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	computation := uint(0)
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: newLocationResolver(contractsAddress),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
+			if compKind == environment.ComputationKindEVMDecodeABI {
+				computation += intensity
+			}
+			return nil
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	t.Run("ABI encode/decode into `bytes` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes = EVM.EVMBytes(value: [5, 10, 15, 20, 25])
+            let encodedData = EVM.encodeABI([bytes])
+            let types = [Type<EVM.EVMBytes>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
+
+            assert(values.length == 1)
+            let evmBytes = values[0] as! EVM.EVMBytes
+            assert(evmBytes.value == [5, 10, 15, 20, 25])
+
+            return true
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
+		)
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode/decode into `bytes[]` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes = EVM.EVMBytes(value: [5, 10, 15, 20, 25])
+            let bytesArray: [EVM.EVMBytes] = [bytes]
+            let encodedData = EVM.encodeABI([bytesArray])
+            let types = [Type<[EVM.EVMBytes]>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
+
+            assert(values.length == 1)
+            let evmBytes = values[0] as! [EVM.EVMBytes]
+            assert(evmBytes[0].value == [5, 10, 15, 20, 25])
+
+            return true
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
+		)
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode/decode into `bytes4` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes4 = EVM.EVMBytes4(value: [5, 10, 15, 20])
+            let encodedData = EVM.encodeABI([bytes])
+            let types = [Type<EVM.EVMBytes4>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
+
+            assert(values.length == 1)
+            let evmBytes = values[0] as! EVM.EVMBytes4
+            assert(evmBytes.value == [5, 10, 15, 20])
+
+            return true
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
+		)
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode/decode into `bytes4[]` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes4 = EVM.EVMBytes4(value: [5, 10, 15, 20])
+            let bytesArray: [EVM.EVMBytes4] = [bytes]
+            let encodedData = EVM.encodeABI([bytesArray])
+            let types = [Type<[EVM.EVMBytes4]>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
+
+            assert(values.length == 1)
+            let evmBytes = values[0] as! [EVM.EVMBytes4]
+            assert(evmBytes[0].value == [5, 10, 15, 20])
+
+            return true
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
+		)
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode/decode into `bytes32` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes32 = EVM.EVMBytes32(
+              value: [
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+                31, 32
+              ]
+            )
+            let encodedData = EVM.encodeABI([bytes])
+            let types = [Type<EVM.EVMBytes32>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
+
+            assert(values.length == 1)
+            let evmBytes = values[0] as! EVM.EVMBytes32
+            assert(evmBytes.value == [
+              1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+              17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+              31, 32
+            ])
+
+            return true
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
+		)
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode/decode into `bytes32[]` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes32 = EVM.EVMBytes32(
+              value: [
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+                31, 32
+              ]
+            )
+            let bytesArray: [EVM.EVMBytes32] = [bytes]
+            let encodedData = EVM.encodeABI([bytesArray])
+            let types = [Type<[EVM.EVMBytes32]>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
+
+            assert(values.length == 1)
+            let evmBytes = values[0] as! [EVM.EVMBytes32]
+            assert(evmBytes[0].value == [
+              1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+              17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+              31, 32
+            ])
+
+            return true
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
+		)
+
+		// Reset computation
+		computation = uint(0)
+	})
+}
+
 func TestEVMEncodeABIComputation(t *testing.T) {
 
 	t.Parallel()
@@ -432,7 +1272,7 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -440,10 +1280,9 @@ func TestEVMEncodeABIComputation(t *testing.T) {
       access(all)
       fun main(): [UInt8] {
         let address = EVM.EVMAddress(
-          bytes: [
-            122, 88, 192, 190, 114, 190, 33, 139, 65, 198,
-            8, 183, 254, 124, 91, 182, 48, 115, 108, 113
-          ]
+            bytes: "7A58c0Be72BE218B41C608b7Fe7C5bB630736C71"
+                .decodeHex()
+                .toConstantSized<[UInt8; 20]>()!
         )
         let arr: [UInt8] = [1, 2, 3, 4, 5]
 
@@ -467,7 +1306,7 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -537,7 +1376,7 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -562,7 +1401,7 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -632,7 +1471,7 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -666,7 +1505,7 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -736,7 +1575,7 @@ func TestEVMDecodeABI(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -764,7 +1603,7 @@ func TestEVMDecodeABI(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -855,7 +1694,7 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -863,10 +1702,9 @@ func TestEVMDecodeABIComputation(t *testing.T) {
       access(all)
       fun main(): [UInt8] {
         let address = EVM.EVMAddress(
-          bytes: [
-            122, 88, 192, 190, 114, 190, 33, 139, 65, 198,
-            8, 183, 254, 124, 91, 182, 48, 115, 108, 113
-          ]
+            bytes: "7A58c0Be72BE218B41C608b7Fe7C5bB630736C71"
+                .decodeHex()
+                .toConstantSized<[UInt8; 20]>()!
         )
         let arr: [UInt8] = [1, 2, 3, 4, 5]
 
@@ -898,7 +1736,7 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -957,6 +1795,266 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 	assert.Equal(t, computation, uint(len(cdcBytes.Values)))
 }
 
+func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
+
+	t.Parallel()
+
+	handler := &testContractHandler{}
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+	rt := runtime.NewRuntime(runtime.Config{})
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: newLocationResolver(contractsAddress),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+		OnHash: func(
+			data []byte,
+			tag string,
+			hashAlgorithm runtime.HashAlgorithm,
+		) ([]byte, error) {
+			return crypto.Keccak256(data), nil
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	t.Run("with values between the boundaries", func(t *testing.T) {
+
+		script := []byte(`
+        import EVM from 0x1
+
+        access(all)
+        fun main(): Bool {
+          // Check UInt/Int encode/decode
+          let amount: UInt256 = 18446744073709551615
+          let minBalance: Int256 = -18446744073709551615
+          let data = EVM.encodeABIWithSignature(
+            "withdraw(uint,int)",
+            [UInt(amount), Int(minBalance)]
+          )
+          let values = EVM.decodeABIWithSignature(
+            "withdraw(uint,int)",
+            types: [Type<UInt>(), Type<Int>()],
+            data: data
+          )
+          assert((values[0] as! UInt) == UInt(amount))
+          assert((values[1] as! Int) == Int(minBalance))
+
+          return true
+        }
+		`)
+
+		// Run script
+
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t, cadence.Bool(true), result)
+	})
+
+	t.Run("with values at the boundaries", func(t *testing.T) {
+
+		script := []byte(`
+        import EVM from 0x1
+
+        access(all)
+        fun main(): Bool {
+          // Check UInt*/Int* encode/decode
+          let data = EVM.encodeABIWithSignature(
+            "withdraw(uint,int,uint,int)",
+            [UInt(UInt256.max), Int(Int256.max),UInt(UInt256.min), Int(Int256.min)]
+          )
+          let values = EVM.decodeABIWithSignature(
+            "withdraw(uint,int,uint,int)",
+            types: [Type<UInt>(), Type<Int>(),Type<UInt>(), Type<Int>()],
+            data: data
+          )
+          assert((values[0] as! UInt) == UInt(UInt256.max))
+          assert((values[1] as! Int) == Int(Int256.max))
+          assert((values[2] as! UInt) == UInt(UInt256.min))
+          assert((values[3] as! Int) == Int(Int256.min))
+
+          return true
+        }
+		`)
+
+		// Run script
+
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t, cadence.Bool(true), result)
+	})
+
+	t.Run("with UInt values outside the boundaries", func(t *testing.T) {
+
+		script := []byte(`
+        import EVM from 0x1
+
+        access(all)
+        fun main(): Bool {
+          let data = EVM.encodeABIWithSignature(
+            "withdraw(uint)",
+            [UInt(UInt256.max)+10]
+          )
+
+          return true
+        }
+		`)
+
+		// Run script
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+
+		assert.ErrorContains(
+			t,
+			err,
+			"failed to ABI encode value of type UInt: value outside the boundaries of uint256",
+		)
+	})
+
+	t.Run("with Int values outside the max boundary", func(t *testing.T) {
+
+		script := []byte(`
+        import EVM from 0x1
+
+        access(all)
+        fun main(): Bool {
+          let data = EVM.encodeABIWithSignature(
+            "withdraw(int)",
+            [Int(Int256.max)+10]
+          )
+
+          return true
+        }
+		`)
+
+		// Run script
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+
+		assert.ErrorContains(
+			t,
+			err,
+			"failed to ABI encode value of type Int: value outside the boundaries of int256",
+		)
+	})
+
+	t.Run("with Int values outside the min boundary", func(t *testing.T) {
+
+		script := []byte(`
+        import EVM from 0x1
+
+        access(all)
+        fun main(): Bool {
+          let data = EVM.encodeABIWithSignature(
+            "withdraw(int)",
+            [Int(Int256.min)-10]
+          )
+
+          return true
+        }
+		`)
+
+		// Run script
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+
+		assert.ErrorContains(
+			t,
+			err,
+			"failed to ABI encode value of type Int: value outside the boundaries of int256",
+		)
+	})
+}
+
 func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 
 	t.Parallel()
@@ -968,7 +2066,7 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -976,12 +2074,10 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
       access(all)
       fun main(): Bool {
         // Check EVM.EVMAddress encode/decode
-        // bytes for address 0x7A58c0Be72BE218B41C608b7Fe7C5bB630736C71
         let address = EVM.EVMAddress(
-          bytes: [
-            122, 88, 192, 190, 114, 190, 33, 139, 65, 198,
-            8, 183, 254, 124, 91, 182, 48, 115, 108, 113
-          ]
+            bytes: "7A58c0Be72BE218B41C608b7Fe7C5bB630736C71"
+                .decodeHex()
+                .toConstantSized<[UInt8; 20]>()!
         )
         var data = EVM.encodeABI([address])
         var values = EVM.decodeABI(types: [Type<EVM.EVMAddress>()], data: data)
@@ -1013,7 +2109,9 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
           Int32(-33),
           Int64(-33),
           Int128(-33),
-          Int256(-33)
+          Int256(-33),
+          UInt(33),
+          Int(-33)
         ])
         values = EVM.decodeABI(
           types: [
@@ -1028,7 +2126,9 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
             Type<Int32>(),
             Type<Int64>(),
             Type<Int128>(),
-            Type<Int256>()
+            Type<Int256>(),
+            Type<UInt>(),
+            Type<Int>()
           ],
           data: data
         )
@@ -1044,6 +2144,8 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
         assert((values[9] as! Int64) == -33)
         assert((values[10] as! Int128) == -33)
         assert((values[11] as! Int256) == -33)
+        assert((values[12] as! UInt) == 33)
+        assert((values[13] as! Int) == -33)
 
         // Check variable-size array of leaf types encode/decode
         data = EVM.encodeABI([
@@ -1177,7 +2279,7 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -1245,7 +2347,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -1255,7 +2357,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: LocationResolver,
+			OnResolveLocation: newLocationResolver(contractsAddress),
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -1312,7 +2414,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -1331,7 +2433,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -1341,7 +2443,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: LocationResolver,
+			OnResolveLocation: newLocationResolver(contractsAddress),
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -1397,7 +2499,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -1416,7 +2518,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -1426,7 +2528,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: LocationResolver,
+			OnResolveLocation: newLocationResolver(contractsAddress),
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -1483,7 +2585,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -1502,7 +2604,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -1512,7 +2614,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: LocationResolver,
+			OnResolveLocation: newLocationResolver(contractsAddress),
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -1569,7 +2671,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -1588,7 +2690,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -1598,7 +2700,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: LocationResolver,
+			OnResolveLocation: newLocationResolver(contractsAddress),
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -1665,7 +2767,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -1684,7 +2786,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -1694,7 +2796,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: LocationResolver,
+			OnResolveLocation: newLocationResolver(contractsAddress),
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -1751,7 +2853,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -1770,7 +2872,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -1780,7 +2882,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: LocationResolver,
+			OnResolveLocation: newLocationResolver(contractsAddress),
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -1837,7 +2939,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -1856,7 +2958,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -1866,7 +2968,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: LocationResolver,
+			OnResolveLocation: newLocationResolver(contractsAddress),
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -1923,7 +3025,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -1942,7 +3044,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -1952,7 +3054,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: LocationResolver,
+			OnResolveLocation: newLocationResolver(contractsAddress),
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -2009,7 +3111,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -2028,7 +3130,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -2038,7 +3140,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: LocationResolver,
+			OnResolveLocation: newLocationResolver(contractsAddress),
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -2095,7 +3197,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -2114,7 +3216,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -2124,7 +3226,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: LocationResolver,
+			OnResolveLocation: newLocationResolver(contractsAddress),
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -2191,7 +3293,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -2211,19 +3313,17 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
 
       access(all)
       fun main(): [UInt8] {
-        // bytes for address 0x7A58c0Be72BE218B41C608b7Fe7C5bB630736C71
         let address = EVM.EVMAddress(
-          bytes: [
-            122, 88, 192, 190, 114, 190, 33, 139, 65, 198,
-            8, 183, 254, 124, 91, 182, 48, 115, 108, 113
-          ]
+            bytes: "7A58c0Be72BE218B41C608b7Fe7C5bB630736C71"
+                .decodeHex()
+                .toConstantSized<[UInt8; 20]>()!
         )
 
         return EVM.encodeABIWithSignature(
@@ -2242,7 +3342,7 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -2337,7 +3437,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -2375,7 +3475,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -2468,7 +3568,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -2495,7 +3595,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -2579,7 +3679,7 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -2598,7 +3698,7 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -2670,6 +3770,183 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 	)
 }
 
+func TestEVMAddressSerializationAndDeserialization(t *testing.T) {
+
+	t.Parallel()
+
+	handler := &testContractHandler{}
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewRuntime(runtime.Config{})
+
+	addressFromBytesScript := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(_ bytes: [UInt8; 20]): EVM.EVMAddress {
+          return EVM.EVMAddress(bytes: bytes)
+      }
+    `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: newLocationResolver(contractsAddress),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	sourceBytes := []byte{
+		1, 1, 2, 2, 3, 3, 4, 4, 5, 5,
+		6, 6, 7, 7, 8, 8, 9, 9, 10, 10,
+	}
+
+	// construct the address as a cadence value from sourceBytes
+	addressBytesArray := cadence.NewArray([]cadence.Value{
+		cadence.UInt8(sourceBytes[0]), cadence.UInt8(sourceBytes[1]),
+		cadence.UInt8(sourceBytes[2]), cadence.UInt8(sourceBytes[3]),
+		cadence.UInt8(sourceBytes[4]), cadence.UInt8(sourceBytes[5]),
+		cadence.UInt8(sourceBytes[6]), cadence.UInt8(sourceBytes[7]),
+		cadence.UInt8(sourceBytes[8]), cadence.UInt8(sourceBytes[9]),
+		cadence.UInt8(sourceBytes[10]), cadence.UInt8(sourceBytes[11]),
+		cadence.UInt8(sourceBytes[12]), cadence.UInt8(sourceBytes[13]),
+		cadence.UInt8(sourceBytes[14]), cadence.UInt8(sourceBytes[15]),
+		cadence.UInt8(sourceBytes[16]), cadence.UInt8(sourceBytes[17]),
+		cadence.UInt8(sourceBytes[18]), cadence.UInt8(sourceBytes[19]),
+	}).WithType(stdlib.EVMAddressBytesCadenceType)
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	// Run script
+
+	constructAddrResult, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: addressFromBytesScript,
+			Arguments: EncodeArgs([]cadence.Value{
+				addressBytesArray,
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	evmAddressCadenceType := stdlib.NewEVMAddressCadenceType(common.Address(contractsAddress))
+	evmAddress := cadence.NewStruct([]cadence.Value{
+		addressBytesArray,
+	}).WithType(evmAddressCadenceType)
+
+	assert.Equal(t,
+		evmAddress,
+		constructAddrResult,
+	)
+
+	// Attempt to serialize and deserialize the address
+
+	addressSerializationScript := []byte(`
+	  import EVM from 0x1
+
+	  access(all)
+	  fun main(address: EVM.EVMAddress): String {
+		return address.toString()
+	  }
+	`)
+
+	serializeAddrResult, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: addressSerializationScript,
+			Arguments: EncodeArgs([]cadence.Value{
+				evmAddress,
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+
+	require.NoError(t, err)
+
+	// Encode the sourceBytes array as a hex string as the expected value to compare the result against
+
+	expectedHex, _ := cadence.NewString(hex.EncodeToString(sourceBytes))
+
+	assert.Equal(t,
+		expectedHex,
+		serializeAddrResult,
+	)
+
+	// Attempt to deserialize the address
+
+	addressDeserializationScript := []byte(`
+	  import EVM from 0x1
+
+	  access(all)
+	  fun main(hexString: String): EVM.EVMAddress {
+		return EVM.addressFromString(hexString)
+	  }
+	`)
+
+	deserializeAddrResult, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: addressDeserializationScript,
+			Arguments: EncodeArgs([]cadence.Value{
+				serializeAddrResult,
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+
+	require.NoError(t, err)
+
+	assert.Equal(t,
+		evmAddress,
+		deserializeAddrResult,
+	)
+}
+
 func TestBalanceConstructionAndReturn(t *testing.T) {
 
 	t.Parallel()
@@ -2681,7 +3958,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -2700,7 +3977,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -2808,7 +4085,7 @@ func TestEVMRun(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -2830,7 +4107,7 @@ func TestEVMRun(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -2937,7 +4214,7 @@ func TestEVMDryRun(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
@@ -2947,7 +4224,7 @@ func TestEVMDryRun(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -3005,10 +4282,128 @@ func TestEVMDryRun(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	res, err := stdlib.ResultSummaryFromEVMResultValue(val)
+	res, err := impl.ResultSummaryFromEVMResultValue(val)
 	require.NoError(t, err)
 	assert.Equal(t, types.StatusSuccessful, res.Status)
 	assert.True(t, dryRunCalled)
+}
+
+func TestEVMDryCall(t *testing.T) {
+
+	t.Parallel()
+
+	dryCallCalled := false
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+	handler := &testContractHandler{
+		evmContractAddress: common.Address(contractsAddress),
+		dryRun: func(tx []byte, from types.Address) *types.ResultSummary {
+			dryCallCalled = true
+			gethTx := &gethTypes.Transaction{}
+			if err := gethTx.UnmarshalBinary(tx); err != nil {
+				require.Fail(t, err.Error())
+			}
+
+			require.NotNil(t, gethTx.To())
+
+			assert.Equal(
+				t,
+				types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 10},
+				from,
+			)
+			assert.Equal(
+				t,
+				types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15},
+				types.NewAddress(*gethTx.To()),
+			)
+			assert.Equal(t, []byte{255, 107, 204, 122}, gethTx.Data())
+			assert.Equal(t, uint64(33_000), gethTx.Gas())
+			assert.Equal(t, big.NewInt(150), gethTx.Value())
+
+			return &types.ResultSummary{
+				Status: types.StatusSuccessful,
+			}
+		},
+	}
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewRuntime(runtime.Config{})
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: newLocationResolver(contractsAddress),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	// Run script
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.Result {
+          return EVM.dryCall(
+            from: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 10]),
+            to: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]),
+            data: [255, 107, 204, 122],
+            gasLimit: 33000,
+            value: EVM.Balance(attoflow: 150)
+          )
+      }
+    `)
+
+	val, err := rt.ExecuteScript(
+		runtime.Script{
+			Source:    script,
+			Arguments: nil,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+	res, err := impl.ResultSummaryFromEVMResultValue(val)
+	require.NoError(t, err)
+	assert.Equal(t, types.StatusSuccessful, res.Status)
+	assert.True(t, dryCallCalled)
 }
 
 func TestEVMBatchRun(t *testing.T) {
@@ -3066,7 +4461,7 @@ func TestEVMBatchRun(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -3086,7 +4481,7 @@ func TestEVMBatchRun(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -3137,7 +4532,7 @@ func TestEVMBatchRun(t *testing.T) {
 	require.True(t, ok)
 
 	for _, v := range resultsCadence.Values {
-		res, err := stdlib.ResultSummaryFromEVMResultValue(v)
+		res, err := impl.ResultSummaryFromEVMResultValue(v)
 		require.NoError(t, err)
 		assert.Equal(t, types.StatusSuccessful, res.Status)
 	}
@@ -3160,7 +4555,7 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -3186,7 +4581,7 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -3239,7 +4634,7 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := cadence.NewArray([]cadence.Value{
-		cadence.UInt8(4), cadence.UInt8(0),
+		cadence.UInt8(5), cadence.UInt8(0),
 		cadence.UInt8(0), cadence.UInt8(0),
 		cadence.UInt8(0), cadence.UInt8(0),
 		cadence.UInt8(0), cadence.UInt8(0),
@@ -3264,23 +4659,11 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 	CheckCadenceEventTypes(t, events, expectedEventTypes)
 
 	// check cadence owned account created events
-	expectedCoaAddress := types.Address{3}
-	require.Equal(t,
-		expectedCoaAddress.ToCadenceValue(),
-		cadence.SearchFieldByName(
-			events[0],
-			types.CadenceOwnedAccountCreatedTypeAddressBytesFieldName,
-		),
-	)
+	expectedCoaAddress := types.Address{4}
+	requireEqualEventAddress(t, events[0], expectedCoaAddress)
 
-	expectedCoaAddress = types.Address{4}
-	require.Equal(t,
-		expectedCoaAddress.ToCadenceValue(),
-		cadence.SearchFieldByName(
-			events[1],
-			types.CadenceOwnedAccountCreatedTypeAddressBytesFieldName,
-		),
-	)
+	expectedCoaAddress = types.Address{5}
+	requireEqualEventAddress(t, events[1], expectedCoaAddress)
 }
 
 func TestCadenceOwnedAccountCall(t *testing.T) {
@@ -3295,7 +4678,7 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 	handler := &testContractHandler{
 		evmContractAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.True(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -3306,14 +4689,14 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 					limit types.GasLimit,
 					balance types.Balance,
 				) *types.ResultSummary {
-					assert.Equal(t, types.Address{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, toAddress)
+					assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, toAddress)
 					assert.Equal(t, types.Data{4, 5, 6}, data)
 					assert.Equal(t, types.GasLimit(9999), limit)
 					assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
 
 					return &types.ResultSummary{
-						Status:        types.StatusSuccessful,
-						ReturnedValue: types.Data{3, 1, 4},
+						Status:       types.StatusSuccessful,
+						ReturnedData: types.Data{3, 1, 4},
 					}
 				},
 			}
@@ -3323,7 +4706,7 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -3335,7 +4718,7 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 		  bal.setFLOW(flow: 1.23)
           let response = cadenceOwnedAccount.call(
               to: EVM.EVMAddress(
-                  bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                  bytes: [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
               ),
               data: [4, 5, 6],
               gasLimit: 9999,
@@ -3354,7 +4737,7 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -3409,6 +4792,136 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 	require.Equal(t, expected, actual)
 }
 
+func TestCadenceOwnedAccountDryCall(t *testing.T) {
+
+	t.Parallel()
+
+	dryCallCalled := false
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	handler := &testContractHandler{
+		evmContractAddress: common.Address(contractsAddress),
+		dryRun: func(tx []byte, from types.Address) *types.ResultSummary {
+			dryCallCalled = true
+			gethTx := &gethTypes.Transaction{}
+			if err := gethTx.UnmarshalBinary(tx); err != nil {
+				require.Fail(t, err.Error())
+			}
+
+			require.NotNil(t, gethTx.To())
+
+			assert.Equal(
+				t,
+				types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+				from,
+			)
+			assert.Equal(
+				t,
+				types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15},
+				types.NewAddress(*gethTx.To()),
+			)
+			assert.Equal(t, []byte{4, 5, 6}, gethTx.Data())
+			assert.Equal(t, uint64(33_000), gethTx.Gas())
+			assert.Equal(t, big.NewInt(1230000000000000000), gethTx.Value())
+
+			return &types.ResultSummary{
+				Status:       types.StatusSuccessful,
+				ReturnedData: []byte{3, 1, 4},
+			}
+		},
+	}
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): [UInt8] {
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          let bal = EVM.Balance(attoflow: 0)
+          bal.setFLOW(flow: 1.23)
+          let response = cadenceOwnedAccount.dryCall(
+              to: EVM.EVMAddress(
+                  bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]
+              ),
+              data: [4, 5, 6],
+              gasLimit: 33000,
+              value: bal
+          )
+          destroy cadenceOwnedAccount
+          return response.data
+      }
+	`)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: newLocationResolver(contractsAddress),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	// Run script
+
+	actual, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: script,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	expected := cadence.NewArray([]cadence.Value{
+		cadence.UInt8(3),
+		cadence.UInt8(1),
+		cadence.UInt8(4),
+	}).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+	require.Equal(t, expected, actual)
+	require.True(t, dryCallCalled)
+}
+
 func TestEVMAddressDeposit(t *testing.T) {
 
 	t.Parallel()
@@ -3422,7 +4935,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 	handler := &testContractHandler{
 
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.False(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -3444,7 +4957,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -3459,7 +4972,7 @@ func TestEVMAddressDeposit(t *testing.T) {
           destroy minter
 
           let address = EVM.EVMAddress(
-              bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+              bytes: [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
           )
           address.deposit(from: <-vault)
       }
@@ -3473,7 +4986,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -3531,7 +5044,7 @@ func TestCOADeposit(t *testing.T) {
 
 	var deposited bool
 
-	var expectedCoaAddress = types.Address{5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	var expectedCoaAddress = types.Address{6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 	handler := &testContractHandler{
 
@@ -3558,7 +5071,7 @@ func TestCOADeposit(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -3586,7 +5099,7 @@ func TestCOADeposit(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -3650,15 +5163,20 @@ func TestCOADeposit(t *testing.T) {
 	tokenDepositEvent := events[3]
 	tokenDepositEventFields := cadence.FieldsMappedByName(tokenDepositEvent)
 
-	// check address
-	require.Equal(t,
-		expectedCoaAddress.ToCadenceValue(),
-		tokenDepositEventFields["addressBytes"],
-	)
+	requireEqualEventAddress(t, tokenDepositEvent, expectedCoaAddress)
+
 	// check amount
 	require.Equal(t,
 		expectedBalance,
 		tokenDepositEventFields["amount"],
+	)
+
+	// check depositedUUID, based on the transaction content
+	// its expected the uuid of 4 be allocated to the source vault.
+	expectedDepositedUUID := cadence.UInt64(5)
+	require.Equal(t,
+		expectedDepositedUUID,
+		tokenDepositEventFields["depositedUUID"],
 	)
 }
 
@@ -3679,13 +5197,12 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 
 	var nextUUID uint64 = 1
 
-	var expectedCoaAddress = types.Address{5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	var expectedCoaAddress = types.Address{6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 	handler := &testContractHandler{
 		flowTokenAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
 			assert.Equal(t, expectedCoaAddress, fromAddress)
-			assert.Equal(t, deposited, isAuthorized)
 
 			return &testFlowAccount{
 				address: fromAddress,
@@ -3716,7 +5233,7 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -3753,7 +5270,7 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -3823,15 +5340,20 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 	tokenWithdrawEvent := events[4]
 	tokenWithdrawEventFields := cadence.FieldsMappedByName(tokenWithdrawEvent)
 
-	// check address
-	require.Equal(t,
-		expectedCoaAddress.ToCadenceValue(),
-		tokenWithdrawEventFields["addressBytes"],
-	)
+	requireEqualEventAddress(t, tokenWithdrawEvent, expectedCoaAddress)
+
 	// check amount
 	require.Equal(t,
 		expectedWithdrawBalance,
 		tokenWithdrawEventFields["amount"],
+	)
+
+	// check expectedWithdrawnUUID
+	// last allocated UUID is 1
+	expectedWithdrawnUUID := cadence.UInt64(1)
+	require.Equal(t,
+		expectedWithdrawnUUID,
+		tokenWithdrawEventFields["withdrawnUUID"],
 	)
 }
 
@@ -3849,7 +5371,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 	handler := &testContractHandler{
 		evmContractAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.True(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -3862,8 +5384,8 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 
 					return &types.ResultSummary{
 						Status:                  types.StatusSuccessful,
-						DeployedContractAddress: &types.Address{4},
-						ReturnedValue:           types.Data{5},
+						DeployedContractAddress: &types.Address{5},
+						ReturnedData:            types.Data{5},
 					}
 				},
 			}
@@ -3873,7 +5395,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -3888,7 +5410,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
           )
           destroy cadenceOwnedAccount
 
-          assert(res.deployedContract?.bytes == [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+          assert(res.deployedContract?.bytes == [5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
           return res.data
       }
    `)
@@ -3901,7 +5423,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -3966,7 +5488,7 @@ func RunEVMScript(
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
@@ -3976,7 +5498,7 @@ func RunEVMScript(
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -4038,7 +5560,7 @@ func TestEVMAccountBalance(t *testing.T) {
 		flowTokenAddress:   common.Address(contractsAddress),
 		evmContractAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.False(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -4073,7 +5595,7 @@ func TestEVMAccountNonce(t *testing.T) {
 		flowTokenAddress:   common.Address(contractsAddress),
 		evmContractAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.False(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -4113,7 +5635,7 @@ func TestEVMAccountCode(t *testing.T) {
 		flowTokenAddress:   common.Address(contractsAddress),
 		evmContractAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.False(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -4153,7 +5675,7 @@ func TestEVMAccountCodeHash(t *testing.T) {
 		flowTokenAddress:   common.Address(contractsAddress),
 		evmContractAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.False(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -4182,91 +5704,80 @@ func TestEVMAccountCodeHash(t *testing.T) {
 
 func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 	t.Parallel()
-
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	proof := &types.COAOwnershipProofInContext{
-		COAOwnershipProof: types.COAOwnershipProof{
-			Address:        types.FlowAddress(contractsAddress),
-			CapabilityPath: "coa",
-			Signatures:     []types.Signature{[]byte("signature")},
-			KeyIndices:     []uint64{0},
-		},
-		SignedData: []byte("signedData"),
-		EVMAddress: RandomAddress(t),
-	}
+	type onGetAccountKeyFunc func(
+		addr runtime.Address,
+		index uint32,
+	) (*cadenceStdlib.AccountKey, error)
 
-	handler := &testContractHandler{
-		deployCOA: func(_ uint64) types.Address {
-			return proof.EVMAddress
-		},
-	}
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
-	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+	type onVerifySignatureFunc func(
+		signature []byte,
+		tag string,
+		sd,
+		publicKey []byte,
+		signatureAlgorithm runtime.SignatureAlgorithm,
+		hashAlgorithm runtime.HashAlgorithm,
+	) (bool, error)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	validate := func(
+		proof *types.COAOwnershipProofInContext,
+		onGetAccountKey onGetAccountKeyFunc,
+		onVerifySignature onVerifySignatureFunc,
+	) (cadence.Value, error) {
+		handler := &testContractHandler{
+			deployCOA: func(_ uint64) types.Address {
+				return proof.EVMAddress
+			},
+		}
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	accountCodes := map[common.Location][]byte{}
-	var events []cadence.Event
+		rt := runtime.NewRuntime(runtime.Config{})
 
-	runtimeInterface := &TestRuntimeInterface{
-		Storage: NewTestLedger(nil, nil),
-		OnGetSigningAccounts: func() ([]runtime.Address, error) {
-			return []runtime.Address{runtime.Address(contractsAddress)}, nil
-		},
-		OnResolveLocation: LocationResolver,
-		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
-			accountCodes[location] = code
-			return nil
-		},
-		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
-			code = accountCodes[location]
-			return code, nil
-		},
-		OnEmitEvent: func(event cadence.Event) error {
-			events = append(events, event)
-			return nil
-		},
-		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
-			return json.Decode(nil, b)
-		},
-		OnGetAccountKey: func(addr runtime.Address, index int) (*cadenceStdlib.AccountKey, error) {
-			require.Equal(t, proof.Address[:], addr[:])
-			return &cadenceStdlib.AccountKey{
-				PublicKey: &cadenceStdlib.PublicKey{},
-				KeyIndex:  index,
-				Weight:    100,
-				HashAlgo:  sema.HashAlgorithmKECCAK_256,
-				IsRevoked: false,
-			}, nil
-		},
-		OnVerifySignature: func(
-			signature []byte,
-			tag string,
-			sd,
-			publicKey []byte,
-			signatureAlgorithm runtime.SignatureAlgorithm,
-			hashAlgorithm runtime.HashAlgorithm) (bool, error) {
-			// require.Equal(t, []byte(signedData.ToGoValue()), st)
-			return true, nil
-		},
-	}
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
 
-	nextTransactionLocation := NewTransactionLocationGenerator()
-	nextScriptLocation := NewScriptLocationGenerator()
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: newLocationResolver(contractsAddress),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+			OnGetAccountKey:   onGetAccountKey,
+			OnVerifySignature: onVerifySignature,
+		}
 
-	// Deploy contracts
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
 
-	deployContracts(
-		t,
-		rt,
-		contractsAddress,
-		runtimeInterface,
-		transactionEnvironment,
-		nextTransactionLocation,
-	)
+		// Deploy contracts
 
-	setupTx := []byte(`
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		setupTx := []byte(`
 		import EVM from 0x1
 
 		transaction {
@@ -4284,55 +5795,211 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 			}
 		}`)
 
-	err := rt.ExecuteTransaction(
-		runtime.Script{
-			Source: setupTx,
-		},
-		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: transactionEnvironment,
-			Location:    nextTransactionLocation(),
-		},
-	)
-	require.NoError(t, err)
+		err := rt.ExecuteTransaction(
+			runtime.Script{
+				Source: setupTx,
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: transactionEnvironment,
+				Location:    nextTransactionLocation(),
+			},
+		)
+		require.NoError(t, err)
 
-	script := []byte(`
-      import EVM from 0x1
+		script := []byte(`
+			import EVM from 0x1
+			
+			access(all)
+			fun main(
+				address: Address,
+				path: PublicPath,
+				signedData: [UInt8],
+				keyIndices: [UInt64],
+				signatures: [[UInt8]],
+				evmAddress: [UInt8; 20]
+			): EVM.ValidationResult {
+				return EVM.validateCOAOwnershipProof(
+					address: address,
+					path: path,
+					signedData: signedData,
+					keyIndices: keyIndices,
+					signatures: signatures, 
+					evmAddress: evmAddress
+				)
+			}
+		`)
 
-      access(all)
-      fun main(
-		  address: Address,
-		  path: PublicPath,
-		  signedData: [UInt8],
-		  keyIndices: [UInt64],
-		  signatures: [[UInt8]],
-		  evmAddress: [UInt8; 20]
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: EncodeArgs(proof.ToCadenceValues()),
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
 
-		) {
-          EVM.validateCOAOwnershipProof(
-			address: address,
-			path: path,
-			signedData: signedData,
-			keyIndices: keyIndices,
-			signatures: signatures, 
-			evmAddress: evmAddress
-		  )
-      }
-    `)
+		return result, err
+	}
 
-	// Run script
-	_, err = rt.ExecuteScript(
-		runtime.Script{
-			Source:    script,
-			Arguments: EncodeArgs(proof.ToCadenceValues()),
-		},
-		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: scriptEnvironment,
-			Location:    nextScriptLocation(),
-		},
-	)
-	require.NoError(t, err)
+	t.Run("Single key", func(t *testing.T) {
+		proof := &types.COAOwnershipProofInContext{
+			COAOwnershipProof: types.COAOwnershipProof{
+				Address:        types.FlowAddress(contractsAddress),
+				CapabilityPath: "coa",
+				Signatures:     []types.Signature{[]byte("signature")},
+				KeyIndices:     []uint64{0},
+			},
+			SignedData: []byte("signedData"),
+			EVMAddress: RandomAddress(t),
+		}
+
+		result, err := validate(
+			proof,
+			func(
+				addr runtime.Address,
+				index uint32,
+			) (*cadenceStdlib.AccountKey, error) {
+				require.Equal(t, proof.Address[:], addr[:])
+				return &cadenceStdlib.AccountKey{
+					PublicKey: &cadenceStdlib.PublicKey{},
+					KeyIndex:  index,
+					Weight:    1000,
+					HashAlgo:  sema.HashAlgorithmKECCAK_256,
+					IsRevoked: false,
+				}, nil
+			},
+			func(
+				signature []byte,
+				tag string,
+				sd,
+				publicKey []byte,
+				signatureAlgorithm runtime.SignatureAlgorithm,
+				hashAlgorithm runtime.HashAlgorithm,
+			) (bool, error) {
+				return true, nil
+			},
+		)
+
+		require.NoError(t, err)
+
+		isValid := result.(cadence.Struct).SearchFieldByName("isValid").(cadence.Bool)
+		require.True(t, bool(isValid))
+	})
+
+	t.Run("Two keys", func(t *testing.T) {
+		proof := &types.COAOwnershipProofInContext{
+			COAOwnershipProof: types.COAOwnershipProof{
+				Address:        types.FlowAddress(contractsAddress),
+				CapabilityPath: "coa",
+				Signatures:     []types.Signature{[]byte("signature2"), []byte("signature0")},
+				KeyIndices:     []uint64{2, 0},
+			},
+			SignedData: []byte("signedData"),
+			EVMAddress: RandomAddress(t),
+		}
+
+		result, err := validate(
+			proof,
+			func(addr runtime.Address, index uint32) (*cadenceStdlib.AccountKey, error) {
+				require.Equal(t, proof.Address[:], addr[:])
+				return &cadenceStdlib.AccountKey{
+					PublicKey: &cadenceStdlib.PublicKey{
+						// encode the key index into the public key
+						PublicKey: []byte{byte(index)},
+					},
+					KeyIndex:  index,
+					Weight:    1000,
+					HashAlgo:  sema.HashAlgorithmKECCAK_256,
+					IsRevoked: false,
+				}, nil
+			},
+			func(
+				signature []byte,
+				tag string,
+				sd,
+				publicKey []byte,
+				signatureAlgorithm runtime.SignatureAlgorithm,
+				hashAlgorithm runtime.HashAlgorithm,
+			) (bool, error) {
+				if bytes.Equal(signature, []byte("signature2")) {
+					require.Equal(t, byte(2), publicKey[0])
+					return true, nil
+				} else if bytes.Equal(signature, []byte("signature0")) {
+					require.Equal(t, byte(0), publicKey[0])
+					return true, nil
+				} else {
+					return false, nil
+				}
+			},
+		)
+
+		require.NoError(t, err)
+
+		isValid := result.(cadence.Struct).SearchFieldByName("isValid").(cadence.Bool)
+		require.True(t, bool(isValid))
+	})
+
+	t.Run("Two keys insufficient weight", func(t *testing.T) {
+		proof := &types.COAOwnershipProofInContext{
+			COAOwnershipProof: types.COAOwnershipProof{
+				Address:        types.FlowAddress(contractsAddress),
+				CapabilityPath: "coa",
+				Signatures:     []types.Signature{[]byte("signature2"), []byte("signature0")},
+				KeyIndices:     []uint64{2, 0},
+			},
+			SignedData: []byte("signedData"),
+			EVMAddress: RandomAddress(t),
+		}
+
+		result, err := validate(
+			proof,
+			func(addr runtime.Address, index uint32) (*cadenceStdlib.AccountKey, error) {
+				require.Equal(t, proof.Address[:], addr[:])
+				return &cadenceStdlib.AccountKey{
+					PublicKey: &cadenceStdlib.PublicKey{
+						// encode the key index into the public key
+						PublicKey: []byte{byte(index)},
+					},
+					KeyIndex:  index,
+					Weight:    499,
+					HashAlgo:  sema.HashAlgorithmKECCAK_256,
+					IsRevoked: false,
+				}, nil
+			},
+			func(
+				signature []byte,
+				tag string,
+				sd,
+				publicKey []byte,
+				signatureAlgorithm runtime.SignatureAlgorithm,
+				hashAlgorithm runtime.HashAlgorithm,
+			) (bool, error) {
+				if bytes.Equal(signature, []byte("signature2")) {
+					require.Equal(t, byte(2), publicKey[0])
+					return true, nil
+				} else if bytes.Equal(signature, []byte("signature0")) {
+					require.Equal(t, byte(0), publicKey[0])
+					return true, nil
+				} else {
+					return false, nil
+				}
+			},
+		)
+
+		require.NoError(t, err)
+
+		isValid := result.(cadence.Struct).SearchFieldByName("isValid").(cadence.Bool)
+		require.False(t, bool(isValid))
+		message := result.(cadence.Struct).
+			SearchFieldByName("problem").(cadence.Optional).
+			Value.(cadence.String).String()
+		require.Equal(t, "\"the given signatures are not valid or provide enough weight\"", message)
+	})
 }
 
 func TestInternalEVMAccess(t *testing.T) {
@@ -4344,7 +6011,7 @@ func TestInternalEVMAccess(t *testing.T) {
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -4362,7 +6029,7 @@ func TestInternalEVMAccess(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil

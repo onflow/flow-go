@@ -1,7 +1,6 @@
 package badger_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -24,7 +23,7 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 
 		// retrieve guarantee without stored
 		_, err := store.ByCollectionID(expected.ID())
-		require.True(t, errors.Is(err, storage.ErrNotFound))
+		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// store guarantee
 		err = store.Store(expected)

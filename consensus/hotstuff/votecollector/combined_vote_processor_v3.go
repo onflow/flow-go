@@ -14,7 +14,9 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	msig "github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 /* **************** Base-Factory for CombinedVoteProcessors ***************** */
@@ -47,10 +49,34 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 	// message that has to be verified against aggregated signature
 	msg := verification.MakeVoteMessage(block.View, block.BlockID)
 
-	// prepare the staking public keys of participants
+	dkg, err := f.committee.DKG(block.View)
+	if err != nil {
+		return nil, fmt.Errorf("could not get DKG info at block %v: %w", block.BlockID, err)
+	}
+
+	// Prepare the staking public keys of participants.
+	// CAUTION: while every participant must have a staking key (hence len(allParticipants) == len(stakingKeys))
+	// some consensus nodes might not be part of the Random Beacon Committee.
+	//   - We use 𝒫 as shorthand notation of `allParticipants`, which is the set of all nodes that are authorized to vote for `block`.
+	//   - The DKG committee 𝒟 is the set of parties that were authorized to participate in the DKG (happy path; or
+	//     eligible to receive a private key share from an alternative source on the fallback path).
+	// With 𝓑 we denote the subset 𝓑 := (𝒟 ∩ 𝒫), i.e. all nodes that are authorized to vote for `block` _and_ are part of the
+	// DKG committee. Only for nodes ρ ∈ 𝓑, the method `dkg.KeyShare(ρ.NodeID)` will return a public key. Note that there might
+	// not exist a private key for ρ  (e.g. if ρ failed the DKG), but `dkg.KeyShare(ρ.NodeID)` nevertheless returns a key.
 	stakingKeys := make([]crypto.PublicKey, 0, len(allParticipants))
+	beaconParticipants := make(flow.IdentityList, 0, len(allParticipants))
+	beaconKeys := make([]crypto.PublicKey, 0, len(allParticipants))
 	for _, participant := range allParticipants {
-		stakingKeys = append(stakingKeys, participant.StakingPubKey)
+		stakingKeys = append(stakingKeys, participant.StakingPubKey) // all nodes have staking keys
+		pk, err := dkg.KeyShare(participant.NodeID)                  // but only a subset of nodes might have random beacon keys
+		if err != nil {
+			if protocol.IsIdentityNotFound(err) {
+				continue
+			}
+			return nil, irrecoverable.NewException(fmt.Errorf("unexpected error retrieving random beacon key share for node %v: %w", participant.NodeID, err))
+		}
+		beaconParticipants = append(beaconParticipants, participant)
+		beaconKeys = append(beaconKeys, pk)
 	}
 
 	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, stakingKeys, msg, msig.ConsensusVoteTag)
@@ -58,28 +84,13 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}
 
-	dkg, err := f.committee.DKG(block.View)
+	beaconAggregator, err := signature.NewWeightedSignatureAggregator(beaconParticipants, beaconKeys, msg, msig.RandomBeaconTag)
 	if err != nil {
-		return nil, fmt.Errorf("could not get DKG info at block %v: %w", block.BlockID, err)
-	}
-
-	// prepare the random beacon public keys of participants
-	beaconKeys := make([]crypto.PublicKey, 0, len(allParticipants))
-	for _, participant := range allParticipants {
-		pk, err := dkg.KeyShare(participant.NodeID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get random beacon key share for %x: %w", participant.NodeID, err)
-		}
-		beaconKeys = append(beaconKeys, pk)
-	}
-
-	rbSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, beaconKeys, msg, msig.RandomBeaconTag)
-	if err != nil {
-		return nil, fmt.Errorf("could not create aggregator for thershold signatures: %w", err)
+		return nil, fmt.Errorf("could not create aggregator for threshold signatures: %w", err)
 	}
 
 	threshold := msig.RandomBeaconThreshold(int(dkg.Size()))
-	randomBeaconInspector, err := signature.NewRandomBeaconInspector(dkg.GroupKey(), beaconKeys, threshold, msg)
+	randomBeaconInspector, err := signature.NewRandomBeaconInspector(dkg.GroupKey(), dkg.KeyShares(), threshold, msg)
 	if err != nil {
 		return nil, fmt.Errorf("could not create random beacon inspector: %w", err)
 	}
@@ -94,7 +105,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 		log:               log.With().Hex("block_id", block.BlockID[:]).Logger(),
 		block:             block,
 		stakingSigAggtor:  stakingSigAggtor,
-		rbSigAggtor:       rbSigAggtor,
+		rbSigAggtor:       beaconAggregator,
 		rbRector:          rbRector,
 		onQCCreated:       f.onQCCreated,
 		packer:            f.packer,

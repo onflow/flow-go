@@ -19,8 +19,8 @@ func TestRecover(t *testing.T) {
 	}
 
 	// Recover with `pending` blocks and record what blocks are forwarded to `onProposal`
-	recovered := make([]*model.Proposal, 0)
-	scanner := func(block *model.Proposal) error {
+	recovered := make([]*model.SignedProposal, 0)
+	scanner := func(block *model.SignedProposal) error {
 		recovered = append(recovered, block)
 		return nil
 	}
@@ -30,12 +30,12 @@ func TestRecover(t *testing.T) {
 	// should forward blocks in exact order, just converting flow.Header to pending block
 	require.Len(t, recovered, len(pending))
 	for i, r := range recovered {
-		require.Equal(t, model.ProposalFromFlow(pending[i]), r)
+		require.Equal(t, model.SignedProposalFromFlow(pending[i]), r)
 	}
 }
 
 func TestRecoverEmptyInput(t *testing.T) {
-	scanner := func(block *model.Proposal) error {
+	scanner := func(block *model.SignedProposal) error {
 		require.Fail(t, "no proposal expected")
 		return nil
 	}

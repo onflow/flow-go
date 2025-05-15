@@ -12,6 +12,7 @@ import (
 	"time"
 
 	gcemd "cloud.google.com/go/compute/metadata"
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -20,6 +21,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/pflag"
 	"golang.org/x/time/rate"
 	"google.golang.org/api/option"
@@ -31,10 +33,10 @@ import (
 	"github.com/onflow/flow-go/admin/commands/common"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/cmd/scaffold"
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
-	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/initialize"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -81,6 +83,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/dbops"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/store"
 	sutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -108,12 +114,17 @@ type namedModuleFunc struct {
 	name string
 }
 
-type namedComponentFunc struct {
-	fn   ReadyDoneFactory
-	name string
+// NamedComponentFactory is wrapper for ReadyDoneFactory with additional fields:
+// Name - name of the component
+// ErrorHandler - error handler for the component
+// Dependencies - list of dependencies for the component that should be ready before
+// the component is started
+type NamedComponentFactory[Input any] struct {
+	ComponentFactory ReadyDoneFactory[Input]
+	Name             string
 
-	errorHandler component.OnError
-	dependencies *DependencyList
+	ErrorHandler component.OnError
+	Dependencies *DependencyList
 }
 
 // FlowNodeBuilder is the default builder struct used for all flow nodes
@@ -129,7 +140,7 @@ type FlowNodeBuilder struct {
 	*NodeConfig
 	flags                    *pflag.FlagSet
 	modules                  []namedModuleFunc
-	components               []namedComponentFunc
+	components               []NamedComponentFactory[*NodeConfig]
 	postShutdownFns          []func() error
 	preInitFns               []BuilderFunc
 	postInitFns              []BuilderFunc
@@ -138,8 +149,8 @@ type FlowNodeBuilder struct {
 	adminCommandBootstrapper *admin.CommandRunnerBootstrapper
 	adminCommands            map[string]func(config *NodeConfig) commands.AdminCommand
 	componentBuilder         component.ComponentManagerBuilder
-	bootstrapNodeAddresses   []string
-	bootstrapNodePublicKeys  []string
+	BootstrapNodeAddresses   []string
+	BootstrapNodePublicKeys  []string
 }
 
 var _ NodeBuilder = (*FlowNodeBuilder)(nil)
@@ -160,7 +171,10 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
+	fnb.flags.StringVar(&fnb.BaseConfig.pebbleCheckpointsDir, "pebble-checkpoints-dir", defaultConfig.pebbleCheckpointsDir, "directory to store the checkpoints for the public pebble database (protocol state)")
+	fnb.flags.StringVar(&fnb.BaseConfig.pebbleDir, "pebble-dir", defaultConfig.pebbleDir, "directory to store the public pebble database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
+	fnb.flags.StringVar(&fnb.BaseConfig.DBOps, "dbops", defaultConfig.DBOps, "database operations to use (badger-transaction, batch-update, pebble-update)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.debugLogLimit, "debug-log-limit", defaultConfig.debugLogLimit, "max number of debug/trace log events per second")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
@@ -190,6 +204,15 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
+
+	fnb.flags.BoolVar(&fnb.BaseConfig.DhtSystemEnabled,
+		"dht-enabled",
+		defaultConfig.DhtSystemEnabled,
+		"[experimental] whether to enable dht system. This is an experimental feature. Use with caution.")
+	fnb.flags.BoolVar(&fnb.BaseConfig.BitswapReprovideEnabled,
+		"bitswap-reprovide-enabled",
+		defaultConfig.BitswapReprovideEnabled,
+		"[experimental] whether to enable bitswap reproviding. This is an experimental feature. Use with caution.")
 
 	// dynamic node startup flags
 	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANPubkey,
@@ -245,19 +268,40 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	// observer mode allows a unstaked execution node to fetch blocks from a public staked access node, and being able to execute blocks
 	fnb.flags.BoolVar(&fnb.BaseConfig.ObserverMode, "observer-mode", defaultConfig.ObserverMode, "whether the node is running in observer mode")
-	fnb.flags.StringSliceVar(&fnb.bootstrapNodePublicKeys,
+	fnb.flags.StringSliceVar(&fnb.BootstrapNodePublicKeys,
 		"observer-mode-bootstrap-node-public-keys",
-		nil,
+		[]string{},
 		"the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
-	fnb.flags.StringSliceVar(&fnb.bootstrapNodeAddresses,
+	fnb.flags.StringSliceVar(&fnb.BootstrapNodeAddresses,
 		"observer-mode-bootstrap-node-addresses",
-		nil,
+		[]string{},
 		"the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
 	fnb.Component("ping service", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		pingLibP2PProtocolID := protocols.PingProtocolId(node.SporkID)
+
+		var hotstuffViewFunc func() (uint64, error)
+		// Setup consensus nodes to report their HotStuff view
+		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
+			hotstuffReader, err := persister.NewReader(node.ProtocolDB, node.RootChainID)
+			if err != nil {
+				return nil, err
+			}
+			hotstuffViewFunc = func() (uint64, error) {
+				livenessData, err := hotstuffReader.GetLivenessData()
+				if err != nil {
+					return 0, fmt.Errorf("could not get liveness data: %w", err)
+				}
+				return livenessData.CurrentView, nil
+			}
+		} else {
+			// All other node roles do not report their hotstuff view
+			hotstuffViewFunc = func() (uint64, error) {
+				return 0, fmt.Errorf("hotstuff view reporting disabled")
+			}
+		}
 
 		// setup the Ping provider to return the software version and the sealed block height
 		pingInfoProvider := &ping.InfoProvider{
@@ -271,28 +315,13 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 				}
 				return head.Height, nil
 			},
-			HotstuffViewFun: func() (uint64, error) {
-				return 0, fmt.Errorf("hotstuff view reporting disabled")
-			},
-		}
-
-		// only consensus roles will need to report hotstuff view
-		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
-			// initialize the persister
-			persist := persister.New(node.DB, node.RootChainID)
-
-			pingInfoProvider.HotstuffViewFun = func() (uint64, error) {
-				livenessData, err := persist.GetLivenessData()
-				if err != nil {
-					return 0, err
-				}
-
-				return livenessData.CurrentView, nil
-			}
+			HotstuffViewFun: hotstuffViewFunc,
 		}
 
 		pingService, err := node.EngineRegistry.RegisterPingService(pingLibP2PProtocolID, pingInfoProvider)
-
+		if err != nil {
+			return nil, fmt.Errorf("could not register ping service: %w", err)
+		}
 		node.PingService = pingService
 
 		return &module.NoopReadyDoneAware{}, err
@@ -404,8 +433,13 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		}
 
 		if fnb.ObserverMode {
-			// observer mode only init pulbic libp2p node
-			publicLibp2pNode, err := fnb.BuildPublicLibp2pNode(myAddr)
+			// observer mode only init public libp2p node
+			ids, err := fnb.DeriveBootstrapPeerIdentities()
+			if err != nil {
+				return nil, fmt.Errorf("failed to derive bootstrap peer identities: %w", err)
+			}
+
+			publicLibp2pNode, err := fnb.BuildPublicLibp2pNode(myAddr, ids)
 			if err != nil {
 				return nil, fmt.Errorf("could not build public libp2p node: %w", err)
 			}
@@ -414,7 +448,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			return publicLibp2pNode, nil
 		}
 
-		dhtActivationStatus, err := DhtSystemActivationStatus(fnb.NodeRole)
+		dhtActivationStatus, err := DhtSystemActivationStatus(fnb.NodeRole, fnb.DhtSystemEnabled)
 		if err != nil {
 			return nil, fmt.Errorf("could not determine dht activation status: %w", err)
 		}
@@ -462,6 +496,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			peerManagerFilters)
 	})
 
+	fnb.Module("epoch transition logger", func(node *NodeConfig) error {
+		node.ProtocolEvents.AddConsumer(events.NewEventLogger(node.Logger))
+		return nil
+	})
+
 	fnb.Module("network underlay dependency", func(node *NodeConfig) error {
 		fnb.networkUnderlayDependable = module.NewProxiedReadyDoneAware()
 		fnb.PeerManagerDependencies.Add(fnb.networkUnderlayDependable)
@@ -486,7 +525,18 @@ func (fnb *FlowNodeBuilder) HeroCacheMetricsFactory() metrics.HeroCacheMetricsFa
 	return metrics.NewNoopHeroCacheMetricsFactory()
 }
 
-// initPublicLibp2pNode creates a libp2p node for the observer service in the public (unstaked) network.
+// DeriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
+// These are the identities of the observers also acting as the DHT bootstrap server
+func (fnb *FlowNodeBuilder) DeriveBootstrapPeerIdentities() (flow.IdentitySkeletonList, error) {
+	ids, err := BootstrapIdentities(fnb.BootstrapNodeAddresses, fnb.BootstrapNodePublicKeys)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive bootstrap peer identities: %w", err)
+	}
+
+	return ids, nil
+}
+
+// BuildPublicLibp2pNode creates a libp2p node for the observer service in the public (unstaked) network.
 // The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
 // The LibP2P host is created with the following options:
 // * DHT as client and seeded with the given bootstrap peers
@@ -501,24 +551,10 @@ func (fnb *FlowNodeBuilder) HeroCacheMetricsFactory() metrics.HeroCacheMetricsFa
 // Returns:
 // - p2p.LibP2PNode: the libp2p node
 // - error: if any error occurs. Any error returned is considered irrecoverable.
-func (fnb *FlowNodeBuilder) BuildPublicLibp2pNode(address string) (p2p.LibP2PNode, error) {
+func (fnb *FlowNodeBuilder) BuildPublicLibp2pNode(address string, bootstrapIdentities flow.IdentitySkeletonList) (p2p.LibP2PNode, error) {
 	var pis []peer.AddrInfo
 
-	ids, err := BootstrapIdentities(fnb.bootstrapNodeAddresses, fnb.bootstrapNodePublicKeys)
-	if err != nil {
-		return nil, fmt.Errorf("could not create bootstrap identities: %w", err)
-	}
-
-	for _, b := range ids {
-		pi, err := utils.PeerAddressInfo(*b)
-		if err != nil {
-			return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
-		}
-
-		pis = append(pis, pi)
-	}
-
-	for _, b := range ids {
+	for _, b := range bootstrapIdentities {
 		pi, err := utils.PeerAddressInfo(*b)
 		if err != nil {
 			return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
@@ -548,6 +584,7 @@ func (fnb *FlowNodeBuilder) BuildPublicLibp2pNode(address string) (p2p.LibP2PNod
 		&p2pbuilderconfig.UnicastConfig{
 			Unicast: fnb.FlowConfig.NetworkConfig.Unicast,
 		}).
+		SetProtocolPeerCacheList(protocols.FlowProtocolID(fnb.SporkID)).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
 				subscription.UnstakedRole, fnb.IdentityProvider,
@@ -923,8 +960,11 @@ func (fnb *FlowNodeBuilder) initMetrics() error {
 		// metrics enabled, report node info metrics as post init event
 		fnb.PostInit(func(nodeConfig *NodeConfig) error {
 			nodeInfoMetrics := metrics.NewNodeInfoCollector()
-			protocolVersion := fnb.RootSnapshot.Params().ProtocolVersion()
-			nodeInfoMetrics.NodeInfo(build.Version(), build.Commit(), nodeConfig.SporkID.String(), protocolVersion)
+			pstate, err := nodeConfig.State.Final().ProtocolState()
+			if err != nil {
+				return fmt.Errorf("could not get protocol state: %w", err)
+			}
+			nodeInfoMetrics.NodeInfo(build.Version(), build.Commit(), nodeConfig.SporkID.String(), pstate.GetProtocolStateVersion())
 			return nil
 		})
 	}
@@ -1036,12 +1076,20 @@ func (fnb *FlowNodeBuilder) initProfiler() error {
 	return nil
 }
 
-func (fnb *FlowNodeBuilder) initDB() error {
-
-	// if a db has been passed in, use that instead of creating one
-	if fnb.BaseConfig.db != nil {
-		fnb.DB = fnb.BaseConfig.db
+func (fnb *FlowNodeBuilder) initBadgerDB() error {
+	// if the badger DB is already set, use it.
+	// the badger DB might be set by the follower engine
+	if fnb.BaseConfig.badgerDB != nil {
+		fnb.DB = fnb.BaseConfig.badgerDB
 		return nil
+	}
+
+	// if the badger DB is not set, then the datadir must be provided to initialize
+	// the badger DB
+	// since we've set an default directory for the badger DB, this check
+	// is not necessary, but rather a sanity check
+	if fnb.BaseConfig.datadir == NotSet {
+		return fmt.Errorf("missing required flag '--datadir'")
 	}
 
 	// Pre-create DB path (Badger creates only one-level dirs)
@@ -1050,8 +1098,6 @@ func (fnb *FlowNodeBuilder) initDB() error {
 		return fmt.Errorf("could not create datadir (path: %s): %w", fnb.BaseConfig.datadir, err)
 	}
 
-	log := sutil.NewLogger(fnb.Logger)
-
 	// we initialize the database with options that allow us to keep the maximum
 	// item size in the trie itself (up to 1MB) and where we keep all level zero
 	// tables in-memory as well; this slows down compaction and increases memory
@@ -1059,7 +1105,7 @@ func (fnb *FlowNodeBuilder) initDB() error {
 	opts := badger.
 		DefaultOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
-		WithLogger(log).
+		WithLogger(sutil.NewLogger(fnb.Logger.With().Str("badgerdb", "protocol").Logger())).
 
 		// the ValueLogFileSize option specifies how big the value of a
 		// key-value pair is allowed to be saved into badger.
@@ -1077,7 +1123,7 @@ func (fnb *FlowNodeBuilder) initDB() error {
 	fnb.DB = publicDB
 
 	fnb.ShutdownFunc(func() error {
-		if err := fnb.DB.Close(); err != nil {
+		if err := publicDB.Close(); err != nil {
 			return fmt.Errorf("error closing protocol database: %w", err)
 		}
 		return nil
@@ -1087,6 +1133,38 @@ func (fnb *FlowNodeBuilder) initDB() error {
 		return bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCWaitDuration), nil
 	})
 
+	return nil
+}
+
+func (fnb *FlowNodeBuilder) initPebbleDB() error {
+	// if the pebble DB is already set, use it
+	// the pebble DB might be set by the follower engine
+	if fnb.BaseConfig.pebbleDB != nil {
+		fnb.PebbleDB = fnb.BaseConfig.pebbleDB
+		return nil
+	}
+
+	db, closer, err := scaffold.InitPebbleDB(fnb.Logger.With().Str("pebbledb", "protocol").Logger(), fnb.BaseConfig.pebbleDir)
+	if err != nil {
+		return err
+	}
+
+	fnb.PebbleDB = db
+	fnb.ShutdownFunc(closer.Close)
+	return nil
+}
+
+// create protocol db according to the badger or pebble db
+func (fnb *FlowNodeBuilder) initProtocolDB(bdb *badger.DB, pdb *pebble.DB) error {
+	if dbops.IsBadgerBased(fnb.DBOps) {
+		fnb.ProtocolDB = badgerimpl.ToDB(bdb)
+		fnb.Logger.Info().Msg("initProtocolDB: using badger protocol db")
+	} else if dbops.IsPebbleBatch(fnb.DBOps) {
+		fnb.ProtocolDB = pebbleimpl.ToDB(pdb)
+		fnb.Logger.Info().Msgf("initProtocolDB: using pebble protocol db")
+	} else {
+		return fmt.Errorf(dbops.UsageErrMsg, fnb.DBOps)
+	}
 	return nil
 }
 
@@ -1107,9 +1185,9 @@ func (fnb *FlowNodeBuilder) initSecretsDB() error {
 		return fmt.Errorf("could not create secrets db dir (path: %s): %w", fnb.BaseConfig.secretsdir, err)
 	}
 
-	log := sutil.NewLogger(fnb.Logger)
-
-	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).WithLogger(log)
+	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).
+		WithLogger(sutil.NewLogger(
+			fnb.Logger.With().Str("badgerdb", "secret").Logger()))
 
 	// NOTE: SN nodes need to explicitly set --insecure-secrets-db to true in order to
 	// disable secrets database encryption
@@ -1171,31 +1249,30 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	collections := bstorage.NewCollections(fnb.DB, transactions)
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
 	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
-	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
-	protocolState := bstorage.NewProtocolState(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
-		bstorage.DefaultProtocolStateCacheSize, bstorage.DefaultProtocolStateByBlockIDCacheSize)
+	protocolState := bstorage.NewEpochProtocolStateEntries(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
+		bstorage.DefaultEpochProtocolStateCacheSize, bstorage.DefaultProtocolStateIndexCacheSize)
 	protocolKVStores := bstorage.NewProtocolKVStore(fnb.Metrics.Cache, fnb.DB,
 		bstorage.DefaultProtocolKVStoreCacheSize, bstorage.DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)
+	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(fnb.DB))
 
 	fnb.Storage = Storage{
-		Headers:            headers,
-		Guarantees:         guarantees,
-		Receipts:           receipts,
-		Results:            results,
-		Seals:              seals,
-		Index:              index,
-		Payloads:           payloads,
-		Blocks:             blocks,
-		QuorumCertificates: qcs,
-		Transactions:       transactions,
-		Collections:        collections,
-		Setups:             setups,
-		EpochCommits:       epochCommits,
-		VersionBeacons:     versionBeacons,
-		EpochProtocolState: protocolState,
-		ProtocolKVStore:    protocolKVStores,
-		Commits:            commits,
+		Headers:                   headers,
+		Guarantees:                guarantees,
+		Seals:                     seals,
+		Index:                     index,
+		Payloads:                  payloads,
+		Blocks:                    blocks,
+		QuorumCertificates:        qcs,
+		Transactions:              transactions,
+		Collections:               collections,
+		Setups:                    setups,
+		EpochCommits:              epochCommits,
+		VersionBeacons:            versionBeacons,
+		EpochProtocolStateEntries: protocolState,
+		ProtocolKVStore:           protocolKVStores,
+
+		Results:  results,
+		Receipts: receipts,
 	}
 
 	return nil
@@ -1210,11 +1287,15 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
-		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
-			return fnb.NetworkUnderlay
-		})
+		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(
+			idCache,
+			node.ProtocolDB,
+			func() network.DisallowListNotificationConsumer {
+				return fnb.NetworkUnderlay
+			},
+		)
 		if err != nil {
-			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
+			return fmt.Errorf("could not initialize NodeDisallowListWrapper: %w", err)
 		}
 		node.IdentityProvider = disallowListWrapper
 
@@ -1284,7 +1365,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
-			fnb.Storage.EpochProtocolState,
+			fnb.Storage.EpochProtocolStateEntries,
 			fnb.Storage.ProtocolKVStore,
 			fnb.Storage.VersionBeacons,
 		)
@@ -1333,7 +1414,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
-			fnb.Storage.EpochProtocolState,
+			fnb.Storage.EpochProtocolStateEntries,
 			fnb.Storage.ProtocolKVStore,
 			fnb.Storage.VersionBeacons,
 			fnb.RootSnapshot,
@@ -1506,32 +1587,9 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 }
 
 func (fnb *FlowNodeBuilder) initFvmOptions() {
-	blockFinder := environment.NewBlockFinder(fnb.Storage.Headers)
-	vmOpts := []fvm.Option{
-		fvm.WithChain(fnb.RootChainID.Chain()),
-		fvm.WithBlocks(blockFinder),
-		fvm.WithAccountStorageLimit(true),
-	}
-	switch fnb.RootChainID {
-	case flow.Testnet,
-		flow.Sandboxnet,
-		flow.Previewnet,
-		flow.Mainnet:
-		vmOpts = append(vmOpts,
-			fvm.WithTransactionFeesEnabled(true),
-		)
-	}
-	switch fnb.RootChainID {
-	case flow.Testnet,
-		flow.Sandboxnet,
-		flow.Previewnet,
-		flow.Localnet,
-		flow.Benchnet:
-		vmOpts = append(vmOpts,
-			fvm.WithContractDeploymentRestricted(false),
-		)
-	}
-	fnb.FvmOptions = vmOpts
+	fnb.FvmOptions = initialize.InitFvmOptions(
+		fnb.RootChainID, fnb.Storage.Headers,
+	)
 }
 
 // handleModules initializes the given module.
@@ -1557,10 +1615,20 @@ func (fnb *FlowNodeBuilder) handleModules() error {
 	return nil
 }
 
-// handleComponents registers the component's factory method with the ComponentManager to be run
+func (fnb *FlowNodeBuilder) handleComponents() error {
+	AddWorkersFromComponents(fnb.Logger, fnb.NodeConfig, fnb.componentBuilder, fnb.components)
+	return nil
+}
+
+// AddWorkersFromComponents registers the component's factory method with the ComponentManager to be run
 // when the node starts.
 // It uses signal channels to ensure that components are started serially.
-func (fnb *FlowNodeBuilder) handleComponents() error {
+func AddWorkersFromComponents[Input any](
+	log zerolog.Logger,
+	input Input,
+	componentBuilder component.ComponentManagerBuilder,
+	components []NamedComponentFactory[Input],
+) {
 	// The parent/started channels are used to enforce serial startup.
 	// - parent is the started channel of the previous component.
 	// - when a component is ready, it closes its started channel by calling the provided callback.
@@ -1571,27 +1639,22 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 	parent := make(chan struct{})
 	close(parent)
 
-	var err error
-	asyncComponents := []namedComponentFunc{}
+	asyncComponents := []NamedComponentFactory[Input]{}
 
 	// Run all components
-	for _, f := range fnb.components {
+	for _, f := range components {
 		// Components with explicit dependencies are not started serially
-		if f.dependencies != nil {
+		if f.Dependencies != nil {
 			asyncComponents = append(asyncComponents, f)
 			continue
 		}
 
 		started := make(chan struct{})
 
-		if f.errorHandler != nil {
-			err = fnb.handleRestartableComponent(f, parent, func() { close(started) })
+		if f.ErrorHandler != nil {
+			componentBuilder.AddWorker(WorkerFromRestartableComponent(log, input, f, parent, func() { close(started) }))
 		} else {
-			err = fnb.handleComponent(f, parent, func() { close(started) })
-		}
-
-		if err != nil {
-			return fmt.Errorf("could not handle component %s: %w", f.name, err)
+			componentBuilder.AddWorker(WorkerFromComponent(log, input, f, parent, func() { close(started) }))
 		}
 
 		parent = started
@@ -1600,17 +1663,12 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 	// Components with explicit dependencies are run asynchronously, which means dependencies in
 	// the dependency list must be initialized outside of the component factory.
 	for _, f := range asyncComponents {
-		fnb.Logger.Debug().Str("component", f.name).Int("dependencies", len(f.dependencies.components)).Msg("handling component asynchronously")
-		err = fnb.handleComponent(f, util.AllReady(f.dependencies.components...), func() {})
-		if err != nil {
-			return fmt.Errorf("could not handle dependable component %s: %w", f.name, err)
-		}
+		log.Debug().Str("component", f.Name).Int("dependencies", len(f.Dependencies.Components)).Msg("handling component asynchronously")
+		componentBuilder.AddWorker(WorkerFromComponent(log, input, f, util.AllReady(f.Dependencies.Components...), func() {}))
 	}
-
-	return nil
 }
 
-// handleComponent constructs a component using the provided ReadyDoneFactory, and registers a
+// WorkerFromComponent constructs a component using the provided ReadyDoneFactory, and registers a
 // worker with the ComponentManager to be run when the node is started.
 //
 // The ComponentManager starts all workers in parallel. Since some components have non-idempotent
@@ -1623,27 +1681,27 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 // using their ReadyDoneAware interface. After components are updated to use the idempotent
 // ReadyDoneAware interface and explicitly wait for their dependencies to be ready, we can remove
 // this channel chaining.
-func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, dependencies <-chan struct{}, started func()) error {
+func WorkerFromComponent[Input any](log zerolog.Logger, input Input, v NamedComponentFactory[Input], dependencies <-chan struct{}, started func()) component.ComponentWorker {
 	// Add a closure that starts the component when the node is started, and then waits for it to exit
 	// gracefully.
 	// Startup for all components will happen in parallel, and components can use their dependencies'
 	// ReadyDoneAware interface to wait until they are ready.
-	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	return func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		// wait for the dependencies to be ready before starting
 		if err := util.WaitClosed(ctx, dependencies); err != nil {
 			return
 		}
 
-		logger := fnb.Logger.With().Str("component", v.name).Logger()
+		logger := log.With().Str("component", v.Name).Logger()
 
 		logger.Info().Msg("component initialization started")
 		// First, build the component using the factory method.
-		readyAware, err := v.fn(fnb.NodeConfig)
+		readyAware, err := v.ComponentFactory(input)
 		if err != nil {
-			ctx.Throw(fmt.Errorf("component %s initialization failed: %w", v.name, err))
+			ctx.Throw(fmt.Errorf("component %s initialization failed: %w", v.Name, err))
 		}
 		if readyAware == nil {
-			ctx.Throw(fmt.Errorf("component %s initialization failed: nil component", v.name))
+			ctx.Throw(fmt.Errorf("component %s initialization failed: nil component", v.Name))
 		}
 		logger.Info().Msg("component initialization complete")
 
@@ -1679,20 +1737,24 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, dependencies <
 		// Finally, wait until component has finished shutting down.
 		<-readyAware.Done()
 		logger.Info().Msg("component shutdown complete")
-	})
-
-	return nil
+	}
 }
 
-// handleRestartableComponent constructs a component using the provided ReadyDoneFactory, and
+// WorkerFromRestartableComponent constructs a component using the provided ReadyDoneFactory, and
 // registers a worker with the ComponentManager to be run when the node is started.
 //
 // Restartable Components are components that can be restarted after successfully handling
 // an irrecoverable error.
 //
 // Any irrecoverable errors thrown by the component will be passed to the provided error handler.
-func (fnb *FlowNodeBuilder) handleRestartableComponent(v namedComponentFunc, parentReady <-chan struct{}, started func()) error {
-	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func WorkerFromRestartableComponent[Input any](
+	log zerolog.Logger,
+	input Input,
+	v NamedComponentFactory[Input],
+	parentReady <-chan struct{},
+	started func(),
+) component.ComponentWorker {
+	return func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		// wait for the previous component to be ready before starting
 		if err := util.WaitClosed(ctx, parentReady); err != nil {
 			return
@@ -1707,12 +1769,12 @@ func (fnb *FlowNodeBuilder) handleRestartableComponent(v namedComponentFunc, par
 		// from within the componentFactory
 		started()
 
-		log := fnb.Logger.With().Str("component", v.name).Logger()
+		log := log.With().Str("component", v.Name).Logger()
 
 		// This may be called multiple times if the component is restarted
 		componentFactory := func() (component.Component, error) {
 			log.Info().Msg("component initialization started")
-			c, err := v.fn(fnb.NodeConfig)
+			c, err := v.ComponentFactory(input)
 			if err != nil {
 				return nil, err
 			}
@@ -1731,15 +1793,13 @@ func (fnb *FlowNodeBuilder) handleRestartableComponent(v namedComponentFunc, par
 			return c.(component.Component), nil
 		}
 
-		err := component.RunComponent(ctx, componentFactory, v.errorHandler)
+		err := component.RunComponent(ctx, componentFactory, v.ErrorHandler)
 		if err != nil && !errors.Is(err, ctx.Err()) {
-			ctx.Throw(fmt.Errorf("component %s encountered an unhandled irrecoverable error: %w", v.name, err))
+			ctx.Throw(fmt.Errorf("component %s encountered an unhandled irrecoverable error: %w", v.Name, err))
 		}
 
 		log.Info().Msg("component shutdown complete")
-	})
-
-	return nil
+	}
 }
 
 // ExtraFlags enables binding additional flags beyond those defined in BaseConfig.
@@ -1774,10 +1834,10 @@ func (fnb *FlowNodeBuilder) AdminCommand(command string, f func(config *NodeConf
 // The ReadyDoneFactory may return either a `Component` or `ReadyDoneAware` instance.
 // In both cases, the object is started when the node is run, and the node will wait for the
 // component to exit gracefully.
-func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory) NodeBuilder {
-	fnb.components = append(fnb.components, namedComponentFunc{
-		fn:   f,
-		name: name,
+func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory[*NodeConfig]) NodeBuilder {
+	fnb.components = append(fnb.components, NamedComponentFactory[*NodeConfig]{
+		ComponentFactory: f,
+		Name:             name,
 	})
 	return fnb
 }
@@ -1793,26 +1853,26 @@ func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory) NodeBuild
 // IMPORTANT: Dependable components are started in parallel with no guaranteed run order, so all
 // dependencies must be initialized outside of the ReadyDoneFactory, and their `Ready()` method
 // MUST be idempotent.
-func (fnb *FlowNodeBuilder) DependableComponent(name string, f ReadyDoneFactory, dependencies *DependencyList) NodeBuilder {
+func (fnb *FlowNodeBuilder) DependableComponent(name string, f ReadyDoneFactory[*NodeConfig], dependencies *DependencyList) NodeBuilder {
 	// Note: dependencies are passed as a struct to allow updating the list after calling this method.
 	// Passing a slice instead would result in out of sync metadata since slices are passed by reference
-	fnb.components = append(fnb.components, namedComponentFunc{
-		fn:           f,
-		name:         name,
-		dependencies: dependencies,
+	fnb.components = append(fnb.components, NamedComponentFactory[*NodeConfig]{
+		ComponentFactory: f,
+		Name:             name,
+		Dependencies:     dependencies,
 	})
 	return fnb
 }
 
 // OverrideComponent adds given builder function to the components set of the node builder. If a builder function with that name
 // already exists, it will be overridden.
-func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) NodeBuilder {
+func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory[*NodeConfig]) NodeBuilder {
 	for i := 0; i < len(fnb.components); i++ {
-		if fnb.components[i].name == name {
+		if fnb.components[i].Name == name {
 			// found component with the name, override it.
-			fnb.components[i] = namedComponentFunc{
-				fn:   f,
-				name: name,
+			fnb.components[i] = NamedComponentFactory[*NodeConfig]{
+				ComponentFactory: f,
+				Name:             name,
 			}
 
 			return fnb
@@ -1836,11 +1896,11 @@ func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) N
 // Note: The ReadyDoneFactory method may be called multiple times if the component is restarted.
 //
 // Any irrecoverable errors thrown by the component will be passed to the provided error handler.
-func (fnb *FlowNodeBuilder) RestartableComponent(name string, f ReadyDoneFactory, errorHandler component.OnError) NodeBuilder {
-	fnb.components = append(fnb.components, namedComponentFunc{
-		fn:           f,
-		name:         name,
-		errorHandler: errorHandler,
+func (fnb *FlowNodeBuilder) RestartableComponent(name string, f ReadyDoneFactory[*NodeConfig], errorHandler component.OnError) NodeBuilder {
+	fnb.components = append(fnb.components, NamedComponentFactory[*NodeConfig]{
+		ComponentFactory: f,
+		Name:             name,
+		ErrorHandler:     errorHandler,
 	})
 	return fnb
 }
@@ -1888,11 +1948,55 @@ func WithBindAddress(bindAddress string) Option {
 	}
 }
 
+// WithDataDir set the data directory for the badger database
+// It will be ignored if WithBadgerDB is used
 func WithDataDir(dataDir string) Option {
 	return func(config *BaseConfig) {
-		if config.db == nil {
-			config.datadir = dataDir
+		if config.badgerDB != nil {
+			log.Warn().Msgf("ignoring data directory %s as badger database is already set", dataDir)
+			return
 		}
+
+		config.datadir = dataDir
+	}
+}
+
+// WithBadgerDB sets the badger database instance
+// If used, then WithDataDir method will be ignored
+func WithBadgerDB(db *badger.DB) Option {
+	return func(config *BaseConfig) {
+		if config.datadir != "" && config.datadir != NotSet {
+			log.Warn().Msgf("ignoring data directory is already set for badger %v", config.datadir)
+			config.datadir = ""
+		}
+
+		config.badgerDB = db
+	}
+}
+
+// WithPebbleDir set the data directory for the pebble database
+// It will be ignored if WithPebbleDB is used
+func WithPebbleDir(dataDir string) Option {
+	return func(config *BaseConfig) {
+		if config.pebbleDB != nil {
+			log.Warn().Msgf("ignoring data directory %s as pebble database is already set", dataDir)
+			return
+		}
+
+		config.pebbleDir = dataDir
+	}
+}
+
+// WithPebbleDB sets the pebble database instance
+// If used, then WithPebbleDir method will be ignored
+func WithPebbleDB(db *pebble.DB) Option {
+	return func(config *BaseConfig) {
+		if config.pebbleDir != "" && config.pebbleDir != NotSet {
+			log.Warn().Msgf("ignoring data directory is already set for pebble %v", config.pebbleDir)
+			config.pebbleDir = ""
+		}
+
+		config.pebbleDB = db
 	}
 }
 
@@ -1923,14 +2027,6 @@ func WithComplianceConfig(complianceConfig compliance.Config) Option {
 func WithLogLevel(level string) Option {
 	return func(config *BaseConfig) {
 		config.level = level
-	}
-}
-
-// WithDB takes precedence over WithDataDir and datadir will be set to empty if DB is set using this option
-func WithDB(db *badger.DB) Option {
-	return func(config *BaseConfig) {
-		config.db = db
-		config.datadir = ""
 	}
 }
 
@@ -2008,6 +2104,9 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 		return storageCommands.NewReadSealsCommand(config.State, config.Storage.Seals, config.Storage.Index)
 	}).AdminCommand("get-latest-identity", func(config *NodeConfig) commands.AdminCommand {
 		return common.NewGetIdentityCommand(config.IdentityProvider)
+	}).AdminCommand("create-pebble-checkpoint", func(config *NodeConfig) commands.AdminCommand {
+		// by default checkpoints will be created under "/data/protocol_pebble_checkpoints"
+		return storageCommands.NewPebbleDBCheckpointCommand(config.pebbleCheckpointsDir, "protocol", config.PebbleDB)
 	})
 }
 
@@ -2039,7 +2138,17 @@ func (fnb *FlowNodeBuilder) onStart() error {
 		return err
 	}
 
-	if err := fnb.initDB(); err != nil {
+	// we always initialize both badger and pebble databases
+	// even if we only use one of them, this simplify the code and checks
+	if err := fnb.initBadgerDB(); err != nil {
+		return err
+	}
+
+	if err := fnb.initPebbleDB(); err != nil {
+		return err
+	}
+
+	if err := fnb.initProtocolDB(fnb.DB, fnb.PebbleDB); err != nil {
 		return err
 	}
 
@@ -2131,10 +2240,11 @@ func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
 // DhtSystemActivationStatus parses the given role string and returns the corresponding DHT system activation status.
 // Args:
 // - roleStr: the role string to parse.
+// - enabled: whether the DHT system is configured to be enabled. Only meaningful for access and execution nodes.
 // Returns:
 // - DhtSystemActivation: the corresponding DHT system activation status.
 // - error: if the role string is invalid, returns an error.
-func DhtSystemActivationStatus(roleStr string) (p2pbuilder.DhtSystemActivation, error) {
+func DhtSystemActivationStatus(roleStr string, enabled bool) (p2pbuilder.DhtSystemActivation, error) {
 	if roleStr == "ghost" {
 		// ghost node is not a valid role, so we don't need to parse it
 		return p2pbuilder.DhtSystemDisabled, nil
@@ -2145,12 +2255,12 @@ func DhtSystemActivationStatus(roleStr string) (p2pbuilder.DhtSystemActivation, 
 		// ghost role is not a valid role, so we don't need to parse it
 		return p2pbuilder.DhtSystemDisabled, fmt.Errorf("could not parse node role: %w", err)
 	}
-	if role == flow.RoleAccess || role == flow.RoleExecution {
-		// Only access and execution nodes need to run DHT;
-		// Access nodes and execution nodes need DHT to run a blob service.
-		// Moreover, access nodes run a DHT to let un-staked (public) access nodes find each other on the public network.
-		return p2pbuilder.DhtSystemEnabled, nil
+
+	// Only access and execution nodes need to run DHT; which is used by bitswap.
+	// Access nodes also run a DHT on the public network for peer discovery of un-staked nodes.
+	if role != flow.RoleAccess && role != flow.RoleExecution {
+		return p2pbuilder.DhtSystemDisabled, nil
 	}
 
-	return p2pbuilder.DhtSystemDisabled, nil
+	return p2pbuilder.DhtSystemActivation(enabled), nil
 }

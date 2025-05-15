@@ -10,10 +10,10 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/grpc/codes"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -31,18 +31,16 @@ type TransactionErrorMessage interface {
 	// Expected errors during normal operation:
 	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 	//   - status.Error - remote GRPC call to EN has failed.
-	LookupErrorMessageByTransactionID(ctx context.Context, blockID flow.Identifier, transactionID flow.Identifier) (string, error)
+	LookupErrorMessageByTransactionID(ctx context.Context, blockID flow.Identifier, height uint64, transactionID flow.Identifier) (string, error)
 
 	// LookupErrorMessageByIndex is a function type for getting transaction error message by index.
 	// Expected errors during normal operation:
-	//   - status.Error[codes.NotFound] - transaction result for given block ID and tx index is not available.
 	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 	//   - status.Error - remote GRPC call to EN has failed.
 	LookupErrorMessageByIndex(ctx context.Context, blockID flow.Identifier, height uint64, index uint32) (string, error)
 
 	// LookupErrorMessagesByBlockID is a function type for getting transaction error messages by block ID.
 	// Expected errors during normal operation:
-	//   - status.Error[codes.NotFound] - transaction results for given block ID are not available.
 	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 	//   - status.Error - remote GRPC call to EN has failed.
 	LookupErrorMessagesByBlockID(ctx context.Context, blockID flow.Identifier, height uint64) (map[flow.Identifier]string, error)
@@ -71,20 +69,20 @@ type TransactionsLocalDataProvider struct {
 // getter or when deriving transaction status.
 func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 	ctx context.Context,
-	block *flow.Block,
+	block *flow.Header,
 	transactionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
-	txResult, err := t.txResultsIndex.ByBlockIDTransactionID(blockID, block.Header.Height, transactionID)
+	txResult, err := t.txResultsIndex.ByBlockIDTransactionID(blockID, block.Height, transactionID)
 	if err != nil {
-		return nil, rpc.ConvertIndexError(err, block.Header.Height, "failed to get transaction result")
+		return nil, rpc.ConvertIndexError(err, block.Height, "failed to get transaction result")
 	}
 
 	var txErrorMessage string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		txErrorMessage, err = t.txErrorMessages.LookupErrorMessageByTransactionID(ctx, blockID, transactionID)
+		txErrorMessage, err = t.txErrorMessages.LookupErrorMessageByTransactionID(ctx, blockID, block.Height, transactionID)
 		if err != nil {
 			return nil, err
 		}
@@ -96,7 +94,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
-	txStatus, err := t.DeriveTransactionStatus(block.Header.Height, true)
+	txStatus, err := t.DeriveTransactionStatus(block.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -104,9 +102,9 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	events, err := t.eventsIndex.ByBlockIDTransactionID(blockID, block.Header.Height, transactionID)
+	events, err := t.eventsIndex.ByBlockIDTransactionID(blockID, block.Height, transactionID)
 	if err != nil {
-		return nil, rpc.ConvertIndexError(err, block.Header.Height, "failed to get events")
+		return nil, rpc.ConvertIndexError(err, block.Height, "failed to get events")
 	}
 
 	// events are encoded in CCF format in storage. convert to JSON-CDC if requested
@@ -117,14 +115,14 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 		}
 	}
 
-	return &access.TransactionResult{
+	return &accessmodel.TransactionResult{
 		TransactionID: txResult.TransactionID,
 		Status:        txStatus,
 		StatusCode:    txStatusCode,
 		Events:        events,
 		ErrorMessage:  txErrorMessage,
 		BlockID:       blockID,
-		BlockHeight:   block.Header.Height,
+		BlockHeight:   block.Height,
 	}, nil
 }
 
@@ -141,7 +139,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 	ctx context.Context,
 	block *flow.Block,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) ([]*access.TransactionResult, error) {
+) ([]*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
 	txResults, err := t.txResultsIndex.ByBlockID(blockID, block.Header.Height)
 	if err != nil {
@@ -154,7 +152,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 	}
 
 	numberOfTxResults := len(txResults)
-	results := make([]*access.TransactionResult, 0, numberOfTxResults)
+	results := make([]*accessmodel.TransactionResult, 0, numberOfTxResults)
 
 	// cache the tx to collectionID mapping to avoid repeated lookups
 	txToCollectionID, err := t.buildTxIDToCollectionIDMapping(block)
@@ -206,7 +204,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 			return nil, status.Errorf(codes.Internal, "transaction %s not found in block %s", txID, blockID)
 		}
 
-		results = append(results, &access.TransactionResult{
+		results = append(results, &accessmodel.TransactionResult{
 			Status:        txStatus,
 			StatusCode:    txStatusCode,
 			Events:        events,
@@ -235,7 +233,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 	block *flow.Block,
 	index uint32,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
 	txResult, err := t.txResultsIndex.ByBlockIDTransactionIndex(blockID, block.Header.Height, index)
 	if err != nil {
@@ -283,7 +281,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 		return nil, err
 	}
 
-	return &access.TransactionResult{
+	return &accessmodel.TransactionResult{
 		TransactionID: txResult.TransactionID,
 		Status:        txStatus,
 		StatusCode:    txStatusCode,

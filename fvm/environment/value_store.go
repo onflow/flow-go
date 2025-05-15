@@ -1,6 +1,7 @@
 package environment
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/onflow/atree"
@@ -20,7 +21,7 @@ type ValueStore interface {
 
 	ValueExists(owner []byte, key []byte) (bool, error)
 
-	AllocateStorageIndex(owner []byte) (atree.StorageIndex, error)
+	AllocateSlabIndex(owner []byte) (atree.SlabIndex, error)
 }
 
 type ParseRestrictedValueStore struct {
@@ -82,16 +83,16 @@ func (store ParseRestrictedValueStore) ValueExists(
 		key)
 }
 
-func (store ParseRestrictedValueStore) AllocateStorageIndex(
+func (store ParseRestrictedValueStore) AllocateSlabIndex(
 	owner []byte,
 ) (
-	atree.StorageIndex,
+	atree.SlabIndex,
 	error,
 ) {
 	return parseRestrict1Arg1Ret(
 		store.txnState,
-		trace.FVMEnvAllocateStorageIndex,
-		store.impl.AllocateStorageIndex,
+		trace.FVMEnvAllocateSlabIndex,
+		store.impl.AllocateSlabIndex,
 		owner)
 }
 
@@ -140,7 +141,6 @@ func (store *valueStore) GetValue(
 	return v, nil
 }
 
-// TODO disable SetValue for scripts, right now the view changes are discarded
 func (store *valueStore) SetValue(
 	owner []byte,
 	keyBytes []byte,
@@ -153,7 +153,16 @@ func (store *valueStore) SetValue(
 		return errors.NewInvalidInternalStateAccessError(id, "modify")
 	}
 
-	err := store.meter.MeterComputation(
+	oldValue, err := store.accounts.GetValue(id)
+	if err != nil {
+		return fmt.Errorf("get value failed: %w", err)
+	}
+	// no-op write
+	if bytes.Equal(oldValue, value) {
+		return nil
+	}
+
+	err = store.meter.MeterComputation(
 		ComputationKindSetValue,
 		uint(len(value)))
 	if err != nil {
@@ -189,26 +198,26 @@ func (store *valueStore) ValueExists(
 	return len(v) > 0, nil
 }
 
-// AllocateStorageIndex allocates new storage index under the owner accounts
+// AllocateSlabIndex allocates new storage index under the owner accounts
 // to store a new register.
-func (store *valueStore) AllocateStorageIndex(
+func (store *valueStore) AllocateSlabIndex(
 	owner []byte,
 ) (
-	atree.StorageIndex,
+	atree.SlabIndex,
 	error,
 ) {
-	defer store.tracer.StartChildSpan(trace.FVMEnvAllocateStorageIndex).End()
+	defer store.tracer.StartChildSpan(trace.FVMEnvAllocateSlabIndex).End()
 
-	err := store.meter.MeterComputation(ComputationKindAllocateStorageIndex, 1)
+	err := store.meter.MeterComputation(ComputationKindAllocateSlabIndex, 1)
 	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf(
+		return atree.SlabIndex{}, fmt.Errorf(
 			"allocate storage index failed: %w",
 			err)
 	}
 
-	v, err := store.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
+	v, err := store.accounts.AllocateSlabIndex(flow.BytesToAddress(owner))
 	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf(
+		return atree.SlabIndex{}, fmt.Errorf(
 			"storage address allocation failed: %w",
 			err)
 	}

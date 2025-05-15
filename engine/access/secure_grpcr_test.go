@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/crypto"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -75,7 +76,6 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	rootHeader := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
 	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
 	params.On("SporkRootBlockHeight").Return(rootHeader.Height, nil)
 	params.On("SealedRoot").Return(rootHeader, nil)
 
@@ -110,6 +110,7 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 		UnsecureGRPCListenAddr: unittest.DefaultAddress,
 		SecureGRPCListenAddr:   unittest.DefaultAddress,
 		HTTPListenAddr:         unittest.DefaultAddress,
+		WebSocketConfig:        websockets.NewDefaultWebsocketConfig(),
 	}
 
 	// generate a server certificate that will be served by the GRPC server
@@ -171,6 +172,7 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 		suite.unsecureGrpcServer,
 		nil,
 		stateStreamConfig,
+		nil,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()

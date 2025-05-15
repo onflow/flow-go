@@ -40,6 +40,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/logging"
+	randutils "github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -73,11 +74,13 @@ func NetworkingKeyFixtures(t *testing.T) crypto.PrivateKey {
 
 // NodeFixture is a test fixture that creates a single libp2p node with the given key, spork id, and options.
 // It returns the node and its identity.
-func NodeFixture(t *testing.T,
+func NodeFixture(
+	t *testing.T,
 	sporkID flow.Identifier,
 	dhtPrefix string,
 	idProvider module.IdentityProvider,
-	opts ...NodeFixtureParameterOption) (p2p.LibP2PNode, flow.Identity) {
+	opts ...NodeFixtureParameterOption,
+) (p2p.LibP2PNode, flow.Identity) {
 
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
@@ -183,6 +186,10 @@ func NodeFixture(t *testing.T,
 		builder.SetConnectionManager(parameters.ConnManager)
 	}
 
+	if parameters.ValidateQueueSize > 0 {
+		builder.OverrideDefaultValidateQueueSize(parameters.ValidateQueueSize)
+	}
+
 	n, err := builder.Build()
 	require.NoError(t, err)
 
@@ -248,6 +255,7 @@ type NodeFixtureParameters struct {
 	GossipSubRpcInspectorFactory  p2p.GossipSubRpcInspectorFactoryFunc
 	FlowConfig                    *config.FlowConfig
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
+	ValidateQueueSize             int
 }
 
 func WithUnicastRateLimitDistributor(distributor p2p.UnicastRateLimiterDistributor) NodeFixtureParameterOption {
@@ -378,6 +386,14 @@ func WithResourceManager(resourceManager network.ResourceManager) NodeFixturePar
 func WithUnicastHandlerFunc(handler network.StreamHandler) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.HandlerFunc = handler
+	}
+}
+
+// WithValidateQueueSize sets the size of the validation queue for the node.
+// Use this to set a higher value to prevent message loss during tests
+func WithValidateQueueSize(size int) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.ValidateQueueSize = size
 	}
 }
 
@@ -848,7 +864,8 @@ func GossipSubRpcFixture(t *testing.T, msgCnt int, opts ...GossipSubCtrlOption) 
 	subscriptions := make([]*pb.RPC_SubOpts, numSubscriptions)
 	for i := 0; i < numSubscriptions; i++ {
 		subscribe := rand.Intn(2) == 1
-		topicID := unittest.RandomStringFixture(t, topicIdSize)
+		topicID, err := randutils.GenerateRandomString(topicIdSize)
+		require.NoError(t, err)
 		subscriptions[i] = &pb.RPC_SubOpts{
 			Subscribe: &subscribe,
 			Topicid:   &topicID,
@@ -1015,7 +1032,8 @@ func GossipSubMessageIdsFixture(count int) []string {
 // Note: the message is not signed.
 func GossipSubMessageFixture(t *testing.T) *pb.Message {
 	byteSize := 100
-	topic := unittest.RandomStringFixture(t, byteSize)
+	topic, err := randutils.GenerateRandomString(byteSize)
+	require.NoError(t, err)
 	return &pb.Message{
 		From:      unittest.RandomBytes(byteSize),
 		Data:      unittest.RandomBytes(byteSize),

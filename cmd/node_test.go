@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"os"
 	"syscall"
@@ -42,7 +43,7 @@ func TestRunShutsDownCleanly(t *testing.T) {
 
 		finished := make(chan struct{})
 		go func() {
-			node.Run()
+			node.Run(context.Background())
 			close(finished)
 		}()
 
@@ -50,6 +51,44 @@ func TestRunShutsDownCleanly(t *testing.T) {
 
 		err := syscall.Kill(syscall.Getpid(), syscall.SIGINT)
 		assert.NoError(t, err)
+
+		<-finished
+
+		assert.Equal(t, []string{
+			"worker starting up",
+			"worker startup complete",
+			"worker shutting down",
+			"worker shutdown complete",
+			"running cleanup",
+		}, testLogger.logs)
+	})
+
+	t.Run("Run shuts down gracefully on context cancel", func(t *testing.T) {
+		testLogger.Reset()
+		manager := component.NewComponentManagerBuilder().
+			AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+				testLogger.Log("worker starting up")
+				ready()
+				testLogger.Log("worker startup complete")
+
+				<-ctx.Done()
+				testLogger.Log("worker shutting down")
+				testLogger.Log("worker shutdown complete")
+			}).
+			Build()
+		node := NewNode(manager, nodeConfig, logger, postShutdown, fatalHandler)
+
+		ctx, cancel := context.WithCancel(context.Background())
+
+		finished := make(chan struct{})
+		go func() {
+			node.Run(ctx)
+			close(finished)
+		}()
+
+		<-node.Ready()
+
+		cancel()
 
 		<-finished
 
@@ -82,7 +121,7 @@ func TestRunShutsDownCleanly(t *testing.T) {
 
 		finished := make(chan struct{})
 		go func() {
-			node.Run()
+			node.Run(context.Background())
 			close(finished)
 		}()
 
@@ -123,7 +162,7 @@ func TestRunShutsDownCleanly(t *testing.T) {
 
 		finished := make(chan struct{})
 		go func() {
-			node.Run()
+			node.Run(context.Background())
 			close(finished)
 		}()
 
@@ -157,7 +196,7 @@ func TestRunShutsDownCleanly(t *testing.T) {
 
 		finished := make(chan struct{})
 		go func() {
-			node.Run()
+			node.Run(context.Background())
 			close(finished)
 		}()
 
@@ -191,7 +230,7 @@ func TestRunShutsDownCleanly(t *testing.T) {
 
 		finished := make(chan struct{})
 		go func() {
-			node.Run()
+			node.Run(context.Background())
 			close(finished)
 		}()
 

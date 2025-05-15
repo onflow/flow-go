@@ -18,7 +18,7 @@ var (
 )
 
 // VerifyingVoteProcessorFactory generates hotstuff.VerifyingVoteCollector instances
-type VerifyingVoteProcessorFactory = func(log zerolog.Logger, proposal *model.Proposal) (hotstuff.VerifyingVoteProcessor, error)
+type VerifyingVoteProcessorFactory = func(log zerolog.Logger, proposal *model.SignedProposal) (hotstuff.VerifyingVoteProcessor, error)
 
 // VoteCollector implements a state machine for transition between different states of vote collector
 type VoteCollector struct {
@@ -175,7 +175,7 @@ func (m *VoteCollector) View() uint64 {
 //	CachingVotes   -> VerifyingVotes
 //	CachingVotes   -> Invalid
 //	VerifyingVotes -> Invalid
-func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
+func (m *VoteCollector) ProcessBlock(proposal *model.SignedProposal) error {
 
 	if proposal.Block.View != m.View() {
 		return fmt.Errorf("this VoteCollector requires a proposal for view %d but received block %v with view %d",
@@ -243,7 +243,7 @@ func (m *VoteCollector) RegisterVoteConsumer(consumer hotstuff.VoteConsumer) {
 // Error returns:
 // * ErrDifferentCollectorState if the VoteCollector's state is _not_ `CachingVotes`
 // * all other errors are unexpected and potential symptoms of internal bugs or state corruption (fatal)
-func (m *VoteCollector) caching2Verifying(proposal *model.Proposal) error {
+func (m *VoteCollector) caching2Verifying(proposal *model.SignedProposal) error {
 	blockID := proposal.Block.BlockID
 	newProc, err := m.createVerifyingProcessor(m.log, proposal)
 	if err != nil {

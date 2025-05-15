@@ -30,6 +30,7 @@ import (
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	randutils "github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -1711,12 +1712,15 @@ func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) 
 		rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Maybe()
 		inspector.Start(signalerCtx)
 
+		topic, err := randutils.GenerateRandomString(100)
+		require.NoError(t, err)
+
 		rpc := unittest.P2PRPCFixture(
 			unittest.WithGrafts(unittest.P2PRPCGraftFixtures(unittest.IdentifierListFixture(numOfMsgs).Strings()...)...),
 			unittest.WithPrunes(unittest.P2PRPCPruneFixtures(unittest.IdentifierListFixture(numOfMsgs).Strings()...)...),
 			unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(numOfMsgs, unittest.IdentifierListFixture(numOfMsgs).Strings()...)...),
 			unittest.WithIWants(unittest.P2PRPCIWantFixtures(numOfMsgs, numOfMsgs)...),
-			unittest.WithPubsubMessages(unittest.GossipSubMessageFixtures(numOfMsgs, unittest.RandomStringFixture(t, 100), unittest.WithFrom(unittest.PeerIdFixture(t)))...),
+			unittest.WithPubsubMessages(unittest.GossipSubMessageFixtures(numOfMsgs, topic, unittest.WithFrom(unittest.PeerIdFixture(t)))...),
 		)
 
 		from := unittest.PeerIdFixture(t)
@@ -1740,7 +1744,8 @@ func invalidTopics(t *testing.T, sporkID flow.Identifier) (string, string, strin
 	// create unknown topic
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", unittest.IdentifierFixture(), sporkID)).String()
 	// create malformed topic
-	malformedTopic := channels.Topic(unittest.RandomStringFixture(t, 100)).String()
+	malformedTopic, err := randutils.GenerateRandomString(100)
+	require.NoError(t, err)
 	// a topics spork ID is considered invalid if it does not match the current spork ID
 	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture())).String()
 	return unknownTopic, malformedTopic, invalidSporkIDTopic

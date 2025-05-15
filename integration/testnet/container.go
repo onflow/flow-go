@@ -32,6 +32,8 @@ import (
 	state "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 var (
@@ -399,11 +401,11 @@ func (c *Container) OpenState() (*state.State, error) {
 	qcs := storage.NewQuorumCertificates(metrics, db, storage.DefaultCacheSize)
 	setups := storage.NewEpochSetups(metrics, db)
 	commits := storage.NewEpochCommits(metrics, db)
-	protocolState := storage.NewProtocolState(metrics, setups, commits, db,
-		storage.DefaultProtocolStateCacheSize, storage.DefaultProtocolStateByBlockIDCacheSize)
+	protocolState := storage.NewEpochProtocolStateEntries(metrics, setups, commits, db,
+		storage.DefaultEpochProtocolStateCacheSize, storage.DefaultProtocolStateIndexCacheSize)
 	protocolKVStates := storage.NewProtocolKVStore(metrics, db,
 		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeacons := storage.NewVersionBeacons(db)
+	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(db))
 
 	return state.OpenState(
 		metrics,

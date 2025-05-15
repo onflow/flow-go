@@ -10,6 +10,9 @@ import (
 	"github.com/sethvargo/go-retry"
 
 	"github.com/onflow/flow-go-sdk/access/grpc"
+
+	"github.com/onflow/flow-go/utils/logging"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -76,22 +79,28 @@ func GetSnapshotAtEpochAndPhase(ctx context.Context, log zerolog.Logger, startup
 		}
 
 		// if we encounter any errors interpreting the snapshot something went wrong stop retrying
-		currEpochCounter, err := snapshot.Epochs().Current().Counter()
+		currEpoch, err := snapshot.Epochs().Current()
 		if err != nil {
-			return fmt.Errorf("failed to get the current epoch counter: %w", err)
+			return fmt.Errorf("failed to get current epoch: %w", err)
 		}
+		currEpochCounter := currEpoch.Counter()
 
-		currEpochPhase, err := snapshot.Phase()
+		currEpochPhase, err := snapshot.EpochPhase()
 		if err != nil {
 			return fmt.Errorf("failed to get the current epoch phase: %w", err)
 		}
 
-		// check if we are in or past the target epoch and phase
-		if currEpochCounter > startupEpoch || (currEpochCounter == startupEpoch && currEpochPhase >= startupEpochPhase) {
+		if shouldStartAtEpochPhase(currEpochCounter, startupEpoch, currEpochPhase, startupEpochPhase) {
+			head, err := snapshot.Head()
+			if err != nil {
+				return fmt.Errorf("could not get Dynamic Startup snapshot header: %w", err)
+			}
 			log.Info().
-				Dur("time-waiting", time.Since(start)).
-				Uint64("current-epoch", currEpochCounter).
-				Str("current-epoch-phase", currEpochPhase.String()).
+				Dur("time_waiting", time.Since(start)).
+				Uint64("current_epoch", currEpochCounter).
+				Str("current_epoch_phase", currEpochPhase.String()).
+				Hex("finalized_root_block_id", logging.ID(head.ID())).
+				Uint64("finalized_block_height", head.Height).
 				Msg("finished dynamic startup - reached desired epoch and phase")
 
 			return nil
@@ -111,4 +120,23 @@ func GetSnapshotAtEpochAndPhase(ctx context.Context, log zerolog.Logger, startup
 	}
 
 	return snapshot, nil
+}
+
+// shouldStartAtEpochPhase determines whether Dynamic Startup should start up the node, based on a
+// target epoch/phase and a current epoch/phase.
+func shouldStartAtEpochPhase(currentEpoch, targetEpoch uint64, currentPhase, targetPhase flow.EpochPhase) bool {
+	// if the current epoch is after the target epoch, start up regardless of phase
+	if currentEpoch > targetEpoch {
+		return true
+	}
+	// if the current epoch is before the target epoch, do not start up regardless of phase
+	if currentEpoch < targetEpoch {
+		return false
+	}
+	// if the target phase is EpochPhaseFallback, only start up if the current phase exactly matches
+	if targetPhase == flow.EpochPhaseFallback {
+		return currentPhase == flow.EpochPhaseFallback
+	}
+	// for any other target phase, start up if current phase is >= target
+	return currentPhase >= targetPhase
 }

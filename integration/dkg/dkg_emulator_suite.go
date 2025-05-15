@@ -2,8 +2,12 @@ package dkg
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"os"
+
+	"github.com/onflow/crypto"
+	"golang.org/x/exp/slices"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -14,24 +18,23 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	emulator "github.com/onflow/flow-emulator/emulator"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
 
-	"github.com/onflow/flow-go/module/metrics"
-
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	emulator "github.com/onflow/flow-go/integration/internal/emulator"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/dkg"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage/badger"
@@ -54,10 +57,10 @@ type EmulatorSuite struct {
 	dkgAccountKey          *sdk.AccountKey
 	dkgSigner              sdkcrypto.Signer
 	checkDKGUnhappy        bool // activate log hook for DKGBroker to check if the DKG core is flagging misbehaviours
-
-	netIDs       flow.IdentityList
-	nodeAccounts []*nodeAccount
-	nodes        []*node
+	serviceAccountAddress  sdk.Address
+	netIDs                 flow.IdentityList
+	nodeAccounts           []*nodeAccount
+	nodes                  []*node
 }
 
 func (s *EmulatorSuite) SetupTest() {
@@ -66,6 +69,9 @@ func (s *EmulatorSuite) SetupTest() {
 	s.setupDKGAdmin()
 
 	boostrapNodesInfo := unittest.PrivateNodeInfosFixture(numberOfNodes, unittest.WithRole(flow.RoleConsensus))
+	slices.SortFunc(boostrapNodesInfo, func(lhs, rhs bootstrap.NodeInfo) int {
+		return flow.IdentifierCanonical(lhs.NodeID, rhs.NodeID)
+	})
 	for _, id := range boostrapNodesInfo {
 		s.nodeAccounts = append(s.nodeAccounts, s.createAndFundAccount(id))
 		s.netIDs = append(s.netIDs, id.Identity())
@@ -119,7 +125,7 @@ func (s *EmulatorSuite) initEmulator() {
 	s.Require().NoError(err)
 
 	s.blockchain = blockchain
-
+	s.serviceAccountAddress = sdk.Address(s.blockchain.ServiceKey().Address)
 	s.adminEmulatorClient = utils.NewEmulatorClient(blockchain)
 
 	s.hub = stub.NewNetworkHub()
@@ -160,18 +166,18 @@ func (s *EmulatorSuite) deployDKGContract() {
 
 func (s *EmulatorSuite) setupDKGAdmin() {
 	setUpAdminTx := sdk.NewTransaction().
-		SetScript(templates.GeneratePublishDKGParticipantScript(s.env)).
+		SetScript(templates.GeneratePublishDKGAdminScript(s.env)).
 		SetComputeLimit(9999).
 		SetProposalKey(
-			s.blockchain.ServiceKey().Address,
+			s.serviceAccountAddress,
 			s.blockchain.ServiceKey().Index,
 			s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address).
+		SetPayer(s.serviceAccountAddress).
 		AddAuthorizer(s.dkgAddress)
 	signer, err := s.blockchain.ServiceKey().Signer()
 	require.NoError(s.T(), err)
 	_, err = s.prepareAndSubmit(setUpAdminTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
+		[]sdk.Address{s.serviceAccountAddress, s.dkgAddress},
 		[]sdkcrypto.Signer{signer, s.dkgSigner},
 	)
 	require.NoError(s.T(), err)
@@ -229,13 +235,13 @@ func (s *EmulatorSuite) createAndFundAccount(netID bootstrap.NodeInfo) *nodeAcco
 					sc.FungibleToken.Address.Hex(),
 					sc.FlowToken.Address.Hex(),
 				))).
-		AddAuthorizer(s.blockchain.ServiceKey().Address).
+		AddAuthorizer(s.serviceAccountAddress).
 		SetProposalKey(
-			s.blockchain.ServiceKey().Address,
+			s.serviceAccountAddress,
 			s.blockchain.ServiceKey().Index,
 			s.blockchain.ServiceKey().SequenceNumber,
 		).
-		SetPayer(s.blockchain.ServiceKey().Address)
+		SetPayer(s.serviceAccountAddress)
 
 	err = fundAccountTx.AddArgument(cadence.UFix64(1_000_000))
 	require.NoError(s.T(), err)
@@ -244,7 +250,7 @@ func (s *EmulatorSuite) createAndFundAccount(netID bootstrap.NodeInfo) *nodeAcco
 	signer, err := s.blockchain.ServiceKey().Signer()
 	require.NoError(s.T(), err)
 	_, err = s.prepareAndSubmit(fundAccountTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address},
+		[]sdk.Address{s.serviceAccountAddress},
 		[]sdkcrypto.Signer{signer},
 	)
 	require.NoError(s.T(), err)
@@ -307,10 +313,10 @@ func (s *EmulatorSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 		SetScript(templates.GenerateStartDKGScript(s.env)).
 		SetComputeLimit(9999).
 		SetProposalKey(
-			s.blockchain.ServiceKey().Address,
+			s.serviceAccountAddress,
 			s.blockchain.ServiceKey().Index,
 			s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address).
+		SetPayer(s.serviceAccountAddress).
 		AddAuthorizer(s.dkgAddress)
 
 	err := startDKGTx.AddArgument(cadence.NewArray(valueNodeIDs))
@@ -318,7 +324,7 @@ func (s *EmulatorSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 	signer, err := s.blockchain.ServiceKey().Signer()
 	require.NoError(s.T(), err)
 	_, err = s.prepareAndSubmit(startDKGTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
+		[]sdk.Address{s.serviceAccountAddress, s.dkgAddress},
 		[]sdkcrypto.Signer{signer, s.dkgSigner},
 	)
 	require.NoError(s.T(), err)
@@ -334,7 +340,7 @@ func (s *EmulatorSuite) claimDKGParticipant(node *node) {
 		SetScript(templates.GenerateCreateDKGParticipantScript(s.env)).
 		SetComputeLimit(9999).
 		SetProposalKey(
-			s.blockchain.ServiceKey().Address,
+			s.serviceAccountAddress,
 			s.blockchain.ServiceKey().Index,
 			s.blockchain.ServiceKey().SequenceNumber,
 		).
@@ -350,7 +356,7 @@ func (s *EmulatorSuite) claimDKGParticipant(node *node) {
 	signer, err := s.blockchain.ServiceKey().Signer()
 	require.NoError(s.T(), err)
 	_, err = s.prepareAndSubmit(createParticipantTx,
-		[]sdk.Address{node.account.accountAddress, s.blockchain.ServiceKey().Address, s.dkgAddress},
+		[]sdk.Address{node.account.accountAddress, s.serviceAccountAddress, s.dkgAddress},
 		[]sdkcrypto.Signer{node.account.accountSigner, signer, s.dkgSigner},
 	)
 	require.NoError(s.T(), err)
@@ -371,21 +377,21 @@ func (s *EmulatorSuite) sendDummyTx() (*flow.Block, error) {
 	createAccountTx, err := sdktemplates.CreateAccount(
 		[]*sdk.AccountKey{test.AccountKeyGenerator().New()},
 		[]sdktemplates.Contract{},
-		s.blockchain.ServiceKey().Address)
+		s.serviceAccountAddress)
 	if err != nil {
 		return nil, err
 	}
 	createAccountTx.
 		SetProposalKey(
-			s.blockchain.ServiceKey().Address,
+			s.serviceAccountAddress,
 			s.blockchain.ServiceKey().Index,
 			s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address)
+		SetPayer(s.serviceAccountAddress)
 
 	signer, err := s.blockchain.ServiceKey().Signer()
 	require.NoError(s.T(), err)
 	block, err := s.prepareAndSubmit(createAccountTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address},
+		[]sdk.Address{s.serviceAccountAddress},
 		[]sdkcrypto.Signer{signer},
 	)
 	return block, err
@@ -397,31 +403,38 @@ func (s *EmulatorSuite) isDKGCompleted() bool {
 	return bool(value.(cadence.Bool))
 }
 
-func (s *EmulatorSuite) getResult() []string {
-	script := fmt.Sprintf(`
-	import FlowDKG from 0x%s
-
-	access(all) fun main(): [String?]? {
-		return FlowDKG.dkgCompleted()
-	} `,
-		s.env.DkgAddress,
-	)
-
-	res := s.executeScript([]byte(script), nil)
+// getParametersAndResult retrieves the DKG setup parameters (`flow.DKGIndexMap`) and the DKG result from the DKG white-board smart contract.
+func (s *EmulatorSuite) getParametersAndResult() (flow.DKGIndexMap, crypto.PublicKey, []crypto.PublicKey) {
+	res := s.executeScript(templates.GenerateGetDKGCanonicalFinalSubmissionScript(s.env), nil)
 	value := res.(cadence.Optional).Value
 	if value == nil {
-		return []string{}
+		s.Fail("DKG result is nil")
 	}
 
-	dkgResult := []string{}
-	for _, item := range value.(cadence.Array).Values {
-		dkgResult = append(
-			dkgResult,
-			string(item.(cadence.Optional).Value.(cadence.String)),
-		)
+	decodePubkey := func(r string) crypto.PublicKey {
+		pkBytes, err := hex.DecodeString(r)
+		require.NoError(s.T(), err)
+		pk, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pkBytes)
+		require.NoError(s.T(), err)
+		return pk
 	}
 
-	return dkgResult
+	fields := value.(cadence.Struct).FieldsMappedByName()
+	groupKey := decodePubkey(string(UnwrapOptional[cadence.String](fields["groupPubKey"])))
+
+	dkgKeyShares := CadenceArrayTo(UnwrapOptional[cadence.Array](fields["pubKeys"]), func(value cadence.Value) crypto.PublicKey {
+		return decodePubkey(string(value.(cadence.String)))
+	})
+
+	cdcIndexMap := CDCToDKGIDMapping(UnwrapOptional[cadence.Dictionary](fields["idMapping"]))
+	indexMap := make(flow.DKGIndexMap, len(cdcIndexMap))
+	for k, v := range cdcIndexMap {
+		nodeID, err := flow.HexStringToIdentifier(k)
+		require.NoError(s.T(), err)
+		indexMap[nodeID] = v
+	}
+
+	return indexMap, groupKey, dkgKeyShares
 }
 
 func (s *EmulatorSuite) initEngines(node *node, ids flow.IdentityList) {
@@ -435,7 +448,7 @@ func (s *EmulatorSuite) initEngines(node *node, ids flow.IdentityList) {
 
 	// dkgState is used to store the private key resulting from the node's
 	// participation in the DKG run
-	dkgState, err := badger.NewDKGState(core.Metrics, core.SecretsDB)
+	dkgState, err := badger.NewRecoverableRandomBeaconStateMachine(core.Metrics, core.SecretsDB, core.Me.NodeID())
 	s.Require().NoError(err)
 
 	// brokerTunnel is used to communicate between the messaging engine and the
@@ -488,7 +501,6 @@ func (s *EmulatorSuite) initEngines(node *node, ids flow.IdentityList) {
 	node.GenericNode = core
 	node.messagingEngine = messagingEngine
 	node.dkgState = dkgState
-	node.safeBeaconKeys = badger.NewSafeBeaconPrivateKeys(dkgState)
 	node.reactorEngine = reactorEngine
 }
 
@@ -528,4 +540,27 @@ func (s *EmulatorSuite) executeScript(script []byte, arguments [][]byte) cadence
 	require.NoError(s.T(), err)
 	require.True(s.T(), result.Succeeded())
 	return result.Value
+}
+
+func UnwrapOptional[T cadence.Value](optional cadence.Value) T {
+	return optional.(cadence.Optional).Value.(T)
+}
+
+func CadenceArrayTo[T any](arr cadence.Value, convert func(cadence.Value) T) []T {
+	out := make([]T, len(arr.(cadence.Array).Values))
+	for i := range out {
+		out[i] = convert(arr.(cadence.Array).Values[i])
+	}
+	return out
+}
+
+func CDCToDKGIDMapping(cdc cadence.Value) map[string]int {
+	idMappingCDC := cdc.(cadence.Dictionary)
+	idMapping := make(map[string]int, len(idMappingCDC.Pairs))
+	for _, pair := range idMappingCDC.Pairs {
+		nodeID := string(pair.Key.(cadence.String))
+		index := pair.Value.(cadence.Int).Int()
+		idMapping[nodeID] = index
+	}
+	return idMapping
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -20,6 +21,7 @@ func TestArchContract(t *testing.T) {
 			func() (uint64, error) {
 				return height, nil
 			},
+			nil,
 			nil,
 			nil,
 		)
@@ -40,14 +42,18 @@ func TestArchContract(t *testing.T) {
 
 	t.Run("test get random source", func(t *testing.T) {
 		address := testutils.RandomAddress(t)
-		rand := uint64(1337)
+		rand := make([]byte, environment.RandomSourceHistoryLength)
+		err := precompiles.EncodeBytes32([]byte{13, 23}, rand, 0)
+		require.NoError(t, err)
+
 		pc := precompiles.ArchContract(
 			address,
 			nil,
 			nil,
-			func(u uint64) (uint64, error) {
+			func(u uint64) ([]byte, error) {
 				return rand, nil
 			},
+			nil,
 		)
 
 		require.Equal(t, address, pc.Address())
@@ -57,6 +63,33 @@ func TestArchContract(t *testing.T) {
 
 		input := append(precompiles.RandomSourceFuncSig.Bytes(), height...)
 		require.Equal(t, precompiles.RandomSourceGas, pc.RequiredGas(input))
+
+		ret, err := pc.Run(input)
+		require.Len(t, ret, environment.RandomSourceHistoryLength)
+		require.NoError(t, err)
+
+		resultRand, err := precompiles.ReadBytes32(ret, 0)
+		require.NoError(t, err)
+		require.Equal(t, rand, resultRand)
+	})
+
+	t.Run("test revertible random", func(t *testing.T) {
+		address := testutils.RandomAddress(t)
+		rand := uint64(1337)
+		pc := precompiles.ArchContract(
+			address,
+			nil,
+			nil,
+			nil,
+			func() (uint64, error) {
+				return rand, nil
+			},
+		)
+
+		require.Equal(t, address, pc.Address())
+
+		input := precompiles.RevertibleRandomFuncSig.Bytes()
+		require.Equal(t, precompiles.RevertibleRandomGas, pc.RequiredGas(input))
 
 		ret, err := pc.Run(input)
 		require.NoError(t, err)
@@ -75,6 +108,7 @@ func TestArchContract(t *testing.T) {
 				require.Equal(t, proof, p)
 				return true, nil
 			},
+			nil,
 			nil,
 		)
 

@@ -2,6 +2,7 @@ package backend
 
 import (
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc"
 
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 
@@ -57,7 +58,9 @@ func NewEng(
 		}).
 		Build()
 
-	executiondata.RegisterExecutionDataAPIServer(server.Server, e.handler)
+	server.RegisterService(func(s *grpc.Server) {
+		executiondata.RegisterExecutionDataAPIServer(s, e.handler)
+	})
 
 	return e, nil
 }

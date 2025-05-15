@@ -40,29 +40,6 @@ func NewStakingSigner(
 	return sc
 }
 
-// CreateProposal will create a proposal with a staking signature for the given block.
-func (c *StakingSigner) CreateProposal(block *model.Block) (*model.Proposal, error) {
-
-	// check that the block is created by us
-	if block.ProposerID != c.signerID {
-		return nil, fmt.Errorf("can't create proposal for someone else's block")
-	}
-
-	// create the signature data
-	sigData, err := c.genSigData(block)
-	if err != nil {
-		return nil, fmt.Errorf("signing my proposal failed: %w", err)
-	}
-
-	// create the proposal
-	proposal := &model.Proposal{
-		Block:   block,
-		SigData: sigData,
-	}
-
-	return proposal, nil
-}
-
 // CreateVote will create a vote with a staking signature for the given block.
 func (c *StakingSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 

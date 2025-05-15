@@ -31,9 +31,11 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
 	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 type Suite struct {
@@ -46,25 +48,30 @@ type Suite struct {
 		params   *protocol.Params
 	}
 
-	me             *modulemock.Local
-	obsIdentity    *flow.Identity
-	request        *modulemock.Requester
-	provider       *mocknetwork.Engine
-	blocks         *storage.Blocks
-	headers        *storage.Headers
-	collections    *storage.Collections
-	transactions   *storage.Transactions
-	receipts       *storage.ExecutionReceipts
-	results        *storage.ExecutionResults
-	seals          *storage.Seals
+	me           *modulemock.Local
+	net          *mocknetwork.Network
+	request      *modulemock.Requester
+	obsIdentity  *flow.Identity
+	provider     *mocknetwork.Engine
+	blocks       *storage.Blocks
+	headers      *storage.Headers
+	collections  *storage.Collections
+	transactions *storage.Transactions
+	receipts     *storage.ExecutionReceipts
+	results      *storage.ExecutionResults
+	seals        *storage.Seals
+
+	conduit        *mocknetwork.Conduit
 	downloader     *downloadermock.Downloader
 	sealedBlock    *flow.Header
 	finalizedBlock *flow.Header
 	log            zerolog.Logger
+	blockMap       map[uint64]*flow.Block
+	rootBlock      flow.Block
 
 	collectionExecutedMetric *indexer.CollectionExecutedMetricImpl
 
-	eng    *Engine
+	ctx    context.Context
 	cancel context.CancelFunc
 
 	db                  *badger.DB
@@ -85,18 +92,18 @@ func (s *Suite) TearDownTest() {
 
 func (s *Suite) SetupTest() {
 	s.log = zerolog.New(os.Stderr)
-	ctx, cancel := context.WithCancel(context.Background())
-	s.cancel = cancel
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
 
 	s.obsIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 
+	s.blocks = storage.NewBlocks(s.T())
 	// mock out protocol state
 	s.proto.state = new(protocol.FollowerState)
 	s.proto.snapshot = new(protocol.Snapshot)
 	s.proto.params = new(protocol.Params)
 	s.finalizedBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	s.proto.state.On("Identity").Return(s.obsIdentity, nil)
-	s.proto.state.On("Final").Return(s.proto.snapshot, nil)
 	s.proto.state.On("Params").Return(s.proto.params)
 	s.proto.snapshot.On("Head").Return(
 		func() *flow.Header {
@@ -106,20 +113,19 @@ func (s *Suite) SetupTest() {
 	).Maybe()
 
 	s.me = modulemock.NewLocal(s.T())
-
-	net := mocknetwork.NewNetwork(s.T())
+	s.me.On("NodeID").Return(s.obsIdentity.NodeID).Maybe()
+	s.net = mocknetwork.NewNetwork(s.T())
 	conduit := mocknetwork.NewConduit(s.T())
-	net.On("Register", channels.ReceiveReceipts, mock.Anything).
+	s.net.On("Register", channels.ReceiveReceipts, mock.Anything).
 		Return(conduit, nil).
 		Once()
 	s.request = modulemock.NewRequester(s.T())
-
 	s.provider = mocknetwork.NewEngine(s.T())
 	s.blocks = storage.NewBlocks(s.T())
 	s.headers = storage.NewHeaders(s.T())
 	s.collections = new(storage.Collections)
-	s.transactions = new(storage.Transactions)
 	s.receipts = new(storage.ExecutionReceipts)
+	s.transactions = new(storage.Transactions)
 	s.results = new(storage.ExecutionResults)
 	collectionsToMarkFinalized, err := stdmap.NewTimes(100)
 	require.NoError(s.T(), err)
@@ -127,6 +133,44 @@ func (s *Suite) SetupTest() {
 	require.NoError(s.T(), err)
 	blocksToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(s.T(), err)
+	blockTransactions, err := stdmap.NewIdentifierMap(100)
+	require.NoError(s.T(), err)
+
+	s.proto.state.On("Identity").Return(s.obsIdentity, nil)
+	s.proto.state.On("Params").Return(s.proto.params)
+
+	blockCount := 5
+	s.blockMap = make(map[uint64]*flow.Block, blockCount)
+	s.rootBlock = unittest.BlockFixture()
+	s.rootBlock.Header.Height = 0
+	parent := s.rootBlock.Header
+
+	for i := 0; i < blockCount; i++ {
+		block := unittest.BlockWithParentFixture(parent)
+		// update for next iteration
+		parent = block.Header
+		s.blockMap[block.Header.Height] = block
+	}
+	s.finalizedBlock = parent
+
+	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(
+		mocks.ConvertStorageOutput(
+			mocks.StorageMapGetter(s.blockMap),
+			func(block *flow.Block) *flow.Block { return block },
+		),
+	).Maybe()
+
+	s.proto.snapshot.On("Head").Return(
+		func() *flow.Header {
+			return s.finalizedBlock
+		},
+		nil,
+	).Maybe()
+	s.proto.state.On("Final").Return(s.proto.snapshot, nil)
+
+	// Mock the finalized root block header with height 0.
+	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
+	s.proto.params.On("FinalizedRoot").Return(header, nil)
 
 	s.collectionExecutedMetric, err = indexer.NewCollectionExecutedMetricImpl(
 		s.log,
@@ -136,39 +180,66 @@ func (s *Suite) SetupTest() {
 		blocksToMarkExecuted,
 		s.collections,
 		s.blocks,
+		blockTransactions,
 	)
 	require.NoError(s.T(), err)
-
-	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
-	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
-		bstorage.NewConsumerProgress(s.db, module.ConsumeProgressLastFullBlockHeight),
-		s.finalizedBlock.Height,
-	)
-	require.NoError(s.T(), err)
-
-	eng, err := New(s.log, net, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections,
-		s.transactions, s.results, s.receipts, s.collectionExecutedMetric, s.lastFullBlockHeight)
-	require.NoError(s.T(), err)
-
-	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
-	eng.ComponentManager.Start(irrecoverableCtx)
-	<-eng.Ready()
-
-	s.eng = eng
 }
 
-// TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
-func (s *Suite) TestOnFinalizedBlock() {
-	s.me.On("NodeID").Return(s.obsIdentity.NodeID)
+// initIngestionEngine create new instance of ingestion engine and waits when it starts
+func (s *Suite) initIngestionEngine(ctx irrecoverable.SignalerContext) *Engine {
+	processedHeightInitializer := store.NewConsumerProgress(badgerimpl.ToDB(s.db), module.ConsumeProgressIngestionEngineBlockHeight)
 
+	lastFullBlockHeight, err := store.NewConsumerProgress(badgerimpl.ToDB(s.db), module.ConsumeProgressLastFullBlockHeight).Initialize(s.finalizedBlock.Height)
+	require.NoError(s.T(), err)
+
+	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeight)
+	require.NoError(s.T(), err)
+
+	eng, err := New(
+		s.log,
+		s.net,
+		s.proto.state,
+		s.me,
+		s.request,
+		s.blocks,
+		s.headers,
+		s.collections,
+		s.transactions,
+		s.results,
+		s.receipts,
+		s.collectionExecutedMetric,
+		processedHeightInitializer,
+		s.lastFullBlockHeight,
+		nil,
+	)
+
+	require.NoError(s.T(), err)
+
+	eng.ComponentManager.Start(ctx)
+	<-eng.Ready()
+
+	return eng
+}
+
+// mockCollectionsForBlock mocks collections for block
+func (s *Suite) mockCollectionsForBlock(block flow.Block) {
+	// we should query the block once and index the guarantee payload once
+	for _, g := range block.Payload.Guarantees {
+		collection := unittest.CollectionFixture(1)
+		light := collection.Light()
+		s.collections.On("LightByID", g.CollectionID).Return(&light, nil).Twice()
+	}
+}
+
+// generateBlock prepares block with payload and specified guarantee.SignerIndices
+func (s *Suite) generateBlock(clusterCommittee flow.IdentitySkeletonList, snap *protocol.Snapshot) flow.Block {
 	block := unittest.BlockFixture()
 	block.SetPayload(unittest.PayloadFixture(
 		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
 		unittest.WithExecutionResults(unittest.ExecutionResultFixture()),
+		unittest.WithSeals(unittest.Seal.Fixture()),
 	))
 
-	// prepare cluster committee members
-	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	refBlockID := unittest.IdentifierFixture()
 	for _, guarantee := range block.Payload.Guarantees {
 		guarantee.ReferenceBlockID = refBlockID
@@ -179,66 +250,148 @@ func (s *Suite) TestOnFinalizedBlock() {
 		guarantee.SignerIndices = indices
 	}
 
+	s.proto.state.On("AtBlockID", refBlockID).Return(snap)
+
+	return block
+}
+
+// TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
+func (s *Suite) TestOnFinalizedBlockSingle() {
+	cluster := new(protocol.Cluster)
+	epoch := new(protocol.CommittedEpoch)
+	epochs := new(protocol.EpochQuery)
+	snap := new(protocol.Snapshot)
+
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs.On("Current").Return(epoch, nil)
+	snap.On("Epochs").Return(epochs)
+
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
+	cluster.On("Members").Return(clusterCommittee, nil)
+
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
+	eng := s.initIngestionEngine(irrecoverableCtx)
+
+	block := s.generateBlock(clusterCommittee, snap)
+	block.Header.Height = s.finalizedBlock.Height + 1
+	s.blockMap[block.Header.Height] = &block
+	s.mockCollectionsForBlock(block)
+	s.finalizedBlock = block.Header
+
 	hotstuffBlock := hotmodel.Block{
 		BlockID: block.ID(),
 	}
 
-	// we should query the block once and index the guarantee payload once
-	s.blocks.On("ByID", block.ID()).Return(&block, nil).Once()
-	for _, g := range block.Payload.Guarantees {
-		collection := unittest.CollectionFixture(1)
-		light := collection.Light()
-		s.collections.On("LightByID", g.CollectionID).Return(&light, nil).Twice()
-	}
-
 	// expect that the block storage is indexed with each of the collection guarantee
 	s.blocks.On("IndexBlockForCollections", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
-
-	cluster := new(protocol.Cluster)
-	cluster.On("Members").Return(clusterCommittee, nil)
-	epoch := new(protocol.Epoch)
-	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
-	epochs := new(protocol.EpochQuery)
-	epochs.On("Current").Return(epoch)
-	snap := new(protocol.Snapshot)
-	snap.On("Epochs").Return(epochs)
-	s.proto.state.On("AtBlockID", refBlockID).Return(snap)
-	s.results.On("Index", mock.Anything, mock.Anything).Return(nil)
-
-	// for each of the guarantees, we should request the corresponding collection once
-	needed := make(map[flow.Identifier]struct{})
-	for _, guarantee := range block.Payload.Guarantees {
-		needed[guarantee.ID()] = struct{}{}
+	for _, seal := range block.Payload.Seals {
+		s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
 	}
 
+	missingCollectionCount := 4
 	wg := sync.WaitGroup{}
-	wg.Add(4)
+	wg.Add(missingCollectionCount)
 
-	s.request.On("EntityByID", mock.Anything, mock.Anything).Run(
-		func(args mock.Arguments) {
-			collID := args.Get(0).(flow.Identifier)
-			_, pending := needed[collID]
-			s.Assert().True(pending, "collection should be pending (%x)", collID)
-			delete(needed, collID)
+	for _, cg := range block.Payload.Guarantees {
+		s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Run(func(args mock.Arguments) {
+			// Ensure the test does not complete its work faster than necessary
 			wg.Done()
-		},
-	)
+		}).Once()
+	}
 
 	// process the block through the finalized callback
-	s.eng.OnFinalizedBlock(&hotstuffBlock)
-	s.Assertions.Eventually(func() bool {
-		wg.Wait()
-		return true
-	}, time.Millisecond*20, time.Millisecond)
+	eng.OnFinalizedBlock(&hotstuffBlock)
+
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, 100*time.Millisecond, "expect to process new block before timeout")
 
 	// assert that the block was retrieved and all collections were requested
 	s.headers.AssertExpectations(s.T())
 	s.request.AssertNumberOfCalls(s.T(), "EntityByID", len(block.Payload.Guarantees))
-	s.request.AssertNumberOfCalls(s.T(), "Index", len(block.Payload.Seals))
+	s.results.AssertNumberOfCalls(s.T(), "Index", len(block.Payload.Seals))
+}
+
+// TestOnFinalizedBlockSeveralBlocksAhead checks OnFinalizedBlock with a block several blocks newer than the last block processed
+func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
+	cluster := new(protocol.Cluster)
+	epoch := new(protocol.CommittedEpoch)
+	epochs := new(protocol.EpochQuery)
+	snap := new(protocol.Snapshot)
+
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs.On("Current").Return(epoch, nil)
+	snap.On("Epochs").Return(epochs)
+
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
+	cluster.On("Members").Return(clusterCommittee, nil)
+
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
+	eng := s.initIngestionEngine(irrecoverableCtx)
+
+	newBlocksCount := 3
+	startHeight := s.finalizedBlock.Height + 1
+	blocks := make([]flow.Block, newBlocksCount)
+
+	// generate the test blocks, cgs and collections
+	for i := 0; i < newBlocksCount; i++ {
+		block := s.generateBlock(clusterCommittee, snap)
+		block.Header.Height = startHeight + uint64(i)
+		s.blockMap[block.Header.Height] = &block
+		blocks[i] = block
+		s.mockCollectionsForBlock(block)
+		s.finalizedBlock = block.Header
+	}
+
+	// latest of all the new blocks which are newer than the last block processed
+	latestBlock := blocks[2]
+
+	// block several blocks newer than the last block processed
+	hotstuffBlock := hotmodel.Block{
+		BlockID: latestBlock.ID(),
+	}
+
+	missingCollectionCountPerBlock := 4
+	wg := sync.WaitGroup{}
+	wg.Add(missingCollectionCountPerBlock * newBlocksCount)
+
+	// expected all new blocks after last block processed
+	for _, block := range blocks {
+		s.blocks.On("IndexBlockForCollections", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
+
+		for _, cg := range block.Payload.Guarantees {
+			s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Run(func(args mock.Arguments) {
+				// Ensure the test does not complete its work faster than necessary, so we can check all expected results
+				wg.Done()
+			}).Once()
+		}
+		for _, seal := range block.Payload.Seals {
+			s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
+		}
+	}
+
+	eng.OnFinalizedBlock(&hotstuffBlock)
+
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, 100*time.Millisecond, "expect to process all blocks before timeout")
+
+	expectedEntityByIDCalls := 0
+	expectedIndexCalls := 0
+	for _, block := range blocks {
+		expectedEntityByIDCalls += len(block.Payload.Guarantees)
+		expectedIndexCalls += len(block.Payload.Seals)
+	}
+
+	s.headers.AssertExpectations(s.T())
+	s.blocks.AssertNumberOfCalls(s.T(), "IndexBlockForCollections", newBlocksCount)
+	s.request.AssertNumberOfCalls(s.T(), "EntityByID", expectedEntityByIDCalls)
+	s.results.AssertNumberOfCalls(s.T(), "Index", expectedIndexCalls)
 }
 
 // TestOnCollection checks that when a Collection is received, it is persisted
 func (s *Suite) TestOnCollection() {
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
+	s.initIngestionEngine(irrecoverableCtx)
+
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
 
@@ -268,6 +421,9 @@ func (s *Suite) TestOnCollection() {
 
 // TestExecutionReceiptsAreIndexed checks that execution receipts are properly indexed
 func (s *Suite) TestExecutionReceiptsAreIndexed() {
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
+	eng := s.initIngestionEngine(irrecoverableCtx)
+
 	originID := unittest.IdentifierFixture()
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
@@ -301,10 +457,10 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 	s.receipts.On("Store", mock.Anything).Return(nil)
 	s.blocks.On("ByID", er2.ExecutionResult.BlockID).Return(nil, storerr.ErrNotFound)
 
-	err := s.eng.handleExecutionReceipt(originID, er1)
+	err := eng.handleExecutionReceipt(originID, er1)
 	require.NoError(s.T(), err)
 
-	err = s.eng.handleExecutionReceipt(originID, er2)
+	err = eng.handleExecutionReceipt(originID, er2)
 	require.NoError(s.T(), err)
 
 	s.receipts.AssertExpectations(s.T())
@@ -315,6 +471,9 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 // TestOnCollectionDuplicate checks that when a duplicate collection is received, the node doesn't
 // crash but just ignores its transactions.
 func (s *Suite) TestOnCollectionDuplicate() {
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
+	s.initIngestionEngine(irrecoverableCtx)
+
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
 
@@ -344,10 +503,11 @@ func (s *Suite) TestOnCollectionDuplicate() {
 
 // TestRequestMissingCollections tests that the all missing collections are requested on the call to requestMissingCollections
 func (s *Suite) TestRequestMissingCollections() {
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
+	eng := s.initIngestionEngine(irrecoverableCtx)
+
 	blkCnt := 3
 	startHeight := uint64(1000)
-	blocks := make([]flow.Block, blkCnt)
-	heightMap := make(map[uint64]*flow.Block, blkCnt)
 
 	// prepare cluster committee members
 	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
@@ -364,8 +524,9 @@ func (s *Suite) TestRequestMissingCollections() {
 		// some blocks may not be present hence add a gap
 		height := startHeight + uint64(i)
 		block.Header.Height = height
-		blocks[i] = block
-		heightMap[height] = &block
+		s.blockMap[block.Header.Height] = &block
+		s.finalizedBlock = block.Header
+
 		for _, c := range block.Payload.Guarantees {
 			collIDs = append(collIDs, c.CollectionID)
 			c.ReferenceBlockID = refBlockID
@@ -378,25 +539,11 @@ func (s *Suite) TestRequestMissingCollections() {
 		}
 	}
 
-	// setup the block storage mock
-	// each block should be queried by height
-	s.blocks.On("ByHeight", mock.IsType(uint64(0))).Return(
-		func(h uint64) *flow.Block {
-			// simulate a db lookup
-			return heightMap[h]
-		},
-		func(h uint64) error {
-			if _, ok := heightMap[h]; ok {
-				return nil
-			}
-			return storerr.ErrNotFound
-		})
 	// consider collections are missing for all blocks
 	err := s.lastFullBlockHeight.Set(startHeight - 1)
 	s.Require().NoError(err)
 
 	// consider the last test block as the head
-	s.finalizedBlock = blocks[blkCnt-1].Header
 
 	// p is the probability of not receiving the collection before the next poll and it
 	// helps simulate the slow trickle of the requested collections being received
@@ -433,10 +580,10 @@ func (s *Suite) TestRequestMissingCollections() {
 
 	cluster := new(protocol.Cluster)
 	cluster.On("Members").Return(clusterCommittee, nil)
-	epoch := new(protocol.Epoch)
+	epoch := new(protocol.CommittedEpoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snap := new(protocol.Snapshot)
 	snap.On("Epochs").Return(epochs)
 	s.proto.state.On("AtBlockID", refBlockID).Return(snap)
@@ -458,7 +605,7 @@ func (s *Suite) TestRequestMissingCollections() {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*defaultCollectionCatchupDBPollInterval)
 		defer cancel()
 
-		err := s.eng.requestMissingCollections(ctx)
+		err := eng.requestMissingCollections(ctx)
 
 		require.Error(s.T(), err)
 		require.Contains(s.T(), err.Error(), "context deadline exceeded")
@@ -474,7 +621,7 @@ func (s *Suite) TestRequestMissingCollections() {
 		ctx, cancel := context.WithTimeout(context.Background(), defaultCollectionCatchupTimeout)
 		defer cancel()
 
-		err := s.eng.requestMissingCollections(ctx)
+		err := eng.requestMissingCollections(ctx)
 
 		require.NoError(s.T(), err)
 		require.Len(s.T(), rcvdColl, len(collIDs))
@@ -487,11 +634,13 @@ func (s *Suite) TestRequestMissingCollections() {
 // function calls keep the FullBlockIndex up-to-date and request collections if blocks with missing
 // collections exceed the threshold.
 func (s *Suite) TestProcessBackgroundCalls() {
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
+	eng := s.initIngestionEngine(irrecoverableCtx)
+
 	blkCnt := 3
 	collPerBlk := 10
 	startHeight := uint64(1000)
 	blocks := make([]flow.Block, blkCnt)
-	heightMap := make(map[uint64]*flow.Block, blkCnt)
 	collMap := make(map[flow.Identifier]*flow.LightCollection, blkCnt*collPerBlk)
 
 	// prepare cluster committee members
@@ -521,35 +670,19 @@ func (s *Suite) TestProcessBackgroundCalls() {
 		// set the height
 		height := startHeight + uint64(i)
 		block.Header.Height = height
+		s.blockMap[block.Header.Height] = &block
 		blocks[i] = block
-		heightMap[height] = &block
+		s.finalizedBlock = block.Header
 	}
 
-	rootBlk := blocks[0]
-	rootBlkHeight := rootBlk.Header.Height
-	finalizedBlk := blocks[blkCnt-1]
-	finalizedHeight := finalizedBlk.Header.Height
-
-	// setup the block storage mock
-	// each block should be queried by height
-	s.blocks.On("ByHeight", mock.IsType(uint64(0))).Return(
-		func(h uint64) *flow.Block {
-			// simulate a db lookup
-			return heightMap[h]
-		},
-		func(h uint64) error {
-			if _, ok := heightMap[h]; ok {
-				return nil
-			}
-			return storerr.ErrNotFound
-		})
+	finalizedHeight := s.finalizedBlock.Height
 
 	cluster := new(protocol.Cluster)
 	cluster.On("Members").Return(clusterCommittee, nil)
-	epoch := new(protocol.Epoch)
+	epoch := new(protocol.CommittedEpoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snap := new(protocol.Snapshot)
 	snap.On("Epochs").Return(epochs)
 	s.proto.state.On("AtBlockID", refBlockID).Return(snap)
@@ -572,11 +705,11 @@ func (s *Suite) TestProcessBackgroundCalls() {
 				})
 		}
 	}
-	// consider the last test block as the head
-	s.finalizedBlock = finalizedBlk.Header
+
+	rootBlk := blocks[0]
 
 	// root block is the last complete block
-	err := s.lastFullBlockHeight.Set(rootBlkHeight)
+	err := s.lastFullBlockHeight.Set(rootBlk.Header.Height)
 	s.Require().NoError(err)
 
 	s.Run("missing collections are requested when count exceeds defaultMissingCollsForBlkThreshold", func() {
@@ -592,7 +725,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			}
 		}
 
-		err := s.eng.checkMissingCollections()
+		err := eng.checkMissingCollections()
 		s.Require().NoError(err)
 
 		// assert that missing collections are requested
@@ -618,7 +751,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			}
 		}
 
-		err := s.eng.checkMissingCollections()
+		err := eng.checkMissingCollections()
 		s.Require().NoError(err)
 
 		// assert that missing collections are requested
@@ -638,7 +771,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			blkMissingColl[i] = true
 		}
 
-		err := s.eng.checkMissingCollections()
+		err := eng.checkMissingCollections()
 		s.Require().NoError(err)
 
 		// assert that missing collections are not requested even though there are collections missing
@@ -649,10 +782,10 @@ func (s *Suite) TestProcessBackgroundCalls() {
 	})
 
 	// create new block
-	finalizedBlk = unittest.BlockFixture()
+	finalizedBlk := unittest.BlockFixture()
 	height := blocks[blkCnt-1].Header.Height + 1
 	finalizedBlk.Header.Height = height
-	heightMap[height] = &finalizedBlk
+	s.blockMap[height] = &finalizedBlk
 
 	finalizedHeight = finalizedBlk.Header.Height
 	s.finalizedBlock = finalizedBlk.Header
@@ -664,7 +797,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 		err = s.lastFullBlockHeight.Set(blockBeforeFinalized.Height)
 		s.Require().NoError(err)
 
-		err = s.eng.updateLastFullBlockReceivedIndex()
+		err = eng.updateLastFullBlockReceivedIndex()
 		s.Require().NoError(err)
 		s.Require().Equal(finalizedHeight, s.lastFullBlockHeight.Value())
 		s.Require().NoError(err)
@@ -673,7 +806,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 	})
 
 	s.Run("full block height index is not advanced beyond finalized blocks", func() {
-		err = s.eng.updateLastFullBlockReceivedIndex()
+		err = eng.updateLastFullBlockReceivedIndex()
 		s.Require().NoError(err)
 
 		s.Require().Equal(finalizedHeight, s.lastFullBlockHeight.Value())
@@ -682,13 +815,14 @@ func (s *Suite) TestProcessBackgroundCalls() {
 }
 
 func (s *Suite) TestComponentShutdown() {
-	s.me.On("NodeID").Return(s.obsIdentity.NodeID)
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
+	eng := s.initIngestionEngine(irrecoverableCtx)
 
 	// start then shut down the engine
-	unittest.AssertClosesBefore(s.T(), s.eng.Ready(), 10*time.Millisecond)
+	unittest.AssertClosesBefore(s.T(), eng.Ready(), 10*time.Millisecond)
 	s.cancel()
-	unittest.AssertClosesBefore(s.T(), s.eng.Done(), 10*time.Millisecond)
+	unittest.AssertClosesBefore(s.T(), eng.Done(), 10*time.Millisecond)
 
-	err := s.eng.ProcessLocal(&flow.ExecutionReceipt{})
+	err := eng.Process(channels.ReceiveReceipts, unittest.IdentifierFixture(), &flow.ExecutionReceipt{})
 	s.Assert().ErrorIs(err, component.ErrComponentShutdown)
 }

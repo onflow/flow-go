@@ -13,8 +13,8 @@ import (
 // TestRandomBeaconReconstructor_InvalidSignerID tests that RandomBeaconReconstructor doesn't forward calls to
 // RandomBeaconInspector if it fails to map signerID to signerIndex
 func TestRandomBeaconReconstructor_InvalidSignerID(t *testing.T) {
-	dkg := &mockhotstuff.DKG{}
-	inspector := &mockhotstuff.RandomBeaconInspector{}
+	dkg := mockhotstuff.NewDKG(t)
+	inspector := mockhotstuff.NewRandomBeaconInspector(t)
 	reconstructor := NewRandomBeaconReconstructor(dkg, inspector)
 	exception := errors.New("invalid-signer-id")
 	t.Run("trustedAdd", func(t *testing.T) {
@@ -31,7 +31,4 @@ func TestRandomBeaconReconstructor_InvalidSignerID(t *testing.T) {
 		require.ErrorAs(t, err, &exception)
 		inspector.AssertNotCalled(t, "Verify")
 	})
-
-	dkg.AssertExpectations(t)
-	inspector.AssertExpectations(t)
 }

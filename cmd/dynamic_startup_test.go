@@ -20,15 +20,16 @@ func dynamicJoinFlagsFixture() (string, string, flow.EpochPhase, uint64) {
 }
 
 func getMockSnapshot(t *testing.T, epochCounter uint64, phase flow.EpochPhase) *protocolmock.Snapshot {
-	currentEpoch := new(protocolmock.Epoch)
+	currentEpoch := new(protocolmock.CommittedEpoch)
 	currentEpoch.On("Counter").Return(epochCounter, nil)
 
 	epochQuery := mocks.NewEpochQuery(t, epochCounter)
-	epochQuery.Add(currentEpoch)
+	epochQuery.AddCommitted(currentEpoch)
 
 	snapshot := new(protocolmock.Snapshot)
 	snapshot.On("Epochs").Return(epochQuery)
-	snapshot.On("Phase").Return(phase, nil)
+	snapshot.On("EpochPhase").Return(phase, nil)
+	snapshot.On("Head").Return(unittest.BlockHeaderFixture(), nil)
 
 	return snapshot
 }

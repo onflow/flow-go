@@ -28,7 +28,7 @@ type Suite struct {
 	exe1ID  flow.Identifier
 
 	// Determines which kvstore version is used for root state
-	KVStoreFactory func(flow.Identifier) protocol_state.KVStoreAPI
+	KVStoreFactory func(flow.Identifier) (protocol_state.KVStoreAPI, error)
 }
 
 func (s *Suite) Ghost() *client.GhostClient {
@@ -100,7 +100,7 @@ func (s *Suite) SetupTest() {
 		// set long staking phase to avoid QC/DKG transactions during test run
 		testnet.WithViewsInStakingAuction(10_000),
 		testnet.WithViewsInEpoch(100_000),
-		testnet.WithEpochCommitSafetyThreshold(5),
+		testnet.WithFinalizationSafetyThreshold(5),
 	}
 	if s.KVStoreFactory != nil {
 		netConfigOpts = append(netConfigOpts, testnet.WithKVStoreFactory(s.KVStoreFactory))
@@ -134,6 +134,15 @@ func (s *Suite) AwaitSnapshotAtView(view uint64, waitFor, tick time.Duration) (s
 		return head.View >= view
 	}, waitFor, tick)
 	return
+}
+
+func (s *Suite) AwaitProtocolVersion(v uint64, waitFor, tick time.Duration) {
+	require.Eventually(s.T(), func() bool {
+		snapshot := s.LatestProtocolStateSnapshot()
+		kvstore, err := snapshot.ProtocolState()
+		s.Require().NoError(err)
+		return kvstore.GetProtocolStateVersion() == v
+	}, waitFor, tick)
 }
 
 func (s *Suite) TearDownTest() {

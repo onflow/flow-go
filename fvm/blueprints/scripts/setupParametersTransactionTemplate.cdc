@@ -1,5 +1,5 @@
-import FlowStorageFees from "FlowStorageFees"
-import FlowServiceAccount from "FlowServiceAccount"
+import "FlowStorageFees"
+import "FlowServiceAccount"
 
 transaction(accountCreationFee: UFix64, minimumStorageReservation: UFix64, storageMegaBytesPerReservedFLOW: UFix64, restrictedAccountCreationEnabled: Bool) {
 

@@ -20,10 +20,14 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// cachedHeader caches a block header and its ID.
-type cachedHeader struct {
-	id     flow.Identifier
-	header *flow.Header
+// cachedLatest caches both latest finalized and sealed block
+// since finalized block and sealed block are updated together atomically,
+// we can cache them together
+type cachedLatest struct {
+	finalizedID     flow.Identifier
+	finalizedHeader *flow.Header
+	sealedID        flow.Identifier
+	sealedHeader    *flow.Header
 }
 
 type State struct {
@@ -38,11 +42,11 @@ type State struct {
 		setups  storage.EpochSetups
 		commits storage.EpochCommits
 	}
-	params                     protocol.Params
-	protocolKVStoreSnapshotsDB storage.ProtocolKVStore
-	protocolStateSnapshotsDB   storage.ProtocolState // TODO remove when ProtocolStateEntry is stored in KVStore
-	protocolState              protocol.MutableProtocolState
-	versionBeacons             storage.VersionBeacons
+	params                      protocol.Params
+	protocolKVStoreSnapshotsDB  storage.ProtocolKVStore
+	epochProtocolStateEntriesDB storage.EpochProtocolStateEntries // TODO remove when MinEpochStateEntry is stored in KVStore
+	protocolState               protocol.ProtocolState
+	versionBeacons              storage.VersionBeacons
 
 	// finalizedRootHeight marks the cutoff of the history this node knows about. We cache it in the state
 	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
@@ -57,12 +61,10 @@ type State struct {
 	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
 	// know the spork's root block in full (though it will always know the height).
 	sporkRootBlockHeight uint64
-	// cachedLatestFinal is the *latest* finalized block header, which we can cache here,
+	// cachedLatest caches both the *latest* finalized header and sealed header,
 	// because the protocol state is solely responsible for updating it.
-	cachedLatestFinal *atomic.Pointer[cachedHeader]
-	// cachedLatestSealed is the *latest* sealed block headers, which we can cache here,
-	// because the protocol state is solely responsible for updating it.
-	cachedLatestSealed *atomic.Pointer[cachedHeader]
+	// finalized header and sealed header can be cached together since they are updated together atomically
+	cachedLatest *atomic.Pointer[cachedLatest]
 }
 
 var _ protocol.State = (*State)(nil)
@@ -95,7 +97,7 @@ func Bootstrap(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	epochProtocolStateSnapshots storage.ProtocolState,
+	epochProtocolStateSnapshots storage.EpochProtocolStateEntries,
 	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	versionBeacons storage.VersionBeacons,
 	root protocol.Snapshot,
@@ -181,10 +183,7 @@ func Bootstrap(
 			return fmt.Errorf("could not bootstrap version beacon: %w", err)
 		}
 
-		// set metric values, we pass `false` here since this node has empty storage and doesn't know anything about EFM.
-		// TODO for 'leaving Epoch Fallback via special service event', this needs to be updated to support bootstrapping
-		// while in EFM, currently initial state doesn't know how to bootstrap node when we have entered EFM.
-		err = updateEpochMetrics(metrics, root, false)
+		err = updateEpochMetrics(metrics, root)
 		if err != nil {
 			return fmt.Errorf("could not update epoch metrics: %w", err)
 		}
@@ -237,7 +236,7 @@ func Bootstrap(
 func bootstrapProtocolState(
 	segment *flow.SealingSegment,
 	params protocol.GlobalParams,
-	epochProtocolStateSnapshots storage.ProtocolState,
+	epochProtocolStateSnapshots storage.EpochProtocolStateEntries,
 	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	epochSetups storage.EpochSetups,
 	epochCommits storage.EpochCommits,
@@ -253,7 +252,7 @@ func bootstrapProtocolState(
 			}
 
 			// Store the epoch portion of the protocol state, including underlying EpochSetup/EpochCommit service events
-			dynamicEpochProtocolState := inmem.NewDynamicProtocolStateAdapter(stateEntry.EpochEntry, params)
+			dynamicEpochProtocolState := inmem.NewEpochProtocolStateAdapter(stateEntry.EpochEntry, params)
 			err = bootstrapEpochForProtocolStateEntry(epochProtocolStateSnapshots, epochSetups, epochCommits, dynamicEpochProtocolState, verifyNetworkAddress)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store epoch service events for state entry (id=%x): %w", stateEntry.EpochEntry.ID(), err)
@@ -484,10 +483,10 @@ func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error 
 // epoch information (service events) they reference, which case duplicate writes of
 // the same data are ignored.
 func bootstrapEpochForProtocolStateEntry(
-	epochProtocolStateSnapshots storage.ProtocolState,
+	epochProtocolStateSnapshots storage.EpochProtocolStateEntries,
 	epochSetups storage.EpochSetups,
 	epochCommits storage.EpochCommits,
-	epochProtocolStateEntry protocol.DynamicProtocolState,
+	epochProtocolStateEntry protocol.EpochProtocolState,
 	verifyNetworkAddress bool,
 ) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
@@ -540,7 +539,7 @@ func bootstrapEpochForProtocolStateEntry(
 
 			if commit != nil {
 				if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
-					return fmt.Errorf("invalid EpochCommit for next epoch")
+					return fmt.Errorf("invalid EpochCommit for next epoch: %w", err)
 				}
 				commits = append(commits, commit)
 			}
@@ -562,7 +561,7 @@ func bootstrapEpochForProtocolStateEntry(
 		}
 
 		// insert epoch protocol state entry, which references above service events
-		err := operation.SkipDuplicatesTx(epochProtocolStateSnapshots.StoreTx(richEntry.ID(), richEntry.ProtocolStateEntry))(tx)
+		err := operation.SkipDuplicatesTx(epochProtocolStateSnapshots.StoreTx(richEntry.ID(), richEntry.MinEpochStateEntry))(tx)
 		if err != nil {
 			return fmt.Errorf("could not store epoch protocol state entry: %w", err)
 		}
@@ -587,18 +586,6 @@ func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
 		err = operation.InsertSporkRootBlockHeight(sporkRootBlockHeight)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert spork root block height: %w", err)
-		}
-
-		version := params.ProtocolVersion()
-		err = operation.InsertProtocolVersion(version)(bdtx)
-		if err != nil {
-			return fmt.Errorf("could not insert protocol version: %w", err)
-		}
-
-		threshold := params.EpochCommitSafetyThreshold()
-		err = operation.InsertEpochCommitSafetyThreshold(threshold)(bdtx)
-		if err != nil {
-			return fmt.Errorf("could not insert epoch commit safety threshold: %w", err)
 		}
 
 		return nil
@@ -655,7 +642,7 @@ func OpenState(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	epochProtocolState storage.ProtocolState,
+	epochProtocolState storage.EpochProtocolStateEntries,
 	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	versionBeacons storage.VersionBeacons,
 ) (*State, error) {
@@ -712,13 +699,7 @@ func OpenState(
 	}
 	metrics.SealedHeight(sealed.Height)
 
-	epochFallbackTriggered, err := state.isEpochEmergencyFallbackTriggered()
-	if err != nil {
-		return nil, fmt.Errorf("could not check epoch emergency fallback flag: %w", err)
-	}
-
-	// update all epoch related metrics
-	err = updateEpochMetrics(metrics, finalSnapshot, epochFallbackTriggered)
+	err = updateEpochMetrics(metrics, finalSnapshot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)
 	}
@@ -733,21 +714,21 @@ func (state *State) Params() protocol.Params {
 // Sealed returns a snapshot for the latest sealed block. A latest sealed block
 // must always exist, so this function always returns a valid snapshot.
 func (state *State) Sealed() protocol.Snapshot {
-	cached := state.cachedLatestSealed.Load()
+	cached := state.cachedLatest.Load()
 	if cached == nil {
 		return invalid.NewSnapshotf("internal inconsistency: no cached sealed header")
 	}
-	return NewFinalizedSnapshot(state, cached.id, cached.header)
+	return NewFinalizedSnapshot(state, cached.sealedID, cached.sealedHeader)
 }
 
 // Final returns a snapshot for the latest finalized block. A latest finalized
 // block must always exist, so this function always returns a valid snapshot.
 func (state *State) Final() protocol.Snapshot {
-	cached := state.cachedLatestFinal.Load()
+	cached := state.cachedLatest.Load()
 	if cached == nil {
 		return invalid.NewSnapshotf("internal inconsistency: no cached final header")
 	}
-	return NewFinalizedSnapshot(state, cached.id, cached.header)
+	return NewFinalizedSnapshot(state, cached.finalizedID, cached.finalizedHeader)
 }
 
 // AtHeight returns a snapshot for the finalized block at the given height.
@@ -757,9 +738,7 @@ func (state *State) Final() protocol.Snapshot {
 //     -> if the given height is below the root height
 //   - exception for critical unexpected storage errors
 func (state *State) AtHeight(height uint64) protocol.Snapshot {
-	// retrieve the block ID for the finalized height
-	var blockID flow.Identifier
-	err := state.db.View(operation.LookupBlockHeight(height, &blockID))
+	blockID, err := state.headers.BlockIDByHeight(height)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return invalid.NewSnapshotf("unknown finalized height %d: %w", height, statepkg.ErrUnknownSnapshotReference)
@@ -801,7 +780,7 @@ func newState(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	epochProtocolStateSnapshots storage.ProtocolState,
+	epochProtocolStateSnapshots storage.EpochProtocolStateEntries,
 	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	versionBeacons storage.VersionBeacons,
 	params protocol.Params,
@@ -821,22 +800,17 @@ func newState(
 			setups:  setups,
 			commits: commits,
 		},
-		params:                     params,
-		protocolKVStoreSnapshotsDB: protocolKVStoreSnapshots,
-		protocolStateSnapshotsDB:   epochProtocolStateSnapshots,
+		params:                      params,
+		protocolKVStoreSnapshotsDB:  protocolKVStoreSnapshots,
+		epochProtocolStateEntriesDB: epochProtocolStateSnapshots,
 		protocolState: protocol_state.
-			NewMutableProtocolState(
+			NewProtocolState(
 				epochProtocolStateSnapshots,
 				protocolKVStoreSnapshots,
 				params,
-				headers,
-				results,
-				setups,
-				commits,
 			),
-		versionBeacons:     versionBeacons,
-		cachedLatestFinal:  new(atomic.Pointer[cachedHeader]),
-		cachedLatestSealed: new(atomic.Pointer[cachedHeader]),
+		versionBeacons: versionBeacons,
+		cachedLatest:   new(atomic.Pointer[cachedLatest]),
 	}
 
 	// populate the protocol state cache
@@ -863,41 +837,23 @@ func IsBootstrapped(db *badger.DB) (bool, error) {
 
 // updateEpochMetrics update the `consensus_compliance_current_epoch_counter` and the
 // `consensus_compliance_current_epoch_phase` metric
-func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot, epochFallbackTriggered bool) error {
-
-	// update epoch counter
-	counter, err := snap.Epochs().Current().Counter()
+func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot) error {
+	currentEpoch, err := snap.Epochs().Current()
 	if err != nil {
-		return fmt.Errorf("could not get current epoch counter: %w", err)
+		return fmt.Errorf("could not get current epoch: %w", err)
 	}
-	metrics.CurrentEpochCounter(counter)
+	metrics.CurrentEpochCounter(currentEpoch.Counter())
+	metrics.CurrentEpochFinalView(currentEpoch.FinalView())
+	metrics.CurrentDKGPhaseViews(currentEpoch.DKGPhase1FinalView(), currentEpoch.DKGPhase2FinalView(), currentEpoch.DKGPhase3FinalView())
 
-	// update epoch phase
-	phase, err := snap.Phase()
+	epochProtocolState, err := snap.EpochProtocolState()
 	if err != nil {
-		return fmt.Errorf("could not get current epoch counter: %w", err)
+		return fmt.Errorf("could not get epoch protocol state: %w", err)
 	}
-	metrics.CurrentEpochPhase(phase)
-
-	currentEpochFinalView, err := snap.Epochs().Current().FinalView()
-	if err != nil {
-		return fmt.Errorf("could not update current epoch final view: %w", err)
-	}
-	metrics.CurrentEpochFinalView(currentEpochFinalView)
-
-	dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(snap.Epochs().Current())
-	if err != nil {
-		return fmt.Errorf("could not get dkg phase final view: %w", err)
-	}
-
-	metrics.CurrentDKGPhase1FinalView(dkgPhase1FinalView)
-	metrics.CurrentDKGPhase2FinalView(dkgPhase2FinalView)
-	metrics.CurrentDKGPhase3FinalView(dkgPhase3FinalView)
-
-	// EFM - check whether the epoch emergency fallback flag has been set
-	// in the database. If so, skip updating any epoch-related metrics.
-	if epochFallbackTriggered {
-		metrics.EpochEmergencyFallbackTriggered()
+	metrics.CurrentEpochPhase(epochProtocolState.EpochPhase()) // update epoch phase
+	// notify whether epoch fallback mode is active
+	if epochProtocolState.EpochFallbackTriggered() {
+		metrics.EpochFallbackModeTriggered()
 	}
 
 	return nil
@@ -930,32 +886,30 @@ func (state *State) populateCache() error {
 		if err != nil {
 			return fmt.Errorf("could not lookup finalized height: %w", err)
 		}
-		var cachedFinalHeader cachedHeader
-		err = operation.LookupBlockHeight(finalizedHeight, &cachedFinalHeader.id)(tx)
+		var cachedLatest cachedLatest
+		err = operation.LookupBlockHeight(finalizedHeight, &cachedLatest.finalizedID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup finalized id (height=%d): %w", finalizedHeight, err)
 		}
-		cachedFinalHeader.header, err = state.headers.ByBlockID(cachedFinalHeader.id)
+		cachedLatest.finalizedHeader, err = state.headers.ByBlockID(cachedLatest.finalizedID)
 		if err != nil {
-			return fmt.Errorf("could not get finalized block (id=%x): %w", cachedFinalHeader.id, err)
+			return fmt.Errorf("could not get finalized block (id=%x): %w", cachedLatest.finalizedID, err)
 		}
-		state.cachedLatestFinal.Store(&cachedFinalHeader)
 		// sealed header
 		var sealedHeight uint64
 		err = operation.RetrieveSealedHeight(&sealedHeight)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup sealed height: %w", err)
 		}
-		var cachedSealedHeader cachedHeader
-		err = operation.LookupBlockHeight(sealedHeight, &cachedSealedHeader.id)(tx)
+		err = operation.LookupBlockHeight(sealedHeight, &cachedLatest.sealedID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup sealed id (height=%d): %w", sealedHeight, err)
 		}
-		cachedSealedHeader.header, err = state.headers.ByBlockID(cachedSealedHeader.id)
+		cachedLatest.sealedHeader, err = state.headers.ByBlockID(cachedLatest.sealedID)
 		if err != nil {
-			return fmt.Errorf("could not get sealed block (id=%x): %w", cachedSealedHeader.id, err)
+			return fmt.Errorf("could not get sealed block (id=%x): %w", cachedLatest.sealedID, err)
 		}
-		state.cachedLatestSealed.Store(&cachedSealedHeader)
+		state.cachedLatest.Store(&cachedLatest)
 
 		state.finalizedRootHeight = state.Params().FinalizedRoot().Height
 		state.sealedRootHeight = state.Params().SealedRoot().Height
@@ -968,15 +922,4 @@ func (state *State) populateCache() error {
 	}
 
 	return nil
-}
-
-// isEpochEmergencyFallbackTriggered checks whether epoch fallback has been globally triggered.
-// Returns:
-// * (true, nil) if epoch fallback is triggered
-// * (false, nil) if epoch fallback is not triggered (including if the flag is not set)
-// * (false, err) if an unexpected error occurs
-func (state *State) isEpochEmergencyFallbackTriggered() (bool, error) {
-	var triggered bool
-	err := state.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
-	return triggered, err
 }

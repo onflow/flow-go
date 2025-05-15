@@ -118,15 +118,15 @@ func (vt *viewTracker) ProcessTC(tc *flow.TimeoutCertificate) (uint64, error) {
 }
 
 // updateLivenessData updates the current view, qc, tc. We want to avoid unnecessary data-base
-// writes, which we enforce by requiring that the view number is STRICTLY monotonously increasing.
+// writes, which we enforce by requiring that the view number is STRICTLY monotonicly increasing.
 // Otherwise, an exception is returned. No errors are expected, any error should be treated as exception.
 func (vt *viewTracker) updateLivenessData(newView uint64, qc *flow.QuorumCertificate, tc *flow.TimeoutCertificate) error {
 	if newView <= vt.livenessData.CurrentView {
 		// This should never happen: in the current implementation, it is trivially apparent that
 		// newView is _always_ larger than currentView. This check is to protect the code from
 		// future modifications that violate the necessary condition for
-		// STRICTLY monotonously increasing view numbers.
-		return fmt.Errorf("cannot move from view %d to %d: currentView must be strictly monotonously increasing",
+		// STRICTLY monotonicly increasing view numbers.
+		return fmt.Errorf("cannot move from view %d to %d: currentView must be strictly monotonicly increasing",
 			vt.livenessData.CurrentView, newView)
 	}
 

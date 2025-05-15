@@ -4,22 +4,46 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"sort"
 	"sync"
 	"time"
 
-	"github.com/onflow/cadence/migrations"
+	"github.com/onflow/cadence/interpreter"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/atree"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+// ShouldFixBrokenCompositeKeyedDictionary returns true if the given value is a dictionary with a composite key type.
+//
+// It is useful for use with atree's PersistentSlabStorage.FixLoadedBrokenReferences.
+//
+// NOTE: The intended use case is to enable migration programs in onflow/flow-go to fix broken references.
+// As of April 2024, only 10 registers in testnet (not mainnet) were found to have broken references,
+// and they seem to have resulted from a bug that was fixed 2 years ago by https://github.com/onflow/cadence/pull/1565.
+func ShouldFixBrokenCompositeKeyedDictionary(atreeValue atree.Value) bool {
+	orderedMap, ok := atreeValue.(*atree.OrderedMap)
+	if !ok {
+		return false
+	}
+
+	dictionaryStaticType, ok := orderedMap.Type().(*interpreter.DictionaryStaticType)
+	if !ok {
+		return false
+	}
+
+	_, ok = dictionaryStaticType.KeyType.(*interpreter.CompositeStaticType)
+	return ok
+}
 
 type FixSlabsWithBrokenReferencesMigration struct {
 	log            zerolog.Logger
@@ -51,7 +75,7 @@ func NewFixBrokenReferencesInSlabsMigration(
 
 func (m *FixSlabsWithBrokenReferencesMigration) InitMigration(
 	log zerolog.Logger,
-	_ []*ledger.Payload,
+	_ *registers.ByAccount,
 	nWorkers int,
 ) error {
 	m.log = log.
@@ -66,91 +90,75 @@ func (m *FixSlabsWithBrokenReferencesMigration) InitMigration(
 func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 	_ context.Context,
 	address common.Address,
-	oldPayloads []*ledger.Payload,
-) (
-	newPayloads []*ledger.Payload,
-	err error,
-) {
+	accountRegisters *registers.AccountRegisters,
+) error {
 
 	if _, exist := m.accountsToFix[address]; !exist {
-		return oldPayloads, nil
+		return nil
 	}
 
-	migrationRuntime, err := NewAtreeRegisterMigratorRuntime(m.log, address, oldPayloads, m.nWorkers)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create cadence runtime: %w", err)
-	}
-
+	migrationRuntime := NewBasicMigrationRuntime(accountRegisters)
 	storage := migrationRuntime.Storage
 
 	// Load all atree registers in storage
-	err = loadAtreeSlabsInStorge(storage, oldPayloads)
+	err := util.LoadAtreeSlabsInStorage(storage, accountRegisters, m.nWorkers)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Fix broken references
 	fixedStorageIDs, skippedStorageIDs, err :=
-		storage.FixLoadedBrokenReferences(migrations.ShouldFixBrokenCompositeKeyedDictionary)
+		storage.FixLoadedBrokenReferences(ShouldFixBrokenCompositeKeyedDictionary)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if len(skippedStorageIDs) > 0 {
 		m.log.Warn().
-			Str("account", address.Hex()).
+			Str("account", address.HexWithPrefix()).
 			Msgf("skipped slabs with broken references: %v", skippedStorageIDs)
 	}
 
 	if len(fixedStorageIDs) == 0 {
 		m.log.Warn().
-			Str("account", address.Hex()).
+			Str("account", address.HexWithPrefix()).
 			Msgf("did not fix any slabs with broken references")
 
-		return oldPayloads, nil
+		return nil
 	}
 
 	m.log.Log().
-		Str("account", address.Hex()).
+		Str("account", address.HexWithPrefix()).
 		Msgf("fixed %d slabs with broken references", len(fixedStorageIDs))
 
 	// Save broken payloads to save to payload file later
-	brokenPayloads, err := getAtreePayloadsByID(oldPayloads, fixedStorageIDs)
+	brokenPayloads, err := getAtreePayloadsByID(accountRegisters, fixedStorageIDs)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	m.mergeBrokenPayloads(brokenPayloads)
 
-	err = storage.FastCommit(m.nWorkers)
+	err = storage.NondeterministicFastCommit(m.nWorkers)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to commit storage: %w", err)
 	}
 
-	// Finalize the transaction
-	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
-	if err != nil {
-		return nil, fmt.Errorf("failed to finalize main transaction: %w", err)
-	}
+	// Commit/finalize the transaction
 
-	// Merge the changes to the original payloads.
 	expectedAddresses := map[flow.Address]struct{}{
 		flow.Address(address): {},
 	}
 
-	newPayloads, err = migrationRuntime.Snapshot.ApplyChangesAndGetNewPayloads(
-		result.WriteSet,
-		expectedAddresses,
-		m.log,
-	)
+	err = migrationRuntime.Commit(expectedAddresses, m.log)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to commit: %w", err)
 	}
 
 	// Log fixed payloads
-	fixedPayloads, err := getAtreePayloadsByID(newPayloads, fixedStorageIDs)
+	fixedPayloads, err := getAtreePayloadsByID(accountRegisters, fixedStorageIDs)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	m.rw.Write(fixedSlabsWithBrokenReferences{
@@ -159,7 +167,7 @@ func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 		FixedPayloads:  fixedPayloads,
 	})
 
-	return newPayloads, nil
+	return nil
 }
 
 func (m *FixSlabsWithBrokenReferencesMigration) mergeBrokenPayloads(payloads []*ledger.Payload) {
@@ -211,27 +219,56 @@ func (m *FixSlabsWithBrokenReferencesMigration) writeBrokenPayloads() error {
 	return nil
 }
 
-func getAtreePayloadsByID(payloads []*ledger.Payload, ids map[atree.StorageID][]atree.StorageID) ([]*ledger.Payload, error) {
+func getAtreePayloadsByID(
+	registers *registers.AccountRegisters,
+	ids map[atree.SlabID][]atree.SlabID,
+) (
+	[]*ledger.Payload,
+	error,
+) {
 	outputPayloads := make([]*ledger.Payload, 0, len(ids))
 
-	for _, payload := range payloads {
-		registerID, _, err := convert.PayloadToRegister(payload)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert payload to register: %w", err)
+	owner := registers.Owner()
+
+	keys := make([]string, 0, len(ids))
+	err := registers.ForEachKey(func(key string) error {
+
+		if !flow.IsSlabIndexKey(key) {
+			return nil
 		}
 
-		if !registerID.IsSlabIndex() {
-			continue
-		}
-
-		storageID := atree.NewStorageID(
-			atree.Address([]byte(registerID.Owner)),
-			atree.StorageIndex([]byte(registerID.Key[1:])),
+		slabID := atree.NewSlabID(
+			atree.Address([]byte(owner)),
+			atree.SlabIndex([]byte(key[1:])),
 		)
 
-		if _, ok := ids[storageID]; ok {
-			outputPayloads = append(outputPayloads, payload)
+		_, ok := ids[slabID]
+		if !ok {
+			return nil
 		}
+
+		keys = append(keys, key)
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		value, err := registers.Get(owner, key)
+		if err != nil {
+			return nil, err
+		}
+
+		ledgerKey := convert.RegisterIDToLedgerKey(flow.RegisterID{
+			Owner: owner,
+			Key:   key,
+		})
+		payload := ledger.NewPayload(ledgerKey, value)
+		outputPayloads = append(outputPayloads, payload)
 	}
 
 	return outputPayloads, nil

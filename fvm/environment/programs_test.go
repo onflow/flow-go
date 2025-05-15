@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
@@ -892,6 +892,12 @@ func (m *metricsReporter) RuntimeTransactionChecked(duration time.Duration) {}
 func (m *metricsReporter) RuntimeTransactionInterpreted(duration time.Duration) {}
 
 func (m *metricsReporter) RuntimeSetNumberOfAccounts(count uint64) {}
+
+func (m *metricsReporter) SetNumberOfDeployedCOAs(count uint64) {}
+
+func (m *metricsReporter) EVMTransactionExecuted(_ uint64, _ bool, _ bool) {}
+
+func (m *metricsReporter) EVMBlockExecuted(_ int, _ uint64, _ float64) {}
 
 func (m *metricsReporter) RuntimeTransactionProgramsCacheMiss() {
 	m.CacheMisses++

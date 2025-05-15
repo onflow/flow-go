@@ -2,11 +2,13 @@ package state
 
 import (
 	"fmt"
-	"math/big"
 
+	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
+	"github.com/onflow/go-ethereum/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethCrypto "github.com/onflow/go-ethereum/crypto"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -18,6 +20,8 @@ const (
 	// CodesStorageIDKey is the path where we store the collection ID for codes
 	CodesStorageIDKey = "CodesStorageIDKey"
 )
+
+var EmptyHash = gethCommon.Hash{}
 
 // BaseView implements a types.BaseView
 // it acts as the base layer of state queries for the stateDB
@@ -70,13 +74,13 @@ func NewBaseView(ledger atree.Ledger, rootAddress flow.Address) (*BaseView, erro
 	// fetch the account collection, if not exist, create one
 	view.accounts, view.accountSetupOnCommit, err = view.fetchOrCreateCollection(AccountsStorageIDKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch or create account collection with key %v: %w", AccountsStorageIDKey, err)
 	}
 
 	// fetch the code collection, if not exist, create one
 	view.codes, view.codeSetupOnCommit, err = view.fetchOrCreateCollection(CodesStorageIDKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch or create code collection with key %v: %w", CodesStorageIDKey, err)
 	}
 
 	return view, nil
@@ -93,17 +97,22 @@ func (v *BaseView) IsCreated(gethCommon.Address) bool {
 	return false
 }
 
+// IsNewContract returns true if the address is a new contract
+func (v *BaseView) IsNewContract(gethCommon.Address) bool {
+	return false
+}
+
 // HasSelfDestructed returns true if an address is flagged for destruction at the end of transaction
-func (v *BaseView) HasSelfDestructed(gethCommon.Address) (bool, *big.Int) {
-	return false, new(big.Int)
+func (v *BaseView) HasSelfDestructed(gethCommon.Address) (bool, *uint256.Int) {
+	return false, new(uint256.Int)
 }
 
 // GetBalance returns the balance of an address
 //
 // for non-existent accounts it returns a balance of zero
-func (v *BaseView) GetBalance(addr gethCommon.Address) (*big.Int, error) {
+func (v *BaseView) GetBalance(addr gethCommon.Address) (*uint256.Int, error) {
 	acc, err := v.getAccount(addr)
-	bal := big.NewInt(0)
+	bal := uint256.NewInt(0)
 	if acc != nil {
 		bal = acc.Balance
 	}
@@ -158,6 +167,39 @@ func (v *BaseView) GetState(sk types.SlotAddress) (gethCommon.Hash, error) {
 	return v.getSlot(sk)
 }
 
+// GetStorageRoot returns some sort of storage root for the given address
+// WARNING! the root that is returned is not a commitment to the state
+// Mostly is returned to satisfy the requirements of the EVM,
+// where the returned value is compared against empty hash and empty root hash
+// to determine smart contracts that already has data.
+//
+// Since BaseView doesn't construct a Merkel tree
+// for each account hash of root slab as some sort of root hash.
+// if account doesn't exist we return empty hash
+// if account exist but not a smart contract we return EmptyRootHash
+// if is a contract we return the hash of the root slab content (some sort of commitment).
+func (v *BaseView) GetStorageRoot(addr common.Address) (common.Hash, error) {
+	account, err := v.getAccount(addr)
+	if err != nil {
+		return gethCommon.Hash{}, err
+	}
+	// account does not exist
+	if account == nil {
+		return gethCommon.Hash{}, nil
+	}
+
+	// account is EOA
+	if len(account.CollectionID) == 0 {
+		return gethTypes.EmptyRootHash, nil
+	}
+
+	// otherwise is smart contract account
+	// return the hash of collection ID
+	// This is not a proper root as it doesn't have
+	// any commitment to the content.
+	return gethCrypto.Keccak256Hash(account.CollectionID), nil
+}
+
 // UpdateSlot updates the value for a slot
 func (v *BaseView) UpdateSlot(sk types.SlotAddress, value gethCommon.Hash) error {
 	return v.storeSlot(sk, value)
@@ -197,7 +239,7 @@ func (v *BaseView) SlotInAccessList(types.SlotAddress) (addressOk bool, slotOk b
 // CreateAccount creates a new account
 func (v *BaseView) CreateAccount(
 	addr gethCommon.Address,
-	balance *big.Int,
+	balance *uint256.Int,
 	nonce uint64,
 	code []byte,
 	codeHash gethCommon.Hash,
@@ -221,7 +263,7 @@ func (v *BaseView) CreateAccount(
 // UpdateAccount updates an account's meta data
 func (v *BaseView) UpdateAccount(
 	addr gethCommon.Address,
-	balance *big.Int,
+	balance *uint256.Int,
 	nonce uint64,
 	code []byte,
 	codeHash gethCommon.Hash,
@@ -243,7 +285,7 @@ func (v *BaseView) UpdateAccount(
 		return err
 	}
 	// TODO: maybe purge the state in the future as well
-	// currently the behaviour of stateDB doesn't purge the data
+	// currently the behavior of stateDB doesn't purge the data
 	// We don't need to check if the code is empty and we purge the state
 	// this is not possible right now.
 
@@ -260,8 +302,8 @@ func (v *BaseView) DeleteAccount(addr gethCommon.Address) error {
 	if err != nil {
 		return err
 	}
-	if acc == nil {
-		return fmt.Errorf("account doesn't exist to be deleted")
+	if acc == nil { // if account doesn't exist return
+		return nil
 	}
 
 	// 2. remove the code
@@ -308,6 +350,34 @@ func (v *BaseView) DeleteAccount(addr gethCommon.Address) error {
 	return nil
 }
 
+// PurgeAllSlotsOfAnAccount purges all the slots related to an account
+func (v *BaseView) PurgeAllSlotsOfAnAccount(addr gethCommon.Address) error {
+	acc, err := v.getAccount(addr)
+	if err != nil {
+		return err
+	}
+	if acc == nil { // if account doesn't exist return
+		return nil
+	}
+	col, err := v.collectionProvider.CollectionByID(acc.CollectionID)
+	if err != nil {
+		return err
+	}
+	// delete all slots related to this account (eip-6780)
+	keys, err := col.Destroy()
+	if err != nil {
+		return err
+	}
+	delete(v.slots, addr)
+	for _, key := range keys {
+		delete(v.cachedSlots, types.SlotAddress{
+			Address: addr,
+			Key:     gethCommon.BytesToHash(key),
+		})
+	}
+	return nil
+}
+
 // Commit commits the changes to the underlying storage layers
 func (v *BaseView) Commit() error {
 	// commit collection changes
@@ -349,6 +419,65 @@ func (v *BaseView) NumberOfAccounts() uint64 {
 	return v.accounts.Size()
 }
 
+// AccountIterator returns an account iterator
+//
+// Warning! this is an expensive operation and should only be used
+// for testing and exporting state operations, while no changes
+// are applied to accounts. Note that the iteration order is not guaranteed.
+func (v *BaseView) AccountIterator() (*AccountIterator, error) {
+	itr, err := v.accounts.ReadOnlyIterator()
+	if err != nil {
+		return nil, err
+	}
+	return &AccountIterator{colIterator: itr}, nil
+}
+
+// CodeIterator returns a code iterator
+//
+// Warning! this is an expensive operation and should only be used
+// for testing and exporting state operations, while no changes
+// are applied to codes. Note that the iteration order is not guaranteed.
+func (v *BaseView) CodeIterator() (*CodeIterator, error) {
+	itr, err := v.codes.ReadOnlyIterator()
+	if err != nil {
+		return nil, err
+	}
+	return &CodeIterator{colIterator: itr}, nil
+}
+
+// AccountStorageIterator returns an account storage iterator
+// for the given address
+//
+// Warning! this is an expensive operation and should only be used
+// for testing and exporting state operations, while no changes
+// are applied to accounts. Note that the iteration order is not guaranteed.
+func (v *BaseView) AccountStorageIterator(
+	addr gethCommon.Address,
+) (*AccountStorageIterator, error) {
+	acc, err := v.getAccount(addr)
+	if err != nil {
+		return nil, err
+	}
+	if acc == nil || !acc.HasStoredValues() {
+		return nil, fmt.Errorf("account %s has no stored value", addr.String())
+	}
+	col, found := v.slots[addr]
+	if !found {
+		col, err = v.collectionProvider.CollectionByID(acc.CollectionID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load storage collection for account %s: %w", addr.String(), err)
+		}
+	}
+	itr, err := col.ReadOnlyIterator()
+	if err != nil {
+		return nil, err
+	}
+	return &AccountStorageIterator{
+		address:     addr,
+		colIterator: itr,
+	}, nil
+}
+
 func (v *BaseView) fetchOrCreateCollection(path string) (collection *Collection, created bool, error error) {
 	collectionID, err := v.ledger.GetValue(v.rootAddress[:], []byte(path))
 	if err != nil {
@@ -356,7 +485,10 @@ func (v *BaseView) fetchOrCreateCollection(path string) (collection *Collection,
 	}
 	if len(collectionID) == 0 {
 		collection, err = v.collectionProvider.NewCollection()
-		return collection, true, err
+		if err != nil {
+			return collection, true, fmt.Errorf("fail to create collection with key %v: %w", path, err)
+		}
+		return collection, true, nil
 	}
 	collection, err = v.collectionProvider.CollectionByID(collectionID)
 	return collection, false, err
@@ -552,8 +684,7 @@ func (v *BaseView) storeSlot(sk types.SlotAddress, data gethCommon.Hash) error {
 		return err
 	}
 
-	emptyValue := gethCommon.Hash{}
-	if data == emptyValue {
+	if data == EmptyHash {
 		delete(v.cachedSlots, sk)
 		return col.Remove(sk.Key.Bytes())
 	}
@@ -590,4 +721,84 @@ func (v *BaseView) getSlotCollection(acc *Account) (*Collection, error) {
 		v.slots[acc.Address] = col
 	}
 	return col, nil
+}
+
+// AccountIterator iterates over accounts
+type AccountIterator struct {
+	colIterator *CollectionIterator
+}
+
+// Next returns the next account
+// if no more accounts next would return nil (no error)
+func (ai *AccountIterator) Next() (*Account, error) {
+	_, value, err := ai.colIterator.Next()
+	if err != nil {
+		return nil, fmt.Errorf("account iteration failed: %w", err)
+	}
+	return DecodeAccount(value)
+}
+
+// CodeIterator iterates over codes stored in EVM
+// code storage only stores unique codes
+type CodeIterator struct {
+	colIterator *CollectionIterator
+}
+
+// Next returns the next code
+// if no more codes, it return nil (no error)
+func (ci *CodeIterator) Next() (
+	*CodeInContext,
+	error,
+) {
+	ch, encodedCC, err := ci.colIterator.Next()
+	if err != nil {
+		return nil, fmt.Errorf("code iteration failed: %w", err)
+	}
+	// no more keys
+	if ch == nil {
+		return nil, nil
+	}
+	if len(encodedCC) == 0 {
+		return nil,
+			fmt.Errorf("encoded code container is empty (code hash: %x)", ch)
+	}
+
+	codeCont, err := CodeContainerFromEncoded(encodedCC)
+	if err != nil {
+		return nil, fmt.Errorf("code container decoding failed (code hash: %x)", ch)
+
+	}
+	return &CodeInContext{
+		Hash:      gethCommon.BytesToHash(ch),
+		Code:      codeCont.Code(),
+		RefCounts: codeCont.RefCount(),
+	}, nil
+}
+
+// AccountStorageIterator iterates over slots of an account
+type AccountStorageIterator struct {
+	address     gethCommon.Address
+	colIterator *CollectionIterator
+}
+
+// Next returns the next slot in the storage
+// if no more keys, it returns nil (no error)
+func (asi *AccountStorageIterator) Next() (
+	*types.SlotEntry,
+	error,
+) {
+	k, v, err := asi.colIterator.Next()
+	if err != nil {
+		return nil, fmt.Errorf("account storage iteration failed: %w", err)
+	}
+	// no more keys
+	if k == nil {
+		return nil, nil
+	}
+	return &types.SlotEntry{
+		Address: asi.address,
+		Key:     gethCommon.BytesToHash(k),
+		Value:   gethCommon.BytesToHash(v),
+	}, nil
+
 }

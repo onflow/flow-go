@@ -1,23 +1,25 @@
 package types
 
 import (
-	"math/big"
-
+	"github.com/holiman/uint256"
+	"github.com/onflow/crypto/hash"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethVM "github.com/onflow/go-ethereum/core/vm"
+	"github.com/onflow/go-ethereum/rlp"
 )
 
 // StateDB acts as the main interface to the EVM runtime
 type StateDB interface {
 	gethVM.StateDB
 
-	// Commit commits the changes
+	// Commit commits the changes and
+	// returns a commitment over changes
 	// setting `finalize` flag
 	// calls a subsequent call to Finalize
-	// defering finalization and calling it once at the end
+	// deferring finalization and calling it once at the end
 	// improves efficiency of batch operations.
-	Commit(finalize bool) error
+	Commit(finalize bool) (hash.Hash, error)
 
 	// Finalize flushes all the changes
 	// to the permanent storage
@@ -37,6 +39,9 @@ type StateDB interface {
 	// preimages, access lists, ...
 	// The method is often called between execution of different transactions
 	Reset()
+
+	// Error returns any error that has been cached so far by the state.
+	Error() error
 }
 
 // ReadOnlyView provides a readonly view of the state
@@ -45,11 +50,14 @@ type ReadOnlyView interface {
 	Exist(gethCommon.Address) (bool, error)
 	// IsCreated returns true if address has been created in this tx
 	IsCreated(gethCommon.Address) bool
+	// IsNewContract returns true if address is a new contract
+	// either is a new account or it had balance but no code before
+	IsNewContract(addr gethCommon.Address) bool
 	// HasSelfDestructed returns true if an address has self destructed
 	// it also returns the balance of address before selfdestruction call
-	HasSelfDestructed(gethCommon.Address) (bool, *big.Int)
+	HasSelfDestructed(gethCommon.Address) (bool, *uint256.Int)
 	// GetBalance returns the balance of an address
-	GetBalance(gethCommon.Address) (*big.Int, error)
+	GetBalance(gethCommon.Address) (*uint256.Int, error)
 	// GetNonce returns the nonce of an address
 	GetNonce(gethCommon.Address) (uint64, error)
 	// GetCode returns the code of an address
@@ -60,6 +68,13 @@ type ReadOnlyView interface {
 	GetCodeSize(gethCommon.Address) (int, error)
 	// GetState returns values for an slot in the main storage
 	GetState(SlotAddress) (gethCommon.Hash, error)
+	// GetStorageRoot returns some sort of root for the given address.
+	// Warning! Since StateDB doesn't construct a Merkel tree under the hood,
+	// the behavior of this endpoint is as follow:
+	// - if an account doesn't exist it returns common.Hash{}
+	// - if account is EOA it returns gethCommon.EmptyRootHash
+	// - else it returns a unique hash value as the root but this returned
+	GetStorageRoot(gethCommon.Address) (gethCommon.Hash, error)
 	// GetTransientState returns values for an slot transient storage
 	GetTransientState(SlotAddress) gethCommon.Hash
 	// GetRefund returns the total amount of (gas) refund
@@ -76,20 +91,25 @@ type HotView interface {
 
 	// CreateAccount creates a new account
 	CreateAccount(gethCommon.Address) error
+	// CreateContract is used whenever a contract is created. This may be preceded
+	// by CreateAccount, but that is not required if it already existed in the
+	// state due to funds sent beforehand.
+	CreateContract(gethCommon.Address)
 	// SelfDestruct set the flag for destruction of the account after execution
 	SelfDestruct(gethCommon.Address) error
 
 	// SubBalance subtracts the amount from the balance the given address
-	SubBalance(gethCommon.Address, *big.Int) error
+	SubBalance(gethCommon.Address, *uint256.Int) error
 	// AddBalance adds the amount to the balance of the given address
-	AddBalance(gethCommon.Address, *big.Int) error
+	AddBalance(gethCommon.Address, *uint256.Int) error
 	// SetNonce sets the nonce for the given address
 	SetNonce(gethCommon.Address, uint64) error
 	// SetCode sets the code for the given address
 	SetCode(gethCommon.Address, []byte) error
 
 	// SetState sets a value for the given slot in the main storage
-	SetState(SlotAddress, gethCommon.Hash) error
+	// and returns the previous value.
+	SetState(SlotAddress, gethCommon.Hash) (gethCommon.Hash, error)
 	// SetTransientState sets a value for the given slot in the transient storage
 	SetTransientState(SlotAddress, gethCommon.Hash)
 
@@ -117,7 +137,7 @@ type BaseView interface {
 	// Creates a new account
 	CreateAccount(
 		addr gethCommon.Address,
-		balance *big.Int,
+		balance *uint256.Int,
 		nonce uint64,
 		code []byte,
 		codeHash gethCommon.Hash,
@@ -126,7 +146,7 @@ type BaseView interface {
 	// UpdateAccount updates a account
 	UpdateAccount(
 		addr gethCommon.Address,
-		balance *big.Int,
+		balance *uint256.Int,
 		nonce uint64,
 		code []byte,
 		codeHash gethCommon.Hash,
@@ -149,4 +169,25 @@ type BaseView interface {
 type SlotAddress struct {
 	Address gethCommon.Address
 	Key     gethCommon.Hash
+}
+
+// SlotEntry captures an address to a storage slot and the value stored in it
+type SlotEntry struct {
+	Address gethCommon.Address
+	Key     gethCommon.Hash
+	Value   gethCommon.Hash
+}
+
+// Encoded returns the encoded content of the slot entry
+func (se *SlotEntry) Encode() ([]byte, error) {
+	return rlp.EncodeToBytes(se)
+}
+
+// SlotEntryFromEncoded constructs an slot entry from the encoded data
+func SlotEntryFromEncoded(encoded []byte) (*SlotEntry, error) {
+	if len(encoded) == 0 {
+		return nil, nil
+	}
+	se := &SlotEntry{}
+	return se, rlp.DecodeBytes(encoded, se)
 }

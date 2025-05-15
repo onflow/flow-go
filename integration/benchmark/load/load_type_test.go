@@ -8,23 +8,26 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
-	convert2 "github.com/onflow/flow-emulator/convert"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
 
+	cadenceCommon "github.com/onflow/cadence/common"
+
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/integration/benchmark/account"
 	"github.com/onflow/flow-go/integration/benchmark/common"
 	"github.com/onflow/flow-go/integration/benchmark/load"
 	"github.com/onflow/flow-go/integration/convert"
+	"github.com/onflow/flow-go/integration/internal/emulator"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -37,14 +40,20 @@ func TestLoadTypes(t *testing.T) {
 	// don't create that many accounts for the test
 	evmLoad.PreCreateEOAAccounts = 20
 
+	evmBatchLoad := load.NewEVMBatchTransferLoad(log)
+	// don't create that many accounts for the test
+	evmBatchLoad.PreCreateEOAAccounts = 20
+
 	loads := []load.Load{
 		load.CompHeavyLoad,
 		load.EventHeavyLoad,
 		load.LedgerHeavyLoad,
 		load.ExecDataHeavyLoad,
 		load.NewTokenTransferLoad(),
+		load.NewTokenTransferMultiLoad(),
 		load.NewAddKeysLoad(),
 		evmLoad,
+		evmBatchLoad,
 		load.NewCreateAccountLoad(),
 	}
 
@@ -185,7 +194,7 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 			SetComputeLimit(tx.GasLimit).
 			SetProposalKey(
 				flow.BytesToAddress(tx.ProposalKey.Address.Bytes()),
-				uint64(tx.ProposalKey.KeyIndex),
+				tx.ProposalKey.KeyIndex,
 				tx.ProposalKey.SequenceNumber,
 			).
 			SetPayer(flow.BytesToAddress(tx.Payer.Bytes()))
@@ -199,14 +208,14 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 	for _, sig := range tx.PayloadSignatures {
 		txBody.AddPayloadSignature(
 			flow.BytesToAddress(sig.Address.Bytes()),
-			uint64(sig.KeyIndex),
+			sig.KeyIndex,
 			sig.Signature,
 		)
 	}
 	for _, sig := range tx.EnvelopeSignatures {
 		txBody.AddEnvelopeSignature(
 			flow.BytesToAddress(sig.Address.Bytes()),
-			uint64(sig.KeyIndex),
+			sig.KeyIndex,
 			sig.Signature,
 		)
 	}
@@ -226,7 +235,18 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 	// Update the snapshot
 	t.snapshot.Append(executionSnapshot)
 
-	computationUsed := environment.MainnetExecutionEffortWeights.ComputationFromIntensities(result.ComputationIntensities)
+	// temporarily hardcode the weights as they are not confirmed yet
+	executionEffortWeights := meter.ExecutionEffortWeights{
+		cadenceCommon.ComputationKindStatement:          314,
+		cadenceCommon.ComputationKindLoop:               314,
+		cadenceCommon.ComputationKindFunctionInvocation: 314,
+		environment.ComputationKindGetValue:             162,
+		environment.ComputationKindCreateAccount:        567534,
+		environment.ComputationKindSetValue:             153,
+		environment.ComputationKindEVMGasUsage:          13,
+	}
+
+	computationUsed := executionEffortWeights.ComputationFromIntensities(result.ComputationIntensities)
 	t.log.Debug().Uint64("computation", computationUsed).Msg("Transaction applied")
 
 	sdkResult := sdk.TransactionResult{
@@ -234,7 +254,7 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 		Error:         result.Err,
 		BlockID:       sdk.EmptyID,
 		BlockHeight:   0,
-		TransactionID: convert2.FlowIdentifierToSDK(txBody.ID()),
+		TransactionID: emulator.FlowIdentifierToSDK(txBody.ID()),
 		CollectionID:  sdk.EmptyID,
 	}
 
@@ -280,7 +300,7 @@ func (t *TestAccountLoader) Load(
 	t.snapshot.Lock()
 	defer t.snapshot.Unlock()
 
-	acc, err := t.vm.GetAccount(t.ctx, flow.ConvertAddress(address), t.snapshot)
+	acc, err := fvm.GetAccount(t.ctx, flow.ConvertAddress(address), t.snapshot)
 	if err != nil {
 		return nil, wrapErr(err)
 	}

@@ -35,7 +35,7 @@ type Account interface {
 	// works only for COAs
 	Withdraw(Balance) *FLOWTokenVault
 
-	// Transfer is a utility method on top of call for transfering tokens to another account
+	// Transfer is a utility method on top of call for transferring tokens to another account
 	Transfer(to Address, balance Balance)
 
 	// Deploy deploys a contract to the environment
@@ -49,7 +49,7 @@ type Account interface {
 	// and the Flow transaction's computation limit.
 	// The fees are deducted from the COA
 	// and are transferred to the target address.
-	// if no data is provided it would behave as transfering tokens to the
+	// if no data is provided it would behave as transferring tokens to the
 	// target address
 	// works only for COAs
 	Call(Address, Data, GasLimit, Balance) *ResultSummary

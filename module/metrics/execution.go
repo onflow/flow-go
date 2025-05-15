@@ -20,6 +20,8 @@ type ExecutionCollector struct {
 	totalFailedTransactionsCounter          prometheus.Counter
 	lastExecutedBlockHeightGauge            prometheus.Gauge
 	lastFinalizedExecutedBlockHeightGauge   prometheus.Gauge
+	lastChunkDataPackPrunedHeightGauge      prometheus.Gauge
+	targetChunkDataPackPrunedHeightGauge    prometheus.Gauge
 	stateStorageDiskTotal                   prometheus.Gauge
 	storageStateCommitment                  prometheus.Gauge
 	checkpointSize                          prometheus.Gauge
@@ -83,10 +85,19 @@ type ExecutionCollector struct {
 	stateSyncActive                         prometheus.Gauge
 	blockDataUploadsInProgress              prometheus.Gauge
 	blockDataUploadsDuration                prometheus.Histogram
-	maxCollectionHeightData                 counters.StrictMonotonousCounter
+	maxCollectionHeightData                 counters.StrictMonotonicCounter
 	maxCollectionHeight                     prometheus.Gauge
 	computationResultUploadedCount          prometheus.Counter
 	computationResultUploadRetriedCount     prometheus.Counter
+	numberOfDeployedCOAs                    prometheus.Gauge
+	evmBlockTotalSupply                     prometheus.Gauge
+	totalExecutedEVMTransactionsCounter     prometheus.Counter
+	totalFailedEVMTransactionsCounter       prometheus.Counter
+	totalExecutedEVMDirectCallsCounter      prometheus.Counter
+	totalFailedEVMDirectCallsCounter        prometheus.Counter
+	evmTransactionGasUsed                   prometheus.Histogram
+	evmBlockTxCount                         prometheus.Histogram
+	evmBlockGasUsed                         prometheus.Histogram
 }
 
 func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
@@ -644,6 +655,20 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the last height that was finalized and executed",
 		}),
 
+		lastChunkDataPackPrunedHeightGauge: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "last_chunk_data_pack_pruned_height",
+			Help:      "the last height that was pruned for chunk data pack",
+		}),
+
+		targetChunkDataPackPrunedHeightGauge: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "target_chunk_data_pack_pruned_height",
+			Help:      "the target height for pruning chunk data pack",
+		}),
+
 		stateStorageDiskTotal: promauto.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemStateStorage,
@@ -694,12 +719,79 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the number of times a program was found in the cache",
 		}),
 
-		maxCollectionHeightData: counters.NewMonotonousCounter(0),
+		maxCollectionHeightData: counters.NewMonotonicCounter(0),
+
 		maxCollectionHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:      "max_collection_height",
 			Namespace: namespaceExecution,
 			Subsystem: subsystemIngestion,
 			Help:      "gauge to track the maximum block height of collections received",
+		}),
+
+		numberOfDeployedCOAs: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "number_of_deployed_coas",
+			Help:      "the number of deployed coas",
+		}),
+
+		totalExecutedEVMTransactionsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "total_executed_evm_transaction_count",
+			Help:      "the total number of executed evm transactions (including direct calls)",
+		}),
+
+		totalFailedEVMTransactionsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "total_failed_evm_transaction_count",
+			Help:      "the total number of executed evm transactions with failed status (including direct calls)",
+		}),
+
+		totalExecutedEVMDirectCallsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "total_executed_evm_direct_call_count",
+			Help:      "the total number of executed evm direct calls",
+		}),
+
+		totalFailedEVMDirectCallsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "total_failed_evm_direct_call_count",
+			Help:      "the total number of executed evm direct calls with failed status.",
+		}),
+
+		evmTransactionGasUsed: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "evm_transaction_gas_used",
+			Help:      "the total amount of gas used by a transaction",
+			Buckets:   prometheus.ExponentialBuckets(20_000, 2, 8),
+		}),
+
+		evmBlockTxCount: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "evm_block_transaction_counts",
+			Help:      "the total number of transactions per evm block",
+			Buckets:   prometheus.ExponentialBuckets(1, 2, 8),
+		}),
+
+		evmBlockGasUsed: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "evm_block_gas_used",
+			Help:      "the total amount of gas used by a block",
+			Buckets:   prometheus.ExponentialBuckets(100_000, 2, 8),
+		}),
+
+		evmBlockTotalSupply: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "evm_block_total_supply",
+			Help:      "the total amount of flow deposited to EVM (in FLOW)",
 		}),
 	}
 
@@ -719,7 +811,7 @@ func (ec *ExecutionCollector) FinishBlockReceivedToExecuted(blockID flow.Identif
 // ExecutionBlockExecuted reports execution meta data after executing a block
 func (ec *ExecutionCollector) ExecutionBlockExecuted(
 	dur time.Duration,
-	stats module.ExecutionResultStats,
+	stats module.BlockExecutionResultStats,
 ) {
 	ec.totalExecutedBlocksCounter.Inc()
 	ec.blockExecutionTime.Observe(float64(dur.Milliseconds()))
@@ -734,7 +826,7 @@ func (ec *ExecutionCollector) ExecutionBlockExecuted(
 // ExecutionCollectionExecuted reports stats for executing a collection
 func (ec *ExecutionCollector) ExecutionCollectionExecuted(
 	dur time.Duration,
-	stats module.ExecutionResultStats,
+	stats module.CollectionExecutionResultStats,
 ) {
 	ec.totalExecutedCollectionsCounter.Inc()
 	ec.collectionExecutionTime.Observe(float64(dur.Milliseconds()))
@@ -758,23 +850,19 @@ func (ec *ExecutionCollector) ExecutionBlockCachedPrograms(programs int) {
 // ExecutionTransactionExecuted reports stats for executing a transaction
 func (ec *ExecutionCollector) ExecutionTransactionExecuted(
 	dur time.Duration,
-	numConflictRetries int,
-	compUsed uint64,
-	memoryUsed uint64,
-	eventCounts int,
-	eventSize int,
-	failed bool,
+	stats module.TransactionExecutionResultStats,
+	info module.TransactionExecutionResultInfo,
 ) {
 	ec.totalExecutedTransactionsCounter.Inc()
 	ec.transactionExecutionTime.Observe(float64(dur.Milliseconds()))
-	ec.transactionConflictRetries.Observe(float64(numConflictRetries))
-	ec.transactionComputationUsed.Observe(float64(compUsed))
+	ec.transactionConflictRetries.Observe(float64(stats.NumberOfTxnConflictRetries))
+	ec.transactionComputationUsed.Observe(float64(stats.ComputationUsed))
 	ec.transactionNormalizedTimePerComputation.Observe(
-		flow.NormalizedExecutionTimePerComputationUnit(dur, compUsed))
-	ec.transactionMemoryEstimate.Observe(float64(memoryUsed))
-	ec.transactionEmittedEvents.Observe(float64(eventCounts))
-	ec.transactionEventSize.Observe(float64(eventSize))
-	if failed {
+		flow.NormalizedExecutionTimePerComputationUnit(dur, stats.ComputationUsed))
+	ec.transactionMemoryEstimate.Observe(float64(stats.MemoryUsed))
+	ec.transactionEmittedEvents.Observe(float64(stats.EventCounts))
+	ec.transactionEventSize.Observe(float64(stats.EventSize))
+	if stats.Failed {
 		ec.totalFailedTransactionsCounter.Inc()
 	}
 }
@@ -818,6 +906,15 @@ func (ec *ExecutionCollector) ExecutionLastExecutedBlockHeight(height uint64) {
 // ExecutionLastFinalizedExecutedBlockHeight reports last finalized executed block height
 func (ec *ExecutionCollector) ExecutionLastFinalizedExecutedBlockHeight(height uint64) {
 	ec.lastFinalizedExecutedBlockHeightGauge.Set(float64(height))
+}
+
+// ExecutionLastChunkDataPackPrunedHeight reports last chunk data pack pruned height
+func (ec *ExecutionCollector) ExecutionLastChunkDataPackPrunedHeight(height uint64) {
+	ec.lastChunkDataPackPrunedHeightGauge.Set(float64(height))
+}
+
+func (ec *ExecutionCollector) ExecutionTargetChunkDataPackPrunedHeight(height uint64) {
+	ec.targetChunkDataPackPrunedHeightGauge.Set(float64(height))
 }
 
 // ForestApproxMemorySize records approximate memory usage of forest (all in-memory trees)
@@ -909,10 +1006,6 @@ func (ec *ExecutionCollector) ExecutionCollectionRequestSent() {
 	ec.collectionRequestSent.Inc()
 }
 
-func (ec *ExecutionCollector) ExecutionCollectionRequestRetried() {
-	ec.collectionRequestRetried.Inc()
-}
-
 func (ec *ExecutionCollector) ExecutionBlockDataUploadStarted() {
 	ec.blockDataUploadsInProgress.Inc()
 }
@@ -963,6 +1056,38 @@ func (ec *ExecutionCollector) RuntimeTransactionProgramsCacheHit() {
 	ec.programsCacheHit.Inc()
 }
 
+func (ec *ExecutionCollector) SetNumberOfDeployedCOAs(count uint64) {
+	ec.numberOfDeployedCOAs.Set(float64(count))
+}
+
+func (ec *ExecutionCollector) EVMTransactionExecuted(
+	gasUsed uint64,
+	isDirectCall bool,
+	failed bool,
+) {
+	ec.totalExecutedEVMTransactionsCounter.Inc()
+	if isDirectCall {
+		ec.totalExecutedEVMDirectCallsCounter.Inc()
+		if failed {
+			ec.totalFailedEVMDirectCallsCounter.Inc()
+		}
+	}
+	if failed {
+		ec.totalFailedEVMTransactionsCounter.Inc()
+	}
+	ec.evmTransactionGasUsed.Observe(float64(gasUsed))
+}
+
+func (ec *ExecutionCollector) EVMBlockExecuted(
+	txCount int,
+	totalGasUsed uint64,
+	totalSupplyInFlow float64,
+) {
+	ec.evmBlockTxCount.Observe(float64(txCount))
+	ec.evmBlockGasUsed.Observe(float64(totalGasUsed))
+	ec.evmBlockTotalSupply.Set(totalSupplyInFlow)
+}
+
 func (ec *ExecutionCollector) UpdateCollectionMaxHeight(height uint64) {
 	updated := ec.maxCollectionHeightData.Set(height)
 	if updated {
@@ -976,4 +1101,35 @@ func (ec *ExecutionCollector) ExecutionComputationResultUploaded() {
 
 func (ec *ExecutionCollector) ExecutionComputationResultUploadRetried() {
 	ec.computationResultUploadRetriedCount.Inc()
+}
+
+type ExecutionCollectorWithTransactionCallback struct {
+	*ExecutionCollector
+	TransactionCallback func(
+		dur time.Duration,
+		stats module.TransactionExecutionResultStats,
+		info module.TransactionExecutionResultInfo,
+	)
+}
+
+func (ec *ExecutionCollector) WithTransactionCallback(
+	callback func(
+		time.Duration,
+		module.TransactionExecutionResultStats,
+		module.TransactionExecutionResultInfo,
+	),
+) *ExecutionCollectorWithTransactionCallback {
+	return &ExecutionCollectorWithTransactionCallback{
+		ExecutionCollector:  ec,
+		TransactionCallback: callback,
+	}
+}
+
+func (ec *ExecutionCollectorWithTransactionCallback) ExecutionTransactionExecuted(
+	dur time.Duration,
+	stats module.TransactionExecutionResultStats,
+	info module.TransactionExecutionResultInfo,
+) {
+	ec.ExecutionCollector.ExecutionTransactionExecuted(dur, stats, info)
+	ec.TransactionCallback(dur, stats, info)
 }

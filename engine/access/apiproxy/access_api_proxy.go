@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	accessflow "github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
 	"github.com/onflow/flow-go/model/flow"
@@ -26,7 +26,7 @@ type FlowAccessAPIRouter struct {
 	logger   zerolog.Logger
 	metrics  *metrics.ObserverCollector
 	upstream *FlowAccessAPIForwarder
-	local    *accessflow.Handler
+	local    *rpc.Handler
 	useIndex bool
 }
 
@@ -34,7 +34,7 @@ type Params struct {
 	Log      zerolog.Logger
 	Metrics  *metrics.ObserverCollector
 	Upstream *FlowAccessAPIForwarder
-	Local    *accessflow.Handler
+	Local    *rpc.Handler
 	UseIndex bool
 }
 
@@ -130,6 +130,18 @@ func (h *FlowAccessAPIRouter) GetCollectionByID(context context.Context, req *ac
 	return res, err
 }
 
+func (h *FlowAccessAPIRouter) GetFullCollectionByID(context context.Context, req *access.GetFullCollectionByIDRequest) (*access.FullCollectionResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetFullCollectionByID(context, req)
+		h.log(LocalApiService, "GetFullCollectionByID", err)
+		return res, err
+	}
+
+	res, err := h.upstream.GetFullCollectionByID(context, req)
+	h.log(UpstreamApiService, "GetFullCollectionByID", err)
+	return res, err
+}
+
 func (h *FlowAccessAPIRouter) SendTransaction(context context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
 	res, err := h.upstream.SendTransaction(context, req)
 	h.log(UpstreamApiService, "SendTransaction", err)
@@ -149,7 +161,7 @@ func (h *FlowAccessAPIRouter) GetTransaction(context context.Context, req *acces
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
-	//TODO: add implementation for transaction error message before adding local impl
+	// TODO: add implementation for transaction error message before adding local impl
 
 	res, err := h.upstream.GetTransactionResult(context, req)
 	h.log(UpstreamApiService, "GetTransactionResult", err)
@@ -157,7 +169,7 @@ func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req 
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResultsByBlockID(context context.Context, req *access.GetTransactionsByBlockIDRequest) (*access.TransactionResultsResponse, error) {
-	//TODO: add implementation for transaction error message before adding local impl
+	// TODO: add implementation for transaction error message before adding local impl
 
 	res, err := h.upstream.GetTransactionResultsByBlockID(context, req)
 	h.log(UpstreamApiService, "GetTransactionResultsByBlockID", err)
@@ -177,7 +189,7 @@ func (h *FlowAccessAPIRouter) GetTransactionsByBlockID(context context.Context, 
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResultByIndex(context context.Context, req *access.GetTransactionByIndexRequest) (*access.TransactionResultResponse, error) {
-	//TODO: add implementation for transaction error message before adding local impl
+	// TODO: add implementation for transaction error message before adding local impl
 
 	res, err := h.upstream.GetTransactionResultByIndex(context, req)
 	h.log(UpstreamApiService, "GetTransactionResultByIndex", err)
@@ -235,6 +247,78 @@ func (h *FlowAccessAPIRouter) GetAccountAtBlockHeight(context context.Context, r
 
 	res, err := h.upstream.GetAccountAtBlockHeight(context, req)
 	h.log(UpstreamApiService, "GetAccountAtBlockHeight", err)
+	return res, err
+}
+
+func (h *FlowAccessAPIRouter) GetAccountBalanceAtLatestBlock(context context.Context, req *access.GetAccountBalanceAtLatestBlockRequest) (*access.AccountBalanceResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetAccountBalanceAtLatestBlock(context, req)
+		h.log(LocalApiService, "GetAccountBalanceAtLatestBlock", err)
+		return res, err
+	}
+
+	res, err := h.upstream.GetAccountBalanceAtLatestBlock(context, req)
+	h.log(UpstreamApiService, "GetAccountBalanceAtLatestBlock", err)
+	return res, err
+}
+
+func (h *FlowAccessAPIRouter) GetAccountBalanceAtBlockHeight(context context.Context, req *access.GetAccountBalanceAtBlockHeightRequest) (*access.AccountBalanceResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetAccountBalanceAtBlockHeight(context, req)
+		h.log(LocalApiService, "GetAccountBalanceAtBlockHeight", err)
+		return res, err
+	}
+
+	res, err := h.upstream.GetAccountBalanceAtBlockHeight(context, req)
+	h.log(UpstreamApiService, "GetAccountBalanceAtBlockHeight", err)
+	return res, err
+}
+
+func (h *FlowAccessAPIRouter) GetAccountKeyAtLatestBlock(context context.Context, req *access.GetAccountKeyAtLatestBlockRequest) (*access.AccountKeyResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetAccountKeyAtLatestBlock(context, req)
+		h.log(LocalApiService, "GetAccountKeyAtLatestBlock", err)
+		return res, err
+	}
+
+	res, err := h.upstream.GetAccountKeyAtLatestBlock(context, req)
+	h.log(UpstreamApiService, "GetAccountKeyAtLatestBlock", err)
+	return res, err
+}
+
+func (h *FlowAccessAPIRouter) GetAccountKeysAtLatestBlock(context context.Context, req *access.GetAccountKeysAtLatestBlockRequest) (*access.AccountKeysResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetAccountKeysAtLatestBlock(context, req)
+		h.log(LocalApiService, "GetAccountKeysAtLatestBlock", err)
+		return res, err
+	}
+
+	res, err := h.upstream.GetAccountKeysAtLatestBlock(context, req)
+	h.log(UpstreamApiService, "GetAccountKeysAtLatestBlock", err)
+	return res, err
+}
+
+func (h *FlowAccessAPIRouter) GetAccountKeyAtBlockHeight(context context.Context, req *access.GetAccountKeyAtBlockHeightRequest) (*access.AccountKeyResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetAccountKeyAtBlockHeight(context, req)
+		h.log(LocalApiService, "GetAccountKeyAtBlockHeight", err)
+		return res, err
+	}
+
+	res, err := h.upstream.GetAccountKeyAtBlockHeight(context, req)
+	h.log(UpstreamApiService, "GetAccountKeyAtBlockHeight", err)
+	return res, err
+}
+
+func (h *FlowAccessAPIRouter) GetAccountKeysAtBlockHeight(context context.Context, req *access.GetAccountKeysAtBlockHeightRequest) (*access.AccountKeysResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetAccountKeysAtBlockHeight(context, req)
+		h.log(LocalApiService, "GetAccountKeysAtBlockHeight", err)
+		return res, err
+	}
+
+	res, err := h.upstream.GetAccountKeysAtBlockHeight(context, req)
+	h.log(UpstreamApiService, "GetAccountKeysAtBlockHeight", err)
 	return res, err
 }
 
@@ -395,7 +479,7 @@ func (h *FlowAccessAPIRouter) SubscribeBlockDigestsFromLatest(req *access.Subscr
 }
 
 func (h *FlowAccessAPIRouter) SendAndSubscribeTransactionStatuses(req *access.SendAndSubscribeTransactionStatusesRequest, server access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {
-	//SendAndSubscribeTransactionStatuses is not implemented for observer yet
+	// SendAndSubscribeTransactionStatuses is not implemented for observer yet
 	return status.Errorf(codes.Unimplemented, "method SendAndSubscribeTransactionStatuses not implemented")
 }
 
@@ -507,6 +591,16 @@ func (h *FlowAccessAPIForwarder) GetCollectionByID(context context.Context, req 
 	return upstream.GetCollectionByID(context, req)
 }
 
+func (h *FlowAccessAPIForwarder) GetFullCollectionByID(context context.Context, req *access.GetFullCollectionByIDRequest) (*access.FullCollectionResponse, error) {
+	// This is a passthrough request
+	upstream, closer, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return upstream.GetFullCollectionByID(context, req)
+}
+
 func (h *FlowAccessAPIForwarder) SendTransaction(context context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
 	// This is a passthrough request
 	upstream, closer, err := h.FaultTolerantClient()
@@ -614,6 +708,66 @@ func (h *FlowAccessAPIForwarder) GetAccountAtBlockHeight(context context.Context
 	}
 	defer closer.Close()
 	return upstream.GetAccountAtBlockHeight(context, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetAccountBalanceAtLatestBlock(context context.Context, req *access.GetAccountBalanceAtLatestBlockRequest) (*access.AccountBalanceResponse, error) {
+	// This is a passthrough request
+	upstream, closer, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return upstream.GetAccountBalanceAtLatestBlock(context, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetAccountBalanceAtBlockHeight(context context.Context, req *access.GetAccountBalanceAtBlockHeightRequest) (*access.AccountBalanceResponse, error) {
+	// This is a passthrough request
+	upstream, closer, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return upstream.GetAccountBalanceAtBlockHeight(context, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetAccountKeyAtLatestBlock(context context.Context, req *access.GetAccountKeyAtLatestBlockRequest) (*access.AccountKeyResponse, error) {
+	// This is a passthrough request
+	upstream, closer, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return upstream.GetAccountKeyAtLatestBlock(context, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetAccountKeysAtLatestBlock(context context.Context, req *access.GetAccountKeysAtLatestBlockRequest) (*access.AccountKeysResponse, error) {
+	// This is a passthrough request
+	upstream, closer, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return upstream.GetAccountKeysAtLatestBlock(context, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetAccountKeyAtBlockHeight(context context.Context, req *access.GetAccountKeyAtBlockHeightRequest) (*access.AccountKeyResponse, error) {
+	// This is a passthrough request
+	upstream, closer, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return upstream.GetAccountKeyAtBlockHeight(context, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetAccountKeysAtBlockHeight(context context.Context, req *access.GetAccountKeysAtBlockHeightRequest) (*access.AccountKeysResponse, error) {
+	// This is a passthrough request
+	upstream, closer, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return upstream.GetAccountKeysAtBlockHeight(context, req)
 }
 
 func (h *FlowAccessAPIForwarder) ExecuteScriptAtLatestBlock(context context.Context, req *access.ExecuteScriptAtLatestBlockRequest) (*access.ExecuteScriptResponse, error) {

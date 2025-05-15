@@ -17,7 +17,7 @@ const RandomSourceLength = crypto.SignatureLenBLSBLS12381
 // The diversifier is used to further diversify the PRGs beyond the customizer. A diversifier
 // can be a slice of any length. If no diversification is needed, `diversifier` can be `nil`.
 //
-// The function uses an extendable-output function (xof) to extract and expand the the input source,
+// The function uses an extendable-output function (xof) to extract and expand the input source,
 // so that any source with enough entropy (at least 128 bits) can be used (no need to pre-hash).
 // Current implementation generates a ChaCha20-based CSPRG.
 //

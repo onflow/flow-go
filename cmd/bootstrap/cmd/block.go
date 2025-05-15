@@ -8,8 +8,6 @@ import (
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 )
 
 // constructRootHeader constructs a header for the root block.
@@ -22,19 +20,18 @@ func constructRootHeader(rootChain string, rootParent string, rootHeight uint64,
 	return run.GenerateRootHeader(chainID, parentID, height, timestamp)
 }
 
-// constructRootBlock constructs a valid root block based on the given header, setup, and commit.
-func constructRootBlock(rootHeader *flow.Header, setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.Block {
+// constructRootBlock constructs a valid root block based on the given header and protocol state ID for that block.
+func constructRootBlock(rootHeader *flow.Header, protocolStateID flow.Identifier) *flow.Block {
 	block := &flow.Block{
 		Header:  rootHeader,
 		Payload: nil,
 	}
 	block.SetPayload(flow.Payload{
-		Guarantees: nil,
-		Seals:      nil,
-		Receipts:   nil,
-		Results:    nil,
-		// TODO: shortcut in bootstrapping; we will probably have to start with a non-empty KV store in the future
-		ProtocolStateID: kvstore.NewDefaultKVStore(inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()).ID(),
+		Guarantees:      nil,
+		Seals:           nil,
+		Receipts:        nil,
+		Results:         nil,
+		ProtocolStateID: protocolStateID,
 	})
 	return block
 }
@@ -45,7 +42,10 @@ func constructRootEpochEvents(
 	participants flow.IdentityList,
 	assignments flow.AssignmentList,
 	clusterQCs []*flow.QuorumCertificate,
-	dkgData dkg.DKGData) (*flow.EpochSetup, *flow.EpochCommit) {
+	dkgData dkg.ThresholdKeySet,
+	dkgIndexMap flow.DKGIndexMap,
+) (*flow.EpochSetup, *flow.EpochCommit) {
+
 	epochSetup := &flow.EpochSetup{
 		Counter:            flagEpochCounter,
 		FirstView:          firstView,
@@ -80,6 +80,7 @@ func constructRootEpochEvents(
 		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
 		DKGGroupKey:        dkgData.PubGroupKey,
 		DKGParticipantKeys: dkgData.PubKeyShares,
+		DKGIndexMap:        dkgIndexMap,
 	}
 	return epochSetup, epochCommit
 }

@@ -35,7 +35,7 @@ func newMockExecutionState(seal *flow.Seal, genesis *flow.Header) *mockExecution
 	es := &mockExecutionState{
 		commits: commits,
 	}
-	es.On("GetHighestExecutedBlockID", mock.Anything).Return(genesis.Height, genesis.ID(), nil)
+	es.On("GetLastExecutedBlockID", mock.Anything).Return(genesis.Height, genesis.ID(), nil)
 	return es
 }
 

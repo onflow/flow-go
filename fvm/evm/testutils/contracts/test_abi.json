@@ -5,6 +5,22 @@
 		"type": "constructor"
 	},
 	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "value",
+				"type": "uint256"
+			},
+			{
+				"internalType": "string",
+				"name": "message",
+				"type": "string"
+			}
+		],
+		"name": "MyCustomError",
+		"type": "error"
+	},
+	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -22,6 +38,13 @@
 		],
 		"name": "NewStore",
 		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "assertError",
+		"outputs": [],
+		"stateMutability": "pure",
+		"type": "function"
 	},
 	{
 		"inputs": [
@@ -92,6 +115,80 @@
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "addr",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "expected",
+				"type": "uint256"
+			}
+		],
+		"name": "checkBalance",
+		"outputs": [],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "num",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "expected",
+				"type": "bytes32"
+			}
+		],
+		"name": "checkBlockHash",
+		"outputs": [],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "expected",
+				"type": "uint256"
+			}
+		],
+		"name": "checkBlockNumber",
+		"outputs": [],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "prev",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "num",
+				"type": "uint256"
+			}
+		],
+		"name": "checkThenStore",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "customError",
+		"outputs": [],
+		"stateMutability": "pure",
 		"type": "function"
 	},
 	{
@@ -194,6 +291,19 @@
 			}
 		],
 		"name": "verifyArchCallToRandomSource",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "verifyArchCallToRevertibleRandom",
 		"outputs": [
 			{
 				"internalType": "uint64",

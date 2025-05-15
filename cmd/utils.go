@@ -22,6 +22,10 @@ import (
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/dbops"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/io"
 )
 
@@ -157,7 +161,7 @@ func CreatePublicIDTranslatorAndIdentifierProvider(
 
 				if flowID, err := idTranslator.GetFlowID(pid); err != nil {
 					// TODO: this is an instance of "log error and continue with best effort" anti-pattern
-					logger.Err(err).Str("peer", p2plogging.PeerId(pid)).Msg("failed to translate to Flow ID")
+					logger.Debug().Str("peer", p2plogging.PeerId(pid)).Msg("failed to translate to Flow ID")
 				} else {
 					result = append(result, flowID)
 				}
@@ -168,4 +172,22 @@ func CreatePublicIDTranslatorAndIdentifierProvider(
 	}
 
 	return idTranslator, factory, nil
+}
+
+// GetStorageMultiDBStoreIfNeeded returns either a single-DB store or
+// a multi-DB store when node.DBOps is pebble-batch.
+// When this function returns a multi-DB store, the store has:
+// - primary read-and-write-store: node.ProtocolDB (Pebble)
+// - secondary read-only store: node.DB (BadgerDB).
+func GetStorageMultiDBStoreIfNeeded(node *NodeConfig) storage.DB {
+	dbStore := node.ProtocolDB
+
+	if dbops.IsPebbleBatch(node.DBOps) {
+		// Create multiDBStore with node.ProtocolDB as primary read-and-write-store,
+		// and node.DB as secondary read-only store.
+		badgerDB := badgerimpl.ToDB(node.DB)
+		dbStore = operation.NewMultiDBStore(node.ProtocolDB, badgerDB)
+	}
+
+	return dbStore
 }

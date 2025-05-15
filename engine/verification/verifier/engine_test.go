@@ -104,7 +104,7 @@ func (suite *VerifierEngineTestSuite) getTestNewEngine() *verifier.Engine {
 		suite.me,
 		suite.chunkVerifier,
 		suite.approvals)
-	require.Nil(suite.T(), err)
+	require.NoError(suite.T(), err)
 
 	suite.net.AssertExpectations(suite.T())
 	return e
@@ -121,7 +121,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 	consensusNodes := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
 	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil)
 
-	vChunk := unittest.VerifiableChunkDataFixture(uint64(0))
+	vChunk, _ := unittest.VerifiableChunkDataFixture(uint64(0))
 
 	tests := []struct {
 		name string
@@ -301,7 +301,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 	}
 
 	for i, test := range tests {
-		vc := unittest.VerifiableChunkDataFixture(uint64(i))
+		vc, _ := unittest.VerifiableChunkDataFixture(uint64(i))
 		expectedErr := test.errFn(vc)
 
 		suite.chunkVerifier.On("Verify", vc).Return(nil, expectedErr).Once()

@@ -135,12 +135,6 @@ func (b *RegisterBootstrap) IndexCheckpointFile(ctx context.Context, workerCount
 	cct, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// validate the checkpoint has correct root hash
-	err := wal.CheckpointHasRootHash(b.log, b.checkpointDir, b.checkpointFileName, b.rootHash)
-	if err != nil {
-		return fmt.Errorf("the root checkpoint to have the trie root hash %v does not match with the root state commitment: %w", b.rootHash, err)
-	}
-
 	g, gCtx := errgroup.WithContext(cct)
 
 	start := time.Now()
@@ -151,7 +145,7 @@ func (b *RegisterBootstrap) IndexCheckpointFile(ctx context.Context, workerCount
 		})
 	}
 
-	err = wal.OpenAndReadLeafNodesFromCheckpointV6(b.leafNodeChan, b.checkpointDir, b.checkpointFileName, b.log)
+	err := wal.OpenAndReadLeafNodesFromCheckpointV6(b.leafNodeChan, b.checkpointDir, b.checkpointFileName, b.rootHash, b.log)
 	if err != nil {
 		return fmt.Errorf("error reading leaf node: %w", err)
 	}

@@ -941,7 +941,7 @@ func (c *ControlMsgValidationInspector) truncateIWantMessageIds(from peer.ID, rp
 	sampleSize := int(10 * lastHighest)
 	if sampleSize == 0 || sampleSize > c.config.IWant.MessageIdCountThreshold {
 		// invalid or 0 sample size is suspicious
-		lg.Warn().Str(logging.KeySuspicious, "true").Msg("zero or invalid sample size, using default max sample size")
+		lg.Debug().Str(logging.KeySuspicious, "true").Msg("zero or invalid sample size, using default max sample size")
 		sampleSize = c.config.IWant.MessageIdCountThreshold
 	}
 	for _, iWant := range rpc.GetControl().GetIwant() {

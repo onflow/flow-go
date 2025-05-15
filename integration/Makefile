@@ -23,7 +23,7 @@ test:
 	CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(GO_TEST_PACKAGES)
 
 .PHONY: access-tests
-access-tests: access-cohort1-tests access-cohort2-tests access-cohort3-tests
+access-tests: access-cohort1-tests access-cohort2-tests access-cohort3-tests access-cohort4-tests
 
 .PHONY: access-cohort1-tests
 access-cohort1-tests:
@@ -36,6 +36,10 @@ access-cohort2-tests:
 .PHONY: access-cohort3-tests
 access-cohort3-tests:
 	CGO_CFLAGS=$(CRYPTO_FLAG) go test -failfast $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/access/cohort3/...
+
+.PHONY: access-cohort4-tests
+access-cohort4-tests:
+	CGO_CFLAGS=$(CRYPTO_FLAG) go test -failfast $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/access/cohort4/...
 
 .PHONY: collection-tests
 collection-tests:
@@ -97,3 +101,10 @@ bft-gossipsub-tests:
 .PHONY: bft-tests
 bft-tests: bft-framework-tests bft-protocol-tests bft-gossipsub-tests
 
+.PHONY: lint
+lint:
+	golangci-lint run -v ./...
+
+.PHONY: fix-lint
+fix-lint:
+	golangci-lint run -v --fix ./...

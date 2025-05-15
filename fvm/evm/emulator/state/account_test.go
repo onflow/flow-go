@@ -13,7 +13,7 @@ import (
 func TestAccountEncoding(t *testing.T) {
 	acc := state.NewAccount(
 		testutils.RandomCommonAddress(t),
-		testutils.RandomBigInt(1000),
+		testutils.RandomUint256Int(1000),
 		uint64(2),
 		common.BytesToHash([]byte{1}),
 		[]byte{2},

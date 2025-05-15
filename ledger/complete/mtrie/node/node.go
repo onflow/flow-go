@@ -211,18 +211,18 @@ func (n *Node) Path() *ledger.Path {
 	return nil
 }
 
-// Payload returns the the Node's payload.
+// Payload returns the Node's payload.
 // Do NOT MODIFY returned slices!
 func (n *Node) Payload() *ledger.Payload {
 	return n.payload
 }
 
-// LeftChild returns the the Node's left child.
+// LeftChild returns the Node's left child.
 // Only INTERIM nodes have children.
 // Do NOT MODIFY returned Node!
 func (n *Node) LeftChild() *Node { return n.lChild }
 
-// RightChild returns the the Node's right child.
+// RightChild returns the Node's right child.
 // Only INTERIM nodes have children.
 // Do NOT MODIFY returned Node!
 func (n *Node) RightChild() *Node { return n.rChild }

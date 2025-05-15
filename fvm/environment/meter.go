@@ -3,7 +3,8 @@ package environment
 import (
 	"context"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -16,7 +17,7 @@ const (
 	ComputationKindVerifySignature
 	ComputationKindAddAccountKey
 	ComputationKindAddEncodedAccountKey
-	ComputationKindAllocateStorageIndex
+	ComputationKindAllocateSlabIndex
 	ComputationKindCreateAccount
 	ComputationKindEmitEvent
 	ComputationKindGenerateUUID
@@ -58,29 +59,25 @@ const (
 )
 
 // MainnetExecutionEffortWeights are the execution effort weights as they are
-// on mainnet from 18.8.2022
+// on mainnet from crescendo spork
 var MainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
-	common.ComputationKindStatement:          1569,
-	common.ComputationKindLoop:               1569,
-	common.ComputationKindFunctionInvocation: 1569,
-	ComputationKindGetValue:                  808,
-	ComputationKindCreateAccount:             2837670,
-	ComputationKindSetValue:                  765,
+	common.ComputationKindStatement:          314,
+	common.ComputationKindLoop:               314,
+	common.ComputationKindFunctionInvocation: 314,
+	ComputationKindGetValue:                  162,
+	ComputationKindCreateAccount:             567534,
+	ComputationKindSetValue:                  153,
+	ComputationKindEVMGasUsage:               13,
 }
 
 type Meter interface {
-	MeterComputation(common.ComputationKind, uint) error
-	ComputationUsed() (uint64, error)
+	runtime.MeterInterface
+
 	ComputationIntensities() meter.MeteredComputationIntensities
 	ComputationAvailable(common.ComputationKind, uint) bool
 
-	MeterMemory(usage common.MemoryUsage) error
-	MemoryUsed() (uint64, error)
-
 	MeterEmittedEvent(byteSize uint64) error
 	TotalEmittedEventBytes() uint64
-
-	InteractionUsed() (uint64, error)
 }
 
 type meterImpl struct {
@@ -109,6 +106,10 @@ func (meter *meterImpl) ComputationAvailable(
 	intensity uint,
 ) bool {
 	return meter.txnState.ComputationAvailable(kind, intensity)
+}
+
+func (meter *meterImpl) ComputationRemaining(kind common.ComputationKind) uint {
+	return meter.txnState.ComputationRemaining(kind)
 }
 
 func (meter *meterImpl) ComputationUsed() (uint64, error) {

@@ -13,6 +13,7 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/network"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -47,7 +48,7 @@ func NewQCContractClient(
 	flowClientANID flow.Identifier,
 	nodeID flow.Identifier,
 	accountAddress string,
-	accountKeyIndex uint,
+	accountKeyIndex uint32,
 	qcContractAddress string,
 	signer sdkcrypto.Signer,
 ) *QCContractClient {
@@ -106,7 +107,7 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 		SetScript(templates.GenerateSubmitVoteScript(c.env)).
 		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
-		SetProposalKey(account.Address, int(c.AccountKeyIndex), seqNumber).
+		SetProposalKey(account.Address, c.AccountKeyIndex, seqNumber).
 		SetPayer(account.Address).
 		AddAuthorizer(account.Address)
 
@@ -132,7 +133,7 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	}
 
 	// sign envelope using account signer
-	err = tx.SignEnvelope(account.Address, int(c.AccountKeyIndex), c.Signer)
+	err = tx.SignEnvelope(account.Address, c.AccountKeyIndex, c.Signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}

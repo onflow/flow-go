@@ -1,12 +1,13 @@
 package migrations
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog"
 
-	migrationSnapshot "github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -15,8 +16,8 @@ func NewTransactionBasedMigration(
 	chainID flow.ChainID,
 	logger zerolog.Logger,
 	expectedWriteAddresses map[flow.Address]struct{},
-) ledger.Migration {
-	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
+) RegistersMigration {
+	return func(registersByAccount *registers.ByAccount) error {
 
 		options := computation.DefaultFVMOptions(chainID, false, false)
 		options = append(options,
@@ -27,9 +28,8 @@ func NewTransactionBasedMigration(
 			fvm.WithTransactionFeesEnabled(false))
 		ctx := fvm.NewContext(options...)
 
-		snapshot, err := migrationSnapshot.NewPayloadSnapshot(zerolog.Nop(), payloads, migrationSnapshot.SmallChangeSetSnapshot, 1)
-		if err != nil {
-			return nil, err
+		storageSnapshot := registers.StorageSnapshot{
+			Registers: registersByAccount,
 		}
 
 		vm := fvm.NewVirtualMachine()
@@ -37,21 +37,26 @@ func NewTransactionBasedMigration(
 		executionSnapshot, res, err := vm.Run(
 			ctx,
 			fvm.Transaction(tx, 0),
-			snapshot,
+			storageSnapshot,
 		)
-
 		if err != nil {
-			return nil, err
+			return fmt.Errorf("failed to run transaction: %w", err)
 		}
 
 		if res.Err != nil {
-			return nil, res.Err
+			return fmt.Errorf("transaction failed: %w", res.Err)
 		}
 
-		return snapshot.ApplyChangesAndGetNewPayloads(
+		err = registers.ApplyChanges(
+			registersByAccount,
 			executionSnapshot.WriteSet,
 			expectedWriteAddresses,
 			logger,
 		)
+		if err != nil {
+			return fmt.Errorf("failed to apply changes: %w", err)
+		}
+
+		return nil
 	}
 }

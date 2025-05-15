@@ -167,12 +167,12 @@ func weightedRandomSelection(
 	return leaders, nil
 }
 
-// binarySearchStriclyBigger finds the index of the first item in the given array that is
+// binarySearchStrictlyBigger finds the index of the first item in the given array that is
 // strictly bigger to the given value.
 // There are a few assumptions on inputs:
-// - `arr` must be non-empty
-// - items in `arr` must be in non-decreasing order
-// - `value` must be less than the last item in `arr`
+//   - `arr` must be non-empty
+//   - items in `arr` must be in monotonically increasing order (for indices i,j with i<j it must hold that arr[i] ≤ arr[j])
+//   - `value` must be less than the last item in `arr`
 func binarySearchStrictlyBigger(value uint64, arr []uint64) int {
 	left := 0
 	arrayLen := len(arr)

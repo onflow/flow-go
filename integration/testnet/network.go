@@ -15,9 +15,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/follower/database"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 
 	"github.com/dapperlabs/testingdock"
+	badgerv2 "github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	dockercontainer "github.com/docker/docker/api/types/container"
@@ -31,6 +33,7 @@ import (
 	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
@@ -52,6 +55,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
+	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -72,6 +76,8 @@ const (
 	DefaultFlowDataDir = "/data"
 	// DefaultFlowDBDir is the default directory for the node database.
 	DefaultFlowDBDir = "/data/protocol"
+	// DefaultFlowPebbleDBDir is the default directory for the pebble database.
+	DefaultFlowPebbleDBDir = "/data/protocol-pebble"
 	// DefaultFlowSecretsDBDir is the default directory for secrets database.
 	DefaultFlowSecretsDBDir = "/data/secrets"
 	// DefaultExecutionRootDir is the default directory for the execution node state database.
@@ -88,6 +94,7 @@ const (
 	DefaultProfilerDir = "/data/profiler"
 
 	// GRPCPort is the GRPC API port.
+	// Use this same port for the ExecutionDataAPI
 	GRPCPort = "9000"
 	// GRPCSecurePort is the secure GRPC API port.
 	GRPCSecurePort = "9001"
@@ -99,8 +106,6 @@ const (
 	MetricsPort = "8080"
 	// AdminPort is the admin server port
 	AdminPort = "9002"
-	// ExecutionStatePort is the execution state server port
-	ExecutionStatePort = "9003"
 	// PublicNetworkPort is the access node network port accessible from outside any docker container
 	PublicNetworkPort = "9876"
 	// DebuggerPort is the go debugger port
@@ -115,10 +120,12 @@ const (
 	// PrimaryON is the container name for the primary observer node to use for API requests
 	PrimaryON = "observer_1"
 
-	DefaultViewsInStakingAuction      uint64 = 5
-	DefaultViewsInDKGPhase            uint64 = 50
-	DefaultViewsInEpoch               uint64 = 200
-	DefaultEpochCommitSafetyThreshold uint64 = 20
+	DefaultViewsInStakingAuction       uint64 = 5
+	DefaultViewsInDKGPhase             uint64 = 50
+	DefaultViewsInEpoch                uint64 = 200
+	DefaultViewsPerSecond              uint64 = 1
+	DefaultFinalizationSafetyThreshold uint64 = 20
+	DefaultEpochExtensionViewCount     uint64 = 50
 
 	// DefaultMinimumNumOfAccessNodeIDS at-least 1 AN ID must be configured for LN & SN
 	DefaultMinimumNumOfAccessNodeIDS = 1
@@ -420,30 +427,34 @@ func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKe
 
 // NetworkConfig is the config for the network.
 type NetworkConfig struct {
-	Nodes                      NodeConfigs
-	ConsensusFollowers         []ConsensusFollowerConfig
-	Observers                  []ObserverConfig
-	Name                       string
-	NClusters                  uint
-	ViewsInDKGPhase            uint64
-	ViewsInStakingAuction      uint64
-	ViewsInEpoch               uint64
-	EpochCommitSafetyThreshold uint64
-	KVStoreFactory             func(epochStateID flow.Identifier) protocol_state.KVStoreAPI
+	Nodes                       NodeConfigs
+	ConsensusFollowers          []ConsensusFollowerConfig
+	Observers                   []ObserverConfig
+	Name                        string
+	NClusters                   uint
+	ViewsInDKGPhase             uint64
+	ViewsInStakingAuction       uint64
+	ViewsInEpoch                uint64
+	ViewsPerSecond              uint64
+	FinalizationSafetyThreshold uint64
+	KVStoreFactory              func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error)
 }
 
 type NetworkConfigOpt func(*NetworkConfig)
 
 func NewNetworkConfig(name string, nodes NodeConfigs, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NetworkConfig{
-		Nodes:                      nodes,
-		Name:                       name,
-		NClusters:                  1, // default to 1 cluster
-		ViewsInStakingAuction:      DefaultViewsInStakingAuction,
-		ViewsInDKGPhase:            DefaultViewsInDKGPhase,
-		ViewsInEpoch:               DefaultViewsInEpoch,
-		EpochCommitSafetyThreshold: DefaultEpochCommitSafetyThreshold,
-		KVStoreFactory:             kvstore.NewDefaultKVStore,
+		Nodes:                       nodes,
+		Name:                        name,
+		NClusters:                   1, // default to 1 cluster
+		ViewsInStakingAuction:       DefaultViewsInStakingAuction,
+		ViewsInDKGPhase:             DefaultViewsInDKGPhase,
+		ViewsInEpoch:                DefaultViewsInEpoch,
+		ViewsPerSecond:              DefaultViewsPerSecond,
+		FinalizationSafetyThreshold: DefaultFinalizationSafetyThreshold,
+		KVStoreFactory: func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+			return kvstore.NewDefaultKVStore(DefaultFinalizationSafetyThreshold, DefaultEpochExtensionViewCount, epochStateID)
+		},
 	}
 
 	for _, apply := range opts {
@@ -458,7 +469,7 @@ func NewNetworkConfigWithEpochConfig(name string, nodes NodeConfigs, viewsInStak
 		WithViewsInStakingAuction(viewsInStakingAuction),
 		WithViewsInDKGPhase(viewsInDKGPhase),
 		WithViewsInEpoch(viewsInEpoch),
-		WithEpochCommitSafetyThreshold(safetyThreshold))
+		WithFinalizationSafetyThreshold(safetyThreshold))
 
 	for _, apply := range opts {
 		apply(&c)
@@ -479,19 +490,25 @@ func WithViewsInEpoch(views uint64) func(*NetworkConfig) {
 	}
 }
 
+func WithViewsPerSecond(views uint64) func(*NetworkConfig) {
+	return func(config *NetworkConfig) {
+		config.ViewsPerSecond = views
+	}
+}
+
 func WithViewsInDKGPhase(views uint64) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
 		config.ViewsInDKGPhase = views
 	}
 }
 
-func WithEpochCommitSafetyThreshold(threshold uint64) func(*NetworkConfig) {
+func WithFinalizationSafetyThreshold(threshold uint64) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
-		config.EpochCommitSafetyThreshold = threshold
+		config.FinalizationSafetyThreshold = threshold
 	}
 }
 
-func WithKVStoreFactory(factory func(flow.Identifier) protocol_state.KVStoreAPI) func(*NetworkConfig) {
+func WithKVStoreFactory(factory func(flow.Identifier) (protocol_state.KVStoreAPI, error)) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
 		config.KVStoreFactory = factory
 	}
@@ -568,7 +585,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 	t.Logf("BootstrapDir: %s \n", bootstrapDir)
 
 	bootstrapData, err := BootstrapNetwork(networkConf, bootstrapDir, chainID)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	root := bootstrapData.Root
 	result := bootstrapData.Result
@@ -633,6 +650,11 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 			nodeContainer.AddFlag("insecure-access-api", "false")
 			nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 		}
+		// Increase the maximum view duration to accommodate the default Localnet block rate of 1bps
+		if nodeConf.Role == flow.RoleConsensus {
+			nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
+			nodeContainer.AddFlag("cruise-ctl-max-view-duration", "2s")
+		}
 	}
 
 	for i, observerConf := range networkConf.Observers {
@@ -640,7 +662,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 			observerConf.ContainerName = fmt.Sprintf("observer_%d", i+1)
 		}
 		t.Logf("add observer %v", observerConf.ContainerName)
-		flowNetwork.addObserver(t, observerConf)
+		flowNetwork.AddObserver(t, observerConf)
 	}
 
 	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
@@ -661,6 +683,10 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 
 	// create a directory for the follower database
 	dataDir := makeDir(t, tmpdir, DefaultFlowDBDir)
+	pebbleDir := makeDir(t, tmpdir, DefaultFlowPebbleDBDir)
+
+	pebbleDB, _, err := database.InitPebbleDB(net.log, pebbleDir)
+	require.NoError(t, err)
 
 	// create a follower-specific directory for the bootstrap files
 	followerBootstrapDir := makeDir(t, tmpdir, DefaultBootstrapDir)
@@ -668,14 +694,26 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 
 	// copy root protocol snapshot to the follower-specific folder
 	// bootstrap/public-root-information directory
-	err := io.Copy(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
+	err = io.Copy(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
 	require.NoError(t, err)
 
 	// consensus follower
+	dbOpts := badgerv2.
+		DefaultOptions(dataDir).
+		WithKeepL0InMemory(true).
+		WithValueLogFileSize(128 << 23).
+		WithValueLogMaxEntries(100000) // Default is 1000000
+	badgerDB, err := badgerstorage.InitPublic(dbOpts)
+	require.NoError(t, err)
+
 	bindAddr := gonet.JoinHostPort("localhost", testingdock.RandomPort(t))
 	opts := append(
 		followerConf.Opts,
-		consensus_follower.WithDataDir(dataDir),
+		consensus_follower.WithDB(badgerDB),
+		// this is required, otherwise consensus follower will create a pebble db at the default
+		// path /data/protocol-pebble, which is outside of the tmpdir, and will run into permission
+		// denied error.
+		consensus_follower.WithPebbleDB(pebbleDB),
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
 	)
 
@@ -717,7 +755,7 @@ type ObserverConfig struct {
 	BootstrapAccessName string
 }
 
-func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
+func (net *FlowNetwork) AddObserver(t *testing.T, conf ObserverConfig) *Container {
 	if conf.BootstrapAccessName == "" {
 		conf.BootstrapAccessName = PrimaryAN
 	}
@@ -753,8 +791,8 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 				fmt.Sprintf("--secretsdir=%s", DefaultFlowSecretsDBDir),
 				fmt.Sprintf("--profiler-dir=%s", DefaultProfilerDir),
 				fmt.Sprintf("--loglevel=%s", conf.LogLevel.String()),
-				fmt.Sprintf("--bootstrap-node-addresses=%s", accessNode.ContainerAddr(PublicNetworkPort)),
-				fmt.Sprintf("--bootstrap-node-public-keys=%s", accessPublicKey),
+				fmt.Sprintf("--observer-mode-bootstrap-node-addresses=%s", accessNode.ContainerAddr(PublicNetworkPort)),
+				fmt.Sprintf("--observer-mode-bootstrap-node-public-keys=%s", accessPublicKey),
 				fmt.Sprintf("--upstream-node-addresses=%s", accessNode.ContainerAddr(GRPCSecurePort)),
 				fmt.Sprintf("--upstream-node-public-keys=%s", accessPublicKey),
 				fmt.Sprintf("--observer-networking-key-path=%s/private-root-information/%s_key", DefaultBootstrapDir, conf.ContainerName),
@@ -769,6 +807,13 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 	}
 
 	nodeContainer := &Container{
+		Config: ContainerConfig{
+			NodeInfo: bootstrap.NodeInfo{
+				Role: flow.RoleAccess,
+			},
+			ContainerName: conf.ContainerName,
+			LogLevel:      conf.LogLevel,
+		},
 		Ports:   make(map[string]string),
 		datadir: tmpdir,
 		net:     net,
@@ -777,6 +822,7 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 
 	nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
 	nodeContainer.AddFlag("rpc-addr", nodeContainer.ContainerAddr(GRPCPort))
+	nodeContainer.AddFlag("state-stream-addr", nodeContainer.ContainerAddr(GRPCPort))
 
 	nodeContainer.exposePort(GRPCSecurePort, testingdock.RandomPort(t))
 	nodeContainer.AddFlag("secure-rpc-addr", nodeContainer.ContainerAddr(GRPCSecurePort))
@@ -790,9 +836,6 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 	nodeContainer.exposePort(RESTPort, testingdock.RandomPort(t))
 	nodeContainer.AddFlag("rest-addr", nodeContainer.ContainerAddr(RESTPort))
 
-	nodeContainer.exposePort(ExecutionStatePort, testingdock.RandomPort(t))
-	nodeContainer.AddFlag("state-stream-addr", nodeContainer.ContainerAddr(ExecutionStatePort))
-
 	nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(nodeContainer.HealthcheckCallback())
 
 	suiteContainer := net.suite.Container(containerOpts)
@@ -801,6 +844,7 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 
 	// start after the bootstrap access node
 	accessNode.After(suiteContainer)
+	return nodeContainer
 }
 
 // AddNode creates a node container with the given config and adds it to the
@@ -889,6 +933,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		case flow.RoleAccess:
 			nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
 			nodeContainer.AddFlag("rpc-addr", nodeContainer.ContainerAddr(GRPCPort))
+			nodeContainer.AddFlag("state-stream-addr", nodeContainer.ContainerAddr(GRPCPort))
 
 			nodeContainer.exposePort(GRPCSecurePort, testingdock.RandomPort(t))
 			nodeContainer.AddFlag("secure-rpc-addr", nodeContainer.ContainerAddr(GRPCSecurePort))
@@ -898,9 +943,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.exposePort(RESTPort, testingdock.RandomPort(t))
 			nodeContainer.AddFlag("rest-addr", nodeContainer.ContainerAddr(RESTPort))
-
-			nodeContainer.exposePort(ExecutionStatePort, testingdock.RandomPort(t))
-			nodeContainer.AddFlag("state-stream-addr", nodeContainer.ContainerAddr(ExecutionStatePort))
 
 			// uncomment line below to point the access node exclusively to a single collection node
 			// nodeContainer.AddFlag("static-collection-ingress-addr", "collection_1:9000")
@@ -920,8 +962,13 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				// tests only start 1 verification node
 				nodeContainer.AddFlag("chunk-alpha", "1")
 			}
-			t.Logf("%v hotstuff startup time will be in 8 seconds: %v", time.Now().UTC(), hotstuffStartupTime)
-			nodeContainer.AddFlag("hotstuff-startup-time", hotstuffStartupTime)
+			// We generally don't need cruise control for integration tests, so disable it by default
+			if !nodeContainer.IsFlagSet("cruise-ctl-enabled") {
+				nodeContainer.AddFlag("cruise-ctl-enabled", "false")
+			}
+			if !nodeContainer.IsFlagSet("cruise-ctl-fallback-proposal-duration") {
+				nodeContainer.AddFlag("cruise-ctl-fallback-proposal-duration", "250ms")
+			}
 
 		case flow.RoleVerification:
 			if !nodeContainer.IsFlagSet("chunk-alpha") {
@@ -1059,11 +1106,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 
 	allNodeInfos := append(toNodeInfos(stakedConfs), followerInfos...)
 
-	// IMPORTANT: we must use this ordering when writing the DKG keys as
-	//            this ordering defines the DKG participant's indices
+	// IMPORTANT: we must use this ordering when writing the Random Beacon keys as
+	//            this ordering defines the DKG participants' indices
 	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), flow.Canonical[flow.Identity])
 
-	dkg, err := runBeaconKG(stakedConfs)
+	dkg, dkgIndexMap, err := runBeaconKG(stakedConfs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
@@ -1100,6 +1147,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	err = utils.WriteMachineAccountFiles(chainID, stakedNodeInfos, writeJSONFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write machine account files: %w", err)
+	}
+
+	err = utils.WriteNodeInternalPubInfos(allNodeInfos, writeJSONFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to node pub info file: %w", err)
 	}
 
 	// define root block parameters
@@ -1142,6 +1194,9 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 
 	dkgOffsetView := rootHeader.View + networkConf.ViewsInStakingAuction - 1
 
+	// target number of seconds in epoch
+	targetDuration := networkConf.ViewsInEpoch / networkConf.ViewsPerSecond
+
 	// generate epoch service events
 	epochSetup := &flow.EpochSetup{
 		Counter:            epochCounter,
@@ -1153,8 +1208,8 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		Participants:       participants.ToSkeleton(),
 		Assignments:        clusterAssignments,
 		RandomSource:       randomSource,
-		TargetDuration:     networkConf.ViewsInEpoch, // 1view/s
-		TargetEndTime:      uint64(time.Now().Unix()) + networkConf.ViewsInEpoch,
+		TargetDuration:     targetDuration,
+		TargetEndTime:      uint64(time.Now().Unix()) + targetDuration,
 	}
 
 	epochCommit := &flow.EpochCommit{
@@ -1162,14 +1217,19 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
 		DKGGroupKey:        dkg.PubGroupKey,
 		DKGParticipantKeys: dkg.PubKeyShares,
+		DKGIndexMap:        dkgIndexMap,
 	}
 	root := &flow.Block{
 		Header: rootHeader,
 	}
+	rootProtocolState, err := networkConf.KVStoreFactory(
+		inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit).ID(),
+	)
+	if err != nil {
+		return nil, err
+	}
 	root.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(
-		networkConf.KVStoreFactory(
-			inmem.ProtocolStateFromEpochServiceEvents(epochSetup, epochCommit).ID(),
-		).ID(),
+		rootProtocolState.ID(),
 	)))
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
@@ -1234,7 +1294,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, fmt.Errorf("has invalid votes: %v", invalidVotesErr)
 	}
 
-	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(root, result, seal, qc, flow.DefaultProtocolVersion, networkConf.EpochCommitSafetyThreshold, networkConf.KVStoreFactory)
+	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(
+		root,
+		result,
+		seal,
+		qc,
+		networkConf.KVStoreFactory,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
 	}
@@ -1317,23 +1383,28 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 // and returns all DKG data. This includes the group private key, node indices,
 // and per-node public and private key-shares.
 // Only consensus nodes participate in the DKG.
-func runBeaconKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
+func runBeaconKG(confs []ContainerConfig) (dkgmod.ThresholdKeySet, flow.DKGIndexMap, error) {
 
 	// filter by consensus nodes
-	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
+	consensusNodes := bootstrap.Sort(bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus), flow.Canonical[flow.Identity])
 	nConsensusNodes := len(consensusNodes)
 
 	dkgSeed, err := getSeed()
 	if err != nil {
-		return dkgmod.DKGData{}, err
+		return dkgmod.ThresholdKeySet{}, nil, err
 	}
 
-	dkg, err := dkg.RandomBeaconKG(nConsensusNodes, dkgSeed)
+	randomBeaconData, err := dkg.RandomBeaconKG(nConsensusNodes, dkgSeed)
 	if err != nil {
-		return dkgmod.DKGData{}, err
+		return dkgmod.ThresholdKeySet{}, nil, err
 	}
 
-	return dkg, nil
+	indexMap := make(flow.DKGIndexMap, nConsensusNodes)
+	for i, node := range consensusNodes {
+		indexMap[node.NodeID] = i
+	}
+
+	return randomBeaconData, indexMap, nil
 }
 
 // setupClusterGenesisBlockQCs generates bootstrapping resources necessary for each collector cluster:

@@ -14,7 +14,7 @@ type ExecutionReceipts interface {
 	Store(receipt *flow.ExecutionReceipt) error
 
 	// BatchStore stores an execution receipt inside given batch
-	BatchStore(receipt *flow.ExecutionReceipt, batch BatchStorage) error
+	BatchStore(receipt *flow.ExecutionReceipt, batch ReaderBatchWriter) error
 
 	// ByID retrieves an execution receipt by its ID.
 	ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error)
@@ -28,17 +28,11 @@ type ExecutionReceipts interface {
 // them. Instead, it includes the "My" in the method name in order to highlight the notion
 // of "MY execution receipt", from the viewpoint of an individual Execution Node.
 type MyExecutionReceipts interface {
-	// StoreMyReceipt stores the receipt and marks it as mine (trusted). My
-	// receipts are indexed by the block whose result they compute. Currently,
-	// we only support indexing a _single_ receipt per block. Attempting to
-	// store conflicting receipts for the same block will error.
-	StoreMyReceipt(receipt *flow.ExecutionReceipt) error
-
 	// BatchStoreMyReceipt stores blockID-to-my-receipt index entry keyed by blockID in a provided batch.
 	// No errors are expected during normal operation
 	// If entity fails marshalling, the error is wrapped in a generic error and returned.
 	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-	BatchStoreMyReceipt(receipt *flow.ExecutionReceipt, batch BatchStorage) error
+	BatchStoreMyReceipt(receipt *flow.ExecutionReceipt, batch ReaderBatchWriter) error
 
 	// MyReceipt retrieves my receipt for the given block.
 	MyReceipt(blockID flow.Identifier) (*flow.ExecutionReceipt, error)
@@ -46,5 +40,5 @@ type MyExecutionReceipts interface {
 	// BatchRemoveIndexByBlockID removes blockID-to-my-execution-receipt index entry keyed by a blockID in a provided batch
 	// No errors are expected during normal operation, even if no entries are matched.
 	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-	BatchRemoveIndexByBlockID(blockID flow.Identifier, batch BatchStorage) error
+	BatchRemoveIndexByBlockID(blockID flow.Identifier, batch ReaderBatchWriter) error
 }

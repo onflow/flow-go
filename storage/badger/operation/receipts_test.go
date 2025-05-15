@@ -17,11 +17,11 @@ func TestReceipts_InsertRetrieve(t *testing.T) {
 		expected := receipt.Meta()
 
 		err := db.Update(InsertExecutionReceiptMeta(receipt.ID(), expected))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var actual flow.ExecutionReceiptMeta
 		err = db.View(RetrieveExecutionReceiptMeta(receipt.ID(), &actual))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, expected, &actual)
 	})
@@ -34,11 +34,11 @@ func TestReceipts_Index(t *testing.T) {
 		blockID := receipt.ExecutionResult.BlockID
 
 		err := db.Update(IndexOwnExecutionReceipt(blockID, expected))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var actual flow.Identifier
 		err = db.View(LookupOwnExecutionReceipt(blockID, &actual))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, expected, actual)
 	})
@@ -51,11 +51,11 @@ func TestReceipts_MultiIndex(t *testing.T) {
 
 		for _, id := range expected {
 			err := db.Update(IndexExecutionReceipts(blockID, id))
-			require.Nil(t, err)
+			require.NoError(t, err)
 		}
 		var actual []flow.Identifier
 		err := db.View(LookupExecutionReceipts(blockID, &actual))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.ElementsMatch(t, expected, actual)
 	})

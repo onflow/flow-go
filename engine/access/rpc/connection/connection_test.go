@@ -34,13 +34,17 @@ func TestProxyAccessAPI(t *testing.T) {
 	metrics := metrics.NewNoopCollector()
 
 	// create a collection node
-	cn := new(collectionNode)
+	cn := newCollectionNode(t)
 	cn.start(t)
 	defer cn.stop(t)
 
 	req := &access.PingRequest{}
 	expected := &access.PingResponse{}
-	cn.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+	cn.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*access.PingRequest")).
+		Return(expected, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -71,7 +75,7 @@ func TestProxyAccessAPI(t *testing.T) {
 	// make the call to the collection node
 	resp, err := client.Ping(ctx, req)
 	assert.NoError(t, err)
-	assert.Equal(t, resp, expected)
+	assert.IsType(t, expected, resp)
 }
 
 func TestProxyExecutionAPI(t *testing.T) {
@@ -79,13 +83,17 @@ func TestProxyExecutionAPI(t *testing.T) {
 	metrics := metrics.NewNoopCollector()
 
 	// create an execution node
-	en := new(executionNode)
+	en := newExecutionNode(t)
 	en.start(t)
 	defer en.stop(t)
 
 	req := &execution.PingRequest{}
 	expected := &execution.PingResponse{}
-	en.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+	en.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*execution.PingRequest")).
+		Return(expected, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -116,7 +124,7 @@ func TestProxyExecutionAPI(t *testing.T) {
 	// make the call to the execution node
 	resp, err := client.Ping(ctx, req)
 	assert.NoError(t, err)
-	assert.Equal(t, resp, expected)
+	assert.IsType(t, expected, resp)
 }
 
 func TestProxyAccessAPIConnectionReuse(t *testing.T) {
@@ -124,13 +132,17 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	metrics := metrics.NewNoopCollector()
 
 	// create a collection node
-	cn := new(collectionNode)
+	cn := newCollectionNode(t)
 	cn.start(t)
 	defer cn.stop(t)
 
 	req := &access.PingRequest{}
 	expected := &access.PingResponse{}
-	cn.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+	cn.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*access.PingRequest")).
+		Return(expected, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -174,7 +186,7 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	ctx := context.Background()
 	resp, err := accessAPIClient.Ping(ctx, req)
 	assert.NoError(t, err)
-	assert.Equal(t, resp, expected)
+	assert.IsType(t, expected, resp)
 }
 
 func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
@@ -182,13 +194,17 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	metrics := metrics.NewNoopCollector()
 
 	// create an execution node
-	en := new(executionNode)
+	en := newExecutionNode(t)
 	en.start(t)
 	defer en.stop(t)
 
 	req := &execution.PingRequest{}
 	expected := &execution.PingResponse{}
-	en.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+	en.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*execution.PingRequest")).
+		Return(expected, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -232,7 +248,7 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	ctx := context.Background()
 	resp, err := executionAPIClient.Ping(ctx, req)
 	assert.NoError(t, err)
-	assert.Equal(t, resp, expected)
+	assert.IsType(t, expected, resp)
 }
 
 // TestExecutionNodeClientTimeout tests that the execution API client times out after the timeout duration
@@ -243,14 +259,19 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 	timeout := 10 * time.Millisecond
 
 	// create an execution node
-	en := new(executionNode)
+	en := newExecutionNode(t)
 	en.start(t)
 	defer en.stop(t)
 
 	// setup the handler mock to not respond within the timeout
 	req := &execution.PingRequest{}
 	resp := &execution.PingResponse{}
-	en.handler.On("Ping", testifymock.Anything, req).After(timeout+time.Second).Return(resp, nil)
+	en.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*execution.PingRequest")).
+		After(timeout+time.Second).
+		Return(resp, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -295,14 +316,19 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	timeout := 10 * time.Millisecond
 
 	// create a collection node
-	cn := new(collectionNode)
+	cn := newCollectionNode(t)
 	cn.start(t)
 	defer cn.stop(t)
 
 	// setup the handler mock to not respond within the timeout
 	req := &access.PingRequest{}
 	resp := &access.PingResponse{}
-	cn.handler.On("Ping", testifymock.Anything, req).After(timeout+time.Second).Return(resp, nil)
+	cn.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*access.PingRequest")).
+		After(timeout+time.Second).
+		Return(resp, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -345,19 +371,13 @@ func TestConnectionPoolFull(t *testing.T) {
 	metrics := metrics.NewNoopCollector()
 
 	// create a collection node
-	cn1, cn2, cn3 := new(collectionNode), new(collectionNode), new(collectionNode)
+	cn1, cn2, cn3 := newCollectionNode(t), newCollectionNode(t), newCollectionNode(t)
 	cn1.start(t)
 	cn2.start(t)
 	cn3.start(t)
 	defer cn1.stop(t)
 	defer cn2.stop(t)
 	defer cn3.stop(t)
-
-	req := &access.PingRequest{}
-	expected := &access.PingResponse{}
-	cn1.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
-	cn2.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
-	cn3.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -430,13 +450,17 @@ func TestConnectionPoolStale(t *testing.T) {
 	metrics := metrics.NewNoopCollector()
 
 	// create a collection node
-	cn := new(collectionNode)
+	cn := newCollectionNode(t)
 	cn.start(t)
 	defer cn.stop(t)
 
 	req := &access.PingRequest{}
 	expected := &access.PingResponse{}
-	cn.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+	cn.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*access.PingRequest")).
+		Return(expected, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -493,7 +517,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	ctx = context.Background()
 	resp, err := accessAPIClient.Ping(ctx, req)
 	assert.NoError(t, err)
-	assert.Equal(t, resp, expected)
+	assert.IsType(t, expected, resp)
 }
 
 // TestExecutionNodeClientClosedGracefully tests the scenario where the execution node client is closed gracefully.
@@ -509,7 +533,7 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 
 	// Add createExecNode function to recreate it each time for rapid test
 	createExecNode := func() (*executionNode, func()) {
-		en := new(executionNode)
+		en := newExecutionNode(t)
 		en.start(t)
 		return en, func() {
 			en.stop(t)
@@ -525,9 +549,14 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 		req := &execution.PingRequest{}
 		resp := &execution.PingResponse{}
 		respSent := atomic.NewUint64(0)
-		en.handler.On("Ping", testifymock.Anything, req).Run(func(_ testifymock.Arguments) {
-			respSent.Inc()
-		}).Return(resp, nil)
+		en.handler.
+			On("Ping",
+				testifymock.Anything,
+				testifymock.AnythingOfType("*execution.PingRequest")).
+			Run(func(_ testifymock.Arguments) {
+				respSent.Inc()
+			}).
+			Return(resp, nil)
 
 		// create the factory
 		connectionFactory := new(ConnectionFactoryImpl)
@@ -604,7 +633,7 @@ func TestEvictingCacheClients(t *testing.T) {
 	metrics := metrics.NewNoopCollector()
 
 	// Create a new collection node for testing
-	cn := new(collectionNode)
+	cn := newCollectionNode(t)
 	cn.start(t)
 	defer cn.stop(t)
 
@@ -615,18 +644,18 @@ func TestEvictingCacheClients(t *testing.T) {
 	// Set up mock handlers for Ping and GetNetworkParameters
 	pingReq := &access.PingRequest{}
 	pingResp := &access.PingResponse{}
-	cn.handler.On("Ping", testifymock.Anything, pingReq).Return(
-		func(context.Context, *access.PingRequest) *access.PingResponse {
-			close(startPing)
-			<-returnFromPing // keeps request open until returnFromPing is closed
-			return pingResp
-		},
-		func(context.Context, *access.PingRequest) error { return nil },
-	)
-
-	netReq := &access.GetNetworkParametersRequest{}
-	netResp := &access.GetNetworkParametersResponse{}
-	cn.handler.On("GetNetworkParameters", testifymock.Anything, netReq).Return(netResp, nil)
+	cn.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*access.PingRequest")).
+		Return(
+			func(context.Context, *access.PingRequest) *access.PingResponse {
+				close(startPing)
+				<-returnFromPing // keeps request open until returnFromPing is closed
+				return pingResp
+			},
+			func(context.Context, *access.PingRequest) error { return nil },
+		)
 
 	// Create the connection factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -690,7 +719,7 @@ func TestEvictingCacheClients(t *testing.T) {
 		}, 100*time.Millisecond, 10*time.Millisecond, "client timed out closing connection")
 
 		// Call a gRPC method on the client, requests should be blocked since the connection is invalidated
-		resp, err := client.GetNetworkParameters(ctx, netReq)
+		resp, err := client.GetNetworkParameters(ctx, &access.GetNetworkParametersRequest{})
 		assert.Equal(t, status.Errorf(codes.Unavailable, "the connection to %s was closed", clientAddress), err)
 		assert.Nil(t, resp)
 
@@ -699,9 +728,7 @@ func TestEvictingCacheClients(t *testing.T) {
 
 	// Call a gRPC method on the client
 	_, err = client.Ping(ctx, pingReq)
-	// Check that Ping was called
-	cn.handler.AssertCalled(t, "Ping", testifymock.Anything, pingReq)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Wait for the client connection to change state from "Ready" to "Shutdown" as connection was closed.
 	require.Eventually(t, func() bool {
@@ -720,7 +747,7 @@ func TestConcurrentConnections(t *testing.T) {
 
 	// Add createExecNode function to recreate it each time for rapid test
 	createExecNode := func() (*executionNode, func()) {
-		en := new(executionNode)
+		en := newExecutionNode(t)
 		en.start(t)
 		return en, func() {
 			en.stop(t)
@@ -748,7 +775,9 @@ func TestConcurrentConnections(t *testing.T) {
 		requestCount := rapid.IntRange(50, 1000).Draw(tt, "r")
 		responsesSent := atomic.NewInt32(0)
 		en.handler.
-			On("Ping", testifymock.Anything, req).
+			On("Ping",
+				testifymock.Anything,
+				testifymock.AnythingOfType("*execution.PingRequest")).
 			Return(func(_ context.Context, _ *execution.PingRequest) (*execution.PingResponse, error) {
 				time.Sleep(getSleep() * time.Microsecond)
 
@@ -834,7 +863,7 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 	circuitBreakerRestoreTimeout := 1500 * time.Millisecond
 
 	// Create an execution node for testing.
-	en := new(executionNode)
+	en := newExecutionNode(t)
 	en.start(t)
 	defer en.stop(t)
 
@@ -882,8 +911,6 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 
 		// Make the call to the execution node.
 		_, err = client.Ping(ctx, req)
-		en.handler.AssertCalled(t, "Ping", testifymock.Anything, req)
-
 		return time.Since(start), err
 	}
 
@@ -891,7 +918,13 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 		ctx := context.Background()
 
 		// Set up the handler mock to not respond within the requestTimeout.
-		en.handler.On("Ping", testifymock.Anything, req).After(2*requestTimeout).Return(resp, nil)
+		en.handler.
+			On("Ping",
+				testifymock.Anything,
+				testifymock.AnythingOfType("*execution.PingRequest")).
+			After(2*requestTimeout).
+			Return(resp, nil).
+			Once()
 
 		// Call and measure the duration for the first invocation.
 		duration, err := callAndMeasurePingDuration(ctx)
@@ -900,12 +933,15 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 
 		// Call and measure the duration for the second invocation (circuit breaker state is now "Open").
 		duration, err = callAndMeasurePingDuration(ctx)
-		assert.Equal(t, gobreaker.ErrOpenState, err)
+		assert.ErrorIs(t, err, gobreaker.ErrOpenState)
 		assert.Greater(t, requestTimeout, duration)
 
-		// Reset the mock Ping for the next invocation to return response without delay
-		en.handler.On("Ping", testifymock.Anything, req).Unset()
-		en.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
+		en.handler.
+			On("Ping",
+				testifymock.Anything,
+				testifymock.AnythingOfType("*execution.PingRequest")).
+			Return(resp, nil).
+			Once()
 
 		// Wait until the circuit breaker transitions to the "HalfOpen" state.
 		time.Sleep(circuitBreakerRestoreTimeout + (500 * time.Millisecond))
@@ -913,15 +949,19 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 		// Call and measure the duration for the third invocation (circuit breaker state is now "HalfOpen").
 		duration, err = callAndMeasurePingDuration(ctx)
 		assert.Greater(t, requestTimeout, duration)
-		assert.Equal(t, nil, err)
+		assert.NoError(t, err)
 	})
 
 	for _, code := range successCodes {
 		t.Run(fmt.Sprintf("test error %s treated as a success for circuit breaker ", code.String()), func(t *testing.T) {
 			ctx := context.Background()
 
-			en.handler.On("Ping", testifymock.Anything, req).Unset()
-			en.handler.On("Ping", testifymock.Anything, req).Return(nil, status.Error(code, code.String()))
+			en.handler.
+				On("Ping",
+					testifymock.Anything,
+					testifymock.AnythingOfType("*execution.PingRequest")).
+				Return(nil, status.Error(code, code.String())).
+				Once()
 
 			duration, err := callAndMeasurePingDuration(ctx)
 			require.Error(t, err)
@@ -940,7 +980,7 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	circuitBreakerRestoreTimeout := 1500 * time.Millisecond
 
 	// Create a collection node for testing.
-	cn := new(collectionNode)
+	cn := newCollectionNode(t)
 	cn.start(t)
 	defer cn.stop(t)
 
@@ -988,8 +1028,6 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 
 		// Make the call to the collection node.
 		_, err = client.Ping(ctx, req)
-		cn.handler.AssertCalled(t, "Ping", testifymock.Anything, req)
-
 		return time.Since(start), err
 	}
 
@@ -997,7 +1035,13 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 		ctx := context.Background()
 
 		// Set up the handler mock to not respond within the requestTimeout.
-		cn.handler.On("Ping", testifymock.Anything, req).After(2*requestTimeout).Return(resp, nil)
+		cn.handler.
+			On("Ping",
+				testifymock.Anything,
+				testifymock.AnythingOfType("*access.PingRequest")).
+			After(2*requestTimeout).
+			Return(resp, nil).
+			Once()
 
 		// Call and measure the duration for the first invocation.
 		duration, err := callAndMeasurePingDuration(ctx)
@@ -1009,9 +1053,12 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 		assert.Equal(t, gobreaker.ErrOpenState, err)
 		assert.Greater(t, requestTimeout, duration)
 
-		// Reset the mock Ping for the next invocation to return response without delay
-		cn.handler.On("Ping", testifymock.Anything, req).Unset()
-		cn.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
+		cn.handler.
+			On("Ping",
+				testifymock.Anything,
+				testifymock.AnythingOfType("*access.PingRequest")).
+			Return(resp, nil).
+			Once()
 
 		// Wait until the circuit breaker transitions to the "HalfOpen" state.
 		time.Sleep(circuitBreakerRestoreTimeout + (500 * time.Millisecond))
@@ -1026,8 +1073,12 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 		t.Run(fmt.Sprintf("test error %s treated as a success for circuit breaker ", code.String()), func(t *testing.T) {
 			ctx := context.Background()
 
-			cn.handler.On("Ping", testifymock.Anything, req).Unset()
-			cn.handler.On("Ping", testifymock.Anything, req).Return(nil, status.Error(code, code.String()))
+			cn.handler.
+				On("Ping",
+					testifymock.Anything,
+					testifymock.AnythingOfType("*access.PingRequest")).
+				Return(nil, status.Error(code, code.String())).
+				Once()
 
 			duration, err := callAndMeasurePingDuration(ctx)
 			require.Error(t, err)

@@ -1,17 +1,15 @@
 package common
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence"
+	cdcCommon "github.com/onflow/cadence/common"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/run"
-	"github.com/onflow/flow-go/model/bootstrap"
-	model "github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/assignment"
 	"github.com/onflow/flow-go/model/flow/factory"
@@ -41,9 +39,9 @@ import (
 // - error: if any error occurs. Any error returned from this function is irrecoverable.
 func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes flow.IdentityList, numCollectionClusters int) (flow.AssignmentList, flow.ClusterList, error) {
 
-	partners := partnerNodes.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
-	internals := internalNodes.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
-	nCollectors := len(partners) + len(internals)
+	partnerCollectors := partnerNodes.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
+	internalCollectors := internalNodes.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
+	nCollectors := len(partnerCollectors) + len(internalCollectors)
 
 	// ensure we have at least as many collection nodes as clusters
 	if nCollectors < int(numCollectionClusters) {
@@ -52,32 +50,24 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 	}
 
 	// shuffle both collector lists based on a non-deterministic algorithm
-	partners, err := partners.Shuffle()
+	partnerCollectors, err := partnerCollectors.Shuffle()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not shuffle partners")
 	}
-	internals, err = internals.Shuffle()
+	internalCollectors, err = internalCollectors.Shuffle()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not shuffle internals")
 	}
 
-	// The following is a heuristic for distributing the internal collector nodes (private staking key available
-	// to generate QC for cluster root block) and partner nodes (private staking unknown). We need internal nodes
-	// to control strictly more than 2/3 of the cluster's total weight.
-	// The following is a heuristic that distributes collectors round-robbin across the specified number of clusters.
-	// This heuristic only works when all collectors have equal weight! The following sanity check enforces this:
-	if len(partnerNodes) > 0 && len(partnerNodes) > 2*len(internalNodes) {
-		return nil, nil, fmt.Errorf("requiring at least x>0 number of partner nodes and y > 2x number of internal nodes, but got x,y=%d,%d", len(partnerNodes), len(internalNodes))
-	}
-	// sanity check ^ enforces that there is at least one internal node, hence `internalNodes[0].InitialWeight` is always a valid reference weight
-	refWeight := internalNodes[0].InitialWeight
+	// capture first reference weight to validate that all collectors have equal weight
+	refWeight := internalCollectors[0].InitialWeight
 
 	identifierLists := make([]flow.IdentifierList, numCollectionClusters)
 	// array to track the 2/3 internal-nodes constraint (internal_nodes > 2 * partner_nodes)
 	constraint := make([]int, numCollectionClusters)
 
 	// first, round-robin internal nodes into each cluster
-	for i, node := range internals {
+	for i, node := range internalCollectors {
 		if node.InitialWeight != refWeight {
 			return nil, nil, fmt.Errorf("current implementation requires all collectors (partner & interal nodes) to have equal weight")
 		}
@@ -87,7 +77,7 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 	}
 
 	// next, round-robin partner nodes into each cluster
-	for i, node := range partners {
+	for i, node := range partnerCollectors {
 		if node.InitialWeight != refWeight {
 			return nil, nil, fmt.Errorf("current implementation requires all collectors (partner & interal nodes) to have equal weight")
 		}
@@ -105,43 +95,13 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 
 	assignments := assignment.FromIdentifierLists(identifierLists)
 
-	collectors := append(partners, internals...)
+	collectors := append(partnerCollectors, internalCollectors...)
 	clusters, err := factory.NewClusterList(assignments, collectors.ToSkeleton())
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not create cluster list")
 	}
 
 	return assignments, clusters, nil
-}
-
-// ConstructRootQCsForClusters constructs a root QC for each cluster in the list.
-// Args:
-// - log: the logger instance.
-// - clusterList: list of clusters
-// - nodeInfos: list of NodeInfos (must contain all internal nodes)
-// - clusterBlocks: list of root blocks for each cluster
-// Returns:
-// - flow.AssignmentList: the generated assignment list.
-// - flow.ClusterList: the generate collection cluster list.
-func ConstructRootQCsForClusters(log zerolog.Logger, clusterList flow.ClusterList, nodeInfos []bootstrap.NodeInfo, clusterBlocks []*cluster.Block) []*flow.QuorumCertificate {
-
-	if len(clusterBlocks) != len(clusterList) {
-		log.Fatal().Int("len(clusterBlocks)", len(clusterBlocks)).Int("len(clusterList)", len(clusterList)).
-			Msg("number of clusters needs to equal number of cluster blocks")
-	}
-
-	qcs := make([]*flow.QuorumCertificate, len(clusterBlocks))
-	for i, cluster := range clusterList {
-		signers := filterClusterSigners(cluster, nodeInfos)
-
-		qc, err := run.GenerateClusterRootQC(signers, cluster, clusterBlocks[i])
-		if err != nil {
-			log.Fatal().Err(err).Int("cluster index", i).Msg("generating collector cluster root QC failed")
-		}
-		qcs[i] = qc
-	}
-
-	return qcs
 }
 
 // ConvertClusterAssignmentsCdc converts golang cluster assignments type to Cadence type `[[String]]`.
@@ -163,8 +123,18 @@ func ConvertClusterAssignmentsCdc(assignments flow.AssignmentList) cadence.Array
 }
 
 // ConvertClusterQcsCdc converts cluster QCs from `QuorumCertificate` type to `ClusterQCVoteData` type.
-func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.ClusterList) ([]*flow.ClusterQCVoteData, error) {
-	voteData := make([]*flow.ClusterQCVoteData, len(qcs))
+// Args:
+//   - qcs: list of quorum certificates.
+//   - clusterList: the list of cluster lists each used to generate one of the quorum certificates in qcs.
+//   - flowClusterQCAddress: the FlowClusterQC contract address where the ClusterQCVoteData type is defined.
+//
+// Returns:
+//   - []cadence.Value: cadence representation of the list of cluster qcs.
+//   - error: error if the cluster qcs and cluster lists don't match in size or
+//     signature indices decoding fails.
+func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.ClusterList, flowClusterQCAddress string) ([]cadence.Value, error) {
+	voteDataType := newClusterQCVoteDataCdcType(flowClusterQCAddress)
+	qcVoteData := make([]cadence.Value, len(qcs))
 	for i, qc := range qcs {
 		c, ok := clusterList.ByIndex(uint(i))
 		if !ok {
@@ -174,29 +144,43 @@ func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.Cluste
 		if err != nil {
 			return nil, fmt.Errorf("could not decode signer indices: %w", err)
 		}
-		voteData[i] = &flow.ClusterQCVoteData{
-			SigData:  qc.SigData,
-			VoterIDs: voterIds,
+		cdcVoterIds := make([]cadence.Value, len(voterIds))
+		for i, id := range voterIds {
+			cdcVoterIds[i] = cadence.String(id.String())
 		}
+
+		qcVoteData[i] = cadence.NewStruct([]cadence.Value{
+			// aggregatedSignature
+			cadence.String(hex.EncodeToString(qc.SigData)),
+			// Node IDs of signers
+			cadence.NewArray(cdcVoterIds).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
+		}).WithType(voteDataType)
+
 	}
 
-	return voteData, nil
+	return qcVoteData, nil
 }
 
-// Filters a list of nodes to include only nodes that will sign the QC for the
-// given cluster. The resulting list of nodes is only nodes that are in the
-// given cluster AND are not partner nodes (ie. we have the private keys).
-func filterClusterSigners(cluster flow.IdentitySkeletonList, nodeInfos []model.NodeInfo) []model.NodeInfo {
+// newClusterQCVoteDataCdcType returns the FlowClusterQC cadence struct type.
+func newClusterQCVoteDataCdcType(clusterQcAddress string) *cadence.StructType {
 
-	var filtered []model.NodeInfo
-	for _, node := range nodeInfos {
-		_, isInCluster := cluster.ByNodeID(node.NodeID)
-		isNotPartner := node.Type() == model.NodeInfoTypePrivate
+	// FlowClusterQC.ClusterQCVoteData
+	address, _ := cdcCommon.HexToAddress(clusterQcAddress)
+	location := cdcCommon.NewAddressLocation(nil, address, "FlowClusterQC")
 
-		if isInCluster && isNotPartner {
-			filtered = append(filtered, node)
-		}
-	}
-
-	return filtered
+	return cadence.NewStructType(
+		location,
+		"FlowClusterQC.ClusterQCVoteData",
+		[]cadence.Field{
+			{
+				Identifier: "aggregatedSignature",
+				Type:       cadence.StringType,
+			},
+			{
+				Identifier: "voterIDs",
+				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
+			},
+		},
+		nil,
+	)
 }

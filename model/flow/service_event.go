@@ -21,8 +21,11 @@ func (set ServiceEventType) String() string {
 const (
 	ServiceEventSetup                       ServiceEventType = "setup"
 	ServiceEventCommit                      ServiceEventType = "commit"
+	ServiceEventRecover                     ServiceEventType = "recover"
 	ServiceEventVersionBeacon               ServiceEventType = "version-beacon"                 // VersionBeacon only controls version of ENs, describing software compatability via semantic versioning
 	ServiceEventProtocolStateVersionUpgrade ServiceEventType = "protocol-state-version-upgrade" // Protocol State version applies to all nodes and uses an _integer version_ of the _protocol_
+	ServiceEventSetEpochExtensionViewCount  ServiceEventType = "set-epoch-extension-view-count" // Sets value for parameter `EpochExtensionViewCount` in the protocol state's KV store.
+	ServiceEventEjectNode                   ServiceEventType = "eject-node"                     // Marks node with specified NodeID as 'ejected' in the protocol state
 )
 
 // ServiceEvent represents a service event, which is a special event that when
@@ -117,10 +120,16 @@ func (marshaller marshallerImpl) UnmarshalWrapped(b []byte) (ServiceEvent, error
 		event, err = unmarshalWrapped[EpochSetup](b, marshaller)
 	case ServiceEventCommit:
 		event, err = unmarshalWrapped[EpochCommit](b, marshaller)
+	case ServiceEventRecover:
+		event, err = unmarshalWrapped[EpochRecover](b, marshaller)
 	case ServiceEventVersionBeacon:
 		event, err = unmarshalWrapped[VersionBeacon](b, marshaller)
 	case ServiceEventProtocolStateVersionUpgrade:
 		event, err = unmarshalWrapped[ProtocolStateVersionUpgrade](b, marshaller)
+	case ServiceEventSetEpochExtensionViewCount:
+		event, err = unmarshalWrapped[SetEpochExtensionViewCount](b, marshaller)
+	case ServiceEventEjectNode:
+		event, err = unmarshalWrapped[EjectNode](b, marshaller)
 	default:
 		return ServiceEvent{}, fmt.Errorf("invalid type: %s", eventType)
 	}
@@ -159,10 +168,16 @@ func (marshaller marshallerImpl) UnmarshalWithType(b []byte, eventType ServiceEv
 		event = new(EpochSetup)
 	case ServiceEventCommit:
 		event = new(EpochCommit)
+	case ServiceEventRecover:
+		event = new(EpochRecover)
 	case ServiceEventVersionBeacon:
 		event = new(VersionBeacon)
 	case ServiceEventProtocolStateVersionUpgrade:
 		event = new(ProtocolStateVersionUpgrade)
+	case ServiceEventSetEpochExtensionViewCount:
+		event = new(SetEpochExtensionViewCount)
+	case ServiceEventEjectNode:
+		event = new(EjectNode)
 	default:
 		return ServiceEvent{}, fmt.Errorf("invalid type: %s", eventType)
 	}
@@ -252,6 +267,23 @@ func (se *ServiceEvent) EqualTo(other *ServiceEvent) (bool, error) {
 		}
 		return commit.EqualTo(otherCommit), nil
 
+	case ServiceEventRecover:
+		ev, ok := se.Event.(*EpochRecover)
+		if !ok {
+			return false, fmt.Errorf(
+				"internal invalid type for ServiceEventRecover: %T",
+				se.Event,
+			)
+		}
+		otherEv, ok := other.Event.(*EpochRecover)
+		if !ok {
+			return false, fmt.Errorf(
+				"internal invalid type for ServiceEventRecover: %T",
+				other.Event,
+			)
+		}
+		return ev.EqualTo(otherEv), nil
+
 	case ServiceEventVersionBeacon:
 		version, ok := se.Event.(*VersionBeacon)
 		if !ok {
@@ -286,6 +318,40 @@ func (se *ServiceEvent) EqualTo(other *ServiceEvent) (bool, error) {
 				)
 		}
 		return version.EqualTo(otherVersion), nil
+	case ServiceEventSetEpochExtensionViewCount:
+		typedEvent, ok := se.Event.(*SetEpochExtensionViewCount)
+		if !ok {
+			return false, fmt.Errorf(
+				"internal invalid type for SetEpochExtensionViewCount: %T",
+				se.Event,
+			)
+		}
+		otherTypedEvent, ok := other.Event.(*SetEpochExtensionViewCount)
+		if !ok {
+			return false,
+				fmt.Errorf(
+					"internal invalid type for SetEpochExtensionViewCount: %T",
+					other.Event,
+				)
+		}
+		return typedEvent.EqualTo(otherTypedEvent), nil
+	case ServiceEventEjectNode:
+		typedEvent, ok := se.Event.(*EjectNode)
+		if !ok {
+			return false, fmt.Errorf(
+				"internal invalid type for EjectNode: %T",
+				se.Event,
+			)
+		}
+		otherTypedEvent, ok := other.Event.(*EjectNode)
+		if !ok {
+			return false,
+				fmt.Errorf(
+					"internal invalid type for EjectNode: %T",
+					other.Event,
+				)
+		}
+		return typedEvent.EqualTo(otherTypedEvent), nil
 
 	default:
 		return false, fmt.Errorf("unknown serice event type: %s", se.Type)

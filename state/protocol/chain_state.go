@@ -49,9 +49,12 @@ type FollowerState interface {
 	// been certified, and it's safe to add it to the protocol state. The QC
 	// cannot be nil and must certify candidate block:
 	//   candidate.View == qc.View && candidate.BlockID == qc.BlockID
-	// The `candidate` block and its QC _must be valid_ (otherwise, the state will
-	// be corrupted). ExtendCertified inserts any given block, as long as its
-	// parent is already in the protocol state. Also orphaned blocks are excepted.
+	//
+	// CAUTION:
+	//   - This function expects that `qc` has been validated. (otherwise, the state will be corrupted)
+	//   - The parent block must already be stored.
+	// Orphaned blocks are excepted.
+	//
 	// No errors are expected during normal operations.
 	ExtendCertified(ctx context.Context, candidate *flow.Block, qc *flow.QuorumCertificate) error
 
@@ -75,6 +78,10 @@ type ParticipantState interface {
 	// us to execute fork-aware queries against ambiguous protocol state, while
 	// still checking that the given block is a valid extension of the protocol state.
 	// The candidate block must have passed HotStuff validation before being passed to Extend.
+	//
+	// CAUTION: per convention, the protocol state requires that the candidate's
+	// parent has already been ingested. Otherwise, an exception is returned.
+	//
 	// Expected errors during normal operations:
 	//  * state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 	//  * state.InvalidExtensionError if the candidate block is invalid

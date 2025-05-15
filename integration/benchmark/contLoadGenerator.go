@@ -12,6 +12,7 @@ import (
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/access"
 	"github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/integration/benchmark/account"
 	"github.com/onflow/flow-go/integration/benchmark/common"
@@ -176,7 +177,6 @@ func New(
 	}
 
 	lg.workFunc = func(workerID int) {
-
 		wlc := lc
 		wlc.WorkerContext.WorkerID = workerID
 

@@ -16,11 +16,11 @@ func TestTransactions(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := unittest.TransactionFixture()
 		err := db.Update(InsertTransaction(expected.ID(), &expected.TransactionBody))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var actual flow.Transaction
 		err = db.View(RetrieveTransaction(expected.ID(), &actual.TransactionBody))
-		require.Nil(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, expected, actual)
 	})
 }

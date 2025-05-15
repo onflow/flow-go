@@ -7,12 +7,19 @@ contract Storage {
     address constant public cadenceArch = 0x0000000000000000000000010000000000000001;
     event NewStore(address indexed caller, uint256 indexed value);
 
+    error MyCustomError(uint value, string message);
+
     uint256 number;
 
     constructor() payable {
     }
 
     function store(uint256 num) public {
+        number = num;
+    }
+
+    function checkThenStore(uint256 prev, uint256 num)public {
+        require(number == prev, "stored value check failed");
         number = num;
     }
 
@@ -34,6 +41,10 @@ contract Storage {
         return block.number;
     }
 
+    function checkBlockNumber(uint expected) public view {
+        require(expected == block.number, "block number check failed");
+    }
+
     function blockTime() public view returns (uint) {
         return block.timestamp;
     }
@@ -42,6 +53,14 @@ contract Storage {
         return blockhash(num);
     }
 
+    function checkBlockHash(uint num, bytes32 expected) public view {
+        require(expected == blockhash(num), "hash check failed");
+    }
+
+    function checkBalance(address addr, uint expected) public view{
+        require(expected == addr.balance, "balance check failed");
+    }
+    
     function random() public view returns (uint256) {
         return block.prevrandao;
     }
@@ -54,9 +73,24 @@ contract Storage {
         selfdestruct(payable(msg.sender));
     }
 
-    function verifyArchCallToRandomSource(uint64 height) public view returns (uint64) {
+    function assertError() public pure{
+        require(false, "Assert Error Message");
+    }
+
+    function customError() public pure{
+       revert MyCustomError(5, "Value is too low");
+    }
+
+    function verifyArchCallToRandomSource(uint64 height) public view returns (bytes32) {
         (bool ok, bytes memory data) = cadenceArch.staticcall(abi.encodeWithSignature("getRandomSource(uint64)", height));
         require(ok, "unsuccessful call to arch ");
+        bytes32 output = abi.decode(data, (bytes32));
+        return output;
+    }
+
+    function verifyArchCallToRevertibleRandom() public view returns (uint64) {
+        (bool ok, bytes memory data) = cadenceArch.staticcall(abi.encodeWithSignature("revertibleRandom()"));
+        require(ok, "unsuccessful call to arch");
         uint64 output = abi.decode(data, (uint64));
         return output;
     }

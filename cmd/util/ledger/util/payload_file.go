@@ -2,7 +2,6 @@ package util
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -11,8 +10,6 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/rs/zerolog"
-
-	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -119,11 +116,11 @@ func CreatePayloadFile(
 	logger zerolog.Logger,
 	payloadFile string,
 	payloads []*ledger.Payload,
-	addresses []common.Address,
+	owners map[string]struct{},
 	inputPayloadsFromPartialState bool,
 ) (int, error) {
 
-	partialState := inputPayloadsFromPartialState || len(addresses) > 0
+	partialState := inputPayloadsFromPartialState || len(owners) > 0
 
 	f, err := os.Create(payloadFile)
 	if err != nil {
@@ -132,9 +129,6 @@ func CreatePayloadFile(
 	defer f.Close()
 
 	writer := bufio.NewWriterSize(f, defaultBufioWriteSize)
-	if err != nil {
-		return 0, fmt.Errorf("can't create bufio writer for %s: %w", payloadFile, err)
-	}
 	defer writer.Flush()
 
 	// TODO: replace CRC-32 checksum.
@@ -155,14 +149,14 @@ func CreatePayloadFile(
 		return 0, fmt.Errorf("can't write payload file head for %s: %w", payloadFile, err)
 	}
 
-	includeAllPayloads := len(addresses) == 0
+	includeAllPayloads := len(owners) == 0
 
 	// Write payloads.
 	var writtenPayloadCount int
 	if includeAllPayloads {
 		writtenPayloadCount, err = writePayloads(logger, crc32Writer, payloads)
 	} else {
-		writtenPayloadCount, err = writeSelectedPayloads(logger, crc32Writer, payloads, addresses)
+		writtenPayloadCount, err = writeSelectedPayloads(logger, crc32Writer, payloads, owners)
 	}
 
 	if err != nil {
@@ -209,7 +203,12 @@ func writePayloads(logger zerolog.Logger, w io.Writer, payloads []*ledger.Payloa
 	return len(payloads), nil
 }
 
-func writeSelectedPayloads(logger zerolog.Logger, w io.Writer, payloads []*ledger.Payload, addresses []common.Address) (int, error) {
+func writeSelectedPayloads(
+	logger zerolog.Logger,
+	w io.Writer,
+	payloads []*ledger.Payload,
+	owners map[string]struct{},
+) (int, error) {
 	logger.Info().Msgf("filtering %d payloads and writing selected payloads to file", len(payloads))
 
 	enc := cbor.NewEncoder(w)
@@ -217,7 +216,7 @@ func writeSelectedPayloads(logger zerolog.Logger, w io.Writer, payloads []*ledge
 	var includedPayloadCount int
 	var payloadScratchBuffer [1024 * 2]byte
 	for _, p := range payloads {
-		include, err := includePayloadByAddresses(p, addresses)
+		include, err := includePayloadByOwners(p, owners)
 		if err != nil {
 			return 0, err
 		}
@@ -239,8 +238,8 @@ func writeSelectedPayloads(logger zerolog.Logger, w io.Writer, payloads []*ledge
 	return includedPayloadCount, nil
 }
 
-func includePayloadByAddresses(payload *ledger.Payload, addresses []common.Address) (bool, error) {
-	if len(addresses) == 0 {
+func includePayloadByOwners(payload *ledger.Payload, owners map[string]struct{}) (bool, error) {
+	if len(owners) == 0 {
 		// Include all payloads
 		return true, nil
 	}
@@ -250,15 +249,16 @@ func includePayloadByAddresses(payload *ledger.Payload, addresses []common.Addre
 		return false, fmt.Errorf("can't get key from payload: %w", err)
 	}
 
-	owner := k.KeyParts[0].Value
+	owner := string(k.KeyParts[0].Value)
 
-	for _, address := range addresses {
-		if bytes.Equal(owner, address[:]) {
-			return true, nil
-		}
+	// Always include payloads for global registers,
+	// i.e. with empty owner
+	if owner == "" {
+		return true, nil
 	}
 
-	return false, nil
+	_, ok := owners[owner]
+	return ok, nil
 }
 
 func ReadPayloadFile(logger zerolog.Logger, payloadFile string) (bool, []*ledger.Payload, error) {

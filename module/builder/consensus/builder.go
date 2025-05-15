@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -17,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 // Builder is the builder for consensus block payloads. Upon providing a payload
@@ -25,7 +23,6 @@ import (
 type Builder struct {
 	metrics              module.MempoolMetrics
 	tracer               module.Tracer
-	db                   *badger.DB
 	state                protocol.ParticipantState
 	seals                storage.Seals
 	headers              storage.Headers
@@ -43,7 +40,6 @@ type Builder struct {
 // NewBuilder creates a new block builder.
 func NewBuilder(
 	metrics module.MempoolMetrics,
-	db *badger.DB,
 	state protocol.ParticipantState,
 	headers storage.Headers,
 	seals storage.Seals,
@@ -80,7 +76,6 @@ func NewBuilder(
 
 	b := &Builder{
 		metrics:              metrics,
-		db:                   db,
 		tracer:               tracer,
 		state:                state,
 		headers:              headers,
@@ -104,9 +99,19 @@ func NewBuilder(
 	return b, nil
 }
 
-// BuildOn creates a new block header on top of the provided parent, using the
-// given view and applying the custom setter function to allow the caller to
-// make changes to the header before storing it.
+// BuildOn generates a new payload that is valid with respect to the parent
+// being built upon, with the view being provided by the consensus algorithm.
+// The builder stores the block and validates it against the protocol state
+// before returning it. The specified parent block must exist in the protocol state.
+//
+// NOTE: Since the block is stored within Builder, HotStuff MUST propose the
+// block once BuildOn successfully returns.
+//
+// # Errors
+// This function does not produce any expected errors.
+// However, it will pass through all errors returned by `setter` and `sign`.
+// Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
+// and handle them accordingly when handling errors returned from BuildOn.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error) {
 
 	// since we don't know the blockID when building the block we track the
@@ -269,13 +274,9 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 		limit = 0
 	}
 
-	// look up the root height so we don't look too far back
-	// initially this is the genesis block height (aka 0).
-	var rootHeight uint64
-	err = b.db.View(operation.RetrieveRootHeight(&rootHeight))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root block height: %w", err)
-	}
+	// the finalized root height is the height where we bootstrapped from.
+	// we should not include guarantees that are older than the finalized root
+	rootHeight := b.state.Params().FinalizedRoot().Height
 	if limit < rootHeight {
 		limit = rootHeight
 	}

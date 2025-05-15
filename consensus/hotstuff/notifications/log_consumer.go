@@ -69,7 +69,7 @@ func (lc *LogConsumer) OnDoubleProposeDetected(block *model.Block, alt *model.Bl
 		Msg("double proposal detected")
 }
 
-func (lc *LogConsumer) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
+func (lc *LogConsumer) OnReceiveProposal(currentView uint64, proposal *model.SignedProposal) {
 	logger := lc.logBasicBlockData(lc.log.Debug(), proposal.Block).
 		Uint64("cur_view", currentView)
 	lastViewTC := proposal.LastViewTC
@@ -197,7 +197,7 @@ func (lc *LogConsumer) OnInvalidVoteDetected(err model.InvalidVoteError) {
 		Msgf("invalid vote detected: %s", err.Error())
 }
 
-func (lc *LogConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal *model.Proposal) {
+func (lc *LogConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal *model.SignedProposal) {
 	lc.log.Warn().
 		Str(logging.KeySuspicious, "true").
 		Uint64("vote_view", vote.View).

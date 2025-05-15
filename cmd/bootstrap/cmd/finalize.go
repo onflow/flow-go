@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -131,7 +132,10 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("assembling network and staking keys")
-	stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
+	stakingNodes, err := mergeNodeInfos(internalNodes, partnerNodes)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("failed to merge internal and partner nodes: %v", err)
+	}
 	log.Info().Msg("")
 
 	// create flow.IdentityList representation of participant set
@@ -148,7 +152,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msgf("received votes total: %v", len(votes))
 
 	log.Info().Msg("reading dkg data")
-	dkgData := readDKGData()
+	dkgData, _ := readRandomBeaconKeys()
 	log.Info().Msg("")
 
 	log.Info().Msg("reading intermediary bootstrapping data")
@@ -180,7 +184,18 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	// construct serializable root protocol snapshot
 	log.Info().Msg("constructing root protocol snapshot")
-	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(block, result, seal, rootQC, intermediaryData.ProtocolVersion, intermediaryData.EpochCommitSafetyThreshold, kvstore.NewDefaultKVStore)
+	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(
+		block,
+		result,
+		seal,
+		rootQC,
+		func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+			return kvstore.NewDefaultKVStore(
+				intermediaryData.FinalizationSafetyThreshold,
+				intermediaryData.EpochExtensionViewCount,
+				epochStateID)
+		},
+	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
 	}
@@ -299,29 +314,31 @@ func readRootBlockVotes() []*hotstuff.Vote {
 //
 // IMPORTANT: node infos are returned in the canonical ordering, meaning this
 // is safe to use as the input to the DKG and protocol state.
-func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeInfo {
+func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) ([]model.NodeInfo, error) {
 	nodes := append(internalNodes, partnerNodes...)
 
 	// test for duplicate Addresses
 	addressLookup := make(map[string]struct{})
 	for _, node := range nodes {
 		if _, ok := addressLookup[node.Address]; ok {
-			log.Fatal().Str("address", node.Address).Msg("duplicate node address")
+			return nil, fmt.Errorf("duplicate node address: %v", node.Address)
 		}
+		addressLookup[node.Address] = struct{}{}
 	}
 
 	// test for duplicate node IDs
 	idLookup := make(map[flow.Identifier]struct{})
 	for _, node := range nodes {
 		if _, ok := idLookup[node.NodeID]; ok {
-			log.Fatal().Str("NodeID", node.NodeID.String()).Msg("duplicate node ID")
+			return nil, fmt.Errorf("duplicate node ID: %v", node.NodeID.String())
 		}
+		idLookup[node.NodeID] = struct{}{}
 	}
 
 	// sort nodes using the canonical ordering
 	nodes = model.Sort(nodes, flow.Canonical[flow.Identity])
 
-	return nodes
+	return nodes, nil
 }
 
 // readRootBlock reads root block data from disc, this file needs to be prepared with
@@ -334,29 +351,28 @@ func readRootBlock() *flow.Block {
 	return rootBlock
 }
 
-// readDKGData reads DKG data from disc, this file needs to be prepared with
-// rootblock command
-func readDKGData() dkg.DKGData {
-	encodableDKG, err := utils.ReadData[inmem.EncodableFullDKG](flagDKGDataPath)
+// readRandomBeaconKeys reads the threshold key data from disc.
+// This file needs to be prepared with rootblock command
+func readRandomBeaconKeys() (dkg.ThresholdKeySet, flow.DKGIndexMap) {
+	encodableDKG, err := utils.ReadData[inmem.ThresholdKeySet](flagDKGDataPath)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not read DKG data")
+		log.Fatal().Err(err).Msg("loading threshold key data for Random Beacon failed")
 	}
 
-	dkgData := dkg.DKGData{
+	dkgData := dkg.ThresholdKeySet{
 		PrivKeyShares: nil,
 		PubGroupKey:   encodableDKG.GroupKey.PublicKey,
 		PubKeyShares:  nil,
 	}
 
-	for _, pubKey := range encodableDKG.PubKeyShares {
-		dkgData.PubKeyShares = append(dkgData.PubKeyShares, pubKey.PublicKey)
+	indexMap := make(flow.DKGIndexMap, len(encodableDKG.Participants))
+	for i, participant := range encodableDKG.Participants {
+		dkgData.PubKeyShares = append(dkgData.PubKeyShares, participant.PubKeyShare.PublicKey)
+		dkgData.PrivKeyShares = append(dkgData.PrivKeyShares, participant.PrivKeyShare.PrivateKey)
+		indexMap[participant.NodeID] = i
 	}
 
-	for _, privKey := range encodableDKG.PrivKeyShares {
-		dkgData.PrivKeyShares = append(dkgData.PrivKeyShares, privKey.PrivateKey)
-	}
-
-	return dkgData
+	return dkgData, indexMap
 }
 
 // Validation utility methods ------------------------------------------------

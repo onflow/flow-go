@@ -22,7 +22,7 @@ import (
 // it contains an attached insertionTime that is used to measure how long we have waited between queening proposal and
 // actually processing by `EventHandler`.
 type queuedProposal struct {
-	proposal      *model.Proposal
+	proposal      *model.SignedProposal
 	insertionTime time.Time
 }
 
@@ -62,7 +62,7 @@ func NewEventLoop(
 	proposals := make(chan queuedProposal, 1000)
 
 	el := &EventLoop{
-		log:                      log,
+		log:                      log.With().Str("component", "hotstuff.event_loop").Logger(),
 		eventHandler:             eventHandler,
 		metrics:                  metrics,
 		mempoolMetrics:           mempoolMetrics,
@@ -263,7 +263,7 @@ func (el *EventLoop) loop(ctx context.Context) error {
 }
 
 // SubmitProposal pushes the received block to the proposals channel
-func (el *EventLoop) SubmitProposal(proposal *model.Proposal) {
+func (el *EventLoop) SubmitProposal(proposal *model.SignedProposal) {
 	queueItem := queuedProposal{
 		proposal:      proposal,
 		insertionTime: time.Now(),

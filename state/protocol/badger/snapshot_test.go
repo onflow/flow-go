@@ -2,7 +2,6 @@ package badger_test
 
 import (
 	"context"
-	"errors"
 	"math/rand"
 	"testing"
 
@@ -40,7 +39,7 @@ func TestUnknownReferenceBlock(t *testing.T) {
 
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		// build some finalized non-root blocks (heights 101-110)
-		head := unittest.BlockWithParentFixture(rootSnapshot.Encodable().Head)
+		head := unittest.BlockWithParentFixture(rootSnapshot.Encodable().Head())
 		head.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		buildFinalizedBlock(t, state, head)
 
@@ -111,7 +110,6 @@ func TestSnapshot_Params(t *testing.T) {
 
 	expectedChainID := rootSnapshot.Params().ChainID()
 	expectedSporkID := rootSnapshot.Params().SporkID()
-	expectedProtocolVersion := rootSnapshot.Params().ProtocolVersion()
 
 	rootHeader, err := rootSnapshot.Head()
 	require.NoError(t, err)
@@ -141,10 +139,6 @@ func TestSnapshot_Params(t *testing.T) {
 			t.Run("should be able to get spork ID from snapshot", func(t *testing.T) {
 				sporkID := snapshot.Params().SporkID()
 				assert.Equal(t, expectedSporkID, sporkID)
-			})
-			t.Run("should be able to get protocol version from snapshot", func(t *testing.T) {
-				protocolVersion := snapshot.Params().ProtocolVersion()
-				assert.Equal(t, expectedProtocolVersion, protocolVersion)
 			})
 		}
 	})
@@ -235,16 +229,23 @@ func TestClusters(t *testing.T) {
 	clusterQCs := unittest.QuorumCertificatesFromAssignments(setup.Assignments)
 	commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(clusterQCs)
 	seal.ResultID = result.ID()
-	root.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(
-		inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()).ID()
-
+	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
+	require.NoError(t, err)
+	rootProtocolState, err := kvstore.NewDefaultKVStore(
+		safetyParams.FinalizationSafetyThreshold,
+		safetyParams.EpochExtensionViewCount,
+		inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID())
+	require.NoError(t, err)
+	root.Payload.ProtocolStateID = rootProtocolState.ID()
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 
 	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {
 		expectedClusters, err := factory.NewClusterList(setup.Assignments, collectors.ToSkeleton())
 		require.NoError(t, err)
-		actualClusters, err := state.Final().Epochs().Current().Clustering()
+		currentEpoch, err := state.Final().Epochs().Current()
+		require.NoError(t, err)
+		actualClusters, err := currentEpoch.Clustering()
 		require.NoError(t, err)
 
 		require.Equal(t, nClusters, len(expectedClusters))
@@ -808,7 +809,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 	// Here, we want to specifically test correct handling of the edge case, where a block exists in storage
 	// that has _lower height_ than the node's local root block. Such blocks are typically contained in the
 	// bootstrapping data, such that all entities referenced in the local root block can be resolved.
-	// Is is possible to retrieve blocks that are lower than the local root block from storage, directly
+	// It is possible to retrieve blocks that are lower than the local root block from storage, directly
 	// via their ID. Despite these blocks existing in storage, SealingSegment construction should be
 	// because the known history is potentially insufficient when going below the root block.
 	t.Run("sealing segment from block below local state root", func(t *testing.T) {
@@ -915,7 +916,8 @@ func TestBootstrapSealingSegmentWithExtraBlocks(t *testing.T) {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
-	rootEpoch := rootSnapshot.Epochs().Current()
+	rootEpoch, err := rootSnapshot.Epochs().Current()
+	require.NoError(t, err)
 	cluster, err := rootEpoch.Cluster(0)
 	require.NoError(t, err)
 	collID := cluster.Members()[0].NodeID
@@ -1206,17 +1208,17 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 		t.Run("Current", func(t *testing.T) {
 			t.Run("epoch 1", func(t *testing.T) {
 				for _, height := range epoch1.Range() {
-					counter, err := state.AtHeight(height).Epochs().Current().Counter()
+					currentEpoch, err := state.AtHeight(height).Epochs().Current()
 					require.NoError(t, err)
-					assert.Equal(t, epoch1Counter, counter)
+					assert.Equal(t, epoch1Counter, currentEpoch.Counter())
 				}
 			})
 
 			t.Run("epoch 2", func(t *testing.T) {
 				for _, height := range epoch2.Range() {
-					counter, err := state.AtHeight(height).Epochs().Current().Counter()
+					currentEpoch, err := state.AtHeight(height).Epochs().Current()
 					require.NoError(t, err)
-					assert.Equal(t, epoch2Counter, counter)
+					assert.Equal(t, epoch2Counter, currentEpoch.Counter())
 				}
 			})
 		})
@@ -1226,17 +1228,31 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 		t.Run("Next", func(t *testing.T) {
 			t.Run("epoch 1: before next epoch available", func(t *testing.T) {
 				for _, height := range epoch1.StakingRange() {
-					_, err := state.AtHeight(height).Epochs().Next().Counter()
-					assert.Error(t, err)
-					assert.True(t, errors.Is(err, protocol.ErrNextEpochNotSetup))
+					_, err := state.AtHeight(height).Epochs().NextUnsafe()
+					assert.ErrorIs(t, err, protocol.ErrNextEpochNotSetup)
+					_, err = state.AtHeight(height).Epochs().NextCommitted()
+					assert.ErrorIs(t, err, protocol.ErrNextEpochNotCommitted)
 				}
 			})
 
 			t.Run("epoch 2: after next epoch available", func(t *testing.T) {
-				for _, height := range append(epoch1.SetupRange(), epoch1.CommittedRange()...) {
-					counter, err := state.AtHeight(height).Epochs().Next().Counter()
+				for _, height := range epoch1.SetupRange() {
+					// Tentative epoch is available
+					nextSetup, err := state.AtHeight(height).Epochs().NextUnsafe()
 					require.NoError(t, err)
-					assert.Equal(t, epoch2Counter, counter)
+					assert.Equal(t, epoch2Counter, nextSetup.Counter())
+					// Committed epoch is not available
+					_, err = state.AtHeight(height).Epochs().NextCommitted()
+					require.ErrorIs(t, err, protocol.ErrNextEpochNotCommitted)
+				}
+				for _, height := range epoch1.CommittedRange() {
+					// Tentative epoch is not available
+					_, err := state.AtHeight(height).Epochs().NextUnsafe()
+					require.ErrorIs(t, err, protocol.ErrNextEpochAlreadyCommitted)
+					// Committed epoch is available
+					nextCommitted, err := state.AtHeight(height).Epochs().NextCommitted()
+					require.NoError(t, err)
+					assert.Equal(t, epoch2Counter, nextCommitted.Counter())
 				}
 			})
 		})
@@ -1247,17 +1263,16 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 		t.Run("Previous", func(t *testing.T) {
 			t.Run("epoch 1", func(t *testing.T) {
 				for _, height := range epoch1.Range() {
-					_, err := state.AtHeight(height).Epochs().Previous().Counter()
-					assert.Error(t, err)
-					assert.True(t, errors.Is(err, protocol.ErrNoPreviousEpoch))
+					_, err := state.AtHeight(height).Epochs().Previous()
+					assert.ErrorIs(t, err, protocol.ErrNoPreviousEpoch)
 				}
 			})
 
 			t.Run("epoch 2", func(t *testing.T) {
 				for _, height := range epoch2.Range() {
-					counter, err := state.AtHeight(height).Epochs().Previous().Counter()
+					previousEpoch, err := state.AtHeight(height).Epochs().Previous()
 					require.NoError(t, err)
-					assert.Equal(t, epoch1Counter, counter)
+					assert.Equal(t, epoch1Counter, previousEpoch.Counter())
 				}
 			})
 		})
@@ -1302,18 +1317,18 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 			// test w.r.t. epoch 1 snapshot
 			t.Run("Current", func(t *testing.T) {
 				for _, height := range epoch1.Range() {
-					actualFirstView, err := state.AtHeight(height).Epochs().Current().FirstView()
+					currentEpoch, err := state.AtHeight(height).Epochs().Current()
 					require.NoError(t, err)
-					assert.Equal(t, epoch1FirstView, actualFirstView)
+					assert.Equal(t, epoch1FirstView, currentEpoch.FirstView())
 				}
 			})
 
 			// test w.r.t. epoch 2 snapshot
 			t.Run("Previous", func(t *testing.T) {
 				for _, height := range epoch2.Range() {
-					actualFirstView, err := state.AtHeight(height).Epochs().Previous().FirstView()
+					previousEpoch, err := state.AtHeight(height).Epochs().Previous()
 					require.NoError(t, err)
-					assert.Equal(t, epoch1FirstView, actualFirstView)
+					assert.Equal(t, epoch1FirstView, previousEpoch.FirstView())
 				}
 			})
 		})
@@ -1324,19 +1339,19 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 
 			// test w.r.t. epoch 1 snapshot
 			t.Run("Next", func(t *testing.T) {
-				for _, height := range append(epoch1.SetupRange(), epoch1.CommittedRange()...) {
-					actualFirstView, err := state.AtHeight(height).Epochs().Next().FirstView()
+				for _, height := range epoch1.CommittedRange() {
+					nextCommitted, err := state.AtHeight(height).Epochs().NextCommitted()
 					require.NoError(t, err)
-					assert.Equal(t, epoch2FirstView, actualFirstView)
+					assert.Equal(t, epoch2FirstView, nextCommitted.FirstView())
 				}
 			})
 
 			// test w.r.t. epoch 2 snapshot
 			t.Run("Current", func(t *testing.T) {
 				for _, height := range epoch2.Range() {
-					actualFirstView, err := state.AtHeight(height).Epochs().Current().FirstView()
+					currentEpoch, err := state.AtHeight(height).Epochs().Current()
 					require.NoError(t, err)
-					assert.Equal(t, epoch2FirstView, actualFirstView)
+					assert.Equal(t, epoch2FirstView, currentEpoch.FirstView())
 				}
 			})
 		})
@@ -1360,12 +1375,14 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 
 		epoch1FirstHeight := head.Height
 		t.Run("first epoch - EpochStaking phase", func(t *testing.T) {
+			currentEpoch, err := state.Final().Epochs().Current()
+			require.NoError(t, err)
 			// first height of started current epoch should be known
-			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			firstHeight, err := currentEpoch.FirstHeight()
 			require.NoError(t, err)
 			assert.Equal(t, epoch1FirstHeight, firstHeight)
 			// final height of not completed current epoch should be unknown
-			_, err = state.Final().Epochs().Current().FinalHeight()
+			_, err = currentEpoch.FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 		})
 
@@ -1373,17 +1390,22 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 		epochBuilder.BuildEpoch()
 
 		t.Run("first epoch - EpochCommitted phase", func(t *testing.T) {
+			finalSnap := state.Final()
+			currentEpoch, err := finalSnap.Epochs().Current()
+			require.NoError(t, err)
+			nextEpoch, err := finalSnap.Epochs().NextCommitted()
+			require.NoError(t, err)
 			// first height of started current epoch should be known
-			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			firstHeight, err := currentEpoch.FirstHeight()
 			require.NoError(t, err)
 			assert.Equal(t, epoch1FirstHeight, firstHeight)
 			// final height of not completed current epoch should be unknown
-			_, err = state.Final().Epochs().Current().FinalHeight()
+			_, err = currentEpoch.FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 			// first and final height of not started next epoch should be unknown
-			_, err = state.Final().Epochs().Next().FirstHeight()
+			_, err = nextEpoch.FirstHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
-			_, err = state.Final().Epochs().Next().FinalHeight()
+			_, err = nextEpoch.FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 		})
 
@@ -1395,20 +1417,25 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 		epoch2FirstHeight := epoch1FinalHeight + 1
 
 		t.Run("second epoch - EpochStaking phase", func(t *testing.T) {
+			finalSnap := state.Final()
+			previousEpoch, err := finalSnap.Epochs().Previous()
+			require.NoError(t, err)
 			// first and final height of completed previous epoch should be known
-			firstHeight, err := state.Final().Epochs().Previous().FirstHeight()
+			firstHeight, err := previousEpoch.FirstHeight()
 			require.NoError(t, err)
 			assert.Equal(t, epoch1FirstHeight, firstHeight)
-			finalHeight, err := state.Final().Epochs().Previous().FinalHeight()
+			finalHeight, err := previousEpoch.FinalHeight()
 			require.NoError(t, err)
 			assert.Equal(t, epoch1FinalHeight, finalHeight)
 
+			currentEpoch, err := finalSnap.Epochs().Current()
+			require.NoError(t, err)
 			// first height of started current epoch should be known
-			firstHeight, err = state.Final().Epochs().Current().FirstHeight()
+			firstHeight, err = currentEpoch.FirstHeight()
 			require.NoError(t, err)
 			assert.Equal(t, epoch2FirstHeight, firstHeight)
 			// final height of not completed current epoch should be unknown
-			_, err = state.Final().Epochs().Current().FinalHeight()
+			_, err = currentEpoch.FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 		})
 	})
@@ -1473,7 +1500,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 			snapshots := []protocol.Snapshot{state.AtHeight(epoch1.Setup), state.AtHeight(epoch1.Committed)}
 
 			for _, snapshot := range snapshots {
-				phase, err := snapshot.Phase()
+				phase, err := snapshot.EpochPhase()
 				require.NoError(t, err)
 
 				t.Run("phase: "+phase.String(), func(t *testing.T) {
@@ -1521,7 +1548,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 			snapshots := []protocol.Snapshot{state.AtHeight(epoch2.Setup), state.AtHeight(epoch2.Committed)}
 
 			for _, snapshot := range snapshots {
-				phase, err := snapshot.Phase()
+				phase, err := snapshot.EpochPhase()
 				require.NoError(t, err)
 
 				t.Run("phase: "+phase.String(), func(t *testing.T) {

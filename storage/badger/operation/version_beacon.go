@@ -10,6 +10,7 @@ import (
 // flow.SealedVersionBeacon.SealHeight.
 //
 // No errors are expected during normal operation.
+// deprecated, this is still needed by the state/protocol/badger/mutator.go
 func IndexVersionBeaconByHeight(
 	beacon *flow.SealedVersionBeacon,
 ) func(*badger.Txn) error {

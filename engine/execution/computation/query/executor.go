@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/rand"
 )
@@ -50,6 +51,47 @@ type Executor interface {
 		*flow.Account,
 		error,
 	)
+
+	GetAccountBalance(
+		ctx context.Context,
+		addr flow.Address,
+		header *flow.Header,
+		snapshot snapshot.StorageSnapshot,
+	) (
+		uint64,
+		error,
+	)
+
+	GetAccountAvailableBalance(
+		ctx context.Context,
+		addr flow.Address,
+		header *flow.Header,
+		snapshot snapshot.StorageSnapshot,
+	) (
+		uint64,
+		error,
+	)
+
+	GetAccountKeys(
+		ctx context.Context,
+		addr flow.Address,
+		header *flow.Header,
+		snapshot snapshot.StorageSnapshot,
+	) (
+		[]flow.AccountPublicKey,
+		error,
+	)
+
+	GetAccountKey(
+		ctx context.Context,
+		addr flow.Address,
+		keyIndex uint32,
+		header *flow.Header,
+		snapshot snapshot.StorageSnapshot,
+	) (
+		*flow.AccountPublicKey,
+		error,
+	)
 }
 
 type QueryConfig struct {
@@ -69,14 +111,14 @@ func NewDefaultConfig() QueryConfig {
 }
 
 type QueryExecutor struct {
-	config           QueryConfig
-	logger           zerolog.Logger
-	metrics          module.ExecutionMetrics
-	vm               fvm.VM
-	vmCtx            fvm.Context
-	derivedChainData *derived.DerivedChainData
-	rngLock          *sync.Mutex
-	entropyPerBlock  EntropyProviderPerBlock
+	config                QueryConfig
+	logger                zerolog.Logger
+	metrics               module.ExecutionMetrics
+	vm                    fvm.VM
+	vmCtx                 fvm.Context
+	derivedChainData      *derived.DerivedChainData
+	rngLock               *sync.Mutex
+	protocolStateSnapshot protocol.SnapshotExecutionSubsetProvider
 }
 
 var _ Executor = &QueryExecutor{}
@@ -88,20 +130,20 @@ func NewQueryExecutor(
 	vm fvm.VM,
 	vmCtx fvm.Context,
 	derivedChainData *derived.DerivedChainData,
-	entropyPerBlock EntropyProviderPerBlock,
+	protocolStateSnapshot protocol.SnapshotExecutionSubsetProvider,
 ) *QueryExecutor {
 	if config.ComputationLimit > 0 {
 		vmCtx = fvm.NewContextFromParent(vmCtx, fvm.WithComputationLimit(config.ComputationLimit))
 	}
 	return &QueryExecutor{
-		config:           config,
-		logger:           logger,
-		metrics:          metrics,
-		vm:               vm,
-		vmCtx:            vmCtx,
-		derivedChainData: derivedChainData,
-		rngLock:          &sync.Mutex{},
-		entropyPerBlock:  entropyPerBlock,
+		config:                config,
+		logger:                logger,
+		metrics:               metrics,
+		vm:                    vm,
+		vmCtx:                 vmCtx,
+		derivedChainData:      derivedChainData,
+		rngLock:               &sync.Mutex{},
+		protocolStateSnapshot: protocolStateSnapshot,
 	}
 }
 
@@ -174,7 +216,7 @@ func (e *QueryExecutor) ExecuteScript(
 		fvm.NewContextFromParent(
 			e.vmCtx,
 			fvm.WithBlockHeader(blockHeader),
-			fvm.WithEntropyProvider(e.entropyPerBlock.AtBlockID(blockHeader.ID())),
+			fvm.WithProtocolStateSnapshot(e.protocolStateSnapshot.AtBlockID(blockHeader.ID())),
 			fvm.WithDerivedBlockData(
 				e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID()))),
 		fvm.NewScriptWithContextAndArgs(script, requestCtx, arguments...),
@@ -219,7 +261,7 @@ func summarizeLog(log string, limit int) string {
 }
 
 func (e *QueryExecutor) GetAccount(
-	ctx context.Context,
+	_ context.Context,
 	address flow.Address,
 	blockHeader *flow.Header,
 	snapshot snapshot.StorageSnapshot,
@@ -234,7 +276,7 @@ func (e *QueryExecutor) GetAccount(
 		fvm.WithDerivedBlockData(
 			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
 
-	account, err := e.vm.GetAccount(
+	account, err := fvm.GetAccount(
 		blockCtx,
 		address,
 		snapshot)
@@ -247,4 +289,120 @@ func (e *QueryExecutor) GetAccount(
 	}
 
 	return account, nil
+}
+
+func (e *QueryExecutor) GetAccountBalance(
+	_ context.Context,
+	address flow.Address,
+	blockHeader *flow.Header,
+	snapshot snapshot.StorageSnapshot,
+) (uint64, error) {
+
+	// TODO(ramtin): utilize ctx
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithDerivedBlockData(
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
+
+	accountBalance, err := fvm.GetAccountBalance(
+		blockCtx,
+		address,
+		snapshot)
+
+	if err != nil {
+		return 0, fmt.Errorf(
+			"failed to get account balance (%s) at block (%s): %w",
+			address.String(),
+			blockHeader.ID(),
+			err)
+	}
+
+	return accountBalance, nil
+}
+
+func (e *QueryExecutor) GetAccountAvailableBalance(
+	_ context.Context,
+	address flow.Address,
+	blockHeader *flow.Header,
+	snapshot snapshot.StorageSnapshot,
+) (uint64, error) {
+
+	// TODO(ramtin): utilize ctx
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithDerivedBlockData(
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
+
+	accountAvailableBalance, err := fvm.GetAccountAvailableBalance(
+		blockCtx,
+		address,
+		snapshot)
+
+	if err != nil {
+		return 0, fmt.Errorf(
+			"failed to get account available balance (%s) at block (%s): %w",
+			address.String(),
+			blockHeader.ID(),
+			err)
+	}
+
+	return accountAvailableBalance, nil
+}
+
+func (e *QueryExecutor) GetAccountKeys(
+	_ context.Context,
+	address flow.Address,
+	blockHeader *flow.Header,
+	snapshot snapshot.StorageSnapshot,
+) ([]flow.AccountPublicKey, error) {
+	// TODO(ramtin): utilize ctx
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithDerivedBlockData(
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
+
+	accountKeys, err := fvm.GetAccountKeys(blockCtx,
+		address,
+		snapshot)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to get account keys (%s) at block (%s): %w",
+			address.String(),
+			blockHeader.ID(),
+			err)
+	}
+
+	return accountKeys, nil
+}
+
+func (e *QueryExecutor) GetAccountKey(
+	_ context.Context,
+	address flow.Address,
+	keyIndex uint32,
+	blockHeader *flow.Header,
+	snapshot snapshot.StorageSnapshot,
+) (*flow.AccountPublicKey, error) {
+	// TODO(ramtin): utilize ctx
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithDerivedBlockData(
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
+
+	accountKey, err := fvm.GetAccountKey(blockCtx,
+		address,
+		keyIndex,
+		snapshot)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to get account key (%s) at block (%s): %w",
+			address.String(),
+			blockHeader.ID(),
+			err)
+	}
+
+	return accountKey, nil
 }

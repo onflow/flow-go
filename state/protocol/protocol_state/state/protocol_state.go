@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
@@ -11,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/pubsub"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
@@ -18,23 +21,23 @@ import (
 
 // ProtocolState is an implementation of the read-only interface for protocol state, it allows querying information
 // on a per-block and per-epoch basis.
-// It is backed by a storage.ProtocolState and an in-memory protocol.GlobalParams.
+// It is backed by a storage.EpochProtocolStateEntries and an in-memory protocol.GlobalParams.
 type ProtocolState struct {
-	epochProtocolStateDB storage.ProtocolState
+	epochProtocolStateDB storage.EpochProtocolStateEntries
 	kvStoreSnapshots     protocol_state.ProtocolKVStore
 	globalParams         protocol.GlobalParams
 }
 
 var _ protocol.ProtocolState = (*ProtocolState)(nil)
 
-func NewProtocolState(epochProtocolStateDB storage.ProtocolState, kvStoreSnapshots storage.ProtocolKVStore, globalParams protocol.GlobalParams) *ProtocolState {
+func NewProtocolState(epochProtocolStateDB storage.EpochProtocolStateEntries, kvStoreSnapshots storage.ProtocolKVStore, globalParams protocol.GlobalParams) *ProtocolState {
 	return newProtocolState(epochProtocolStateDB, kvstore.NewProtocolKVStore(kvStoreSnapshots), globalParams)
 }
 
 // newProtocolState creates a new ProtocolState instance. The exported constructor `NewProtocolState` only requires the
 // lower-level `storage.ProtocolKVStore` as input. Though, internally we use the higher-level `protocol_state.ProtocolKVStore`,
 // which wraps the lower-level ProtocolKVStore.
-func newProtocolState(epochProtocolStateDB storage.ProtocolState, kvStoreSnapshots protocol_state.ProtocolKVStore, globalParams protocol.GlobalParams) *ProtocolState {
+func newProtocolState(epochProtocolStateDB storage.EpochProtocolStateEntries, kvStoreSnapshots protocol_state.ProtocolKVStore, globalParams protocol.GlobalParams) *ProtocolState {
 	return &ProtocolState{
 		epochProtocolStateDB: epochProtocolStateDB,
 		kvStoreSnapshots:     kvStoreSnapshots,
@@ -42,19 +45,19 @@ func newProtocolState(epochProtocolStateDB storage.ProtocolState, kvStoreSnapsho
 	}
 }
 
-// AtBlockID returns epoch protocol state at block ID.
+// EpochStateAtBlockID returns epoch protocol state at block ID.
 // The resulting epoch protocol state is returned AFTER applying updates that are contained in block.
 // Can be queried for any block that has been added to the block tree.
 // Returns:
-// - (DynamicProtocolState, nil) - if there is an epoch protocol state associated with given block ID.
+// - (EpochProtocolState, nil) - if there is an epoch protocol state associated with given block ID.
 // - (nil, storage.ErrNotFound) - if there is no epoch protocol state associated with given block ID.
 // - (nil, exception) - any other error should be treated as exception.
-func (s *ProtocolState) AtBlockID(blockID flow.Identifier) (protocol.DynamicProtocolState, error) {
+func (s *ProtocolState) EpochStateAtBlockID(blockID flow.Identifier) (protocol.EpochProtocolState, error) {
 	protocolStateEntry, err := s.epochProtocolStateDB.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not query epoch protocol state at block (%x): %w", blockID, err)
 	}
-	return inmem.NewDynamicProtocolStateAdapter(protocolStateEntry, s.globalParams), nil
+	return inmem.NewEpochProtocolStateAdapter(protocolStateEntry, s.globalParams), nil
 }
 
 // KVStoreAtBlockID returns protocol state at block ID.
@@ -86,7 +89,8 @@ var _ protocol.MutableProtocolState = (*MutableProtocolState)(nil)
 
 // NewMutableProtocolState creates a new instance of MutableProtocolState.
 func NewMutableProtocolState(
-	epochProtocolStateDB storage.ProtocolState,
+	log zerolog.Logger,
+	epochProtocolStateDB storage.EpochProtocolStateEntries,
 	kvStoreSnapshots storage.ProtocolKVStore,
 	globalParams protocol.GlobalParams,
 	headers storage.Headers,
@@ -94,11 +98,40 @@ func NewMutableProtocolState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 ) *MutableProtocolState {
+	log = log.With().Str("module", "dynamic_protocol_state").Logger()
+	// TODO [future generalization]: ideally, the telemetry consumers would be injected into the constructor
+	// mirroring telemetry collection in HotStuff. Thereby it would become possible to add more advanced supervision
+	// logic or to expose the telemetry as structured data by implementing custom telemetry consumers. At the moment,
+	// we only desire to log events picked up by the state machines, so the implementation below suffices. In case
+	// of two proposals for the same view, our current `StateMachineTelemetryConsumer` by itself does not collect
+	// sufficient context to differentiate events from the two blocks, as it only observes the view number. From the
+	// surrounding logs, we can infer the proposals' IDs. However, for more advanced analytics on the state machines,
+	// we might want to extend the current Telemetry implementation in the future.
+	epochHappyPathTelemetryFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
+		return pubsub.NewLogConsumer(
+			log.With().
+				Str("state_machine", "epoch_happy_path").
+				Uint64("candidate_view", candidateView).
+				Logger(),
+		)
+	}
+	epochFallbackTelemetryFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
+		return pubsub.NewLogConsumer(
+			log.With().
+				Str("state_machine", "epoch_fallback_path").
+				Uint64("candidate_view", candidateView).
+				Logger(),
+		)
+	}
+	psVersionUpgradeStateMachineTelemetry := pubsub.NewLogConsumer(log.With().Str("state_machine", "version_upgrade").Logger())
+	setKVStoreValueTelemetry := pubsub.NewLogConsumer(log.With().Str("state_machine", "set_kvstore_value").Logger())
+
 	// an ordered list of factories to create state machines for different sub-states of the Dynamic Protocol State.
 	// all factories are expected to be called in order defined here.
 	kvStateMachineFactories := []protocol_state.KeyValueStoreStateMachineFactory{
-		kvstore.NewPSVersionUpgradeStateMachineFactory(globalParams),
-		epochs.NewEpochStateMachineFactory(globalParams, setups, commits, epochProtocolStateDB),
+		kvstore.NewPSVersionUpgradeStateMachineFactory(psVersionUpgradeStateMachineTelemetry),
+		epochs.NewEpochStateMachineFactory(setups, commits, epochProtocolStateDB, epochHappyPathTelemetryFactory, epochFallbackTelemetryFactory),
+		kvstore.NewSetValueStateMachineFactory(setKVStoreValueTelemetry),
 	}
 	return newMutableProtocolState(epochProtocolStateDB, kvstore.NewProtocolKVStore(kvStoreSnapshots), globalParams, headers, results, kvStateMachineFactories)
 }
@@ -109,7 +142,7 @@ func NewMutableProtocolState(
 // implement. Therefore, we test it independently of the state machines required for production. In comparison, the
 // constructor `NewMutableProtocolState` is intended for production use, where the list of state machines is hard-coded.
 func newMutableProtocolState(
-	epochProtocolStateDB storage.ProtocolState,
+	epochProtocolStateDB storage.EpochProtocolStateEntries,
 	kvStoreSnapshots protocol_state.ProtocolKVStore,
 	globalParams protocol.GlobalParams,
 	headers storage.Headers,
@@ -282,7 +315,7 @@ func (s *MutableProtocolState) build(
 	parentStateID flow.Identifier,
 	stateMachines []protocol_state.KeyValueStoreStateMachine,
 	serviceEvents []flow.ServiceEvent,
-	evolvingState protocol_state.KVStoreMutator,
+	evolvingState protocol.KVStoreReader,
 ) (flow.Identifier, *transaction.DeferredBlockPersist, error) {
 	for _, stateMachine := range stateMachines {
 		err := stateMachine.EvolveState(serviceEvents) // state machine should only bubble up exceptions

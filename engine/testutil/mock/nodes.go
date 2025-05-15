@@ -22,7 +22,7 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution/computation"
-	"github.com/onflow/flow-go/engine/execution/ingestion"
+	executionIngest "github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/verification/assigner"
@@ -46,7 +46,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -82,7 +81,7 @@ type GenericNode struct {
 	Results            storage.ExecutionResults
 	Setups             storage.EpochSetups
 	EpochCommits       storage.EpochCommits
-	EpochProtocolState storage.ProtocolState
+	EpochProtocolState storage.EpochProtocolStateEntries
 	ProtocolKVStore    storage.ProtocolKVStore
 	State              protocol.ParticipantState
 	Index              storage.Index
@@ -140,6 +139,7 @@ func (n CollectionNode) Start(t *testing.T) {
 	n.IngestionEngine.Start(n.Ctx)
 	n.EpochManagerEngine.Start(n.Ctx)
 	n.ProviderEngine.Start(n.Ctx)
+	n.PusherEngine.Start(n.Ctx)
 }
 
 func (n CollectionNode) Ready() <-chan struct{} {
@@ -178,21 +178,38 @@ type ConsensusNode struct {
 	MatchingEngine  *matching.Engine
 }
 
-func (cn ConsensusNode) Ready() {
-	<-cn.IngestionEngine.Ready()
-	<-cn.SealingEngine.Ready()
+func (cn ConsensusNode) Start(t *testing.T) {
+	go unittest.FailOnIrrecoverableError(t, cn.Ctx.Done(), cn.Errs)
+	cn.IngestionEngine.Start(cn.Ctx)
+	cn.SealingEngine.Start(cn.Ctx)
 }
 
-func (cn ConsensusNode) Done() {
-	<-cn.IngestionEngine.Done()
-	<-cn.SealingEngine.Done()
+func (cn ConsensusNode) Ready() <-chan struct{} {
+	return util.AllReady(
+		cn.IngestionEngine,
+		cn.SealingEngine,
+	)
+}
+
+func (cn ConsensusNode) Done() <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		cn.GenericNode.Cancel()
+		<-util.AllDone(
+			cn.IngestionEngine,
+			cn.SealingEngine,
+		)
+		cn.GenericNode.Done()
+		close(done)
+	}()
+	return done
 }
 
 // ExecutionNode implements a mocked execution node for tests.
 type ExecutionNode struct {
 	GenericNode
 	FollowerState       protocol.FollowerState
-	IngestionEngine     *ingestion.Engine
+	IngestionEngine     *executionIngest.Core
 	ExecutionEngine     *computation.Manager
 	RequestEngine       *requester.Engine
 	ReceiptsEngine      *executionprovider.Engine
@@ -211,12 +228,13 @@ type ExecutionNode struct {
 	StorehouseEnabled   bool
 }
 
-func (en ExecutionNode) Ready(ctx context.Context) {
+func (en ExecutionNode) Ready(t *testing.T, ctx context.Context) {
 	// TODO: receipt engine has been migrated to the new component interface, hence
 	// is using Start. Other engines' startup should be refactored once migrated to
 	// new interface.
-	irctx, _ := irrecoverable.WithSignaler(ctx)
+	irctx := irrecoverable.NewMockSignalerContext(t, ctx)
 	en.ReceiptsEngine.Start(irctx)
+	en.IngestionEngine.Start(irctx)
 	en.FollowerCore.Start(irctx)
 	en.FollowerEngine.Start(irctx)
 	en.SyncEngine.Start(irctx)
@@ -239,7 +257,6 @@ func (en ExecutionNode) Done(cancelFunc context.CancelFunc) {
 	// to stop all (deprecated) ready-done-aware
 	<-util.AllDone(
 		en.IngestionEngine,
-		en.IngestionEngine,
 		en.ReceiptsEngine,
 		en.Ledger,
 		en.FollowerCore,
@@ -253,7 +270,7 @@ func (en ExecutionNode) Done(cancelFunc context.CancelFunc) {
 }
 
 func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.Header) {
-	height, blockID, err := en.ExecutionState.GetHighestExecutedBlockID(context.Background())
+	height, blockID, err := en.ExecutionState.GetLastExecutedBlockID(context.Background())
 	require.NoError(t, err)
 
 	require.Equal(t, header.ID(), blockID)
@@ -281,12 +298,12 @@ type VerificationNode struct {
 	Receipts      storage.ExecutionReceipts
 
 	// chunk consumer and processor for fetcher engine
-	ProcessedChunkIndex storage.ConsumerProgress
-	ChunksQueue         *bstorage.ChunksQueue
+	ProcessedChunkIndex storage.ConsumerProgressInitializer
+	ChunksQueue         storage.ChunksQueue
 	ChunkConsumer       *chunkconsumer.ChunkConsumer
 
 	// block consumer for chunk consumer
-	ProcessedBlockHeight storage.ConsumerProgress
+	ProcessedBlockHeight storage.ConsumerProgressInitializer
 	BlockConsumer        *blockconsumer.BlockConsumer
 
 	VerifierEngine  *verifier.Engine
