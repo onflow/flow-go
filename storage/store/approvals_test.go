@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
@@ -60,19 +61,23 @@ func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		store := store.NewResultApprovals(metrics, db)
 
-		approval1 := unittest.ResultApprovalFixture()
-		approval2 := unittest.ResultApprovalFixture()
+		approval1, approval2 := twoApprovalsForTheSameResult()
 
 		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
-		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
+
 		err := store.Store(lctx, approval1)
+		lctx.Release()
 		require.NoError(t, err)
 
 		// we can store a different approval, but we can't index a different
 		// approval for the same chunk.
-		err = store.Store(lctx, approval2)
+		lctx2 := lockManager.NewContext()
+		require.NoError(t, lctx2.AcquireLock(storage.LockIndexResultApproval))
+		err = store.Store(lctx2, approval2)
+		lctx2.Release()
+		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrDataMismatch)
 	})
 }
@@ -85,8 +90,7 @@ func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 		store := store.NewResultApprovals(metrics, db)
 
 		lockManager := storage.NewTestingLockManager()
-		approval1 := unittest.ResultApprovalFixture()
-		approval2 := unittest.ResultApprovalFixture()
+		approval1, approval2 := twoApprovalsForTheSameResult()
 
 		var wg sync.WaitGroup
 		wg.Add(2)
@@ -127,4 +131,13 @@ func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 			require.True(t, errors.Is(firstIndexErr, storage.ErrDataMismatch))
 		}
 	})
+}
+
+func twoApprovalsForTheSameResult() (*flow.ResultApproval, *flow.ResultApproval) {
+	approval1 := unittest.ResultApprovalFixture()
+	approval2 := unittest.ResultApprovalFixture()
+	// make sure the two approvals are different
+	approval2.Body.ChunkIndex = approval1.Body.ChunkIndex
+	approval2.Body.ExecutionResultID = approval1.Body.ExecutionResultID
+	return approval1, approval2
 }
