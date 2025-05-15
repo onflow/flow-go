@@ -1,3 +1,40 @@
+// Package pipeline provides the implementation for processing individual execution results
+// through a multi-stage state machine. Each pipeline manages the lifecycle of downloading,
+// indexing, and persisting execution data for a single ExecutionResult.
+//
+// The pipeline implements the state machine described in the Optimistic Syncing design,
+// transitioning through states: StateReady -> StateDownloading -> StateIndexing -> StateWaitingPersist ->
+// StatePersisting -> StateComplete, with an optional StateCanceled state for abandoned forks.
+//
+// Pipelines form a tree that mirrors the execution result tree. Each pipeline tracks
+// its parent and communicates state updates to its children. This allows the entire
+// tree to coordinate processing and handle chain reorganizations gracefully.
+//
+// State Transition Conditions:
+//
+//	Ready -> Downloading:
+//	  - Must descend from last persisted sealed result
+//	  - Parent must be in active state (Downloading/Indexing/WaitingPersist/Persisting/Complete)
+//
+//	Downloading -> Indexing:
+//	  - Download completed successfully
+//	  - Must still descend from sealed chain
+//	  - Parent must not be canceled
+//
+//	Indexing -> WaitingPersist:
+//	  - Indexing completed successfully
+//	  - Must still descend from sealed chain
+//	  - Parent must not be canceled
+//
+//	WaitingPersist -> Persisting:
+//	  - ExecutionResult must be sealed
+//	  - Parent pipeline must be complete
+//
+//	Persisting -> Complete:
+//	  - Persist completed successfully
+//
+//	Any -> Canceled:
+//	  - No longer descends from sealed chain
 package pipeline
 
 import (
@@ -56,9 +93,9 @@ func (s State) String() string {
 
 // StateUpdate contains state update information
 type StateUpdate struct {
-	// DescendsFromLastPersistedSealed indicates if this pipeline descends from
+	// DescendsFromSealed indicates if this pipeline descends from
 	// the last persisted sealed result
-	DescendsFromLastPersistedSealed bool
+	DescendsFromSealed bool
 	// ParentState contains the state information from the parent pipeline
 	ParentState State
 }
@@ -156,16 +193,17 @@ func (p *Pipeline) Run(parentCtx context.Context) error {
 		case <-notifierChan:
 			processed, err := p.processCurrentState(ctx)
 			if err != nil {
-				if errors.Is(err, context.Canceled) {
-					if ctxErr := context.Cause(ctx); ctxErr == nil || errors.Is(ctxErr, context.Canceled) {
-						return nil
-					}
+				isContextCanceled := errors.Is(err, context.Canceled)
+				isCtxCanceledWithSpecificCause := context.Cause(ctx) != nil && !errors.Is(context.Cause(ctx), context.Canceled)
+				isParentCtxCanceledWithSpecificCause := context.Cause(parentCtx) != nil && !errors.Is(context.Cause(parentCtx), context.Canceled)
 
-					if parentCtxErr := context.Cause(parentCtx); parentCtxErr == nil || errors.Is(parentCtxErr, context.Canceled) {
-						return nil
-					}
+				contextCanceledGracefully :=
+					isContextCanceled &&
+						!isCtxCanceledWithSpecificCause &&
+						!isParentCtxCanceledWithSpecificCause
 
-					return err
+				if contextCanceledGracefully {
+					return nil
 				}
 
 				return err
@@ -195,7 +233,12 @@ func (p *Pipeline) SetSealed() {
 	p.stateNotifier.Notify()
 }
 
-// UpdateState updates the pipeline's state based on the provided state update.
+// UpdateState updates the pipeline's state based on the provided state update from its parent
+// pipeline or the Results Forest.
+//
+// This function is the primary mechanism for state communication in the processing graph. State
+// updates flow from parent to child pipelines, allowing coordinated lifecycle management across
+// the entire execution result tree.
 func (p *Pipeline) UpdateState(update StateUpdate) {
 	if shouldAbort := p.handleStateUpdate(update); !shouldAbort {
 		// Trigger state check
@@ -218,11 +261,11 @@ func (p *Pipeline) UpdateState(update StateUpdate) {
 func (p *Pipeline) handleStateUpdate(update StateUpdate) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	previousDescendsFromLatest := p.descendsFromSealed
-	p.descendsFromSealed = update.DescendsFromLastPersistedSealed
+	previousDescendsFromSealed := p.descendsFromSealed
+	p.descendsFromSealed = update.DescendsFromSealed
 	p.parentState = update.ParentState
 
-	return previousDescendsFromLatest && !update.DescendsFromLastPersistedSealed
+	return previousDescendsFromSealed && !update.DescendsFromSealed
 }
 
 // broadcastStateUpdate sends a state update via the state publisher.
@@ -233,8 +276,8 @@ func (p *Pipeline) broadcastStateUpdate() {
 
 	p.mu.RLock()
 	update := StateUpdate{
-		DescendsFromLastPersistedSealed: p.descendsFromSealed,
-		ParentState:                     p.state,
+		DescendsFromSealed: p.descendsFromSealed,
+		ParentState:        p.state,
 	}
 	p.mu.RUnlock()
 

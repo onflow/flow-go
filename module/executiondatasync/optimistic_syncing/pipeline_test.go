@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -32,7 +31,7 @@ func TestPipelineStateTransitions(t *testing.T) {
 	mockCore.On("Persist", mock.Anything).Return(nil)
 
 	// Create a pipeline
-	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
+	pipeline := NewPipeline(unittest.Logger(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
 
 	// Start the pipeline in a goroutine
 	ctx, cancel := context.WithCancel(context.Background())
@@ -48,8 +47,8 @@ func TestPipelineStateTransitions(t *testing.T) {
 
 	// Send parent update to trigger state transition
 	pipeline.UpdateState(StateUpdate{
-		DescendsFromLastPersistedSealed: true,
-		ParentState:                     StateComplete, // Assume that parent is already complete
+		DescendsFromSealed: true,
+		ParentState:        StateComplete, // Assume that parent is already complete
 	})
 
 	// Wait for pipeline to reach WaitingPersist state
@@ -103,7 +102,7 @@ func TestPipelineCancellation(t *testing.T) {
 	}).Return(nil)
 
 	// Create a pipeline
-	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
+	pipeline := NewPipeline(unittest.Logger(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
 
 	// Start the pipeline
 	ctx, cancel := context.WithCancel(context.Background())
@@ -116,8 +115,8 @@ func TestPipelineCancellation(t *testing.T) {
 
 	// Send an update that allows starting
 	pipeline.UpdateState(StateUpdate{
-		DescendsFromLastPersistedSealed: true,
-		ParentState:                     StateComplete,
+		DescendsFromSealed: true,
+		ParentState:        StateComplete,
 	})
 
 	// Wait for download to start
@@ -130,8 +129,8 @@ func TestPipelineCancellation(t *testing.T) {
 
 	// Now send an update that causes cancellation
 	pipeline.UpdateState(StateUpdate{
-		DescendsFromLastPersistedSealed: false, // No longer descends from latest
-		ParentState:                     StateComplete,
+		DescendsFromSealed: false, // No longer descends from latest
+		ParentState:        StateComplete,
 	})
 
 	// Check the error channel
@@ -156,7 +155,7 @@ func TestPipelineCancellation(t *testing.T) {
 	for !found {
 		select {
 		case update := <-updateChan:
-			if !update.DescendsFromLastPersistedSealed {
+			if !update.DescendsFromSealed {
 				found = true
 			}
 		case <-timeout:
@@ -185,7 +184,7 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 	mockCore.On("Persist", mock.Anything).Return(nil)
 
 	// Create a pipeline
-	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
+	pipeline := NewPipeline(unittest.Logger(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
 
 	// Start the pipeline
 	ctx, cancel := context.WithCancel(context.Background())
@@ -198,8 +197,8 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 
 	// Initial update - parent in Ready state
 	pipeline.UpdateState(StateUpdate{
-		DescendsFromLastPersistedSealed: true,
-		ParentState:                     StateReady,
+		DescendsFromSealed: true,
+		ParentState:        StateReady,
 	})
 
 	// Sleep a bit to allow processing
@@ -211,8 +210,8 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 
 	// Update parent to downloading
 	pipeline.UpdateState(StateUpdate{
-		DescendsFromLastPersistedSealed: true,
-		ParentState:                     StateDownloading,
+		DescendsFromSealed: true,
+		ParentState:        StateDownloading,
 	})
 
 	// Wait for pipeline to progress to WaitingPersist
@@ -224,8 +223,8 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 
 	// Update parent to complete - should allow persisting when sealed
 	pipeline.UpdateState(StateUpdate{
-		DescendsFromLastPersistedSealed: true,
-		ParentState:                     StateComplete,
+		DescendsFromSealed: true,
+		ParentState:        StateComplete,
 	})
 
 	// Mark the execution result as sealed to trigger persisting
@@ -290,7 +289,7 @@ func TestPipelineErrorHandling(t *testing.T) {
 			tc.setupMock(mockCore, tc.expectedErr)
 
 			// Create a pipeline
-			pipeline := NewPipeline(zerolog.Nop(), true, unittest.ExecutionResultFixture(), mockCore, publisher)
+			pipeline := NewPipeline(unittest.Logger(), true, unittest.ExecutionResultFixture(), mockCore, publisher)
 
 			// Start the pipeline
 			ctx, cancel := context.WithCancel(context.Background())
@@ -303,8 +302,8 @@ func TestPipelineErrorHandling(t *testing.T) {
 
 			// Send parent update to trigger processing
 			pipeline.UpdateState(StateUpdate{
-				DescendsFromLastPersistedSealed: true,
-				ParentState:                     StateComplete,
+				DescendsFromSealed: true,
+				ParentState:        StateComplete,
 			})
 
 			// Wait for error
@@ -336,7 +335,7 @@ func TestBroadcastStateUpdate(t *testing.T) {
 	mockCore.On("Index", mock.Anything).Return(nil)
 
 	// Create a pipeline
-	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
+	pipeline := NewPipeline(unittest.Logger(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
 
 	// Start the pipeline
 	ctx, cancel := context.WithCancel(context.Background())
@@ -349,20 +348,20 @@ func TestBroadcastStateUpdate(t *testing.T) {
 
 	// Send a state update to trigger a broadcast to children
 	pipeline.UpdateState(StateUpdate{
-		DescendsFromLastPersistedSealed: true,
-		ParentState:                     StateDownloading,
+		DescendsFromSealed: true,
+		ParentState:        StateDownloading,
 	})
 
 	// Wait for an update to be sent to children
 	update := waitForStateUpdate(t, updateChan, StateWaitingPersist)
 
 	// Check that the update has the correct flag
-	assert.True(t, update.DescendsFromLastPersistedSealed, "Initial update should indicate descends=true")
+	assert.True(t, update.DescendsFromSealed, "Initial update should indicate descends=true")
 
 	// Now simulate this pipeline being canceled
 	pipeline.UpdateState(StateUpdate{
-		DescendsFromLastPersistedSealed: false, // No longer descends
-		ParentState:                     StateReady,
+		DescendsFromSealed: false, // No longer descends
+		ParentState:        StateReady,
 	})
 
 	// Wait for the pipeline to complete
@@ -389,7 +388,7 @@ func TestBroadcastStateUpdate(t *testing.T) {
 	for !canceledUpdateFound {
 		select {
 		case update := <-updateChan:
-			if !update.DescendsFromLastPersistedSealed && update.ParentState == StateCanceled {
+			if !update.DescendsFromSealed && update.ParentState == StateCanceled {
 				canceledUpdateFound = true
 			}
 		case <-drainTimeout:
