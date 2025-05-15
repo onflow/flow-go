@@ -185,7 +185,7 @@ func (suite *BuilderSuite) InsertBlock(block model.Block) {
 
 func (suite *BuilderSuite) FinalizeBlock(block model.Block) {
 	err := suite.db.Update(func(tx *badger.Txn) error {
-		var refBlock flow.Header
+		var refBlock flow.ProposalHeader
 		err := operation.RetrieveHeader(block.Payload.ReferenceBlockID, &refBlock)(tx)
 		if err != nil {
 			return err
@@ -194,7 +194,7 @@ func (suite *BuilderSuite) FinalizeBlock(block model.Block) {
 		if err != nil {
 			return err
 		}
-		err = operation.IndexClusterBlockByReferenceHeight(refBlock.Height, block.ID())(tx)
+		err = operation.IndexClusterBlockByReferenceHeight(refBlock.Header.Height, block.ID())(tx)
 		return err
 	})
 	suite.Assert().NoError(err)

@@ -18,16 +18,19 @@ func InsertClusterBlock(proposal *cluster.BlockProposal) func(*badger.Txn) error
 	return func(tx *badger.Txn) error {
 		// store the block header
 		blockID := proposal.Block.ID()
-		err := operation.InsertHeader(blockID, proposal.Block.ToHeader())(tx)
+		err := operation.InsertHeader(blockID, &flow.ProposalHeader{
+			Header:          proposal.Block.ToHeader(),
+			ProposerSigData: proposal.ProposerSigData,
+		})(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
 		}
 
 		// store the block proposer signature
-		err = operation.InsertProposalSignature(blockID, &proposal.ProposerSigData)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert proposer signature: %w", err)
-		}
+		//err = operation.InsertProposalSignature(blockID, &proposal.ProposerSigData)(tx)
+		//if err != nil {
+		//	return fmt.Errorf("could not insert proposer signature: %w", err)
+		//}
 
 		// insert the block payload
 		err = InsertClusterPayload(blockID, &proposal.Block.Payload)(tx)
@@ -48,7 +51,7 @@ func InsertClusterBlock(proposal *cluster.BlockProposal) func(*badger.Txn) error
 func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// retrieve the block header
-		var header flow.Header
+		var header flow.ProposalHeader
 		err := operation.RetrieveHeader(blockID, &header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve header: %w", err)
@@ -62,7 +65,7 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 		}
 
 		// overwrite block
-		*block = cluster.NewBlock(header.HeaderBody, payload)
+		*block = cluster.NewBlock(header.Header.HeaderBody, payload)
 
 		return nil
 	}
@@ -84,10 +87,12 @@ func RetrieveLatestFinalizedClusterHeader(chainID flow.ChainID, final *flow.Head
 			return fmt.Errorf("could not retrieve final ID: %w", err)
 		}
 
-		err = operation.RetrieveHeader(finalID, final)(tx)
+		var header flow.ProposalHeader
+		err = operation.RetrieveHeader(finalID, &header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized header: %w", err)
 		}
+		*final = *header.Header
 
 		return nil
 	}
@@ -97,11 +102,12 @@ func RetrieveLatestFinalizedClusterHeader(chainID flow.ChainID, final *flow.Head
 func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// retrieve the header to check the parent
-		var header flow.Header
-		err := operation.RetrieveHeader(blockID, &header)(tx)
+		var proposalHeader flow.ProposalHeader
+		err := operation.RetrieveHeader(blockID, &proposalHeader)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve header: %w", err)
 		}
+		header := proposalHeader.Header
 
 		// get the chain ID, which determines which cluster state to query
 		chainID := header.ChainID

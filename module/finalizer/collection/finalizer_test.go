@@ -50,7 +50,7 @@ func TestFinalizer(t *testing.T) {
 			require.NoError(t, err)
 			state, err = cluster.Bootstrap(db, stateRoot)
 			require.NoError(t, err)
-			err = db.Update(operation.InsertHeader(refBlock.ID(), refBlock.ToHeader()))
+			err = db.Update(operation.InsertHeader(refBlock.ID(), unittest.ProposalFromHeader(refBlock.ToHeader())))
 			require.NoError(t, err)
 		}
 

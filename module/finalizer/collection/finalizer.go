@@ -56,11 +56,12 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	return operation.RetryOnConflict(f.db.Update, func(tx *badger.Txn) error {
 
 		// retrieve the header of the block we want to finalize
-		var header flow.Header
-		err := operation.RetrieveHeader(blockID, &header)(tx)
+		var proposalHeader flow.ProposalHeader
+		err := operation.RetrieveHeader(blockID, &proposalHeader)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve header: %w", err)
 		}
+		header := proposalHeader.Header
 
 		// retrieve the current finalized cluster state boundary
 		var boundary uint64
@@ -86,16 +87,16 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 		// including the current, we first enumerate each of these blocks.
 		// We start at the youngest block and remember all visited blocks,
 		// while tracing back until we reach the finalized state
-		steps := []*flow.Header{&header}
+		steps := []*flow.Header{header}
 		parentID := header.ParentID
 		for parentID != headID {
-			var parent flow.Header
+			var parent flow.ProposalHeader
 			err = operation.RetrieveHeader(parentID, &parent)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve parent (%x): %w", parentID, err)
 			}
-			steps = append(steps, &parent)
-			parentID = parent.ParentID
+			steps = append(steps, parent.Header)
+			parentID = parent.Header.ParentID
 		}
 
 		// now we can step backwards in order to go from oldest to youngest; for
@@ -135,11 +136,12 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			}
 
 			// look up the reference block height to populate index
-			var refBlock flow.Header
-			err = operation.RetrieveHeader(payload.ReferenceBlockID, &refBlock)(tx)
+			var refBlockProposal flow.ProposalHeader
+			err = operation.RetrieveHeader(payload.ReferenceBlockID, &refBlockProposal)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve reference block (id=%x): %w", payload.ReferenceBlockID, err)
 			}
+			refBlock := refBlockProposal.Header
 			// index the finalized cluster block by reference block height
 			err = operation.IndexClusterBlockByReferenceHeight(refBlock.Height, clusterBlockID)(tx)
 			if err != nil {
