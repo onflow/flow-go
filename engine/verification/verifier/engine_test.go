@@ -154,7 +154,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 				On("Store", testifymock.Anything, testifymock.Anything).
 				Return(nil).
 				Run(func(args testifymock.Arguments) {
-					ra, ok := args[0].(*flow.ResultApproval)
+					ra, ok := args[1].(*flow.ResultApproval)
 					suite.Require().True(ok)
 
 					suite.Assert().Equal(vChunk.Chunk.BlockID, ra.Body.BlockID)
@@ -172,23 +172,6 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 					suite.Assert().NotNil(ra.Body.Spock)
 
 					expectedApproval = ra
-				}).
-				Once()
-			suite.approvals.
-				On("Index", testifymock.Anything, testifymock.Anything, testifymock.Anything).
-				Return(nil).
-				Run(func(args testifymock.Arguments) {
-					erID, ok := args[0].(flow.Identifier)
-					suite.Require().True(ok)
-					suite.Assert().Equal(expectedApproval.Body.ExecutionResultID, erID)
-
-					chIndex, ok := args[1].(uint64)
-					suite.Require().True(ok)
-					suite.Assert().Equal(expectedApproval.Body.ChunkIndex, chIndex)
-
-					raID, ok := args[2].(flow.Identifier)
-					suite.Require().True(ok)
-					suite.Assert().Equal(expectedApproval.ID(), raID)
 				}).
 				Once()
 
