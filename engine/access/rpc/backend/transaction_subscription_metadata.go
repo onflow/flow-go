@@ -8,9 +8,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state"
@@ -28,7 +28,7 @@ type transactionSubscriptionMetadata struct {
 	collections  storage.Collections
 	transactions storage.Transactions
 
-	txResult             *access.TransactionResult
+	txResult             *accessmodel.TransactionResult
 	txReferenceBlockID   flow.Identifier
 	blockWithTx          *flow.Header
 	eventEncodingVersion entities.EventEncodingVersion
@@ -57,7 +57,7 @@ func newTransactionSubscriptionMetadata(
 ) *transactionSubscriptionMetadata {
 	return &transactionSubscriptionMetadata{
 		backendTransactions:  backendTransactions,
-		txResult:             &access.TransactionResult{TransactionID: txID},
+		txResult:             &accessmodel.TransactionResult{TransactionID: txID},
 		eventEncodingVersion: eventEncodingVersion,
 		blocks:               backendTransactions.blocks,
 		collections:          backendTransactions.collections,

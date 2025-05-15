@@ -62,6 +62,7 @@ func TestReceipts_MultiIndex(t *testing.T) {
 			}
 			return nil
 		}))
+
 		var actual []flow.Identifier
 		err := operation.LookupExecutionReceipts(db.Reader(), blockID, &actual)
 		require.Nil(t, err)

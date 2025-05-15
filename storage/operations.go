@@ -2,6 +2,7 @@ package storage
 
 import (
 	"io"
+	"sync"
 )
 
 // Iterator is an interface for iterating over key-value pairs in a storage backend.
@@ -68,6 +69,16 @@ func DefaultIteratorOptions() IteratorOption {
 	}
 }
 
+// Seeker is an interface for seeking a key within a range.
+type Seeker interface {
+	// SeekLE (seek less than or equal) returns the largest key in lexicographical
+	// order within inclusive range of [startPrefix, key].
+	// This function returns an error if specified key is less than startPrefix.
+	// This function returns storage.ErrNotFound if a key that matches
+	// the specified criteria is not found.
+	SeekLE(startPrefix, key []byte) ([]byte, error)
+}
+
 type Reader interface {
 	// Get gets the value for the given key. It returns ErrNotFound if the DB
 	// does not contain the key.
@@ -86,6 +97,9 @@ type Reader interface {
 	//   - have a prefix equal to the endPrefix OR
 	//   - have a prefix that is lexicographically between startPrefix and endPrefix
 	NewIter(startPrefix, endPrefix []byte, ops IteratorOption) (Iterator, error)
+
+	// NewSeeker returns a new Seeker.
+	NewSeeker() Seeker
 }
 
 // Writer is an interface for batch writing to a storage backend.
@@ -115,6 +129,7 @@ type Writer interface {
 // It is useful for performing a related sequence of reads and writes, after which you would like
 // to modify some non-database state if the sequence completed successfully (via AddCallback).
 // If you are not using AddCallback, avoid using ReaderBatchWriter: use Reader and Writer directly.
+// ReaderBatchWriter is not safe for concurrent use.
 type ReaderBatchWriter interface {
 	// GlobalReader returns a database-backed reader which reads the latest committed global database state ("read-committed isolation").
 	// This reader will not read writes written to ReaderBatchWriter.Writer until the write batch is committed.
@@ -127,6 +142,14 @@ type ReaderBatchWriter interface {
 	// Note:
 	// - The writer cannot be used concurrently for writing.
 	Writer() Writer
+
+	// Lock tries to acquire the lock for the batch.
+	// if the lock is already acquired by this same batch from other pending db operations,
+	// then it will not be blocked and can continue updating the batch, which prevents a re-entrant deadlock.
+	// Note the ReaderBatchWriter is not concurrent-safe, so the caller must ensure that
+	// the batch is not used concurrently by multiple goroutines.
+	// CAUTION: The caller must ensure that no other references exist for the input lock.
+	Lock(*sync.Mutex)
 
 	// AddCallback adds a callback to execute after the batch has been flush
 	// regardless the batch update is succeeded or failed.
@@ -157,6 +180,11 @@ type Batch interface {
 
 	// Commit applies the batched updates to the database.
 	Commit() error
+
+	// Close releases memory of the batch.
+	// This can be called as a defer statement immediately after creating Batch
+	// to reduce risk of unbounded memory consumption.
+	Close() error
 }
 
 // OnlyWriter is an adapter to convert a function that takes a Writer

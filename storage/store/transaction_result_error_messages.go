@@ -98,6 +98,7 @@ func (t *TransactionResultErrorMessages) Exists(blockID flow.Identifier) (bool, 
 	if ok := t.blockCache.IsCached(key); ok {
 		return ok, nil
 	}
+
 	// otherwise, check badger store
 	var exists bool
 	err := operation.TransactionResultErrorMessagesExists(t.db.Reader(), blockID, &exists)

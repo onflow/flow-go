@@ -118,12 +118,13 @@ func TestExecuteCanBeResumed(t *testing.T) {
 
 		// expect all blocks are pruned
 		for i, b := range bs {
+
 			// verify they are pruned
 			var c storage.StoredChunkDataPack
 
 			if i < 3 {
 				// the first 3 blocks in the first batch are pruned
-				err := operation.RetrieveChunkDataPack(pdb.Reader(), b, &c)
+				err = operation.RetrieveChunkDataPack(pdb.Reader(), b, &c)
 				require.True(t, errors.Is(err, storage.ErrNotFound), "expected ErrNotFound for block %v but got %v", i, err)
 				continue
 			}
@@ -148,7 +149,7 @@ func TestExecuteCanBeResumed(t *testing.T) {
 		for _, b := range bs {
 			var c storage.StoredChunkDataPack
 			// the first 5 blocks are pruned
-			err := operation.RetrieveChunkDataPack(pdb.Reader(), b, &c)
+			err = operation.RetrieveChunkDataPack(pdb.Reader(), b, &c)
 			require.True(t, errors.Is(err, storage.ErrNotFound), "expected ErrNotFound but got %v", err)
 		}
 	})
