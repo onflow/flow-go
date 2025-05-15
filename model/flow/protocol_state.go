@@ -439,7 +439,18 @@ func (e *MinEpochStateEntry) ID() Identifier {
 	if e == nil {
 		return ZeroID
 	}
-	return MakeID(e)
+	body := struct {
+		PreviousEpochID        Identifier
+		CurrentEpochID         Identifier
+		NextEpochID            Identifier
+		EpochFallbackTriggered bool
+	}{
+		PreviousEpochID:        e.PreviousEpoch.ID(),
+		CurrentEpochID:         e.CurrentEpoch.ID(),
+		NextEpochID:            e.NextEpoch.ID(),
+		EpochFallbackTriggered: e.EpochFallbackTriggered,
+	}
+	return MakeID(body)
 }
 
 // Copy returns a full copy of the entry.
