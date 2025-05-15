@@ -136,6 +136,8 @@ const EpochSetupRandomSourceLength = 16
 // When an EpochSetup event is accepted and incorporated into the Protocol State, this triggers the
 // Distributed Key Generation [DKG] and cluster QC voting process for the next epoch.
 // It also causes the current epoch to enter the EpochPhaseSetup phase.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type EpochSetup struct {
 	Counter            uint64               // the number of the epoch being setup (current+1)
 	FirstView          uint64               // the first view of the epoch being setup
@@ -148,6 +150,34 @@ type EpochSetup struct {
 	RandomSource       []byte               // source of randomness for epoch-specific setup tasks
 	TargetDuration     uint64               // desired real-world duration for the epoch [seconds]
 	TargetEndTime      uint64               // desired real-world end time for the epoch in UNIX time [seconds]
+}
+
+func NewEpochSetup(
+	counter uint64,
+	firstView uint64,
+	dKGPhase1FinalView uint64,
+	dKGPhase2FinalView uint64,
+	dKGPhase3FinalView uint64,
+	finalView uint64,
+	participants IdentitySkeletonList,
+	assignments AssignmentList,
+	randomSource []byte,
+	targetDuration uint64,
+	targetEndTime uint64,
+) EpochSetup {
+	return EpochSetup{
+		Counter:            counter,
+		FirstView:          firstView,
+		DKGPhase1FinalView: dKGPhase1FinalView,
+		DKGPhase2FinalView: dKGPhase2FinalView,
+		DKGPhase3FinalView: dKGPhase3FinalView,
+		FinalView:          finalView,
+		Participants:       participants,
+		Assignments:        assignments,
+		RandomSource:       randomSource,
+		TargetDuration:     targetDuration,
+		TargetEndTime:      targetEndTime,
+	}
 }
 
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {
@@ -250,6 +280,8 @@ func (er *EpochRecover) EqualTo(other *EpochRecover) bool {
 // artifacts produced by the DKG are referred to with the "DKG" prefix (for example, DKGGroupKey).
 // These artifacts are *produced by* the DKG, but used for the Random Beacon. As such, other
 // components refer to these same artifacts with the "RandomBeacon" prefix.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type EpochCommit struct {
 	// Counter is the epoch counter of the epoch being committed
 	Counter uint64
@@ -274,6 +306,22 @@ type EpochCommit struct {
 	//          and may NOT include identifiers for all nodes in the consensus committee.
 	//
 	DKGIndexMap DKGIndexMap
+}
+
+func NewEpochCommit(
+	counter uint64,
+	clusterQCs []ClusterQCVoteData,
+	dKGGroupKey crypto.PublicKey,
+	dKGParticipantKeys []crypto.PublicKey,
+	dKGIndexMap DKGIndexMap,
+) EpochCommit {
+	return EpochCommit{
+		Counter:            counter,
+		ClusterQCs:         clusterQCs,
+		DKGGroupKey:        dKGGroupKey,
+		DKGParticipantKeys: dKGParticipantKeys,
+		DKGIndexMap:        dKGIndexMap,
+	}
 }
 
 // ClusterQCVoteData represents the votes for a cluster quorum certificate, as
@@ -351,13 +399,13 @@ func commitFromEncodable(enc encodableCommit) EpochCommit {
 	for _, key := range enc.DKGParticipantKeys {
 		dkgKeys = append(dkgKeys, key.PublicKey)
 	}
-	return EpochCommit{
-		Counter:            enc.Counter,
-		ClusterQCs:         enc.ClusterQCs,
-		DKGGroupKey:        enc.DKGGroupKey.PublicKey,
-		DKGParticipantKeys: dkgKeys,
-		DKGIndexMap:        enc.DKGIndexMap,
-	}
+	return NewEpochCommit(
+		enc.Counter,
+		enc.ClusterQCs,
+		enc.DKGGroupKey.PublicKey,
+		dkgKeys,
+		enc.DKGIndexMap,
+	)
 }
 
 func (commit EpochCommit) MarshalJSON() ([]byte, error) {
