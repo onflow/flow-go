@@ -59,7 +59,7 @@ func TestBootstrapValid(t *testing.T) {
 		err = db.View(operation.LookupBlockHeight(0, &genesisID))
 		require.NoError(t, err)
 
-		var header flow.Header
+		var header flow.ProposalHeader
 		err = db.View(operation.RetrieveHeader(genesisID, &header))
 		require.NoError(t, err)
 
@@ -78,7 +78,7 @@ func TestBootstrapValid(t *testing.T) {
 		require.Equal(t, block.Height, sealed)
 		require.Equal(t, block.ID(), genesisID)
 		require.Equal(t, block.ID(), seal.BlockID)
-		require.Equal(t, block, &header)
+		require.Equal(t, block, header.Header)
 	})
 }
 
