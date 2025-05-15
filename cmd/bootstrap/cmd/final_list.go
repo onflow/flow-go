@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -71,7 +72,11 @@ func finalList(cmd *cobra.Command, args []string) {
 	validateNodes(localNodes, registeredNodes)
 
 	// write node-config.json with the new list of nodes to be used for the `finalize` command
-	err = common.WriteJSON(model.PathFinallist, flagOutdir, model.ToPublicNodeInfoList(localNodes))
+	pubInfo, err := model.ToPublicNodeInfoList(localNodes)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read public info")
+	}
+	err = common.WriteJSON(model.PathFinallist, flagOutdir, pubInfo)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
@@ -135,27 +140,43 @@ func validateNodes(localNodes []model.NodeInfo, registeredNodes []model.NodeInfo
 		// flow localNodes contain private key info
 		if matchingNode.NetworkPubKey().String() != "" {
 			// check networking pubkey match
-			matchNodeKey := matchingNode.NetworkPubKey().String()
-			registeredNodeKey := registeredNode.NetworkPubKey().String()
+			matchNodeKey := matchingNode.NetworkPubKey()
+			registeredNodeKey := registeredNode.NetworkPubKey()
 
-			if matchNodeKey != registeredNodeKey {
+			if !matchNodeKey.Equals(registeredNodeKey) {
 				log.Error().
-					Str("registered network key", registeredNodeKey).
-					Str("network key", matchNodeKey).
+					Str("registered network key", registeredNodeKey.String()).
+					Str("network key", matchNodeKey.String()).
 					Msg("networking keys do not match")
 			}
 		}
 
 		// flow localNodes contain privatekey info
 		if matchingNode.StakingPubKey().String() != "" {
-			matchNodeKey := matchingNode.StakingPubKey().String()
-			registeredNodeKey := registeredNode.StakingPubKey().String()
+			matchNodeKey := matchingNode.StakingPubKey()
+			registeredNodeKey := registeredNode.StakingPubKey()
 
-			if matchNodeKey != registeredNodeKey {
+			if !matchNodeKey.Equals(registeredNodeKey) {
 				log.Error().
-					Str("registered staking key", registeredNodeKey).
-					Str("staking key", matchNodeKey).
+					Str("registered staking key", registeredNodeKey.String()).
+					Str("staking key", matchNodeKey.String()).
 					Msg("staking keys do not match")
+			}
+
+			matchingPoP, err := matchingNode.StakingPoP()
+			if err != nil {
+				log.Error().Msgf("error reading matching PoP: %s", err.Error())
+			}
+			registeredPoP, err := registeredNode.StakingPoP()
+			if err != nil {
+				log.Error().Msgf("error reading registered PoP: %s", err.Error())
+			}
+
+			if !bytes.Equal(matchingPoP, registeredPoP) {
+				log.Error().
+					Str("registered staking PoP", fmt.Sprintf("%x", registeredPoP)).
+					Str("staking PoP", fmt.Sprintf("%x", matchingPoP)).
+					Msg("staking PoP do not match")
 			}
 		}
 	}
@@ -256,14 +277,17 @@ func assembleInternalNodesWithoutWeight() []model.NodeInfo {
 			log.Fatal().Err(err).Msg(fmt.Sprintf("invalid node ID: %s", internal.NodeID))
 		}
 
-		node := model.NewPrivateNodeInfo(
+		node, err := model.NewPrivateNodeInfo(
 			internal.NodeID,
 			internal.Role,
 			internal.Address,
 			flow.DefaultInitialWeight,
 			internal.NetworkPrivKey,
-			internal.StakingPrivKey,
+			internal.StakingPrivKey.PrivateKey,
 		)
+		if err != nil {
+			panic(err)
+		}
 
 		nodes = append(nodes, node)
 	}
@@ -303,9 +327,9 @@ func createPublicNodeInfo(nodes []model.NodeInfoPub) []model.NodeInfo {
 		if err != nil {
 			log.Fatal().Err(err).Msg(fmt.Sprintf("invalid network public key: %s", n.NetworkPubKey))
 		}
-		err = common.ValidateStakingPubKey(n.StakingPubKey)
+		err = common.ValidateStakingPubKey(n.StakingPubKey, n.StakingPoP)
 		if err != nil {
-			log.Fatal().Err(err).Msg(fmt.Sprintf("invalid staking public key: %s", n.StakingPubKey))
+			log.Fatal().Err(err).Msg(fmt.Sprintf("invalid staking public key : %s, or staking PoP: %s", n.StakingPubKey, n.StakingPoP))
 		}
 
 		// all nodes should have equal weight (this might change in the future)
@@ -316,6 +340,7 @@ func createPublicNodeInfo(nodes []model.NodeInfoPub) []model.NodeInfo {
 			flow.DefaultInitialWeight,
 			n.NetworkPubKey,
 			n.StakingPubKey,
+			n.StakingPoP,
 		)
 
 		publicInfoNodes = append(publicInfoNodes, node)

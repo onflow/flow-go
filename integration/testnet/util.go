@@ -171,7 +171,7 @@ func WriteTestExecutionService(_ flow.Identifier, address, observerName, bootstr
 
 	log.Info().Msgf("test execution node private key: %v, public key: %x, peerID: %v, nodeID: %v", networkKey, k, peerID, nodeID)
 
-	nodeInfo := bootstrap.NewPrivateNodeInfo(
+	nodeInfo, err := bootstrap.NewPrivateNodeInfo(
 		nodeID,
 		flow.RoleExecution,
 		address,
@@ -179,6 +179,10 @@ func WriteTestExecutionService(_ flow.Identifier, address, observerName, bootstr
 		networkKey,
 		stakingKey,
 	)
+
+	if err != nil {
+		return bootstrap.NodeInfo{}, fmt.Errorf("failed to create node info: %w", err)
+	}
 
 	path := fmt.Sprintf("%s/private-root-information/private-node-info_%v/%vjson",
 		bootstrapDir, nodeID, bootstrap.PathPrivNodeInfoPrefix)

@@ -43,7 +43,7 @@ func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNod
 		if err != nil {
 			return nil, fmt.Errorf("invalid network public key: %s", partner.NetworkPubKey)
 		}
-		err = ValidateStakingPubKey(partner.StakingPubKey)
+		err = ValidateStakingPubKey(partner.StakingPubKey, partner.StakingPoP)
 		if err != nil {
 			return nil, fmt.Errorf("invalid staking public key: %s", partner.StakingPubKey)
 		}
@@ -64,6 +64,7 @@ func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNod
 			weight,
 			partner.NetworkPubKey.PublicKey,
 			partner.StakingPubKey.PublicKey,
+			partner.StakingPoP,
 		)
 		nodes = append(nodes, node)
 	}
@@ -136,7 +137,7 @@ func ReadFullInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, inte
 	log.Info().Msgf("read %d weights for internal nodes", len(weights))
 
 	var nodes []bootstrap.NodeInfo
-	for _, internal := range privInternals {
+	for i, internal := range privInternals {
 		// check if address is valid format
 		ValidateAddressFormat(log, internal.Address)
 
@@ -154,14 +155,18 @@ func ReadFullInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, inte
 			log.Warn().Msgf("internal node (id=%x) has non-default weight (%d != %d)", internal.NodeID, weight, flow.DefaultInitialWeight)
 		}
 
-		node := bootstrap.NewPrivateNodeInfo(
+		node, err := bootstrap.NewPrivateNodeInfo(
 			internal.NodeID,
 			internal.Role,
 			internal.Address,
 			weight,
 			internal.NetworkPrivKey,
-			internal.StakingPrivKey,
+			internal.StakingPrivKey.PrivateKey,
 		)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to build private node info at index %d: %w", i, err)
+		}
 
 		nodes = append(nodes, node)
 	}

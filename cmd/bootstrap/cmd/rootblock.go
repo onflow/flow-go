@@ -183,11 +183,16 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("assembling network and staking keys")
+
 	stakingNodes, err := mergeNodeInfos(internalNodes, partnerNodes)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("failed to merge node infos")
 	}
-	err = common.WriteJSON(model.PathNodeInfosPub, flagOutdir, model.ToPublicNodeInfoList(stakingNodes))
+	publicInfo, err := model.ToPublicNodeInfoList(stakingNodes)
+	if err != nil {
+		log.Fatal().Msg("failed to read public node info")
+	}
+	err = common.WriteJSON(model.PathNodeInfosPub, flagOutdir, publicInfo)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
