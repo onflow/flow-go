@@ -42,7 +42,7 @@ type UntrustedClusterBlock struct {
 
 // ToInternal returns the internal representation of the type.
 func (ub *UntrustedClusterBlock) ToInternal() *cluster.Block {
-	txs := make([]*flow.TransactionBody, len(ub.Payload.Collection))
+	txs := make([]*flow.TransactionBody, 0, len(ub.Payload.Collection))
 
 	for _, tx := range ub.Payload.Collection {
 		txs = append(txs, &tx)
