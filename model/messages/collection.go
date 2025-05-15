@@ -42,17 +42,19 @@ type UntrustedClusterBlock struct {
 
 // ToInternal returns the internal representation of the type.
 func (ub *UntrustedClusterBlock) ToInternal() *cluster.Block {
-	block := &cluster.Block{
+	txs := make([]*flow.TransactionBody, len(ub.Payload.Collection))
+
+	for _, tx := range ub.Payload.Collection {
+		txs = append(txs, &tx)
+	}
+
+	return &cluster.Block{
 		Header: &ub.Header,
 		Payload: &cluster.Payload{
 			ReferenceBlockID: ub.Payload.ReferenceBlockID,
+			Collection:       flow.NewCollection(txs),
 		},
 	}
-	for _, tx := range ub.Payload.Collection {
-		tx := tx
-		block.Payload.Collection.Transactions = append(block.Payload.Collection.Transactions, &tx)
-	}
-	return block
 }
 
 // UntrustedClusterBlockFromInternal converts the internal cluster.Block representation
