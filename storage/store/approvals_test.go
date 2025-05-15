@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -20,7 +21,7 @@ func TestApprovalStoreAndRetrieve(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		store := store.NewResultApprovals(metrics, db)
 
-		lockManager := storage.NewTestingLockManager()
+		lockManager := locks.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
@@ -43,7 +44,7 @@ func TestApprovalStoreTwice(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		store := store.NewResultApprovals(metrics, db)
 
-		lockManager := storage.NewTestingLockManager()
+		lockManager := locks.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
@@ -63,7 +64,7 @@ func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 
 		approval1, approval2 := twoApprovalsForTheSameResult()
 
-		lockManager := storage.NewTestingLockManager()
+		lockManager := locks.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
 
@@ -89,7 +90,7 @@ func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		store := store.NewResultApprovals(metrics, db)
 
-		lockManager := storage.NewTestingLockManager()
+		lockManager := locks.NewTestingLockManager()
 		approval1, approval2 := twoApprovalsForTheSameResult()
 
 		var wg sync.WaitGroup

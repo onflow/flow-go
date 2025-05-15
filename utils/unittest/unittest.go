@@ -29,7 +29,7 @@ import (
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/topology"
-	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/locks"
 )
 
 type SkipReason int
@@ -440,10 +440,10 @@ func RunWithTypedPebbleDB(
 	})
 }
 
-func LockManagerWithContext(t *testing.T, locks ...string) (lockctx.Manager, lockctx.Context) {
-	lockManager := storage.NewTestingLockManager()
+func LockManagerWithContext(t *testing.T, lcks ...string) (lockctx.Manager, lockctx.Context) {
+	lockManager := locks.NewTestingLockManager()
 	lctx := lockManager.NewContext()
-	for _, lock := range locks {
+	for _, lock := range lcks {
 		err := lctx.AcquireLock(lock)
 		require.NoError(t, err)
 	}
