@@ -360,10 +360,11 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	createMetrics := func(chainID flow.ChainID) module.HotstuffMetrics {
 		return metrics.NewNoopCollector()
 	}
+
 	hotstuffFactory, err := factories.NewHotStuffFactory(
 		node.Log,
 		node.Me,
-		node.PublicDB,
+		badgerimpl.ToDB(node.PublicDB),
 		node.State,
 		node.Metrics,
 		node.Metrics,
