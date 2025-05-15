@@ -616,24 +616,20 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 		uint64(targetEndTimeUnix),
 	)
 
-	commit := flow.EpochCommit{
-		Counter: uint64(counter),
-	}
-
 	// parse cluster qc votes
-	commit.ClusterQCs, err = convertClusterQCVoteData(cdcClusterQCVoteData.Values)
+	clusterQCs, err := convertClusterQCVoteData(cdcClusterQCVoteData.Values)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode clusterQCVoteData from EpochRecover event: %w", err)
 	}
 
 	// parse DKG participants
-	commit.DKGParticipantKeys, err = convertDKGKeys(cdcDKGKeys.Values)
+	dKGParticipantKeys, err := convertDKGKeys(cdcDKGKeys.Values)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode Random Beacon key shares from EpochRecover event: %w", err)
 	}
 
 	// parse DKG group key
-	commit.DKGGroupKey, err = convertDKGKey(cdcDKGGroupKey)
+	dKGGroupKey, err := convertDKGKey(cdcDKGGroupKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode Random Beacon group key from EpochRecover event: %w", err)
 	}
@@ -662,14 +658,14 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	// such events, it is fine to not relay them in the first place.
 	n := len(cdcDKGIndexMap.Pairs)
 	encounteredIndices := make([]bool, n) // tracks which indices we have already seed, to detect duplicates
-	commit.DKGIndexMap = make(flow.DKGIndexMap, n)
+	dKGIndexMap := make(flow.DKGIndexMap, n)
 	for _, pair := range cdcDKGIndexMap.Pairs {
 		nodeID, err := flow.HexStringToIdentifier(string(pair.Key.(cadence.String)))
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode flow.Identifer in DKGIndexMap entry from EpochRecover event: %w", err)
 		}
 		index := pair.Value.(cadence.Int).Int()
-		commit.DKGIndexMap[nodeID] = index
+		dKGIndexMap[nodeID] = index
 
 		// enforce invariant needed for ID computation: DKGIndexMap values form the set {0, 1, ..., n-1}
 		if index < 0 || index >= n {
@@ -680,6 +676,14 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 		}
 		encounteredIndices[index] = true
 	}
+
+	commit := flow.NewEpochCommit(
+		uint64(counter),
+		clusterQCs,
+		dKGGroupKey,
+		dKGParticipantKeys,
+		dKGIndexMap,
+	)
 
 	// create the service event
 	epochRecover := flow.NewEpochRecover(setup, commit)

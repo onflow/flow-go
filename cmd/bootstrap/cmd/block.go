@@ -73,14 +73,14 @@ func constructRootEpochEvents(
 		})
 	}
 
-	epochCommit := &flow.EpochCommit{
-		Counter:            flagEpochCounter,
-		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
-		DKGGroupKey:        dkgData.PubGroupKey,
-		DKGParticipantKeys: dkgData.PubKeyShares,
-		DKGIndexMap:        dkgIndexMap,
-	}
-	return &epochSetup, epochCommit
+	epochCommit := flow.NewEpochCommit(
+		flagEpochCounter,
+		flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
+		dkgData.PubGroupKey,
+		dkgData.PubKeyShares,
+		dkgIndexMap,
+	)
+	return &epochSetup, &epochCommit
 }
 
 func parseChainID(chainID string) flow.ChainID {
