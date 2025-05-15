@@ -60,13 +60,21 @@ type TimeoutObject struct {
 	TimeoutTick uint64
 }
 
-// Equals returns true if the TimeoutObject is equal to the provided other TimeoutObject.
+// Equals returns true if and only if the receiver TimeoutObject is equal to the `other`. Nil values are supported.
 // It compares View, NewestQC, LastViewTC, SignerID and SigData and is used for de-duplicate TimeoutObjects in the cache.
-// It excludes TimeoutTick: two TimeoutObjects with different TimeoutTick values can be considered equal.
+// It excludes TimeoutTick: two TimeoutObjects with different TimeoutTick values are considered equivalent.
 func (t *TimeoutObject) Equals(other *TimeoutObject) bool {
+	// Shortcut if `t` and `other` point to the same object; covers case where both are nil.
+	if t == other {
+		return true
+	}
+	if t == nil || other == nil { // only one is nil, the other not (otherwise we would have returned above)
+		return false
+	}
+	// both are not nil, so we can compare the fields
 	return t.View == other.View &&
-		t.NewestQC.ID() == other.NewestQC.ID() &&
-		t.LastViewTC.ID() == other.LastViewTC.ID() &&
+		t.NewestQC.Equals(other.NewestQC) &&
+		t.LastViewTC.Equals(other.LastViewTC) &&
 		t.SignerID == other.SignerID &&
 		bytes.Equal(t.SigData, other.SigData)
 }
