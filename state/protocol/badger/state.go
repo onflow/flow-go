@@ -3,8 +3,9 @@ package badger
 import (
 	"errors"
 	"fmt"
-	"sync"
 	"sync/atomic"
+
+	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
@@ -30,14 +31,15 @@ type cachedLatest struct {
 }
 
 type State struct {
-	metrics module.ComplianceMetrics
-	db      storage.DB
-	headers storage.Headers
-	blocks  storage.Blocks
-	qcs     storage.QuorumCertificates
-	results storage.ExecutionResults
-	seals   storage.Seals
-	epoch   struct {
+	metrics     module.ComplianceMetrics
+	db          storage.DB
+	lockManager lockctx.Manager
+	headers     storage.Headers
+	blocks      storage.Blocks
+	qcs         storage.QuorumCertificates
+	results     storage.ExecutionResults
+	seals       storage.Seals
+	epoch       struct {
 		setups  storage.EpochSetups
 		commits storage.EpochCommits
 	}
@@ -89,6 +91,7 @@ func SkipNetworkAddressValidation(conf *BootstrapConfig) {
 func Bootstrap(
 	metrics module.ComplianceMetrics,
 	db storage.DB,
+	lockManager lockctx.Manager,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
@@ -102,6 +105,19 @@ func Bootstrap(
 	root protocol.Snapshot,
 	options ...BootstrapConfigOptions,
 ) (*State, error) {
+	// we acquire both [storage.LockInsertBlock] and [storage.LockFinalizeBlock] because
+	// the bootstrapping process inserts and finalizes blocks (all blocks within the
+	// trusted root snapshot are presumed to be finalized)
+	lctx := lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockInsertBlock)
+	if err != nil {
+		return nil, err
+	}
+	err = lctx.AcquireLock(storage.LockFinalizeBlock)
+	if err != nil {
+		return nil, err
+	}
 
 	config := defaultBootstrapConfig()
 	for _, opt := range options {
@@ -140,7 +156,7 @@ func Bootstrap(
 		// bootstrap the sealing segment
 		// creating sealed root block with the rootResult
 		// creating finalized root block with lastFinalized
-		err = bootstrapSealingSegment(rw, blocks, qcs, segment, lastFinalized, rootSeal)
+		err = bootstrapSealingSegment(lctx, rw, blocks, qcs, segment, lastFinalized, rootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap sealing chain segment blocks: %w", err)
 		}
@@ -156,7 +172,7 @@ func Bootstrap(
 		}
 
 		// initialize the current protocol state height/view pointers
-		err = bootstrapStatePointers(rw, root)
+		err = bootstrapStatePointers(lctx, rw, root)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap height/view pointers: %w", err)
 		}
@@ -209,6 +225,7 @@ func Bootstrap(
 	return newState(
 		metrics,
 		db,
+		lockManager,
 		headers,
 		seals,
 		results,
@@ -274,6 +291,7 @@ func bootstrapProtocolState(
 // bootstrapSealingSegment inserts all blocks and associated metadata for the
 // protocol state root snapshot to disk.
 func bootstrapSealingSegment(
+	lctx lockctx.Proof,
 	rw storage.ReaderBatchWriter,
 	blocks storage.Blocks,
 	qcs storage.QuorumCertificates,
@@ -316,11 +334,11 @@ func bootstrapSealingSegment(
 	for _, block := range segment.ExtraBlocks {
 		blockID := block.ID()
 		height := block.Header.Height
-		err := blocks.BatchStoreWithStoringResults(rw, block, storingResults)
+		err := blocks.BatchStoreWithStoringResults(lctx, rw, block, storingResults)
 		if err != nil {
 			return fmt.Errorf("could not insert SealingSegment extra block: %w", err)
 		}
-		err = operation.IndexBlockHeight(rw, height, blockID)
+		err = operation.IndexBlockHeight(lctx, rw, height, blockID)
 		if err != nil {
 			return fmt.Errorf("could not index SealingSegment extra block (id=%x): %w", blockID, err)
 		}
@@ -339,11 +357,11 @@ func bootstrapSealingSegment(
 		blockID := block.ID()
 		height := block.Header.Height
 
-		err := blocks.BatchStoreWithStoringResults(rw, block, storingResults)
+		err := blocks.BatchStoreWithStoringResults(lctx, rw, block, storingResults)
 		if err != nil {
 			return fmt.Errorf("could not insert SealingSegment block: %w", err)
 		}
-		err = operation.IndexBlockHeight(rw, height, blockID)
+		err = operation.IndexBlockHeight(lctx, rw, height, blockID)
 		if err != nil {
 			return fmt.Errorf("could not index SealingSegment block (id=%x): %w", blockID, err)
 		}
@@ -367,7 +385,7 @@ func bootstrapSealingSegment(
 		if !ok {
 			return fmt.Errorf("sanity check fail: missing latest seal for sealing segment block (id=%s)", blockID)
 		}
-		err = operation.IndexLatestSealAtBlock(w, blockID, latestSealID)
+		err = operation.IndexLatestSealAtBlock(lctx, w, blockID, latestSealID)
 		if err != nil {
 			return fmt.Errorf("could not index block seal: %w", err)
 		}
@@ -392,7 +410,7 @@ func bootstrapSealingSegment(
 
 // bootstrapStatePointers instantiates special pointers used to by the protocol
 // state to keep track of special block heights and views.
-func bootstrapStatePointers(rw storage.ReaderBatchWriter, root protocol.Snapshot) error {
+func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, root protocol.Snapshot) error {
 	segment, err := root.SealingSegment()
 	if err != nil {
 		return fmt.Errorf("could not get sealing segment: %w", err)
@@ -437,7 +455,6 @@ func bootstrapStatePointers(rw storage.ReaderBatchWriter, root protocol.Snapshot
 	}
 
 	w := rw.Writer()
-	bootstrapping := &sync.Mutex{}
 	// insert initial views for HotStuff
 	err = operation.UpsertSafetyData(w, highest.Header.ChainID, safetyData)
 	if err != nil {
@@ -458,11 +475,11 @@ func bootstrapStatePointers(rw storage.ReaderBatchWriter, root protocol.Snapshot
 	if err != nil {
 		return fmt.Errorf("could not insert sealed root height: %w", err)
 	}
-	err = operation.UpsertFinalizedHeight(w, highest.Header.Height)
+	err = operation.UpsertFinalizedHeight(lctx, w, highest.Header.Height)
 	if err != nil {
 		return fmt.Errorf("could not insert finalized height: %w", err)
 	}
-	err = operation.UpsertSealedHeight(w, lowest.Header.Height)
+	err = operation.UpsertSealedHeight(lctx, w, lowest.Header.Height)
 	if err != nil {
 		return fmt.Errorf("could not insert sealed height: %w", err)
 	}
@@ -472,7 +489,7 @@ func bootstrapStatePointers(rw storage.ReaderBatchWriter, root protocol.Snapshot
 	}
 
 	// insert first-height indices for epochs which begin within the sealing segment
-	err = indexEpochHeights(bootstrapping, rw, segment)
+	err = indexEpochHeights(lctx, rw, segment)
 	if err != nil {
 		return fmt.Errorf("could not index epoch heights: %w", err)
 	}
@@ -598,13 +615,13 @@ func bootstrapSporkInfo(rw storage.ReaderBatchWriter, root protocol.Snapshot) er
 // We index the FirstHeight for every epoch where the transition occurs within the sealing segment of the root snapshot,
 // or for the first epoch of a spork if the snapshot is a spork root snapshot (1 block sealing segment).
 // No errors are expected during normal operation.
-func indexEpochHeights(lock *sync.Mutex, rw storage.ReaderBatchWriter, segment *flow.SealingSegment) error {
+func indexEpochHeights(lctx lockctx.Proof, rw storage.ReaderBatchWriter, segment *flow.SealingSegment) error {
 	// CASE 1: For spork root snapshots, there is exactly one block B and one epoch E.
 	// Index `E.counter → B.Height`.
 	if segment.IsSporkRoot() {
 		counter := segment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
 		firstHeight := segment.Highest().Header.Height
-		err := operation.InsertEpochFirstHeight(lock, rw, counter, firstHeight)
+		err := operation.InsertEpochFirstHeight(lctx, rw, counter, firstHeight)
 		if err != nil {
 			return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, counter, err)
 		}
@@ -622,7 +639,7 @@ func indexEpochHeights(lock *sync.Mutex, rw storage.ReaderBatchWriter, segment *
 		thisBlockEpochCounter := segment.ProtocolStateEntries[block.Payload.ProtocolStateID].EpochEntry.EpochCounter()
 		if lastBlockEpochCounter != thisBlockEpochCounter {
 			firstHeight := block.Header.Height
-			err := operation.InsertEpochFirstHeight(lock, rw, thisBlockEpochCounter, firstHeight)
+			err := operation.InsertEpochFirstHeight(lctx, rw, thisBlockEpochCounter, firstHeight)
 			if err != nil {
 				return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, thisBlockEpochCounter, err)
 			}
@@ -635,6 +652,7 @@ func indexEpochHeights(lock *sync.Mutex, rw storage.ReaderBatchWriter, segment *
 func OpenState(
 	metrics module.ComplianceMetrics,
 	db storage.DB,
+	lockManager lockctx.Manager,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
@@ -669,6 +687,7 @@ func OpenState(
 	state, err := newState(
 		metrics,
 		db,
+		lockManager,
 		headers,
 		seals,
 		results,
@@ -773,6 +792,7 @@ func (state *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
 func newState(
 	metrics module.ComplianceMetrics,
 	db storage.DB,
+	lockManager lockctx.Manager,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
@@ -786,13 +806,14 @@ func newState(
 	params protocol.Params,
 ) (*State, error) {
 	state := &State{
-		metrics: metrics,
-		db:      db,
-		headers: headers,
-		results: results,
-		seals:   seals,
-		blocks:  blocks,
-		qcs:     qcs,
+		metrics:     metrics,
+		db:          db,
+		lockManager: lockManager,
+		headers:     headers,
+		results:     results,
+		seals:       seals,
+		blocks:      blocks,
+		qcs:         qcs,
 		epoch: struct {
 			setups  storage.EpochSetups
 			commits storage.EpochCommits
