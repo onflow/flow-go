@@ -61,7 +61,7 @@ func (s *CacheSuite) TestBlocksEquivocation() {
 	require.NoError(s.T(), err)
 
 	equivocatedBlocks, _, _ := unittest.ChainFixture(len(blocks) - 1)
-	equivocatedProposals := make([]*flow.BlockProposal, 0, len(equivocatedBlocks))
+	equivocatedProposals := make([]*flow.BlockProposal, 0, len(equivocatedBlocks)-1)
 
 	// we will skip genesis block as it will be the same
 	for i := 1; i < len(equivocatedBlocks); i++ {
