@@ -454,19 +454,19 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 // Per API convention, timeoutAggregator` is non-blocking, hence, this call returns quickly.
 func (h *MessageHub) forwardToOwnVoteAggregator(vote *messages.ClusterBlockVote, originID flow.Identifier) {
 	h.engineMetrics.MessageReceived(metrics.EngineCollectionMessageHub, metrics.MessageBlockVote)
-	v := &model.Vote{
-		View:     vote.View,
-		BlockID:  vote.BlockID,
-		SignerID: originID,
-		SigData:  vote.SigData,
-	}
+	v := model.NewVote(
+		vote.View,
+		vote.BlockID,
+		originID,
+		vote.SigData,
+	)
 	h.log.Debug().
 		Uint64("block_view", v.View).
 		Hex("block_id", v.BlockID[:]).
 		Hex("voter", v.SignerID[:]).
 		Str("vote_id", v.ID().String()).
 		Msg("block vote received, forwarding block vote to hotstuff vote aggregator")
-	h.voteAggregator.AddVote(v)
+	h.voteAggregator.AddVote(&v)
 }
 
 // forwardToOwnTimeoutAggregator logs timeout and forwards it to own `timeoutAggregator`.
