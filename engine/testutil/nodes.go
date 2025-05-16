@@ -966,7 +966,7 @@ func VerificationNode(t testing.TB,
 	assigner module.ChunkAssigner,
 	chunksLimit uint,
 	chainID flow.ChainID,
-	collector module.VerificationMetrics,   // used to enable collecting metrics on happy path integration
+	collector module.VerificationMetrics, //used to enable collecting metrics on happy path integration
 	mempoolCollector module.MempoolMetrics, // used to enable collecting metrics on happy path integration
 	opts ...VerificationOpt) testmock.VerificationNode {
 
