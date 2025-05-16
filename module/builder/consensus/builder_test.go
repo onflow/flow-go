@@ -679,10 +679,17 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 	// Incorporate result for block B1 into payload of block B4
 	resultB1 := bs.resultForBlock[b1.ID()]
 	receiptB1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultB1))
-	b4.Payload = flow.Payload{
-		Results:  []*flow.ExecutionResult{&receiptB1.ExecutionResult},
-		Receipts: []*flow.ExecutionReceiptStub{receiptB1.Stub()},
-	}
+	newB4 := flow.NewBlock(
+		b4.Header,
+		flow.Payload{
+			Results:  []*flow.ExecutionResult{&receiptB1.ExecutionResult},
+			Receipts: []*flow.ExecutionReceiptStub{receiptB1.Stub()},
+		},
+	)
+	b4 = &newB4
+
+	// update bchain
+	bchain[2] = b4
 
 	// add blocks B2, B3, B4, A5 to the mocked storage layer (block b0 and b1 are already added):
 	a5 := unittest.BlockWithParentFixture(b4.ToHeader())
@@ -830,17 +837,27 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 	receiptChain1 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[F]_1, Result[A]_1, Result[B]_1, ...]
 	receiptChain2 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[F]_2, Result[A]_2, Result[B]_2, ...]
 
-	for i := 1; i <= 3; i++ { // set payload for blocks A, B, C
-		blocks[i].Payload = flow.Payload{
-			Results:  []*flow.ExecutionResult{&receiptChain1[i-1].ExecutionResult, &receiptChain2[i-1].ExecutionResult},
-			Receipts: []*flow.ExecutionReceiptStub{receiptChain1[i-1].Stub(), receiptChain2[i-1].Stub()},
-		}
+	// set payload for blocks A, B, C
+	for i := 1; i <= 3; i++ {
+		b := flow.NewBlock(
+			blocks[i].Header,
+			flow.Payload{
+				Results:  []*flow.ExecutionResult{&receiptChain1[i-1].ExecutionResult, &receiptChain2[i-1].ExecutionResult},
+				Receipts: []*flow.ExecutionReceiptStub{receiptChain1[i-1].Stub(), receiptChain2[i-1].Stub()},
+			},
+		)
+		blocks[i] = &b
 	}
 	sealedResult := receiptChain1[0].ExecutionResult
 	sealF := unittest.Seal.Fixture(unittest.Seal.WithResult(&sealedResult))
-	blocks[4].Payload = flow.Payload{ // set payload for block D
-		Seals: []*flow.Seal{sealF},
-	}
+	// set payload for block D
+	b := flow.NewBlock(
+		blocks[4].Header,
+		flow.Payload{
+			Seals: []*flow.Seal{sealF},
+		},
+	)
+	blocks[4] = &b
 	for i := 0; i <= 4; i++ {
 		// we need to run this several times, as in each iteration as we have _multiple_ execution chains.
 		// In each iteration, we only mange to reconnect one additional height

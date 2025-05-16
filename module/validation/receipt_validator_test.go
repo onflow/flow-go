@@ -308,7 +308,8 @@ func (s *ReceiptValidationSuite) TestReceiptForBlockWith0Collections() {
 	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
 
 	valSubgrph := s.ValidSubgraphFixture()
-	valSubgrph.Block.Payload = unittest.PayloadFixture()
+	block := flow.NewBlock(valSubgrph.Block.Header, unittest.PayloadFixture())
+	valSubgrph.Block = &block
 	s.Assert().Equal(0, len(valSubgrph.Block.Payload.Guarantees)) // sanity check that no collections in block
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 
@@ -541,11 +542,13 @@ func (s *ReceiptValidationSuite) TestMultiReceiptValidResultChain() {
 	}
 	s.PersistedResults[result0.ID()] = result0
 
-	candidate := unittest.BlockWithParentFixture(blockC.ToHeader())
-	candidate.Payload = flow.Payload{
-		Receipts: []*flow.ExecutionReceiptStub{receiptB.Stub(), receiptC.Stub()},
-		Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult, &receiptC.ExecutionResult},
-	}
+	candidate := unittest.BlockWithParentAndPayload(
+		blockC.ToHeader(),
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{receiptB.Stub(), receiptC.Stub()},
+			Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult, &receiptC.ExecutionResult},
+		},
+	)
 
 	err := s.receiptValidator.ValidatePayload(candidate)
 	s.Require().NoError(err)
@@ -588,11 +591,13 @@ func (s *ReceiptValidationSuite) TestMultiReceiptInvalidParent() {
 	// because there is no valid identity, where we can retrieve a staking signature from.
 	receiptBInvalid.ExecutorID = unittest.IdentifierFixture()
 
-	candidate := unittest.BlockWithParentFixture(blockC.ToHeader())
-	candidate.Payload = flow.Payload{
-		Receipts: []*flow.ExecutionReceiptStub{receiptBInvalid.Stub(), receiptC.Stub()},
-		Results:  []*flow.ExecutionResult{&receiptBInvalid.ExecutionResult, &receiptC.ExecutionResult},
-	}
+	candidate := unittest.BlockWithParentAndPayload(
+		blockC.ToHeader(),
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{receiptBInvalid.Stub(), receiptC.Stub()},
+			Results:  []*flow.ExecutionResult{&receiptBInvalid.ExecutionResult, &receiptC.ExecutionResult},
+		},
+	)
 
 	// receiptB and receiptC
 	err := s.receiptValidator.ValidatePayload(candidate)
@@ -1052,11 +1057,13 @@ func (s *ReceiptValidationSuite) TestValidateReceiptResultWithoutReceipt() {
 	}
 	s.PersistedResults[result0.ID()] = result0
 
-	candidate := unittest.BlockWithParentFixture(blockB.ToHeader())
-	candidate.Payload = flow.Payload{
-		Receipts: []*flow.ExecutionReceiptStub{},
-		Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult},
-	}
+	candidate := unittest.BlockWithParentAndPayload(
+		blockB.ToHeader(),
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{},
+			Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult},
+		},
+	)
 
 	err := s.receiptValidator.ValidatePayload(candidate)
 	s.Require().Error(err)
@@ -1111,11 +1118,13 @@ func (s *ReceiptValidationSuite) TestValidateReceiptResultHasEnoughReceipts() {
 		candidateReceipts = append(candidateReceipts, &receipt)
 	}
 
-	candidate := unittest.BlockWithParentFixture(blockB.ToHeader())
-	candidate.Payload = flow.Payload{
-		Receipts: candidateReceipts,
-		Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult},
-	}
+	candidate := unittest.BlockWithParentAndPayload(
+		blockB.ToHeader(),
+		flow.Payload{
+			Receipts: candidateReceipts,
+			Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult},
+		},
+	)
 
 	err := s.receiptValidator.ValidatePayload(candidate)
 	s.Require().NoError(err)

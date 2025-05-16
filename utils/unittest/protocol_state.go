@@ -85,20 +85,23 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState 
 	err := st.Extend(context.Background(), ProposalFromBlock(block2))
 	require.NoError(t, err)
 
-	block3 := BlockWithParentFixture(block2.ToHeader())
+	headerBody3 := HeaderBodyWithParentFixture(block2.ToHeader())
 	seals := []*flow.Seal{seal}
-	updatedStateId, dbUpdates, err := mutableProtocolState.EvolveState(block3.Header.ParentID, block3.Header.View, seals)
+	updatedStateId, dbUpdates, err := mutableProtocolState.EvolveState(headerBody3.ParentID, headerBody3.View, seals)
 	require.NoError(t, err)
 	require.False(t, dbUpdates.IsEmpty())
 
-	block3.Payload = flow.Payload{
-		Seals:           seals,
-		ProtocolStateID: updatedStateId,
-	}
-	err = st.Extend(context.Background(), ProposalFromBlock(block3))
+	block3 := flow.NewBlock(
+		headerBody3,
+		flow.Payload{
+			Seals:           seals,
+			ProtocolStateID: updatedStateId,
+		},
+	)
+	err = st.Extend(context.Background(), ProposalFromBlock(&block3))
 	require.NoError(t, err)
 
-	return block2, block3
+	return block2, &block3
 }
 
 // InsertAndFinalize inserts, then finalizes, the input block.
