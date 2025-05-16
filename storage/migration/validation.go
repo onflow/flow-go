@@ -52,6 +52,13 @@ func validateMinMaxKeyConsistency(badgerDB *badger.DB, pebbleDB *pebble.DB, pref
 	return nil
 }
 
+// collectValidationKeysByPrefix takes a prefix bytes number (1 means 1 byte prefix, 2 means 2 bytes prefix, etc.),
+// and returns a list of keys that are the min and max keys for each prefix.
+// The output will be used to validate the consistency between Badger and Pebble databases.
+// Why? Because we want to validate the consistency between Badger and Pebble databases by selecting
+// some keys and compare their values between the two databases.
+// An easy way to select keys is to go through each prefix, and find the min and max keys for each prefix using
+// the database iterator.
 func collectValidationKeysByPrefix(db *badger.DB, prefixBytes int) ([][]byte, error) {
 	prefixes := GeneratePrefixes(prefixBytes)
 	var allKeys [][]byte
@@ -100,6 +107,8 @@ func collectValidationKeysByPrefix(db *badger.DB, prefixBytes int) ([][]byte, er
 	return uniqueKeys, nil
 }
 
+// compareValuesBetweenDBs takes a list of keys and compares the values between Badger and Pebble databases,
+// it returns error if any of the values are different.
 func compareValuesBetweenDBs(keys [][]byte, badgerDB *badger.DB, pebbleDB *pebble.DB) error {
 	for _, key := range keys {
 		var badgerVal []byte
@@ -120,7 +129,8 @@ func compareValuesBetweenDBs(keys [][]byte, badgerDB *badger.DB, pebbleDB *pebbl
 			return fmt.Errorf("pebble get error for key %x: %w", key, err)
 		}
 		if string(pebbleVal) != string(badgerVal) {
-			return fmt.Errorf("value mismatch for key %x: badger=%q pebble=%q", key, badgerVal, pebbleVal)
+			return fmt.Errorf("value mismatch for key %x: badger=%q pebble=%q: %w", key, badgerVal, pebbleVal,
+				storage.ErrDataMismatch)
 		}
 		_ = closer.Close()
 	}
