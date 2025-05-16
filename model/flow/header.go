@@ -50,6 +50,16 @@ type HeaderBody struct {
 	LastViewTC *TimeoutCertificate
 }
 
+// QuorumCertificate returns quorum certificate that is incorporated in the block header body.
+func (h HeaderBody) QuorumCertificate() *QuorumCertificate {
+	return &QuorumCertificate{
+		BlockID:       h.ParentID,
+		View:          h.ParentView,
+		SignerIndices: h.ParentVoterIndices,
+		SigData:       h.ParentVoterSigData,
+	}
+}
+
 // Header contains all meta-data for a block, as well as a hash of the block payload.
 // Headers are used when the metadata about a block is needed, but the payload is not.
 // Because [Header] includes the payload hash for the block, and the block ID is Merkle-ized
@@ -58,16 +68,6 @@ type Header struct {
 	HeaderBody
 	// PayloadHash is a hash of the payload of this block.
 	PayloadHash Identifier
-}
-
-// QuorumCertificate returns quorum certificate that is incorporated in the block header.
-func (h Header) QuorumCertificate() *QuorumCertificate {
-	return &QuorumCertificate{
-		BlockID:       h.ParentID,
-		View:          h.ParentView,
-		SignerIndices: h.ParentVoterIndices,
-		SigData:       h.ParentVoterSigData,
-	}
 }
 
 // Fingerprint defines custom encoding for the header to calculate its ID.

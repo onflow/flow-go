@@ -422,8 +422,8 @@ func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error 
 		if rootQC.View != highest.Header.View {
 			return fmt.Errorf("root QC's view %d does not match the highest block in sealing segment (view %d)", rootQC.View, highest.Header.View)
 		}
-		if rootQC.BlockID != highest.Header.ID() {
-			return fmt.Errorf("root QC is for block %v, which does not match the highest block %v in sealing segment", rootQC.BlockID, highest.Header.ID())
+		if rootQC.BlockID != highest.ID() {
+			return fmt.Errorf("root QC is for block %v, which does not match the highest block %v in sealing segment", rootQC.BlockID, highest.ID())
 		}
 
 		livenessData := &hotstuff.LivenessData{

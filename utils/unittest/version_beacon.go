@@ -32,7 +32,7 @@ func AddVersionBeacon(t *testing.T, beacon *flow.VersionBeacon, state protocol.F
 	receiptA := ReceiptForBlockFixture(A)
 	receiptA.ExecutionResult.ServiceEvents = []flow.ServiceEvent{beacon.ServiceEvent()}
 
-	B := BlockWithParentFixture(A.Header)
+	B := BlockWithParentFixture(A.ToHeader())
 	B.SetPayload(flow.Payload{
 		Receipts:        []*flow.ExecutionReceiptStub{receiptA.Stub()},
 		Results:         []*flow.ExecutionResult{&receiptA.ExecutionResult},
@@ -44,7 +44,7 @@ func AddVersionBeacon(t *testing.T, beacon *flow.VersionBeacon, state protocol.F
 		Seal.Fixture(Seal.WithResult(&receiptA.ExecutionResult)),
 	}
 
-	C := BlockWithParentFixture(B.Header)
+	C := BlockWithParentFixture(B.ToHeader())
 	C.SetPayload(flow.Payload{
 		Seals:           sealsForB,
 		ProtocolStateID: protocolStateID,

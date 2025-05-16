@@ -64,7 +64,7 @@ func TestSubscribeEventsSuite(t *testing.T) {
 
 func (s *SubscribeEventsSuite) SetupTest() {
 	rootBlock := unittest.BlockFixture()
-	parent := rootBlock.Header
+	parent := rootBlock.ToHeader()
 
 	blockCount := 5
 
@@ -77,10 +77,10 @@ func (s *SubscribeEventsSuite) SetupTest() {
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
-		parent = block.Header
+		parent = block.ToHeader()
 
 		result := unittest.ExecutionResultFixture()
-		blockEvents := unittest.BlockEventsFixture(block.Header, (i%len(testEventTypes))*3+1, testEventTypes...)
+		blockEvents := unittest.BlockEventsFixture(block.ToHeader(), (i%len(testEventTypes))*3+1, testEventTypes...)
 
 		// update payloads with valid CCF encoded data
 		for i := range blockEvents.Events {

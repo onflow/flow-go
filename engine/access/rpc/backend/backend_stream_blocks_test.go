@@ -93,13 +93,13 @@ func (s *BackendBlocksSuite) SetupTest() {
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
-	parent := s.rootBlock.Header
+	parent := s.rootBlock.ToHeader()
 	s.blockMap[s.rootBlock.Header.Height] = &s.rootBlock
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
-		parent = block.Header
+		parent = block.ToHeader()
 
 		s.blocksArray = append(s.blocksArray, block)
 		s.blockMap[block.Header.Height] = block
@@ -109,7 +109,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 		func(blockID flow.Identifier) (*flow.Header, error) {
 			for _, block := range s.blockMap {
 				if block.ID() == blockID {
-					return block.Header, nil
+					return block.ToHeader(), nil
 				}
 			}
 			return nil, storage.ErrNotFound
@@ -119,7 +119,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 		mocks.ConvertStorageOutput(
 			mocks.StorageMapGetter(s.blockMap),
-			func(block *flow.Block) *flow.Header { return block.Header },
+			func(block *flow.Block) *flow.Header { return block.ToHeader() },
 		),
 	).Maybe()
 
@@ -127,7 +127,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 		mocks.StorageMapGetter(s.blockMap),
 	).Maybe()
 
-	s.snapshot.On("Head").Return(s.rootBlock.Header, nil).Twice()
+	s.snapshot.On("Head").Return(s.rootBlock.ToHeader(), nil).Twice()
 	s.state.On("Final").Return(s.snapshot, nil).Maybe()
 	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
 
@@ -377,7 +377,7 @@ func (s *BackendBlocksSuite) subscribe(
 			// add "backfill" block - blocks that are already in the database before the test starts
 			// this simulates a subscription on a past block
 			if test.highestBackfill > 0 {
-				s.setupBlockTrackerMock(test.blockStatus, s.blocksArray[test.highestBackfill].Header)
+				s.setupBlockTrackerMock(test.blockStatus, s.blocksArray[test.highestBackfill].ToHeader())
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
@@ -385,7 +385,7 @@ func (s *BackendBlocksSuite) subscribe(
 			// mock latest sealed if no start value provided
 			if test.startValue == nil {
 				s.snapshot.On("Head").Unset()
-				s.snapshot.On("Head").Return(s.rootBlock.Header, nil).Once()
+				s.snapshot.On("Head").Return(s.rootBlock.ToHeader(), nil).Once()
 			}
 
 			sub := subscribeFn(subCtx, test.startValue, test.blockStatus)
@@ -397,7 +397,7 @@ func (s *BackendBlocksSuite) subscribe(
 				// simulate new block received.
 				// all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.setupBlockTrackerMock(test.blockStatus, b.Header)
+					s.setupBlockTrackerMock(test.blockStatus, b.ToHeader())
 
 					s.broadcaster.Publish()
 				}
@@ -436,7 +436,7 @@ func (s *BackendBlocksSuite) requireBlocks(v interface{}, expectedBlock *flow.Bl
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
 	s.Require().Equal(expectedBlock.Header.Height, actualBlock.Header.Height)
-	s.Require().Equal(expectedBlock.Header.ID(), actualBlock.Header.ID())
+	s.Require().Equal(expectedBlock.ID(), actualBlock.ID())
 	s.Require().Equal(*expectedBlock, *actualBlock)
 }
 

@@ -199,7 +199,7 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 
 	// grabbing collections and guarantees from BadgerDB
 	guarantees := make([]*flow.CollectionGuarantee, 0)
-	if block != nil && block.Payload != nil {
+	if block != nil {
 		guarantees = block.Payload.Guarantees
 	}
 
