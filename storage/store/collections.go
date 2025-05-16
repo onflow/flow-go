@@ -64,8 +64,8 @@ func (c *Collections) Store(collection *flow.Collection) error {
 // ByID retrieves a collection by its ID.
 func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 	var (
-		light      flow.LightCollection
-		collection flow.Collection
+		light flow.LightCollection
+		txs   []*flow.TransactionBody
 	)
 
 	err := operation.RetrieveCollection(c.db.Reader(), colID, &light)
@@ -73,15 +73,17 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 		return nil, fmt.Errorf("could not retrieve collection: %w", err)
 	}
 
+	txs = make([]*flow.TransactionBody, 0, len(light.Transactions))
 	for _, txID := range light.Transactions {
 		tx, err := c.transactions.ByID(txID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve transaction %v: %w", txID, err)
 		}
 
-		collection.Transactions = append(collection.Transactions, tx)
+		txs = append(txs, tx)
 	}
 
+	collection := flow.NewCollection(txs)
 	return &collection, nil
 }
 
