@@ -191,7 +191,7 @@ func Bootstrap(
 		metrics.SealedHeight(lastSealed.Header.Height)
 		metrics.FinalizedHeight(lastFinalized.Header.Height)
 		for _, proposal := range segment.Blocks {
-			metrics.BlockFinalized(proposal.Block)
+			metrics.BlockFinalized(&proposal.Block)
 		}
 
 		return nil

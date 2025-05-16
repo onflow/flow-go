@@ -109,7 +109,7 @@ func TestExecutionFlow(t *testing.T) {
 	signerIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
 	require.NoError(t, err)
-	block = *flow.NewBlock(
+	block = flow.NewBlock(
 		block.Header,
 		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{
@@ -134,7 +134,7 @@ func TestExecutionFlow(t *testing.T) {
 	// the default signer indices is 2 bytes, but in this test cases
 	// we need 1 byte
 	child.Header.ParentVoterIndices = voterIndices
-	child = *flow.NewBlock(
+	child = flow.NewBlock(
 		child.Header,
 		unittest.PayloadFixture(unittest.WithProtocolStateID(block.Payload.ProtocolStateID)),
 	)
@@ -289,7 +289,7 @@ func deployContractBlock(
 		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
 	block.Header.ParentVoterIndices = voterIndices
-	block = *flow.NewBlock(
+	block = flow.NewBlock(
 		block.Header,
 		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{
@@ -332,7 +332,7 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
 	require.NoError(t, err)
 
-	block = *flow.NewBlock(
+	block = flow.NewBlock(
 		block.Header,
 		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{
@@ -364,7 +364,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
 	block.Header.ParentVoterIndices = voterIndices
-	block = *flow.NewBlock(
+	block = flow.NewBlock(
 		block.Header,
 		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{
@@ -598,7 +598,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	voterIndices, err := signature.EncodeSignersToIndices([]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
 	block.Header.ParentVoterIndices = voterIndices
-	block = *flow.NewBlock(
+	block = flow.NewBlock(
 		block.Header,
 		unittest.PayloadFixture(unittest.WithProtocolStateID(genesis.Payload.ProtocolStateID)),
 	)

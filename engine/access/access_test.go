@@ -627,7 +627,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		}
 
 		// generate receipts
-		executionReceipts := unittest.ReceiptsForBlockFixture(block, enNodeIDs)
+		executionReceipts := unittest.ReceiptsForBlockFixture(&block, enNodeIDs)
 
 		// assume execution node returns an empty list of events
 		suite.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(&exeEventResp, nil)
@@ -938,8 +938,8 @@ func (suite *Suite) TestGetTransactionResult() {
 		require.NoError(suite.T(), err)
 		finalSnapshot.On("Head").Return(block.ToHeader(), nil)
 
-		processExecutionReceipts(block, collection, enNodeIDs, originID, ingestEng)
-		processExecutionReceipts(blockNegative, collectionNegative, enNodeIDs, originID, ingestEng)
+		processExecutionReceipts(&block, collection, enNodeIDs, originID, ingestEng)
+		processExecutionReceipts(&blockNegative, collectionNegative, enNodeIDs, originID, ingestEng)
 
 		txId := collection.Transactions[0].ID()
 		collectionId := collection.ID()

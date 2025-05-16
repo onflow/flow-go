@@ -679,13 +679,15 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 	// Incorporate result for block B1 into payload of block B4
 	resultB1 := bs.resultForBlock[b1.ID()]
 	receiptB1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultB1))
-	b4 = flow.NewBlock(
+	newB4 := flow.NewBlock(
 		b4.Header,
 		flow.Payload{
 			Results:  []*flow.ExecutionResult{&receiptB1.ExecutionResult},
 			Receipts: []*flow.ExecutionReceiptStub{receiptB1.Stub()},
 		},
 	)
+	b4 = &newB4
+
 	// update bchain
 	bchain[2] = b4
 
@@ -837,23 +839,25 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 
 	// set payload for blocks A, B, C
 	for i := 1; i <= 3; i++ {
-		blocks[i] = flow.NewBlock(
+		b := flow.NewBlock(
 			blocks[i].Header,
 			flow.Payload{
 				Results:  []*flow.ExecutionResult{&receiptChain1[i-1].ExecutionResult, &receiptChain2[i-1].ExecutionResult},
 				Receipts: []*flow.ExecutionReceiptStub{receiptChain1[i-1].Stub(), receiptChain2[i-1].Stub()},
 			},
 		)
+		blocks[i] = &b
 	}
 	sealedResult := receiptChain1[0].ExecutionResult
 	sealF := unittest.Seal.Fixture(unittest.Seal.WithResult(&sealedResult))
 	// set payload for block D
-	blocks[4] = flow.NewBlock(
+	b := flow.NewBlock(
 		blocks[4].Header,
 		flow.Payload{
 			Seals: []*flow.Seal{sealF},
 		},
 	)
+	blocks[4] = &b
 	for i := 0; i <= 4; i++ {
 		// we need to run this several times, as in each iteration as we have _multiple_ execution chains.
 		// In each iteration, we only mange to reconnect one additional height

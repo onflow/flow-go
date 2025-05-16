@@ -101,7 +101,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	)
 
 	executableBlock := &entity.ExecutableBlock{
-		Block: block,
+		Block: &block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.CollectionID: {
 				Guarantee:    &guarantee,
@@ -274,7 +274,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	)
 
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
-		block1 = flow.NewBlock(
+		block = flow.NewBlock(
 			flow.HeaderBody{
 				View: 1,
 			},
@@ -282,6 +282,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 				Guarantees: []*flow.CollectionGuarantee{},
 			},
 		)
+		block1 = &block
 		block1Snapshot = snapshotTree
 		executableBlock := &entity.ExecutableBlock{
 			Block:      block1,
@@ -510,7 +511,7 @@ func createTestBlockAndRun(
 	)
 
 	executableBlock := &entity.ExecutableBlock{
-		Block: block,
+		Block: &block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.CollectionID: {
 				Guarantee:    &guarantee,
@@ -534,7 +535,7 @@ func createTestBlockAndRun(
 		snapshotTree = snapshotTree.Append(snapshot)
 	}
 
-	return block, returnedComputationResult, snapshotTree
+	return &block, returnedComputationResult, snapshotTree
 }
 
 func prepareTx(t *testing.T,

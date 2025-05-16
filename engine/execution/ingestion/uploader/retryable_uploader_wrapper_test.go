@@ -151,7 +151,7 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 	// mock storage interfaces
 
 	mockBlocksStorage := new(storageMock.Blocks)
-	mockBlocksStorage.On("ByID", testBlockID).Return(testBlock, nil)
+	mockBlocksStorage.On("ByID", testBlockID).Return(&testBlock, nil)
 
 	mockCommitsStorage := new(storageMock.Commits)
 	mockCommitsStorage.On("ByBlockID", testBlockID).Return(testStateCommit, nil)
@@ -219,7 +219,7 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 	}
 
 	expectedBlockData := &BlockData{
-		Block:                testBlock,
+		Block:                &testBlock,
 		Collections:          expectedCompleteCollections,
 		TxResults:            []*flow.TransactionResult{&testTransactionResult},
 		Events:               expectedTestEvents,
@@ -238,7 +238,8 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 // AsyncUploader instance and proper mock storage and EDS interfaces.
 func createTestBadgerRetryableUploaderWrapper(asyncUploader *AsyncUploader) *BadgerRetryableUploaderWrapper {
 	mockBlocksStorage := new(storageMock.Blocks)
-	mockBlocksStorage.On("ByID", mock.Anything).Return(flow.NewBlock(flow.HeaderBody{}, flow.Payload{}), nil)
+	block := flow.NewBlock(flow.HeaderBody{}, flow.Payload{})
+	mockBlocksStorage.On("ByID", mock.Anything).Return(&block, nil)
 
 	mockCommitsStorage := new(storageMock.Commits)
 	mockCommitsStorage.On("ByBlockID", mock.Anything).Return(nil, nil)

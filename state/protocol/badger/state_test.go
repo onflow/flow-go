@@ -362,9 +362,9 @@ func TestBootstrapNonRoot(t *testing.T) {
 					ProtocolStateID: calculateExpectedStateId(t, mutableState)(headerBody3, seals),
 				},
 			)
-			buildFinalizedBlock(t, state, block3)
+			buildFinalizedBlock(t, state, &block3)
 
-			child := unittest.BlockWithParentProtocolState(block3)
+			child := unittest.BlockWithParentProtocolState(&block3)
 			buildBlock(t, state, child)
 
 			return state.AtBlockID(block3.ID())
@@ -416,9 +416,9 @@ func TestBootstrapNonRoot(t *testing.T) {
 					ProtocolStateID: calculateExpectedStateId(t, mutableState)(headerBody3, seals),
 				},
 			)
-			buildFinalizedBlock(t, state, block3)
+			buildFinalizedBlock(t, state, &block3)
 
-			child := unittest.BlockWithParentProtocolState(block3)
+			child := unittest.BlockWithParentProtocolState(&block3)
 			buildBlock(t, state, child)
 
 			// ensure we have entered EFM

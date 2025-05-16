@@ -83,7 +83,7 @@ func newPendingBlock(
 }
 
 // Block returns the block information for the pending block.
-func (b *pendingBlock) Block() *flowgo.Block {
+func (b *pendingBlock) Block() flowgo.Block {
 	collections := b.Collections()
 
 	guarantees := make([]*flowgo.CollectionGuarantee, len(collections))

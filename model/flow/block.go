@@ -21,7 +21,8 @@ func Genesis(chainID ChainID) *Block {
 	}
 
 	// combine to block
-	return NewBlock(headerBody, payload)
+	block := NewBlock(headerBody, payload)
+	return &block
 }
 
 // Block (currently) includes the all block header metadata and the payload content.
@@ -38,8 +39,8 @@ type Block struct {
 func NewBlock(
 	headerBody HeaderBody,
 	payload Payload,
-) *Block {
-	return &Block{
+) Block {
+	return Block{
 		Header:  headerBody,
 		Payload: payload,
 	}
@@ -107,10 +108,9 @@ func (s BlockStatus) String() string {
 	return [...]string{"BLOCK_UNKNOWN", "BLOCK_FINALIZED", "BLOCK_SEALED"}[s]
 }
 
-// TODO(malleability): update fields for BlockProposal with non-pointers in the follow up PR.
 // BlockProposal is a signed proposal that includes the block payload, in addition to the required header and signature.
 type BlockProposal struct {
-	Block           *Block
+	Block           Block
 	ProposerSigData []byte
 }
 

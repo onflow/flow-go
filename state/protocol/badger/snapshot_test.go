@@ -361,7 +361,7 @@ func TestSealingSegment(t *testing.T) {
 					ProtocolStateID: calculateExpectedStateId(t, mutableState)(headerBody3, seals),
 				},
 			)
-			buildFinalizedBlock(t, state, block3)
+			buildFinalizedBlock(t, state, &block3)
 
 			segment, err := state.AtBlockID(block3.ID()).SealingSegment()
 			require.NoError(t, err)
@@ -370,11 +370,11 @@ func TestSealingSegment(t *testing.T) {
 			assert.Equal(t, segment.ExtraBlocks[0].Block.Header.Height, head.Height)
 
 			// build a valid child B3 to ensure we have a QC
-			buildBlock(t, state, unittest.BlockWithParentProtocolState(block3))
+			buildBlock(t, state, unittest.BlockWithParentProtocolState(&block3))
 
 			// sealing segment should contain B1, B2, B3
 			// B3 is reference of snapshot, B1 is latest sealed
-			unittest.AssertEqualBlockSequences(t, []*flow.Block{block1, block2, block3}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{block1, block2, &block3}, segment.Blocks)
 			assert.Len(t, segment.ExecutionResults, 1)
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(block3.ID()))
 		})
@@ -398,7 +398,7 @@ func TestSealingSegment(t *testing.T) {
 			parent := block1
 			// build a large chain of intermediary blocks
 			for i := 0; i < 100; i++ {
-				next := unittest.BlockWithParentProtocolState(parent)
+				next := *unittest.BlockWithParentProtocolState(parent)
 				if i == 0 {
 					// Repetitions of the same receipt in one fork would be a protocol violation.
 					// Hence, we include the result only once in the direct child of B1.
@@ -410,8 +410,8 @@ func TestSealingSegment(t *testing.T) {
 						),
 					)
 				}
-				buildFinalizedBlock(t, state, next)
-				parent = next
+				buildFinalizedBlock(t, state, &next)
+				parent = &next
 			}
 
 			// build the block sealing block 1

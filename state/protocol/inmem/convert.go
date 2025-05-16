@@ -156,7 +156,7 @@ func SnapshotFromBootstrapStateWithParams(
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
 		SealingSegment: &flow.SealingSegment{
-			Blocks:           []*flow.BlockProposal{{Block: root, ProposerSigData: nil}},
+			Blocks:           []*flow.BlockProposal{{Block: *root, ProposerSigData: nil}},
 			ExecutionResults: flow.ExecutionResultList{result},
 			LatestSeals:      map[flow.Identifier]flow.Identifier{root.ID(): seal.ID()},
 			ProtocolStateEntries: map[flow.Identifier]*flow.ProtocolStateEntryWrapper{

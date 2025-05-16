@@ -79,7 +79,8 @@ func MessageToBlock(m *entities.Block) (*flow.Block, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert block header: %w", err)
 	}
-	return flow.NewBlock(header.HeaderBody, *payload), nil
+	block := flow.NewBlock(header.HeaderBody, *payload)
+	return &block, nil
 }
 
 // BlockSealToMessage converts a flow.Seal to a protobuf BlockSeal message.

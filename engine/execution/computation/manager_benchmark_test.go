@@ -223,11 +223,11 @@ func benchmarkComputeBlock(
 	for i := 0; i < b.N; i++ {
 		executableBlock := createBlock(
 			b,
-			parentBlock,
+			&parentBlock,
 			accs,
 			numCollections,
 			numTransactionsPerCollection)
-		parentBlock = executableBlock.Block
+		parentBlock = *executableBlock.Block
 
 		b.StartTimer()
 		start := time.Now()
@@ -289,7 +289,7 @@ func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colN
 	)
 
 	return &entity.ExecutableBlock{
-		Block:               block,
+		Block:               &block,
 		CompleteCollections: completeCollections,
 		StartState:          unittest.StateCommitmentPointerFixture(),
 	}

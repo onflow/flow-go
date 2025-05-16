@@ -242,7 +242,7 @@ func FullBlockFixture() flow.Block {
 	block := BlockFixture()
 	payload := PayloadFixture(WithAllTheFixins)
 
-	return *flow.NewBlock(block.Header, payload)
+	return flow.NewBlock(block.Header, payload)
 }
 
 func BlockFixtures(number int) []*flow.Block {
@@ -277,7 +277,7 @@ func ProposalFromHeader(header *flow.Header) *flow.ProposalHeader {
 
 func ProposalFromBlock(block *flow.Block) *flow.BlockProposal {
 	return &flow.BlockProposal{
-		Block:           block,
+		Block:           *block,
 		ProposerSigData: SignatureFixture(),
 	}
 }
@@ -397,20 +397,23 @@ func BlockWithParentFixture(parent *flow.Header) *flow.Block {
 // BlockWithParentAndPayload creates a new block that is valid
 // with respect to the given parent block and with given payload.
 func BlockWithParentAndPayload(parent *flow.Header, payload flow.Payload) *flow.Block {
-	return flow.NewBlock(HeaderBodyWithParentFixture(parent), payload)
+	block := flow.NewBlock(HeaderBodyWithParentFixture(parent), payload)
+	return &block
 }
 
 func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
 	payload := PayloadFixture(WithProtocolStateID(parent.Payload.ProtocolStateID))
 	headerBody := HeaderBodyWithParentFixture(parent.ToHeader())
-	return flow.NewBlock(headerBody, payload)
+	block := flow.NewBlock(headerBody, payload)
+	return &block
 }
 
 func BlockWithGuaranteesFixture(guarantees []*flow.CollectionGuarantee) *flow.Block {
 	payload := PayloadFixture(WithGuarantees(guarantees...))
 	headerBody := HeaderBodyFixture()
 
-	return flow.NewBlock(headerBody, payload)
+	block := flow.NewBlock(headerBody, payload)
+	return &block
 }
 
 func WithoutGuarantee(payload *flow.Payload) {
@@ -1643,7 +1646,7 @@ func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.HeaderBody
 		Result:        &result,
 		ChunkDataPack: chunkDataPack,
 		EndState:      endState,
-	}, block
+	}, &block
 }
 
 // ChunkDataResponseMsgFixture creates a chunk data response message with a single-transaction collection, and random chunk ID.
@@ -2039,7 +2042,7 @@ func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
 
 func CertifiedByChild(block *flow.Block, child *flow.Block) *flow.CertifiedBlock {
 	return &flow.CertifiedBlock{
-		Proposal:     &flow.BlockProposal{Block: block, ProposerSigData: SignatureFixture()},
+		Proposal:     &flow.BlockProposal{Block: *block, ProposerSigData: SignatureFixture()},
 		CertifyingQC: child.ToHeader().QuorumCertificate(),
 	}
 }
@@ -2047,7 +2050,7 @@ func CertifiedByChild(block *flow.Block, child *flow.Block) *flow.CertifiedBlock
 func NewCertifiedBlock(block *flow.Block) *flow.CertifiedBlock {
 	return &flow.CertifiedBlock{
 		Proposal: &flow.BlockProposal{
-			Block:           block,
+			Block:           *block,
 			ProposerSigData: SignatureFixture(),
 		},
 		CertifyingQC: CertifyBlock(block.ToHeader()),
@@ -2367,7 +2370,7 @@ func BootstrapFixtureWithSetupAndCommit(
 	root := flow.NewBlock(header, flow.Payload{ProtocolStateID: rootProtocolState.ID()})
 	stateCommit := GenesisStateCommitmentByChainID(header.ChainID)
 
-	result := BootstrapExecutionResultFixture(root, stateCommit)
+	result := BootstrapExecutionResultFixture(&root, stateCommit)
 	result.ServiceEvents = []flow.ServiceEvent{
 		setup.ServiceEvent(),
 		commit.ServiceEvent(),
@@ -2375,7 +2378,7 @@ func BootstrapFixtureWithSetupAndCommit(
 
 	seal := Seal.Fixture(Seal.WithResult(result))
 
-	return root, result, seal
+	return &root, result, seal
 }
 
 // RootSnapshotFixture returns a snapshot representing a root chain state, for
