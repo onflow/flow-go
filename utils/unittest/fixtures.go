@@ -1579,7 +1579,7 @@ func RegisterIDFixture() flow.RegisterID {
 
 // VerifiableChunkDataFixture returns a complete verifiable chunk with an
 // execution receipt referencing the block/collections.
-func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(flow.HeaderBody)) (*verification.VerifiableChunkData, *flow.Block) {
+func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.HeaderBody)) (*verification.VerifiableChunkData, *flow.Block) {
 
 	guarantees := make([]*flow.CollectionGuarantee, 0, chunkIndex+1)
 
@@ -1596,7 +1596,7 @@ func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(flow.HeaderBody)
 	}
 	headerBody := HeaderBodyFixture()
 	for _, opt := range opts {
-		opt(headerBody)
+		opt(&headerBody)
 	}
 
 	block := flow.NewBlock(headerBody, payload)
