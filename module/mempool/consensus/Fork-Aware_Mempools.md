@@ -3,7 +3,7 @@
 ### Problem Description 
 A consensus primary knows a set `S` of Execution Receipts, some of which might not be known to other consensus replicas.
 The primaries Fork-Choice rule decides to build on top of block `F`. When constructing the payload, the primary must 
-decide which ExecutionReceipts to incorporated in the payload.
+decide which ExecutionReceipts to incorporate in the payload.
 * Consider the fork `<- A <- B <- ... <- E <- F` leading up to block `F`. Here, `A` denotes the latest sealed block in that fork.
 * For incorporating Execution Receipts, we can restrict our consideration to the section `B <- ... <- E <- F` of the fork, 
   as all earlier blocks have already been sealed as of `F`. 
@@ -12,7 +12,7 @@ _Notation_
 
 We use the following notation
 * `r[B]` is an execution result for block `B`. If there are multiple different results for block `B`, we add an index, e.g. `r[B]_1`, `r[B]_2`, ...
-* `Er[r]` is a execution receipt vouching for result `r`. For example `Er[r[C]_2]` is the receipt for result `r[C]_2`
+* `Er[r]` is an execution receipt vouching for result `r`. For example `Er[r[C]_2]` is the receipt for result `r[C]_2`
 * an Execution Receipt `r` has the following fields:
   * `PreviousResultID` denotes the result `ID` for the parent block that has been used as starting state for computing the current block
 
@@ -39,14 +39,14 @@ There are multiple criteria that have to be satisfied for a receipt to be incorp
        with `Er'.ExecutionResult.ID() == Er.PreviousResultID`
   
 
-Note that the condition cannot be relaxed to: "there must be any ExecutionResult for the parent block be included in the fork" . It must be specifically the parent result referenced by PreviousResultID.
+Note that the condition cannot be relaxed to: "there must be any ExecutionResult for the parent block included in the fork". It must be specifically the parent result referenced by PreviousResultID.
 
 ### Problem formalization
 
 As illustrated by the figure above, the ExecutionResults form a tree, with the last sealed result as the root. 
 * All Execution Receipts committing to the same result from an [equivalence class](https://en.wikipedia.org/wiki/Equivalence_class) and can be 
 represented as one vertex in the [Execution Tree](/docs/ExecutionResultTrees.png).
-* Consider the results `r[A]` and `r[B]`. As `r[A]`'s output state is used as the staring state to compute block `B`, 
+* Consider the results `r[A]` and `r[B]`. As `r[A]`'s output state is used as the starting state to compute block `B`, 
   we can say: "from result `r[A]` `computation` (denoted by symbol `Σ`) leads to `r[B]`". Formally:     
   ```
     r[A] Σ r[B]
@@ -67,8 +67,8 @@ Note:
 
 ### Algorithmic solution
 
-Lets break up the problem into 3 steps:
-1. For the first step, lets ignore the receipts already included in the fork. Lets start with only the `sealed_state` and ask:
+Let's break up the problem into 3 steps:
+1. For the first step, let's ignore the receipts already included in the fork. Let's start with only the `sealed_state` and ask:
    ```
    What is the largest set of Execution Receipts that are potential candidates for inclusion in the block I am building?
    ```

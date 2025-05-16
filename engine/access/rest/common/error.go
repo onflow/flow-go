@@ -4,7 +4,7 @@ import "net/http"
 
 // StatusError provides custom error with http status.
 type StatusError interface {
-	error                // this is the actual error that occured
+	error                // this is the actual error that occurred
 	Status() int         // the HTTP status code to return
 	UserMessage() string // the error message to return to the client
 }

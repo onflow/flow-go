@@ -121,7 +121,7 @@ func (b *backend) pruneByView(view uint64) {
 	}
 }
 
-// size returns the number of elements stored in teh backend
+// size returns the number of elements stored in the backend
 func (b *backend) size() uint {
 	b.mu.RLock()
 	defer b.mu.RUnlock()

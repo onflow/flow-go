@@ -111,7 +111,7 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 	if !schdp.SystemChunk {
 		collection, err := ch.collections.ByID(schdp.CollectionID)
 		if err != nil {
-			return nil, fmt.Errorf("could not retrive collection (id: %x) for stored chunk data pack: %w", schdp.CollectionID, err)
+			return nil, fmt.Errorf("could not retrieve collection (id: %x) for stored chunk data pack: %w", schdp.CollectionID, err)
 		}
 
 		chdp.Collection = collection
@@ -123,7 +123,7 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 func (ch *ChunkDataPacks) byChunkID(chunkID flow.Identifier) (*storage.StoredChunkDataPack, error) {
 	schdp, err := ch.retrieveCHDP(chunkID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrive stored chunk data pack: %w", err)
+		return nil, fmt.Errorf("could not retrieve stored chunk data pack: %w", err)
 	}
 
 	return schdp, nil

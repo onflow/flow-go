@@ -347,7 +347,7 @@ func checkExecutionForkEvidence(db *badger.DB) ([]*flow.IncorporatedResultSeal, 
 			return nil // no evidence in data base; conflictingSeals is still nil slice
 		}
 		if err != nil {
-			return fmt.Errorf("failed to load evidence whether or not an execution fork occured: %w", err)
+			return fmt.Errorf("failed to load evidence whether or not an execution fork occurred: %w", err)
 		}
 		return nil
 	})

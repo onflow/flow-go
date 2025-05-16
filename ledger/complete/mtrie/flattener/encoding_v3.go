@@ -48,7 +48,7 @@ func ReadNodeFromCheckpointV3AndEarlier(reader io.Reader, getNode getNodeFunc) (
 	}
 
 	if version > encodingDecodingVersion {
-		return nil, 0, 0, fmt.Errorf("found unsuported version %d (> %d) of serialized node in v3", version, encodingDecodingVersion)
+		return nil, 0, 0, fmt.Errorf("found unsupported version %d (> %d) of serialized node in v3", version, encodingDecodingVersion)
 	}
 
 	// fixed-length data:
@@ -189,7 +189,7 @@ func ReadTrieFromCheckpointV3AndEarlier(reader io.Reader, getNode getNodeFunc) (
 	}
 
 	if version > encodingDecodingVersion {
-		return nil, fmt.Errorf("found unsuported version %d (> %d) of serialized trie in v3", version, encodingDecodingVersion)
+		return nil, fmt.Errorf("found unsupported version %d (> %d) of serialized trie in v3", version, encodingDecodingVersion)
 	}
 
 	// Read root index (8 bytes)

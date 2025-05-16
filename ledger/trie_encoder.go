@@ -54,7 +54,7 @@ const (
 	// TypeTrieUpdate - type for trie update
 	TypeTrieUpdate
 	// this is used to flag types from the future
-	typeUnsuported
+	typeUnsupported
 )
 
 func (e Type) String() string {
@@ -85,8 +85,8 @@ func CheckType(rawInput []byte, expectedType uint8) (rest []byte, err error) {
 	}
 
 	// error if type is known for this code
-	if t >= typeUnsuported {
-		return r, fmt.Errorf("unknown entity type in the encoded data (%d > %d)", t, typeUnsuported)
+	if t >= typeUnsupported {
+		return r, fmt.Errorf("unknown entity type in the encoded data (%d > %d)", t, typeUnsupported)
 	}
 
 	// error if type is known for this code

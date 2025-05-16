@@ -115,11 +115,11 @@ func TestEVMRun(t *testing.T) {
 
 				// fee transfer event
 				feeTransferEvent := output.Events[1]
-				feeTranferEventPayload := TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
+				feeTransferEventPayload := TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
 				require.NoError(t, err)
-				require.Equal(t, uint16(types.ErrCodeNoError), feeTranferEventPayload.ErrorCode)
-				require.Equal(t, uint16(1), feeTranferEventPayload.Index)
-				require.Equal(t, uint64(21000), feeTranferEventPayload.GasConsumed)
+				require.Equal(t, uint16(types.ErrCodeNoError), feeTransferEventPayload.ErrorCode)
+				require.Equal(t, uint16(1), feeTransferEventPayload.Index)
+				require.Equal(t, uint64(21000), feeTransferEventPayload.GasConsumed)
 
 				// commit block
 				blockEventPayload, snapshot := callEVMHeartBeat(t,
@@ -131,7 +131,7 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, uint64(64785), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
 
-				txHashes := types.TransactionHashes{txEventPayload.Hash, feeTranferEventPayload.Hash}
+				txHashes := types.TransactionHashes{txEventPayload.Hash, feeTransferEventPayload.Hash}
 				require.Equal(t,
 					txHashes.RootHash(),
 					blockEventPayload.TransactionHashRoot,
@@ -142,7 +142,7 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
 				require.Equal(t, uint16(0), txEventPayload.Index)
 				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
-				require.Equal(t, blockEventPayload.TotalGasUsed-feeTranferEventPayload.GasConsumed, txEventPayload.GasConsumed)
+				require.Equal(t, blockEventPayload.TotalGasUsed-feeTransferEventPayload.GasConsumed, txEventPayload.GasConsumed)
 				require.Empty(t, txEventPayload.ContractAddress)
 
 				// append the state
@@ -678,12 +678,12 @@ func TestEVMBatchRun(t *testing.T) {
 
 				// last event is fee transfer event
 				feeTransferEvent := output.Events[batchCount]
-				feeTranferEventPayload := TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
+				feeTransferEventPayload := TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
 				require.NoError(t, err)
-				require.Equal(t, uint16(types.ErrCodeNoError), feeTranferEventPayload.ErrorCode)
-				require.Equal(t, uint16(batchCount), feeTranferEventPayload.Index)
-				require.Equal(t, uint64(21000), feeTranferEventPayload.GasConsumed)
-				txHashes = append(txHashes, feeTranferEventPayload.Hash)
+				require.Equal(t, uint16(types.ErrCodeNoError), feeTransferEventPayload.ErrorCode)
+				require.Equal(t, uint16(batchCount), feeTransferEventPayload.Index)
+				require.Equal(t, uint64(21000), feeTransferEventPayload.GasConsumed)
+				txHashes = append(txHashes, feeTransferEventPayload.Hash)
 
 				// check coinbase balance (note the gas price is 1)
 				coinbaseBalance = getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)

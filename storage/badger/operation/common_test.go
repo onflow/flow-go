@@ -435,9 +435,9 @@ func TestRemove(t *testing.T) {
 		})
 
 		t.Run("should error when removing non-existing value", func(t *testing.T) {
-			nonexistantKey := append(key, 0x01)
+			nonexistentKey := append(key, 0x01)
 			_ = db.Update(func(txn *badger.Txn) error {
-				err := remove(nonexistantKey)(txn)
+				err := remove(nonexistentKey)(txn)
 				assert.ErrorIs(t, err, storage.ErrNotFound)
 				assert.Error(t, err)
 				return nil
@@ -459,8 +459,8 @@ func TestRemoveByPrefix(t *testing.T) {
 				return nil
 			})
 
-			nonexistantKey := append(key, 0x01)
-			err := db.Update(removeByPrefix(nonexistantKey))
+			nonexistentKey := append(key, 0x01)
+			err := db.Update(removeByPrefix(nonexistentKey))
 			assert.NoError(t, err)
 
 			var act Entity

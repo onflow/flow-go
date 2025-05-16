@@ -213,7 +213,7 @@ func (c *Controller) GetIndex() int {
 }
 
 // SubmitResult instructs the broker to submit DKG results. It is up to the
-// caller to ensure that this method is called after a succesfull run of the
+// caller to ensure that this method is called after a successful run of the
 // protocol.
 func (c *Controller) SubmitResult() error {
 	_, pubKey, groupKeys := c.GetArtifacts()

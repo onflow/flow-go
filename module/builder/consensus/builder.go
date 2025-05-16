@@ -210,7 +210,7 @@ func (b *Builder) repopulateExecutionTree() error {
 	receiptCollector := func(header *flow.Header) error {
 		receipts, err := b.receiptsDB.ByBlockID(header.ID())
 		if err != nil {
-			return fmt.Errorf("could not retrieve execution reciepts for block %x: %w", header.ID(), err)
+			return fmt.Errorf("could not retrieve execution receipts for block %x: %w", header.ID(), err)
 		}
 		for _, receipt := range receipts {
 			_, err = b.recPool.AddReceipt(receipt, header)

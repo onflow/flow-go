@@ -427,7 +427,7 @@ func (e *Engine) approvalRequestHandler(originID flow.Identifier, req *messages.
 			err)
 	}
 
-	log.Debug().Msg("succesfully replied to approval request")
+	log.Debug().Msg("successfully replied to approval request")
 
 	return nil
 }

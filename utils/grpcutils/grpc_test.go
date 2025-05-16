@@ -34,7 +34,7 @@ func TestCertificateGeneration(t *testing.T) {
 	pubKey, err := libp2ptls.PubKeyFromCertChain([]*x509.Certificate{cert})
 	require.NoError(t, err)
 
-	// convert the test key to a libp2p key for easy comparision
+	// convert the test key to a libp2p key for easy comparison
 	libp2pKey, err := keyutils.LibP2PPrivKeyFromFlow(key)
 	expectedKey := libp2pKey.GetPublic()
 	require.NoError(t, err)

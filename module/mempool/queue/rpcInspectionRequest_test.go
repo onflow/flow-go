@@ -50,7 +50,7 @@ func TestMessageEntity_InspectRPCRequest_ID(t *testing.T) {
 	entity2 := queue.NewMessageEntity(&engine.Message{Payload: req2})
 	entity3 := queue.NewMessageEntity(&engine.Message{Payload: req3})
 
-	// as the Nonce and PeerID fields are the same, the ID of the MessageEntity should be the same accross all three
+	// as the Nonce and PeerID fields are the same, the ID of the MessageEntity should be the same across all three
 	// in other words, the RPC field should not affect the ID
 	require.Equal(t, entity1.ID(), entity2.ID())
 	require.Equal(t, entity1.ID(), entity3.ID())
