@@ -35,7 +35,7 @@ func IterateExecuteAndCommitInBatch(
 	// executor decides what data in the storage will be updated for a certain block
 	executor IterationExecutor,
 	// db creates a new batch for each block, and passed to the executor for adding updates,
-	// the batch is commited when it's full
+	// the batch is committed when it's full
 	db storage.DB,
 	// batchSize decides the batch size for each commit.
 	batchSize uint,

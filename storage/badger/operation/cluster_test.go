@@ -70,7 +70,7 @@ func TestClusterBoundaries(t *testing.T) {
 			err       error
 		)
 
-		t.Run("retrieve non-existant", func(t *testing.T) {
+		t.Run("retrieve non-existent", func(t *testing.T) {
 			var actual uint64
 			err = db.View(operation.RetrieveClusterFinalizedHeight(clusterID, &actual))
 			t.Log(err)

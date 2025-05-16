@@ -29,14 +29,14 @@ Conceptually, we maintain four categories of branches:
   However, for the foreseeable future, large and broadly-breaking improvements will be necessary for a fast evolution and
   feature-completion of Flow. Such features should be kept in their individual feature branches.
 * The `spork` branch will be created in preparation of a new spork from the most recent `master`. Feature branches holding HCU-**in**compatible upgrades will be
-  consolidated on this `spork` branch. The spork branch is intended to be very short-lived and only exist for a few weeks right before the testnet spork.
+  consolidated on this `spork` branch. The spork branch is intended to be very short-lived and only exists for a few weeks right before the testnet spork.
   When the Flow network has committed to the spork on a governance level (currently coordinated by the Flow Foundation), 
   the `spork` branch will be merged back to `master`.
 
 We are purposefully continuing the usage of the 'spork' terminology here, to describe a "severely breaking change".
 Specifically, spork describes a deployment of new node software, which requires the entire network to be stopped and rebooted.
 We only carry over a snapshot of the execution state but fully re-initialize the protocol state. Thereby, major upgrades of the protocol,
-incl. migrations of the entire execution state to a new formats become reasonably straight forward.
+incl. migrations of the entire execution state to a new formats become reasonably straightforward.
 Additional context on HCU vs sporks can be found [here](https://developers.flow.com/networks/node-ops/node-operation/hcu#hcu-versus-spork).   
 
 
@@ -153,7 +153,7 @@ which we do on the `spork` branch.
 
 ### Mainnet
 
-- Features must live on Testnet for two week before making it to Mainnet
+- Features must live on Testnet for two weeks before making it to Mainnet
 - The current schedule is the Wednesday two weeks after the Testnet Spork
 
 ## Breaking Change Classifications

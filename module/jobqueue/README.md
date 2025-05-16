@@ -57,7 +57,7 @@ In the scenario of processing finalized blocks, implementing symmetric functions
 In order to report job completion, the worker needs to call job consumer's `NotifyJobIsDone` method.
 
 ### Error handling
-Job queue doesn't allow job to fail, because job queue has to guarantee any job below the last processed job index has been finished successfully. Leaving a gap is not accpeted.
+Job queue doesn't allow job to fail, because job queue has to guarantee any job below the last processed job index has been finished successfully. Leaving a gap is not accepted.
 
 Therefore, if a worker fails to process a job, it should retry by itself, or just crash.
 
@@ -78,8 +78,8 @@ Some use cases might require "push" style jobs where there is a job producer tha
 
 ### TODOs
 1. Jobs at different index are processed in parallel, it's possible that there is a job takes a long time to work on, and causing too many completed jobs cached in memory before being used to update the last processed job index.
-  `maxSearchAhead` will allow the job consumer to stop consume more blocks if too many jobs are completed, but the job at index lastProcesssed + 1 has not been unprocessed yet.
-  The difference between `maxSearchAhead` and `maxProcessing` is that: `maxProcessing` allows at most `maxProcessing` number of works to process jobs. However, even if there is worker available, it might not be assigned to a job, because the job at index lastProcesssed +1 has not been done, it won't work on an job with index higher than `lastProcesssed + maxSearchAhead`.
+  `maxSearchAhead` will allow the job consumer to stop consume more blocks if too many jobs are completed, but the job at index lastProcessed + 1 has not been unprocessed yet.
+  The difference between `maxSearchAhead` and `maxProcessing` is that: `maxProcessing` allows at most `maxProcessing` number of works to process jobs. However, even if there is worker available, it might not be assigned to a job, because the job at index lastProcessed +1 has not been done, it won't work on a job with index higher than `lastProcessed + maxSearchAhead`.
 2. accept callback to get notified when the consecutive job index is finished.
 3. implement ReadyDoneAware interface
 

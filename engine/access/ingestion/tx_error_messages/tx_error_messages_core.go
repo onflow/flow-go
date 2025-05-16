@@ -69,7 +69,7 @@ func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessagesByENs(
 ) error {
 	exists, err := c.transactionResultErrorMessages.Exists(blockID)
 	if err != nil {
-		return fmt.Errorf("could not check existance of transaction result error messages: %w", err)
+		return fmt.Errorf("could not check existence of transaction result error messages: %w", err)
 	}
 
 	if exists {
