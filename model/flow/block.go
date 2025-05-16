@@ -30,12 +30,6 @@ type Block struct {
 	Payload Payload
 }
 
-// TODO: SetPayload will be removed in the follow up PR.
-// SetPayload sets the payload and updates the payload hash.
-func (b *Block) SetPayload(payload Payload) {
-	b.Payload = payload
-}
-
 // NewBlock creates a new block.
 //
 // Parameters:

@@ -1345,8 +1345,10 @@ func (suite *Suite) createChain() (*flow.BlockProposal, *flow.Collection) {
 		ReferenceBlockID: refBlockID,
 		SignerIndices:    indices,
 	}
-	block := unittest.BlockWithParentFixture(suite.finalizedBlock)
-	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
+	block := unittest.BlockWithParentAndPayload(
+		suite.finalizedBlock,
+		unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
+	)
 	proposal := unittest.ProposalFromBlock(block)
 
 	cluster := new(protocol.Cluster)
