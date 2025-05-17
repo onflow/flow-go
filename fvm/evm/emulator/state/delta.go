@@ -484,7 +484,7 @@ func (d *DeltaView) AddressInAccessList(addr gethCommon.Address) bool {
 			return true
 		}
 	}
-	return d.parent.AddressInAccessList(addr)
+	return false
 }
 
 // AddAddressToAccessList adds an address to the access list
@@ -507,8 +507,7 @@ func (d *DeltaView) SlotInAccessList(sk types.SlotAddress) (addressOk bool, slot
 			return addressFound, true
 		}
 	}
-	_, slotFound := d.parent.SlotInAccessList(sk)
-	return addressFound, slotFound
+	return addressFound, false
 }
 
 // AddSlotToAccessList adds a slot to the access list

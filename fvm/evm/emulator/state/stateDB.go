@@ -308,12 +308,44 @@ func (db *StateDB) SetTransientState(addr gethCommon.Address, key, value gethCom
 
 // AddressInAccessList checks if an address is in the access list
 func (db *StateDB) AddressInAccessList(addr gethCommon.Address) bool {
-	return db.latestView().AddressInAccessList(addr)
+	// For each static call / call / delegate call, the EVM will create
+	// a snapshot, so that it can revert to it in case of execution errors,
+	// such as out of gas etc, using `Snapshot` & `RevertToSnapshot`.
+	// This can create a long list of views, in the order of 4K for certain
+	// large transactions. To avoid performance issues with deep stacks,
+	// we use a plain for-loop, instead of checking parents, as DeltaView did.
+	// We take advantage of the fact that addresses are added in AccessList
+	// in the early steps of tx execution, so we return early.
+	for _, view := range db.views {
+		if view.AddressInAccessList(addr) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // SlotInAccessList checks if the given (address,slot) is in the access list
 func (db *StateDB) SlotInAccessList(addr gethCommon.Address, key gethCommon.Hash) (addressOk bool, slotOk bool) {
-	return db.latestView().SlotInAccessList(types.SlotAddress{Address: addr, Key: key})
+	slotKey := types.SlotAddress{Address: addr, Key: key}
+
+	// For each static call / call / delegate call, the EVM will create
+	// a snapshot, so that it can revert to it in case of execution errors,
+	// such as out of gas etc, using `Snapshot` & `RevertToSnapshot`.
+	// This can create a long list of views, in the order of 4K for certain
+	// large transactions. To avoid performance issues with deep stacks,
+	// we use a plain for-loop, instead of checking parents, as DeltaView did.
+	// We take advantage of the fact that slots are added in AccessList
+	// in the early steps of tx execution, so we return early.
+	for _, view := range db.views {
+		addressFound, slotFound := view.SlotInAccessList(slotKey)
+		if slotFound {
+			return addressFound, true
+		}
+	}
+
+	addressFound := db.AddressInAccessList(addr)
+	return addressFound, false
 }
 
 // AddAddressToAccessList adds the given address to the access list.
