@@ -18,7 +18,7 @@ func MakeTC(options ...func(*flow.TimeoutCertificate)) *flow.TimeoutCertificate 
 	tc := flow.TimeoutCertificate{
 		View:          rand.Uint64(),
 		NewestQC:      qc,
-		NewestQCViews: []uint64{qc.View},
+		NewestQCViews: highQCViews,
 		SignerIndices: signerIndices,
 		SigData:       unittest.SignatureFixture(),
 	}

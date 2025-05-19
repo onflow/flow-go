@@ -17,7 +17,7 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/templates"
 
-	"github.com/onflow/flow-go/access"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	flowgo "github.com/onflow/flow-go/model/flow"
 )
 
@@ -386,7 +386,7 @@ func (b *SDKAdapter) GetSystemTransaction(_ context.Context, _ flowgo.Identifier
 	return nil, nil
 }
 
-func (b *SDKAdapter) GetSystemTransactionResult(_ context.Context, _ flowgo.Identifier, _ entities.EventEncodingVersion) (*access.TransactionResult, error) {
+func (b *SDKAdapter) GetSystemTransactionResult(_ context.Context, _ flowgo.Identifier, _ entities.EventEncodingVersion) (*accessmodel.TransactionResult, error) {
 	return nil, nil
 }
 

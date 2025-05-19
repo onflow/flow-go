@@ -25,12 +25,15 @@ import (
 	cadenceStdlib "github.com/onflow/cadence/stdlib"
 	"github.com/onflow/cadence/test_utils/runtime_utils"
 	"github.com/onflow/crypto"
+	"github.com/onflow/flow-core-contracts/lib/go/contracts"
+	bridge "github.com/onflow/flow-evm-bridge"
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/test"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
@@ -2987,7 +2990,7 @@ func TestEVM(t *testing.T) {
 				errStorage.
 					On("Get", mockery.AnythingOfType("flow.RegisterID")).
 					Return(func(id flow.RegisterID) (flow.RegisterValue, error) {
-						if id.Key == "LatestBlock" {
+						if id.Key == "LatestBlock" || id.Key == "LatestBlockProposal" {
 							return nil, e.err
 						}
 						return snapshotTree.Get(id)
@@ -3103,6 +3106,535 @@ func TestEVM(t *testing.T) {
 				},
 				eventTypeIDs,
 			)
+		}),
+	)
+}
+
+func TestVMBridge(t *testing.T) {
+	blocks := new(envMock.Blocks)
+	block1 := unittest.BlockFixture()
+	blocks.On("ByHeightFrom",
+		block1.Header.Height,
+		block1.Header,
+	).Return(block1.Header, nil)
+
+	ctxOpts := []fvm.Option{
+		// default is testnet, but testnet has a special EVM storage contract location
+		// so we have to use emulator here so that the EVM storage contract is deployed
+		// to the 5th address
+		fvm.WithChain(flow.Emulator.Chain()),
+		fvm.WithEVMEnabled(true),
+		fvm.WithBlocks(blocks),
+		fvm.WithBlockHeader(block1.Header),
+		fvm.WithCadenceLogging(true),
+		fvm.WithContractDeploymentRestricted(false),
+	}
+
+	t.Run("successful FT Type Onboarding and Bridging", newVMTest().
+		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true), fvm.WithSetupVMBridgeEnabled(true)).
+		withContextOptions(ctxOpts...).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+			env := sc.AsTemplateEnv()
+
+			bridgeEnv := bridge.Environment{
+				CrossVMNFTAddress:                     env.ServiceAccountAddress,
+				CrossVMTokenAddress:                   env.ServiceAccountAddress,
+				FlowEVMBridgeHandlerInterfacesAddress: env.ServiceAccountAddress,
+				IBridgePermissionsAddress:             env.ServiceAccountAddress,
+				ICrossVMAddress:                       env.ServiceAccountAddress,
+				ICrossVMAssetAddress:                  env.ServiceAccountAddress,
+				IEVMBridgeNFTMinterAddress:            env.ServiceAccountAddress,
+				IEVMBridgeTokenMinterAddress:          env.ServiceAccountAddress,
+				IFlowEVMNFTBridgeAddress:              env.ServiceAccountAddress,
+				IFlowEVMTokenBridgeAddress:            env.ServiceAccountAddress,
+				FlowEVMBridgeAddress:                  env.ServiceAccountAddress,
+				FlowEVMBridgeAccessorAddress:          env.ServiceAccountAddress,
+				FlowEVMBridgeConfigAddress:            env.ServiceAccountAddress,
+				FlowEVMBridgeHandlersAddress:          env.ServiceAccountAddress,
+				FlowEVMBridgeNFTEscrowAddress:         env.ServiceAccountAddress,
+				FlowEVMBridgeResolverAddress:          env.ServiceAccountAddress,
+				FlowEVMBridgeTemplatesAddress:         env.ServiceAccountAddress,
+				FlowEVMBridgeTokenEscrowAddress:       env.ServiceAccountAddress,
+				FlowEVMBridgeUtilsAddress:             env.ServiceAccountAddress,
+				ArrayUtilsAddress:                     env.ServiceAccountAddress,
+				ScopedFTProvidersAddress:              env.ServiceAccountAddress,
+				SerializeAddress:                      env.ServiceAccountAddress,
+				SerializeMetadataAddress:              env.ServiceAccountAddress,
+				StringUtilsAddress:                    env.ServiceAccountAddress,
+			}
+
+			// Create an account private key.
+			privateKey, err := testutil.GenerateAccountPrivateKey()
+			require.NoError(t, err)
+
+			// Create accounts with the provided private
+			// key and the root account.
+			snapshotTree, accounts, err := testutil.CreateAccounts(
+				vm,
+				snapshotTree,
+				[]flow.AccountPrivateKey{privateKey},
+				chain)
+			require.NoError(t, err)
+
+			txBody := blueprints.TransferFlowTokenTransaction(env, chain.ServiceAddress(), accounts[0], "2.0")
+
+			err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			executionSnapshot, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			// Deploy the ExampleToken contract
+			tokenContract := contracts.ExampleToken(env)
+			tokenContractName := "ExampleToken"
+			txBody = blueprints.DeployContractTransaction(
+				accounts[0],
+				tokenContract,
+				tokenContractName,
+			)
+
+			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 0)
+			require.NoError(t, err)
+
+			executionSnapshot, output, err = vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			// Onboard the Fungible Token Type
+			typeToOnboard := "A." + accounts[0].String() + "." + tokenContractName + ".Vault"
+
+			txBody = blueprints.OnboardToBridgeByTypeIDTransaction(env, bridgeEnv, accounts[0], typeToOnboard)
+
+			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 1)
+			require.NoError(t, err)
+
+			executionSnapshot, output, err = vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.Len(t, output.Events, 7)
+			for _, event := range output.Events {
+				if strings.Contains(string(event.Type), "Onboarded") {
+					// decode the event payload
+					data, _ := ccf.Decode(nil, event.Payload)
+					// get the contractAddress field from the event
+					typeOnboarded := cadence.SearchFieldByName(
+						data.(cadence.Event),
+						"type",
+					).(cadence.String)
+
+					require.Equal(t, typeToOnboard, typeOnboarded.String()[1:len(typeOnboarded)+1])
+				}
+			}
+
+			// Create COA in the new account
+			txBody = blueprints.CreateCOATransaction(env, bridgeEnv, accounts[0])
+			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 2)
+			require.NoError(t, err)
+
+			executionSnapshot, output, err = vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			// Bridge the Fungible Token to EVM
+			txBody = blueprints.BridgeFTToEVMTransaction(env, bridgeEnv, accounts[0], typeToOnboard, "1.0")
+			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 3)
+			require.NoError(t, err)
+
+			executionSnapshot, output, err = vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			// Confirm that the FT is escrowed
+			script := blueprints.GetEscrowedTokenBalanceScript(env, bridgeEnv)
+
+			arguments := []cadence.Value{
+				cadence.String(typeToOnboard),
+			}
+
+			encodedArguments := make([][]byte, 0, len(arguments))
+			for _, argument := range arguments {
+				encodedArguments = append(encodedArguments, jsoncdc.MustEncode(argument))
+			}
+
+			_, output, err = vm.Run(
+				ctx,
+				fvm.Script(script).
+					WithArguments(encodedArguments...),
+				snapshotTree)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			result := output.Value.(cadence.Optional).Value
+			expected, _ := cadence.NewUFix64("1.0")
+			require.Equal(t, expected, result)
+
+			// Bridge the tokens back to Cadence
+			txBody = blueprints.BridgeFTFromEVMTransaction(env, bridgeEnv, accounts[0], typeToOnboard, 1000000000000000000)
+
+			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 4)
+			require.NoError(t, err)
+
+			executionSnapshot, output, err = vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			// Confirm that the FT is no longer escrowed
+			script = blueprints.GetEscrowedTokenBalanceScript(env, bridgeEnv)
+
+			arguments = []cadence.Value{
+				cadence.String(typeToOnboard),
+			}
+
+			encodedArguments = make([][]byte, 0, len(arguments))
+			for _, argument := range arguments {
+				encodedArguments = append(encodedArguments, jsoncdc.MustEncode(argument))
+			}
+
+			_, output, err = vm.Run(
+				ctx,
+				fvm.Script(script).
+					WithArguments(encodedArguments...),
+				snapshotTree)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			result = output.Value.(cadence.Optional).Value
+			expected, _ = cadence.NewUFix64("0.0")
+			require.Equal(t, expected, result)
+		}),
+	)
+
+	t.Run("successful NFT Type Onboarding and Bridging", newVMTest().
+		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true), fvm.WithSetupVMBridgeEnabled(true)).
+		withContextOptions(ctxOpts...).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+			env := sc.AsTemplateEnv()
+
+			bridgeEnv := bridge.Environment{
+				CrossVMNFTAddress:                     env.ServiceAccountAddress,
+				CrossVMTokenAddress:                   env.ServiceAccountAddress,
+				FlowEVMBridgeHandlerInterfacesAddress: env.ServiceAccountAddress,
+				IBridgePermissionsAddress:             env.ServiceAccountAddress,
+				ICrossVMAddress:                       env.ServiceAccountAddress,
+				ICrossVMAssetAddress:                  env.ServiceAccountAddress,
+				IEVMBridgeNFTMinterAddress:            env.ServiceAccountAddress,
+				IEVMBridgeTokenMinterAddress:          env.ServiceAccountAddress,
+				IFlowEVMNFTBridgeAddress:              env.ServiceAccountAddress,
+				IFlowEVMTokenBridgeAddress:            env.ServiceAccountAddress,
+				FlowEVMBridgeAddress:                  env.ServiceAccountAddress,
+				FlowEVMBridgeAccessorAddress:          env.ServiceAccountAddress,
+				FlowEVMBridgeConfigAddress:            env.ServiceAccountAddress,
+				FlowEVMBridgeHandlersAddress:          env.ServiceAccountAddress,
+				FlowEVMBridgeNFTEscrowAddress:         env.ServiceAccountAddress,
+				FlowEVMBridgeResolverAddress:          env.ServiceAccountAddress,
+				FlowEVMBridgeTemplatesAddress:         env.ServiceAccountAddress,
+				FlowEVMBridgeTokenEscrowAddress:       env.ServiceAccountAddress,
+				FlowEVMBridgeUtilsAddress:             env.ServiceAccountAddress,
+				ArrayUtilsAddress:                     env.ServiceAccountAddress,
+				ScopedFTProvidersAddress:              env.ServiceAccountAddress,
+				SerializeAddress:                      env.ServiceAccountAddress,
+				SerializeMetadataAddress:              env.ServiceAccountAddress,
+				StringUtilsAddress:                    env.ServiceAccountAddress,
+			}
+
+			// Create an account private key.
+			privateKey, err := testutil.GenerateAccountPrivateKey()
+			require.NoError(t, err)
+
+			// Create accounts with the provided private
+			// key and the root account.
+			snapshotTree, accounts, err := testutil.CreateAccounts(
+				vm,
+				snapshotTree,
+				[]flow.AccountPrivateKey{privateKey},
+				chain)
+			require.NoError(t, err)
+
+			txBody := blueprints.TransferFlowTokenTransaction(env, chain.ServiceAddress(), accounts[0], "2.0")
+
+			err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			executionSnapshot, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			// Deploy the ExampleNFT contract
+			nftContract := contracts.ExampleNFT(env)
+			nftContractName := "ExampleNFT"
+			txBody = blueprints.DeployContractTransaction(
+				accounts[0],
+				nftContract,
+				nftContractName,
+			)
+
+			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 0)
+			require.NoError(t, err)
+
+			executionSnapshot, output, err = vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			// Onboard the Non-Fungible Token Type
+			typeToOnboard := "A." + accounts[0].String() + "." + nftContractName + ".NFT"
+
+			txBody = blueprints.OnboardToBridgeByTypeIDTransaction(env, bridgeEnv, accounts[0], typeToOnboard)
+
+			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 1)
+			require.NoError(t, err)
+
+			executionSnapshot, output, err = vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.Len(t, output.Events, 7)
+			for _, event := range output.Events {
+				if strings.Contains(string(event.Type), "Onboarded") {
+					// decode the event payload
+					data, _ := ccf.Decode(nil, event.Payload)
+					// get the contractAddress field from the event
+					typeOnboarded := cadence.SearchFieldByName(
+						data.(cadence.Event),
+						"type",
+					).(cadence.String)
+
+					require.Equal(t, typeToOnboard, typeOnboarded.String()[1:len(typeOnboarded)+1])
+				}
+			}
+
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			// Create COA in the new account
+			txBody = blueprints.CreateCOATransaction(env, bridgeEnv, accounts[0])
+			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 2)
+			require.NoError(t, err)
+
+			executionSnapshot, output, err = vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			// Mint an NFT
+			txBody = flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(
+					`
+						import NonFungibleToken from 0x%s
+						import ExampleNFT from 0x%s
+						import MetadataViews from 0x%s
+						import FungibleToken from 0x%s
+
+						transaction {
+
+							/// local variable for storing the minter reference
+							let minter: &ExampleNFT.NFTMinter
+
+							/// Reference to the receiver's collection
+							let recipientCollectionRef: &{NonFungibleToken.Receiver}
+
+							prepare(signer: auth(BorrowValue) &Account) {
+
+								let collectionData = ExampleNFT.resolveContractView(resourceType: nil, viewType: Type<MetadataViews.NFTCollectionData>()) as! MetadataViews.NFTCollectionData?
+									?? panic("Could not resolve NFTCollectionData view. The ExampleNFT contract needs to implement the NFTCollectionData Metadata view in order to execute this transaction")
+
+								// borrow a reference to the NFTMinter resource in storage
+								self.minter = signer.storage.borrow<&ExampleNFT.NFTMinter>(from: ExampleNFT.MinterStoragePath)
+									?? panic("The signer does not store an ExampleNFT.Minter object at the path "
+											 .concat(ExampleNFT.MinterStoragePath.toString())
+											 .concat("The signer must initialize their account with this minter resource first!"))
+
+								// Borrow the recipient's public NFT collection reference
+								self.recipientCollectionRef = getAccount(0x%s).capabilities.borrow<&{NonFungibleToken.Receiver}>(collectionData.publicPath)
+									?? panic("The recipient does not have a NonFungibleToken Receiver at "
+											.concat(collectionData.publicPath.toString())
+											.concat(" that is capable of receiving an NFT.")
+											.concat("The recipient must initialize their account with this collection and receiver first!"))
+							}
+
+							execute {
+								// Mint the NFT and deposit it to the recipient's collection
+								let mintedNFT <- self.minter.mintNFT(
+									name: "BridgeTestNFT",
+									description: "",
+									thumbnail: "",
+									royalties: []
+								)
+								self.recipientCollectionRef.deposit(token: <-mintedNFT)
+							}
+						}
+			`,
+					env.NonFungibleTokenAddress, accounts[0].String(), env.NonFungibleTokenAddress, env.FungibleTokenAddress, accounts[0].String(),
+				))).AddAuthorizer(accounts[0])
+
+			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 3)
+			require.NoError(t, err)
+
+			executionSnapshot, output, err = vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+			id := cadence.UInt64(0)
+
+			for _, event := range output.Events {
+				if strings.Contains(string(event.Type), "Minted") {
+					// decode the event payload
+					data, _ := ccf.Decode(nil, event.Payload)
+					// get the contractAddress field from the event
+					id = cadence.SearchFieldByName(
+						data.(cadence.Event),
+						"id",
+					).(cadence.UInt64)
+				}
+			}
+
+			// Bridge the NFT to EVM
+			txBody = blueprints.BridgeNFTToEVMTransaction(env, bridgeEnv, accounts[0], typeToOnboard, id)
+
+			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 4)
+			require.NoError(t, err)
+
+			executionSnapshot, output, err = vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			// Confirm that the NFT is escrowed
+			script := blueprints.GetIsNFTInEscrowScript(env, bridgeEnv)
+
+			arguments := []cadence.Value{
+				cadence.String(typeToOnboard),
+				id,
+			}
+
+			encodedArguments := make([][]byte, 0, len(arguments))
+			for _, argument := range arguments {
+				encodedArguments = append(encodedArguments, jsoncdc.MustEncode(argument))
+			}
+
+			_, output, err = vm.Run(
+				ctx,
+				fvm.Script(script).
+					WithArguments(encodedArguments...),
+				snapshotTree)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			result := output.Value.(cadence.Bool)
+			require.Equal(t, cadence.Bool(true), result)
+
+			id256 := cadence.NewUInt256(uint(id))
+
+			// Bridge the NFT back to Cadence
+			txBody = blueprints.BridgeNFTFromEVMTransaction(env, bridgeEnv, accounts[0], typeToOnboard, id256)
+
+			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 5)
+			require.NoError(t, err)
+
+			executionSnapshot, output, err = vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			// Confirm that the NFT is no longer escrowed
+
+			_, output, err = vm.Run(
+				ctx,
+				fvm.Script(script).
+					WithArguments(encodedArguments...),
+				snapshotTree)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			result = output.Value.(cadence.Bool)
+			require.Equal(t, cadence.Bool(false), result)
 		}),
 	)
 }

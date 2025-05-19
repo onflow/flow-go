@@ -97,8 +97,13 @@ func NewEVMSpecialTypeIDs(
 	}
 }
 
+type abiEncodingContext interface {
+	interpreter.MemberAccessibleContext
+	interpreter.ValueTransferContext
+}
+
 func reportABIEncodingComputation(
-	inter *interpreter.Interpreter,
+	context abiEncodingContext,
 	locationRange interpreter.LocationRange,
 	values *interpreter.ArrayValue,
 	evmTypeIDs evmSpecialTypeIDs,
@@ -106,7 +111,7 @@ func reportABIEncodingComputation(
 ) {
 
 	values.Iterate(
-		inter,
+		context,
 		func(element interpreter.Value) (resume bool) {
 			switch value := element.(type) {
 			case *interpreter.StringValue:
@@ -151,11 +156,11 @@ func reportABIEncodingComputation(
 
 				case evmTypeIDs.BytesTypeID:
 					computation := uint(2 * abiEncodingByteSize)
-					valueMember := value.GetMember(inter, locationRange, stdlib.EVMBytesTypeValueFieldName)
+					valueMember := value.GetMember(context, locationRange, stdlib.EVMBytesTypeValueFieldName)
 					bytesArray, ok := valueMember.(*interpreter.ArrayValue)
 					if !ok {
 						panic(abiEncodingError{
-							Type:    value.StaticType(inter),
+							Type:    value.StaticType(context),
 							Message: "could not convert value field to array",
 						})
 					}
@@ -172,7 +177,7 @@ func reportABIEncodingComputation(
 
 				default:
 					panic(abiEncodingError{
-						Type: value.StaticType(inter),
+						Type: value.StaticType(context),
 					})
 				}
 
@@ -186,7 +191,7 @@ func reportABIEncodingComputation(
 				computation := uint(2 * abiEncodingByteSize)
 				reportComputation(computation)
 				reportABIEncodingComputation(
-					inter,
+					context,
 					locationRange,
 					value,
 					evmTypeIDs,
@@ -195,7 +200,7 @@ func reportABIEncodingComputation(
 
 			default:
 				panic(abiEncodingError{
-					Type: element.StaticType(inter),
+					Type: element.StaticType(context),
 				})
 			}
 
@@ -218,7 +223,7 @@ func newInternalEVMTypeEncodeABIFunction(
 		gauge,
 		stdlib.InternalEVMTypeEncodeABIFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			inter := invocation.Interpreter
+			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
 
 			// Get `values` argument
@@ -229,12 +234,12 @@ func newInternalEVMTypeEncodeABIFunction(
 			}
 
 			reportABIEncodingComputation(
-				inter,
+				context,
 				locationRange,
 				valuesArray,
 				evmSpecialTypeIDs,
 				func(intensity uint) {
-					inter.ReportComputation(environment.ComputationKindEVMEncodeABI, intensity)
+					context.ReportComputation(environment.ComputationKindEVMEncodeABI, intensity)
 				},
 			)
 
@@ -244,13 +249,13 @@ func newInternalEVMTypeEncodeABIFunction(
 			arguments := make(gethABI.Arguments, 0, size)
 
 			valuesArray.Iterate(
-				inter,
+				context,
 				func(element interpreter.Value) (resume bool) {
 					value, ty, err := encodeABI(
-						inter,
+						context,
 						locationRange,
 						element,
-						element.StaticType(inter),
+						element.StaticType(context),
 						evmSpecialTypeIDs,
 					)
 					if err != nil {
@@ -276,7 +281,7 @@ func newInternalEVMTypeEncodeABIFunction(
 				)
 			}
 
-			return interpreter.ByteSliceToByteArrayValue(inter, encodedValues)
+			return interpreter.ByteSliceToByteArrayValue(context, encodedValues)
 		},
 	)
 }
@@ -483,7 +488,7 @@ func goType(
 }
 
 func encodeABI(
-	inter *interpreter.Interpreter,
+	context abiEncodingContext,
 	locationRange interpreter.LocationRange,
 	value interpreter.Value,
 	staticType interpreter.StaticType,
@@ -509,7 +514,7 @@ func encodeABI(
 		if staticType == interpreter.PrimitiveStaticTypeUInt {
 			if value.BigInt.Cmp(sema.UInt256TypeMaxIntBig) > 0 || value.BigInt.Cmp(sema.UInt256TypeMinIntBig) < 0 {
 				return nil, gethABI.Type{}, abiEncodingError{
-					Type:    value.StaticType(inter),
+					Type:    value.StaticType(context),
 					Message: "value outside the boundaries of uint256",
 				}
 			}
@@ -550,7 +555,7 @@ func encodeABI(
 		if staticType == interpreter.PrimitiveStaticTypeInt {
 			if value.BigInt.Cmp(sema.Int256TypeMaxIntBig) > 0 || value.BigInt.Cmp(sema.Int256TypeMinIntBig) < 0 {
 				return nil, gethABI.Type{}, abiEncodingError{
-					Type:    value.StaticType(inter),
+					Type:    value.StaticType(context),
 					Message: "value outside the boundaries of int256",
 				}
 			}
@@ -590,9 +595,9 @@ func encodeABI(
 	case *interpreter.CompositeValue:
 		switch value.TypeID() {
 		case evmTypeIDs.AddressTypeID:
-			addressBytesArrayValue := value.GetMember(inter, locationRange, stdlib.EVMAddressTypeBytesFieldName)
+			addressBytesArrayValue := value.GetMember(context, locationRange, stdlib.EVMAddressTypeBytesFieldName)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(
-				inter,
+				context,
 				addressBytesArrayValue,
 				locationRange,
 			)
@@ -602,9 +607,9 @@ func encodeABI(
 			return gethCommon.Address(bytes), gethTypeAddress, nil
 
 		case evmTypeIDs.BytesTypeID:
-			bytesValue := value.GetMember(inter, locationRange, stdlib.EVMBytesTypeValueFieldName)
+			bytesValue := value.GetMember(context, locationRange, stdlib.EVMBytesTypeValueFieldName)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(
-				inter,
+				context,
 				bytesValue,
 				locationRange,
 			)
@@ -614,9 +619,9 @@ func encodeABI(
 			return bytes, gethTypeBytes, nil
 
 		case evmTypeIDs.Bytes4TypeID:
-			bytesValue := value.GetMember(inter, locationRange, stdlib.EVMBytesTypeValueFieldName)
+			bytesValue := value.GetMember(context, locationRange, stdlib.EVMBytesTypeValueFieldName)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(
-				inter,
+				context,
 				bytesValue,
 				locationRange,
 			)
@@ -626,9 +631,9 @@ func encodeABI(
 			return [stdlib.EVMBytes4Length]byte(bytes), gethTypeBytes4, nil
 
 		case evmTypeIDs.Bytes32TypeID:
-			bytesValue := value.GetMember(inter, locationRange, stdlib.EVMBytesTypeValueFieldName)
+			bytesValue := value.GetMember(context, locationRange, stdlib.EVMBytesTypeValueFieldName)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(
-				inter,
+				context,
 				bytesValue,
 				locationRange,
 			)
@@ -667,14 +672,14 @@ func encodeABI(
 
 		var index int
 		value.Iterate(
-			inter,
+			context,
 			func(element interpreter.Value) (resume bool) {
 
 				arrayElement, _, err := encodeABI(
-					inter,
+					context,
 					locationRange,
 					element,
-					element.StaticType(inter),
+					element.StaticType(context),
 					evmTypeIDs,
 				)
 				if err != nil {
@@ -696,7 +701,7 @@ func encodeABI(
 	}
 
 	return nil, gethABI.Type{}, abiEncodingError{
-		Type: value.StaticType(inter),
+		Type: value.StaticType(context),
 	}
 }
 func newInternalEVMTypeDecodeABIFunction(
@@ -709,7 +714,7 @@ func newInternalEVMTypeDecodeABIFunction(
 		gauge,
 		stdlib.InternalEVMTypeDecodeABIFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			inter := invocation.Interpreter
+			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
 
 			// Get `types` argument
@@ -726,19 +731,19 @@ func newInternalEVMTypeDecodeABIFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			invocation.Interpreter.ReportComputation(
+			invocation.InvocationContext.ReportComputation(
 				environment.ComputationKindEVMDecodeABI,
 				uint(dataValue.Count()),
 			)
 
-			data, err := interpreter.ByteArrayValueToByteSlice(inter, dataValue, locationRange)
+			data, err := interpreter.ByteArrayValueToByteSlice(context, dataValue, locationRange)
 			if err != nil {
 				panic(err)
 			}
 
 			var arguments gethABI.Arguments
 			typesArray.Iterate(
-				inter,
+				context,
 				func(element interpreter.Value) (resume bool) {
 					typeValue, ok := element.(interpreter.TypeValue)
 					if !ok {
@@ -777,7 +782,7 @@ func newInternalEVMTypeDecodeABIFunction(
 			values := make([]interpreter.Value, 0, len(decodedValues))
 
 			typesArray.Iterate(
-				inter,
+				context,
 				func(element interpreter.Value) (resume bool) {
 					typeValue, ok := element.(interpreter.TypeValue)
 					if !ok {
@@ -787,7 +792,7 @@ func newInternalEVMTypeDecodeABIFunction(
 					staticType := typeValue.Type
 
 					value, err := decodeABI(
-						inter,
+						context,
 						locationRange,
 						decodedValues[index],
 						staticType,
@@ -810,15 +815,15 @@ func newInternalEVMTypeDecodeABIFunction(
 			)
 
 			arrayType := interpreter.NewVariableSizedStaticType(
-				inter,
+				context,
 				interpreter.NewPrimitiveStaticType(
-					inter,
+					context,
 					interpreter.PrimitiveStaticTypeAnyStruct,
 				),
 			)
 
 			return interpreter.NewArrayValue(
-				inter,
+				context,
 				locationRange,
 				arrayType,
 				common.ZeroAddress,
@@ -828,8 +833,13 @@ func newInternalEVMTypeDecodeABIFunction(
 	)
 }
 
+type memberAccessibleArrayCreationContext interface {
+	interpreter.MemberAccessibleContext
+	interpreter.ArrayCreationContext
+}
+
 func decodeABI(
-	inter *interpreter.Interpreter,
+	context memberAccessibleArrayCreationContext,
 	locationRange interpreter.LocationRange,
 	value any,
 	staticType interpreter.StaticType,
@@ -847,7 +857,7 @@ func decodeABI(
 			break
 		}
 		return interpreter.NewStringValue(
-			inter,
+			context,
 			common.NewStringMemoryUsage(len(value)),
 			func() string {
 				return value
@@ -869,49 +879,49 @@ func decodeABI(
 		memoryUsage := common.NewBigIntMemoryUsage(
 			common.BigIntByteLength(value),
 		)
-		return interpreter.NewUIntValueFromBigInt(inter, memoryUsage, func() *big.Int { return value }), nil
+		return interpreter.NewUIntValueFromBigInt(context, memoryUsage, func() *big.Int { return value }), nil
 
 	case interpreter.PrimitiveStaticTypeUInt8:
 		value, ok := value.(uint8)
 		if !ok {
 			break
 		}
-		return interpreter.NewUInt8Value(inter, func() uint8 { return value }), nil
+		return interpreter.NewUInt8Value(context, func() uint8 { return value }), nil
 
 	case interpreter.PrimitiveStaticTypeUInt16:
 		value, ok := value.(uint16)
 		if !ok {
 			break
 		}
-		return interpreter.NewUInt16Value(inter, func() uint16 { return value }), nil
+		return interpreter.NewUInt16Value(context, func() uint16 { return value }), nil
 
 	case interpreter.PrimitiveStaticTypeUInt32:
 		value, ok := value.(uint32)
 		if !ok {
 			break
 		}
-		return interpreter.NewUInt32Value(inter, func() uint32 { return value }), nil
+		return interpreter.NewUInt32Value(context, func() uint32 { return value }), nil
 
 	case interpreter.PrimitiveStaticTypeUInt64:
 		value, ok := value.(uint64)
 		if !ok {
 			break
 		}
-		return interpreter.NewUInt64Value(inter, func() uint64 { return value }), nil
+		return interpreter.NewUInt64Value(context, func() uint64 { return value }), nil
 
 	case interpreter.PrimitiveStaticTypeUInt128:
 		value, ok := value.(*big.Int)
 		if !ok {
 			break
 		}
-		return interpreter.NewUInt128ValueFromBigInt(inter, func() *big.Int { return value }), nil
+		return interpreter.NewUInt128ValueFromBigInt(context, func() *big.Int { return value }), nil
 
 	case interpreter.PrimitiveStaticTypeUInt256:
 		value, ok := value.(*big.Int)
 		if !ok {
 			break
 		}
-		return interpreter.NewUInt256ValueFromBigInt(inter, func() *big.Int { return value }), nil
+		return interpreter.NewUInt256ValueFromBigInt(context, func() *big.Int { return value }), nil
 
 	case interpreter.PrimitiveStaticTypeInt:
 		value, ok := value.(*big.Int)
@@ -921,49 +931,49 @@ func decodeABI(
 		memoryUsage := common.NewBigIntMemoryUsage(
 			common.BigIntByteLength(value),
 		)
-		return interpreter.NewIntValueFromBigInt(inter, memoryUsage, func() *big.Int { return value }), nil
+		return interpreter.NewIntValueFromBigInt(context, memoryUsage, func() *big.Int { return value }), nil
 
 	case interpreter.PrimitiveStaticTypeInt8:
 		value, ok := value.(int8)
 		if !ok {
 			break
 		}
-		return interpreter.NewInt8Value(inter, func() int8 { return value }), nil
+		return interpreter.NewInt8Value(context, func() int8 { return value }), nil
 
 	case interpreter.PrimitiveStaticTypeInt16:
 		value, ok := value.(int16)
 		if !ok {
 			break
 		}
-		return interpreter.NewInt16Value(inter, func() int16 { return value }), nil
+		return interpreter.NewInt16Value(context, func() int16 { return value }), nil
 
 	case interpreter.PrimitiveStaticTypeInt32:
 		value, ok := value.(int32)
 		if !ok {
 			break
 		}
-		return interpreter.NewInt32Value(inter, func() int32 { return value }), nil
+		return interpreter.NewInt32Value(context, func() int32 { return value }), nil
 
 	case interpreter.PrimitiveStaticTypeInt64:
 		value, ok := value.(int64)
 		if !ok {
 			break
 		}
-		return interpreter.NewInt64Value(inter, func() int64 { return value }), nil
+		return interpreter.NewInt64Value(context, func() int64 { return value }), nil
 
 	case interpreter.PrimitiveStaticTypeInt128:
 		value, ok := value.(*big.Int)
 		if !ok {
 			break
 		}
-		return interpreter.NewInt128ValueFromBigInt(inter, func() *big.Int { return value }), nil
+		return interpreter.NewInt128ValueFromBigInt(context, func() *big.Int { return value }), nil
 
 	case interpreter.PrimitiveStaticTypeInt256:
 		value, ok := value.(*big.Int)
 		if !ok {
 			break
 		}
-		return interpreter.NewInt256ValueFromBigInt(inter, func() *big.Int { return value }), nil
+		return interpreter.NewInt256ValueFromBigInt(context, func() *big.Int { return value }), nil
 	}
 
 	switch staticType := staticType.(type) {
@@ -976,7 +986,7 @@ func decodeABI(
 
 		var index int
 		return interpreter.NewArrayValueWithIterator(
-			inter,
+			context,
 			staticType,
 			common.ZeroAddress,
 			uint64(size),
@@ -988,7 +998,7 @@ func decodeABI(
 				element := array.Index(index).Interface()
 
 				result, err := decodeABI(
-					inter,
+					context,
 					locationRange,
 					element,
 					elementStaticType,
@@ -1016,7 +1026,7 @@ func decodeABI(
 			var address types.Address
 			copy(address[:], addr.Bytes())
 			return NewEVMAddress(
-				inter,
+				context,
 				locationRange,
 				location,
 				address,
@@ -1028,7 +1038,7 @@ func decodeABI(
 				break
 			}
 			return NewEVMBytes(
-				inter,
+				context,
 				locationRange,
 				location,
 				bytes,
@@ -1040,7 +1050,7 @@ func decodeABI(
 				break
 			}
 			return NewEVMBytes4(
-				inter,
+				context,
 				locationRange,
 				location,
 				bytes,
@@ -1052,7 +1062,7 @@ func decodeABI(
 				break
 			}
 			return NewEVMBytes32(
-				inter,
+				context,
 				locationRange,
 				location,
 				bytes,

@@ -288,6 +288,9 @@ func (bs *BuilderSuite) SetupTest() {
 		}
 		return unittest.StateSnapshotForUnknownBlock()
 	})
+	params := new(protocol.Params)
+	params.On("FinalizedRoot").Return(first.Header)
+	bs.state.On("Params").Return(params)
 
 	// set up storage mocks for tests
 	bs.sealDB = &storage.Seals{}
@@ -428,7 +431,6 @@ func (bs *BuilderSuite) SetupTest() {
 	// initialize the builder
 	bs.build, err = NewBuilder(
 		noopMetrics,
-		bs.db,
 		bs.state,
 		bs.headerDB,
 		bs.sealDB,
@@ -1471,7 +1473,6 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 	var err error
 	bs.build, err = NewBuilder(
 		noopMetrics,
-		bs.db,
 		bs.state,
 		bs.headerDB,
 		bs.sealDB,

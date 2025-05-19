@@ -62,7 +62,7 @@ func NewEventLoop(
 	proposals := make(chan queuedProposal, 1000)
 
 	el := &EventLoop{
-		log:                      log,
+		log:                      log.With().Str("component", "hotstuff.event_loop").Logger(),
 		eventHandler:             eventHandler,
 		metrics:                  metrics,
 		mempoolMetrics:           mempoolMetrics,

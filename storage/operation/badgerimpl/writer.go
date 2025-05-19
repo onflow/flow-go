@@ -2,19 +2,28 @@ package badgerimpl
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	op "github.com/onflow/flow-go/storage/operation"
 )
 
+// ReaderBatchWriter is for reading and writing to a storage backend.
+// It is useful for performing a related sequence of reads and writes, after which you would like
+// to modify some non-database state if the sequence completed successfully (via AddCallback).
+// If you are not using AddCallback, avoid using ReaderBatchWriter: use Reader and Writer directly.
+// ReaderBatchWriter is not safe for concurrent use.
 type ReaderBatchWriter struct {
 	globalReader storage.Reader
 	batch        *badger.WriteBatch
 
-	callbacks op.Callbacks
+	// for executing callbacks after the batch has been flushed, such as updating caches
+	callbacks *operation.Callbacks
+
+	// for repreventing re-entrant deadlock
+	locks *operation.BatchLocks
 }
 
 var _ storage.ReaderBatchWriter = (*ReaderBatchWriter)(nil)
@@ -41,6 +50,14 @@ func (b *ReaderBatchWriter) BadgerWriteBatch() *badger.WriteBatch {
 	return b.batch
 }
 
+// Lock tries to acquire the lock for the batch.
+// if the lock is already acquired by this same batch from other pending db operations,
+// then it will not be blocked and can continue updating the batch, which prevents a re-entrant deadlock.
+// CAUTION: The caller must ensure that no other references exist for the input lock.
+func (b *ReaderBatchWriter) Lock(lock *sync.Mutex) {
+	b.locks.Lock(lock, b.callbacks)
+}
+
 // AddCallback adds a callback to execute after the batch has been flush
 // regardless the batch update is succeeded or failed.
 // The error parameter is the error returned by the batch update.
@@ -58,8 +75,27 @@ func (b *ReaderBatchWriter) Commit() error {
 	return err
 }
 
+// Close releases memory of the batch and no error is returned.
+// This can be called as a defer statement immediately after creating Batch
+// to reduce risk of unbounded memory consumption.
+func (b *ReaderBatchWriter) Close() error {
+	// BadgerDB v2 docs for WriteBatch.Cancel():
+	//
+	// "Cancel function must be called if there's a chance that Flush might not get
+	// called. If neither Flush or Cancel is called, the transaction oracle would
+	// never get a chance to clear out the row commit timestamp map, thus causing an
+	// unbounded memory consumption. Typically, you can call Cancel as a defer
+	// statement right after NewWriteBatch is called.
+	//
+	// Note that any committed writes would still go through despite calling Cancel."
+
+	b.batch.Cancel()
+	return nil
+}
+
 func WithReaderBatchWriter(db *badger.DB, fn func(storage.ReaderBatchWriter) error) error {
 	batch := NewReaderBatchWriter(db)
+	defer batch.Close() // Release memory
 
 	err := fn(batch)
 	if err != nil {
@@ -79,6 +115,8 @@ func NewReaderBatchWriter(db *badger.DB) *ReaderBatchWriter {
 	return &ReaderBatchWriter{
 		globalReader: ToReader(db),
 		batch:        db.NewWriteBatch(),
+		callbacks:    operation.NewCallbacks(),
+		locks:        operation.NewBatchLocks(),
 	}
 }
 

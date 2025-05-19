@@ -122,23 +122,26 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedClu
 
 	log := c.log.With().
 		Hex("origin_id", proposal.OriginID[:]).
-		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", blockID[:]).
-		Hex("parent_id", header.ParentID[:]).
 		Hex("ref_block_id", payload.ReferenceBlockID[:]).
 		Hex("collection_id", logging.Entity(payload.Collection)).
 		Int("tx_count", payload.Collection.Len()).
-		Time("timestamp", time.UnixMilli(int64(header.Timestamp)).UTC()).
+		Hex("parent_id", header.ParentID[:]).
 		Hex("proposer", header.ProposerID[:]).
-		Hex("parent_signer_indices", header.ParentVoterIndices).
-		Uint64("finalized_height", finalHeight).
-		Uint64("finalized_view", finalView).
+		Time("timestamp", time.UnixMilli(int64(header.Timestamp)).UTC()).
 		Logger()
 	if log.Debug().Enabled() {
-		log = log.With().Strs("tx_ids",
-			flow.IdentifierList(payload.Collection.Light().Transactions).Strings()).Logger()
+		payloadHash := payload.Hash()
+		log = log.With().
+			Uint64("finalized_height", finalHeight).
+			Uint64("finalized_view", finalView).
+			Str("chain_id", header.ChainID.String()).
+			Hex("payload_hash", payloadHash[:]).
+			Hex("parent_signer_indices", header.ParentVoterIndices).
+			Strs("tx_ids", flow.IdentifierList(payload.Collection.Light().Transactions).Strings()).
+			Logger()
 	}
 	log.Info().Msg("block proposal received")
 
@@ -317,7 +320,7 @@ func (c *Core) processBlockProposal(proposal *cluster.BlockProposal) error {
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Logger()
-	log.Info().Msg("processing block proposal")
+	log.Debug().Msg("processing block proposal")
 
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 	err := c.validator.ValidateProposal(hotstuffProposal)
@@ -357,7 +360,7 @@ func (c *Core) processBlockProposal(proposal *cluster.BlockProposal) error {
 
 	// submit the model to hotstuff for processing
 	// TODO replace with pubsub https://github.com/dapperlabs/flow-go/issues/6395
-	log.Info().Msg("forwarding block proposal to hotstuff")
+	log.Debug().Msg("forwarding block proposal to hotstuff")
 	c.hotstuff.SubmitProposal(hotstuffProposal)
 
 	return nil

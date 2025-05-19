@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -23,7 +24,7 @@ type backendSubscribeBlocks struct {
 	headers storage.Headers
 
 	subscriptionHandler *subscription.SubscriptionHandler
-	blockTracker        subscription.BlockTracker
+	blockTracker        tracker.BlockTracker
 }
 
 // SubscribeBlocksFromStartBlockID subscribes to the finalized or sealed blocks starting at the requested
