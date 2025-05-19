@@ -54,11 +54,6 @@ func (b Block) ID() Identifier {
 	return b.Header.ID()
 }
 
-// Checksum returns the checksum of the header.
-func (b Block) Checksum() Identifier {
-	return b.Header.Checksum()
-}
-
 // BlockStatus represents the status of a block.
 type BlockStatus int
 

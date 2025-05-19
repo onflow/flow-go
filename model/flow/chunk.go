@@ -230,11 +230,6 @@ func (ch *Chunk) ID() Identifier {
 	return MakeID(ch)
 }
 
-// Checksum provides a cryptographic commitment for a chunk content
-func (ch *Chunk) Checksum() Identifier {
-	return MakeID(ch)
-}
-
 // ChunkDataPack holds all register touches (any read, or write).
 //
 // Note that we have to include merkle paths as storage proof for all registers touched (read or written) for
@@ -283,11 +278,6 @@ func NewChunkDataPack(
 
 // ID returns a collision-resistant hash of the ChunkDataPack struct.
 func (c *ChunkDataPack) ID() Identifier {
-	return MakeID(c)
-}
-
-// Checksum returns the checksum of the chunk data pack.
-func (c *ChunkDataPack) Checksum() Identifier {
 	return MakeID(c)
 }
 

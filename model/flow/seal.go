@@ -42,7 +42,3 @@ type Seal struct {
 func (s Seal) ID() Identifier {
 	return MakeID(s)
 }
-
-func (s Seal) Checksum() Identifier {
-	return MakeID(s)
-}

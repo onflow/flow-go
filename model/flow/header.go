@@ -107,11 +107,6 @@ func (h Header) ID() Identifier {
 	return MakeID(h)
 }
 
-// Checksum returns the checksum of the header.
-func (h Header) Checksum() Identifier {
-	return MakeID(h)
-}
-
 // MarshalJSON makes sure the timestamp is encoded in UTC.
 func (h Header) MarshalJSON() ([]byte, error) {
 

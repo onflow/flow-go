@@ -29,11 +29,6 @@ func (er *ExecutionReceipt) ID() Identifier {
 	return er.Stub().ID()
 }
 
-// Checksum returns a checksum for the execution receipt including the signatures.
-func (er *ExecutionReceipt) Checksum() Identifier {
-	return MakeID(er)
-}
-
 // Stub returns a stub of the full ExecutionReceipt, where the ExecutionResult is replaced by its cryptographic hash.
 func (er *ExecutionReceipt) Stub() *ExecutionReceiptStub {
 	return &ExecutionReceiptStub{
@@ -108,11 +103,6 @@ func (er ExecutionReceiptStub) MarshalJSON() ([]byte, error) {
 		Alias: Alias(er),
 		ID:    er.ID().String(),
 	})
-}
-
-// Checksum returns a checksum for the execution receipt including the signatures.
-func (er *ExecutionReceiptStub) Checksum() Identifier {
-	return MakeID(er)
 }
 
 /*******************************************************************************

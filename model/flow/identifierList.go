@@ -52,11 +52,6 @@ func (il IdentifierList) ID() Identifier {
 	return MakeID(il)
 }
 
-// Checksum returns a cryptographic commitment to the list of identifiers.
-func (il IdentifierList) Checksum() Identifier {
-	return MakeID(il)
-}
-
 func (il IdentifierList) Copy() IdentifierList {
 	cpy := make(IdentifierList, 0, il.Len())
 	return append(cpy, il...)

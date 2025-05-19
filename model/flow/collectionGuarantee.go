@@ -19,9 +19,3 @@ type CollectionGuarantee struct {
 func (cg *CollectionGuarantee) ID() Identifier {
 	return MakeID(cg)
 }
-
-// Checksum returns a checksum of the collection guarantee including the
-// signatures.
-func (cg *CollectionGuarantee) Checksum() Identifier {
-	return MakeID(cg)
-}
