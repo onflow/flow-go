@@ -494,11 +494,11 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 
 	// Construct a valid flow.RichEpochStateEntry for next block
 	// We do this by copying the parent protocol state and updating the identities manually
-	updatedRichProtocolState := &flow.RichEpochStateEntry{
-		EpochStateEntry:           updatedState,
-		CurrentEpochIdentityTable: s.parentProtocolState.CurrentEpochIdentityTable.Copy(),
-		NextEpochIdentityTable:    flow.IdentityList{},
-	}
+	updatedRichProtocolState := flow.NewRichEpochStateEntryWithIdentityTable(
+		updatedState,
+		s.parentProtocolState.CurrentEpochIdentityTable.Copy(),
+		flow.IdentityList{},
+	)
 	// Update enriched data with the changes made to the low-level updated table
 	for _, identity := range ejectedChanges {
 		toBeUpdated, _ := updatedRichProtocolState.CurrentEpochIdentityTable.ByNodeID(identity.NodeID)
@@ -507,7 +507,7 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 
 	// now we can use it to construct HappyPathStateMachine for next block, which will process epoch setup event.
 	nextBlock := unittest.BlockHeaderWithParentFixture(s.candidate)
-	s.stateMachine, err = NewHappyPathStateMachine(s.consumer, nextBlock.View, updatedRichProtocolState)
+	s.stateMachine, err = NewHappyPathStateMachine(s.consumer, nextBlock.View, &updatedRichProtocolState)
 	require.NoError(s.T(), err)
 
 	setup := unittest.EpochSetupFixture(

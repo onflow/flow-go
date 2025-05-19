@@ -2730,8 +2730,8 @@ func RootEpochProtocolStateFixture() *flow.RichEpochStateEntry {
 			},
 		})
 	}
-	return &flow.RichEpochStateEntry{
-		EpochStateEntry: &flow.EpochStateEntry{
+	richEpochStateEntry := flow.NewRichEpochStateEntryWithIdentityTable(
+		&flow.EpochStateEntry{
 			MinEpochStateEntry: &flow.MinEpochStateEntry{
 				PreviousEpoch: nil,
 				CurrentEpoch: flow.EpochStateContainer{
@@ -2749,9 +2749,10 @@ func RootEpochProtocolStateFixture() *flow.RichEpochStateEntry {
 			NextEpochSetup:      nil,
 			NextEpochCommit:     nil,
 		},
-		CurrentEpochIdentityTable: allIdentities,
-		NextEpochIdentityTable:    flow.IdentityList{},
-	}
+		allIdentities,
+		flow.IdentityList{},
+	)
+	return &richEpochStateEntry
 }
 
 // EpochStateFixture creates a fixture with correctly structured data. The returned Identity Table

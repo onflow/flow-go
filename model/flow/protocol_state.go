@@ -227,11 +227,27 @@ func NewEpochStateEntry(
 // the Identity Table additionally contains nodes (with weight zero) from the previous or
 // upcoming epoch, which are transitioning into / out of the network and are only allowed
 // to listen but not to actively contribute.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type RichEpochStateEntry struct {
 	*EpochStateEntry
 
 	CurrentEpochIdentityTable IdentityList
 	NextEpochIdentityTable    IdentityList
+}
+
+// NewRichEpochStateEntryWithIdentityTable creates a new instance of RichEpochStateEntry.
+// Construction RichEpochStateEntry allowed only within the constructor.
+func NewRichEpochStateEntryWithIdentityTable(
+	epochState *EpochStateEntry,
+	currentEpochIdentityTable IdentityList,
+	nextEpochIdentityTable IdentityList,
+) RichEpochStateEntry {
+	return RichEpochStateEntry{
+		EpochStateEntry:           epochState,
+		CurrentEpochIdentityTable: currentEpochIdentityTable,
+		NextEpochIdentityTable:    nextEpochIdentityTable,
+	}
 }
 
 // NewRichEpochStateEntry constructs a RichEpochStateEntry from an EpochStateEntry.
@@ -353,11 +369,12 @@ func (e *RichEpochStateEntry) Copy() *RichEpochStateEntry {
 	if e == nil {
 		return nil
 	}
-	return &RichEpochStateEntry{
-		EpochStateEntry:           e.EpochStateEntry.Copy(),
-		CurrentEpochIdentityTable: e.CurrentEpochIdentityTable.Copy(),
-		NextEpochIdentityTable:    e.NextEpochIdentityTable.Copy(),
-	}
+	richEpochStateEntry := NewRichEpochStateEntryWithIdentityTable(
+		e.EpochStateEntry.Copy(),
+		e.CurrentEpochIdentityTable.Copy(),
+		e.NextEpochIdentityTable.Copy(),
+	)
+	return &richEpochStateEntry
 }
 
 // CurrentEpochFinalView returns the final view of the current epoch, taking into account possible epoch extensions.
