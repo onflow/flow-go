@@ -308,10 +308,12 @@ func buildQCWithPackerAndSigData(
 		return nil, fmt.Errorf("could not pack the block sig data: %w", err)
 	}
 
-	return &flow.QuorumCertificate{
-		View:          block.View,
-		BlockID:       block.BlockID,
-		SignerIndices: signerIndices,
-		SigData:       sigData,
-	}, nil
+	qc := flow.NewQuorumCertificate(
+		block.View,
+		block.BlockID,
+		signerIndices,
+		sigData,
+	)
+
+	return &qc, nil
 }

@@ -3,6 +3,8 @@ package flow
 // QuorumCertificate represents a quorum certificate for a block proposal as defined in the HotStuff algorithm.
 // A quorum certificate is a collection of votes for a particular block proposal. Valid quorum certificates contain
 // signatures from a super-majority of consensus committee members.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type QuorumCertificate struct {
 	View    uint64
 	BlockID Identifier
@@ -20,6 +22,18 @@ type QuorumCertificate struct {
 	// For collector cluster HotStuff, SigData is simply the aggregated staking signatures
 	// from all signers.
 	SigData []byte
+}
+
+func NewQuorumCertificate(
+	view uint64,
+	blockID Identifier,
+	signerIndices []byte,
+	sigData []byte) QuorumCertificate {
+	return QuorumCertificate{
+		View:          view,
+		BlockID:       blockID,
+		SignerIndices: signerIndices,
+		SigData:       sigData}
 }
 
 // ID returns the QuorumCertificate's identifier

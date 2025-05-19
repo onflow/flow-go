@@ -852,14 +852,14 @@ func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.Quor
 	signerIndices, err := signature.EncodeSignersToIndices(signerIDs, signerIDs)
 	require.NoError(t, err)
 
-	rootQC := &flow.QuorumCertificate{
-		View:          rootHead.View,
-		BlockID:       rootHead.ID(),
-		SignerIndices: signerIndices,
-		SigData:       unittest.SignatureFixture(),
-	}
+	rootQC := flow.NewQuorumCertificate(
+		rootHead.View,
+		rootHead.ID(),
+		signerIndices,
+		unittest.SignatureFixture(),
+	)
 
-	return rootHead, rootQC
+	return rootHead, &rootQC
 }
 
 type RoundRobinLeaderSelection struct {
