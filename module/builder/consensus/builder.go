@@ -55,7 +55,7 @@ func NewBuilder(
 	options ...func(*Config),
 ) (*Builder, error) {
 
-	blockTimer, err := blocktimer.NewBlockTimer(500*time.Millisecond, 10*time.Second)
+	blockTimer, err := blocktimer.NewBlockTimer(500, 10_000)
 	if err != nil {
 		return nil, fmt.Errorf("could not create default block timer: %w", err)
 	}

@@ -102,7 +102,7 @@ func (b *pendingBlock) Block() *flowgo.Block {
 				Height:    b.height,
 				View:      b.view,
 				ParentID:  b.parentID,
-				Timestamp: b.timestamp,
+				Timestamp: uint64(b.timestamp.UnixMilli()),
 			},
 		},
 		Payload: &flowgo.Payload{

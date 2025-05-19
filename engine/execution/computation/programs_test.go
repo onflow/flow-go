@@ -507,7 +507,7 @@ func createTestBlockAndRun(
 			HeaderBody: flow.HeaderBody{
 				ParentID:  parentBlock.ID(),
 				View:      parentBlock.Header.Height + 1,
-				Timestamp: time.Now(),
+				Timestamp: uint64(time.Now().UnixMilli()),
 			},
 		},
 		Payload: &flow.Payload{

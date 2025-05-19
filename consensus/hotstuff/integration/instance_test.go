@@ -204,7 +204,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 					ParentID:   parentID,
 					ParentView: parent.View,
 					Height:     parent.Height + 1,
-					Timestamp:  time.Now().UTC(),
+					Timestamp:  uint64(time.Now().UnixMilli()),
 				},
 				PayloadHash: unittest.IdentifierFixture(),
 			}
