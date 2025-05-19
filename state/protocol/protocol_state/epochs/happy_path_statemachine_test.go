@@ -494,7 +494,7 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 
 	// Construct a valid flow.RichEpochStateEntry for next block
 	// We do this by copying the parent protocol state and updating the identities manually
-	updatedRichProtocolState := flow.NewRichEpochStateEntryWithIdentityTable(
+	updatedRichProtocolState := flow.NewRichEpochStateEntryWithEpochIdentityTables(
 		updatedState,
 		s.parentProtocolState.CurrentEpochIdentityTable.Copy(),
 		flow.IdentityList{},

@@ -193,6 +193,9 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		EpochExtensions:  nil,
 	}
 
+	nextEpochSetup := epochRecover.EpochSetup
+	nextEpochCommit := epochRecover.EpochCommit
+
 	err = m.ejector.TrackDynamicIdentityList(nextEpoch.ActiveIdentities)
 	if err != nil {
 		if protocol.IsInvalidServiceEventError(err) {
@@ -202,8 +205,26 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		return false, fmt.Errorf("unexpected errors tracking identity list: %w", err)
 	}
 	// if we have processed a valid EpochRecover event, we should exit EFM.
-	m.state.NextEpoch = nextEpoch
-	m.state.EpochFallbackTriggered = false
+	newMinEpochStateEntry := flow.NewMinEpochStateEntry(
+		m.state.PreviousEpoch,
+		m.state.CurrentEpoch,
+		nextEpoch,
+		false,
+	)
+
+	m.state, err = flow.NewEpochStateEntry(
+		&newMinEpochStateEntry,
+		m.state.PreviousEpochSetup,
+		m.state.PreviousEpochCommit,
+		m.state.CurrentEpochSetup,
+		m.state.CurrentEpochCommit,
+		&nextEpochSetup,
+		&nextEpochCommit,
+	)
+	if err != nil {
+		// Should never reach here
+		return false, fmt.Errorf("could not construct epoch state entry: %w", err)
+	}
 	m.telemetry.OnServiceEventProcessed(epochRecover.ServiceEvent())
 	return true, nil
 }

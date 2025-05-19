@@ -21,6 +21,8 @@ type DynamicIdentityEntryList []*DynamicIdentityEntry
 // table that is constant throughout an epoch, are only referenced by their hash commitment.
 // Note that a MinEpochStateEntry does not hold the entire data for the identity table directly. It
 // allows reconstructing the identity table with the referenced epoch setup events and dynamic identities.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type MinEpochStateEntry struct {
 	PreviousEpoch *EpochStateContainer // minimal dynamic properties for previous epoch [optional, nil for first epoch after spork, genesis]
 	CurrentEpoch  EpochStateContainer  // minimal dynamic properties for current epoch
@@ -32,6 +34,22 @@ type MinEpochStateEntry struct {
 	// finalized that changes this flag from false to true.
 	// A state transition from true -> false is possible only when protocol undergoes epoch recovery.
 	EpochFallbackTriggered bool
+}
+
+// NewMinEpochStateEntry creates a new instance of MinEpochStateEntry.
+// Construction MinEpochStateEntry allowed only within the constructor.
+func NewMinEpochStateEntry(
+	previousEpoch *EpochStateContainer,
+	currentEpoch EpochStateContainer,
+	nextEpoch *EpochStateContainer,
+	epochFallbackTriggered bool,
+) MinEpochStateEntry {
+	return MinEpochStateEntry{
+		PreviousEpoch:          previousEpoch,
+		CurrentEpoch:           currentEpoch,
+		NextEpoch:              nextEpoch,
+		EpochFallbackTriggered: epochFallbackTriggered,
+	}
 }
 
 // EpochStateContainer holds the data pertaining to a _single_ epoch but no information about
@@ -119,6 +137,8 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 //   - CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
 //   - PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Can be nil.
 //   - NextEpochSetup and NextEpochCommit are for the same epoch. Can be nil.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type EpochStateEntry struct {
 	*MinEpochStateEntry
 
@@ -236,9 +256,9 @@ type RichEpochStateEntry struct {
 	NextEpochIdentityTable    IdentityList
 }
 
-// NewRichEpochStateEntryWithIdentityTable creates a new instance of RichEpochStateEntry.
+// NewRichEpochStateEntryWithEpochIdentityTables creates a new instance of RichEpochStateEntry.
 // Construction RichEpochStateEntry allowed only within the constructor.
-func NewRichEpochStateEntryWithIdentityTable(
+func NewRichEpochStateEntryWithEpochIdentityTables(
 	epochState *EpochStateEntry,
 	currentEpochIdentityTable IdentityList,
 	nextEpochIdentityTable IdentityList,
@@ -255,11 +275,8 @@ func NewRichEpochStateEntryWithIdentityTable(
 func NewRichEpochStateEntry(
 	epochState *EpochStateEntry,
 ) (*RichEpochStateEntry, error) {
-	result := &RichEpochStateEntry{
-		EpochStateEntry:           epochState,
-		CurrentEpochIdentityTable: IdentityList{},
-		NextEpochIdentityTable:    IdentityList{},
-	}
+	var currentEpochIdentityTable IdentityList
+	nextEpochIdentityTable := IdentityList{}
 	// If we are in staking phase (i.e. epochState.NextEpoch == nil):
 	//  (1) Full identity table contains active identities from current epoch.
 	//      If previous epoch exists, we add nodes from previous epoch that are leaving in the current epoch with status `EpochParticipationStatusLeaving`.
@@ -276,7 +293,7 @@ func NewRichEpochStateEntry(
 			previousEpochIdentitySkeletons = previousEpochSetup.Participants
 			previousEpochDynamicIdentities = epochState.PreviousEpoch.ActiveIdentities
 		}
-		result.CurrentEpochIdentityTable, err = BuildIdentityTable(
+		currentEpochIdentityTable, err = BuildIdentityTable(
 			epochState.CurrentEpochSetup.Participants,
 			epochState.CurrentEpoch.ActiveIdentities,
 			previousEpochIdentitySkeletons,
@@ -287,7 +304,7 @@ func NewRichEpochStateEntry(
 			return nil, fmt.Errorf("could not build identity table for staking phase: %w", err)
 		}
 	} else { // epochState.NextEpoch ≠ nil, i.e. we are in epoch setup or epoch commit phase
-		result.CurrentEpochIdentityTable, err = BuildIdentityTable(
+		currentEpochIdentityTable, err = BuildIdentityTable(
 			epochState.CurrentEpochSetup.Participants,
 			epochState.CurrentEpoch.ActiveIdentities,
 			epochState.NextEpochSetup.Participants,
@@ -298,7 +315,7 @@ func NewRichEpochStateEntry(
 			return nil, fmt.Errorf("could not build identity table for setup/commit phase: %w", err)
 		}
 
-		result.NextEpochIdentityTable, err = BuildIdentityTable(
+		nextEpochIdentityTable, err = BuildIdentityTable(
 			epochState.NextEpochSetup.Participants,
 			nextEpoch.ActiveIdentities,
 			epochState.CurrentEpochSetup.Participants,
@@ -309,7 +326,13 @@ func NewRichEpochStateEntry(
 			return nil, fmt.Errorf("could not build next epoch identity table: %w", err)
 		}
 	}
-	return result, nil
+
+	result := NewRichEpochStateEntryWithEpochIdentityTables(
+		epochState,
+		currentEpochIdentityTable,
+		nextEpochIdentityTable,
+	)
+	return &result, nil
 }
 
 // ID returns hash of entry by hashing all fields.
@@ -337,12 +360,13 @@ func (e *MinEpochStateEntry) Copy() *MinEpochStateEntry {
 	if e == nil {
 		return nil
 	}
-	return &MinEpochStateEntry{
-		PreviousEpoch:          e.PreviousEpoch.Copy(),
-		CurrentEpoch:           *e.CurrentEpoch.Copy(),
-		NextEpoch:              e.NextEpoch.Copy(),
-		EpochFallbackTriggered: e.EpochFallbackTriggered,
-	}
+	minEpochStateEntry := NewMinEpochStateEntry(
+		e.PreviousEpoch.Copy(),
+		*e.CurrentEpoch.Copy(),
+		e.NextEpoch.Copy(),
+		e.EpochFallbackTriggered,
+	)
+	return &minEpochStateEntry
 }
 
 // Copy returns a full copy of the EpochStateEntry.
@@ -351,6 +375,7 @@ func (e *EpochStateEntry) Copy() *EpochStateEntry {
 	if e == nil {
 		return nil
 	}
+	//nolint:structwrite // it is safe to construct EpochStateEntry outside constructor cause it does not change the ID
 	return &EpochStateEntry{
 		MinEpochStateEntry:  e.MinEpochStateEntry.Copy(),
 		PreviousEpochSetup:  e.PreviousEpochSetup,
@@ -369,7 +394,7 @@ func (e *RichEpochStateEntry) Copy() *RichEpochStateEntry {
 	if e == nil {
 		return nil
 	}
-	richEpochStateEntry := NewRichEpochStateEntryWithIdentityTable(
+	richEpochStateEntry := NewRichEpochStateEntryWithEpochIdentityTables(
 		e.EpochStateEntry.Copy(),
 		e.CurrentEpochIdentityTable.Copy(),
 		e.NextEpochIdentityTable.Copy(),

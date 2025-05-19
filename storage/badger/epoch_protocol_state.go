@@ -245,7 +245,8 @@ func newRichEpochProtocolStateEntry(
 		currentEpochSetup,
 		currentEpochCommit,
 		nextEpochSetup,
-		nextEpochCommit)
+		nextEpochCommit,
+	)
 	if err != nil {
 		// observing an error here would be an indication of severe data corruption or bug in our code since
 		// all data should be available and correctly structured at this point.
