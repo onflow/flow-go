@@ -98,12 +98,15 @@ func CollectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.Collect
 
 // MessageToCollectionGuarantee converts a protobuf message to a collection guarantee
 func MessageToCollectionGuarantee(m *entities.CollectionGuarantee) *flow.CollectionGuarantee {
-	return &flow.CollectionGuarantee{
-		CollectionID:     MessageToIdentifier(m.CollectionId),
-		ReferenceBlockID: MessageToIdentifier(m.ReferenceBlockId),
-		SignerIndices:    m.SignerIndices,
-		Signature:        MessageToSignature(m.Signature),
-	}
+	guarantee := flow.NewCollectionGuarantee(
+		MessageToIdentifier(m.CollectionId),
+		MessageToIdentifier(m.ReferenceBlockId),
+		flow.ChainID(""),
+		m.SignerIndices,
+		MessageToSignature(m.Signature),
+	)
+
+	return &guarantee
 }
 
 // CollectionGuaranteesToMessages converts a slice of collection guarantees to a slice of protobuf messages

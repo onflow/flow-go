@@ -1,6 +1,10 @@
 package flow
 
-import "github.com/onflow/flow-go/model/fingerprint"
+import (
+	"github.com/onflow/crypto"
+
+	"github.com/onflow/flow-go/model/fingerprint"
+)
 
 // Collection is set of transactions.
 //
@@ -35,9 +39,13 @@ func (c Collection) Light() LightCollection {
 
 // Guarantee returns a collection guarantee for this collection.
 func (c *Collection) Guarantee() CollectionGuarantee {
-	return CollectionGuarantee{
-		CollectionID: c.ID(),
-	}
+	return NewCollectionGuarantee(
+		c.ID(),             // the collection’s ID
+		Identifier{},       // zero-value ReferenceBlockID
+		ChainID(""),        // zero-value ChainID
+		nil,                // empty signer indices
+		crypto.Signature{}, // zero-value signature
+	)
 }
 
 func (c Collection) ID() Identifier {

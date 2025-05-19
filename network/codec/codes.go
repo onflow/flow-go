@@ -3,6 +3,8 @@ package codec
 import (
 	"fmt"
 
+	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
@@ -182,7 +184,14 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 
 	// collections, guarantees & transactions
 	case CodeCollectionGuarantee:
-		return &flow.CollectionGuarantee{}, what(&flow.CollectionGuarantee{}), nil
+		guarantee := flow.NewCollectionGuarantee(
+			flow.Identifier{},
+			flow.Identifier{},
+			flow.ChainID(""),
+			nil,
+			crypto.Signature{},
+		)
+		return &guarantee, what(&guarantee), nil
 	case CodeTransactionBody:
 		return &flow.TransactionBody{}, what(&flow.TransactionBody{}), nil
 	case CodeTransaction:

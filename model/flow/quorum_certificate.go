@@ -33,7 +33,8 @@ func NewQuorumCertificate(
 		View:          view,
 		BlockID:       blockID,
 		SignerIndices: signerIndices,
-		SigData:       sigData}
+		SigData:       sigData,
+	}
 }
 
 // ID returns the QuorumCertificate's identifier
