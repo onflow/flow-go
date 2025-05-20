@@ -333,8 +333,8 @@ func (db *StateDB) SlotInAccessList(addr gethCommon.Address, key gethCommon.Hash
 	// a snapshot, so that it can revert to it in case of execution errors,
 	// such as out of gas etc, using `Snapshot` & `RevertToSnapshot`.
 	// This can create a long list of views, in the order of 4K for certain
-	// large transactions. To avoid performance issues with deep stacks,
-	// we use a plain for-loop, instead of checking parents, as DeltaView did.
+	// large transactions. To avoid performance issues with DeltaView checking parents,
+	// which causes deep stacks and function call overhead, we use a plain for-loop instead.
 	// We take advantage of the fact that slots are added in AccessList
 	// in the early steps of tx execution, so we return early.
 	for _, view := range db.views {
