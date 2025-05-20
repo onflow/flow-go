@@ -27,11 +27,26 @@ func (a Attestation) ID() Identifier {
 }
 
 // ResultApprovalBody holds body part of a result approval
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type ResultApprovalBody struct {
 	Attestation
 	ApproverID           Identifier       // node id generating this result approval
 	AttestationSignature crypto.Signature // signature over attestation, this has been separated for BLS aggregation
 	Spock                crypto.Signature // proof of re-computation, one per each chunk
+}
+
+func NewResultApprovalBody(
+	attestation Attestation,
+	approvalID Identifier,
+	attestSignature crypto.Signature,
+	spock crypto.Signature) ResultApprovalBody {
+	return ResultApprovalBody{
+		Attestation:          attestation,
+		ApproverID:           approvalID,
+		AttestationSignature: attestSignature,
+		Spock:                spock,
+	}
 }
 
 // PartialID generates a unique identifier using Attestation + ApproverID

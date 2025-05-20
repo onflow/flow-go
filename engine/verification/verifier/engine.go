@@ -337,12 +337,12 @@ func GenerateResultApproval(
 	}
 
 	// result approval body
-	body := flow.ResultApprovalBody{
-		Attestation:          *attestation,
-		ApproverID:           me.NodeID(),
-		AttestationSignature: atstSign,
-		Spock:                spock,
-	}
+	body := flow.NewResultApprovalBody(
+		*attestation,
+		me.NodeID(),
+		atstSign,
+		spock,
+	)
 
 	// generates a signature over result approval body
 	bodyID := body.ID()
