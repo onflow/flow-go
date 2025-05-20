@@ -5,10 +5,20 @@ import (
 )
 
 // Attestation confirms correctness of a chunk of an exec result
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Attestation struct {
 	BlockID           Identifier // ID of the block included the collection
 	ExecutionResultID Identifier // ID of the execution result
 	ChunkIndex        uint64     // index of the approved chunk
+}
+
+func NewAttestation(blockID Identifier, executionResultID Identifier, chunkIndex uint64) Attestation {
+	return Attestation{
+		BlockID:           blockID,
+		ExecutionResultID: executionResultID,
+		ChunkIndex:        chunkIndex,
+	}
 }
 
 // ID generates a unique identifier using attestation

@@ -55,11 +55,11 @@ func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.Aggregate
 	chunk *flow.Chunk, executionResultID flow.Identifier) error {
 	// TODO: replace implementation once proper aggregation is used for Verifiers' attestation signatures.
 
-	atst := flow.Attestation{
-		BlockID:           chunk.BlockID,
-		ExecutionResultID: executionResultID,
-		ChunkIndex:        chunk.Index,
-	}
+	atst := flow.NewAttestation(
+		chunk.BlockID,
+		executionResultID,
+		chunk.Index,
+	)
 	atstID := atst.ID()
 
 	for i, signature := range aggregatedSignatures.VerifierSignatures {

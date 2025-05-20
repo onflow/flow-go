@@ -265,16 +265,16 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 
 	// Generate result approval
 	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERVerGenerateResultApproval)
-	attestation := &flow.Attestation{
-		BlockID:           vc.Header.ID(),
-		ExecutionResultID: vc.Result.ID(),
-		ChunkIndex:        vc.Chunk.Index,
-	}
+	attestation := flow.NewAttestation(
+		vc.Header.ID(),
+		vc.Result.ID(),
+		vc.Chunk.Index,
+	)
 	approval, err := GenerateResultApproval(
 		e.me,
 		e.approvalHasher,
 		e.spockHasher,
-		attestation,
+		&attestation,
 		spockSecret)
 
 	span.End()
