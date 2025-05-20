@@ -32,6 +32,11 @@ func NewFallbackStateMachine(
 ) (*FallbackStateMachine, error) {
 	state := parentEpochState.EpochStateEntry.Copy()
 	nextEpochCommitted := state.EpochPhase() == flow.EpochPhaseCommitted
+
+	nextEpoch := state.NextEpoch
+	nextEpochSetup := state.NextEpochSetup
+	nextEpochCommit := state.NextEpochCommit
+
 	// we are entering fallback mode, this logic needs to be executed only once
 	if !state.EpochFallbackTriggered {
 		// The next epoch has not been committed. Though setup event may be in the state, make sure it is cleared.
@@ -41,9 +46,31 @@ func NewFallbackStateMachine(
 		// we go through with that committed epoch. Otherwise, we have tentative values of an epoch
 		// not yet properly specified, which we have to clear out.
 		if !nextEpochCommitted {
-			state.NextEpoch = nil
+			nextEpoch = nil
+			nextEpochSetup = nil
+			nextEpochCommit = nil
 		}
-		state.EpochFallbackTriggered = true
+
+		minEpochStateEntry := flow.NewMinEpochStateEntry(
+			state.PreviousEpoch,
+			state.CurrentEpoch,
+			nextEpoch,
+			true,
+		)
+
+		var err error
+		state, err = flow.NewEpochStateEntry(
+			&minEpochStateEntry,
+			state.PreviousEpochSetup,
+			state.PreviousEpochCommit,
+			state.CurrentEpochSetup,
+			state.CurrentEpochCommit,
+			nextEpochSetup,
+			nextEpochCommit,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create epoch state entry: %w", err)
+		}
 	}
 
 	base, err := newBaseStateMachine(telemetry, view, parentEpochState, state)

@@ -138,7 +138,7 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 //   - PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Can be nil.
 //   - NextEpochSetup and NextEpochCommit are for the same epoch. Can be nil.
 //
-//structwrite:immutable - mutations allowed only within the constructor
+//structwrite:immutable - mutations allowed only within the constructor.
 type EpochStateEntry struct {
 	*MinEpochStateEntry
 
@@ -375,16 +375,22 @@ func (e *EpochStateEntry) Copy() *EpochStateEntry {
 	if e == nil {
 		return nil
 	}
-	//nolint:structwrite // it is safe to construct EpochStateEntry outside constructor cause it does not change the ID
-	return &EpochStateEntry{
-		MinEpochStateEntry:  e.MinEpochStateEntry.Copy(),
-		PreviousEpochSetup:  e.PreviousEpochSetup,
-		PreviousEpochCommit: e.PreviousEpochCommit,
-		CurrentEpochSetup:   e.CurrentEpochSetup,
-		CurrentEpochCommit:  e.CurrentEpochCommit,
-		NextEpochSetup:      e.NextEpochSetup,
-		NextEpochCommit:     e.NextEpochCommit,
+
+	epochStateEntry, err := NewEpochStateEntry(
+		e.MinEpochStateEntry.Copy(),
+		e.PreviousEpochSetup,
+		e.PreviousEpochCommit,
+		e.CurrentEpochSetup,
+		e.CurrentEpochCommit,
+		e.NextEpochSetup,
+		e.NextEpochCommit,
+	)
+	if err != nil {
+		// Should never reach here
+		panic(err)
 	}
+
+	return epochStateEntry
 }
 
 // Copy returns a full copy of the RichEpochStateEntry.
