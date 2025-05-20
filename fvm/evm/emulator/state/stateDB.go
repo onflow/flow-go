@@ -335,8 +335,9 @@ func (db *StateDB) SlotInAccessList(addr gethCommon.Address, key gethCommon.Hash
 	// This can create a long list of views, in the order of 4K for certain
 	// large transactions. To avoid performance issues with DeltaView checking parents,
 	// which causes deep stacks and function call overhead, we use a plain for-loop instead.
-	// We take advantage of the fact that slots are added in AccessList
-	// in the early steps of tx execution, so we return early.
+	// We iterate through the views in ascending order (from lowest to highest) as an optimization.
+	// Since slots are typically added to the AccessList early during transaction execution,
+	// this allows us to return early when the needed slots are found in the initial views.
 	for _, view := range db.views {
 		addressFound, slotFound := view.SlotInAccessList(slotKey)
 		if slotFound {
