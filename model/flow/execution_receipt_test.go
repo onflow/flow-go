@@ -12,6 +12,7 @@ import (
 // TestExecutionReceiptID_Malleability confirms that ExecutionReceipt and ExecutionReceiptStub, which implement
 // the [flow.IDEntity] interface, are resistant to tampering.
 func TestExecutionReceiptID_Malleability(t *testing.T) {
+	t.Skip("TODO: postponing malleability ID changes to mainnet27")
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithServiceEvents(3))),
 		unittest.WithSpocks(unittest.SignaturesFixture(3)),
