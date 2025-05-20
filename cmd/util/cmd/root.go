@@ -17,6 +17,7 @@ import (
 	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
 	checkpoint_trie_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-trie-stats"
+	db_migration "github.com/onflow/flow-go/cmd/util/cmd/db-migration"
 	debug_script "github.com/onflow/flow-go/cmd/util/cmd/debug-script"
 	debug_tx "github.com/onflow/flow-go/cmd/util/cmd/debug-tx"
 	diff_states "github.com/onflow/flow-go/cmd/util/cmd/diff-states"
@@ -132,6 +133,7 @@ func addCommands() {
 	rootCmd.AddCommand(evm_state_exporter.Cmd)
 	rootCmd.AddCommand(verify_execution_result.Cmd)
 	rootCmd.AddCommand(verify_evm_offchain_replay.Cmd)
+	rootCmd.AddCommand(db_migration.Cmd)
 }
 
 func initConfig() {
