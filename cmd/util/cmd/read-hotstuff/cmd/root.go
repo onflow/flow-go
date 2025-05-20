@@ -6,12 +6,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 )
 
 var (
-	flagDatadir   string
-	flagPebbleDir string
-	flagChain     string
+	flagChain string
 )
 
 var rootCmd = &cobra.Command{
@@ -29,10 +29,7 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the badger dababase")
-	_ = rootCmd.MarkPersistentFlagRequired("datadir")
-
-	rootCmd.PersistentFlags().StringVar(&flagPebbleDir, "pebble-dir", "", "directory to the pebble dababase")
+	common.InitWithDBFlags(rootCmd)
 
 	rootCmd.PersistentFlags().StringVar(&flagChain, "chain", "", "Chain name, e.g. flow-mainnet, flow-testnet")
 	_ = rootCmd.MarkPersistentFlagRequired("chain")
