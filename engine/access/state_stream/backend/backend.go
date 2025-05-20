@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -62,7 +63,7 @@ type Config struct {
 type GetExecutionDataFunc func(context.Context, uint64) (*execution_data.BlockExecutionDataEntity, error)
 
 type StateStreamBackend struct {
-	subscription.ExecutionDataTracker
+	tracker.ExecutionDataTracker
 
 	ExecutionDataBackend
 	EventsBackend
@@ -92,7 +93,7 @@ func New(
 	useEventsIndex bool,
 	registerIDsRequestLimit int,
 	subscriptionHandler *subscription.SubscriptionHandler,
-	executionDataTracker subscription.ExecutionDataTracker,
+	executionDataTracker tracker.ExecutionDataTracker,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 

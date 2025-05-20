@@ -142,7 +142,8 @@ func (p *AutoProfiler) runOnce(d time.Duration) {
 		{profileName: "goroutine", profileType: pb.ProfileType_THREADS, profileFunc: func(w io.Writer, _ time.Duration) error { return newProfileFunc("goroutine")(w) }},
 		{profileName: "heap", profileType: pb.ProfileType_HEAP, profileFunc: p.pprofHeap},
 		{profileName: "allocs", profileType: pb.ProfileType_HEAP_ALLOC, profileFunc: p.pprofAllocs},
-		{profileName: "block", profileType: pb.ProfileType_CONTENTION, profileFunc: p.pprofBlock},
+		// The block profiling is causing some crashes in the runtime, so we are disabling it for now.
+		// {profileName: "block", profileType: pb.ProfileType_CONTENTION, profileFunc: p.pprofBlock},
 		{profileName: "cpu", profileType: pb.ProfileType_WALL, profileFunc: p.pprofCpu},
 	} {
 		path := filepath.Join(p.dir, fmt.Sprintf("%s-%s", prof.profileName, time.Now().Format(time.RFC3339)))
@@ -311,6 +312,9 @@ func (p *AutoProfiler) pprofAllocs(w io.Writer, d time.Duration) (err error) {
 	return diff.Write(w)
 }
 
+// I'm keeping this for later use
+//
+//nolint:unused
 func (p *AutoProfiler) pprofBlock(w io.Writer, d time.Duration) error {
 	runtime.SetBlockProfileRate(100)
 	defer runtime.SetBlockProfileRate(0)

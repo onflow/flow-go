@@ -189,7 +189,7 @@ func (c *Consumer) checkProcessable() {
 	}
 
 	if processingCount > 0 {
-		c.log.Info().Int64("processing", processingCount).Msg("processing jobs")
+		c.log.Debug().Int64("processing", processingCount).Msg("processing jobs")
 	} else {
 		c.log.Debug().Bool("running", c.running).Msg("no job found")
 	}

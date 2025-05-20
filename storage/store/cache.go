@@ -38,6 +38,18 @@ func noopStore[K comparable, V any](_ storage.ReaderBatchWriter, _ K, _ V) error
 	return nil
 }
 
+type removeFunc[K comparable] func(storage.ReaderBatchWriter, K) error
+
+func withRemove[K comparable, V any](remove removeFunc[K]) func(*Cache[K, V]) {
+	return func(c *Cache[K, V]) {
+		c.remove = remove
+	}
+}
+
+func noRemove[K comparable](_ storage.ReaderBatchWriter, _ K) error {
+	return fmt.Errorf("no remove function for cache remove available")
+}
+
 type retrieveFunc[K comparable, V any] func(r storage.Reader, key K) (V, error)
 
 // nolint:unused
@@ -59,6 +71,7 @@ type Cache[K comparable, V any] struct {
 	limit    uint
 	store    storeFunc[K, V]
 	retrieve retrieveFunc[K, V]
+	remove   removeFunc[K]
 	resource string
 	cache    *lru.Cache[K, V]
 }
@@ -70,6 +83,7 @@ func newCache[K comparable, V any](collector module.CacheMetrics, resourceName s
 		limit:    1000,
 		store:    noStore[K, V],
 		retrieve: noRetrieve[K, V],
+		remove:   noRemove[K],
 		resource: resourceName,
 	}
 	for _, option := range options {
@@ -140,6 +154,19 @@ func (c *Cache[K, V]) PutTx(rw storage.ReaderBatchWriter, key K, resource V) err
 	err := c.store(rw, key, resource)
 	if err != nil {
 		return fmt.Errorf("could not store resource: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Cache[K, V]) RemoveTx(rw storage.ReaderBatchWriter, key K) error {
+	storage.OnCommitSucceed(rw, func() {
+		c.Remove(key)
+	})
+
+	err := c.remove(rw, key)
+	if err != nil {
+		return fmt.Errorf("could not remove resource: %w", err)
 	}
 
 	return nil

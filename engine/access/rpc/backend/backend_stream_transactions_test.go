@@ -21,16 +21,16 @@ import (
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
-	accessapi "github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	access "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
+	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
@@ -74,7 +74,7 @@ type TransactionStatusSuite struct {
 
 	connectionFactory *connectionmock.ConnectionFactory
 	communicator      *backendmock.Communicator
-	blockTracker      *subscriptionmock.BlockTracker
+	blockTracker      *trackermock.BlockTracker
 	reporter          *syncmock.IndexReporter
 	indexReporter     *index.Reporter
 
@@ -124,7 +124,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.connectionFactory = connectionmock.NewConnectionFactory(s.T())
 	s.communicator = backendmock.NewCommunicator(s.T())
 	s.broadcaster = engine.NewBroadcaster()
-	s.blockTracker = subscriptionmock.NewBlockTracker(s.T())
+	s.blockTracker = trackermock.NewBlockTracker(s.T())
 	s.reporter = syncmock.NewIndexReporter(s.T())
 	s.indexReporter = index.NewReporter()
 	err := s.indexReporter.Initialize(s.reporter)
@@ -371,7 +371,7 @@ func (s *TransactionStatusSuite) checkNewSubscriptionMessage(sub subscription.Su
 			"channel closed while waiting for transaction info:\n\t- txID %x\n\t- blockID: %x \n\t- err: %v",
 			txId, s.finalizedBlock.ID(), sub.Err())
 
-		txResults, ok := v.([]*accessapi.TransactionResult)
+		txResults, ok := v.([]*accessmodel.TransactionResult)
 		require.True(s.T(), ok, "unexpected response type: %T", v)
 		require.Len(s.T(), txResults, len(expectedTxStatuses))
 

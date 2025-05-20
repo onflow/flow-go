@@ -8,31 +8,13 @@ import (
 )
 
 // InsertSafetyData inserts safety data into the database.
+// Deprecated: this function will be replaced by `operation.UpsertSafetyData` from the `storage/operation` package when moving to Pebble
 func InsertSafetyData(chainID flow.ChainID, safetyData *hotstuff.SafetyData) func(*badger.Txn) error {
 	return insert(makePrefix(codeSafetyData, chainID), safetyData)
 }
 
-// UpdateSafetyData updates safety data in the database.
-func UpdateSafetyData(chainID flow.ChainID, safetyData *hotstuff.SafetyData) func(*badger.Txn) error {
-	return update(makePrefix(codeSafetyData, chainID), safetyData)
-}
-
-// RetrieveSafetyData retrieves safety data from the database.
-func RetrieveSafetyData(chainID flow.ChainID, safetyData *hotstuff.SafetyData) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeSafetyData, chainID), safetyData)
-}
-
 // InsertLivenessData inserts liveness data into the database.
+// Deprecated: this function will be replaced by `operation.UpsertLivenessData` from the `storage/operation` package when moving to Pebble
 func InsertLivenessData(chainID flow.ChainID, livenessData *hotstuff.LivenessData) func(*badger.Txn) error {
 	return insert(makePrefix(codeLivenessData, chainID), livenessData)
-}
-
-// UpdateLivenessData updates liveness data in the database.
-func UpdateLivenessData(chainID flow.ChainID, livenessData *hotstuff.LivenessData) func(*badger.Txn) error {
-	return update(makePrefix(codeLivenessData, chainID), livenessData)
-}
-
-// RetrieveLivenessData retrieves liveness data from the database.
-func RetrieveLivenessData(chainID flow.ChainID, livenessData *hotstuff.LivenessData) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeLivenessData, chainID), livenessData)
 }

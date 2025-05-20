@@ -46,7 +46,7 @@ func TestProfiler(t *testing.T) {
 				require.NoError(t, err)
 
 				foundPtypes := make(map[string]bool)
-				for _, pType := range []string{"heap", "allocs", "goroutine", "cpu", "block"} {
+				for _, pType := range []string{"heap", "allocs", "goroutine", "cpu"} {
 					foundPtypes[pType] = false
 				}
 

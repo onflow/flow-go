@@ -132,7 +132,7 @@ func TestChunksQueue(t *testing.T) {
 
 			for _, locator := range locators {
 				var stored chunks.Locator
-				err := operation.RetrieveChunkLocator(db.Reader(), locator.ID(), &stored)
+				err = operation.RetrieveChunkLocator(db.Reader(), locator.ID(), &stored)
 				require.NoError(t, err)
 				require.Equal(t, *locator, stored)
 			}
