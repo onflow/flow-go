@@ -351,10 +351,9 @@ func GenerateResultApproval(
 		return nil, fmt.Errorf("could not sign result approval body: %w", err)
 	}
 
-	return &flow.ResultApproval{
-		Body:              body,
-		VerifierSignature: bodySign,
-	}, nil
+	resultApproval := flow.NewResultApproval(body, bodySign)
+
+	return &resultApproval, nil
 }
 
 // verifiableChunkHandler acts as a wrapper around the verify method that captures its performance-related metrics

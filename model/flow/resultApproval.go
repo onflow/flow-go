@@ -68,9 +68,20 @@ func (rab ResultApprovalBody) ID() Identifier {
 }
 
 // ResultApproval includes an approval for a chunk, verified by a verification node
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type ResultApproval struct {
 	Body              ResultApprovalBody
 	VerifierSignature crypto.Signature // signature over all above fields
+}
+
+func NewResultApproval(
+	body ResultApprovalBody,
+	verifierSignature crypto.Signature) ResultApproval {
+	return ResultApproval{
+		Body:              body,
+		VerifierSignature: verifierSignature,
+	}
 }
 
 // ID generates a unique identifier using result approval body
