@@ -317,7 +317,9 @@ func (db *StateDB) AddressInAccessList(addr gethCommon.Address) bool {
 	// We iterate through the views in ascending order (from lowest to highest) as an optimization.
 	// Since addresses are typically added to the AccessList early during transaction execution,
 	// this allows us to return early when the needed addresses are found in the initial views.
-	for _, view := range db.views {
+	end := len(db.views)
+	for i := 0; i < end; i++ {
+		view := db.views[i]
 		if view.AddressInAccessList(addr) {
 			return true
 		}
