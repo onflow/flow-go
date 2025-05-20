@@ -227,7 +227,7 @@ func NewChunk_ProtocolVersion1(
 
 // ID returns the unique identifier of the Chunk
 func (ch *Chunk) ID() Identifier {
-	return MakeID(ch)
+	return MakeID(ch.ChunkBody)
 }
 
 // ChunkDataPack holds all register touches (any read, or write).
