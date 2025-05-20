@@ -3125,7 +3125,7 @@ func TestVMBridge(t *testing.T) {
 		fvm.WithChain(flow.Emulator.Chain()),
 		fvm.WithEVMEnabled(true),
 		fvm.WithBlocks(blocks),
-		fvm.WithBlockHeader(block1.Header),
+		fvm.WithBlockHeader(block1.ToHeader()),
 		fvm.WithCadenceLogging(true),
 		fvm.WithContractDeploymentRestricted(false),
 	}

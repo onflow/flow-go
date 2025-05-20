@@ -289,7 +289,7 @@ func (bs *BuilderSuite) SetupTest() {
 		return unittest.StateSnapshotForUnknownBlock()
 	})
 	params := new(protocol.Params)
-	params.On("FinalizedRoot").Return(first.Header)
+	params.On("FinalizedRoot").Return(first.ToHeader())
 	bs.state.On("Params").Return(params)
 
 	// set up storage mocks for tests
