@@ -91,7 +91,7 @@ func (erb UnsignedExecutionReceiptStub) ID() Identifier {
 // ID returns the canonical ID of the execution receipt.
 // It is identical to the ID of the full receipt.
 func (er *ExecutionReceiptStub) ID() Identifier {
-	return MakeID(er)
+	return er.UnsignedExecutionReceiptStub.ID()
 }
 
 func (er ExecutionReceiptStub) MarshalJSON() ([]byte, error) {
