@@ -47,6 +47,7 @@ func NewFallbackStateMachine(
 		// not yet properly specified, which we have to clear out.
 		if !nextEpochCommitted {
 			nextEpoch = nil
+			// update corresponding service events
 			nextEpochSetup = nil
 			nextEpochCommit = nil
 		}
@@ -220,6 +221,7 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		EpochExtensions:  nil,
 	}
 
+	// update corresponding service events
 	nextEpochSetup := epochRecover.EpochSetup
 	nextEpochCommit := epochRecover.EpochCommit
 

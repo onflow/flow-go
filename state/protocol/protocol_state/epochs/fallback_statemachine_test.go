@@ -654,7 +654,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 			nil,
 			true,
 		)
-		require.Equal(s.T(), expectedState, *parentProtocolState.MinEpochStateEntry)
+		require.Equal(s.T(), &expectedState, parentProtocolState.MinEpochStateEntry)
 		require.Greater(s.T(), parentProtocolState.CurrentEpochFinalView(), candidateView,
 			"final view should be greater than final view of test")
 	}
