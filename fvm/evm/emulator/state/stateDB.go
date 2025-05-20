@@ -318,7 +318,7 @@ func (db *StateDB) AddressInAccessList(addr gethCommon.Address) bool {
 	// Since addresses are typically added to the AccessList early during transaction execution,
 	// this allows us to return early when the needed addresses are found in the initial views.
 	end := len(db.views)
-	for i := 0; i < end; i++ {
+	for i := range end {
 		view := db.views[i]
 		if view.AddressInAccessList(addr) {
 			return true
@@ -341,14 +341,16 @@ func (db *StateDB) SlotInAccessList(addr gethCommon.Address, key gethCommon.Hash
 	// We iterate through the views in ascending order (from lowest to highest) as an optimization.
 	// Since slots are typically added to the AccessList early during transaction execution,
 	// this allows us to return early when the needed slots are found in the initial views.
-	for _, view := range db.views {
+	addressFound := false
+	end := len(db.views)
+	for i := range end {
+		view := db.views[i]
 		addressFound, slotFound := view.SlotInAccessList(slotKey)
 		if slotFound {
 			return addressFound, true
 		}
 	}
 
-	addressFound := db.AddressInAccessList(addr)
 	return addressFound, false
 }
 
