@@ -52,7 +52,7 @@ func (_m *ExecutionMetrics) ExecutionBlockExecuted(dur time.Duration, stats modu
 }
 
 // ExecutionBlockExecutionEffortVectorComponent provides a mock function with given fields: _a0, _a1
-func (_m *ExecutionMetrics) ExecutionBlockExecutionEffortVectorComponent(_a0 string, _a1 uint) {
+func (_m *ExecutionMetrics) ExecutionBlockExecutionEffortVectorComponent(_a0 string, _a1 uint64) {
 	_m.Called(_a0, _a1)
 }
 
