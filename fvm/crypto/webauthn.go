@@ -119,15 +119,14 @@ func validateWebAuthNExtensionData(extensionData []byte, message []byte) (bool, 
 
 	// extract rpIdHash, userFlags, sigCounter, extensions
 	rpIdHash := decodedWebAuthnData.AuthenticatorData[:WebAuthnChallengeLength]
-	userFlags := decodedWebAuthnData.AuthenticatorData[WebAuthnChallengeLength : WebAuthnChallengeLength+1]
-	// _ := decodedWebAuthnData.AuthenticatorData[WebAuthnChallengeLength+1:WebAuthnExtensionDataMinimumLength]
+	userFlags := decodedWebAuthnData.AuthenticatorData[WebAuthnChallengeLength]
 	extensions := decodedWebAuthnData.AuthenticatorData[WebAuthnExtensionDataMinimumLength:]
 	if bytes.Equal(flow.TransactionDomainTag[:], rpIdHash) {
 		return false, nil
 	}
 
 	// validate user flags according to FLIP 264
-	if err := validateFlags(userFlags[0], extensions); err != nil {
+	if err := validateFlags(userFlags, extensions); err != nil {
 		return false, nil
 	}
 
