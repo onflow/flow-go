@@ -8,8 +8,6 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
-	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/rs/zerolog/log"
 )
@@ -127,15 +125,7 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 	lg.Info().Str("file", completeMarkerPath).
 		Msgf("Step 6/6 Migration marker file written successfully. Compacting pebbleDB...")
 
-	lg.Info().Msgf("reading finalized height...")
-
-	var height uint64
-	err = operation.RetrieveFinalizedHeight(pebbleimpl.ToDB(pebbleDB).Reader(), &height)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve finalized height: %w", err)
-	}
-
-	log.Info().Msgf("Finalized height retrieved: %d", height)
+	lg.Info().Str("file", completeMarkerPath).Msgf("Migration marker file written successfully.")
 
 	return nil
 }
