@@ -102,7 +102,7 @@ func (suite *Suite) SetupTest() {
 	suite.snapshot = new(protocol.Snapshot)
 	suite.state.On("Final").Return(suite.snapshot)
 	suite.snapshot.On("Head").Return(
-		func() *flow.Header { return suite.final.Header },
+		func() *flow.Header { return suite.final.ToHeader() },
 		func() error { return nil },
 	)
 	suite.state.On("AtBlockID", mock.Anything).Return(
@@ -110,7 +110,7 @@ func (suite *Suite) SetupTest() {
 			snap := new(protocol.Snapshot)
 			block, ok := suite.blocks[blockID]
 			if ok {
-				snap.On("Head").Return(block.Header, nil)
+				snap.On("Head").Return(block.ToHeader(), nil)
 			} else {
 				snap.On("Head").Return(nil, storage.ErrNotFound)
 			}

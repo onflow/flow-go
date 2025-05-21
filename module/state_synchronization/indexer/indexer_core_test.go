@@ -90,7 +90,7 @@ func (i *indexCoreTest) useDefaultBlockByHeight() *indexCoreTest {
 		Return(func(height uint64) (*flow.Header, error) {
 			for _, b := range i.blocks {
 				if b.Header.Height == height {
-					return b.Header, nil
+					return b.ToHeader(), nil
 				}
 			}
 			return nil, fmt.Errorf("not found")
@@ -538,7 +538,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Invalid Heights", func(t *testing.T) {
 		last := blocks[len(blocks)-1]
 		ed := &execution_data.BlockExecutionData{
-			BlockID: last.Header.ID(),
+			BlockID: last.ID(),
 		}
 		execData := execution_data.NewBlockExecutionDataEntity(last.ID(), ed)
 		latestHeight := blocks[len(blocks)-3].Header.Height
@@ -558,9 +558,9 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Unknown block ID", func(t *testing.T) {
 		unknownBlock := unittest.BlockFixture()
 		ed := &execution_data.BlockExecutionData{
-			BlockID: unknownBlock.Header.ID(),
+			BlockID: unknownBlock.ID(),
 		}
-		execData := execution_data.NewBlockExecutionDataEntity(unknownBlock.Header.ID(), ed)
+		execData := execution_data.NewBlockExecutionDataEntity(unknownBlock.ID(), ed)
 
 		err := newIndexCoreTest(t, blocks, execData).runIndexBlockData()
 

@@ -106,21 +106,21 @@ func TestThrottleFallBehindCatchUp(t *testing.T) {
 	wg.Add(1)
 	require.NoError(t, throttle.OnBlock(allBlocks[11].ID(), allBlocks[11].Header.Height))
 	wg.Wait()
-	require.Equal(t, HeaderToBlockIDHeight(allBlocks[11].Header), consumer.LastProcessable())
+	require.Equal(t, HeaderToBlockIDHeight(allBlocks[11].ToHeader()), consumer.LastProcessable())
 
 	require.NoError(t, throttle.Done())
 }
 
 func makeBlocks(t *testing.T, start, count int) []*flow.Block {
 	genesis := unittest.GenesisFixture()
-	blocks := unittest.ChainFixtureFrom(count, genesis.Header)
+	blocks := unittest.ChainFixtureFrom(count, genesis.ToHeader())
 	return append([]*flow.Block{genesis}, blocks...)
 }
 
 func toHeaders(blocks []*flow.Block) []*flow.Header {
 	headers := make([]*flow.Header, len(blocks))
 	for i, block := range blocks {
-		headers[i] = block.Header
+		headers[i] = block.ToHeader()
 	}
 	return headers
 }

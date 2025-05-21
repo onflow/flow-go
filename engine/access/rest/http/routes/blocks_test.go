@@ -244,7 +244,7 @@ func generateMocks(backend *mock.API, count int) ([]string, []string, []*flow.Bl
 		block := unittest.BlockFixture()
 		block.Header.Height = uint64(i)
 		blocks[i] = &block
-		blockIDs[i] = block.Header.ID().String()
+		blockIDs[i] = block.ID().String()
 		heights[i] = fmt.Sprintf("%d", block.Header.Height)
 
 		executionResult := unittest.ExecutionResultFixture()

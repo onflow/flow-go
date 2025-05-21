@@ -63,7 +63,7 @@ func (b *Store) HeaderByID(id flowgo.Identifier) (*flowgo.Header, error) {
 		}
 		return nil, err
 	}
-	return block.Header, nil
+	return block.ToHeader(), nil
 }
 
 func (b *Store) FinalizedHeader() (*flowgo.Header, error) {
@@ -72,7 +72,7 @@ func (b *Store) FinalizedHeader() (*flowgo.Header, error) {
 		return nil, err
 	}
 
-	return block.Header, nil
+	return block.ToHeader(), nil
 }
 
 func (b *Store) SealedHeader() (*flowgo.Header, error) {
@@ -81,7 +81,7 @@ func (b *Store) SealedHeader() (*flowgo.Header, error) {
 		return nil, err
 	}
 
-	return block.Header, nil
+	return block.ToHeader(), nil
 }
 
 func (b *Store) IndexedHeight() (uint64, error) {
@@ -103,7 +103,7 @@ func (b *Store) ByHeightFrom(height uint64, header *flowgo.Header) (*flowgo.Head
 		return nil, err
 	}
 
-	return block.Header, nil
+	return block.ToHeader(), nil
 }
 
 // New returns a new in-memory Store implementation.
