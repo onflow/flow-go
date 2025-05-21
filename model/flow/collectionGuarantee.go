@@ -17,5 +17,5 @@ type CollectionGuarantee struct {
 // ID returns a collision-resistant hash of the CollectionGuarantee struct.
 // This is distinct from the ID of the corresponding collection.
 func (cg *CollectionGuarantee) ID() Identifier {
-	return MakeID(cg)
+	return cg.CollectionID
 }
