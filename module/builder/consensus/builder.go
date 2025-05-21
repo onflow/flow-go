@@ -156,7 +156,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not extend state with built proposal: %w", err)
 	}
 
-	return blockProposal.HeaderProposal(), nil
+	return blockProposal.ProposalHeader(), nil
 }
 
 // repopulateExecutionTree restores latest state of execution tree mempool based on local chain state information.

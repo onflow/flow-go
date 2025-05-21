@@ -19,7 +19,7 @@ func NewPendingBlocks() *PendingBlocks {
 func (b *PendingBlocks) Add(block flow.Slashable[*flow.BlockProposal]) bool {
 	return b.backend.add(flow.Slashable[*flow.ProposalHeader]{
 		OriginID: block.OriginID,
-		Message:  block.Message.HeaderProposal(),
+		Message:  block.Message.ProposalHeader(),
 	}, block.Message.Block.Payload)
 }
 
