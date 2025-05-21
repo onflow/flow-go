@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -61,6 +62,14 @@ var blocksCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("could not get block with height %d: %w", flagBlockHeight, err)
 				}
+
+				var finalized uint64
+				err := operation.RetrieveFinalizedHeight(db.Reader(), &finalized)
+				if err != nil {
+					return fmt.Errorf("retrieving finalized height failed: %w", err)
+				}
+
+				log.Info().Msgf("finalized height: %d", finalized)
 			} else {
 				return fmt.Errorf("provide either a --id or --height and not both, (--block-id: %v), (--height: %v)", flagBlockID, flagBlockHeight)
 			}
