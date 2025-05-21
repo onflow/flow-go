@@ -526,8 +526,7 @@ func TestExtendMissingParent(t *testing.T) {
 		extend.Payload.Seals = nil
 		extend.Header.Height = 2
 		extend.Header.View = 2
-		parentBlock := unittest.BlockFixture()
-		extend.Header.ParentID = parentBlock.ID()
+		extend.Header.ParentID = unittest.IdentifierFixture()
 
 		err := state.Extend(context.Background(), unittest.ProposalFromBlock(&extend))
 		require.Error(t, err)
@@ -560,14 +559,11 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		require.NoError(t, err)
 
 		// create another block with the same height and view, that is coming after
-		extendHeaderBody2 := extend.Header
-		extendHeaderBody2.ParentID = extend.ID()
-		extendHeaderBody2.Height = 1
-		extendHeaderBody2.View = 2
-
-		extend2 := flow.NewBlock(extendHeaderBody2, extend.Payload)
+		extend2 := unittest.BlockWithParentFixture(extend.ToHeader())
+		extend2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		extend2.Header.Height = 1
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(extend2))
-		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err))
 
 		// verify seal not indexed
 		var sealID flow.Identifier
@@ -2689,8 +2685,7 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 		extend.Payload.Seals = nil
 		extend.Header.Height = 2
 		extend.Header.View = 2
-		parentBlock := unittest.BlockFixture()
-		extend.Header.ParentID = parentBlock.ID()
+		extend.Header.ParentID = unittest.IdentifierFixture()
 
 		err := state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(&extend))
 		require.Error(t, err)
