@@ -50,7 +50,8 @@ type HeaderBody struct {
 	LastViewTC *TimeoutCertificate
 }
 
-// QuorumCertificate returns quorum certificate that is incorporated in the block header body.
+// QuorumCertificate returns quorum certificate [QC] that is incorporated in the block header body.
+// Caution: this is the QC for the parent. 
 func (h HeaderBody) QuorumCertificate() *QuorumCertificate {
 	return &QuorumCertificate{
 		BlockID:       h.ParentID,
