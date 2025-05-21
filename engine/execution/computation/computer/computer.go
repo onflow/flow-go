@@ -3,6 +3,8 @@ package computer
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	"sync"
 
 	"github.com/onflow/crypto/hash"
@@ -285,6 +287,16 @@ func (e *blockComputer) queueTransactionRequests(
 		txnIndex,
 		systemTxnBody,
 		true)
+
+	for _, callback := range callbacks {
+		requestQueue <- newTransactionRequest(
+			systemCollectionInfo,
+			systemCtx,
+			systemCollectionLogger,
+			txnIndex,
+			callback,
+			true)
+	}
 }
 
 func numberOfTransactionsInBlock(collections []*entity.CompleteCollection) int {
@@ -316,10 +328,42 @@ func (e *blockComputer) selectChunkConstructorForProtocolVersion(blockID flow.Id
 	}
 }
 
+type callbackScheduledEvent struct {
+	ID                uint64 `cadence:"ID"`
+	Priority          uint8  `cadence:"priority"`
+	ComputationEffort uint64 `cadence:"computationEffort"`
+	Timestamp         uint64 `cadence:"timestamp"`
+}
+
+func parseCallbackEvents(events flow.EventsList) ([]*callbackScheduledEvent, error) {
+	const callbackScheduledEventType = "A.0xScheduler.CallbackScheduled"
+	var callbacks []*callbackScheduledEvent
+
+	for _, event := range events {
+		if event.Type != callbackScheduledEventType {
+			continue
+		}
+
+		payload, err := ccf.Decode(nil, event.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode event payload: %w", err)
+		}
+
+		var callbackEvent callbackScheduledEvent
+		if err := cadence.DecodeFields(payload.(cadence.Event), &callbackEvent); err != nil {
+			return nil, fmt.Errorf("failed to parse event fields: %w", err)
+		}
+
+		callbacks = append(callbacks, &callbackEvent)
+	}
+
+	return callbacks, nil
+}
+
 func (e *blockComputer) callbackTransactions(
 	baseSnapshot snapshot.StorageSnapshot,
 ) ([]*flow.TransactionBody, error) {
-	tx := flow.NewTransactionBody().
+	scheduleTx := flow.NewTransactionBody().
 		SetScript([]byte("transaction { execute { /* call scheduler contract schedule() to emit new callbacks to be executed */ } }"))
 
 	ctx := fvm.NewContextFromParent(
@@ -327,14 +371,27 @@ func (e *blockComputer) callbackTransactions(
 		fvm.WithAuthorizationChecksEnabled(false),
 	)
 
-	_, out, err := e.vm.Run(ctx, fvm.NewTransaction(tx.ID(), 1, tx), baseSnapshot)
+	_, out, err := e.vm.Run(ctx, fvm.NewTransaction(scheduleTx.ID(), 1, scheduleTx), baseSnapshot)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("events", out.Events)
+	scheduledEvents, err := parseCallbackEvents(out.Events)
+	if err != nil {
+		return nil, err
+	}
+
 	var callbacks []*flow.TransactionBody
-	// build transactions out of events
+	callbacks = append(callbacks, scheduleTx) // add schedule() tx as first
+
+	for _, event := range scheduledEvents {
+		executeTx := flow.NewTransactionBody().
+			SetScript([]byte("transaction { execute { /* call scheduler contract schedule() to emit new callbacks to be executed */ } }")).
+			//SetArguments(cadence.NewUInt64(event.ID))
+			SetComputeLimit(event.ComputationEffort)
+
+		callbacks = append(callbacks, executeTx)
+	}
 
 	return callbacks, nil
 }
