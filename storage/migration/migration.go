@@ -67,8 +67,6 @@ func readerWorker(
 	defer wg.Done()
 
 	for prefix := range jobs {
-		defer lgProgress(1)
-
 		err := db.View(func(txn *badger.Txn) error {
 			it := txn.NewIterator(badger.DefaultIteratorOptions)
 			defer it.Close()
@@ -84,6 +82,8 @@ func readerWorker(
 
 			return nil
 		})
+
+		lgProgress(1)
 
 		if err != nil {
 			return fmt.Errorf("Reader error for prefix %x: %v\n", prefix, err)
