@@ -2,7 +2,6 @@ package unittest
 
 import (
 	"bytes"
-	crand "crypto/rand"
 	"fmt"
 	"math/rand"
 	"net"
@@ -155,7 +154,7 @@ func AccountKeyFixture(
 ) (*flow.AccountPrivateKey, error) {
 	seed := make([]byte, seedLength)
 
-	_, err := crand.Read(seed)
+	_, err := rand.Read(seed)
 	if err != nil {
 		return nil, err
 	}
@@ -1066,7 +1065,7 @@ func AttestationFixture() *flow.Attestation {
 
 func StateCommitmentFixture() flow.StateCommitment {
 	var state flow.StateCommitment
-	_, _ = crand.Read(state[:])
+	_, _ = rand.Read(state[:])
 	return state
 }
 
@@ -1093,7 +1092,7 @@ func IdentifierListFixture(n int) flow.IdentifierList {
 
 func IdentifierFixture() flow.Identifier {
 	var id flow.Identifier
-	_, _ = crand.Read(id[:])
+	_, _ = rand.Read(id[:])
 	return id
 }
 
@@ -1150,7 +1149,7 @@ func WithNetworkingKey(key crypto.PublicKey) func(*flow.Identity) {
 
 func RandomBytes(n int) []byte {
 	b := make([]byte, n)
-	read, err := crand.Read(b)
+	read, err := rand.Read(b)
 	if err != nil {
 		panic("cannot read random bytes")
 	}
@@ -1490,7 +1489,7 @@ func QCSigDataWithSoRFixture(sor []byte) []byte {
 
 func SignatureFixture() crypto.Signature {
 	sig := make([]byte, crypto.SignatureLenBLSBLS12381)
-	_, _ = crand.Read(sig)
+	_, _ = rand.Read(sig)
 	return sig
 }
 
@@ -1819,7 +1818,7 @@ func ChunkDataPacksFixtureAndResult() ([]*flow.ChunkDataPack, *flow.ExecutionRes
 // SeedFixture returns a random []byte with length n
 func SeedFixture(n int) []byte {
 	var seed = make([]byte, n)
-	_, _ = crand.Read(seed)
+	_, _ = rand.Read(seed)
 	return seed
 }
 
@@ -2771,7 +2770,7 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 		}
 
 		v := make([]byte, size)
-		_, err := crand.Read(v)
+		_, err := rand.Read(v)
 		require.NoError(t, err)
 
 		k, err := ced.TrieUpdate.Payloads[0].Key()
@@ -3209,7 +3208,7 @@ func LibP2PResourceLimitOverrideFixture() p2pconfig.ResourceManagerOverrideLimit
 
 func RegisterEntryFixture() flow.RegisterEntry {
 	val := make([]byte, 4)
-	_, _ = crand.Read(val)
+	_, _ = rand.Read(val)
 	return flow.RegisterEntry{
 		Key: flow.RegisterID{
 			Owner: "owner",
