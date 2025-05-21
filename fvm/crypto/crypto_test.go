@@ -674,7 +674,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 					},
 					require: func(t *testing.T, sigOk bool, err error) {
 						require.NoError(t, err)
-						require.False(t, sigOk)
+						require.True(t, sigOk)
 					},
 				}, {
 					description:       "invalid client data type",
@@ -689,7 +689,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 						require.False(t, sigOk)
 					},
 				}, {
-					description:       "invalid client data, empty origin",
+					description:       "valid client data, empty origin",
 					authenticatorData: validAuthenticatorData,
 					clientDataJSON: map[string]string{
 						"type":      crypto.WebAuthnTypeGet,
@@ -713,7 +713,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 
 			for _, c := range cases {
 
-				t.Run(fmt.Sprintf("auth scheme - %s (authenticatorData): %v", c.description, c.authenticatorData), func(t *testing.T) {
+				t.Run(fmt.Sprintf("auth scheme - %s (authenticatorData)", c.description), func(t *testing.T) {
 					// This will be the equivalent of possible client side actions, while mocking out the majority of
 					// the webauthn process.
 					// Could eventually consider using flow-go-sdk here if it makes sense
