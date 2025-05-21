@@ -58,7 +58,7 @@ type HeaderBody struct {
 }
 
 // QuorumCertificate returns quorum certificate [QC] that is incorporated in the block header body.
-// Caution: this is the QC for the parent. 
+// Caution: this is the QC for the parent.
 func (h HeaderBody) QuorumCertificate() *QuorumCertificate {
 	return &QuorumCertificate{
 		BlockID:       h.ParentID,
