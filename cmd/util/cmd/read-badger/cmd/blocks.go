@@ -62,7 +62,7 @@ var blocksCmd = &cobra.Command{
 					return fmt.Errorf("could not get block with height %d: %w", flagBlockHeight, err)
 				}
 			} else {
-				return fmt.Errorf("provide either a --id or --height and not both")
+				return fmt.Errorf("provide either a --id or --height and not both, (--block-id: %v), (--height: %v)", flagBlockID, flagBlockHeight)
 			}
 
 			common.PrettyPrintEntity(block)
