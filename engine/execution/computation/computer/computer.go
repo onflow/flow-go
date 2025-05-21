@@ -320,7 +320,7 @@ func (e *blockComputer) callbackTransactions(
 	baseSnapshot snapshot.StorageSnapshot,
 ) ([]*flow.TransactionBody, error) {
 	tx := flow.NewTransactionBody().
-		SetScript([]byte("transaction { execute {} }"))
+		SetScript([]byte("transaction { execute { /* call scheduler contract schedule() to emit new callbacks to be executed */ } }"))
 
 	ctx := fvm.NewContextFromParent(
 		e.vmCtx,
