@@ -386,7 +386,7 @@ func (e *blockComputer) callbackTransactions(
 
 	for _, event := range scheduledEvents {
 		executeTx := flow.NewTransactionBody().
-			SetScript([]byte("transaction { execute { /* call scheduler contract schedule() to emit new callbacks to be executed */ } }")).
+			SetScript([]byte("transaction { execute { /* call scheduler contract execute() to execute callback by ID */ } }")).
 			//SetArguments(cadence.NewUInt64(event.ID))
 			SetComputeLimit(event.ComputationEffort)
 
