@@ -48,7 +48,7 @@ func (w *WebAuthnExtensionData) GetUnmarshalledCollectedClientData() (*Collected
 // check UP is set, BS is not set if BE is not set, AT is only set if attested data is included, ED is set only if extension data is included. If any of the checks fail, return "invalid".
 func validateFlags(flags byte, extensions []byte) error {
 	// Parse flags
-	if userPresent := (flags & 0x01) != 0; !userPresent {
+	if userPresent := (flags & 0x01) != 0; !userPresent { // Bit 0: User Present (UP).
 		return errors.New("invalid flags: user presence (UP) not set")
 	}
 
@@ -99,10 +99,11 @@ func validateWebAuthNExtensionData(extensionData []byte, message []byte) (bool, 
 		return false, nil
 	}
 
-	// Validate challenge
+	// make sure the challenge is the hash of the transaction payload
 	hasher, err := NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)
 	if err != nil {
-		// could not create hasher for challenge validation, swallowing error here, but should never occur
+		// could not create hasher for challenge validation
+		// panic here because this is a bug and should not happen in normal operations
 		panic(err)
 	}
 
