@@ -213,6 +213,7 @@ func (e *blockComputer) queueTransactionRequests(
 	blockHeader *flow.Header,
 	rawCollections []*entity.CompleteCollection,
 	systemTxnBody *flow.TransactionBody,
+	callbacks []*flow.TransactionBody,
 	requestQueue chan TransactionRequest,
 	numTxns int,
 ) {
@@ -315,6 +316,29 @@ func (e *blockComputer) selectChunkConstructorForProtocolVersion(blockID flow.Id
 	}
 }
 
+func (e *blockComputer) callbackTransactions(
+	baseSnapshot snapshot.StorageSnapshot,
+) ([]*flow.TransactionBody, error) {
+	tx := flow.NewTransactionBody().
+		SetScript([]byte("transaction { execute {} }"))
+
+	ctx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithAuthorizationChecksEnabled(false),
+	)
+
+	_, out, err := e.vm.Run(ctx, fvm.NewTransaction(tx.ID(), 1, tx), baseSnapshot)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("events", out.Events)
+	var callbacks []*flow.TransactionBody
+	// build transactions out of events
+
+	return callbacks, nil
+}
+
 func (e *blockComputer) executeBlock(
 	ctx context.Context,
 	parentBlockExecutionResultID flow.Identifier,
@@ -350,7 +374,13 @@ func (e *blockComputer) executeBlock(
 			err)
 	}
 
+	callbacks, err := e.callbackTransactions(baseSnapshot)
+	if err != nil {
+		return nil, fmt.Errorf("could not get callback transactions: %w", err)
+	}
+
 	numTxns := numberOfTransactionsInBlock(rawCollections)
+	numTxns += len(callbacks)
 
 	// We temporarily support chunk models associated with both protocol versions 1 and 2.
 	// TODO(mainnet27, #6773): remove this https://github.com/onflow/flow-go/issues/6773
@@ -391,6 +421,7 @@ func (e *blockComputer) executeBlock(
 		block.Block.Header,
 		rawCollections,
 		systemTxn,
+		callbacks,
 		requestQueue,
 		numTxns,
 	)
