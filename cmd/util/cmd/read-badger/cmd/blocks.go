@@ -20,7 +20,7 @@ func init() {
 	rootCmd.AddCommand(blocksCmd)
 
 	blocksCmd.Flags().StringVarP(&flagBlockID, "id", "i", "", "the id of the block")
-	blocksCmd.Flags().Uint64Var(&flagHeight, "height", 0, "Block height")
+	blocksCmd.Flags().Uint64Var(&flagBlockHeight, "height", 0, "Block height")
 }
 
 var blocksCmd = &cobra.Command{
