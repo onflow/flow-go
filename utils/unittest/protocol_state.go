@@ -74,13 +74,14 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 // B <- BR(Result_B) <- BS(Seal_B)
 // Returns the two generated blocks.
 func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState protocol.MutableProtocolState, block *flow.Block, receipt *flow.ExecutionReceipt, seal *flow.Seal) (br *flow.Block, bs *flow.Block) {
-
-	block2 := BlockWithParentFixture(block.ToHeader())
-	block2.SetPayload(flow.Payload{
-		Receipts:        []*flow.ExecutionReceiptStub{receipt.Stub()},
-		Results:         []*flow.ExecutionResult{&receipt.ExecutionResult},
-		ProtocolStateID: block.Payload.ProtocolStateID,
-	})
+	block2 := BlockWithParentAndPayload(
+		block.ToHeader(),
+		flow.Payload{
+			Receipts:        []*flow.ExecutionReceiptStub{receipt.Stub()},
+			Results:         []*flow.ExecutionResult{&receipt.ExecutionResult},
+			ProtocolStateID: block.Payload.ProtocolStateID,
+		},
+	)
 	err := st.Extend(context.Background(), ProposalFromBlock(block2))
 	require.NoError(t, err)
 
@@ -90,10 +91,13 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState 
 	require.NoError(t, err)
 	require.False(t, dbUpdates.IsEmpty())
 
-	block3.SetPayload(flow.Payload{
-		Seals:           seals,
-		ProtocolStateID: updatedStateId,
-	})
+	block3 = flow.NewBlock(
+		block3.Header,
+		flow.Payload{
+			Seals:           seals,
+			ProtocolStateID: updatedStateId,
+		},
+	)
 	err = st.Extend(context.Background(), ProposalFromBlock(block3))
 	require.NoError(t, err)
 

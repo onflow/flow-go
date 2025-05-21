@@ -474,12 +474,14 @@ func ExecutionResultFromParentBlockFixture(t *testing.T,
 // ContainerBlockFixture builds and returns a block that contains input execution receipts.
 func ContainerBlockFixture(parent *flow.Header, protocolStateID flow.Identifier, receipts []*flow.ExecutionReceipt, source []byte) *flow.Block {
 	// container block is the block that contains the execution receipt of reference block
-	containerBlock := unittest.BlockWithParentFixture(parent)
+	containerBlock := unittest.BlockWithParentAndPayload(
+		parent,
+		unittest.PayloadFixture(
+			unittest.WithReceipts(receipts...),
+			unittest.WithProtocolStateID(protocolStateID),
+		),
+	)
 	containerBlock.Header.ParentVoterSigData = unittest.QCSigDataWithSoRFixture(source)
-	containerBlock.SetPayload(unittest.PayloadFixture(
-		unittest.WithReceipts(receipts...),
-		unittest.WithProtocolStateID(protocolStateID),
-	))
 
 	return containerBlock
 }

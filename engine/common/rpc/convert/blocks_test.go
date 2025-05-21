@@ -18,7 +18,6 @@ func TestConvertBlock(t *testing.T) {
 	t.Parallel()
 
 	block := unittest.FullBlockFixture()
-	block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
 
 	signerIDs := unittest.IdentifierListFixture(5)
 
@@ -37,7 +36,6 @@ func TestConvertBlockLight(t *testing.T) {
 	t.Parallel()
 
 	block := unittest.FullBlockFixture()
-	block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
 
 	msg := convert.BlockToMessageLight(&block)
 

@@ -27,8 +27,10 @@ func TestSaveBlockAsReplica(t *testing.T) {
 	b0, err := rootSnapshot.Head()
 	require.NoError(t, err)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
-		b1 := unittest.BlockWithParentFixture(b0)
-		b1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		b1 := unittest.BlockWithParentAndPayload(
+			b0,
+			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+		)
 		b1p := unittest.ProposalFromBlock(b1)
 		err = state.Extend(context.Background(), b1p)
 		require.NoError(t, err)

@@ -339,23 +339,29 @@ func TestBootstrapNonRoot(t *testing.T) {
 	// ROOT <- B1 <- B2(R1) <- B3(S1) <- CHILD
 	t.Run("with sealed block", func(t *testing.T) {
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
-			block1 := unittest.BlockWithParentFixture(rootBlock)
-			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+			block1 := unittest.BlockWithParentAndPayload(
+				rootBlock,
+				unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+			)
 			buildFinalizedBlock(t, state, block1)
 
 			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
-			block2 := unittest.BlockWithParentFixture(block1.ToHeader())
-			block2.SetPayload(unittest.PayloadFixture(
-				unittest.WithReceipts(receipt1),
-				unittest.WithProtocolStateID(rootProtocolStateID)))
+			block2 := unittest.BlockWithParentAndPayload(
+				block1.ToHeader(),
+				unittest.PayloadFixture(
+					unittest.WithReceipts(receipt1),
+					unittest.WithProtocolStateID(rootProtocolStateID)))
 			buildFinalizedBlock(t, state, block2)
 
 			seals := []*flow.Seal{seal1}
-			block3 := unittest.BlockWithParentFixture(block2.ToHeader())
-			block3.SetPayload(flow.Payload{
-				Seals:           seals,
-				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.ToHeader(), seals),
-			})
+			headerBody3 := unittest.HeaderBodyWithParentFixture(block2.ToHeader())
+			block3 := flow.NewBlock(
+				headerBody3,
+				flow.Payload{
+					Seals:           seals,
+					ProtocolStateID: calculateExpectedStateId(t, mutableState)(headerBody3, seals),
+				},
+			)
 			buildFinalizedBlock(t, state, block3)
 
 			child := unittest.BlockWithParentProtocolState(block3)
@@ -385,24 +391,31 @@ func TestBootstrapNonRoot(t *testing.T) {
 	// ROOT <- B1 <- B2(R1) <- B3(S1) <- CHILD
 	t.Run("in EFM", func(t *testing.T) {
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
-			block1 := unittest.BlockWithParentFixture(rootBlock)
-			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+			block1 := unittest.BlockWithParentAndPayload(
+				rootBlock,
+				unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+			)
 			buildFinalizedBlock(t, state, block1)
 
 			invalidEpochSetup := unittest.EpochSetupFixture()
 			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1, invalidEpochSetup.ServiceEvent())
-			block2 := unittest.BlockWithParentFixture(block1.ToHeader())
-			block2.SetPayload(unittest.PayloadFixture(
-				unittest.WithReceipts(receipt1),
-				unittest.WithProtocolStateID(rootProtocolStateID)))
+			block2 := unittest.BlockWithParentAndPayload(
+				block1.ToHeader(),
+				unittest.PayloadFixture(
+					unittest.WithReceipts(receipt1),
+					unittest.WithProtocolStateID(rootProtocolStateID)),
+			)
 			buildFinalizedBlock(t, state, block2)
 
 			seals := []*flow.Seal{seal1}
-			block3 := unittest.BlockWithParentFixture(block2.ToHeader())
-			block3.SetPayload(flow.Payload{
-				Seals:           seals,
-				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.ToHeader(), seals),
-			})
+			headerBody3 := unittest.HeaderBodyWithParentFixture(block2.ToHeader())
+			block3 := flow.NewBlock(
+				headerBody3,
+				flow.Payload{
+					Seals:           seals,
+					ProtocolStateID: calculateExpectedStateId(t, mutableState)(headerBody3, seals),
+				},
+			)
 			buildFinalizedBlock(t, state, block3)
 
 			child := unittest.BlockWithParentProtocolState(block3)
