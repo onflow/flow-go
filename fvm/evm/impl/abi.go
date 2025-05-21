@@ -239,7 +239,8 @@ func newInternalEVMTypeEncodeABIFunction(
 				valuesArray,
 				evmSpecialTypeIDs,
 				func(intensity uint64) {
-					context.MeterComputation(
+					common.UseComputation(
+						context,
 						common.ComputationUsage{
 							Kind:      environment.ComputationKindEVMEncodeABI,
 							Intensity: intensity,
