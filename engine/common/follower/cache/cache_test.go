@@ -97,7 +97,7 @@ func (s *CacheSuite) TestBlocksAreNotConnected() {
 	s.Run("blocks-with-gaps", func() {
 		blocks := unittest.ProposalChainFixtureFrom(10, unittest.BlockHeaderFixture())
 
-		// altering Height will break ParentID in next block rendering batch as not sequential
+		// altering Height will break ParentID in next block, rendering batch as not sequential
 		blocks[len(blocks)/2].Block.Header.Height += 1
 
 		_, err := s.cache.AddBlocks(blocks)

@@ -650,7 +650,6 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		Results:         insertableReceipts.results,
 		ProtocolStateID: protocolStateID,
 	}
-
 	block := flow.NewBlock(header.HeaderBody, payload)
 
 	// sign the proposal
