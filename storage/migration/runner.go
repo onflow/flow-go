@@ -62,17 +62,25 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 		return fmt.Errorf("failed to write MIGRATION_STARTED file: %w", err)
 	}
 
-	log.Info().Str("file", startMarkerPath).Msgf("Migration started.")
+	lg := log.With().
+		Str("from-badger-dir", badgerDir).
+		Str("to-pebble-dir", pebbleDir).
+		Logger()
+
+	lg.Info().Msgf("Migration started. created mark file: %s", startMarkerPath)
 
 	// Step 4: Migrate data
 	if err := CopyFromBadgerToPebble(badgerDB, pebbleDB, cfg); err != nil {
 		return fmt.Errorf("failed to migrate data from Badger to Pebble: %w", err)
 	}
 
-	log.Info().Msgf("Migration from BadgerDB to PebbleDB completed successfully. Validating...")
+	validatingPrefixBytesCount := 2
+
+	lg.Info().Msgf("Migration from BadgerDB to PebbleDB completed successfully. "+
+		"Validating key consistency with %v prefix bytes...", validatingPrefixBytesCount)
 
 	// Step 5: Validate data
-	if err := validateMinMaxKeyConsistency(badgerDB, pebbleDB, 2); err != nil {
+	if err := validateMinMaxKeyConsistency(badgerDB, pebbleDB, validatingPrefixBytesCount); err != nil {
 		return fmt.Errorf("data validation failed: %w", err)
 	}
 
@@ -86,7 +94,7 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 		return fmt.Errorf("failed to write MIGRATION_COMPLETED file: %w", err)
 	}
 
-	log.Info().Str("file", completeMarkerPath).Msgf("Migration marker file written successfully.")
+	lg.Info().Str("file", completeMarkerPath).Msgf("Migration marker file written successfully.")
 
 	return nil
 }
