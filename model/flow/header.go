@@ -20,8 +20,15 @@ type ProposalHeader struct {
 }
 
 // HeaderBody contains all block header metadata, except for the payload hash.
-// HeaderBody generally should not be used on its own. It is embedded within [Block] and
-// [Header]: those types should be used in almost all circumstances.
+// HeaderBody generally should not be used on its own. It is merely a container used by other
+// data structures in the code base. For example, it is embedded within [Block], [Header], and the
+// respective collector cluster structs - those types should be used in almost all circumstances.
+// CAUTION regarding security:
+//   - HeaderBody does not contain the hash of the block payload. Therefore, it is not a cryptographic digest
+//     of the block and should not be confused with a "proper" header, which commits to the _entire_ content
+//     of a block.
+//   - With a byzantine HeaderBody alone, an honest node cannot prove who created that faulty data structure,
+//     because HeaderBody does not include the proposer's signature.
 type HeaderBody struct {
 	// ChainID is a chain-specific value to prevent replay attacks.
 	ChainID ChainID
@@ -65,6 +72,9 @@ func (h HeaderBody) QuorumCertificate() *QuorumCertificate {
 // Headers are used when the metadata about a block is needed, but the payload is not.
 // Because [Header] includes the payload hash for the block, and the block ID is Merkle-ized
 // with the Payload field as a Merkle tree node, the block ID can be computed from the [Header].
+// CAUTION regarding security:
+//   - With a byzantine HeaderBody alone, an honest node cannot prove who created that faulty data structure,
+//     because HeaderBody does not include the proposer's signature.
 type Header struct {
 	HeaderBody
 	// PayloadHash is a hash of the payload of this block.
