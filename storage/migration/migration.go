@@ -2,6 +2,7 @@ package migration
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -57,6 +58,16 @@ func GeneratePrefixes(n int) [][]byte {
 	return results
 }
 
+func GenerateKeysShorterThanPrefix(n int) [][]byte {
+	allKeys := make([][]byte, 0)
+	for i := 1; i < n; i++ {
+		keys := GeneratePrefixes(i)
+		allKeys = append(allKeys, keys...)
+	}
+	return allKeys
+}
+
+// readerWorker reads key-value pairs from BadgerDB using a prefix iterator.
 func readerWorker(
 	lgProgress func(int),
 	wg *sync.WaitGroup,
@@ -93,6 +104,7 @@ func readerWorker(
 	return nil
 }
 
+// writerWorker writes key-value pairs to PebbleDB in batches.
 func writerWorker(wg *sync.WaitGroup, db *pebble.DB, kvChan <-chan KVPair, batchSize int) error {
 	defer wg.Done()
 	batch := db.NewBatch()
@@ -142,6 +154,17 @@ func writerWorker(wg *sync.WaitGroup, db *pebble.DB, kvChan <-chan KVPair, batch
 // The function blocks until all keys are migrated and written successfully.
 // It returns an error if any part of the process fails.
 func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg MigrationConfig) error {
+	// Step 1: Copy all keys that is shorter than cfg.ReaderShardPrefixBytes
+	// for example, if cfg.ReaderShardPrefixBytes is 2, we will copy all keys that is only 1 byte.
+	// this is necessary, because the next step will use the 2 bytes prefix to iterate the keys, which
+	// will not cover keys that is shorter than 2 bytes.
+
+	keysShorterThanPrefix := GenerateKeysShorterThanPrefix(cfg.ReaderShardPrefixBytes)
+	err := copyExactKeysFromBadgerToPebble(badgerDB, pebbleDB, keysShorterThanPrefix)
+	if err != nil {
+		return fmt.Errorf("failed to copy keys shorter than prefix: %w", err)
+	}
+
 	// Step 1: Generate key prefixes for sharding
 	prefixes := GeneratePrefixes(cfg.ReaderShardPrefixBytes)
 
@@ -168,6 +191,8 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 	for i := 0; i < cfg.ReaderWorkerCount; i++ {
 		readerWg.Add(1)
 		go func() {
+			// Each reader worker will take a prefix from the channel and read all keys with that prefix
+			// from BadgerDB, sending the key-value pairs to the kvChan.
 			err := readerWorker(lg, &readerWg, badgerDB, prefixJobs, kvChan)
 			errChan <- err
 		}()
@@ -178,6 +203,8 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 	for i := 0; i < cfg.WriterWorkerCount; i++ {
 		writerWg.Add(1)
 		go func() {
+			// Each writer worker will take key-value pairs from the kvChan and write them to PebbleDB
+			// in batches of size cfg.BatchByteSize (32MB by default).
 			err := writerWorker(&writerWg, pebbleDB, kvChan, cfg.BatchByteSize)
 			errChan <- err
 		}()
@@ -197,6 +224,47 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 		if err != nil {
 			return fmt.Errorf("error: %w", err)
 		}
+	}
+
+	return nil
+}
+
+func copyExactKeysFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, keys [][]byte) error {
+	batch := pebbleDB.NewBatch()
+	for _, key := range keys {
+		err := badgerDB.View(func(txn *badger.Txn) error {
+			item, err := txn.Get(key)
+			if err != nil {
+				if errors.Is(err, badger.ErrKeyNotFound) {
+					// skip if the key is not found
+					return nil
+				}
+
+				return err
+			}
+
+			// read key value
+			val, err := item.ValueCopy(nil)
+			if err != nil {
+				return err
+			}
+
+			// write to pebble
+			err = batch.Set(key, val, nil)
+			if err != nil {
+				return fmt.Errorf("failed to set key %x in PebbleDB: %w", key, err)
+			}
+
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("failed to get key %x from BadgerDB: %w", key, err)
+		}
+	}
+
+	err := batch.Commit(nil)
+	if err != nil {
+		return fmt.Errorf("failed to commit batch to PebbleDB: %w", err)
 	}
 
 	return nil
