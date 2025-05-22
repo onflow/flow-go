@@ -94,7 +94,14 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 		return fmt.Errorf("failed to write MIGRATION_COMPLETED file: %w", err)
 	}
 
-	lg.Info().Str("file", completeMarkerPath).Msgf("Migration marker file written successfully.")
+	lg.Info().Str("file", completeMarkerPath).Msgf("Migration marker file written successfully. start compaction...")
+
+	// Step 7: Compact the PebbleDB to optimize storage
+	if err := pebbleDB.Compact(nil, nil, true); err != nil {
+		return fmt.Errorf("failed to compact PebbleDB: %w", err)
+	}
+
+	lg.Info().Msgf("PebbleDB compaction completed successfully.")
 
 	return nil
 }
