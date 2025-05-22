@@ -82,6 +82,8 @@ func runMigrationTestCase(t *testing.T, testData map[string]string, cfg Migratio
 // Simple deterministic dataset
 func TestMigrationWithSimpleData(t *testing.T) {
 	data := map[string]string{
+		"a":      "a single key byte",
+		"z":      "a single key byte",
 		"apple":  "fruit",
 		"banana": "yellow",
 		"carrot": "vegetable",
@@ -93,6 +95,26 @@ func TestMigrationWithSimpleData(t *testing.T) {
 		ReaderWorkerCount:      2,
 		WriterWorkerCount:      2,
 		ReaderShardPrefixBytes: 1,
+	}
+	runMigrationTestCase(t, data, cfg)
+}
+
+// Simple deterministic dataset
+func TestMigrationWithSimpleDataAnd2PrefixBytes(t *testing.T) {
+	data := map[string]string{
+		"a":      "a single key byte",
+		"z":      "a single key byte",
+		"apple":  "fruit",
+		"banana": "yellow",
+		"carrot": "vegetable",
+		"dog":    "animal",
+		"egg":    "protein",
+	}
+	cfg := MigrationConfig{
+		BatchByteSize:          1024,
+		ReaderWorkerCount:      2,
+		WriterWorkerCount:      2,
+		ReaderShardPrefixBytes: 2,
 	}
 	runMigrationTestCase(t, data, cfg)
 }
