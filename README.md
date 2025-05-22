@@ -30,7 +30,7 @@ digital assets that power them. Read more about it [here](https://github.com/onf
 
 ## Documentation
 
-You can find an overview of the Flow architecture on the [documentation website](https://www.onflow.org/primer).
+You can find an overview of the Flow architecture on the [documentation website](https://developers.flow.com/networks/network-architecture).
 
 Development on Flow is divided into work streams. Each work stream has a home directory containing high-level
 documentation for the stream, as well as links to documentation for relevant components used by that work stream.
@@ -50,6 +50,8 @@ The following table lists all work streams and links to their home directory and
 | Ledger             | [/ledger](/ledger)                         |
 | Networking         | [/network](/network/)                      |
 | Cryptography       | [/crypto](/crypto)                         |
+
+You can find a technical [overview of the codebase on the deepwiki](https://deepwiki.com/onflow/flow-go/1-overview).
 
 ## Installation
 
