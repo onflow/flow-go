@@ -34,6 +34,8 @@ func WithStorage(f func(storage.DB) error) error {
 			return err
 		}
 
+		log.Info().Msgf("database opened at %s", flagPebbleDir)
+
 		defer db.Close()
 		return f(pebbleimpl.ToDB(db))
 	}
