@@ -3,6 +3,7 @@ package requester
 import (
 	"context"
 	"errors"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -32,23 +33,29 @@ type OneshotExecutionDataConfig struct {
 // OneshotExecutionDataRequester is a component that requests execution data for a block.
 // It uses a retry mechanism to retry the download execution data if they are not found.
 type OneshotExecutionDataRequester struct {
-	log           zerolog.Logger
-	metrics       module.ExecutionDataRequesterMetrics
-	config        OneshotExecutionDataConfig
-	execDataCache *cache.ExecutionDataCache
+	log             zerolog.Logger
+	metrics         module.ExecutionDataRequesterMetrics
+	config          OneshotExecutionDataConfig
+	execDataCache   *cache.ExecutionDataCache
+	executionResult *flow.ExecutionResult
+	blockHeader     *flow.Header
 }
 
 func NewOneshotExecutionDataRequester(
 	log zerolog.Logger,
 	metrics module.ExecutionDataRequesterMetrics,
 	execDataCache *cache.ExecutionDataCache,
+	executionResult *flow.ExecutionResult,
+	blockHeader *flow.Header,
 	config OneshotExecutionDataConfig,
 ) *OneshotExecutionDataRequester {
 	return &OneshotExecutionDataRequester{
-		log:           log.With().Str("component", "oneshot_execution_data_requester").Logger(),
-		metrics:       metrics,
-		execDataCache: execDataCache,
-		config:        config,
+		log:             log.With().Str("component", "oneshot_execution_data_requester").Logger(),
+		metrics:         metrics,
+		execDataCache:   execDataCache,
+		executionResult: executionResult,
+		blockHeader:     blockHeader,
+		config:          config,
 	}
 }
 
@@ -59,11 +66,11 @@ func NewOneshotExecutionDataRequester(
 // The function logs each retry attempt and emits metrics for retries and fetch durations.
 // The block height is used only for logging and metric purposes.
 //
-// Returns a terminal error if fetching fails due to non-retryable issues.
+// Expected errors:
+// - context.Canceled: if the provided context was canceled before completion
+// All other errors are unexpected exceptions and may indicate invalid execution data was received.
 func (r *OneshotExecutionDataRequester) RequestExecutionData(
 	ctx context.Context,
-	blockID flow.Identifier,
-	height uint64,
 ) error {
 	backoff := retry.NewExponential(r.config.RetryDelay)
 	backoff = retry.WithCappedDuration(r.config.MaxRetryDelay, backoff)
@@ -76,11 +83,15 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 	timeout = retry.WithCappedDuration(r.config.MaxFetchTimeout, timeout)
 
 	attempt := 0
+	blockID := r.executionResult.BlockID
+	blockHeight := r.blockHeader.Height
+	executionDataID := r.executionResult.ExecutionDataID
 	return retry.Do(ctx, backoff, func(context.Context) error {
 		if attempt > 0 {
 			r.log.Debug().
 				Str("block_id", blockID.String()).
-				Uint64("height", height).
+				Str("execution_data_id", executionDataID.String()).
+				Uint64("height", blockHeight).
 				Uint64("attempt", uint64(attempt)).
 				Msgf("retrying download")
 
@@ -90,9 +101,19 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 
 		// download execution data for the block
 		fetchTimeout, _ := timeout.Next()
-		err := r.processFetchRequest(ctx, blockID, height, fetchTimeout)
+		err := r.processFetchRequest(ctx, blockHeight, fetchTimeout)
 		if isBlobNotFoundError(err) || errors.Is(err, context.DeadlineExceeded) {
 			return retry.RetryableError(err)
+		}
+
+		if execution_data.IsMalformedDataError(err) || execution_data.IsBlobSizeLimitExceededError(err) {
+			// these errors indicate the execution data was received successfully and its hash matched
+			// the value in the ExecutionResult, however, the data was malformed or invalid. this means that
+			// an execution node produced an invalid execution data blob, and verification nodes approved it
+			r.log.Error().Err(err).Str(
+				"execution_data_id",
+				executionDataID.String(),
+			).Msg("received invalid execution data from network (potential slashing evidence?)")
 		}
 
 		return err
@@ -112,12 +133,15 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 // - context.DeadlineExceeded if fetching time exceeded fetchTimeout duration
 func (r *OneshotExecutionDataRequester) processFetchRequest(
 	parentCtx context.Context,
-	blockID flow.Identifier,
 	height uint64,
 	fetchTimeout time.Duration,
 ) error {
+	blockID := r.executionResult.BlockID
+	executionDataID := r.executionResult.ExecutionDataID
+
 	logger := r.log.With().
 		Str("block_id", blockID.String()).
+		Str("execution_data_id", executionDataID.String()).
 		Uint64("height", height).
 		Logger()
 	logger.Debug().Msg("processing fetch request")
@@ -129,7 +153,7 @@ func (r *OneshotExecutionDataRequester) processFetchRequest(
 	ctx, cancel := context.WithTimeout(parentCtx, fetchTimeout)
 	defer cancel()
 
-	execData, err := r.execDataCache.ByBlockID(ctx, blockID)
+	execData, err := r.execDataCache.ByID(ctx, executionDataID)
 	r.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, height)
 	if err != nil {
 		return err
