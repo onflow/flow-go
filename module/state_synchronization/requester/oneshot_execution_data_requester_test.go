@@ -53,8 +53,9 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecutionData() {
 			Return(seal, nil).
 			Once()
 
+		block := unittest.BlockFixture()
 		results := storagemock.NewExecutionResults(suite.T())
-		result := unittest.ExecutionResultFixture()
+		result := unittest.ExecutionResultFixture(unittest.WithBlock(&block))
 		results.
 			On("ByID", mock.AnythingOfType("flow.Identifier")).
 			Return(result, nil).
@@ -70,11 +71,11 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecutionData() {
 			Once()
 
 		edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
-		requester := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, config)
+		requester := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, result, block.Header, config)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := requester.RequestExecutionData(ctx, blockEd.BlockID, 0)
+		err := requester.RequestExecutionData(ctx)
 		require.NoError(suite.T(), err)
 
 		// Requester doesn't return downloaded execution data. It puts them into the internal cache.
@@ -151,7 +152,8 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 			Once()
 
 		// eventually return an execution result
-		expectedResult := unittest.ExecutionResultFixture()
+		block := unittest.BlockFixture()
+		expectedResult := unittest.ExecutionResultFixture(unittest.WithBlock(&block))
 		results.
 			On("ByID", mock.AnythingOfType("flow.Identifier")).
 			Return(expectedResult, nil).
@@ -159,11 +161,11 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 
 		heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
 		edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
-		requester := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, config)
+		requester := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, expectedResult, block.Header, config)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := requester.RequestExecutionData(ctx, blockEd.BlockID, 0)
+		err := requester.RequestExecutionData(ctx)
 		require.NoError(suite.T(), err)
 
 		// Requester doesn't return downloaded execution data. It puts them into the internal cache.

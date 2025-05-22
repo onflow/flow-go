@@ -3,7 +3,6 @@ package requester
 import (
 	"context"
 	"errors"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/utils/logging"
 )
