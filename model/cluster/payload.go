@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -56,4 +57,14 @@ func PayloadFromTransactions(refID flow.Identifier, transactions ...*flow.Transa
 // Hash returns the hash of the payload.
 func (p Payload) Hash() flow.Identifier {
 	return flow.MakeID(p)
+}
+
+func (p Payload) Fingerprint() []byte {
+	return fingerprint.Fingerprint(struct {
+		Collection       []byte
+		ReferenceBlockID flow.Identifier
+	}{
+		Collection:       p.Collection.Fingerprint(),
+		ReferenceBlockID: p.ReferenceBlockID,
+	})
 }
