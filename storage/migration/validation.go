@@ -60,7 +60,13 @@ func validateMinMaxKeyConsistency(badgerDB *badger.DB, pebbleDB *pebble.DB, pref
 // An easy way to select keys is to go through each prefix, and find the min and max keys for each prefix using
 // the database iterator.
 func collectValidationKeysByPrefix(db *badger.DB, prefixBytes int) ([][]byte, error) {
-	prefixes := GeneratePrefixes(prefixBytes)
+	// this includes all prefixes that is shorter than or equal to prefixBytes
+	// for instance, if prefixBytes is 2, we will include all prefixes that is 1 byte or 2 bytes:
+	// [
+	//   [0x00], [0x01], [0x02], ..., [0xff], 												// 1 byte prefixes
+	//   [0x00, 0x00], [0x00, 0x01], [0x00, 0x02], ..., [0xff, 0xff] 	// 2 byte prefixes
+	// ]
+	prefixes := GenerateKeysShorterThanPrefix(prefixBytes + 1)
 	var allKeys [][]byte
 
 	err := db.View(func(txn *badger.Txn) error {
