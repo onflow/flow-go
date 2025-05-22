@@ -182,23 +182,34 @@ func MessageToChunk(m *entities.Chunk) (*flow.Chunk, error) {
 		return nil, fmt.Errorf("failed to parse Message end state to Chunk: %w", err)
 	}
 
-	var serviceCount uint16
-	if cnt := MessageToServiceEventCountField(m.ServiceEventCount); cnt != nil {
-		serviceCount = *cnt
+	serviceEventCountPtr := MessageToServiceEventCountField(m.ServiceEventCount)
+
+	// Branch on nil-vs-non-nil to preserve backward compatibility
+	if serviceEventCountPtr == nil {
+		// Protocol v1: omit ServiceEventCount
+		return flow.NewChunk_ProtocolVersion1(
+			MessageToIdentifier(m.BlockId),
+			int(m.CollectionIndex),
+			startState,
+			int(m.NumberOfTransactions),
+			MessageToIdentifier(m.EventCollection),
+			0,
+			endState,
+			m.TotalComputationUsed,
+		), nil
 	}
 
-	chunk := flow.NewChunk(
-		MessageToIdentifier(m.BlockId),         // blockID
-		int(m.CollectionIndex),                 // collectionIndex
-		startState,                             // startState
-		int(m.NumberOfTransactions),            // numberOfTransactions
-		MessageToIdentifier(m.EventCollection), // eventCollection
-		serviceCount,                           // serviceEventCount
-		endState,                               // endState
-		m.TotalComputationUsed,                 // totalComputationUsed
-	)
-
-	return chunk, nil
+	// Protocol v2+: include ServiceEventCount
+	return flow.NewChunk(
+		MessageToIdentifier(m.BlockId),
+		int(m.CollectionIndex),
+		startState,
+		int(m.NumberOfTransactions),
+		MessageToIdentifier(m.EventCollection),
+		*serviceEventCountPtr,
+		endState,
+		m.TotalComputationUsed,
+	), nil
 }
 
 // MessagesToChunkList converts a slice of protobuf messages to a chunk list

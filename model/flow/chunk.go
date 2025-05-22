@@ -253,6 +253,8 @@ func (ch *Chunk) Checksum() Identifier {
 // during the execution of the chunk.
 // Register proofs order must not be correlated to the order of register reads during
 // the chunk execution in order to enforce the SPoCK secret high entropy.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type ChunkDataPack struct {
 	ChunkID    Identifier      // ID of the chunk this data pack is for
 	StartState StateCommitment // commitment for starting state
