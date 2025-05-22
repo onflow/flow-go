@@ -224,7 +224,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
 		Module("bootstrap", exeNode.LoadBootstrapper).
 		Module("register store", exeNode.LoadRegisterStore).
-		Module("migrate last executed block", exeNode.MigrateLastSealedExecutedResultToPebble).
+		// Module("migrate last executed block", exeNode.MigrateLastSealedExecutedResultToPebble).
 		AdminCommand("get-transactions", func(conf *NodeConfig) commands.AdminCommand {
 			return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, exeNode.collections)
 		}).
