@@ -3,6 +3,7 @@ package ingestion2
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -119,7 +120,28 @@ func (f *ResultsForest) pipelineManagerLoop(ctx irrecoverable.SignalerContext, r
 					go func() {
 						defer wg.Done()
 
-						core := pipeline.NewCore()
+						// TODO: This core stubbed with nil storages, but needs to be initialized with real data
+						core := pipeline.NewCoreImpl(
+							f.log,
+							container.result,
+							container.blockHeader,
+							nil,
+							requester.OneshotExecutionDataConfig{
+								FetchTimeout:    requester.DefaultFetchTimeout,
+								MaxFetchTimeout: requester.DefaultMaxFetchTimeout,
+								RetryDelay:      requester.DefaultRetryDelay,
+								MaxRetryDelay:   requester.DefaultMaxRetryDelay,
+							},
+							nil,
+							nil,
+							nil,
+							nil,
+							nil,
+							nil,
+							nil,
+							nil,
+						)
+
 						if err := container.pipeline.Run(ctx, core); err != nil {
 							ctx.Throw(fmt.Errorf("pipeline execution failed (result: %s): %w", container.resultID, err))
 						}
