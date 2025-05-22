@@ -6,9 +6,23 @@ import (
 
 // Locator is used to locate a chunk by providing the execution result the chunk belongs to as well as the chunk index within that execution result.
 // Since a chunk is unique by the result ID and its index in the result's chunk list.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Locator struct {
 	ResultID flow.Identifier // execution result id that chunk belongs to
 	Index    uint64          // index of chunk in the execution result
+}
+
+// NewLocator creates a new instance of Locator.
+// Construction Locator allowed only within the constructor.
+func NewLocator(
+	resultID flow.Identifier,
+	index uint64,
+) Locator {
+	return Locator{
+		ResultID: resultID,
+		Index:    index,
+	}
 }
 
 // ID returns a unique id for chunk locator.
@@ -24,10 +38,7 @@ func (c Locator) Checksum() flow.Identifier {
 // ChunkLocatorID is a util function that returns identifier of corresponding chunk locator to
 // the specified result and chunk index.
 func ChunkLocatorID(resultID flow.Identifier, chunkIndex uint64) flow.Identifier {
-	return Locator{
-		ResultID: resultID,
-		Index:    chunkIndex,
-	}.ID()
+	return NewLocator(resultID, chunkIndex).ID()
 }
 
 // LocatorMap maps keeps chunk locators based on their locator id.

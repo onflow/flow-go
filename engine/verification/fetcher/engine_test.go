@@ -522,14 +522,8 @@ func TestStopAtHeight(t *testing.T) {
 	mockBlockSealingStatus(s.state, s.headers, headerB, false)
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{resultA, resultB})
 
-	locatorA := chunks.Locator{
-		ResultID: resultA.ID(),
-		Index:    0,
-	}
-	locatorB := chunks.Locator{
-		ResultID: resultB.ID(),
-		Index:    0,
-	}
+	locatorA := chunks.NewLocator(resultA.ID(), 0)
+	locatorB := chunks.NewLocator(resultB.ID(), 0)
 
 	// expects processing notifier being invoked upon sealed chunk detected,
 	// which means the termination of processing a sealed chunk on fetcher engine
@@ -876,10 +870,7 @@ func chunkDataPackResponseFixture(t *testing.T,
 	require.Equal(t, collection != nil, !convert.IsSystemChunk(chunk.Index, result), "only non-system chunks must have a collection")
 
 	return &verification.ChunkDataPackResponse{
-		Locator: chunks.Locator{
-			ResultID: result.ID(),
-			Index:    chunk.Index,
-		},
+		Locator: chunks.NewLocator(result.ID(), chunk.Index),
 		Cdp: unittest.ChunkDataPackFixture(chunk.ID(),
 			unittest.WithStartState(chunk.StartState),
 			unittest.WithChunkDataPackCollection(collection)),
@@ -959,10 +950,7 @@ func chunkRequestFixture(resultID flow.Identifier,
 	disagrees flow.IdentityList) *verification.ChunkDataPackRequest {
 
 	return &verification.ChunkDataPackRequest{
-		Locator: chunks.Locator{
-			ResultID: resultID,
-			Index:    status.ChunkIndex,
-		},
+		Locator: chunks.NewLocator(resultID, status.ChunkIndex),
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID:   status.Chunk().ID(),
 			Height:    status.BlockHeight,

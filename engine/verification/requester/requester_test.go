@@ -120,18 +120,13 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 
 	// we remove pending request on receiving this response
 	locators := chunks.LocatorMap{}
-	locators[chunks.ChunkLocatorID(request.ResultID, request.Index)] = &chunks.Locator{
-		ResultID: request.ResultID,
-		Index:    request.Index,
-	}
+	locator := chunks.NewLocator(request.ResultID, request.Index)
+	locators[locator.ID()] = &locator
 	s.pendingRequests.On("PopAll", response.ChunkDataPack.ChunkID).Return(locators, true).Once()
 
 	s.handler.On("HandleChunkDataPack", originID, &verification.ChunkDataPackResponse{
-		Locator: chunks.Locator{
-			ResultID: request.ResultID,
-			Index:    request.Index,
-		},
-		Cdp: &response.ChunkDataPack,
+		Locator: chunks.NewLocator(request.ResultID, request.Index),
+		Cdp:     &response.ChunkDataPack,
 	}).Return().Once()
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Once()

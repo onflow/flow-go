@@ -1371,25 +1371,18 @@ func ChunkLocatorListFixture(n uint) chunks.LocatorList {
 	locators := chunks.LocatorList{}
 	resultID := IdentifierFixture()
 	for i := uint64(0); i < uint64(n); i++ {
-		locator := ChunkLocatorFixture(resultID, i)
-		locators = append(locators, locator)
+		locator := chunks.NewLocator(resultID, i)
+		locators = append(locators, &locator)
 	}
 	return locators
-}
-
-func ChunkLocatorFixture(resultID flow.Identifier, index uint64) *chunks.Locator {
-	return &chunks.Locator{
-		ResultID: resultID,
-		Index:    index,
-	}
 }
 
 // ChunkStatusListToChunkLocatorFixture extracts chunk locators from a list of chunk statuses.
 func ChunkStatusListToChunkLocatorFixture(statuses []*verification.ChunkStatus) chunks.LocatorMap {
 	locators := chunks.LocatorMap{}
 	for _, status := range statuses {
-		locator := ChunkLocatorFixture(status.ExecutionResult.ID(), status.ChunkIndex)
-		locators[locator.ID()] = locator
+		locator := chunks.NewLocator(status.ExecutionResult.ID(), status.ChunkIndex)
+		locators[locator.ID()] = &locator
 	}
 
 	return locators
@@ -1700,10 +1693,7 @@ func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest
 	ChunkDataPackRequest {
 
 	req := &verification.ChunkDataPackRequest{
-		Locator: chunks.Locator{
-			ResultID: IdentifierFixture(),
-			Index:    0,
-		},
+		Locator: chunks.NewLocator(IdentifierFixture(), 0),
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID:   IdentifierFixture(),
 			Height:    0,
