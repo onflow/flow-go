@@ -731,12 +731,14 @@ func mockVerifierEngine(t *testing.T,
 			require.True(t, ok)
 
 			// verifiable chunk data should be distinct.
-			_, ok = seen[chunks.ChunkLocatorID(vc.Result.ID(), vc.Chunk.Index)]
+			locatorID := chunks.NewLocator(vc.Result.ID(), vc.Chunk.Index).ID()
+
+			_, ok = seen[locatorID]
 			require.False(t, ok, "duplicated verifiable chunk received")
-			seen[chunks.ChunkLocatorID(vc.Result.ID(), vc.Chunk.Index)] = struct{}{}
+			seen[locatorID] = struct{}{}
 
 			// we should expect this verifiable chunk and its fields should match our expectation
-			expected, ok := verifiableChunks[chunks.ChunkLocatorID(vc.Result.ID(), vc.Chunk.Index)]
+			expected, ok := verifiableChunks[locatorID]
 			require.True(t, ok, "verifier engine received an unknown verifiable chunk data")
 
 			if vc.IsSystemChunk {

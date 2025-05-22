@@ -611,7 +611,7 @@ func mockChunkDataPackHandler(t *testing.T, handler *mockfetcher.ChunkDataPackHa
 			require.True(t, requests.ContainsChunkID(response.Cdp.ChunkID))
 
 			// invocation should be distinct per chunk ID
-			locatorID := chunks.ChunkLocatorID(response.ResultID, response.Index)
+			locatorID := chunks.NewLocator(response.ResultID, response.Index).ID()
 			_, ok = handledLocators[locatorID]
 			require.False(t, ok)
 
@@ -642,7 +642,7 @@ func mockNotifyBlockSealedHandler(t *testing.T, handler *mockfetcher.ChunkDataPa
 			require.True(t, requests.ContainsLocator(resultID, chunkIndex))
 
 			// invocation should be distinct per chunk ID
-			locatorID := chunks.ChunkLocatorID(resultID, chunkIndex)
+			locatorID := chunks.NewLocator(resultID, chunkIndex).ID()
 			_, ok = seen[locatorID]
 			require.False(t, ok)
 			seen[locatorID] = struct{}{}
