@@ -50,49 +50,8 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 
 	pebbleDB, err := pebble.Open(pebbleDir, &pebble.Options{
 		EventListener: &pebble.EventListener{
-			DiskSlow: func(info pebble.DiskSlowInfo) {
-				log.Info().Msgf("Disk slow: %s", info.String())
-			},
-			FlushBegin: func(info pebble.FlushInfo) {
-				log.Info().Msgf("Flush started: %s", info.String())
-			},
-			FlushEnd: func(info pebble.FlushInfo) {
-				log.Info().Msgf("Flush ended: %s", info.String())
-			},
-			ManifestCreated: func(info pebble.ManifestCreateInfo) {
-				log.Info().Msgf("Manifest created: %s", info.String())
-			},
-			ManifestDeleted: func(info pebble.ManifestDeleteInfo) {
-				log.Info().Msgf("Manifest deleted: %s", info.String())
-			},
-			CompactionBegin: func(info pebble.CompactionInfo) {
-				log.Info().Msgf("Compaction started: %s", info.String())
-			},
 			CompactionEnd: func(info pebble.CompactionInfo) {
 				log.Info().Msgf("Compaction ended: %s", info.String())
-			},
-			TableCreated: func(info pebble.TableCreateInfo) {
-				log.Info().Msgf("Table created: %s", info.String())
-			},
-			TableDeleted: func(info pebble.TableDeleteInfo) {
-				log.Info().Msgf("Table deleted: %s", info.String())
-			},
-			TableIngested: func(info pebble.TableIngestInfo) {
-				log.Info().Msgf("Table ingested: %s", info.String())
-			},
-			TableValidated: func(info pebble.TableValidatedInfo) {
-				log.Info().Msgf("Table validated: %s", info.String())
-			},
-			WALCreated: func(info pebble.WALCreateInfo) {
-				log.Info().Msgf("WAL created: %s", info.String())
-			},
-			WALDeleted: func(info pebble.WALDeleteInfo) {
-				log.Info().Msgf("WAL deleted: %s", info.String())
-			},
-			WriteStallBegin: func(info pebble.WriteStallBeginInfo) {
-			},
-			WriteStallEnd: func() {
-				log.Info().Msgf("Write stall ended")
 			},
 		},
 	})
@@ -142,12 +101,12 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 	}
 
 	lg.Info().Str("file", completeMarkerPath).Msgf("Migration marker file written successfully. start compaction...")
-	start := []byte{}
-	end := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
-	// Step 7: Compact the PebbleDB to optimize storage
-	if err := pebbleDB.Compact(start, end, true); err != nil {
-		return fmt.Errorf("failed to compact PebbleDB: %w", err)
-	}
+	// start := []byte{}
+	// end := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+	// // Step 7: Compact the PebbleDB to optimize storage
+	// if err := pebbleDB.Compact(start, end, true); err != nil {
+	// 	return fmt.Errorf("failed to compact PebbleDB: %w", err)
+	// }
 
 	lg.Info().Msgf("PebbleDB compaction completed successfully.")
 
