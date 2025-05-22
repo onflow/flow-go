@@ -2,11 +2,9 @@ package consensus
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sync"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
@@ -15,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 // ExecForkSuppressor is a wrapper around a conventional mempool.IncorporatedResultSeals
@@ -40,15 +38,15 @@ import (
 //
 // Implementation is concurrency safe.
 type ExecForkSuppressor struct {
-	mutex            sync.RWMutex
-	seals            mempool.IncorporatedResultSeals
-	sealsForBlock    map[flow.Identifier]sealSet             // map BlockID -> set of IncorporatedResultSeal
-	byHeight         map[uint64]map[flow.Identifier]struct{} // map height -> set of executed block IDs at height
-	lowestHeight     uint64
-	execForkDetected atomic.Bool
-	onExecFork       ExecForkActor
-	db               *badger.DB
-	log              zerolog.Logger
+	mutex                      sync.RWMutex
+	seals                      mempool.IncorporatedResultSeals
+	sealsForBlock              map[flow.Identifier]sealSet             // map BlockID -> set of IncorporatedResultSeal
+	byHeight                   map[uint64]map[flow.Identifier]struct{} // map height -> set of executed block IDs at height
+	lowestHeight               uint64
+	execForkDetected           atomic.Bool
+	onExecFork                 ExecForkActor
+	executionForkEvidenceStore storage.ExecutionForkEvidence
+	log                        zerolog.Logger
 }
 
 var _ mempool.IncorporatedResultSeals = (*ExecForkSuppressor)(nil)
@@ -59,25 +57,33 @@ type sealSet map[flow.Identifier]*flow.IncorporatedResultSeal
 // sealsList is a list of seals
 type sealsList []*flow.IncorporatedResultSeal
 
-func NewExecStateForkSuppressor(seals mempool.IncorporatedResultSeals, onExecFork ExecForkActor, db *badger.DB, log zerolog.Logger) (*ExecForkSuppressor, error) {
-	conflictingSeals, err := checkExecutionForkEvidence(db)
+func NewExecStateForkSuppressor(
+	seals mempool.IncorporatedResultSeals,
+	onExecFork ExecForkActor,
+	db storage.DB,
+	log zerolog.Logger,
+) (*ExecForkSuppressor, error) {
+	executionForkEvidenceStore := store.NewExecutionForkEvidence(db)
+
+	conflictingSeals, err := executionForkEvidenceStore.Retrieve()
 	if err != nil {
 		return nil, fmt.Errorf("failed to interface with storage: %w", err)
 	}
+
 	execForkDetectedFlag := len(conflictingSeals) != 0
 	if execForkDetectedFlag {
 		onExecFork(conflictingSeals)
 	}
 
 	wrapper := ExecForkSuppressor{
-		mutex:            sync.RWMutex{},
-		seals:            seals,
-		sealsForBlock:    make(map[flow.Identifier]sealSet),
-		byHeight:         make(map[uint64]map[flow.Identifier]struct{}),
-		execForkDetected: *atomic.NewBool(execForkDetectedFlag),
-		onExecFork:       onExecFork,
-		db:               db,
-		log:              log.With().Str("mempool", "ExecForkSuppressor").Logger(),
+		mutex:                      sync.RWMutex{},
+		seals:                      seals,
+		sealsForBlock:              make(map[flow.Identifier]sealSet),
+		byHeight:                   make(map[uint64]map[flow.Identifier]struct{}),
+		execForkDetected:           *atomic.NewBool(execForkDetectedFlag),
+		onExecFork:                 onExecFork,
+		executionForkEvidenceStore: executionForkEvidenceStore,
+		log:                        log.With().Str("mempool", "ExecForkSuppressor").Logger(),
 	}
 
 	return &wrapper, nil
@@ -337,41 +343,6 @@ func hasConsistentStateTransitions(irSeal, irSeal2 *flow.IncorporatedResultSeal)
 	return true
 }
 
-// checkExecutionForkDetected checks the database whether evidence
-// about an execution fork is stored. Returns the stored evidence.
-func checkExecutionForkEvidence(db *badger.DB) ([]*flow.IncorporatedResultSeal, error) {
-	var conflictingSeals []*flow.IncorporatedResultSeal
-	err := db.View(func(tx *badger.Txn) error {
-		err := operation.RetrieveExecutionForkEvidence(&conflictingSeals)(tx)
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil // no evidence in data base; conflictingSeals is still nil slice
-		}
-		if err != nil {
-			return fmt.Errorf("failed to load evidence whether or not an execution fork occured: %w", err)
-		}
-		return nil
-	})
-	return conflictingSeals, err
-}
-
-// storeExecutionForkEvidence stores the provided seals in the database
-// as evidence for an execution fork.
-func storeExecutionForkEvidence(conflictingSeals []*flow.IncorporatedResultSeal, db *badger.DB) error {
-	err := operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
-		err := operation.InsertExecutionForkEvidence(conflictingSeals)(tx)
-		if errors.Is(err, storage.ErrAlreadyExists) {
-			// some evidence about execution fork already stored;
-			// we only keep the first evidence => noting more to do
-			return nil
-		}
-		if err != nil {
-			return fmt.Errorf("failed to store evidence about execution fork: %w", err)
-		}
-		return nil
-	})
-	return err
-}
-
 // filterConflictingSeals performs filtering of provided seals by checking if there are conflicting seals for same block.
 // For every block we check if first seal has same state transitions as others. Multiple seals for same block are allowed
 // but their state transitions should be the same. Upon detecting seal with inconsistent state transition we will clear our mempool,
@@ -395,7 +366,7 @@ func (s *ExecForkSuppressor) filterConflictingSeals(sealsByBlockID map[flow.Iden
 				s.execForkDetected.Store(true)
 				s.Clear()
 				conflictingSeals = append(sealsList{candidateSeal}, conflictingSeals...)
-				err := storeExecutionForkEvidence(conflictingSeals, s.db)
+				err := s.executionForkEvidenceStore.StoreIfNotExists(conflictingSeals)
 				if err != nil {
 					panic("failed to store execution fork evidence")
 				}
