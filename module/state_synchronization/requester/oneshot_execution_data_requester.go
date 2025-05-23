@@ -61,7 +61,7 @@ func NewOneshotExecutionDataRequester(
 
 // RequestExecutionData requests execution data for a given block from the execution data cache.
 // It performs a fetch using a retry mechanism with exponential backoff if execution data not found.
-// Execution data are saved in the execution data cache passed on instantiation.
+// Returns the execution data entity and any error encountered.
 //
 // The function logs each retry attempt and emits metrics for retries and fetch durations.
 // The block height is used only for logging and metric purposes.
@@ -71,7 +71,7 @@ func NewOneshotExecutionDataRequester(
 // All other errors are unexpected exceptions and may indicate invalid execution data was received.
 func (r *OneshotExecutionDataRequester) RequestExecutionData(
 	ctx context.Context,
-) error {
+) (*execution_data.BlockExecutionDataEntity, error) {
 	backoff := retry.NewExponential(r.config.RetryDelay)
 	backoff = retry.WithCappedDuration(r.config.MaxRetryDelay, backoff)
 	backoff = retry.WithJitterPercent(15, backoff)
@@ -86,7 +86,9 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 	blockID := r.executionResult.BlockID
 	blockHeight := r.blockHeader.Height
 	executionDataID := r.executionResult.ExecutionDataID
-	return retry.Do(ctx, backoff, func(context.Context) error {
+
+	var execData *execution_data.BlockExecutionDataEntity
+	err := retry.Do(ctx, backoff, func(context.Context) error {
 		if attempt > 0 {
 			r.log.Debug().
 				Str("block_id", blockID.String()).
@@ -101,7 +103,8 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 
 		// download execution data for the block
 		fetchTimeout, _ := timeout.Next()
-		err := r.processFetchRequest(ctx, blockHeight, fetchTimeout)
+		var err error
+		execData, err = r.processFetchRequest(ctx, blockHeight, fetchTimeout)
 		if isBlobNotFoundError(err) || errors.Is(err, context.DeadlineExceeded) {
 			return retry.RetryableError(err)
 		}
@@ -118,6 +121,12 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 
 		return err
 	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return execData, nil
 }
 
 // processFetchRequest performs the actual fetch of execution data for the given block within the provided timeout.
@@ -135,7 +144,7 @@ func (r *OneshotExecutionDataRequester) processFetchRequest(
 	parentCtx context.Context,
 	height uint64,
 	fetchTimeout time.Duration,
-) error {
+) (*execution_data.BlockExecutionDataEntity, error) {
 	blockID := r.executionResult.BlockID
 	executionDataID := r.executionResult.ExecutionDataID
 
@@ -153,15 +162,16 @@ func (r *OneshotExecutionDataRequester) processFetchRequest(
 	ctx, cancel := context.WithTimeout(parentCtx, fetchTimeout)
 	defer cancel()
 
-	execData, err := r.execDataCache.ByID(ctx, executionDataID)
+	// NOTE: ByID does not add execData to cache or check if it is already in a cache, it only returns execData
+	execData, err := r.execDataCache.ByID(ctx, blockID)
 	r.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, height)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	logger.Info().
 		Hex("execution_data_id", logging.ID(execData.ID())).
 		Msg("execution data fetched")
 
-	return nil
+	return execData, nil
 }

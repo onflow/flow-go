@@ -53,9 +53,8 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecutionData() {
 			Return(seal, nil).
 			Once()
 
-		block := unittest.BlockFixture()
 		results := storagemock.NewExecutionResults(suite.T())
-		result := unittest.ExecutionResultFixture(unittest.WithBlock(&block))
+		result := unittest.ExecutionResultFixture()
 		results.
 			On("ByID", mock.AnythingOfType("flow.Identifier")).
 			Return(result, nil).
@@ -71,11 +70,11 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecutionData() {
 			Once()
 
 		edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
-		requester := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, result, block.Header, config)
+		requester := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, config)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := requester.RequestExecutionData(ctx)
+		err := requester.RequestExecutionData(ctx, blockEd.BlockID, 0)
 		require.NoError(suite.T(), err)
 
 		// Requester doesn't return downloaded execution data. It puts them into the internal cache.
@@ -84,8 +83,8 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecutionData() {
 	})
 
 	suite.Run("Happy path. Full storages setup", func() {
-		datastore := dssync.MutexWrap(datastore.NewMapDatastore())
-		blobstore := blobs.NewBlobstore(datastore)
+		dataStore := dssync.MutexWrap(datastore.NewMapDatastore())
+		blobstore := blobs.NewBlobstore(dataStore)
 		testData := generateTestData(suite.T(), blobstore, 5, map[uint64]testExecutionDataCallback{})
 
 		headers := synctest.MockBlockHeaderStorage(
@@ -152,8 +151,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 			Once()
 
 		// eventually return an execution result
-		block := unittest.BlockFixture()
-		expectedResult := unittest.ExecutionResultFixture(unittest.WithBlock(&block))
+		expectedResult := unittest.ExecutionResultFixture()
 		results.
 			On("ByID", mock.AnythingOfType("flow.Identifier")).
 			Return(expectedResult, nil).
@@ -161,11 +159,11 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 
 		heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
 		edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
-		requester := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, expectedResult, block.Header, config)
+		requester := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, config)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := requester.RequestExecutionData(ctx)
+		err := requester.RequestExecutionData(ctx, blockEd.BlockID, 0)
 		require.NoError(suite.T(), err)
 
 		// Requester doesn't return downloaded execution data. It puts them into the internal cache.
