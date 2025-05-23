@@ -66,18 +66,19 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 		if newestQC == nil {
 			return nil, fmt.Errorf("invalid structure newest QC should be present")
 		}
-		lastViewTC = &flow.TimeoutCertificate{
-			View:          m.LastViewTc.View,
-			NewestQCViews: m.LastViewTc.HighQcViews,
-			SignerIndices: m.LastViewTc.SignerIndices,
-			SigData:       m.LastViewTc.SigData,
-			NewestQC: &flow.QuorumCertificate{
+		tc := flow.NewTimeoutCertificate(
+			m.LastViewTc.View,
+			m.LastViewTc.HighQcViews,
+			&flow.QuorumCertificate{
 				View:          newestQC.View,
 				BlockID:       MessageToIdentifier(newestQC.BlockId),
 				SignerIndices: newestQC.SignerIndices,
 				SigData:       newestQC.SigData,
 			},
-		}
+			m.LastViewTc.SignerIndices,
+			m.LastViewTc.SigData,
+		)
+		lastViewTC = &tc
 	}
 
 	return &flow.Header{

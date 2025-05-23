@@ -15,13 +15,13 @@ func MakeTC(options ...func(*flow.TimeoutCertificate)) *flow.TimeoutCertificate 
 	for i := range highQCViews {
 		highQCViews[i] = qc.View
 	}
-	tc := flow.TimeoutCertificate{
-		View:          rand.Uint64(),
-		NewestQC:      qc,
-		NewestQCViews: []uint64{qc.View},
-		SignerIndices: signerIndices,
-		SigData:       unittest.SignatureFixture(),
-	}
+	tc := flow.NewTimeoutCertificate(
+		rand.Uint64(),
+		[]uint64{qc.View},
+		qc,
+		signerIndices,
+		unittest.SignatureFixture(),
+	)
 	for _, option := range options {
 		option(&tc)
 	}

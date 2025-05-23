@@ -1,10 +1,14 @@
 package flow
 
-import "github.com/onflow/crypto"
+import (
+	"github.com/onflow/crypto"
+)
 
 // TimeoutCertificate proves that a super-majority of consensus participants want to abandon the specified View.
 // At its core, a timeout certificate is an aggregation of TimeoutObjects, which individual nodes send to signal
 // their intent to leave the active view.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type TimeoutCertificate struct {
 	View uint64
 	// NewestQCViews lists for each signer (in the same order) the view of the newest QC they supplied
@@ -19,6 +23,24 @@ type TimeoutCertificate struct {
 	// SigData is an aggregated signature from multiple TimeoutObjects, each from a different replica.
 	// In their TimeoutObjects, replicas sign the pair (View, NewestQCView) with their staking keys.
 	SigData crypto.Signature
+}
+
+// NewTimeoutCertificate creates a new instance of TimeoutCertificate.
+// Construction TimeoutCertificate allowed only within the constructor.
+func NewTimeoutCertificate(
+	view uint64,
+	newestQCViews []uint64,
+	newestQC *QuorumCertificate,
+	signerIndices []byte,
+	sigData crypto.Signature,
+) TimeoutCertificate {
+	return TimeoutCertificate{
+		View:          view,
+		NewestQCViews: newestQCViews,
+		NewestQC:      newestQC,
+		SignerIndices: signerIndices,
+		SigData:       sigData,
+	}
 }
 
 // ID returns the TimeoutCertificate's identifier
