@@ -66,11 +66,12 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		}
 		minStateEntry := &flow.MinEpochStateEntry{
 			PreviousEpoch: nil,
-			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:          setup.ID(),
-				CommitID:         currentEpochCommit.ID(),
-				ActiveIdentities: identities,
-			},
+			CurrentEpoch: flow.NewEpochStateContainer(
+				setup.ID(),
+				currentEpochCommit.ID(),
+				identities,
+				nil,
+			),
 			EpochFallbackTriggered: false,
 		}
 		stateEntry, err := flow.NewEpochStateEntry(

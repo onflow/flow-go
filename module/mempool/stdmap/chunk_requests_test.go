@@ -204,10 +204,7 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 	// adding another request for the same tuple of (chunkID, resultID, chunkIndex)
 	// is deduplicated.
 	require.False(t, requests.Add(&verification.ChunkDataPackRequest{
-		Locator: chunks.Locator{
-			ResultID: thisReq.ResultID,
-			Index:    thisReq.Index,
-		},
+		Locator: chunks.NewLocator(thisReq.ResultID, thisReq.Index),
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID: thisReq.ChunkID,
 		},
@@ -215,10 +212,7 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 
 	// adding another request for the same chunk ID but different result ID is stored.
 	otherReq := &verification.ChunkDataPackRequest{
-		Locator: chunks.Locator{
-			ResultID: unittest.IdentifierFixture(),
-			Index:    thisReq.Index,
-		},
+		Locator: chunks.NewLocator(unittest.IdentifierFixture(), thisReq.Index),
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID:   thisReq.ChunkID,
 			Agrees:    unittest.IdentifierListFixture(2),

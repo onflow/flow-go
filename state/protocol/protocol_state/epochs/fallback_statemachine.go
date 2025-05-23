@@ -91,7 +91,14 @@ func (m *FallbackStateMachine) extendCurrentEpoch(epochExtension flow.EpochExten
 		return fmt.Errorf("cannot extend current epoch when next epoch is present")
 	}
 
-	state.CurrentEpoch.EpochExtensions = append(state.CurrentEpoch.EpochExtensions, epochExtension)
+	epochExtensions := append(state.CurrentEpoch.EpochExtensions, epochExtension)
+	state.CurrentEpoch = flow.NewEpochStateContainer(
+		state.CurrentEpoch.SetupID,
+		state.CurrentEpoch.CommitID,
+		state.CurrentEpoch.ActiveIdentities,
+		epochExtensions,
+	)
+
 	return nil
 }
 
@@ -186,14 +193,14 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), fmt.Errorf("rejecting EpochRecover event: %w", err))
 		return false, nil
 	}
-	nextEpoch = &flow.EpochStateContainer{
-		SetupID:          epochRecover.EpochSetup.ID(),
-		CommitID:         epochRecover.EpochCommit.ID(),
-		ActiveIdentities: nextEpochParticipants,
-		EpochExtensions:  nil,
-	}
+	nextEpochState := flow.NewEpochStateContainer(
+		epochRecover.EpochSetup.ID(),
+		epochRecover.EpochCommit.ID(),
+		nextEpochParticipants,
+		nil,
+	)
 
-	err = m.ejector.TrackDynamicIdentityList(nextEpoch.ActiveIdentities)
+	err = m.ejector.TrackDynamicIdentityList(nextEpochState.ActiveIdentities)
 	if err != nil {
 		if protocol.IsInvalidServiceEventError(err) {
 			m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), fmt.Errorf("rejecting EpochRecover event: %w", err))
@@ -202,7 +209,7 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		return false, fmt.Errorf("unexpected errors tracking identity list: %w", err)
 	}
 	// if we have processed a valid EpochRecover event, we should exit EFM.
-	m.state.NextEpoch = nextEpoch
+	m.state.NextEpoch = &nextEpochState
 	m.state.EpochFallbackTriggered = false
 	m.telemetry.OnServiceEventProcessed(epochRecover.ServiceEvent())
 	return true, nil

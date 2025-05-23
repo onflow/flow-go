@@ -8,6 +8,8 @@ import (
 )
 
 // EpochProtocolStateAdapter implements protocol.EpochProtocolState by wrapping a flow.RichEpochStateEntry.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type EpochProtocolStateAdapter struct {
 	*flow.RichEpochStateEntry
 	params protocol.GlobalParams
@@ -15,6 +17,8 @@ type EpochProtocolStateAdapter struct {
 
 var _ protocol.EpochProtocolState = (*EpochProtocolStateAdapter)(nil)
 
+// NewEpochProtocolStateAdapter creates a new instance of EpochProtocolStateAdapter.
+// Construction EpochProtocolStateAdapter allowed only within the constructor.
 func NewEpochProtocolStateAdapter(entry *flow.RichEpochStateEntry, params protocol.GlobalParams) *EpochProtocolStateAdapter {
 	return &EpochProtocolStateAdapter{
 		RichEpochStateEntry: entry,

@@ -522,14 +522,8 @@ func TestStopAtHeight(t *testing.T) {
 	mockBlockSealingStatus(s.state, s.headers, headerB, false)
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{resultA, resultB})
 
-	locatorA := chunks.Locator{
-		ResultID: resultA.ID(),
-		Index:    0,
-	}
-	locatorB := chunks.Locator{
-		ResultID: resultB.ID(),
-		Index:    0,
-	}
+	locatorA := chunks.NewLocator(resultA.ID(), 0)
+	locatorB := chunks.NewLocator(resultB.ID(), 0)
 
 	// expects processing notifier being invoked upon sealed chunk detected,
 	// which means the termination of processing a sealed chunk on fetcher engine
@@ -737,12 +731,14 @@ func mockVerifierEngine(t *testing.T,
 			require.True(t, ok)
 
 			// verifiable chunk data should be distinct.
-			_, ok = seen[chunks.ChunkLocatorID(vc.Result.ID(), vc.Chunk.Index)]
+			locatorID := chunks.NewLocator(vc.Result.ID(), vc.Chunk.Index).ID()
+
+			_, ok = seen[locatorID]
 			require.False(t, ok, "duplicated verifiable chunk received")
-			seen[chunks.ChunkLocatorID(vc.Result.ID(), vc.Chunk.Index)] = struct{}{}
+			seen[locatorID] = struct{}{}
 
 			// we should expect this verifiable chunk and its fields should match our expectation
-			expected, ok := verifiableChunks[chunks.ChunkLocatorID(vc.Result.ID(), vc.Chunk.Index)]
+			expected, ok := verifiableChunks[locatorID]
 			require.True(t, ok, "verifier engine received an unknown verifiable chunk data")
 
 			if vc.IsSystemChunk {
@@ -876,10 +872,7 @@ func chunkDataPackResponseFixture(t *testing.T,
 	require.Equal(t, collection != nil, !convert.IsSystemChunk(chunk.Index, result), "only non-system chunks must have a collection")
 
 	return &verification.ChunkDataPackResponse{
-		Locator: chunks.Locator{
-			ResultID: result.ID(),
-			Index:    chunk.Index,
-		},
+		Locator: chunks.NewLocator(result.ID(), chunk.Index),
 		Cdp: unittest.ChunkDataPackFixture(chunk.ID(),
 			unittest.WithStartState(chunk.StartState),
 			unittest.WithChunkDataPackCollection(collection)),
@@ -959,10 +952,7 @@ func chunkRequestFixture(resultID flow.Identifier,
 	disagrees flow.IdentityList) *verification.ChunkDataPackRequest {
 
 	return &verification.ChunkDataPackRequest{
-		Locator: chunks.Locator{
-			ResultID: resultID,
-			Index:    status.ChunkIndex,
-		},
+		Locator: chunks.NewLocator(resultID, status.ChunkIndex),
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID:   status.Chunk().ID(),
 			Height:    status.BlockHeight,

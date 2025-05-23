@@ -108,11 +108,13 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 	}
 
 	// construct data container specifying next epoch
-	u.state.NextEpoch = &flow.EpochStateContainer{
-		SetupID:          epochSetup.ID(),
-		CommitID:         flow.ZeroID,
-		ActiveIdentities: nextEpochActiveIdentities,
-	}
+	nextEpoch := flow.NewEpochStateContainer(
+		epochSetup.ID(),
+		flow.ZeroID,
+		nextEpochActiveIdentities,
+		nil,
+	)
+	u.state.NextEpoch = &nextEpoch
 	u.state.NextEpochSetup = epochSetup
 
 	// subsequent epoch commit event and update identities afterwards.
@@ -156,7 +158,13 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 		return false, fmt.Errorf("invalid epoch commit event for epoch %d: %w", epochCommit.Counter, err)
 	}
 
-	u.state.NextEpoch.CommitID = epochCommit.ID()
+	nextEpoch := flow.NewEpochStateContainer(
+		u.state.NextEpoch.SetupID,
+		epochCommit.ID(),
+		u.state.NextEpoch.ActiveIdentities,
+		u.state.NextEpoch.EpochExtensions,
+	)
+	u.state.NextEpoch = &nextEpoch
 	u.state.NextEpochCommit = epochCommit
 	u.telemetry.OnServiceEventProcessed(epochCommit.ServiceEvent())
 	return true, nil

@@ -1371,25 +1371,18 @@ func ChunkLocatorListFixture(n uint) chunks.LocatorList {
 	locators := chunks.LocatorList{}
 	resultID := IdentifierFixture()
 	for i := uint64(0); i < uint64(n); i++ {
-		locator := ChunkLocatorFixture(resultID, i)
-		locators = append(locators, locator)
+		locator := chunks.NewLocator(resultID, i)
+		locators = append(locators, &locator)
 	}
 	return locators
-}
-
-func ChunkLocatorFixture(resultID flow.Identifier, index uint64) *chunks.Locator {
-	return &chunks.Locator{
-		ResultID: resultID,
-		Index:    index,
-	}
 }
 
 // ChunkStatusListToChunkLocatorFixture extracts chunk locators from a list of chunk statuses.
 func ChunkStatusListToChunkLocatorFixture(statuses []*verification.ChunkStatus) chunks.LocatorMap {
 	locators := chunks.LocatorMap{}
 	for _, status := range statuses {
-		locator := ChunkLocatorFixture(status.ExecutionResult.ID(), status.ChunkIndex)
-		locators[locator.ID()] = locator
+		locator := chunks.NewLocator(status.ExecutionResult.ID(), status.ChunkIndex)
+		locators[locator.ID()] = &locator
 	}
 
 	return locators
@@ -1700,10 +1693,7 @@ func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest
 	ChunkDataPackRequest {
 
 	req := &verification.ChunkDataPackRequest{
-		Locator: chunks.Locator{
-			ResultID: IdentifierFixture(),
-			Index:    0,
-		},
+		Locator: chunks.NewLocator(IdentifierFixture(), 0),
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID:   IdentifierFixture(),
 			Height:    0,
@@ -2734,11 +2724,12 @@ func RootEpochProtocolStateFixture() *flow.RichEpochStateEntry {
 		EpochStateEntry: &flow.EpochStateEntry{
 			MinEpochStateEntry: &flow.MinEpochStateEntry{
 				PreviousEpoch: nil,
-				CurrentEpoch: flow.EpochStateContainer{
-					SetupID:          currentEpochSetup.ID(),
-					CommitID:         currentEpochCommit.ID(),
-					ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
-				},
+				CurrentEpoch: flow.NewEpochStateContainer(
+					currentEpochSetup.ID(),
+					currentEpochCommit.ID(),
+					flow.DynamicIdentityEntryListFromIdentities(allIdentities),
+					nil,
+				),
 				EpochFallbackTriggered: false,
 				NextEpoch:              nil,
 			},
@@ -2799,19 +2790,22 @@ func EpochStateFixture(options ...func(*flow.RichEpochStateEntry)) *flow.RichEpo
 	allIdentities := currentEpochIdentities.Union(
 		prevEpochIdentities.Map(mapfunc.WithEpochParticipationStatus(flow.EpochParticipationStatusLeaving)))
 
+	previousEpoch := flow.NewEpochStateContainer(
+		prevEpochSetup.ID(),
+		prevEpochCommit.ID(),
+		flow.DynamicIdentityEntryListFromIdentities(prevEpochIdentities),
+		nil,
+	)
 	entry := &flow.RichEpochStateEntry{
 		EpochStateEntry: &flow.EpochStateEntry{
 			MinEpochStateEntry: &flow.MinEpochStateEntry{
-				CurrentEpoch: flow.EpochStateContainer{
-					SetupID:          currentEpochSetup.ID(),
-					CommitID:         currentEpochCommit.ID(),
-					ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(currentEpochIdentities),
-				},
-				PreviousEpoch: &flow.EpochStateContainer{
-					SetupID:          prevEpochSetup.ID(),
-					CommitID:         prevEpochCommit.ID(),
-					ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(prevEpochIdentities),
-				},
+				CurrentEpoch: flow.NewEpochStateContainer(
+					currentEpochSetup.ID(),
+					currentEpochCommit.ID(),
+					flow.DynamicIdentityEntryListFromIdentities(currentEpochIdentities),
+					nil,
+				),
+				PreviousEpoch:          &previousEpoch,
 				EpochFallbackTriggered: false,
 				NextEpoch:              nil,
 			},
@@ -2874,11 +2868,13 @@ func WithNextEpochProtocolState() func(entry *flow.RichEpochStateEntry) {
 		entry.NextEpochIdentityTable = nextEpochParticipants.Union(
 			currentEpochParticipants.Map(mapfunc.WithEpochParticipationStatus(flow.EpochParticipationStatusLeaving)))
 
-		entry.NextEpoch = &flow.EpochStateContainer{
-			SetupID:          nextEpochSetup.ID(),
-			CommitID:         nextEpochCommit.ID(),
-			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochParticipants),
-		}
+		nextEpoch := flow.NewEpochStateContainer(
+			nextEpochSetup.ID(),
+			nextEpochCommit.ID(),
+			flow.DynamicIdentityEntryListFromIdentities(nextEpochParticipants),
+			nil,
+		)
+		entry.NextEpoch = &nextEpoch
 		entry.NextEpochSetup = nextEpochSetup
 		entry.NextEpochCommit = nextEpochCommit
 	}
@@ -2907,11 +2903,12 @@ func EpochProtocolStateEntryFixture(tentativePhase flow.EpochPhase, efmTriggered
 	entry := flow.MinEpochStateEntry{
 		EpochFallbackTriggered: efmTriggered,
 		PreviousEpoch:          nil,
-		CurrentEpoch: flow.EpochStateContainer{
-			SetupID:          IdentifierFixture(),
-			CommitID:         IdentifierFixture(),
-			ActiveIdentities: identities,
-		},
+		CurrentEpoch: flow.NewEpochStateContainer(
+			IdentifierFixture(),
+			IdentifierFixture(),
+			identities,
+			nil,
+		),
 		NextEpoch: nil,
 	}
 
@@ -2919,17 +2916,21 @@ func EpochProtocolStateEntryFixture(tentativePhase flow.EpochPhase, efmTriggered
 	case flow.EpochPhaseStaking:
 		break
 	case flow.EpochPhaseSetup:
-		entry.NextEpoch = &flow.EpochStateContainer{
-			SetupID:          IdentifierFixture(),
-			CommitID:         flow.ZeroID,
-			ActiveIdentities: identities,
-		}
+		nextEpoch := flow.NewEpochStateContainer(
+			IdentifierFixture(),
+			flow.ZeroID,
+			identities,
+			nil,
+		)
+		entry.NextEpoch = &nextEpoch
 	case flow.EpochPhaseCommitted:
-		entry.NextEpoch = &flow.EpochStateContainer{
-			SetupID:          IdentifierFixture(),
-			CommitID:         IdentifierFixture(),
-			ActiveIdentities: identities,
-		}
+		nextEpoch := flow.NewEpochStateContainer(
+			IdentifierFixture(),
+			IdentifierFixture(),
+			identities,
+			nil,
+		)
+		entry.NextEpoch = &nextEpoch
 	default:
 		panic("unexpected input phase: " + tentativePhase.String())
 	}

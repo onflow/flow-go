@@ -37,6 +37,8 @@ type MinEpochStateEntry struct {
 // EpochStateContainer holds the data pertaining to a _single_ epoch but no information about
 // any adjacent epochs. To perform a transition from epoch N to N+1, EpochStateContainers for
 // both epochs are necessary.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type EpochStateContainer struct {
 	// ID of setup event for this epoch, never nil.
 	SetupID Identifier
@@ -63,6 +65,22 @@ type EpochStateContainer struct {
 	// and each consecutive pair of slice elements must obey
 	//   EpochExtensions[i].FinalView+1 = EpochExtensions[i+1].FirstView
 	EpochExtensions []EpochExtension
+}
+
+// NewEpochStateContainer creates a new instance of EpochStateContainer.
+// Construction EpochStateContainer allowed only within the constructor.
+func NewEpochStateContainer(
+	setupID Identifier,
+	commitID Identifier,
+	activeIdentities DynamicIdentityEntryList,
+	epochExtensions []EpochExtension,
+) EpochStateContainer {
+	return EpochStateContainer{
+		SetupID:          setupID,
+		CommitID:         commitID,
+		ActiveIdentities: activeIdentities,
+		EpochExtensions:  epochExtensions,
+	}
 }
 
 // EpochExtension represents a range of views, which contiguously extends this epoch.
@@ -101,12 +119,14 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 		ext = make([]EpochExtension, len(c.EpochExtensions))
 		copy(ext, c.EpochExtensions)
 	}
-	return &EpochStateContainer{
-		SetupID:          c.SetupID,
-		CommitID:         c.CommitID,
-		ActiveIdentities: c.ActiveIdentities.Copy(),
-		EpochExtensions:  ext,
-	}
+
+	epochStateContainer := NewEpochStateContainer(
+		c.SetupID,
+		c.CommitID,
+		c.ActiveIdentities.Copy(),
+		ext,
+	)
+	return &epochStateContainer
 }
 
 // EpochStateEntry is a MinEpochStateEntry that has additional fields that are cached from the
