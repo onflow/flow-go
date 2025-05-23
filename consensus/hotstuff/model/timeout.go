@@ -36,6 +36,8 @@ type NewViewEvent TimerInfo
 
 // TimeoutObject represents intent of replica to leave its current view with a timeout. This concept is very similar to
 // HotStuff vote. Valid TimeoutObject is signed by staking key.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type TimeoutObject struct {
 	// View is the view number which is replica is timing out
 	View uint64
@@ -59,6 +61,26 @@ type TimeoutObject struct {
 	// This field is not part of timeout object ID. Thereby, two timeouts are identical if only they differ
 	// by their TimeoutTick value.
 	TimeoutTick uint64
+}
+
+// NewTimeoutObject creates a new instance of TimeoutObject.
+// Construction TimeoutObject allowed only within the constructor.
+func NewTimeoutObject(
+	view uint64,
+	newestQC *flow.QuorumCertificate,
+	lastViewTC *flow.TimeoutCertificate,
+	signerID flow.Identifier,
+	sigData crypto.Signature,
+	timeoutTick uint64,
+) TimeoutObject {
+	return TimeoutObject{
+		View:        view,
+		NewestQC:    newestQC,
+		LastViewTC:  lastViewTC,
+		SignerID:    signerID,
+		SigData:     sigData,
+		TimeoutTick: timeoutTick,
+	}
 }
 
 // ID returns the TimeoutObject's identifier

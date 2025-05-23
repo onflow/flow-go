@@ -181,8 +181,14 @@ func (r *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertif
 	lastTimeout := r.safetyData.LastTimeout
 	if lastTimeout != nil && lastTimeout.View == curView {
 		// model.TimeoutObject are conceptually immutable, hence we create a shallow copy here, which allows us to increment TimeoutTick
-		updatedTimeout := *lastTimeout
-		updatedTimeout.TimeoutTick += 1
+		updatedTimeout := model.NewTimeoutObject(
+			lastTimeout.View,
+			lastTimeout.NewestQC,
+			lastTimeout.LastViewTC,
+			lastTimeout.SignerID,
+			lastTimeout.SigData,
+			lastTimeout.TimeoutTick+1,
+		)
 
 		// persist updated TimeoutObject in `safetyData` and return it
 		r.safetyData.LastTimeout = &updatedTimeout

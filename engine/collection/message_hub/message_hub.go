@@ -430,15 +430,15 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 	case *messages.ClusterBlockVote:
 		h.forwardToOwnVoteAggregator(msg, originID)
 	case *messages.ClusterTimeoutObject:
-		t := &model.TimeoutObject{
-			View:        msg.View,
-			NewestQC:    msg.NewestQC,
-			LastViewTC:  msg.LastViewTC,
-			SignerID:    originID,
-			SigData:     msg.SigData,
-			TimeoutTick: msg.TimeoutTick,
-		}
-		h.forwardToOwnTimeoutAggregator(t)
+		t := model.NewTimeoutObject(
+			msg.View,
+			msg.NewestQC,
+			msg.LastViewTC,
+			originID,
+			msg.SigData,
+			msg.TimeoutTick,
+		)
+		h.forwardToOwnTimeoutAggregator(&t)
 	default:
 		h.log.Warn().
 			Bool(logging.KeySuspicious, true).
