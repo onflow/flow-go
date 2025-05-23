@@ -56,8 +56,8 @@ func (we *WrappedEnvironment) AllocateSlabIndex(owner []byte) (atree.SlabIndex, 
 }
 
 // MeterComputation updates the total computation used based on the kind and intensity of the operation.
-func (we *WrappedEnvironment) MeterComputation(kind common.ComputationKind, intensity uint) error {
-	err := we.env.MeterComputation(kind, intensity)
+func (we *WrappedEnvironment) MeterComputation(usage common.ComputationUsage) error {
+	err := we.env.MeterComputation(usage)
 	return handleEnvironmentError(err)
 }
 
@@ -74,11 +74,8 @@ func (we *WrappedEnvironment) ComputationIntensities() meter.MeteredComputationI
 
 // ComputationAvailable returns true if there is computation room
 // for the given kind and intensity operation.
-func (we *WrappedEnvironment) ComputationAvailable(
-	kind common.ComputationKind,
-	intensity uint,
-) bool {
-	return we.env.ComputationAvailable(kind, intensity)
+func (we *WrappedEnvironment) ComputationAvailable(usage common.ComputationUsage) bool {
+	return we.env.ComputationAvailable(usage)
 }
 
 // MeterMemory meters the memory usage of a new operation.

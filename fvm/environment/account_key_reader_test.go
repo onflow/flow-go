@@ -22,7 +22,7 @@ func newDummyAccountKeyReader(
 ) environment.AccountKeyReader {
 	tracer := tracing.NewTracerSpan()
 	meter := mock.NewMeter(t)
-	meter.On("MeterComputation", testMock.Anything, testMock.Anything).Return(nil)
+	meter.On("MeterComputation", testMock.Anything).Return(nil)
 	accounts := &FakeAccounts{keyCount: keyCount}
 	return environment.NewAccountKeyReader(tracer, meter, accounts)
 }

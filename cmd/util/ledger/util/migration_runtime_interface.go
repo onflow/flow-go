@@ -6,7 +6,6 @@ import (
 
 	"github.com/onflow/cadence/ast"
 	"github.com/onflow/cadence/common"
-	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/environment"
@@ -21,15 +20,15 @@ type GetContractNamesFunc func(address flow.Address) ([]string, error)
 
 type GetOrLoadProgramFunc func(
 	location runtime.Location,
-	load func() (*interpreter.Program, error),
+	load func() (*runtime.Program, error),
 ) (
-	*interpreter.Program,
+	*runtime.Program,
 	error,
 )
 
 type GerOrLoadProgramListenerFunc func(
 	location runtime.Location,
-	program *interpreter.Program,
+	program *runtime.Program,
 	err error,
 )
 
@@ -100,9 +99,9 @@ func (m *MigrationRuntimeInterface) GetAccountContractCode(
 
 func (m *MigrationRuntimeInterface) GetOrLoadProgram(
 	location runtime.Location,
-	load func() (*interpreter.Program, error),
+	load func() (*runtime.Program, error),
 ) (
-	program *interpreter.Program,
+	program *runtime.Program,
 	err error,
 ) {
 	getOrLoadProgram := m.GetOrLoadProgramFunc

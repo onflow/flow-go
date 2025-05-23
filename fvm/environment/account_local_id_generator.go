@@ -66,7 +66,12 @@ func (generator *accountLocalIDGenerator) GenerateAccountID(
 		trace.FVMEnvGenerateAccountLocalID,
 	).End()
 
-	err := generator.meter.MeterComputation(ComputationKindGenerateAccountLocalID, 1)
+	err := generator.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindGenerateAccountLocalID,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return 0, err
 	}

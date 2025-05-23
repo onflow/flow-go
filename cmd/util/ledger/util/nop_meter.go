@@ -10,11 +10,11 @@ import (
 // NopMeter is a meter that does nothing. It can be used in migrations.
 type NopMeter struct{}
 
-func (n NopMeter) ComputationAvailable(_ common.ComputationKind, _ uint) bool {
+func (n NopMeter) ComputationAvailable(_ common.ComputationUsage) bool {
 	return false
 }
 
-func (n NopMeter) MeterComputation(_ common.ComputationKind, _ uint) error {
+func (n NopMeter) MeterComputation(_ common.ComputationUsage) error {
 	return nil
 }
 
