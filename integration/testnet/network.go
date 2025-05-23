@@ -1195,32 +1195,32 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	targetDuration := networkConf.ViewsInEpoch / networkConf.ViewsPerSecond
 
 	// generate epoch service events
-	epochSetup := &flow.EpochSetup{
-		Counter:            epochCounter,
-		FirstView:          rootHeader.View,
-		DKGPhase1FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase,
-		DKGPhase2FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*2,
-		DKGPhase3FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*3,
-		FinalView:          rootHeader.View + networkConf.ViewsInEpoch - 1,
-		Participants:       participants.ToSkeleton(),
-		Assignments:        clusterAssignments,
-		RandomSource:       randomSource,
-		TargetDuration:     targetDuration,
-		TargetEndTime:      uint64(time.Now().Unix()) + targetDuration,
-	}
+	epochSetup := flow.NewEpochSetup(
+		epochCounter,
+		rootHeader.View,
+		dkgOffsetView+networkConf.ViewsInDKGPhase,
+		dkgOffsetView+networkConf.ViewsInDKGPhase*2,
+		dkgOffsetView+networkConf.ViewsInDKGPhase*3,
+		rootHeader.View+networkConf.ViewsInEpoch-1,
+		participants.ToSkeleton(),
+		clusterAssignments,
+		randomSource,
+		targetDuration,
+		uint64(time.Now().Unix())+targetDuration,
+	)
 
-	epochCommit := &flow.EpochCommit{
-		Counter:            epochCounter,
-		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
-		DKGGroupKey:        dkg.PubGroupKey,
-		DKGParticipantKeys: dkg.PubKeyShares,
-		DKGIndexMap:        dkgIndexMap,
-	}
+	epochCommit := flow.NewEpochCommit(
+		epochCounter,
+		flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
+		dkg.PubGroupKey,
+		dkg.PubKeyShares,
+		dkgIndexMap,
+	)
 	root := &flow.Block{
 		Header: rootHeader,
 	}
 	rootProtocolState, err := networkConf.KVStoreFactory(
-		inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit).ID(),
+		inmem.EpochProtocolStateFromServiceEvents(&epochSetup, &epochCommit).ID(),
 	)
 	if err != nil {
 		return nil, err
@@ -1267,7 +1267,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	}
 
 	// generate execution result and block seal
-	result := run.GenerateRootResult(root, commit, epochSetup, epochCommit)
+	result := run.GenerateRootResult(root, commit, &epochSetup, &epochCommit)
 	seal, err := run.GenerateRootSeal(result)
 	if err != nil {
 		return nil, fmt.Errorf("generating root seal failed: %w", err)

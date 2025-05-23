@@ -43,26 +43,35 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 	// we arbitrarily use 999 as the current epoch counter
 	currentCounter := uint64(999)
 
-	currentEpochSetup := flow.EpochSetup{
-		Counter:            currentCounter,
-		FirstView:          0,
-		DKGPhase1FinalView: 150,
-		DKGPhase2FinalView: 200,
-		DKGPhase3FinalView: 250,
-		FinalView:          300,
-		Participants:       s.netIDs.ToSkeleton(),
-		RandomSource:       unittest.EpochSetupRandomSourceFixture(),
-	}
+	currentEpochSetup := flow.NewEpochSetup(
+		currentCounter,
+		0,
+		150,
+		200,
+		250,
+		300,
+		s.netIDs.ToSkeleton(),
+		nil,
+		unittest.EpochSetupRandomSourceFixture(),
+		0,
+		0,
+	)
 
 	// create the EpochSetup that will trigger the next DKG run with all the
 	// desired parameters
-	nextEpochSetup := flow.EpochSetup{
-		Counter:      currentCounter + 1,
-		Participants: s.netIDs.ToSkeleton(),
-		RandomSource: unittest.EpochSetupRandomSourceFixture(),
-		FirstView:    301,
-		FinalView:    600,
-	}
+	nextEpochSetup := flow.NewEpochSetup(
+		currentCounter+1,
+		301,
+		0,
+		0,
+		0,
+		600,
+		s.netIDs.ToSkeleton(),
+		nil,
+		unittest.EpochSetupRandomSourceFixture(),
+		0,
+		0,
+	)
 
 	firstBlock := &flow.Header{View: 100}
 
