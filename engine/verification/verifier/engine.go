@@ -265,16 +265,16 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 
 	// Generate result approval
 	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERVerGenerateResultApproval)
-	attestation := &flow.Attestation{
-		BlockID:           vc.Header.ID(),
-		ExecutionResultID: vc.Result.ID(),
-		ChunkIndex:        vc.Chunk.Index,
-	}
+	attestation := flow.NewAttestation(
+		vc.Header.ID(),
+		vc.Result.ID(),
+		vc.Chunk.Index,
+	)
 	approval, err := GenerateResultApproval(
 		e.me,
 		e.approvalHasher,
 		e.spockHasher,
-		attestation,
+		&attestation,
 		spockSecret)
 
 	span.End()
@@ -337,12 +337,12 @@ func GenerateResultApproval(
 	}
 
 	// result approval body
-	body := flow.ResultApprovalBody{
-		Attestation:          *attestation,
-		ApproverID:           me.NodeID(),
-		AttestationSignature: atstSign,
-		Spock:                spock,
-	}
+	body := flow.NewResultApprovalBody(
+		*attestation,
+		me.NodeID(),
+		atstSign,
+		spock,
+	)
 
 	// generates a signature over result approval body
 	bodyID := body.ID()
@@ -351,10 +351,9 @@ func GenerateResultApproval(
 		return nil, fmt.Errorf("could not sign result approval body: %w", err)
 	}
 
-	return &flow.ResultApproval{
-		Body:              body,
-		VerifierSignature: bodySign,
-	}, nil
+	resultApproval := flow.NewResultApproval(body, bodySign)
+
+	return &resultApproval, nil
 }
 
 // verifiableChunkHandler acts as a wrapper around the verify method that captures its performance-related metrics
