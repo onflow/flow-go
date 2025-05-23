@@ -47,9 +47,7 @@ func PayloadFromTransactions(refID flow.Identifier, transactions ...*flow.Transa
 		transactions = []*flow.TransactionBody{}
 	}
 	return Payload{
-		Collection: flow.Collection{
-			Transactions: transactions,
-		},
+		Collection:       flow.NewCollection(transactions),
 		ReferenceBlockID: refID,
 	}
 }
