@@ -5,6 +5,10 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 )
 
+// ComputationResult captures artifacts of execution of block collections, collection attestation results and
+// the full execution receipt, as sent by the Execution Node.
+//
+// structwrite:immutable - mutations allowed only within the constructor
 type ComputationResult struct {
 	*BlockExecutionResult
 	*BlockAttestationResult
@@ -12,6 +16,8 @@ type ComputationResult struct {
 	*flow.ExecutionReceipt
 }
 
+// NewEmptyComputationResult creates an empty ComputationResult.
+// Construction ComputationResult allowed only within the constructor.
 func NewEmptyComputationResult(
 	block *entity.ExecutableBlock,
 	versionAwareChunkConstructor flow.ChunkConstructor,

@@ -8,7 +8,7 @@ import (
 // At its core, a timeout certificate is an aggregation of TimeoutObjects, which individual nodes send to signal
 // their intent to leave the active view.
 //
-//structwrite:immutable - mutations allowed only within the constructor
+// structwrite:immutable - mutations allowed only within the constructor
 type TimeoutCertificate struct {
 	View uint64
 	// NewestQCViews lists for each signer (in the same order) the view of the newest QC they supplied
