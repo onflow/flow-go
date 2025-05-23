@@ -1,4 +1,4 @@
-# default value of the Docker base registry URL which can be overriden when invoking the Makefile
+# default value of the Docker base registry URL which can be overridden when invoking the Makefile
 DOCKER_REGISTRY := us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet
 CONFIGURATION_BUCKET := flow-benchnet-automation
 

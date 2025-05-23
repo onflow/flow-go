@@ -15,7 +15,7 @@ func TestCollections(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := unittest.CollectionFixture(2).Light()
 
-		t.Run("Retrieve nonexistant", func(t *testing.T) {
+		t.Run("Retrieve nonexistent", func(t *testing.T) {
 			var actual flow.LightCollection
 			err := db.View(RetrieveCollection(expected.ID(), &actual))
 			assert.Error(t, err)

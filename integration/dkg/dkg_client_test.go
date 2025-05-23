@@ -126,7 +126,7 @@ func (s *ClientSuite) TestBroadcastReadSingle() {
 	block, err := s.blockchain.GetLatestBlock()
 	require.NoError(s.T(), err)
 
-	// verify the data recieved with data sent
+	// verify the data received with data sent
 	messages, err := clients[0].ReadBroadcast(0, block.ID())
 	require.NoError(s.T(), err)
 	assert.Len(s.T(), messages, 1)

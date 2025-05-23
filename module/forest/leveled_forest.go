@@ -165,7 +165,7 @@ func (f *LevelledForest) GetVerticesAtLevel(level uint64) VertexIterator {
 // an empty vertex container represents a vertex that is _referenced_ as parent by
 // one or more full vertices, but has not been added itself to the forest.
 // We only count vertices that have been explicitly added to the forest and not yet
-// pruned. (In comparision, we do _not_ count vertices that are _referenced_ as
+// pruned. (In comparison, we do _not_ count vertices that are _referenced_ as
 // parent by vertices, but have not been added themselves).
 func (f *LevelledForest) GetNumberOfVerticesAtLevel(level uint64) int {
 	num := 0

@@ -79,7 +79,7 @@ func NewBlockQueue(logger zerolog.Logger) *BlockQueue {
 // HandleBlock is called when a new block is received, the parentFinalState indicates
 // whether its parent block has been executed.
 // Caller must ensure:
-// 1. blocks are passsed in order, i.e. parent block is passed in before its child block
+// 1. blocks are passed in order, i.e. parent block is passed in before its child block
 // 2. if a block's parent is not executed, then the parent block must be passed in first
 // 3. if a block's parent is executed, then the parent's finalState must be passed in
 // It returns (nil, nil, nil) if this block is a duplication

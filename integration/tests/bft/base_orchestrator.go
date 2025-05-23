@@ -17,7 +17,7 @@ type OnIngressEvent func(event *insecure.IngressEvent) error
 // simply passes through messages without changes to the orchestrator network. This orchestrator reduces boilerplate
 // of BFT tests by implementing common logic. Boilerplate can further be reduced by using the OnEgressEvent and OnIngressEvent
 // fields to define callbacks that will be invoked on each event received, this removes the need to redefine the logger and send
-// message logic. Each func can be completely overriden if special functionality is needed.
+// message logic. Each func can be completely overridden if special functionality is needed.
 type BaseOrchestrator struct {
 	T                   *testing.T
 	Logger              zerolog.Logger

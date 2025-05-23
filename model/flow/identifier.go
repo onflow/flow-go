@@ -160,7 +160,7 @@ func GetIDs[T Entity](entities []T) IdentifierList {
 
 func MerkleRoot(ids ...Identifier) Identifier {
 	var root Identifier
-	tree, _ := merkle.NewTree(IdentifierLen) // we verify in a unit test that constructor does not error for this paramter
+	tree, _ := merkle.NewTree(IdentifierLen) // we verify in a unit test that constructor does not error for this parameter
 	for i, id := range ids {
 		val := make([]byte, 8)
 		binary.BigEndian.PutUint64(val, uint64(i))
