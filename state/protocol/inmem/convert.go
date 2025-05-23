@@ -191,14 +191,15 @@ func EpochProtocolStateFromServiceEvents(setup *flow.EpochSetup, commit *flow.Ep
 			Ejected: false,
 		})
 	}
-	return &flow.MinEpochStateEntry{
-		PreviousEpoch: nil,
-		CurrentEpoch: flow.EpochStateContainer{
+	minEpochStateEntry := flow.NewMinEpochStateEntry(
+		nil,
+		flow.EpochStateContainer{
 			SetupID:          setup.ID(),
 			CommitID:         commit.ID(),
 			ActiveIdentities: identities,
 		},
-		NextEpoch:              nil,
-		EpochFallbackTriggered: false,
-	}
+		nil,
+		false,
+	)
+	return &minEpochStateEntry
 }

@@ -2730,18 +2730,20 @@ func RootEpochProtocolStateFixture() *flow.RichEpochStateEntry {
 			},
 		})
 	}
-	return &flow.RichEpochStateEntry{
-		EpochStateEntry: &flow.EpochStateEntry{
-			MinEpochStateEntry: &flow.MinEpochStateEntry{
-				PreviousEpoch: nil,
-				CurrentEpoch: flow.EpochStateContainer{
-					SetupID:          currentEpochSetup.ID(),
-					CommitID:         currentEpochCommit.ID(),
-					ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
-				},
-				EpochFallbackTriggered: false,
-				NextEpoch:              nil,
-			},
+	minEpochStateEntry := flow.NewMinEpochStateEntry(
+		nil,
+		flow.EpochStateContainer{
+			SetupID:          currentEpochSetup.ID(),
+			CommitID:         currentEpochCommit.ID(),
+			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
+		},
+		nil,
+		false,
+	)
+
+	richEpochStateEntry := flow.NewRichEpochStateEntryWithEpochIdentityTables(
+		&flow.EpochStateEntry{
+			MinEpochStateEntry:  &minEpochStateEntry,
 			PreviousEpochSetup:  nil,
 			PreviousEpochCommit: nil,
 			CurrentEpochSetup:   currentEpochSetup,
@@ -2749,9 +2751,10 @@ func RootEpochProtocolStateFixture() *flow.RichEpochStateEntry {
 			NextEpochSetup:      nil,
 			NextEpochCommit:     nil,
 		},
-		CurrentEpochIdentityTable: allIdentities,
-		NextEpochIdentityTable:    flow.IdentityList{},
-	}
+		allIdentities,
+		flow.IdentityList{},
+	)
+	return &richEpochStateEntry
 }
 
 // EpochStateFixture creates a fixture with correctly structured data. The returned Identity Table
@@ -2895,6 +2898,8 @@ func WithValidDKG() func(*flow.RichEpochStateEntry) {
 			commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, KeyFixture(crypto.BLSBLS12381).PublicKey())
 			commit.DKGIndexMap[nodeID] = index
 		}
+		// update CommitID according to new CurrentEpochCommit object
+		entry.MinEpochStateEntry.CurrentEpoch.CommitID = entry.CurrentEpochCommit.ID()
 	}
 }
 
@@ -2904,28 +2909,19 @@ func WithValidDKG() func(*flow.RichEpochStateEntry) {
 //   - efmTriggered defines whether the EpochFallbackTriggered flag should be set.
 func EpochProtocolStateEntryFixture(tentativePhase flow.EpochPhase, efmTriggered bool) flow.MinEpochStateEntry {
 	identities := DynamicIdentityEntryListFixture(5)
-	entry := flow.MinEpochStateEntry{
-		EpochFallbackTriggered: efmTriggered,
-		PreviousEpoch:          nil,
-		CurrentEpoch: flow.EpochStateContainer{
-			SetupID:          IdentifierFixture(),
-			CommitID:         IdentifierFixture(),
-			ActiveIdentities: identities,
-		},
-		NextEpoch: nil,
-	}
+	var nextEpoch *flow.EpochStateContainer
 
 	switch tentativePhase {
 	case flow.EpochPhaseStaking:
 		break
 	case flow.EpochPhaseSetup:
-		entry.NextEpoch = &flow.EpochStateContainer{
+		nextEpoch = &flow.EpochStateContainer{
 			SetupID:          IdentifierFixture(),
 			CommitID:         flow.ZeroID,
 			ActiveIdentities: identities,
 		}
 	case flow.EpochPhaseCommitted:
-		entry.NextEpoch = &flow.EpochStateContainer{
+		nextEpoch = &flow.EpochStateContainer{
 			SetupID:          IdentifierFixture(),
 			CommitID:         IdentifierFixture(),
 			ActiveIdentities: identities,
@@ -2933,7 +2929,17 @@ func EpochProtocolStateEntryFixture(tentativePhase flow.EpochPhase, efmTriggered
 	default:
 		panic("unexpected input phase: " + tentativePhase.String())
 	}
-	return entry
+
+	return flow.NewMinEpochStateEntry(
+		nil,
+		flow.EpochStateContainer{
+			SetupID:          IdentifierFixture(),
+			CommitID:         IdentifierFixture(),
+			ActiveIdentities: identities,
+		},
+		nextEpoch,
+		efmTriggered,
+	)
 }
 
 func CreateSendTxHttpPayload(tx flow.TransactionBody) map[string]interface{} {
