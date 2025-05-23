@@ -273,7 +273,7 @@ func loadPayloads() (payloads1, payloads2 []*ledger.Payload) {
 			log.Info().Msg("Reading first trie")
 
 			stateCommitment := util.ParseStateCommitment(flagStateCommitment1)
-			payloads1, err = util.ReadTrie(flagState1, stateCommitment)
+			payloads1, err = util.ReadTrieForPayloads(flagState1, stateCommitment)
 		}
 		return
 	})
@@ -285,7 +285,7 @@ func loadPayloads() (payloads1, payloads2 []*ledger.Payload) {
 			log.Info().Msg("Reading second trie")
 
 			stateCommitment := util.ParseStateCommitment(flagStateCommitment2)
-			payloads2, err = util.ReadTrie(flagState2, stateCommitment)
+			payloads2, err = util.ReadTrieForPayloads(flagState2, stateCommitment)
 		}
 		return
 	})
