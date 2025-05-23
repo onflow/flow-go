@@ -58,5 +58,5 @@ func (c *RegistersCache) Get(
 	reg flow.RegisterID,
 	height uint64,
 ) (flow.RegisterValue, error) {
-	return c.cache.Get(newLookupKey(height, reg).String())
+	return c.cache.Get(NewLookupKey(height, reg).String())
 }

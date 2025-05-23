@@ -7,6 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -55,4 +58,28 @@ func TestEvents_HappyPath(t *testing.T) {
 	assert.Len(t, typeEvents, 2)
 	assert.Contains(t, typeEvents, event1)
 	assert.Contains(t, typeEvents, event3)
+}
+
+func TestEvents_Persist(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		eventStore := NewEvents()
+		block := unittest.BlockFixture()
+		transaction := unittest.TransactionFixture()
+		event := unittest.EventFixture(flow.EventAccountCreated, 0, 0, transaction.ID(), 200)
+		expectedStoredEvents := flow.EventsList{event}
+
+		// Store events
+		err := eventStore.Store(block.ID(), []flow.EventsList{expectedStoredEvents})
+		require.NoError(t, err)
+		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return eventStore.AddToBatch(rw)
+		}))
+
+		// Get event
+		actualEvents := make([]flow.Event, 0)
+		err = operation.LookupEventsByBlockID(db.Reader(), block.ID(), &actualEvents)
+		require.NoError(t, err)
+		require.Len(t, actualEvents, 1)
+		require.Equal(t, event, actualEvents[0])
+	})
 }
