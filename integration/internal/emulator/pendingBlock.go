@@ -119,7 +119,7 @@ func (b *pendingBlock) Collections() []*flowgo.LightCollection {
 	// TODO: remove once SDK models are removed
 	copy(transactionIDs, b.transactionIDs)
 
-	collection := flowgo.LightCollection{Transactions: transactionIDs}
+	collection := flowgo.NewLightCollection(transactionIDs)
 
 	return []*flowgo.LightCollection{&collection}
 }
