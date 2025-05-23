@@ -236,13 +236,14 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 		var collection flow.LightCollection
 		err := operation.RetrieveCollection(suite.genesis.Payload.Collection.ID(), &collection)(tx)
 		suite.Assert().Nil(err)
-		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
+		suite.Assert().Equal(suite.genesis.Payload.Collection.Light().Transactions, collection.Transactions)
+		suite.Assert().Equal(suite.genesis.Payload.Collection.Light().ID(), collection.ID())
 
 		// should index collection
 		collection = flow.LightCollection{} // reset the collection
 		err = operation.LookupCollectionPayload(suite.genesis.ID(), &collection.Transactions)(tx)
 		suite.Assert().Nil(err)
-		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
+		suite.Assert().Equal(suite.genesis.Payload.Collection.Light().Transactions, collection.Transactions)
 
 		// should insert header
 		var header flow.Header

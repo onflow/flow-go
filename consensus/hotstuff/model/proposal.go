@@ -46,12 +46,13 @@ type SignedProposal struct {
 
 // ProposerVote extracts the proposer vote from the proposal
 func (p *SignedProposal) ProposerVote() *Vote {
-	vote := Vote{
-		View:     p.Block.View,
-		BlockID:  p.Block.BlockID,
-		SignerID: p.Block.ProposerID,
-		SigData:  p.SigData,
-	}
+	vote := NewVote(
+		p.Block.View,
+		p.Block.BlockID,
+		p.Block.ProposerID,
+		p.SigData,
+	)
+
 	return &vote
 }
 
