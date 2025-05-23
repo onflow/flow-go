@@ -84,6 +84,7 @@ import (
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/dbops"
+	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -1224,6 +1225,16 @@ func (fnb *FlowNodeBuilder) initSecretsDB() error {
 	return nil
 }
 
+// initStorageLockManager initializes the lock manager used by the storage layer.
+// This manager must be a process-wide singleton.
+func (fnb *FlowNodeBuilder) initStorageLockManager() error {
+	if fnb.StorageLockMgr != nil {
+		return fmt.Errorf("storage lock manager has been created")
+	}
+	fnb.StorageLockMgr = locks.NewLockManagerFactory().Create()
+	return nil
+}
+
 func (fnb *FlowNodeBuilder) initStorage() error {
 
 	// in order to void long iterations with big keys when initializing with an
@@ -2135,6 +2146,10 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	}
 
 	if err := fnb.initLogger(); err != nil {
+		return err
+	}
+
+	if err := fnb.initStorageLockManager(); err != nil {
 		return err
 	}
 
