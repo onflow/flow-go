@@ -19,7 +19,7 @@ var (
 
 var (
 	PreviewnetPragueActivation = uint64(0)          // already on Prague for PreviewNet
-	TestnetPragueActivation    = uint64(1748977200) // Tue Jun 03 2025 19:00:00 GMT+0000
+	TestnetPragueActivation    = uint64(1746637200) // Wed May 07 2025 17:00:00 GMT+0000
 	MainnetPragueActivation    = uint64(1748977200) // Tue Jun 03 2025 19:00:00 GMT+0000
 )
 
