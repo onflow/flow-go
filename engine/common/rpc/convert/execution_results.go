@@ -52,13 +52,13 @@ func MessageToExecutionResult(m *entities.ExecutionResult) (
 	if err != nil {
 		return nil, err
 	}
-	return &flow.ExecutionResult{
-		PreviousResultID: MessageToIdentifier(m.PreviousResultId),
-		BlockID:          MessageToIdentifier(m.BlockId),
-		Chunks:           parsedChunks,
-		ServiceEvents:    parsedServiceEvents,
-		ExecutionDataID:  MessageToIdentifier(m.ExecutionDataId),
-	}, nil
+	return flow.NewExecutionResult(
+		MessageToIdentifier(m.PreviousResultId),
+		MessageToIdentifier(m.BlockId),
+		parsedChunks,
+		parsedServiceEvents,
+		MessageToIdentifier(m.ExecutionDataId),
+	), nil
 }
 
 // ExecutionResultsToMessages converts a slice of execution results to a slice of protobuf messages

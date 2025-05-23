@@ -12,11 +12,11 @@ func GenerateRootResult(
 	epochCommit *flow.EpochCommit,
 ) *flow.ExecutionResult {
 
-	result := &flow.ExecutionResult{
-		PreviousResultID: flow.ZeroID,
-		BlockID:          block.ID(),
-		Chunks:           chunks.ChunkListFromCommit(commit),
-		ServiceEvents:    []flow.ServiceEvent{epochSetup.ServiceEvent(), epochCommit.ServiceEvent()},
-	}
-	return result
+	return flow.NewExecutionResult(
+		flow.ZeroID,
+		block.ID(),
+		chunks.ChunkListFromCommit(commit),
+		[]flow.ServiceEvent{epochSetup.ServiceEvent(), epochCommit.ServiceEvent()},
+		flow.ZeroID,
+	)
 }
