@@ -1,6 +1,7 @@
 package migration
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -71,6 +72,7 @@ func GenerateKeysShorterThanPrefix(n int) [][]byte {
 
 // readerWorker reads key-value pairs from BadgerDB using a prefix iterator.
 func readerWorker(
+	ctx context.Context,
 	lgProgress func(int),
 	db *badger.DB,
 	jobs <-chan []byte, // each job is a prefix to iterate over
@@ -79,6 +81,10 @@ func readerWorker(
 ) error {
 	return db.View(func(txn *badger.Txn) error {
 		for prefix := range jobs {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+
 			options := badger.DefaultIteratorOptions
 			options.Prefix = prefix
 			it := txn.NewIterator(options)
@@ -90,6 +96,10 @@ func readerWorker(
 			)
 
 			for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+
 				item := it.Item()
 				key := item.KeyCopy(nil)
 				val, err := item.ValueCopy(nil)
@@ -101,14 +111,22 @@ func readerWorker(
 				currSize += len(key) + len(val)
 
 				if currSize >= batchSize {
-					kvChan <- kvBatch
+					select {
+					case kvChan <- kvBatch:
+					case <-ctx.Done():
+						return ctx.Err()
+					}
 					kvBatch = nil
 					currSize = 0
 				}
 			}
 
 			if len(kvBatch) > 0 {
-				kvChan <- kvBatch
+				select {
+				case kvChan <- kvBatch:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
 			}
 
 			lgProgress(1)
@@ -118,21 +136,27 @@ func readerWorker(
 }
 
 // writerWorker writes key-value pairs to PebbleDB in batches.
-func writerWorker(db *pebble.DB, kvChan <-chan []KVPair) error {
-	for kvGroup := range kvChan {
-		batch := db.NewBatch()
-		for _, kv := range kvGroup {
-			if err := batch.Set(kv.Key, kv.Value, nil); err != nil {
-				return fmt.Errorf("fail to set key %x: %w", kv.Key, err)
+func writerWorker(ctx context.Context, db *pebble.DB, kvChan <-chan []KVPair) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case kvGroup, ok := <-kvChan:
+			if !ok {
+				return nil
+			}
+			batch := db.NewBatch()
+			for _, kv := range kvGroup {
+				if err := batch.Set(kv.Key, kv.Value, nil); err != nil {
+					return fmt.Errorf("fail to set key %x: %w", kv.Key, err)
+				}
+			}
+
+			if err := batch.Commit(nil); err != nil {
+				return fmt.Errorf("fail to commit batch: %w", err)
 			}
 		}
-
-		if err := batch.Commit(nil); err != nil {
-			return fmt.Errorf("fail to commit batch: %w", err)
-		}
 	}
-
-	return nil
 }
 
 // CopyFromBadgerToPebble migrates all key-value pairs from a BadgerDB instance to a PebbleDB instance.
@@ -151,24 +175,32 @@ func writerWorker(db *pebble.DB, kvChan <-chan []KVPair) error {
 // The function blocks until all keys are migrated and written successfully.
 // It returns an error if any part of the process fails.
 func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg MigrationConfig) error {
-	// Step 1: Copy all keys that is shorter than cfg.ReaderShardPrefixBytes
-	// for example, if cfg.ReaderShardPrefixBytes is 2, we will copy all keys that is only 1 byte.
-	// this is necessary, because the next step will use the 2 bytes prefix to iterate the keys, which
-	// will not cover keys that is shorter than 2 bytes.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	keysShorterThanPrefix := GenerateKeysShorterThanPrefix(cfg.ReaderShardPrefixBytes)
-	err := copyExactKeysFromBadgerToPebble(badgerDB, pebbleDB, keysShorterThanPrefix)
-	if err != nil {
-		return fmt.Errorf("failed to copy keys shorter than prefix: %w", err)
+	var (
+		errOnce  sync.Once
+		firstErr error
+	)
+
+	reportError := func(err error) {
+		if err != nil {
+			errOnce.Do(func() {
+				firstErr = err
+				cancel()
+			})
+		}
 	}
 
+	// Step 1: Copy all keys shorter than prefix
+	keysShorterThanPrefix := GenerateKeysShorterThanPrefix(cfg.ReaderShardPrefixBytes)
+	if err := copyExactKeysFromBadgerToPebble(badgerDB, pebbleDB, keysShorterThanPrefix); err != nil {
+		return fmt.Errorf("failed to copy keys shorter than prefix: %w", err)
+	}
 	log.Info().Msgf("Copied %d keys shorter than %v bytes prefix", len(keysShorterThanPrefix), cfg.ReaderShardPrefixBytes)
 
-	// Step 1: Generate key prefixes for sharding
+	// Step 2: Generate prefix shards and initialize channels
 	prefixes := GeneratePrefixes(cfg.ReaderShardPrefixBytes)
-
-	// Step 2: Start reader workers
-	// Job queue for prefix scan tasks
 	prefixJobs := make(chan []byte, len(prefixes))
 	for _, prefix := range prefixes {
 		prefixJobs <- prefix
@@ -177,57 +209,41 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 
 	kvChan := make(chan []KVPair, cfg.ReaderWorkerCount*2)
 
-	// Reader worker pool
 	lg := util.LogProgress(
 		log.Logger,
 		util.DefaultLogProgressConfig("migration keys from badger to pebble", len(prefixes)),
 	)
 
-	// Error collection
-	errChan := make(chan error, cfg.ReaderWorkerCount+cfg.WriterWorkerCount)
-
 	var readerWg sync.WaitGroup
 	for i := 0; i < cfg.ReaderWorkerCount; i++ {
 		readerWg.Add(1)
 		go func() {
-			// Each reader worker will take a prefix from the channel and read all keys with that prefix
-			// from BadgerDB, sending the key-value pairs to the kvChan.
-			err := readerWorker(lg, badgerDB, prefixJobs, kvChan, cfg.BatchByteSize)
-			readerWg.Done()
-			errChan <- err
+			defer readerWg.Done()
+			if err := readerWorker(ctx, lg, badgerDB, prefixJobs, kvChan, cfg.BatchByteSize); err != nil {
+				reportError(err)
+			}
 		}()
 	}
 
-	// Step 3: Start writer workers
 	var writerWg sync.WaitGroup
 	for i := 0; i < cfg.WriterWorkerCount; i++ {
 		writerWg.Add(1)
 		go func() {
-			// Each writer worker will take key-value pairs from the kvChan and write them to PebbleDB
-			// in batches of size cfg.BatchByteSize (32MB by default).
-			err := writerWorker(pebbleDB, kvChan)
-			writerWg.Done()
-			errChan <- err
+			defer writerWg.Done()
+			if err := writerWorker(ctx, pebbleDB, kvChan); err != nil {
+				reportError(err)
+			}
 		}()
 	}
 
-	// Wait for all readers to finish, then close writer channel
+	// Close kvChan after readers complete
 	go func() {
 		readerWg.Wait()
 		close(kvChan)
 	}()
 
 	writerWg.Wait()
-
-	// Check for errors
-	close(errChan)
-	for err := range errChan {
-		if err != nil {
-			return fmt.Errorf("error: %w", err)
-		}
-	}
-
-	return nil
+	return firstErr
 }
 
 func copyExactKeysFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, keys [][]byte) error {
