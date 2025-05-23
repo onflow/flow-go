@@ -79,8 +79,10 @@ func readerWorker(
 	kvChan chan<- []KVPair, // channel to send key-value pairs to writer workers
 	batchSize int,
 ) error {
-	return db.View(func(txn *badger.Txn) error {
-		for prefix := range jobs {
+	for prefix := range jobs {
+		err := db.View(func(txn *badger.Txn) error {
+			defer lgProgress(1)
+
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
@@ -129,10 +131,14 @@ func readerWorker(
 				}
 			}
 
-			lgProgress(1)
+			return nil
+		})
+
+		if err != nil {
+			return err
 		}
-		return nil
-	})
+	}
+	return nil
 }
 
 // writerWorker writes key-value pairs to PebbleDB in batches.
@@ -183,7 +189,8 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 		firstErr error
 	)
 
-	reportError := func(err error) {
+	// once running into an exception, cancel the context and report the first error
+	reportFirstError := func(err error) {
 		if err != nil {
 			errOnce.Do(func() {
 				firstErr = err
@@ -199,7 +206,8 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 	}
 	log.Info().Msgf("Copied %d keys shorter than %v bytes prefix", len(keysShorterThanPrefix), cfg.ReaderShardPrefixBytes)
 
-	// Step 2: Generate prefix shards and initialize channels
+	// Step 2: Copy all keys with prefix by first generating prefix shards and then
+	// using reader and writer workers to copy the keys with the same prefix
 	prefixes := GeneratePrefixes(cfg.ReaderShardPrefixBytes)
 	prefixJobs := make(chan []byte, len(prefixes))
 	for _, prefix := range prefixes {
@@ -220,7 +228,7 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 		go func() {
 			defer readerWg.Done()
 			if err := readerWorker(ctx, lg, badgerDB, prefixJobs, kvChan, cfg.BatchByteSize); err != nil {
-				reportError(err)
+				reportFirstError(err)
 			}
 		}()
 	}
@@ -231,7 +239,7 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 		go func() {
 			defer writerWg.Done()
 			if err := writerWorker(ctx, pebbleDB, kvChan); err != nil {
-				reportError(err)
+				reportFirstError(err)
 			}
 		}()
 	}
@@ -248,28 +256,35 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 
 func copyExactKeysFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, keys [][]byte) error {
 	batch := pebbleDB.NewBatch()
-	for _, key := range keys {
-		err := badgerDB.View(func(txn *badger.Txn) error {
+	err := badgerDB.View(func(txn *badger.Txn) error {
+		for _, key := range keys {
 			item, err := txn.Get(key)
 			if err != nil {
 				if errors.Is(err, badger.ErrKeyNotFound) {
 					// skip if the key is not found
-					return nil
+					continue
 				}
 
 				return err
 			}
 
-			return item.Value(func(val []byte) error {
+			err = item.Value(func(val []byte) error {
 				return batch.Set(key, val, nil)
 			})
-		})
-		if err != nil {
-			return fmt.Errorf("failed to get key %x from BadgerDB: %w", key, err)
+
+			if err != nil {
+				return fmt.Errorf("failed to get value for key %x: %w", key, err)
+			}
 		}
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to get key from BadgerDB: %w", err)
 	}
 
-	err := batch.Commit(pebble.Sync)
+	err = batch.Commit(pebble.Sync)
 	if err != nil {
 		return fmt.Errorf("failed to commit batch to PebbleDB: %w", err)
 	}
