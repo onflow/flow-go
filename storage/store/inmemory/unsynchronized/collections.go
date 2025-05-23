@@ -128,3 +128,27 @@ func (c *Collections) Remove(collID flow.Identifier) error {
 
 	return nil
 }
+
+// Collections returns a copy of stored collections
+func (c *Collections) Collections() []flow.Collection {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	out := make([]flow.Collection, 0, len(c.collections))
+	for _, coll := range c.collections {
+		out = append(out, *coll)
+	}
+	return out
+}
+
+// LightCollections returns a copy of stored light collections
+func (c *Collections) LightCollections() []flow.LightCollection {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	out := make([]flow.LightCollection, 0, len(c.lightCollections))
+	for _, coll := range c.lightCollections {
+		out = append(out, *coll)
+	}
+	return out
+}

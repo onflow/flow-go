@@ -123,3 +123,15 @@ func (t *TransactionResultErrorMessages) Store(
 
 	return nil
 }
+
+// Data returns a copy of all stored transaction result error messages keyed by block ID.
+func (t *TransactionResultErrorMessages) Data() []flow.TransactionResultErrorMessage {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	out := make([]flow.TransactionResultErrorMessage, 0, len(t.blockStore))
+	for _, errorMessages := range t.blockStore {
+		out = append(out, errorMessages...)
+	}
+	return out
+}
