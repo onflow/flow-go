@@ -27,7 +27,7 @@ func TestFinalizedReader(t *testing.T) {
 		require.NoError(t, err)
 
 		// index the header
-		err = db.Update(operation.IndexBlockHeight(block.Header.Height, block.ID()))
+		err = db.Update(operation.IndexFinalizedBlockByHeight(block.Header.Height, block.ID()))
 		require.NoError(t, err)
 
 		// verify is able to reader the finalized block ID
@@ -44,7 +44,7 @@ func TestFinalizedReader(t *testing.T) {
 		// finalize one more block
 		block2 := unittest.BlockWithParentFixture(block.Header)
 		require.NoError(t, headers.Store(block2.Header))
-		err = db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
+		err = db.Update(operation.IndexFinalizedBlockByHeight(block2.Header.Height, block2.ID()))
 		require.NoError(t, err)
 		reader.BlockFinalized(block2.Header)
 
