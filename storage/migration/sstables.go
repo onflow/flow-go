@@ -83,7 +83,7 @@ func CopyFromBadgerToPebbleSSTables(badgerDB *badger.DB, pebbleDB *pebble.DB, cf
 		writerWg.Add(1)
 		go func() {
 			defer writerWg.Done()
-			if err := writerSSTableWorker(ctx, pebbleDB, sstableDir, kvChan); err != nil {
+			if err := writerSSTableWorker(ctx, i, pebbleDB, sstableDir, kvChan); err != nil {
 				reportFirstError(err)
 			}
 		}()
@@ -99,7 +99,7 @@ func CopyFromBadgerToPebbleSSTables(badgerDB *badger.DB, pebbleDB *pebble.DB, cf
 	return firstErr
 }
 
-func writerSSTableWorker(ctx context.Context, db *pebble.DB, sstableDir string, kvChan <-chan KVPairs) error {
+func writerSSTableWorker(ctx context.Context, workerIndex int, db *pebble.DB, sstableDir string, kvChan <-chan KVPairs) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -109,7 +109,7 @@ func writerSSTableWorker(ctx context.Context, db *pebble.DB, sstableDir string, 
 				return nil
 			}
 
-			filePath := fmt.Sprintf("%s/prefix_%x.sst", sstableDir, kvGroup.Prefix)
+			filePath := fmt.Sprintf("%s/prefix_%x_worker_%v.sst", sstableDir, kvGroup.Prefix, workerIndex)
 			writer, err := createSSTableWriter(filePath)
 			if err != nil {
 				return err
