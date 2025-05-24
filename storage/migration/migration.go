@@ -86,8 +86,6 @@ func readerWorker(
 ) error {
 	for prefix := range jobs {
 		err := db.View(func(txn *badger.Txn) error {
-			defer lgProgress(1)
-
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
