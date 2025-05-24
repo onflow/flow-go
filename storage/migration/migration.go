@@ -16,6 +16,7 @@ import (
 )
 
 type MigrationConfig struct {
+	PebbleDir         string
 	BatchByteSize     int // the size of each batch to write to pebble
 	ReaderWorkerCount int // the number of workers to read from badger
 	WriterWorkerCount int // the number of workers to write to the pebble

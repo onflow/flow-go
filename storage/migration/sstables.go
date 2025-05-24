@@ -19,12 +19,12 @@ import (
 // using SSTable ingestion. It reads BadgerDB in prefix-sharded ranges and writes
 // those ranges into SSTable files, which are then ingested into Pebble.
 func CopyFromBadgerToPebbleSSTables(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg MigrationConfig) error {
-	pebbleDir, err := os.MkdirTemp("", "flow-migration-temp-")
+	sstableDir, err := os.MkdirTemp(cfg.PebbleDir, "flow-migration-temp-")
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
 
-	log.Info().Msgf("Created temporary directory for SSTables: %s", pebbleDir)
+	log.Info().Msgf("Created temporary directory for SSTables: %s", sstableDir)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -83,7 +83,7 @@ func CopyFromBadgerToPebbleSSTables(badgerDB *badger.DB, pebbleDB *pebble.DB, cf
 		writerWg.Add(1)
 		go func() {
 			defer writerWg.Done()
-			if err := writerSSTableWorker(ctx, pebbleDB, pebbleDir, kvChan); err != nil {
+			if err := writerSSTableWorker(ctx, pebbleDB, sstableDir, kvChan); err != nil {
 				reportFirstError(err)
 			}
 		}()
@@ -99,7 +99,7 @@ func CopyFromBadgerToPebbleSSTables(badgerDB *badger.DB, pebbleDB *pebble.DB, cf
 	return firstErr
 }
 
-func writerSSTableWorker(ctx context.Context, db *pebble.DB, pebbleDir string, kvChan <-chan KVPairs) error {
+func writerSSTableWorker(ctx context.Context, db *pebble.DB, sstableDir string, kvChan <-chan KVPairs) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -109,7 +109,7 @@ func writerSSTableWorker(ctx context.Context, db *pebble.DB, pebbleDir string, k
 				return nil
 			}
 
-			filePath := fmt.Sprintf("%s/prefix_%x.sst", pebbleDir, kvGroup.Prefix)
+			filePath := fmt.Sprintf("%s/prefix_%x.sst", sstableDir, kvGroup.Prefix)
 			writer, err := createSSTableWriter(filePath)
 			if err != nil {
 				return err

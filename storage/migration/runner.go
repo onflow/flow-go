@@ -83,6 +83,7 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 	lg.Info().Msgf("Step 3/7 Migration started. created mark file: %s", startMarkerPath)
 
 	// Step 4: Migrate data
+	cfg.PebbleDir = pebbleDir
 	if err := CopyFromBadgerToPebbleSSTables(badgerDB, pebbleDB, cfg); err != nil {
 		return fmt.Errorf("failed to migrate data from Badger to Pebble: %w", err)
 	}
