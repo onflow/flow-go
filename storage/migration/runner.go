@@ -37,11 +37,13 @@ var DefaultMigrationConfig = MigrationConfig{
 // database operations, or validation mismatches.
 func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error {
 	// Step 1: Validate directories
+	log.Info().Msgf("Step 1/7 Validating directories...")
 	if err := validateBadgerFolderExistPebbleFolderEmpty(badgerDir, pebbleDir); err != nil {
 		return fmt.Errorf("directory validation failed: %w", err)
 	}
 
 	// Step 2: Open Badger and Pebble DBs
+	log.Info().Msgf("Step 2/7 Opening BadgerDB and PebbleDB...")
 	badgerDB, err := badger.Open(badger.DefaultOptions(badgerDir).WithLogger(nil))
 	if err != nil {
 		return fmt.Errorf("failed to open BadgerDB: %w", err)
@@ -50,7 +52,6 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 
 	pebbleDB, err := pebble.Open(pebbleDir, &pebble.Options{
 		DisableAutomaticCompactions: true, // compaction will be done at the end
-		DisableWAL:                  true, // no need for WAL during migration
 		EventListener: &pebble.EventListener{
 			CompactionEnd: func(info pebble.CompactionInfo) {
 				log.Info().Msgf("Compaction ended: %s", info.String())
