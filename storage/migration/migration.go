@@ -134,6 +134,8 @@ func readerWorker(
 			return nil
 		})
 
+		lgProgress(1)
+
 		if err != nil {
 			return err
 		}
