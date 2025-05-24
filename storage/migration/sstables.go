@@ -131,8 +131,6 @@ func writerSSTableWorker(ctx context.Context, db *pebble.DB, pebbleDir string, k
 			}
 
 			log.Info().Msgf("Ingested SSTable file: %s", filePath)
-
-			return nil
 		}
 	}
 }
