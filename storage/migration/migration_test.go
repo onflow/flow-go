@@ -45,7 +45,7 @@ func runMigrationTestCase(t *testing.T, testData map[string]string, cfg Migratio
 		}))
 
 		// Run migration
-		err := CopyFromBadgerToPebble(badgerDB, pebbleDB, cfg)
+		err := CopyFromBadgerToPebbleSSTables(badgerDB, pebbleDB, cfg)
 		require.NoError(t, err)
 
 		// Validate each key
