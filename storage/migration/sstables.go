@@ -110,7 +110,7 @@ func writerSSTableWorker(ctx context.Context, db *pebble.DB, pebbleDir string, k
 			}
 
 			filePath := fmt.Sprintf("%s/prefix_%x.sst", pebbleDir, kvGroup.Prefix)
-			writer, err := createSSTableWriter(pebbleDir)
+			writer, err := createSSTableWriter(filePath)
 			if err != nil {
 				return err
 			}
@@ -131,11 +131,6 @@ func writerSSTableWorker(ctx context.Context, db *pebble.DB, pebbleDir string, k
 			}
 
 			log.Info().Msgf("Ingested SSTable file: %s", filePath)
-
-			err = os.Remove(filePath)
-			if err != nil {
-				return fmt.Errorf("fail to remove file %v: %w", filePath, err)
-			}
 
 			return nil
 		}
