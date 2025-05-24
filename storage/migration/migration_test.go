@@ -1,6 +1,7 @@
 package migration
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 
@@ -163,4 +164,74 @@ func generateRandomKVData(count, keyLen, valLen int) map[string]string {
 		data[k] = v
 	}
 	return data
+}
+
+func BenchmarkCopyFromBadgerToPebble(b *testing.B) {
+	// Configuration
+	const (
+		numEntries        = 1_000_000
+		keySize           = 16
+		valueSize         = 128
+		batchByteSize     = 4 * 1024 * 1024 // 4MB
+		readerWorkerCount = 4
+		writerWorkerCount = 4
+		prefixBytes       = 1
+	)
+
+	// Setup: Create temp dirs for Badger and Pebble
+	unittest.RunWithTempDirs(b, func(badgerDir, pebbleDir string) {
+		// Open Badger
+		badgerOpts := badger.DefaultOptions(badgerDir).WithLogger(nil)
+		badgerDB, err := badger.Open(badgerOpts)
+		if err != nil {
+			b.Fatalf("failed to open BadgerDB: %v", err)
+		}
+		defer badgerDB.Close()
+
+		// Insert random data into Badger
+		rng := rand.New(rand.NewSource(42))
+		batchSize := 100
+		batchCount := numEntries / batchSize
+		for range batchSize {
+			err = badgerDB.Update(func(txn *badger.Txn) error {
+				for range batchCount {
+					key := make([]byte, keySize)
+					value := make([]byte, valueSize)
+					rng.Read(key)
+					rng.Read(value)
+
+					if err := txn.Set(key, value); err != nil {
+						return fmt.Errorf("failed to set key %x: %w", key, err)
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				b.Fatalf("failed to insert data into BadgerDB: %v", err)
+			}
+		}
+
+		// Open Pebble
+		pebbleDB, err := pebble.Open(pebbleDir, &pebble.Options{})
+		if err != nil {
+			b.Fatalf("failed to open PebbleDB: %v", err)
+		}
+		defer pebbleDB.Close()
+
+		// Setup migration config
+		cfg := MigrationConfig{
+			BatchByteSize:          batchByteSize,
+			ReaderWorkerCount:      readerWorkerCount,
+			WriterWorkerCount:      writerWorkerCount,
+			ReaderShardPrefixBytes: prefixBytes,
+		}
+
+		// Benchmark the migration
+		b.ResetTimer()
+		b.StartTimer()
+		if err := CopyFromBadgerToPebble(badgerDB, pebbleDB, cfg); err != nil {
+			b.Fatalf("migration failed: %v", err)
+		}
+		b.StopTimer()
+	})
 }
