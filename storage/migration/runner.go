@@ -50,6 +50,7 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 
 	pebbleDB, err := pebble.Open(pebbleDir, &pebble.Options{
 		DisableAutomaticCompactions: true, // compaction will be done at the end
+		DisableWAL:                  true, // no need for WAL during migration
 		EventListener: &pebble.EventListener{
 			CompactionEnd: func(info pebble.CompactionInfo) {
 				log.Info().Msgf("Compaction ended: %s", info.String())
