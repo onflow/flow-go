@@ -8,6 +8,7 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/storage/util"
 	"github.com/rs/zerolog/log"
 )
 
@@ -42,14 +43,25 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 	}
 
 	// Step 2: Open Badger and Pebble DBs
-	badgerDB, err := badger.Open(badger.DefaultOptions(badgerDir).WithLogger(nil))
+	log.Info().Msgf("Step 2/7 Opening BadgerDB and PebbleDB...")
+	badgerOptions := badger.DefaultOptions(badgerDir).
+		WithLogger(util.NewLogger(log.Logger.With().Str("db", "badger").Logger())).
+		WithReadOnly(true).
+		WithNumCompactors(0).
+		WithNumLevelZeroTables(0)
+	badgerDB, err := badger.Open(badgerOptions)
 	if err != nil {
 		return fmt.Errorf("failed to open BadgerDB: %w", err)
 	}
 	defer badgerDB.Close()
 
 	pebbleDB, err := pebble.Open(pebbleDir, &pebble.Options{
-		DisableAutomaticCompactions: true,
+		DisableAutomaticCompactions: true, // compaction will be done at the end
+		EventListener: &pebble.EventListener{
+			CompactionEnd: func(info pebble.CompactionInfo) {
+				log.Info().Msgf("Compaction ended: %s", info.String())
+			},
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to open PebbleDB: %w", err)
