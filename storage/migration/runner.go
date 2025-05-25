@@ -19,6 +19,20 @@ var DefaultMigrationConfig = MigrationConfig{
 	ReaderShardPrefixBytes: 2, // better to keep it as 2.
 }
 
+func RunMigrationAndCompaction(badgerDir string, pebbleDir string, cfg MigrationConfig) error {
+	err := RunMigration(badgerDir, pebbleDir, cfg)
+	if err != nil {
+		return err
+	}
+
+	err = ForceCompactPebbleDB(pebbleDir)
+	if err != nil {
+		return fmt.Errorf("failed to compact PebbleDB: %w", err)
+	}
+
+	return nil
+}
+
 // RunMigration performs a complete migration of key-value data from a BadgerDB directory
 // to a PebbleDB directory and verifies the integrity of the migrated data.
 //
@@ -43,7 +57,7 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 	}
 
 	// Step 2: Open Badger and Pebble DBs
-	log.Info().Msgf("Step 2/7 Opening BadgerDB and PebbleDB...")
+	log.Info().Msgf("Step 2/6 Opening BadgerDB and PebbleDB...")
 	badgerOptions := badger.DefaultOptions(badgerDir).
 		WithLogger(util.NewLogger(log.Logger.With().Str("db", "badger").Logger())).
 		WithNumCompactors(0).
@@ -80,7 +94,7 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 		Str("to-pebble-dir", pebbleDir).
 		Logger()
 
-	lg.Info().Msgf("Step 3/7 Migration started. created mark file: %s", startMarkerPath)
+	lg.Info().Msgf("Step 3/6 Migration started. created mark file: %s", startMarkerPath)
 
 	// Step 4: Migrate data
 	cfg.PebbleDir = pebbleDir
@@ -90,7 +104,7 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 
 	validatingPrefixBytesCount := 2
 
-	lg.Info().Msgf("Step 4/7 Migration from BadgerDB to PebbleDB completed successfully. "+
+	lg.Info().Msgf("Step 4/6 Migration from BadgerDB to PebbleDB completed successfully. "+
 		"Validating key consistency with %v prefix bytes...", validatingPrefixBytesCount)
 
 	// Step 5: Validate data
@@ -98,7 +112,7 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 		return fmt.Errorf("data validation failed: %w", err)
 	}
 
-	log.Info().Msgf("Step 5/7 Data validation between BadgerDB and PebbleDB completed successfully.")
+	log.Info().Msgf("Step 5/6 Data validation between BadgerDB and PebbleDB completed successfully.")
 
 	// Step 6: Write MIGRATION_COMPLETED file with timestamp
 	endTime := time.Now().Format(time.RFC3339)
@@ -109,16 +123,7 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 	}
 
 	lg.Info().Str("file", completeMarkerPath).
-		Msgf("Step 6/7 Migration marker file written successfully. Compacting pebbleDB...")
-
-	// Step 7: Compact the Pebble DB
-	// 1 byte prefix is enough
-	err = pebbleDB.Compact([]byte{0x00}, []byte{0xff}, true)
-	if err != nil {
-		return fmt.Errorf("fail to compact")
-	}
-
-	log.Info().Msgf("Step 7/7 Compaction completed. Migration completed.")
+		Msgf("Step 6/6 Migration marker file written successfully. Compacting pebbleDB...")
 
 	return nil
 }

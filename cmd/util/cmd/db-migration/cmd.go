@@ -55,7 +55,7 @@ func run(*cobra.Command, []string) {
 
 	lg.Info().Msgf("starting migration from badger db to pebble db")
 
-	err := migration.RunMigration(flagBadgerDBdir, flagPebbleDBdir, migration.MigrationConfig{
+	err := migration.RunMigrationAndCompaction(flagBadgerDBdir, flagPebbleDBdir, migration.MigrationConfig{
 		BatchByteSize:          flagBatchByteSize,
 		ReaderWorkerCount:      flagReaderCount,
 		WriterWorkerCount:      flagWriterCount,
