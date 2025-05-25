@@ -145,3 +145,12 @@ func createSSTableWriter(filePath string) (*sstable.Writer, error) {
 
 	return sstWriter, nil
 }
+
+func ForceCompactPebbleDB(pebbleDir string) error {
+	pebbleDB, err := pebble.Open(pebbleDir, &pebble.Options{})
+	if err != nil {
+		return err
+	}
+
+	return pebbleDB.Compact([]byte{0x00}, []byte{0xff}, true)
+}
