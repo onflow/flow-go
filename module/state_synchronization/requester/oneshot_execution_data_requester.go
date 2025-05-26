@@ -3,6 +3,7 @@ package requester
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -48,7 +49,11 @@ func NewOneshotExecutionDataRequester(
 	executionResult *flow.ExecutionResult,
 	blockHeader *flow.Header,
 	config OneshotExecutionDataConfig,
-) *OneshotExecutionDataRequester {
+) (*OneshotExecutionDataRequester, error) {
+	if blockHeader.ID() != executionResult.BlockID {
+		return nil, fmt.Errorf("block id and execution result mismatch")
+	}
+
 	return &OneshotExecutionDataRequester{
 		log:             log.With().Str("component", "oneshot_execution_data_requester").Logger(),
 		metrics:         metrics,
@@ -56,7 +61,7 @@ func NewOneshotExecutionDataRequester(
 		executionResult: executionResult,
 		blockHeader:     blockHeader,
 		config:          config,
-	}
+	}, nil
 }
 
 // RequestExecutionData requests execution data for a given block from the execution data cache.
@@ -163,7 +168,7 @@ func (r *OneshotExecutionDataRequester) processFetchRequest(
 	defer cancel()
 
 	// NOTE: ByID does not add execData to cache or check if it is already in a cache, it only returns execData
-	execData, err := r.execDataCache.ByID(ctx, blockID)
+	execData, err := r.execDataCache.ByID(ctx, executionDataID)
 	r.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, height)
 	if err != nil {
 		return nil, err
