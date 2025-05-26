@@ -62,6 +62,47 @@ func NewExecutionNodeIdentitiesProvider(
 	}
 }
 
+// ExecutionNodesForResultID returns execution node identities that produced receipts
+// for the specific execution result ID within the given block.
+func (e *ExecutionNodeIdentitiesProvider) ExecutionNodesForResultID(
+	_ context.Context,
+	blockID flow.Identifier,
+	resultID flow.Identifier,
+) (flow.IdentitySkeletonList, error) {
+	allReceipts, err := e.executionReceipts.ByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve execution receipts for block ID %v: %w", blockID, err)
+	}
+
+	executionReceiptMetaList := make(flow.ExecutionReceiptMetaList, 0, len(allReceipts))
+	for _, r := range allReceipts {
+		executionReceiptMetaList = append(executionReceiptMetaList, r.Meta())
+	}
+
+	receiptsByResultID := executionReceiptMetaList.GroupByResultID()
+	targetReceipts := receiptsByResultID.GetGroup(resultID)
+
+	if len(targetReceipts) == 0 {
+		return nil, fmt.Errorf("no execution receipts found for result ID %v in block %v", resultID, blockID)
+	}
+
+	var executorIDs flow.IdentifierList
+	for _, receipt := range targetReceipts {
+		executorIDs = append(executorIDs, receipt.ExecutorID)
+	}
+
+	subsetENs, err := e.chooseExecutionNodes(executorIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve execution IDs for result ID %v: %w", resultID, err)
+	}
+
+	if len(subsetENs) == 0 {
+		return nil, fmt.Errorf("no matching execution node found for result ID %v", resultID)
+	}
+
+	return subsetENs, nil
+}
+
 // ExecutionNodesForBlockID returns upto maxNodesCnt number of randomly chosen execution node identities
 // which have executed the given block ID.
 // If no such execution node is found, an InsufficientExecutionReceipts error is returned.

@@ -20,41 +20,49 @@ type TransactionErrorMessagesRequesterConfig struct {
 }
 
 // TransactionErrorMessagesRequester is a thin wrapper over a TxErrorMessagesCore that manages the retrieval
-// of transaction error messages with retry and backoff configurations.
+// of transaction error messages with retry and backoff configurations for a specific execution result.
 type TransactionErrorMessagesRequester struct {
-	core   *TxErrorMessagesCore
-	config *TransactionErrorMessagesRequesterConfig
+	core            *TxErrorMessagesCore
+	config          *TransactionErrorMessagesRequesterConfig
+	executionResult *flow.ExecutionResult
 }
 
 func NewTransactionErrorMessagesRequester(
 	core *TxErrorMessagesCore,
 	config *TransactionErrorMessagesRequesterConfig,
+	executionResult *flow.ExecutionResult,
 ) *TransactionErrorMessagesRequester {
 	return &TransactionErrorMessagesRequester{
-		core:   core,
-		config: config,
+		core:            core,
+		config:          config,
+		executionResult: executionResult,
 	}
 }
 
-func (r *TransactionErrorMessagesRequester) RequestTransactionErrorMessagesByBlockID(
+// RequestTransactionErrorMessages fetches transaction error messages for the specific
+// execution result this requester was configured with.
+func (r *TransactionErrorMessagesRequester) RequestTransactionErrorMessages(
 	ctx irrecoverable.SignalerContext,
-	blockID flow.Identifier,
 ) error {
 	backoff := retry.NewExponential(r.config.RetryDelay)
 	backoff = retry.WithCappedDuration(r.config.MaxRetryDelay, backoff)
 	backoff = retry.WithJitterPercent(15, backoff)
+
+	blockID := r.executionResult.BlockID
+	resultID := r.executionResult.ID()
 
 	attempt := 0
 	return retry.Do(ctx, backoff, func(context.Context) error {
 		if attempt > 0 {
 			r.core.log.Debug().
 				Str("block_id", blockID.String()).
+				Str("result_id", resultID.String()).
 				Uint64("attempt", uint64(attempt)).
 				Msgf("retrying download")
 		}
 		attempt++
 
-		err := r.core.HandleTransactionResultErrorMessages(ctx, blockID)
+		err := r.core.HandleTransactionResultErrorMessagesByResultID(ctx, blockID, resultID)
 
 		return retry.RetryableError(err)
 	})

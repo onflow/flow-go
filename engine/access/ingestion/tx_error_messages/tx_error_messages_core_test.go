@@ -163,12 +163,16 @@ func (s *TxErrorMessagesCoreSuite) TestTransactionErrorMessagesRequester_HappyPa
 	block := unittest.BlockWithParentFixture(s.finalizedBlock)
 	blockId := block.ID()
 
+	executionResult := &flow.ExecutionResult{
+		BlockID: blockId,
+		Chunks:  unittest.ChunkListFixture(1, blockId, unittest.StateCommitmentFixture()),
+	}
+
 	s.connFactory.On("GetExecutionAPIClient", mock.Anything).Return(s.execClient, &mockCloser{}, nil)
 
 	// Mock the protocol snapshot to return fixed execution node IDs.
-	setupReceiptsForBlock(s.receipts, block, s.enNodeIDs.NodeIDs()[0])
+	setupReceiptsForBlockWithResult(s.receipts, block, s.enNodeIDs.NodeIDs()[0], *executionResult)
 	s.proto.snapshot.On("Identities", mock.Anything).Return(s.enNodeIDs, nil)
-	s.proto.state.On("AtBlockID", blockId).Return(s.proto.snapshot).Once()
 
 	// Create mock transaction results with a mix of failed and non-failed transactions.
 	resultsByBlockID := mockTransactionResultsByBlock(5)
@@ -198,9 +202,9 @@ func (s *TxErrorMessagesCoreSuite) TestTransactionErrorMessagesRequester_HappyPa
 		RetryDelay:    1 * time.Second,
 		MaxRetryDelay: 5 * time.Minute,
 	}
-	requester := NewTransactionErrorMessagesRequester(core, config)
+	requester := NewTransactionErrorMessagesRequester(core, config, executionResult)
 
-	err := requester.RequestTransactionErrorMessagesByBlockID(irrecoverableCtx, blockId)
+	err := requester.RequestTransactionErrorMessages(irrecoverableCtx)
 	require.NoError(s.T(), err)
 
 	// Verify that the mock expectations for storing the error messages were met.
@@ -377,6 +381,20 @@ func setupReceiptsForBlock(receipts *storage.ExecutionReceipts, block *flow.Bloc
 	receipt2 := unittest.ReceiptForBlockFixture(block)
 	receipt2.ExecutorID = eNodeID
 	receipt1.ExecutionResult = receipt2.ExecutionResult
+
+	receiptsList := flow.ExecutionReceiptList{receipt1, receipt2}
+
+	receipts.
+		On("ByBlockID", block.ID()).
+		Return(func(flow.Identifier) flow.ExecutionReceiptList {
+			return receiptsList
+		}, nil)
+}
+
+// setupReceiptsForBlockWithResult sets up mock execution receipts for a block with a specific execution result
+func setupReceiptsForBlockWithResult(receipts *storage.ExecutionReceipts, block *flow.Block, eNodeID flow.Identifier, executionResult flow.ExecutionResult) {
+	receipt1 := unittest.ExecutionReceiptFixture(unittest.WithResult(&executionResult), unittest.WithExecutorID(eNodeID))
+	receipt2 := unittest.ExecutionReceiptFixture(unittest.WithResult(&executionResult), unittest.WithExecutorID(eNodeID))
 
 	receiptsList := flow.ExecutionReceiptList{receipt1, receipt2}
 

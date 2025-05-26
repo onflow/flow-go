@@ -62,6 +62,33 @@ func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessages(ctx context.C
 	return c.HandleTransactionResultErrorMessagesByENs(ctx, blockID, execNodes)
 }
 
+// HandleTransactionResultErrorMessagesByResultID processes transaction result error messages
+// for a specific execution result ID within a given block.
+// It retrieves error messages from execution nodes that produced receipts for the specific result.
+//
+// Parameters:
+// - ctx: The context for managing cancellation and deadlines during the operation.
+// - blockID: The identifier of the block containing the execution result.
+// - resultID: The identifier of the specific execution result for which to fetch error messages.
+//
+// No errors are expected during normal operation.
+func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessagesByResultID(
+	ctx context.Context,
+	blockID flow.Identifier,
+	resultID flow.Identifier,
+) error {
+	execNodes, err := c.execNodeIdentitiesProvider.ExecutionNodesForResultID(ctx, blockID, resultID)
+	if err != nil {
+		c.log.Error().Err(err).
+			Str("block_id", blockID.String()).
+			Str("result_id", resultID.String()).
+			Msg("failed to find execution nodes for specific result ID")
+		return fmt.Errorf("could not find execution nodes for result %v in block %v: %w", resultID, blockID, err)
+	}
+
+	return c.HandleTransactionResultErrorMessagesByENs(ctx, blockID, execNodes)
+}
+
 func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessagesByENs(
 	ctx context.Context,
 	blockID flow.Identifier,
