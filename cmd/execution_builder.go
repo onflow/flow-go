@@ -54,7 +54,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
-	"github.com/onflow/flow-go/engine/execution/migration"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	exepruner "github.com/onflow/flow-go/engine/execution/pruner"
 	"github.com/onflow/flow-go/engine/execution/rpc"
@@ -224,7 +223,6 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
 		Module("bootstrap", exeNode.LoadBootstrapper).
 		Module("register store", exeNode.LoadRegisterStore).
-		Module("migrate last executed block", exeNode.MigrateLastSealedExecutedResultToPebble).
 		AdminCommand("get-transactions", func(conf *NodeConfig) commands.AdminCommand {
 			return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, exeNode.collections)
 		}).
@@ -753,16 +751,6 @@ func (exeNode *ExecutionNode) LoadBlobservicePeerManagerDependencies(node *NodeC
 func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
 	exeNode.executionDataBlobstore = blobs.NewBlobstore(exeNode.executionDataDatastore)
 	exeNode.executionDataStore = execution_data.NewExecutionDataStore(exeNode.executionDataBlobstore, execution_data.DefaultSerializer)
-	return nil
-}
-
-func (exeNode *ExecutionNode) MigrateLastSealedExecutedResultToPebble(node *NodeConfig) error {
-	// Migrate the last sealed executed
-	err := migration.MigrateLastSealedExecutedResultToPebble(node.Logger, node.DB, node.PebbleDB, node.State, node.RootSeal)
-	if err != nil {
-		return fmt.Errorf("could not migrate last sealed executed result to pebble: %w", err)
-	}
-
 	return nil
 }
 
