@@ -875,15 +875,16 @@ func chunkDataPackResponseFixture(t *testing.T,
 
 	require.Equal(t, collection != nil, !convert.IsSystemChunk(chunk.Index, result), "only non-system chunks must have a collection")
 
-	return &verification.ChunkDataPackResponse{
-		Locator: chunks.Locator{
+	response := verification.NewChunkDataPackResponse(
+		chunks.Locator{
 			ResultID: result.ID(),
 			Index:    chunk.Index,
 		},
-		Cdp: unittest.ChunkDataPackFixture(chunk.ID(),
+		unittest.ChunkDataPackFixture(chunk.ID(),
 			unittest.WithStartState(chunk.StartState),
 			unittest.WithChunkDataPackCollection(collection)),
-	}
+	)
+	return &response
 }
 
 // verifiableChunksFixture is a test helper that creates verifiable chunks and chunk data responses.

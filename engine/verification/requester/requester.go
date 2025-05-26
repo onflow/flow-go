@@ -198,10 +198,10 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	}
 
 	for _, locator := range locators {
-		response := verification.ChunkDataPackResponse{
-			Locator: *locator,
-			Cdp:     chunkDataPack,
-		}
+		response := verification.NewChunkDataPackResponse(
+			*locator,
+			chunkDataPack,
+		)
 
 		e.handler.HandleChunkDataPack(originID, &response)
 		e.metrics.OnChunkDataPackSentToFetcher()
