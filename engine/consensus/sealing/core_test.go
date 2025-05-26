@@ -775,7 +775,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 //  1. Proper handling of seals/results referencing blocks *before* the lowest block in `SealingSegment.Blocks`
 //  2. Correct initialization of the assignment collector tree.
 //
-// We referr to the lowest block in `SealingSegment.Blocks` as the `SealedRoot` and to the highest as `FinalizedRoot`
+// We refer to the lowest block in `SealingSegment.Blocks` as the `SealedRoot` and to the highest as `FinalizedRoot`
 // Chain structure:
 //
 //	Pre-Root Blocks    Root Sealing Segment (queryable blocks)
@@ -816,8 +816,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 //   - With excluded ancestor blocks (i), ProposerSigData cannot be nil for any block in
 //     SealingSegment.Blocks as they are not genesis blocks.
 //
-// This test focuses on case (i) to verify the engine correctly handles references to
-// pre-root blocks during assignment collector tree population.
+// However, in this test we combine both scenarios to reduce the number of test cases.
 func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_RootSealingSegment() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -894,8 +893,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 			Blocks: []*flow.BlockProposal{
 				{
 					Block:           &blockS,
-					ProposerSigData: unittest.SignatureFixture(), // By convention, root block has no proposer signature - implementation has to handle this edge case
-					// ProposerSigData: nil,
+					ProposerSigData: nil, // combination of (i) and (ii): spork root block without proposer signature; but with ancestor blocks
 				},
 				{
 					Block:           blockB,
@@ -915,12 +913,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 
 	// Mock highest sealed block lookup
 	s.sealsDB.On("HighestInFork", blockD.ID()).Return(sealS, nil)
-
-	// print height of blocks S, B, C, D:
-	//fmt.Printf("Receipt X S height: %v\n", receiptX.ExecutionResult.ID())
-	//fmt.Printf("Block X id: %v\n", receiptX.ExecutionResult.BlockID)
-	//fmt.Printf("Block C height: %d\n", blockC.Header.Height)
-	//fmt.Printf("Block D height: %d\n", blockD.Header.Height)
 
 	// Instantiate sealing.Core and repopulate the assignment collector tree
 	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{},
