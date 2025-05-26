@@ -262,6 +262,7 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 
 func copyExactKeysFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, keys [][]byte) error {
 	batch := pebbleDB.NewBatch()
+	keyCount := 0
 	err := badgerDB.View(func(txn *badger.Txn) error {
 		for _, key := range keys {
 			item, err := txn.Get(key)
@@ -275,6 +276,7 @@ func copyExactKeysFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, k
 			}
 
 			err = item.Value(func(val []byte) error {
+				keyCount++
 				return batch.Set(key, val, nil)
 			})
 
@@ -289,6 +291,8 @@ func copyExactKeysFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, k
 	if err != nil {
 		return fmt.Errorf("failed to get key from BadgerDB: %w", err)
 	}
+
+	log.Info().Msgf("Copied %d keys from BadgerDB to PebbleDB", keyCount)
 
 	err = batch.Commit(pebble.Sync)
 	if err != nil {
