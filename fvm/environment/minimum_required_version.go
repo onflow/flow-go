@@ -1,6 +1,8 @@
 package environment
 
 import (
+	"sync"
+
 	"github.com/coreos/go-semver/semver"
 
 	"github.com/onflow/flow-go/fvm/errors"
@@ -15,32 +17,49 @@ type GetVersionBeaconFunc func() (*flow.SealedVersionBeacon, error)
 
 type VersionBeaconExecutionVersionProvider struct {
 	getVersionBeacon GetVersionBeaconFunc
+
+	once          sync.Once
+	cachedVersion semver.Version
+	cachedErr     error
 }
 
-func NewVersionBeaconExecutionVersionProvider(getVersionBeacon GetVersionBeaconFunc) VersionBeaconExecutionVersionProvider {
-	return VersionBeaconExecutionVersionProvider{
+// NewVersionBeaconExecutionVersionProvider creates a new VersionBeaconExecutionVersionProvider
+// It caches the result of the getVersionBeacon function
+// The assumption here is that the GetVersionBeaconFunc will not return a different result for the lifetime of the provider
+// This is safe to make because version beacons change in between blocks and VersionBeaconExecutionVersionProvider are created
+// on every block.
+//
+// This logic will go away once we switch to the cadence component version from the dynamic protocol state
+func NewVersionBeaconExecutionVersionProvider(getVersionBeacon GetVersionBeaconFunc) *VersionBeaconExecutionVersionProvider {
+	return &VersionBeaconExecutionVersionProvider{
 		getVersionBeacon: getVersionBeacon,
 	}
 }
 
-func (v VersionBeaconExecutionVersionProvider) ExecutionVersion() (semver.Version, error) {
-	vb, err := v.getVersionBeacon()
-	if err != nil {
-		return semver.Version{}, err
-	}
-	// Special case. If there are no version boundaries, then the execution version is 0.0.0.
-	if vb == nil || len(vb.VersionBoundaries) == 0 {
-		return semver.Version{}, nil
-	}
+func (v *VersionBeaconExecutionVersionProvider) ExecutionVersion() (semver.Version, error) {
+	v.once.Do(func() {
+		vb, err := v.getVersionBeacon()
+		if err != nil {
+			v.cachedErr = err
+			return
+		}
+		// Special case. If there are no version boundaries, then the execution version is 0.0.0.
+		if vb == nil || len(vb.VersionBoundaries) == 0 {
+			v.cachedVersion = semver.Version{}
+			return
+		}
 
-	// by definition zero boundary is the last most recent past boundary
-	boundary := vb.VersionBoundaries[0]
-	sv, err := boundary.Semver()
-	if err != nil {
-		return semver.Version{}, err
-	}
+		// by definition zero boundary is the last most recent past boundary
+		boundary := vb.VersionBoundaries[0]
+		sv, err := boundary.Semver()
+		if err != nil {
+			v.cachedErr = err
+			return
+		}
+		v.cachedVersion = *sv
+	})
 
-	return *sv, nil
+	return v.cachedVersion, v.cachedErr
 }
 
 type ZeroExecutionVersionProvider struct{}
