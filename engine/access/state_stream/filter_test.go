@@ -161,7 +161,15 @@ func TestMatch(t *testing.T) {
 
 	events := make([]flow.Event, 0, len(eventTypes))
 	for eventType := range eventTypes {
-		events = append(events, flow.Event{Type: flow.EventType(eventType)})
+		events = append(events,
+			flow.NewEvent(
+				eventType,
+				flow.ZeroID,
+				0,
+				0,
+				nil,
+			),
+		)
 	}
 
 	for _, test := range tests {

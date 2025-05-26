@@ -91,11 +91,11 @@ func contractUpdatedFixture(t *testing.T, address common.Address, contractName s
 	payload, err := ccf.Encode(testEvent)
 	require.NoError(t, err)
 
-	return flow.Event{
-		Type:             accountContractUpdated,
-		TransactionID:    unittest.IdentifierFixture(),
-		TransactionIndex: 0,
-		EventIndex:       0,
-		Payload:          payload,
-	}
+	return flow.NewEvent(
+		accountContractUpdated,
+		unittest.IdentifierFixture(),
+		0,
+		0,
+		payload,
+	)
 }

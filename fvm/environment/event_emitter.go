@@ -184,13 +184,13 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 	}
 
 	eventType := flow.EventType(event.EventType.ID())
-	flowEvent := flow.Event{
-		Type:             eventType,
-		TransactionID:    emitter.txID,
-		TransactionIndex: emitter.txIndex,
-		EventIndex:       emitter.eventCollection.TotalEventCounter(),
-		Payload:          payload,
-	}
+	flowEvent := flow.NewEvent(
+		eventType,
+		emitter.txID,
+		emitter.txIndex,
+		emitter.eventCollection.TotalEventCounter(),
+		payload,
+	)
 
 	// TODO: to set limit to maximum when it is service account and get rid of this flag
 	isServiceAccount := emitter.payer == emitter.chain.ServiceAddress()

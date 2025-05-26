@@ -96,13 +96,13 @@ func (g *Events) New() flow.Event {
 		}
 	}
 
-	event := flow.Event{
-		Type:             flow.EventType(typeID),
-		TransactionID:    g.ids.New(),
-		TransactionIndex: g.count,
-		EventIndex:       g.count,
-		Payload:          payload,
-	}
+	event := flow.NewEvent(
+		flow.EventType(typeID),
+		g.ids.New(),
+		g.count,
+		g.count,
+		payload,
+	)
 
 	g.count++
 

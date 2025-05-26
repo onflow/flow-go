@@ -30,13 +30,13 @@ func EventToMessage(e flow.Event) *entities.Event {
 // MessageToEvent converts a protobuf message to a flow.Event
 // Note: this function does not convert the payload encoding
 func MessageToEvent(m *entities.Event) flow.Event {
-	return flow.Event{
-		Type:             flow.EventType(m.GetType()),
-		TransactionID:    flow.HashToID(m.GetTransactionId()),
-		TransactionIndex: m.GetTransactionIndex(),
-		EventIndex:       m.GetEventIndex(),
-		Payload:          m.GetPayload(),
-	}
+	return flow.NewEvent(
+		flow.EventType(m.GetType()),
+		flow.HashToID(m.GetTransactionId()),
+		m.GetTransactionIndex(),
+		m.GetEventIndex(),
+		m.GetPayload(),
+	)
 }
 
 // EventsToMessages converts a slice of flow.Events to a slice of protobuf messages
@@ -232,13 +232,14 @@ func CcfEventToJsonEvent(e flow.Event) (*flow.Event, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &flow.Event{
-		Type:             e.Type,
-		TransactionID:    e.TransactionID,
-		TransactionIndex: e.TransactionIndex,
-		EventIndex:       e.EventIndex,
-		Payload:          convertedPayload,
-	}, nil
+
+	event := flow.NewEvent(e.Type,
+		e.TransactionID,
+		e.TransactionIndex,
+		e.EventIndex,
+		convertedPayload,
+	)
+	return &event, nil
 }
 
 // CcfEventsToJsonEvents returns a new event with the payload converted from CCF to JSON

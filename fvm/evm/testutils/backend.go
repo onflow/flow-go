@@ -170,10 +170,13 @@ func getSimpleEventEmitter() *testEventEmitter {
 				return err
 			}
 			eventType := flow.EventType(event.EventType.ID())
-			events = append(events, flow.Event{
-				Type:    eventType,
-				Payload: payload,
-			})
+			events = append(events, flow.NewEvent(
+				eventType,
+				flow.ZeroID,
+				0,
+				0,
+				payload,
+			))
 			return nil
 		},
 		events: func() flow.EventsList {

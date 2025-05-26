@@ -1791,11 +1791,13 @@ func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 	events := make([]flow.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
 		// creating some dummy event
-		event := flow.Event{
-			Type:             "whatever",
-			EventIndex:       uint32(i),
-			TransactionIndex: txIndex,
-		}
+		event := flow.NewEvent(
+			"whatever",
+			flow.ZeroID,
+			txIndex,
+			uint32(i),
+			nil,
+		)
 		events[i] = event
 	}
 	return events

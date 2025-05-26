@@ -1903,13 +1903,13 @@ func EventFixture(
 	txID flow.Identifier,
 	_ int,
 ) flow.Event {
-	return flow.Event{
-		Type:             eType,
-		TransactionIndex: transactionIndex,
-		EventIndex:       eventIndex,
-		Payload:          []byte{},
-		TransactionID:    txID,
-	}
+	return flow.NewEvent(
+		eType,
+		txID,
+		transactionIndex,
+		eventIndex,
+		[]byte{},
+	)
 }
 
 func EmulatorRootKey() (*flow.AccountPrivateKey, error) {

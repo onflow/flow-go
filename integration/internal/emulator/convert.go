@@ -188,13 +188,13 @@ func SDKEventToFlow(event sdk.Event) (flowgo.Event, error) {
 		return flowgo.Event{}, err
 	}
 
-	return flowgo.Event{
-		Type:             flowgo.EventType(event.Type),
-		TransactionID:    SDKIdentifierToFlow(event.TransactionID),
-		TransactionIndex: uint32(event.TransactionIndex),
-		EventIndex:       uint32(event.EventIndex),
-		Payload:          payload,
-	}, nil
+	return flowgo.NewEvent(
+		flowgo.EventType(event.Type),
+		SDKIdentifierToFlow(event.TransactionID),
+		uint32(event.TransactionIndex),
+		uint32(event.EventIndex),
+		payload,
+	), nil
 }
 
 func FlowEventToSDK(flowEvent flowgo.Event) (sdk.Event, error) {
