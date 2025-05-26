@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
@@ -89,6 +90,11 @@ func findFirstMismatch(datadir string, startHeight, endHeight uint64) error {
 	}
 
 	fmt.Printf("mismatching block %v (id: %v)\n", mismatchHeight, blockID)
+
+	err = c.DeepCompareAtBlock(blockID)
+	if err != nil {
+		return fmt.Errorf("could not deep compare at block %v: %v", blockID, err)
+	}
 
 	return nil
 }
@@ -192,4 +198,34 @@ func findSealedResultIDByBlockHeight(seals storage.Seals, blockID flow.Identifie
 	}
 
 	return seal.ResultID, nil
+}
+
+func (c *checker) DeepCompareAtBlock(blockID flow.Identifier) error {
+	ownResultID, err := findOwnResultIDByBlockID(c.results, blockID)
+	if err != nil {
+		return fmt.Errorf("could not find own result for block %v: %w", blockID, err)
+	}
+
+	sealedResultID, err := findSealedResultIDByBlockHeight(c.seals, blockID)
+	if err != nil {
+		return fmt.Errorf("could not find sealed result for block %v: %w", blockID, err)
+	}
+
+	ownResult, err := c.results.ByID(ownResultID)
+	if err != nil {
+		return fmt.Errorf("could not find own result by id %v: %w", ownResultID, err)
+	}
+
+	log.Info().Msgf("own result")
+	common.PrettyPrintEntity(ownResult)
+
+	sealedResult, err := c.results.ByID(sealedResultID)
+	if err != nil {
+		return fmt.Errorf("could not find sealed result by id %v: %w", sealedResultID, err)
+	}
+
+	log.Info().Msgf("sealed result")
+	common.PrettyPrintEntity(sealedResult)
+
+	return nil
 }
