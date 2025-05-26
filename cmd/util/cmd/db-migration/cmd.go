@@ -1,6 +1,9 @@
 package db
 
 import (
+	"fmt"
+
+	"github.com/cockroachdb/pebble"
 	"github.com/docker/go-units"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -20,7 +23,7 @@ var (
 var Cmd = &cobra.Command{
 	Use:   "db-migration",
 	Short: "copy badger db to pebble db",
-	Run:   run,
+	RunE:  run,
 }
 
 func init() {
@@ -43,7 +46,7 @@ func init() {
 		"the number of prefix bytes used to assign iterator workload")
 }
 
-func run(*cobra.Command, []string) {
+func run(*cobra.Command, []string) error {
 	lg := log.With().
 		Str("badger_db_dir", flagBadgerDBdir).
 		Str("pebble_db_dir", flagPebbleDBdir).
@@ -54,18 +57,27 @@ func run(*cobra.Command, []string) {
 		Logger()
 
 	lg.Info().Msgf("starting migration from badger db to pebble db")
-
-	err := migration.RunMigrationAndCompaction(flagBadgerDBdir, flagPebbleDBdir, migration.MigrationConfig{
-		BatchByteSize:          flagBatchByteSize,
-		ReaderWorkerCount:      flagReaderCount,
-		WriterWorkerCount:      flagWriterCount,
-		ReaderShardPrefixBytes: flagReaderShardPrefixBytes,
-	})
-
+	pebbleDB, err := pebble.Open(flagPebbleDBdir, &pebble.Options{})
 	if err != nil {
-		lg.Error().Err(err).Msg("migration failed")
-		return
+		return fmt.Errorf("failed to open PebbleDB: %w", err)
 	}
 
-	lg.Info().Msgf("migration completed")
+	height, err := migration.ReadFinalizedHeight(pebbleDB)
+	if err != nil {
+		return fmt.Errorf("failed to read finalized height from PebbleDB: %w", err)
+	}
+
+	// err = migration.RunMigrationAndCompaction(flagBadgerDBdir, flagPebbleDBdir, migration.MigrationConfig{
+	// 	BatchByteSize:          flagBatchByteSize,
+	// 	ReaderWorkerCount:      flagReaderCount,
+	// 	WriterWorkerCount:      flagWriterCount,
+	// 	ReaderShardPrefixBytes: flagReaderShardPrefixBytes,
+	// })
+	//
+	// if err != nil {
+	// 	return fmt.Errorf("migration failed: %w", err)
+	// }
+
+	lg.Info().Msgf("finalized height: %d", height)
+	return nil
 }
