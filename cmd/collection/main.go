@@ -565,7 +565,7 @@ func main() {
 			hotstuffFactory, err := factories.NewHotStuffFactory(
 				node.Logger,
 				node.Me,
-				node.DB,
+				node.ProtocolDB,
 				node.State,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
