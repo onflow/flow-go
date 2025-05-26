@@ -953,24 +953,27 @@ func chunkRequestsFixture(
 //
 // Agrees and disagrees are the list of execution node identifiers that generate the same and contradicting execution result
 // with the execution result that chunks belong to, respectively.
-func chunkRequestFixture(resultID flow.Identifier,
+func chunkRequestFixture(
+	resultID flow.Identifier,
 	status *verification.ChunkStatus,
 	agrees flow.IdentityList,
-	disagrees flow.IdentityList) *verification.ChunkDataPackRequest {
+	disagrees flow.IdentityList,
+) *verification.ChunkDataPackRequest {
 
-	return &verification.ChunkDataPackRequest{
-		Locator: chunks.Locator{
+	request := verification.NewChunkDataPackRequest(
+		chunks.Locator{
 			ResultID: resultID,
 			Index:    status.ChunkIndex,
 		},
-		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
+		verification.ChunkDataPackRequestInfo{
 			ChunkID:   status.Chunk().ID(),
 			Height:    status.BlockHeight,
 			Agrees:    agrees.NodeIDs(),
 			Disagrees: disagrees.NodeIDs(),
 			Targets:   agrees.Union(disagrees),
 		},
-	}
+	)
+	return &request
 }
 
 // completeChunkStatusListFixture creates a reference block with an execution result associated with it.
