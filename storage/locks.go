@@ -15,6 +15,7 @@ const (
 	LockFinalizeBlock = "lock_finalize_block"
 	// LockIndexResultApproval protects indexing result approvals by approval and chunk.
 	LockIndexResultApproval = "lock_index_result_approval"
+	LockInsertClusterBlock  = "lock_insert_cluster_block"
 )
 
 // Locks returns a list of all named locks used by the storage layer.

@@ -29,6 +29,18 @@ func IndexNewBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flo
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
 	}
 
+	return insertNewBlock(rw, blockID, parentID)
+}
+
+func InsertNewClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertClusterBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+	}
+
+	return insertNewBlock(rw, blockID, parentID)
+}
+
+func insertNewBlock(rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
 	// Step 1: index the child for the new block.
 	// the new block has no child, so adding an empty child index for it
 	err := operation.UpsertBlockChildren(rw.Writer(), blockID, nil)
