@@ -108,7 +108,7 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 
 		if err == nil {
 			for _, node := range nodes {
-				node.ProtocolEvents.BlockFinalized(block.Header)
+				node.ProtocolEvents.BlockFinalized(block.ToHeader())
 			}
 			view = int(block.Header.View)
 		}

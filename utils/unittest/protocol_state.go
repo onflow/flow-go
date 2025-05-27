@@ -16,8 +16,8 @@ import (
 func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 	*flow.Block, *mockprotocol.Snapshot, *mockprotocol.State, *mockprotocol.Snapshot) {
 	sealed := BlockFixture()
-	block := BlockWithParentFixture(sealed.Header)
-	head := block.Header
+	block := BlockWithParentFixture(sealed.ToHeader())
+	head := block.ToHeader()
 
 	// set up protocol snapshot mock
 	snapshot := &mockprotocol.Snapshot{}
@@ -45,7 +45,7 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 	sealedSnapshot := &mockprotocol.Snapshot{}
 	sealedSnapshot.On("Head").Return(
 		func() *flow.Header {
-			return sealed.Header
+			return sealed.ToHeader()
 		},
 		nil,
 	)
@@ -75,7 +75,7 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 // Returns the two generated blocks.
 func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState protocol.MutableProtocolState, block *flow.Block, receipt *flow.ExecutionReceipt, seal *flow.Seal) (br *flow.Block, bs *flow.Block) {
 
-	block2 := BlockWithParentFixture(block.Header)
+	block2 := BlockWithParentFixture(block.ToHeader())
 	block2.SetPayload(flow.Payload{
 		Receipts:        []*flow.ExecutionReceiptStub{receipt.Stub()},
 		Results:         []*flow.ExecutionResult{&receipt.ExecutionResult},
@@ -84,7 +84,7 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState 
 	err := st.Extend(context.Background(), ProposalFromBlock(block2))
 	require.NoError(t, err)
 
-	block3 := BlockWithParentFixture(block2.Header)
+	block3 := BlockWithParentFixture(block2.ToHeader())
 	seals := []*flow.Seal{seal}
 	updatedStateId, dbUpdates, err := mutableProtocolState.EvolveState(block3.Header.ParentID, block3.Header.View, seals)
 	require.NoError(t, err)

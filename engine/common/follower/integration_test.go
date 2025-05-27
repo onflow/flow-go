@@ -160,7 +160,7 @@ func TestFollowerHappyPath(t *testing.T) {
 			proposal.Block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			if i > 0 {
 				proposal.Block.Header.ParentView = flowBlocks[i-1].Block.Header.View
-				proposal.Block.Header.ParentID = flowBlocks[i-1].Block.Header.ID()
+				proposal.Block.Header.ParentID = flowBlocks[i-1].Block.ID()
 			}
 		}
 		pendingBlocks := flowBlockProposalsToMessage(flowBlocks...)

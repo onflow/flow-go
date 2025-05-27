@@ -418,14 +418,14 @@ func (ss *SyncSuite) TestPrune() {
 	for i := 0; i < 3; i++ {
 		block := unittest.BlockFixture()
 		block.Header.Height = uint64(i + 1)
-		ss.core.blockIDs[block.ID()] = ss.ReceivedStatus(block.Header)
+		ss.core.blockIDs[block.ID()] = ss.ReceivedStatus(block.ToHeader())
 		prunableBlockIDs = append(prunableBlockIDs, block)
 	}
 	// add some un-finalized, received blocks by block ID
 	for i := 0; i < 3; i++ {
 		block := unittest.BlockFixture()
 		block.Header.Height = 100 + uint64(i+1)
-		ss.core.blockIDs[block.ID()] = ss.ReceivedStatus(block.Header)
+		ss.core.blockIDs[block.ID()] = ss.ReceivedStatus(block.ToHeader())
 		unprunable = append(unprunable, block)
 	}
 

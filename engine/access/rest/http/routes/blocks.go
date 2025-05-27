@@ -106,7 +106,7 @@ func GetBlockPayloadByID(r *common.Request, backend access.API, _ commonmodels.L
 	}
 
 	var payload commonmodels.BlockPayload
-	err = payload.Build(blk.Payload)
+	err = payload.Build(&blk.Payload)
 	if err != nil {
 		return nil, err
 	}

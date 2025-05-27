@@ -96,16 +96,16 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.SetupTestSuite(blockCount)
 
 	var err error
-	parent := s.rootBlock.Header
+	parent := s.rootBlock.ToHeader()
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
-		parent = block.Header
+		parent = block.ToHeader()
 
 		seal := unittest.BlockSealsFixture(1)[0]
 		result := unittest.ExecutionResultFixture()
-		blockEvents := generateMockEvents(block.Header, (i%len(testEventTypes))*3+1)
+		blockEvents := generateMockEvents(block.ToHeader(), (i%len(testEventTypes))*3+1)
 
 		numChunks := 5
 		chunkDatas := make([]*execution_data.ChunkExecutionData, 0, numChunks)
@@ -172,7 +172,7 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
 	s.blockMap[s.rootBlock.Header.Height] = &s.rootBlock
-	s.highestBlockHeader = s.rootBlock.Header
+	s.highestBlockHeader = s.rootBlock.ToHeader()
 
 	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Header.Height, s.rootBlock.ID())
 }
@@ -196,7 +196,7 @@ func (s *BackendExecutionDataSuite) SetupTestMocks() {
 		}).Maybe()
 
 	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
-	s.snapshot.On("Head").Return(s.blocks[0].Header, nil).Maybe()
+	s.snapshot.On("Head").Return(s.blocks[0].ToHeader(), nil).Maybe()
 
 	s.seals.On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).Return(
 		mocks.StorageMapGetter(s.sealMap),
@@ -210,7 +210,7 @@ func (s *BackendExecutionDataSuite) SetupTestMocks() {
 		func(blockID flow.Identifier) (*flow.Header, error) {
 			for _, block := range s.blockMap {
 				if block.ID() == blockID {
-					return block.Header, nil
+					return block.ToHeader(), nil
 				}
 			}
 			return nil, storage.ErrNotFound
@@ -220,7 +220,7 @@ func (s *BackendExecutionDataSuite) SetupTestMocks() {
 	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 		mocks.ConvertStorageOutput(
 			mocks.StorageMapGetter(s.blockMap),
-			func(block *flow.Block) *flow.Header { return block.Header },
+			func(block *flow.Block) *flow.Header { return block.ToHeader() },
 		),
 	).Maybe()
 
@@ -323,7 +323,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	execData := s.execDataMap[block.ID()]
 
 	// notify backend block is available
-	s.highestBlockHeader = block.Header
+	s.highestBlockHeader = block.ToHeader()
 
 	var err error
 	s.Run("happy path TestGetExecutionDataByBlockID success", func() {
@@ -374,8 +374,8 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 		},
 		{
 			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1,       // backfill all blocks
-			startBlockID:    s.rootBlock.Header.ID(), // start from root block
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+			startBlockID:    s.rootBlock.ID(),  // start from root block
 			startHeight:     0,
 		},
 	}
@@ -508,7 +508,7 @@ func (s *BackendExecutionDataSuite) subscribe(subscribeFunc func(ctx context.Con
 			// this simulates a subscription on a past block
 			for i := 0; i <= test.highestBackfill; i++ {
 				s.T().Logf("backfilling block %d", i)
-				s.highestBlockHeader = s.blocks[i].Header
+				s.highestBlockHeader = s.blocks[i].ToHeader()
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
@@ -522,7 +522,7 @@ func (s *BackendExecutionDataSuite) subscribe(subscribeFunc func(ctx context.Con
 				// simulate new exec data received.
 				// exec data for all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.highestBlockHeader = b.Header
+					s.highestBlockHeader = b.ToHeader()
 					s.broadcaster.Publish()
 				}
 

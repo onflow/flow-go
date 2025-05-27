@@ -207,7 +207,7 @@ func ChainBlockFixtureWithRoot(root *flow.Header, n int) []*flow.Block {
 	for i := 0; i < n; i++ {
 		b := BlockWithParentFixture(parent)
 		bs = append(bs, b)
-		parent = b.Header
+		parent = b.ToHeader()
 	}
 	return bs
 }
@@ -227,7 +227,8 @@ func RechainBlocks(blocks []*flow.Block) {
 
 func FullBlockFixture() flow.Block {
 	block := BlockFixture()
-	payload := block.Payload
+
+	var payload flow.Payload
 	payload.Seals = Seal.Fixtures(10)
 	payload.Results = []*flow.ExecutionResult{
 		ExecutionResultFixture(),
@@ -239,13 +240,7 @@ func FullBlockFixture() flow.Block {
 	}
 	payload.ProtocolStateID = IdentifierFixture()
 
-	header := block.Header
-	header.PayloadHash = payload.Hash()
-
-	return flow.Block{
-		Header:  header,
-		Payload: payload,
-	}
+	return *flow.NewBlock(block.Header, payload)
 }
 
 func BlockFixtures(number int) []*flow.Block {
@@ -298,7 +293,7 @@ func BlockchainFixture(length int) []*flow.Block {
 	genesis := BlockFixture()
 	blocks[0] = &genesis
 	for i := 1; i < length; i++ {
-		blocks[i] = BlockWithParentFixture(blocks[i-1].Header)
+		blocks[i] = BlockWithParentFixture(blocks[i-1].ToHeader())
 	}
 
 	return blocks
@@ -317,7 +312,7 @@ func AsSlashable[T any](msg T) flow.Slashable[T] {
 func ReceiptAndSealForBlock(block *flow.Block, serviceEvents ...flow.ServiceEvent) (*flow.ExecutionReceipt, *flow.Seal) {
 	receipt := ReceiptForBlockFixture(block)
 	receipt.ExecutionResult.ServiceEvents = serviceEvents
-	seal := Seal.Fixture(Seal.WithBlock(block.Header), Seal.WithResult(&receipt.ExecutionResult))
+	seal := Seal.Fixture(Seal.WithBlock(block.ToHeader()), Seal.WithResult(&receipt.ExecutionResult))
 	return receipt, seal
 }
 
@@ -394,33 +389,21 @@ func WithExecutionResults(results ...*flow.ExecutionResult) func(*flow.Payload) 
 
 func BlockWithParentFixture(parent *flow.Header) *flow.Block {
 	payload := PayloadFixture()
-	header := BlockHeaderWithParentFixture(parent)
-	header.PayloadHash = payload.Hash()
-	return &flow.Block{
-		Header:  header,
-		Payload: &payload,
-	}
+	headerBody := HeaderBodyWithParentFixture(parent)
+	return flow.NewBlock(*headerBody, payload)
 }
 
 func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
 	payload := PayloadFixture(WithProtocolStateID(parent.Payload.ProtocolStateID))
-	header := BlockHeaderWithParentFixture(parent.Header)
-	header.PayloadHash = payload.Hash()
-	return &flow.Block{
-		Header:  header,
-		Payload: &payload,
-	}
+	headerBody := HeaderBodyWithParentFixture(parent.ToHeader())
+	return flow.NewBlock(*headerBody, payload)
 }
 
 func BlockWithGuaranteesFixture(guarantees []*flow.CollectionGuarantee) *flow.Block {
 	payload := PayloadFixture(WithGuarantees(guarantees...))
-	header := BlockHeaderFixture()
-	header.PayloadHash = payload.Hash()
-	return &flow.Block{
-		Header:  header,
-		Payload: &payload,
-	}
+	headerBody := HeaderBodyFixture()
 
+	return flow.NewBlock(*headerBody, payload)
 }
 
 func WithoutGuarantee(payload *flow.Payload) {
@@ -667,7 +650,7 @@ func ClusterBlockWithParentAndPayload(parent cluster.Block, payload cluster.Payl
 	headerBody.Height = parent.Header.Height + 1
 	headerBody.View = parent.Header.View + 1
 	headerBody.ChainID = parent.Header.ChainID
-	headerBody.Timestamp = time.Now()
+	headerBody.Timestamp = time.Now().UTC()
 	headerBody.ParentID = parent.ID()
 	headerBody.ParentView = parent.Header.View
 
@@ -693,7 +676,7 @@ func AddCollectionsToBlock(block *flow.Block, collections []*flow.Collection) {
 	}
 
 	block.Payload.Guarantees = gs
-	block.SetPayload(*block.Payload)
+	block.SetPayload(block.Payload)
 }
 
 func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flow.CollectionGuarantee {
@@ -798,7 +781,6 @@ func ExecutableBlockFixture(
 	collectionsSignerIDs [][]flow.Identifier,
 	startState *flow.StateCommitment,
 ) *entity.ExecutableBlock {
-
 	header := BlockHeaderFixture()
 	return ExecutableBlockFixtureWithParent(collectionsSignerIDs, header, startState)
 }
@@ -818,8 +800,6 @@ func ExecutableBlockFixtureWithParent(
 		block.Payload.Guarantees = append(block.Payload.Guarantees, completeCollection.Guarantee)
 		completeCollections[completeCollection.Guarantee.CollectionID] = completeCollection
 	}
-
-	block.Header.PayloadHash = block.Payload.Hash()
 
 	executableBlock := &entity.ExecutableBlock{
 		Block:               block,
@@ -844,8 +824,6 @@ func ExecutableBlockFromTransactions(
 		block.Payload.Guarantees = append(block.Payload.Guarantees, cc.Guarantee)
 		completeCollections[cc.Guarantee.CollectionID] = cc
 	}
-
-	block.Header.PayloadHash = block.Payload.Hash()
 
 	executableBlock := &entity.ExecutableBlock{
 		Block:               &block,
@@ -930,9 +908,7 @@ func WithPreviousResult(prevResult flow.ExecutionResult) func(*flow.ExecutionRes
 func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	chunks := 1 // tailing chunk is always system chunk
 	var previousResultID flow.Identifier
-	if block.Payload != nil {
-		chunks += len(block.Payload.Guarantees)
-	}
+	chunks += len(block.Payload.Guarantees)
 	blockID := block.ID()
 
 	return func(result *flow.ExecutionResult) {
@@ -1599,7 +1575,7 @@ func RegisterIDFixture() flow.RegisterID {
 
 // VerifiableChunkDataFixture returns a complete verifiable chunk with an
 // execution receipt referencing the block/collections.
-func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.Header)) (*verification.VerifiableChunkData, *flow.Block) {
+func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.HeaderBody)) (*verification.VerifiableChunkData, *flow.Block) {
 
 	guarantees := make([]*flow.CollectionGuarantee, 0, chunkIndex+1)
 
@@ -1614,16 +1590,12 @@ func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.Header)) (
 		Guarantees: guarantees,
 		Seals:      nil,
 	}
-	header := BlockHeaderFixture()
+	headerBody := HeaderBodyFixture()
 	for _, opt := range opts {
-		opt(header)
+		opt(headerBody)
 	}
-	header.PayloadHash = payload.Hash()
 
-	block := flow.Block{
-		Header:  header,
-		Payload: &payload,
-	}
+	block := flow.NewBlock(*headerBody, payload)
 
 	chunks := make([]*flow.Chunk, 0)
 
@@ -1663,11 +1635,11 @@ func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.Header)) (
 
 	return &verification.VerifiableChunkData{
 		Chunk:         &chunk,
-		Header:        block.Header,
+		Header:        block.ToHeader(),
 		Result:        &result,
 		ChunkDataPack: chunkDataPack,
 		EndState:      endState,
-	}, &block
+	}, block
 }
 
 // ChunkDataResponseMsgFixture creates a chunk data response message with a single-transaction collection, and random chunk ID.
@@ -2074,7 +2046,7 @@ func NewCertifiedBlock(block *flow.Block) *flow.CertifiedBlock {
 			Block:           block,
 			ProposerSigData: SignatureFixture(),
 		},
-		CertifyingQC: CertifyBlock(block.Header),
+		CertifyingQC: CertifyBlock(block.ToHeader()),
 	}
 }
 
@@ -2174,6 +2146,12 @@ func WithParticipants(participants flow.IdentitySkeletonList) func(*flow.EpochSe
 	}
 }
 
+func WithAssignments(assignments flow.AssignmentList) func(*flow.EpochSetup) {
+	return func(setup *flow.EpochSetup) {
+		setup.Assignments = assignments
+	}
+}
+
 func SetupWithCounter(counter uint64) func(*flow.EpochSetup) {
 	return func(setup *flow.EpochSetup) {
 		setup.Counter = counter
@@ -2260,13 +2238,14 @@ func WithDKGFromParticipants(participants flow.IdentitySkeletonList) func(*flow.
 	}
 }
 
-func WithClusterQCsFromAssignments(assignments flow.AssignmentList) func(*flow.EpochCommit) {
-	qcs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(assignments))
-	for _, assignment := range assignments {
-		qcWithSignerIndex := QuorumCertificateWithSignerIDsFixture()
-		qcWithSignerIndex.SignerIDs = assignment
-		qcs = append(qcs, qcWithSignerIndex)
+func WithClusterQCs(qcs []flow.ClusterQCVoteData) func(*flow.EpochCommit) {
+	return func(commit *flow.EpochCommit) {
+		commit.ClusterQCs = qcs
 	}
+}
+
+func WithClusterQCsFromAssignments(assignments flow.AssignmentList) func(*flow.EpochCommit) {
+	qcs := QuorumCertificatesFromAssignments(assignments)
 	return func(commit *flow.EpochCommit) {
 		commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(qcs)
 	}
@@ -2361,7 +2340,17 @@ func BootstrapFixtureWithChainID(
 		WithDKGFromParticipants(participants.ToSkeleton()),
 	)
 
-	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
+	return BootstrapFixtureWithSetupAndCommit(root.Header, setup, commit)
+}
+
+// BootstrapFixtureWithSetupAndCommit generates all the artifacts necessary to bootstrap the
+// protocol state using the provided epoch setup and commit.
+func BootstrapFixtureWithSetupAndCommit(
+	header flow.HeaderBody,
+	setup *flow.EpochSetup,
+	commit *flow.EpochCommit,
+) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+	safetyParams, err := protocol.DefaultEpochSafetyParams(header.ChainID)
 	if err != nil {
 		panic(err)
 	}
@@ -2370,8 +2359,9 @@ func BootstrapFixtureWithChainID(
 	if err != nil {
 		panic(err)
 	}
-	root.SetPayload(flow.Payload{ProtocolStateID: rootProtocolState.ID()})
-	stateCommit := GenesisStateCommitmentByChainID(chainID)
+
+	root := flow.NewBlock(header, flow.Payload{ProtocolStateID: rootProtocolState.ID()})
+	stateCommit := GenesisStateCommitmentByChainID(header.ChainID)
 
 	result := BootstrapExecutionResultFixture(root, stateCommit)
 	result.ServiceEvents = []flow.ServiceEvent{
@@ -2435,7 +2425,7 @@ func ChainFixture(nonGenesisCount int) (
 	genesis, result, seal := BootstrapFixture(participants)
 	chain = append(chain, genesis)
 
-	children := ChainFixtureFrom(nonGenesisCount, genesis.Header)
+	children := ChainFixtureFrom(nonGenesisCount, genesis.ToHeader())
 	chain = append(chain, children...)
 	return chain, result, seal
 }
@@ -2448,7 +2438,7 @@ func ChainFixtureFrom(count int, parent *flow.Header) []*flow.Block {
 	for i := 0; i < count; i++ {
 		block := BlockWithParentFixture(parent)
 		blocks = append(blocks, block)
-		parent = block.Header
+		parent = block.ToHeader()
 	}
 
 	return blocks
@@ -2496,7 +2486,6 @@ func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.Execution
 			panic(fmt.Sprintf("height has gap when connecting blocks: expect %v, but got %v", prev.Header.Height+1, b.Header.Height))
 		}
 		b.Header.ParentID = prev.ID()
-		b.Header.PayloadHash = b.Payload.Hash()
 		receipts[i].ExecutionResult.BlockID = b.ID()
 		prevReceipt := receipts[p]
 		receipts[i].ExecutionResult.PreviousResultID = prevReceipt.ExecutionResult.ID()

@@ -248,8 +248,8 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		suite.executionResults.On("ByBlockID", block.ID()).Return(execResult, nil)
 	}
 
-	suite.sealedBlock = testBlocks[len(testBlocks)-1].Header
-	suite.finalizedBlock = testBlocks[len(testBlocks)-2].Header
+	suite.sealedBlock = testBlocks[len(testBlocks)-1].ToHeader()
+	suite.finalizedBlock = testBlocks[len(testBlocks)-2].ToHeader()
 
 	client := suite.restAPIClient()
 

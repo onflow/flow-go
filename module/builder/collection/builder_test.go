@@ -684,7 +684,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 		suite.Require().NoError(err)
 		err = suite.protoState.Finalize(context.Background(), block.ID())
 		suite.Require().NoError(err)
-		head = block.Header
+		head = block.ToHeader()
 	}
 
 	// reset the pool and builder

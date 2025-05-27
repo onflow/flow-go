@@ -24,7 +24,8 @@ func TestEntityExpirySnapshotValidation(t *testing.T) {
 	})
 	t.Run("not-enough-history", func(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		rootSnapshot.Encodable().Head().Height += 10 // advance height to be not spork root snapshot
+		blockLen := len(rootSnapshot.Encodable().SealingSegment.Blocks)
+		rootSnapshot.Encodable().SealingSegment.Blocks[blockLen-1].Block.Header.Height += 10 // advance height to be not spork root snapshot
 		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
 		require.Error(t, err)
 	})
@@ -84,7 +85,7 @@ func TestValidateVersionBeacon(t *testing.T) {
 			SealHeight: uint64(37),
 		}
 
-		snap.On("Head").Return(block.Header, nil)
+		snap.On("Head").Return(block.ToHeader(), nil)
 		snap.On("VersionBeacon").Return(vb, nil)
 
 		err := validateVersionBeacon(snap)
@@ -108,7 +109,7 @@ func TestValidateVersionBeacon(t *testing.T) {
 			SealHeight: uint64(37),
 		}
 
-		snap.On("Head").Return(block.Header, nil)
+		snap.On("Head").Return(block.ToHeader(), nil)
 		snap.On("VersionBeacon").Return(vb, nil)
 
 		err := validateVersionBeacon(snap)
@@ -133,7 +134,7 @@ func TestValidateVersionBeacon(t *testing.T) {
 			SealHeight: uint64(1),
 		}
 
-		snap.On("Head").Return(block.Header, nil)
+		snap.On("Head").Return(block.ToHeader(), nil)
 		snap.On("VersionBeacon").Return(vb, nil)
 
 		err := validateVersionBeacon(snap)

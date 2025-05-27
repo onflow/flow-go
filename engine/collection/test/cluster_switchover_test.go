@@ -24,7 +24,6 @@ import (
 	bcluster "github.com/onflow/flow-go/state/cluster/badger"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -52,7 +51,6 @@ type ClusterSwitchoverTestCase struct {
 // NewClusterSwitchoverTestCase constructs a new cluster switchover test case
 // given the configuration, creating all dependencies and mock nodes.
 func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) *ClusterSwitchoverTestCase {
-
 	tc := &ClusterSwitchoverTestCase{
 		t:    t,
 		conf: conf,
@@ -89,24 +87,28 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	tc.sentTransactions = make(map[uint64]map[uint]flow.IdentifierList)
 	tc.hub = stub.NewNetworkHub()
 
+	rootHeader := unittest.GenesisFixture().Header
+	counter := uint64(1)
+
+	setup := unittest.EpochSetupFixture(
+		unittest.WithParticipants(identities.ToSkeleton()),
+		unittest.SetupWithCounter(counter),
+		unittest.WithFirstView(rootHeader.View),
+		unittest.WithFinalView(rootHeader.View+100_000),
+		unittest.WithAssignments(unittest.ClusterAssignment(tc.conf.clusters, identities.ToSkeleton())),
+	)
+	commit := unittest.EpochCommitFixture(
+		unittest.CommitWithCounter(counter),
+		unittest.WithClusterQCsFromAssignments(setup.Assignments),
+		unittest.WithDKGFromParticipants(identities.ToSkeleton()),
+		unittest.WithClusterQCs(rootClusterQCs),
+	)
+
 	// create a root snapshot with the given number of initial clusters
-	root, result, seal := unittest.BootstrapFixture(identities)
-	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
-	setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
-	commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
-
-	setup.Assignments = unittest.ClusterAssignment(tc.conf.clusters, identities.ToSkeleton())
-	commit.ClusterQCs = rootClusterQCs
-
+	root, result, seal := unittest.BootstrapFixtureWithSetupAndCommit(rootHeader, setup, commit)
 	seal.ResultID = result.ID()
-	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
-	require.NoError(t, err)
-	rootProtocolState, err := kvstore.NewDefaultKVStore(
-		safetyParams.FinalizationSafetyThreshold,
-		safetyParams.EpochExtensionViewCount,
-		inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID())
-	require.NoError(t, err)
-	root.Payload.ProtocolStateID = rootProtocolState.ID()
+	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
+
 	tc.root, err = inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 

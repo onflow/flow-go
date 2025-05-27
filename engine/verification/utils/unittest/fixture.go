@@ -336,10 +336,7 @@ func ExecutionResultFixture(t *testing.T,
 			Guarantees:      guarantees,
 			ProtocolStateID: protocolStateID,
 		}
-		referenceBlock = flow.Block{
-			Header: refBlkHeader,
-		}
-		referenceBlock.SetPayload(payload)
+		referenceBlock = *flow.NewBlock(refBlkHeader.HeaderBody, payload)
 
 		executableBlock := &entity.ExecutableBlock{
 			Block:               &referenceBlock,
@@ -419,7 +416,7 @@ func CompleteExecutionReceiptChainFixture(t *testing.T,
 			ReceiptsData:   allData,
 		})
 
-		parent = containerBlock.Header
+		parent = containerBlock.ToHeader()
 	}
 	return completeERs
 }
@@ -455,7 +452,7 @@ func ExecutionReceiptsFromParentBlockFixture(t *testing.T,
 
 			allData = append(allData, data)
 		}
-		parent = data.ReferenceBlock.Header
+		parent = data.ReferenceBlock.ToHeader()
 	}
 
 	return allReceipts, allData, parent

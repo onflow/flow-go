@@ -320,7 +320,7 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 				e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, blocks[indexOfLastConnected:i])
 				indexOfLastConnected = i
 			}
-			parentID = block.Block.Header.ID()
+			parentID = block.Block.ID()
 		}
 		e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, blocks[indexOfLastConnected:])
 		e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlocks)

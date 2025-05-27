@@ -148,7 +148,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
 
-	span, ctx := b.tracer.StartBlockSpan(context.Background(), blockProposal.Block.Header.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
+	span, ctx := b.tracer.StartBlockSpan(context.Background(), blockProposal.Block.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
 	defer span.End()
 
 	err = b.state.Extend(ctx, blockProposal)
@@ -156,7 +156,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not extend state with built proposal: %w", err)
 	}
 
-	return blockProposal.HeaderProposal(), nil
+	return blockProposal.ProposalHeader(), nil
 }
 
 // repopulateExecutionTree restores latest state of execution tree mempool based on local chain state information.
@@ -643,19 +643,17 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		return nil, fmt.Errorf("evolving protocol state failed: %w", err)
 	}
 
-	block := &flow.Block{
-		Header: header,
-	}
-	block.SetPayload(flow.Payload{
+	payload := flow.Payload{
 		Guarantees:      guarantees,
 		Seals:           seals,
 		Receipts:        insertableReceipts.receipts,
 		Results:         insertableReceipts.results,
 		ProtocolStateID: protocolStateID,
-	})
+	}
+	block := flow.NewBlock(header.HeaderBody, payload)
 
 	// sign the proposal
-	sig, err := sign(header)
+	sig, err := sign(block.ToHeader())
 	if err != nil {
 		return nil, fmt.Errorf("could not sign the block: %w", err)
 	}

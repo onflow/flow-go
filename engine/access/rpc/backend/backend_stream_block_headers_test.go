@@ -83,8 +83,8 @@ func (s *BackendBlockHeadersSuite) requireBlockHeaders(v interface{}, expectedBl
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
 	s.Require().Equal(expectedBlock.Header.Height, actualHeader.Height)
-	s.Require().Equal(expectedBlock.Header.ID(), actualHeader.ID())
-	s.Require().Equal(*expectedBlock.Header, *actualHeader)
+	s.Require().Equal(expectedBlock.ToHeader().ID(), actualHeader.ID())
+	s.Require().Equal(*expectedBlock.ToHeader(), *actualHeader)
 }
 
 // TestSubscribeBlockHeadersHandlesErrors tests error handling scenarios for the SubscribeBlockHeadersFromStartBlockID and SubscribeBlockHeadersFromStartHeight methods in the Backend.

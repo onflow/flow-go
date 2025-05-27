@@ -41,7 +41,7 @@ func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_HappyPath() {
 		s.validBlockHeadersArgumentsTestCases(),
 		func(dataChan chan interface{}) {
 			for _, block := range s.blocks {
-				dataChan <- block.Header
+				dataChan <- block.ToHeader()
 			}
 		},
 		s.requireBlockHeader,
@@ -54,7 +54,7 @@ func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []test
 	expectedResponses := make([]interface{}, len(s.blocks))
 	for i, b := range s.blocks {
 		var header commonmodels.BlockHeader
-		header.Build(b.Header)
+		header.Build(b.ToHeader())
 
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   BlockHeadersTopic,

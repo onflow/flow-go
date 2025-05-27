@@ -346,12 +346,12 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 
 	// add one block that should be processed
 	processable := unittest.ProposalFixture()
-	ss.core.On("HandleBlock", processable.Block.Header).Return(true)
+	ss.core.On("HandleBlock", processable.Block.ToHeader()).Return(true)
 	res.Blocks = append(res.Blocks, *messages.NewUntrustedProposal(processable))
 
 	// add one block that should not be processed
 	unprocessable := unittest.ProposalFixture()
-	ss.core.On("HandleBlock", unprocessable.Block.Header).Return(false)
+	ss.core.On("HandleBlock", unprocessable.Block.ToHeader()).Return(false)
 	res.Blocks = append(res.Blocks, *messages.NewUntrustedProposal(unprocessable))
 
 	ss.comp.On("OnSyncedBlocks", mock.Anything).Run(func(args mock.Arguments) {
