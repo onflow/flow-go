@@ -2,6 +2,7 @@ package ingestion2
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -18,6 +19,10 @@ import (
 const (
 	// DefaultMaxProcessingSize is the default maximum number of pipelines that can be run in parallel
 	DefaultMaxProcessingSize = 20
+)
+
+var (
+	ErrResultNotFound = fmt.Errorf("result not found")
 )
 
 type Pipeline interface {
@@ -45,16 +50,20 @@ type ResultsForest struct {
 
 	forest forest.LevelledForest
 
+	// maxRunningCount is the maximum number of pipelines that can be run in parallel.
 	maxRunningCount uint
 
+	// latestSealedResultID is the ID of the latest sealed result.
+	// This may be the same as the latest persisted sealed result ID, or a result for a newer block.
+	latestSealedResultID flow.Identifier
+
+	// latestPersistedSealedResultID is the ID of the latest sealed result that is fully indexed
+	// and persisted to the database.
+	// TODO: use a wrapper struct that is updated when persisting is done.
 	latestPersistedSealedResultID flow.Identifier
 
-	// completed is used to pass state machine update notifications from the pipelines to the handler
-	// Note: updates are pushed onto the completed channel even after the component begins shutdown.
-	// This allows the forest to handle all final completed state machine updates. It relies on the
-	// pipelines to stop gracefully when the context is done.
-	// the completed channel must only be closed after all pipelines have stopped.
-	completed chan flow.Identifier
+	// loadingComplete is set to true when all results have been loaded from the database into the forest.
+	loadingComplete bool
 
 	// notifier is used to signal to the pipelineManager>Loop that a new vertex is available, or one has completed
 	notifier engine.Notifier
@@ -65,18 +74,19 @@ type ResultsForest struct {
 // NewResultsForest instantiates a ResultsForest
 func NewResultsForest(
 	log zerolog.Logger,
+	latestPersistedSealedResultID flow.Identifier,
 ) *ResultsForest {
 	f := &ResultsForest{
-		log:             log.With().Str("component", "results_forest").Logger(),
-		forest:          *forest.NewLevelledForest(0),
-		completed:       make(chan flow.Identifier, 1),
-		notifier:        engine.NewNotifier(),
-		maxRunningCount: DefaultMaxProcessingSize,
+		log:                           log.With().Str("component", "results_forest").Logger(),
+		forest:                        *forest.NewLevelledForest(0),
+		maxRunningCount:               DefaultMaxProcessingSize,
+		latestSealedResultID:          latestPersistedSealedResultID,
+		latestPersistedSealedResultID: latestPersistedSealedResultID,
+		notifier:                      engine.NewNotifier(),
 	}
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(f.pipelineManagerLoop).
-		AddWorker(f.processCompletedLoop).
 		Build()
 
 	f.Component = cm
@@ -95,11 +105,6 @@ func (f *ResultsForest) pipelineManagerLoop(ctx irrecoverable.SignalerContext, r
 		case <-ctx.Done():
 			// wait for all pipelines to gracefully shutdown
 			wg.Wait()
-
-			// it is safe to close this channel since it is only written to by updates passed
-			// from pipelines, and all pipelines are stopped.
-			// this signals to the processCompletedLoop that it should shut down
-			close(f.completed)
 			return
 
 		case <-ch:
@@ -108,13 +113,20 @@ func (f *ResultsForest) pipelineManagerLoop(ctx irrecoverable.SignalerContext, r
 			// Inspect all vertices in the tree forming from the latest persisted sealed result.
 			// Count all running pipelines, and start new ones up to the maxRunningCount.
 			// This will iterate over at most maxRunningCount vertices.
-			f.visitAllAncestorsBFS(f.latestPersistedSealedResultID, func(container *ExecutionResultContainer) bool {
+			f.visitAllAncestorsBFS(f.LatestPersistedSealedResultID(), func(container *ExecutionResultContainer) bool {
 				state := container.pipeline.GetState()
-				if state == pipeline.StateComplete || state == pipeline.StateCanceled {
-					return true
-				}
 
-				if state == pipeline.StateUninitialized {
+				switch state {
+				case pipeline.StateCanceled:
+					return true
+
+				case pipeline.StateComplete:
+					if err := f.processCompleted(container.resultID); err != nil {
+						ctx.Throw(err)
+					}
+					return true
+
+				case pipeline.StateUninitialized:
 					wg.Add(1)
 					go func() {
 						defer wg.Done()
@@ -154,31 +166,49 @@ func (f *ResultsForest) visitAllAncestorsBFS(resultID flow.Identifier, fn func(*
 	}
 }
 
-// processCompletedLoop processes completed messages from the pipelines, and prunes the forest as pipelines complete.
-func (f *ResultsForest) processCompletedLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-	for {
-		resultID, ok := <-f.completed
-		if !ok {
-			// exit after fully draining the channel
-			// note: since this loop only handles fully completed pipelines and persisting is done
-			// sequentially, there will only ever be zero or one pipelines waiting with an update.
-			return
-		}
-
-		// first ensure that the result ID is in the forest, otherwise the forest is in an inconsistent state
-		updater, ok := f.forest.GetVertex(resultID)
-		if !ok {
-			ctx.Throw(fmt.Errorf("state update from unknown result vertex %s", resultID))
-		}
-
-		latestPersistedHeight := updater.(*ExecutionResultContainer).blockHeader.Height
-
-		err := f.pruneUpToHeight(latestPersistedHeight)
-		if err != nil {
-			ctx.Throw(fmt.Errorf("failed to prune results forest (height: %d): %w", latestPersistedHeight, err))
-		}
+// processCompleted processes a completed pipeline and prunes the forest.
+func (f *ResultsForest) processCompleted(resultID flow.Identifier) error {
+	// first, ensure that the result ID is in the forest, otherwise the forest is in an inconsistent state
+	updater, ok := f.forest.GetVertex(resultID)
+	if !ok {
+		return fmt.Errorf("state update from unknown result vertex %s", resultID)
 	}
+
+	container := updater.(*ExecutionResultContainer)
+
+	// next, ensure that this result descends from the latest persisted sealed result, otherwise
+	// the forest is in an inconsistent state since persisting must be done sequentially
+	latestPersistedSealedResultID := f.LatestPersistedSealedResultID()
+	if container.result.PreviousResultID != latestPersistedSealedResultID {
+		return fmt.Errorf("pipeline completed for result %s but it is not a child of the latest persisted result %s", resultID, latestPersistedSealedResultID)
+	}
+
+	// update the latest persisted sealed result ID to the newly completed result ID
+	f.setLatestPersistedSealedResultID(resultID)
+
+	// finally, prune the forest up to the latest persisted height
+	latestPersistedHeight := container.blockHeader.Height
+	err := f.pruneUpToHeight(latestPersistedHeight)
+	if err != nil {
+		return fmt.Errorf("failed to prune results forest (height: %d): %w", latestPersistedHeight, err)
+	}
+
+	return nil
+}
+
+// LatestPersistedSealedResultID returns the ID of the latest persisted sealed result.
+func (f *ResultsForest) LatestPersistedSealedResultID() flow.Identifier {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	return f.latestPersistedSealedResultID
+}
+
+// setLatestPersistedSealedResultID sets the ID of the latest persisted sealed result.
+// Note: this value is already written to the db during the pipeline persist step's batch write.
+func (f *ResultsForest) setLatestPersistedSealedResultID(resultID flow.Identifier) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.latestPersistedSealedResultID = resultID
 }
 
 // AddResult adds an Execution Result to the Results Forest, in case the result is not already
@@ -240,28 +270,18 @@ func (f *ResultsForest) getExecutionResultContainer(result *flow.ExecutionResult
 //
 // No errors are expected during normal operation.
 func (f *ResultsForest) OnResultSealed(resultID flow.Identifier) error {
-	// TODO: handle the case where we are still loading results into the tree
-	// 	- possible solution: ignore missing vertices, then seal all ancestors when a disconnected
-	// 		result is sealed (last sealed result != previousResultID)
-	sealedVertex, ok := f.forest.GetVertex(resultID)
-	if !ok {
-		return fmt.Errorf("failed to mark result sealed: vertex not found")
-	}
-
-	// Mark the vertex as sealed
-	sealedContainer := sealedVertex.(*ExecutionResultContainer)
-	sealedContainer.pipeline.SetSealed()
-	parentID, _ := sealedContainer.Parent()
-
-	// Update all siblings that they no longer descend from the latest sealed result
-	hasUpdates := false
-	siblings := f.forest.GetChildren(parentID)
-	for siblings.HasNext() {
-		sibling := siblings.NextVertex().(*ExecutionResultContainer)
-		if sibling.resultID != resultID {
-			sibling.pipeline.OnParentStateUpdated(pipeline.StateCanceled)
-			hasUpdates = true
+	hasUpdates, err := f.sealAllAncestors(resultID)
+	if err != nil {
+		if f.loadingComplete || !errors.Is(err, ErrResultNotFound) {
+			return fmt.Errorf("failed to mark ancestors as sealed for result %s: %w", resultID, err)
 		}
+
+		// if we're still loading, then we can ignore this notification for now and handle it during
+		// a future notification.
+		f.log.Debug().
+			Str("result_id", resultID.String()).
+			Msg("sealed result is not in the tree, ignoring")
+		return nil
 	}
 
 	if hasUpdates {
@@ -271,10 +291,85 @@ func (f *ResultsForest) OnResultSealed(resultID flow.Identifier) error {
 	return nil
 }
 
+// sealAllAncestors marks all ancestors of the given result ID as sealed.
+//
+// Expected errors:
+//   - ErrResultNotFound: if the result ID or any of its unsealed ancestors are not found in the forest.
+func (f *ResultsForest) sealAllAncestors(resultID flow.Identifier) (hasUpdates bool, err error) {
+	// Find all unsealed ancestors of the result ID ending on the latest sealed result.
+	ancestorsAndSelf, err := f.findUnsealedAncestors(resultID)
+	if err != nil {
+		return false, err
+	}
+
+	// Mark all ancestors as sealed in sealing order, and abort their siblings
+	for i := len(ancestorsAndSelf) - 1; i >= 0; i-- {
+		sealedContainer := ancestorsAndSelf[i]
+		if f.markContainerAsSealed(sealedContainer) {
+			hasUpdates = true
+		}
+		f.latestSealedResultID = sealedContainer.resultID
+	}
+
+	return hasUpdates, nil
+}
+
+// findUnsealedAncestors finds all ancestor vertices of the given result ID that are not marked sealed.
+// The returned slice includes the result itself.
+//
+// Expected errors:
+//   - ErrResultNotFound: if the result ID or any of its unsealed ancestors up to the latest sealed
+//     result are not found in the forest.
+func (f *ResultsForest) findUnsealedAncestors(resultID flow.Identifier) ([]*ExecutionResultContainer, error) {
+	ancestorsAndSelf := make([]*ExecutionResultContainer, 0)
+
+	// Find all unsealed ancestors of the result ID ending on the latest persisted sealed result.
+	// abort and return an error if we fail to find any ancestor.
+	sealedResultID := resultID
+	for {
+		sealedVertex, ok := f.forest.GetVertex(sealedResultID)
+		if !ok {
+			// Note: if resultID does not descend from the latest persisted sealed result, iteration
+			// will eventually stop when it reaches the pruned level.
+			return nil, fmt.Errorf("sealed result %s not found in the tree: %w", sealedResultID, ErrResultNotFound)
+		}
+
+		sealedContainer := sealedVertex.(*ExecutionResultContainer)
+
+		// stop searching once we find the first sealed result.
+		if sealedContainer.resultID == f.latestSealedResultID {
+			break
+		}
+
+		ancestorsAndSelf = append(ancestorsAndSelf, sealedContainer)
+		sealedResultID, _ = sealedContainer.Parent()
+	}
+
+	return ancestorsAndSelf, nil
+}
+
+// markContainerAsSealed marks the given container as sealed and aborts all its siblings.
+// Returns true if any siblings were aborted.
+func (f *ResultsForest) markContainerAsSealed(sealed *ExecutionResultContainer) (hasUpdates bool) {
+	sealed.pipeline.SetSealed()
+	parentID, _ := sealed.Parent()
+
+	siblings := f.forest.GetChildren(parentID)
+	for siblings.HasNext() {
+		sibling := siblings.NextVertex().(*ExecutionResultContainer)
+		if sibling.resultID != sealed.resultID {
+			sibling.pipeline.OnParentStateUpdated(pipeline.StateCanceled)
+			hasUpdates = true
+		}
+	}
+
+	return hasUpdates
+}
+
 // OnBlockFinalized signals that the given block is finalized.
 // All pipelines for siblings of the finalized block should be aborted.
 func (f *ResultsForest) OnBlockFinalized(blockID flow.Identifier, parentResultIDs ...flow.Identifier) {
-	// Find all vertices for results of blocks that conflict with the finalized block and cancel them
+	// Find all vertices for results of blocks that conflict with the finalized block and abort them
 	// To accomplish this
 	// 1. Get all ExecutionResults for the finalized block's parent
 	// 2. For each of these results, get all child vertices
@@ -303,8 +398,6 @@ func (f *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState pipeli
 	// Note on concurrency: This is designed to keep the propagation of state updates within the caller's
 	// goroutine. This ensures that the state updates are propagated to all descendents before continuing
 	// and avoids blocking the forest's loop.
-	// Only completed pipeline notifications are handled by the forest's pruning loop to ensure that
-	// updates are handled in order
 
 	// propagate the state update to all children of the result
 	children := f.forest.GetChildren(resultID)
@@ -316,11 +409,6 @@ func (f *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState pipeli
 	// notify the pipeline manager loop that a pipeline has completed
 	if newState == pipeline.StateCanceled || newState == pipeline.StateComplete {
 		f.notifier.Notify()
-	}
-
-	// pass the completed resultID to the pruning loop
-	if newState == pipeline.StateComplete {
-		f.completed <- resultID
 	}
 }
 

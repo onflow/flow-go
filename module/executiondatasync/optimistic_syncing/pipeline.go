@@ -118,10 +118,12 @@ func (p *Pipeline) GetState() State {
 // SetSealed marks the data as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.
 func (p *Pipeline) SetSealed() {
 	p.mu.Lock()
-	p.isSealed = true
-	p.mu.Unlock()
+	defer p.mu.Unlock()
 
-	p.stateNotifier.Notify()
+	if !p.isSealed {
+		p.isSealed = true
+		p.stateNotifier.Notify()
+	}
 }
 
 // OnParentStateUpdated updates the pipeline's parent state.
