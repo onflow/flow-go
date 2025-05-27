@@ -57,6 +57,17 @@ func run(*cobra.Command, []string) error {
 		Logger()
 
 	lg.Info().Msgf("starting migration from badger db to pebble db")
+	err := migration.RunMigrationAndCompaction(flagBadgerDBdir, flagPebbleDBdir, migration.MigrationConfig{
+		BatchByteSize:          flagBatchByteSize,
+		ReaderWorkerCount:      flagReaderCount,
+		WriterWorkerCount:      flagWriterCount,
+		ReaderShardPrefixBytes: flagReaderShardPrefixBytes,
+	})
+
+	if err != nil {
+		return fmt.Errorf("migration failed: %w", err)
+	}
+
 	pebbleDB, err := pebble.Open(flagPebbleDBdir, &pebble.Options{})
 	if err != nil {
 		return fmt.Errorf("failed to open PebbleDB: %w", err)
@@ -66,17 +77,6 @@ func run(*cobra.Command, []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read finalized height from PebbleDB: %w", err)
 	}
-
-	// err = migration.RunMigrationAndCompaction(flagBadgerDBdir, flagPebbleDBdir, migration.MigrationConfig{
-	// 	BatchByteSize:          flagBatchByteSize,
-	// 	ReaderWorkerCount:      flagReaderCount,
-	// 	WriterWorkerCount:      flagWriterCount,
-	// 	ReaderShardPrefixBytes: flagReaderShardPrefixBytes,
-	// })
-	//
-	// if err != nil {
-	// 	return fmt.Errorf("migration failed: %w", err)
-	// }
 
 	lg.Info().Msgf("finalized height: %d", height)
 	return nil
