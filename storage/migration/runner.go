@@ -10,6 +10,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/rs/zerolog/log"
 )
@@ -70,14 +71,13 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 	}
 	defer badgerDB.Close()
 
-	pebbleDB, err := pebble.Open(pebbleDir, &pebble.Options{
-		DisableAutomaticCompactions: true, // compaction will be done at the end
-		EventListener: &pebble.EventListener{
-			CompactionEnd: func(info pebble.CompactionInfo) {
-				log.Info().Msgf("Compaction ended: %s", info.String())
-			},
-		},
-	})
+	cache := pebble.NewCache(pebblestorage.DefaultPebbleCacheSize)
+	defer cache.Unref()
+	// reuse the same pebble options for opening pebble storage
+	pebbleDBOpts := pebblestorage.DefaultPebbleOptions(log.Logger, cache, pebble.DefaultComparer)
+	pebbleDBOpts.DisableAutomaticCompactions = true // compaction will be done at the end
+
+	pebbleDB, err := pebble.Open(pebbleDir, pebbleDBOpts)
 	if err != nil {
 		return fmt.Errorf("failed to open PebbleDB: %w", err)
 	}
