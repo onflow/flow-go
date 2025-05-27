@@ -249,7 +249,7 @@ func (c *BlockThrottle) Done() error {
 func (c *BlockThrottle) OnBlock(blockID flow.Identifier, height uint64) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.log.Debug().Msgf("recieved block (%v) height: %v", blockID, height)
+	c.log.Debug().Msgf("received block (%v) height: %v", blockID, height)
 
 	if !c.inited() {
 		return fmt.Errorf("throttle not inited")

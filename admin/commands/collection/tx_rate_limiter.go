@@ -93,7 +93,7 @@ func (s *TxRateLimitCommand) Handler(_ context.Context, req *admin.CommandReques
 		oldLimit, oldBurst := s.limiter.GetLimitConfig()
 		log.Info().Msgf("admintool set_config limit: %v, burst: %v, old limit: %v, old burst: %v", limit, burst, oldLimit, oldBurst)
 		s.limiter.SetLimitConfig(rate.Limit(limit), int(burst))
-		return fmt.Sprintf("succesfully set limit %v, burst %v", limit, burst), nil
+		return fmt.Sprintf("successfully set limit %v, burst %v", limit, burst), nil
 	}
 
 	return fmt.Sprintf(
