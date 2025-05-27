@@ -57,11 +57,10 @@ func NewInMemoryIndexer(
 		header:          header,
 	}
 
-	indexer.metrics.InitializeLatestHeight(indexer.registers.LatestHeight())
+	indexer.metrics.InitializeLatestHeight(header.Height)
 
 	indexer.log.Info().
-		Uint64("first_height", indexer.registers.FirstHeight()).
-		Uint64("latest_height", indexer.registers.LatestHeight()).
+		Uint64("latest_height", header.Height).
 		Msg("indexer initialized")
 
 	return indexer

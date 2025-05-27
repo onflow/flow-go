@@ -39,6 +39,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		indexer := createInMemoryIndexer(exeResult, header)
 
 		trie := createTestTrieUpdate(t)
+		require.NotEmpty(t, trie.Payloads)
 		collection := unittest.CollectionFixture(0)
 
 		ed := &execution_data.BlockExecutionData{
@@ -148,21 +149,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		// Verify events were indexed correctly
 		events, err := indexer.events.ByBlockID(blockID)
 		require.NoError(t, err)
-		assert.Len(t, events, len(expectedEvents))
-
-		// Verify all events are present
-		for _, expectedEvent := range expectedEvents {
-			found := false
-			for _, event := range events {
-				if event.TransactionID == expectedEvent.TransactionID &&
-					event.TransactionIndex == expectedEvent.TransactionIndex &&
-					event.EventIndex == expectedEvent.EventIndex {
-					found = true
-					break
-				}
-			}
-			assert.True(t, found, "Event not found")
-		}
+		assert.ElementsMatch(t, expectedEvents, events)
 	})
 
 	t.Run("Index Tx Results", func(t *testing.T) {
@@ -198,20 +185,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		// Verify results were indexed correctly
 		results, err := indexer.results.ByBlockID(blockID)
 		require.NoError(t, err)
-		assert.Len(t, results, len(expectedResults))
-
-		// Verify all results are present
-		for _, expectedResult := range expectedResults {
-			found := false
-			for _, result := range results {
-				if result.TransactionID == expectedResult.TransactionID {
-					found = true
-					assert.Equal(t, expectedResult.Failed, result.Failed)
-					break
-				}
-			}
-			assert.True(t, found, "Transaction result not found")
-		}
+		assert.ElementsMatch(t, expectedResults, results)
 	})
 
 	t.Run("Index Collections", func(t *testing.T) {
@@ -223,30 +197,14 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 
 		// Create collections and store them directly first
 		expectedCollections := unittest.CollectionListFixture(2)
-
-		// Store collections manually to avoid "key not found" errors
-		for _, coll := range expectedCollections {
-			// Store the collection
-			err := indexer.collections.Store(coll)
-			require.NoError(t, err)
-
-			// Store the light collection too
-			lightColl := coll.Light()
-			err = indexer.collections.StoreLightAndIndexByTransaction(&lightColl)
-			require.NoError(t, err)
-
-			// Store each transaction
-			for _, tx := range coll.Transactions {
-				err := indexer.transactions.Store(tx)
-				require.NoError(t, err)
-			}
-		}
+		systemChunkCollection := unittest.CollectionFixture(1)
 
 		ed := &execution_data.BlockExecutionData{
 			BlockID: blockID,
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
 				{Collection: expectedCollections[0]},
 				{Collection: expectedCollections[1]},
+				{Collection: &systemChunkCollection},
 			},
 		}
 
@@ -284,25 +242,8 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		expectedEvents := unittest.EventsFixture(20)
 		expectedResults := unittest.LightTransactionResultsFixture(20)
 		expectedCollections := unittest.CollectionListFixture(2)
+		systemChunkCollection := unittest.CollectionFixture(1)
 		expectedTries := []*ledger.TrieUpdate{createTestTrieUpdate(t), createTestTrieUpdate(t)}
-
-		// Store collections manually to avoid "key not found" errors
-		for _, coll := range expectedCollections {
-			// Store the collection
-			err := indexer.collections.Store(coll)
-			require.NoError(t, err)
-
-			// Store the light collection too
-			lightColl := coll.Light()
-			err = indexer.collections.StoreLightAndIndexByTransaction(&lightColl)
-			require.NoError(t, err)
-
-			// Store each transaction
-			for _, tx := range coll.Transactions {
-				err := indexer.transactions.Store(tx)
-				require.NoError(t, err)
-			}
-		}
 
 		ed := &execution_data.BlockExecutionData{
 			BlockID: blockID,
@@ -318,6 +259,9 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 					TransactionResults: expectedResults[10:],
 					Events:             expectedEvents[10:],
 					TrieUpdate:         expectedTries[1],
+				},
+				{
+					Collection: &systemChunkCollection,
 				},
 			},
 		}
