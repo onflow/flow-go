@@ -337,8 +337,8 @@ func WithAllTheFixins(payload *flow.Payload) {
 			WithResult(ExecutionResultFixture(WithServiceEvents(3))),
 			WithSpocks(SignaturesFixture(3)),
 		)
-		payload.Receipts = flow.ExecutionReceiptStubList{receipt.Stub()}
-		payload.Results = flow.ExecutionResultList{&receipt.ExecutionResult}
+		payload.Receipts = append(payload.Receipts, receipt.Stub())
+		payload.Results = append(payload.Results, &receipt.ExecutionResult)
 	}
 	payload.ProtocolStateID = IdentifierFixture()
 }
