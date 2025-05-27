@@ -551,8 +551,7 @@ func TestExtendMissingParent(t *testing.T) {
 		extend.Payload.Seals = nil
 		extend.Header.Height = 2
 		extend.Header.View = 2
-		parentBlock := unittest.BlockFixture()
-		extend.Header.ParentID = parentBlock.ID()
+		extend.Header.ParentID = unittest.IdentifierFixture()
 
 		err := state.Extend(context.Background(), unittest.ProposalFromBlock(&extend))
 		require.Error(t, err)
@@ -585,16 +584,15 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		require.NoError(t, err)
 
 		// create another block with the same height and view, that is coming after
-		extend.Header.ParentID = extend.ID()
-		extend.Header.Height = 1
-		extend.Header.View = 2
-
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(&extend))
-		require.Error(t, err)
+		extend2 := unittest.BlockWithParentFixture(extend.ToHeader())
+		extend2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		extend2.Header.Height = 1
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(extend2))
+		require.True(t, st.IsInvalidExtensionError(err))
 
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
+		err = db.View(operation.LookupLatestSealAtBlock(extend2.ID(), &sealID))
 		require.Error(t, err)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
@@ -2837,8 +2835,7 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 		extend.Payload.Seals = nil
 		extend.Header.Height = 2
 		extend.Header.View = 2
-		parentBlock := unittest.BlockFixture()
-		extend.Header.ParentID = parentBlock.ID()
+		extend.Header.ParentID = unittest.IdentifierFixture()
 
 		err := state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(&extend))
 		require.Error(t, err)
@@ -2919,7 +2916,7 @@ func TestExtendBlockProcessable(t *testing.T) {
 		grandChild := unittest.BlockWithParentProtocolState(child)
 
 		// extend block using certifying QC, expect that BlockProcessable will be emitted once
-		consumer.On("BlockProcessable", block.ToHeader(), child.ToHeader().QuorumCertificate()).Once()
+		consumer.On("BlockProcessable", block.ToHeader(), child.Header.QuorumCertificate()).Once()
 		err := state.ExtendCertified(context.Background(), unittest.CertifiedByChild(block, child))
 		require.NoError(t, err)
 
@@ -2931,7 +2928,7 @@ func TestExtendBlockProcessable(t *testing.T) {
 		// extend block using certifying QC, expect that BlockProcessable will be emitted twice.
 		// One for parent block and second for current block.
 		certifiedGrandchild := unittest.NewCertifiedBlock(grandChild)
-		consumer.On("BlockProcessable", child.ToHeader(), grandChild.ToHeader().QuorumCertificate()).Once()
+		consumer.On("BlockProcessable", child.ToHeader(), grandChild.Header.QuorumCertificate()).Once()
 		consumer.On("BlockProcessable", grandChild.ToHeader(), certifiedGrandchild.CertifyingQC).Once()
 		err = state.ExtendCertified(context.Background(), certifiedGrandchild)
 		require.NoError(t, err)

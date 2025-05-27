@@ -1,9 +1,9 @@
 package models
 
 import (
-	"github.com/onflow/flow-go/access"
+	accessmodel "github.com/onflow/flow-go/model/access"
 )
 
-func (t *NetworkParameters) Build(params *access.NetworkParameters) {
+func (t *NetworkParameters) Build(params *accessmodel.NetworkParameters) {
 	t.ChainId = params.ChainID.String()
 }

@@ -629,7 +629,7 @@ func main() {
 			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
-			persist, err := persister.New(node.DB, node.RootChainID)
+			persist, err := persister.New(node.ProtocolDB, node.RootChainID)
 			if err != nil {
 				return nil, err
 			}
@@ -761,7 +761,6 @@ func main() {
 			var build module.Builder
 			build, err = builder.NewBuilder(
 				node.Metrics.Mempool,
-				node.DB,
 				mutableState,
 				node.Storage.Headers,
 				node.Storage.Seals,

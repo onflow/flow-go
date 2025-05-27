@@ -603,7 +603,8 @@ func TestNotificationSkippedForCompatibleVersions(t *testing.T) {
 // versions
 func TestIsOverriden(t *testing.T) {
 	vc := &VersionControl{
-		compatibilityOverrides: map[string]struct{}{"0.0.1": {}},
+		compatibilityOverrides:  map[string]struct{}{"0.0.1": {}},
+		overridesLogSuppression: make(map[string]struct{}),
 	}
 
 	assert.True(t, vc.isOverridden(semver.New("0.0.1")))

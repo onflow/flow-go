@@ -6,6 +6,8 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 var GetLivenessCmd = &cobra.Command{
@@ -19,28 +21,30 @@ func init() {
 }
 
 func runGetLivenessData(*cobra.Command, []string) {
-	db := common.InitStorage(flagDatadir)
-	defer db.Close()
+	flagDBs := common.ReadDBFlags()
+	err := common.WithStorage(flagDBs, func(db storage.DB) error {
+		chainID := flow.ChainID(flagChain)
+		reader, err := persister.NewReader(db, chainID)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not create reader from db")
+		}
 
-	storages := common.InitStorages(db)
-	state, err := common.InitProtocolState(db, storages)
+		log.Info().
+			Str("chain", flagChain).
+			Msg("getting hotstuff liveness data")
+
+		livenessData, err := reader.GetLivenessData()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not get hotstuff liveness data")
+		}
+
+		log.Info().Msgf("successfully get hotstuff liveness data")
+		common.PrettyPrint(livenessData)
+		return nil
+	})
+
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not init protocol state")
+		log.Error().Err(err).Msg("could not get hotstuff liveness data")
 	}
 
-	rootBlock := state.Params().FinalizedRoot()
-	reader, err := persister.NewReader(db, rootBlock.ChainID)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not create reader from db")
-	}
-
-	log.Info().Msg("getting hotstuff liveness data")
-
-	livenessData, err := reader.GetLivenessData()
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not get hotstuff liveness data")
-	}
-
-	log.Info().Msgf("successfully get hotstuff liveness data")
-	common.PrettyPrint(livenessData)
 }

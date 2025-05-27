@@ -239,7 +239,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.B
 	}
 
 	// check if the block header is a valid extension of the finalized state
-	err = m.checkOutdatedExtension(candidate.ToHeader())
+	err = m.checkOutdatedExtension(candidate.Header)
 	if err != nil {
 		if state.IsOutdatedExtensionError(err) {
 			return fmt.Errorf("candidate block is an outdated extension: %w", err)
@@ -351,7 +351,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.BlockP
 	}
 
 	// STEP 4:
-	qc := candidate.Block.ToHeader().QuorumCertificate()
+	qc := header.QuorumCertificate()
 	deferredDbOps.AddDbOp(func(tx *transaction.Tx) error {
 		// STEP 4a: Store QC for parent block and emit `BlockProcessable` notification if and only if
 		//  - the QC for the parent has not been stored before (otherwise, we already emitted the notification) and
@@ -376,7 +376,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.BlockP
 		if err != nil {
 			return fmt.Errorf("could not store candidate block: %w", err)
 		}
-		err = transaction.WithTx(procedure.IndexNewBlock(blockID, candidate.Block.Header.ParentID))(tx)
+		err = transaction.WithTx(procedure.IndexNewBlock(blockID, header.ParentID))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}
@@ -419,7 +419,7 @@ func (m *FollowerState) checkBlockAlreadyProcessed(blockID flow.Identifier) (boo
 // directly connect, through its ancestors, to the last finalized block.
 // Expected errors during normal operations:
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
-func (m *ParticipantState) checkOutdatedExtension(header *flow.Header) error {
+func (m *ParticipantState) checkOutdatedExtension(header flow.HeaderBody) error {
 	var finalizedHeight uint64
 	err := m.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
 	if err != nil {
