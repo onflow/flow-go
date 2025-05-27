@@ -501,6 +501,7 @@ func main() {
 			builderFactory, err := factories.NewBuilderFactory(
 				node.ProtocolDB,
 				node.State,
+				node.StorageLockMgr,
 				node.Storage.Headers,
 				node.Tracer,
 				colMetrics,

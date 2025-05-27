@@ -3,6 +3,7 @@ package factories
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/collection"
@@ -18,6 +19,7 @@ import (
 type BuilderFactory struct {
 	db               storage.DB
 	protoState       protocol.State
+	lockManager      lockctx.Manager
 	mainChainHeaders storage.Headers
 	trace            module.Tracer
 	opts             []builder.Opt
@@ -29,6 +31,7 @@ type BuilderFactory struct {
 func NewBuilderFactory(
 	db storage.DB,
 	protoState protocol.State,
+	lockManager lockctx.Manager,
 	mainChainHeaders storage.Headers,
 	trace module.Tracer,
 	metrics module.CollectionMetrics,
@@ -40,6 +43,7 @@ func NewBuilderFactory(
 	factory := &BuilderFactory{
 		db:               db,
 		protoState:       protoState,
+		lockManager:      lockManager,
 		mainChainHeaders: mainChainHeaders,
 		trace:            trace,
 		metrics:          metrics,
@@ -61,6 +65,7 @@ func (f *BuilderFactory) Create(
 	build, err := builder.NewBuilder(
 		f.db,
 		f.trace,
+		f.lockManager,
 		f.protoState,
 		clusterState,
 		f.mainChainHeaders,
