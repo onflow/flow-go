@@ -22,6 +22,8 @@ type Core interface {
 	Abort(ctx context.Context) error
 }
 
+var _ Core = (*CoreImpl)(nil)
+
 type CoreImpl struct{}
 
 func NewCore() *CoreImpl {

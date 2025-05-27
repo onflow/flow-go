@@ -17,7 +17,16 @@ type StateUpdatePublisher func(resultID flow.Identifier, newState State)
 // Pipeline represents a generic processing pipeline with state transitions.
 // It processes data through sequential states: Ready -> Downloading -> Indexing ->
 // WaitingPersist -> Persisting -> Complete, with conditions for each transition.
-type Pipeline struct {
+type Pipeline interface {
+	Run(context.Context, Core) error
+	GetState() State
+	SetSealed()
+	OnParentStateUpdated(State)
+}
+
+var _ Pipeline = (*PipelineImpl)(nil)
+
+type PipelineImpl struct {
 	logger         zerolog.Logger
 	statePublisher StateUpdatePublisher
 
@@ -49,8 +58,8 @@ func NewPipeline(
 	isSealed bool,
 	executionResult *flow.ExecutionResult,
 	stateUpdatePublisher StateUpdatePublisher,
-) *Pipeline {
-	p := &Pipeline{
+) *PipelineImpl {
+	p := &PipelineImpl{
 		logger: logger.With().
 			Str("component", "pipeline").
 			Str("execution_result_id", executionResult.ExecutionDataID.String()).
@@ -77,7 +86,7 @@ func NewPipeline(
 // Returns an error if any processing step fails with an irrecoverable error.
 // Returns nil if processing completes successfully, reaches a terminal state,
 // or if either the parent or pipeline context is canceled.
-func (p *Pipeline) Run(parentCtx context.Context, core Core) error {
+func (p *PipelineImpl) Run(parentCtx context.Context, core Core) error {
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
 
@@ -109,14 +118,14 @@ func (p *Pipeline) Run(parentCtx context.Context, core Core) error {
 }
 
 // GetState returns the current state of the pipeline.
-func (p *Pipeline) GetState() State {
+func (p *PipelineImpl) GetState() State {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.state
 }
 
 // SetSealed marks the data as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.
-func (p *Pipeline) SetSealed() {
+func (p *PipelineImpl) SetSealed() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -127,7 +136,7 @@ func (p *Pipeline) SetSealed() {
 }
 
 // OnParentStateUpdated updates the pipeline's parent state.
-func (p *Pipeline) OnParentStateUpdated(parentState State) {
+func (p *PipelineImpl) OnParentStateUpdated(parentState State) {
 	p.mu.Lock()
 	p.parentState = parentState
 	p.mu.Unlock()
@@ -143,11 +152,11 @@ func (p *Pipeline) OnParentStateUpdated(parentState State) {
 
 // broadcastStateUpdate sends a state update via the state publisher.
 // Note: this causes the state updates to propagate to all descendent pipelines synchronously.
-func (p *Pipeline) broadcastStateUpdate() {
+func (p *PipelineImpl) broadcastStateUpdate() {
 	p.statePublisher(p.executionResult.ID(), p.GetState())
 }
 
-func (p *Pipeline) cancel() {
+func (p *PipelineImpl) cancel() {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -160,7 +169,7 @@ func (p *Pipeline) cancel() {
 // It returns false when a terminal state is reached (StateComplete or StateCanceled), true otherwise.
 // Returns an error if any processing step fails.
 // TODO: document expected error's once the Core logic is implemented
-func (p *Pipeline) processCurrentState(ctx context.Context) (bool, error) {
+func (p *PipelineImpl) processCurrentState(ctx context.Context) (bool, error) {
 	currentState := p.GetState()
 
 	switch currentState {
@@ -187,7 +196,7 @@ func (p *Pipeline) processCurrentState(ctx context.Context) (bool, error) {
 
 // transitionTo transitions the pipeline to the given state and broadcasts
 // the state change to children pipelines.
-func (p *Pipeline) transitionTo(newState State) {
+func (p *PipelineImpl) transitionTo(newState State) {
 	p.mu.Lock()
 	oldState := p.state
 	p.state = newState
@@ -209,7 +218,7 @@ func (p *Pipeline) transitionTo(newState State) {
 
 // processReady handles the Ready state and transitions to StateDownloading if possible.
 // Returns true to continue processing, false if a terminal state was reached.
-func (p *Pipeline) processReady() bool {
+func (p *PipelineImpl) processReady() bool {
 	if p.canStartDownloading() {
 		p.transitionTo(StateDownloading)
 		return true
@@ -222,7 +231,7 @@ func (p *Pipeline) processReady() bool {
 // Returns true to continue processing, false if a terminal state was reached.
 // Returns an error if the download step fails.
 // TODO: document expected error's once the Core logic is implemented
-func (p *Pipeline) processDownloading(ctx context.Context) (bool, error) {
+func (p *PipelineImpl) processDownloading(ctx context.Context) (bool, error) {
 	p.logger.Debug().Msg("starting download step")
 
 	if err := p.core.Download(ctx); err != nil {
@@ -249,7 +258,7 @@ func (p *Pipeline) processDownloading(ctx context.Context) (bool, error) {
 // Returns true to continue processing, false if a terminal state was reached.
 // Returns an error if the index step fails.
 // TODO: document expected error's once the Core logic is implemented
-func (p *Pipeline) processIndexing(ctx context.Context) (bool, error) {
+func (p *PipelineImpl) processIndexing(ctx context.Context) (bool, error) {
 	p.logger.Debug().Msg("starting index step")
 
 	if err := p.core.Index(ctx); err != nil {
@@ -274,7 +283,7 @@ func (p *Pipeline) processIndexing(ctx context.Context) (bool, error) {
 // processWaitingPersist handles the WaitingPersist state.
 // It checks if the conditions for persisting are met and transitions to StatePersisting if possible.
 // Returns true to continue processing, false if a terminal state was reached.
-func (p *Pipeline) processWaitingPersist() bool {
+func (p *PipelineImpl) processWaitingPersist() bool {
 	if p.canStartPersisting() {
 		p.transitionTo(StatePersisting)
 		return true
@@ -290,7 +299,7 @@ func (p *Pipeline) processWaitingPersist() bool {
 // Returns true to continue processing, false if a terminal state was reached.
 // Returns an error if the persist step fails.
 // TODO: document expected error's once the Core logic is implemented
-func (p *Pipeline) processPersisting(ctx context.Context) (bool, error) {
+func (p *PipelineImpl) processPersisting(ctx context.Context) (bool, error) {
 	p.logger.Debug().Msg("starting persist step")
 
 	if err := p.core.Persist(ctx); err != nil {
@@ -309,7 +318,7 @@ func (p *Pipeline) processPersisting(ctx context.Context) (bool, error) {
 // It calls the core's Abort method to perform any necessary cleanup.
 // Returns an error if the abort step fails.
 // TODO: document expected error's once the Core logic is implemented
-func (p *Pipeline) processCancel(ctx context.Context) error {
+func (p *PipelineImpl) processCancel(ctx context.Context) error {
 	p.cancel()
 	return p.core.Abort(ctx)
 }
@@ -320,7 +329,7 @@ func (p *Pipeline) processCancel(ctx context.Context) error {
 //  1. The current state must be Ready
 //  2. The parent pipeline must be in an active state (StateDownloading, StateIndexing,
 //     StateWaitingPersist, StatePersisting, or StateComplete)
-func (p *Pipeline) canStartDownloading() bool {
+func (p *PipelineImpl) canStartDownloading() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -341,7 +350,7 @@ func (p *Pipeline) canStartDownloading() bool {
 // Conditions for transition:
 // 1. The current state must be Downloading
 // 2. The parent pipeline must not be canceled
-func (p *Pipeline) canStartIndexing() bool {
+func (p *PipelineImpl) canStartIndexing() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -353,7 +362,7 @@ func (p *Pipeline) canStartIndexing() bool {
 // Conditions for transition:
 // 1. The current state must be Indexing
 // 2. The parent pipeline must not be canceled
-func (p *Pipeline) canWaitForPersist() bool {
+func (p *PipelineImpl) canWaitForPersist() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -366,7 +375,7 @@ func (p *Pipeline) canWaitForPersist() bool {
 // 1. The current state must be WaitingPersist
 // 2. The data must be sealed
 // 3. The parent pipeline must be complete
-func (p *Pipeline) canStartPersisting() bool {
+func (p *PipelineImpl) canStartPersisting() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 

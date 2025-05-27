@@ -14,12 +14,6 @@ type ResultEntry struct {
 	header *flow.Header
 }
 
-// TODO: notes from discussion with Alex:
-// * it will be easier to allow adding all results into the forest, and only running some
-// * the results forest will decide which to run, and signal to the pipelines to begin
-//     * TODO: calculate how much data is needed for each entry that is not run. is it OK to add them all?
-//     * possibly a good way to do it is only add up to the max size of sealed results, then once we reach the head, add all unsealed results
-
 // TODO: what happens when sealing is halted for an extended period of time?
 // * if we continue indexing data, we may end up with a large amount of data in memory
 // * if we don't, we will stop tracking data. maybe this is OK?
