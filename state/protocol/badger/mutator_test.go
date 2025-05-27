@@ -584,8 +584,10 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		require.NoError(t, err)
 
 		// create another block with the same height and view, that is coming after
-		extend2 := unittest.BlockWithParentFixture(extend.ToHeader())
-		extend2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		extend2 := unittest.BlockWithParentAndPayload(
+			extend.ToHeader(),
+			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+		)
 		extend2.Header.Height = 1
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(extend2))
 		require.True(t, st.IsInvalidExtensionError(err))
