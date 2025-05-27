@@ -241,7 +241,6 @@ func RechainBlocks(blocks []*flow.Block) {
 func FullBlockFixture() flow.Block {
 	block := BlockFixture()
 	payload := PayloadFixture(WithAllTheFixins)
-
 	return *flow.NewBlock(block.Header, payload)
 }
 
@@ -443,9 +442,7 @@ func BlockWithParentAndProposerFixture(
 }
 
 func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Block {
-	payload := flow.Payload{
-		Guarantees: nil,
-	}
+	payload := flow.Payload{}
 
 	if len(seals) > 0 {
 		payload.Seals = make([]*flow.Seal, len(seals))
@@ -455,7 +452,6 @@ func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Bl
 			)
 		}
 	}
-
 	return BlockWithParentAndPayload(parent, payload)
 }
 

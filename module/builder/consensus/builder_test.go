@@ -858,7 +858,7 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 	)
 	for i := 0; i <= 4; i++ {
 		// we need to run this several times, as in each iteration as we have _multiple_ execution chains.
-		// In each iteration, we only mange to reconnect one additional height
+		// In each iteration, we only manage to reconnect one additional height
 		unittest.ReconnectBlocksAndReceipts(blocks, receiptChain1)
 		unittest.ReconnectBlocksAndReceipts(blocks, receiptChain2)
 	}
