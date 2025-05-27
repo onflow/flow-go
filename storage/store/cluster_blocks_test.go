@@ -1,35 +1,46 @@
-package badger
+package store
 
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
+	"github.com/onflow/flow-go/storage/procedure"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestClusterBlocksByHeight(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		chain := unittest.ClusterBlockChainFixture(5)
 		parent, blocks := chain[0], chain[1:]
 
 		// add parent as boundary
-		err := db.Update(operation.IndexClusterBlockHeight(parent.Header.ChainID, parent.Header.Height, parent.ID()))
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexClusterBlockHeight(rw.Writer(), parent.Header.ChainID, parent.Header.Height, parent.ID())
+		})
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertClusterFinalizedHeight(parent.Header.ChainID, parent.Header.Height))
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.UpsertClusterFinalizedHeight(rw.Writer(), parent.Header.ChainID, parent.Header.Height)
+		})
 		require.NoError(t, err)
 
 		// store a chain of blocks
 		for _, block := range blocks {
-			err := db.Update(procedure.InsertClusterBlock(&block))
+			_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertClusterBlock)
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.InsertClusterBlock(lctx, rw, &block)
+			})
 			require.NoError(t, err)
+			lctx.Release()
 
-			err = db.Update(procedure.FinalizeClusterBlock(block.Header.ID()))
+			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.FinalizeClusterBlock(rw, block.Header.ID())
+			})
 			require.NoError(t, err)
 		}
 
