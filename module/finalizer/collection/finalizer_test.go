@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -15,13 +16,16 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	cluster "github.com/onflow/flow-go/state/cluster/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/procedure"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestFinalizer(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(badgerdb *badger.DB) {
+		db := badgerimpl.ToDB(badgerdb)
 		// reference block on the main consensus chain
 		refBlock := unittest.BlockHeaderFixture()
 		// genesis block for the cluster chain
@@ -36,7 +40,7 @@ func TestFinalizer(t *testing.T) {
 		// a helper function to clean up shared state between tests
 		cleanup := func() {
 			// wipe the DB
-			err := db.DropAll()
+			err := badgerdb.DropAll()
 			require.NoError(t, err)
 			// clear the mempool
 			for _, tx := range pool.All() {
@@ -44,19 +48,31 @@ func TestFinalizer(t *testing.T) {
 			}
 		}
 
+		lockManager := storage.NewTestingLockManager()
 		// a helper function to bootstrap with the genesis block
 		bootstrap := func() {
 			stateRoot, err := cluster.NewStateRoot(genesis, unittest.QuorumCertificateFixture(), 0)
 			require.NoError(t, err)
-			state, err = cluster.Bootstrap(db, stateRoot)
+
+			lctx := lockManager.NewContext()
+			defer lctx.Release()
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertClusterBlock))
+			state, err = cluster.Bootstrap(db, lockManager, stateRoot)
 			require.NoError(t, err)
-			err = db.Update(operation.InsertHeader(refBlock.ID(), refBlock))
+			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertHeader(rw.Writer(), refBlock.ID(), refBlock)
+			})
 			require.NoError(t, err)
 		}
 
 		// a helper function to insert a block
-		insert := func(block model.Block) {
-			err := db.Update(procedure.InsertClusterBlock(&block))
+		insert := func(db storage.DB, lockManager lockctx.Manager, block model.Block) {
+			lctx := lockManager.NewContext()
+			defer lctx.Release()
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertClusterBlock))
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.InsertClusterBlock(lctx, rw, &block)
+			})
 			assert.NoError(t, err)
 		}
 
@@ -87,7 +103,7 @@ func TestFinalizer(t *testing.T) {
 			// create a new block on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
 			block.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
-			insert(block)
+			insert(db, lockManager, block)
 
 			// finalize the block
 			err := finalizer.MakeFinal(block.ID())
@@ -109,7 +125,7 @@ func TestFinalizer(t *testing.T) {
 			block := unittest.ClusterBlockWithParent(genesis)
 			block.Header.ParentID = unittest.IdentifierFixture()
 			block.SetPayload(model.EmptyPayload(refBlock.ID()))
-			insert(block)
+			insert(db, lockManager, block)
 
 			// try to finalize - this should fail
 			err := finalizer.MakeFinal(block.ID())
@@ -126,7 +142,7 @@ func TestFinalizer(t *testing.T) {
 			// create a block with empty payload on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
 			block.SetPayload(model.EmptyPayload(refBlock.ID()))
-			insert(block)
+			insert(db, lockManager, block)
 
 			// finalize the block
 			err := finalizer.MakeFinal(block.ID())
@@ -158,7 +174,7 @@ func TestFinalizer(t *testing.T) {
 			// create a block containing tx1 on top of genesis
 			block := unittest.ClusterBlockWithParent(genesis)
 			block.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
-			insert(block)
+			insert(db, lockManager, block)
 
 			// block should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
@@ -203,12 +219,12 @@ func TestFinalizer(t *testing.T) {
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
 			block1.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
-			insert(block1)
+			insert(db, lockManager, block1)
 
 			// create a block containing tx2 on top of block1
 			block2 := unittest.ClusterBlockWithParent(&block1)
 			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
-			insert(block2)
+			insert(db, lockManager, block2)
 
 			// both blocks should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
@@ -258,12 +274,12 @@ func TestFinalizer(t *testing.T) {
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
 			block1.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
-			insert(block1)
+			insert(db, lockManager, block1)
 
 			// create a block containing tx2 on top of block1
 			block2 := unittest.ClusterBlockWithParent(&block1)
 			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
-			insert(block2)
+			insert(db, lockManager, block2)
 
 			// block should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
@@ -308,12 +324,12 @@ func TestFinalizer(t *testing.T) {
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
 			block1.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
-			insert(block1)
+			insert(db, lockManager, block1)
 
 			// create a block containing tx2 on top of genesis (conflicting with block1)
 			block2 := unittest.ClusterBlockWithParent(genesis)
 			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
-			insert(block2)
+			insert(db, lockManager, block2)
 
 			// block should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
@@ -345,9 +361,9 @@ func TestFinalizer(t *testing.T) {
 // assertClusterBlocksIndexedByReferenceHeight checks the given cluster blocks have
 // been indexed by the given reference block height, which is expected as part of
 // finalization.
-func assertClusterBlocksIndexedByReferenceHeight(t *testing.T, db *badger.DB, refHeight uint64, clusterBlockIDs ...flow.Identifier) {
+func assertClusterBlocksIndexedByReferenceHeight(t *testing.T, db storage.DB, refHeight uint64, clusterBlockIDs ...flow.Identifier) {
 	var ids []flow.Identifier
-	err := db.View(operation.LookupClusterBlocksByReferenceHeightRange(refHeight, refHeight, &ids))
+	err := operation.LookupClusterBlocksByReferenceHeightRange(db.Reader(), refHeight, refHeight, &ids)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, clusterBlockIDs, ids)
 }
