@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -21,9 +22,10 @@ import (
 
 type MutableState struct {
 	*State
-	tracer   module.Tracer
-	headers  storage.Headers
-	payloads storage.ClusterPayloads
+	lockManager lockctx.Manager
+	tracer      module.Tracer
+	headers     storage.Headers
+	payloads    storage.ClusterPayloads
 }
 
 var _ clusterstate.MutableState = (*MutableState)(nil)
@@ -137,7 +139,11 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
 	lctx := m.lockManager.NewContext()
-	lctx.AcquireLock
+	defer lctx.Release()
+	err = lctx.AcquireLock(storage.LockInsertClusterBlock)
+	if err != nil {
+		return fmt.Errorf("could not acquire lock for inserting cluster block: %w", err)
+	}
 
 	err = m.State.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return procedure.InsertClusterBlock(lctx, rw, candidate)
