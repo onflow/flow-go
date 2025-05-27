@@ -3,7 +3,6 @@ package db
 import (
 	"fmt"
 
-	"github.com/cockroachdb/pebble"
 	"github.com/docker/go-units"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -68,16 +67,5 @@ func run(*cobra.Command, []string) error {
 		return fmt.Errorf("migration failed: %w", err)
 	}
 
-	pebbleDB, err := pebble.Open(flagPebbleDBdir, &pebble.Options{})
-	if err != nil {
-		return fmt.Errorf("failed to open PebbleDB: %w", err)
-	}
-
-	height, err := migration.ReadFinalizedHeight(pebbleDB)
-	if err != nil {
-		return fmt.Errorf("failed to read finalized height from PebbleDB: %w", err)
-	}
-
-	lg.Info().Msgf("finalized height: %d", height)
 	return nil
 }
