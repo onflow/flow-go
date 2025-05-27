@@ -122,10 +122,12 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block, candidateS
 	block.Payload.Receipts = append(block.Payload.Receipts, receipt.Meta())
 	block.Payload.Results = append(block.Payload.Results, &receipt.ExecutionResult)
 
-	incorporatedResultForPrevBlock = unittest.IncorporatedResult.Fixture(
-		unittest.IncorporatedResult.WithResult(previousResult),
-		unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
-	)
+	//incorporatedResultForPrevBlock = unittest.IncorporatedResult.Fixture(
+	//	unittest.IncorporatedResult.WithResult(previousResult),
+	//	unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
+	//)
+
+	incorporatedResultForPrevBlock = flow.NewIncorporatedResult(block.ID(), previousResult)
 
 	result := unittest.ExecutionResultFixture(
 		unittest.WithBlock(block),
