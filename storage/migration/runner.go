@@ -125,7 +125,7 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 	}
 
 	lg.Info().Str("file", completeMarkerPath).
-		Msgf("Step 6/6 Migration marker file written successfully. Compacting pebbleDB...")
+		Msgf("Step 6/6 Migration marker file written successfully.")
 
 	lg.Info().Str("file", completeMarkerPath).Msgf("Migration marker file written successfully.")
 

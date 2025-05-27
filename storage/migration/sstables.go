@@ -141,7 +141,9 @@ func createSSTableWriter(filePath string) (*sstable.Writer, error) {
 	}
 
 	writable := objstorageprovider.NewFileWritable(f)
-	sstWriter := sstable.NewWriter(writable, sstable.WriterOptions{})
+	sstWriter := sstable.NewWriter(writable, sstable.WriterOptions{
+		TableFormat: sstable.TableFormatPebblev4,
+	})
 
 	return sstWriter, nil
 }
