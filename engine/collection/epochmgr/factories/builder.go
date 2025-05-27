@@ -3,7 +3,6 @@ package factories
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/collection"
@@ -17,7 +16,7 @@ import (
 )
 
 type BuilderFactory struct {
-	db               *badger.DB
+	db               storage.DB
 	protoState       protocol.State
 	mainChainHeaders storage.Headers
 	trace            module.Tracer
@@ -28,7 +27,7 @@ type BuilderFactory struct {
 }
 
 func NewBuilderFactory(
-	db *badger.DB,
+	db storage.DB,
 	protoState protocol.State,
 	mainChainHeaders storage.Headers,
 	trace module.Tracer,

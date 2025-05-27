@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/cluster"
@@ -19,8 +19,8 @@ import (
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/procedure"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -31,7 +31,8 @@ import (
 // HotStuff event loop is the only consumer of this interface and is single
 // threaded, this is OK.
 type Builder struct {
-	db             *badger.DB
+	db             storage.DB
+	lockManager    lockctx.Manager
 	mainHeaders    storage.Headers
 	clusterHeaders storage.Headers
 	protoState     protocol.State
@@ -48,8 +49,9 @@ type Builder struct {
 }
 
 func NewBuilder(
-	db *badger.DB,
+	db storage.DB,
 	tracer module.Tracer,
+	lockManager lockctx.Manager,
 	protoState protocol.State,
 	clusterState clusterstate.State,
 	mainHeaders storage.Headers,
@@ -63,6 +65,7 @@ func NewBuilder(
 	b := Builder{
 		db:             db,
 		tracer:         tracer,
+		lockManager:    lockManager,
 		protoState:     protoState,
 		clusterState:   clusterState,
 		mainHeaders:    mainHeaders,
@@ -198,7 +201,17 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 	// STEP 4: insert the cluster block to the database.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnDBInsert)
-	err = operation.RetryOnConflict(b.db.Update, procedure.InsertClusterBlock(&proposal))
+
+	lctx := b.lockManager.NewContext()
+	defer lctx.Release()
+	err = lctx.AcquireLock(storage.LockInsertClusterBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return procedure.InsertClusterBlock(lctx, rw, &proposal)
+	})
 	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("could not insert built block: %w", err)
@@ -246,18 +259,18 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 	}
 
 	// otherwise, attempt to read them from storage
-	err = b.db.View(func(btx *badger.Txn) error {
+	err = (func(r storage.Reader) error {
 		var refEpochFinalHeight uint64
 		var refEpochFinalID flow.Identifier
 
-		err = operation.RetrieveEpochLastHeight(b.clusterEpoch, &refEpochFinalHeight)(btx)
+		err = operation.RetrieveEpochLastHeight(r, b.clusterEpoch, &refEpochFinalHeight)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				return nil
 			}
 			return fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
 		}
-		err = operation.LookupBlockHeight(refEpochFinalHeight, &refEpochFinalID)(btx)
+		err = operation.LookupBlockHeight(r, refEpochFinalHeight, &refEpochFinalID)
 		if err != nil {
 			// if we are able to retrieve the epoch's final height, the block must be finalized
 			// therefore failing to look up its height here is an unexpected error
@@ -272,7 +285,7 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 		ctx.refEpochFinalHeight = b.epochFinalHeight
 
 		return nil
-	})
+	})(b.db.Reader())
 	if err != nil {
 		return nil, fmt.Errorf("could not get block build context: %w", err)
 	}
@@ -336,7 +349,7 @@ func (b *Builder) populateFinalizedAncestryLookup(ctx *blockBuildContext) error 
 	// the finalized cluster blocks which could possibly contain any conflicting transactions
 	var clusterBlockIDs []flow.Identifier
 	start, end := findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight)
-	err := b.db.View(operation.LookupClusterBlocksByReferenceHeightRange(start, end, &clusterBlockIDs))
+	err := operation.LookupClusterBlocksByReferenceHeightRange(b.db.Reader(), start, end, &clusterBlockIDs)
 	if err != nil {
 		return fmt.Errorf("could not lookup finalized cluster blocks by reference height range [%d,%d]: %w", start, end, err)
 	}
