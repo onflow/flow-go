@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 // OneshotExecutionDataConfig is a config for the oneshot execution data requester.
@@ -88,17 +87,16 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 	timeout = retry.WithCappedDuration(r.config.MaxFetchTimeout, timeout)
 
 	attempt := 0
-	blockID := r.executionResult.BlockID
-	blockHeight := r.blockHeader.Height
-	executionDataID := r.executionResult.ExecutionDataID
+	lg := r.log.With().
+		Str("block_id", r.executionResult.BlockID.String()).
+		Str("execution_data_id", r.executionResult.ExecutionDataID.String()).
+		Uint64("height", r.blockHeader.Height).
+		Logger()
 
 	var execData *execution_data.BlockExecutionDataEntity
 	err := retry.Do(ctx, backoff, func(context.Context) error {
 		if attempt > 0 {
-			r.log.Debug().
-				Str("block_id", blockID.String()).
-				Str("execution_data_id", executionDataID.String()).
-				Uint64("height", blockHeight).
+			lg.Debug().
 				Uint64("attempt", uint64(attempt)).
 				Msgf("retrying download")
 
@@ -109,7 +107,7 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 		// download execution data for the block
 		fetchTimeout, _ := timeout.Next()
 		var err error
-		execData, err = r.processFetchRequest(ctx, blockHeight, fetchTimeout)
+		execData, err = r.processFetchRequest(ctx, fetchTimeout)
 		if isBlobNotFoundError(err) || errors.Is(err, context.DeadlineExceeded) {
 			return retry.RetryableError(err)
 		}
@@ -118,10 +116,8 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 			// these errors indicate the execution data was received successfully and its hash matched
 			// the value in the ExecutionResult, however, the data was malformed or invalid. this means that
 			// an execution node produced an invalid execution data blob, and verification nodes approved it
-			r.log.Error().Err(err).Str(
-				"execution_data_id",
-				executionDataID.String(),
-			).Msg("received invalid execution data from network (potential slashing evidence?)")
+			lg.Error().Err(err).
+				Msg("received invalid execution data from network (potential slashing evidence?)")
 		}
 
 		return err
@@ -140,29 +136,28 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 // from the execution data cache based on the block ID.
 //
 // Expected errors during normal operations:
-// - storage.ErrNotFound if a seal or execution result is not available for the block
 // - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
 // - MalformedDataError if some level of the blob tree cannot be properly deserialized
 // - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
 // - context.DeadlineExceeded if fetching time exceeded fetchTimeout duration
 func (r *OneshotExecutionDataRequester) processFetchRequest(
 	parentCtx context.Context,
-	height uint64,
 	fetchTimeout time.Duration,
 ) (*execution_data.BlockExecutionDataEntity, error) {
-	blockID := r.executionResult.BlockID
+	height := r.blockHeader.Height
 	executionDataID := r.executionResult.ExecutionDataID
 
-	logger := r.log.With().
-		Str("block_id", blockID.String()).
+	lg := r.log.With().
+		Str("block_id", r.executionResult.BlockID.String()).
 		Str("execution_data_id", executionDataID.String()).
 		Uint64("height", height).
 		Logger()
-	logger.Debug().Msg("processing fetch request")
+
+	lg.Debug().Msg("processing fetch request")
 
 	start := time.Now()
 	r.metrics.ExecutionDataFetchStarted()
-	logger.Debug().Msg("downloading execution data")
+	lg.Debug().Msg("downloading execution data")
 
 	ctx, cancel := context.WithTimeout(parentCtx, fetchTimeout)
 	defer cancel()
@@ -174,9 +169,7 @@ func (r *OneshotExecutionDataRequester) processFetchRequest(
 		return nil, err
 	}
 
-	logger.Info().
-		Hex("execution_data_id", logging.ID(execData.ID())).
-		Msg("execution data fetched")
+	lg.Info().Msg("execution data fetched")
 
 	return execData, nil
 }
