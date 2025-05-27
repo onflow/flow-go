@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
@@ -11,15 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	edmock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
-	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
-	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
-	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -43,25 +39,17 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecutionData() {
 	}
 
 	suite.Run("Happy path. Raw setup", func() {
-		headers := storagemock.NewHeaders(suite.T())
-		seals := storagemock.NewSeals(suite.T())
-
-		results := storagemock.NewExecutionResults(suite.T())
 		block := unittest.BlockFixture()
 		result := unittest.ExecutionResultFixture(unittest.WithBlock(&block))
-
 		blockEd := unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(block.ID()))
 
-		heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
-
-		downloader := edmock.NewDownloader(suite.T())
-		downloader.
+		execDataDownloader := edmock.NewDownloader(suite.T())
+		execDataDownloader.
 			On("Get", mock.Anything, mock.AnythingOfType("flow.Identifier")).
 			Return(blockEd, nil).
 			Once()
 
-		edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
-		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, result, block.Header, config)
+		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, result, block.Header, config)
 		require.NoError(suite.T(), err)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -76,22 +64,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecutionData() {
 		dataStore := dssync.MutexWrap(datastore.NewMapDatastore())
 		blobstore := blobs.NewBlobstore(dataStore)
 		testData := generateTestData(suite.T(), blobstore, 5, map[uint64]testExecutionDataCallback{})
-
-		headers := synctest.MockBlockHeaderStorage(
-			synctest.WithByID(testData.blocksByID),
-			synctest.WithByHeight(testData.blocksByHeight),
-			synctest.WithBlockIDByHeight(testData.blocksByHeight),
-		)
-		results := synctest.MockResultsStorage(
-			synctest.WithResultByID(testData.resultsByID),
-		)
-		seals := synctest.MockSealsStorage(
-			synctest.WithSealsByBlockID(testData.sealsByBlockID),
-		)
-
-		downloader := MockDownloader(testData.executionDataEntries)
-		heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
-		edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
+		execDataDownloader := MockDownloader(testData.executionDataEntries)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -104,7 +77,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecutionData() {
 			requester, err := NewOneshotExecutionDataRequester(
 				logger,
 				metricsCollector,
-				edCache,
+				execDataDownloader,
 				result,
 				block.Header,
 				config,
@@ -114,10 +87,9 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecutionData() {
 
 			execData, err := requester.RequestExecutionData(ctx)
 			require.NoError(suite.T(), err)
-
 			require.Equal(suite.T(), execData.BlockID, result.BlockID)
-			require.Equal(suite.T(), expectedED.BlockID, execData.BlockExecutionData.BlockID)
-			require.Equal(suite.T(), expectedED.ChunkExecutionDatas, execData.BlockExecutionData.ChunkExecutionDatas)
+			require.Equal(suite.T(), expectedED.BlockID, execData.BlockID)
+			require.Equal(suite.T(), expectedED.ChunkExecutionDatas, execData.ChunkExecutionDatas)
 		}
 	})
 }
@@ -132,33 +104,27 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 		MaxRetryDelay:   DefaultMaxRetryDelay,
 	}
 
-	headers := storagemock.NewHeaders(suite.T())
-	seals := storagemock.NewSeals(suite.T())
-
 	// Create a block and execution result
 	block := unittest.BlockFixture()
 	executionResult := unittest.ExecutionResultFixture(unittest.WithBlock(&block))
-	results := storagemock.NewExecutionResults(suite.T())
 
 	suite.Run("blob not found error", func() {
 		// Mock downloader to return blob not found error first, then success
-		downloader := edmock.NewDownloader(suite.T())
+		execDataDownloader := edmock.NewDownloader(suite.T())
 		expectedError := &execution_data.BlobNotFoundError{}
-		downloader.
+		execDataDownloader.
 			On("Get", mock.Anything, executionResult.ExecutionDataID).
 			Return(nil, expectedError).
 			Once()
 
-		// eventually return execution data
+		// Eventually return execution data
 		blockEd := unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(block.ID()))
-		downloader.
+		execDataDownloader.
 			On("Get", mock.Anything, executionResult.ExecutionDataID).
 			Return(blockEd, nil).
 			Once()
 
-		heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
-		edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
-		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, executionResult, block.Header, config)
+		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, executionResult, block.Header, config)
 		require.NoError(suite.T(), err)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -172,21 +138,20 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 
 	suite.Run("execution data not found in storage", func() {
 		// Mock downloader to return not found error
-		downloader := edmock.NewDownloader(suite.T())
-		expectedError := &execution_data.BlobNotFoundError{}
-		downloader.
+		execDataDownloader := edmock.NewDownloader(suite.T())
+		expectedError := context.DeadlineExceeded
+		execDataDownloader.
 			On("Get", mock.Anything, executionResult.ExecutionDataID).
 			Return(nil, expectedError).
 			Maybe()
 
-		heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
-		edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
-		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, executionResult, block.Header, config)
+		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, executionResult, block.Header, config)
 		require.NoError(suite.T(), err)
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 
+		// Should retry until timeout
 		execData, err := requester.RequestExecutionData(ctx)
 		require.ErrorIs(suite.T(), err, expectedError)
 		require.Nil(suite.T(), execData)
@@ -194,16 +159,14 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 
 	suite.Run("malformed data error", func() {
 		// Mock downloader to return malformed data error
-		downloader := edmock.NewDownloader(suite.T())
+		execDataDownloader := edmock.NewDownloader(suite.T())
 		expectedError := execution_data.NewMalformedDataError(fmt.Errorf("malformed data"))
-		downloader.
+		execDataDownloader.
 			On("Get", mock.Anything, executionResult.ExecutionDataID).
 			Return(nil, expectedError).
 			Once()
 
-		heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
-		edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
-		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, executionResult, block.Header, config)
+		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, executionResult, block.Header, config)
 		require.NoError(suite.T(), err)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -216,16 +179,40 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 
 	suite.Run("blob size limit exceed error", func() {
 		// Mock downloader to return blob size limit exceeded error
-		downloader := edmock.NewDownloader(suite.T())
+		execDataDownloader := edmock.NewDownloader(suite.T())
 		expectedError := &execution_data.BlobSizeLimitExceededError{}
-		downloader.
+		execDataDownloader.
 			On("Get", mock.Anything, executionResult.ExecutionDataID).
 			Return(nil, expectedError).
 			Once()
 
-		heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
-		edCache := cache.NewExecutionDataCache(downloader, headers, seals, results, heroCache)
-		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, edCache, executionResult, block.Header, config)
+		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, executionResult, block.Header, config)
+		require.NoError(suite.T(), err)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		execData, err := requester.RequestExecutionData(ctx)
+		require.ErrorIs(suite.T(), err, expectedError)
+		require.Nil(suite.T(), execData)
+	})
+
+	suite.Run("context deadline exceeded error", func() {
+		// Return context.DeadlineExceeded to trigger retry logic
+		execDataDownloader := edmock.NewDownloader(suite.T())
+		execDataDownloader.
+			On("Get", mock.Anything, executionResult.ExecutionDataID).
+			Return(nil, context.DeadlineExceeded).
+			Once()
+
+		// Eventually return context.Canceled to stop downloader's retry logic
+		expectedError := context.Canceled
+		execDataDownloader.
+			On("Get", mock.Anything, executionResult.ExecutionDataID).
+			Return(nil, expectedError).
+			Once()
+
+		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, executionResult, block.Header, config)
 		require.NoError(suite.T(), err)
 
 		ctx, cancel := context.WithCancel(context.Background())

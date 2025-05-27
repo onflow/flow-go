@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 )
 
 // OneshotExecutionDataConfig is a config for the oneshot execution data requester.
@@ -36,15 +35,28 @@ type OneshotExecutionDataRequester struct {
 	log             zerolog.Logger
 	metrics         module.ExecutionDataRequesterMetrics
 	config          OneshotExecutionDataConfig
-	execDataCache   *cache.ExecutionDataCache
+	execDataGetter  execution_data.ExecutionDataGetter
 	executionResult *flow.ExecutionResult
 	blockHeader     *flow.Header
 }
 
+// NewOneshotExecutionDataRequester creates a new OneshotExecutionDataRequester instance.
+// It validates that the provided block header and execution result are consistent
+//
+// Parameters:
+//   - log: Logger instance for the requester component
+//   - metrics: Metrics collector for execution data requester operations
+//   - execDataGetter: Cache for storing and retrieving execution data
+//   - executionResult: The execution result to request data for
+//   - blockHeader: The block header corresponding to the execution result
+//   - config: Configuration settings for the oneshot execution data requester
+//
+// Expected errors during normal operation:
+//   - validation error returned if block header ID is not equal to execution result block ID
 func NewOneshotExecutionDataRequester(
 	log zerolog.Logger,
 	metrics module.ExecutionDataRequesterMetrics,
-	execDataCache *cache.ExecutionDataCache,
+	execDataGetter execution_data.ExecutionDataGetter,
 	executionResult *flow.ExecutionResult,
 	blockHeader *flow.Header,
 	config OneshotExecutionDataConfig,
@@ -56,7 +68,7 @@ func NewOneshotExecutionDataRequester(
 	return &OneshotExecutionDataRequester{
 		log:             log.With().Str("component", "oneshot_execution_data_requester").Logger(),
 		metrics:         metrics,
-		execDataCache:   execDataCache,
+		execDataGetter:  execDataGetter,
 		executionResult: executionResult,
 		blockHeader:     blockHeader,
 		config:          config,
@@ -75,7 +87,7 @@ func NewOneshotExecutionDataRequester(
 // All other errors are unexpected exceptions and may indicate invalid execution data was received.
 func (r *OneshotExecutionDataRequester) RequestExecutionData(
 	ctx context.Context,
-) (*execution_data.BlockExecutionDataEntity, error) {
+) (*execution_data.BlockExecutionData, error) {
 	backoff := retry.NewExponential(r.config.RetryDelay)
 	backoff = retry.WithCappedDuration(r.config.MaxRetryDelay, backoff)
 	backoff = retry.WithJitterPercent(15, backoff)
@@ -93,7 +105,7 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 		Uint64("height", r.blockHeader.Height).
 		Logger()
 
-	var execData *execution_data.BlockExecutionDataEntity
+	var execData *execution_data.BlockExecutionData
 	err := retry.Do(ctx, backoff, func(context.Context) error {
 		if attempt > 0 {
 			lg.Debug().
@@ -143,7 +155,7 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 func (r *OneshotExecutionDataRequester) processFetchRequest(
 	parentCtx context.Context,
 	fetchTimeout time.Duration,
-) (*execution_data.BlockExecutionDataEntity, error) {
+) (*execution_data.BlockExecutionData, error) {
 	height := r.blockHeader.Height
 	executionDataID := r.executionResult.ExecutionDataID
 
@@ -163,7 +175,7 @@ func (r *OneshotExecutionDataRequester) processFetchRequest(
 	defer cancel()
 
 	// NOTE: ByID does not add execData to cache or check if it is already in a cache, it only returns execData
-	execData, err := r.execDataCache.ByID(ctx, executionDataID)
+	execData, err := r.execDataGetter.Get(ctx, executionDataID)
 	r.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, height)
 	if err != nil {
 		return nil, err
