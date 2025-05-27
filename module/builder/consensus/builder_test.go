@@ -675,21 +675,19 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 
 	// create blocks B1 to B4:
 	b1 := bs.createAndRecordBlock(bs.blocks[bs.parentID], true)
-	bchain := unittest.ChainFixtureFrom(3, b1.ToHeader()) // creates blocks b2, b3, b4
-	b4 := bchain[2]
+	bchain := unittest.ChainFixtureFrom(2, b1.ToHeader()) // creates blocks b2, b3
 
-	// Incorporate result for block B1 into payload of block B4
+	// create block B4: includes result for block B1 in its payload
 	resultB1 := bs.resultForBlock[b1.ID()]
 	receiptB1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultB1))
-	b4 = flow.NewBlock(
-		b4.Header,
+	b4 := unittest.BlockWithParentAndPayload(
+		bchain[1].ToHeader(),
 		flow.Payload{
 			Results:  []*flow.ExecutionResult{&receiptB1.ExecutionResult},
 			Receipts: []*flow.ExecutionReceiptStub{receiptB1.Stub()},
 		},
 	)
-	// update bchain
-	bchain[2] = b4
+	bchain = append(bchain, b4)
 
 	// add blocks B2, B3, B4, A5 to the mocked storage layer (block b0 and b1 are already added):
 	a5 := unittest.BlockWithParentFixture(b4.ToHeader())
