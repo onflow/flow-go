@@ -10,7 +10,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/onflow/flow-go/fvm/accountV2Migration"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm"
@@ -201,11 +200,6 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 		}
 	}
 
-	accountV2Migration.DeclareFunctions(
-		executor.cadenceRuntime.TxRuntimeEnv,
-		chainID,
-	)
-
 	// get meter parameters
 	executionParameters, executionStateRead, err := getExecutionParameters(
 		executor.env.Logger(),
@@ -274,11 +268,6 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 			return err
 		}
 	}
-
-	accountV2Migration.DeclareFunctions(
-		executor.cadenceRuntime.TxRuntimeEnv,
-		chainID,
-	)
 
 	var invalidator derived.TransactionInvalidator
 	if !executor.errs.CollectedError() {

@@ -2,6 +2,8 @@ package badgerimpl
 
 import (
 	"fmt"
+	"slices"
+	"sync"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -9,11 +11,20 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 )
 
+// ReaderBatchWriter is for reading and writing to a storage backend.
+// It is useful for performing a related sequence of reads and writes, after which you would like
+// to modify some non-database state if the sequence completed successfully (via AddCallback).
+// If you are not using AddCallback, avoid using ReaderBatchWriter: use Reader and Writer directly.
+// ReaderBatchWriter is not safe for concurrent use.
 type ReaderBatchWriter struct {
 	globalReader storage.Reader
 	batch        *badger.WriteBatch
 
-	callbacks operation.Callbacks
+	// for executing callbacks after the batch has been flushed, such as updating caches
+	callbacks *operation.Callbacks
+
+	// for repreventing re-entrant deadlock
+	locks *operation.BatchLocks
 }
 
 var _ storage.ReaderBatchWriter = (*ReaderBatchWriter)(nil)
@@ -38,6 +49,14 @@ func (b *ReaderBatchWriter) Writer() storage.Writer {
 // BadgerWriteBatch returns the badger write batch
 func (b *ReaderBatchWriter) BadgerWriteBatch() *badger.WriteBatch {
 	return b.batch
+}
+
+// Lock tries to acquire the lock for the batch.
+// if the lock is already acquired by this same batch from other pending db operations,
+// then it will not be blocked and can continue updating the batch, which prevents a re-entrant deadlock.
+// CAUTION: The caller must ensure that no other references exist for the input lock.
+func (b *ReaderBatchWriter) Lock(lock *sync.Mutex) {
+	b.locks.Lock(lock, b.callbacks)
 }
 
 // AddCallback adds a callback to execute after the batch has been flush
@@ -97,6 +116,8 @@ func NewReaderBatchWriter(db *badger.DB) *ReaderBatchWriter {
 	return &ReaderBatchWriter{
 		globalReader: ToReader(db),
 		batch:        db.NewWriteBatch(),
+		callbacks:    operation.NewCallbacks(),
+		locks:        operation.NewBatchLocks(),
 	}
 }
 
@@ -108,7 +129,26 @@ var _ storage.Writer = (*ReaderBatchWriter)(nil)
 // It is safe to modify the contents of the arguments after Set returns.
 // No errors expected during normal operation
 func (b *ReaderBatchWriter) Set(key, value []byte) error {
-	return b.batch.Set(key, value)
+	// BadgerDB v2 docs for WriteBatch.Set() says:
+	//
+	//   "Set is equivalent of Txn.Set()."
+	//
+	// BadgerDB v2 docs for Txn.Set() says:
+	//
+	//   "Set adds a key-value pair to the database.
+	//   ...
+	//   The current transaction keeps a reference to the key and val byte slice
+	//   arguments. Users must not modify key and val until the end of the transaction."
+
+	// Make copies of given key and value because:
+	// - ReaderBatchWriter.Set() (this function) promises that it is safe to modify
+	//   key and value after Set returns, while
+	// - BadgerDB's WriteBatch.Set() said users must not modify key and value
+	//   until end of transaction.
+	keyCopy := slices.Clone(key)
+	valueCopy := slices.Clone(value)
+
+	return b.batch.Set(keyCopy, valueCopy)
 }
 
 // Delete deletes the value for the given key. Deletes are blind all will
@@ -117,7 +157,24 @@ func (b *ReaderBatchWriter) Set(key, value []byte) error {
 // It is safe to modify the contents of the arguments after Delete returns.
 // No errors expected during normal operation
 func (b *ReaderBatchWriter) Delete(key []byte) error {
-	return b.batch.Delete(key)
+	// BadgerDB v2 docs for WriteBatch.Delete() says:
+	//
+	//   "Set is equivalent of Txn.Delete."
+	//
+	// BadgerDB v2 docs for Txn.Set() says:
+	//
+	//   "Delete deletes a key.
+	//   ...
+	//   The current transaction keeps a reference to the key byte slice argument.
+	//   Users must not modify the key until the end of the transaction."
+
+	// Make copies of given key because:
+	// - ReaderBatchWriter.Delete() (this function) promises that it is safe to modify
+	//   key after Delete returns, while
+	// - BadgerDB's WriteBatch.Delete() says users must not modify key until end of transaction.
+	keyCopy := slices.Clone(key)
+
+	return b.batch.Delete(keyCopy)
 }
 
 // DeleteByRange removes all keys with a prefix that falls within the
