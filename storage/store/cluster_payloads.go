@@ -1,36 +1,31 @@
-package badger
+package store
 
 import (
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/procedure"
 )
 
 // ClusterPayloads implements storage of block payloads for collection node
 // cluster consensus.
 type ClusterPayloads struct {
-	db    *badger.DB
+	db    storage.DB
 	cache *Cache[flow.Identifier, *cluster.Payload]
 }
 
-func NewClusterPayloads(cacheMetrics module.CacheMetrics, db *badger.DB) *ClusterPayloads {
+func NewClusterPayloads(cacheMetrics module.CacheMetrics, db storage.DB) *ClusterPayloads {
 
-	store := func(blockID flow.Identifier, payload *cluster.Payload) func(*transaction.Tx) error {
-		return transaction.WithTx(procedure.InsertClusterPayload(blockID, payload))
+	store := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *cluster.Payload) error {
+		return procedure.InsertClusterPayload(rw, blockID, payload)
 	}
 
-	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (*cluster.Payload, error) {
+	retrieve := func(r storage.Reader, blockID flow.Identifier) (*cluster.Payload, error) {
 		var payload cluster.Payload
-		return func(tx *badger.Txn) (*cluster.Payload, error) {
-			err := procedure.RetrieveClusterPayload(blockID, &payload)(tx)
-			return &payload, err
-		}
+		err := procedure.RetrieveClusterPayload(r, blockID, &payload)
+		return &payload, err
 	}
 
 	cp := &ClusterPayloads{
@@ -44,26 +39,24 @@ func NewClusterPayloads(cacheMetrics module.CacheMetrics, db *badger.DB) *Cluste
 	return cp
 }
 
-func (cp *ClusterPayloads) storeTx(blockID flow.Identifier, payload *cluster.Payload) func(*transaction.Tx) error {
-	return cp.cache.PutTx(blockID, payload)
+func (cp *ClusterPayloads) storeTx(rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *cluster.Payload) error {
+	return cp.cache.PutTx(rw, blockID, payload)
 }
 
-func (cp *ClusterPayloads) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*cluster.Payload, error) {
-	return func(tx *badger.Txn) (*cluster.Payload, error) {
-		val, err := cp.cache.Get(blockID)(tx)
-		if err != nil {
-			return nil, err
-		}
-		return val, nil
+func (cp *ClusterPayloads) retrieveTx(r storage.Reader, blockID flow.Identifier) (*cluster.Payload, error) {
+	val, err := cp.cache.Get(r, blockID)
+	if err != nil {
+		return nil, err
 	}
+	return val, nil
 }
 
 func (cp *ClusterPayloads) Store(blockID flow.Identifier, payload *cluster.Payload) error {
-	return operation.RetryOnConflictTx(cp.db, transaction.Update, cp.storeTx(blockID, payload))
+	return cp.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return cp.storeTx(rw, blockID, payload)
+	})
 }
 
 func (cp *ClusterPayloads) ByBlockID(blockID flow.Identifier) (*cluster.Payload, error) {
-	tx := cp.db.NewTransaction(false)
-	defer tx.Discard()
-	return cp.retrieveTx(blockID)(tx)
+	return cp.retrieveTx(cp.db.Reader(), blockID)
 }
