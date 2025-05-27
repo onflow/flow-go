@@ -7,7 +7,6 @@ import (
 	"github.com/sethvargo/go-retry"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 // TransactionErrorMessagesRequesterConfig contains the retry settings for the tx error messages fetch.
@@ -42,7 +41,7 @@ func NewTransactionErrorMessagesRequester(
 // RequestTransactionErrorMessages fetches transaction error messages for the specific
 // execution result this requester was configured with.
 func (r *TransactionErrorMessagesRequester) RequestTransactionErrorMessages(
-	ctx irrecoverable.SignalerContext,
+	ctx context.Context,
 ) error {
 	backoff := retry.NewExponential(r.config.RetryDelay)
 	backoff = retry.WithCappedDuration(r.config.MaxRetryDelay, backoff)
@@ -62,7 +61,7 @@ func (r *TransactionErrorMessagesRequester) RequestTransactionErrorMessages(
 		}
 		attempt++
 
-		err := r.core.HandleTransactionResultErrorMessagesByResultID(ctx, blockID, resultID)
+		err := r.core.FetchTransactionResultErrorMessagesByResultID(ctx, blockID, resultID)
 
 		return retry.RetryableError(err)
 	})
