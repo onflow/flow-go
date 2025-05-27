@@ -2,10 +2,12 @@ package unsynchronized
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -119,6 +121,33 @@ func (t *TransactionResultErrorMessages) Store(
 
 		t.store[txIDKey] = &txResult
 		t.indexStore[txIndexKey] = &txResult
+	}
+
+	return nil
+}
+
+// AddToBatch adds all the in-memory storages to the given batch.
+// It is used for the batching writes to the DB.
+func (t *TransactionResultErrorMessages) AddToBatch(batch storage.ReaderBatchWriter) error {
+	writer := batch.Writer()
+
+	for block, errorMessages := range t.blockStore {
+		blockID, err := store.KeyToBlockID(block)
+		if err != nil {
+			return fmt.Errorf("could not decode block: %w", err)
+		}
+
+		for _, msg := range errorMessages {
+			err := operation.BatchInsertTransactionResultErrorMessage(writer, blockID, &msg)
+			if err != nil {
+				return fmt.Errorf("could not persist transaction result error message: %w", err)
+			}
+
+			err = operation.BatchIndexTransactionResultErrorMessage(writer, blockID, &msg)
+			if err != nil {
+				return fmt.Errorf("could not index transaction result error message: %w", err)
+			}
+		}
 	}
 
 	return nil
