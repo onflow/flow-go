@@ -37,8 +37,10 @@ func TestFinalizeClusterBlock(t *testing.T) {
 
 		block := unittest.ClusterBlockWithParent(&parent)
 
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertClusterBlock)
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
 		defer lctx.Release()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertClusterBlock))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return InsertClusterBlock(lctx, rw, &block)
 		}))
