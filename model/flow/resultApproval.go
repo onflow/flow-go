@@ -13,6 +13,8 @@ type Attestation struct {
 	ChunkIndex        uint64     // index of the approved chunk
 }
 
+// NewAttestation creates a new instance of Attestation.
+// Construction Attestation allowed only within the constructor.
 func NewAttestation(blockID Identifier, executionResultID Identifier, chunkIndex uint64) Attestation {
 	return Attestation{
 		BlockID:           blockID,
@@ -36,6 +38,8 @@ type ResultApprovalBody struct {
 	Spock                crypto.Signature // proof of re-computation, one per each chunk
 }
 
+// NewResultApprovalBody creates a new instance of ResultApprovalBody.
+// Construction ResultApprovalBody allowed only within the constructor.
 func NewResultApprovalBody(
 	attestation Attestation,
 	approvalID Identifier,
@@ -75,6 +79,8 @@ type ResultApproval struct {
 	VerifierSignature crypto.Signature // signature over all above fields
 }
 
+// NewResultApproval creates a new instance of ResultApproval.
+// Construction NewResultApproval allowed only within the constructor.
 func NewResultApproval(
 	body ResultApprovalBody,
 	verifierSignature crypto.Signature) ResultApproval {
