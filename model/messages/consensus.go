@@ -10,14 +10,6 @@ import (
 // represented by different types (like this one), until it is fully validated.
 type UntrustedBlock flow.Block
 
-// ToHeader converts the untrusted block into a compact [flow.Header] representation,
-// where the payload is compressed to a hash reference.
-// TODO(malleability immutable): This conversion should eventually be accompanied by a full validation of the untrusted input.
-func (ub *UntrustedBlock) ToHeader() *flow.Header {
-	internal := flow.NewBlock(ub.Header, ub.Payload)
-	return internal.ToHeader()
-}
-
 // UntrustedProposal is part of the consensus protocol and represents the leader
 // of a consensus round pushing a new proposal to the network.
 // This differentiation is currently largely unused, but eventually untrusted models should use
