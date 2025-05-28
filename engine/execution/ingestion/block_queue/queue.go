@@ -55,6 +55,8 @@ type MissingCollection struct {
 	Guarantee *flow.CollectionGuarantee
 }
 
+// NewMissingCollection creates a new instance of MissingCollection.
+// Construction MissingCollection allowed only within the constructor
 func NewMissingCollection(blockID flow.Identifier, height uint64, guarantee *flow.CollectionGuarantee) MissingCollection {
 	return MissingCollection{
 		BlockID:   blockID,

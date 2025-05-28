@@ -16,6 +16,8 @@ type IncorporatedResult struct {
 	Result *ExecutionResult
 }
 
+// NewIncorporatedResult creates a new instance of IncorporatedResult.
+// Construction IncorporatedResult allowed only within the constructor
 func NewIncorporatedResult(incorporatedBlockID Identifier, result *ExecutionResult) *IncorporatedResult {
 	return &IncorporatedResult{
 		IncorporatedBlockID: incorporatedBlockID,

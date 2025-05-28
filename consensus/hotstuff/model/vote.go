@@ -16,6 +16,8 @@ type Vote struct {
 	SigData  []byte
 }
 
+// NewVote creates a new instance of Vote.
+// Construction Vote allowed only within the constructor
 func NewVote(view uint64, blockID flow.Identifier, signerID flow.Identifier, sigData []byte) Vote {
 	return Vote{
 		View:     view,
