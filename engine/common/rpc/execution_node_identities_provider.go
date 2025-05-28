@@ -64,6 +64,9 @@ func NewExecutionNodeIdentitiesProvider(
 
 // ExecutionNodesForResultID returns execution node identities that produced receipts
 // for the specific execution result ID within the given block.
+//
+// Expected errors during normal operation:
+// - storage.ErrNotFound - if no receipts was found in the storage for the given block
 func (e *ExecutionNodeIdentitiesProvider) ExecutionNodesForResultID(
 	blockID flow.Identifier,
 	resultID flow.Identifier,
