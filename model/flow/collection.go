@@ -13,6 +13,8 @@ type Collection struct {
 	Transactions []*TransactionBody
 }
 
+// NewCollection creates a new instance of Collection.
+// Construction Collection allowed only within the constructor
 func NewCollection(transactions []*TransactionBody) Collection {
 	return Collection{Transactions: transactions}
 }
@@ -40,11 +42,11 @@ func (c Collection) Light() LightCollection {
 // Guarantee returns a collection guarantee for this collection.
 func (c *Collection) Guarantee() CollectionGuarantee {
 	return NewCollectionGuarantee(
-		c.ID(),             // the collection’s ID
-		Identifier{},       // zero-value ReferenceBlockID
-		ChainID(""),        // zero-value ChainID
-		nil,                // empty signer indices
-		crypto.Signature{}, // zero-value signature
+		c.ID(),
+		Identifier{},
+		ChainID(""),
+		nil,
+		crypto.Signature{},
 	)
 }
 

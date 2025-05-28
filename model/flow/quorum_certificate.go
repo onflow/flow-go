@@ -24,6 +24,8 @@ type QuorumCertificate struct {
 	SigData []byte
 }
 
+// NewQuorumCertificate creates a new instance of QuorumCertificate.
+// Construction QuorumCertificate allowed only within the constructor
 func NewQuorumCertificate(
 	view uint64,
 	blockID Identifier,

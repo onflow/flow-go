@@ -16,6 +16,8 @@ type CollectionGuarantee struct {
 	Signature        crypto.Signature // guarantor signatures
 }
 
+// NewCollectionGuarantee creates a new instance of CollectionGuarantee.
+// Construction CollectionGuarantee allowed only within the constructor
 func NewCollectionGuarantee(
 	collectionID Identifier,
 	referenceBlockID Identifier,
