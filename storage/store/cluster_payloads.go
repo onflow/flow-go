@@ -1,6 +1,7 @@
 package store
 
 import (
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -18,8 +19,8 @@ type ClusterPayloads struct {
 
 func NewClusterPayloads(cacheMetrics module.CacheMetrics, db storage.DB) *ClusterPayloads {
 
-	store := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *cluster.Payload) error {
-		return procedure.InsertClusterPayload(rw, blockID, payload)
+	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *cluster.Payload) error {
+		return procedure.InsertClusterPayload(lctx, rw, blockID, payload)
 	}
 
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*cluster.Payload, error) {
@@ -32,15 +33,15 @@ func NewClusterPayloads(cacheMetrics module.CacheMetrics, db storage.DB) *Cluste
 		db: db,
 		cache: newCache[flow.Identifier, *cluster.Payload](cacheMetrics, metrics.ResourceClusterPayload,
 			withLimit[flow.Identifier, *cluster.Payload](flow.DefaultTransactionExpiry*4),
-			withStore(store),
+			withStoreWithLock(storeWithLock),
 			withRetrieve(retrieve)),
 	}
 
 	return cp
 }
 
-func (cp *ClusterPayloads) storeTx(rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *cluster.Payload) error {
-	return cp.cache.PutTx(rw, blockID, payload)
+func (cp *ClusterPayloads) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *cluster.Payload) error {
+	return cp.cache.PutWithLockTx(lctx, rw, blockID, payload)
 }
 
 func (cp *ClusterPayloads) retrieveTx(r storage.Reader, blockID flow.Identifier) (*cluster.Payload, error) {
@@ -51,9 +52,9 @@ func (cp *ClusterPayloads) retrieveTx(r storage.Reader, blockID flow.Identifier)
 	return val, nil
 }
 
-func (cp *ClusterPayloads) Store(blockID flow.Identifier, payload *cluster.Payload) error {
+func (cp *ClusterPayloads) Store(lctx lockctx.Proof, blockID flow.Identifier, payload *cluster.Payload) error {
 	return cp.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return cp.storeTx(rw, blockID, payload)
+		return cp.storeTx(lctx, rw, blockID, payload)
 	})
 }
 

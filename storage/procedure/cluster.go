@@ -33,7 +33,7 @@ func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block 
 	}
 
 	// insert the block payload
-	err = InsertClusterPayload(rw, blockID, block.Payload)
+	err = InsertClusterPayload(lctx, rw, blockID, block.Payload)
 	if err != nil {
 		return fmt.Errorf("could not insert payload: %w", err)
 	}
@@ -150,7 +150,20 @@ func FinalizeClusterBlock(rw storage.ReaderBatchWriter, blockID flow.Identifier)
 
 // InsertClusterPayload inserts the payload for a cluster block. It inserts
 // both the collection and all constituent transactions, allowing duplicates.
-func InsertClusterPayload(rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *cluster.Payload) error {
+func InsertClusterPayload(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *cluster.Payload) error {
+	if !lctx.HoldsLock(storage.LockInsertClusterBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertClusterBlock)
+	}
+
+	var txIDs []flow.Identifier
+	err := operation.LookupCollectionPayload(rw.GlobalReader(), blockID, &txIDs)
+	if err == nil {
+		return fmt.Errorf("collection payload already exists for block %s: %w", blockID, storage.ErrAlreadyExists)
+	}
+
+	if err != storage.ErrNotFound {
+		return fmt.Errorf("could not look up collection payload: %w", err)
+	}
 
 	// cluster payloads only contain a single collection, allow duplicates,
 	// because it is valid for two competing forks to have the same payload.
@@ -159,7 +172,7 @@ func InsertClusterPayload(rw storage.ReaderBatchWriter, blockID flow.Identifier,
 	// This means the Insert operation is actually a Upsert operation.
 	// The upsert is ok, because the data is unique by its ID
 	writer := rw.Writer()
-	err := operation.UpsertCollection(writer, &light)
+	err = operation.UpsertCollection(writer, &light)
 	if err != nil {
 		return fmt.Errorf("could not insert payload collection: %w", err)
 	}
@@ -176,7 +189,7 @@ func InsertClusterPayload(rw storage.ReaderBatchWriter, blockID flow.Identifier,
 	}
 
 	// index the transaction IDs within the collection
-	txIDs := payload.Collection.Light().Transactions
+	txIDs = payload.Collection.Light().Transactions
 	// SkipDuplicates here is to ignore the error if the collection already exists
 	// This means the Insert operation is actually a Upsert operation.
 	err = operation.IndexCollectionPayload(writer, blockID, txIDs)
