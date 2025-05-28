@@ -19,6 +19,8 @@ type ExecutionResult struct {
 	ExecutionDataID  Identifier // hash commitment to flow.BlockExecutionDataRoot
 }
 
+// NewExecutionResult creates a new instance of ExecutionResult.
+// Construction ExecutionResult allowed only within the constructor
 func NewExecutionResult(
 	previousResultID Identifier,
 	blockID Identifier,

@@ -171,6 +171,8 @@ type ChunkConstructor func(
 	endState StateCommitment,
 	totalComputationUsed uint64) *Chunk
 
+// NewChunk creates a new instance of MissingCollection.
+// Construction Chunk allowed only within the constructor
 // NewChunk returns a Chunk compliant with Protocol Version 2 and later.
 func NewChunk(
 	blockID Identifier,
@@ -267,7 +269,8 @@ type ChunkDataPack struct {
 	ExecutionDataRoot BlockExecutionDataRoot
 }
 
-// NewChunkDataPack returns an initialized chunk data pack.
+// NewChunkDataPack creates a new instance of ChunkDataPack.
+// Construction ChunkDataPack allowed only within the constructor
 func NewChunkDataPack(
 	chunkID Identifier,
 	startState StateCommitment,
