@@ -32,12 +32,12 @@ type OneshotExecutionDataConfig struct {
 // OneshotExecutionDataRequester is a component that requests execution data for a block.
 // It uses a retry mechanism to retry the download execution data if they are not found.
 type OneshotExecutionDataRequester struct {
-	log             zerolog.Logger
-	metrics         module.ExecutionDataRequesterMetrics
-	config          OneshotExecutionDataConfig
-	execDataGetter  execution_data.ExecutionDataGetter
-	executionResult *flow.ExecutionResult
-	blockHeader     *flow.Header
+	log                zerolog.Logger
+	metrics            module.ExecutionDataRequesterMetrics
+	config             OneshotExecutionDataConfig
+	execDataDownloader execution_data.ExecutionDataGetter
+	executionResult    *flow.ExecutionResult
+	blockHeader        *flow.Header
 }
 
 // NewOneshotExecutionDataRequester creates a new OneshotExecutionDataRequester instance.
@@ -46,17 +46,17 @@ type OneshotExecutionDataRequester struct {
 // Parameters:
 //   - log: Logger instance for the requester component
 //   - metrics: Metrics collector for execution data requester operations
-//   - execDataGetter: Cache for storing and retrieving execution data
+//   - execDataDownloader: Cache for storing and retrieving execution data
 //   - executionResult: The execution result to request data for
 //   - blockHeader: The block header corresponding to the execution result
 //   - config: Configuration settings for the oneshot execution data requester
 //
-// Expected errors during normal operation:
-//   - validation error returned if block header ID is not equal to execution result block ID
+// No errors are expected during normal operations and likely indicate a bug or
+// inconsistent state.
 func NewOneshotExecutionDataRequester(
 	log zerolog.Logger,
 	metrics module.ExecutionDataRequesterMetrics,
-	execDataGetter execution_data.ExecutionDataGetter,
+	execDataDownloader execution_data.Downloader,
 	executionResult *flow.ExecutionResult,
 	blockHeader *flow.Header,
 	config OneshotExecutionDataConfig,
@@ -66,21 +66,18 @@ func NewOneshotExecutionDataRequester(
 	}
 
 	return &OneshotExecutionDataRequester{
-		log:             log.With().Str("component", "oneshot_execution_data_requester").Logger(),
-		metrics:         metrics,
-		execDataGetter:  execDataGetter,
-		executionResult: executionResult,
-		blockHeader:     blockHeader,
-		config:          config,
+		log:                log.With().Str("component", "oneshot_execution_data_requester").Logger(),
+		metrics:            metrics,
+		execDataDownloader: execDataDownloader,
+		executionResult:    executionResult,
+		blockHeader:        blockHeader,
+		config:             config,
 	}, nil
 }
 
-// RequestExecutionData requests execution data for a given block from the execution data cache.
+// RequestExecutionData requests execution data for a given block.
 // It performs a fetch using a retry mechanism with exponential backoff if execution data not found.
 // Returns the execution data entity and any error encountered.
-//
-// The function logs each retry attempt and emits metrics for retries and fetch durations.
-// The block height is used only for logging and metric purposes.
 //
 // Expected errors:
 // - context.Canceled: if the provided context was canceled before completion
@@ -144,14 +141,12 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 
 // processFetchRequest performs the actual fetch of execution data for the given block within the provided timeout.
 //
-// It wraps the fetch with metrics tracking and contextual logging. The execution data is retrieved
-// from the execution data cache based on the block ID.
-//
 // Expected errors during normal operations:
 // - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
 // - MalformedDataError if some level of the blob tree cannot be properly deserialized
 // - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
 // - context.DeadlineExceeded if fetching time exceeded fetchTimeout duration
+// - context.Canceled if context was canceled during the request.
 func (r *OneshotExecutionDataRequester) processFetchRequest(
 	parentCtx context.Context,
 	fetchTimeout time.Duration,
@@ -174,8 +169,7 @@ func (r *OneshotExecutionDataRequester) processFetchRequest(
 	ctx, cancel := context.WithTimeout(parentCtx, fetchTimeout)
 	defer cancel()
 
-	// NOTE: ByID does not add execData to cache or check if it is already in a cache, it only returns execData
-	execData, err := r.execDataGetter.Get(ctx, executionDataID)
+	execData, err := r.execDataDownloader.Get(ctx, executionDataID)
 	r.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, height)
 	if err != nil {
 		return nil, err

@@ -136,7 +136,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 		require.Equal(suite.T(), block.ID(), execData.BlockID)
 	})
 
-	suite.Run("execution data not found in storage", func() {
+	suite.Run("deadline exceeded error", func() {
 		// Mock downloader to return not found error
 		execDataDownloader := edmock.NewDownloader(suite.T())
 		expectedError := context.DeadlineExceeded
@@ -197,7 +197,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 		require.Nil(suite.T(), execData)
 	})
 
-	suite.Run("context deadline exceeded error", func() {
+	suite.Run("context canceled error", func() {
 		// Return context.DeadlineExceeded to trigger retry logic
 		execDataDownloader := edmock.NewDownloader(suite.T())
 		execDataDownloader.
