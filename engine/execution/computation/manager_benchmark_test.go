@@ -214,7 +214,8 @@ func benchmarkComputeBlock(
 		derivedChainData: derivedChainData,
 	}
 
-	parentBlock := flow.NewBlock(flow.HeaderBody{}, flow.Payload{})
+	block := flow.NewBlock(flow.HeaderBody{}, flow.Payload{})
+	parentBlock := &block
 
 	b.StopTimer()
 	b.ResetTimer()
@@ -223,11 +224,11 @@ func benchmarkComputeBlock(
 	for i := 0; i < b.N; i++ {
 		executableBlock := createBlock(
 			b,
-			&parentBlock,
+			parentBlock,
 			accs,
 			numCollections,
 			numTransactionsPerCollection)
-		parentBlock = *executableBlock.Block
+		parentBlock = executableBlock.Block
 
 		b.StartTimer()
 		start := time.Now()
