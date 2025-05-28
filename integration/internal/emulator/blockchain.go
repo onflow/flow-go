@@ -743,10 +743,10 @@ func (b *Blockchain) commitBlock() (*flowgo.Block, error) {
 	b.broadcaster.Publish()
 
 	// reset pending block using current block and ledger state
-	b.pendingBlock = newPendingBlock(&block, ledger, b.Now())
+	b.pendingBlock = newPendingBlock(block, ledger, b.Now())
 	b.entropyProvider.LatestBlock = block.ID()
 
-	return &block, nil
+	return block, nil
 }
 
 // ExecuteAndCommitBlock is a utility that combines ExecuteBlock with CommitBlock.

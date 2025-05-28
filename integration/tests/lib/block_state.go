@@ -71,11 +71,10 @@ func (bs *BlockState) WaitForHalt(t *testing.T, requiredDurationWithoutProgress,
 }
 
 func (bs *BlockState) Add(t *testing.T, msg *messages.UntrustedProposal) {
-	p := msg.ToInternal()
 	bs.Lock()
 	defer bs.Unlock()
 
-	b := &p.Block
+	b := &msg.ToInternal().Block
 	bs.blocksByID[b.ID()] = b
 	bs.blocksByHeight[b.Header.Height] = append(bs.blocksByHeight[b.Header.Height], b)
 	if bs.highestProposed == nil {

@@ -526,8 +526,8 @@ func (builder *SealingSegmentBuilder) highest() *Block {
 }
 
 // lowest returns the lowest block in segment.
-func (builder *SealingSegmentBuilder) lowest() Block {
-	return builder.blocks[0].Block
+func (builder *SealingSegmentBuilder) lowest() *Block {
+	return &builder.blocks[0].Block
 }
 
 // NewSealingSegmentBuilder returns *SealingSegmentBuilder

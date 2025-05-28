@@ -83,7 +83,7 @@ func newPendingBlock(
 }
 
 // Block returns the block information for the pending block.
-func (b *pendingBlock) Block() flowgo.Block {
+func (b *pendingBlock) Block() *flowgo.Block {
 	collections := b.Collections()
 
 	guarantees := make([]*flowgo.CollectionGuarantee, len(collections))
@@ -93,7 +93,7 @@ func (b *pendingBlock) Block() flowgo.Block {
 		}
 	}
 
-	return flowgo.NewBlock(
+	block := flowgo.NewBlock(
 		flowgo.HeaderBody{
 			Height:    b.height,
 			View:      b.view,
@@ -104,6 +104,7 @@ func (b *pendingBlock) Block() flowgo.Block {
 			Guarantees: guarantees,
 		},
 	)
+	return &block
 }
 
 func (b *pendingBlock) Collections() []*flowgo.LightCollection {
