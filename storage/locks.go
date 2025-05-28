@@ -25,6 +25,8 @@ func Locks() []string {
 		LockInsertBlock,
 		LockFinalizeBlock,
 		LockIndexResultApproval,
+		LockInsertClusterBlock,
+		LockFinalizeClusterBlock,
 	}
 }
 
