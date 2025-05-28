@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
-	"github.com/vmihailenco/msgpack/v4"
+	"github.com/vmihailenco/msgpack"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/provider/internal"

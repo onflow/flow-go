@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/utils/merr"
 
 	"github.com/stretchr/testify/require"
-	"github.com/vmihailenco/msgpack/v4"
+	"github.com/vmihailenco/msgpack"
 )
 
 func BenchmarkFindHighestAtOrBelowByPrefixUsingIterator(t *testing.B) {
