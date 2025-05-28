@@ -20,6 +20,9 @@ func InitPublic(opts badger.Options) (*badger.DB, error) {
 	}
 	err = db.Update(operation.InsertPublicDBMarker)
 	if err != nil {
+		// Close db before returning error.
+		db.Close()
+
 		return nil, fmt.Errorf("could not assert db type: %w", err)
 	}
 
@@ -38,6 +41,9 @@ func InitSecret(opts badger.Options) (*badger.DB, error) {
 	}
 	err = db.Update(operation.InsertSecretDBMarker)
 	if err != nil {
+		// Close db before returning error.
+		db.Close()
+
 		return nil, fmt.Errorf("could not assert db type: %w", err)
 	}
 

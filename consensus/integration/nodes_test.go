@@ -488,7 +488,6 @@ func createNode(
 	// initialize the block builder
 	build, err := builder.NewBuilder(
 		metricsCollector,
-		db,
 		fullState,
 		headersDB,
 		sealsDB,
@@ -553,7 +552,7 @@ func createNode(
 
 	signer := verification.NewCombinedSigner(me, beaconKeyStore)
 
-	persist, err := persister.New(db, rootHeader.ChainID)
+	persist, err := persister.New(badgerimpl.ToDB(db), rootHeader.ChainID)
 	require.NoError(t, err)
 
 	livenessData, err := persist.GetLivenessData()

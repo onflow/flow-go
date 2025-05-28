@@ -27,6 +27,14 @@ func Genesis(chainID ChainID) *Block {
 
 // Block (currently) includes the all block header metadata and the payload content.
 type Block struct {
+	// Header is a container encapsulating most of the header fields - *excluding* the payload hash
+	// and the proposer signature. Generally, the type [HeaderBody] should not be used on its own.
+	// CAUTION regarding security:
+	//  * HeaderBody does not contain the hash of the block payload. Therefore, it is not a cryptographic digest
+	//    of the block and should not be confused with a "proper" header, which commits to the _entire_ content
+	//    of a block.
+	//  * With a byzantine HeaderBody alone, an honest node cannot prove who created that faulty data structure,
+	//    because HeaderBody does not include the proposer's signature.
 	Header  HeaderBody
 	Payload Payload
 }
@@ -114,7 +122,9 @@ type BlockProposal struct {
 	ProposerSigData []byte
 }
 
-func (b *BlockProposal) HeaderProposal() *ProposalHeader {
+// ProposalHeader converts the proposal into a compact [ProposalHeader] representation,
+// where the payload is compressed to a hash reference.
+func (b *BlockProposal) ProposalHeader() *ProposalHeader {
 	return &ProposalHeader{Header: b.Block.ToHeader(), ProposerSigData: b.ProposerSigData}
 }
 

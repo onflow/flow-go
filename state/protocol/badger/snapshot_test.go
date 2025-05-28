@@ -351,15 +351,16 @@ func TestSealingSegment(t *testing.T) {
 			buildFinalizedBlock(t, state, block2)
 
 			// build a block sealing block1
-			headerBody3 := unittest.HeaderBodyWithParentFixture(block2.ToHeader())
-
 			seals := []*flow.Seal{seal1}
-			block3 := flow.NewBlock(
-				headerBody3,
-				flow.Payload{
-					Seals:           seals,
-					ProtocolStateID: calculateExpectedStateId(t, mutableState)(headerBody3, seals),
-				},
+			block3View := block2.Header.View + 1 + uint64(rand.Intn(10))
+			block3 := unittest.BlockFixture(
+				unittest.Block.WithParent(block2.ID(), block2.Header.View, block2.Header.Height),
+				unittest.Block.WithView(block3View),
+				unittest.Block.WithPayload(
+					flow.Payload{
+						Seals:           seals,
+						ProtocolStateID: calculateExpectedStateId(t, mutableState)(block2.ID(), block3View, seals),
+					}),
 			)
 			buildFinalizedBlock(t, state, &block3)
 
@@ -1077,7 +1078,6 @@ func TestBootstrapSealingSegmentWithExtraBlocks(t *testing.T) {
 
 		// bootstrap from snapshot
 		util.RunWithFullProtocolState(t, snapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-
 			guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollRef(block1.ID()))
 			guarantee.ChainID = cluster.ChainID()
 

@@ -787,8 +787,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 		unittest.Seal.Fixture(
 			unittest.Seal.WithBlock(s.ParentBlock)), nil)
 
-	// the sealing candidate block (S) is the lowest block in the segment under consideration here
-	// initially, this block would represent the lowest block in a node's root sealing segment,
+	// The sealing candidate block (S) is the lowest block in the segment under consideration here.
+	// Initially, this block would represent the lowest block in a node's root sealing segment,
 	// meaning that all earlier blocks are not known. In this case we should ignore results and seals
 	// referencing unknown blocks (tested here by adding such a result+seal to the candidate payload).
 	candidatePayload := unittest.PayloadFixture(

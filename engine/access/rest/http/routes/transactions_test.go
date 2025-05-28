@@ -17,11 +17,11 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rest/util"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -215,7 +215,7 @@ func TestGetTransactionResult(t *testing.T) {
 	id := unittest.IdentifierFixture()
 	bid := unittest.IdentifierFixture()
 	cid := unittest.IdentifierFixture()
-	txr := &access.TransactionResult{
+	txr := &accessmodel.TransactionResult{
 		Status:     flow.TransactionStatusSealed,
 		StatusCode: 10,
 		Events: []flow.Event{
@@ -285,7 +285,7 @@ func TestGetTransactionResult(t *testing.T) {
 	t.Run("get execution statuses", func(t *testing.T) {
 		backend := &mock.API{}
 
-		testVectors := map[*access.TransactionResult]string{{
+		testVectors := map[*accessmodel.TransactionResult]string{{
 			Status:       flow.TransactionStatusExpired,
 			ErrorMessage: "",
 		}: string(models.FAILURE_RESULT), {
@@ -425,9 +425,9 @@ func TestCreateTransaction(t *testing.T) {
 	})
 }
 
-func transactionResultFixture(tx flow.Transaction) *access.TransactionResult {
+func transactionResultFixture(tx flow.Transaction) *accessmodel.TransactionResult {
 	cid := unittest.IdentifierFixture()
-	return &access.TransactionResult{
+	return &accessmodel.TransactionResult{
 		Status:     flow.TransactionStatusSealed,
 		StatusCode: 1,
 		Events: []flow.Event{

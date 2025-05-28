@@ -4,10 +4,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// UntrustedBlock represents untrusted block model received over the network.
+// UntrustedBlock represents untrusted block received over the network (from a potentially byzantine peer).
 // This type exists only to explicitly differentiate between trusted and untrusted instances of a block.
-// This differentiation is currently largely unused, but eventually untrusted models should use
-// a different type (like this one), until such time as they are fully validated.
+// This differentiation is currently largely unused. But eventually, untrusted data should be
+// represented by different types (like this one), until it is fully validated.
 type UntrustedBlock flow.Block
 
 // ToHeader converts the untrusted block into a compact [flow.Header] representation,

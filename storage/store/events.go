@@ -207,7 +207,5 @@ func (e *ServiceEvents) RemoveByBlockID(blockID flow.Identifier) error {
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (e *ServiceEvents) BatchRemoveByBlockID(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-	return e.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.RemoveServiceEventsByBlockID(rw.GlobalReader(), rw.Writer(), blockID)
-	})
+	return operation.RemoveServiceEventsByBlockID(rw.GlobalReader(), rw.Writer(), blockID)
 }

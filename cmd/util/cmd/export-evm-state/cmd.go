@@ -82,7 +82,7 @@ func ExportEVMState(
 	storageRoot := evm.StorageAccountAddress(chainID)
 	rootOwner := string(storageRoot.Bytes())
 
-	payloads, err := util.ReadTrie(ledgerPath, util.ParseStateCommitment(targetState))
+	payloads, err := util.ReadTrieForPayloads(ledgerPath, util.ParseStateCommitment(targetState))
 	if err != nil {
 		return err
 	}
