@@ -301,7 +301,7 @@ func assembleInternalNodesWithoutWeight() []model.NodeInfo {
 			internal.Role,
 			internal.Address,
 			flow.DefaultInitialWeight,
-			internal.NetworkPrivKey,
+			internal.NetworkPrivKey.PrivateKey,
 			internal.StakingPrivKey.PrivateKey,
 		)
 		if err != nil {

@@ -16,7 +16,7 @@ import (
 // also writes a map containing each of the nodes weights mapped by NodeID
 func WritePartnerFiles(nodeInfos []model.NodeInfo, bootDir string) (string, string, error) {
 
-	// convert to public nodeInfos and map stkes
+	// convert to public nodeInfos and create a map from nodeID to weight
 	nodePubInfos := make([]model.NodeInfoPub, len(nodeInfos))
 	weights := make(map[flow.Identifier]uint64)
 	for i, node := range nodeInfos {

@@ -179,7 +179,6 @@ func WriteTestExecutionService(_ flow.Identifier, address, observerName, bootstr
 		networkKey,
 		stakingKey,
 	)
-
 	if err != nil {
 		return bootstrap.NodeInfo{}, fmt.Errorf("failed to create node info: %w", err)
 	}

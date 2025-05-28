@@ -242,12 +242,17 @@ type NodeInfo struct {
 	// Weight is the weight of the node
 	Weight uint64
 
-	// key information is private
-	networkPubKey  crypto.PublicKey
+	// PRIVATE Variant:
 	networkPrivKey crypto.PrivateKey
-	stakingPubKey  crypto.PublicKey
 	stakingPrivKey crypto.PrivateKey
-	stakingPoP     crypto.Signature
+
+	// By convention, `NodeInfo` must either include the public fields and exclude the private fields, or
+	// vice versa. Mixtures are not allowed. Please check function [NodeInfoType] for the precise convention.
+	//
+	// PUBLIC Variant:
+	networkPubKey crypto.PublicKey
+	stakingPubKey crypto.PublicKey
+	stakingPoP    crypto.Signature
 }
 
 func NewPublicNodeInfo(
@@ -301,7 +306,7 @@ func (node NodeInfo) Type() NodeInfoType {
 	if node.networkPrivKey != nil && node.stakingPrivKey != nil {
 		return NodeInfoTypePrivate
 	}
-	if node.networkPubKey != nil && node.stakingPubKey != nil {
+	if node.networkPubKey != nil && node.stakingPubKey != nil && node.stakingPoP != nil {
 		return NodeInfoTypePublic
 	}
 	return NodeInfoTypeInvalid
@@ -357,7 +362,11 @@ func (node NodeInfo) Private() (NodeInfoPriv, error) {
 	}, nil
 }
 
-// Public returns the canonical public encodable structure
+// Public returns the canonical encodable structure holding the node's public information.
+// It derives the networking and staking public keys, as well as the Proof of Possession (PoP) of the staking private key
+// if they are not already provided in the NodeInfo.
+//
+// It errors, if there is a problem generating the staking key PoP.
 func (node NodeInfo) Public() (NodeInfoPub, error) {
 	stakingPoP, err := node.StakingPoP()
 	if err != nil {

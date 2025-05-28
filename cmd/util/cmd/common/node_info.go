@@ -160,10 +160,9 @@ func ReadFullInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, inte
 			internal.Role,
 			internal.Address,
 			weight,
-			internal.NetworkPrivKey,
+			internal.NetworkPrivKey.PrivateKey,
 			internal.StakingPrivKey.PrivateKey,
 		)
-
 		if err != nil {
 			return nil, fmt.Errorf("failed to build private node info at index %d: %w", i, err)
 		}

@@ -28,7 +28,7 @@ const (
 	networkingAddressField = "networkingAddress"
 	networkingKeyField     = "networkingKey"
 	stakingKeyField        = "stakingKey"
-	stakingKePOPyField     = "stakingKeyPoP"
+	stakingKePOPField      = "stakingKeyPoP"
 )
 
 const (
@@ -174,9 +174,9 @@ func parseNodeInfo(info cadence.Value) (*bootstrap.NodeInfoPub, error) {
 		return nil, fmt.Errorf("failed to decode staking public key: %w", err)
 	}
 
-	stakingPOP, err := hex.DecodeString(string(fields[stakingKePOPyField].(cadence.String)))
+	stakingPOP, err := hex.DecodeString(string(fields[stakingKePOPField].(cadence.String)))
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode staking private key PoP hex (%s): %w", string(fields[stakingKePOPyField].(cadence.String)), err)
+		return nil, fmt.Errorf("failed to decode staking private key PoP hex (%s): %w", string(fields[stakingKePOPField].(cadence.String)), err)
 	}
 
 	return &bootstrap.NodeInfoPub{
