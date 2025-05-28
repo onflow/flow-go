@@ -75,7 +75,7 @@ func NewOneshotExecutionDataRequester(
 	}, nil
 }
 
-// RequestExecutionData requests execution data for a given block.
+// RequestExecutionData requests execution data for a given block from the network.
 // It performs a fetch using a retry mechanism with exponential backoff if execution data not found.
 // Returns the execution data entity and any error encountered.
 //
@@ -139,7 +139,7 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 	return execData, nil
 }
 
-// processFetchRequest performs the actual fetch of execution data for the given block within the provided timeout.
+// processFetchRequest performs the actual fetch of execution data for the given execution result.
 //
 // Expected errors during normal operations:
 // - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
