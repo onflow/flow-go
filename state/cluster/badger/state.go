@@ -27,6 +27,9 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 	lctx := lockManager.NewContext()
 	defer lctx.Release()
 	err := lctx.AcquireLock(storage.LockInsertClusterBlock)
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire lock for inserting cluster block: %w", err)
+	}
 
 	isBootstrapped, err := IsBootstrapped(db, stateRoot.ClusterID())
 	if err != nil {
