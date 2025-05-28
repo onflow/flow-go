@@ -59,15 +59,7 @@ var _ Entity = (*ResultApproval)(nil)
 
 // ID generates a unique identifier using result approval full content
 func (ra ResultApproval) ID() Identifier {
-	stub := struct {
-		Body              Identifier
-		VerifierSignature crypto.Signature
-	}{
-		Body:              ra.Body.ID(),
-		VerifierSignature: ra.VerifierSignature,
-	}
-
-	return MakeID(stub)
+	return MakeID(ra)
 }
 
 // Checksum generates checksum using the result approval full content
