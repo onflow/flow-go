@@ -37,9 +37,10 @@ func NewUntrustedClusterProposal(internal cluster.Block, proposerSig []byte) *Un
 	}
 }
 
-// ToInternal converts the UntrustedClusterProposal to a trusted internal cluster.BlockProposal.
+// DeclareTrusted converts the UntrustedClusterProposal to a trusted internal cluster.BlockProposal.
+// CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
 // TODO(malleability immutable, #7277): This conversion should eventually be accompanied by a full validation of the untrusted input.
-func (cbp *UntrustedClusterProposal) ToInternal() *cluster.BlockProposal {
+func (cbp *UntrustedClusterProposal) DeclareTrusted() *cluster.BlockProposal {
 	return &cluster.BlockProposal{
 		Block:           cluster.NewBlock(cbp.Block.Header, cbp.Block.Payload),
 		ProposerSigData: cbp.ProposerSigData,

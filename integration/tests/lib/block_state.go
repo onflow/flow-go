@@ -74,7 +74,7 @@ func (bs *BlockState) Add(t *testing.T, msg *messages.UntrustedProposal) {
 	bs.Lock()
 	defer bs.Unlock()
 
-	b := &msg.ToInternal().Block
+	b := &msg.DeclareTrusted().Block
 	bs.blocksByID[b.ID()] = b
 	bs.blocksByHeight[b.Header.Height] = append(bs.blocksByHeight[b.Header.Height], b)
 	if bs.highestProposed == nil {

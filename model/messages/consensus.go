@@ -21,9 +21,10 @@ func NewUntrustedProposal(internal *flow.BlockProposal) *UntrustedProposal {
 	return &p
 }
 
-// ToInternal converts the UntrustedProposal to a trusted internal flow.BlockProposal.
+// DeclareTrusted converts the UntrustedProposal to a trusted internal flow.BlockProposal.
+// CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
 // TODO(malleability immutable): This conversion should eventually be accompanied by a full validation of the untrusted input.
-func (msg *UntrustedProposal) ToInternal() *flow.BlockProposal {
+func (msg *UntrustedProposal) DeclareTrusted() *flow.BlockProposal {
 	return &flow.BlockProposal{
 		Block:           flow.NewBlock(msg.Block.Header, msg.Block.Payload),
 		ProposerSigData: msg.ProposerSigData,

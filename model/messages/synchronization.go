@@ -57,7 +57,7 @@ func (br *BlockResponse) BlocksInternal() []*flow.BlockProposal {
 	internal := make([]*flow.BlockProposal, len(br.Blocks))
 	for i, block := range br.Blocks {
 		block := block
-		internal[i] = block.ToInternal()
+		internal[i] = block.DeclareTrusted()
 	}
 	return internal
 }
@@ -73,7 +73,7 @@ func (br *ClusterBlockResponse) BlocksInternal() []*cluster.BlockProposal {
 	internal := make([]*cluster.BlockProposal, len(br.Blocks))
 	for i, block := range br.Blocks {
 		block := block
-		internal[i] = block.ToInternal()
+		internal[i] = block.DeclareTrusted()
 	}
 	return internal
 }
