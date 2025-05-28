@@ -140,15 +140,13 @@ func GenerateAccountCreateEvent(t *testing.T, address flow.Address) flow.Event {
 	payload, err := ccf.Encode(cadenceEvent)
 	require.NoError(t, err)
 
-	event := unittest.EventFixture(
+	event := flow.NewEvent(
 		flow.EventType(cadenceEvent.EventType.Location.TypeID(nil, cadenceEvent.EventType.QualifiedIdentifier)),
-		0,
-		0,
 		unittest.IdentifierFixture(),
 		0,
+		0,
+		payload,
 	)
-
-	event.Payload = payload
 
 	return event
 }
@@ -189,15 +187,13 @@ func GenerateAccountContractEvent(t *testing.T, qualifiedIdentifier string, addr
 	payload, err := ccf.Encode(cadenceEvent)
 	require.NoError(t, err)
 
-	event := unittest.EventFixture(
+	event := flow.NewEvent(
 		flow.EventType(cadenceEvent.EventType.Location.TypeID(nil, cadenceEvent.EventType.QualifiedIdentifier)),
-		0,
-		0,
 		unittest.IdentifierFixture(),
 		0,
+		0,
+		payload,
 	)
-
-	event.Payload = payload
 
 	return event
 }

@@ -92,7 +92,13 @@ func MessageToEventFromVersion(m *entities.Event, inputVersion entities.EventEnc
 		if err != nil {
 			return nil, fmt.Errorf("could not convert event payload from CCF to Json: %w", err)
 		}
-		event.Payload = convertedPayload
+		event = flow.NewEvent(
+			event.Type,
+			event.TransactionID,
+			event.TransactionIndex,
+			event.EventIndex,
+			convertedPayload,
+		)
 		return &event, nil
 	case entities.EventEncodingVersion_JSON_CDC_V0:
 		return &event, nil
@@ -250,8 +256,13 @@ func CcfEventsToJsonEvents(events []flow.Event) ([]flow.Event, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert event payload for event %d: %w", i, err)
 		}
-		e.Payload = payload
-		convertedEvents[i] = e
+		convertedEvents[i] = flow.NewEvent(
+			e.Type,
+			e.TransactionID,
+			e.TransactionIndex,
+			e.EventIndex,
+			payload,
+		)
 	}
 	return convertedEvents, nil
 }

@@ -259,7 +259,13 @@ func (b *backendEvents) getBlockEventsFromStorage(
 					err = fmt.Errorf("failed to convert event payload for block %s: %w", blockInfo.ID, err)
 					return nil, nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 				}
-				e.Payload = payload
+				e = flow.NewEvent(
+					e.Type,
+					e.TransactionID,
+					e.TransactionIndex,
+					e.EventIndex,
+					payload,
+				)
 			}
 
 			filteredEvents = append(filteredEvents, e)

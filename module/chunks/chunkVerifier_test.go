@@ -34,20 +34,20 @@ import (
 
 // eventsList is the set of events emitted by each transaction, by default
 var eventsList = flow.EventsList{
-	{
-		Type:             "event.someType",
-		TransactionID:    flow.Identifier{2, 3, 2, 3},
-		TransactionIndex: 1,
-		EventIndex:       2,
-		Payload:          []byte{7, 3, 1, 2},
-	},
-	{
-		Type:             "event.otherType",
-		TransactionID:    flow.Identifier{3, 3, 3},
-		TransactionIndex: 4,
-		EventIndex:       4,
-		Payload:          []byte{7, 3, 1, 2},
-	},
+	flow.NewEvent(
+		"event.someType",
+		flow.Identifier{2, 3, 2, 3},
+		1,
+		2,
+		[]byte{7, 3, 1, 2},
+	),
+	flow.NewEvent(
+		"event.otherType",
+		flow.Identifier{3, 3, 3},
+		4,
+		4,
+		[]byte{7, 3, 1, 2},
+	),
 }
 
 const computationUsed = uint64(100)

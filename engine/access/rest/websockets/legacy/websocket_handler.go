@@ -160,7 +160,13 @@ func (wsController *WebsocketController) writeEvents(sub subscription.Subscripti
 					wsController.wsErrorHandler(err)
 					return
 				}
-				resp.Events[i].Payload = payload
+				resp.Events[i] = flow.NewEvent(
+					e.Type,
+					e.TransactionID,
+					e.TransactionIndex,
+					e.EventIndex,
+					payload,
+				)
 			}
 
 			// Write the response to the WebSocket connection

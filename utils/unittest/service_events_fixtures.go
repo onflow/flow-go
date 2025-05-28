@@ -35,9 +35,8 @@ func EpochSetupRandomSourceFixture() []byte {
 func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 	events := systemcontracts.ServiceEventsForChain(chain)
 
-	event := EventFixture(events.EpochSetup.EventType(), 1, 1, IdentifierFixture(), 0)
 	randomSource := EpochSetupRandomSourceFixture()
-	event.Payload = EpochSetupFixtureCCF(randomSource)
+	event := flow.NewEvent(events.EpochSetup.EventType(), IdentifierFixture(), 1, 1, EpochSetupFixtureCCF(randomSource))
 
 	expected := &flow.EpochSetup{
 		Counter:            1,
@@ -125,11 +124,8 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 // EpochCommitFixtureByChainID returns an EpochCommit service event as a Cadence event
 // representation and as a protocol model representation.
 func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
-
 	events := systemcontracts.ServiceEventsForChain(chain)
-
-	event := EventFixture(events.EpochCommit.EventType(), 1, 1, IdentifierFixture(), 0)
-	event.Payload = EpochCommitFixtureCCF
+	event := flow.NewEvent(events.EpochCommit.EventType(), IdentifierFixture(), 1, 1, EpochCommitFixtureCCF)
 
 	expected := &flow.EpochCommit{
 		Counter: 1,
@@ -166,9 +162,7 @@ func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCom
 // TODO(EFM, #6794): Remove this once we complete the network upgrade
 func EpochCommitV0FixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
 	events := systemcontracts.ServiceEventsForChain(chain)
-
-	event := EventFixture(events.EpochCommit.EventType(), 1, 1, IdentifierFixture(), 0)
-	event.Payload = EpochCommitV0FixtureCCF
+	event := flow.NewEvent(events.EpochCommit.EventType(), IdentifierFixture(), 1, 1, EpochCommitV0FixtureCCF)
 
 	expected := &flow.EpochCommit{
 		Counter: 1,
@@ -201,12 +195,9 @@ func EpochCommitV0FixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochC
 // EpochRecoverFixtureByChainID returns an EpochRecover service event as a Cadence event
 // representation and as a protocol model representation.
 func EpochRecoverFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochRecover) {
-
 	events := systemcontracts.ServiceEventsForChain(chain)
-
 	randomSource := EpochSetupRandomSourceFixture()
-	event := EventFixture(events.EpochRecover.EventType(), 1, 1, IdentifierFixture(), 0)
-	event.Payload = EpochRecoverFixtureCCF(randomSource)
+	event := flow.NewEvent(events.EpochRecover.EventType(), IdentifierFixture(), 1, 1, EpochRecoverFixtureCCF(randomSource))
 
 	expected := &flow.EpochRecover{
 		EpochSetup: flow.EpochSetup{
@@ -322,11 +313,8 @@ func EpochRecoverFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochRe
 // VersionBeaconFixtureByChainID returns a VersionTable service event as a Cadence event
 // representation and as a protocol model representation.
 func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.VersionBeacon) {
-
 	events := systemcontracts.ServiceEventsForChain(chain)
-
-	event := EventFixture(events.VersionBeacon.EventType(), 1, 1, IdentifierFixture(), 0)
-	event.Payload = VersionBeaconFixtureCCF
+	event := flow.NewEvent(events.VersionBeacon.EventType(), IdentifierFixture(), 1, 1, VersionBeaconFixtureCCF)
 
 	expected := &flow.VersionBeacon{
 		VersionBoundaries: []flow.VersionBoundary{
@@ -343,9 +331,7 @@ func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.Versio
 
 func ProtocolStateVersionUpgradeFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.ProtocolStateVersionUpgrade) {
 	events := systemcontracts.ServiceEventsForChain(chain)
-
-	event := EventFixture(events.ProtocolStateVersionUpgrade.EventType(), 1, 1, IdentifierFixture(), 0)
-	event.Payload = ProtocolStateVersionUpgradeFixtureCCF
+	event := flow.NewEvent(events.ProtocolStateVersionUpgrade.EventType(), IdentifierFixture(), 1, 1, ProtocolStateVersionUpgradeFixtureCCF)
 
 	expected := &flow.ProtocolStateVersionUpgrade{
 		NewProtocolStateVersion: 1,
