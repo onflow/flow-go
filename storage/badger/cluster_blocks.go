@@ -52,7 +52,7 @@ func (b *ClusterBlocks) storeTx(proposal *cluster.BlockProposal) func(*transacti
 }
 
 func (b *ClusterBlocks) ProposalByID(blockID flow.Identifier) (*cluster.BlockProposal, error) {
-	header, err := b.headers.ProposalByBlockID(blockID)
+	header, err := b.headers.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get header: %w", err)
 	}
@@ -60,9 +60,13 @@ func (b *ClusterBlocks) ProposalByID(blockID flow.Identifier) (*cluster.BlockPro
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve payload: %w", err)
 	}
+	sig, err := b.headers.sigs.ByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve proposer signature: %w", err)
+	}
 	proposal := &cluster.BlockProposal{
-		Block:           cluster.NewBlock(header.Header.HeaderBody, *payload),
-		ProposerSigData: header.ProposerSigData,
+		Block:           cluster.NewBlock(header.HeaderBody, *payload),
+		ProposerSigData: sig,
 	}
 	return proposal, nil
 }

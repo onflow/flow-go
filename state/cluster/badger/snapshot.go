@@ -66,12 +66,11 @@ func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// get the snapshot header
-		var proposal flow.ProposalHeader
-		err := operation.RetrieveHeader(s.blockID, &proposal)(tx)
+		err := operation.RetrieveHeader(s.blockID, head)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve header for block (%s): %w", s.blockID, err)
 		}
-		*head = *proposal.Header
+
 		return nil
 	}
 }
