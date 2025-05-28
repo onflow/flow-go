@@ -46,6 +46,19 @@ func addFinalListFlags() {
 		"number of collection clusters")
 }
 
+// finalList generates a final list of nodes to be used for the next network by validating node data and
+// matching against the nodes listed in the staking smart contract.
+// In a nutshell we compare two sets of nodes:
+//   - the set of nodes that are registered on-chain (staking contract nodes), whose information
+//     is provided here as a json dump ( flag `staking-nodes`)
+//   - the set of nodes whose information we provide manually in the form of partner nodes (using flag
+//     `partner-infos` referencing the directory containing partner nodes details) and internal nodes
+//     (using flag `flow-infos` referencing the directory containing internal/flow nodes details).
+//
+// If both sets do not contain exactly the same nodes, we raise a fatal error.
+//
+// The public information from the node set is written to the output directory specified by
+// `flagOutdir` in the file defined by `model.PathFinallist`.
 func finalList(cmd *cobra.Command, args []string) {
 	// read public partner node infos
 	log.Info().Msgf("reading partner public node information: %s", flagPartnerNodeInfoDir)
@@ -68,7 +81,7 @@ func finalList(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("failed to merge node infos")
 	}
 
-	// reconcile nodes from staking contract nodes
+	// check consistency with the nodes list from the staking contract
 	validateNodes(localNodes, registeredNodes)
 
 	// write node-config.json with the new list of nodes to be used for the `finalize` command
@@ -83,6 +96,9 @@ func finalList(cmd *cobra.Command, args []string) {
 	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathFinallist)
 }
 
+// validateNodes checks there is no mismatch between the local list and registered list of nodes.
+// In particular, the function checks that nodeIDs from both lists aren't missing (equal to empty srings),
+// and that the rest of their info is matching.
 func validateNodes(localNodes []model.NodeInfo, registeredNodes []model.NodeInfo) {
 	// check node count
 	if len(localNodes) != len(registeredNodes) {
@@ -107,7 +123,7 @@ func validateNodes(localNodes []model.NodeInfo, registeredNodes []model.NodeInfo
 	// check node type mismatch
 	for _, registeredNode := range registeredNodes {
 
-		// win have matching node as we have a check before
+		// will have matching node as we have a check before
 		matchingNode := localNodeMap[registeredNode.NodeID]
 
 		// check node type and error if mismatch
@@ -217,6 +233,9 @@ func validateNodeIDs(localNodes []model.NodeInfo, registeredNodes []model.NodeIn
 	}
 }
 
+// checkMismatchingNodes validates that all local nodes have corresponding matches in the registered nodes
+// list and vice versa. It compares nodes based on their NodeID and logs warnings for all mismatches found.
+// If any mismatches are found between the two sets, it terminates with a fatal log.
 func checkMismatchingNodes(localNodes []model.NodeInfo, registeredNodes []model.NodeInfo) {
 
 	localNodesByID := make(map[flow.Identifier]model.NodeInfo)
