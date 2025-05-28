@@ -16,7 +16,6 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
-	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/rs/zerolog"
@@ -78,6 +77,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
+	execdatastorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/finalizedreader"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -168,7 +168,7 @@ type ExecutionNode struct {
 	executionDataStore     execution_data.ExecutionDataStore
 	toTriggerCheckpoint    *atomic.Bool      // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
 	stopControl            *stop.StopControl // stop the node at given block height
-	executionDataDatastore *badgerds.Datastore
+	executionDataDatastore *execdatastorage.PebbleDatastoreManager
 	executionDataPruner    *pruner.Pruner
 	executionDataBlobstore blobs.Blobstore
 	executionDataTracker   tracker.Storage
@@ -417,7 +417,7 @@ func (exeNode *ExecutionNode) LoadBlobService(
 	if node.ObserverMode {
 		edsChannel = channels.PublicExecutionDataService
 	}
-	bs, err := node.EngineRegistry.RegisterBlobService(edsChannel, exeNode.executionDataDatastore, opts...)
+	bs, err := node.EngineRegistry.RegisterBlobService(edsChannel, exeNode.executionDataDatastore.GetDatastore(), opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register blob service: %w", err)
 	}
@@ -716,8 +716,8 @@ func (exeNode *ExecutionNode) LoadExecutionDataDatastore(
 	if err != nil {
 		return err
 	}
-	dsOpts := &badgerds.DefaultOptions
-	ds, err := badgerds.NewDatastore(datastoreDir, dsOpts)
+
+	ds, err := execdatastorage.NewPebbleDatastoreManager(node.Logger, datastoreDir, nil)
 	if err != nil {
 		return err
 	}
@@ -733,7 +733,7 @@ func (exeNode *ExecutionNode) LoadBlobservicePeerManagerDependencies(node *NodeC
 }
 
 func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
-	exeNode.executionDataBlobstore = blobs.NewBlobstore(exeNode.executionDataDatastore)
+	exeNode.executionDataBlobstore = blobs.NewBlobstore(exeNode.executionDataDatastore.GetDatastore())
 	exeNode.executionDataStore = execution_data.NewExecutionDataStore(exeNode.executionDataBlobstore, execution_data.DefaultSerializer)
 	return nil
 }

@@ -61,6 +61,12 @@ func (p *PebbleDatastoreManager) Datastore() ds.Batching {
 	return p.ds
 }
 
+func (p *PebbleDatastoreManager) GetDatastore() *pebbleds.Datastore {
+	// This method returns the underlying pebble datastore.
+	// It is useful for operations that require direct access to the pebble datastore.
+	return p.ds
+}
+
 // DB returns the raw database object, allowing for more direct
 // access to the underlying database features and operations.
 func (p *PebbleDatastoreManager) DB() storage.DB {
