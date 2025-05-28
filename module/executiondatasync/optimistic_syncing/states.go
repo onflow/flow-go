@@ -4,8 +4,8 @@ package pipeline
 type State int
 
 const (
-	// StateUninitialized is the initial state before the pipeline's Run method is called
-	StateUninitialized State = iota
+	// StatePending is the initial state before the pipeline's Run method is called
+	StatePending State = iota
 	// StateReady is the initial state after instantiation and before downloading has begun
 	StateReady
 	// StateDownloading represents the state where data download is in progress
@@ -25,8 +25,8 @@ const (
 // String representation of states for logging
 func (s State) String() string {
 	switch s {
-	case StateUninitialized:
-		return "uninitialized"
+	case StatePending:
+		return "pending"
 	case StateReady:
 		return "ready"
 	case StateDownloading:

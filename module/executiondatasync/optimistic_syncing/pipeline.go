@@ -66,7 +66,7 @@ func NewPipeline(
 			Str("block_id", executionResult.BlockID.String()).
 			Logger(),
 		statePublisher:  stateUpdatePublisher,
-		state:           StateUninitialized,
+		state:           StatePending,
 		isSealed:        isSealed,
 		stateNotifier:   engine.NewNotifier(),
 		executionResult: executionResult,
@@ -83,9 +83,7 @@ func NewPipeline(
 // When the pipeline reaches a terminal state (StateComplete or StateCanceled), the function returns.
 // The function will also return if the provided context is canceled.
 //
-// Returns an error if any processing step fails with an irrecoverable error.
-// Returns nil if processing completes successfully, reaches a terminal state,
-// or if either the parent or pipeline context is canceled.
+// TODO: document expected error's once the Core logic is implemented
 func (p *PipelineImpl) Run(parentCtx context.Context, core Core) error {
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
@@ -106,11 +104,11 @@ func (p *PipelineImpl) Run(parentCtx context.Context, core Core) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-notifierChan:
-			processed, err := p.processCurrentState(ctx)
+			processing, err := p.processCurrentState(ctx)
 			if err != nil {
 				return err
 			}
-			if !processed {
+			if !processing {
 				return nil // Terminal state reached
 			}
 		}
@@ -144,10 +142,9 @@ func (p *PipelineImpl) OnParentStateUpdated(parentState State) {
 	// If our parent pipeline has aborted, we should abort too
 	if parentState == StateCanceled {
 		p.transitionTo(StateCanceled)
-		return
+	} else {
+		p.stateNotifier.Notify()
 	}
-
-	p.stateNotifier.Notify()
 }
 
 // broadcastStateUpdate sends a state update via the state publisher.
@@ -188,7 +185,7 @@ func (p *PipelineImpl) processCurrentState(ctx context.Context) (bool, error) {
 	case StateComplete:
 		return false, nil
 	default:
-		// this also catches StateUninitialized since processCurrentState should never be called before
+		// this also catches StatePending since processCurrentState should never be called before
 		// Run() is called.
 		return false, fmt.Errorf("invalid pipeline state: %s", currentState.String())
 	}
@@ -211,7 +208,7 @@ func (p *PipelineImpl) transitionTo(newState State) {
 	p.broadcastStateUpdate()
 
 	// Trigger state check in case we can immediately transition again
-	if newState != StateComplete && newState != StateCanceled {
+	if newState != StateComplete {
 		p.stateNotifier.Notify()
 	}
 }
@@ -235,9 +232,7 @@ func (p *PipelineImpl) processDownloading(ctx context.Context) (bool, error) {
 	p.logger.Debug().Msg("starting download step")
 
 	if err := p.core.Download(ctx); err != nil {
-		p.logger.Error().
-			Err(err).
-			Msg("download step failed")
+		p.logger.Error().Err(err).Msg("download step failed")
 		return false, err
 	}
 
@@ -262,9 +257,7 @@ func (p *PipelineImpl) processIndexing(ctx context.Context) (bool, error) {
 	p.logger.Debug().Msg("starting index step")
 
 	if err := p.core.Index(ctx); err != nil {
-		p.logger.Error().
-			Err(err).
-			Msg("index step failed")
+		p.logger.Error().Err(err).Msg("index step failed")
 		return false, err
 	}
 
@@ -303,9 +296,7 @@ func (p *PipelineImpl) processPersisting(ctx context.Context) (bool, error) {
 	p.logger.Debug().Msg("starting persist step")
 
 	if err := p.core.Persist(ctx); err != nil {
-		p.logger.Error().
-			Err(err).
-			Msg("persist step failed")
+		p.logger.Error().Err(err).Msg("persist step failed")
 		return false, err
 	}
 
@@ -314,7 +305,7 @@ func (p *PipelineImpl) processPersisting(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-// processCancel handles the cancelation of the pipeline.
+// processCancel handles the cancellation of the pipeline.
 // It calls the core's Abort method to perform any necessary cleanup.
 // Returns an error if the abort step fails.
 // TODO: document expected error's once the Core logic is implemented
