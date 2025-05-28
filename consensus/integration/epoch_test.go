@@ -289,13 +289,8 @@ func withNextEpoch(
 	}
 
 	// Since we modified the root protocol state, we need to update the root block's ProtocolStateID field.
+	encodableSnapshot.SealingSegment.Blocks[0].Block.Payload.ProtocolStateID = rootKVStore.ID()
 	rootBlock := encodableSnapshot.SealingSegment.Blocks[0].Block
-	rootBlockPayload := rootBlock.Payload
-	rootBlockPayload.ProtocolStateID = rootKVStore.ID()
-
-	rootBlock = flow.NewBlock(rootBlock.Header, rootBlockPayload)
-	// rootBlock is not a pointer, so we need to update the Snapshot
-	encodableSnapshot.SealingSegment.Blocks[0].Block = rootBlock
 
 	// Since we changed the root block, we need to update the QC, root result, and root seal.
 	// rootResult and rootSeal are pointers, so mutations apply to Snapshot
