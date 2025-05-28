@@ -1046,14 +1046,15 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
 	block := unittest.BlockFixture(
-		unittest.WithPayload(unittest.PayloadFixture(
+		unittest.Block.WithHeight(2),
+		unittest.Block.WithPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(
 				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...),
 		)),
 	)
-	block.Header.Height = 2
-	headBlock := unittest.BlockFixture()
-	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
+	headBlock := unittest.BlockFixture(
+		unittest.Block.WithHeight(block.Header.Height - 1), // head is behind the current block
+	)
 
 	suite.snapshot.
 		On("Head").
@@ -1265,7 +1266,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	transactionBody := collection.Transactions[0]
 	// block which will eventually contain the transaction
 	block := unittest.BlockFixture(
-		unittest.WithPayload(unittest.PayloadFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(
 				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...),
 		)),
@@ -1747,7 +1748,7 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	transactionBody := collection.Transactions[0]
 	// block which will eventually contain the transaction
 	block := unittest.BlockFixture(
-		unittest.WithPayload(unittest.PayloadFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(
 				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...),
 		)),

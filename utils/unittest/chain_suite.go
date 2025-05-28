@@ -487,7 +487,7 @@ type subgraphFixture struct {
 func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 	// BLOCKS: <- previousBlock <- block
 	parentBlock := BlockFixture(
-		WithPayload(PayloadFixture(
+		Block.WithPayload(PayloadFixture(
 			WithGuarantees(CollectionGuaranteesFixture(12)...))),
 	)
 	block := BlockWithParentAndPayload(

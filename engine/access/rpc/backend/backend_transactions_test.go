@@ -1271,7 +1271,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
 	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
 	block := unittest.BlockFixture(
-		unittest.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
 	)
 	txId := transaction.ID()
 	blockId := block.ID()
@@ -1362,7 +1362,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
 	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
 	block := unittest.BlockFixture(
-		unittest.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
 	)
 	blockId := block.ID()
 	txId := transaction.ID()
@@ -1448,7 +1448,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	col := unittest.CollectionFixture(2)
 	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
 	block := unittest.BlockFixture(
-		unittest.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
 	)
 	blockId := block.ID()
 

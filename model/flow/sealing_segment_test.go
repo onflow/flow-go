@@ -100,7 +100,7 @@ func (suite *SealingSegmentSuite) SetupTest() {
 // BlockFixture returns a Block fixture with the default protocol state ID.
 func (suite *SealingSegmentSuite) BlockFixture() flow.Block {
 	return unittest.BlockFixture(
-		unittest.WithPayload(suite.PayloadFixture()),
+		unittest.Block.WithPayload(suite.PayloadFixture()),
 	)
 }
 
@@ -125,7 +125,7 @@ func (suite *SealingSegmentSuite) ProtocolStateEntryWrapperFixture() *flow.Proto
 // priorBlock (this is the simplest case for a sealing segment).
 func (suite *SealingSegmentSuite) FirstBlock() *flow.Block {
 	block := unittest.BlockFixture(
-		unittest.WithPayload(suite.PayloadFixture(
+		unittest.Block.WithPayload(suite.PayloadFixture(
 			unittest.WithSeals(suite.priorSeal),
 			unittest.WithReceipts(suite.priorReceipt),
 		)),
@@ -155,10 +155,9 @@ func (suite *SealingSegmentSuite) AddBlocks(blocks ...*flow.Block) {
 //
 // B1(R*,S*) <- B2(R1) <- B4(S1)
 func (suite *SealingSegmentSuite) TestBuild_MissingResultFromReceipt() {
-
 	// B1 contains a receipt (but no result) and seal for a prior block
 	block1 := unittest.BlockFixture(
-		unittest.WithPayload(suite.PayloadFixture(
+		unittest.Block.WithPayload(suite.PayloadFixture(
 			unittest.WithReceiptsAndNoResults(suite.priorReceipt),
 			unittest.WithSeals(suite.priorSeal),
 		)),
@@ -464,7 +463,7 @@ func (suite *SealingSegmentSuite) TestBuild_HighestAncestorContainsWrongSeal() {
 // B1(R*,S*) <- B2(R1,PS2) <- B3(S1,PS2)
 func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_Blocks() {
 	block1 := unittest.BlockFixture(
-		unittest.WithPayload(suite.PayloadFixture(
+		unittest.Block.WithPayload(suite.PayloadFixture(
 			unittest.WithReceipts(suite.priorReceipt),
 			unittest.WithSeals(suite.priorSeal),
 		)),
@@ -506,7 +505,7 @@ func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_Blocks() {
 // EB2(PS2) <- EB1 <- B1(R*,S*) <- B2(R1) <- B3(S1)
 func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_ExtraBlocks() {
 	block1 := unittest.BlockFixture(
-		unittest.WithPayload(suite.PayloadFixture(
+		unittest.Block.WithPayload(suite.PayloadFixture(
 			unittest.WithReceipts(suite.priorReceipt),
 			unittest.WithSeals(suite.priorSeal),
 		)),
@@ -530,11 +529,11 @@ func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_ExtraBlocks(
 	suite.addProtocolStateEntry(protocolStateID2, suite.ProtocolStateEntryWrapperFixture())
 
 	extraBlock1 := unittest.BlockFixture(
-		unittest.WithPayload(unittest.PayloadFixture(
+		unittest.Block.WithHeight(block1.Header.Height-1),
+		unittest.Block.WithPayload(unittest.PayloadFixture(
 			unittest.WithProtocolStateID(protocolStateID2),
 		)),
 	)
-	extraBlock1.Header.Height = block1.Header.Height - 1
 	err := suite.builder.AddExtraBlock(unittest.ProposalFromBlock(&extraBlock1))
 	require.NoError(suite.T(), err)
 
@@ -596,7 +595,7 @@ func TestAddBlock_StorageError(t *testing.T) {
 		}
 		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
 		block1 := unittest.BlockFixture(
-			unittest.WithPayload(unittest.PayloadFixture(
+			unittest.Block.WithPayload(unittest.PayloadFixture(
 				unittest.WithReceiptsAndNoResults(missingReceipt),
 				unittest.WithSeals(unittest.Seal.Fixture(unittest.Seal.WithResult(&missingReceipt.ExecutionResult))),
 			)),
@@ -615,7 +614,7 @@ func TestAddBlock_StorageError(t *testing.T) {
 			return &flow.ProtocolStateEntryWrapper{}, nil
 		}
 		block1 := unittest.BlockFixture(
-			unittest.WithPayload(flow.EmptyPayload()),
+			unittest.Block.WithPayload(flow.EmptyPayload()),
 		)
 		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
 
@@ -629,7 +628,7 @@ func TestAddBlock_StorageError(t *testing.T) {
 		sealLookup := func(flow.Identifier) (*flow.Seal, error) { return unittest.Seal.Fixture(), nil }
 		protocolStateEntryLookup := func(flow.Identifier) (*flow.ProtocolStateEntryWrapper, error) { return nil, exception }
 		block1 := unittest.BlockFixture(
-			unittest.WithPayload(flow.EmptyPayload()),
+			unittest.Block.WithPayload(flow.EmptyPayload()),
 		)
 		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
 

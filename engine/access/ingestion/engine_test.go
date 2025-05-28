@@ -231,7 +231,7 @@ func (s *Suite) mockCollectionsForBlock(block flow.Block) {
 // generateBlock prepares block with payload and specified guarantee.SignerIndices
 func (s *Suite) generateBlock(clusterCommittee flow.IdentitySkeletonList, snap *protocol.Snapshot) flow.Block {
 	block := unittest.BlockFixture(
-		unittest.WithPayload(unittest.PayloadFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
 			unittest.WithExecutionResults(unittest.ExecutionResultFixture()),
 			unittest.WithSeals(unittest.Seal.Fixture()),
@@ -512,12 +512,11 @@ func (s *Suite) TestRequestMissingCollections() {
 	refBlockID := unittest.IdentifierFixture()
 	for i := 0; i < blkCnt; i++ {
 		block := unittest.BlockFixture(
-			unittest.WithPayload(unittest.PayloadFixture(
+			// some blocks may not be present hence add a gap
+			unittest.Block.WithHeight(startHeight+uint64(i)),
+			unittest.Block.WithPayload(unittest.PayloadFixture(
 				unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(refBlockID))...)),
 			))
-		// some blocks may not be present hence add a gap
-		height := startHeight + uint64(i)
-		block.Header.Height = height
 		s.blockMap[block.Header.Height] = &block
 		s.finalizedBlock = block.ToHeader()
 
@@ -660,11 +659,9 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			guarantees[j] = cg
 		}
 		block := unittest.BlockFixture(
-			unittest.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantees...))),
+			unittest.Block.WithHeight(startHeight+uint64(i)),
+			unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantees...))),
 		)
-		// set the height
-		height := startHeight + uint64(i)
-		block.Header.Height = height
 		s.blockMap[block.Header.Height] = &block
 		blocks[i] = block
 		s.finalizedBlock = block.ToHeader()

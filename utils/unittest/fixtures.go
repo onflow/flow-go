@@ -191,29 +191,6 @@ func AccountFixture() (*flow.Account, error) {
 	}, nil
 }
 
-// WithPayload sets the payload for the block.
-// It returns a new instance of the request with the specified payload.
-func WithPayload(payload flow.Payload) func(*flow.Block) {
-	return func(b *flow.Block) {
-		b.Payload = payload
-	}
-}
-
-// BlockFixture initializes and returns a new flow.Block instance.
-func BlockFixture(opts ...func(*flow.Block)) flow.Block {
-	header := BlockHeaderFixture()
-	block := BlockWithParentFixture(header)
-	for _, opt := range opts {
-		opt(block)
-	}
-	return *block
-}
-
-func ChainBlockFixture(n int) []*flow.Block {
-	root := BlockHeaderFixture()
-	return ChainBlockFixtureWithRoot(root, n)
-}
-
 func ChainBlockFixtureWithRoot(root *flow.Header, n int) []*flow.Block {
 	bs := make([]*flow.Block, 0, n)
 	parent := root
@@ -542,19 +519,6 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 func HeaderBodyWithParentFixture(parent *flow.Header) flow.HeaderBody {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
-	var lastViewTC *flow.TimeoutCertificate
-	if view != parent.View+1 {
-		newestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
-			qc.View = parent.View
-		})
-		lastViewTC = &flow.TimeoutCertificate{
-			View:          view - 1,
-			NewestQCViews: []uint64{newestQC.View},
-			NewestQC:      newestQC,
-			SignerIndices: SignerIndicesFixture(4),
-			SigData:       SignatureFixture(),
-		}
-	}
 	return flow.HeaderBody{
 		ChainID:            parent.ChainID,
 		ParentID:           parent.ID(),
@@ -565,7 +529,7 @@ func HeaderBodyWithParentFixture(parent *flow.Header) flow.HeaderBody {
 		ParentVoterIndices: SignerIndicesFixture(4),
 		ParentVoterSigData: QCSigDataFixture(),
 		ProposerID:         IdentifierFixture(),
-		LastViewTC:         lastViewTC,
+		LastViewTC:         Block.lastViewTCFixture(view, parent.View),
 	}
 }
 
@@ -574,34 +538,11 @@ func BlockHeaderWithHeight(height uint64) *flow.Header {
 }
 
 func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *flow.Header {
-	height := parent.Height + 1
-	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
-	var lastViewTC *flow.TimeoutCertificate
-	if view != parent.View+1 {
-		newestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
-			qc.View = parent.View
-		})
-		lastViewTC = &flow.TimeoutCertificate{
-			View:          view - 1,
-			NewestQCViews: []uint64{newestQC.View},
-			NewestQC:      newestQC,
-			SignerIndices: SignerIndicesFixture(4),
-			SigData:       SignatureFixture(),
-		}
-	}
+	headerBody := HeaderBodyWithParentFixture(parent)
+	headerBody.ParentVoterSigData = QCSigDataWithSoRFixture(source)
+
 	return &flow.Header{
-		HeaderBody: flow.HeaderBody{
-			ChainID:            parent.ChainID,
-			ParentID:           parent.ID(),
-			Height:             height,
-			Timestamp:          time.Now().UTC(),
-			View:               view,
-			ParentView:         parent.View,
-			ParentVoterIndices: SignerIndicesFixture(4),
-			ParentVoterSigData: QCSigDataWithSoRFixture(source),
-			ProposerID:         IdentifierFixture(),
-			LastViewTC:         lastViewTC,
-		},
+		HeaderBody:  headerBody,
 		PayloadHash: IdentifierFixture(),
 	}
 }

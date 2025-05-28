@@ -351,16 +351,18 @@ func TestSealingSegment(t *testing.T) {
 			buildFinalizedBlock(t, state, block2)
 
 			// build a block sealing block1
-			headerBody3 := unittest.HeaderBodyWithParentFixture(block2.ToHeader())
 			seals := []*flow.Seal{seal1}
-			block3 := flow.NewBlock(
-				headerBody3,
-				flow.Payload{
-					Seals:           seals,
-					ProtocolStateID: calculateExpectedStateId(t, mutableState)(headerBody3, seals),
-				},
+			block3View := block2.Header.View + 1 + uint64(rand.Intn(10))
+			block3 := unittest.BlockFixture(
+				unittest.Block.WithParent(block2.ID(), block2.Header.View, block2.Header.Height),
+				unittest.Block.WithView(block3View),
+				unittest.Block.WithPayload(
+					flow.Payload{
+						Seals:           seals,
+						ProtocolStateID: calculateExpectedStateId(t, mutableState)(block2.ID(), block3View, seals),
+					}),
 			)
-			buildFinalizedBlock(t, state, block3)
+			buildFinalizedBlock(t, state, &block3)
 
 			segment, err := state.AtBlockID(block3.ID()).SealingSegment()
 			require.NoError(t, err)
@@ -369,11 +371,11 @@ func TestSealingSegment(t *testing.T) {
 			assert.Equal(t, segment.ExtraBlocks[0].Block.Header.Height, head.Height)
 
 			// build a valid child B3 to ensure we have a QC
-			buildBlock(t, state, unittest.BlockWithParentProtocolState(block3))
+			buildBlock(t, state, unittest.BlockWithParentProtocolState(&block3))
 
 			// sealing segment should contain B1, B2, B3
 			// B3 is reference of snapshot, B1 is latest sealed
-			unittest.AssertEqualBlockSequences(t, []*flow.Block{block1, block2, block3}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{block1, block2, &block3}, segment.Blocks)
 			assert.Len(t, segment.ExecutionResults, 1)
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(block3.ID()))
 		})

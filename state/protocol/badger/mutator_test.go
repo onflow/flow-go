@@ -546,12 +546,10 @@ func TestExtendSealedBoundary(t *testing.T) {
 func TestExtendMissingParent(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
-		extend := unittest.BlockFixture()
-		extend.Payload.Guarantees = nil
-		extend.Payload.Seals = nil
-		extend.Header.Height = 2
-		extend.Header.View = 2
-		extend.Header.ParentID = unittest.IdentifierFixture()
+		extend := unittest.BlockFixture(
+			unittest.Block.WithHeight(2),
+			unittest.Block.WithView(2),
+		)
 
 		err := state.Extend(context.Background(), unittest.ProposalFromBlock(&extend))
 		require.Error(t, err)
@@ -574,11 +572,10 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		require.NoError(t, err)
 
 		extend := unittest.BlockFixture(
-			unittest.WithPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID))))
-		extend.Header.Height = 1
-		extend.Header.View = 1
-		extend.Header.ParentID = head.ID()
-		extend.Header.ParentView = head.View
+			unittest.Block.WithParent(head.ID(), head.View, head.Height),
+			unittest.Block.WithHeight(1),
+			unittest.Block.WithView(1),
+			unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID))))
 
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(&extend))
 		require.NoError(t, err)
@@ -994,17 +991,18 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// block 3 contains the seal for block 1
 		seals := []*flow.Seal{seal1}
-		headerBody3 := unittest.HeaderBodyWithParentFixture(block2.ToHeader())
-		block3 := flow.NewBlock(
-			headerBody3,
-			flow.Payload{
-				Seals:           seals,
-				ProtocolStateID: expectedStateIdCalculator(headerBody3, seals),
-			},
+		block3View := block2.Header.View + 1 + uint64(rand.Intn(10))
+		block3 := unittest.BlockFixture(
+			unittest.Block.WithParent(block2.ID(), block2.Header.View, block2.Header.Height),
+			unittest.Block.WithView(block3View),
+			unittest.Block.WithPayload(
+				flow.Payload{
+					Seals:           seals,
+					ProtocolStateID: expectedStateIdCalculator(block2.ID(), block3View, seals),
+				}),
 		)
-
 		// insert the block sealing the EpochSetup event
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block3))
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block3))
 		require.NoError(t, err)
 
 		// now that the setup event has been emitted, we should be in the setup phase
@@ -1027,7 +1025,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.Error(t, err)
 
 		// insert B4
-		block4 := unittest.BlockWithParentProtocolState(block3)
+		block4 := unittest.BlockWithParentProtocolState(&block3)
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block4))
 		require.NoError(t, err)
 
@@ -1071,16 +1069,17 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// block 6 contains the seal for block 2
 		seals = []*flow.Seal{seal2}
-		headerBody6 := unittest.HeaderBodyWithParentFixture(block5.ToHeader())
-		block6 := flow.NewBlock(
-			headerBody6,
-			flow.Payload{
-				Seals:           seals,
-				ProtocolStateID: expectedStateIdCalculator(headerBody6, seals),
-			},
+		block6View := block2.Header.View + 1 + uint64(rand.Intn(10))
+		block6 := unittest.BlockFixture(
+			unittest.Block.WithParent(block5.ID(), block5.Header.View, block5.Header.Height),
+			unittest.Block.WithView(block6View),
+			unittest.Block.WithPayload(
+				flow.Payload{
+					Seals:           seals,
+					ProtocolStateID: expectedStateIdCalculator(block5.ID(), block6View, seals),
+				}),
 		)
-
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block6))
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block6))
 		require.NoError(t, err)
 
 		// we should NOT be able to query epoch 2 commit info wrt blocks before 6
@@ -1099,7 +1098,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.Equal(t, flow.EpochPhaseCommitted, phase)
 
 		// block 7 has the final view of the epoch, insert it, finalized after finalizing block 6
-		block7 := unittest.BlockWithParentProtocolState(block6)
+		block7 := unittest.BlockWithParentProtocolState(&block6)
 		block7.Header.View = epoch1FinalView
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block7))
 		require.NoError(t, err)
@@ -1128,16 +1127,17 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.Equal(t, epoch1Setup.Counter, block7epoch.Counter())
 
 		// block 8 has a view > final view of epoch 1, it will be considered the first block of epoch 2
-		headerBody8 := unittest.HeaderBodyWithParentFixture(block7.ToHeader())
 		// we should handle views that aren't exactly the first valid view of the epoch
-		headerBody8.View = epoch1FinalView + uint64(1+rand.Intn(10))
-		// need to update root protocol state since we enter new epoch
-		block8 := flow.NewBlock(
-			headerBody8,
-			unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(headerBody8, nil))),
+		block8View := epoch1FinalView + uint64(1+rand.Intn(10))
+		block8 := unittest.BlockFixture(
+			unittest.Block.WithParent(block7.ID(), block7.Header.View, block7.Header.Height),
+			unittest.Block.WithView(block8View),
+			unittest.Block.WithPayload(
+				flow.Payload{
+					ProtocolStateID: expectedStateIdCalculator(block7.ID(), block8View, nil),
+				}),
 		)
-
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block8))
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block8))
 		require.NoError(t, err)
 
 		// now, at long last, we are in epoch 2
@@ -1277,36 +1277,40 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		seals2 := []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))}
 
 		// block 5 builds on block 3, contains seal for block 1
-		headerBody5 := unittest.HeaderBodyWithParentFixture(block3.ToHeader())
-		block5 := flow.NewBlock(
-			headerBody5,
-			flow.Payload{
-				Seals:           seals1,
-				ProtocolStateID: expectedStateIdCalculator(headerBody5, seals1),
-			},
+		block5View := block3.Header.View + 1 + uint64(rand.Intn(10))
+		block5 := unittest.BlockFixture(
+			unittest.Block.WithParent(block3.ID(), block3.Header.View, block3.Header.Height),
+			unittest.Block.WithView(block5View),
+			unittest.Block.WithPayload(
+				flow.Payload{
+					Seals:           seals1,
+					ProtocolStateID: expectedStateIdCalculator(block3.ID(), block5View, seals1),
+				}),
 		)
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block5))
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block5))
 		require.NoError(t, err)
 
 		// block 6 builds on block 4, contains seal for block 2
-		headerBody6 := unittest.HeaderBodyWithParentFixture(block4.ToHeader())
-		block6 := flow.NewBlock(
-			headerBody6,
-			flow.Payload{
-				Seals:           seals2,
-				ProtocolStateID: expectedStateIdCalculator(headerBody6, seals2),
-			},
+		block6View := block4.Header.View + 1 + uint64(rand.Intn(10))
+		block6 := unittest.BlockFixture(
+			unittest.Block.WithParent(block4.ID(), block4.Header.View, block4.Header.Height),
+			unittest.Block.WithView(block6View),
+			unittest.Block.WithPayload(
+				flow.Payload{
+					Seals:           seals2,
+					ProtocolStateID: expectedStateIdCalculator(block4.ID(), block6View, seals2),
+				}),
 		)
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block6))
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block6))
 		require.NoError(t, err)
 
 		// block 7 builds on block 5, contains QC for block 5
-		block7 := unittest.BlockWithParentProtocolState(block5)
+		block7 := unittest.BlockWithParentProtocolState(&block5)
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block7))
 		require.NoError(t, err)
 
 		// block 8 builds on block 6, contains QC for block 6
-		block8 := unittest.BlockWithParentProtocolState(block6)
+		block8 := unittest.BlockWithParentProtocolState(&block6)
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block8))
 		require.NoError(t, err)
 
@@ -1409,37 +1413,41 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		seals2 := []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))}
 
 		// block 5 builds on block 3, contains seal for block 1
-		headerBody5 := unittest.HeaderBodyWithParentFixture(block3.ToHeader())
-		block5 := flow.NewBlock(
-			headerBody5,
-			flow.Payload{
-				Seals:           seals1,
-				ProtocolStateID: expectedStateIdCalculator(headerBody5, seals1),
-			},
+		block5View := block3.Header.View + 1 + uint64(rand.Intn(10))
+		block5 := unittest.BlockFixture(
+			unittest.Block.WithParent(block3.ID(), block3.Header.View, block3.Header.Height),
+			unittest.Block.WithView(block5View),
+			unittest.Block.WithPayload(
+				flow.Payload{
+					Seals:           seals1,
+					ProtocolStateID: expectedStateIdCalculator(block3.ID(), block5View, seals1),
+				}),
 		)
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block5))
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block5))
 		require.NoError(t, err)
 
 		// block 6 builds on block 4, contains seal for block 2
-		headerBody6 := unittest.HeaderBodyWithParentFixture(block4.ToHeader())
-		block6 := flow.NewBlock(
-			headerBody6,
-			flow.Payload{
-				Seals:           seals2,
-				ProtocolStateID: expectedStateIdCalculator(headerBody6, seals2),
-			},
+		block6View := block4.Header.View + 1 + uint64(rand.Intn(10))
+		block6 := unittest.BlockFixture(
+			unittest.Block.WithParent(block4.ID(), block4.Header.View, block4.Header.Height),
+			unittest.Block.WithView(block6View),
+			unittest.Block.WithPayload(
+				flow.Payload{
+					Seals:           seals2,
+					ProtocolStateID: expectedStateIdCalculator(block4.ID(), block6View, seals2),
+				}),
 		)
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block6))
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block6))
 		require.NoError(t, err)
 
 		// block 7 builds on block 5, contains QC for block 5
-		block7 := unittest.BlockWithParentProtocolState(block5)
+		block7 := unittest.BlockWithParentProtocolState(&block5)
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block7))
 		require.NoError(t, err)
 
 		// block 8 builds on block 6, contains QC for block 6
 		// at this point we are inserting the duplicate EpochSetup, should not error
-		block8 := unittest.BlockWithParentProtocolState(block6)
+		block8 := unittest.BlockWithParentProtocolState(&block6)
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block8))
 		require.NoError(t, err)
 
@@ -1817,13 +1825,15 @@ func TestEpochFallbackMode(t *testing.T) {
 
 			// we begin the epoch in the EpochStaking phase and
 			// block 1 will be the first block on or past the epoch commitment deadline
-			headerBody1 := unittest.HeaderBodyWithParentFixture(head)
-			headerBody1.View = epoch1CommitmentDeadline + rand.Uint64()%2
-			block1 := flow.NewBlock(
-				headerBody1,
-				unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(headerBody1, nil))),
+			block1View := epoch1CommitmentDeadline + rand.Uint64()%2
+			block1 := unittest.BlockFixture(
+				unittest.Block.WithParent(head.ID(), head.View, head.Height),
+				unittest.Block.WithView(block1View),
+				unittest.Block.WithPayload(
+					flow.Payload{
+						ProtocolStateID: expectedStateIdCalculator(head.ID(), block1View, nil),
+					}),
 			)
-
 			// finalizing block 1 should trigger EFM
 			metricsMock.On("EpochFallbackModeTriggered").Once()
 			metricsMock.On("CurrentEpochPhase", flow.EpochPhaseFallback).Once()
@@ -1831,7 +1841,7 @@ func TestEpochFallbackMode(t *testing.T) {
 			protoEventsMock.On("EpochFallbackModeTriggered", epoch1Setup.Counter, block1.ToHeader()).Once()
 			protoEventsMock.On("EpochExtended", epoch1Setup.Counter, block1.ToHeader(), unittest.MatchEpochExtension(epoch1FinalView, epochExtensionViewCount)).Once()
 
-			err = state.Extend(context.Background(), unittest.ProposalFromBlock(block1))
+			err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block1))
 			require.NoError(t, err)
 			assertEpochFallbackTriggered(t, state.Final(), false) // not triggered before finalization
 			err = state.Finalize(context.Background(), block1.ID())
@@ -1840,7 +1850,7 @@ func TestEpochFallbackMode(t *testing.T) {
 			assertInPhase(t, state.Final(), flow.EpochPhaseFallback) // immediately enter fallback phase
 
 			// block 2 will be the first block past the first epoch boundary
-			block2 := unittest.BlockWithParentProtocolState(block1)
+			block2 := unittest.BlockWithParentProtocolState(&block1)
 			block2.Header.View = epoch1FinalView + 1
 			err = state.Extend(context.Background(), unittest.ProposalFromBlock(block2))
 			require.NoError(t, err)
@@ -1923,17 +1933,18 @@ func TestEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 
 			// block 3 seals block 1 and will be the first block on or past the epoch commitment deadline
-			headerBody3 := unittest.HeaderBodyWithParentFixture(block2.ToHeader())
-			headerBody3.View = epoch1CommitmentDeadline + rand.Uint64()%2
+			block3View := epoch1CommitmentDeadline + rand.Uint64()%2
 			seals := []*flow.Seal{seal1}
-			block3 := flow.NewBlock(
-				headerBody3,
-				flow.Payload{
-					Seals:           seals,
-					ProtocolStateID: calculateExpectedStateId(t, mutableState)(headerBody3, seals),
-				},
+			block3 := unittest.BlockFixture(
+				unittest.Block.WithParent(block2.ID(), block2.Header.View, block2.Header.Height),
+				unittest.Block.WithView(block3View),
+				unittest.Block.WithPayload(
+					flow.Payload{
+						Seals:           seals,
+						ProtocolStateID: calculateExpectedStateId(t, mutableState)(block2.ID(), block3View, seals),
+					}),
 			)
-			err = state.Extend(context.Background(), unittest.ProposalFromBlock(block3))
+			err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block3))
 			require.NoError(t, err)
 
 			// finalizing block 3 should trigger EFM
@@ -1950,7 +1961,7 @@ func TestEpochFallbackMode(t *testing.T) {
 			assertInPhase(t, state.Final(), flow.EpochPhaseFallback)
 
 			// block 4 will be the first block past the first epoch boundary
-			block4 := unittest.BlockWithParentProtocolState(block3)
+			block4 := unittest.BlockWithParentProtocolState(&block3)
 			block4.Header.View = epoch1FinalView + 1
 			err = state.Extend(context.Background(), unittest.ProposalFromBlock(block4))
 			require.NoError(t, err)
@@ -2031,16 +2042,18 @@ func TestEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 
 			// block 3 is where the service event state change comes into effect
-			headerBody3 := unittest.HeaderBodyWithParentFixture(block2.ToHeader())
 			seals := []*flow.Seal{seal1}
-			block3 := flow.NewBlock(
-				headerBody3,
-				flow.Payload{
-					Seals:           seals,
-					ProtocolStateID: calculateExpectedStateId(t, mutableState)(headerBody3, seals),
-				},
+			block3View := block2.Header.View + 1 + uint64(rand.Intn(10))
+			block3 := unittest.BlockFixture(
+				unittest.Block.WithParent(block2.ID(), block2.Header.View, block2.Header.Height),
+				unittest.Block.WithView(block3View),
+				unittest.Block.WithPayload(
+					flow.Payload{
+						Seals:           seals,
+						ProtocolStateID: calculateExpectedStateId(t, mutableState)(block2.ID(), block3View, seals),
+					}),
 			)
-			err = state.Extend(context.Background(), unittest.ProposalFromBlock(block3))
+			err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block3))
 			require.NoError(t, err)
 
 			// incorporating the service event should trigger EFM
@@ -2055,15 +2068,16 @@ func TestEpochFallbackMode(t *testing.T) {
 			assertInPhase(t, state.Final(), flow.EpochPhaseFallback) // immediately enters fallback phase
 
 			// block 4 is the first block past the current epoch boundary
-			headerBody4 := unittest.HeaderBodyWithParentFixture(block3.ToHeader())
-			headerBody4.View = epoch1Setup.FinalView + 1
-			block4 := flow.NewBlock(
-				headerBody4,
-				flow.Payload{
-					ProtocolStateID: calculateExpectedStateId(t, mutableState)(headerBody4, nil),
-				},
+			block4View := epoch1Setup.FinalView + 1
+			block4 := unittest.BlockFixture(
+				unittest.Block.WithParent(block3.ID(), block3.Header.View, block3.Header.Height),
+				unittest.Block.WithView(block4View),
+				unittest.Block.WithPayload(
+					flow.Payload{
+						ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.ID(), block4View, nil),
+					}),
 			)
-			err = state.Extend(context.Background(), unittest.ProposalFromBlock(block4))
+			err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block4))
 			require.NoError(t, err)
 
 			// we add the epoch extension after the epoch transition
@@ -2122,12 +2136,16 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
 
 			// add a block for the first seal to reference
-			headerBody1 := unittest.HeaderBodyWithParentFixture(head)
-			block1 := flow.NewBlock(
-				headerBody1,
-				unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(headerBody1, nil))),
+			block1View := head.View + 1 + uint64(rand.Intn(10))
+			block1 := unittest.BlockFixture(
+				unittest.Block.WithParent(head.ID(), head.View, head.Height),
+				unittest.Block.WithView(block1View),
+				unittest.Block.WithPayload(
+					flow.Payload{
+						ProtocolStateID: expectedStateIdCalculator(head.ID(), block1View, nil),
+					}),
 			)
-			unittest.InsertAndFinalize(t, state, block1)
+			unittest.InsertAndFinalize(t, state, &block1)
 
 			// add a participant for the next epoch
 			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
@@ -2141,10 +2159,10 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 				unittest.WithFinalView(epoch1Setup.FinalView+1000),
 				unittest.WithFirstView(epoch1Setup.FinalView+1),
 			)
-			receipt, seal := unittest.ReceiptAndSealForBlock(block1, invalidSetup.ServiceEvent())
+			receipt, seal := unittest.ReceiptAndSealForBlock(&block1, invalidSetup.ServiceEvent())
 
 			// ingesting block 2 and 3, block 3 seals the invalid setup event
-			block2, block3 := unittest.SealBlock(t, state, mutableProtocolState, block1, receipt, seal)
+			block2, block3 := unittest.SealBlock(t, state, mutableProtocolState, &block1, receipt, seal)
 			assertEpochFallbackTriggered(t, state.AtBlockID(block2.ID()), false) // EFM shouldn't be triggered since block 2 only incorporates the event, sealing happens in block 3
 			assertEpochFallbackTriggered(t, state.AtBlockID(block3.ID()), true)  // EFM has to be triggered at block 3, since it seals the invalid setup event
 			assertEpochFallbackTriggered(t, state.Final(), false)                // EFM should still not be triggered for finalized state since the invalid service event does not have a finalized seal
@@ -2201,7 +2219,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 	// since the epoch commitment deadline has not been reached.
 	// ROOT <- B1 <- B2(ER(B1, EpochSetup)) <- B3(S(ER(B1))) <- B4(ER(B2, InvalidEpochCommit)) <- B5(S(ER(B2))) <- B6(ER(B3, EpochRecover)) <- B7(S(ER(B3)))
 	t.Run("entered-EFM-in-setup-phase", func(t *testing.T) {
-
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 		metricsMock := mockmodule.NewComplianceMetrics(t)
 		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
@@ -2218,13 +2235,16 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
 
 			// add a block for the first seal to reference
-			headerBody1 := unittest.HeaderBodyWithParentFixture(head)
-			block1 := flow.NewBlock(
-				headerBody1,
-				unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(headerBody1, nil))),
+			block1View := head.View + 1 + uint64(rand.Intn(10))
+			block1 := unittest.BlockFixture(
+				unittest.Block.WithParent(head.ID(), head.View, head.Height),
+				unittest.Block.WithView(block1View),
+				unittest.Block.WithPayload(
+					flow.Payload{
+						ProtocolStateID: expectedStateIdCalculator(head.ID(), block1View, nil),
+					}),
 			)
-
-			unittest.InsertAndFinalize(t, state, block1)
+			unittest.InsertAndFinalize(t, state, &block1)
 
 			// add a participant for the next epoch
 			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
@@ -2239,10 +2259,10 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 				unittest.WithFinalView(epoch1Setup.FinalView+1000),
 				unittest.WithFirstView(epoch1Setup.FinalView+1),
 			)
-			receipt, seal := unittest.ReceiptAndSealForBlock(block1, epoch2Setup.ServiceEvent())
+			receipt, seal := unittest.ReceiptAndSealForBlock(&block1, epoch2Setup.ServiceEvent())
 
 			// ingesting block 2 and 3, block 3 seals the EpochSetup event
-			block2, block3 := unittest.SealBlock(t, state, mutableProtocolState, block1, receipt, seal)
+			block2, block3 := unittest.SealBlock(t, state, mutableProtocolState, &block1, receipt, seal)
 			err = state.Finalize(context.Background(), block2.ID())
 			require.NoError(t, err)
 
@@ -2360,12 +2380,16 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// We expect that the Protocol state at B5 enters `epoch committed` phase.
 
 			// add a block for the first seal to reference
-			headerBody1 := unittest.HeaderBodyWithParentFixture(head)
-			block1 := flow.NewBlock(
-				headerBody1,
-				unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(headerBody1, nil))),
+			block1View := head.View + 1 + uint64(rand.Intn(10))
+			block1 := unittest.BlockFixture(
+				unittest.Block.WithParent(head.ID(), head.View, head.Height),
+				unittest.Block.WithView(block1View),
+				unittest.Block.WithPayload(
+					flow.Payload{
+						ProtocolStateID: expectedStateIdCalculator(head.ID(), block1View, nil),
+					}),
 			)
-			unittest.InsertAndFinalize(t, state, block1)
+			unittest.InsertAndFinalize(t, state, &block1)
 
 			// add a participant for the next epoch
 			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
@@ -2380,10 +2404,10 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 				unittest.WithFinalView(epoch1Setup.FinalView+1000),
 				unittest.WithFirstView(epoch1Setup.FinalView+1),
 			)
-			receipt, seal := unittest.ReceiptAndSealForBlock(block1, epoch2Setup.ServiceEvent())
+			receipt, seal := unittest.ReceiptAndSealForBlock(&block1, epoch2Setup.ServiceEvent())
 
 			// ingesting block 2 and 3, block 3 seals the `epochSetup` for the next epoch
-			block2, block3 := unittest.SealBlock(t, state, mutableProtocolState, block1, receipt, seal)
+			block2, block3 := unittest.SealBlock(t, state, mutableProtocolState, &block1, receipt, seal)
 			err = state.Finalize(context.Background(), block2.ID())
 			require.NoError(t, err)
 
@@ -2449,11 +2473,14 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			//  After we have notification mechanism in place, we can extend this test.
 
 			// B8 will trigger epoch transition to already committed epoch
-			headerBody8 := unittest.HeaderBodyWithParentFixture(block7.ToHeader())
-			headerBody8.View = epoch1Setup.FinalView + 1 // first block past the epoch boundary
-			block8 := flow.NewBlock(
-				headerBody8,
-				unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(headerBody8, nil))),
+			block8View := epoch1Setup.FinalView + 1 // first block past the epoch boundary
+			block8 := unittest.BlockFixture(
+				unittest.Block.WithParent(block7.ID(), block7.Header.View, block7.Header.Height),
+				unittest.Block.WithView(block8View),
+				unittest.Block.WithPayload(
+					flow.Payload{
+						ProtocolStateID: expectedStateIdCalculator(block7.ID(), block8View, nil),
+					}),
 			)
 
 			metricsMock.On("CurrentEpochCounter", epoch2Setup.Counter).Once()
@@ -2463,7 +2490,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			protoEventsMock.On("EpochTransition", epoch2Setup.Counter, block8.ToHeader()).Once()
 
 			// epoch transition happens at this point
-			unittest.InsertAndFinalize(t, state, block8)
+			unittest.InsertAndFinalize(t, state, &block8)
 			assertInPhase(t, state.Final(), flow.EpochPhaseFallback) // enter fallback phase immediately after transition
 
 			metricsMock.AssertCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)
@@ -2472,13 +2499,16 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			protoEventsMock.AssertCalled(t, "EpochTransition", epoch2Setup.Counter, block8.ToHeader())
 
 			// B9 doesn't have any seals, but it reaches the safety threshold for the current epoch, meaning we will create an EpochExtension
-			headerBody9 := unittest.HeaderBodyWithParentFixture(block8.ToHeader())
-			headerBody9.View = epoch2Setup.FinalView - safetyThreshold
-			block9 := flow.NewBlock(
-				headerBody9,
-				unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(headerBody9, nil))),
+			block9View := epoch2Setup.FinalView - safetyThreshold
+			block9 := unittest.BlockFixture(
+				unittest.Block.WithParent(block8.ID(), block8.Header.View, block8.Header.Height),
+				unittest.Block.WithView(block9View),
+				unittest.Block.WithPayload(
+					flow.Payload{
+						ProtocolStateID: expectedStateIdCalculator(block8.ID(), block9View, nil),
+					}),
 			)
-			err = state.Extend(context.Background(), unittest.ProposalFromBlock(block9))
+			err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block9))
 			require.NoError(t, err)
 
 			epochProtocolState, err := state.AtBlockID(block9.ID()).EpochProtocolState()
@@ -2505,7 +2535,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// We expect that the Protocol state at B12 switches `EpochFallbackTriggered` back to false.
 
 			// B10 will be the first block past the epoch extension
-			block10 := unittest.BlockWithParentProtocolState(block9)
+			block10 := unittest.BlockWithParentProtocolState(&block9)
 			block10.Header.View = epochExtensions[0].FirstView
 			unittest.InsertAndFinalize(t, state, block10)
 
@@ -2559,11 +2589,14 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			// B14 will be the first block past the epoch extension, meaning it will enter the next epoch which
 			// had been set up by EpochRecover event
-			headerBody14 := unittest.HeaderBodyWithParentFixture(block13.ToHeader())
-			headerBody14.View = epochExtensions[0].FinalView + 1
-			block14 := flow.NewBlock(
-				headerBody14,
-				unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(headerBody14, nil))),
+			block14View := epochExtensions[0].FinalView + 1
+			block14 := unittest.BlockFixture(
+				unittest.Block.WithParent(block13.ID(), block13.Header.View, block13.Header.Height),
+				unittest.Block.WithView(block14View),
+				unittest.Block.WithPayload(
+					flow.Payload{
+						ProtocolStateID: expectedStateIdCalculator(block13.ID(), block14View, nil),
+					}),
 			)
 
 			metricsMock.On("CurrentEpochCounter", epochRecover.EpochSetup.Counter).Once()
@@ -2571,7 +2604,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			metricsMock.On("CurrentEpochFinalView", epochRecover.EpochSetup.FinalView).Once()
 			protoEventsMock.On("EpochTransition", epochRecover.EpochSetup.Counter, block14.ToHeader()).Once()
 
-			unittest.InsertAndFinalize(t, state, block14)
+			unittest.InsertAndFinalize(t, state, &block14)
 
 			epochProtocolState, err = state.Final().EpochProtocolState()
 			require.NoError(t, err)
@@ -2602,13 +2635,16 @@ func TestEpochTargetEndTime(t *testing.T) {
 		expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
 
 		// add a block that will trigger EFM and add an epoch extension since the view of the epoch exceeds the safety threshold
-		headerBody1 := unittest.HeaderBodyWithParentFixture(head)
-		headerBody1.View = epoch1Setup.FinalView
-		block1 := flow.NewBlock(
-			headerBody1,
-			unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(headerBody1, nil))),
+		block1View := epoch1Setup.FinalView
+		block1 := unittest.BlockFixture(
+			unittest.Block.WithParent(head.ID(), head.View, head.Height),
+			unittest.Block.WithView(block1View),
+			unittest.Block.WithPayload(
+				flow.Payload{
+					ProtocolStateID: expectedStateIdCalculator(head.ID(), block1View, nil),
+				}),
 		)
-		unittest.InsertAndFinalize(t, state, block1)
+		unittest.InsertAndFinalize(t, state, &block1)
 
 		block1snap := state.Final()
 		assertEpochFallbackTriggered(t, block1snap, true)
@@ -2625,13 +2661,16 @@ func TestEpochTargetEndTime(t *testing.T) {
 		require.Equal(t, expectedTargetEndTime, afterFirstExtensionTargetEndTime)
 
 		// add a second block that exceeds the safety threshold and triggers another epoch extension
-		headerBody2 := unittest.HeaderBodyWithParentFixture(block1.ToHeader())
-		headerBody2.View = firstExtension.FinalView
-		block2 := flow.NewBlock(
-			headerBody2,
-			unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(headerBody2, nil))),
+		block2View := firstExtension.FinalView
+		block2 := unittest.BlockFixture(
+			unittest.Block.WithParent(block1.ID(), block1.Header.View, block1.Header.Height),
+			unittest.Block.WithView(block2View),
+			unittest.Block.WithPayload(
+				flow.Payload{
+					ProtocolStateID: expectedStateIdCalculator(block1.ID(), block2View, nil),
+				}),
 		)
-		unittest.InsertAndFinalize(t, state, block2)
+		unittest.InsertAndFinalize(t, state, &block2)
 
 		block2snap := state.Final()
 		epochState, err = block2snap.EpochProtocolState()
@@ -2666,13 +2705,16 @@ func TestEpochTargetDuration(t *testing.T) {
 		expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
 
 		// add a block that will trigger EFM and add an epoch extension since the view of the epoch exceeds the safety threshold
-		headerBody1 := unittest.HeaderBodyWithParentFixture(head)
-		headerBody1.View = epoch1Setup.FinalView
-		block1 := flow.NewBlock(
-			headerBody1,
-			unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(headerBody1, nil))),
+		block1View := epoch1Setup.FinalView
+		block1 := unittest.BlockFixture(
+			unittest.Block.WithParent(head.ID(), head.View, head.Height),
+			unittest.Block.WithView(block1View),
+			unittest.Block.WithPayload(
+				flow.Payload{
+					ProtocolStateID: expectedStateIdCalculator(head.ID(), block1View, nil),
+				}),
 		)
-		unittest.InsertAndFinalize(t, state, block1)
+		unittest.InsertAndFinalize(t, state, &block1)
 
 		assertEpochFallbackTriggered(t, state.Final(), true)
 		assertInPhase(t, state.Final(), flow.EpochPhaseFallback)
@@ -2688,13 +2730,16 @@ func TestEpochTargetDuration(t *testing.T) {
 		require.Equal(t, expectedTargetDuration, afterFirstExtensionTargetDuration)
 
 		// add a second block that exceeds the safety threshold and triggers another epoch extension
-		headerBody2 := unittest.HeaderBodyWithParentFixture(block1.ToHeader())
-		headerBody2.View = firstExtension.FinalView
-		block2 := flow.NewBlock(
-			headerBody2,
-			unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(headerBody2, nil))),
+		block2View := firstExtension.FinalView
+		block2 := unittest.BlockFixture(
+			unittest.Block.WithParent(block1.ID(), block1.Header.View, block1.Header.Height),
+			unittest.Block.WithView(block2View),
+			unittest.Block.WithPayload(
+				flow.Payload{
+					ProtocolStateID: expectedStateIdCalculator(block1.ID(), block2View, nil),
+				}),
 		)
-		unittest.InsertAndFinalize(t, state, block2)
+		unittest.InsertAndFinalize(t, state, &block2)
 
 		epochState, err = state.Final().EpochProtocolState()
 		require.NoError(t, err)
@@ -2832,12 +2877,10 @@ func TestHeaderExtendValid(t *testing.T) {
 func TestHeaderExtendMissingParent(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
-		extend := unittest.BlockFixture()
-		extend.Payload.Guarantees = nil
-		extend.Payload.Seals = nil
-		extend.Header.Height = 2
-		extend.Header.View = 2
-		extend.Header.ParentID = unittest.IdentifierFixture()
+		extend := unittest.BlockFixture(
+			unittest.Block.WithHeight(2),
+			unittest.Block.WithView(2),
+		)
 
 		err := state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(&extend))
 		require.Error(t, err)
@@ -3448,9 +3491,9 @@ func getRootProtocolStateID(t *testing.T, rootSnapshot *inmem.Snapshot) flow.Ide
 }
 
 // calculateExpectedStateId is a utility function which makes easier to get expected protocol state ID after applying service events contained in seals.
-func calculateExpectedStateId(t *testing.T, mutableProtocolState realprotocol.MutableProtocolState) func(headerBody flow.HeaderBody, seals []*flow.Seal) flow.Identifier {
-	return func(headerBody flow.HeaderBody, seals []*flow.Seal) flow.Identifier {
-		expectedStateID, _, err := mutableProtocolState.EvolveState(headerBody.ParentID, headerBody.View, seals)
+func calculateExpectedStateId(t *testing.T, mutableProtocolState realprotocol.MutableProtocolState) func(parentBlockID flow.Identifier, candidateView uint64, candidateSeals []*flow.Seal) flow.Identifier {
+	return func(parentBlockID flow.Identifier, candidateView uint64, candidateSeals []*flow.Seal) flow.Identifier {
+		expectedStateID, _, err := mutableProtocolState.EvolveState(parentBlockID, candidateView, candidateSeals)
 		require.NoError(t, err)
 		return expectedStateID
 	}
