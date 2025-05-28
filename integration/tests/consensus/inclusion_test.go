@@ -151,8 +151,7 @@ func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
 		if !ok {
 			continue
 		}
-		p := proposal.ToInternal()
-		block := p.Block
+		block := proposal.ToInternal().Block
 
 		is.T().Logf("receive block proposal from %v, height %v", originID, block.Header.Height)
 		// wait until proposal finalized
@@ -201,8 +200,7 @@ func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Tim
 		if !ok {
 			continue
 		}
-		p := proposal.ToInternal()
-		block := p.Block
+		block := proposal.ToInternal().Block
 
 		guarantees := block.Payload.Guarantees
 		height := block.Header.Height
@@ -245,8 +243,7 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 		if !ok {
 			continue
 		}
-		p := proposal.ToInternal()
-		nextBlock := p.Block
+		nextBlock := proposal.ToInternal().Block
 
 		// check if the proposal was already processed
 		proposalID := nextBlock.ID()
