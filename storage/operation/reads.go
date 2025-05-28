@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"slices"
 
-	"github.com/vmihailenco/msgpack/v4"
+	"github.com/vmihailenco/msgpack"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
@@ -234,4 +235,27 @@ func FindHighestAtOrBelowByPrefix(r storage.Reader, prefix []byte, height uint64
 	}
 
 	return nil
+}
+
+// CommonPrefix returns common prefix of startPrefix and endPrefix.
+// The common prefix is used to narrow down the SSTables that
+// BadgerDB's iterator picks up.
+func CommonPrefix(startPrefix, endPrefix []byte) []byte {
+	commonPrefixMaxLength := min(
+		len(startPrefix),
+		len(endPrefix),
+	)
+
+	commonPrefixLength := commonPrefixMaxLength
+	for i := range commonPrefixMaxLength {
+		if startPrefix[i] != endPrefix[i] {
+			commonPrefixLength = i
+			break
+		}
+	}
+
+	if commonPrefixLength == 0 {
+		return nil
+	}
+	return slices.Clone(startPrefix[:commonPrefixLength])
 }

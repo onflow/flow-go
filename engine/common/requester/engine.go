@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/vmihailenco/msgpack/v4"
+	"github.com/vmihailenco/msgpack"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine"

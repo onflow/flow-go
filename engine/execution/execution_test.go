@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/vmihailenco/msgpack/v4"
+	"github.com/vmihailenco/msgpack"
 	"go.uber.org/atomic"
 
 	execTestutil "github.com/onflow/flow-go/engine/execution/testutil"
