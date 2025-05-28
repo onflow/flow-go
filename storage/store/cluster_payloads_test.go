@@ -22,7 +22,13 @@ func TestStoreRetrieveClusterPayload(t *testing.T) {
 		expected := unittest.ClusterPayloadFixture(5)
 
 		// store payload
-		err := store1.Store(blockID, expected)
+		manager := storage.NewTestingLockManager()
+		lctx := manager.NewContext()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertClusterBlock))
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return store1.Store(lctx, blockID, expected)
+		})
+		lctx.Release()
 		require.NoError(t, err)
 
 		// fetch payload
@@ -31,7 +37,12 @@ func TestStoreRetrieveClusterPayload(t *testing.T) {
 		require.Equal(t, expected, payload)
 
 		// storing again should error with key already exists
-		err = store1.Store(blockID, expected)
+		lctx = manager.NewContext()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertClusterBlock))
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return store1.Store(lctx, blockID, expected)
+		})
+		lctx.Release()
 		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 	})
 }
