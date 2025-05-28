@@ -201,7 +201,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.10.0 // indirect
-	github.com/onflow/cadence v1.4.0 // indirect
+	github.com/onflow/cadence v1.4.1 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.6.1 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.6.1 // indirect
 	github.com/onflow/flow-evm-bridge v0.1.0 // indirect
@@ -275,7 +275,6 @@ require (
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/turbolent/prettier v0.0.0-20220320183459-661cc755135d // indirect
-	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
 	github.com/vmihailenco/msgpack/v4 v4.3.11 // indirect
 	github.com/vmihailenco/tagparser v0.1.1 // indirect
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
