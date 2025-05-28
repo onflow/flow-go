@@ -62,9 +62,7 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 	// Step 2: Open Badger and Pebble DBs
 	log.Info().Msgf("Step 2/6 Opening BadgerDB and PebbleDB...")
 	badgerOptions := badger.DefaultOptions(badgerDir).
-		WithLogger(util.NewLogger(log.Logger.With().Str("db", "badger").Logger())).
-		WithNumCompactors(0).
-		WithNumLevelZeroTables(0)
+		WithLogger(util.NewLogger(log.Logger.With().Str("db", "badger").Logger()))
 	badgerDB, err := badger.Open(badgerOptions)
 	if err != nil {
 		return fmt.Errorf("failed to open BadgerDB: %w", err)
@@ -126,8 +124,6 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 
 	lg.Info().Str("file", completeMarkerPath).
 		Msgf("Step 6/6 Migration marker file written successfully.")
-
-	lg.Info().Str("file", completeMarkerPath).Msgf("Migration marker file written successfully.")
 
 	return nil
 }
