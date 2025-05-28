@@ -12,7 +12,7 @@ type Vertex interface {
 	VertexID() flow.Identifier
 	// Level returns the vertex's level
 	Level() uint64
-	// Parent returns the parent's (level, ID)
+	// Parent returns the parent's (ID, level)
 	Parent() (flow.Identifier, uint64)
 }
 

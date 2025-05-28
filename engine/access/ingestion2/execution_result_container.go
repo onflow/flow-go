@@ -40,8 +40,13 @@ func NewExecutionResultContainer(
 	}, nil
 }
 
+// VertexID returns the ExecutionResult ID of the ExecutionResultContainer.
 func (c *ExecutionResultContainer) VertexID() flow.Identifier { return c.resultID }
-func (c *ExecutionResultContainer) Level() uint64             { return c.blockHeader.Height }
+
+// Level returns the View of the block the ExecutionResult is associated with.
+func (c *ExecutionResultContainer) Level() uint64 { return c.blockHeader.View }
+
+// Parent returns the ID and view of the parent result.
 func (c *ExecutionResultContainer) Parent() (flow.Identifier, uint64) {
-	return c.result.PreviousResultID, c.blockHeader.Height - 1
+	return c.result.PreviousResultID, c.blockHeader.ParentView
 }

@@ -1,6 +1,7 @@
 package ingestion2
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -26,13 +27,14 @@ var (
 	ErrResultNotFound = fmt.Errorf("result not found")
 )
 
-// ResultsForest is a mempool holding receipts, which is aware of the tree structure
-// formed by the results. The mempool supports pruning by height: only results
-// descending from the latest sealed and finalized result are relevant. Hence, we
-// can prune all results for blocks _below_ the latest block with a finalized seal.
-// Results of sufficient height for forks that conflict with the finalized fork are
+// ResultsForest is a mempool holding processing pipelines for ingesting execution data
+// for a particular ExecutionResult. The mempool is aware of the tree structure
+// formed by the results. The mempool supports pruning by view: only results
+// descending from the latest persisted sealed result are relevant. Hence, we
+// can prune all results for blocks _below_ the latest persisted sealed result.
+// Results of sufficient views for forks that conflict with the finalized fork are
 // retained. However, such orphaned forks do not grow anymore and their results
-// will be progressively flushed out with increasing sealed-finalized height.
+// will be progressively flushed out with increasing sealed view.
 //
 // Safe for concurrent access. Internally, the mempool utilizes the LevelledForrest.
 // For an in-depth discussion of the core algorithm, see ./Fork-Aware_Mempools.md
@@ -113,6 +115,7 @@ func (f *ResultsForest) pipelineManagerLoop(ctx irrecoverable.SignalerContext, r
 
 				switch state {
 				case pipeline.StateCanceled:
+					// TODO: free the pipeline's resources (not necessarily here)
 					return true
 
 				case pipeline.StateComplete:
@@ -127,7 +130,8 @@ func (f *ResultsForest) pipelineManagerLoop(ctx irrecoverable.SignalerContext, r
 						defer wg.Done()
 
 						core := pipeline.NewCore()
-						if err := container.pipeline.Run(ctx, core); err != nil {
+						err := container.pipeline.Run(ctx, core)
+						if err != nil && !errors.Is(err, context.Canceled) {
 							ctx.Throw(fmt.Errorf("pipeline execution failed (result: %s): %w", container.resultID, err))
 						}
 					}()
@@ -179,11 +183,11 @@ func (f *ResultsForest) processCompleted(resultID flow.Identifier) error {
 	// TODO: this should be done during persisting
 	f.setLatestPersistedSealedResultID(resultID)
 
-	// finally, prune the forest up to the latest persisted height
-	latestPersistedHeight := container.blockHeader.Height
-	err := f.pruneUpToHeight(latestPersistedHeight)
+	// finally, prune the forest up to the latest persisted result's block view
+	latestPersistedView := container.blockHeader.View
+	err := f.pruneUpToView(latestPersistedView)
 	if err != nil {
-		return fmt.Errorf("failed to prune results forest (height: %d): %w", latestPersistedHeight, err)
+		return fmt.Errorf("failed to prune results forest (view: %d): %w", latestPersistedView, err)
 	}
 
 	return nil
@@ -212,8 +216,8 @@ func (f *ResultsForest) AddResult(result *flow.ExecutionResult, block *flow.Head
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	// drop results for block heights lower than the lowest height.
-	if block.Height < f.forest.LowestLevel {
+	// drop results for block views lower than the lowest view.
+	if block.View < f.forest.LowestLevel {
 		return nil
 	}
 
@@ -400,18 +404,18 @@ func (f *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState pipeli
 	}
 }
 
-// pruneUpToHeight prunes all results for all blocks with height up to but
+// pruneUpToView prunes all results for all blocks with view up to but
 // NOT INCLUDING `level`. Errors if level is lower than
 // the previous value (as we cannot recover previously pruned results).
 //
 // No errors are expected during normal operation.
-func (f *ResultsForest) pruneUpToHeight(level uint64) error {
+func (f *ResultsForest) pruneUpToView(level uint64) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	err := f.forest.PruneUpToLevel(level)
 	if err != nil {
-		return fmt.Errorf("pruning Levelled Forest up to height (aka level) %d failed: %w", level, err)
+		return fmt.Errorf("pruning Levelled Forest up to view (aka level) %d failed: %w", level, err)
 	}
 
 	return nil
@@ -424,8 +428,8 @@ func (f *ResultsForest) Size() uint {
 	return uint(f.forest.GetSize())
 }
 
-// LowestHeight returns the lowest height, where results are still stored in the mempool.
-func (f *ResultsForest) LowestHeight() uint64 {
+// LowestView returns the lowest view, where results are still stored in the mempool.
+func (f *ResultsForest) LowestView() uint64 {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	return f.forest.LowestLevel
