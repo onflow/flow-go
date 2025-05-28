@@ -3,8 +3,6 @@ package codec
 import (
 	"fmt"
 
-	"github.com/onflow/crypto"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
@@ -194,22 +192,7 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 	case CodeExecutionReceipt:
 		return &flow.ExecutionReceipt{}, what(&flow.ExecutionReceipt{}), nil
 	case CodeResultApproval:
-		attestation := flow.NewAttestation(
-			flow.Identifier{},
-			flow.Identifier{},
-			0,
-		)
-		body := flow.NewResultApprovalBody(
-			attestation,
-			flow.Identifier{},
-			crypto.Signature{},
-			crypto.Signature{},
-		)
-		approval := flow.NewResultApproval(
-			body,
-			crypto.Signature{},
-		)
-
+		var approval flow.ResultApproval
 		return &approval, what(&approval), nil
 
 	// data exchange for execution of blocks
