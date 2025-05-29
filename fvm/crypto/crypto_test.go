@@ -889,10 +889,10 @@ func TestSigningAlgorithmConversion(t *testing.T) {
 
 func TestAuthenticationSchemeConversion(t *testing.T) {
 	schemeMapping := map[byte]string{
-		0x0:  "PLAIN",
-		0x01: "WEBAUTHN",
-		0x02: "INVALID",
-		0x03: "INVALID",
+		0x0:  "PlainScheme",
+		0x01: "WebAuthnScheme",
+		0x02: "InvalidScheme",
+		0x03: "InvalidScheme",
 	}
 
 	for authSchemeByte, authSchemeName := range schemeMapping {
