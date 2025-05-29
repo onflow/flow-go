@@ -991,7 +991,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// block 3 contains the seal for block 1
 		seals := []*flow.Seal{seal1}
-		block3View := block2.Header.View + 1 + uint64(rand.Intn(10))
+		block3View := block2.Header.View + 1
 		block3 := unittest.BlockFixture(
 			unittest.Block.WithParent(block2.ID(), block2.Header.View, block2.Header.Height),
 			unittest.Block.WithView(block3View),
@@ -1069,7 +1069,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// block 6 contains the seal for block 2
 		seals = []*flow.Seal{seal2}
-		block6View := block2.Header.View + 1 + uint64(rand.Intn(10))
+		block6View := block2.Header.View + 1
 		block6 := unittest.BlockFixture(
 			unittest.Block.WithParent(block5.ID(), block5.Header.View, block5.Header.Height),
 			unittest.Block.WithView(block6View),
@@ -1277,7 +1277,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		seals2 := []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))}
 
 		// block 5 builds on block 3, contains seal for block 1
-		block5View := block3.Header.View + 1 + uint64(rand.Intn(10))
+		block5View := block3.Header.View + 1
 		block5 := unittest.BlockFixture(
 			unittest.Block.WithParent(block3.ID(), block3.Header.View, block3.Header.Height),
 			unittest.Block.WithView(block5View),
@@ -1291,7 +1291,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		require.NoError(t, err)
 
 		// block 6 builds on block 4, contains seal for block 2
-		block6View := block4.Header.View + 1 + uint64(rand.Intn(10))
+		block6View := block4.Header.View + 1
 		block6 := unittest.BlockFixture(
 			unittest.Block.WithParent(block4.ID(), block4.Header.View, block4.Header.Height),
 			unittest.Block.WithView(block6View),
@@ -1413,7 +1413,7 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		seals2 := []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))}
 
 		// block 5 builds on block 3, contains seal for block 1
-		block5View := block3.Header.View + 1 + uint64(rand.Intn(10))
+		block5View := block3.Header.View + 1
 		block5 := unittest.BlockFixture(
 			unittest.Block.WithParent(block3.ID(), block3.Header.View, block3.Header.Height),
 			unittest.Block.WithView(block5View),
@@ -1427,7 +1427,7 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		require.NoError(t, err)
 
 		// block 6 builds on block 4, contains seal for block 2
-		block6View := block4.Header.View + 1 + uint64(rand.Intn(10))
+		block6View := block4.Header.View + 1
 		block6 := unittest.BlockFixture(
 			unittest.Block.WithParent(block4.ID(), block4.Header.View, block4.Header.Height),
 			unittest.Block.WithView(block6View),
@@ -2043,7 +2043,7 @@ func TestEpochFallbackMode(t *testing.T) {
 
 			// block 3 is where the service event state change comes into effect
 			seals := []*flow.Seal{seal1}
-			block3View := block2.Header.View + 1 + uint64(rand.Intn(10))
+			block3View := block2.Header.View + 1
 			block3 := unittest.BlockFixture(
 				unittest.Block.WithParent(block2.ID(), block2.Header.View, block2.Header.Height),
 				unittest.Block.WithView(block3View),
@@ -2136,7 +2136,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
 
 			// add a block for the first seal to reference
-			block1View := head.View + 1 + uint64(rand.Intn(10))
+			block1View := head.View + 1
 			block1 := unittest.BlockFixture(
 				unittest.Block.WithParent(head.ID(), head.View, head.Height),
 				unittest.Block.WithView(block1View),
@@ -2235,7 +2235,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
 
 			// add a block for the first seal to reference
-			block1View := head.View + 1 + uint64(rand.Intn(10))
+			block1View := head.View + 1
 			block1 := unittest.BlockFixture(
 				unittest.Block.WithParent(head.ID(), head.View, head.Height),
 				unittest.Block.WithView(block1View),
@@ -2380,7 +2380,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// We expect that the Protocol state at B5 enters `epoch committed` phase.
 
 			// add a block for the first seal to reference
-			block1View := head.View + 1 + uint64(rand.Intn(10))
+			block1View := head.View + 1
 			block1 := unittest.BlockFixture(
 				unittest.Block.WithParent(head.ID(), head.View, head.Height),
 				unittest.Block.WithView(block1View),
