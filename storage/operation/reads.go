@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"slices"
 
-	"github.com/vmihailenco/msgpack"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
@@ -206,25 +207,16 @@ func FindHighestAtOrBelowByPrefix(r storage.Reader, prefix []byte, height uint64
 	}
 
 	key := append(prefix, EncodeKeyPart(height)...)
-	it, err := r.NewIter(prefix, key, storage.DefaultIteratorOptions())
+
+	seeker := r.NewSeeker()
+
+	// Seek the highest key equal or below to the given key within the [prefix, key] prefix range
+	highestKey, err := seeker.SeekLE(prefix, key)
 	if err != nil {
-		return fmt.Errorf("can not create iterator: %w", err)
-	}
-	defer func() {
-		errToReturn = merr.CloseAndMergeError(it, errToReturn)
-	}()
-
-	var highestKey []byte
-
-	// find highest value below the given height
-	for it.First(); it.Valid(); it.Next() {
-		// copy the key to avoid the underlying slices of the key
-		// being modified by the Next() call
-		highestKey = it.IterItem().KeyCopy(highestKey)
-	}
-
-	if len(highestKey) == 0 {
-		return storage.ErrNotFound
+		if err == storage.ErrNotFound {
+			return storage.ErrNotFound
+		}
+		return fmt.Errorf("can not seek height %d: %w", height, err)
 	}
 
 	// read the value of the highest key
@@ -243,4 +235,27 @@ func FindHighestAtOrBelowByPrefix(r storage.Reader, prefix []byte, height uint64
 	}
 
 	return nil
+}
+
+// CommonPrefix returns common prefix of startPrefix and endPrefix.
+// The common prefix is used to narrow down the SSTables that
+// BadgerDB's iterator picks up.
+func CommonPrefix(startPrefix, endPrefix []byte) []byte {
+	commonPrefixMaxLength := min(
+		len(startPrefix),
+		len(endPrefix),
+	)
+
+	commonPrefixLength := commonPrefixMaxLength
+	for i := range commonPrefixMaxLength {
+		if startPrefix[i] != endPrefix[i] {
+			commonPrefixLength = i
+			break
+		}
+	}
+
+	if commonPrefixLength == 0 {
+		return nil
+	}
+	return slices.Clone(startPrefix[:commonPrefixLength])
 }

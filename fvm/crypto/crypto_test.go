@@ -433,7 +433,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 		h := hash.SHA2_256
 		s := onflowCrypto.ECDSAP256
 
-		transactionBody := transactionBodyScafold{
+		transactionBody := transactionBodyScaffold{
 			flow.TransactionBody{
 				Script: []byte("some script"),
 				Arguments: [][]byte{
@@ -471,12 +471,12 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 		t.Run("plain authentication schemes", func(t *testing.T) {
 			cases := []struct {
 				payloadExtensionData                   []byte
-				expectedEnvelopeSignatureCanonicalForm func(tb transactionBodyScafold) []byte
+				expectedEnvelopeSignatureCanonicalForm func(tb transactionBodyScaffold) []byte
 				require                                func(t *testing.T, sigOk bool, err error)
 			}{
 				{
 					payloadExtensionData: nil,
-					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScafold) []byte {
+					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScaffold) []byte {
 						return fingerprint.Fingerprint(struct {
 							Payload           interface{}
 							PayloadSignatures interface{}
@@ -503,7 +503,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 				},
 				{
 					payloadExtensionData: []byte{},
-					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScafold) []byte {
+					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScaffold) []byte {
 						return fingerprint.Fingerprint(struct {
 							Payload           interface{}
 							PayloadSignatures interface{}
@@ -529,7 +529,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 					},
 				}, {
 					payloadExtensionData: []byte{0x0},
-					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScafold) []byte {
+					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScaffold) []byte {
 						return fingerprint.Fingerprint(struct {
 							Payload           interface{}
 							PayloadSignatures interface{}
@@ -557,7 +557,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 					},
 				}, {
 					payloadExtensionData: []byte{0x0},
-					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScafold) []byte {
+					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScaffold) []byte {
 						return fingerprint.Fingerprint(struct {
 							Payload           interface{}
 							PayloadSignatures interface{}
@@ -981,12 +981,12 @@ func TestVerifySignatureFromRuntime_error_handling_produces_valid_utf8_for_inval
 	require.Equal(t, errorString, unmarshalledString)
 }
 
-type transactionBodyScafold struct {
+type transactionBodyScaffold struct {
 	flow.TransactionBody
 }
 
 // For not, this is taken directly from model/flow/transaction.go
-func (tb *transactionBodyScafold) payloadCanonicalForm() interface{} {
+func (tb *transactionBodyScaffold) payloadCanonicalForm() interface{} {
 	authorizers := make([][]byte, len(tb.Authorizers))
 	for i, auth := range tb.Authorizers {
 		authorizers[i] = auth.Bytes()

@@ -247,7 +247,7 @@ func (h *MessageHub) sendOwnMessages(ctx context.Context) error {
 // No errors are expected during normal operations.
 func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 	log := timeout.LogContext(h.log).Logger()
-	log.Info().Msg("processing timeout broadcast request from hotstuff")
+	log.Debug().Msg("processing timeout broadcast request from hotstuff")
 
 	// Retrieve all collection nodes in our cluster (excluding myself).
 	recipients, err := h.state.Final().Identities(h.clusterIdentityFilter)
@@ -270,7 +270,7 @@ func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 		}
 		return nil
 	}
-	log.Info().Msg("cluster timeout was broadcast")
+	log.Debug().Msg("cluster timeout was broadcast")
 	h.engineMetrics.MessageSent(metrics.EngineCollectionMessageHub, metrics.MessageTimeoutObject)
 
 	return nil
@@ -284,7 +284,7 @@ func (h *MessageHub) sendOwnVote(packed *packedVote) error {
 		Uint64("collection_view", packed.vote.View).
 		Hex("recipient_id", packed.recipientID[:]).
 		Logger()
-	log.Info().Msg("processing vote transmission request from hotstuff")
+	log.Debug().Msg("processing vote transmission request from hotstuff")
 
 	// send the vote the desired recipient
 	err := h.con.Unicast(packed.vote, packed.recipientID)
@@ -292,7 +292,7 @@ func (h *MessageHub) sendOwnVote(packed *packedVote) error {
 		log.Err(err).Msg("could not send vote")
 		return nil
 	}
-	log.Info().Msg("collection vote transmitted")
+	log.Debug().Msg("collection vote transmitted")
 	h.engineMetrics.MessageSent(metrics.EngineCollectionMessageHub, metrics.MessageBlockVote)
 
 	return nil
@@ -460,7 +460,7 @@ func (h *MessageHub) forwardToOwnVoteAggregator(vote *messages.ClusterBlockVote,
 		SignerID: originID,
 		SigData:  vote.SigData,
 	}
-	h.log.Info().
+	h.log.Debug().
 		Uint64("block_view", v.View).
 		Hex("block_id", v.BlockID[:]).
 		Hex("voter", v.SignerID[:]).
@@ -473,7 +473,7 @@ func (h *MessageHub) forwardToOwnVoteAggregator(vote *messages.ClusterBlockVote,
 // Per API convention, timeoutAggregator` is non-blocking, hence, this call returns quickly.
 func (h *MessageHub) forwardToOwnTimeoutAggregator(t *model.TimeoutObject) {
 	h.engineMetrics.MessageReceived(metrics.EngineCollectionMessageHub, metrics.MessageTimeoutObject)
-	h.log.Info().
+	h.log.Debug().
 		Hex("origin_id", t.SignerID[:]).
 		Uint64("view", t.View).
 		Str("timeout_id", t.ID().String()).

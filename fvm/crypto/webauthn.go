@@ -64,11 +64,9 @@ func validateFlags(flags byte, extensions []byte) error {
 
 	// For now, just check if there is a mismatch in expected state,
 	// i.e. no extension data but flags are set.
-	if len(extensions) == 0 && (attestationCredentialData || extensionData) {
-		return errors.New("invalid flags: Attestation Credential Data (AT) Extension Data (ED) flag set without corrosponding extension data")
-	} else if len(extensions) != 0 && !(attestationCredentialData && extensionData) {
-		return errors.New("invalid flags: Extension Data (ED) flag set without corrosponding extension data")
-	}
+	if (len(extensions) > 0) != (attestationCredentialData || extensionData) {
+		return errors.New("invalid flags: Attestation Credential Data (AT) or Extension Data (ED) flag are not matching the corresponding extension data")
+	} 
 
 	// If all checks pass, return nil
 	return nil

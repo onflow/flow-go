@@ -282,7 +282,7 @@ func validateExtensionDataAndReconstructMessage(scheme AuthenticationScheme, ext
 	case WebAuthnScheme: // See FLIP 264 for more details
 		return validateWebAuthNExtensionData(extensionData, message)
 	default:
-		// signature scheme type not found
+		// authentication scheme not found
 		return false, nil
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"runtime/pprof"
 	"strings"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -383,6 +385,24 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("state extraction plan: %s, %s", inputMsg, outputMsg)
 
+	// Extract state and create checkpoint files without migration.
+	if flagNoMigration &&
+		len(flagInputPayloadFileName) == 0 &&
+		len(flagOutputPayloadFileName) == 0 {
+
+		exportedState, err := extractStateToCheckpointWithoutMigration(
+			log.Logger,
+			flagExecutionStateDir,
+			flagOutputDir,
+			stateCommitment)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("error extracting state for commitment %s", stateCommitment)
+		}
+
+		reportExtraction(stateCommitment, exportedState)
+		return
+	}
+
 	var extractor extractor
 	if len(flagInputPayloadFileName) > 0 {
 		extractor = newPayloadFileExtractor(log.Logger, flagInputPayloadFileName)
@@ -448,13 +468,17 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("exported %d payloads", len(payloads))
 
+	reportExtraction(stateCommitment, exportedState)
+}
+
+func reportExtraction(loadedState flow.StateCommitment, exportedState ledger.State) {
 	// Create export reporter.
 	reporter := reporters.NewExportReporter(
 		log.Logger,
-		func() flow.StateCommitment { return stateCommitment },
+		func() flow.StateCommitment { return loadedState },
 	)
 
-	err = reporter.Report(nil, exportedState)
+	err := reporter.Report(nil, exportedState)
 	if err != nil {
 		log.Error().Err(err).Msgf("can not generate report for migrated state: %v", exportedState)
 	}
@@ -464,6 +488,22 @@ func run(*cobra.Command, []string) {
 		exportedState.String(),
 		exportedState.Base64(),
 	)
+}
+
+func extractStateToCheckpointWithoutMigration(
+	logger zerolog.Logger,
+	executionStateDir string,
+	outputDir string,
+	stateCommitment flow.StateCommitment,
+) (ledger.State, error) {
+	// Load state for given state commitment
+	newTrie, err := util.ReadTrie(executionStateDir, stateCommitment)
+	if err != nil {
+		return ledger.DummyState, fmt.Errorf("failed to load state: %w", err)
+	}
+
+	// Create checkpoint files
+	return createCheckpoint(logger, newTrie, outputDir, bootstrap.FilenameWALRootCheckpoint)
 }
 
 func ensureCheckpointFileExist(dir string) error {
