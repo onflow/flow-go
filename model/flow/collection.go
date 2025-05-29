@@ -1,6 +1,8 @@
 package flow
 
-import "github.com/onflow/flow-go/model/fingerprint"
+import (
+	"github.com/onflow/flow-go/model/fingerprint"
+)
 
 // Collection is set of transactions.
 type Collection struct {
@@ -18,8 +20,11 @@ func CollectionFromTransactions(transactions []*Transaction) Collection {
 }
 
 // Light returns the light, reference-only version of the collection.
-func (c Collection) Light() LightCollection {
-	return NewLightCollection(GetIDs(c.Transactions))
+func (c Collection) Light() (*LightCollection, error) {
+	encodable := EncodableLightCollection{
+		Transactions: GetIDs(c.Transactions),
+	}
+	return NewLightCollection(encodable)
 }
 
 // Guarantee returns a collection guarantee for this collection.
@@ -60,15 +65,28 @@ func (c Collection) Fingerprint() []byte {
 //
 //structwrite:immutable - mutations allowed only within the constructor
 type LightCollection struct {
+	EncodableLightCollection
+	id Identifier
+}
+
+type EncodableLightCollection struct {
 	Transactions []Identifier
 }
 
-func NewLightCollection(txIDs []Identifier) LightCollection {
-	return LightCollection{Transactions: txIDs}
+func (lc EncodableLightCollection) ID() Identifier {
+	return MakeID(lc)
+}
+
+// NewLightCollection constructs a new LightCollection instance.
+func NewLightCollection(encodable EncodableLightCollection) (*LightCollection, error) {
+	return &LightCollection{
+		EncodableLightCollection: encodable,
+		id:                       encodable.ID(),
+	}, nil
 }
 
 func (lc LightCollection) ID() Identifier {
-	return MakeID(lc)
+	return lc.id
 }
 
 func (lc LightCollection) Checksum() Identifier {
