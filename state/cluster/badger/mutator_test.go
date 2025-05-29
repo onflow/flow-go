@@ -272,7 +272,7 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 		suite.Assert().Equal(suite.genesis.Header.Height, boundary)
 
 		return nil
-	})
+	})(suite.db.Reader())
 	suite.Assert().Nil(err)
 }
 
