@@ -49,7 +49,7 @@ func TestBlockEncodingJSON(t *testing.T) {
 	require.NoError(t, err)
 	decodedID := decoded.ID()
 	assert.Equal(t, blockID, decodedID)
-	assert.Equal(t, block, decoded)
+	assert.Equal(t, block, &decoded)
 }
 
 func TestBlockEncodingMsgpack(t *testing.T) {
@@ -62,7 +62,7 @@ func TestBlockEncodingMsgpack(t *testing.T) {
 	require.NoError(t, err)
 	decodedID := decoded.ID()
 	assert.Equal(t, blockID, decodedID)
-	assert.Equal(t, block, decoded)
+	assert.Equal(t, block, &decoded)
 }
 
 func TestNilProducesSameHashAsEmptySlice(t *testing.T) {

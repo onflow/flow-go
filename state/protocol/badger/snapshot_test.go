@@ -362,7 +362,7 @@ func TestSealingSegment(t *testing.T) {
 						ProtocolStateID: calculateExpectedStateId(t, mutableState)(block2.ID(), block3View, seals),
 					}),
 			)
-			buildFinalizedBlock(t, state, &block3)
+			buildFinalizedBlock(t, state, block3)
 
 			segment, err := state.AtBlockID(block3.ID()).SealingSegment()
 			require.NoError(t, err)
@@ -371,11 +371,11 @@ func TestSealingSegment(t *testing.T) {
 			assert.Equal(t, segment.ExtraBlocks[0].Block.Header.Height, head.Height)
 
 			// build a valid child B3 to ensure we have a QC
-			buildBlock(t, state, unittest.BlockWithParentProtocolState(&block3))
+			buildBlock(t, state, unittest.BlockWithParentProtocolState(block3))
 
 			// sealing segment should contain B1, B2, B3
 			// B3 is reference of snapshot, B1 is latest sealed
-			unittest.AssertEqualBlockSequences(t, []*flow.Block{block1, block2, &block3}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.Block{block1, block2, block3}, segment.Blocks)
 			assert.Len(t, segment.ExecutionResults, 1)
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(block3.ID()))
 		})

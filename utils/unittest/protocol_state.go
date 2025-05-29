@@ -100,10 +100,10 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState 
 				ProtocolStateID: updatedStateId,
 			}),
 	)
-	err = st.Extend(context.Background(), ProposalFromBlock(&block3))
+	err = st.Extend(context.Background(), ProposalFromBlock(block3))
 	require.NoError(t, err)
 
-	return block2, &block3
+	return block2, block3
 }
 
 // InsertAndFinalize inserts, then finalizes, the input block.

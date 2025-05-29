@@ -452,7 +452,7 @@ func blockFixture(collection *flow.Collection) *flow.Block {
 			flow.Payload{Guarantees: []*flow.CollectionGuarantee{guarantee}},
 		),
 	)
-	return &block
+	return block
 }
 
 func generateStateUpdates(t *testing.T, f *completeLedger.Ledger) (ledger.State, ledger.Proof, *ledger.Update) {

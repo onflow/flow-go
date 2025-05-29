@@ -241,9 +241,10 @@ func generateMocks(backend *mock.API, count int) ([]string, []string, []*flow.Bl
 	executionResults := make([]*flow.ExecutionResult, count)
 
 	for i := 0; i < count; i++ {
-		block := unittest.BlockFixture()
-		block.Header.Height = uint64(i)
-		blocks[i] = &block
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(uint64(i)),
+		)
+		blocks[i] = block
 		blockIDs[i] = block.ID().String()
 		heights[i] = fmt.Sprintf("%d", block.Header.Height)
 
@@ -251,8 +252,8 @@ func generateMocks(backend *mock.API, count int) ([]string, []string, []*flow.Bl
 		executionResult.BlockID = block.ID()
 		executionResults[i] = executionResult
 
-		backend.Mock.On("GetBlockByID", mocks.Anything, block.ID()).Return(&block, flow.BlockStatusSealed, nil)
-		backend.Mock.On("GetBlockByHeight", mocks.Anything, block.Header.Height).Return(&block, flow.BlockStatusSealed, nil)
+		backend.Mock.On("GetBlockByID", mocks.Anything, block.ID()).Return(block, flow.BlockStatusSealed, nil)
+		backend.Mock.On("GetBlockByHeight", mocks.Anything, block.Header.Height).Return(block, flow.BlockStatusSealed, nil)
 		backend.Mock.On("GetExecutionResultForBlockID", mocks.Anything, block.ID()).Return(executionResults[i], nil)
 	}
 
