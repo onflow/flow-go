@@ -50,7 +50,8 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.chainID = suite.genesis.Header.ChainID
 
 	suite.dbdir = unittest.TempDir(suite.T())
-	suite.db = badgerimpl.ToDB(unittest.BadgerDB(suite.T(), suite.dbdir))
+	suite.badgerdb = unittest.BadgerDB(suite.T(), suite.dbdir)
+	suite.db = badgerimpl.ToDB(suite.badgerdb)
 	lockManager := storage.NewTestingLockManager()
 	suite.lockManager = lockManager
 
@@ -65,7 +66,7 @@ func (suite *SnapshotSuite) SetupTest() {
 
 	suite.protoState, err = pbadger.Bootstrap(
 		metrics,
-		badgerimpl.ToDB(suite.badgerdb),
+		suite.db,
 		lockManager,
 		all.Headers,
 		all.Seals,
