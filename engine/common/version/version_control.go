@@ -38,13 +38,15 @@ var NoHeight = uint64(0)
 // IMPORTANT: only add versions to this list if you are certain that the cadence and fvm changes
 // deployed during the HCU are backwards compatible for scripts.
 var defaultCompatibilityOverrides = map[string]struct{}{
-	"0.37.17": {},
-	"0.37.18": {},
-	"0.37.22": {},
-	"0.37.26": {},
-	"0.38.0":  {},
-	"0.39.0":  {},
-	"0.40.0":  {},
+	"0.37.17": {}, // mainnet, testnet
+	"0.37.18": {}, // testnet only
+	"0.37.20": {}, // mainnet, testnet
+	"0.37.22": {}, // mainnet, testnet
+	"0.37.26": {}, // mainnet, testnet
+	"0.38.1":  {}, // testnet only
+	"0.38.2":  {}, // mainnet, testnet
+	"0.38.3":  {}, // mainnet, testnet
+	"0.40.0":  {}, // mainnet, testnet
 }
 
 // VersionControl manages the version control system for the node.
