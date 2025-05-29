@@ -30,7 +30,7 @@ var _ storage.ResultApprovals = (*ResultApprovals)(nil)
 
 func NewResultApprovals(collector module.CacheMetrics, db storage.DB) *ResultApprovals {
 	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, key flow.Identifier, val *flow.ResultApproval) error {
-		return operation.InsertResultApproval(rw.Writer(), val)
+		return operation.InsertResultApproval(lctx, rw.Writer(), val)
 	}
 
 	retrieve := func(r storage.Reader, approvalID flow.Identifier) (*flow.ResultApproval, error) {
@@ -48,8 +48,21 @@ func NewResultApprovals(collector module.CacheMetrics, db storage.DB) *ResultApp
 	}
 }
 
-// Store stores a ResultApproval
-func (r *ResultApprovals) Store(lctx lockctx.Proof, approval *flow.ResultApproval) error {
+// Store stores my own ResultApproval
+// No errors are expected during normal operations.
+// it also indexes a ResultApproval by result ID and chunk index.
+//
+// CAUTION: the Flow protocol requires multiple approvals for the same chunk from different verification
+// nodes. In other words, there are multiple different approvals for the same chunk. Therefore, the index
+// Executed Chunk ➜ ResultApproval ID (populated here) is *only safe* to be used by Verification Nodes
+// for tracking their own approvals.
+//
+// For the same ExecutionResult, a Verifier will always produce the same approval. Therefore, this operation
+// is idempotent, i.e. repeated calls with the *same inputs* are equivalent to just calling the method once;
+// still the method succeeds on each call. However, when attempting to index *different* ResultApproval IDs
+// for the same key (resultID, chunkIndex) this method returns an exception, as this should never happen for
+// a correct Verification Node indexing its own approvals.
+func (r *ResultApprovals) StoreMyApproval(lctx lockctx.Proof, approval *flow.ResultApproval) error {
 	if !lctx.HoldsLock(storage.LockIndexResultApproval) {
 		return fmt.Errorf("missing lock for index result approval")
 	}
@@ -84,7 +97,7 @@ func (r *ResultApprovals) Store(lctx lockctx.Proof, approval *flow.ResultApprova
 		}
 
 		// index approval
-		return operation.UnsafeIndexResultApproval(rw.Writer(), resultID, chunkIndex, approvalID)
+		return operation.IndexResultApproval(lctx, rw.Writer(), resultID, chunkIndex, approvalID)
 	})
 }
 

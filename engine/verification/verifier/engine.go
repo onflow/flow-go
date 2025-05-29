@@ -323,7 +323,7 @@ func (e *Engine) storeApproval(approval *flow.ResultApproval) error {
 	}
 
 	// store the approval in the database
-	err = e.approvals.Store(lctx, approval)
+	err = e.approvals.StoreMyApproval(lctx, approval)
 	if err != nil {
 		return fmt.Errorf("could not store result approval: %w", err)
 	}

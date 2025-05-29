@@ -26,7 +26,7 @@ func TestApprovalStoreAndRetrieve(t *testing.T) {
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
 		approval := unittest.ResultApprovalFixture()
-		err := store.Store(lctx, approval)
+		err := store.StoreMyApproval(lctx, approval)
 		require.NoError(t, err)
 
 		byID, err := store.ByID(approval.ID())
@@ -49,10 +49,10 @@ func TestApprovalStoreTwice(t *testing.T) {
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
 		approval := unittest.ResultApprovalFixture()
-		err := store.Store(lctx, approval)
+		err := store.StoreMyApproval(lctx, approval)
 		require.NoError(t, err)
 
-		err = store.Store(lctx, approval)
+		err = store.StoreMyApproval(lctx, approval)
 		require.NoError(t, err)
 	})
 }
@@ -68,7 +68,7 @@ func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
 
-		err := store.Store(lctx, approval1)
+		err := store.StoreMyApproval(lctx, approval1)
 		lctx.Release()
 		require.NoError(t, err)
 
@@ -76,7 +76,7 @@ func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 		// approval for the same chunk.
 		lctx2 := lockManager.NewContext()
 		require.NoError(t, lctx2.AcquireLock(storage.LockIndexResultApproval))
-		err = store.Store(lctx2, approval2)
+		err = store.StoreMyApproval(lctx2, approval2)
 		lctx2.Release()
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrDataMismatch)
@@ -106,7 +106,7 @@ func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 			defer lctx.Release()
 			require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
 
-			firstIndexErr = store.Store(lctx, approval1)
+			firstIndexErr = store.StoreMyApproval(lctx, approval1)
 		}()
 
 		// Second goroutine stores and tries to index the second approval for the same chunk.
@@ -117,7 +117,7 @@ func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 			defer lctx.Release()
 			require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
 
-			secondIndexErr = store.Store(lctx, approval2)
+			secondIndexErr = store.StoreMyApproval(lctx, approval2)
 		}()
 
 		// Wait for both goroutines to finish

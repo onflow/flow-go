@@ -74,12 +74,12 @@ func (_m *ResultApprovals) ByID(approvalID flow.Identifier) (*flow.ResultApprova
 	return r0, r1
 }
 
-// Store provides a mock function with given fields: lctx, result
-func (_m *ResultApprovals) Store(lctx lockctx.Proof, result *flow.ResultApproval) error {
+// StoreMyApproval provides a mock function with given fields: lctx, result
+func (_m *ResultApprovals) StoreMyApproval(lctx lockctx.Proof, result *flow.ResultApproval) error {
 	ret := _m.Called(lctx, result)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Store")
+		panic("no return value specified for StoreMyApproval")
 	}
 
 	var r0 error
