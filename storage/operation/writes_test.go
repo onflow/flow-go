@@ -117,6 +117,79 @@ func TestBatchWrite(t *testing.T) {
 	})
 }
 
+func TestBatchWriteArgumentCanBeModified(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		b := db.NewBatch()
+		defer b.Close()
+
+		k := []byte{0x01}
+		v := []byte{0x02}
+
+		// Insert k and v into batch.
+		err := b.Writer().Set(k, v)
+		require.NoError(t, err)
+
+		// Modify k and v.
+		k[0]++
+		v[0]++
+
+		// Commit batch.
+		err = b.Commit()
+		require.NoError(t, err)
+
+		// Retrieve value with original key.
+		retreivedValue, closer, err := db.Reader().Get([]byte{0x01})
+		defer closer.Close()
+		require.NoError(t, err)
+		require.Equal(t, []byte{0x02}, retreivedValue)
+	})
+}
+
+func TestBatchDeleteArgumentCanBeModified(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		{
+			b := db.NewBatch()
+			defer b.Close()
+
+			k := []byte{0x01}
+			v := []byte{0x02}
+
+			// Insert k and v into batch.
+			err := b.Writer().Set(k, v)
+			require.NoError(t, err)
+
+			// Commit batch.
+			err = b.Commit()
+			require.NoError(t, err)
+		}
+		{
+			// Create batch to remove records.
+			b := db.NewBatch()
+			defer b.Close()
+
+			k := []byte{0x01}
+
+			// Delete record.
+			err := b.Writer().Delete(k)
+			require.NoError(t, err)
+
+			// Modify k
+			k[0]++
+
+			// Commit batch.
+			err = b.Commit()
+			require.NoError(t, err)
+		}
+		{
+			// Retrieve value with original key
+			retreivedValue, closer, err := db.Reader().Get([]byte{0x01})
+			defer closer.Close()
+			require.ErrorIs(t, storage.ErrNotFound, err)
+			require.Nil(t, retreivedValue)
+		}
+	})
+}
+
 func TestRemove(t *testing.T) {
 	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		e := Entity{ID: 1337}
