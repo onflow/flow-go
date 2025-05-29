@@ -24,6 +24,10 @@ func NewExecutionForkEvidence(db storage.DB) *ExecutionForkEvidence {
 // StoreIfNotExists stores the given conflictingSeals to the database.
 // This is a no-op if there is already a record in the database with the same key.
 // No errors are expected during normal operations.
+// CAUTION: This function is not safe for concurrent use by multiple goroutines.  For safety,
+// we rely on the fact that Execution Fork Evidence has a very small surface area of use
+// in the Execution Fork Suppressor.  The Execution Fork Suppressor is responsible for
+// ensuring mutually exclusive access to this function.
 func (efe *ExecutionForkEvidence) StoreIfNotExists(conflictingSeals []*flow.IncorporatedResultSeal) error {
 	return efe.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		found, err := operation.HasExecutionForkEvidence(rw.GlobalReader())

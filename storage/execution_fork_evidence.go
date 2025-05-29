@@ -3,10 +3,12 @@ package storage
 import "github.com/onflow/flow-go/model/flow"
 
 // ExecutionForkEvidence represents persistent storage for execution fork evidence.
+// CAUTION: Not safe for concurrent use by multiple goroutines.
 type ExecutionForkEvidence interface {
 	// StoreIfNotExists stores the given conflictingSeals to the database
-	// if a record with the same key does not exist in the database.
-	// If a record exists with the same key, this is a no-op.
+	// if no execution fork evidence is currently stored in the database.
+	// This function is a no-op if evidence is already stored, because
+	// only one execution fork evidence can be stored at a time.
 	// No errors are expected during normal operations.
 	StoreIfNotExists(conflictingSeals []*flow.IncorporatedResultSeal) error
 
