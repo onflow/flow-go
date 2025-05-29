@@ -34,6 +34,8 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 			txResults = append(txResults, expected)
 		}
 		writeBatch := db.NewBatch()
+		defer writeBatch.Close()
+
 		err := st.BatchStore(blockID, txResults, writeBatch)
 		require.NoError(t, err)
 
@@ -88,8 +90,7 @@ func TestKeyConversion(t *testing.T) {
 	blockID := unittest.IdentifierFixture()
 	txID := unittest.IdentifierFixture()
 	key := store.KeyFromBlockIDTransactionID(blockID, txID)
-	bID, tID, err := store.KeyToBlockIDTransactionID(key)
-	require.NoError(t, err)
+	bID, tID := store.KeyToBlockIDTransactionID(key)
 	require.Equal(t, blockID, bID)
 	require.Equal(t, txID, tID)
 }
@@ -98,8 +99,79 @@ func TestIndexKeyConversion(t *testing.T) {
 	blockID := unittest.IdentifierFixture()
 	txIndex := mathRand.Uint32()
 	key := store.KeyFromBlockIDIndex(blockID, txIndex)
-	bID, tID, err := store.KeyToBlockIDIndex(key)
-	require.NoError(t, err)
+	bID, tID := store.KeyToBlockIDIndex(key)
 	require.Equal(t, blockID, bID)
 	require.Equal(t, txIndex, tID)
+}
+
+func BenchmarkTransactionResultCacheKey(b *testing.B) {
+	b.Run("new: create cache key", func(b *testing.B) {
+		blockID := unittest.IdentifierFixture()
+		txID := unittest.IdentifierFixture()
+
+		var key store.TwoIdentifier
+		for range b.N {
+			key = store.KeyFromBlockIDTransactionID(blockID, txID)
+		}
+		_ = key
+	})
+
+	b.Run("old: create cache key", func(b *testing.B) {
+		blockID := unittest.IdentifierFixture()
+		txID := unittest.IdentifierFixture()
+
+		var key string
+		for range b.N {
+			key = DeprecatedKeyFromBlockIDTransactionID(blockID, txID)
+		}
+		_ = key
+	})
+
+	b.Run("new: parse cache key", func(b *testing.B) {
+		blockID := unittest.IdentifierFixture()
+		txID := unittest.IdentifierFixture()
+		key := store.KeyFromBlockIDTransactionID(blockID, txID)
+
+		var id1, id2 flow.Identifier
+		for range b.N {
+			id1, id2 = store.KeyToBlockIDTransactionID(key)
+		}
+		_ = id1
+		_ = id2
+	})
+
+	b.Run("old: parse cache key", func(b *testing.B) {
+		blockID := unittest.IdentifierFixture()
+		txID := unittest.IdentifierFixture()
+		key := DeprecatedKeyFromBlockIDTransactionID(blockID, txID)
+
+		var id1, id2 flow.Identifier
+		for range b.N {
+			id1, id2, _ = DeprecatedKeyToBlockIDTransactionID(key)
+		}
+		_ = id1
+		_ = id2
+	})
+}
+
+// This deprecated function is for benchmark purpose.
+func DeprecatedKeyFromBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) string {
+	return fmt.Sprintf("%x%x", blockID, txID)
+}
+
+// This deprecated function is for benchmark purpose.
+func DeprecatedKeyToBlockIDTransactionID(key string) (flow.Identifier, flow.Identifier, error) {
+	blockIDStr := key[:64]
+	txIDStr := key[64:]
+	blockID, err := flow.HexStringToIdentifier(blockIDStr)
+	if err != nil {
+		return flow.ZeroID, flow.ZeroID, fmt.Errorf("could not get block ID: %w", err)
+	}
+
+	txID, err := flow.HexStringToIdentifier(txIDStr)
+	if err != nil {
+		return flow.ZeroID, flow.ZeroID, fmt.Errorf("could not get transaction id: %w", err)
+	}
+
+	return blockID, txID, nil
 }

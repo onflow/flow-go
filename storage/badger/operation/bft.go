@@ -16,7 +16,7 @@ import (
 // TODO: TEMPORARY manual override for adding node IDs to list of ejected nodes, applies to networking layer only
 func PurgeBlocklist() func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
-		err := remove(makePrefix(blockedNodeIDs))(tx)
+		err := remove(makePrefix(disallowedNodeIDs))(tx)
 		if err != nil && !errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("enexpected error while purging blocklist: %w", err)
 		}
@@ -30,7 +30,7 @@ func PurgeBlocklist() func(*badger.Txn) error {
 //
 // TODO: TEMPORARY manual override for adding node IDs to list of ejected nodes, applies to networking layer only
 func PersistBlocklist(blocklist map[flow.Identifier]struct{}) func(*badger.Txn) error {
-	return upsert(makePrefix(blockedNodeIDs), blocklist)
+	return upsert(makePrefix(disallowedNodeIDs), blocklist)
 }
 
 // RetrieveBlocklist reads the set of blocked node IDs from the data base.
@@ -38,5 +38,5 @@ func PersistBlocklist(blocklist map[flow.Identifier]struct{}) func(*badger.Txn) 
 //
 // TODO: TEMPORARY manual override for adding node IDs to list of ejected nodes, applies to networking layer only
 func RetrieveBlocklist(blocklist *map[flow.Identifier]struct{}) func(*badger.Txn) error {
-	return retrieve(makePrefix(blockedNodeIDs), blocklist)
+	return retrieve(makePrefix(disallowedNodeIDs), blocklist)
 }
