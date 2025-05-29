@@ -230,12 +230,13 @@ func (s *Suite) mockCollectionsForBlock(block flow.Block) {
 
 // generateBlock prepares block with payload and specified guarantee.SignerIndices
 func (s *Suite) generateBlock(clusterCommittee flow.IdentitySkeletonList, snap *protocol.Snapshot) flow.Block {
-	block := unittest.BlockFixture()
-	block.SetPayload(unittest.PayloadFixture(
-		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
-		unittest.WithExecutionResults(unittest.ExecutionResultFixture()),
-		unittest.WithSeals(unittest.Seal.Fixture()),
-	))
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(
+			unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
+			unittest.WithExecutionResults(unittest.ExecutionResultFixture()),
+			unittest.WithSeals(unittest.Seal.Fixture()),
+		)),
+	)
 
 	refBlockID := unittest.IdentifierFixture()
 	for _, guarantee := range block.Payload.Guarantees {
@@ -510,14 +511,12 @@ func (s *Suite) TestRequestMissingCollections() {
 	var collIDs []flow.Identifier
 	refBlockID := unittest.IdentifierFixture()
 	for i := 0; i < blkCnt; i++ {
-		block := unittest.BlockFixture()
-		block.SetPayload(unittest.PayloadFixture(
-			unittest.WithGuarantees(
-				unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(refBlockID))...),
-		))
-		// some blocks may not be present hence add a gap
-		height := startHeight + uint64(i)
-		block.Header.Height = height
+		block := unittest.BlockFixture(
+			// some blocks may not be present hence add a gap
+			unittest.Block.WithHeight(startHeight+uint64(i)),
+			unittest.Block.WithPayload(unittest.PayloadFixture(
+				unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(refBlockID))...)),
+			))
 		s.blockMap[block.Header.Height] = &block
 		s.finalizedBlock = block.ToHeader()
 
@@ -659,11 +658,10 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			cg.SignerIndices = indices
 			guarantees[j] = cg
 		}
-		block := unittest.BlockFixture()
-		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantees...)))
-		// set the height
-		height := startHeight + uint64(i)
-		block.Header.Height = height
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(startHeight+uint64(i)),
+			unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantees...))),
+		)
 		s.blockMap[block.Header.Height] = &block
 		blocks[i] = block
 		s.finalizedBlock = block.ToHeader()
