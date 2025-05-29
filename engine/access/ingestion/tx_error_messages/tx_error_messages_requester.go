@@ -2,11 +2,15 @@ package tx_error_messages
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/sethvargo/go-retry"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 // TransactionErrorMessagesRequesterConfig contains the retry settings for the tx error messages fetch.
@@ -62,6 +66,9 @@ func (r *TransactionErrorMessagesRequester) RequestTransactionErrorMessages(
 		attempt++
 
 		err := r.core.FetchTransactionResultErrorMessagesByResultID(ctx, blockID, resultID)
+		if errors.Is(err, storage.ErrNotFound) || status.Code(err) == codes.Canceled {
+			return err
+		}
 
 		return retry.RetryableError(err)
 	})
