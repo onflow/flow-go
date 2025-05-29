@@ -518,6 +518,19 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 func HeaderBodyWithParentFixture(parent *flow.Header) flow.HeaderBody {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
+	var lastViewTC *flow.TimeoutCertificate
+	if view != parent.View+1 {
+		newestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
+			qc.View = parent.View
+		})
+		lastViewTC = &flow.TimeoutCertificate{
+			View:          view - 1,
+			NewestQCViews: []uint64{newestQC.View},
+			NewestQC:      newestQC,
+			SignerIndices: SignerIndicesFixture(4),
+			SigData:       SignatureFixture(),
+		}
+	}
 	return flow.HeaderBody{
 		ChainID:            parent.ChainID,
 		ParentID:           parent.ID(),
@@ -528,7 +541,7 @@ func HeaderBodyWithParentFixture(parent *flow.Header) flow.HeaderBody {
 		ParentVoterIndices: SignerIndicesFixture(4),
 		ParentVoterSigData: QCSigDataFixture(),
 		ProposerID:         IdentifierFixture(),
-		LastViewTC:         Block.lastViewTCFixture(view, parent.View),
+		LastViewTC:         lastViewTC,
 	}
 }
 

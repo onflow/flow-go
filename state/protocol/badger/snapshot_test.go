@@ -352,7 +352,7 @@ func TestSealingSegment(t *testing.T) {
 
 			// build a block sealing block1
 			seals := []*flow.Seal{seal1}
-			block3View := block2.Header.View + 1 + uint64(rand.Intn(10))
+			block3View := block2.Header.View + 1
 			block3 := unittest.BlockFixture(
 				unittest.Block.WithParent(block2.ID(), block2.Header.View, block2.Header.Height),
 				unittest.Block.WithView(block3View),

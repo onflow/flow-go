@@ -1,8 +1,6 @@
 package unittest
 
 import (
-	"math/rand"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -25,8 +23,6 @@ func (f *blockFactory) WithParent(parentID flow.Identifier, parentView uint64, p
 		block.Header.ParentID = parentID
 		block.Header.ParentView = parentView
 		block.Header.Height = parentHeight + 1
-		block.Header.View = parentView + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
-		block.Header.LastViewTC = f.lastViewTCFixture(block.Header.View, block.Header.ParentView)
 	}
 }
 
@@ -58,21 +54,4 @@ func (f *blockFactory) WithLastViewTC(lastViewTC *flow.TimeoutCertificate) func(
 	return func(block *flow.Block) {
 		block.Header.LastViewTC = lastViewTC
 	}
-}
-
-func (f *blockFactory) lastViewTCFixture(view uint64, parentView uint64) *flow.TimeoutCertificate {
-	var lastViewTC *flow.TimeoutCertificate
-	if view != parentView+1 {
-		newestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
-			qc.View = parentView
-		})
-		lastViewTC = &flow.TimeoutCertificate{
-			View:          view - 1,
-			NewestQCViews: []uint64{newestQC.View},
-			NewestQC:      newestQC,
-			SignerIndices: SignerIndicesFixture(4),
-			SigData:       SignatureFixture(),
-		}
-	}
-	return lastViewTC
 }
