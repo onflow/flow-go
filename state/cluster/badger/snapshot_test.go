@@ -273,9 +273,10 @@ func (suite *SnapshotSuite) TestPending_Grandchildren() {
 	parents[suite.genesis.ID()] = struct{}{}
 
 	for _, blockID := range pending {
-		var header flow.Header
-		err := suite.db.View(operation.RetrieveHeader(blockID, &header))
+		var proposalHeader flow.ProposalHeader
+		err := suite.db.View(operation.RetrieveHeader(blockID, &proposalHeader))
 		suite.Require().Nil(err)
+		header := proposalHeader.Header
 
 		// we must have already seen the parent
 		_, seen := parents[header.ParentID]
