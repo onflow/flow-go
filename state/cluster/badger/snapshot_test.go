@@ -48,11 +48,11 @@ func (suite *SnapshotSuite) SetupTest() {
 
 	suite.genesis = model.Genesis()
 	suite.chainID = suite.genesis.Header.ChainID
-	suite.lockManager = storage.NewTestingLockManager()
 
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = badgerimpl.ToDB(unittest.BadgerDB(suite.T(), suite.dbdir))
 	lockManager := storage.NewTestingLockManager()
+	suite.lockManager = lockManager
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
