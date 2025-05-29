@@ -107,7 +107,7 @@ func reportABIEncodingComputation(
 	locationRange interpreter.LocationRange,
 	values *interpreter.ArrayValue,
 	evmTypeIDs evmSpecialTypeIDs,
-	reportComputation func(intensity uint),
+	reportComputation func(intensity uint64),
 ) {
 
 	values.Iterate(
@@ -121,10 +121,10 @@ func reportABIEncodingComputation(
 				// the second chunk contains the number of bytes the
 				// string occupies, and the third chunk contains the
 				// value of the string itself.
-				computation := uint(2 * abiEncodingByteSize)
+				computation := uint64(2 * abiEncodingByteSize)
 				stringLength := len(value.Str)
 				chunks := math.Ceil(float64(stringLength) / float64(abiEncodingByteSize))
-				computation += uint(chunks * abiEncodingByteSize)
+				computation += uint64(chunks * abiEncodingByteSize)
 				reportComputation(computation)
 
 			case interpreter.BoolValue,
@@ -155,7 +155,7 @@ func reportABIEncodingComputation(
 					reportComputation(abiEncodingByteSize)
 
 				case evmTypeIDs.BytesTypeID:
-					computation := uint(2 * abiEncodingByteSize)
+					computation := uint64(2 * abiEncodingByteSize)
 					valueMember := value.GetMember(context, locationRange, stdlib.EVMBytesTypeValueFieldName)
 					bytesArray, ok := valueMember.(*interpreter.ArrayValue)
 					if !ok {
@@ -166,7 +166,7 @@ func reportABIEncodingComputation(
 					}
 					bytesLength := bytesArray.Count()
 					chunks := math.Ceil(float64(bytesLength) / float64(abiEncodingByteSize))
-					computation += uint(chunks * abiEncodingByteSize)
+					computation += uint64(chunks * abiEncodingByteSize)
 					reportComputation(computation)
 
 				case evmTypeIDs.Bytes4TypeID:
@@ -188,7 +188,7 @@ func reportABIEncodingComputation(
 				// the second chunk contains the number of bytes the
 				// array occupies, and the third chunk contains the
 				// values of the array itself.
-				computation := uint(2 * abiEncodingByteSize)
+				computation := uint64(2 * abiEncodingByteSize)
 				reportComputation(computation)
 				reportABIEncodingComputation(
 					context,
@@ -238,8 +238,14 @@ func newInternalEVMTypeEncodeABIFunction(
 				locationRange,
 				valuesArray,
 				evmSpecialTypeIDs,
-				func(intensity uint) {
-					context.ReportComputation(environment.ComputationKindEVMEncodeABI, intensity)
+				func(intensity uint64) {
+					common.UseComputation(
+						context,
+						common.ComputationUsage{
+							Kind:      environment.ComputationKindEVMEncodeABI,
+							Intensity: intensity,
+						},
+					)
 				},
 			)
 
@@ -731,9 +737,12 @@ func newInternalEVMTypeDecodeABIFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			invocation.InvocationContext.ReportComputation(
-				environment.ComputationKindEVMDecodeABI,
-				uint(dataValue.Count()),
+			common.UseComputation(
+				context,
+				common.ComputationUsage{
+					Kind:      environment.ComputationKindEVMDecodeABI,
+					Intensity: uint64(dataValue.Count()),
+				},
 			)
 
 			data, err := interpreter.ByteArrayValueToByteSlice(context, dataValue, locationRange)
