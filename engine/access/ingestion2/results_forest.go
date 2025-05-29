@@ -109,11 +109,11 @@ func (f *ResultsForest) pipelineManagerLoop(ctx irrecoverable.SignalerContext, r
 			// Inspect all vertices in the tree forming from the latest persisted sealed result.
 			// Count all running pipelines, and start new ones up to the maxRunningCount.
 			// This will iterate over at most 2*maxRunningCount vertices.
-			f.visitAllAncestorsBFS(f.latestPersistedSealedResult.ResultID(), func(container *ExecutionResultContainer) bool {
+			f.visitAllDescendantsBFS(f.latestPersistedSealedResult.ResultID(), func(container *ExecutionResultContainer) bool {
 				state := container.pipeline.GetState()
 
 				switch state {
-				case pipeline.StateCanceled:
+				case pipeline.StateAbandoned:
 					// TODO: free the pipeline's resources (not necessarily here)
 					return true
 
@@ -143,10 +143,10 @@ func (f *ResultsForest) pipelineManagerLoop(ctx irrecoverable.SignalerContext, r
 	}
 }
 
-// visitAllAncestorsBFS visits all ancestors of the given result ID in a breadth-first manner, and
+// visitAllDescendantsBFS visits all ancestors of the given result ID in a breadth-first manner, and
 // calls the provided function on each ancestor.
 // If the function returns false, the traversal is stopped.
-func (f *ResultsForest) visitAllAncestorsBFS(resultID flow.Identifier, fn func(*ExecutionResultContainer) bool) {
+func (f *ResultsForest) visitAllDescendantsBFS(resultID flow.Identifier, fn func(*ExecutionResultContainer) bool) {
 	queue := []flow.Identifier{resultID}
 	for len(queue) > 0 {
 		currentID := queue[0]
@@ -336,7 +336,7 @@ func (f *ResultsForest) markContainerAsSealed(sealed *ExecutionResultContainer) 
 
 	f.iterateChildren(parentID, func(child *ExecutionResultContainer) bool {
 		if child.resultID != sealed.resultID {
-			child.pipeline.OnParentStateUpdated(pipeline.StateCanceled)
+			child.pipeline.OnParentStateUpdated(pipeline.StateAbandoned)
 			hasUpdates = true
 		}
 		return true
@@ -361,7 +361,7 @@ func (f *ResultsForest) OnBlockFinalized(blockID flow.Identifier, parentResultID
 	for _, parentID := range parentResultIDs {
 		f.iterateChildren(parentID, func(child *ExecutionResultContainer) bool {
 			if child.result.BlockID != blockID {
-				child.pipeline.OnParentStateUpdated(pipeline.StateCanceled)
+				child.pipeline.OnParentStateUpdated(pipeline.StateAbandoned)
 				hasUpdates = true
 			}
 			return true

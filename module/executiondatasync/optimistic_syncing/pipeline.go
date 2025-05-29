@@ -42,8 +42,7 @@ type PipelineImpl struct {
 }
 
 // NewPipeline creates a new processing pipeline.
-// Pipelines must only be created for ExecutionResults that descend from the latest persisted sealed result.
-// The pipeline is initialized in the Ready state.
+// The pipeline is initialized in the Pending state.
 //
 // Parameters:
 //   - logger: the logger to use for the pipeline
@@ -80,7 +79,7 @@ func NewPipeline(
 // This function handles the progression through the pipeline states, executing the appropriate
 // processing functions at each step.
 //
-// When the pipeline reaches a terminal state (StateComplete or StateCanceled), the function returns.
+// When the pipeline reaches a terminal state (StateComplete or StateAbandoned), the function returns.
 // The function will also return if the provided context is canceled.
 //
 // TODO: document expected error's once the Core logic is implemented
@@ -122,7 +121,7 @@ func (p *PipelineImpl) GetState() State {
 	return p.state
 }
 
-// SetSealed marks the data as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.
+// SetSealed marks the data as sealed, which enables transitioning from StateWaitingForCommit to StatePersisting.
 func (p *PipelineImpl) SetSealed() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -140,8 +139,8 @@ func (p *PipelineImpl) OnParentStateUpdated(parentState State) {
 	p.mu.Unlock()
 
 	// If our parent pipeline has aborted, we should abort too
-	if parentState == StateCanceled {
-		p.transitionTo(StateCanceled)
+	if parentState == StateAbandoned {
+		p.transitionTo(StateAbandoned)
 	} else {
 		p.stateNotifier.Notify()
 	}
@@ -163,7 +162,7 @@ func (p *PipelineImpl) cancel() {
 }
 
 // processCurrentState handles the current state and transitions to the next state if possible.
-// It returns false when a terminal state is reached (StateComplete or StateCanceled), true otherwise.
+// It returns false when a terminal state is reached (StateComplete or StateAbandoned), true otherwise.
 // Returns an error if any processing step fails.
 // TODO: document expected error's once the Core logic is implemented
 func (p *PipelineImpl) processCurrentState(ctx context.Context) (bool, error) {
@@ -176,11 +175,11 @@ func (p *PipelineImpl) processCurrentState(ctx context.Context) (bool, error) {
 		return p.processDownloading(ctx)
 	case StateIndexing:
 		return p.processIndexing(ctx)
-	case StateWaitingPersist:
+	case StateWaitingForCommit:
 		return p.processWaitingPersist(), nil
 	case StatePersisting:
 		return p.processPersisting(ctx)
-	case StateCanceled:
+	case StateAbandoned:
 		return false, p.processCancel(ctx)
 	case StateComplete:
 		return false, nil
@@ -240,7 +239,7 @@ func (p *PipelineImpl) processDownloading(ctx context.Context) (bool, error) {
 
 	// If we can't transition to indexing after successful download, cancel
 	if !p.canStartIndexing() {
-		p.transitionTo(StateCanceled)
+		p.transitionTo(StateAbandoned)
 		return false, nil
 	}
 
@@ -249,7 +248,7 @@ func (p *PipelineImpl) processDownloading(ctx context.Context) (bool, error) {
 }
 
 // processIndexing handles the Indexing state.
-// It executes the index function and transitions to StateWaitingPersist if possible.
+// It executes the index function and transitions to StateWaitingForCommit if possible.
 // Returns true to continue processing, false if a terminal state was reached.
 // Returns an error if the index step fails.
 // TODO: document expected error's once the Core logic is implemented
@@ -265,11 +264,11 @@ func (p *PipelineImpl) processIndexing(ctx context.Context) (bool, error) {
 
 	// If we can't transition to waiting for persist after successful indexing, cancel
 	if !p.canWaitForPersist() {
-		p.transitionTo(StateCanceled)
+		p.transitionTo(StateAbandoned)
 		return false, nil
 	}
 
-	p.transitionTo(StateWaitingPersist)
+	p.transitionTo(StateWaitingForCommit)
 	return true, nil
 }
 
@@ -306,12 +305,12 @@ func (p *PipelineImpl) processPersisting(ctx context.Context) (bool, error) {
 }
 
 // processCancel handles the cancellation of the pipeline.
-// It calls the core's Abort method to perform any necessary cleanup.
+// It calls the core's Abandon method to perform any necessary cleanup.
 // Returns an error if the abort step fails.
 // TODO: document expected error's once the Core logic is implemented
 func (p *PipelineImpl) processCancel(ctx context.Context) error {
 	p.cancel()
-	return p.core.Abort(ctx)
+	return p.core.Abandon(ctx)
 }
 
 // canStartDownloading checks if the pipeline can transition from Ready to Downloading.
@@ -319,7 +318,7 @@ func (p *PipelineImpl) processCancel(ctx context.Context) error {
 // Conditions for transition:
 //  1. The current state must be Ready
 //  2. The parent pipeline must be in an active state (StateDownloading, StateIndexing,
-//     StateWaitingPersist, StatePersisting, or StateComplete)
+//     StateWaitingForCommit, StatePersisting, or StateComplete)
 func (p *PipelineImpl) canStartDownloading() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -329,7 +328,7 @@ func (p *PipelineImpl) canStartDownloading() bool {
 	}
 
 	switch p.parentState {
-	case StateDownloading, StateIndexing, StateWaitingPersist, StatePersisting, StateComplete:
+	case StateDownloading, StateIndexing, StateWaitingForCommit, StatePersisting, StateComplete:
 		return true
 	default:
 		return false
@@ -345,7 +344,7 @@ func (p *PipelineImpl) canStartIndexing() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	return p.state == StateDownloading && p.parentState != StateCanceled
+	return p.state == StateDownloading && p.parentState != StateAbandoned
 }
 
 // canWaitForPersist checks if the pipeline can transition from Indexing to WaitingPersist.
@@ -357,7 +356,7 @@ func (p *PipelineImpl) canWaitForPersist() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	return p.state == StateIndexing && p.parentState != StateCanceled
+	return p.state == StateIndexing && p.parentState != StateAbandoned
 }
 
 // canStartPersisting checks if the pipeline can transition from WaitingPersist to Persisting.
@@ -370,5 +369,5 @@ func (p *PipelineImpl) canStartPersisting() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	return p.state == StateWaitingPersist && p.isSealed && p.parentState == StateComplete
+	return p.state == StateWaitingForCommit && p.isSealed && p.parentState == StateComplete
 }

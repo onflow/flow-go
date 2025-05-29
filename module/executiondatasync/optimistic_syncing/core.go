@@ -18,8 +18,9 @@ type Core interface {
 	// Persist stores the indexed data in permanent storage.
 	Persist(ctx context.Context) error
 
-	// Abort performs any necessary cleanup in case of failure.
-	Abort(ctx context.Context) error
+	// Abandon indicates that the protocol has abandoned this state. Hence processing will be aborted
+	// and any data dropped.
+	Abandon(ctx context.Context) error
 }
 
 var _ Core = (*CoreImpl)(nil)
@@ -42,6 +43,6 @@ func (c *CoreImpl) Persist(ctx context.Context) error {
 	return fmt.Errorf("not implemented")
 }
 
-func (c *CoreImpl) Abort(ctx context.Context) error {
+func (c *CoreImpl) Abandon(ctx context.Context) error {
 	return fmt.Errorf("not implemented")
 }

@@ -53,8 +53,8 @@ func TestPipelineStateTransitions(t *testing.T) {
 	})
 
 	// Wait for pipeline to reach WaitingPersist state
-	waitForStateUpdate(t, updateChan, StateWaitingPersist)
-	assert.Equal(t, StateWaitingPersist, pipeline.GetState(), "Pipeline should be in WaitingPersist state")
+	waitForStateUpdate(t, updateChan, StateWaitingForCommit)
+	assert.Equal(t, StateWaitingForCommit, pipeline.GetState(), "Pipeline should be in WaitingPersist state")
 	mockCore.AssertCalled(t, "Download", mock.Anything)
 	mockCore.AssertCalled(t, "Index", mock.Anything)
 	mockCore.AssertNotCalled(t, "Persist")
@@ -216,8 +216,8 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 	})
 
 	// Wait for pipeline to progress to WaitingPersist
-	waitForStateUpdate(t, updateChan, StateWaitingPersist)
-	assert.Equal(t, StateWaitingPersist, pipeline.GetState(), "Pipeline should progress to WaitingPersist state")
+	waitForStateUpdate(t, updateChan, StateWaitingForCommit)
+	assert.Equal(t, StateWaitingForCommit, pipeline.GetState(), "Pipeline should progress to WaitingPersist state")
 	mockCore.AssertCalled(t, "Download", mock.Anything)
 	mockCore.AssertCalled(t, "Index", mock.Anything)
 	mockCore.AssertNotCalled(t, "Persist")
@@ -354,7 +354,7 @@ func TestBroadcastStateUpdate(t *testing.T) {
 	})
 
 	// Wait for an update to be sent to children
-	update := waitForStateUpdate(t, updateChan, StateWaitingPersist)
+	update := waitForStateUpdate(t, updateChan, StateWaitingForCommit)
 
 	// Check that the update has the correct flag
 	assert.True(t, update.DescendsFromLastPersistedSealed, "Initial update should indicate descends=true")
@@ -379,7 +379,7 @@ func TestBroadcastStateUpdate(t *testing.T) {
 	}
 
 	// Verify the pipeline transitioned to canceled state
-	assert.Equal(t, StateCanceled, pipeline.GetState(), "Pipeline should be in canceled state")
+	assert.Equal(t, StateAbandoned, pipeline.GetState(), "Pipeline should be in canceled state")
 
 	// Drain the update channel to check if any updates indicate descended=false
 	// This approach uses a timeout to prevent hanging
@@ -389,7 +389,7 @@ func TestBroadcastStateUpdate(t *testing.T) {
 	for !canceledUpdateFound {
 		select {
 		case update := <-updateChan:
-			if !update.DescendsFromLastPersistedSealed && update.ParentState == StateCanceled {
+			if !update.DescendsFromLastPersistedSealed && update.ParentState == StateAbandoned {
 				canceledUpdateFound = true
 			}
 		case <-drainTimeout:

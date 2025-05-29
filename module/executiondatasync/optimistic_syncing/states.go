@@ -12,14 +12,15 @@ const (
 	StateDownloading
 	// StateIndexing represents the state where data is being indexed
 	StateIndexing
-	// StateWaitingPersist represents the state where all data is indexed, but conditions to persist are not met
-	StateWaitingPersist
-	// StatePersisting represents the state where the indexed data is being persisted to storage
+	// StateWaitingForCommit represents the state where all data is indexed, but we are still waiting
+	// for the state to be committed by the protocol
+	StateWaitingForCommit
+	// StatePersisting indicates that the process of persisting the indexed data to storage is currently ongoing
 	StatePersisting
 	// StateComplete represents the state where all data is persisted to storage
 	StateComplete
-	// StateCanceled represents the state where processing was aborted
-	StateCanceled
+	// StateAbandoned indicates that the protocol has abandoned this state and hence processing was aborted
+	StateAbandoned
 )
 
 // String representation of states for logging
@@ -33,13 +34,13 @@ func (s State) String() string {
 		return "downloading"
 	case StateIndexing:
 		return "indexing"
-	case StateWaitingPersist:
-		return "waiting_persist"
+	case StateWaitingForCommit:
+		return "waiting_commit"
 	case StatePersisting:
 		return "persisting"
 	case StateComplete:
 		return "complete"
-	case StateCanceled:
+	case StateAbandoned:
 		return "canceled"
 	default:
 		return ""
@@ -47,5 +48,5 @@ func (s State) String() string {
 }
 
 func (s State) IsTerminal() bool {
-	return s == StateComplete || s == StateCanceled
+	return s == StateComplete || s == StateAbandoned
 }
