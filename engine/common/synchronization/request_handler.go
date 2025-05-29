@@ -221,9 +221,13 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	}
 
 	// get all the blocks, one by one
-	blocks := make([]messages.UntrustedBlock, 0, req.ToHeight-req.FromHeight+1)
+	// We currently require all blocks in the block response to be sent with a valid proposer signature.
+	// Consensus Followers theoretically only need the last block to have a valid proposer signature,
+	// as the other blocks can be verified via included QCs. Though, for now we keep it simple and just
+	// uniformly use proposals, so all nodes (consensus participants and followers) maintain the same data.
+	blocks := make([]messages.UntrustedProposal, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
-		block, err := r.blocks.ByHeight(height)
+		proposal, err := r.blocks.ProposalByHeight(height)
 		if errors.Is(err, storage.ErrNotFound) {
 			logger.Error().Uint64("height", height).Msg("skipping unknown heights")
 			break
@@ -231,7 +235,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 		if err != nil {
 			return fmt.Errorf("could not get block for height (%d): %w", height, err)
 		}
-		blocks = append(blocks, messages.UntrustedBlockFromInternal(block))
+		blocks = append(blocks, *messages.NewUntrustedProposal(proposal))
 	}
 
 	// if there are no blocks to send, skip network message
@@ -293,9 +297,9 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 	}
 
 	// try to get all the blocks by ID
-	blocks := make([]messages.UntrustedBlock, 0, len(blockIDs))
+	blocks := make([]messages.UntrustedProposal, 0, len(blockIDs))
 	for blockID := range blockIDs {
-		block, err := r.blocks.ByID(blockID)
+		proposal, err := r.blocks.ProposalByID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
 			logger.Debug().Hex("block_id", blockID[:]).Msg("skipping unknown block")
 			continue
@@ -303,7 +307,7 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 		if err != nil {
 			return fmt.Errorf("could not get block by ID (%s): %w", blockID, err)
 		}
-		blocks = append(blocks, messages.UntrustedBlockFromInternal(block))
+		blocks = append(blocks, *messages.NewUntrustedProposal(proposal))
 	}
 
 	// if there are no blocks to send, skip network message

@@ -583,8 +583,3 @@ type EventIDs struct {
 	// CommitID is the ID of the EpochCommit event for the respective Epoch
 	CommitID Identifier
 }
-
-// ID returns hash of the event IDs.
-func (e *EventIDs) ID() Identifier {
-	return MakeID(e)
-}

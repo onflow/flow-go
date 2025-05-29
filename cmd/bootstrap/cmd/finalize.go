@@ -171,7 +171,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	// if no root commit is specified, bootstrap an empty execution state
 	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
 		commit := generateEmptyExecutionState(
-			block.Header,
+			block.ToHeader(),
 			intermediaryData.ExecutionStateConfig,
 			participants,
 		)

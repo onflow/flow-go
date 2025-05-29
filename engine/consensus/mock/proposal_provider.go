@@ -14,7 +14,7 @@ type ProposalProvider struct {
 }
 
 // ProvideProposal provides a mock function with given fields: proposal
-func (_m *ProposalProvider) ProvideProposal(proposal *messages.BlockProposal) {
+func (_m *ProposalProvider) ProvideProposal(proposal *messages.UntrustedProposal) {
 	_m.Called(proposal)
 }
 

@@ -29,7 +29,7 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results 
 		// assemble DB operations to store result (no execution)
 		storeResultOps := results.store(&receipt.ExecutionResult)
 		// assemble DB operations to index receipt (no execution)
-		storeReceiptOps := transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionReceiptMeta(receiptID, receipt.Meta())))
+		storeReceiptOps := transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionReceiptStub(receiptID, receipt.Stub())))
 		// assemble DB operations to index receipt by the block it computes (no execution)
 		indexReceiptOps := transaction.WithTx(operation.SkipDuplicates(
 			operation.IndexExecutionReceipts(receipt.ExecutionResult.BlockID, receiptID),
@@ -54,8 +54,8 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results 
 
 	retrieve := func(receiptID flow.Identifier) func(tx *badger.Txn) (*flow.ExecutionReceipt, error) {
 		return func(tx *badger.Txn) (*flow.ExecutionReceipt, error) {
-			var meta flow.ExecutionReceiptMeta
-			err := operation.RetrieveExecutionReceiptMeta(receiptID, &meta)(tx)
+			var meta flow.ExecutionReceiptStub
+			err := operation.RetrieveExecutionReceiptStub(receiptID, &meta)(tx)
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve receipt meta: %w", err)
 			}
@@ -63,7 +63,7 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results 
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve result: %w", err)
 			}
-			return flow.ExecutionReceiptFromMeta(meta, *result), nil
+			return flow.ExecutionReceiptFromStub(meta, *result), nil
 		}
 	}
 

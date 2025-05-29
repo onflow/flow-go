@@ -217,7 +217,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.HighestInFork, getProtocolStateEntry)
 	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
-		block, err := s.state.blocks.ByID(blockID)
+		block, err := s.state.blocks.ProposalByID(blockID)
 		if err != nil {
 			return fmt.Errorf("could not get block: %w", err)
 		}
@@ -264,7 +264,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 		// we need to include extra blocks in sealing segment
 		extraBlocksScraper := func(header *flow.Header) error {
 			blockID := header.ID()
-			block, err := s.state.blocks.ByID(blockID)
+			block, err := s.state.blocks.ProposalByID(blockID)
 			if err != nil {
 				return fmt.Errorf("could not get block: %w", err)
 			}

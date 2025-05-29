@@ -48,7 +48,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock_Success() {
 
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.snapshot.
 		On("Head").
@@ -77,7 +77,7 @@ func (suite *Suite) TestGetLatestSealedBlock_Success() {
 
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.snapshot.
 		On("Head").
@@ -106,7 +106,7 @@ func (suite *Suite) TestGetLatestBlock_StorageNotFoundFailure() {
 
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.snapshot.
 		On("Head").
@@ -128,7 +128,7 @@ func (suite *Suite) TestGetLatestBlock_CodesNotFoundFailure() {
 
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.snapshot.
 		On("Head").
@@ -150,7 +150,7 @@ func (suite *Suite) TestGetLatestBlock_InternalFailure() {
 
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.snapshot.
 		On("Head").
@@ -423,7 +423,7 @@ func (suite *Suite) TestGetLatestBlockHeader_InternalFailure() {
 func (suite *Suite) TestGetBlockHeaderByID_Success() {
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.headers.
 		On("ByBlockID", block.ID()).
@@ -448,7 +448,7 @@ func (suite *Suite) TestGetBlockHeaderByID_Success() {
 func (suite *Suite) TestGetBlockHeaderByID_StorageNotFoundFailure() {
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.headers.
 		On("ByBlockID", block.ID()).
@@ -468,7 +468,7 @@ func (suite *Suite) TestGetBlockHeaderByID_StorageNotFoundFailure() {
 func (suite *Suite) TestGetBlockHeaderByID_CodesNotFoundFailure() {
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.headers.
 		On("ByBlockID", block.ID()).
@@ -488,7 +488,7 @@ func (suite *Suite) TestGetBlockHeaderByID_CodesNotFoundFailure() {
 func (suite *Suite) TestGetBlockHeaderByID_InternalFailure() {
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.headers.
 		On("ByBlockID", block.ID()).

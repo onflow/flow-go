@@ -81,14 +81,16 @@ func ComputationResultForBlockFixture(
 
 	executionResult := flow.NewExecutionResult(
 		parentBlockExecutionResultID,
-		completeBlock.ID(),
+		completeBlock.BlockID(),
 		computationResult.AllChunks(),
 		convertedServiceEvents,
 		executionDataID)
 
 	computationResult.ExecutionReceipt = &flow.ExecutionReceipt{
-		ExecutionResult:   *executionResult,
-		Spocks:            make([]crypto.Signature, numberOfChunks),
+		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
+			ExecutionResult: *executionResult,
+			Spocks:          make([]crypto.Signature, numberOfChunks),
+		},
 		ExecutorSignature: crypto.Signature{},
 	}
 

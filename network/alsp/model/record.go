@@ -34,22 +34,22 @@ type ProtocolSpamRecord struct {
 // The function is called with the current record and should return the adjusted record.
 // Returned error indicates that the adjustment is not applied, and the record should not be updated.
 // In BFT setup, the returned error should be treated as a fatal error.
-type RecordAdjustFunc func(ProtocolSpamRecord) (ProtocolSpamRecord, error)
+type RecordAdjustFunc func(*ProtocolSpamRecord) (*ProtocolSpamRecord, error)
 
 // SpamRecordFactoryFunc is a function that creates a new protocol spam record with the given origin id and initial values.
 // Args:
 // - originId: the origin id of the spam record.
 // Returns:
 // - ProtocolSpamRecord, the created record.
-type SpamRecordFactoryFunc func(flow.Identifier) ProtocolSpamRecord
+type SpamRecordFactoryFunc func(flow.Identifier) *ProtocolSpamRecord
 
 // SpamRecordFactory returns the default factory function for creating a new protocol spam record.
 // Returns:
 // - SpamRecordFactoryFunc, the default factory function.
 // Note that the default factory function creates a new record with the initial values.
 func SpamRecordFactory() SpamRecordFactoryFunc {
-	return func(originId flow.Identifier) ProtocolSpamRecord {
-		return ProtocolSpamRecord{
+	return func(originId flow.Identifier) *ProtocolSpamRecord {
+		return &ProtocolSpamRecord{
 			OriginId:       originId,
 			Decay:          InitialDecaySpeed,
 			DisallowListed: false,

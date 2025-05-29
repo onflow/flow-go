@@ -230,7 +230,7 @@ func (tc *TransactionCollector) sizeLabel(size int) string {
 
 func (tc *TransactionCollector) TransactionReceived(txID flow.Identifier, when time.Time) {
 	// we don't need to check whether the transaction timing already exists, it will not be overwritten by the mempool
-	added := tc.transactionTimings.Add(&flow.TransactionTiming{TransactionID: txID, Received: when})
+	added := tc.transactionTimings.Add(txID, &flow.TransactionTiming{TransactionID: txID, Received: when})
 	if !added {
 		tc.log.Warn().
 			Str("transaction_id", txID.String()).
@@ -363,7 +363,7 @@ func (tc *TransactionCollector) TransactionSubmissionFailed() {
 }
 
 func (tc *TransactionCollector) TransactionExpired(txID flow.Identifier) {
-	_, exist := tc.transactionTimings.ByID(txID)
+	_, exist := tc.transactionTimings.Get(txID)
 
 	if !exist {
 		// likely previously removed, either executed or expired

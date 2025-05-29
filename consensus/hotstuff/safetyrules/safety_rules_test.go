@@ -543,7 +543,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 
 	otherTimeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), timeout.ID(), otherTimeout.ID())
+	require.True(s.T(), timeout.Equals(otherTimeout))
 	require.Equal(s.T(), timeout.TimeoutTick+1, otherTimeout.TimeoutTick)
 
 	// to create new TO we need to provide a TC

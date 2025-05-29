@@ -235,7 +235,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 			TargetIds:       receiptEvent.TargetIds,
 
 			// wrapping execution result in an execution receipt for sake of encoding and decoding.
-			FlowProtocolEvent: &flow.ExecutionReceipt{ExecutionResult: *corruptedResult},
+			FlowProtocolEvent: &flow.ExecutionReceipt{UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{ExecutionResult: *corruptedResult}},
 		})
 		if err != nil {
 			return fmt.Errorf("could not send rpc on channel: %w", err)
@@ -343,7 +343,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 	}
 	o.logger.Debug().
 		Hex("corrupted_id", logging.ID(chunkDataPackReplyEvent.CorruptOriginId)).
-		Hex("chunk_id", logging.ID(cdpRep.ChunkDataPack.ID())).
+		Hex("chunk_id", logging.ID(cdpRep.ChunkDataPack.ChunkID)).
 		Msg("chunk data pack response passed through")
 	return nil
 }

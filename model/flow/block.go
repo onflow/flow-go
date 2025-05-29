@@ -3,58 +3,105 @@ package flow
 import (
 	"fmt"
 	"time"
+
+	"github.com/vmihailenco/msgpack/v4"
 )
 
 func Genesis(chainID ChainID) *Block {
-
 	// create the raw content for the genesis block
 	payload := Payload{}
 
-	// create the header
-	header := Header{
-		ChainID:     chainID,
-		ParentID:    ZeroID,
-		Height:      0,
-		PayloadHash: payload.Hash(),
-		Timestamp:   GenesisTime,
-		View:        0,
+	// create the headerBody
+	headerBody := HeaderBody{
+		ChainID:   chainID,
+		ParentID:  ZeroID,
+		Height:    0,
+		Timestamp: GenesisTime,
+		View:      0,
 	}
 
 	// combine to block
-	genesis := Block{
-		Header:  &header,
-		Payload: &payload,
-	}
-
-	return &genesis
+	return NewBlock(headerBody, payload)
 }
 
-// Block (currently) includes the header, the payload hashes as well as the
-// payload contents.
+// Block (currently) includes the all block header metadata and the payload content.
 type Block struct {
-	Header  *Header
-	Payload *Payload
+	// Header is a container encapsulating most of the header fields - *excluding* the payload hash
+	// and the proposer signature. Generally, the type [HeaderBody] should not be used on its own.
+	// CAUTION regarding security:
+	//  * HeaderBody does not contain the hash of the block payload. Therefore, it is not a cryptographic digest
+	//    of the block and should not be confused with a "proper" header, which commits to the _entire_ content
+	//    of a block.
+	//  * With a byzantine HeaderBody alone, an honest node cannot prove who created that faulty data structure,
+	//    because HeaderBody does not include the proposer's signature.
+	Header  HeaderBody
+	Payload Payload
 }
 
+// TODO: SetPayload will be removed in the follow up PR.
 // SetPayload sets the payload and updates the payload hash.
 func (b *Block) SetPayload(payload Payload) {
-	b.Payload = &payload
-	b.Header.PayloadHash = b.Payload.Hash()
+	b.Payload = payload
 }
 
-// Valid will check whether the block is valid bottom-up.
-func (b Block) Valid() bool {
-	return b.Header.PayloadHash == b.Payload.Hash()
+// NewBlock creates a new block.
+//
+// Parameters:
+// - headerBody: the header fields to use for the block
+// - payload: the payload to associate with the block
+func NewBlock(
+	headerBody HeaderBody,
+	payload Payload,
+) *Block {
+	return &Block{
+		Header:  headerBody,
+		Payload: payload,
+	}
 }
 
-// ID returns the ID of the header.
+// ID returns a collision-resistant hash of the Block struct.
 func (b Block) ID() Identifier {
-	return b.Header.ID()
+	return b.ToHeader().ID()
 }
 
 // Checksum returns the checksum of the header.
+// Deprecated: This is needed temporarily until further malleability is done, because many components assume Block implements Entity
+// TODO(malleability): remove this function
 func (b Block) Checksum() Identifier {
-	return b.Header.Checksum()
+	return b.ToHeader().Checksum()
+}
+
+// ToHeader converts the block into a compact [flow.Header] representation,
+// where the payload is compressed to a hash reference.
+func (b Block) ToHeader() *Header {
+	return &Header{
+		HeaderBody:  b.Header,
+		PayloadHash: b.Payload.Hash(),
+	}
+}
+
+// TODO(malleability): remove MarshalMsgpack when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
+func (b Block) MarshalMsgpack() ([]byte, error) {
+	if b.Header.Timestamp.Location() != time.UTC {
+		b.Header.Timestamp = b.Header.Timestamp.UTC()
+	}
+
+	type Encodable Block
+	return msgpack.Marshal(Encodable(b))
+}
+
+// TODO(malleability): remove UnmarshalMsgpack when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
+func (b *Block) UnmarshalMsgpack(data []byte) error {
+	type Decodable Block
+	decodable := Decodable(*b)
+	err := msgpack.Unmarshal(data, &decodable)
+	*b = Block(decodable)
+
+	if b.Header.Timestamp.Location() != time.UTC {
+		b.Header.Timestamp = b.Header.Timestamp.UTC()
+	}
+
+	return err
 }
 
 // BlockStatus represents the status of a block.
@@ -74,12 +121,35 @@ func (s BlockStatus) String() string {
 	return [...]string{"BLOCK_UNKNOWN", "BLOCK_FINALIZED", "BLOCK_SEALED"}[s]
 }
 
-// CertifiedBlock holds a certified block, which is a block and a QC that is pointing to
-// the block. A QC is the aggregated form of votes from a supermajority of HotStuff and
-// therefore proves validity of the block. A certified block satisfies:
+// TODO(malleability): update fields for BlockProposal with non-pointers in the follow up PR.
+// BlockProposal is a signed proposal that includes the block payload, in addition to the required header and signature.
+type BlockProposal struct {
+	Block           *Block
+	ProposerSigData []byte
+}
+
+// ProposalHeader converts the proposal into a compact [ProposalHeader] representation,
+// where the payload is compressed to a hash reference.
+func (b *BlockProposal) ProposalHeader() *ProposalHeader {
+	return &ProposalHeader{Header: b.Block.ToHeader(), ProposerSigData: b.ProposerSigData}
+}
+
+// CertifiedBlock holds a certified block, which is a block and a Quorum Certificate [QC] pointing
+// to the block. A QC is the aggregated form of votes from a supermajority of HotStuff and therefore
+// proves validity of the block. A certified block satisfies:
 // Block.View == QC.View and Block.BlockID == QC.BlockID
+//
+// Conceptually, blocks must always be signed by the proposer. Once a block is certified, the
+// proposer's signature is included in the QC and does not need to be provided individually anymore.
+// Therefore, from the protocol perspective, the canonical data structures are either a block proposal
+// (including the proposer's signature) or a certified block (including a QC for the block).
+// Though, for simplicity, we just extend the BlockProposal structure to represent a certified block,
+// including proof that the proposer has signed their block twice. Thereby it is easy to convert
+// a [CertifiedBlock] into a [BlockProposal], which otherwise would not be possible because the QC only
+// contains an aggregated signature (including the proposer's signature), which cannot be separated
+// into individual signatures.
 type CertifiedBlock struct {
-	Block        *Block
+	Proposal     *BlockProposal
 	CertifyingQC *QuorumCertificate
 }
 
@@ -87,19 +157,20 @@ type CertifiedBlock struct {
 // requirements and errors otherwise:
 //
 //	Block.View == QC.View and Block.BlockID == QC.BlockID
-func NewCertifiedBlock(block *Block, qc *QuorumCertificate) (CertifiedBlock, error) {
-	if block.Header.View != qc.View {
-		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", block.Header.View, qc.View)
+func NewCertifiedBlock(proposal *BlockProposal, qc *QuorumCertificate) (CertifiedBlock, error) {
+	if proposal.Block.Header.View != qc.View {
+		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", proposal.Block.Header.View, qc.View)
 	}
-	if block.ID() != qc.BlockID {
-		return CertifiedBlock{}, fmt.Errorf("block's ID (%v) should equal the block referenced by the qc (%d)", block.ID(), qc.BlockID)
+	if proposal.Block.ID() != qc.BlockID {
+		return CertifiedBlock{}, fmt.Errorf("block's ID (%v) should equal the block referenced by the qc (%d)", proposal.Block.ID(), qc.BlockID)
 	}
-	return CertifiedBlock{Block: block, CertifyingQC: qc}, nil
+	return CertifiedBlock{Proposal: proposal, CertifyingQC: qc}, nil
 }
 
-// ID returns unique identifier for the block.
+// BlockID returns a unique identifier for the block (the ID signed to produce a block vote).
 // To avoid repeated computation, we use value from the QC.
-func (b *CertifiedBlock) ID() Identifier {
+// CAUTION: This is not a cryptographic commitment for the CertifiedBlock model.
+func (b *CertifiedBlock) BlockID() Identifier {
 	return b.CertifyingQC.BlockID
 }
 
@@ -110,30 +181,25 @@ func (b *CertifiedBlock) View() uint64 {
 
 // Height returns height of the block.
 func (b *CertifiedBlock) Height() uint64 {
-	return b.Block.Header.Height
+	return b.Proposal.Block.Header.Height
 }
 
-// BlockDigest holds lightweight block information which includes only block id, block height and block timestamp
+// BlockDigest holds lightweight block information which includes only the block's id, height and timestamp
 type BlockDigest struct {
-	id        Identifier
+	BlockID   Identifier
 	Height    uint64
 	Timestamp time.Time
 }
 
 // NewBlockDigest constructs a new block digest.
 func NewBlockDigest(
-	id Identifier,
+	blockID Identifier,
 	height uint64,
 	timestamp time.Time,
 ) *BlockDigest {
 	return &BlockDigest{
-		id:        id,
+		BlockID:   blockID,
 		Height:    height,
 		Timestamp: timestamp,
 	}
-}
-
-// ID returns the id of the BlockDigest.
-func (b *BlockDigest) ID() Identifier {
-	return b.id
 }

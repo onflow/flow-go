@@ -84,7 +84,7 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 
 				metrics := metrics.NewNoopCollector()
 				headersDB := badgerstorage.NewHeaders(metrics, badgerDB)
-				require.NoError(t, headersDB.Store(finalizedHeaders[10]))
+				require.NoError(t, headersDB.Store(unittest.ProposalFromHeader(finalizedHeaders[10])))
 
 				getLatestFinalized := func() (uint64, error) {
 					return rootHeight, nil
@@ -131,7 +131,7 @@ func TestExecutionStateWithStorehouse(t *testing.T) {
 
 		// block 11 is the block to be executed
 		block11 := finalized.BlockAtHeight(11)
-		header11 := block11.Header
+		header11 := block11.ToHeader()
 		sc10 := flow.StateCommitment(l.InitialState())
 
 		reg1 := unittest.MakeOwnerReg("fruit", "apple")
@@ -236,19 +236,21 @@ func makeComputationResult(
 
 	executionResult := flow.NewExecutionResult(
 		unittest.IdentifierFixture(),
-		completeBlock.ID(),
+		completeBlock.BlockID(),
 		computationResult.AllChunks(),
 		flow.ServiceEventList{},
 		executionDataID)
 
 	computationResult.BlockAttestationResult.BlockExecutionResult.ExecutionDataRoot = &flow.BlockExecutionDataRoot{
-		BlockID:               completeBlock.ID(),
+		BlockID:               completeBlock.BlockID(),
 		ChunkExecutionDataIDs: []cid.Cid{flow.IdToCid(unittest.IdentifierFixture())},
 	}
 
 	computationResult.ExecutionReceipt = &flow.ExecutionReceipt{
-		ExecutionResult:   *executionResult,
-		Spocks:            make([]crypto.Signature, numberOfChunks),
+		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
+			ExecutionResult: *executionResult,
+			Spocks:          make([]crypto.Signature, numberOfChunks),
+		},
 		ExecutorSignature: crypto.Signature{},
 	}
 	return computationResult

@@ -229,7 +229,7 @@ func (suite *NetworkTestSuite) TestUpdateNodeAddresses() {
 		Text: "TestUpdateNodeAddresses",
 	}
 
-	senderID := suite.ids[0].ID()
+	senderID := suite.ids[0].NodeID
 	senderMessageProcessor := mocknetwork.NewMessageProcessor(suite.T())
 	receiverMessageProcessor := mocknetwork.NewMessageProcessor(suite.T())
 	receiverMessageProcessor.

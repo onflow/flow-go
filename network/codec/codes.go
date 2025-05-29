@@ -70,7 +70,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 	s := what(v)
 	switch v.(type) {
 	// consensus
-	case *messages.BlockProposal:
+	case *messages.UntrustedProposal:
 		return CodeBlockProposal, s, nil
 	case *messages.BlockVote:
 		return CodeBlockVote, s, nil
@@ -78,7 +78,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 		return CodeTimeoutObject, s, nil
 
 	// cluster consensus
-	case *messages.ClusterBlockProposal:
+	case *messages.UntrustedClusterProposal:
 		return CodeClusterBlockProposal, s, nil
 	case *messages.ClusterBlockVote:
 		return CodeClusterBlockVote, s, nil
@@ -152,7 +152,7 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 	switch code {
 	// consensus
 	case CodeBlockProposal:
-		return &messages.BlockProposal{}, what(&messages.BlockProposal{}), nil
+		return &messages.UntrustedProposal{}, what(&messages.UntrustedProposal{}), nil
 	case CodeBlockVote:
 		return &messages.BlockVote{}, what(&messages.BlockVote{}), nil
 	case CodeTimeoutObject:
@@ -160,7 +160,7 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 
 	// cluster consensus
 	case CodeClusterBlockProposal:
-		return &messages.ClusterBlockProposal{}, what(&messages.ClusterBlockProposal{}), nil
+		return &messages.UntrustedClusterProposal{}, what(&messages.UntrustedClusterProposal{}), nil
 	case CodeClusterBlockVote:
 		return &messages.ClusterBlockVote{}, what(&messages.ClusterBlockVote{}), nil
 	case CodeClusterBlockResponse:
