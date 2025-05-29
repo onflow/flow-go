@@ -56,7 +56,6 @@ func TestFinalizer(t *testing.T) {
 
 			lctx := lockManager.NewContext()
 			defer lctx.Release()
-			require.NoError(t, lctx.AcquireLock(storage.LockInsertClusterBlock))
 			state, err = cluster.Bootstrap(db, lockManager, stateRoot)
 			require.NoError(t, err)
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
