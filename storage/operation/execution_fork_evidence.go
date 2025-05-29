@@ -5,6 +5,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// NOTE: the following functions have the same functionality as
+// the corresponding BadgerDB-specific implementations in
+// badger/operation/payload.go
+
 // HasExecutionForkEvidence checks if conflicting seals record exists in the database.
 // No errors are expected during normal operations.
 func HasExecutionForkEvidence(r storage.Reader) (bool, error) {
