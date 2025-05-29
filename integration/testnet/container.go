@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	state "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 )
@@ -403,9 +404,11 @@ func (c *Container) OpenState() (*state.State, error) {
 		store.DefaultProtocolKVStoreCacheSize, store.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := store.NewVersionBeacons(db)
 
+	lockManager := storage.NewTestingLockManager()
 	return state.OpenState(
 		metrics,
 		db,
+		lockManager,
 		headers,
 		seals,
 		results,
