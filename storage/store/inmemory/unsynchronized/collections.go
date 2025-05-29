@@ -130,8 +130,8 @@ func (c *Collections) Remove(collID flow.Identifier) error {
 	return nil
 }
 
-// Collections returns a copy of stored collections
-func (c *Collections) Collections() []flow.Collection {
+// Data returns a copy of stored collections
+func (c *Collections) Data() []flow.Collection {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 

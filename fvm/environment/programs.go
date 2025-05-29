@@ -4,12 +4,12 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/onflow/cadence/runtime"
 	"golang.org/x/xerrors"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/interpreter"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage"
@@ -51,7 +51,7 @@ type Programs struct {
 
 	// NOTE: non-address programs are not reusable across transactions, hence
 	// they are kept out of the derived data database.
-	nonAddressPrograms map[common.Location]*interpreter.Program
+	nonAddressPrograms map[common.Location]*runtime.Program
 
 	// dependencyStack tracks programs currently being loaded and their dependencies.
 	dependencyStack *dependencyStack
@@ -71,7 +71,7 @@ func NewPrograms(
 		metrics:            metrics,
 		txnState:           txnState,
 		accounts:           accounts,
-		nonAddressPrograms: make(map[common.Location]*interpreter.Program),
+		nonAddressPrograms: make(map[common.Location]*runtime.Program),
 		dependencyStack:    newDependencyStack(),
 	}
 }
@@ -79,7 +79,7 @@ func NewPrograms(
 // Reset resets the program cache.
 // this is called if the transactions happy path fails.
 func (programs *Programs) Reset() {
-	programs.nonAddressPrograms = make(map[common.Location]*interpreter.Program)
+	programs.nonAddressPrograms = make(map[common.Location]*runtime.Program)
 	programs.dependencyStack = newDependencyStack()
 }
 
@@ -89,10 +89,15 @@ func (programs *Programs) Reset() {
 // to load the dependencies of the program.
 func (programs *Programs) GetOrLoadProgram(
 	location common.Location,
-	load func() (*interpreter.Program, error),
-) (*interpreter.Program, error) {
+	load func() (*runtime.Program, error),
+) (*runtime.Program, error) {
 	defer programs.tracer.StartChildSpan(trace.FVMEnvGetOrLoadProgram).End()
-	err := programs.meter.MeterComputation(ComputationKindGetOrLoadProgram, 1)
+	err := programs.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindGetOrLoadProgram,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("get program failed: %w", err)
 	}
@@ -108,8 +113,8 @@ func (programs *Programs) GetOrLoadProgram(
 
 func (programs *Programs) getOrLoadAddressProgram(
 	location common.AddressLocation,
-	load func() (*interpreter.Program, error),
-) (*interpreter.Program, error) {
+	load func() (*runtime.Program, error),
+) (*runtime.Program, error) {
 	top, err := programs.dependencyStack.top()
 	if err != nil {
 		return nil, err
@@ -168,8 +173,8 @@ func (programs *Programs) getOrLoadAddressProgram(
 
 func (programs *Programs) getOrLoadNonAddressProgram(
 	location common.Location,
-	load func() (*interpreter.Program, error),
-) (*interpreter.Program, error) {
+	load func() (*runtime.Program, error),
+) (*runtime.Program, error) {
 	program, ok := programs.nonAddressPrograms[location]
 	if ok {
 		return program, nil
@@ -216,7 +221,7 @@ func (programs *Programs) cacheMiss() {
 
 // programLoader is used to load a program from a location.
 type programLoader struct {
-	loadFunc        func() (*interpreter.Program, error)
+	loadFunc        func() (*runtime.Program, error)
 	dependencyStack *dependencyStack
 	called          bool
 	location        common.AddressLocation
@@ -225,7 +230,7 @@ type programLoader struct {
 var _ derived.ValueComputer[common.AddressLocation, *derived.Program] = (*programLoader)(nil)
 
 func newProgramLoader(
-	loadFunc func() (*interpreter.Program, error),
+	loadFunc func() (*runtime.Program, error),
 	dependencyStack *dependencyStack,
 	location common.AddressLocation,
 ) *programLoader {
@@ -282,9 +287,9 @@ func (loader *programLoader) Called() bool {
 
 func (loader *programLoader) loadWithDependencyTracking(
 	address common.AddressLocation,
-	load func() (*interpreter.Program, error),
+	load func() (*runtime.Program, error),
 ) (
-	*interpreter.Program,
+	*runtime.Program,
 	derived.ProgramDependencies,
 	error,
 ) {
