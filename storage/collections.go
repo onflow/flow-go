@@ -56,4 +56,9 @@ type Collections interface {
 	//
 	// No errors are expected during normal operation.
 	StoreLightAndIndexByTransaction(collection *flow.LightCollection) error
+
+	// BatchStoreLightAndIndexByTransaction stores multiple light collections and indexes them by transaction ID
+	// within a single batch operation.
+	// No errors are expected during normal operation.
+	BatchStoreLightAndIndexByTransaction(collections []flow.LightCollection, batch ReaderBatchWriter) error
 }
