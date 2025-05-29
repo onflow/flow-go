@@ -35,7 +35,7 @@ type OneshotExecutionDataRequester struct {
 	log                zerolog.Logger
 	metrics            module.ExecutionDataRequesterMetrics
 	config             OneshotExecutionDataConfig
-	execDataDownloader execution_data.ExecutionDataGetter
+	execDataDownloader execution_data.Downloader
 	executionResult    *flow.ExecutionResult
 	blockHeader        *flow.Header
 }
