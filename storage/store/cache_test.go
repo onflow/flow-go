@@ -212,7 +212,7 @@ func BenchmarkCacheRemoveFunc(b *testing.B) {
 			removePrefixes := make(map[string]bool)
 			for blockIDIndex := len(blockIDs) - 1; len(removePrefixes) < prefixCount; blockIDIndex-- {
 				blockID := blockIDs[blockIDIndex]
-				removePrefixes[KeyFromBlockID(blockID)] = true
+				removePrefixes[fmt.Sprintf("%x", blockID)] = true
 			}
 
 			for range b.N {
