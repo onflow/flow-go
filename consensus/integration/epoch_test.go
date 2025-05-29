@@ -224,14 +224,14 @@ func withNextEpoch(
 	nextEpochSetup := flow.NewEpochSetup(
 		currEpochSetup.Counter+1,
 		currEpochSetup.FinalView+1,
-		0,
+		0, // DKG ignored in this test
 		0,
 		0,
 		currEpochSetup.FinalView+1+10_000,
 		nextEpochIdentities.ToSkeleton(),
 		unittest.ClusterAssignment(1, nextEpochIdentities.ToSkeleton()),
 		unittest.SeedFixture(flow.EpochSetupRandomSourceLength),
-		0,
+		0, // cruise control ignored in this test
 		0,
 	)
 	dkgIndexMap, dkgParticipantKeys := nextEpochParticipantData.DKGData()

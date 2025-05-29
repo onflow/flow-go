@@ -53,7 +53,7 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 		s.netIDs.ToSkeleton(),
 		nil,
 		unittest.EpochSetupRandomSourceFixture(),
-		0,
+		0, // cruise control ignored in this test
 		0,
 	)
 
@@ -62,14 +62,14 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 	nextEpochSetup := flow.NewEpochSetup(
 		currentCounter+1,
 		301,
-		0,
+		0, // DKG config ignored in this test
 		0,
 		0,
 		600,
 		s.netIDs.ToSkeleton(),
 		nil,
 		unittest.EpochSetupRandomSourceFixture(),
-		0,
+		0, // cruise control ignored in this test
 		0,
 	)
 
