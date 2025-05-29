@@ -8,6 +8,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	lockctx "github.com/jordanschalm/lockctx"
 	flow "github.com/onflow/flow-go/model/flow"
 	storage "github.com/onflow/flow-go/storage"
 	transaction "github.com/onflow/flow-go/storage/badger/transaction"
@@ -37,31 +38,31 @@ func (m *MockBlocks) EXPECT() *MockBlocksMockRecorder {
 }
 
 // BatchStore mocks base method.
-func (m *MockBlocks) BatchStore(arg0 storage.ReaderBatchWriter, arg1 *flow.Block) error {
+func (m *MockBlocks) BatchStore(arg0 lockctx.Proof, arg1 storage.ReaderBatchWriter, arg2 *flow.Block) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BatchStore", arg0, arg1)
+	ret := m.ctrl.Call(m, "BatchStore", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // BatchStore indicates an expected call of BatchStore.
-func (mr *MockBlocksMockRecorder) BatchStore(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockBlocksMockRecorder) BatchStore(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStore", reflect.TypeOf((*MockBlocks)(nil).BatchStore), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStore", reflect.TypeOf((*MockBlocks)(nil).BatchStore), arg0, arg1, arg2)
 }
 
 // BatchStoreWithStoringResults mocks base method.
-func (m *MockBlocks) BatchStoreWithStoringResults(arg0 storage.ReaderBatchWriter, arg1 *flow.Block, arg2 map[flow.Identifier]*flow.ExecutionResult) error {
+func (m *MockBlocks) BatchStoreWithStoringResults(arg0 lockctx.Proof, arg1 storage.ReaderBatchWriter, arg2 *flow.Block, arg3 map[flow.Identifier]*flow.ExecutionResult) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BatchStoreWithStoringResults", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "BatchStoreWithStoringResults", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // BatchStoreWithStoringResults indicates an expected call of BatchStoreWithStoringResults.
-func (mr *MockBlocksMockRecorder) BatchStoreWithStoringResults(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockBlocksMockRecorder) BatchStoreWithStoringResults(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStoreWithStoringResults", reflect.TypeOf((*MockBlocks)(nil).BatchStoreWithStoringResults), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStoreWithStoringResults", reflect.TypeOf((*MockBlocks)(nil).BatchStoreWithStoringResults), arg0, arg1, arg2, arg3)
 }
 
 // ByCollectionID mocks base method.
