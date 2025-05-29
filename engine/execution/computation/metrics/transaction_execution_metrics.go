@@ -42,7 +42,7 @@ type GetTransactionExecutionMetricsAfterResponse = map[uint64][]TransactionExecu
 type TransactionExecutionMetrics struct {
 	TransactionID          flow.Identifier
 	ExecutionTime          time.Duration
-	ExecutionEffortWeights map[cadenceCommon.ComputationKind]uint
+	ExecutionEffortWeights map[cadenceCommon.ComputationKind]uint64
 }
 
 type metrics struct {
