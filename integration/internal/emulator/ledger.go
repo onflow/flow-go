@@ -49,7 +49,7 @@ func configureLedger(
 
 		err = store.CommitBlock(
 			context.Background(),
-			*genesis,
+			genesis,
 			nil,
 			nil,
 			nil,

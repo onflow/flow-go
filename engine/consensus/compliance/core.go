@@ -114,7 +114,7 @@ func NewCore(
 func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedProposal]) error {
 	proposal := flow.Slashable[*flow.BlockProposal]{
 		OriginID: proposalMsg.OriginID,
-		Message:  proposalMsg.Message.ToInternal(),
+		Message:  proposalMsg.Message.DeclareTrusted(),
 	}
 	block := proposal.Message.Block
 	header := block.ToHeader()

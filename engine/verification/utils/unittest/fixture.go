@@ -225,7 +225,7 @@ func ExecutionResultFixture(t *testing.T,
 	log := zerolog.Nop()
 
 	// setups execution outputs:
-	var referenceBlock flow.Block
+	var referenceBlock *flow.Block
 	var spockSecrets [][]byte
 	var chunkDataPacks []*flow.ChunkDataPack
 	var result *flow.ExecutionResult
@@ -336,10 +336,10 @@ func ExecutionResultFixture(t *testing.T,
 			Guarantees:      guarantees,
 			ProtocolStateID: protocolStateID,
 		}
-		referenceBlock = *flow.NewBlock(refBlkHeader.HeaderBody, payload)
+		referenceBlock = flow.NewBlock(refBlkHeader.HeaderBody, payload)
 
 		executableBlock := &entity.ExecutableBlock{
-			Block:               &referenceBlock,
+			Block:               referenceBlock,
 			CompleteCollections: completeColls,
 			StartState:          &startStateCommitment,
 		}
@@ -360,7 +360,7 @@ func ExecutionResultFixture(t *testing.T,
 	})
 
 	return result, &ExecutionReceiptData{
-		ReferenceBlock: &referenceBlock,
+		ReferenceBlock: referenceBlock,
 		ChunkDataPacks: chunkDataPacks,
 		SpockSecrets:   spockSecrets,
 	}

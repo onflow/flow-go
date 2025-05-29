@@ -149,7 +149,7 @@ func NewFullConsensusState(
 //
 // No errors are expected during normal operations.
 func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.CertifiedBlock) error {
-	candidate := certified.Proposal.Block
+	candidate := &certified.Proposal.Block
 	certifyingQC := certified.CertifyingQC
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
 	defer span.End()
@@ -223,7 +223,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.Cer
 func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.BlockProposal) error {
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
 	defer span.End()
-	candidate := candidateProposal.Block
+	candidate := &candidateProposal.Block
 
 	// check if candidate block has been already processed
 	isDuplicate, err := m.checkBlockAlreadyProcessed(candidate.ID())

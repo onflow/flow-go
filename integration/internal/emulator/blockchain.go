@@ -721,7 +721,7 @@ func (b *Blockchain) commitBlock() (*flowgo.Block, error) {
 	// commit the pending block to storage
 	err = b.storage.CommitBlock(
 		context.Background(),
-		*block,
+		block,
 		collections,
 		transactions,
 		transactionResults,

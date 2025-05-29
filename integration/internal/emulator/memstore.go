@@ -197,7 +197,7 @@ func (b *Store) BlockByHeight(_ context.Context, height uint64) (*flowgo.Block, 
 
 func (b *Store) CommitBlock(
 	_ context.Context,
-	block flowgo.Block,
+	block *flowgo.Block,
 	collections []*flowgo.LightCollection,
 	transactions map[flowgo.Identifier]*flowgo.TransactionBody,
 	transactionResults map[flowgo.Identifier]*StorableTransactionResult,
@@ -215,7 +215,7 @@ func (b *Store) CommitBlock(
 		)
 	}
 
-	err := b.storeBlock(&block)
+	err := b.storeBlock(block)
 	if err != nil {
 		return err
 	}

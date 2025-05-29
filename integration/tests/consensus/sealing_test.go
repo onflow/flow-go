@@ -168,7 +168,7 @@ SearchLoop:
 		if !ok {
 			continue
 		}
-		block := proposal.Block.ToInternal()
+		block := proposal.DeclareTrusted().Block
 
 		// make sure we skip duplicates
 		proposalID := block.ID()
@@ -358,7 +358,7 @@ SealingLoop:
 		if !ok {
 			continue
 		}
-		block := proposal.Block.ToInternal()
+		block := proposal.DeclareTrusted().Block
 
 		// log the proposal details
 		proposalID := block.ID()

@@ -215,10 +215,10 @@ func RechainBlocks(blocks []*flow.Block) {
 	}
 }
 
-func FullBlockFixture() flow.Block {
+func FullBlockFixture() *flow.Block {
 	block := BlockFixture()
 	payload := PayloadFixture(WithAllTheFixins)
-	return *flow.NewBlock(block.Header, payload)
+	return flow.NewBlock(block.Header, payload)
 }
 
 func BlockFixtures(number int) []*flow.Block {
@@ -253,7 +253,7 @@ func ProposalFromHeader(header *flow.Header) *flow.ProposalHeader {
 
 func ProposalFromBlock(block *flow.Block) *flow.BlockProposal {
 	return &flow.BlockProposal{
-		Block:           block,
+		Block:           *block,
 		ProposerSigData: SignatureFixture(),
 	}
 }
@@ -401,7 +401,7 @@ func BlockWithParentAndProposerFixture(
 	t *testing.T,
 	parent *flow.Header,
 	proposer flow.Identifier,
-) flow.Block {
+) *flow.Block {
 	block := BlockWithParentFixture(parent)
 
 	indices, err := signature.EncodeSignersToIndices(
@@ -415,7 +415,7 @@ func BlockWithParentAndProposerFixture(
 		block.Header.LastViewTC.NewestQC.SignerIndices = indices
 	}
 
-	return *block
+	return block
 }
 
 func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Block {
@@ -1989,7 +1989,7 @@ func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
 
 func CertifiedByChild(block *flow.Block, child *flow.Block) *flow.CertifiedBlock {
 	return &flow.CertifiedBlock{
-		Proposal:     &flow.BlockProposal{Block: block, ProposerSigData: SignatureFixture()},
+		Proposal:     &flow.BlockProposal{Block: *block, ProposerSigData: SignatureFixture()},
 		CertifyingQC: child.Header.QuorumCertificate(),
 	}
 }
@@ -1997,7 +1997,7 @@ func CertifiedByChild(block *flow.Block, child *flow.Block) *flow.CertifiedBlock
 func NewCertifiedBlock(block *flow.Block) *flow.CertifiedBlock {
 	return &flow.CertifiedBlock{
 		Proposal: &flow.BlockProposal{
-			Block:           block,
+			Block:           *block,
 			ProposerSigData: SignatureFixture(),
 		},
 		CertifyingQC: CertifyBlock(block.ToHeader()),

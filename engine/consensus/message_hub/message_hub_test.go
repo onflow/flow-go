@@ -313,7 +313,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		wg.Add(1)
 		// prepare proposal fixture
 		block := unittest.BlockWithParentAndProposerFixture(s.T(), s.head, s.myID)
-		proposal := unittest.ProposalFromBlock(&block)
+		proposal := unittest.ProposalFromBlock(block)
 		s.payloads.On("ByBlockID", block.ID()).Return(&block.Payload, nil)
 
 		// unset chain and height to make sure they are correctly reconstructed

@@ -268,7 +268,7 @@ func certifiedBlocksFixture(count int, parent *flow.Header) []flow.CertifiedBloc
 		}
 		result = append(result, certBlock)
 	}
-	result = append(result, certifiedBlockFixture(blocks[len(blocks)-1].Block))
+	result = append(result, certifiedBlockFixture(&blocks[len(blocks)-1].Block))
 	return result
 }
 

@@ -384,7 +384,6 @@ func (s *SealValidationSuite) TestHighestSeal() {
 //
 // In addition, we also run a valid test case to confirm the proper construction of the test
 func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
-
 	blocks := unittest.ChainFixtureFrom(4, s.LatestSealedBlock.ToHeader())
 
 	// B3's payload contains results and receipts for B0, B1, B2
@@ -480,7 +479,8 @@ func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
 	receiptChain1 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[S]_1, Result[A]_1, Result[B]_1, ...]
 	receiptChain2 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[S]_2, Result[A]_2, Result[B]_2, ...]
 
-	for i := 1; i <= 3; i++ { // set payload for blocks A, B, C
+	for i := 1; i <= 3; i++ {
+		// set payload for blocks A, B, C
 		blocks[i] = flow.NewBlock(
 			blocks[i].Header,
 			flow.Payload{
