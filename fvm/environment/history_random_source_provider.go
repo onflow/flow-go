@@ -3,6 +3,8 @@ package environment
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/common"
+
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
@@ -95,7 +97,12 @@ func (b *historySourceProvider) RandomSourceHistory() ([]byte, error) {
 	defer b.tracer.StartExtensiveTracingChildSpan(
 		trace.FVMEnvRandomSourceHistoryProvider).End()
 
-	err := b.meter.MeterComputation(ComputationKindGetRandomSourceHistory, 1)
+	err := b.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindGetRandomSourceHistory,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("get block randomSource failed: %w", err)
 	}
