@@ -105,7 +105,7 @@ func TestBlocks(t *testing.T) {
 		t.Run("LatestBlock", func(t *testing.T) {
 			block, err := store.LatestBlock(context.Background())
 			assert.NoError(t, err)
-			assert.Equal(t, block1, block)
+			assert.Equal(t, *block1, block)
 		})
 	})
 
@@ -116,7 +116,7 @@ func TestBlocks(t *testing.T) {
 	t.Run("Latest block should update", func(t *testing.T) {
 		block, err := store.LatestBlock(context.Background())
 		assert.NoError(t, err)
-		assert.Equal(t, block2, block)
+		assert.Equal(t, *block2, block)
 	})
 }
 
