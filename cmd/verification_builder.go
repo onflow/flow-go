@@ -168,9 +168,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			var ok bool
 			var err error
 
-			if dbops.IsBadgerTransaction(node.DBOps) {
-				node.Logger.Info().Msgf("chunks queue index has been initialized with badger db transaction updates")
-			} else if dbops.IsBatchUpdate(node.DBOps) {
+			if dbops.IsBatchUpdate(node.DBOps) {
 				queue := store.NewChunkQueue(node.Metrics.Cache, node.ProtocolDB)
 				ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
 				if err != nil {
