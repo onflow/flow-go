@@ -399,7 +399,7 @@ func TestSealingSegment(t *testing.T) {
 			parent := block1
 			// build a large chain of intermediary blocks
 			for i := 0; i < 100; i++ {
-				next := *unittest.BlockWithParentProtocolState(parent)
+				next := unittest.BlockWithParentProtocolState(parent)
 				if i == 0 {
 					// Repetitions of the same receipt in one fork would be a protocol violation.
 					// Hence, we include the result only once in the direct child of B1.
@@ -411,8 +411,8 @@ func TestSealingSegment(t *testing.T) {
 						),
 					)
 				}
-				buildFinalizedBlock(t, state, &next)
-				parent = &next
+				buildFinalizedBlock(t, state, next)
+				parent = next
 			}
 
 			// build the block sealing block 1

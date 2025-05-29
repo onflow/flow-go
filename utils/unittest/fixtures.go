@@ -215,7 +215,7 @@ func RechainBlocks(blocks []*flow.Block) {
 	}
 }
 
-func FullBlockFixture() flow.Block {
+func FullBlockFixture() *flow.Block {
 	block := BlockFixture()
 	payload := PayloadFixture(WithAllTheFixins)
 	return flow.NewBlock(block.Header, payload)
@@ -373,23 +373,20 @@ func BlockWithParentFixture(parent *flow.Header) *flow.Block {
 // BlockWithParentAndPayload creates a new block that is valid
 // with respect to the given parent block and with given payload.
 func BlockWithParentAndPayload(parent *flow.Header, payload flow.Payload) *flow.Block {
-	block := flow.NewBlock(HeaderBodyWithParentFixture(parent), payload)
-	return &block
+	return flow.NewBlock(HeaderBodyWithParentFixture(parent), payload)
 }
 
 func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
 	payload := PayloadFixture(WithProtocolStateID(parent.Payload.ProtocolStateID))
 	headerBody := HeaderBodyWithParentFixture(parent.ToHeader())
-	block := flow.NewBlock(headerBody, payload)
-	return &block
+	return flow.NewBlock(headerBody, payload)
 }
 
 func BlockWithGuaranteesFixture(guarantees []*flow.CollectionGuarantee) *flow.Block {
 	payload := PayloadFixture(WithGuarantees(guarantees...))
 	headerBody := HeaderBodyFixture()
 
-	block := flow.NewBlock(headerBody, payload)
-	return &block
+	return flow.NewBlock(headerBody, payload)
 }
 
 func WithoutGuarantee(payload *flow.Payload) {
@@ -404,7 +401,7 @@ func BlockWithParentAndProposerFixture(
 	t *testing.T,
 	parent *flow.Header,
 	proposer flow.Identifier,
-) flow.Block {
+) *flow.Block {
 	block := BlockWithParentFixture(parent)
 
 	indices, err := signature.EncodeSignersToIndices(
@@ -418,7 +415,7 @@ func BlockWithParentAndProposerFixture(
 		block.Header.LastViewTC.NewestQC.SignerIndices = indices
 	}
 
-	return *block
+	return block
 }
 
 func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Block {
@@ -1583,7 +1580,7 @@ func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.HeaderBody
 		Result:        &result,
 		ChunkDataPack: chunkDataPack,
 		EndState:      endState,
-	}, &block
+	}, block
 }
 
 // ChunkDataResponseMsgFixture creates a chunk data response message with a single-transaction collection, and random chunk ID.
@@ -2307,7 +2304,7 @@ func BootstrapFixtureWithSetupAndCommit(
 	root := flow.NewBlock(header, flow.Payload{ProtocolStateID: rootProtocolState.ID()})
 	stateCommit := GenesisStateCommitmentByChainID(header.ChainID)
 
-	result := BootstrapExecutionResultFixture(&root, stateCommit)
+	result := BootstrapExecutionResultFixture(root, stateCommit)
 	result.ServiceEvents = []flow.ServiceEvent{
 		setup.ServiceEvent(),
 		commit.ServiceEvent(),
@@ -2315,7 +2312,7 @@ func BootstrapFixtureWithSetupAndCommit(
 
 	seal := Seal.Fixture(Seal.WithResult(result))
 
-	return &root, result, seal
+	return root, result, seal
 }
 
 // RootSnapshotFixture returns a snapshot representing a root chain state, for

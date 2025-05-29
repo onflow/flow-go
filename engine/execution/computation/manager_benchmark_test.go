@@ -215,7 +215,7 @@ func benchmarkComputeBlock(
 	}
 
 	block := flow.NewBlock(flow.HeaderBody{}, flow.Payload{})
-	parentBlock := &block
+	parentBlock := block
 
 	b.StopTimer()
 	b.ResetTimer()
@@ -290,7 +290,7 @@ func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colN
 	)
 
 	return &entity.ExecutableBlock{
-		Block:               &block,
+		Block:               block,
 		CompleteCollections: completeCollections,
 		StartState:          unittest.StateCommitmentPointerFixture(),
 	}

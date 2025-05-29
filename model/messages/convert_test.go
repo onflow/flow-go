@@ -13,7 +13,7 @@ import (
 
 func TestBlockProposal(t *testing.T) {
 	block := unittest.FullBlockFixture()
-	proposal := unittest.ProposalFromBlock(&block)
+	proposal := unittest.ProposalFromBlock(block)
 	proposalMsg := messages.NewUntrustedProposal(proposal)
 	converted := proposalMsg.DeclareTrusted()
 	assert.Equal(t, proposal, converted)

@@ -110,10 +110,9 @@ func TestBlock_Status(t *testing.T) {
 // TestBlockMalleability checks that flow.Block is not malleable: any change in its data
 // should result in a different ID.
 func TestBlockMalleability(t *testing.T) {
-	block := unittest.FullBlockFixture()
 	unittest.RequireEntityNonMalleable(
 		t,
-		&block,
+		unittest.FullBlockFixture(),
 		unittest.WithFieldGenerator("Header.Timestamp", func() time.Time { return time.Now().UTC() }),
 		unittest.WithFieldGenerator("Payload.Results", func() flow.ExecutionResultList {
 			return flow.ExecutionResultList{unittest.ExecutionResultFixture()}

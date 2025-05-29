@@ -92,8 +92,7 @@ func (b *pendingBlock) Block() *flowgo.Block {
 			CollectionID: collection.ID(),
 		}
 	}
-
-	block := flowgo.NewBlock(
+	return flowgo.NewBlock(
 		flowgo.HeaderBody{
 			Height:    b.height,
 			View:      b.view,
@@ -104,7 +103,6 @@ func (b *pendingBlock) Block() *flowgo.Block {
 			Guarantees: guarantees,
 		},
 	)
-	return &block
 }
 
 func (b *pendingBlock) Collections() []*flowgo.LightCollection {

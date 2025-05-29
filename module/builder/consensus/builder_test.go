@@ -837,25 +837,23 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 
 	// set payload for blocks A, B, C
 	for i := 1; i <= 3; i++ {
-		b := flow.NewBlock(
+		blocks[i] = flow.NewBlock(
 			blocks[i].Header,
 			flow.Payload{
 				Results:  []*flow.ExecutionResult{&receiptChain1[i-1].ExecutionResult, &receiptChain2[i-1].ExecutionResult},
 				Receipts: []*flow.ExecutionReceiptStub{receiptChain1[i-1].Stub(), receiptChain2[i-1].Stub()},
 			},
 		)
-		blocks[i] = &b
 	}
 	sealedResult := receiptChain1[0].ExecutionResult
 	sealF := unittest.Seal.Fixture(unittest.Seal.WithResult(&sealedResult))
 	// set payload for block D
-	b := flow.NewBlock(
+	blocks[4] = flow.NewBlock(
 		blocks[4].Header,
 		flow.Payload{
 			Seals: []*flow.Seal{sealF},
 		},
 	)
-	blocks[4] = &b
 	for i := 0; i <= 4; i++ {
 		// we need to run this several times, as in each iteration as we have _multiple_ execution chains.
 		// In each iteration, we only manage to reconnect one additional height

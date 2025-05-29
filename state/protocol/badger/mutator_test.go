@@ -3169,25 +3169,25 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		}
 
 		// now the valid block has a guarantee in the payload with valid signer indices.
-		block := *unittest.BlockWithParentAndPayload(
+		block := unittest.BlockWithParentAndPayload(
 			head,
 			payload,
 		)
 
 		// check Extend should accept this valid block
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block))
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 		require.NoError(t, err)
 
 		// now the guarantee has invalid signer indices: the checksum should have 4 bytes, but it only has 1
 		payload.Guarantees[0].SignerIndices = []byte{byte(1)}
 
 		// create new block that has invalid collection guarantee
-		block = *unittest.BlockWithParentAndPayload(
+		block = unittest.BlockWithParentAndPayload(
 			head,
 			payload,
 		)
 
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block))
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
 		require.ErrorIs(t, err, signature.ErrInvalidChecksum)
 		require.True(t, st.IsInvalidExtensionError(err), err)
@@ -3201,7 +3201,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		}
 		payload.Guarantees[0].SignerIndices = checksumMismatch
 		block = flow.NewBlock(block.Header, payload)
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block))
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
 		require.ErrorIs(t, err, signature.ErrInvalidChecksum)
 		require.True(t, st.IsInvalidExtensionError(err), err)
@@ -3214,7 +3214,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 
 		payload.Guarantees[0].SignerIndices = wrongTailing
 		block = flow.NewBlock(block.Header, payload)
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block))
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 		require.Error(t, err)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
 		require.ErrorIs(t, err, signature.ErrIllegallyPaddedBitVector)
@@ -3224,7 +3224,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		wrongbitVectorLength := validSignerIndices[0 : len(validSignerIndices)-1]
 		payload.Guarantees[0].SignerIndices = wrongbitVectorLength
 		block = flow.NewBlock(block.Header, payload)
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block))
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
 		require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength)
 		require.True(t, st.IsInvalidExtensionError(err), err)
@@ -3235,7 +3235,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		// test the ReferenceBlockID is not found
 		payload.Guarantees[0].ReferenceBlockID = flow.ZeroID
 		block = flow.NewBlock(block.Header, payload)
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block))
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
@@ -3250,7 +3250,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		// test the guarantee has wrong chain ID, and should return ErrClusterNotFound
 		payload.Guarantees[0].ChainID = flow.ChainID("some_bad_chain_ID")
 		block = flow.NewBlock(block.Header, payload)
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(&block))
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 		require.Error(t, err)
 		require.ErrorIs(t, err, realprotocol.ErrClusterNotFound)
 		require.True(t, st.IsInvalidExtensionError(err), err)

@@ -151,7 +151,7 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 	// mock storage interfaces
 
 	mockBlocksStorage := new(storageMock.Blocks)
-	mockBlocksStorage.On("ByID", testBlockID).Return(&testBlock, nil)
+	mockBlocksStorage.On("ByID", testBlockID).Return(testBlock, nil)
 
 	mockCommitsStorage := new(storageMock.Commits)
 	mockCommitsStorage.On("ByBlockID", testBlockID).Return(testStateCommit, nil)
@@ -219,7 +219,7 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 	}
 
 	expectedBlockData := &BlockData{
-		Block:                &testBlock,
+		Block:                testBlock,
 		Collections:          expectedCompleteCollections,
 		TxResults:            []*flow.TransactionResult{&testTransactionResult},
 		Events:               expectedTestEvents,
@@ -239,7 +239,7 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 func createTestBadgerRetryableUploaderWrapper(asyncUploader *AsyncUploader) *BadgerRetryableUploaderWrapper {
 	mockBlocksStorage := new(storageMock.Blocks)
 	block := flow.NewBlock(flow.HeaderBody{}, flow.Payload{})
-	mockBlocksStorage.On("ByID", mock.Anything).Return(&block, nil)
+	mockBlocksStorage.On("ByID", mock.Anything).Return(block, nil)
 
 	mockCommitsStorage := new(storageMock.Commits)
 	mockCommitsStorage.On("ByBlockID", mock.Anything).Return(nil, nil)

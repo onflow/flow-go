@@ -308,8 +308,7 @@ func (s *ReceiptValidationSuite) TestReceiptForBlockWith0Collections() {
 	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
 
 	valSubgrph := s.ValidSubgraphFixture()
-	block := flow.NewBlock(valSubgrph.Block.Header, unittest.PayloadFixture())
-	valSubgrph.Block = &block
+	valSubgrph.Block = flow.NewBlock(valSubgrph.Block.Header, unittest.PayloadFixture())
 	s.Assert().Equal(0, len(valSubgrph.Block.Payload.Guarantees)) // sanity check that no collections in block
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 

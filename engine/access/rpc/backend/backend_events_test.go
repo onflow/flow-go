@@ -108,7 +108,7 @@ func (s *BackendEventsSuite) SetupTest() {
 			s.sealedHead = header
 		}
 
-		s.blocks[i] = &block
+		s.blocks[i] = block
 		s.blockIDs[i] = block.ID()
 
 		s.T().Logf("block %d: %s", header.Height, block.ID())

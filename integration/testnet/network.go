@@ -1267,7 +1267,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	}
 
 	// generate execution result and block seal
-	result := run.GenerateRootResult(&root, commit, epochSetup, epochCommit)
+	result := run.GenerateRootResult(root, commit, epochSetup, epochCommit)
 	seal, err := run.GenerateRootSeal(result)
 	if err != nil {
 		return nil, fmt.Errorf("generating root seal failed: %w", err)
@@ -1278,11 +1278,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	if err != nil {
 		return nil, err
 	}
-	votes, err := run.GenerateRootBlockVotes(&root, signerData)
+	votes, err := run.GenerateRootBlockVotes(root, signerData)
 	if err != nil {
 		return nil, err
 	}
-	qc, invalidVotesErr, err := run.GenerateRootQC(&root, votes, signerData, signerData.Identities())
+	qc, invalidVotesErr, err := run.GenerateRootQC(root, votes, signerData, signerData.Identities())
 	if err != nil {
 		return nil, err
 	}
@@ -1292,7 +1292,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	}
 
 	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(
-		&root,
+		root,
 		result,
 		seal,
 		qc,
@@ -1313,7 +1313,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	}
 
 	return &BootstrapData{
-		Root:              &root,
+		Root:              root,
 		Result:            result,
 		Seal:              seal,
 		StakedConfs:       stakedConfs,
