@@ -38,15 +38,15 @@ import (
 //
 // Implementation is concurrency safe.
 type ExecForkSuppressor struct {
-	mutex                      sync.RWMutex
-	seals                      mempool.IncorporatedResultSeals
-	sealsForBlock              map[flow.Identifier]sealSet             // map BlockID -> set of IncorporatedResultSeal
-	byHeight                   map[uint64]map[flow.Identifier]struct{} // map height -> set of executed block IDs at height
-	lowestHeight               uint64
-	execForkDetected           atomic.Bool
-	onExecFork                 ExecForkActor
-	executionForkEvidenceStore storage.ExecutionForkEvidence
-	log                        zerolog.Logger
+	mutex                 sync.RWMutex
+	seals                 mempool.IncorporatedResultSeals
+	sealsForBlock         map[flow.Identifier]sealSet             // map BlockID -> set of IncorporatedResultSeal
+	byHeight              map[uint64]map[flow.Identifier]struct{} // map height -> set of executed block IDs at height
+	lowestHeight          uint64
+	execForkDetected      atomic.Bool
+	onExecFork            ExecForkActor
+	execForkEvidenceStore storage.ExecutionForkEvidence
+	log                   zerolog.Logger
 }
 
 var _ mempool.IncorporatedResultSeals = (*ExecForkSuppressor)(nil)
@@ -76,14 +76,14 @@ func NewExecStateForkSuppressor(
 	}
 
 	wrapper := ExecForkSuppressor{
-		mutex:                      sync.RWMutex{},
-		seals:                      seals,
-		sealsForBlock:              make(map[flow.Identifier]sealSet),
-		byHeight:                   make(map[uint64]map[flow.Identifier]struct{}),
-		execForkDetected:           *atomic.NewBool(execForkDetectedFlag),
-		onExecFork:                 onExecFork,
-		executionForkEvidenceStore: executionForkEvidenceStore,
-		log:                        log.With().Str("mempool", "ExecForkSuppressor").Logger(),
+		mutex:                 sync.RWMutex{},
+		seals:                 seals,
+		sealsForBlock:         make(map[flow.Identifier]sealSet),
+		byHeight:              make(map[uint64]map[flow.Identifier]struct{}),
+		execForkDetected:      *atomic.NewBool(execForkDetectedFlag),
+		onExecFork:            onExecFork,
+		execForkEvidenceStore: executionForkEvidenceStore,
+		log:                   log.With().Str("mempool", "ExecForkSuppressor").Logger(),
 	}
 
 	return &wrapper, nil
@@ -366,7 +366,7 @@ func (s *ExecForkSuppressor) filterConflictingSeals(sealsByBlockID map[flow.Iden
 				s.execForkDetected.Store(true)
 				s.Clear()
 				conflictingSeals = append(sealsList{candidateSeal}, conflictingSeals...)
-				err := s.executionForkEvidenceStore.StoreIfNotExists(conflictingSeals)
+				err := s.execForkEvidenceStore.StoreIfNotExists(conflictingSeals)
 				if err != nil {
 					panic("failed to store execution fork evidence")
 				}
