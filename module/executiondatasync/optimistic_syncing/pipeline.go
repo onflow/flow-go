@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// StateUpdatePublisher is a function that publishes state updates
+// StateUpdatePublisher is a function that publishes state updates that have been successfully processed
 type StateUpdatePublisher func(resultID flow.Identifier, newState State)
 
 // Pipeline represents a generic processing pipeline with state transitions.

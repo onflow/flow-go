@@ -1,6 +1,6 @@
 package pipeline
 
-// State represents the state of the processing pipeline
+// State represents the state of the processing [Pipeline]
 type State int
 
 const (

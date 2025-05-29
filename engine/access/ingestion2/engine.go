@@ -44,6 +44,8 @@ type Engine struct {
 	latestPersistedSealedResult flow.Identifier
 }
 
+var _ hotstuff.FinalizationConsumer = (*Engine)(nil)
+
 func New(log zerolog.Logger) *Engine {
 	resultsForest := NewResultsForest(log)
 
@@ -109,8 +111,22 @@ func (e *Engine) OnFinalizedBlock(*model.Block) {
 
 // OnBlockIncorporated is called by the follower engine after a block has been certified and the state has been updated.
 // Receives block incorporated events from the finalization distributor.
-func (e *Engine) OnBlockIncorporated(*model.Block) {
+func (e *Engine) OnBlockIncorporated(hotstuffBlock *model.Block) {
+	// Per specification of the `hotstuff.FinalizationConsumer` consumers of the `OnBlockIncorporated` notification must
+	// be non-blocking. This code is run on the hotpath of consensus and should induce as little overhead as possible.
+	//
+	// The input is coming from the node-internal consensus follower, which is a trusted component. Hence, we don't
+	// need to verify the inputs and queue them directly for processing by one of the engine's workers.
 
+	// ToDO: queue incoming incorporated hotstuffBlock for processing in a dedicated pipeline
+	// The thread picking up the hotstuffBlock would then convert it to `flow.block` and process it further
+	//
+	//  block, err := e.blocks.ByID(hotstuffBlock.BlockID)
+	//  if err != nil {
+	//	  return irrecoverable.NewExceptionf("received incorporated block %s from consensus follower, but failed to retrieve full block: %w", err)
+	//   }
+	//   err = e.processCertifiedBlock(block)
+	//      ...
 }
 
 // processCertifiedBlock adds results from the certified block to the results forest.

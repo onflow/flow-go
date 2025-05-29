@@ -55,7 +55,7 @@ func (it *VertexIterator) HasNext() bool {
 	return it.next != nil
 }
 
-// Reset resets the iterator to the beginning of the VertexList.
+// Reset wipes the iterator's internal state so it starts again from the beginning.
 func (it *VertexIterator) Reset() {
 	it.idx = 0
 	it.preLoad()
