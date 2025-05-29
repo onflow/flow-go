@@ -214,8 +214,7 @@ func benchmarkComputeBlock(
 		derivedChainData: derivedChainData,
 	}
 
-	block := flow.NewBlock(flow.HeaderBody{}, flow.Payload{})
-	parentBlock := block
+	parentBlock := flow.NewBlock(flow.HeaderBody{}, flow.Payload{})
 
 	b.StopTimer()
 	b.ResetTimer()

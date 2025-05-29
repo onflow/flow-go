@@ -29,6 +29,7 @@ func constructRootBlock(rootHeader *flow.Header, protocolStateID flow.Identifier
 		Results:         nil,
 		ProtocolStateID: protocolStateID,
 	}
+
 	return flow.NewBlock(rootHeader.HeaderBody, payload)
 }
 
