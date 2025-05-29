@@ -1,10 +1,6 @@
 package flow
 
-import (
-	"github.com/fxamacker/cbor/v2"
-
-	"github.com/onflow/flow-go/model/fingerprint"
-)
+import "github.com/onflow/flow-go/model/fingerprint"
 
 // Collection is set of transactions.
 type Collection struct {
@@ -65,38 +61,14 @@ func (c Collection) Fingerprint() []byte {
 //structwrite:immutable - mutations allowed only within the constructor
 type LightCollection struct {
 	Transactions []Identifier
-	cachedID     idCache
 }
 
 func NewLightCollection(txIDs []Identifier) LightCollection {
-	lc := LightCollection{
-		Transactions: txIDs,
-	}
-	lc.cachedID = newIDCache(lc.UncachedID)
-	return lc
+	return LightCollection{Transactions: txIDs}
 }
 
-// UncachedID computes and returns the canonical ID of the LightCollection, bypassing the ID cache.
-func (lc LightCollection) UncachedID() Identifier {
-	return MakeID(lc)
-}
-
-// ID computes and returns the canonical ID of the LightCollection,
-// or returns a cached version if the ID has ever been computed before.
 func (lc LightCollection) ID() Identifier {
-	return lc.cachedID.getID()
-}
-
-// UnmarshalCBOR populates the ID cache field (otherwise uses default CBOR unmarshaling behaviour).
-func (lc *LightCollection) UnmarshalCBOR(bytes []byte) error {
-	type alias LightCollection
-	lca := (*alias)(lc)
-	err := cbor.Unmarshal(bytes, &lca)
-	if err != nil {
-		return err
-	}
-	lc.cachedID = newIDCache(lc.UncachedID) //nolint:structwrite
-	return nil
+	return MakeID(lc)
 }
 
 func (lc LightCollection) Checksum() Identifier {
