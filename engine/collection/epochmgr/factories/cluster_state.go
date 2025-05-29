@@ -62,7 +62,7 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot) (
 		}
 	}
 
-	mutableState, err := clusterkv.NewMutableState(clusterState, f.tracer, headers, payloads)
+	mutableState, err := clusterkv.NewMutableState(clusterState, f.lockManager, f.tracer, headers, payloads)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could create mutable cluster state: %w", err)
 	}

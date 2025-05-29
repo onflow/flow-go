@@ -85,7 +85,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.Require().NoError(err)
 	clusterState, err := Bootstrap(suite.db, lockManager, clusterStateRoot)
 	suite.Require().NoError(err)
-	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads)
+	suite.state, err = NewMutableState(clusterState, suite.lockManager, tracer, all.Headers, colPayloads)
 	suite.Require().NoError(err)
 }
 

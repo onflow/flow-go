@@ -31,12 +31,13 @@ type MutableState struct {
 
 var _ clusterstate.MutableState = (*MutableState)(nil)
 
-func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads) (*MutableState, error) {
+func NewMutableState(state *State, lockManager lockctx.Manager, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads) (*MutableState, error) {
 	mutableState := &MutableState{
-		State:    state,
-		tracer:   tracer,
-		headers:  headers,
-		payloads: payloads,
+		State:       state,
+		lockManager: lockManager,
+		tracer:      tracer,
+		headers:     headers,
+		payloads:    payloads,
 	}
 	return mutableState, nil
 }
