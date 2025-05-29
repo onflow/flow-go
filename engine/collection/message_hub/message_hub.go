@@ -466,7 +466,7 @@ func (h *MessageHub) forwardToOwnVoteAggregator(vote *messages.ClusterBlockVote,
 		Hex("voter", v.SignerID[:]).
 		Str("vote_id", v.ID().String()).
 		Msg("block vote received, forwarding block vote to hotstuff vote aggregator")
-	h.voteAggregator.AddVote(&v)
+	h.voteAggregator.AddVote(v)
 }
 
 // forwardToOwnTimeoutAggregator logs timeout and forwards it to own `timeoutAggregator`.

@@ -18,8 +18,8 @@ type Vote struct {
 
 // NewVote creates a new instance of Vote.
 // Construction Vote allowed only within the constructor
-func NewVote(view uint64, blockID flow.Identifier, signerID flow.Identifier, sigData []byte) Vote {
-	return Vote{
+func NewVote(view uint64, blockID flow.Identifier, signerID flow.Identifier, sigData []byte) *Vote {
+	return &Vote{
 		View:     view,
 		BlockID:  blockID,
 		SignerID: signerID,
@@ -34,11 +34,10 @@ func (uv *Vote) ID() flow.Identifier {
 
 // VoteFromFlow turns the vote parameters into a vote struct.
 func VoteFromFlow(signerID flow.Identifier, blockID flow.Identifier, view uint64, sig crypto.Signature) *Vote {
-	vote := NewVote(
+	return NewVote(
 		view,
 		blockID,
 		signerID,
 		sig,
 	)
-	return &vote
 }

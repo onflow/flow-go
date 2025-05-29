@@ -49,15 +49,12 @@ func (c *StakingSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 		return nil, fmt.Errorf("could not create signature: %w", err)
 	}
 
-	// create the vote
-	vote := model.NewVote(
+	return model.NewVote(
 		block.View,
 		block.BlockID,
 		c.signerID,
 		sigData,
-	)
-
-	return &vote, nil
+	), nil
 }
 
 // CreateTimeout will create a signed timeout object for the given view.

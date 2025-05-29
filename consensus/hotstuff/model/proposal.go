@@ -46,13 +46,12 @@ type SignedProposal struct {
 
 // ProposerVote extracts the proposer vote from the proposal
 func (p *SignedProposal) ProposerVote() *Vote {
-	vote := NewVote(
+	return NewVote(
 		p.Block.View,
 		p.Block.BlockID,
 		p.Block.ProposerID,
 		p.SigData,
 	)
-	return &vote
 }
 
 // SignedProposalFromFlow turns a flow header into a hotstuff block type.
