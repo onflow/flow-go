@@ -44,6 +44,12 @@ var (
 // HexStringToIdentifier converts a hex string to an identifier. The input
 // must be 64 characters long and contain only valid hex characters.
 func HexStringToIdentifier(hexString string) (Identifier, error) {
+	// hex.Decode does not check that there is enough room to decode the input into the destination
+	// slice, so we do it explicitly here
+	if len(hexString) != 64 {
+		return ZeroID, fmt.Errorf("malformed input, expected 64 characters, got %d", len(hexString))
+	}
+
 	var identifier Identifier
 	i, err := hex.Decode(identifier[:], []byte(hexString))
 	if err != nil {

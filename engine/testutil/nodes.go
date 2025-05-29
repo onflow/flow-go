@@ -360,10 +360,11 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	createMetrics := func(chainID flow.ChainID) module.HotstuffMetrics {
 		return metrics.NewNoopCollector()
 	}
+
 	hotstuffFactory, err := factories.NewHotStuffFactory(
 		node.Log,
 		node.Me,
-		node.PublicDB,
+		badgerimpl.ToDB(node.PublicDB),
 		node.State,
 		node.Metrics,
 		node.Metrics,
@@ -605,7 +606,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	rootResult, rootSeal, err := protoState.Sealed().SealedResult()
 	require.NoError(t, err)
 
-	require.Equal(t, fmt.Sprintf("%x", rootSeal.FinalState), fmt.Sprintf("%x", commit))
+	require.Equal(t, fmt.Sprint(rootSeal.FinalState), fmt.Sprint(commit))
 	require.Equal(t, rootSeal.ResultID, rootResult.ID())
 
 	err = bootstrapper.BootstrapExecutionDatabase(db, rootSeal)

@@ -85,7 +85,6 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
 		testnet.WithAdditionalFlagf("--websocket-inactivity-timeout=%ds", InactivityTimeout),
 		testnet.WithAdditionalFlagf("--websocket-max-subscriptions-per-connection=%d", MaxSubscriptionsPerConnection),
-		testnet.WithAdditionalFlagf("--experimental-enable-websockets-stream-api=true"),
 		testnet.WithMetricsServer(),
 	)
 

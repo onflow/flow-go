@@ -400,10 +400,13 @@ func main() {
 			// the chain of seals
 			rawMempool := stdmap.NewIncorporatedResultSeals(sealLimit)
 			multipleReceiptsFilterMempool := consensusMempools.NewIncorporatedResultSeals(rawMempool, node.Storage.Receipts)
+
+			dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+
 			seals, err = consensusMempools.NewExecStateForkSuppressor(
 				multipleReceiptsFilterMempool,
 				consensusMempools.LogForkAndCrash(node.Logger),
-				node.DB,
+				dbStore,
 				node.Logger,
 			)
 			if err != nil {
@@ -629,7 +632,7 @@ func main() {
 			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
-			persist, err := persister.New(node.DB, node.RootChainID)
+			persist, err := persister.New(node.ProtocolDB, node.RootChainID)
 			if err != nil {
 				return nil, err
 			}
@@ -761,7 +764,6 @@ func main() {
 			var build module.Builder
 			build, err = builder.NewBuilder(
 				node.Metrics.Mempool,
-				node.DB,
 				mutableState,
 				node.Storage.Headers,
 				node.Storage.Seals,

@@ -93,7 +93,7 @@ func (reusable *ReusableCadenceRuntime) declareRandomSourceHistory() {
 				}
 
 				return interpreter.ByteSliceToByteArrayValue(
-					invocation.Interpreter,
+					invocation.InvocationContext,
 					source)
 			},
 		),
@@ -183,7 +183,7 @@ type ReusableCadenceRuntimePool struct {
 	config runtime.Config
 
 	// When newCustomRuntime is nil, the pool will create standard cadence
-	// interpreter runtimes via runtime.NewInterpreterRuntime.  Otherwise, the
+	// interpreter runtimes via runtime.NewRuntime.  Otherwise, the
 	// pool will create runtimes using this function.
 	//
 	// Note that this is primarily used for testing.
@@ -234,7 +234,7 @@ func (pool ReusableCadenceRuntimePool) newRuntime() runtime.Runtime {
 	if pool.newCustomRuntime != nil {
 		return pool.newCustomRuntime(pool.config)
 	}
-	return runtime.NewInterpreterRuntime(pool.config)
+	return runtime.NewRuntime(pool.config)
 }
 
 func (pool ReusableCadenceRuntimePool) Borrow(

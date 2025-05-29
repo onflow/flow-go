@@ -38,11 +38,18 @@ var NoHeight = uint64(0)
 // IMPORTANT: only add versions to this list if you are certain that the cadence and fvm changes
 // deployed during the HCU are backwards compatible for scripts.
 var defaultCompatibilityOverrides = map[string]struct{}{
-	"0.37.17": {},
-	"0.37.18": {},
-	"0.37.22": {},
-	"0.37.26": {},
-	"0.38.0":  {},
+	"0.37.17": {}, // mainnet, testnet
+	"0.37.18": {}, // testnet only
+	"0.37.20": {}, // mainnet, testnet
+	"0.37.22": {}, // mainnet, testnet
+	"0.37.26": {}, // mainnet, testnet
+	"0.38.1":  {}, // testnet only
+	"0.38.2":  {}, // mainnet, testnet
+	"0.38.3":  {}, // mainnet, testnet
+	"0.40.0":  {}, // mainnet, testnet
+	"0.41.0":  {}, // mainnet, testnet
+	"0.41.4":  {}, // mainnet, testnet
+	"0.42.0":  {}, // mainnet, testnet
 }
 
 // VersionControl manages the version control system for the node.
@@ -82,6 +89,10 @@ type VersionControl struct {
 	// compatibilityOverrides stores the list of version compatibility overrides.
 	// version beacon events who's Major.Minor.Patch version match an entry in this map will be ignored.
 	compatibilityOverrides map[string]struct{}
+
+	// overridesLogSuppression stores the list of version compatibility overrides that have been logged.
+	// this is used to avoid emitting logs during every check when a version is overridden.
+	overridesLogSuppression map[string]struct{}
 }
 
 var _ protocol.Consumer = (*VersionControl)(nil)
@@ -113,6 +124,7 @@ func NewVersionControl(
 		startHeight:             atomic.NewUint64(NoHeight),
 		endHeight:               atomic.NewUint64(NoHeight),
 		compatibilityOverrides:  defaultCompatibilityOverrides,
+		overridesLogSuppression: make(map[string]struct{}),
 	}
 
 	if vc.nodeVersion == nil {
@@ -398,21 +410,24 @@ func (v *VersionControl) EndHeight() uint64 {
 
 // isOverridden checks if the version is overridden by the compatibility overrides and can be ignored.
 func (v *VersionControl) isOverridden(ver *semver.Version) bool {
-	normalizedVersion := &semver.Version{
+	normalizedVersion := semver.Version{
 		Major: ver.Major,
 		Minor: ver.Minor,
 		Patch: ver.Patch,
-	}
+	}.String()
 
-	_, ok := v.compatibilityOverrides[normalizedVersion.String()]
-	if !ok {
+	if _, ok := v.compatibilityOverrides[normalizedVersion]; !ok {
 		return false
 	}
 
-	v.log.Info().
-		Str("event_version", ver.String()).
-		Str("override_version", normalizedVersion.String()).
-		Msg("ignoring version beacon event matching compatibility override")
+	// only log the suppression once per version
+	if _, ok := v.overridesLogSuppression[normalizedVersion]; !ok {
+		v.overridesLogSuppression[normalizedVersion] = struct{}{}
+		v.log.Info().
+			Str("event_version", ver.String()).
+			Str("override_version", normalizedVersion).
+			Msg("ignoring version beacon event matching compatibility override")
+	}
 
 	return true
 }
