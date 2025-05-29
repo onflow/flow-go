@@ -57,8 +57,8 @@ type MissingCollection struct {
 
 // NewMissingCollection creates a new instance of MissingCollection.
 // Construction MissingCollection allowed only within the constructor
-func NewMissingCollection(blockID flow.Identifier, height uint64, guarantee *flow.CollectionGuarantee) MissingCollection {
-	return MissingCollection{
+func NewMissingCollection(blockID flow.Identifier, height uint64, guarantee *flow.CollectionGuarantee) *MissingCollection {
+	return &MissingCollection{
 		BlockID:   blockID,
 		Height:    height,
 		Guarantee: guarantee,
@@ -95,9 +95,9 @@ func NewBlockQueue(logger zerolog.Logger) *BlockQueue {
 // 3. if a block's parent is executed, then the parent's finalState must be passed in
 // It returns (nil, nil, nil) if this block is a duplication
 func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.StateCommitment) (
-	[]*MissingCollection, // missing collections
+	[]*MissingCollection,      // missing collections
 	[]*entity.ExecutableBlock, // blocks ready to execute
-	error, // exceptions
+	error,                     // exceptions
 ) {
 	q.Lock()
 	defer q.Unlock()
@@ -189,7 +189,14 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 				},
 			}
 
-			missingCollections = append(missingCollections, missingCollectionForBlock(executable, guarantee))
+			missingCollections = append(
+				missingCollections,
+				NewMissingCollection(
+					executable.ID(),
+					executable.Block.Header.Height,
+					col.Guarantee,
+				),
+			)
 		}
 	}
 
@@ -276,9 +283,9 @@ func (q *BlockQueue) OnBlockExecuted(
 }
 
 func (q *BlockQueue) handleKnownBlock(executable *entity.ExecutableBlock, parentFinalState *flow.StateCommitment) (
-	[]*MissingCollection, // missing collections
+	[]*MissingCollection,      // missing collections
 	[]*entity.ExecutableBlock, // blocks ready to execute
-	error, // exceptions
+	error,                     // exceptions
 ) {
 	// we have already received this block, and its parent still has not been executed yet
 	if executable.StartState == nil && parentFinalState == nil {
@@ -445,14 +452,15 @@ func (q *BlockQueue) GetMissingCollections(blockID flow.Identifier) (
 		if col.IsCompleted() {
 			continue
 		}
-		missingCollections = append(missingCollections, missingCollectionForBlock(block, col.Guarantee))
+		missingCollections = append(
+			missingCollections,
+			NewMissingCollection(
+				block.ID(),
+				block.Block.Header.Height,
+				col.Guarantee,
+			),
+		)
 	}
 
 	return missingCollections, block.StartState, nil
-}
-
-func missingCollectionForBlock(block *entity.ExecutableBlock, guarantee *flow.CollectionGuarantee) *MissingCollection {
-	missingCollection := NewMissingCollection(block.ID(), block.Block.Header.Height, guarantee)
-
-	return &missingCollection
 }
