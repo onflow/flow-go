@@ -238,8 +238,7 @@ func messageToTrustedCollection(
 ) (*flow.Collection, error) {
 	messages := m.GetTransactions()
 	if len(messages) == 0 {
-		empty := flow.NewCollection(nil)
-		return &empty, nil
+		return flow.NewCollection(nil), nil
 	}
 
 	transactions := make([]*flow.TransactionBody, len(messages))
@@ -251,8 +250,7 @@ func messageToTrustedCollection(
 		transactions[i] = &transaction
 	}
 
-	collection := flow.NewCollection(transactions)
-	return &collection, nil
+	return flow.NewCollection(transactions), nil
 }
 
 // messageToTrustedTransaction converts a transaction message to a transaction body.

@@ -652,8 +652,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		channels.RequestCollections,
 		filter.HasRole[flow.Identity](flow.RoleCollection),
 		func() flow.Entity {
-			empty := flow.NewCollection(nil)
-			return &empty
+			return flow.NewCollection(nil)
 		},
 	)
 	require.NoError(t, err)

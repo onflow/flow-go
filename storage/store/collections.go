@@ -83,8 +83,7 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 		txs = append(txs, tx)
 	}
 
-	collection := flow.NewCollection(txs)
-	return &collection, nil
+	return flow.NewCollection(txs), nil
 }
 
 // LightByID retrieves a light collection by its ID.

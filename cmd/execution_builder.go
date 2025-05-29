@@ -1126,8 +1126,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 			channels.RequestCollections,
 			filter.Any,
 			func() flow.Entity {
-				empty := flow.NewCollection(nil)
-				return &empty
+				return flow.NewCollection(nil)
 			},
 			// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
 			requester.WithBatchInterval(exeNode.exeConf.requestInterval),

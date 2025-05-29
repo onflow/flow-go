@@ -40,7 +40,7 @@ type BlocksByCollection struct {
 }
 
 func (c CompleteCollection) Collection() flow.Collection {
-	return flow.NewCollection(c.Transactions)
+	return *flow.NewCollection(c.Transactions)
 }
 
 func (c CompleteCollection) IsCompleted() bool {
@@ -102,8 +102,7 @@ func (b *ExecutableBlock) CollectionAt(index int) *flow.Collection {
 	if cc == nil {
 		return nil
 	}
-	collection := flow.NewCollection(cc.Transactions)
-	return &collection
+	return flow.NewCollection(cc.Transactions)
 }
 
 // HasAllTransactions returns whether all the transactions for all collections

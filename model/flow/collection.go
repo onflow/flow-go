@@ -15,8 +15,8 @@ type Collection struct {
 
 // NewCollection creates a new instance of Collection.
 // Construction Collection allowed only within the constructor
-func NewCollection(transactions []*TransactionBody) Collection {
-	return Collection{Transactions: transactions}
+func NewCollection(transactions []*TransactionBody) *Collection {
+	return &Collection{Transactions: transactions}
 }
 
 // CollectionFromTransactions creates a new collection from the list of
@@ -27,7 +27,7 @@ func CollectionFromTransactions(transactions []*Transaction) Collection {
 	for _, tx := range transactions {
 		txs = append(txs, &tx.TransactionBody)
 	}
-	return NewCollection(txs)
+	return *NewCollection(txs)
 }
 
 // Light returns the light, reference-only version of the collection.
