@@ -93,7 +93,8 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		signature, err := stakingPrivKey.Sign(voteMessage, hasher)
 		s.Require().NoError(err)
 
-		vote := hotstuffmodel.VoteFromFlow(nodeID, blockID, view, signature)
+		vote := hotstuffmodel.NewVote(view, blockID, nodeID, signature)
+
 		hotSigner := &hotstuff.Signer{}
 		hotSigner.On("CreateVote", mock.Anything).Return(vote, nil)
 

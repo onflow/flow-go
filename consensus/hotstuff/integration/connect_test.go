@@ -75,7 +75,7 @@ func Connect(t *testing.T, instances []*Instance) {
 				recipientID, ok := args[3].(flow.Identifier)
 				require.True(t, ok)
 				// convert into vote
-				vote := model.VoteFromFlow(sender.localID, blockID, view, sigData)
+				vote := model.NewVote(view, blockID, sender.localID, sigData)
 
 				// get the receiver
 				receiver, exists := lookup[recipientID]

@@ -1,8 +1,6 @@
 package model
 
 import (
-	"github.com/onflow/crypto"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -30,14 +28,4 @@ func NewVote(view uint64, blockID flow.Identifier, signerID flow.Identifier, sig
 // ID returns the identifier for the vote.
 func (uv *Vote) ID() flow.Identifier {
 	return flow.MakeID(uv)
-}
-
-// VoteFromFlow turns the vote parameters into a vote struct.
-func VoteFromFlow(signerID flow.Identifier, blockID flow.Identifier, view uint64, sig crypto.Signature) *Vote {
-	return NewVote(
-		view,
-		blockID,
-		signerID,
-		sig,
-	)
 }
