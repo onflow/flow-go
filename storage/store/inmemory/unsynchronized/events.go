@@ -116,6 +116,18 @@ func (e *Events) Store(blockID flow.Identifier, blockEvents []flow.EventsList) e
 	return nil
 }
 
+// Data returns a copy of the cached blockID -> events map as EventsList.
+func (e *Events) Data() flow.EventsList {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
+	out := make(flow.EventsList, 0, len(e.blockIdToEvents))
+	for _, events := range e.blockIdToEvents {
+		out = append(out, events...)
+	}
+	return out
+}
+
 // BatchStore will store events for the given block ID in a given batch.
 //
 // This method is NOT implemented and will always return an error.
