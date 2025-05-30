@@ -79,7 +79,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 			NewestQCViews: m.LastViewTc.HighQcViews,
 			SignerIndices: m.LastViewTc.SignerIndices,
 			SigData:       m.LastViewTc.SigData,
-			NewestQC:      &qc,
+			NewestQC:      qc,
 		}
 	}
 

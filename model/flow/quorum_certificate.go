@@ -30,8 +30,8 @@ func NewQuorumCertificate(
 	view uint64,
 	blockID Identifier,
 	signerIndices []byte,
-	sigData []byte) QuorumCertificate {
-	return QuorumCertificate{
+	sigData []byte) *QuorumCertificate {
+	return &QuorumCertificate{
 		View:          view,
 		BlockID:       blockID,
 		SignerIndices: signerIndices,

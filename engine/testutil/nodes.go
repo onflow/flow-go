@@ -858,7 +858,7 @@ func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.Quor
 		unittest.SignatureFixture(),
 	)
 
-	return rootHead, &rootQC
+	return rootHead, rootQC
 }
 
 type RoundRobinLeaderSelection struct {

@@ -247,7 +247,7 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 		Counter:   epochCounter,
 		Members:   members,
 		RootBlock: rootBlock,
-		RootQC:    &rootQC,
+		RootQC:    rootQC,
 	})
 	return cluster, err
 }
