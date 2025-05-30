@@ -3665,7 +3665,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 		},
 	)
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "panic: signature mismatch")
+	assert.ErrorContains(t, err, "EVM.decodeABIWithSignature(): Cannot decode! The signature does not match the provided data.")
 }
 
 func TestEVMAddressConstructionAndReturn(t *testing.T) {

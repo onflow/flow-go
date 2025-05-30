@@ -238,7 +238,7 @@ access(all) contract EVM {
     fun addressFromString(_ asHex: String): EVMAddress {
         pre {
             asHex.length == 40 || asHex.length == 42:
-                "Invalid hex string length for an EVM address. The provided string is \(asHex.length), but the length must be 40 or 42."
+                "EVM.addressFromString(): Invalid hex string length for an EVM address. The provided string is \(asHex.length), but the length must be 40 or 42."
         }
         // Strip the 0x prefix if it exists
         var withoutPrefix = (asHex[1] == "x" ? asHex.slice(from: 2, upTo: asHex.length) : asHex).toLower()
@@ -477,7 +477,7 @@ access(all) contract EVM {
             for item in self.addressBytes {
                 assert(
                     item == 0,
-                    message: "Cannot initialize the address bytes if it has already been set!"
+                    message: "EVM.CadenceOwnedAccount.initAddress(): Cannot initialize the address bytes if it has already been set!"
                 )
             }
            self.addressBytes = addressBytes
@@ -703,7 +703,7 @@ access(all) contract EVM {
         let runResult = self.run(tx: tx, coinbase: coinbase)
         assert(
             runResult.status == Status.failed || runResult.status == Status.successful,
-            message: "tx is not valid for execution"
+            message: "EVM.mustRun(): The provided transaction is not valid for execution"
         )
         return runResult
     }
@@ -786,7 +786,7 @@ access(all) contract EVM {
 
         for byte in methodID {
             if byte != data.removeFirst() {
-                panic("signature mismatch")
+                panic("EVM.decodeABIWithSignature(): Cannot decode! The signature does not match the provided data.")
             }
         }
 
@@ -974,11 +974,12 @@ access(all) contract EVM {
         /// Sets the BridgeAccessor Capability in the BridgeRouter
         access(Bridge) fun setBridgeAccessor(_ accessor: Capability<auth(Bridge) &{BridgeAccessor}>) {
             pre {
-                accessor.check(): "Invalid BridgeAccessor Capability provided"
+                accessor.check(): 
+                    "EVM.setBridgeAccessor(): Invalid BridgeAccessor Capability provided"
                 emit BridgeAccessorUpdated(
                     routerType: self.getType(),
                     routerUUID: self.uuid,
-                    routerAddress: self.owner?.address ?? panic("Router must have an owner to be identified"),
+                    routerAddress: self.owner?.address ?? panic("EVM.setBridgeAccessor(): Router must be stored in an account's storage"),
                     accessorType: accessor.borrow()!.getType(),
                     accessorUUID: accessor.borrow()!.uuid,
                     accessorAddress: accessor.address
@@ -992,7 +993,7 @@ access(all) contract EVM {
     view fun borrowBridgeAccessor(): auth(Bridge) &{BridgeAccessor} {
         return self.account.storage.borrow<auth(Bridge) &{BridgeRouter}>(from: /storage/evmBridgeRouter)
             ?.borrowBridgeAccessor()
-            ?? panic("Could not borrow reference to the EVM bridge")
+            ?? panic("EVM.borrowBridgeAccessor(): Could not borrow a reference to the EVM bridge.")
     }
 
     /// The Heartbeat resource controls the block production.
