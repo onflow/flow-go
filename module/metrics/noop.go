@@ -173,8 +173,8 @@ func (nc *NoopCollector) ExecutionTargetChunkDataPackPrunedHeight(height uint64)
 
 func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ module.CollectionExecutionResultStats) {
 }
-func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
-func (nc *NoopCollector) ExecutionBlockCachedPrograms(programs int)                     {}
+func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint64) {}
+func (nc *NoopCollector) ExecutionBlockCachedPrograms(programs int)                       {}
 func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _ module.TransactionExecutionResultStats, _ module.TransactionExecutionResultInfo) {
 }
 func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                              {}
