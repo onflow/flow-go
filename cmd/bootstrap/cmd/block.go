@@ -46,16 +46,19 @@ func constructRootEpochEvents(
 	dkgIndexMap flow.DKGIndexMap,
 ) (*flow.EpochSetup, *flow.EpochCommit) {
 	epochSetup := flow.NewEpochSetup(
-		flagEpochCounter,
-		firstView,
-		firstView+flagNumViewsInStakingAuction+flagNumViewsInDKGPhase-1,
-		firstView+flagNumViewsInStakingAuction+flagNumViewsInDKGPhase*2-1,
-		firstView+flagNumViewsInStakingAuction+flagNumViewsInDKGPhase*3-1,
-		firstView+flagNumViewsInEpoch-1,
-		participants.Sort(flow.Canonical[flow.Identity]).ToSkeleton(), assignments,
-		GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
-		flagEpochTimingDuration,
-		rootEpochTargetEndTime(),
+		flow.UntrustedEpochSetup{
+			Counter:            flagEpochCounter,
+			FirstView:          firstView,
+			DKGPhase1FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase - 1,
+			DKGPhase2FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*2 - 1,
+			DKGPhase3FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 - 1,
+			FinalView:          firstView + flagNumViewsInEpoch - 1,
+			Participants:       participants.Sort(flow.Canonical[flow.Identity]).ToSkeleton(),
+			Assignments:        assignments,
+			RandomSource:       GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
+			TargetDuration:     flagEpochTimingDuration,
+			TargetEndTime:      rootEpochTargetEndTime(),
+		},
 	)
 
 	qcsWithSignerIDs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clusterQCs))
@@ -74,13 +77,15 @@ func constructRootEpochEvents(
 	}
 
 	epochCommit := flow.NewEpochCommit(
-		flagEpochCounter,
-		flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
-		dkgData.PubGroupKey,
-		dkgData.PubKeyShares,
-		dkgIndexMap,
+		flow.UntrustedEpochCommit{
+			Counter:            flagEpochCounter,
+			ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
+			DKGGroupKey:        dkgData.PubGroupKey,
+			DKGParticipantKeys: dkgData.PubKeyShares,
+			DKGIndexMap:        dkgIndexMap,
+		},
 	)
-	return &epochSetup, &epochCommit
+	return epochSetup, epochCommit
 }
 
 func parseChainID(chainID string) flow.ChainID {

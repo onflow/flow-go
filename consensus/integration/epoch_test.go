@@ -222,25 +222,29 @@ func withNextEpoch(
 
 	// Construct events for next epoch
 	nextEpochSetup := flow.NewEpochSetup(
-		currEpochSetup.Counter+1,
-		currEpochSetup.FinalView+1,
-		0, // DKG ignored in this test
-		0,
-		0,
-		currEpochSetup.FinalView+1+10_000,
-		nextEpochIdentities.ToSkeleton(),
-		unittest.ClusterAssignment(1, nextEpochIdentities.ToSkeleton()),
-		unittest.SeedFixture(flow.EpochSetupRandomSourceLength),
-		0, // cruise control ignored in this test
-		0,
+		flow.UntrustedEpochSetup{
+			Counter:            currEpochSetup.Counter + 1,
+			FirstView:          currEpochSetup.FinalView + 1,
+			DKGPhase1FinalView: 0, // DKG ignored in this test
+			DKGPhase2FinalView: 0,
+			DKGPhase3FinalView: 0,
+			FinalView:          currEpochSetup.FinalView + 1 + 10_000,
+			Participants:       nextEpochIdentities.ToSkeleton(),
+			Assignments:        unittest.ClusterAssignment(1, nextEpochIdentities.ToSkeleton()),
+			RandomSource:       unittest.SeedFixture(flow.EpochSetupRandomSourceLength),
+			TargetDuration:     0, // cruise control ignored in this test
+			TargetEndTime:      0,
+		},
 	)
 	dkgIndexMap, dkgParticipantKeys := nextEpochParticipantData.DKGData()
 	nextEpochCommit := flow.NewEpochCommit(
-		nextEpochSetup.Counter,
-		currEpochCommit.ClusterQCs,
-		nextEpochParticipantData.DKGGroupKey,
-		dkgParticipantKeys,
-		dkgIndexMap,
+		flow.UntrustedEpochCommit{
+			Counter:            nextEpochSetup.Counter,
+			ClusterQCs:         currEpochCommit.ClusterQCs,
+			DKGGroupKey:        nextEpochParticipantData.DKGGroupKey,
+			DKGParticipantKeys: dkgParticipantKeys,
+			DKGIndexMap:        dkgIndexMap,
+		},
 	)
 
 	// Construct the new min epoch state entry
@@ -265,8 +269,11 @@ func withNextEpoch(
 		minEpochStateEntry,
 		rootProtocolState.EpochEntry.PreviousEpochSetup,
 		rootProtocolState.EpochEntry.PreviousEpochCommit,
-		currEpochSetup, currEpochCommit,
-		&nextEpochSetup, &nextEpochCommit)
+		currEpochSetup,
+		currEpochCommit,
+		nextEpochSetup,
+		nextEpochCommit,
+	)
 	require.NoError(t, err)
 	// Re-construct epoch protocol state with modified events (constructs ActiveIdentity fields)
 	epochRichProtocolState, err := flow.NewRichEpochStateEntry(epochStateEntry)

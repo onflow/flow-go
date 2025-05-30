@@ -183,23 +183,25 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 		return nil, fmt.Errorf("could not convert participants: %w", err)
 	}
 	setup := flow.NewEpochSetup(
-		uint64(counter),
-		uint64(firstView),
-		uint64(dkgPhase1FinalView),
-		uint64(dkgPhase2FinalView),
-		uint64(dkgPhase3FinalView),
-		uint64(finalView),
-		participants,
-		assignments,
-		randomSource,
-		uint64(targetDuration),
-		uint64(targetEndTimeUnix),
+		flow.UntrustedEpochSetup{
+			Counter:            uint64(counter),
+			FirstView:          uint64(firstView),
+			DKGPhase1FinalView: uint64(dkgPhase1FinalView),
+			DKGPhase2FinalView: uint64(dkgPhase2FinalView),
+			DKGPhase3FinalView: uint64(dkgPhase3FinalView),
+			FinalView:          uint64(finalView),
+			Participants:       participants,
+			Assignments:        assignments,
+			RandomSource:       randomSource,
+			TargetDuration:     uint64(targetDuration),
+			TargetEndTime:      uint64(targetEndTimeUnix),
+		},
 	)
 
 	// construct the service event
 	serviceEvent := &flow.ServiceEvent{
 		Type:  flow.ServiceEventSetup,
-		Event: &setup,
+		Event: setup,
 	}
 
 	return serviceEvent, nil
@@ -360,17 +362,19 @@ func convertServiceEventEpochCommitV1(event flow.Event) (*flow.ServiceEvent, err
 	}
 
 	commit := flow.NewEpochCommit(
-		uint64(counter),
-		clusterQCs,
-		dKGGroupKey,
-		dKGParticipantKeys,
-		dKGIndexMap,
+		flow.UntrustedEpochCommit{
+			Counter:            uint64(counter),
+			ClusterQCs:         clusterQCs,
+			DKGGroupKey:        dKGGroupKey,
+			DKGParticipantKeys: dKGParticipantKeys,
+			DKGIndexMap:        dKGIndexMap,
+		},
 	)
 
 	// create the service event
 	serviceEvent := &flow.ServiceEvent{
 		Type:  flow.ServiceEventCommit,
-		Event: &commit,
+		Event: commit,
 	}
 
 	return serviceEvent, nil
@@ -445,17 +449,19 @@ func convertServiceEventEpochCommitV0(event flow.Event) (*flow.ServiceEvent, err
 	}
 
 	commit := flow.NewEpochCommit(
-		uint64(counter),
-		clusterQCs,
-		dKGGroupKey,
-		dKGParticipantKeys,
-		nil,
+		flow.UntrustedEpochCommit{
+			Counter:            uint64(counter),
+			ClusterQCs:         clusterQCs,
+			DKGGroupKey:        dKGGroupKey,
+			DKGParticipantKeys: dKGParticipantKeys,
+			DKGIndexMap:        nil,
+		},
 	)
 
 	// create the service event
 	serviceEvent := &flow.ServiceEvent{
 		Type:  flow.ServiceEventCommit,
-		Event: &commit,
+		Event: commit,
 	}
 
 	return serviceEvent, nil
@@ -603,17 +609,19 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	}
 
 	setup := flow.NewEpochSetup(
-		uint64(counter),
-		uint64(firstView),
-		uint64(dkgPhase1FinalView),
-		uint64(dkgPhase2FinalView),
-		uint64(dkgPhase3FinalView),
-		uint64(finalView),
-		participants,
-		assignments,
-		randomSource,
-		uint64(targetDuration),
-		uint64(targetEndTimeUnix),
+		flow.UntrustedEpochSetup{
+			Counter:            uint64(counter),
+			FirstView:          uint64(firstView),
+			DKGPhase1FinalView: uint64(dkgPhase1FinalView),
+			DKGPhase2FinalView: uint64(dkgPhase2FinalView),
+			DKGPhase3FinalView: uint64(dkgPhase3FinalView),
+			FinalView:          uint64(finalView),
+			Participants:       participants,
+			Assignments:        assignments,
+			RandomSource:       randomSource,
+			TargetDuration:     uint64(targetDuration),
+			TargetEndTime:      uint64(targetEndTimeUnix),
+		},
 	)
 
 	// parse cluster qc votes
@@ -678,18 +686,25 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	}
 
 	commit := flow.NewEpochCommit(
-		uint64(counter),
-		clusterQCs,
-		dKGGroupKey,
-		dKGParticipantKeys,
-		dKGIndexMap,
+		flow.UntrustedEpochCommit{
+			Counter:            uint64(counter),
+			ClusterQCs:         clusterQCs,
+			DKGGroupKey:        dKGGroupKey,
+			DKGParticipantKeys: dKGParticipantKeys,
+			DKGIndexMap:        dKGIndexMap,
+		},
 	)
 
 	// create the service event
-	epochRecover := flow.NewEpochRecover(setup, commit)
+	epochRecover := flow.NewEpochRecover(
+		flow.UntrustedEpochRecover{
+			EpochSetup:  *setup,
+			EpochCommit: *commit,
+		},
+	)
 	serviceEvent := &flow.ServiceEvent{
 		Type:  flow.ServiceEventRecover,
-		Event: &epochRecover,
+		Event: epochRecover,
 	}
 
 	return serviceEvent, nil

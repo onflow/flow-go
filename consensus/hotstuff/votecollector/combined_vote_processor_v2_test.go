@@ -856,13 +856,15 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	proposal := helper.MakeProposal(helper.WithBlock(block))
 
 	commit := flow.NewEpochCommit(
-		0,
-		nil,
-		dkgData.PubGroupKey,
-		dkgData.PubKeyShares,
-		dkgIndexMap,
+		flow.UntrustedEpochCommit{
+			Counter:            0,
+			ClusterQCs:         nil,
+			DKGGroupKey:        dkgData.PubGroupKey,
+			DKGParticipantKeys: dkgData.PubKeyShares,
+			DKGIndexMap:        dkgIndexMap,
+		},
 	)
-	inmemDKG := inmem.NewDKG(nil, &commit)
+	inmemDKG := inmem.NewDKG(nil, commit)
 
 	committee := &mockhotstuff.DynamicCommittee{}
 	committee.On("LeaderForView", block.View).Return(leader.NodeID, nil).Maybe()

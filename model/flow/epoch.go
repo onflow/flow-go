@@ -152,33 +152,23 @@ type EpochSetup struct {
 	TargetEndTime      uint64               // desired real-world end time for the epoch in UNIX time [seconds]
 }
 
+type UntrustedEpochSetup EpochSetup
+
 // NewEpochSetup creates a new instance of EpochSetup.
 // Construction EpochSetup allowed only within the constructor.
-func NewEpochSetup(
-	counter uint64,
-	firstView uint64,
-	dKGPhase1FinalView uint64,
-	dKGPhase2FinalView uint64,
-	dKGPhase3FinalView uint64,
-	finalView uint64,
-	participants IdentitySkeletonList,
-	assignments AssignmentList,
-	randomSource []byte,
-	targetDuration uint64,
-	targetEndTime uint64,
-) EpochSetup {
-	return EpochSetup{
-		Counter:            counter,
-		FirstView:          firstView,
-		DKGPhase1FinalView: dKGPhase1FinalView,
-		DKGPhase2FinalView: dKGPhase2FinalView,
-		DKGPhase3FinalView: dKGPhase3FinalView,
-		FinalView:          finalView,
-		Participants:       participants,
-		Assignments:        assignments,
-		RandomSource:       randomSource,
-		TargetDuration:     targetDuration,
-		TargetEndTime:      targetEndTime,
+func NewEpochSetup(untrusted UntrustedEpochSetup) *EpochSetup {
+	return &EpochSetup{
+		Counter:            untrusted.Counter,
+		FirstView:          untrusted.FirstView,
+		DKGPhase1FinalView: untrusted.DKGPhase1FinalView,
+		DKGPhase2FinalView: untrusted.DKGPhase2FinalView,
+		DKGPhase3FinalView: untrusted.DKGPhase3FinalView,
+		FinalView:          untrusted.FinalView,
+		Participants:       untrusted.Participants,
+		Assignments:        untrusted.Assignments,
+		RandomSource:       untrusted.RandomSource,
+		TargetDuration:     untrusted.TargetDuration,
+		TargetEndTime:      untrusted.TargetEndTime,
 	}
 }
 
@@ -238,12 +228,14 @@ type EpochRecover struct {
 	EpochCommit EpochCommit
 }
 
+type UntrustedEpochRecover EpochRecover
+
 // NewEpochRecover creates a new instance of EpochRecover.
 // Construction EpochRecover allowed only within the constructor.
-func NewEpochRecover(setup EpochSetup, commit EpochCommit) EpochRecover {
-	return EpochRecover{
-		EpochSetup:  setup,
-		EpochCommit: commit,
+func NewEpochRecover(untrusted UntrustedEpochRecover) *EpochRecover {
+	return &EpochRecover{
+		EpochSetup:  untrusted.EpochSetup,
+		EpochCommit: untrusted.EpochCommit,
 	}
 }
 
@@ -312,21 +304,17 @@ type EpochCommit struct {
 	DKGIndexMap DKGIndexMap
 }
 
+type UntrustedEpochCommit EpochCommit
+
 // NewEpochCommit creates a new instance of EpochCommit.
 // Construction EpochCommit allowed only within the constructor.
-func NewEpochCommit(
-	counter uint64,
-	clusterQCs []ClusterQCVoteData,
-	dKGGroupKey crypto.PublicKey,
-	dKGParticipantKeys []crypto.PublicKey,
-	dKGIndexMap DKGIndexMap,
-) EpochCommit {
-	return EpochCommit{
-		Counter:            counter,
-		ClusterQCs:         clusterQCs,
-		DKGGroupKey:        dKGGroupKey,
-		DKGParticipantKeys: dKGParticipantKeys,
-		DKGIndexMap:        dKGIndexMap,
+func NewEpochCommit(untrusted UntrustedEpochCommit) *EpochCommit {
+	return &EpochCommit{
+		Counter:            untrusted.Counter,
+		ClusterQCs:         untrusted.ClusterQCs,
+		DKGGroupKey:        untrusted.DKGGroupKey,
+		DKGParticipantKeys: untrusted.DKGParticipantKeys,
+		DKGIndexMap:        untrusted.DKGIndexMap,
 	}
 }
 
@@ -405,12 +393,14 @@ func commitFromEncodable(enc encodableCommit) EpochCommit {
 	for _, key := range enc.DKGParticipantKeys {
 		dkgKeys = append(dkgKeys, key.PublicKey)
 	}
-	return NewEpochCommit(
-		enc.Counter,
-		enc.ClusterQCs,
-		enc.DKGGroupKey.PublicKey,
-		dkgKeys,
-		enc.DKGIndexMap,
+	return *NewEpochCommit(
+		UntrustedEpochCommit{
+			Counter:            enc.Counter,
+			ClusterQCs:         enc.ClusterQCs,
+			DKGGroupKey:        enc.DKGGroupKey.PublicKey,
+			DKGParticipantKeys: dkgKeys,
+			DKGIndexMap:        enc.DKGIndexMap,
+		},
 	)
 }
 

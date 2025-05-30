@@ -44,39 +44,43 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 	currentCounter := uint64(999)
 
 	currentEpochSetup := flow.NewEpochSetup(
-		currentCounter,
-		0,
-		150,
-		200,
-		250,
-		300,
-		s.netIDs.ToSkeleton(),
-		nil,
-		unittest.EpochSetupRandomSourceFixture(),
-		0, // cruise control ignored in this test
-		0,
+		flow.UntrustedEpochSetup{
+			Counter:            currentCounter,
+			FirstView:          0,
+			DKGPhase1FinalView: 150,
+			DKGPhase2FinalView: 200,
+			DKGPhase3FinalView: 250,
+			FinalView:          300,
+			Participants:       s.netIDs.ToSkeleton(),
+			Assignments:        nil,
+			RandomSource:       unittest.EpochSetupRandomSourceFixture(),
+			TargetDuration:     0, // cruise control ignored in this test
+			TargetEndTime:      0,
+		},
 	)
 
 	// create the EpochSetup that will trigger the next DKG run with all the
 	// desired parameters
 	nextEpochSetup := flow.NewEpochSetup(
-		currentCounter+1,
-		301,
-		0, // DKG config ignored in this test
-		0,
-		0,
-		600,
-		s.netIDs.ToSkeleton(),
-		nil,
-		unittest.EpochSetupRandomSourceFixture(),
-		0, // cruise control ignored in this test
-		0,
+		flow.UntrustedEpochSetup{
+			Counter:            currentCounter + 1,
+			FirstView:          301,
+			DKGPhase1FinalView: 0, // DKG config ignored in this test
+			DKGPhase2FinalView: 0,
+			DKGPhase3FinalView: 0,
+			FinalView:          600,
+			Participants:       s.netIDs.ToSkeleton(),
+			Assignments:        nil,
+			RandomSource:       unittest.EpochSetupRandomSourceFixture(),
+			TargetDuration:     0, // cruise control ignored in this test
+			TargetEndTime:      0,
+		},
 	)
 
 	firstBlock := &flow.Header{View: 100}
 
 	for _, node := range nodes {
-		node.setEpochs(s.T(), currentEpochSetup, nextEpochSetup, firstBlock)
+		node.setEpochs(s.T(), *currentEpochSetup, *nextEpochSetup, firstBlock)
 		node.Start()
 		unittest.RequireCloseBefore(s.T(), node.Ready(), time.Second, "failed to start up")
 	}
