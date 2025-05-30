@@ -10,6 +10,8 @@ import (
 
 	cadence "github.com/onflow/cadence"
 
+	cadenceruntime "github.com/onflow/cadence/runtime"
+
 	common "github.com/onflow/cadence/common"
 
 	environment "github.com/onflow/flow-go/fvm/environment"
@@ -300,17 +302,17 @@ func (_m *Environment) CheckPayerBalanceAndGetMaxTxFees(payer flow.Address, incl
 	return r0, r1
 }
 
-// ComputationAvailable provides a mock function with given fields: _a0, _a1
-func (_m *Environment) ComputationAvailable(_a0 common.ComputationKind, _a1 uint) bool {
-	ret := _m.Called(_a0, _a1)
+// ComputationAvailable provides a mock function with given fields: _a0
+func (_m *Environment) ComputationAvailable(_a0 common.ComputationUsage) bool {
+	ret := _m.Called(_a0)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ComputationAvailable")
 	}
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(common.ComputationKind, uint) bool); ok {
-		r0 = rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(common.ComputationUsage) bool); ok {
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -928,27 +930,27 @@ func (_m *Environment) GetInterpreterSharedState() *interpreter.SharedState {
 }
 
 // GetOrLoadProgram provides a mock function with given fields: location, load
-func (_m *Environment) GetOrLoadProgram(location common.Location, load func() (*interpreter.Program, error)) (*interpreter.Program, error) {
+func (_m *Environment) GetOrLoadProgram(location common.Location, load func() (*cadenceruntime.Program, error)) (*cadenceruntime.Program, error) {
 	ret := _m.Called(location, load)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetOrLoadProgram")
 	}
 
-	var r0 *interpreter.Program
+	var r0 *cadenceruntime.Program
 	var r1 error
-	if rf, ok := ret.Get(0).(func(common.Location, func() (*interpreter.Program, error)) (*interpreter.Program, error)); ok {
+	if rf, ok := ret.Get(0).(func(common.Location, func() (*cadenceruntime.Program, error)) (*cadenceruntime.Program, error)); ok {
 		return rf(location, load)
 	}
-	if rf, ok := ret.Get(0).(func(common.Location, func() (*interpreter.Program, error)) *interpreter.Program); ok {
+	if rf, ok := ret.Get(0).(func(common.Location, func() (*cadenceruntime.Program, error)) *cadenceruntime.Program); ok {
 		r0 = rf(location, load)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*interpreter.Program)
+			r0 = ret.Get(0).(*cadenceruntime.Program)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(common.Location, func() (*interpreter.Program, error)) error); ok {
+	if rf, ok := ret.Get(1).(func(common.Location, func() (*cadenceruntime.Program, error)) error); ok {
 		r1 = rf(location, load)
 	} else {
 		r1 = ret.Error(1)
@@ -1281,17 +1283,17 @@ func (_m *Environment) MemoryUsed() (uint64, error) {
 	return r0, r1
 }
 
-// MeterComputation provides a mock function with given fields: operationType, intensity
-func (_m *Environment) MeterComputation(operationType common.ComputationKind, intensity uint) error {
-	ret := _m.Called(operationType, intensity)
+// MeterComputation provides a mock function with given fields: usage
+func (_m *Environment) MeterComputation(usage common.ComputationUsage) error {
+	ret := _m.Called(usage)
 
 	if len(ret) == 0 {
 		panic("no return value specified for MeterComputation")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(common.ComputationKind, uint) error); ok {
-		r0 = rf(operationType, intensity)
+	if rf, ok := ret.Get(0).(func(common.ComputationUsage) error); ok {
+		r0 = rf(usage)
 	} else {
 		r0 = ret.Error(0)
 	}
