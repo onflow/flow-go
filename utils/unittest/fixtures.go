@@ -1699,21 +1699,21 @@ func WithChunkID(chunkID flow.Identifier) func(*verification.ChunkDataPackReques
 func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest)) *verification.
 	ChunkDataPackRequest {
 
-	req := &verification.ChunkDataPackRequest{
-		Locator: chunks.Locator{
+	req := verification.NewChunkDataPackRequest(
+		chunks.Locator{
 			ResultID: IdentifierFixture(),
 			Index:    0,
 		},
-		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
+		verification.ChunkDataPackRequestInfo{
 			ChunkID:   IdentifierFixture(),
 			Height:    0,
 			Agrees:    IdentifierListFixture(1),
 			Disagrees: IdentifierListFixture(1),
 		},
-	}
+	)
 
 	for _, opt := range opts {
-		opt(req)
+		opt(&req)
 	}
 
 	// creates identity fixtures for target ids as union of agrees and disagrees
@@ -1728,7 +1728,7 @@ func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest
 
 	req.Targets = targets
 
-	return req
+	return &req
 }
 
 func WithChunkDataPackCollection(collection *flow.Collection) func(*flow.ChunkDataPack) {
