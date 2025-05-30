@@ -107,6 +107,10 @@ func (r *ExecutionReceipts) ByID(receiptID flow.Identifier) (*flow.ExecutionRece
 	return r.byID(receiptID)
 }
 
+// ByBlockID retrieves list of execution receipts from the storage
+//
+// Expected errors during normal operation:
+// - storage.ErrNotFound if no receipts was found in the storage
 func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (flow.ExecutionReceiptList, error) {
 	return r.byBlockID(blockID)
 }

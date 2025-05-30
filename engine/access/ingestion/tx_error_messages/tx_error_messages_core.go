@@ -41,8 +41,8 @@ func NewTxErrorMessagesCore(
 	}
 }
 
-// HandleTransactionResultErrorMessages processes transaction result error messages for a given block ID.
-// It retrieves error messages from the backend if they do not already exist in storage.
+// FetchTransactionResultErrorMessages retrieves transaction result for a given block ID
+// if they do not already exist in storage.
 //
 // The function first checks if error messages for the given block ID are already present in storage.
 // If they are not, it fetches the messages from execution nodes and stores them.
@@ -51,18 +51,59 @@ func NewTxErrorMessagesCore(
 // - ctx: The context for managing cancellation and deadlines during the operation.
 // - blockID: The identifier of the block for which transaction result error messages need to be processed.
 //
-// No errors are expected during normal operation.
-func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessages(ctx context.Context, blockID flow.Identifier) error {
+// Expected errors during normal operation:
+//   - status.Error - GRPC call failed, some of possible codes are:
+//   - codes.NotFound - request cannot be served by EN because of absence of data.
+//   - codes.Unavailable - remote node is not unavailable.
+func (c *TxErrorMessagesCore) FetchTransactionResultErrorMessages(ctx context.Context, blockID flow.Identifier) error {
 	execNodes, err := c.execNodeIdentitiesProvider.ExecutionNodesForBlockID(ctx, blockID)
 	if err != nil {
 		c.log.Error().Err(err).Msg(fmt.Sprintf("failed to find execution nodes for block id: %s", blockID))
 		return fmt.Errorf("could not find execution nodes for block: %w", err)
 	}
 
-	return c.HandleTransactionResultErrorMessagesByENs(ctx, blockID, execNodes)
+	return c.FetchTransactionResultErrorMessagesFromENs(ctx, blockID, execNodes)
 }
 
-func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessagesByENs(
+// FetchTransactionResultErrorMessagesByResultID retrieves tx result error messages for a given execution result ID
+// from execution nodes that generated receipts within a specific block.
+//
+// Parameters:
+// - ctx: The context for managing cancellation and deadlines during the operation.
+// - blockID: The identifier of the block containing the execution result.
+// - resultID: The identifier of the specific execution result for which to fetch error messages.
+//
+// Expected errors during normal operation:
+//   - storage.ErrNotFound - if no execution result is found for the given block in the AN's storage.
+//   - rpc.ErrNoExecutionReceiptsFoundOnENs - if execution nodes provided to this operator don't have execution receipts
+//   - status.Error - GRPC call failed, some of possible codes are:
+//   - codes.NotFound - request cannot be served by EN because of absence of data.
+//   - codes.Unavailable - remote node is not unavailable.
+func (c *TxErrorMessagesCore) FetchTransactionResultErrorMessagesByResultID(
+	ctx context.Context,
+	blockID flow.Identifier,
+	resultID flow.Identifier,
+) error {
+	execNodes, err := c.execNodeIdentitiesProvider.ExecutionNodesForResultID(blockID, resultID)
+	if err != nil {
+		c.log.Error().Err(err).
+			Str("block_id", blockID.String()).
+			Str("result_id", resultID.String()).
+			Msg("failed to find execution nodes for specific result ID")
+		return fmt.Errorf("could not find execution nodes for result %v in block %v: %w", resultID, blockID, err)
+	}
+
+	return c.FetchTransactionResultErrorMessagesFromENs(ctx, blockID, execNodes)
+}
+
+// FetchTransactionResultErrorMessagesFromENs fetches transaction result error messages via provided list
+// of execution nodes.
+//
+// Expected errors during normal operation:
+//   - status.Error - GRPC call failed, some of possible codes are:
+//   - codes.NotFound - request cannot be served by EN because of absence of data.
+//   - codes.Unavailable - remote node is not unavailable.
+func (c *TxErrorMessagesCore) FetchTransactionResultErrorMessagesFromENs(
 	ctx context.Context,
 	blockID flow.Identifier,
 	execNodes flow.IdentitySkeletonList,
