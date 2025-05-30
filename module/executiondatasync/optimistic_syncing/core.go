@@ -3,8 +3,8 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -41,9 +41,10 @@ var _ Core = (*CoreImpl)(nil)
 type CoreImpl struct {
 	log zerolog.Logger
 
-	requester *requester.OneshotExecutionDataRequester
-	indexer   *indexer.InMemoryIndexer
-	persister *indexer.Persister
+	execDataRequester *requester.OneshotExecutionDataRequester
+	txErrRequester    *tx_error_messages.TransactionErrorMessagesRequester
+	indexer           *indexer.InMemoryIndexer
+	persister         *indexer.Persister
 
 	executionResult *flow.ExecutionResult
 	header          *flow.Header
@@ -65,14 +66,17 @@ func NewCoreImpl(
 	executionResult *flow.ExecutionResult,
 	header *flow.Header,
 	downloader execution_data.Downloader,
-	requesterConfig requester.OneshotExecutionDataConfig,
-	requesterMetrics module.ExecutionDataRequesterMetrics,
+	txErrCore *tx_error_messages.TxErrorMessagesCore,
+	txErrMsgRequesterConfig tx_error_messages.TransactionErrorMessagesRequesterConfig,
+	execDataRequesterConfig requester.OneshotExecutionDataConfig,
+	execDataRequesterMetrics module.ExecutionDataRequesterMetrics,
 	indexerMetrics module.ExecutionStateIndexerMetrics,
 	persistentRegisters storage.RegisterIndex,
 	persistentEvents storage.Events,
 	persistentCollections storage.Collections,
 	persistentTransactions storage.Transactions,
 	persistentResults storage.LightTransactionResults,
+	persistentTxResultErrMsg storage.TransactionResultErrorMessages,
 	protocolDB storage.DB,
 ) (*CoreImpl, error) {
 	coreLogger := logger.With().
@@ -86,18 +90,21 @@ func NewCoreImpl(
 	collections := unsynchronized.NewCollections()
 	transactions := unsynchronized.NewTransactions()
 	results := unsynchronized.NewLightTransactionResults()
+	txResultErrMsg := unsynchronized.NewTransactionResultErrorMessages()
 
 	requesterComponent, err := requester.NewOneshotExecutionDataRequester(
 		coreLogger,
-		requesterMetrics,
+		execDataRequesterMetrics,
 		downloader,
 		executionResult,
 		header,
-		requesterConfig,
+		execDataRequesterConfig,
 	)
 	if err != nil {
 		return nil, err
 	}
+
+	txErrRequester := tx_error_messages.NewTransactionErrorMessagesRequester(txErrCore, &txErrMsgRequesterConfig, executionResult)
 
 	indexerComponent := indexer.NewInMemoryIndexer(
 		coreLogger,
@@ -118,28 +125,31 @@ func NewCoreImpl(
 		collections,
 		transactions,
 		results,
+		txResultErrMsg,
 		persistentRegisters,
 		persistentEvents,
 		persistentCollections,
 		persistentTransactions,
 		persistentResults,
+		persistentTxResultErrMsg,
 		executionResult,
 		header,
 	)
 
 	return &CoreImpl{
-		log:             coreLogger,
-		requester:       requesterComponent,
-		indexer:         indexerComponent,
-		persister:       persisterComponent,
-		executionResult: executionResult,
-		header:          header,
-		registers:       registers,
-		events:          events,
-		collections:     collections,
-		transactions:    transactions,
-		results:         results,
-		protocolDB:      protocolDB,
+		log:               coreLogger,
+		execDataRequester: requesterComponent,
+		txErrRequester:    txErrRequester,
+		indexer:           indexerComponent,
+		persister:         persisterComponent,
+		executionResult:   executionResult,
+		header:            header,
+		registers:         registers,
+		events:            events,
+		collections:       collections,
+		transactions:      transactions,
+		results:           results,
+		protocolDB:        protocolDB,
 	}, nil
 }
 
@@ -154,12 +164,17 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 		Uint64("height", height).
 		Msg("downloading execution data")
 
-	executionData, err := c.requester.RequestExecutionData(ctx)
+	executionData, err := c.execDataRequester.RequestExecutionData(ctx)
 	if err != nil {
 		return err
 	}
 
 	c.executionData = execution_data.NewBlockExecutionDataEntity(c.executionResult.ExecutionDataID, executionData)
+
+	err = c.txErrRequester.RequestTransactionErrorMessages(ctx)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -177,6 +192,7 @@ func (c *CoreImpl) Index(ctx context.Context) error {
 	return c.indexer.IndexBlockData(c.executionData)
 }
 
+// TODO: Populate the exec cache with exec data during peersist.
 // Persist implements the Core.Persist method.
 // It persists the indexed data to permanent storage atomically.
 func (c *CoreImpl) Persist(ctx context.Context) error {
@@ -228,7 +244,7 @@ func (c *CoreImpl) Abandon(ctx context.Context) error {
 	c.results = nil
 
 	// Clear other references
-	c.requester = nil
+	c.execDataRequester = nil
 	c.indexer = nil
 	c.persister = nil
 

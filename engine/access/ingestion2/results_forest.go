@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -135,6 +136,11 @@ func (f *ResultsForest) pipelineManagerLoop(ctx irrecoverable.SignalerContext, r
 							container.result,
 							container.blockHeader,
 							nil,
+							nil,
+							tx_error_messages.TransactionErrorMessagesRequesterConfig{
+								RetryDelay:    requester.DefaultRetryDelay,
+								MaxRetryDelay: requester.DefaultMaxRetryDelay,
+							},
 							requester.OneshotExecutionDataConfig{
 								FetchTimeout:    requester.DefaultFetchTimeout,
 								MaxFetchTimeout: requester.DefaultMaxFetchTimeout,
@@ -149,9 +155,10 @@ func (f *ResultsForest) pipelineManagerLoop(ctx irrecoverable.SignalerContext, r
 							nil,
 							nil,
 							nil,
+							nil,
 						)
 						if err != nil {
-							ctx.Throw(fmt.Errorf("core creation failed (result: %s): %w", container.resultID, err)
+							ctx.Throw(fmt.Errorf("core creation failed (result: %s): %w", container.resultID, err))
 						}
 
 						err = container.pipeline.Run(ctx, core)

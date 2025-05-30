@@ -13,12 +13,12 @@ type Core struct {
 	mock.Mock
 }
 
-// Abort provides a mock function with given fields: ctx
-func (_m *Core) Abort(ctx context.Context) error {
+// Abandon provides a mock function with given fields: ctx
+func (_m *Core) Abandon(ctx context.Context) error {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Abort")
+		panic("no return value specified for Abandon")
 	}
 
 	var r0 error
