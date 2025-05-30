@@ -168,7 +168,12 @@ func (info *accountInfo) GetStorageUsed(
 ) {
 	defer info.tracer.StartChildSpan(trace.FVMEnvGetStorageUsed).End()
 
-	err := info.meter.MeterComputation(ComputationKindGetStorageUsed, 1)
+	err := info.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindGetStorageUsed,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return 0, fmt.Errorf("get storage used failed: %w", err)
 	}
@@ -198,7 +203,12 @@ func (info *accountInfo) GetStorageCapacity(
 ) {
 	defer info.tracer.StartChildSpan(trace.FVMEnvGetStorageCapacity).End()
 
-	err := info.meter.MeterComputation(ComputationKindGetStorageCapacity, 1)
+	err := info.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindGetStorageCapacity,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return 0, fmt.Errorf("get storage capacity failed: %w", err)
 	}
@@ -223,7 +233,12 @@ func (info *accountInfo) GetAccountBalance(
 ) {
 	defer info.tracer.StartChildSpan(trace.FVMEnvGetAccountBalance).End()
 
-	err := info.meter.MeterComputation(ComputationKindGetAccountBalance, 1)
+	err := info.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindGetAccountBalance,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return 0, fmt.Errorf("get account balance failed: %w", err)
 	}
@@ -246,8 +261,11 @@ func (info *accountInfo) GetAccountAvailableBalance(
 		trace.FVMEnvGetAccountAvailableBalance).End()
 
 	err := info.meter.MeterComputation(
-		ComputationKindGetAccountAvailableBalance,
-		1)
+		common.ComputationUsage{
+			Kind:      ComputationKindGetAccountAvailableBalance,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return 0, fmt.Errorf("get account available balance failed: %w", err)
 	}
