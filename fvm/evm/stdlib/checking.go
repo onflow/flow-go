@@ -2,7 +2,6 @@ package stdlib
 
 import (
 	"github.com/onflow/cadence/common"
-	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/environment"
@@ -14,7 +13,7 @@ import (
 type checkingInterface struct {
 	runtime.EmptyRuntimeInterface
 	SystemContractCodes   map[common.Location][]byte
-	Programs              map[runtime.Location]*interpreter.Program
+	Programs              map[runtime.Location]*runtime.Program
 	cryptoContractAddress common.Address
 }
 
@@ -37,13 +36,13 @@ func (i *checkingInterface) ResolveLocation(
 
 func (i *checkingInterface) GetOrLoadProgram(
 	location runtime.Location,
-	load func() (*interpreter.Program, error),
+	load func() (*runtime.Program, error),
 ) (
-	program *interpreter.Program,
+	program *runtime.Program,
 	err error,
 ) {
 	if i.Programs == nil {
-		i.Programs = map[runtime.Location]*interpreter.Program{}
+		i.Programs = map[runtime.Location]*runtime.Program{}
 	}
 
 	var ok bool
