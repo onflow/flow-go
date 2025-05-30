@@ -7,6 +7,7 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 
@@ -44,6 +45,9 @@ type Config struct {
 	exposeMetrics    bool                // whether to expose metrics
 	syncConfig       *chainsync.Config   // sync core configuration
 	complianceConfig *compliance.Config  // follower engine configuration
+	// lock manager for the follower, allows integration tests who run mulitple followers
+	// to be able to use different lock managers.
+	lockManager lockctx.Manager
 }
 
 type Option func(c *Config)
@@ -88,6 +92,12 @@ func WithSyncCoreConfig(config *chainsync.Config) Option {
 func WithComplianceConfig(config *compliance.Config) Option {
 	return func(c *Config) {
 		c.complianceConfig = config
+	}
+}
+
+func WithLockManager(lockManager lockctx.Manager) Option {
+	return func(c *Config) {
+		c.lockManager = lockManager
 	}
 }
 
@@ -186,6 +196,7 @@ func NewConsensusFollower(
 		pebbleDB:       nil,
 		logLevel:       "info",
 		exposeMetrics:  false,
+		lockManager:    nil, // default to nil, can be set optionally with WithLockManager in tests
 	}
 
 	for _, opt := range opts {

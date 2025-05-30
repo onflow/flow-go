@@ -25,6 +25,11 @@ func makeLockPolicy() lockctx.Policy {
 		Build()
 }
 
+func NewLockManager() lockctx.Manager {
+	// Create a new lockctx manager with the storage locks and the lock policy.
+	return lockctx.NewManager(storage.Locks(), makeLockPolicy())
+}
+
 // LockManagerFactory is for creating a singleton lockctx manager
 // The factory can only create a single manager, by ensuring the
 // NewLockManagerFactory function is only called once, only one
