@@ -5998,7 +5998,7 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 		message := result.(cadence.Struct).
 			SearchFieldByName("problem").(cadence.Optional).
 			Value.(cadence.String).String()
-		require.Equal(t, "\"the given signatures are not valid or provide enough weight\"", message)
+		require.Equal(t, "\"EVM.validateCOAOwnershipProof(): Cannot validate COA ownership for Cadence account 0x0000000000000001. The given signatures are not valid or provide enough weight.\"", message)
 	})
 }
 
