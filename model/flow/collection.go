@@ -41,7 +41,7 @@ func (c Collection) Light() LightCollection {
 
 // Guarantee returns a collection guarantee for this collection.
 func (c *Collection) Guarantee() CollectionGuarantee {
-	return NewCollectionGuarantee(
+	return *NewCollectionGuarantee(
 		c.ID(),
 		Identifier{},
 		ChainID(""),

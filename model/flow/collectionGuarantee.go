@@ -23,8 +23,8 @@ func NewCollectionGuarantee(
 	referenceBlockID Identifier,
 	chainID ChainID,
 	signerIndices []byte,
-	signature crypto.Signature) CollectionGuarantee {
-	return CollectionGuarantee{
+	signature crypto.Signature) *CollectionGuarantee {
+	return &CollectionGuarantee{
 		CollectionID:     collectionID,
 		ReferenceBlockID: referenceBlockID,
 		ChainID:          chainID,

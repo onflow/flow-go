@@ -168,7 +168,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				nil, // TODO: to remove because it's not easily verifiable by consensus nodes
 			)
 
-			f.pusher.SubmitCollectionGuarantee(&guarantee)
+			f.pusher.SubmitCollectionGuarantee(guarantee)
 		}
 
 		return nil
