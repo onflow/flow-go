@@ -251,7 +251,8 @@ func TestWithWhiteboard(t *testing.T) {
 		bootstrapNodesInfo,
 		currentEpochSetup,
 		nextEpochSetup,
-		firstBlock)
+		firstBlock,
+	)
 
 	for _, node := range nodes {
 		node.Start()

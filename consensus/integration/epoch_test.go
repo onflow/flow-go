@@ -260,8 +260,11 @@ func withNextEpoch(
 		minEpochStateEntry,
 		rootProtocolState.EpochEntry.PreviousEpochSetup,
 		rootProtocolState.EpochEntry.PreviousEpochCommit,
-		currEpochSetup, currEpochCommit,
-		nextEpochSetup, nextEpochCommit)
+		currEpochSetup,
+		currEpochCommit,
+		nextEpochSetup,
+		nextEpochCommit,
+	)
 	require.NoError(t, err)
 	// Re-construct epoch protocol state with modified events (constructs ActiveIdentity fields)
 	epochRichProtocolState, err := flow.NewRichEpochStateEntry(epochStateEntry)
