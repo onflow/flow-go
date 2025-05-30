@@ -3,12 +3,12 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/storage"
@@ -29,9 +29,12 @@ type Core interface {
 	// Persist stores the indexed data in permanent storage.
 	Persist(ctx context.Context) error
 
-	// Abort performs any necessary cleanup in case of failure.
-	Abort(ctx context.Context) error
+	// Abandon indicates that the protocol has abandoned this state. Hence processing will be aborted
+	// and any data dropped.
+	Abandon(ctx context.Context) error
 }
+
+var _ Core = (*CoreImpl)(nil)
 
 // CoreImpl implements the Core interface for processing execution data.
 // It coordinates the download, indexing, and persisting of execution data.
@@ -42,15 +45,16 @@ type CoreImpl struct {
 	indexer   *indexer.InMemoryIndexer
 	persister *indexer.Persister
 
-	executionResult    *flow.ExecutionResult
-	header             *flow.Header
-	executionDataCache *cache.ExecutionDataCache
+	executionResult *flow.ExecutionResult
+	header          *flow.Header
 
 	registers    *unsynchronized.Registers
 	events       *unsynchronized.Events
 	collections  *unsynchronized.Collections
 	transactions *unsynchronized.Transactions
 	results      *unsynchronized.LightTransactionResults
+
+	executionData *execution_data.BlockExecutionDataEntity
 
 	protocolDB storage.DB
 }
@@ -60,7 +64,7 @@ func NewCoreImpl(
 	logger zerolog.Logger,
 	executionResult *flow.ExecutionResult,
 	header *flow.Header,
-	executionDataCache *cache.ExecutionDataCache,
+	downloader execution_data.Downloader,
 	requesterConfig requester.OneshotExecutionDataConfig,
 	requesterMetrics module.ExecutionDataRequesterMetrics,
 	indexerMetrics module.ExecutionStateIndexerMetrics,
@@ -70,7 +74,7 @@ func NewCoreImpl(
 	persistentTransactions storage.Transactions,
 	persistentResults storage.LightTransactionResults,
 	protocolDB storage.DB,
-) *CoreImpl {
+) (*CoreImpl, error) {
 	coreLogger := logger.With().
 		Str("component", "execution_data_core").
 		Str("execution_result_id", executionResult.ID().String()).
@@ -83,12 +87,17 @@ func NewCoreImpl(
 	transactions := unsynchronized.NewTransactions()
 	results := unsynchronized.NewLightTransactionResults()
 
-	requesterComponent := requester.NewOneshotExecutionDataRequester(
+	requesterComponent, err := requester.NewOneshotExecutionDataRequester(
 		coreLogger,
 		requesterMetrics,
-		executionDataCache,
+		downloader,
+		executionResult,
+		header,
 		requesterConfig,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	indexerComponent := indexer.NewInMemoryIndexer(
 		coreLogger,
@@ -119,20 +128,19 @@ func NewCoreImpl(
 	)
 
 	return &CoreImpl{
-		log:                coreLogger,
-		requester:          requesterComponent,
-		indexer:            indexerComponent,
-		persister:          persisterComponent,
-		executionResult:    executionResult,
-		header:             header,
-		executionDataCache: executionDataCache,
-		registers:          registers,
-		events:             events,
-		collections:        collections,
-		transactions:       transactions,
-		results:            results,
-		protocolDB:         protocolDB,
-	}
+		log:             coreLogger,
+		requester:       requesterComponent,
+		indexer:         indexerComponent,
+		persister:       persisterComponent,
+		executionResult: executionResult,
+		header:          header,
+		registers:       registers,
+		events:          events,
+		collections:     collections,
+		transactions:    transactions,
+		results:         results,
+		protocolDB:      protocolDB,
+	}, nil
 }
 
 // Download implements the Core.Download method.
@@ -146,7 +154,14 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 		Uint64("height", height).
 		Msg("downloading execution data")
 
-	return c.requester.RequestExecutionData(ctx, blockID, height)
+	executionData, err := c.requester.RequestExecutionData(ctx)
+	if err != nil {
+		return err
+	}
+
+	c.executionData = execution_data.NewBlockExecutionDataEntity(c.executionResult.ExecutionDataID, executionData)
+
+	return nil
 }
 
 // Index implements the Core.Index method.
@@ -159,13 +174,7 @@ func (c *CoreImpl) Index(ctx context.Context) error {
 		Uint64("height", c.header.Height).
 		Msg("indexing execution data")
 
-	// Retrieve the execution data from the cache
-	execData, err := c.executionDataCache.ByBlockID(ctx, blockID)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve execution data: %w", err)
-	}
-
-	return c.indexer.IndexBlockData(execData)
+	return c.indexer.IndexBlockData(c.executionData)
 }
 
 // Persist implements the Core.Persist method.
@@ -202,9 +211,9 @@ func (c *CoreImpl) Persist(ctx context.Context) error {
 	return nil
 }
 
-// Abort cleans up resources used by the core.
+// Abandon cleans up resources used by the core.
 // It's called when the pipeline is canceled to free memory and resources.
-func (c *CoreImpl) Abort(ctx context.Context) error {
+func (c *CoreImpl) Abandon(ctx context.Context) error {
 	c.log.Debug().
 		Hex("block_id", logging.ID(c.executionResult.BlockID)).
 		Uint64("height", c.header.Height).
