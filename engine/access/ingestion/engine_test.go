@@ -411,7 +411,7 @@ func (s *Suite) TestOnCollection() {
 		},
 	)
 
-	err := indexer.HandleCollection(&collection, s.collections, s.transactions, s.log, s.collectionExecutedMetric)
+	err := indexer.IndexCollection(&collection, s.collections, s.transactions, s.log, s.collectionExecutedMetric)
 	require.NoError(s.T(), err)
 
 	// check that the collection was stored and indexed, and we stored all transactions
@@ -493,7 +493,7 @@ func (s *Suite) TestOnCollectionDuplicate() {
 		},
 	)
 
-	err := indexer.HandleCollection(&collection, s.collections, s.transactions, s.log, s.collectionExecutedMetric)
+	err := indexer.IndexCollection(&collection, s.collections, s.transactions, s.log, s.collectionExecutedMetric)
 	require.NoError(s.T(), err)
 
 	// check that the collection was stored and indexed, and we stored all transactions
