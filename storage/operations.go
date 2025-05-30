@@ -173,6 +173,9 @@ type DB interface {
 
 	// NewBatch create a new batch for writing.
 	NewBatch() Batch
+
+	// Close closes the database and releases all resources.
+	Close() error
 }
 
 // Batch is an interface for a batch of writes to a storage backend.
