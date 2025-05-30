@@ -305,12 +305,12 @@ func TestPayloadWithoutPrefixSerialization(t *testing.T) {
 	})
 
 	t.Run("decoding", func(t *testing.T) {
-		// decode payload without prefix encoding in verison 0
+		// decode payload without prefix encoding in version 0
 		decodedp, err := ledger.DecodePayloadWithoutPrefix(encodedV0, true, 0)
 		require.NoError(t, err)
 		require.Equal(t, p, decodedp)
 
-		// decode payload without prefix encoding in verison 1
+		// decode payload without prefix encoding in version 1
 		decodedp, err = ledger.DecodePayloadWithoutPrefix(encodedV1, true, 1)
 		require.NoError(t, err)
 		require.Equal(t, p, decodedp)

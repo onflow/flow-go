@@ -20,7 +20,7 @@ const encodingDecodingVersion = uint16(0)
 // getNodeFunc returns node by nodeIndex along with node's regCount and regSize.
 type getNodeFunc func(nodeIndex uint64) (n *node.Node, regCount uint64, regSize uint64, err error)
 
-// ReadNodeFromCheckpointV3AndEarlier returns a node recontructed from data in
+// ReadNodeFromCheckpointV3AndEarlier returns a node reconstructed from data in
 // checkpoint v3 and earlier versions.  It also returns node's regCount and regSize.
 // Encoded node in checkpoint v3 and earlier is in the following format:
 // - version (2 bytes)
