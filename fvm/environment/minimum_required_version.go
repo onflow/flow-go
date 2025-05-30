@@ -38,28 +38,29 @@ func NewVersionBeaconExecutionVersionProvider(getVersionBeacon GetVersionBeaconF
 
 func (v *VersionBeaconExecutionVersionProvider) ExecutionVersion() (semver.Version, error) {
 	v.once.Do(func() {
-		vb, err := v.getVersionBeacon()
-		if err != nil {
-			v.cachedErr = err
-			return
-		}
-		// Special case. If there are no version boundaries, then the execution version is 0.0.0.
-		if vb == nil || len(vb.VersionBoundaries) == 0 {
-			v.cachedVersion = semver.Version{}
-			return
-		}
-
-		// by definition zero boundary is the last most recent past boundary
-		boundary := vb.VersionBoundaries[0]
-		sv, err := boundary.Semver()
-		if err != nil {
-			v.cachedErr = err
-			return
-		}
-		v.cachedVersion = *sv
+		v.cachedVersion, v.cachedErr = v.queryExecutionVersion()
 	})
 
 	return v.cachedVersion, v.cachedErr
+}
+
+func (v *VersionBeaconExecutionVersionProvider) queryExecutionVersion() (semver.Version, error) {
+	vb, err := v.getVersionBeacon()
+	if err != nil {
+		return semver.Version{}, err
+	}
+	// Special case. If there are no version boundaries, then the execution version is 0.0.0.
+	if vb == nil || len(vb.VersionBoundaries) == 0 {
+		return semver.Version{}, nil
+	}
+
+	// by definition zero boundary is the last most recent past boundary
+	boundary := vb.VersionBoundaries[0]
+	sv, err := boundary.Semver()
+	if err != nil {
+		return semver.Version{}, err
+	}
+	return *sv, nil
 }
 
 type ZeroExecutionVersionProvider struct{}
