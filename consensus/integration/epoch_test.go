@@ -221,31 +221,22 @@ func withNextEpoch(
 	currEpochSetup.FinalView = currEpochSetup.FirstView + curEpochViews - 1
 
 	// Construct events for next epoch
-	nextEpochSetup := flow.NewEpochSetup(
-		flow.UntrustedEpochSetup{
-			Counter:            currEpochSetup.Counter + 1,
-			FirstView:          currEpochSetup.FinalView + 1,
-			DKGPhase1FinalView: 0, // DKG ignored in this test
-			DKGPhase2FinalView: 0,
-			DKGPhase3FinalView: 0,
-			FinalView:          currEpochSetup.FinalView + 1 + 10_000,
-			Participants:       nextEpochIdentities.ToSkeleton(),
-			Assignments:        unittest.ClusterAssignment(1, nextEpochIdentities.ToSkeleton()),
-			RandomSource:       unittest.SeedFixture(flow.EpochSetupRandomSourceLength),
-			TargetDuration:     0, // cruise control ignored in this test
-			TargetEndTime:      0,
-		},
-	)
+	nextEpochSetup := &flow.EpochSetup{
+		Counter:      currEpochSetup.Counter + 1,
+		FirstView:    currEpochSetup.FinalView + 1,
+		FinalView:    currEpochSetup.FinalView + 1 + 10_000,
+		RandomSource: unittest.SeedFixture(flow.EpochSetupRandomSourceLength),
+		Participants: nextEpochIdentities.ToSkeleton(),
+		Assignments:  unittest.ClusterAssignment(1, nextEpochIdentities.ToSkeleton()),
+	}
 	dkgIndexMap, dkgParticipantKeys := nextEpochParticipantData.DKGData()
-	nextEpochCommit := flow.NewEpochCommit(
-		flow.UntrustedEpochCommit{
-			Counter:            nextEpochSetup.Counter,
-			ClusterQCs:         currEpochCommit.ClusterQCs,
-			DKGGroupKey:        nextEpochParticipantData.DKGGroupKey,
-			DKGParticipantKeys: dkgParticipantKeys,
-			DKGIndexMap:        dkgIndexMap,
-		},
-	)
+	nextEpochCommit := &flow.EpochCommit{
+		Counter:            nextEpochSetup.Counter,
+		ClusterQCs:         currEpochCommit.ClusterQCs,
+		DKGParticipantKeys: dkgParticipantKeys,
+		DKGGroupKey:        nextEpochParticipantData.DKGGroupKey,
+		DKGIndexMap:        dkgIndexMap,
+	}
 
 	// Construct the new min epoch state entry
 	minEpochStateEntry := &flow.MinEpochStateEntry{

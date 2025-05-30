@@ -3,7 +3,9 @@ package flow
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
+	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/fxamacker/cbor/v2"
@@ -152,11 +154,41 @@ type EpochSetup struct {
 	TargetEndTime      uint64               // desired real-world end time for the epoch in UNIX time [seconds]
 }
 
+// UntrustedEpochSetup is an untrusted input-only representation of an EpochSetup,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedEpochSetup should be validated and converted into
+// a trusted EpochSetup using NewEpochSetup constructor.
 type UntrustedEpochSetup EpochSetup
 
 // NewEpochSetup creates a new instance of EpochSetup.
 // Construction EpochSetup allowed only within the constructor.
-func NewEpochSetup(untrusted UntrustedEpochSetup) *EpochSetup {
+func NewEpochSetup(untrusted UntrustedEpochSetup) (*EpochSetup, error) {
+	if untrusted.FirstView > untrusted.FinalView {
+		return nil, fmt.Errorf("first view %d is greater than the final view %d", untrusted.FirstView, untrusted.FinalView)
+	}
+	if untrusted.Participants == nil {
+		return nil, fmt.Errorf("participants is nil")
+	}
+	if untrusted.Assignments == nil {
+		return nil, fmt.Errorf("assignments is nil")
+	}
+	if len(untrusted.RandomSource) != EpochSetupRandomSourceLength {
+		return nil, fmt.Errorf(
+			"random source must be of (%d) bytes, got (%d)",
+			EpochSetupRandomSourceLength,
+			len(untrusted.RandomSource),
+		)
+	}
+
+	if untrusted.TargetEndTime <= uint64(time.Now().Unix()) {
+		return nil, fmt.Errorf("epoch setup target end time is before current time")
+	}
+
 	return &EpochSetup{
 		Counter:            untrusted.Counter,
 		FirstView:          untrusted.FirstView,
@@ -169,7 +201,7 @@ func NewEpochSetup(untrusted UntrustedEpochSetup) *EpochSetup {
 		RandomSource:       untrusted.RandomSource,
 		TargetDuration:     untrusted.TargetDuration,
 		TargetEndTime:      untrusted.TargetEndTime,
-	}
+	}, nil
 }
 
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {
@@ -228,15 +260,33 @@ type EpochRecover struct {
 	EpochCommit EpochCommit
 }
 
+// UntrustedEpochRecover is an untrusted input-only representation of an EpochRecover,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedEpochRecover should be validated and converted into
+// a trusted EpochRecover using NewEpochRecover constructor.
 type UntrustedEpochRecover EpochRecover
 
 // NewEpochRecover creates a new instance of EpochRecover.
 // Construction EpochRecover allowed only within the constructor.
-func NewEpochRecover(untrusted UntrustedEpochRecover) *EpochRecover {
+func NewEpochRecover(untrusted UntrustedEpochRecover) (*EpochRecover, error) {
+	// EpochSetup and must be non-empty and is intended to be constructed solely through the constructor.
+	if untrusted.EpochSetup.EqualTo(new(EpochSetup)) {
+		return nil, fmt.Errorf("EpochSetup is empty")
+	}
+	// EpochCommit and must be non-empty and is intended to be constructed solely through the constructor.
+	if untrusted.EpochCommit.EqualTo(new(EpochCommit)) {
+		return nil, fmt.Errorf("EpochCommit is empty")
+	}
+
 	return &EpochRecover{
 		EpochSetup:  untrusted.EpochSetup,
 		EpochCommit: untrusted.EpochCommit,
-	}
+	}, nil
 }
 
 func (er *EpochRecover) ServiceEvent() ServiceEvent {
@@ -304,18 +354,38 @@ type EpochCommit struct {
 	DKGIndexMap DKGIndexMap
 }
 
+// UntrustedEpochCommit is an untrusted input-only representation of an EpochCommit,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedEpochCommit should be validated and converted into
+// a trusted EpochCommit using NewEpochCommit constructor.
 type UntrustedEpochCommit EpochCommit
 
 // NewEpochCommit creates a new instance of EpochCommit.
 // Construction EpochCommit allowed only within the constructor.
-func NewEpochCommit(untrusted UntrustedEpochCommit) *EpochCommit {
+func NewEpochCommit(untrusted UntrustedEpochCommit) (*EpochCommit, error) {
+	if untrusted.ClusterQCs == nil {
+		return nil, fmt.Errorf("cluster QCs is nil")
+	}
+	if untrusted.DKGGroupKey == nil {
+		return nil, fmt.Errorf("DKG group key is nil")
+
+	}
+	if len(untrusted.DKGParticipantKeys) != len(untrusted.DKGIndexMap) {
+		return nil, fmt.Errorf("mismatched lengths — DKGParticipantKeys (%d) vs DKGIndexMap (%d)", len(untrusted.DKGParticipantKeys), len(untrusted.DKGIndexMap))
+	}
+
 	return &EpochCommit{
 		Counter:            untrusted.Counter,
 		ClusterQCs:         untrusted.ClusterQCs,
 		DKGGroupKey:        untrusted.DKGGroupKey,
 		DKGParticipantKeys: untrusted.DKGParticipantKeys,
 		DKGIndexMap:        untrusted.DKGIndexMap,
-	}
+	}, nil
 }
 
 // ClusterQCVoteData represents the votes for a cluster quorum certificate, as
@@ -388,12 +458,12 @@ func encodableFromCommit(commit *EpochCommit) encodableCommit {
 	}
 }
 
-func commitFromEncodable(enc encodableCommit) EpochCommit {
+func commitFromEncodable(enc encodableCommit) (*EpochCommit, error) {
 	dkgKeys := make([]crypto.PublicKey, 0, len(enc.DKGParticipantKeys))
 	for _, key := range enc.DKGParticipantKeys {
 		dkgKeys = append(dkgKeys, key.PublicKey)
 	}
-	return *NewEpochCommit(
+	return NewEpochCommit(
 		UntrustedEpochCommit{
 			Counter:            enc.Counter,
 			ClusterQCs:         enc.ClusterQCs,
@@ -404,8 +474,8 @@ func commitFromEncodable(enc encodableCommit) EpochCommit {
 	)
 }
 
-func (commit EpochCommit) MarshalJSON() ([]byte, error) {
-	return json.Marshal(encodableFromCommit(&commit))
+func (commit *EpochCommit) MarshalJSON() ([]byte, error) {
+	return json.Marshal(encodableFromCommit(commit))
 }
 
 func (commit *EpochCommit) UnmarshalJSON(b []byte) error {
@@ -415,7 +485,12 @@ func (commit *EpochCommit) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	*commit = commitFromEncodable(enc)
+	newCommit, err := commitFromEncodable(enc)
+	if err != nil {
+		return err
+	}
+	*commit = *newCommit
+
 	return nil
 }
 
@@ -430,7 +505,12 @@ func (commit *EpochCommit) UnmarshalCBOR(b []byte) error {
 		return err
 	}
 
-	*commit = commitFromEncodable(enc)
+	newCommit, err := commitFromEncodable(enc)
+	if err != nil {
+		return err
+	}
+	*commit = *newCommit
+
 	return nil
 }
 
@@ -444,7 +524,12 @@ func (commit *EpochCommit) UnmarshalMsgpack(b []byte) error {
 	if err != nil {
 		return err
 	}
-	*commit = commitFromEncodable(enc)
+	newCommit, err := commitFromEncodable(enc)
+	if err != nil {
+		return err
+	}
+	*commit = *newCommit
+
 	return nil
 }
 

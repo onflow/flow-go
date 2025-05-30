@@ -225,39 +225,23 @@ func TestWithWhiteboard(t *testing.T) {
 	// we arbitrarily use 999 as the current epoch counter
 	currentCounter := uint64(999)
 
-	currentEpochSetup := flow.NewEpochSetup(
-		flow.UntrustedEpochSetup{
-			Counter:            currentCounter,
-			FirstView:          0,
-			DKGPhase1FinalView: 150,
-			DKGPhase2FinalView: 200,
-			DKGPhase3FinalView: 250,
-			FinalView:          300,
-			Participants:       conIdentities.ToSkeleton(),
-			Assignments:        nil,
-			RandomSource:       unittest.EpochSetupRandomSourceFixture(),
-			TargetDuration:     0, // cruise control ignored in this test
-			TargetEndTime:      0,
-		},
-	)
+	currentEpochSetup := flow.EpochSetup{
+		Counter:            currentCounter,
+		DKGPhase1FinalView: 150,
+		DKGPhase2FinalView: 200,
+		DKGPhase3FinalView: 250,
+		FinalView:          300,
+		Participants:       conIdentities.ToSkeleton(),
+		RandomSource:       unittest.EpochSetupRandomSourceFixture(),
+	}
 
 	// create the EpochSetup that will trigger the next DKG run with all the
 	// desired parameters
-	nextEpochSetup := flow.NewEpochSetup(
-		flow.UntrustedEpochSetup{
-			Counter:            currentCounter + 1,
-			FirstView:          0,
-			DKGPhase1FinalView: 0,
-			DKGPhase2FinalView: 0,
-			DKGPhase3FinalView: 0,
-			FinalView:          0,
-			Participants:       conIdentities.ToSkeleton(),
-			Assignments:        nil,
-			RandomSource:       unittest.EpochSetupRandomSourceFixture(),
-			TargetDuration:     0,
-			TargetEndTime:      0,
-		},
-	)
+	nextEpochSetup := flow.EpochSetup{
+		Counter:      currentCounter + 1,
+		Participants: conIdentities.ToSkeleton(),
+		RandomSource: unittest.EpochSetupRandomSourceFixture(),
+	}
 
 	nodes := createNodes(
 		t,
@@ -265,8 +249,8 @@ func TestWithWhiteboard(t *testing.T) {
 		chainID,
 		whiteboard,
 		bootstrapNodesInfo,
-		*currentEpochSetup,
-		*nextEpochSetup,
+		currentEpochSetup,
+		nextEpochSetup,
 		firstBlock,
 	)
 

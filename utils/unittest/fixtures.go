@@ -2159,12 +2159,10 @@ func EpochRecoverFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochRecove
 		WithClusterQCsFromAssignments(setup.Assignments),
 	)
 
-	return flow.NewEpochRecover(
-		flow.UntrustedEpochRecover{
-			EpochSetup:  *setup,
-			EpochCommit: *commit,
-		},
-	)
+	return &flow.EpochRecover{
+		EpochSetup:  *setup,
+		EpochCommit: *commit,
+	}
 }
 
 func IndexFixture() *flow.Index {

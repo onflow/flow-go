@@ -1195,7 +1195,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	targetDuration := networkConf.ViewsInEpoch / networkConf.ViewsPerSecond
 
 	// generate epoch service events
-	epochSetup := flow.NewEpochSetup(
+	epochSetup, err := flow.NewEpochSetup(
 		flow.UntrustedEpochSetup{
 			Counter:            epochCounter,
 			FirstView:          rootHeader.View,
@@ -1210,8 +1210,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 			TargetEndTime:      uint64(time.Now().Unix()) + targetDuration,
 		},
 	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch setup: %w", err)
+	}
 
-	epochCommit := flow.NewEpochCommit(
+	epochCommit, err := flow.NewEpochCommit(
 		flow.UntrustedEpochCommit{
 			Counter:            epochCounter,
 			ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
@@ -1220,6 +1223,10 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 			DKGIndexMap:        dkgIndexMap,
 		},
 	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch commit: %w", err)
+	}
+
 	root := &flow.Block{
 		Header: rootHeader,
 	}

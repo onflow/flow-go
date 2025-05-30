@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
@@ -44,8 +45,8 @@ func constructRootEpochEvents(
 	clusterQCs []*flow.QuorumCertificate,
 	dkgData dkg.ThresholdKeySet,
 	dkgIndexMap flow.DKGIndexMap,
-) (*flow.EpochSetup, *flow.EpochCommit) {
-	epochSetup := flow.NewEpochSetup(
+) (*flow.EpochSetup, *flow.EpochCommit, error) {
+	epochSetup, err := flow.NewEpochSetup(
 		flow.UntrustedEpochSetup{
 			Counter:            flagEpochCounter,
 			FirstView:          firstView,
@@ -60,6 +61,9 @@ func constructRootEpochEvents(
 			TargetEndTime:      rootEpochTargetEndTime(),
 		},
 	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not construct epoch setup: %w", err)
+	}
 
 	qcsWithSignerIDs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clusterQCs))
 	for i, clusterQC := range clusterQCs {
@@ -76,7 +80,7 @@ func constructRootEpochEvents(
 		})
 	}
 
-	epochCommit := flow.NewEpochCommit(
+	epochCommit, err := flow.NewEpochCommit(
 		flow.UntrustedEpochCommit{
 			Counter:            flagEpochCounter,
 			ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
@@ -85,7 +89,11 @@ func constructRootEpochEvents(
 			DKGIndexMap:        dkgIndexMap,
 		},
 	)
-	return epochSetup, epochCommit
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not construct epoch commit: %w", err)
+	}
+
+	return epochSetup, epochCommit, nil
 }
 
 func parseChainID(chainID string) flow.ChainID {
