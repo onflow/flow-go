@@ -151,7 +151,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 			var expectedApproval *flow.ResultApproval
 
 			suite.approvals.
-				On("Store", testifymock.Anything, testifymock.Anything).
+				On("StoreMyApproval", testifymock.Anything, testifymock.Anything).
 				Return(nil).
 				Run(func(args testifymock.Arguments) {
 					ra, ok := args[1].(*flow.ResultApproval)
