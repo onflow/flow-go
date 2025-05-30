@@ -495,7 +495,7 @@ func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 		return
 	}
 
-	err := indexer.HandleCollection(collection, e.collections, e.transactions, e.log, e.collectionExecutedMetric)
+	err := indexer.IndexCollection(collection, e.collections, e.transactions, e.log, e.collectionExecutedMetric)
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not handle collection")
 		return
