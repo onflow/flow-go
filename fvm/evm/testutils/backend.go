@@ -27,7 +27,7 @@ import (
 )
 
 var TestFlowEVMRootAddress = flow.Address{1, 2, 3, 4}
-var TestComputationLimit = uint(100_000_000)
+var TestComputationLimit = uint64(100_000_000)
 
 func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(flow.Address)) {
 	as := environment.NewAccountStatus()
@@ -186,20 +186,20 @@ func getSimpleEventEmitter() *testEventEmitter {
 }
 
 func getSimpleMeter() *testMeter {
-	compUsed := uint(0)
+	compUsed := uint64(0)
 	return &testMeter{
-		meterComputation: func(kind common.ComputationKind, intensity uint) error {
-			compUsed += intensity
+		meterComputation: func(usage common.ComputationUsage) error {
+			compUsed += usage.Intensity
 			if compUsed > TestComputationLimit {
 				return fmt.Errorf("computation limit has hit %d", TestComputationLimit)
 			}
 			return nil
 		},
-		hasComputationCapacity: func(kind common.ComputationKind, intensity uint) bool {
-			return compUsed+intensity < TestComputationLimit
+		hasComputationCapacity: func(usage common.ComputationUsage) bool {
+			return compUsed+usage.Intensity < TestComputationLimit
 		},
 		computationUsed: func() (uint64, error) {
-			return uint64(compUsed), nil
+			return compUsed, nil
 		},
 	}
 }
@@ -272,85 +272,96 @@ type TestValueStore struct {
 var _ environment.ValueStore = &TestValueStore{}
 
 func (vs *TestValueStore) GetValue(owner, key []byte) ([]byte, error) {
-	if vs.GetValueFunc == nil {
+	getValueFunc := vs.GetValueFunc
+	if getValueFunc == nil {
 		panic("method not set")
 	}
-	return vs.GetValueFunc(owner, key)
+	return getValueFunc(owner, key)
 }
 
 func (vs *TestValueStore) SetValue(owner, key, value []byte) error {
-	if vs.SetValueFunc == nil {
+	setValueFunc := vs.SetValueFunc
+	if setValueFunc == nil {
 		panic("method not set")
 	}
-	return vs.SetValueFunc(owner, key, value)
+	return setValueFunc(owner, key, value)
 }
 
 func (vs *TestValueStore) ValueExists(owner, key []byte) (bool, error) {
-	if vs.ValueExistsFunc == nil {
+	valueExistsFunc := vs.ValueExistsFunc
+	if valueExistsFunc == nil {
 		panic("method not set")
 	}
-	return vs.ValueExistsFunc(owner, key)
+	return valueExistsFunc(owner, key)
 }
 
 func (vs *TestValueStore) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
-	if vs.AllocateSlabIndexFunc == nil {
+	allocateSlabIndexFunc := vs.AllocateSlabIndexFunc
+	if allocateSlabIndexFunc == nil {
 		panic("method not set")
 	}
-	return vs.AllocateSlabIndexFunc(owner)
+	return allocateSlabIndexFunc(owner)
 }
 
 func (vs *TestValueStore) TotalBytesRead() int {
-	if vs.TotalBytesReadFunc == nil {
+	totalBytesReadFunc := vs.TotalBytesReadFunc
+	if totalBytesReadFunc == nil {
 		panic("method not set")
 	}
-	return vs.TotalBytesReadFunc()
+	return totalBytesReadFunc()
 }
 
 func (vs *TestValueStore) TotalBytesWritten() int {
-	if vs.TotalBytesWrittenFunc == nil {
+	totalBytesWrittenFunc := vs.TotalBytesWrittenFunc
+	if totalBytesWrittenFunc == nil {
 		panic("method not set")
 	}
-	return vs.TotalBytesWrittenFunc()
+	return totalBytesWrittenFunc()
 }
 
 func (vs *TestValueStore) TotalStorageSize() int {
-	if vs.TotalStorageSizeFunc == nil {
+	totalStorageSizeFunc := vs.TotalStorageSizeFunc
+	if totalStorageSizeFunc == nil {
 		panic("method not set")
 	}
-	return vs.TotalStorageSizeFunc()
+	return totalStorageSizeFunc()
 }
 
 func (vs *TestValueStore) TotalStorageItems() int {
-	if vs.TotalStorageItemsFunc == nil {
+	totalStorageItemsFunc := vs.TotalStorageItemsFunc
+	if totalStorageItemsFunc == nil {
 		panic("method not set")
 	}
-	return vs.TotalStorageItemsFunc()
+	return totalStorageItemsFunc()
 }
 
 func (vs *TestValueStore) ResetStats() {
-	if vs.ResetStatsFunc == nil {
+	resetStatsFunc := vs.ResetStatsFunc
+	if resetStatsFunc == nil {
 		panic("method not set")
 	}
-	vs.ResetStatsFunc()
+	resetStatsFunc()
 }
 
 func (vs *TestValueStore) Clone() *TestValueStore {
-	if vs.CloneFunc == nil {
+	cloneFunc := vs.CloneFunc
+	if cloneFunc == nil {
 		panic("method not set")
 	}
-	return vs.CloneFunc()
+	return cloneFunc()
 }
 
 func (vs *TestValueStore) Dump() (map[string][]byte, map[string]uint64) {
-	if vs.DumpFunc == nil {
+	dumpFunc := vs.DumpFunc
+	if dumpFunc == nil {
 		panic("method not set")
 	}
-	return vs.DumpFunc()
+	return dumpFunc()
 }
 
 type testMeter struct {
-	meterComputation       func(common.ComputationKind, uint) error
-	hasComputationCapacity func(common.ComputationKind, uint) bool
+	meterComputation       func(usage common.ComputationUsage) error
+	hasComputationCapacity func(common.ComputationUsage) bool
 	computationUsed        func() (uint64, error)
 	computationIntensities func() meter.MeteredComputationIntensities
 
@@ -365,73 +376,76 @@ type testMeter struct {
 
 var _ environment.Meter = &testMeter{}
 
-func (m *testMeter) MeterComputation(
-	kind common.ComputationKind,
-	intensity uint,
-) error {
-	if m.meterComputation == nil {
+func (m *testMeter) MeterComputation(usage common.ComputationUsage) error {
+	meterComputation := m.meterComputation
+	if meterComputation == nil {
 		panic("method not set")
 	}
-	return m.meterComputation(kind, intensity)
+	return meterComputation(usage)
 }
 
-func (m *testMeter) ComputationAvailable(
-	kind common.ComputationKind,
-	intensity uint,
-) bool {
-	if m.hasComputationCapacity == nil {
+func (m *testMeter) ComputationAvailable(usage common.ComputationUsage) bool {
+	hasComputationCapacity := m.hasComputationCapacity
+	if hasComputationCapacity == nil {
 		panic("method not set")
 	}
-	return m.hasComputationCapacity(kind, intensity)
+	return hasComputationCapacity(usage)
 }
 
 func (m *testMeter) ComputationIntensities() meter.MeteredComputationIntensities {
-	if m.computationIntensities == nil {
+	computationIntensities := m.computationIntensities
+	if computationIntensities == nil {
 		panic("method not set")
 	}
-	return m.computationIntensities()
+	return computationIntensities()
 }
 
 func (m *testMeter) ComputationUsed() (uint64, error) {
-	if m.computationUsed == nil {
+	computationUsed := m.computationUsed
+	if computationUsed == nil {
 		panic("method not set")
 	}
-	return m.computationUsed()
+	return computationUsed()
 }
 
 func (m *testMeter) MeterMemory(usage common.MemoryUsage) error {
-	if m.meterMemory == nil {
+	meterMemory := m.meterMemory
+	if meterMemory == nil {
 		panic("method not set")
 	}
-	return m.meterMemory(usage)
+	return meterMemory(usage)
 }
 
 func (m *testMeter) MemoryUsed() (uint64, error) {
-	if m.memoryUsed == nil {
+	memoryUsed := m.memoryUsed
+	if memoryUsed == nil {
 		panic("method not set")
 	}
-	return m.memoryUsed()
+	return memoryUsed()
 }
 
 func (m *testMeter) InteractionUsed() (uint64, error) {
-	if m.interactionUsed == nil {
+	interactionUsed := m.interactionUsed
+	if interactionUsed == nil {
 		panic("method not set")
 	}
-	return m.interactionUsed()
+	return interactionUsed()
 }
 
 func (m *testMeter) MeterEmittedEvent(byteSize uint64) error {
-	if m.meterEmittedEvent == nil {
+	meterEmittedEvent := m.meterEmittedEvent
+	if meterEmittedEvent == nil {
 		panic("method not set")
 	}
-	return m.meterEmittedEvent(byteSize)
+	return meterEmittedEvent(byteSize)
 }
 
 func (m *testMeter) TotalEmittedEventBytes() uint64 {
-	if m.totalEmittedEventBytes == nil {
+	totalEmittedEventBytes := m.totalEmittedEventBytes
+	if totalEmittedEventBytes == nil {
 		panic("method not set")
 	}
-	return m.totalEmittedEventBytes()
+	return totalEmittedEventBytes()
 }
 
 type testEventEmitter struct {
@@ -445,38 +459,43 @@ type testEventEmitter struct {
 var _ environment.EventEmitter = &testEventEmitter{}
 
 func (vs *testEventEmitter) EmitEvent(event cadence.Event) error {
-	if vs.emitEvent == nil {
+	emitEvent := vs.emitEvent
+	if emitEvent == nil {
 		panic("method not set")
 	}
-	return vs.emitEvent(event)
+	return emitEvent(event)
 }
 
 func (vs *testEventEmitter) Events() flow.EventsList {
-	if vs.events == nil {
+	events := vs.events
+	if events == nil {
 		panic("method not set")
 	}
-	return vs.events()
+	return events()
 }
 
 func (vs *testEventEmitter) ServiceEvents() flow.EventsList {
-	if vs.serviceEvents == nil {
+	serviceEvents := vs.serviceEvents
+	if serviceEvents == nil {
 		panic("method not set")
 	}
-	return vs.serviceEvents()
+	return serviceEvents()
 }
 
 func (vs *testEventEmitter) ConvertedServiceEvents() flow.ServiceEventList {
-	if vs.convertedServiceEvents == nil {
+	convertedServiceEvents := vs.convertedServiceEvents
+	if convertedServiceEvents == nil {
 		panic("method not set")
 	}
-	return vs.convertedServiceEvents()
+	return convertedServiceEvents()
 }
 
 func (vs *testEventEmitter) Reset() {
-	if vs.reset == nil {
+	reset := vs.reset
+	if reset == nil {
 		panic("method not set")
 	}
-	vs.reset()
+	reset()
 }
 
 type TestBlockInfo struct {
@@ -488,18 +507,20 @@ var _ environment.BlockInfo = &TestBlockInfo{}
 
 // GetCurrentBlockHeight returns the current block height.
 func (tb *TestBlockInfo) GetCurrentBlockHeight() (uint64, error) {
-	if tb.GetCurrentBlockHeightFunc == nil {
+	getCurrentBlockHeightFunc := tb.GetCurrentBlockHeightFunc
+	if getCurrentBlockHeightFunc == nil {
 		panic("GetCurrentBlockHeight method is not set")
 	}
-	return tb.GetCurrentBlockHeightFunc()
+	return getCurrentBlockHeightFunc()
 }
 
 // GetBlockAtHeight returns the block at the given height.
 func (tb *TestBlockInfo) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
-	if tb.GetBlockAtHeightFunc == nil {
+	getBlockAtHeightFunc := tb.GetBlockAtHeightFunc
+	if getBlockAtHeightFunc == nil {
 		panic("GetBlockAtHeight method is not set")
 	}
-	return tb.GetBlockAtHeightFunc(height)
+	return getBlockAtHeightFunc(height)
 }
 
 type TestRandomGenerator struct {
@@ -509,10 +530,11 @@ type TestRandomGenerator struct {
 var _ environment.RandomGenerator = &TestRandomGenerator{}
 
 func (t *TestRandomGenerator) ReadRandom(buffer []byte) error {
-	if t.ReadRandomFunc == nil {
+	readRandomFunc := t.ReadRandomFunc
+	if readRandomFunc == nil {
 		panic("ReadRandomFunc method is not set")
 	}
-	return t.ReadRandomFunc(buffer)
+	return readRandomFunc(buffer)
 }
 
 func getSimpleRandomGenerator() *TestRandomGenerator {
@@ -543,10 +565,11 @@ func (t *TestContractFunctionInvoker) Invoke(
 	cadence.Value,
 	error,
 ) {
-	if t.InvokeFunc == nil {
+	invokeFunc := t.InvokeFunc
+	if invokeFunc == nil {
 		panic("InvokeFunc method is not set")
 	}
-	return t.InvokeFunc(spec, arguments)
+	return invokeFunc(spec, arguments)
 }
 
 type testUUIDGenerator struct {
@@ -556,10 +579,11 @@ type testUUIDGenerator struct {
 var _ environment.UUIDGenerator = &testUUIDGenerator{}
 
 func (t *testUUIDGenerator) GenerateUUID() (uint64, error) {
-	if t.generateUUID == nil {
+	generateUUID := t.generateUUID
+	if generateUUID == nil {
 		panic("generateUUID method is not set")
 	}
-	return t.generateUUID()
+	return generateUUID()
 }
 
 type TestTracer struct {
@@ -573,10 +597,11 @@ func (tt *TestTracer) StartChildSpan(
 	options ...otelTrace.SpanStartOption,
 ) tracing.TracerSpan {
 	// if not set we use noop tracer
-	if tt.StartChildSpanFunc == nil {
+	startChildSpanFunc := tt.StartChildSpanFunc
+	if startChildSpanFunc == nil {
 		return tracing.NewMockTracerSpan()
 	}
-	return tt.StartChildSpanFunc(name, options...)
+	return startChildSpanFunc(name, options...)
 }
 
 func (tt *TestTracer) ExpectedSpan(t *testing.T, expected trace.SpanName) {
@@ -599,22 +624,25 @@ var _ environment.EVMMetricsReporter = &TestMetricsReporter{}
 
 func (tmr *TestMetricsReporter) SetNumberOfDeployedCOAs(count uint64) {
 	// call the method if available otherwise skip
-	if tmr.SetNumberOfDeployedCOAsFunc != nil {
-		tmr.SetNumberOfDeployedCOAsFunc(count)
+	setNumberOfDeployedCOAsFunc := tmr.SetNumberOfDeployedCOAsFunc
+	if setNumberOfDeployedCOAsFunc != nil {
+		setNumberOfDeployedCOAsFunc(count)
 	}
 }
 
 func (tmr *TestMetricsReporter) EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool) {
 	// call the method if available otherwise skip
-	if tmr.EVMTransactionExecutedFunc != nil {
-		tmr.EVMTransactionExecutedFunc(gasUsed, isDirectCall, failed)
+	evmTransactionExecutedFunc := tmr.EVMTransactionExecutedFunc
+	if evmTransactionExecutedFunc != nil {
+		evmTransactionExecutedFunc(gasUsed, isDirectCall, failed)
 	}
 }
 
 func (tmr *TestMetricsReporter) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow float64) {
 	// call the method if available otherwise skip
-	if tmr.EVMBlockExecutedFunc != nil {
-		tmr.EVMBlockExecutedFunc(txCount, totalGasUsed, totalSupplyInFlow)
+	evmBlockExecutedFunc := tmr.EVMBlockExecutedFunc
+	if evmBlockExecutedFunc != nil {
+		evmBlockExecutedFunc(txCount, totalGasUsed, totalSupplyInFlow)
 	}
 }
 
@@ -624,8 +652,9 @@ type TestLoggerProvider struct {
 
 func (tlp *TestLoggerProvider) Logger() zerolog.Logger {
 	// call the method if not available return noop logger
-	if tlp.LoggerFunc != nil {
-		return tlp.LoggerFunc()
+	loggerFunc := tlp.LoggerFunc
+	if loggerFunc != nil {
+		return loggerFunc()
 	}
 	return zerolog.Nop()
 }

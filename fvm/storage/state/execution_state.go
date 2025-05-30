@@ -216,32 +216,32 @@ func (state *ExecutionState) Set(id flow.RegisterID, value flow.RegisterValue) e
 }
 
 // MeterComputation meters computation usage
-func (state *ExecutionState) MeterComputation(kind common.ComputationKind, intensity uint) error {
+func (state *ExecutionState) MeterComputation(usage common.ComputationUsage) error {
 	if state.finalized {
 		return fmt.Errorf("cannot MeterComputation on a finalized state")
 	}
 
 	if state.enforceLimits {
-		return state.meter.MeterComputation(kind, intensity)
+		return state.meter.MeterComputation(usage)
 	}
 	return nil
 }
 
 // ComputationAvailable checks if enough computation capacity is available without metering
-func (state *ExecutionState) ComputationAvailable(kind common.ComputationKind, intensity uint) bool {
+func (state *ExecutionState) ComputationAvailable(usage common.ComputationUsage) bool {
 	if state.finalized {
 		// if state is finalized return false
 		return false
 	}
 
 	if state.enforceLimits {
-		return state.meter.ComputationAvailable(kind, intensity)
+		return state.meter.ComputationAvailable(usage)
 	}
 	return true
 }
 
 // ComputationRemaining returns the available computation capacity without metering
-func (state *ExecutionState) ComputationRemaining(kind common.ComputationKind) uint {
+func (state *ExecutionState) ComputationRemaining(kind common.ComputationKind) uint64 {
 	if state.finalized {
 		// if state is finalized return 0
 		return 0
@@ -251,7 +251,7 @@ func (state *ExecutionState) ComputationRemaining(kind common.ComputationKind) u
 		return state.meter.ComputationRemaining(kind)
 	}
 
-	return math.MaxUint
+	return math.MaxUint64
 }
 
 // TotalComputationUsed returns total computation used
@@ -265,26 +265,26 @@ func (state *ExecutionState) ComputationIntensities() meter.MeteredComputationIn
 }
 
 // TotalComputationLimit returns total computation limit
-func (state *ExecutionState) TotalComputationLimit() uint {
+func (state *ExecutionState) TotalComputationLimit() uint64 {
 	return state.meter.TotalComputationLimit()
 }
 
 // MeterMemory meters memory usage
-func (state *ExecutionState) MeterMemory(kind common.MemoryKind, intensity uint) error {
+func (state *ExecutionState) MeterMemory(usage common.MemoryUsage) error {
 	if state.finalized {
 		return fmt.Errorf("cannot MeterMemory on a finalized state")
 	}
 
 	if state.enforceLimits {
-		return state.meter.MeterMemory(kind, intensity)
+		return state.meter.MeterMemory(usage)
 	}
 
 	return nil
 }
 
-// MemoryIntensities returns computation intensities
-func (state *ExecutionState) MemoryIntensities() meter.MeteredMemoryIntensities {
-	return state.meter.MemoryIntensities()
+// MemoryAmounts returns memory amounts
+func (state *ExecutionState) MemoryAmounts() meter.MeteredMemoryAmounts {
+	return state.meter.MemoryAmounts()
 }
 
 // TotalMemoryEstimate returns total memory used

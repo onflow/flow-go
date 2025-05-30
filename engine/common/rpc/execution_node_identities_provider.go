@@ -22,6 +22,8 @@ const maxAttemptsForExecutionReceipt = 3
 // MaxNodesCnt is the maximum number of nodes that will be contacted to complete an API request.
 const MaxNodesCnt = 3
 
+var ErrNoExecutionReceiptsFoundOnENs = fmt.Errorf("no execution receipts found on any access nodes")
+
 // ExecutionNodeIdentitiesProvider is a container for elements required to retrieve
 // execution node identities for a given block ID.
 type ExecutionNodeIdentitiesProvider struct {
@@ -60,6 +62,50 @@ func NewExecutionNodeIdentitiesProvider(
 		preferredENIdentifiers: preferredENIdentifiers,
 		fixedENIdentifiers:     fixedENIdentifiers,
 	}
+}
+
+// ExecutionNodesForResultID returns execution node identities that produced receipts
+// for the specific execution result ID within the given block.
+//
+// Expected errors during normal operation:
+// - storage.ErrNotFound - if no execution receipts found in the storage for the given block
+// - ErrNoExecutionReceiptsFoundOnENs - if no execution receipts found on the ENs provided to the current node operator
+func (e *ExecutionNodeIdentitiesProvider) ExecutionNodesForResultID(
+	blockID flow.Identifier,
+	resultID flow.Identifier,
+) (flow.IdentitySkeletonList, error) {
+	allReceipts, err := e.executionReceipts.ByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve execution receipts for block ID %v: %w", blockID, err)
+	}
+
+	executionReceiptMetaList := make(flow.ExecutionReceiptMetaList, 0, len(allReceipts))
+	for _, r := range allReceipts {
+		executionReceiptMetaList = append(executionReceiptMetaList, r.Meta())
+	}
+
+	receiptsByResultID := executionReceiptMetaList.GroupByResultID()
+	targetReceipts := receiptsByResultID.GetGroup(resultID)
+
+	if len(targetReceipts) == 0 {
+		return nil, fmt.Errorf("no execution receipts found for result ID %v in block %v", resultID, blockID)
+	}
+
+	var executorIDs flow.IdentifierList
+	for _, receipt := range targetReceipts {
+		executorIDs = append(executorIDs, receipt.ExecutorID)
+	}
+
+	subsetENs, err := e.chooseExecutionNodes(executorIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve execution IDs for result ID %v: %w", resultID, err)
+	}
+
+	if len(subsetENs) == 0 {
+		return nil, ErrNoExecutionReceiptsFoundOnENs
+	}
+
+	return subsetENs, nil
 }
 
 // ExecutionNodesForBlockID returns upto maxNodesCnt number of randomly chosen execution node identities
@@ -131,7 +177,7 @@ func (e *ExecutionNodeIdentitiesProvider) ExecutionNodesForBlockID(
 	}
 
 	if len(subsetENs) == 0 {
-		return nil, fmt.Errorf("no matching execution node found for block ID %v", blockID)
+		return nil, ErrNoExecutionReceiptsFoundOnENs
 	}
 
 	return subsetENs, nil
@@ -197,24 +243,27 @@ func (e *ExecutionNodeIdentitiesProvider) findAllExecutionNodes(
 // If neither preferred nor fixed nodes are defined, then all execution node matching the executor IDs are returned.
 // e.g. If execution nodes in identity table are {1,2,3,4}, preferred ENs are defined as {2,3,4}
 // and the executor IDs is {1,2,3}, then {2, 3} is returned as the chosen subset of ENs
+//
+// Expected errors during normal operation:
+// -
 func (e *ExecutionNodeIdentitiesProvider) chooseExecutionNodes(
 	executorIDs flow.IdentifierList,
 ) (flow.IdentitySkeletonList, error) {
-	allENs, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+	chosenENs, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve all execution IDs: %w", err)
 	}
 
 	// choose from preferred EN IDs
 	if len(e.preferredENIdentifiers) > 0 {
-		chosenIDs := e.ChooseFromPreferredENIDs(allENs, executorIDs)
+		chosenIDs := e.ChooseFromPreferredENIDs(chosenENs, executorIDs)
 		return chosenIDs.ToSkeleton(), nil
 	}
 
 	// if no preferred EN ID is found, then choose from the fixed EN IDs
 	if len(e.fixedENIdentifiers) > 0 {
 		// choose fixed ENs which have executed the transaction
-		chosenIDs := allENs.Filter(filter.And(
+		chosenIDs := chosenENs.Filter(filter.And(
 			filter.HasNodeID[flow.Identity](e.fixedENIdentifiers...),
 			filter.HasNodeID[flow.Identity](executorIDs...),
 		))
@@ -222,12 +271,12 @@ func (e *ExecutionNodeIdentitiesProvider) chooseExecutionNodes(
 			return chosenIDs.ToSkeleton(), nil
 		}
 		// if no such ENs are found, then just choose all fixed ENs
-		chosenIDs = allENs.Filter(filter.HasNodeID[flow.Identity](e.fixedENIdentifiers...))
+		chosenIDs = chosenENs.Filter(filter.HasNodeID[flow.Identity](e.fixedENIdentifiers...))
 		return chosenIDs.ToSkeleton(), nil
 	}
 
 	// if no preferred or fixed ENs have been specified, then return all executor IDs i.e., no preference at all
-	return allENs.Filter(filter.HasNodeID[flow.Identity](executorIDs...)).ToSkeleton(), nil
+	return chosenENs.Filter(filter.HasNodeID[flow.Identity](executorIDs...)).ToSkeleton(), nil
 }
 
 // ChooseFromPreferredENIDs finds the subset of execution nodes if preferred execution nodes are defined.

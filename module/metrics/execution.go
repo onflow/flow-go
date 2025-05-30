@@ -839,7 +839,7 @@ func (ec *ExecutionCollector) ExecutionCollectionExecuted(
 	ec.collectionTransactionCounts.Observe(float64(stats.NumberOfTransactions))
 }
 
-func (ec *ExecutionCollector) ExecutionBlockExecutionEffortVectorComponent(compKind string, value uint) {
+func (ec *ExecutionCollector) ExecutionBlockExecutionEffortVectorComponent(compKind string, value uint64) {
 	ec.blockComputationVector.With(prometheus.Labels{LabelComputationKind: compKind}).Set(float64(value))
 }
 

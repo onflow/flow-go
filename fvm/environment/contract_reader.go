@@ -46,8 +46,11 @@ func (reader *ContractReader) GetAccountContractNames(
 		trace.FVMEnvGetAccountContractNames).End()
 
 	err := reader.meter.MeterComputation(
-		ComputationKindGetAccountContractNames,
-		1)
+		common.ComputationUsage{
+			Kind:      ComputationKindGetAccountContractNames,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("get account contract names failed: %w", err)
 	}
@@ -67,7 +70,12 @@ func (reader *ContractReader) ResolveLocation(
 	defer reader.tracer.StartExtensiveTracingChildSpan(
 		trace.FVMEnvResolveLocation).End()
 
-	err := reader.meter.MeterComputation(ComputationKindResolveLocation, 1)
+	err := reader.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindResolveLocation,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("resolve location failed: %w", err)
 	}
@@ -166,7 +174,12 @@ func (reader *ContractReader) getCode(
 ) {
 	defer reader.tracer.StartChildSpan(trace.FVMEnvGetCode).End()
 
-	err := reader.meter.MeterComputation(ComputationKindGetCode, 1)
+	err := reader.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindGetCode,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("get code failed: %w", err)
 	}
@@ -205,8 +218,11 @@ func (reader *ContractReader) GetAccountContractCode(
 		trace.FVMEnvGetAccountContractCode).End()
 
 	err := reader.meter.MeterComputation(
-		ComputationKindGetAccountContractCode,
-		1)
+		common.ComputationUsage{
+			Kind:      ComputationKindGetAccountContractCode,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("get account contract code failed: %w", err)
 	}

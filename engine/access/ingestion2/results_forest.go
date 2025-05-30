@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -14,6 +15,7 @@ import (
 	pipeline "github.com/onflow/flow-go/module/executiondatasync/optimistic_syncing"
 	"github.com/onflow/flow-go/module/forest"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/state_synchronization/requester"
 )
 
 const (
@@ -128,8 +130,38 @@ func (f *ResultsForest) pipelineManagerLoop(ctx irrecoverable.SignalerContext, r
 					go func() {
 						defer wg.Done()
 
-						core := pipeline.NewCore()
-						err := container.pipeline.Run(ctx, core)
+						// TODO: This core stubbed with nil storages, but needs to be initialized with real data
+						core, err := pipeline.NewCoreImpl(
+							f.log,
+							container.result,
+							container.blockHeader,
+							nil,
+							nil,
+							tx_error_messages.TransactionErrorMessagesRequesterConfig{
+								RetryDelay:    requester.DefaultRetryDelay,
+								MaxRetryDelay: requester.DefaultMaxRetryDelay,
+							},
+							requester.OneshotExecutionDataConfig{
+								FetchTimeout:    requester.DefaultFetchTimeout,
+								MaxFetchTimeout: requester.DefaultMaxFetchTimeout,
+								RetryDelay:      requester.DefaultRetryDelay,
+								MaxRetryDelay:   requester.DefaultMaxRetryDelay,
+							},
+							nil,
+							nil,
+							nil,
+							nil,
+							nil,
+							nil,
+							nil,
+							nil,
+							nil,
+						)
+						if err != nil {
+							ctx.Throw(fmt.Errorf("core creation failed (result: %s): %w", container.resultID, err))
+						}
+
+						err = container.pipeline.Run(ctx, core)
 						if err != nil && !errors.Is(err, context.Canceled) {
 							ctx.Throw(fmt.Errorf("pipeline execution failed (result: %s): %w", container.resultID, err))
 						}
