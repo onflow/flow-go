@@ -78,6 +78,7 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 		entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 		// cleanup the commit event, so we are in setup phase
 		entry.NextEpoch.CommitID = flow.ZeroID
+		entry.NextEpochCommit = nil
 
 		adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
 		assert.Equal(t, flow.EpochPhaseSetup, adapter.EpochPhase())

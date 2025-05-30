@@ -106,19 +106,25 @@ func (u *baseStateMachine) TransitionToNextEpoch() error {
 	if u.view < u.state.NextEpochSetup.FirstView {
 		return fmt.Errorf("epoch transition is only allowed when entering next epoch")
 	}
-	u.state = &flow.EpochStateEntry{
-		MinEpochStateEntry: &flow.MinEpochStateEntry{
-			PreviousEpoch:          &u.state.CurrentEpoch,
-			CurrentEpoch:           *u.state.NextEpoch,
-			NextEpoch:              nil,
-			EpochFallbackTriggered: u.state.EpochFallbackTriggered,
-		},
-		PreviousEpochSetup:  u.state.CurrentEpochSetup,
-		PreviousEpochCommit: u.state.CurrentEpochCommit,
-		CurrentEpochSetup:   u.state.NextEpochSetup,
-		CurrentEpochCommit:  u.state.NextEpochCommit,
-		NextEpochSetup:      nil,
-		NextEpochCommit:     nil,
+	minEpochStateEntry := flow.NewMinEpochStateEntry(
+		&u.state.CurrentEpoch,
+		*u.state.NextEpoch,
+		nil,
+		u.state.EpochFallbackTriggered,
+	)
+	var err error
+	u.state, err = flow.NewEpochStateEntry(
+		&minEpochStateEntry,
+		u.state.CurrentEpochSetup,
+		u.state.CurrentEpochCommit,
+		u.state.NextEpochSetup,
+		u.state.NextEpochCommit,
+		nil,
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("could not construct epoch state entry: %w", err)
 	}
+
 	return nil
 }

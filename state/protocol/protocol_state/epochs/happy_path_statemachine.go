@@ -108,12 +108,32 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 	}
 
 	// construct data container specifying next epoch
-	u.state.NextEpoch = &flow.EpochStateContainer{
+	nextEpoch := &flow.EpochStateContainer{
 		SetupID:          epochSetup.ID(),
 		CommitID:         flow.ZeroID,
 		ActiveIdentities: nextEpochActiveIdentities,
 	}
-	u.state.NextEpochSetup = epochSetup
+
+	newMinEpochStateEntry := flow.NewMinEpochStateEntry(
+		u.state.PreviousEpoch,
+		u.state.CurrentEpoch,
+		nextEpoch,
+		u.state.EpochFallbackTriggered,
+	)
+
+	u.state, err = flow.NewEpochStateEntry(
+		&newMinEpochStateEntry,
+		u.state.PreviousEpochSetup,
+		u.state.PreviousEpochCommit,
+		u.state.CurrentEpochSetup,
+		u.state.CurrentEpochCommit,
+		epochSetup,
+		u.state.NextEpochCommit,
+	)
+	if err != nil {
+		// Should never reach here
+		return false, fmt.Errorf("could not construct epoch state entry: %w", err)
+	}
 
 	// subsequent epoch commit event and update identities afterwards.
 	err = u.ejector.TrackDynamicIdentityList(u.state.NextEpoch.ActiveIdentities)
@@ -155,9 +175,29 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 		u.telemetry.OnInvalidServiceEvent(epochCommit.ServiceEvent(), err)
 		return false, fmt.Errorf("invalid epoch commit event for epoch %d: %w", epochCommit.Counter, err)
 	}
+	nextEpoch := u.state.NextEpoch
+	nextEpoch.CommitID = epochCommit.ID()
 
-	u.state.NextEpoch.CommitID = epochCommit.ID()
-	u.state.NextEpochCommit = epochCommit
+	newMinEpochStateEntry := flow.NewMinEpochStateEntry(
+		u.state.PreviousEpoch,
+		u.state.CurrentEpoch,
+		nextEpoch,
+		u.state.EpochFallbackTriggered,
+	)
+
+	u.state, err = flow.NewEpochStateEntry(
+		&newMinEpochStateEntry,
+		u.state.PreviousEpochSetup,
+		u.state.PreviousEpochCommit,
+		u.state.CurrentEpochSetup,
+		u.state.CurrentEpochCommit,
+		u.state.NextEpochSetup,
+		epochCommit,
+	)
+	if err != nil {
+		// Should never reach here
+		return false, fmt.Errorf("could not construct epoch state entry: %w", err)
+	}
 	u.telemetry.OnServiceEventProcessed(epochCommit.ServiceEvent())
 	return true, nil
 }
