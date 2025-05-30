@@ -14,19 +14,21 @@ import (
 
 // Persister handles transferring data from in-memory storage to permanent storage.
 type Persister struct {
-	log                  zerolog.Logger
-	inMemoryRegisters    *unsynchronized.Registers
-	inMemoryEvents       *unsynchronized.Events
-	inMemoryCollections  *unsynchronized.Collections
-	inMemoryTransactions *unsynchronized.Transactions
-	inMemoryResults      *unsynchronized.LightTransactionResults
-	registers            storage.RegisterIndex
-	events               storage.Events
-	collections          storage.Collections
-	transactions         storage.Transactions
-	results              storage.LightTransactionResults
-	executionResult      *flow.ExecutionResult
-	header               *flow.Header
+	log                    zerolog.Logger
+	inMemoryRegisters      *unsynchronized.Registers
+	inMemoryEvents         *unsynchronized.Events
+	inMemoryCollections    *unsynchronized.Collections
+	inMemoryTransactions   *unsynchronized.Transactions
+	inMemoryResults        *unsynchronized.LightTransactionResults
+	inMemoryTxResultErrMsg *unsynchronized.TransactionResultErrorMessages
+	registers              storage.RegisterIndex
+	events                 storage.Events
+	collections            storage.Collections
+	transactions           storage.Transactions
+	results                storage.LightTransactionResults
+	txResultErrMsg         storage.TransactionResultErrorMessages
+	executionResult        *flow.ExecutionResult
+	header                 *flow.Header
 
 	LastPersistedSealedExecutionResult *flow.ExecutionResult
 }
@@ -39,28 +41,32 @@ func NewPersister(
 	inMemoryCollections *unsynchronized.Collections,
 	inMemoryTransactions *unsynchronized.Transactions,
 	inMemoryResults *unsynchronized.LightTransactionResults,
+	inMemoryTxResultErrMsg *unsynchronized.TransactionResultErrorMessages,
 	registers storage.RegisterIndex,
 	events storage.Events,
 	collections storage.Collections,
 	transactions storage.Transactions,
 	results storage.LightTransactionResults,
+	txResultErrMsg storage.TransactionResultErrorMessages,
 	executionResult *flow.ExecutionResult,
 	header *flow.Header,
 ) *Persister {
 	persister := &Persister{
-		log:                  log.With().Str("component", "persister").Logger(),
-		inMemoryRegisters:    inMemoryRegisters,
-		inMemoryEvents:       inMemoryEvents,
-		inMemoryCollections:  inMemoryCollections,
-		inMemoryTransactions: inMemoryTransactions,
-		inMemoryResults:      inMemoryResults,
-		registers:            registers,
-		events:               events,
-		collections:          collections,
-		transactions:         transactions,
-		results:              results,
-		executionResult:      executionResult,
-		header:               header,
+		log:                    log.With().Str("component", "persister").Logger(),
+		inMemoryRegisters:      inMemoryRegisters,
+		inMemoryEvents:         inMemoryEvents,
+		inMemoryCollections:    inMemoryCollections,
+		inMemoryTransactions:   inMemoryTransactions,
+		inMemoryResults:        inMemoryResults,
+		inMemoryTxResultErrMsg: inMemoryTxResultErrMsg,
+		registers:              registers,
+		events:                 events,
+		collections:            collections,
+		transactions:           transactions,
+		results:                results,
+		txResultErrMsg:         txResultErrMsg,
+		executionResult:        executionResult,
+		header:                 header,
 	}
 
 	persister.log.Info().
@@ -101,6 +107,10 @@ func (p *Persister) AddToBatch(batch storage.Batch) error {
 	}
 
 	if err := p.persistTransactions(batch); err != nil {
+		return err
+	}
+
+	if err := p.persistTransactionResultErrorMessages(batch); err != nil {
 		return err
 	}
 
@@ -158,7 +168,6 @@ func (p *Persister) persistRegisters() error {
 }
 
 // persistCollections persists collections from in-memory to permanent storage.
-// It skips collections that already exist in permanent storage.
 // If there are no collections, this is a no-op.
 func (p *Persister) persistCollections(batch storage.Batch) error {
 	if collections := p.inMemoryCollections.LightCollections(); len(collections) > 0 {
@@ -172,7 +181,6 @@ func (p *Persister) persistCollections(batch storage.Batch) error {
 }
 
 // persistTransactions persists transactions from in-memory to permanent storage.
-// It skips transactions that already exist in permanent storage.
 // If there are no transactions, this is a no-op.
 func (p *Persister) persistTransactions(batch storage.Batch) error {
 	if transactions := p.inMemoryTransactions.Data(); len(transactions) > 0 {
@@ -180,6 +188,19 @@ func (p *Persister) persistTransactions(batch storage.Batch) error {
 			return fmt.Errorf("could not add transactions to batch: %w", err)
 		}
 		p.log.Debug().Int("transactions_count", len(transactions)).Msg("added transactions to batch")
+	}
+
+	return nil
+}
+
+// persistTransactionResultErrorMessages persists transaction result error messages from in-memory to permanent storage.
+// If there are no transaction result error messages, this is a no-op.
+func (p *Persister) persistTransactionResultErrorMessages(batch storage.Batch) error {
+	if txResultErrMsgs := p.inMemoryTxResultErrMsg.Data(); len(txResultErrMsgs) > 0 {
+		if err := p.txResultErrMsg.BatchStore(p.header.ID(), txResultErrMsgs, batch); err != nil {
+			return fmt.Errorf("could not add transactions to batch: %w", err)
+		}
+		p.log.Debug().Int("transaction_result_error_messages_count", len(txResultErrMsgs)).Msg("added transaction result error messages to batch")
 	}
 
 	return nil
