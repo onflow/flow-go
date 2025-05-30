@@ -1229,9 +1229,11 @@ func (fnb *FlowNodeBuilder) initSecretsDB() error {
 // This manager must be a process-wide singleton.
 func (fnb *FlowNodeBuilder) initStorageLockManager() error {
 	if fnb.StorageLockMgr != nil {
-		return fmt.Errorf("storage lock manager has been created")
+		fnb.Logger.Warn().Msgf("storage lock manager already initialized, skipping re-initialization, this should only happen in test case")
+		return nil
 	}
-	fnb.StorageLockMgr = locks.NewLockManagerFactory().Create()
+
+	fnb.StorageLockMgr = locks.MakeSingletonLockManager()
 	return nil
 }
 

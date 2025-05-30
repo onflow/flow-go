@@ -1,6 +1,8 @@
 package locks
 
 import (
+	"sync"
+
 	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/storage"
 )
@@ -25,44 +27,21 @@ func makeLockPolicy() lockctx.Policy {
 		Build()
 }
 
-func NewLockManager() lockctx.Manager {
-	// Create a new lockctx manager with the storage locks and the lock policy.
-	return lockctx.NewManager(storage.Locks(), makeLockPolicy())
-}
+var makeLockManagerOnce sync.Once
 
-// LockManagerFactory is for creating a singleton lockctx manager
-// The factory can only create a single manager, by ensuring the
-// NewLockManagerFactory function is only called once, only one
-// manager is created.
-// This is useful for the integration tests to create multiple followers, each
-// has their own singleton lockctx manager.
-type LockManagerFactory struct {
-	// the default value is false, so that if the type is used by constructor
-	// from other package, the default canCreate is false preventing it from
-	// creating lock manager
-	canCreate bool
-}
-
-func NewLockManagerFactory() *LockManagerFactory {
-	return &LockManagerFactory{
-		canCreate: true,
+func MakeSingletonLockManager() lockctx.Manager {
+	var manager lockctx.Manager
+	makeLockManagerOnce.Do(func() {
+		manager = lockctx.NewManager(storage.Locks(), makeLockPolicy())
+	})
+	if manager == nil {
+		panic("critical sanity check failed: MakeSingletonLockManager invoked more than once")
 	}
+	return manager
 }
 
-// Create creates a lockctx manager, this method can only be called once to ensure
-// only a single manager can be created.
-func (f *LockManagerFactory) Create() lockctx.Manager {
-	if !f.canCreate {
-		panic("critical sanity check fail: factory can only be used once to create lock manager")
-	}
-
-	f.canCreate = false
-
-	return lockctx.NewManager(storage.Locks(), makeLockPolicy())
-}
-
-// NewTestingLockManager returns the lock manager used by the storage layer.
-// This function must be used for testing only and must not be used in production builds.
+// NewTestingLockManager returns a new lock manager instance for testing purposes.
+// This function should only be used in tests.
 func NewTestingLockManager() lockctx.Manager {
 	return lockctx.NewManager(storage.Locks(), makeLockPolicy())
 }

@@ -127,6 +127,7 @@ func getFollowerServiceOptions(config *Config) []FollowerOption {
 		WithBootStrapPeers(ids...),
 		WithBaseOptions(getBaseOptions(config)),
 		WithNetworkKey(config.networkPrivKey),
+		WithStorageLockManager(config.lockManager),
 	}
 }
 
