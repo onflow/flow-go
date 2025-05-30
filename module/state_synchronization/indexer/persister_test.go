@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -75,7 +74,7 @@ func (pt *persisterTest) initPersister() *persisterTest {
 	return pt
 }
 
-func (pt *persisterTest) populateInMemoryStorages() *persisterTest {
+func (pt *persisterTest) populateInMemoryStorages() {
 	regEntries := make(flow.RegisterEntries, 3)
 	for i := 0; i < 3; i++ {
 		regEntries[i] = unittest.RegisterEntryFixture()
@@ -88,7 +87,8 @@ func (pt *persisterTest) populateInMemoryStorages() *persisterTest {
 
 	for i := 0; i < 2; i++ {
 		collection := unittest.CollectionFixture(2)
-		err := pt.inMemoryCollections.Store(&collection)
+		light := collection.Light()
+		err := pt.inMemoryCollections.StoreLightAndIndexByTransaction(&light)
 		require.NoError(pt.t, err)
 
 		for _, tx := range collection.Transactions {
@@ -100,8 +100,6 @@ func (pt *persisterTest) populateInMemoryStorages() *persisterTest {
 	results := unittest.LightTransactionResultsFixture(4)
 	err = pt.inMemoryResults.Store(pt.executionResult.BlockID, results)
 	require.NoError(pt.t, err)
-
-	return pt
 }
 
 // verifySuccess verifies that the operation completed successfully with no errors
@@ -135,6 +133,8 @@ func (pt *persisterTest) verifyError(err error, errorMessage string) {
 func TestPersister_AddToBatch_EmptyStorages(t *testing.T) {
 	pt := newPersisterTest(t).initPersister()
 
+	pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)
+
 	// Test AddToBatch with empty storages
 	err := pt.persister.AddToBatch(pt.batch)
 
@@ -143,44 +143,15 @@ func TestPersister_AddToBatch_EmptyStorages(t *testing.T) {
 }
 
 func TestPersister_AddToBatch_WithData(t *testing.T) {
-	pt := newPersisterTest(t).initPersister().populateInMemoryStorages()
+	pt := newPersisterTest(t).initPersister()
+	pt.populateInMemoryStorages()
 
 	// Set up expectations for populated storages
 	pt.events.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
 	pt.results.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
 	pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)
-	pt.collections.On("StoreLightAndIndexByTransaction", mock.Anything).Return(nil)
-	pt.transactions.On("Store", mock.Anything).Return(nil)
-
-	err := pt.persister.AddToBatch(pt.batch)
-
-	pt.verifySuccess(err)
-}
-
-func TestPersister_AddToBatch_ExistingCollections(t *testing.T) {
-	pt := newPersisterTest(t).initPersister().populateInMemoryStorages()
-
-	// Set up expectations including collections returning "already exists"
-	pt.events.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
-	pt.results.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
-	pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)
-	pt.collections.On("StoreLightAndIndexByTransaction", mock.Anything).Return(storage.ErrAlreadyExists)
-	pt.transactions.On("Store", mock.Anything).Return(nil)
-
-	err := pt.persister.AddToBatch(pt.batch)
-
-	pt.verifySuccess(err)
-}
-
-func TestPersister_AddToBatch_ExistingTransactions(t *testing.T) {
-	pt := newPersisterTest(t).initPersister().populateInMemoryStorages()
-
-	// Set up expectations including transactions returning "already exists"
-	pt.events.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
-	pt.results.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
-	pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)
-	pt.collections.On("StoreLightAndIndexByTransaction", mock.Anything).Return(nil)
-	pt.transactions.On("Store", mock.Anything).Return(storage.ErrAlreadyExists)
+	pt.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil)
+	pt.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil)
 
 	err := pt.persister.AddToBatch(pt.batch)
 
@@ -189,7 +160,8 @@ func TestPersister_AddToBatch_ExistingTransactions(t *testing.T) {
 
 func TestPersister_AddToBatch_ErrorHandling(t *testing.T) {
 	t.Run("RegistersStoreError", func(t *testing.T) {
-		pt := newPersisterTest(t).initPersister().populateInMemoryStorages()
+		pt := newPersisterTest(t).initPersister()
+		pt.populateInMemoryStorages()
 
 		// Only set up the registers mock to return an error
 		pt.events.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
@@ -205,7 +177,8 @@ func TestPersister_AddToBatch_ErrorHandling(t *testing.T) {
 	})
 
 	t.Run("EventsBatchStoreError", func(t *testing.T) {
-		pt := newPersisterTest(t).initPersister().populateInMemoryStorages()
+		pt := newPersisterTest(t).initPersister()
+		pt.populateInMemoryStorages()
 
 		// Only set up the events mock to return an error
 		pt.events.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(assert.AnError)
@@ -219,7 +192,8 @@ func TestPersister_AddToBatch_ErrorHandling(t *testing.T) {
 	})
 
 	t.Run("ResultsBatchStoreError", func(t *testing.T) {
-		pt := newPersisterTest(t).initPersister().populateInMemoryStorages()
+		pt := newPersisterTest(t).initPersister()
+		pt.populateInMemoryStorages()
 
 		// Set up events to succeed but results to fail
 		pt.events.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
@@ -234,35 +208,37 @@ func TestPersister_AddToBatch_ErrorHandling(t *testing.T) {
 	})
 
 	t.Run("CollectionsStoreError", func(t *testing.T) {
-		pt := newPersisterTest(t).initPersister().populateInMemoryStorages()
+		pt := newPersisterTest(t).initPersister()
+		pt.populateInMemoryStorages()
 
 		// Set up everything before collections to succeed, but collections to fail
 		pt.events.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
 		pt.results.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
 		pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)
-		pt.collections.On("StoreLightAndIndexByTransaction", mock.Anything).Return(assert.AnError)
+		pt.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(assert.AnError)
 
 		// No need to set up transactions as we expect early return
 
 		err := pt.persister.AddToBatch(pt.batch)
 
 		// Verify the function worked as expected
-		pt.verifyError(err, "could not persist collection")
+		pt.verifyError(err, "could not add collections to batch")
 	})
 
 	t.Run("TransactionsStoreError", func(t *testing.T) {
-		pt := newPersisterTest(t).initPersister().populateInMemoryStorages()
+		pt := newPersisterTest(t).initPersister()
+		pt.populateInMemoryStorages()
 
 		// Set up everything before transactions to succeed, but transactions to fail
 		pt.events.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
 		pt.results.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
 		pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)
-		pt.collections.On("StoreLightAndIndexByTransaction", mock.Anything).Return(nil)
-		pt.transactions.On("Store", mock.Anything).Return(assert.AnError)
+		pt.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil)
+		pt.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(assert.AnError)
 
 		err := pt.persister.AddToBatch(pt.batch)
 
 		// Verify the function worked as expected
-		pt.verifyError(err, "could not persist transaction")
+		pt.verifyError(err, "could not add transactions to batch")
 	})
 }

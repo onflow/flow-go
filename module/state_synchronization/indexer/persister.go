@@ -1,7 +1,6 @@
 package indexer
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -97,11 +96,11 @@ func (p *Persister) AddToBatch(batch storage.Batch) error {
 		return err
 	}
 
-	if err := p.persistCollections(); err != nil {
+	if err := p.persistCollections(batch); err != nil {
 		return err
 	}
 
-	if err := p.persistTransactions(); err != nil {
+	if err := p.persistTransactions(batch); err != nil {
 		return err
 	}
 
@@ -142,20 +141,18 @@ func (p *Persister) addResultsToBatch(batch storage.Batch) error {
 }
 
 // persistRegisters persists registers from in-memory to permanent storage.
-// If there are no registers, this is a no-op.
+// Registers must be stored for every height, even if it's an empty set.
 func (p *Persister) persistRegisters() error {
-	if registerData := p.inMemoryRegisters.Data(); len(registerData) > 0 {
-		start := time.Now()
+	registerData := p.inMemoryRegisters.Data()
 
-		if err := p.registers.Store(registerData, p.header.Height); err != nil {
-			return fmt.Errorf("could not persist registers: %w", err)
-		}
-
-		p.log.Debug().
-			Int("register_count", len(registerData)).
-			Dur("duration_ms", time.Since(start)).
-			Msg("persisted registers")
+	// Always store registers for every height to maintain height continuity
+	if err := p.registers.Store(registerData, p.header.Height); err != nil {
+		return fmt.Errorf("could not persist registers: %w", err)
 	}
+
+	p.log.Debug().
+		Int("register_count", len(registerData)).
+		Msg("persisted registers")
 
 	return nil
 }
@@ -163,37 +160,12 @@ func (p *Persister) persistRegisters() error {
 // persistCollections persists collections from in-memory to permanent storage.
 // It skips collections that already exist in permanent storage.
 // If there are no collections, this is a no-op.
-func (p *Persister) persistCollections() error {
-	collections := p.inMemoryCollections.Collections()
-
-	if len(collections) == 0 {
-		return nil
-	}
-
-	start := time.Now()
-	persistedCount := 0
-
-	for _, collection := range collections {
-		light := collection.Light()
-		if err := p.collections.StoreLightAndIndexByTransaction(&light); err != nil {
-			if errors.Is(err, storage.ErrAlreadyExists) {
-				// Skip if already exists
-				p.log.Debug().
-					Hex("collection_id", logging.Entity(light)).
-					Msg("collection already exists in permanent storage")
-				continue
-			}
-			return fmt.Errorf("could not persist collection: %w", err)
+func (p *Persister) persistCollections(batch storage.Batch) error {
+	if collections := p.inMemoryCollections.LightCollections(); len(collections) > 0 {
+		if err := p.collections.BatchStoreLightAndIndexByTransaction(collections, batch); err != nil {
+			return fmt.Errorf("could not add collections to batch: %w", err)
 		}
-		persistedCount++
-	}
-
-	if persistedCount > 0 {
-		p.log.Debug().
-			Int("persisted_collections", persistedCount).
-			Int("total_collections", len(collections)).
-			Dur("duration_ms", time.Since(start)).
-			Msg("persisted collections")
+		p.log.Debug().Int("collections_count", len(collections)).Msg("added collections to batch")
 	}
 
 	return nil
@@ -202,33 +174,12 @@ func (p *Persister) persistCollections() error {
 // persistTransactions persists transactions from in-memory to permanent storage.
 // It skips transactions that already exist in permanent storage.
 // If there are no transactions, this is a no-op.
-func (p *Persister) persistTransactions() error {
-	transactions := p.inMemoryTransactions.Data()
-
-	if len(transactions) == 0 {
-		return nil
-	}
-
-	start := time.Now()
-	persistedCount := 0
-
-	for _, tx := range transactions {
-		if err := p.transactions.Store(&tx); err != nil {
-			if errors.Is(err, storage.ErrAlreadyExists) {
-				// Skip if already exists
-				continue
-			}
-			return fmt.Errorf("could not persist transaction (%s): %w", tx.ID().String(), err)
+func (p *Persister) persistTransactions(batch storage.Batch) error {
+	if transactions := p.inMemoryTransactions.Data(); len(transactions) > 0 {
+		if err := p.transactions.BatchStore(transactions, batch); err != nil {
+			return fmt.Errorf("could not add transactions to batch: %w", err)
 		}
-		persistedCount++
-	}
-
-	if persistedCount > 0 {
-		p.log.Debug().
-			Int("persisted_transactions", persistedCount).
-			Int("total_transactions", len(transactions)).
-			Dur("duration_ms", time.Since(start)).
-			Msg("persisted transactions")
+		p.log.Debug().Int("transactions_count", len(transactions)).Msg("added transactions to batch")
 	}
 
 	return nil

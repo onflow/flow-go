@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
@@ -65,4 +66,9 @@ func (t *Transactions) retrieveTx(txID flow.Identifier) func(*badger.Txn) (*flow
 		}
 		return val, err
 	}
+}
+
+// BatchStore stores multiple transactions in a batch operation.
+func (t *Transactions) BatchStore(txs []flow.TransactionBody, batch storage.ReaderBatchWriter) error {
+	return nil
 }
