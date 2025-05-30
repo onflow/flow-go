@@ -49,7 +49,7 @@ type BackendBlocksSuite struct {
 	broadcaster *engine.Broadcaster
 	blocksArray []*flow.Block
 	blockMap    map[uint64]*flow.Block
-	rootBlock   flow.Block
+	rootBlock   *flow.Block
 
 	backend *Backend
 }
@@ -94,7 +94,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
 	parent := s.rootBlock.ToHeader()
-	s.blockMap[s.rootBlock.Header.Height] = &s.rootBlock
+	s.blockMap[s.rootBlock.Header.Height] = s.rootBlock
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)

@@ -66,9 +66,7 @@ func (s *BackendAccountsSuite) SetupTest() {
 
 	s.execClient = access.NewExecutionAPIClient(s.T())
 	s.executionNodes = unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-
-	block := unittest.BlockFixture()
-	s.block = &block
+	s.block = unittest.BlockFixture()
 
 	var err error
 	s.account, err = unittest.AccountFixture()

@@ -20,12 +20,13 @@ import (
 func (suite *Suite) TestTransactionRetry() {
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
-	block := unittest.BlockFixture()
-	// Height needs to be at least DefaultTransactionExpiry before we start doing retries
-	block.Header.Height = flow.DefaultTransactionExpiry + 1
+	block := unittest.BlockFixture(
+		unittest.Block.WithHeight(flow.DefaultTransactionExpiry + 1), // Height needs to be at least DefaultTransactionExpiry before we start doing retries
+	)
 	transactionBody.SetReferenceBlockID(block.ID())
-	headBlock := unittest.BlockFixture()
-	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
+	headBlock := unittest.BlockFixture(
+		unittest.Block.WithHeight(block.Header.Height - 1), // head is behind the current block
+	)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	suite.snapshot.On("Head").Return(headBlock.ToHeader(), nil)
@@ -77,8 +78,9 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
 
-	refBlock := unittest.BlockFixture()
-	refBlock.Header.Height = 2
+	refBlock := unittest.BlockFixture(
+		unittest.Block.WithHeight(2),
+	)
 	transactionBody.SetReferenceBlockID(refBlock.ID())
 
 	block := unittest.BlockFixture(
@@ -98,7 +100,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(&light, nil)
 	suite.collections.On("LightByID", light.ID()).Return(&light, nil)
 	// block storage returns the corresponding block
-	suite.blocks.On("ByCollectionID", collection.ID()).Return(&block, nil)
+	suite.blocks.On("ByCollectionID", collection.ID()).Return(block, nil)
 
 	txID := transactionBody.ID()
 	blockID := block.ID()
@@ -110,7 +112,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 		Events: nil,
 	}
 
-	_, enIDs := suite.setupReceipts(&block)
+	_, enIDs := suite.setupReceipts(block)
 	suite.snapshot.On("Identities", mock.Anything).Return(enIDs, nil)
 	connFactory := suite.setupConnectionFactory()
 

@@ -32,7 +32,7 @@ type EventsProviderSuite struct {
 	api *ssmock.API
 
 	chain          flow.Chain
-	rootBlock      flow.Block
+	rootBlock      *flow.Block
 	finalizedBlock *flow.Header
 
 	factory *DataProviderFactoryImpl
@@ -48,8 +48,9 @@ func (s *EventsProviderSuite) SetupTest() {
 
 	s.chain = flow.Testnet.Chain()
 
-	s.rootBlock = unittest.BlockFixture()
-	s.rootBlock.Header.Height = 0
+	s.rootBlock = unittest.BlockFixture(
+		unittest.Block.WithHeight(0),
+	)
 
 	s.factory = NewDataProviderFactory(
 		s.log,

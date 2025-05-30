@@ -35,7 +35,7 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 	t.Run("store1 one get one", func(t *testing.T) {
 		withStore(t, func(store1 *store.ExecutionReceipts) {
 			block := unittest.BlockFixture()
-			receipt1 := unittest.ReceiptForBlockFixture(&block)
+			receipt1 := unittest.ReceiptForBlockFixture(block)
 
 			err := store1.Store(receipt1)
 			require.NoError(t, err)
@@ -59,8 +59,8 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 			executor1 := unittest.IdentifierFixture()
 			executor2 := unittest.IdentifierFixture()
 
-			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block, executor1)
-			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block, executor2)
+			receipt1 := unittest.ReceiptForBlockExecutorFixture(block, executor1)
+			receipt2 := unittest.ReceiptForBlockExecutorFixture(block, executor2)
 
 			err := store1.Store(receipt1)
 			require.NoError(t, err)
@@ -83,8 +83,8 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 			executor1 := unittest.IdentifierFixture()
 			executor2 := unittest.IdentifierFixture()
 
-			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block1, executor1)
-			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block2, executor2)
+			receipt1 := unittest.ReceiptForBlockExecutorFixture(block1, executor1)
+			receipt2 := unittest.ReceiptForBlockExecutorFixture(block2, executor2)
 
 			err := store1.Store(receipt1)
 			require.NoError(t, err)
@@ -108,7 +108,7 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 			block1 := unittest.BlockFixture()
 
 			executor1 := unittest.IdentifierFixture()
-			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block1, executor1)
+			receipt1 := unittest.ReceiptForBlockExecutorFixture(block1, executor1)
 
 			err := store1.Store(receipt1)
 			require.NoError(t, err)
@@ -129,8 +129,8 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 
 			executor1 := unittest.IdentifierFixture()
 
-			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block1, executor1)
-			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block1, executor1)
+			receipt1 := unittest.ReceiptForBlockExecutorFixture(block1, executor1)
+			receipt2 := unittest.ReceiptForBlockExecutorFixture(block1, executor1)
 
 			err := store1.Store(receipt1)
 			require.NoError(t, err)
@@ -144,5 +144,4 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 			require.ElementsMatch(t, []*flow.ExecutionReceipt{receipt1, receipt2}, receipts)
 		})
 	})
-
 }

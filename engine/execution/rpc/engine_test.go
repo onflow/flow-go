@@ -127,8 +127,9 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	// setup the events storage mock
 	for i := range blockIDs {
-		block := unittest.BlockFixture()
-		block.Header.Height = uint64(i)
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(uint64(i)),
+		)
 		id := block.ID()
 		blockIDs[i] = id[:]
 		eventsForBlock := make([]flow.Event, eventsPerBlock)

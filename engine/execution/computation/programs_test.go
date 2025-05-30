@@ -209,9 +209,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	execCtx := fvm.NewContext(
 		fvm.WithEVMEnabled(true),
 		fvm.WithBlockHeader(block.ToHeader()),
-		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: &block}}),
+		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: block}}),
 		fvm.WithChain(chain))
-
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	snapshotTree, accounts, err := testutil.CreateAccounts(

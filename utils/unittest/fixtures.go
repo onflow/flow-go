@@ -225,7 +225,7 @@ func BlockFixtures(number int) []*flow.Block {
 	blocks := make([]*flow.Block, 0, number)
 	for range number {
 		block := BlockFixture()
-		blocks = append(blocks, &block)
+		blocks = append(blocks, block)
 	}
 	return blocks
 }
@@ -240,8 +240,7 @@ func ProposalFixtures(number int) []*flow.BlockProposal {
 }
 
 func ProposalFixture() *flow.BlockProposal {
-	block := BlockFixture()
-	return ProposalFromBlock(&block)
+	return ProposalFromBlock(BlockFixture())
 }
 
 func ProposalFromHeader(header *flow.Header) *flow.ProposalHeader {
@@ -269,7 +268,7 @@ func BlockchainFixture(length int) []*flow.Block {
 	blocks := make([]*flow.Block, length)
 
 	genesis := BlockFixture()
-	blocks[0] = &genesis
+	blocks[0] = genesis
 	for i := 1; i < length; i++ {
 		blocks[i] = BlockWithParentFixture(blocks[i-1].ToHeader())
 	}

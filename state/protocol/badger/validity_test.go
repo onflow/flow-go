@@ -69,8 +69,9 @@ func TestValidateVersionBeacon(t *testing.T) {
 	})
 	t.Run("valid version beacon is ok", func(t *testing.T) {
 		snap := new(mock.Snapshot)
-		block := unittest.BlockFixture()
-		block.Header.Height = 100
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(100),
+		)
 
 		vb := &flow.SealedVersionBeacon{
 			VersionBeacon: &flow.VersionBeacon{
@@ -93,8 +94,9 @@ func TestValidateVersionBeacon(t *testing.T) {
 	})
 	t.Run("height must be below highest block", func(t *testing.T) {
 		snap := new(mock.Snapshot)
-		block := unittest.BlockFixture()
-		block.Header.Height = 12
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(12),
+		)
 
 		vb := &flow.SealedVersionBeacon{
 			VersionBeacon: &flow.VersionBeacon{
@@ -118,8 +120,9 @@ func TestValidateVersionBeacon(t *testing.T) {
 	})
 	t.Run("version beacon must be valid", func(t *testing.T) {
 		snap := new(mock.Snapshot)
-		block := unittest.BlockFixture()
-		block.Header.Height = 12
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(12),
+		)
 
 		vb := &flow.SealedVersionBeacon{
 			VersionBeacon: &flow.VersionBeacon{
