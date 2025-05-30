@@ -2,6 +2,8 @@ package flow
 
 // IncorporatedResult is a wrapper around an ExecutionResult which contains the
 // ID of the first block on its fork in which it was incorporated.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type IncorporatedResult struct {
 	// IncorporatedBlockID is the ID of the first block on its fork where a
 	// receipt for this result was incorporated. Within a fork, multiple blocks
@@ -14,6 +16,8 @@ type IncorporatedResult struct {
 	Result *ExecutionResult
 }
 
+// NewIncorporatedResult creates a new instance of IncorporatedResult.
+// Construction IncorporatedResult allowed only within the constructor
 func NewIncorporatedResult(incorporatedBlockID Identifier, result *ExecutionResult) *IncorporatedResult {
 	return &IncorporatedResult{
 		IncorporatedBlockID: incorporatedBlockID,
