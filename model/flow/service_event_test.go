@@ -10,7 +10,7 @@ import (
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
-	"github.com/vmihailenco/msgpack"
+	"github.com/vmihailenco/msgpack/v4"
 	"gotest.tools/assert"
 
 	"github.com/onflow/flow-go/model/flow"

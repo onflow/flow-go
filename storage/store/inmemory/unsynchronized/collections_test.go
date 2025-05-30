@@ -25,7 +25,7 @@ func TestCollection_HappyCase(t *testing.T) {
 	require.Equal(t, &collection, retrieved)
 
 	// Extract collections
-	extracted := collections.Collections()
+	extracted := collections.Data()
 	require.Len(t, extracted, 1)
 	require.Equal(t, collection, extracted[0])
 

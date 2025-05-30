@@ -3,6 +3,7 @@ package requester
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -10,8 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
-	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
 // OneshotExecutionDataConfig is a config for the oneshot execution data requester.
@@ -32,39 +32,59 @@ type OneshotExecutionDataConfig struct {
 // OneshotExecutionDataRequester is a component that requests execution data for a block.
 // It uses a retry mechanism to retry the download execution data if they are not found.
 type OneshotExecutionDataRequester struct {
-	log           zerolog.Logger
-	metrics       module.ExecutionDataRequesterMetrics
-	config        OneshotExecutionDataConfig
-	execDataCache *cache.ExecutionDataCache
+	log                zerolog.Logger
+	metrics            module.ExecutionDataRequesterMetrics
+	config             OneshotExecutionDataConfig
+	execDataDownloader execution_data.Downloader
+	executionResult    *flow.ExecutionResult
+	blockHeader        *flow.Header
 }
 
+// NewOneshotExecutionDataRequester creates a new OneshotExecutionDataRequester instance.
+// It validates that the provided block header and execution result are consistent
+//
+// Parameters:
+//   - log: Logger instance for the requester component
+//   - metrics: Metrics collector for execution data requester operations
+//   - execDataDownloader: Cache for storing and retrieving execution data
+//   - executionResult: The execution result to request data for
+//   - blockHeader: The block header corresponding to the execution result
+//   - config: Configuration settings for the oneshot execution data requester
+//
+// No errors are expected during normal operations and likely indicate a bug or
+// inconsistent state.
 func NewOneshotExecutionDataRequester(
 	log zerolog.Logger,
 	metrics module.ExecutionDataRequesterMetrics,
-	execDataCache *cache.ExecutionDataCache,
+	execDataDownloader execution_data.Downloader,
+	executionResult *flow.ExecutionResult,
+	blockHeader *flow.Header,
 	config OneshotExecutionDataConfig,
-) *OneshotExecutionDataRequester {
-	return &OneshotExecutionDataRequester{
-		log:           log.With().Str("component", "oneshot_execution_data_requester").Logger(),
-		metrics:       metrics,
-		execDataCache: execDataCache,
-		config:        config,
+) (*OneshotExecutionDataRequester, error) {
+	if blockHeader.ID() != executionResult.BlockID {
+		return nil, fmt.Errorf("block id and execution result mismatch")
 	}
+
+	return &OneshotExecutionDataRequester{
+		log:                log.With().Str("component", "oneshot_execution_data_requester").Logger(),
+		metrics:            metrics,
+		execDataDownloader: execDataDownloader,
+		executionResult:    executionResult,
+		blockHeader:        blockHeader,
+		config:             config,
+	}, nil
 }
 
-// RequestExecutionData requests execution data for a given block from the execution data cache.
+// RequestExecutionData requests execution data for a given block from the network.
 // It performs a fetch using a retry mechanism with exponential backoff if execution data not found.
-// Execution data are saved in the execution data cache passed on instantiation.
+// Returns the execution data entity and any error encountered.
 //
-// The function logs each retry attempt and emits metrics for retries and fetch durations.
-// The block height is used only for logging and metric purposes.
-//
-// Returns a terminal error if fetching fails due to non-retryable issues.
+// Expected errors:
+// - context.Canceled: if the provided context was canceled before completion
+// All other errors are unexpected exceptions and may indicate invalid execution data was received.
 func (r *OneshotExecutionDataRequester) RequestExecutionData(
 	ctx context.Context,
-	blockID flow.Identifier,
-	height uint64,
-) error {
+) (*execution_data.BlockExecutionData, error) {
 	backoff := retry.NewExponential(r.config.RetryDelay)
 	backoff = retry.WithCappedDuration(r.config.MaxRetryDelay, backoff)
 	backoff = retry.WithJitterPercent(15, backoff)
@@ -76,11 +96,16 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 	timeout = retry.WithCappedDuration(r.config.MaxFetchTimeout, timeout)
 
 	attempt := 0
-	return retry.Do(ctx, backoff, func(context.Context) error {
+	lg := r.log.With().
+		Str("block_id", r.executionResult.BlockID.String()).
+		Str("execution_data_id", r.executionResult.ExecutionDataID.String()).
+		Uint64("height", r.blockHeader.Height).
+		Logger()
+
+	var execData *execution_data.BlockExecutionData
+	err := retry.Do(ctx, backoff, func(context.Context) error {
 		if attempt > 0 {
-			r.log.Debug().
-				Str("block_id", blockID.String()).
-				Uint64("height", height).
+			lg.Debug().
 				Uint64("attempt", uint64(attempt)).
 				Msgf("retrying download")
 
@@ -90,54 +115,67 @@ func (r *OneshotExecutionDataRequester) RequestExecutionData(
 
 		// download execution data for the block
 		fetchTimeout, _ := timeout.Next()
-		err := r.processFetchRequest(ctx, blockID, height, fetchTimeout)
+		var err error
+		execData, err = r.processFetchRequest(ctx, fetchTimeout)
 		if isBlobNotFoundError(err) || errors.Is(err, context.DeadlineExceeded) {
 			return retry.RetryableError(err)
 		}
 
+		if execution_data.IsMalformedDataError(err) || execution_data.IsBlobSizeLimitExceededError(err) {
+			// these errors indicate the execution data was received successfully and its hash matched
+			// the value in the ExecutionResult, however, the data was malformed or invalid. this means that
+			// an execution node produced an invalid execution data blob, and verification nodes approved it
+			lg.Error().Err(err).
+				Msg("received invalid execution data from network (potential slashing evidence?)")
+		}
+
 		return err
 	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return execData, nil
 }
 
-// processFetchRequest performs the actual fetch of execution data for the given block within the provided timeout.
-//
-// It wraps the fetch with metrics tracking and contextual logging. The execution data is retrieved
-// from the execution data cache based on the block ID.
+// processFetchRequest performs the actual fetch of execution data for the given execution result.
 //
 // Expected errors during normal operations:
-// - storage.ErrNotFound if a seal or execution result is not available for the block
 // - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
 // - MalformedDataError if some level of the blob tree cannot be properly deserialized
 // - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
 // - context.DeadlineExceeded if fetching time exceeded fetchTimeout duration
+// - context.Canceled if context was canceled during the request.
 func (r *OneshotExecutionDataRequester) processFetchRequest(
 	parentCtx context.Context,
-	blockID flow.Identifier,
-	height uint64,
 	fetchTimeout time.Duration,
-) error {
-	logger := r.log.With().
-		Str("block_id", blockID.String()).
+) (*execution_data.BlockExecutionData, error) {
+	height := r.blockHeader.Height
+	executionDataID := r.executionResult.ExecutionDataID
+
+	lg := r.log.With().
+		Str("block_id", r.executionResult.BlockID.String()).
+		Str("execution_data_id", executionDataID.String()).
 		Uint64("height", height).
 		Logger()
-	logger.Debug().Msg("processing fetch request")
+
+	lg.Debug().Msg("processing fetch request")
 
 	start := time.Now()
 	r.metrics.ExecutionDataFetchStarted()
-	logger.Debug().Msg("downloading execution data")
+	lg.Debug().Msg("downloading execution data")
 
 	ctx, cancel := context.WithTimeout(parentCtx, fetchTimeout)
 	defer cancel()
 
-	execData, err := r.execDataCache.ByBlockID(ctx, blockID)
+	execData, err := r.execDataDownloader.Get(ctx, executionDataID)
 	r.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, height)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	logger.Info().
-		Hex("execution_data_id", logging.ID(execData.ID())).
-		Msg("execution data fetched")
+	lg.Info().Msg("execution data fetched")
 
-	return nil
+	return execData, nil
 }
