@@ -163,14 +163,6 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 		)
 	}
 
-	if len(randomSource) != flow.EpochSetupRandomSourceLength {
-		return nil, fmt.Errorf(
-			"random source in epoch setup event must be of (%d) bytes, got (%d)",
-			flow.EpochSetupRandomSourceLength,
-			len(randomSource),
-		)
-	}
-
 	// parse cluster assignments; returned assignments are in canonical order
 	assignments, err := convertClusterAssignments(cdcClusters.Values)
 	if err != nil {
