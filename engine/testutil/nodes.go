@@ -651,7 +651,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		node.Log, node.Metrics, node.Net, node.Me, node.State,
 		channels.RequestCollections,
 		filter.HasRole[flow.Identity](flow.RoleCollection),
-		func() flow.Entity { return &flow.Collection{} },
+		func() flow.Entity {
+			return flow.NewCollection(nil)
+		},
 	)
 	require.NoError(t, err)
 
@@ -849,12 +851,12 @@ func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.Quor
 	signerIndices, err := signature.EncodeSignersToIndices(signerIDs, signerIDs)
 	require.NoError(t, err)
 
-	rootQC := &flow.QuorumCertificate{
-		View:          rootHead.View,
-		BlockID:       rootHead.ID(),
-		SignerIndices: signerIndices,
-		SigData:       unittest.SignatureFixture(),
-	}
+	rootQC := flow.NewQuorumCertificate(
+		rootHead.View,
+		rootHead.ID(),
+		signerIndices,
+		unittest.SignatureFixture(),
+	)
 
 	return rootHead, rootQC
 }
@@ -963,7 +965,7 @@ func VerificationNode(t testing.TB,
 	assigner module.ChunkAssigner,
 	chunksLimit uint,
 	chainID flow.ChainID,
-	collector module.VerificationMetrics, // used to enable collecting metrics on happy path integration
+	collector module.VerificationMetrics, //used to enable collecting metrics on happy path integration
 	mempoolCollector module.MempoolMetrics, // used to enable collecting metrics on happy path integration
 	opts ...VerificationOpt) testmock.VerificationNode {
 

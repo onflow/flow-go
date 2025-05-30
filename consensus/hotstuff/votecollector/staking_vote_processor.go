@@ -179,12 +179,12 @@ func (p *StakingVoteProcessor) buildQC() (*flow.QuorumCertificate, error) {
 		return nil, fmt.Errorf("could not encode signer indices: %w", err)
 	}
 
-	return &flow.QuorumCertificate{
-		View:          p.block.View,
-		BlockID:       p.block.BlockID,
-		SignerIndices: signerIndices,
-		SigData:       aggregatedStakingSig,
-	}, nil
+	return flow.NewQuorumCertificate(
+		p.block.View,
+		p.block.BlockID,
+		signerIndices,
+		aggregatedStakingSig,
+	), nil
 }
 
 func (p *StakingVoteProcessor) signerIndicesFromIdentities(signerIDs flow.IdentifierList) ([]byte, error) {

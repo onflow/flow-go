@@ -1,20 +1,33 @@
 package flow
 
-import "github.com/onflow/flow-go/model/fingerprint"
+import (
+	"github.com/onflow/crypto"
+
+	"github.com/onflow/flow-go/model/fingerprint"
+)
 
 // Collection is set of transactions.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Collection struct {
 	Transactions []*TransactionBody
+}
+
+// NewCollection creates a new instance of Collection.
+// Construction Collection allowed only within the constructor
+func NewCollection(transactions []*TransactionBody) *Collection {
+	return &Collection{Transactions: transactions}
 }
 
 // CollectionFromTransactions creates a new collection from the list of
 // transactions.
 func CollectionFromTransactions(transactions []*Transaction) Collection {
-	coll := Collection{Transactions: make([]*TransactionBody, 0, len(transactions))}
+	txs := make([]*TransactionBody, 0, len(transactions))
+
 	for _, tx := range transactions {
-		coll.Transactions = append(coll.Transactions, &tx.TransactionBody)
+		txs = append(txs, &tx.TransactionBody)
 	}
-	return coll
+	return *NewCollection(txs)
 }
 
 // Light returns the light, reference-only version of the collection.
@@ -28,9 +41,13 @@ func (c Collection) Light() LightCollection {
 
 // Guarantee returns a collection guarantee for this collection.
 func (c *Collection) Guarantee() CollectionGuarantee {
-	return CollectionGuarantee{
-		CollectionID: c.ID(),
-	}
+	return *NewCollectionGuarantee(
+		c.ID(),
+		Identifier{},
+		ChainID(""),
+		nil,
+		crypto.Signature{},
+	)
 }
 
 func (c Collection) ID() Identifier {
