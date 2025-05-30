@@ -15,21 +15,23 @@ import (
 )
 
 type persisterTest struct {
-	t                    *testing.T
-	persister            *Persister
-	inMemoryRegisters    *unsynchronized.Registers
-	inMemoryEvents       *unsynchronized.Events
-	inMemoryCollections  *unsynchronized.Collections
-	inMemoryTransactions *unsynchronized.Transactions
-	inMemoryResults      *unsynchronized.LightTransactionResults
-	registers            *storagemock.RegisterIndex
-	events               *storagemock.Events
-	collections          *storagemock.Collections
-	transactions         *storagemock.Transactions
-	results              *storagemock.LightTransactionResults
-	batch                *storagemock.Batch
-	executionResult      *flow.ExecutionResult
-	header               *flow.Header
+	t                      *testing.T
+	persister              *Persister
+	inMemoryRegisters      *unsynchronized.Registers
+	inMemoryEvents         *unsynchronized.Events
+	inMemoryCollections    *unsynchronized.Collections
+	inMemoryTransactions   *unsynchronized.Transactions
+	inMemoryResults        *unsynchronized.LightTransactionResults
+	inMemoryTxResultErrMsg *unsynchronized.TransactionResultErrorMessages
+	registers              *storagemock.RegisterIndex
+	events                 *storagemock.Events
+	collections            *storagemock.Collections
+	transactions           *storagemock.Transactions
+	results                *storagemock.LightTransactionResults
+	txResultErrMsg         *storagemock.TransactionResultErrorMessages
+	batch                  *storagemock.Batch
+	executionResult        *flow.ExecutionResult
+	header                 *flow.Header
 }
 
 func newPersisterTest(t *testing.T) *persisterTest {
@@ -38,20 +40,22 @@ func newPersisterTest(t *testing.T) *persisterTest {
 	executionResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 
 	return &persisterTest{
-		t:                    t,
-		inMemoryRegisters:    unsynchronized.NewRegisters(header.Height),
-		inMemoryEvents:       unsynchronized.NewEvents(),
-		inMemoryCollections:  unsynchronized.NewCollections(),
-		inMemoryTransactions: unsynchronized.NewTransactions(),
-		inMemoryResults:      unsynchronized.NewLightTransactionResults(),
-		registers:            storagemock.NewRegisterIndex(t),
-		events:               storagemock.NewEvents(t),
-		collections:          storagemock.NewCollections(t),
-		transactions:         storagemock.NewTransactions(t),
-		results:              storagemock.NewLightTransactionResults(t),
-		batch:                storagemock.NewBatch(t),
-		executionResult:      executionResult,
-		header:               header,
+		t:                      t,
+		inMemoryRegisters:      unsynchronized.NewRegisters(header.Height),
+		inMemoryEvents:         unsynchronized.NewEvents(),
+		inMemoryCollections:    unsynchronized.NewCollections(),
+		inMemoryTransactions:   unsynchronized.NewTransactions(),
+		inMemoryResults:        unsynchronized.NewLightTransactionResults(),
+		inMemoryTxResultErrMsg: unsynchronized.NewTransactionResultErrorMessages(),
+		registers:              storagemock.NewRegisterIndex(t),
+		events:                 storagemock.NewEvents(t),
+		collections:            storagemock.NewCollections(t),
+		transactions:           storagemock.NewTransactions(t),
+		results:                storagemock.NewLightTransactionResults(t),
+		txResultErrMsg:         storagemock.NewTransactionResultErrorMessages(t),
+		batch:                  storagemock.NewBatch(t),
+		executionResult:        executionResult,
+		header:                 header,
 	}
 }
 
@@ -63,11 +67,13 @@ func (pt *persisterTest) initPersister() *persisterTest {
 		pt.inMemoryCollections,
 		pt.inMemoryTransactions,
 		pt.inMemoryResults,
+		pt.inMemoryTxResultErrMsg,
 		pt.registers,
 		pt.events,
 		pt.collections,
 		pt.transactions,
 		pt.results,
+		pt.txResultErrMsg,
 		pt.executionResult,
 		pt.header,
 	)
@@ -100,6 +106,19 @@ func (pt *persisterTest) populateInMemoryStorages() {
 	results := unittest.LightTransactionResultsFixture(4)
 	err = pt.inMemoryResults.Store(pt.executionResult.BlockID, results)
 	require.NoError(pt.t, err)
+
+	txResultErrMsgs := make([]flow.TransactionResultErrorMessage, 2)
+	executorID := unittest.IdentifierFixture()
+	for i := 0; i < 2; i++ {
+		txResultErrMsgs[i] = flow.TransactionResultErrorMessage{
+			TransactionID: unittest.IdentifierFixture(),
+			ErrorMessage:  "expected test error",
+			Index:         uint32(i),
+			ExecutorID:    executorID,
+		}
+	}
+	err = pt.inMemoryTxResultErrMsg.Store(pt.header.ID(), txResultErrMsgs)
+	require.NoError(pt.t, err)
 }
 
 // verifySuccess verifies that the operation completed successfully with no errors
@@ -112,6 +131,7 @@ func (pt *persisterTest) verifySuccess(err error) {
 	pt.registers.AssertExpectations(pt.t)
 	pt.collections.AssertExpectations(pt.t)
 	pt.transactions.AssertExpectations(pt.t)
+	pt.txResultErrMsg.AssertExpectations(pt.t)
 
 	// Verify LastPersistedSealedExecutionResult was updated
 	assert.Equal(pt.t, pt.executionResult, pt.persister.LastPersistedSealedExecutionResult)
@@ -128,6 +148,7 @@ func (pt *persisterTest) verifyError(err error, errorMessage string) {
 	pt.registers.AssertExpectations(pt.t)
 	pt.collections.AssertExpectations(pt.t)
 	pt.transactions.AssertExpectations(pt.t)
+	pt.txResultErrMsg.AssertExpectations(pt.t)
 }
 
 func TestPersister_AddToBatch_EmptyStorages(t *testing.T) {
@@ -152,6 +173,7 @@ func TestPersister_AddToBatch_WithData(t *testing.T) {
 	pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)
 	pt.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil)
 	pt.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil)
+	pt.txResultErrMsg.On("BatchStore", pt.header.ID(), mock.Anything, pt.batch).Return(nil)
 
 	err := pt.persister.AddToBatch(pt.batch)
 
@@ -235,6 +257,23 @@ func TestPersister_AddToBatch_ErrorHandling(t *testing.T) {
 		pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)
 		pt.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil)
 		pt.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(assert.AnError)
+
+		err := pt.persister.AddToBatch(pt.batch)
+
+		pt.verifyError(err, "could not add transactions to batch")
+	})
+
+	t.Run("TxResultErrMsgStoreError", func(t *testing.T) {
+		pt := newPersisterTest(t).initPersister()
+		pt.populateInMemoryStorages()
+
+		// Set up everything before txResultErrMsg to succeed, but txResultErrMsg to fail
+		pt.events.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
+		pt.results.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
+		pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)
+		pt.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil)
+		pt.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil)
+		pt.txResultErrMsg.On("BatchStore", pt.header.ID(), mock.Anything, pt.batch).Return(assert.AnError)
 
 		err := pt.persister.AddToBatch(pt.batch)
 
