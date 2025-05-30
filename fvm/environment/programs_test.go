@@ -703,7 +703,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 
 		require.Equal(
 			t,
-			uint(
+			uint64(
 				1+ // import A
 					3+ // import B (import A, import A2)
 					4, // import C (import B (3), import A (already imported in this scope))
