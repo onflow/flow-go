@@ -75,6 +75,7 @@ func (c *TxErrorMessagesCore) FetchTransactionResultErrorMessages(ctx context.Co
 //
 // Expected errors during normal operation:
 //   - storage.ErrNotFound - if no execution result is found for the given block in the AN's storage.
+//   - rpc.ErrNoExecutionReceiptsFoundOnENs - if execution nodes provided to this operator don't have execution receipts
 //   - status.Error - GRPC call failed, some of possible codes are:
 //   - codes.NotFound - request cannot be served by EN because of absence of data.
 //   - codes.Unavailable - remote node is not unavailable.
