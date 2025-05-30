@@ -83,15 +83,12 @@ func TestExecutionForkWithDuplicateAssignedChunks(t *testing.T) {
 	processWG := &sync.WaitGroup{}
 	processWG.Add(len(assignedChunkStatuses))
 	for _, status := range assignedChunkStatuses {
-		locator := &chunks.Locator{
-			Index:    status.ChunkIndex,
-			ResultID: status.ExecutionResult.ID(),
-		}
+		locator := chunks.NewLocator(status.ExecutionResult.ID(), status.ChunkIndex)
 
 		go func(l *chunks.Locator) {
 			e.ProcessAssignedChunk(l)
 			processWG.Done()
-		}(locator)
+		}(&locator)
 
 	}
 

@@ -573,10 +573,7 @@ func (e *Engine) requestChunkDataPack(chunkIndex uint64, chunkID flow.Identifier
 	}
 
 	request := &verification.ChunkDataPackRequest{
-		Locator: chunks.Locator{
-			ResultID: resultID,
-			Index:    chunkIndex,
-		},
+		Locator: chunks.NewLocator(resultID, chunkIndex),
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID:   chunkID,
 			Height:    header.Height,

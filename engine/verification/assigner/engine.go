@@ -123,13 +123,10 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier, block
 		Uint64("block_height", blockHeight).
 		Logger()
 
-	locator := &chunks.Locator{
-		ResultID: resultID,
-		Index:    chunk.Index,
-	}
+	locator := chunks.NewLocator(resultID, chunk.Index)
 
 	// pushes chunk locator to the chunks queue
-	ok, err := e.chunksQueue.StoreChunkLocator(locator)
+	ok, err := e.chunksQueue.StoreChunkLocator(&locator)
 	if err != nil {
 		return false, fmt.Errorf("could not push chunk locator to chunks queue: %w", err)
 	}

@@ -94,14 +94,16 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochRecover() {
 	require.True(s.T(), hasChanges, "should have changes")
 	require.Equal(s.T(), updatedState.ID(), updatedStateID, "state ID should be equal to updated state ID")
 
+	nextEpoch := flow.NewEpochStateContainer(
+		epochRecover.EpochSetup.ID(),
+		epochRecover.EpochCommit.ID(),
+		flow.DynamicIdentityEntryListFromIdentities(nextEpochParticipants),
+		nil,
+	)
 	expectedState := &flow.MinEpochStateEntry{
-		PreviousEpoch: s.parentProtocolState.PreviousEpoch.Copy(),
-		CurrentEpoch:  s.parentProtocolState.CurrentEpoch,
-		NextEpoch: &flow.EpochStateContainer{
-			SetupID:          epochRecover.EpochSetup.ID(),
-			CommitID:         epochRecover.EpochCommit.ID(),
-			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochParticipants),
-		},
+		PreviousEpoch:          s.parentProtocolState.PreviousEpoch.Copy(),
+		CurrentEpoch:           s.parentProtocolState.CurrentEpoch,
+		NextEpoch:              &nextEpoch,
 		EpochFallbackTriggered: false,
 	}
 	require.Equal(s.T(), expectedState, updatedState.MinEpochStateEntry, "updatedState should be equal to expected one")
@@ -369,11 +371,12 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 
 		expectedProtocolState := &flow.MinEpochStateEntry{
 			PreviousEpoch: parentProtocolState.PreviousEpoch,
-			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:          parentProtocolState.CurrentEpoch.SetupID,
-				CommitID:         parentProtocolState.CurrentEpoch.CommitID,
-				ActiveIdentities: parentProtocolState.CurrentEpoch.ActiveIdentities,
-			},
+			CurrentEpoch: flow.NewEpochStateContainer(
+				parentProtocolState.CurrentEpoch.SetupID,
+				parentProtocolState.CurrentEpoch.CommitID,
+				parentProtocolState.CurrentEpoch.ActiveIdentities,
+				nil,
+			),
 			NextEpoch:              nil,
 			EpochFallbackTriggered: true,
 		}
@@ -395,17 +398,17 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 
 		expectedProtocolState := &flow.MinEpochStateEntry{
 			PreviousEpoch: parentProtocolState.PreviousEpoch,
-			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:          parentProtocolState.CurrentEpoch.SetupID,
-				CommitID:         parentProtocolState.CurrentEpoch.CommitID,
-				ActiveIdentities: parentProtocolState.CurrentEpoch.ActiveIdentities,
-				EpochExtensions: []flow.EpochExtension{
+			CurrentEpoch: flow.NewEpochStateContainer(
+				parentProtocolState.CurrentEpoch.SetupID,
+				parentProtocolState.CurrentEpoch.CommitID,
+				parentProtocolState.CurrentEpoch.ActiveIdentities,
+				[]flow.EpochExtension{
 					{
 						FirstView: parentProtocolState.CurrentEpochFinalView() + 1,
 						FinalView: parentProtocolState.CurrentEpochFinalView() + extensionViewCount,
 					},
 				},
-			},
+			),
 			NextEpoch:              nil,
 			EpochFallbackTriggered: true,
 		}
@@ -434,17 +437,17 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 
 		expectedProtocolState := &flow.MinEpochStateEntry{
 			PreviousEpoch: parentProtocolState.PreviousEpoch,
-			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:          parentProtocolState.CurrentEpoch.SetupID,
-				CommitID:         parentProtocolState.CurrentEpoch.CommitID,
-				ActiveIdentities: parentProtocolState.CurrentEpoch.ActiveIdentities,
-				EpochExtensions: []flow.EpochExtension{
+			CurrentEpoch: flow.NewEpochStateContainer(
+				parentProtocolState.CurrentEpoch.SetupID,
+				parentProtocolState.CurrentEpoch.CommitID,
+				parentProtocolState.CurrentEpoch.ActiveIdentities,
+				[]flow.EpochExtension{
 					{
 						FirstView: parentProtocolState.CurrentEpochFinalView() + 1,
 						FinalView: parentProtocolState.CurrentEpochFinalView() + extensionViewCount,
 					},
 				},
-			},
+			),
 			NextEpoch:              nil,
 			EpochFallbackTriggered: true,
 		}
@@ -473,11 +476,12 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 
 		expectedProtocolState := &flow.MinEpochStateEntry{
 			PreviousEpoch: parentProtocolState.PreviousEpoch,
-			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:          parentProtocolState.CurrentEpoch.SetupID,
-				CommitID:         parentProtocolState.CurrentEpoch.CommitID,
-				ActiveIdentities: parentProtocolState.CurrentEpoch.ActiveIdentities,
-			},
+			CurrentEpoch: flow.NewEpochStateContainer(
+				parentProtocolState.CurrentEpoch.SetupID,
+				parentProtocolState.CurrentEpoch.CommitID,
+				parentProtocolState.CurrentEpoch.ActiveIdentities,
+				nil,
+			),
 			NextEpoch:              parentProtocolState.NextEpoch,
 			EpochFallbackTriggered: true,
 		}
@@ -552,12 +556,12 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 
 			expectedState := &flow.MinEpochStateEntry{
 				PreviousEpoch: originalParentState.PreviousEpoch,
-				CurrentEpoch: flow.EpochStateContainer{
-					SetupID:          originalParentState.CurrentEpoch.SetupID,
-					CommitID:         originalParentState.CurrentEpoch.CommitID,
-					ActiveIdentities: originalParentState.CurrentEpoch.ActiveIdentities,
-					EpochExtensions:  data.ExpectedExtensions,
-				},
+				CurrentEpoch: flow.NewEpochStateContainer(
+					originalParentState.CurrentEpoch.SetupID,
+					originalParentState.CurrentEpoch.CommitID,
+					originalParentState.CurrentEpoch.ActiveIdentities,
+					data.ExpectedExtensions,
+				),
 				NextEpoch:              nil,
 				EpochFallbackTriggered: true,
 			}
@@ -643,12 +647,12 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 
 		expectedState := &flow.MinEpochStateEntry{
 			PreviousEpoch: originalParentState.CurrentEpoch.Copy(),
-			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:          originalParentState.NextEpoch.SetupID,
-				CommitID:         originalParentState.NextEpoch.CommitID,
-				ActiveIdentities: originalParentState.NextEpoch.ActiveIdentities,
-				EpochExtensions:  data.ExpectedExtensions,
-			},
+			CurrentEpoch: flow.NewEpochStateContainer(
+				originalParentState.NextEpoch.SetupID,
+				originalParentState.NextEpoch.CommitID,
+				originalParentState.NextEpoch.ActiveIdentities,
+				data.ExpectedExtensions,
+			),
 			NextEpoch:              nil,
 			EpochFallbackTriggered: true,
 		}
