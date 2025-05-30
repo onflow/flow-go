@@ -716,6 +716,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 		// denied error.
 		consensus_follower.WithPebbleDB(pebbleDB),
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
+		// each consenesus follower will have a different lock manager singleton
 		consensus_follower.WithLockManager(locks.NewTestingLockManager()),
 	)
 

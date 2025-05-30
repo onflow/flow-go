@@ -29,6 +29,33 @@ func makeLockPolicy() lockctx.Policy {
 
 var makeLockManagerOnce sync.Once
 
+// MakeSingletonLockManager returns the lock manager used by the storage layer.
+// This function must be used for production builds and must be called exactly once process-wide.
+//
+// The Lock Manager is a core component enforcing atomicity of various storage operations across different
+// components. Therefore, the lock manager is a singleton instance, because its correctness depends on the
+// same set of locks being used everywhere.
+// By convention, the lock mananger singleton is injected into the node's components during their
+// initialization, following the same dependency-injection pattern as other components that are conceptually
+// singletons (e.g. the storage layer abstractions). Thereby, we explicitly codify in the constructor that a
+// component uses the lock mananger. We think it is helpful to emphasize that the component at times
+// will acquire _exclusive access_ to all key-value pairs in the database whose keys start with some specific
+// prefixes (see `storage/badger/operation/prefix.go` for an exhaustive list of prefixes).
+// In comparison, the alternative pattern (which we do not use) of retrieving a singleton instance via a
+// global variable would hide which components required exclusive storage access, and in addition, it would
+// break with our broadly established dependency-injection pattern. To enforce best practices, this function
+// will panic if it is called more than once.
+//
+// CAUTION:
+//   - The lock manager only guarantees atomicity of reads and writes for the thread holding the lock.
+//     Other threads can continue to read possibly stale values, while the lock is held by a different thread.
+//   - Furthermore, the writer must bundle all their writes into a _single_ Write Batch for atomicity. Even
+//     when holding the lock, reading threads can still observe the writes of one batch while not observing
+//     the writes of a second batch, despite the thread writing both batches while holding the lock. It was
+//     a deliberate choice for the sake of performance to allow reads without any locking - so instead of
+//     waiting for the newest value in case a write is currently ongoing, the reader will just retrieve the
+//     previous value. This aligns with our architecture of the node operating as an eventually-consistent
+//     system, which favors loose coupling and high throughput for different components within a node.
 func MakeSingletonLockManager() lockctx.Manager {
 	var manager lockctx.Manager
 	makeLockManagerOnce.Do(func() {
