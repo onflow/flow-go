@@ -43,7 +43,7 @@ func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNod
 		if err != nil {
 			return nil, fmt.Errorf("invalid network public key: %s", partner.NetworkPubKey)
 		}
-		err = ValidateStakingPubKey(partner.StakingPubKey, partner.StakingPoP)
+		err = ValidateStakingPubKey(partner.StakingPubKey)
 		if err != nil {
 			return nil, fmt.Errorf("invalid staking public key: %s", partner.StakingPubKey)
 		}

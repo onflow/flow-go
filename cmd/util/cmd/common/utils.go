@@ -160,19 +160,9 @@ func ValidateNetworkPubKey(key encodable.NetworkPubKey) error {
 // - key: the public key.
 // Returns:
 // - error: if the staking key is nil.
-func ValidateStakingPubKey(key encodable.StakingPubKey, pop []byte) error {
+func ValidateStakingPubKey(key encodable.StakingPubKey) error {
 	if key.PublicKey == nil {
 		return fmt.Errorf("staking public key must not be nil")
-	}
-	if pop == nil {
-		return fmt.Errorf("staking key proof of possession must not be nil")
-	}
-	valid, err := crypto.BLSVerifyPOP(key.PublicKey, pop)
-	if err != nil {
-		return fmt.Errorf("verifying staking key PoP failed")
-	}
-	if !valid {
-		return fmt.Errorf("staking key PoP is invalid")
 	}
 	return nil
 }
