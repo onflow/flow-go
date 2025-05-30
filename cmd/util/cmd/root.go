@@ -32,6 +32,7 @@ import (
 	find_trie_root "github.com/onflow/flow-go/cmd/util/cmd/find-trie-root"
 	generate_authorization_fixes "github.com/onflow/flow-go/cmd/util/cmd/generate-authorization-fixes"
 	"github.com/onflow/flow-go/cmd/util/cmd/leaders"
+	pebble_checkpoint "github.com/onflow/flow-go/cmd/util/cmd/pebble-checkpoint"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
@@ -132,6 +133,7 @@ func addCommands() {
 	rootCmd.AddCommand(evm_state_exporter.Cmd)
 	rootCmd.AddCommand(verify_execution_result.Cmd)
 	rootCmd.AddCommand(verify_evm_offchain_replay.Cmd)
+	rootCmd.AddCommand(pebble_checkpoint.Cmd)
 }
 
 func initConfig() {
