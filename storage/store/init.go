@@ -15,6 +15,15 @@ type All struct {
 	QuorumCertificates *QuorumCertificates
 	Results            *ExecutionResults
 	Receipts           *ExecutionReceipts
+	Commits            *Commits
+
+	Setups                    *EpochSetups
+	EpochCommits              *EpochCommits
+	EpochProtocolStateEntries *EpochProtocolStateEntries
+	ProtocolKVStore           *ProtocolKVStore
+	VersionBeacons            *VersionBeacons
+	Transactions              *Transactions
+	Collections               *Collections
 }
 
 func InitAll(metrics module.CacheMetrics, db storage.DB) *All {
@@ -24,9 +33,20 @@ func InitAll(metrics module.CacheMetrics, db storage.DB) *All {
 	index := NewIndex(metrics, db)
 	results := NewExecutionResults(metrics, db)
 	receipts := NewExecutionReceipts(metrics, db, results, DefaultCacheSize)
+	commits := NewCommits(metrics, db)
 	payloads := NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := NewBlocks(db, headers, payloads)
 	qcs := NewQuorumCertificates(metrics, db, DefaultCacheSize)
+
+	setups := NewEpochSetups(metrics, db)
+	epochCommits := NewEpochCommits(metrics, db)
+	epochProtocolStateEntries := NewEpochProtocolStateEntries(metrics, setups, epochCommits, db,
+		DefaultEpochProtocolStateCacheSize, DefaultProtocolStateIndexCacheSize)
+	protocolKVStore := NewProtocolKVStore(metrics, db, DefaultProtocolKVStoreCacheSize, DefaultProtocolKVStoreByBlockIDCacheSize)
+	versionBeacons := NewVersionBeacons(db)
+
+	transactions := NewTransactions(metrics, db)
+	collections := NewCollections(db, transactions)
 
 	return &All{
 		Headers:            headers,
@@ -38,5 +58,14 @@ func InitAll(metrics module.CacheMetrics, db storage.DB) *All {
 		QuorumCertificates: qcs,
 		Results:            results,
 		Receipts:           receipts,
+		Commits:            commits,
+
+		Setups:                    setups,
+		EpochCommits:              epochCommits,
+		EpochProtocolStateEntries: epochProtocolStateEntries,
+		ProtocolKVStore:           protocolKVStore,
+		VersionBeacons:            versionBeacons,
+		Transactions:              transactions,
+		Collections:               collections,
 	}
 }
