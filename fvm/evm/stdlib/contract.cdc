@@ -751,28 +751,16 @@ access(all) contract EVM {
         ) as! [Result]
     }
 
-    /// Converts Solidity code into the standard ABI format that is
-    /// used by the internal EVM to read fields and call functions
-    ///
-    /// @param values: The Solidity code
-    ///
-    /// @return [UInt8]: The encoded ABI
     access(all)
     fun encodeABI(_ values: [AnyStruct]): [UInt8] {
         return InternalEVM.encodeABI(values)
     }
 
-    /// Converts an ABI to Solidity code
-    ///
-    /// @param types: 
-    ///
-    /// @return [AnyStruct]:
     access(all)
     fun decodeABI(types: [Type], data: [UInt8]): [AnyStruct] {
         return InternalEVM.decodeABI(types: types, data: data)
     }
 
-    ///
     access(all)
     fun encodeABIWithSignature(
         _ signature: String,
@@ -786,7 +774,6 @@ access(all) contract EVM {
         return methodID.concat(arguments)
     }
 
-    ///
     access(all)
     fun decodeABIWithSignature(
         _ signature: String,
