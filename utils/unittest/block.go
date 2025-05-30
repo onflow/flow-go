@@ -8,7 +8,7 @@ var Block blockFactory
 
 type blockFactory struct{}
 
-// BlockFixture initializes and returns a new flow.Block instance.
+// BlockFixture initializes and returns a new *flow.Block instance.
 func BlockFixture(opts ...func(*flow.Block)) *flow.Block {
 	header := BlockHeaderFixture()
 	block := BlockWithParentFixture(header)
