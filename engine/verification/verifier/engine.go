@@ -274,7 +274,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 		e.me,
 		e.approvalHasher,
 		e.spockHasher,
-		&attestation,
+		attestation,
 		spockSecret)
 
 	span.End()
@@ -351,9 +351,9 @@ func GenerateResultApproval(
 		return nil, fmt.Errorf("could not sign result approval body: %w", err)
 	}
 
-	resultApproval := flow.NewResultApproval(body, bodySign)
+	resultApproval := flow.NewResultApproval(*body, bodySign)
 
-	return &resultApproval, nil
+	return resultApproval, nil
 }
 
 // verifiableChunkHandler acts as a wrapper around the verify method that captures its performance-related metrics

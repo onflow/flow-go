@@ -15,8 +15,8 @@ type Attestation struct {
 
 // NewAttestation creates a new instance of Attestation.
 // Construction Attestation allowed only within the constructor.
-func NewAttestation(blockID Identifier, executionResultID Identifier, chunkIndex uint64) Attestation {
-	return Attestation{
+func NewAttestation(blockID Identifier, executionResultID Identifier, chunkIndex uint64) *Attestation {
+	return &Attestation{
 		BlockID:           blockID,
 		ExecutionResultID: executionResultID,
 		ChunkIndex:        chunkIndex,
@@ -44,8 +44,8 @@ func NewResultApprovalBody(
 	attestation Attestation,
 	approvalID Identifier,
 	attestSignature crypto.Signature,
-	spock crypto.Signature) ResultApprovalBody {
-	return ResultApprovalBody{
+	spock crypto.Signature) *ResultApprovalBody {
+	return &ResultApprovalBody{
 		Attestation:          attestation,
 		ApproverID:           approvalID,
 		AttestationSignature: attestSignature,
@@ -80,11 +80,11 @@ type ResultApproval struct {
 }
 
 // NewResultApproval creates a new instance of ResultApproval.
-// Construction NewResultApproval allowed only within the constructor.
+// Construction ResultApproval allowed only within the constructor.
 func NewResultApproval(
 	body ResultApprovalBody,
-	verifierSignature crypto.Signature) ResultApproval {
-	return ResultApproval{
+	verifierSignature crypto.Signature) *ResultApproval {
+	return &ResultApproval{
 		Body:              body,
 		VerifierSignature: verifierSignature,
 	}
