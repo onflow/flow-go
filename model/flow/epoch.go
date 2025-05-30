@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/fxamacker/cbor/v2"
@@ -168,7 +167,7 @@ type UntrustedEpochSetup EpochSetup
 // NewEpochSetup creates a new instance of EpochSetup.
 // Construction EpochSetup allowed only within the constructor.
 func NewEpochSetup(untrusted UntrustedEpochSetup) (*EpochSetup, error) {
-	if untrusted.FirstView > untrusted.FinalView {
+	if untrusted.FirstView >= untrusted.FinalView {
 		return nil, fmt.Errorf("first view %d is greater than the final view %d", untrusted.FirstView, untrusted.FinalView)
 	}
 	if untrusted.Participants == nil {
@@ -183,10 +182,6 @@ func NewEpochSetup(untrusted UntrustedEpochSetup) (*EpochSetup, error) {
 			EpochSetupRandomSourceLength,
 			len(untrusted.RandomSource),
 		)
-	}
-
-	if untrusted.TargetEndTime <= uint64(time.Now().Unix()) {
-		return nil, fmt.Errorf("epoch setup target end time is before current time")
 	}
 
 	return &EpochSetup{
@@ -374,9 +369,6 @@ func NewEpochCommit(untrusted UntrustedEpochCommit) (*EpochCommit, error) {
 	if untrusted.DKGGroupKey == nil {
 		return nil, fmt.Errorf("DKG group key is nil")
 
-	}
-	if len(untrusted.DKGParticipantKeys) != len(untrusted.DKGIndexMap) {
-		return nil, fmt.Errorf("mismatched lengths — DKGParticipantKeys (%d) vs DKGIndexMap (%d)", len(untrusted.DKGParticipantKeys), len(untrusted.DKGIndexMap))
 	}
 
 	return &EpochCommit{
