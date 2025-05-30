@@ -212,10 +212,8 @@ func (e *blockComputer) queueTransactionRequests(
 	blockIdStr string,
 	blockHeader *flow.Header,
 	rawCollections []*entity.CompleteCollection,
-	systemTxnBody *flow.TransactionBody,
 	requestQueue chan TransactionRequest,
-	numTxns int,
-) {
+) error {
 	txnIndex := uint32(0)
 
 	collectionCtx := fvm.NewContextFromParent(
@@ -253,6 +251,31 @@ func (e *blockComputer) queueTransactionRequests(
 		}
 	}
 
+	return e.queueSystemTransaction(
+		blockId,
+		blockIdStr,
+		blockHeader,
+		len(rawCollections),
+		txnIndex,
+		requestQueue,
+	)
+}
+
+func (e *blockComputer) queueSystemTransaction(
+	blockId flow.Identifier,
+	blockIdStr string,
+	blockHeader *flow.Header,
+	numCollections int,
+	txnIndex uint32,
+	requestQueue chan TransactionRequest,
+) error {
+	numTxs := txnIndex + 1 // there's one system transaction per block
+
+	systemTxnBody, err := blueprints.SystemChunkTransaction(e.vmCtx.Chain)
+	if err != nil {
+		return fmt.Errorf("could not get system chunk transaction: %w", err)
+	}
+
 	systemCtx := fvm.NewContextFromParent(
 		e.systemChunkCtx,
 		fvm.WithBlockHeader(blockHeader),
@@ -263,14 +286,14 @@ func (e *blockComputer) queueTransactionRequests(
 		Uint64("height", blockHeader.Height).
 		Bool("system_chunk", true).
 		Bool("system_transaction", true).
-		Int("num_collections", len(rawCollections)).
-		Int("num_txs", numTxns).
+		Int("num_collections", numCollections).
+		Int("num_txs", int(numTxs)).
 		Logger()
 	systemCollectionInfo := collectionInfo{
 		blockId:         blockId,
 		blockIdStr:      blockIdStr,
 		blockHeight:     blockHeader.Height,
-		collectionIndex: len(rawCollections),
+		collectionIndex: numCollections,
 		CompleteCollection: &entity.CompleteCollection{
 			Transactions: []*flow.TransactionBody{systemTxnBody},
 		},
@@ -284,6 +307,8 @@ func (e *blockComputer) queueTransactionRequests(
 		txnIndex,
 		systemTxnBody,
 		true)
+
+	return nil
 }
 
 func numberOfTransactionsInBlock(collections []*entity.CompleteCollection) int {
@@ -343,13 +368,6 @@ func (e *blockComputer) executeBlock(
 		attribute.Int("collection_counts", len(rawCollections)))
 	defer blockSpan.End()
 
-	systemTxn, err := blueprints.SystemChunkTransaction(e.vmCtx.Chain)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"could not get system chunk transaction: %w",
-			err)
-	}
-
 	numTxns := numberOfTransactionsInBlock(rawCollections)
 
 	// We temporarily support chunk models associated with both protocol versions 1 and 2.
@@ -385,16 +403,17 @@ func (e *blockComputer) executeBlock(
 		derivedBlockData,
 		collector)
 
-	e.queueTransactionRequests(
+	err = e.queueTransactionRequests(
 		blockId,
 		blockIdStr,
 		block.Block.Header,
 		rawCollections,
-		systemTxn,
 		requestQueue,
-		numTxns,
 	)
 	close(requestQueue)
+	if err != nil {
+		return nil, fmt.Errorf("cannot queue transactions: %w", err)
+	}
 
 	wg := &sync.WaitGroup{}
 	wg.Add(e.maxConcurrency)
