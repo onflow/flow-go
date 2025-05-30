@@ -1,6 +1,10 @@
 package operation
 
 import (
+	"fmt"
+
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -19,10 +23,8 @@ func RetrieveResultApproval(r storage.Reader, approvalID flow.Identifier, approv
 	return RetrieveByKey(r, MakePrefix(codeResultApproval, approvalID), approval)
 }
 
-// UnsafeIndexResultApproval inserts a ResultApproval ID keyed by ExecutionResult ID
+// IndexResultApproval inserts a ResultApproval ID keyed by ExecutionResult ID
 // and chunk index.
-// Unsafe means that it does not check if a different approval is indexed for the same
-// chunk, and will overwrite the existing index.
 // CAUTION:
 //   - In general, the Flow protocol requires multiple approvals for the same chunk from different
 //     verification nodes. In other words, there are multiple different approvals for the same chunk.
@@ -30,9 +32,12 @@ func RetrieveResultApproval(r storage.Reader, approvalID flow.Identifier, approv
 //     Verification Nodes for tracking their own approvals (for the same ExecutionResult, a Verifier
 //     will always produce the same approval)
 //   - In order to make sure only one approval is indexed for the chunk, _all calls_ to
-//     `UnsafeIndexResultApproval` must be synchronized by the higher-logic. Currently, we have the
-//     convention that `store.ResultApprovals` is the only place that is allowed to call this method.
-func UnsafeIndexResultApproval(w storage.Writer, resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error {
+//     [IndexResultApproval] must acquire the [storage.LockIndexResultApproval] and check
+//     that no value already exists for the index prior to writing.
+func IndexResultApproval(lctx lockctx.Proof, w storage.Writer, resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockIndexResultApproval) {
+		return fmt.Errorf("cannot index result approval without lock: %s", storage.LockIndexResultApproval)
+	}
 	return UpsertByKey(w, MakePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID)
 }
 
