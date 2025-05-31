@@ -50,7 +50,7 @@ var (
 var finalizeCmd = &cobra.Command{
 	Use:   "finalize",
 	Short: "Finalize the bootstrapping process",
-	Long: `Finalize the bootstrapping process, which includes running the DKG for the generation of the random beacon
+	Long: `Finalize the bootstrapping process, which includes generating the random beacon
 	keys and generating the root block, QC, execution result and block seal.`,
 	Run: finalize,
 }
@@ -73,7 +73,7 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().StringVar(&deprecatedFlagPartnerStakes, "partner-stakes", "", "deprecated: use partner-weights instead")
 	finalizeCmd.Flags().StringVar(&flagPartnerWeights, "partner-weights", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their weight")
-	finalizeCmd.Flags().StringVar(&flagDKGDataPath, "dkg-data", "", "path to a JSON file containing data as output from DKG process")
+	finalizeCmd.Flags().StringVar(&flagDKGDataPath, "dkg-data", "", "path to a JSON file containing data as output from the random beacon key generation")
 	finalizeCmd.Flags().StringVar(&flagRootCommit, "root-commit", "0000000000000000000000000000000000000000000000000000000000000000", "state commitment of root execution state")
 
 	cmd.MarkFlagRequired(finalizeCmd, "config")
@@ -151,7 +151,7 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	log.Info().Msgf("received votes total: %v", len(votes))
 
-	log.Info().Msg("reading dkg data")
+	log.Info().Msg("reading random beacon keys")
 	dkgData, _ := readRandomBeaconKeys()
 	log.Info().Msg("")
 
