@@ -666,10 +666,10 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 					},
 				}, {
 					description:       "invalid user flag (extensions do not exist but flag (AT or ED) set)",
-					authenticatorData: slices.Concat(rpIDHash, []byte{0x01 & 0x80}, sigCounter),
+					authenticatorData: slices.Concat(rpIDHash, []byte{0x01 | 0x80}, sigCounter),
 					clientDataJSON: map[string]string{
 						"type":      crypto.WebAuthnTypeGet,
-						"challenge": string(authNChallenge[:]),
+						"challenge": authNChallengeBase64Url,
 						"origin":    validClientDataOrigin,
 					},
 					require: func(t *testing.T, sigOk bool, err error) {
@@ -681,7 +681,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 					authenticatorData: validAuthenticatorData,
 					clientDataJSON: map[string]string{
 						"type":      "invalid_type",
-						"challenge": string(authNChallenge[:]),
+						"challenge": authNChallengeBase64Url,
 						"origin":    validClientDataOrigin,
 					},
 					require: func(t *testing.T, sigOk bool, err error) {
@@ -689,16 +689,16 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 						require.False(t, sigOk)
 					},
 				}, {
-					description:       "invalid client data, empty origin",
+					description:       "empty origin (valid)",
 					authenticatorData: validAuthenticatorData,
 					clientDataJSON: map[string]string{
 						"type":      crypto.WebAuthnTypeGet,
-						"challenge": string(authNChallenge[:]),
+						"challenge": authNChallengeBase64Url,
 						"origin":    "",
 					},
 					require: func(t *testing.T, sigOk bool, err error) {
 						require.NoError(t, err)
-						require.False(t, sigOk)
+						require.True(t, sigOk)
 					},
 				}, {
 					description:       "valid authn scheme signature",
