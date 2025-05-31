@@ -153,7 +153,7 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NextEpochRetrieveMyBea
 // In case like this there is no need for recovery and we should exit early.
 func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_KeyAlreadyRecovered() {
 	s.dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(
-		unittest.PrivateKeyFixture(crypto.ECDSAP256, unittest.DefaultSeedFixtureLength), true, nil).Once()
+		unittest.PrivateKeyFixture(crypto.BLSBLS12381), true, nil).Once()
 
 	recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, s.dkgState)
 	require.NoError(s.T(), err)
@@ -219,7 +219,7 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NoSafeMyBeaconPrivateK
 func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NextEpochDKGException() {
 	s.dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(nil, false, nil).Once()
 	// have a safe key for the current epoch
-	myBeaconKey := unittest.PrivateKeyFixture(crypto.ECDSAP256, unittest.DefaultSeedFixtureLength)
+	myBeaconKey := unittest.PrivateKeyFixture(crypto.BLSBLS12381)
 	s.dkgState.On("RetrieveMyBeaconPrivateKey", s.currentEpochCounter).Return(myBeaconKey, true, nil).Once()
 
 	exception := errors.New("exception")
@@ -240,7 +240,7 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NextEpochDKGException(
 func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NextEpochKeyShareException() {
 	s.dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(nil, false, nil).Once()
 	// have a safe key for the current epoch
-	myBeaconKey := unittest.PrivateKeyFixture(crypto.ECDSAP256, unittest.DefaultSeedFixtureLength)
+	myBeaconKey := unittest.PrivateKeyFixture(crypto.BLSBLS12381)
 	s.dkgState.On("RetrieveMyBeaconPrivateKey", s.currentEpochCounter).Return(myBeaconKey, true, nil).Once()
 
 	exception := errors.New("exception")
@@ -265,7 +265,7 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NodeIsNotPartOfNextEpo
 		dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(nil, false, nil).Once()
 
 		// have a safe key for the current epoch
-		myBeaconKey := unittest.PrivateKeyFixture(crypto.ECDSAP256, unittest.DefaultSeedFixtureLength)
+		myBeaconKey := unittest.PrivateKeyFixture(crypto.BLSBLS12381)
 		dkgState.On("RetrieveMyBeaconPrivateKey", s.currentEpochCounter).Return(myBeaconKey, true, nil).Once()
 		// node is not part of the DKG for the next epoch
 		dkg := mockprotocol.NewDKG(s.T())
@@ -283,11 +283,11 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NodeIsNotPartOfNextEpo
 		dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(nil, false, nil).Once()
 
 		// have a safe key for the current epoch
-		myBeaconKey := unittest.PrivateKeyFixture(crypto.ECDSAP256, unittest.DefaultSeedFixtureLength)
+		myBeaconKey := unittest.PrivateKeyFixture(crypto.BLSBLS12381)
 		dkgState.On("RetrieveMyBeaconPrivateKey", s.currentEpochCounter).Return(myBeaconKey, true, nil).Once()
 		// DKG doesn't contain a public key for our private key.
 		dkg := mockprotocol.NewDKG(s.T())
-		randomPubKey := unittest.PublicKeysFixture(1, crypto.ECDSAP256)[0]
+		randomPubKey := unittest.PublicKeysFixture(1, crypto.BLSBLS12381)[0]
 		dkg.On("KeyShare", s.local.NodeID()).Return(randomPubKey, nil).Once()
 		s.nextEpoch.On("DKG").Return(dkg, nil).Once()
 
@@ -308,7 +308,7 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NodeIsNotPartOfNextEpo
 func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_RecoverKey() {
 	performTest := func(dkgState *mockstorage.EpochRecoveryMyBeaconKey) {
 		// have a safe key for the current epoch
-		myBeaconKey := unittest.PrivateKeyFixture(crypto.ECDSAP256, unittest.DefaultSeedFixtureLength)
+		myBeaconKey := unittest.PrivateKeyFixture(crypto.BLSBLS12381)
 		dkgState.On("RetrieveMyBeaconPrivateKey", s.currentEpochCounter).Return(myBeaconKey, true, nil).Once()
 		// node is part of the DKG for the next epoch
 		dkg := mockprotocol.NewDKG(s.T())
@@ -364,7 +364,7 @@ func (s *BeaconKeyRecoverySuite) TestEpochFallbackModeExited() {
 	s.dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(nil, false, nil).Once()
 
 	// have a safe key for the current epoch
-	myBeaconKey := unittest.PrivateKeyFixture(crypto.ECDSAP256, unittest.DefaultSeedFixtureLength)
+	myBeaconKey := unittest.PrivateKeyFixture(crypto.BLSBLS12381)
 	s.dkgState.On("RetrieveMyBeaconPrivateKey", s.currentEpochCounter).Return(myBeaconKey, true, nil).Once()
 	// node is part of the DKG for the next epoch
 	dkg := mockprotocol.NewDKG(s.T())
