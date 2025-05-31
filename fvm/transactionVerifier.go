@@ -71,7 +71,7 @@ func (entry *signatureContinuation) verify() errors.CodedError {
 		entry.message,
 		entry.accountKey.PublicKey,
 		entry.accountKey.HashAlgo,
-		entry.Info,
+		entry.ExtensionData,
 	)
 	if err != nil {
 		entry.verifyErr = entry.newError(err)

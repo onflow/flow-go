@@ -9,7 +9,9 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -66,7 +68,7 @@ func validateFlags(flags byte, extensions []byte) error {
 	// i.e. no extension data but flags are set.
 	if (len(extensions) > 0) != (attestationCredentialData || extensionData) {
 		return errors.New("invalid flags: Attestation Credential Data (AT) or Extension Data (ED) flag are not matching the corresponding extension data")
-	} 
+	}
 
 	// If all checks pass, return nil
 	return nil
@@ -94,7 +96,7 @@ func validateWebAuthNExtensionData(extensionData []byte, message []byte) (bool, 
 		return false, nil
 	}
 
-	if !strings.EqualFold(clientData.Type, WebAuthnTypeGet) || len(clientDataChallenge) != WebAuthnChallengeLength || len(clientData.Origin) == 0 {
+	if strings.Compare(clientData.Type, WebAuthnTypeGet) != 0 || len(clientDataChallenge) != WebAuthnChallengeLength {
 		// invalid client data
 		return false, nil
 	}
@@ -102,7 +104,7 @@ func validateWebAuthNExtensionData(extensionData []byte, message []byte) (bool, 
 	// Validate challenge
 	hasher, err := NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)
 	if err != nil {
-		// could not create hasher for challenge validation, swallowing error here, but should never occur
+		// could not create hasher for challenge validation, panic here, but should never occur
 		panic(err)
 	}
 
@@ -118,15 +120,14 @@ func validateWebAuthNExtensionData(extensionData []byte, message []byte) (bool, 
 
 	// extract rpIdHash, userFlags, sigCounter, extensions
 	rpIdHash := decodedWebAuthnData.AuthenticatorData[:WebAuthnChallengeLength]
-	userFlags := decodedWebAuthnData.AuthenticatorData[WebAuthnChallengeLength : WebAuthnChallengeLength+1]
-	// _ := decodedWebAuthnData.AuthenticatorData[WebAuthnChallengeLength+1:WebAuthnExtensionDataMinimumLength]
+	userFlags := decodedWebAuthnData.AuthenticatorData[WebAuthnChallengeLength]
 	extensions := decodedWebAuthnData.AuthenticatorData[WebAuthnExtensionDataMinimumLength:]
 	if bytes.Equal(flow.TransactionDomainTag[:], rpIdHash) {
 		return false, nil
 	}
 
 	// validate user flags according to FLIP 264
-	if err := validateFlags(userFlags[0], extensions); err != nil {
+	if err := validateFlags(userFlags, extensions); err != nil {
 		return false, nil
 	}
 
