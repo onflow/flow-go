@@ -522,8 +522,14 @@ func TestStopAtHeight(t *testing.T) {
 	mockBlockSealingStatus(s.state, s.headers, headerB, false)
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{resultA, resultB})
 
-	locatorA := chunks.NewLocator(resultA.ID(), 0)
-	locatorB := chunks.NewLocator(resultB.ID(), 0)
+	locatorA := chunks.Locator{
+		ResultID: resultA.ID(),
+		Index:    0,
+	}
+	locatorB := chunks.Locator{
+		ResultID: resultB.ID(),
+		Index:    0,
+	}
 
 	// expects processing notifier being invoked upon sealed chunk detected,
 	// which means the termination of processing a sealed chunk on fetcher engine
@@ -731,7 +737,11 @@ func mockVerifierEngine(t *testing.T,
 			require.True(t, ok)
 
 			// verifiable chunk data should be distinct.
-			locatorID := chunks.NewLocator(vc.Result.ID(), vc.Chunk.Index).ID()
+			locator := chunks.Locator{
+				ResultID: vc.Result.ID(),
+				Index:    vc.Chunk.Index,
+			}
+			locatorID := locator.ID()
 
 			_, ok = seen[locatorID]
 			require.False(t, ok, "duplicated verifiable chunk received")
@@ -872,7 +882,10 @@ func chunkDataPackResponseFixture(t *testing.T,
 	require.Equal(t, collection != nil, !convert.IsSystemChunk(chunk.Index, result), "only non-system chunks must have a collection")
 
 	return &verification.ChunkDataPackResponse{
-		Locator: chunks.NewLocator(result.ID(), chunk.Index),
+		Locator: chunks.Locator{
+			ResultID: result.ID(),
+			Index:    chunk.Index,
+		},
 		Cdp: unittest.ChunkDataPackFixture(chunk.ID(),
 			unittest.WithStartState(chunk.StartState),
 			unittest.WithChunkDataPackCollection(collection)),
@@ -952,7 +965,10 @@ func chunkRequestFixture(resultID flow.Identifier,
 	disagrees flow.IdentityList) *verification.ChunkDataPackRequest {
 
 	return &verification.ChunkDataPackRequest{
-		Locator: chunks.NewLocator(resultID, status.ChunkIndex),
+		Locator: chunks.Locator{
+			ResultID: resultID,
+			Index:    status.ChunkIndex,
+		},
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID:   status.Chunk().ID(),
 			Height:    status.BlockHeight,

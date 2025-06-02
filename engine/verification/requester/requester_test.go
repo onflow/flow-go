@@ -120,13 +120,19 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 
 	// we remove pending request on receiving this response
 	locators := chunks.LocatorMap{}
-	locator := chunks.NewLocator(request.ResultID, request.Index)
-	locators[locator.ID()] = &locator
+	locator := &chunks.Locator{
+		ResultID: request.ResultID,
+		Index:    request.Index,
+	}
+	locators[locator.ID()] = locator
 	s.pendingRequests.On("PopAll", response.ChunkDataPack.ChunkID).Return(locators, true).Once()
 
 	s.handler.On("HandleChunkDataPack", originID, &verification.ChunkDataPackResponse{
-		Locator: chunks.NewLocator(request.ResultID, request.Index),
-		Cdp:     &response.ChunkDataPack,
+		Locator: chunks.Locator{
+			ResultID: request.ResultID,
+			Index:    request.Index,
+		},
+		Cdp: &response.ChunkDataPack,
 	}).Return().Once()
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Once()
@@ -611,7 +617,11 @@ func mockChunkDataPackHandler(t *testing.T, handler *mockfetcher.ChunkDataPackHa
 			require.True(t, requests.ContainsChunkID(response.Cdp.ChunkID))
 
 			// invocation should be distinct per chunk ID
-			locatorID := chunks.NewLocator(response.ResultID, response.Index).ID()
+			locator := chunks.Locator{
+				ResultID: response.ResultID,
+				Index:    response.Index,
+			}
+			locatorID := locator.ID()
 			_, ok = handledLocators[locatorID]
 			require.False(t, ok)
 
@@ -642,7 +652,11 @@ func mockNotifyBlockSealedHandler(t *testing.T, handler *mockfetcher.ChunkDataPa
 			require.True(t, requests.ContainsLocator(resultID, chunkIndex))
 
 			// invocation should be distinct per chunk ID
-			locatorID := chunks.NewLocator(resultID, chunkIndex).ID()
+			locator := chunks.Locator{
+				ResultID: resultID,
+				Index:    chunkIndex,
+			}
+			locatorID := locator.ID()
 			_, ok = seen[locatorID]
 			require.False(t, ok)
 			seen[locatorID] = struct{}{}

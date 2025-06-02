@@ -83,13 +83,15 @@ func TestExecutionForkWithDuplicateAssignedChunks(t *testing.T) {
 	processWG := &sync.WaitGroup{}
 	processWG.Add(len(assignedChunkStatuses))
 	for _, status := range assignedChunkStatuses {
-		locator := chunks.NewLocator(status.ExecutionResult.ID(), status.ChunkIndex)
+		locator := &chunks.Locator{
+			Index:    status.ChunkIndex,
+			ResultID: status.ExecutionResult.ID(),
+		}
 
 		go func(l *chunks.Locator) {
 			e.ProcessAssignedChunk(l)
 			processWG.Done()
-		}(&locator)
-
+		}(locator)
 	}
 
 	unittest.RequireReturnsBefore(t, requesterWg.Wait, 100*time.Millisecond, "could not handle received chunk data pack on time")
