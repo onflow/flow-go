@@ -367,7 +367,7 @@ func TestNewEpochSetup(t *testing.T) {
 	validRandomSource := unittest.SeedFixture(flow.EpochSetupRandomSourceLength)
 	validAssignments := unittest.ClusterAssignment(1, validParticipants)
 
-	t.Run("valid input returns setup", func(t *testing.T) {
+	t.Run("valid input", func(t *testing.T) {
 		untrusted := flow.UntrustedEpochSetup{
 			Counter:            1,
 			FirstView:          10,
@@ -505,7 +505,7 @@ func TestNewEpochCommit(t *testing.T) {
 		},
 	}
 
-	t.Run("valid input returns commit", func(t *testing.T) {
+	t.Run("valid input", func(t *testing.T) {
 		untrusted := flow.UntrustedEpochCommit{
 			Counter:            1,
 			ClusterQCs:         validClusterQCs,
@@ -638,7 +638,7 @@ func TestNewEpochRecover(t *testing.T) {
 		unittest.WithDKGFromParticipants(validSetup.Participants),
 	)
 
-	t.Run("valid input returns recover", func(t *testing.T) {
+	t.Run("valid input", func(t *testing.T) {
 		untrusted := flow.UntrustedEpochRecover{
 			EpochSetup:  *validSetup,
 			EpochCommit: *validCommit,
