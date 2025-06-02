@@ -335,9 +335,7 @@ func convertServiceEventEpochCommitV1(event flow.Event) (*flow.ServiceEvent, err
 	// ExecutionResult has already been fully constructed, but can't be broadcast).
 	//    We will only drop service events whose DKGIndexMap is invalid. As the Protocol State will anyway discard
 	// such events, it is fine to not relay them in the first place.
-	n := len(cdcDKGIndexMap.Pairs)
-	encounteredIndices := make([]bool, n) // tracks which indices we have already seed, to detect duplicates
-	dKGIndexMap := make(flow.DKGIndexMap, n)
+	dKGIndexMap := make(flow.DKGIndexMap, len(cdcDKGIndexMap.Pairs))
 	for _, pair := range cdcDKGIndexMap.Pairs {
 		nodeID, err := flow.HexStringToIdentifier(string(pair.Key.(cadence.String)))
 		if err != nil {
@@ -345,15 +343,6 @@ func convertServiceEventEpochCommitV1(event flow.Event) (*flow.ServiceEvent, err
 		}
 		index := pair.Value.(cadence.Int).Int()
 		dKGIndexMap[nodeID] = index
-
-		// enforce invariant needed for ID computation: DKGIndexMap values form the set {0, 1, ..., n-1}
-		if index < 0 || index >= n {
-			return nil, fmt.Errorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", index, n)
-		}
-		if encounteredIndices[index] {
-			return nil, fmt.Errorf("duplicated DKG index %d", index)
-		}
-		encounteredIndices[index] = true
 	}
 
 	commit, err := flow.NewEpochCommit(
@@ -660,9 +649,7 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	// ExecutionResult has already been fully constructed, but can't be broadcast).
 	//    We will only drop service events whose DKGIndexMap is invalid. As the Protocol State will anyway discard
 	// such events, it is fine to not relay them in the first place.
-	n := len(cdcDKGIndexMap.Pairs)
-	encounteredIndices := make([]bool, n) // tracks which indices we have already seed, to detect duplicates
-	dKGIndexMap := make(flow.DKGIndexMap, n)
+	dKGIndexMap := make(flow.DKGIndexMap, len(cdcDKGIndexMap.Pairs))
 	for _, pair := range cdcDKGIndexMap.Pairs {
 		nodeID, err := flow.HexStringToIdentifier(string(pair.Key.(cadence.String)))
 		if err != nil {
@@ -670,15 +657,6 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 		}
 		index := pair.Value.(cadence.Int).Int()
 		dKGIndexMap[nodeID] = index
-
-		// enforce invariant needed for ID computation: DKGIndexMap values form the set {0, 1, ..., n-1}
-		if index < 0 || index >= n {
-			return nil, fmt.Errorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", index, n)
-		}
-		if encounteredIndices[index] {
-			return nil, fmt.Errorf("duplicated DKG index %d", index)
-		}
-		encounteredIndices[index] = true
 	}
 
 	commit, err := flow.NewEpochCommit(

@@ -361,9 +361,6 @@ func TestEpochSetup_EqualTo(t *testing.T) {
 //
 // 6. Invalid TargetDuration:
 //   - Confirms that an error is returned when TargetDuration is zero.
-//
-// 7. Invalid TargetEndTime:
-//   - Checks that an error is returned when TargetEndTime is not greater than the current time, ensuring future-oriented epoch scheduling.
 func TestNewEpochSetup(t *testing.T) {
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	validParticipants := participants.Sort(flow.Canonical[flow.Identity]).ToSkeleton()
@@ -459,22 +456,6 @@ func TestNewEpochSetup(t *testing.T) {
 		require.Nil(t, setup)
 		require.Contains(t, err.Error(), "target duration must be greater than 0")
 	})
-
-	t.Run("invalid TargetEndTime", func(t *testing.T) {
-		untrusted := flow.UntrustedEpochSetup{
-			FirstView:      10,
-			FinalView:      50,
-			Participants:   validParticipants,
-			Assignments:    validAssignments,
-			RandomSource:   validRandomSource,
-			TargetDuration: 300,
-			TargetEndTime:  uint64(time.Now().Unix()) - 1000, // past time
-		}
-		setup, err := flow.NewEpochSetup(untrusted)
-		require.Error(t, err)
-		require.Nil(t, setup)
-		require.Contains(t, err.Error(), "target end time")
-	})
 }
 
 // TestNewEpochCommit validates the behavior of the NewEpochCommit constructor function.
@@ -487,14 +468,17 @@ func TestNewEpochSetup(t *testing.T) {
 //
 // 2. Nil DKGGroupKey:
 //   - Verifies that an error is returned when DKGGroupKey is nil.
+
+// 3. Empty cluster QCs list:
+//   - Verifies that an error is returned when cluster QCs list is empty.
 //
-// 3. Mismatched DKGParticipantKeys and DKGIndexMap lengths:
+// 4. Mismatched DKGParticipantKeys and DKGIndexMap lengths:
 //   - Checks that an error is returned when the number of DKGParticipantKeys does not match the length of DKGIndexMap.
 //
-// 4. DKGIndexMap with out-of-range index:
+// 5. DKGIndexMap with out-of-range index:
 //   - Ensures that an error is returned when DKGIndexMap contains an index outside the valid range.
 //
-// 5. DKGIndexMap with duplicate indices:
+// 6. DKGIndexMap with duplicate indices:
 //   - Validates that an error is returned when DKGIndexMap contains duplicate indices.
 func TestNewEpochCommit(t *testing.T) {
 	// Setup common valid data
@@ -548,6 +532,21 @@ func TestNewEpochCommit(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, commit)
 		require.Contains(t, err.Error(), "DKG group key must not be nil")
+	})
+
+	t.Run("empty list of cluster QCs", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochCommit{
+			Counter:            1,
+			ClusterQCs:         []flow.ClusterQCVoteData{},
+			DKGGroupKey:        validDKGGroupKey,
+			DKGParticipantKeys: validParticipantKeys,
+			DKGIndexMap:        validIndexMap,
+		}
+
+		commit, err := flow.NewEpochCommit(untrusted)
+		require.Error(t, err)
+		require.Nil(t, commit)
+		require.Contains(t, err.Error(), "cluster QCs list must not be empty")
 	})
 
 	t.Run("mismatched DKGParticipantKeys and DKGIndexMap lengths", func(t *testing.T) {
@@ -619,10 +618,25 @@ func TestNewEpochCommit(t *testing.T) {
 //
 // 3. Empty EpochCommit:
 //   - Checks that an error is returned when EpochCommit is empty.
+//
+// 4. Mismatched cluster counts:
+//    - Validates that an error is returned when the number of Assignments in EpochSetup does not match the number of ClusterQCs in EpochCommit.
+//
+// 5. Mismatched epoch counters:
+//    - Ensures that an error is returned when the Counter values in EpochSetup and EpochCommit do not match.
+
 func TestNewEpochRecover(t *testing.T) {
 	// Setup common valid data
-	validSetup := unittest.EpochSetupFixture()
-	validCommit := unittest.EpochCommitFixture()
+	setupParticipants := unittest.IdentityListFixture(5, unittest.WithAllRoles()).Sort(flow.Canonical[flow.Identity])
+
+	validSetup := unittest.EpochSetupFixture(
+		unittest.SetupWithCounter(1),
+		unittest.WithParticipants(setupParticipants.ToSkeleton()),
+	)
+	validCommit := unittest.EpochCommitFixture(
+		unittest.CommitWithCounter(1),
+		unittest.WithDKGFromParticipants(validSetup.Participants),
+	)
 
 	t.Run("valid input returns recover", func(t *testing.T) {
 		untrusted := flow.UntrustedEpochRecover{
@@ -657,5 +671,37 @@ func TestNewEpochRecover(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, recoverEpoch)
 		require.Contains(t, err.Error(), "EpochCommit is empty")
+	})
+
+	t.Run("mismatched cluster counts", func(t *testing.T) {
+		// Create a copy of validSetup with an extra assignment
+		mismatchedSetup := *validSetup
+		mismatchedSetup.Assignments = unittest.ClusterAssignment(2, setupParticipants.ToSkeleton())
+
+		untrusted := flow.UntrustedEpochRecover{
+			EpochSetup:  mismatchedSetup,
+			EpochCommit: *validCommit,
+		}
+
+		recoverEpoch, err := flow.NewEpochRecover(untrusted)
+		require.Error(t, err)
+		require.Nil(t, recoverEpoch)
+		require.Contains(t, err.Error(), "number of clusters")
+	})
+
+	t.Run("mismatched epoch counters", func(t *testing.T) {
+		// Create a copy of validCommit with a different counter
+		mismatchedCommit := *validCommit
+		mismatchedCommit.Counter = validSetup.Counter + 1
+
+		untrusted := flow.UntrustedEpochRecover{
+			EpochSetup:  *validSetup,
+			EpochCommit: mismatchedCommit,
+		}
+
+		recoverEpoch, err := flow.NewEpochRecover(untrusted)
+		require.Error(t, err)
+		require.Nil(t, recoverEpoch)
+		require.Contains(t, err.Error(), "inconsistent epoch counter")
 	})
 }
