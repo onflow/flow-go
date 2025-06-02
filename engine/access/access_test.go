@@ -697,21 +697,28 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// create the ingest engine
 		processedHeight := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressIngestionEngineBlockHeight)
 
+		collectionSyncer := ingestion.NewCollectionSyncer(
+			suite.log,
+			collectionExecutedMetric,
+			suite.request,
+			suite.state,
+			all.Blocks,
+			collections,
+			transactions,
+			lastFullBlockHeight,
+		)
+
 		ingestEng, err := ingestion.New(
 			suite.log,
 			suite.net,
 			suite.state,
 			suite.me,
-			suite.request,
 			all.Blocks,
-			all.Headers,
-			collections,
-			transactions,
 			en.Results,
 			en.Receipts,
-			collectionExecutedMetric,
 			processedHeight,
-			lastFullBlockHeight,
+			collectionSyncer,
+			collectionExecutedMetric,
 			nil,
 		)
 		require.NoError(suite.T(), err)
@@ -886,22 +893,28 @@ func (suite *Suite) TestGetTransactionResult() {
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeightProgress)
 		require.NoError(suite.T(), err)
 
-		// create the ingest engine
+		collectionSyncer := ingestion.NewCollectionSyncer(
+			suite.log,
+			collectionExecutedMetric,
+			suite.request,
+			suite.state,
+			all.Blocks,
+			collections,
+			transactions,
+			lastFullBlockHeight,
+		)
+
 		ingestEng, err := ingestion.New(
 			suite.log,
 			suite.net,
 			suite.state,
 			suite.me,
-			suite.request,
 			all.Blocks,
-			all.Headers,
-			collections,
-			transactions,
 			en.Results,
 			en.Receipts,
-			collectionExecutedMetric,
 			processedHeightInitializer,
-			lastFullBlockHeight,
+			collectionSyncer,
+			collectionExecutedMetric,
 			nil,
 		)
 		require.NoError(suite.T(), err)
@@ -1140,22 +1153,28 @@ func (suite *Suite) TestExecuteScript() {
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeightProgress)
 		require.NoError(suite.T(), err)
 
-		// create the ingest engine
+		collectionSyncer := ingestion.NewCollectionSyncer(
+			suite.log,
+			collectionExecutedMetric,
+			suite.request,
+			suite.state,
+			all.Blocks,
+			all.Collections,
+			all.Transactions,
+			lastFullBlockHeight,
+		)
+
 		ingestEng, err := ingestion.New(
 			suite.log,
 			suite.net,
 			suite.state,
 			suite.me,
-			suite.request,
 			all.Blocks,
-			all.Headers,
-			all.Collections,
-			all.Transactions,
 			en.Results,
 			en.Receipts,
-			collectionExecutedMetric,
 			processedHeightInitializer,
-			lastFullBlockHeight,
+			collectionSyncer,
+			collectionExecutedMetric,
 			nil,
 		)
 		require.NoError(suite.T(), err)

@@ -2,7 +2,6 @@ package ingestion
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -13,13 +12,10 @@ import (
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/jobqueue"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -42,7 +38,7 @@ const (
 
 	// a threshold of number of blocks with missing collections beyond which collections should be re-requested
 	// this is to prevent spamming the collection nodes with request
-	missingCollsForBlkThreshold = 100
+	missingCollsForBlockThreshold = 100
 
 	// a threshold of block height beyond which collections should be re-requested (regardless of the number of blocks for which collection are missing)
 	// this is to ensure that if a collection is missing for a long time (in terms of block height) it is eventually re-requested
@@ -57,15 +53,6 @@ const (
 
 	// ensure blocks are processed sequentially by jobqueue
 	searchAhead = 1
-)
-
-var (
-	defaultCollectionCatchupTimeout               = collectionCatchupTimeout
-	defaultCollectionCatchupDBPollInterval        = collectionCatchupDBPollInterval
-	defaultFullBlockRefreshInterval               = fullBlockRefreshInterval
-	defaultMissingCollsRequestInterval            = missingCollsRequestInterval
-	defaultMissingCollsForBlkThreshold            = missingCollsForBlkThreshold
-	defaultMissingCollsForAgeThreshold     uint64 = missingCollsForAgeThreshold
 )
 
 // Engine represents the ingestion engine, used to funnel data from other nodes
@@ -88,20 +75,17 @@ type Engine struct {
 	log     zerolog.Logger   // used to log relevant actions with context
 	state   protocol.State   // used to access the  protocol state
 	me      module.Local     // used to access local node information
-	request module.Requester // used to request collections
 
 	// storage
 	// FIX: remove direct DB access by substituting indexer module
 	blocks            storage.Blocks
-	headers           storage.Headers
-	collections       storage.Collections
-	transactions      storage.Transactions
 	executionReceipts storage.ExecutionReceipts
 	maxReceiptHeight  uint64
 	executionResults  storage.ExecutionResults
 
-	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
-	// metrics
+	collectionSyncer         *CollectionSyncer
+	// TODO: There's still a need for this metric to be in the ingestion engine rather than collection syncer.
+	// Maybe it is a good idea to split it up?
 	collectionExecutedMetric module.CollectionExecutedMetric
 
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore
@@ -117,16 +101,12 @@ func New(
 	net network.EngineRegistry,
 	state protocol.State,
 	me module.Local,
-	request module.Requester,
 	blocks storage.Blocks,
-	headers storage.Headers,
-	collections storage.Collections,
-	transactions storage.Transactions,
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
-	collectionExecutedMetric module.CollectionExecutedMetric,
 	finalizedProcessedHeight storage.ConsumerProgressInitializer,
-	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
+	collectionSyncer *CollectionSyncer,
+	collectionExecutedMetric module.CollectionExecutedMetric,
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
@@ -148,24 +128,17 @@ func New(
 		},
 	)
 
-	collectionExecutedMetric.UpdateLastFullBlockHeight(lastFullBlockHeight.Value())
-
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		log:                      log.With().Str("engine", "ingestion").Logger(),
 		state:                    state,
 		me:                       me,
-		request:                  request,
 		blocks:                   blocks,
-		headers:                  headers,
-		collections:              collections,
-		transactions:             transactions,
 		executionResults:         executionResults,
 		executionReceipts:        executionReceipts,
 		maxReceiptHeight:         0,
 		collectionExecutedMetric: collectionExecutedMetric,
 		finalizedBlockNotifier:   engine.NewNotifier(),
-		lastFullBlockHeight:      lastFullBlockHeight,
 
 		// queue / notifier for execution receipts
 		executionReceiptsNotifier: engine.NewNotifier(),
@@ -173,6 +146,7 @@ func New(
 		executionReceiptsQueue:    executionReceiptsQueue,
 		messageHandler:            messageHandler,
 		txErrorMessagesCore:       txErrorMessagesCore,
+		collectionSyncer:          collectionSyncer,
 	}
 
 	// jobqueue Jobs object that tracks finalized blocks by height. This is used by the finalizedBlockConsumer
@@ -202,9 +176,11 @@ func New(
 
 	// Add workers
 	builder := component.NewComponentManagerBuilder().
-		AddWorker(e.processBackground).
+		AddWorker(e.collectionSyncer.RequestCollections).
 		AddWorker(e.processExecutionReceipts).
 		AddWorker(e.runFinalizedBlockConsumer)
+
+	//TODO: should I add a check for nil ptr for collection syncer ? (as done below)
 
 	// If txErrorMessagesCore is provided, add a worker responsible for processing
 	// transaction result error messages by receipts. This worker listens for blocks
@@ -266,51 +242,6 @@ func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job
 	}
 
 	e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
-}
-
-// processBackground is a background routine responsible for executing periodic tasks related to block processing and collection retrieval.
-// It performs tasks such as updating indexes of processed blocks and requesting missing collections from the network.
-// This function runs indefinitely until the context is canceled.
-// Periodically, it checks for updates in the last fully processed block index and requests missing collections if necessary.
-// Additionally, it checks for missing collections across a range of blocks and requests them if certain thresholds are met.
-func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	// context with timeout
-	requestCtx, cancel := context.WithTimeout(ctx, defaultCollectionCatchupTimeout)
-	defer cancel()
-
-	// request missing collections
-	err := e.requestMissingCollections(requestCtx)
-	if err != nil {
-		e.log.Error().Err(err).Msg("requesting missing collections failed")
-	}
-	ready()
-
-	updateTicker := time.NewTicker(defaultFullBlockRefreshInterval)
-	defer updateTicker.Stop()
-
-	requestTicker := time.NewTicker(defaultMissingCollsRequestInterval)
-	defer requestTicker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-
-		// refresh the LastFullBlockReceived index
-		case <-updateTicker.C:
-			err := e.updateLastFullBlockReceivedIndex()
-			if err != nil {
-				ctx.Throw(err)
-			}
-
-		// request missing collections from the network
-		case <-requestTicker.C:
-			err := e.checkMissingCollections()
-			if err != nil {
-				ctx.Throw(err)
-			}
-		}
-	}
 }
 
 // processExecutionReceipts is responsible for processing the execution receipts.
@@ -454,17 +385,8 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 		}
 	}
 
-	// skip requesting collections, if this block is below the last full block height
-	// this means that either we have already received these collections, or the block
-	// may contain unverifiable guarantees (in case this node has just joined the network)
-	lastFullBlockHeight := e.lastFullBlockHeight.Value()
-	if block.Header.Height <= lastFullBlockHeight {
-		e.log.Info().Msgf("skipping requesting collections for finalized block below last full block height (%d<=%d)", block.Header.Height, lastFullBlockHeight)
-		return nil
-	}
-
-	// queue requesting each of the collections from the collection node
-	e.requestCollectionsInFinalizedBlock(block.Payload.Guarantees)
+	//TODO: what should I do with the comment that was here? It looked pretty useful.
+	e.collectionSyncer.RequestCollectionsForBlock(block.Header.Height, block.Payload.Guarantees, false)
 
 	e.collectionExecutedMetric.BlockFinalized(block)
 
@@ -484,267 +406,4 @@ func (e *Engine) handleExecutionReceipt(_ flow.Identifier, r *flow.ExecutionRece
 
 	e.collectionExecutedMetric.ExecutionReceiptReceived(r)
 	return nil
-}
-
-// OnCollection handles the response of the collection request made earlier when a block was received.
-// No errors expected during normal operations.
-func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
-	collection, ok := entity.(*flow.Collection)
-	if !ok {
-		e.log.Error().Msgf("invalid entity type (%T)", entity)
-		return
-	}
-
-	err := indexer.IndexCollection(collection, e.collections, e.transactions, e.log, e.collectionExecutedMetric)
-	if err != nil {
-		e.log.Error().Err(err).Msg("could not handle collection")
-		return
-	}
-}
-
-// requestMissingCollections requests missing collections for all blocks in the local db storage once at startup
-func (e *Engine) requestMissingCollections(ctx context.Context) error {
-	var startHeight, endHeight uint64
-
-	// get the height of the last block for which all collections were received
-	lastFullHeight := e.lastFullBlockHeight.Value()
-	// start from the next block
-	startHeight = lastFullHeight + 1
-
-	// end at the finalized block
-	finalBlk, err := e.state.Final().Head()
-	if err != nil {
-		return err
-	}
-	endHeight = finalBlk.Height
-
-	e.log.Info().
-		Uint64("start_height", startHeight).
-		Uint64("end_height", endHeight).
-		Msg("starting collection catchup")
-
-	// collect all missing collection ids in a map
-	var missingCollMap = make(map[flow.Identifier]struct{})
-
-	// iterate through the complete chain and request the missing collections
-	for i := startHeight; i <= endHeight; i++ {
-
-		// if deadline exceeded or someone cancelled the context
-		if ctx.Err() != nil {
-			return fmt.Errorf("failed to complete requests for missing collections: %w", ctx.Err())
-		}
-
-		missingColls, err := e.missingCollectionsAtHeight(i)
-		if err != nil {
-			return fmt.Errorf("failed to retrieve missing collections by height %d during collection catchup: %w", i, err)
-		}
-
-		// request the missing collections
-		e.requestCollectionsInFinalizedBlock(missingColls)
-
-		// add them to the missing collection id map to track later
-		for _, cg := range missingColls {
-			missingCollMap[cg.CollectionID] = struct{}{}
-		}
-	}
-
-	// if no collections were found to be missing we are done.
-	if len(missingCollMap) == 0 {
-		// nothing more to do
-		e.log.Info().Msg("no missing collections found")
-		return nil
-	}
-
-	// the collection catchup needs to happen ASAP when the node starts up. Hence, force the requester to dispatch all request
-	e.request.Force()
-
-	// track progress of retrieving all the missing collections by polling the db periodically
-	ticker := time.NewTicker(defaultCollectionCatchupDBPollInterval)
-	defer ticker.Stop()
-
-	// while there are still missing collections, keep polling
-	for len(missingCollMap) > 0 {
-		select {
-		case <-ctx.Done():
-			// context may have expired
-			return fmt.Errorf("failed to complete collection retreival: %w", ctx.Err())
-		case <-ticker.C:
-
-			// log progress
-			e.log.Info().
-				Int("total_missing_collections", len(missingCollMap)).
-				Msg("retrieving missing collections...")
-
-			var foundColls []flow.Identifier
-			// query db to find if collections are still missing
-			for collID := range missingCollMap {
-				found, err := e.haveCollection(collID)
-				if err != nil {
-					return err
-				}
-				// if collection found in local db, remove it from missingColls later
-				if found {
-					foundColls = append(foundColls, collID)
-				}
-			}
-
-			// update the missingColls list by removing collections that have now been received
-			for _, c := range foundColls {
-				delete(missingCollMap, c)
-			}
-		}
-	}
-
-	e.log.Info().Msg("collection catchup done")
-	return nil
-}
-
-// updateLastFullBlockReceivedIndex finds the next highest height where all previous collections
-// have been indexed, and updates the LastFullBlockReceived index to that height
-func (e *Engine) updateLastFullBlockReceivedIndex() error {
-	lastFullHeight := e.lastFullBlockHeight.Value()
-
-	finalBlk, err := e.state.Final().Head()
-	if err != nil {
-		return fmt.Errorf("failed to get finalized block: %w", err)
-	}
-	finalizedHeight := finalBlk.Height
-
-	// track the latest contiguous full height
-	newLastFullHeight, err := e.lowestHeightWithMissingCollection(lastFullHeight, finalizedHeight)
-	if err != nil {
-		return fmt.Errorf("failed to find last full block received height: %w", err)
-	}
-
-	// if more contiguous blocks are now complete, update db
-	if newLastFullHeight > lastFullHeight {
-		err := e.lastFullBlockHeight.Set(newLastFullHeight)
-		if err != nil {
-			return fmt.Errorf("failed to update last full block height: %w", err)
-		}
-
-		e.collectionExecutedMetric.UpdateLastFullBlockHeight(newLastFullHeight)
-
-		e.log.Debug().
-			Uint64("last_full_block_height", newLastFullHeight).
-			Msg("updated LastFullBlockReceived index")
-	}
-
-	return nil
-}
-
-// lowestHeightWithMissingCollection returns the lowest height that is missing collections
-func (e *Engine) lowestHeightWithMissingCollection(lastFullHeight, finalizedHeight uint64) (uint64, error) {
-	newLastFullHeight := lastFullHeight
-
-	for i := lastFullHeight + 1; i <= finalizedHeight; i++ {
-		missingColls, err := e.missingCollectionsAtHeight(i)
-		if err != nil {
-			return 0, err
-		}
-
-		// return when we find the first block with missing collections
-		if len(missingColls) > 0 {
-			return newLastFullHeight, nil
-		}
-
-		newLastFullHeight = i
-	}
-
-	return newLastFullHeight, nil
-}
-
-// checkMissingCollections requests missing collections if the number of blocks missing collections
-// have reached the defaultMissingCollsForBlkThreshold value.
-func (e *Engine) checkMissingCollections() error {
-	lastFullHeight := e.lastFullBlockHeight.Value()
-
-	finalBlk, err := e.state.Final().Head()
-	if err != nil {
-		return fmt.Errorf("failed to get finalized block: %w", err)
-	}
-	finalizedHeight := finalBlk.Height
-
-	// number of blocks with missing collections
-	incompleteBlksCnt := 0
-
-	// collect all missing collections
-	var allMissingColls []*flow.CollectionGuarantee
-
-	// start from the next block till we either hit the finalized block or cross the max collection missing threshold
-	for i := lastFullHeight + 1; i <= finalizedHeight && incompleteBlksCnt < defaultMissingCollsForBlkThreshold; i++ {
-		missingColls, err := e.missingCollectionsAtHeight(i)
-		if err != nil {
-			return fmt.Errorf("failed to find missing collections at height %d: %w", i, err)
-		}
-
-		if len(missingColls) == 0 {
-			continue
-		}
-
-		incompleteBlksCnt++
-
-		allMissingColls = append(allMissingColls, missingColls...)
-	}
-
-	// additionally, if more than threshold blocks have missing collections OR collections are
-	// missing since defaultMissingCollsForAgeThreshold, re-request those collections
-	if incompleteBlksCnt >= defaultMissingCollsForBlkThreshold ||
-		(finalizedHeight-lastFullHeight) > defaultMissingCollsForAgeThreshold {
-		// warn log since this should generally not happen
-		e.log.Warn().
-			Uint64("finalized_height", finalizedHeight).
-			Uint64("last_full_blk_height", lastFullHeight).
-			Int("missing_collection_blk_count", incompleteBlksCnt).
-			Int("missing_collection_count", len(allMissingColls)).
-			Msg("re-requesting missing collections")
-		e.requestCollectionsInFinalizedBlock(allMissingColls)
-	}
-
-	return nil
-}
-
-// missingCollectionsAtHeight returns all missing collection guarantees at a given height
-func (e *Engine) missingCollectionsAtHeight(h uint64) ([]*flow.CollectionGuarantee, error) {
-	block, err := e.blocks.ByHeight(h)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve block by height %d: %w", h, err)
-	}
-
-	var missingColls []*flow.CollectionGuarantee
-	for _, guarantee := range block.Payload.Guarantees {
-		collID := guarantee.CollectionID
-		found, err := e.haveCollection(collID)
-		if err != nil {
-			return nil, err
-		}
-		if !found {
-			missingColls = append(missingColls, guarantee)
-		}
-	}
-	return missingColls, nil
-}
-
-// haveCollection looks up the collection from the collection db with collID
-func (e *Engine) haveCollection(collID flow.Identifier) (bool, error) {
-	_, err := e.collections.LightByID(collID)
-	if err == nil {
-		return true, nil
-	}
-	if errors.Is(err, storage.ErrNotFound) {
-		return false, nil
-	}
-	return false, fmt.Errorf("failed to retrieve collection %s: %w", collID.String(), err)
-}
-
-// requestCollectionsInFinalizedBlock registers collection requests with the requester engine
-func (e *Engine) requestCollectionsInFinalizedBlock(missingColls []*flow.CollectionGuarantee) {
-	for _, cg := range missingColls {
-		guarantors, err := protocol.FindGuarantors(e.state, cg)
-		if err != nil {
-			// failed to find guarantors for guarantees contained in a finalized block is fatal error
-			e.log.Fatal().Err(err).Msgf("could not find guarantors for guarantee %v", cg.ID())
-		}
-		e.request.EntityByID(cg.ID(), filter.HasNodeID[flow.Identity](guarantors...))
-	}
 }
