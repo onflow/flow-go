@@ -160,12 +160,13 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 			// TODO add real signatures here (https://github.com/onflow/flow-go-internal/issues/4569)
 
-			guarantee := flow.NewCollectionGuarantee(
-				payload.Collection.ID(),
-				payload.ReferenceBlockID,
-				header.ChainID,
-				step.ParentVoterIndices,
-				nil, // TODO: to remove because it's not easily verifiable by consensus nodes
+			guarantee := flow.NewCollectionGuarantee(flow.UntrustedCollectionGuarantee{
+				CollectionID:     payload.Collection.ID(),
+				ReferenceBlockID: payload.ReferenceBlockID,
+				ChainID:          header.ChainID,
+				SignerIndices:    step.ParentVoterIndices,
+				Signature:        nil, // TODO: to remove because it's not easily verifiable by consensus nodes
+			},
 			)
 
 			f.pusher.SubmitCollectionGuarantee(guarantee)

@@ -6,6 +6,13 @@ import (
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
+// Collection is set of transactions.
+//
+//structwrite:immutable - mutations allowed only within the constructor
+type Collection struct {
+	Transactions []*TransactionBody
+}
+
 // UntrustedCollection is an untrusted input-only representation of an Collection,
 // used for construction.
 //
@@ -17,17 +24,10 @@ import (
 // a trusted Collection using NewCollection constructor.
 type UntrustedCollection Collection
 
-// Collection is set of transactions.
-//
-//structwrite:immutable - mutations allowed only within the constructor
-type Collection struct {
-	Transactions []*TransactionBody
-}
-
 // NewCollection creates a new instance of Collection.
 // Construction Collection allowed only within the constructor
-func NewCollection(untrustedColl UntrustedCollection) *Collection {
-	return &Collection{Transactions: untrustedColl.Transactions}
+func NewCollection(untrustedCollection UntrustedCollection) *Collection {
+	return &Collection{Transactions: untrustedCollection.Transactions}
 }
 
 // CollectionFromTransactions creates a new collection from the list of
@@ -52,13 +52,14 @@ func (c Collection) Light() LightCollection {
 
 // Guarantee returns a collection guarantee for this collection.
 func (c *Collection) Guarantee() CollectionGuarantee {
-	return *NewCollectionGuarantee(
-		c.ID(),
-		Identifier{},
-		ChainID(""),
-		nil,
-		crypto.Signature{},
-	)
+	return *NewCollectionGuarantee(UntrustedCollectionGuarantee{
+		CollectionID:     c.ID(),
+		ReferenceBlockID: Identifier{},
+		ChainID:          ChainID(""),
+		SignerIndices:    nil,
+		Signature:        crypto.Signature{},
+	})
+
 }
 
 func (c Collection) ID() Identifier {

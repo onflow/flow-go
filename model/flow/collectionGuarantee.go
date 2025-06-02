@@ -16,20 +16,26 @@ type CollectionGuarantee struct {
 	Signature        crypto.Signature // guarantor signatures
 }
 
+// UntrustedCollectionGuarantee is an untrusted input-only representation of an CollectionGuarantee,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedCollectionGuarantee should be validated and converted into
+// a trusted CollectionGuarantee using NewCollectionGuarantee constructor.
+type UntrustedCollectionGuarantee CollectionGuarantee
+
 // NewCollectionGuarantee creates a new instance of CollectionGuarantee.
 // Construction CollectionGuarantee allowed only within the constructor
-func NewCollectionGuarantee(
-	collectionID Identifier,
-	referenceBlockID Identifier,
-	chainID ChainID,
-	signerIndices []byte,
-	signature crypto.Signature) *CollectionGuarantee {
+func NewCollectionGuarantee(untrustedGuarantee UntrustedCollectionGuarantee) *CollectionGuarantee {
 	return &CollectionGuarantee{
-		CollectionID:     collectionID,
-		ReferenceBlockID: referenceBlockID,
-		ChainID:          chainID,
-		SignerIndices:    signerIndices,
-		Signature:        signature,
+		CollectionID:     untrustedGuarantee.CollectionID,
+		ReferenceBlockID: untrustedGuarantee.ReferenceBlockID,
+		ChainID:          untrustedGuarantee.ChainID,
+		SignerIndices:    untrustedGuarantee.SignerIndices,
+		Signature:        untrustedGuarantee.Signature,
 	}
 }
 
