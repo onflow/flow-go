@@ -299,6 +299,7 @@ func (collection *EventCollection) AppendServiceEvent(
 	collection.convertedServiceEvents = append(
 		collection.convertedServiceEvents,
 		*convertedEvent)
+	collection.eventCounter++
 	return collection.meter.MeterEmittedEvent(size)
 }
 
