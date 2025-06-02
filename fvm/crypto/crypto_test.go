@@ -739,6 +739,8 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 					// This is the equivalent of the client side encoding
 					extensionDataRLPBytes := rlp.NewMarshaler().MustMarshal(extensionData)
 
+					t.Fatalf("%x", extensionDataRLPBytes)
+
 					// Construct the message to sign in the same way a client would, as per
 					// https://github.com/onflow/flips/blob/tarak/webauthn/protocol/20250203-webauthn-credential-support.md#fvm-transaction-validation-changes
 					messageToSign := slices.Concat(c.authenticatorData, noPrefixHasher.ComputeHash(clientDataJsonBytes)[:])

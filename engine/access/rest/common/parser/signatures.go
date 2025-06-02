@@ -36,7 +36,7 @@ func (s *TransactionSignature) Parse(
 	var extensionData ExtensionData
 	err = extensionData.Parse(rawExtensionData)
 	if err != nil {
-		return fmt.Errorf("invalid signature: %w", err)
+		return fmt.Errorf("invalid extension data: %w", err)
 	}
 
 	*s = TransactionSignature(flow.TransactionSignature{
@@ -101,10 +101,7 @@ func (s Signature) Flow() []byte {
 type ExtensionData []byte
 
 func (s *ExtensionData) Parse(raw string) error {
-	if raw == "" {
-		return fmt.Errorf("missing value")
-	}
-
+	// Allow empty
 	extensionDataBytes, err := util.FromBase64(raw)
 	if err != nil {
 		return fmt.Errorf("invalid encoding")
