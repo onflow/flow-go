@@ -853,12 +853,12 @@ func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.Quor
 	signerIndices, err := signature.EncodeSignersToIndices(signerIDs, signerIDs)
 	require.NoError(t, err)
 
-	rootQC := flow.NewQuorumCertificate(
-		rootHead.View,
-		rootHead.ID(),
-		signerIndices,
-		unittest.SignatureFixture(),
-	)
+	rootQC := flow.NewQuorumCertificate(flow.UntrustedQuorumCertificate{
+		View:          rootHead.View,
+		BlockID:       rootHead.ID(),
+		SignerIndices: signerIndices,
+		SigData:       unittest.SignatureFixture(),
+	})
 
 	return rootHead, rootQC
 }

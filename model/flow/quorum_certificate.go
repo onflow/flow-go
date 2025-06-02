@@ -24,18 +24,25 @@ type QuorumCertificate struct {
 	SigData []byte
 }
 
+// UntrustedQuorumCertificate is an untrusted input-only representation of an QuorumCertificate,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedQuorumCertificate should be validated and converted into
+// a trusted QuorumCertificate using NewQuorumCertificate constructor.
+type UntrustedQuorumCertificate QuorumCertificate
+
 // NewQuorumCertificate creates a new instance of QuorumCertificate.
 // Construction QuorumCertificate allowed only within the constructor
-func NewQuorumCertificate(
-	view uint64,
-	blockID Identifier,
-	signerIndices []byte,
-	sigData []byte) *QuorumCertificate {
+func NewQuorumCertificate(untrustedQC UntrustedQuorumCertificate) *QuorumCertificate {
 	return &QuorumCertificate{
-		View:          view,
-		BlockID:       blockID,
-		SignerIndices: signerIndices,
-		SigData:       sigData,
+		View:          untrustedQC.View,
+		BlockID:       untrustedQC.BlockID,
+		SignerIndices: untrustedQC.SignerIndices,
+		SigData:       untrustedQC.SigData,
 	}
 }
 

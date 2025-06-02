@@ -67,12 +67,12 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 			return nil, fmt.Errorf("invalid structure newest QC should be present")
 		}
 
-		qc := flow.NewQuorumCertificate(
-			newestQC.View,
-			MessageToIdentifier(newestQC.BlockId),
-			newestQC.SignerIndices,
-			newestQC.SigData,
-		)
+		qc := flow.NewQuorumCertificate(flow.UntrustedQuorumCertificate{
+			View:          newestQC.View,
+			BlockID:       MessageToIdentifier(newestQC.BlockId),
+			SignerIndices: newestQC.SignerIndices,
+			SigData:       newestQC.SigData,
+		})
 
 		lastViewTC = &flow.TimeoutCertificate{
 			View:          m.LastViewTc.View,

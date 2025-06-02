@@ -78,12 +78,12 @@ func (h Header) Body() interface{} {
 
 // QuorumCertificate returns quorum certificate that is incorporated in the block header.
 func (h Header) QuorumCertificate() *QuorumCertificate {
-	return NewQuorumCertificate(
-		h.ParentView,
-		h.ParentID,
-		h.ParentVoterIndices,
-		h.ParentVoterSigData,
-	)
+	return NewQuorumCertificate(UntrustedQuorumCertificate{
+		View:          h.ParentView,
+		BlockID:       h.ParentID,
+		SignerIndices: h.ParentVoterIndices,
+		SigData:       h.ParentVoterSigData,
+	})
 }
 
 func (h Header) Fingerprint() []byte {

@@ -324,5 +324,10 @@ func (p *CombinedVoteProcessorV3) buildQC() (*flow.QuorumCertificate, error) {
 		return nil, fmt.Errorf("could not pack the block sig data: %w", err)
 	}
 
-	return flow.NewQuorumCertificate(p.block.View, p.block.BlockID, signerIndices, sigData), nil
+	return flow.NewQuorumCertificate(flow.UntrustedQuorumCertificate{
+		View:          p.block.View,
+		BlockID:       p.block.BlockID,
+		SignerIndices: signerIndices,
+		SigData:       sigData,
+	}), nil
 }
