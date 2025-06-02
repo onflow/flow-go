@@ -2730,20 +2730,18 @@ func RootEpochProtocolStateFixture() *flow.RichEpochStateEntry {
 			},
 		})
 	}
-	minEpochStateEntry := flow.NewMinEpochStateEntry(
-		nil,
-		flow.EpochStateContainer{
-			SetupID:          currentEpochSetup.ID(),
-			CommitID:         currentEpochCommit.ID(),
-			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
-		},
-		nil,
-		false,
-	)
-
-	richEpochStateEntry := flow.NewRichEpochStateEntryWithEpochIdentityTables(
-		&flow.EpochStateEntry{
-			MinEpochStateEntry:  &minEpochStateEntry,
+	return &flow.RichEpochStateEntry{
+		EpochStateEntry: &flow.EpochStateEntry{
+			MinEpochStateEntry: &flow.MinEpochStateEntry{
+				PreviousEpoch: nil,
+				CurrentEpoch: flow.EpochStateContainer{
+					SetupID:          currentEpochSetup.ID(),
+					CommitID:         currentEpochCommit.ID(),
+					ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
+				},
+				EpochFallbackTriggered: false,
+				NextEpoch:              nil,
+			},
 			PreviousEpochSetup:  nil,
 			PreviousEpochCommit: nil,
 			CurrentEpochSetup:   currentEpochSetup,
@@ -2751,10 +2749,9 @@ func RootEpochProtocolStateFixture() *flow.RichEpochStateEntry {
 			NextEpochSetup:      nil,
 			NextEpochCommit:     nil,
 		},
-		allIdentities,
-		flow.IdentityList{},
-	)
-	return &richEpochStateEntry
+		CurrentEpochIdentityTable: allIdentities,
+		NextEpochIdentityTable:    flow.IdentityList{},
+	}
 }
 
 // EpochStateFixture creates a fixture with correctly structured data. The returned Identity Table

@@ -122,13 +122,15 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 	)
 
 	u.state, err = flow.NewEpochStateEntry(
-		&newMinEpochStateEntry,
-		u.state.PreviousEpochSetup,
-		u.state.PreviousEpochCommit,
-		u.state.CurrentEpochSetup,
-		u.state.CurrentEpochCommit,
-		epochSetup,
-		u.state.NextEpochCommit,
+		flow.UntrustedEpochStateEntry{
+			MinEpochStateEntry:  &newMinEpochStateEntry,
+			PreviousEpochSetup:  u.state.PreviousEpochSetup,
+			PreviousEpochCommit: u.state.PreviousEpochCommit,
+			CurrentEpochSetup:   u.state.CurrentEpochSetup,
+			CurrentEpochCommit:  u.state.CurrentEpochCommit,
+			NextEpochSetup:      epochSetup,
+			NextEpochCommit:     u.state.NextEpochCommit,
+		},
 	)
 	if err != nil {
 		// Should never reach here
@@ -186,13 +188,15 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 	)
 
 	u.state, err = flow.NewEpochStateEntry(
-		&newMinEpochStateEntry,
-		u.state.PreviousEpochSetup,
-		u.state.PreviousEpochCommit,
-		u.state.CurrentEpochSetup,
-		u.state.CurrentEpochCommit,
-		u.state.NextEpochSetup,
-		epochCommit,
+		flow.UntrustedEpochStateEntry{
+			MinEpochStateEntry:  &newMinEpochStateEntry,
+			PreviousEpochSetup:  u.state.PreviousEpochSetup,
+			PreviousEpochCommit: u.state.PreviousEpochCommit,
+			CurrentEpochSetup:   u.state.CurrentEpochSetup,
+			CurrentEpochCommit:  u.state.CurrentEpochCommit,
+			NextEpochSetup:      u.state.NextEpochSetup,
+			NextEpochCommit:     epochCommit,
+		},
 	)
 	if err != nil {
 		// Should never reach here

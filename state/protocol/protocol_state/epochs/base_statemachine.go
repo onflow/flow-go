@@ -114,13 +114,15 @@ func (u *baseStateMachine) TransitionToNextEpoch() error {
 	)
 	var err error
 	u.state, err = flow.NewEpochStateEntry(
-		&minEpochStateEntry,
-		u.state.CurrentEpochSetup,
-		u.state.CurrentEpochCommit,
-		u.state.NextEpochSetup,
-		u.state.NextEpochCommit,
-		nil,
-		nil,
+		flow.UntrustedEpochStateEntry{
+			MinEpochStateEntry:  &minEpochStateEntry,
+			PreviousEpochSetup:  u.state.CurrentEpochSetup,
+			PreviousEpochCommit: u.state.CurrentEpochCommit,
+			CurrentEpochSetup:   u.state.NextEpochSetup,
+			CurrentEpochCommit:  u.state.NextEpochCommit,
+			NextEpochSetup:      nil,
+			NextEpochCommit:     nil,
+		},
 	)
 	if err != nil {
 		return fmt.Errorf("could not construct epoch state entry: %w", err)

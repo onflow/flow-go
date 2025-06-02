@@ -137,7 +137,17 @@ func SnapshotFromBootstrapStateWithParams(
 		return nil, fmt.Errorf("could not encode kvstore: %w", err)
 	}
 
-	rootEpochState, err := flow.NewEpochStateEntry(rootMinEpochState, nil, nil, setup, commit, nil, nil)
+	rootEpochState, err := flow.NewEpochStateEntry(
+		flow.UntrustedEpochStateEntry{
+			MinEpochStateEntry:  rootMinEpochState,
+			PreviousEpochSetup:  nil,
+			PreviousEpochCommit: nil,
+			CurrentEpochSetup:   setup,
+			CurrentEpochCommit:  commit,
+			NextEpochSetup:      nil,
+			NextEpochCommit:     nil,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct root epoch state entry: %w", err)
 	}

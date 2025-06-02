@@ -74,13 +74,15 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			EpochFallbackTriggered: false,
 		}
 		stateEntry, err := flow.NewEpochStateEntry(
-			minStateEntry,
-			nil,
-			nil,
-			setup,
-			currentEpochCommit,
-			nil,
-			nil,
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  minStateEntry,
+				PreviousEpochSetup:  nil,
+				PreviousEpochCommit: nil,
+				CurrentEpochSetup:   setup,
+				CurrentEpochCommit:  currentEpochCommit,
+				NextEpochSetup:      nil,
+				NextEpochCommit:     nil,
+			},
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.EpochPhaseStaking, stateEntry.EpochPhase())
@@ -106,13 +108,15 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 	t.Run("staking-phase", func(t *testing.T) {
 		stateEntryFixture := unittest.EpochStateFixture()
 		epochStateEntry, err := flow.NewEpochStateEntry(
-			stateEntryFixture.MinEpochStateEntry,
-			stateEntryFixture.PreviousEpochSetup,
-			stateEntryFixture.PreviousEpochCommit,
-			stateEntryFixture.CurrentEpochSetup,
-			stateEntryFixture.CurrentEpochCommit,
-			nil,
-			nil,
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  stateEntryFixture.MinEpochStateEntry,
+				PreviousEpochSetup:  stateEntryFixture.PreviousEpochSetup,
+				PreviousEpochCommit: stateEntryFixture.PreviousEpochCommit,
+				CurrentEpochSetup:   stateEntryFixture.CurrentEpochSetup,
+				CurrentEpochCommit:  stateEntryFixture.CurrentEpochCommit,
+				NextEpochSetup:      nil,
+				NextEpochCommit:     nil,
+			},
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.EpochPhaseStaking, epochStateEntry.EpochPhase())
@@ -142,13 +146,15 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		})
 
 		stateEntry, err := flow.NewEpochStateEntry(
-			stateEntryFixture.MinEpochStateEntry,
-			stateEntryFixture.PreviousEpochSetup,
-			stateEntryFixture.PreviousEpochCommit,
-			stateEntryFixture.CurrentEpochSetup,
-			stateEntryFixture.CurrentEpochCommit,
-			stateEntryFixture.NextEpochSetup,
-			nil,
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  stateEntryFixture.MinEpochStateEntry,
+				PreviousEpochSetup:  stateEntryFixture.PreviousEpochSetup,
+				PreviousEpochCommit: stateEntryFixture.PreviousEpochCommit,
+				CurrentEpochSetup:   stateEntryFixture.CurrentEpochSetup,
+				CurrentEpochCommit:  stateEntryFixture.CurrentEpochCommit,
+				NextEpochSetup:      stateEntryFixture.NextEpochSetup,
+				NextEpochCommit:     nil,
+			},
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.EpochPhaseSetup, stateEntry.EpochPhase())
@@ -197,13 +203,15 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Nil(t, stateEntryFixture.PreviousEpochCommit)
 
 		stateEntry, err := flow.NewEpochStateEntry(
-			stateEntryFixture.MinEpochStateEntry,
-			stateEntryFixture.PreviousEpochSetup,
-			stateEntryFixture.PreviousEpochCommit,
-			stateEntryFixture.CurrentEpochSetup,
-			stateEntryFixture.CurrentEpochCommit,
-			stateEntryFixture.NextEpochSetup,
-			nil,
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  stateEntryFixture.MinEpochStateEntry,
+				PreviousEpochSetup:  stateEntryFixture.PreviousEpochSetup,
+				PreviousEpochCommit: stateEntryFixture.PreviousEpochCommit,
+				CurrentEpochSetup:   stateEntryFixture.CurrentEpochSetup,
+				CurrentEpochCommit:  stateEntryFixture.CurrentEpochCommit,
+				NextEpochSetup:      stateEntryFixture.NextEpochSetup,
+				NextEpochCommit:     nil,
+			},
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.EpochPhaseSetup, stateEntry.EpochPhase())
@@ -239,13 +247,15 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 
 		stateEntry, err := flow.NewEpochStateEntry(
-			stateEntryFixture.MinEpochStateEntry,
-			stateEntryFixture.PreviousEpochSetup,
-			stateEntryFixture.PreviousEpochCommit,
-			stateEntryFixture.CurrentEpochSetup,
-			stateEntryFixture.CurrentEpochCommit,
-			stateEntryFixture.NextEpochSetup,
-			stateEntryFixture.NextEpochCommit,
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  stateEntryFixture.MinEpochStateEntry,
+				PreviousEpochSetup:  stateEntryFixture.PreviousEpochSetup,
+				PreviousEpochCommit: stateEntryFixture.PreviousEpochCommit,
+				CurrentEpochSetup:   stateEntryFixture.CurrentEpochSetup,
+				CurrentEpochCommit:  stateEntryFixture.CurrentEpochCommit,
+				NextEpochSetup:      stateEntryFixture.NextEpochSetup,
+				NextEpochCommit:     stateEntryFixture.NextEpochCommit,
+			},
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.EpochPhaseCommitted, stateEntry.EpochPhase())
@@ -289,13 +299,15 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Nil(t, stateEntryFixture.PreviousEpochCommit)
 
 		stateEntry, err := flow.NewEpochStateEntry(
-			stateEntryFixture.MinEpochStateEntry,
-			stateEntryFixture.PreviousEpochSetup,
-			stateEntryFixture.PreviousEpochCommit,
-			stateEntryFixture.CurrentEpochSetup,
-			stateEntryFixture.CurrentEpochCommit,
-			stateEntryFixture.NextEpochSetup,
-			stateEntryFixture.NextEpochCommit,
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  stateEntryFixture.MinEpochStateEntry,
+				PreviousEpochSetup:  stateEntryFixture.PreviousEpochSetup,
+				PreviousEpochCommit: stateEntryFixture.PreviousEpochCommit,
+				CurrentEpochSetup:   stateEntryFixture.CurrentEpochSetup,
+				CurrentEpochCommit:  stateEntryFixture.CurrentEpochCommit,
+				NextEpochSetup:      stateEntryFixture.NextEpochSetup,
+				NextEpochCommit:     stateEntryFixture.NextEpochCommit,
+			},
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.EpochPhaseCommitted, stateEntry.EpochPhase())

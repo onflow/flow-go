@@ -61,13 +61,15 @@ func NewFallbackStateMachine(
 
 		var err error
 		state, err = flow.NewEpochStateEntry(
-			&minEpochStateEntry,
-			state.PreviousEpochSetup,
-			state.PreviousEpochCommit,
-			state.CurrentEpochSetup,
-			state.CurrentEpochCommit,
-			nextEpochSetup,
-			nextEpochCommit,
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  &minEpochStateEntry,
+				PreviousEpochSetup:  state.PreviousEpochSetup,
+				PreviousEpochCommit: state.PreviousEpochCommit,
+				CurrentEpochSetup:   state.CurrentEpochSetup,
+				CurrentEpochCommit:  state.CurrentEpochCommit,
+				NextEpochSetup:      nextEpochSetup,
+				NextEpochCommit:     nextEpochCommit,
+			},
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create epoch state entry: %w", err)
@@ -242,13 +244,15 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 	)
 
 	m.state, err = flow.NewEpochStateEntry(
-		&newMinEpochStateEntry,
-		m.state.PreviousEpochSetup,
-		m.state.PreviousEpochCommit,
-		m.state.CurrentEpochSetup,
-		m.state.CurrentEpochCommit,
-		&nextEpochSetup,
-		&nextEpochCommit,
+		flow.UntrustedEpochStateEntry{
+			MinEpochStateEntry:  &newMinEpochStateEntry,
+			PreviousEpochSetup:  m.state.PreviousEpochSetup,
+			PreviousEpochCommit: m.state.PreviousEpochCommit,
+			CurrentEpochSetup:   m.state.CurrentEpochSetup,
+			CurrentEpochCommit:  m.state.CurrentEpochCommit,
+			NextEpochSetup:      &nextEpochSetup,
+			NextEpochCommit:     &nextEpochCommit,
+		},
 	)
 	if err != nil {
 		// Should never reach here
