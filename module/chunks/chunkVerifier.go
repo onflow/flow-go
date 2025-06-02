@@ -10,6 +10,7 @@ import (
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	fvmEvents "github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -261,6 +262,12 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 			collectionID = chunkDataPack.Collection.ID().String()
 		}
 		for i, event := range events {
+
+			ce, err := fvmEvents.FlowEventToCadenceEvent(event)
+			if err != nil {
+				return nil, fmt.Errorf("cannot convert event to cadence event: %w", err)
+			}
+
 			fcv.logger.Warn().Int("list_index", i).
 				Str("event_id", event.ID().String()).
 				Hex("event_fingerptint", event.Fingerprint()).
@@ -268,7 +275,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 				Str("event_tx_id", event.TransactionID.String()).
 				Uint32("event_tx_index", event.TransactionIndex).
 				Uint32("event_index", event.EventIndex).
-				Bytes("event_payload", event.Payload).
+				Str("event_payload", ce.String()).
 				Str("block_id", chunk.BlockID.String()).
 				Str("collection_id", collectionID).
 				Str("result_id", result.ID().String()).
