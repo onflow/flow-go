@@ -14,17 +14,17 @@ import (
 // When no edges are added, each lock context may acquire at most one lock.
 //
 // For example, the bootstrapping logic both inserts and finalizes block. So it needs to
-// acquire both LockInsertBlock and LockFinalizeBlock. To allow this, we add the directed
-// edge LockInsertBlock -> LockFinalizeBlock with `Add(LockInsertBlock, LockFinalizeBlock)`.
+// acquire both LockNewBlock and LockFinalizeBlock. To allow this, we add the directed
+// edge LockNewBlock -> LockFinalizeBlock with `Add(LockNewBlock, LockFinalizeBlock)`.
 // This means:
-//   - a context can acquire either LockInsertBlock or LockFinalizeBlock first (always true)
-//   - a context holding LockInsertBlock can acquire LockFinalizeBlock next (allowed by the edge)
-//   - a context holding LockFinalizeBlock cannot acquire LockInsertBlock next (disallowed, because the edge is directed)
+//   - a context can acquire either LockNewBlock or LockFinalizeBlock first (always true)
+//   - a context holding LockNewBlock can acquire LockFinalizeBlock next (allowed by the edge)
+//   - a context holding LockFinalizeBlock cannot acquire LockNewBlock next (disallowed, because the edge is directed)
 //
 // This function will panic if a policy is created which does not prevent deadlocks.
 func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
-		Add(storage.LockInsertBlock, storage.LockFinalizeBlock).
+		Add(storage.LockNewBlock, storage.LockFinalizeBlock).
 		Build()
 }
 

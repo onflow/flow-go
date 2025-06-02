@@ -317,7 +317,7 @@ func (e *Engine) storeApproval(approval *flow.ResultApproval) error {
 	lctx := e.lockManager.NewContext()
 	defer lctx.Release()
 
-	err := lctx.AcquireLock(storage.LockIndexResultApproval)
+	err := lctx.AcquireLock(storage.LockMyResultApproval)
 	if err != nil {
 		return fmt.Errorf("fail to acquire lock to insert result approval: %w", err)
 	}
