@@ -166,6 +166,8 @@ type UntrustedEpochSetup EpochSetup
 
 // NewEpochSetup creates a new instance of EpochSetup.
 // Construction EpochSetup allowed only within the constructor.
+//
+// No errors are expected during normal operation.
 func NewEpochSetup(untrusted UntrustedEpochSetup) (*EpochSetup, error) {
 	if untrusted.FirstView >= untrusted.FinalView {
 		return nil, fmt.Errorf("first view %d is greater than the final view %d", untrusted.FirstView, untrusted.FinalView)
@@ -271,6 +273,8 @@ type UntrustedEpochRecover EpochRecover
 
 // NewEpochRecover creates a new instance of EpochRecover.
 // Construction EpochRecover allowed only within the constructor.
+//
+// No errors are expected during normal operation.
 func NewEpochRecover(untrusted UntrustedEpochRecover) (*EpochRecover, error) {
 	// EpochSetup and must be non-empty and is intended to be constructed solely through the constructor.
 	if untrusted.EpochSetup.EqualTo(new(EpochSetup)) {
@@ -372,6 +376,8 @@ type UntrustedEpochCommit EpochCommit
 
 // NewEpochCommit creates a new instance of EpochCommit.
 // Construction EpochCommit allowed only within the constructor.
+//
+// No errors are expected during normal operation.
 func NewEpochCommit(untrusted UntrustedEpochCommit) (*EpochCommit, error) {
 	if untrusted.DKGGroupKey == nil {
 		return nil, fmt.Errorf("DKG group key must not be nil")
