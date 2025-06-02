@@ -281,18 +281,12 @@ func NewEpochRecover(untrusted UntrustedEpochRecover) (*EpochRecover, error) {
 		return nil, fmt.Errorf("EpochCommit is empty")
 	}
 
-	if len(untrusted.EpochSetup.Assignments) != len(untrusted.EpochCommit.ClusterQCs) {
-		return nil, fmt.Errorf("number of clusters (%d) does not number of QCs (%d)", len(untrusted.EpochSetup.Assignments), len(untrusted.EpochCommit.ClusterQCs))
-	}
-
 	if untrusted.EpochCommit.Counter != untrusted.EpochSetup.Counter {
 		return nil, fmt.Errorf("inconsistent epoch counter between commit (%d) and setup (%d) events in same epoch", untrusted.EpochCommit.Counter, untrusted.EpochSetup.Counter)
 	}
-
-	//participants := untrusted.EpochSetup.Participants.Filter(filter.IsConsensusCommitteeMember)
-	//if len(participants) != len(untrusted.EpochCommit.DKGParticipantKeys) {
-	//	return nil, fmt.Errorf("participant list (len=%d) does not match dkg key list (len=%d)", len(participants), len(untrusted.EpochCommit.DKGParticipantKeys))
-	//}
+	if len(untrusted.EpochSetup.Assignments) != len(untrusted.EpochCommit.ClusterQCs) {
+		return nil, fmt.Errorf("number of clusters (%d) does not match number of QCs (%d)", len(untrusted.EpochSetup.Assignments), len(untrusted.EpochCommit.ClusterQCs))
+	}
 
 	return &EpochRecover{
 		EpochSetup:  untrusted.EpochSetup,

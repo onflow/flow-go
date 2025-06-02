@@ -686,7 +686,7 @@ func TestNewEpochRecover(t *testing.T) {
 		recoverEpoch, err := flow.NewEpochRecover(untrusted)
 		require.Error(t, err)
 		require.Nil(t, recoverEpoch)
-		require.Contains(t, err.Error(), "number of clusters")
+		require.Contains(t, err.Error(), "does not match number of QCs")
 	})
 
 	t.Run("mismatched epoch counters", func(t *testing.T) {
