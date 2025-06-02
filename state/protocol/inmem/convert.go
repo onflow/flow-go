@@ -122,7 +122,10 @@ func SnapshotFromBootstrapStateWithParams(
 		SporkRootBlockHeight: root.Header.Height,  // use root block height as the spork root block height
 	}
 
-	rootMinEpochState := EpochProtocolStateFromServiceEvents(setup, commit)
+	rootMinEpochState, err := EpochProtocolStateFromServiceEvents(setup, commit)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch protocol state: %w", err)
+	}
 	rootEpochStateID := rootMinEpochState.ID()
 	rootKvStore, err := kvStoreFactory(rootEpochStateID)
 	if err != nil {
@@ -193,7 +196,9 @@ func SnapshotFromBootstrapStateWithParams(
 //     that happened before should be reflected in the EpochSetup event. Specifically, ejected
 //     nodes should be no longer listed in the EpochSetup event.
 //     Hence, when the EpochSetup event is emitted / processed, the ejected flag is false for all epoch participants.
-func EpochProtocolStateFromServiceEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.MinEpochStateEntry {
+//
+// No errors are expected during normal operation.
+func EpochProtocolStateFromServiceEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) (*flow.MinEpochStateEntry, error) {
 	identities := make(flow.DynamicIdentityEntryList, 0, len(setup.Participants))
 	for _, identity := range setup.Participants {
 		identities = append(identities, &flow.DynamicIdentityEntry{
@@ -201,15 +206,16 @@ func EpochProtocolStateFromServiceEvents(setup *flow.EpochSetup, commit *flow.Ep
 			Ejected: false,
 		})
 	}
-	minEpochStateEntry := flow.NewMinEpochStateEntry(
-		nil,
-		flow.EpochStateContainer{
-			SetupID:          setup.ID(),
-			CommitID:         commit.ID(),
-			ActiveIdentities: identities,
+	return flow.NewMinEpochStateEntry(
+		flow.UntrustedMinEpochStateEntry{
+			PreviousEpoch: nil,
+			CurrentEpoch: flow.EpochStateContainer{
+				SetupID:          setup.ID(),
+				CommitID:         commit.ID(),
+				ActiveIdentities: identities,
+			},
+			NextEpoch:              nil,
+			EpochFallbackTriggered: false,
 		},
-		nil,
-		false,
 	)
-	return &minEpochStateEntry
 }

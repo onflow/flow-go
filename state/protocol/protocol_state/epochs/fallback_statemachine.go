@@ -52,17 +52,21 @@ func NewFallbackStateMachine(
 			nextEpochCommit = nil
 		}
 
-		minEpochStateEntry := flow.NewMinEpochStateEntry(
-			state.PreviousEpoch,
-			state.CurrentEpoch,
-			nextEpoch,
-			true,
+		minEpochStateEntry, err := flow.NewMinEpochStateEntry(
+			flow.UntrustedMinEpochStateEntry{
+				PreviousEpoch:          state.PreviousEpoch,
+				CurrentEpoch:           state.CurrentEpoch,
+				NextEpoch:              nextEpoch,
+				EpochFallbackTriggered: true,
+			},
 		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create min epoch state: %w", err)
+		}
 
-		var err error
 		state, err = flow.NewEpochStateEntry(
 			flow.UntrustedEpochStateEntry{
-				MinEpochStateEntry:  &minEpochStateEntry,
+				MinEpochStateEntry:  minEpochStateEntry,
 				PreviousEpochSetup:  state.PreviousEpochSetup,
 				PreviousEpochCommit: state.PreviousEpochCommit,
 				CurrentEpochSetup:   state.CurrentEpochSetup,
@@ -236,16 +240,21 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		return false, fmt.Errorf("unexpected errors tracking identity list: %w", err)
 	}
 	// if we have processed a valid EpochRecover event, we should exit EFM.
-	newMinEpochStateEntry := flow.NewMinEpochStateEntry(
-		m.state.PreviousEpoch,
-		m.state.CurrentEpoch,
-		nextEpoch,
-		false,
+	newMinEpochStateEntry, err := flow.NewMinEpochStateEntry(
+		flow.UntrustedMinEpochStateEntry{
+			PreviousEpoch:          m.state.PreviousEpoch,
+			CurrentEpoch:           m.state.CurrentEpoch,
+			NextEpoch:              nextEpoch,
+			EpochFallbackTriggered: false,
+		},
 	)
+	if err != nil {
+		return false, fmt.Errorf("could not create min epoch state: %w", err)
+	}
 
 	m.state, err = flow.NewEpochStateEntry(
 		flow.UntrustedEpochStateEntry{
-			MinEpochStateEntry:  &newMinEpochStateEntry,
+			MinEpochStateEntry:  newMinEpochStateEntry,
 			PreviousEpochSetup:  m.state.PreviousEpochSetup,
 			PreviousEpochCommit: m.state.PreviousEpochCommit,
 			CurrentEpochSetup:   m.state.CurrentEpochSetup,

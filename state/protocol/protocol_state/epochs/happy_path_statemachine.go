@@ -114,16 +114,21 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 		ActiveIdentities: nextEpochActiveIdentities,
 	}
 
-	newMinEpochStateEntry := flow.NewMinEpochStateEntry(
-		u.state.PreviousEpoch,
-		u.state.CurrentEpoch,
-		nextEpoch,
-		u.state.EpochFallbackTriggered,
+	newMinEpochStateEntry, err := flow.NewMinEpochStateEntry(
+		flow.UntrustedMinEpochStateEntry{
+			PreviousEpoch:          u.state.PreviousEpoch,
+			CurrentEpoch:           u.state.CurrentEpoch,
+			NextEpoch:              nextEpoch,
+			EpochFallbackTriggered: u.state.EpochFallbackTriggered,
+		},
 	)
+	if err != nil {
+		return false, fmt.Errorf("could not create min epoch state: %w", err)
+	}
 
 	u.state, err = flow.NewEpochStateEntry(
 		flow.UntrustedEpochStateEntry{
-			MinEpochStateEntry:  &newMinEpochStateEntry,
+			MinEpochStateEntry:  newMinEpochStateEntry,
 			PreviousEpochSetup:  u.state.PreviousEpochSetup,
 			PreviousEpochCommit: u.state.PreviousEpochCommit,
 			CurrentEpochSetup:   u.state.CurrentEpochSetup,
@@ -180,16 +185,21 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 	nextEpoch := u.state.NextEpoch
 	nextEpoch.CommitID = epochCommit.ID()
 
-	newMinEpochStateEntry := flow.NewMinEpochStateEntry(
-		u.state.PreviousEpoch,
-		u.state.CurrentEpoch,
-		nextEpoch,
-		u.state.EpochFallbackTriggered,
+	newMinEpochStateEntry, err := flow.NewMinEpochStateEntry(
+		flow.UntrustedMinEpochStateEntry{
+			PreviousEpoch:          u.state.PreviousEpoch,
+			CurrentEpoch:           u.state.CurrentEpoch,
+			NextEpoch:              nextEpoch,
+			EpochFallbackTriggered: u.state.EpochFallbackTriggered,
+		},
 	)
+	if err != nil {
+		return false, fmt.Errorf("could not create min epoch state: %w", err)
+	}
 
 	u.state, err = flow.NewEpochStateEntry(
 		flow.UntrustedEpochStateEntry{
-			MinEpochStateEntry:  &newMinEpochStateEntry,
+			MinEpochStateEntry:  newMinEpochStateEntry,
 			PreviousEpochSetup:  u.state.PreviousEpochSetup,
 			PreviousEpochCommit: u.state.PreviousEpochCommit,
 			CurrentEpochSetup:   u.state.CurrentEpochSetup,

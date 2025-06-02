@@ -49,18 +49,15 @@ type UntrustedMinEpochStateEntry MinEpochStateEntry
 
 // NewMinEpochStateEntry creates a new instance of MinEpochStateEntry.
 // Construction MinEpochStateEntry allowed only within the constructor.
-func NewMinEpochStateEntry(
-	previousEpoch *EpochStateContainer,
-	currentEpoch EpochStateContainer,
-	nextEpoch *EpochStateContainer,
-	epochFallbackTriggered bool,
-) MinEpochStateEntry {
-	return MinEpochStateEntry{
-		PreviousEpoch:          previousEpoch,
-		CurrentEpoch:           currentEpoch,
-		NextEpoch:              nextEpoch,
-		EpochFallbackTriggered: epochFallbackTriggered,
-	}
+//
+// No errors are expected during normal operation.
+func NewMinEpochStateEntry(untrusted UntrustedMinEpochStateEntry) (*MinEpochStateEntry, error) {
+	return &MinEpochStateEntry{
+		PreviousEpoch:          untrusted.PreviousEpoch,
+		CurrentEpoch:           untrusted.CurrentEpoch,
+		NextEpoch:              untrusted.NextEpoch,
+		EpochFallbackTriggered: untrusted.EpochFallbackTriggered,
+	}, nil
 }
 
 // EpochStateContainer holds the data pertaining to a _single_ epoch but no information about
@@ -175,6 +172,8 @@ type UntrustedEpochStateEntry EpochStateEntry
 
 // NewEpochStateEntry constructs a EpochStateEntry from an MinEpochStateEntry and additional data.
 // No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
+//
+// No errors are expected during normal operation.
 func NewEpochStateEntry(untrusted UntrustedEpochStateEntry) (*EpochStateEntry, error) {
 	// If previous epoch is specified: ensure respective epoch service events are not nil and consistent with commitments in `MinEpochStateEntry.PreviousEpoch`
 	if untrusted.PreviousEpoch != nil {
@@ -270,6 +269,8 @@ type RichEpochStateEntry struct {
 
 // NewRichEpochStateEntry constructs a RichEpochStateEntry from an EpochStateEntry.
 // No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
+//
+// No errors are expected during normal operation.
 func NewRichEpochStateEntry(
 	epochState *EpochStateEntry,
 ) (*RichEpochStateEntry, error) {
@@ -357,13 +358,14 @@ func (e *MinEpochStateEntry) Copy() *MinEpochStateEntry {
 	if e == nil {
 		return nil
 	}
-	minEpochStateEntry := NewMinEpochStateEntry(
+	// we can omit using constructor here cause we copy already created object
+	//nolint:structwrite
+	return &MinEpochStateEntry{
 		e.PreviousEpoch.Copy(),
 		*e.CurrentEpoch.Copy(),
 		e.NextEpoch.Copy(),
 		e.EpochFallbackTriggered,
-	)
-	return &minEpochStateEntry
+	}
 }
 
 // Copy returns a full copy of the EpochStateEntry.
@@ -401,13 +403,13 @@ func (e *RichEpochStateEntry) Copy() *RichEpochStateEntry {
 	if e == nil {
 		return nil
 	}
+	// we can omit using constructor here cause we copy already created object
 	//nolint:structwrite
-	richEpochStateEntry := RichEpochStateEntry{
+	return &RichEpochStateEntry{
 		EpochStateEntry:           e.EpochStateEntry.Copy(),
 		CurrentEpochIdentityTable: e.CurrentEpochIdentityTable.Copy(),
 		NextEpochIdentityTable:    e.NextEpochIdentityTable.Copy(),
 	}
-	return &richEpochStateEntry
 }
 
 // CurrentEpochFinalView returns the final view of the current epoch, taking into account possible epoch extensions.

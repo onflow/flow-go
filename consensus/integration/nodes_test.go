@@ -285,8 +285,9 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 			commit.DKGIndexMap = dkgIndexMap
 		},
 	)
-
-	epochProtocolStateID := inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID()
+	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
+	require.NoError(t, err)
+	epochProtocolStateID := minEpochStateEntry.ID()
 	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
 	require.NoError(t, err)
 	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochProtocolStateID)

@@ -1219,9 +1219,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	root := &flow.Block{
 		Header: rootHeader,
 	}
-	rootProtocolState, err := networkConf.KVStoreFactory(
-		inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit).ID(),
-	)
+	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch protocol state: %w", err)
+	}
+	rootProtocolState, err := networkConf.KVStoreFactory(minEpochStateEntry.ID())
 	if err != nil {
 		return nil, err
 	}
