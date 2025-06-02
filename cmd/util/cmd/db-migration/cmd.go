@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/docker/go-units"
 	"github.com/rs/zerolog/log"
@@ -56,6 +57,7 @@ func run(*cobra.Command, []string) error {
 		Logger()
 
 	lg.Info().Msgf("starting migration from badger db to pebble db")
+	start := time.Now()
 	err := migration.RunMigrationAndCompaction(flagBadgerDBdir, flagPebbleDBdir, migration.MigrationConfig{
 		BatchByteSize:          flagBatchByteSize,
 		ReaderWorkerCount:      flagReaderCount,
@@ -66,6 +68,8 @@ func run(*cobra.Command, []string) error {
 	if err != nil {
 		return fmt.Errorf("migration failed: %w", err)
 	}
+
+	lg.Info().Msgf("migration completed successfully in %s", time.Since(start).String())
 
 	return nil
 }
