@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/fxamacker/cbor/v2"
@@ -171,10 +172,10 @@ func NewEpochSetup(untrusted UntrustedEpochSetup) (*EpochSetup, error) {
 		return nil, fmt.Errorf("first view %d is greater than the final view %d", untrusted.FirstView, untrusted.FinalView)
 	}
 	if untrusted.Participants == nil {
-		return nil, fmt.Errorf("participants is nil")
+		return nil, fmt.Errorf("participants must not be nil")
 	}
 	if untrusted.Assignments == nil {
-		return nil, fmt.Errorf("assignments is nil")
+		return nil, fmt.Errorf("assignments must not be nil")
 	}
 	if len(untrusted.RandomSource) != EpochSetupRandomSourceLength {
 		return nil, fmt.Errorf(
@@ -182,6 +183,13 @@ func NewEpochSetup(untrusted UntrustedEpochSetup) (*EpochSetup, error) {
 			EpochSetupRandomSourceLength,
 			len(untrusted.RandomSource),
 		)
+	}
+	if untrusted.TargetDuration == 0 {
+		return nil, fmt.Errorf("target duration must be greater than 0")
+	}
+	currentTime := uint64(time.Now().Unix())
+	if untrusted.TargetEndTime <= currentTime {
+		return nil, fmt.Errorf("target end time %d must be greater than current time %d", untrusted.TargetEndTime, currentTime)
 	}
 
 	return &EpochSetup{
@@ -363,12 +371,27 @@ type UntrustedEpochCommit EpochCommit
 // NewEpochCommit creates a new instance of EpochCommit.
 // Construction EpochCommit allowed only within the constructor.
 func NewEpochCommit(untrusted UntrustedEpochCommit) (*EpochCommit, error) {
-	if untrusted.ClusterQCs == nil {
-		return nil, fmt.Errorf("cluster QCs is nil")
-	}
 	if untrusted.DKGGroupKey == nil {
-		return nil, fmt.Errorf("DKG group key is nil")
+		return nil, fmt.Errorf("DKG group key must not be nil")
+	}
+	if untrusted.DKGIndexMap != nil {
+		// enforce invariant: len(DKGParticipantKeys) == len(DKGIndexMap)
+		n := len(untrusted.DKGIndexMap) // size of the DKG committee
+		if len(untrusted.DKGParticipantKeys) != n {
+			return nil, fmt.Errorf("number of %d Random Beacon key shares is inconsistent with number of DKG participants (len=%d)", len(untrusted.DKGParticipantKeys), len(untrusted.DKGIndexMap))
+		}
 
+		// enforce invariant: DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
+		encounteredIndex := make([]bool, n)
+		for _, index := range untrusted.DKGIndexMap {
+			if index < 0 || index >= n {
+				return nil, fmt.Errorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", index, n)
+			}
+			if encounteredIndex[index] {
+				return nil, fmt.Errorf("duplicated DKG index %d", index)
+			}
+			encounteredIndex[index] = true
+		}
 	}
 
 	return &EpochCommit{

@@ -2,6 +2,7 @@ package flow_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
@@ -11,7 +12,6 @@ import (
 )
 
 func TestClusterQCVoteData_Equality(t *testing.T) {
-
 	pks := unittest.PublicKeysFixture(2, crypto.BLSBLS12381)
 
 	_ = len(pks)
@@ -77,7 +77,6 @@ func TestClusterQCVoteData_Equality(t *testing.T) {
 }
 
 func TestEpochCommit_EqualTo(t *testing.T) {
-
 	qcA := flow.ClusterQCVoteData{
 		SigData:  []byte{3, 3, 3},
 		VoterIDs: []flow.Identifier{flow.HashToID([]byte{1, 2, 3}), flow.HashToID([]byte{3, 2, 1})},
@@ -214,7 +213,6 @@ func TestEpochCommit_EqualTo(t *testing.T) {
 }
 
 func TestEpochSetup_EqualTo(t *testing.T) {
-
 	identityA := &unittest.IdentityFixture().IdentitySkeleton
 	identityB := &unittest.IdentityFixture().IdentitySkeleton
 
@@ -338,5 +336,326 @@ func TestEpochSetup_EqualTo(t *testing.T) {
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
+	})
+}
+
+// TestNewEpochSetup verifies the behavior of the NewEpochSetup constructor function.
+// It checks for correct handling of both valid and invalid inputs.
+//
+// Test Cases:
+//
+// 1. Valid input returns setup:
+//   - Ensures that providing all required and correctly formatted fields results in a successful creation of an EpochSetup instance.
+//
+// 2. Invalid FirstView and FinalView:
+//   - Verifies that an error is returned when FirstView is not less than FinalView, as this violates the expected chronological order.
+//
+// 3. Invalid participants:
+//   - Checks that an error is returned when the Participants field is nil.
+//
+// 4. Invalid assignments:
+//   - Ensures that an error is returned when the Assignments field is nil.
+//
+// 5. Invalid RandomSource:
+//   - Validates that an error is returned when the RandomSource does not meet the required length.
+//
+// 6. Invalid TargetDuration:
+//   - Confirms that an error is returned when TargetDuration is zero.
+//
+// 7. Invalid TargetEndTime:
+//   - Checks that an error is returned when TargetEndTime is not greater than the current time, ensuring future-oriented epoch scheduling.
+func TestNewEpochSetup(t *testing.T) {
+	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	validParticipants := participants.Sort(flow.Canonical[flow.Identity]).ToSkeleton()
+	validRandomSource := unittest.SeedFixture(flow.EpochSetupRandomSourceLength)
+	validAssignments := unittest.ClusterAssignment(1, validParticipants)
+
+	t.Run("valid input returns setup", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochSetup{
+			Counter:            1,
+			FirstView:          10,
+			DKGPhase1FinalView: 20,
+			DKGPhase2FinalView: 30,
+			DKGPhase3FinalView: 40,
+			FinalView:          50,
+			Participants:       validParticipants,
+			Assignments:        validAssignments,
+			RandomSource:       validRandomSource,
+			TargetDuration:     60 * 60,
+			TargetEndTime:      uint64(time.Now().Unix()) + 1000,
+		}
+
+		setup, err := flow.NewEpochSetup(untrusted)
+		require.NoError(t, err)
+		require.NotNil(t, setup)
+	})
+
+	t.Run("invalid FirstView and FinalView", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochSetup{
+			FirstView:    100,
+			FinalView:    100,
+			Participants: validParticipants,
+			Assignments:  validAssignments,
+			RandomSource: validRandomSource,
+		}
+		setup, err := flow.NewEpochSetup(untrusted)
+		require.Error(t, err)
+		require.Nil(t, setup)
+		require.Contains(t, err.Error(), "first view 100 is greater than the final view 100")
+	})
+
+	t.Run("invalid participants", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochSetup{
+			FirstView:    10,
+			FinalView:    50,
+			Participants: nil,
+			Assignments:  validAssignments,
+			RandomSource: validRandomSource,
+		}
+		setup, err := flow.NewEpochSetup(untrusted)
+		require.Error(t, err)
+		require.Nil(t, setup)
+		require.Contains(t, err.Error(), "participants must not be nil")
+	})
+
+	t.Run("invalid assignments", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochSetup{
+			FirstView:    10,
+			FinalView:    50,
+			Participants: validParticipants,
+			Assignments:  nil,
+			RandomSource: validRandomSource,
+		}
+		setup, err := flow.NewEpochSetup(untrusted)
+		require.Error(t, err)
+		require.Nil(t, setup)
+		require.Contains(t, err.Error(), "assignments must not be nil")
+	})
+
+	t.Run("invalid RandomSource", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochSetup{
+			FirstView:    10,
+			FinalView:    50,
+			Participants: validParticipants,
+			Assignments:  validAssignments,
+			RandomSource: make([]byte, flow.EpochSetupRandomSourceLength-1), // too short
+		}
+		setup, err := flow.NewEpochSetup(untrusted)
+		require.Error(t, err)
+		require.Nil(t, setup)
+		require.Contains(t, err.Error(), "random source must be of")
+	})
+	t.Run("invalid TargetDuration", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochSetup{
+			FirstView:      10,
+			FinalView:      50,
+			Participants:   validParticipants,
+			Assignments:    validAssignments,
+			RandomSource:   validRandomSource,
+			TargetDuration: 0,
+		}
+		setup, err := flow.NewEpochSetup(untrusted)
+		require.Error(t, err)
+		require.Nil(t, setup)
+		require.Contains(t, err.Error(), "target duration must be greater than 0")
+	})
+
+	t.Run("invalid TargetEndTime", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochSetup{
+			FirstView:      10,
+			FinalView:      50,
+			Participants:   validParticipants,
+			Assignments:    validAssignments,
+			RandomSource:   validRandomSource,
+			TargetDuration: 300,
+			TargetEndTime:  uint64(time.Now().Unix()) - 1000, // past time
+		}
+		setup, err := flow.NewEpochSetup(untrusted)
+		require.Error(t, err)
+		require.Nil(t, setup)
+		require.Contains(t, err.Error(), "target end time")
+	})
+}
+
+// TestNewEpochCommit validates the behavior of the NewEpochCommit constructor function.
+// It checks for correct handling of both valid and invalid inputs.
+//
+// Test Cases:
+//
+// 1. Valid input returns commit:
+//   - Ensures that providing all required and correctly formatted fields results in a successful creation of an EpochCommit instance.
+//
+// 2. Nil DKGGroupKey:
+//   - Verifies that an error is returned when DKGGroupKey is nil.
+//
+// 3. Mismatched DKGParticipantKeys and DKGIndexMap lengths:
+//   - Checks that an error is returned when the number of DKGParticipantKeys does not match the length of DKGIndexMap.
+//
+// 4. DKGIndexMap with out-of-range index:
+//   - Ensures that an error is returned when DKGIndexMap contains an index outside the valid range.
+//
+// 5. DKGIndexMap with duplicate indices:
+//   - Validates that an error is returned when DKGIndexMap contains duplicate indices.
+func TestNewEpochCommit(t *testing.T) {
+	// Setup common valid data
+	validParticipantKeys := unittest.PublicKeysFixture(2, crypto.BLSBLS12381)
+	validDKGGroupKey := unittest.KeyFixture(crypto.BLSBLS12381).PublicKey()
+	validIndexMap := flow.DKGIndexMap{
+		unittest.IdentifierFixture(): 0,
+		unittest.IdentifierFixture(): 1,
+	}
+	validClusterQCs := []flow.ClusterQCVoteData{
+		{
+			VoterIDs: []flow.Identifier{
+				unittest.IdentifierFixture(),
+				unittest.IdentifierFixture(),
+			},
+			SigData: []byte{1, 1, 1},
+		},
+		{
+			VoterIDs: []flow.Identifier{
+				unittest.IdentifierFixture(),
+				unittest.IdentifierFixture(),
+			},
+			SigData: []byte{2, 2, 2},
+		},
+	}
+
+	t.Run("valid input returns commit", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochCommit{
+			Counter:            1,
+			ClusterQCs:         validClusterQCs,
+			DKGGroupKey:        validDKGGroupKey,
+			DKGParticipantKeys: validParticipantKeys,
+			DKGIndexMap:        validIndexMap,
+		}
+
+		commit, err := flow.NewEpochCommit(untrusted)
+		require.NoError(t, err)
+		require.NotNil(t, commit)
+	})
+
+	t.Run("nil DKGGroupKey", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochCommit{
+			Counter:            1,
+			ClusterQCs:         validClusterQCs,
+			DKGGroupKey:        nil,
+			DKGParticipantKeys: validParticipantKeys,
+			DKGIndexMap:        validIndexMap,
+		}
+
+		commit, err := flow.NewEpochCommit(untrusted)
+		require.Error(t, err)
+		require.Nil(t, commit)
+		require.Contains(t, err.Error(), "DKG group key must not be nil")
+	})
+
+	t.Run("mismatched DKGParticipantKeys and DKGIndexMap lengths", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochCommit{
+			Counter:            1,
+			ClusterQCs:         validClusterQCs,
+			DKGGroupKey:        validDKGGroupKey,
+			DKGParticipantKeys: unittest.PublicKeysFixture(1, crypto.BLSBLS12381), // Only one key
+			DKGIndexMap:        validIndexMap,                                     // Two entries
+		}
+
+		commit, err := flow.NewEpochCommit(untrusted)
+		require.Error(t, err)
+		require.Nil(t, commit)
+		require.Contains(t, err.Error(), "number of 1 Random Beacon key shares is inconsistent with number of DKG participants (len=2)")
+	})
+
+	t.Run("DKGIndexMap with out-of-range index", func(t *testing.T) {
+		invalidIndexMap := flow.DKGIndexMap{
+			unittest.IdentifierFixture(): 0,
+			unittest.IdentifierFixture(): 2, // Index out of range for 2 participants
+		}
+
+		untrusted := flow.UntrustedEpochCommit{
+			Counter:            1,
+			ClusterQCs:         validClusterQCs,
+			DKGGroupKey:        validDKGGroupKey,
+			DKGParticipantKeys: validParticipantKeys,
+			DKGIndexMap:        invalidIndexMap,
+		}
+
+		commit, err := flow.NewEpochCommit(untrusted)
+		require.Error(t, err)
+		require.Nil(t, commit)
+		require.Contains(t, err.Error(), "index 2 is outside allowed range [0,n-1] for a DKG committee of size n=2")
+	})
+
+	t.Run("DKGIndexMap with duplicate indices", func(t *testing.T) {
+		duplicateIndexMap := flow.DKGIndexMap{
+			unittest.IdentifierFixture(): 0,
+			unittest.IdentifierFixture(): 0, // Duplicate index
+		}
+
+		untrusted := flow.UntrustedEpochCommit{
+			Counter:            1,
+			ClusterQCs:         validClusterQCs,
+			DKGGroupKey:        validDKGGroupKey,
+			DKGParticipantKeys: validParticipantKeys,
+			DKGIndexMap:        duplicateIndexMap,
+		}
+
+		commit, err := flow.NewEpochCommit(untrusted)
+		require.Error(t, err)
+		require.Nil(t, commit)
+		require.Contains(t, err.Error(), "duplicated DKG index 0")
+	})
+}
+
+// TestNewEpochRecover validates the behavior of the NewEpochRecover constructor function.
+// It checks for correct handling of both valid and invalid inputs.
+//
+// Test Cases:
+//
+// 1. Valid input returns recover:
+//   - Ensures that providing non-empty EpochSetup and EpochCommit results in a successful creation of an EpochRecover instance.
+//
+// 2. Empty EpochSetup:
+//   - Verifies that an error is returned when EpochSetup is empty.
+//
+// 3. Empty EpochCommit:
+//   - Checks that an error is returned when EpochCommit is empty.
+func TestNewEpochRecover(t *testing.T) {
+	// Setup common valid data
+	validSetup := unittest.EpochSetupFixture()
+	validCommit := unittest.EpochCommitFixture()
+
+	t.Run("valid input returns recover", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochRecover{
+			EpochSetup:  *validSetup,
+			EpochCommit: *validCommit,
+		}
+
+		recoverEpoch, err := flow.NewEpochRecover(untrusted)
+		require.NoError(t, err)
+		require.NotNil(t, recoverEpoch)
+	})
+
+	t.Run("empty EpochSetup", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochRecover{
+			EpochSetup:  *new(flow.EpochSetup), // Empty setup
+			EpochCommit: *validCommit,
+		}
+
+		recoverEpoch, err := flow.NewEpochRecover(untrusted)
+		require.Error(t, err)
+		require.Nil(t, recoverEpoch)
+		require.Contains(t, err.Error(), "EpochSetup is empty")
+	})
+
+	t.Run("empty EpochCommit", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochRecover{
+			EpochSetup:  *validSetup,
+			EpochCommit: *new(flow.EpochCommit), // Empty commit
+		}
+
+		recoverEpoch, err := flow.NewEpochRecover(untrusted)
+		require.Error(t, err)
+		require.Nil(t, recoverEpoch)
+		require.Contains(t, err.Error(), "EpochCommit is empty")
 	})
 }
