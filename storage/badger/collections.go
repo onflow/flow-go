@@ -72,7 +72,7 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 		return nil, err
 	}
 
-	return flow.NewCollection(txs), nil
+	return flow.NewCollection(flow.UntrustedCollection{Transactions: txs}), nil
 }
 
 func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, error) {

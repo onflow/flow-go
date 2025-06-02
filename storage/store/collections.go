@@ -83,7 +83,7 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 		txs = append(txs, tx)
 	}
 
-	return flow.NewCollection(txs), nil
+	return flow.NewCollection(flow.UntrustedCollection{Transactions: txs}), nil
 }
 
 // LightByID retrieves a light collection by its ID.

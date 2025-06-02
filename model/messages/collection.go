@@ -52,7 +52,7 @@ func (ub *UntrustedClusterBlock) ToInternal() *cluster.Block {
 		Header: &ub.Header,
 		Payload: &cluster.Payload{
 			ReferenceBlockID: ub.Payload.ReferenceBlockID,
-			Collection:       *flow.NewCollection(txs),
+			Collection:       *flow.NewCollection(flow.UntrustedCollection{Transactions: txs}),
 		},
 	}
 }

@@ -79,7 +79,7 @@ func MessageToFullCollection(m []*entities.Transaction, chain flow.Chain) (*flow
 		transactions[i] = &t
 	}
 
-	return flow.NewCollection(transactions), nil
+	return flow.NewCollection(flow.UntrustedCollection{Transactions: transactions}), nil
 }
 
 // CollectionGuaranteeToMessage converts a collection guarantee to a protobuf message

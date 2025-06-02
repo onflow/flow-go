@@ -6,6 +6,17 @@ import (
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
+// UntrustedCollection is an untrusted input-only representation of an Collection,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedCollection should be validated and converted into
+// a trusted Collection using NewCollection constructor.
+type UntrustedCollection Collection
+
 // Collection is set of transactions.
 //
 //structwrite:immutable - mutations allowed only within the constructor
@@ -15,8 +26,8 @@ type Collection struct {
 
 // NewCollection creates a new instance of Collection.
 // Construction Collection allowed only within the constructor
-func NewCollection(transactions []*TransactionBody) *Collection {
-	return &Collection{Transactions: transactions}
+func NewCollection(untrustedColl UntrustedCollection) *Collection {
+	return &Collection{Transactions: untrustedColl.Transactions}
 }
 
 // CollectionFromTransactions creates a new collection from the list of
@@ -27,7 +38,7 @@ func CollectionFromTransactions(transactions []*Transaction) Collection {
 	for _, tx := range transactions {
 		txs = append(txs, &tx.TransactionBody)
 	}
-	return *NewCollection(txs)
+	return *NewCollection(UntrustedCollection{Transactions: txs})
 }
 
 // Light returns the light, reference-only version of the collection.

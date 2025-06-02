@@ -652,7 +652,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		channels.RequestCollections,
 		filter.HasRole[flow.Identity](flow.RoleCollection),
 		func() flow.Entity {
-			return flow.NewCollection(nil)
+			return flow.NewCollection(flow.UntrustedCollection{
+				Transactions: nil,
+			})
 		},
 	)
 	require.NoError(t, err)
