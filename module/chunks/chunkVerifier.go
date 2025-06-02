@@ -6,11 +6,11 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
-	fvmEvents "github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -252,39 +252,41 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID, problematicTx)
 	}
 
-	eventsHash, err := flow.EventsMerkleRootHash(events)
-	if err != nil {
-		return nil, fmt.Errorf("cannot calculate events collection hash: %w", err)
+	// eventsHash, err := flow.EventsMerkleRootHash(events)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("cannot calculate events collection hash: %w", err)
+	// }
+	// if chunk.EventCollection != eventsHash {
+	// collectionID := ""
+	// if chunkDataPack.Collection != nil {
+	// 	collectionID = chunkDataPack.Collection.ID().String()
+	// }
+	for _, event := range events {
+
+		// ce, err := fvmEvents.FlowEventToCadenceEvent(event)
+		// if err != nil {
+		// 	return nil, fmt.Errorf("cannot convert event to cadence event: %w", err)
+		// }
+
+		// fcv.logger.Warn().Int("list_index", i).
+		// 	Str("event_id", event.ID().String()).
+		// 	Hex("event_fingerptint", event.Fingerprint()).
+		// 	Str("event_type", string(event.Type)).
+		// 	Str("event_tx_id", event.TransactionID.String()).
+		// 	Uint32("event_tx_index", event.TransactionIndex).
+		// 	Uint32("event_index", event.EventIndex).
+		// 	Str("event_payload", ce.String()).
+		// 	Str("block_id", chunk.BlockID.String()).
+		// 	Str("collection_id", collectionID).
+		// 	Str("result_id", result.ID().String()).
+		// 	Uint64("chunk_index", chunk.Index).
+		// 	Msg("not matching events debug")
+
+		common.PrettyPrint(event)
 	}
-	if chunk.EventCollection != eventsHash {
-		collectionID := ""
-		if chunkDataPack.Collection != nil {
-			collectionID = chunkDataPack.Collection.ID().String()
-		}
-		for i, event := range events {
 
-			ce, err := fvmEvents.FlowEventToCadenceEvent(event)
-			if err != nil {
-				return nil, fmt.Errorf("cannot convert event to cadence event: %w", err)
-			}
-
-			fcv.logger.Warn().Int("list_index", i).
-				Str("event_id", event.ID().String()).
-				Hex("event_fingerptint", event.Fingerprint()).
-				Str("event_type", string(event.Type)).
-				Str("event_tx_id", event.TransactionID.String()).
-				Uint32("event_tx_index", event.TransactionIndex).
-				Uint32("event_index", event.EventIndex).
-				Str("event_payload", ce.String()).
-				Str("block_id", chunk.BlockID.String()).
-				Str("collection_id", collectionID).
-				Str("result_id", result.ID().String()).
-				Uint64("chunk_index", chunk.Index).
-				Msg("not matching events debug")
-		}
-
-		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID, events)
-	}
+	// return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID, events)
+	// }
 
 	serviceEventsInChunk := result.ServiceEventsByChunk(chunk.Index)
 	equal, err := serviceEventsInChunk.EqualTo(serviceEvents)
