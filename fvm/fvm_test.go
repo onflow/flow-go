@@ -598,7 +598,7 @@ func TestHappyPathTransactionSigning(t *testing.T) {
 
 			sig, err := txBody.Sign(txBody.EnvelopeMessage(), privateKey.PrivateKey, hasher)
 			require.NoError(t, err)
-			txBody.AddEnvelopeSignature(accounts[0], 0, sig)
+			txBody.AddEnvelopeSignature(accounts[0], 0, sig, nil)
 
 			_, output, err := vm.Run(
 				ctx,
@@ -2413,7 +2413,7 @@ func TestInteractionLimit(t *testing.T) {
 
 				sig, err := txBody.Sign(txBody.EnvelopeMessage(), privateKey.PrivateKey, hasher)
 				require.NoError(t, err)
-				txBody.AddEnvelopeSignature(address, 0, sig)
+				txBody.AddEnvelopeSignature(address, 0, sig, nil)
 
 				// ==== IMPORTANT LINE ====
 				ctx.MaxStateInteractionSize = tc.interactionLimit

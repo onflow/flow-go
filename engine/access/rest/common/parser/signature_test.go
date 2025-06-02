@@ -41,9 +41,11 @@ func TestTransactionSignature_ValidParse(t *testing.T) {
 	var txSignature TransactionSignature
 	addr := "01cf0e2f2f715450"
 	sig := "c83665f5212fad065cd27d370ef80e5fbdd20cd57411af5c76076a15dced05ac6e6d9afa88cd7337bf9c869f6785ecc1c568ca593a99dfeec14e024c0cd78289"
+	// TODO add better extData mock
+	extData := ""
 	sigHex, _ := hex.DecodeString(sig)
 	encodedSig := util.ToBase64(sigHex)
-	err := txSignature.Parse(addr, "0", encodedSig, "", flow.Localnet.Chain())
+	err := txSignature.Parse(addr, "0", encodedSig, extData, flow.Localnet.Chain())
 
 	assert.NoError(t, err)
 	assert.Equal(t, addr, txSignature.Address.String())
