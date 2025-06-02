@@ -239,25 +239,25 @@ func withNextEpoch(
 	}
 
 	// Construct the new min epoch state entry
-	minEpochStateEntry := flow.NewMinEpochStateEntry(
-		rootProtocolState.EpochEntry.PreviousEpoch,
-		flow.EpochStateContainer{
+	minEpochStateEntry := &flow.MinEpochStateEntry{
+		PreviousEpoch: rootProtocolState.EpochEntry.PreviousEpoch,
+		CurrentEpoch: flow.EpochStateContainer{
 			SetupID:          currEpochSetup.ID(),
 			CommitID:         currEpochCommit.ID(),
 			ActiveIdentities: rootProtocolState.EpochEntry.CurrentEpoch.ActiveIdentities,
 			EpochExtensions:  rootProtocolState.EpochEntry.CurrentEpoch.EpochExtensions,
 		},
-		&flow.EpochStateContainer{
+		NextEpoch: &flow.EpochStateContainer{
 			SetupID:          nextEpochSetup.ID(),
 			CommitID:         nextEpochCommit.ID(),
 			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
 		},
-		false,
-	)
+		EpochFallbackTriggered: false,
+	}
 
 	// Construct the new epoch protocol state entry
 	epochStateEntry, err := flow.NewEpochStateEntry(
-		&minEpochStateEntry,
+		minEpochStateEntry,
 		rootProtocolState.EpochEntry.PreviousEpochSetup,
 		rootProtocolState.EpochEntry.PreviousEpochCommit,
 		currEpochSetup,

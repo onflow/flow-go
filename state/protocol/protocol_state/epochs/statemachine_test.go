@@ -538,16 +538,16 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	indexTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
 	s.epochStateDB.On("Index", s.candidate.ID(), mocks.Anything).Return(indexTxDeferredUpdate.Execute, nil).Once()
 
-	expectedEpochState := flow.NewMinEpochStateEntry(
-		s.parentEpochState.CurrentEpoch.Copy(),
-		*s.parentEpochState.NextEpoch.Copy(),
-		nil,
-		true,
-	)
+	expectedEpochState := &flow.MinEpochStateEntry{
+		PreviousEpoch:          s.parentEpochState.CurrentEpoch.Copy(),
+		CurrentEpoch:           *s.parentEpochState.NextEpoch.Copy(),
+		NextEpoch:              nil,
+		EpochFallbackTriggered: true,
+	}
 
 	storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
 	storeTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
-	s.epochStateDB.On("StoreTx", expectedEpochState.ID(), &expectedEpochState).Return(storeTxDeferredUpdate.Execute, nil).Once()
+	s.epochStateDB.On("StoreTx", expectedEpochState.ID(), expectedEpochState).Return(storeTxDeferredUpdate.Execute, nil).Once()
 	s.mutator.On("SetEpochStateID", expectedEpochState.ID()).Return().Once()
 
 	dbOps, err := stateMachine.Build()
