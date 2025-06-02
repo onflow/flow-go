@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -56,6 +57,12 @@ var eventsCmd = &cobra.Command{
 					return fmt.Errorf("could not get events for block id: %v, transaction id: %v: %w", blockID, transactionID, err)
 				}
 
+				sort.Slice(events, func(i, j int) bool {
+					if events[i].TransactionIndex == events[j].TransactionIndex {
+						return events[i].EventIndex < events[j].EventIndex
+					}
+					return events[i].TransactionIndex < events[j].TransactionIndex
+				})
 				for _, event := range events {
 					common.PrettyPrint(event)
 				}
@@ -75,7 +82,12 @@ var eventsCmd = &cobra.Command{
 					if err != nil {
 						return fmt.Errorf("could not get events for block id: %v, event type: %s, %w", blockID, flagEventType, err)
 					}
-
+					sort.Slice(events, func(i, j int) bool {
+						if events[i].TransactionIndex == events[j].TransactionIndex {
+							return events[i].EventIndex < events[j].EventIndex
+						}
+						return events[i].TransactionIndex < events[j].TransactionIndex
+					})
 					for _, event := range events {
 						common.PrettyPrint(event)
 					}
@@ -92,6 +104,12 @@ var eventsCmd = &cobra.Command{
 				return fmt.Errorf("could not get events for block id: %v: %w", blockID, err)
 			}
 
+			sort.Slice(evts, func(i, j int) bool {
+				if evts[i].TransactionIndex == evts[j].TransactionIndex {
+					return evts[i].EventIndex < evts[j].EventIndex
+				}
+				return evts[i].TransactionIndex < evts[j].TransactionIndex
+			})
 			for _, event := range evts {
 				common.PrettyPrint(event)
 			}
