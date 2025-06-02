@@ -23,10 +23,10 @@ import (
 // TestChunkLocatorToJob evaluates that a chunk locator can be converted to a job,
 // and its corresponding job can be converted back to the same locator.
 func TestChunkLocatorToJob(t *testing.T) {
-	locator := chunks.NewLocator(unittest.IdentifierFixture(), rand.Uint64())
-	actual, err := chunkconsumer.JobToChunkLocator(chunkconsumer.ChunkLocatorToJob(&locator))
+	locator := unittest.ChunkLocatorFixture(unittest.IdentifierFixture(), rand.Uint64())
+	actual, err := chunkconsumer.JobToChunkLocator(chunkconsumer.ChunkLocatorToJob(locator))
 	require.NoError(t, err)
-	require.Equal(t, &locator, actual)
+	require.Equal(t, locator, actual)
 }
 
 // TestProduceConsume evaluates different scenarios on passing jobs to chunk queue with 3 workers on the consumer side. It evaluates blocking and
