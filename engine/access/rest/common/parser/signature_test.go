@@ -43,7 +43,12 @@ func TestTransactionSignature_ValidParse(t *testing.T) {
 	sig := "c83665f5212fad065cd27d370ef80e5fbdd20cd57411af5c76076a15dced05ac6e6d9afa88cd7337bf9c869f6785ecc1c568ca593a99dfeec14e024c0cd78289"
 	sigHex, _ := hex.DecodeString(sig)
 	encodedSig := util.ToBase64(sigHex)
-	err := txSignature.Parse(addr, "0", encodedSig, flow.Localnet.Chain())
+
+	extData := "f899a59caaf435410c08def0ecabfe372f7820ef71fb22bb82a0c8875499682d3a268e014e2e2254b8717b226368616c6c656e6765223a22306a7574344b2d334b696947307437432d776159767259447a6474765849594b323553414637767a5f4e493d222c226f726967696e223a2268747470733a2f2f74657374696e672e636f6d222c2274797065223a22776562617574686e2e676574227d"
+	extHex, _ := hex.DecodeString(extData)
+	encodedExt := util.ToBase64(extHex)
+
+	err := txSignature.Parse(addr, "0", encodedSig, encodedExt, flow.Localnet.Chain())
 
 	assert.NoError(t, err)
 	assert.Equal(t, addr, txSignature.Address.String())
@@ -56,9 +61,18 @@ func TestTransactionSignatures_ValidParse(t *testing.T) {
 	tests := []struct {
 		inAddresses []string
 		inSigs      []string
+		inExtData   []string
 	}{
-		{[]string{"01cf0e2f2f715450"}, []string{"c83665f5212fad065cd27d370ef80e5fbdd20cd57411af5c76076a15dced05ac6e6d9afa88cd7337bf9c869f6785ecc1c568ca593a99dfeec14e024c0cd78289"}},
-		{[]string{"ee82856bf20e2aa6", "e03daebed8ca0615"}, []string{"223665f5212fad065cd27d370ef80e5fbdd20cd57411af5c76076a15dced05ac6e6d9afa88cd7337bf9c869f6785ecc1c568ca593a99dfeec14e024c0cd78289", "5553665f5212fad065cd27d370ef80e5fbdd20cd57411af5c76076a15dced05ac6e6d9afa88cd7337bf9c869f6785ecc1c568ca593a99dfeec14e024c0cd7822"}},
+		{
+			[]string{"01cf0e2f2f715450"},
+			[]string{"c83665f5212fad065cd27d370ef80e5fbdd20cd57411af5c76076a15dced05ac6e6d9afa88cd7337bf9c869f6785ecc1c568ca593a99dfeec14e024c0cd78289"},
+			[]string{"f899a59caaf435410c08def0ecabfe372f7820ef71fb22bb82a0c8875499682d3a268e014e2e2254b8717b226368616c6c656e6765223a22306a7574344b2d334b696947307437432d776159767259447a6474765849594b323553414637767a5f4e493d222c226f726967696e223a2268747470733a2f2f74657374696e672e636f6d222c2274797065223a22776562617574686e2e676574227d"},
+		},
+		{
+			[]string{"ee82856bf20e2aa6", "e03daebed8ca0615"},
+			[]string{"223665f5212fad065cd27d370ef80e5fbdd20cd57411af5c76076a15dced05ac6e6d9afa88cd7337bf9c869f6785ecc1c568ca593a99dfeec14e024c0cd78289", "5553665f5212fad065cd27d370ef80e5fbdd20cd57411af5c76076a15dced05ac6e6d9afa88cd7337bf9c869f6785ecc1c568ca593a99dfeec14e024c0cd7822"},
+			[]string{"", ""},
+		},
 	}
 
 	var txSigantures TransactionSignatures
@@ -68,7 +82,10 @@ func TestTransactionSignatures_ValidParse(t *testing.T) {
 		for i, a := range test.inAddresses {
 			sigHex, _ := hex.DecodeString(test.inSigs[i])
 			encodedSig := util.ToBase64(sigHex)
+			extHex, _ := hex.DecodeString(test.inExtData[i])
+			encodedExt := util.ToBase64(extHex)
 			sigs[i].Signature = encodedSig
+			sigs[i].ExtensionData = encodedExt
 			sigs[i].KeyIndex = "0"
 			sigs[i].Address = a
 		}
@@ -82,6 +99,7 @@ func TestTransactionSignatures_ValidParse(t *testing.T) {
 			assert.Equal(t, 0, txSigantures[i].SignerIndex)
 			assert.Equal(t, uint32(0), txSigantures[i].KeyIndex)
 			assert.Equal(t, test.inSigs[i], fmt.Sprintf("%x", txSigantures[i].Signature))
+			assert.Equal(t, test.inExtData[i], fmt.Sprintf("%x", txSigantures[i].ExtensionData))
 		}
 	}
 }

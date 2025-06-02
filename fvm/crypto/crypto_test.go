@@ -739,6 +739,8 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 					// This is the equivalent of the client side encoding
 					extensionDataRLPBytes := rlp.NewMarshaler().MustMarshal(extensionData)
 
+					t.Fatalf("%x", extensionDataRLPBytes)
+
 					// Construct the message to sign in the same way a client would, as per
 					// https://github.com/onflow/flips/blob/tarak/webauthn/protocol/20250203-webauthn-credential-support.md#fvm-transaction-validation-changes
 					messageToSign := slices.Concat(c.authenticatorData, noPrefixHasher.ComputeHash(clientDataJsonBytes)[:])
@@ -761,19 +763,19 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 
 			cases := []struct {
 				description string
-				scheme      crypto.AuthenticationScheme
+				scheme      flow.AuthenticationScheme
 				require     func(t *testing.T, sigOk bool, err error)
 			}{
 				{
 					description: "invalid scheme (0x02)",
-					scheme:      crypto.InvalidScheme,
+					scheme:      flow.InvalidScheme,
 					require: func(t *testing.T, sigOk bool, err error) {
 						require.NoError(t, err)
 						require.False(t, sigOk)
 					},
 				}, {
 					description: "invalid scheme, parsed using AuthenticationSchemeFromByte (0xFF)",
-					scheme:      crypto.AuthenticationSchemeFromByte(0xFF),
+					scheme:      flow.AuthenticationSchemeFromByte(0xFF),
 					require: func(t *testing.T, sigOk bool, err error) {
 						require.NoError(t, err)
 						require.False(t, sigOk)
@@ -896,7 +898,7 @@ func TestAuthenticationSchemeConversion(t *testing.T) {
 	}
 
 	for authSchemeByte, authSchemeName := range schemeMapping {
-		assert.Equal(t, authSchemeName, crypto.AuthenticationSchemeFromByte(authSchemeByte).String())
+		assert.Equal(t, authSchemeName, flow.AuthenticationSchemeFromByte(authSchemeByte).String())
 	}
 }
 

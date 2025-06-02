@@ -236,7 +236,7 @@ func (tb *TransactionBody) signerMap() map[Address]int {
 	return signers
 }
 
-// SignPayload signs the transaction payload (TransactionDomainTag + payload) with the specified account key using the default transaction domain tag.
+// SignPayload signs the transaction payload (TransactionDomainTag + payload) with the specified account key using the default transaction domain tag, and plain authentication scheme.
 //
 // The resulting signature is combined with the account address and key ID before
 // being added to the transaction.
@@ -254,12 +254,12 @@ func (tb *TransactionBody) SignPayload(
 		return fmt.Errorf("failed to sign transaction payload with given key: %w", err)
 	}
 
-	tb.AddPayloadSignature(address, keyID, sig)
+	tb.AddPayloadSignature(address, keyID, sig, []byte{byte(PlainScheme)})
 
 	return nil
 }
 
-// SignEnvelope signs the full transaction (TransactionDomainTag + payload + payload signatures) with the specified account key using the default transaction domain tag.
+// SignEnvelope signs the full transaction (TransactionDomainTag + payload + payload signatures) with the specified account key using the default transaction domain tag, and plain authentication scheme.
 //
 // The resulting signature is combined with the account address and key ID before
 // being added to the transaction.
@@ -277,7 +277,7 @@ func (tb *TransactionBody) SignEnvelope(
 		return fmt.Errorf("failed to sign transaction envelope with given key: %w", err)
 	}
 
-	tb.AddEnvelopeSignature(address, keyID, sig)
+	tb.AddEnvelopeSignature(address, keyID, sig, []byte{byte(PlainScheme)})
 
 	return nil
 }
@@ -303,8 +303,8 @@ func (tb *TransactionBody) Sign(
 }
 
 // AddPayloadSignature adds a payload signature to the transaction for the given address and key ID.
-func (tb *TransactionBody) AddPayloadSignature(address Address, keyID uint32, sig []byte) *TransactionBody {
-	s := tb.createSignature(address, keyID, sig)
+func (tb *TransactionBody) AddPayloadSignature(address Address, keyID uint32, sig []byte, extensionData []byte) *TransactionBody {
+	s := tb.createSignature(address, keyID, sig, extensionData)
 
 	tb.PayloadSignatures = append(tb.PayloadSignatures, s)
 	slices.SortFunc(tb.PayloadSignatures, compareSignatures)
@@ -313,8 +313,8 @@ func (tb *TransactionBody) AddPayloadSignature(address Address, keyID uint32, si
 }
 
 // AddEnvelopeSignature adds an envelope signature to the transaction for the given address and key ID.
-func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID uint32, sig []byte) *TransactionBody {
-	s := tb.createSignature(address, keyID, sig)
+func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID uint32, sig []byte, extensionData []byte) *TransactionBody {
+	s := tb.createSignature(address, keyID, sig, extensionData)
 
 	tb.EnvelopeSignatures = append(tb.EnvelopeSignatures, s)
 	slices.SortFunc(tb.EnvelopeSignatures, compareSignatures)
@@ -322,17 +322,18 @@ func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID uint32, s
 	return tb
 }
 
-func (tb *TransactionBody) createSignature(address Address, keyID uint32, sig []byte) TransactionSignature {
+func (tb *TransactionBody) createSignature(address Address, keyID uint32, sig []byte, extensionData []byte) TransactionSignature {
 	signerIndex, signerExists := tb.signerMap()[address]
 	if !signerExists {
 		signerIndex = -1
 	}
 
 	return TransactionSignature{
-		Address:     address,
-		SignerIndex: signerIndex,
-		KeyIndex:    keyID,
-		Signature:   sig,
+		Address:       address,
+		SignerIndex:   signerIndex,
+		KeyIndex:      keyID,
+		Signature:     sig,
+		ExtensionData: extensionData,
 	}
 }
 
