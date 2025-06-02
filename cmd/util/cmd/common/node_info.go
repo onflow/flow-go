@@ -64,7 +64,7 @@ func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNod
 			weight,
 			partner.NetworkPubKey.PublicKey,
 			partner.StakingPubKey.PublicKey,
-			partner.StakingPoP,
+			partner.StakingPoP.Signature,
 		)
 		nodes = append(nodes, node)
 	}

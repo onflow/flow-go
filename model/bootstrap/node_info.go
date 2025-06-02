@@ -159,7 +159,7 @@ type NodeInfoPub struct {
 	Weight        uint64
 	NetworkPubKey encodable.NetworkPubKey
 	StakingPubKey encodable.StakingPubKey
-	StakingPoP    []byte
+	StakingPoP    encodable.StakingKeyPoP
 }
 
 // decodableNodeInfoPub provides backward-compatible decoding of old models
@@ -171,7 +171,7 @@ type decodableNodeInfoPub struct {
 	Weight        uint64
 	NetworkPubKey encodable.NetworkPubKey
 	StakingPubKey encodable.StakingPubKey
-	StakingPoP    []byte
+	StakingPoP    encodable.StakingKeyPoP
 	// Stake previously was used in place of the Weight field.
 	// Deprecated: supported in decoding for backward-compatibility
 	Stake uint64
@@ -380,7 +380,7 @@ func (node NodeInfo) Public() (NodeInfoPub, error) {
 		Weight:        node.Weight,
 		NetworkPubKey: encodable.NetworkPubKey{PublicKey: node.NetworkPubKey()},
 		StakingPubKey: encodable.StakingPubKey{PublicKey: node.StakingPubKey()},
-		StakingPoP:    stakingPoP,
+		StakingPoP:    encodable.StakingKeyPoP{Signature: stakingPoP},
 	}, nil
 }
 
