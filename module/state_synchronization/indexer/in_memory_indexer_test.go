@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -308,18 +307,42 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 			assert.ElementsMatch(t, expectedValue, value, "Register values should match")
 		}
 	})
+
+	t.Run("Index Transaction Error Messages", func(t *testing.T) {
+		header := unittest.BlockHeaderFixture()
+		block := unittest.BlockWithParentFixture(header)
+		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
+		indexer := createInMemoryIndexer(exeResult, header)
+
+		txResultErrMsgsData := make([]flow.TransactionResultErrorMessage, 2)
+		for i := 0; i < 2; i++ {
+			txResultErrMsgsData[i] = flow.TransactionResultErrorMessage{
+				TransactionID: unittest.IdentifierFixture(),
+				ErrorMessage:  "expected test error",
+				Index:         uint32(i),
+				ExecutorID:    unittest.IdentifierFixture(),
+			}
+		}
+
+		err := indexer.IndexTxResultErrorMessagesData(txResultErrMsgsData)
+		require.NoError(t, err)
+
+		results, err := indexer.txResultErrMsgs.ByBlockID(block.ID())
+		require.NoError(t, err)
+		assert.ElementsMatch(t, txResultErrMsgsData, results)
+	})
 }
 
 // Helper functions
 
 func createInMemoryIndexer(executionResult *flow.ExecutionResult, header *flow.Header) *InMemoryIndexer {
 	return NewInMemoryIndexer(zerolog.Nop(),
-		metrics.NewNoopCollector(),
 		unsynchronized.NewRegisters(header.Height),
 		unsynchronized.NewEvents(),
 		unsynchronized.NewCollections(),
 		unsynchronized.NewTransactions(),
 		unsynchronized.NewLightTransactionResults(),
+		unsynchronized.NewTransactionResultErrorMessages(),
 		executionResult,
 		header)
 }
