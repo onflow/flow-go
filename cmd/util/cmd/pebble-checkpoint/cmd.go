@@ -13,6 +13,10 @@ var (
 	flagOutput    string
 )
 
+// Note: Although checkpoint is fast to create, it is not free. When creating a checkpoint, the
+// underlying pebble sstables are hard-linked to the checkpoint directory, which means the compaction
+// process will not be able to delete the sstables until the checkpoint is deleted. This can lead to
+// increased disk usage if checkpoints are created frequently without being cleaned up.
 var Cmd = &cobra.Command{
 	Use:   "pebble-checkpoint",
 	Short: "Create a checkpoint from a Pebble database",
