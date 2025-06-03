@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/rs/zerolog"
 
 	pebblestorage "github.com/onflow/flow-go/storage/pebble"
