@@ -112,7 +112,11 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	}
 	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathSecretsEncryptionKey)
 
-	err = common.WriteJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), flagOutdir, nodeInfo.Public())
+	public, err := nodeInfo.Public()
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not access public keys")
+	}
+	err = common.WriteJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), flagOutdir, public)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
