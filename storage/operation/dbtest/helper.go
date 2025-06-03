@@ -5,6 +5,7 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/storage"
@@ -32,6 +33,20 @@ func RunWithDB(t *testing.T, fn func(*testing.T, storage.DB)) {
 		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 			fn(t, pebbleimpl.ToDB(db))
 		})
+	})
+}
+
+// RunFuncsWithNewPebbleDBHandle runs provided functions with
+// new database handles of the same underlying database.
+// Each provided function will receive a new (different) DB handle.
+// This can be used to test database persistence.
+func RunFuncsWithNewDBHandle(t *testing.T, fn ...func(*testing.T, storage.DB)) {
+	t.Run("BadgerStorage", func(t *testing.T) {
+		RunFuncsWithNewBadgerDBHandle(t, fn...)
+	})
+
+	t.Run("PebbleStorage", func(t *testing.T) {
+		RunFuncsWithNewPebbleDBHandle(t, fn...)
 	})
 }
 
@@ -121,4 +136,45 @@ func runWithPebble(fn func(storage.Reader, WithWriter)) func(*pebble.DB) {
 		reader := pebbleimpl.ToReader(db)
 		fn(reader, withWriter)
 	}
+}
+
+// RunFuncsWithNewBadgerDBHandle runs provided functions with
+// new BadgerDB handles of the same underlying database.
+// Each provided function will receive a new (different) DB handle.
+// This can be used to test database persistence.
+func RunFuncsWithNewBadgerDBHandle(t *testing.T, fs ...func(*testing.T, storage.DB)) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		// Run provided functions with new DB handles of the same underlying database.
+		for _, f := range fs {
+			// Open BadgerDB
+			db := unittest.BadgerDB(t, dir)
+
+			// Run provided function
+			f(t, badgerimpl.ToDB(db))
+
+			// Close BadgerDB
+			assert.NoError(t, db.Close())
+		}
+	})
+}
+
+// RunFuncsWithNewPebbleDBHandle runs provided functions with
+// new Pebble handles of the same underlying database.
+// Each provided function will receive a new (different) DB handle.
+// This can be used to test database persistence.
+func RunFuncsWithNewPebbleDBHandle(t *testing.T, fs ...func(*testing.T, storage.DB)) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		// Run provided f with new DB handle to test database persistence.
+		for _, f := range fs {
+			// Open Pebble
+			db, err := pebble.Open(dir, &pebble.Options{})
+			require.NoError(t, err)
+
+			// Call provided function
+			f(t, pebbleimpl.ToDB(db))
+
+			// Close Pebble
+			assert.NoError(t, db.Close())
+		}
+	})
 }
