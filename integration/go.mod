@@ -17,7 +17,7 @@ require (
 	github.com/ipfs/boxo v0.27.2
 	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-datastore v0.8.2
-	github.com/ipfs/go-ds-badger2 v0.1.3
+	github.com/ipfs/go-ds-badger2 v0.1.4
 	github.com/ipfs/go-ds-pebble v0.5.0
 	github.com/libp2p/go-libp2p v0.38.2
 	github.com/onflow/cadence v1.6.3
