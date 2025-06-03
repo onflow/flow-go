@@ -3,9 +3,10 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/storage/pebble"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+
+	"github.com/onflow/flow-go/storage/pebble"
 )
 
 var (
