@@ -12,6 +12,20 @@ type DynamicIdentityEntry struct {
 	Ejected bool
 }
 
+// EqualTo returns true if the two DynamicIdentityEntry are equivalent.
+func (d *DynamicIdentityEntry) EqualTo(other *DynamicIdentityEntry) bool {
+	// Shortcut if `t` and `other` point to the same object; covers case where both are nil.
+	if d == other {
+		return true
+	}
+	if d == nil || other == nil { // only one is nil, the other not (otherwise we would have returned above)
+		return false
+	}
+
+	return d.NodeID == other.NodeID &&
+		d.Ejected == other.Ejected
+}
+
 type DynamicIdentityEntryList []*DynamicIdentityEntry
 
 // MinEpochStateEntry is the most compact snapshot of the epoch state and identity table (set of all notes authorized to
@@ -52,6 +66,9 @@ type UntrustedMinEpochStateEntry MinEpochStateEntry
 //
 // All errors indicate a valid MinEpochStateEntry cannot be constructed from the input.
 func NewMinEpochStateEntry(untrusted UntrustedMinEpochStateEntry) (*MinEpochStateEntry, error) {
+	if untrusted.CurrentEpoch.EqualTo(new(EpochStateContainer)) {
+		return nil, fmt.Errorf("current epoch must not be empty")
+	}
 	return &MinEpochStateEntry{
 		PreviousEpoch:          untrusted.PreviousEpoch,
 		CurrentEpoch:           untrusted.CurrentEpoch,
@@ -97,6 +114,20 @@ type EpochExtension struct {
 	FinalView uint64
 }
 
+// EqualTo returns true if the two EpochExtension are equivalent.
+func (e *EpochExtension) EqualTo(other *EpochExtension) bool {
+	// Shortcut if `t` and `other` point to the same object; covers case where both are nil.
+	if e == other {
+		return true
+	}
+	if e == nil || other == nil { // only one is nil, the other not (otherwise we would have returned above)
+		return false
+	}
+
+	return e.FirstView == other.FirstView &&
+		e.FinalView == other.FinalView
+}
+
 // ID returns an identifier for this EpochStateContainer by hashing internal fields.
 // Per convention, the ID of a `nil` EpochStateContainer is `flow.ZeroID`.
 func (c *EpochStateContainer) ID() Identifier {
@@ -133,6 +164,43 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 		ActiveIdentities: c.ActiveIdentities.Copy(),
 		EpochExtensions:  ext,
 	}
+}
+
+// EqualTo returns true if the two EpochStateContainer are equivalent.
+func (c *EpochStateContainer) EqualTo(other *EpochStateContainer) bool {
+	// Shortcut if `t` and `other` point to the same object; covers case where both are nil.
+	if c == other {
+		return true
+	}
+	if c == nil || other == nil { // only one is nil, the other not (otherwise we would have returned above)
+		return false
+	}
+	// both are not nil, so we can compare the fields
+	if c.SetupID != other.SetupID {
+		return false
+	}
+	if c.CommitID != other.CommitID {
+		return false
+	}
+	if len(c.ActiveIdentities) != len(other.ActiveIdentities) {
+		return false
+	}
+	if !slices.EqualFunc(c.ActiveIdentities, other.ActiveIdentities, func(e1 *DynamicIdentityEntry, e2 *DynamicIdentityEntry) bool {
+		return e1.EqualTo(e2)
+	}) {
+		return false
+	}
+
+	if len(c.EpochExtensions) != len(other.EpochExtensions) {
+		return false
+	}
+	if !slices.EqualFunc(c.EpochExtensions, other.EpochExtensions, func(e1 EpochExtension, e2 EpochExtension) bool {
+		return e1.EqualTo(&e2)
+	}) {
+		return false
+	}
+
+	return true
 }
 
 // EpochStateEntry is a MinEpochStateEntry that has additional fields that are cached from the
@@ -272,6 +340,9 @@ type RichEpochStateEntry struct {
 //
 // All errors indicate a valid RichEpochStateEntry cannot be constructed from the input.
 func NewRichEpochStateEntry(epochState *EpochStateEntry) (*RichEpochStateEntry, error) {
+	if epochState == nil {
+		return nil, fmt.Errorf("epoch state must not be nil")
+	}
 	var currentEpochIdentityTable IdentityList
 	nextEpochIdentityTable := IdentityList{}
 	// If we are in staking phase (i.e. epochState.NextEpoch == nil):
