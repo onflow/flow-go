@@ -267,7 +267,7 @@ func TestPersister_AddToBatch_ErrorHandling(t *testing.T) {
 		pt := newPersisterTest(t).initPersister()
 		pt.populateInMemoryStorages()
 
-		// Set up everything before txResultErrMsg to succeed, but txResultErrMsg to fail
+		// Set up everything before txResultErrMsgs to succeed, but txResultErrMsgs to fail
 		pt.events.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
 		pt.results.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
 		pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)

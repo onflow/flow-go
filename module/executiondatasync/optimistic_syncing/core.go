@@ -41,21 +41,23 @@ var _ Core = (*CoreImpl)(nil)
 type CoreImpl struct {
 	log zerolog.Logger
 
-	execDataRequester *requester.OneshotExecutionDataRequester
-	txErrRequester    *tx_error_messages.TransactionErrorMessagesRequester
-	indexer           *indexer.InMemoryIndexer
-	persister         *indexer.Persister
+	execDataRequester        *requester.OneshotExecutionDataRequester
+	txResultErrMsgsRequester *tx_error_messages.TransactionErrorMessagesRequester
+	indexer                  *indexer.InMemoryIndexer
+	persister                *indexer.Persister
 
 	executionResult *flow.ExecutionResult
 	header          *flow.Header
 
-	registers    *unsynchronized.Registers
-	events       *unsynchronized.Events
-	collections  *unsynchronized.Collections
-	transactions *unsynchronized.Transactions
-	results      *unsynchronized.LightTransactionResults
+	registers       *unsynchronized.Registers
+	events          *unsynchronized.Events
+	collections     *unsynchronized.Collections
+	transactions    *unsynchronized.Transactions
+	results         *unsynchronized.LightTransactionResults
+	txResultErrMsgs *unsynchronized.TransactionResultErrorMessages
 
-	executionData *execution_data.BlockExecutionDataEntity
+	executionData       *execution_data.BlockExecutionDataEntity
+	txResultErrMsgsData []flow.TransactionResultErrorMessage
 
 	protocolDB storage.DB
 }
@@ -70,7 +72,6 @@ func NewCoreImpl(
 	txErrMsgRequesterConfig tx_error_messages.TransactionErrorMessagesRequesterConfig,
 	execDataRequesterConfig requester.OneshotExecutionDataConfig,
 	execDataRequesterMetrics module.ExecutionDataRequesterMetrics,
-	indexerMetrics module.ExecutionStateIndexerMetrics,
 	persistentRegisters storage.RegisterIndex,
 	persistentEvents storage.Events,
 	persistentCollections storage.Collections,
@@ -90,7 +91,37 @@ func NewCoreImpl(
 	collections := unsynchronized.NewCollections()
 	transactions := unsynchronized.NewTransactions()
 	results := unsynchronized.NewLightTransactionResults()
-	txResultErrMsg := unsynchronized.NewTransactionResultErrorMessages()
+	txResultErrMsgs := unsynchronized.NewTransactionResultErrorMessages()
+
+	indexerComponent := indexer.NewInMemoryIndexer(
+		coreLogger,
+		registers,
+		events,
+		collections,
+		transactions,
+		results,
+		txResultErrMsgs,
+		executionResult,
+		header,
+	)
+
+	persisterComponent := indexer.NewPersister(
+		coreLogger,
+		registers,
+		events,
+		collections,
+		transactions,
+		results,
+		txResultErrMsgs,
+		persistentRegisters,
+		persistentEvents,
+		persistentCollections,
+		persistentTransactions,
+		persistentResults,
+		persistentTxResultErrMsg,
+		executionResult,
+		header,
+	)
 
 	requesterComponent, err := requester.NewOneshotExecutionDataRequester(
 		coreLogger,
@@ -104,52 +135,21 @@ func NewCoreImpl(
 		return nil, err
 	}
 
-	txErrRequester := tx_error_messages.NewTransactionErrorMessagesRequester(txErrCore, &txErrMsgRequesterConfig, executionResult)
-
-	indexerComponent := indexer.NewInMemoryIndexer(
-		coreLogger,
-		indexerMetrics,
-		registers,
-		events,
-		collections,
-		transactions,
-		results,
-		executionResult,
-		header,
-	)
-
-	persisterComponent := indexer.NewPersister(
-		coreLogger,
-		registers,
-		events,
-		collections,
-		transactions,
-		results,
-		txResultErrMsg,
-		persistentRegisters,
-		persistentEvents,
-		persistentCollections,
-		persistentTransactions,
-		persistentResults,
-		persistentTxResultErrMsg,
-		executionResult,
-		header,
-	)
-
 	return &CoreImpl{
-		log:               coreLogger,
-		execDataRequester: requesterComponent,
-		txErrRequester:    txErrRequester,
-		indexer:           indexerComponent,
-		persister:         persisterComponent,
-		executionResult:   executionResult,
-		header:            header,
-		registers:         registers,
-		events:            events,
-		collections:       collections,
-		transactions:      transactions,
-		results:           results,
-		protocolDB:        protocolDB,
+		log:                      coreLogger,
+		execDataRequester:        requesterComponent,
+		txResultErrMsgsRequester: tx_error_messages.NewTransactionErrorMessagesRequester(txErrCore, &txErrMsgRequesterConfig, executionResult),
+		indexer:                  indexerComponent,
+		persister:                persisterComponent,
+		executionResult:          executionResult,
+		header:                   header,
+		registers:                registers,
+		events:                   events,
+		collections:              collections,
+		transactions:             transactions,
+		results:                  results,
+		txResultErrMsgs:          txResultErrMsgs,
+		protocolDB:               protocolDB,
 	}, nil
 }
 
@@ -171,10 +171,14 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 
 	c.executionData = execution_data.NewBlockExecutionDataEntity(c.executionResult.ExecutionDataID, executionData)
 
-	err = c.txErrRequester.RequestTransactionErrorMessages(ctx)
+	//TODO: this should return []flow.TransactionResultErrorMessage and initialize txResultErrMsgsData
+	err = c.txResultErrMsgsRequester.RequestTransactionErrorMessages(ctx)
 	if err != nil {
 		return err
 	}
+
+	//TODO: initialize txResultErrMsgsData with returned data from requester
+	c.txResultErrMsgsData = make([]flow.TransactionResultErrorMessage, 0)
 
 	return nil
 }
@@ -189,10 +193,17 @@ func (c *CoreImpl) Index(ctx context.Context) error {
 		Uint64("height", c.header.Height).
 		Msg("indexing execution data")
 
-	return c.indexer.IndexBlockData(c.executionData)
+	if err := c.indexer.IndexBlockData(c.executionData); err != nil {
+		return err
+	}
+
+	if err := c.indexer.IndexTxResultErrorMessagesData(c.txResultErrMsgsData); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-// TODO: Populate the exec cache with exec data during peersist.
 // Persist implements the Core.Persist method.
 // It persists the indexed data to permanent storage atomically.
 func (c *CoreImpl) Persist(ctx context.Context) error {
@@ -227,13 +238,13 @@ func (c *CoreImpl) Persist(ctx context.Context) error {
 	return nil
 }
 
-// Abandon cleans up resources used by the core.
-// It's called when the pipeline is canceled to free memory and resources.
+// Abandon indicates that the protocol has abandoned this state. Hence processing will be aborted
+// and any data dropped.
 func (c *CoreImpl) Abandon(ctx context.Context) error {
 	c.log.Debug().
 		Hex("block_id", logging.ID(c.executionResult.BlockID)).
 		Uint64("height", c.header.Height).
-		Msg("aborting execution data processing")
+		Msg("Abandon execution data processing")
 
 	// Clear in-memory storage by setting references to nil for garbage collection
 	// Since we don't have Clear() methods, we remove the references to allow GC
@@ -242,8 +253,10 @@ func (c *CoreImpl) Abandon(ctx context.Context) error {
 	c.collections = nil
 	c.transactions = nil
 	c.results = nil
+	c.txResultErrMsgs = nil
 
 	// Clear other references
+	c.txResultErrMsgsRequester = nil
 	c.execDataRequester = nil
 	c.indexer = nil
 	c.persister = nil

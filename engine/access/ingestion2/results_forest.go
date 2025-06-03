@@ -155,7 +155,6 @@ func (f *ResultsForest) pipelineManagerLoop(ctx irrecoverable.SignalerContext, r
 							nil,
 							nil,
 							nil,
-							nil,
 						)
 						if err != nil {
 							ctx.Throw(fmt.Errorf("core creation failed (result: %s): %w", container.resultID, err))
