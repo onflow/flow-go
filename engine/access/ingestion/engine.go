@@ -72,9 +72,9 @@ type Engine struct {
 	// txResultErrorMessagesChan is used to fetch and store transaction result error messages for blocks
 	txResultErrorMessagesChan chan flow.Identifier
 
-	log     zerolog.Logger   // used to log relevant actions with context
-	state   protocol.State   // used to access the  protocol state
-	me      module.Local     // used to access local node information
+	log   zerolog.Logger // used to log relevant actions with context
+	state protocol.State // used to access the  protocol state
+	me    module.Local   // used to access local node information
 
 	// storage
 	// FIX: remove direct DB access by substituting indexer module
@@ -83,7 +83,7 @@ type Engine struct {
 	maxReceiptHeight  uint64
 	executionResults  storage.ExecutionResults
 
-	collectionSyncer         *CollectionSyncer
+	collectionSyncer *CollectionSyncer
 	// TODO: There's still a need for this metric to be in the ingestion engine rather than collection syncer.
 	// Maybe it is a good idea to split it up?
 	collectionExecutedMetric module.CollectionExecutedMetric
