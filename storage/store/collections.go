@@ -205,3 +205,43 @@ func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCol
 
 	return &collection, nil
 }
+
+// BatchStoreLightAndIndexByTransaction stores multiple light collections and indexes them by transaction ID
+// within a single batch operation.
+// No errors are expected during normal operation.
+func (c *Collections) BatchStoreLightAndIndexByTransaction(collections []flow.LightCollection, batch storage.ReaderBatchWriter) error {
+	c.indexingByTx.Lock()
+	defer c.indexingByTx.Unlock()
+
+	writer := batch.Writer()
+
+	for _, collection := range collections {
+		collectionID := collection.ID()
+
+		if err := operation.UpsertCollection(writer, &collection); err != nil {
+			return fmt.Errorf("cannot batch insert collection: %w", err)
+		}
+
+		for _, txID := range collection.Transactions {
+			var differentColTxIsIn flow.Identifier
+
+			if err := operation.LookupCollectionByTransaction(batch.GlobalReader(), txID, &differentColTxIsIn); err == nil {
+				// Collection nodes have ensured that a transaction can only belong to one collection
+				// so if transaction is already indexed by a collection, check if it's the same collection.
+				// TODO: For now we log a warning, but eventually we need to handle Byzantine clusters
+				if collectionID != differentColTxIsIn {
+					log.Error().Msgf("sanity check failed: transaction %v in collection %v is already indexed by a different collection %v",
+						txID, collectionID, differentColTxIsIn)
+				}
+				continue
+			}
+
+			// The indexingByTx lock has ensured we are the only process indexing collection by transaction
+			if err := operation.UnsafeIndexCollectionByTransaction(writer, txID, collectionID); err != nil {
+				return fmt.Errorf("could not batch insert transaction ID: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
