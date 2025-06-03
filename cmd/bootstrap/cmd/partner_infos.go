@@ -28,6 +28,7 @@ const (
 	networkingAddressField = "networkingAddress"
 	networkingKeyField     = "networkingKey"
 	stakingKeyField        = "stakingKey"
+	// PoP field isn't included because it is not stored on-chain
 )
 
 const (
@@ -172,6 +173,8 @@ func parseNodeInfo(info cadence.Value) (*bootstrap.NodeInfoPub, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode staking public key: %w", err)
 	}
+
+	// PoP field isn't decoded because it is not stored on-chain
 
 	return &bootstrap.NodeInfoPub{
 		Role:          flow.Role(fields[roleField].(cadence.UInt8)),
