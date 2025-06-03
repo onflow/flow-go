@@ -29,6 +29,25 @@ var (
 	defaultMissingCollsForAgeThreshold     uint64 = missingCollsForAgeThreshold
 )
 
+// The CollectionSyncer type provides mechanisms for syncing and indexing data
+// from the Flow blockchain into local storage. Specifically, it handles
+// the retrieval and processing of collections and transactions that may
+// have been missed due to network delays, restarts, or gaps in finalization.
+//
+// It is responsible for ensuring the local node has
+// all collections associated with finalized blocks starting from the
+// last fully synced height. It works by periodically scanning the finalized
+// block range, identifying missing collections, and triggering requests
+// to fetch them from the network. Once collections are retrieved, it
+// ensures they are persisted in the local collection and transaction stores.
+//
+// The syncer maintains a persistent, strictly monotonic counter
+// (`lastFullBlockHeight`) to track the highest finalized block for which
+// all collections have been fully indexed. It uses this information to
+// avoid redundant processing and to measure catch-up progress.
+//
+// It is meant to operate in a background goroutine as part of the
+// node's ingestion pipeline.
 type CollectionSyncer struct {
 	logger                   zerolog.Logger
 	collectionExecutedMetric module.CollectionExecutedMetric
@@ -45,6 +64,8 @@ type CollectionSyncer struct {
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 }
 
+// NewCollectionSyncer creates a new CollectionSyncer responsible for downloading,
+// tracking, and indexing missing collections.
 func NewCollectionSyncer(
 	logger zerolog.Logger,
 	collectionExecutedMetric module.CollectionExecutedMetric,
@@ -69,6 +90,8 @@ func NewCollectionSyncer(
 	}
 }
 
+// RequestCollections continuously monitors and triggers collection sync operations.
+// It handles on startup collection catchup, periodic missing collection requests, and full block height updates.
 func (s *CollectionSyncer) RequestCollections(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	requestCtx, cancel := context.WithTimeout(ctx, defaultCollectionCatchupTimeout)
 	defer cancel()
@@ -107,7 +130,8 @@ func (s *CollectionSyncer) RequestCollections(ctx irrecoverable.SignalerContext,
 	}
 }
 
-// requestMissingCollections triggers missing collections downloading process.
+// requestMissingCollections checks if missing collections should be requested based on configured
+// block or age thresholds and triggers requests if needed.
 func (s *CollectionSyncer) requestMissingCollections() error {
 	lastFullBlockHeight := s.lastFullBlockHeight.Value()
 	lastFinalizedBlock, err := s.state.Final().Head()
@@ -139,7 +163,8 @@ func (s *CollectionSyncer) requestMissingCollections() error {
 	return nil
 }
 
-// downloadMissingCollections triggers missing collections downloading process and blocks until it is finished.
+// downloadMissingCollections requests and waits for all missing collections to be downloaded,
+// blocking until either completion or context timeout.
 func (s *CollectionSyncer) downloadMissingCollections(ctx context.Context) error {
 	collections, _, err := s.findMissingCollections(s.lastFullBlockHeight.Value())
 	if err != nil {
@@ -189,6 +214,8 @@ func (s *CollectionSyncer) downloadMissingCollections(ctx context.Context) error
 	return nil
 }
 
+// findMissingCollections scans block heights from last known full block up to the latest finalized
+// block and returns all missing collection along with the count of incomplete blocks.
 func (s *CollectionSyncer) findMissingCollections(lastFullBlockHeight uint64) ([]*flow.CollectionGuarantee, int, error) {
 	// first block to look up collections at
 	firstBlockHeight := lastFullBlockHeight + 1
@@ -220,7 +247,7 @@ func (s *CollectionSyncer) findMissingCollections(lastFullBlockHeight uint64) ([
 	return missingCollections, incompleteBlocksCount, nil
 }
 
-// findMissingCollectionsAtHeight looks for the collections at the given block height in the collection storage
+// findMissingCollectionsAtHeight returns all missing collections for a specific block height.
 func (s *CollectionSyncer) findMissingCollectionsAtHeight(height uint64) ([]*flow.CollectionGuarantee, error) {
 	block, err := s.blocks.ByHeight(height)
 	if err != nil {
@@ -242,7 +269,7 @@ func (s *CollectionSyncer) findMissingCollectionsAtHeight(height uint64) ([]*flo
 	return missingCollections, nil
 }
 
-// isCollectionInStorage looks up the collection from the collection DB
+// isCollectionInStorage checks whether the given collection is present in local storage.
 func (s *CollectionSyncer) isCollectionInStorage(collectionID flow.Identifier) (bool, error) {
 	_, err := s.collections.LightByID(collectionID)
 	if err == nil {
@@ -256,6 +283,8 @@ func (s *CollectionSyncer) isCollectionInStorage(collectionID flow.Identifier) (
 	return false, fmt.Errorf("failed to retrieve collection %s: %w", collectionID.String(), err)
 }
 
+// RequestCollectionsForBlock conditionally requests missing collections for a specific block height,
+// skipping requests if the block is already below the known full block height.
 func (s *CollectionSyncer) RequestCollectionsForBlock(height uint64, missingCollections []*flow.CollectionGuarantee) {
 	// skip requesting collections, if this block is below the last full block height.
 	// this means that either we have already received these collections, or the block
@@ -270,7 +299,8 @@ func (s *CollectionSyncer) RequestCollectionsForBlock(height uint64, missingColl
 	s.requestCollections(missingCollections, false)
 }
 
-// requestCollections registers download request in the requester engine to fetch collections from the network
+// requestCollections registers collection download requests in the requester engine,
+// optionally forcing immediate dispatch.
 func (s *CollectionSyncer) requestCollections(missingCollections []*flow.CollectionGuarantee, immediately bool) {
 	for _, collection := range missingCollections {
 		guarantors, err := protocol.FindGuarantors(s.state, collection)
@@ -286,8 +316,7 @@ func (s *CollectionSyncer) requestCollections(missingCollections []*flow.Collect
 	}
 }
 
-// updateLastFullBlockHeight finds and updates the next highest height where
-// all previous collections have been indexed
+// updateLastFullBlockHeight updates the next highest block height where all previous collections have been indexed
 func (s *CollectionSyncer) updateLastFullBlockHeight() error {
 	lastFullBlockHeight := s.lastFullBlockHeight.Value()
 	lastFinalizedBlock, err := s.state.Final().Head()
@@ -318,7 +347,12 @@ func (s *CollectionSyncer) updateLastFullBlockHeight() error {
 	return nil
 }
 
-func (s *CollectionSyncer) findLowestBlockHeightWithMissingCollections(lastKnownFullBlockHeight uint64, finalizedBlockHeight uint64) (uint64, error) {
+// findLowestBlockHeightWithMissingCollections finds the next block height with missing collections,
+// returning the latest contiguous height where all collections are present.
+func (s *CollectionSyncer) findLowestBlockHeightWithMissingCollections(
+	lastKnownFullBlockHeight uint64,
+	finalizedBlockHeight uint64,
+) (uint64, error) {
 	newLastFullBlockHeight := lastKnownFullBlockHeight
 
 	for currBlockHeight := lastKnownFullBlockHeight + 1; currBlockHeight <= finalizedBlockHeight; currBlockHeight++ {
@@ -338,9 +372,8 @@ func (s *CollectionSyncer) findLowestBlockHeightWithMissingCollections(lastKnown
 	return newLastFullBlockHeight, nil
 }
 
-// OnCollectionDownloaded indexes and persist collection after it has been downloaded. This function should be
-// registered in a place where we know that a collection has been fetched successfully. At the moment, such place is a
-// requester engine. The function's signature is dictated by the callback type the requester engine expects.
+// OnCollectionDownloaded indexes and persists a downloaded collection.
+// This is a callback intended to be used with the requester engine.
 func (s *CollectionSyncer) OnCollectionDownloaded(_ flow.Identifier, entity flow.Entity) {
 	collection, ok := entity.(*flow.Collection)
 	if !ok {
@@ -348,17 +381,6 @@ func (s *CollectionSyncer) OnCollectionDownloaded(_ flow.Identifier, entity flow
 		return
 	}
 
-	// TODO: we could wrap the collection storage with a thin abstraction that puts a collection ID to a channel when it
-	// has been downloaded. Then we could listen to this channel instead of polling storage periodically as we do atm.
-	//
-	// However, as I understand, we're not interested in the collection retrieval itself, we're interested of the fact
-	// that it has been saved in the storage, so we can serve it to the end users. Correct? (ask Peter)
-	//
-	// But I'm curious whether we can rely on the fact that indexer returns an error if sth goes wrong.
-	// If indexer didn't return error on indexing, does it mean the item has been successfully saved into the storage?
-	// I guess no because it doesn't align with the fact that we use batch writes...
-	// Can indexer signal when the batch write finished successfully though?
-	// I guess I need more knowledge of how indexer works.. (ask Peter)
 	err := indexer.IndexCollection(collection, s.collections, s.transactions, s.logger, s.collectionExecutedMetric)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("could not index collection after it has been downloaded")
