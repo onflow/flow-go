@@ -150,12 +150,12 @@ func (i *InMemoryIndexer) indexRegisters(registers map[ledger.Path]*ledger.Paylo
 	for _, register := range registers {
 		k, err := register.Key()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get ledger key: %w", err)
 		}
 
 		id, err := convert.LedgerKeyToRegisterID(k)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to convert ledger key to register id: %w", err)
 		}
 
 		regEntries = append(regEntries, flow.RegisterEntry{
@@ -171,13 +171,13 @@ func (i *InMemoryIndexer) indexRegisters(registers map[ledger.Path]*ledger.Paylo
 func (i *InMemoryIndexer) indexCollection(collection *flow.Collection) error {
 	// Store the full collection
 	if err := i.collections.Store(collection); err != nil {
-		return err
+		return fmt.Errorf("failed to store collection: %w", err)
 	}
 
 	// Store the light collection
 	light := collection.Light()
 	if err := i.collections.StoreLightAndIndexByTransaction(&light); err != nil {
-		return err
+		return fmt.Errorf("failed to store light collection and transaction index: %w", err)
 	}
 
 	// Store each of the transaction bodies
