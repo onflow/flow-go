@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
 	"github.com/onflow/flow-go/utils/logging"
@@ -20,12 +19,12 @@ import (
 // to be populated once before being read.
 type InMemoryIndexer struct {
 	log             zerolog.Logger
-	metrics         module.ExecutionStateIndexerMetrics
 	registers       *unsynchronized.Registers
 	events          *unsynchronized.Events
 	collections     *unsynchronized.Collections
 	transactions    *unsynchronized.Transactions
 	results         *unsynchronized.LightTransactionResults
+	txResultErrMsgs *unsynchronized.TransactionResultErrorMessages
 	executionResult *flow.ExecutionResult
 	header          *flow.Header
 }
@@ -36,34 +35,40 @@ type InMemoryIndexer struct {
 // by the persister to save data permanently when a block is sealed.
 func NewInMemoryIndexer(
 	log zerolog.Logger,
-	metrics module.ExecutionStateIndexerMetrics,
 	registers *unsynchronized.Registers,
 	events *unsynchronized.Events,
 	collections *unsynchronized.Collections,
 	transactions *unsynchronized.Transactions,
 	results *unsynchronized.LightTransactionResults,
+	txResultErrMsgs *unsynchronized.TransactionResultErrorMessages,
 	executionResult *flow.ExecutionResult,
 	header *flow.Header,
 ) *InMemoryIndexer {
 	indexer := &InMemoryIndexer{
 		log:             log.With().Str("component", "in_memory_indexer").Logger(),
-		metrics:         metrics,
 		registers:       registers,
 		events:          events,
 		collections:     collections,
 		transactions:    transactions,
 		results:         results,
+		txResultErrMsgs: txResultErrMsgs,
 		executionResult: executionResult,
 		header:          header,
 	}
-
-	indexer.metrics.InitializeLatestHeight(header.Height)
 
 	indexer.log.Info().
 		Uint64("latest_height", header.Height).
 		Msg("indexer initialized")
 
 	return indexer
+}
+
+// IndexTxResultErrorMessagesData index transaction result error messages
+func (i *InMemoryIndexer) IndexTxResultErrorMessagesData(txResultErrMsgs []flow.TransactionResultErrorMessage) error {
+	if err := i.txResultErrMsgs.Store(i.executionResult.BlockID, txResultErrMsgs); err != nil {
+		return fmt.Errorf("could not index transaction result error messages: %w", err)
+	}
+	return nil
 }
 
 // IndexBlockData indexes all execution block data.
@@ -127,14 +132,6 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 
 	duration := time.Since(start)
 
-	i.metrics.BlockIndexed(
-		i.header.Height,
-		duration,
-		len(events),
-		len(registers),
-		len(results),
-	)
-
 	log.Debug().
 		Dur("duration_ms", duration).
 		Int("event_count", len(events)).
@@ -153,12 +150,12 @@ func (i *InMemoryIndexer) indexRegisters(registers map[ledger.Path]*ledger.Paylo
 	for _, register := range registers {
 		k, err := register.Key()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get ledger key: %w", err)
 		}
 
 		id, err := convert.LedgerKeyToRegisterID(k)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to convert ledger key to register id: %w", err)
 		}
 
 		regEntries = append(regEntries, flow.RegisterEntry{
@@ -174,13 +171,13 @@ func (i *InMemoryIndexer) indexRegisters(registers map[ledger.Path]*ledger.Paylo
 func (i *InMemoryIndexer) indexCollection(collection *flow.Collection) error {
 	// Store the full collection
 	if err := i.collections.Store(collection); err != nil {
-		return err
+		return fmt.Errorf("failed to store collection: %w", err)
 	}
 
 	// Store the light collection
 	light := collection.Light()
 	if err := i.collections.StoreLightAndIndexByTransaction(&light); err != nil {
-		return err
+		return fmt.Errorf("failed to store light collection and transaction index: %w", err)
 	}
 
 	// Store each of the transaction bodies
