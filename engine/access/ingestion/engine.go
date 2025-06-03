@@ -385,9 +385,7 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 		}
 	}
 
-	//TODO: what should I do with the comment that was here? It looked pretty useful.
-	e.collectionSyncer.RequestCollectionsForBlock(block.Header.Height, block.Payload.Guarantees, false)
-
+	e.collectionSyncer.RequestCollectionsForBlock(block.Header.Height, block.Payload.Guarantees)
 	e.collectionExecutedMetric.BlockFinalized(block)
 
 	return nil

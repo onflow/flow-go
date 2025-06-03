@@ -83,6 +83,7 @@ func (s *CollectionSyncer) RequestCollections(ctx irrecoverable.SignalerContext,
 	requestCollectionsInterval := time.NewTicker(defaultMissingCollsRequestInterval)
 	defer requestCollectionsInterval.Stop()
 
+	//TODO: leave comment why this needed
 	updateLastFullBlockHeightInternal := time.NewTicker(defaultFullBlockRefreshInterval)
 	defer updateLastFullBlockHeightInternal.Stop()
 
@@ -94,14 +95,13 @@ func (s *CollectionSyncer) RequestCollections(ctx irrecoverable.SignalerContext,
 		case <-requestCollectionsInterval.C:
 			err := s.requestMissingCollections()
 			if err != nil {
-				s.logger.Error().Err(err).Msg("error requesting missing collections")
-				return
+				ctx.Throw(err)
 			}
 
 		case <-updateLastFullBlockHeightInternal.C:
 			err := s.updateLastFullBlockHeight()
 			if err != nil {
-				s.logger.Error().Err(err).Msg("error updating last full block height")
+				ctx.Throw(err)
 			}
 		}
 	}
@@ -125,6 +125,14 @@ func (s *CollectionSyncer) requestMissingCollections() error {
 	shouldRequest := blocksThresholdReached || ageThresholdReached
 
 	if shouldRequest {
+		// warn log since generally this should not happen
+		s.logger.Warn().
+			Uint64("finalized_height", lastFinalizedBlock.Height).
+			Uint64("last_full_blk_height", lastFullBlockHeight).
+			Int("missing_collection_blk_count", incompleteBlocksCount).
+			Int("missing_collection_count", len(collections)).
+			Msg("re-requesting missing collections")
+
 		s.requestCollections(collections, false)
 	}
 
@@ -138,7 +146,7 @@ func (s *CollectionSyncer) downloadMissingCollections(ctx context.Context) error
 		return err
 	}
 	if len(collections) == 0 {
-		s.logger.Info().Msg("no missing collections found")
+		s.logger.Info().Msg("skipping downloading missing collections. no missing collections found")
 		return nil
 	}
 
@@ -149,10 +157,11 @@ func (s *CollectionSyncer) downloadMissingCollections(ctx context.Context) error
 		collectionsToBeDownloaded[collection.CollectionID] = struct{}{}
 	}
 
-	// wait for all collections to be downloaded
 	collectionStoragePollInterval := time.NewTicker(defaultCollectionCatchupDBPollInterval)
 	defer collectionStoragePollInterval.Stop()
 
+	// we want to wait for all collections to be downloaded so we poll local storage periodically to make sure each
+	// collection was successfully saved in the storage.
 	for len(collectionsToBeDownloaded) > 0 {
 		select {
 		case <-ctx.Done():
@@ -247,12 +256,18 @@ func (s *CollectionSyncer) isCollectionInStorage(collectionID flow.Identifier) (
 	return false, fmt.Errorf("failed to retrieve collection %s: %w", collectionID.String(), err)
 }
 
-func (s *CollectionSyncer) RequestCollectionsForBlock(height uint64, missingCollections []*flow.CollectionGuarantee, immediately bool) {
+func (s *CollectionSyncer) RequestCollectionsForBlock(height uint64, missingCollections []*flow.CollectionGuarantee) {
+	// skip requesting collections, if this block is below the last full block height.
+	// this means that either we have already received these collections, or the block
+	// may contain unverifiable guarantees (in case this node has just joined the network)
 	if height <= s.lastFullBlockHeight.Value() {
+		s.logger.
+			Info().
+			Msg("skipping requesting collections for finalized block as its collections have been already retrieved")
 		return
 	}
 
-	s.requestCollections(missingCollections, immediately)
+	s.requestCollections(missingCollections, false)
 }
 
 // requestCollections registers download request in the requester engine to fetch collections from the network
@@ -283,7 +298,7 @@ func (s *CollectionSyncer) updateLastFullBlockHeight() error {
 	// track the latest contiguous full height
 	newLastFullBlockHeight, err := s.findLowestBlockHeightWithMissingCollections(lastFullBlockHeight, lastFinalizedBlock.Height)
 	if err != nil {
-		return fmt.Errorf("failed to find last full block received height: %w", err)
+		return fmt.Errorf("failed to find last full block height: %w", err)
 	}
 
 	// if more contiguous blocks are now complete, update db
