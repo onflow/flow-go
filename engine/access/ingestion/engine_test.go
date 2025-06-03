@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/counters"
 	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -119,7 +120,6 @@ func (s *Suite) SetupTest() {
 		Return(conduit, nil).
 		Once()
 	s.request = modulemock.NewRequester(s.T())
-	s.request.On("Force").Return().Maybe()
 	s.provider = mocknetwork.NewEngine(s.T())
 	s.blocks = storage.NewBlocks(s.T())
 	s.headers = storage.NewHeaders(s.T())
@@ -733,7 +733,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			}
 		}
 
-		_, _, err := syncer.findMissingCollections(s.lastFullBlockHeight.Value())
+		err := syncer.requestMissingCollections()
 		s.Require().NoError(err)
 
 		// assert that missing collections are requested
@@ -759,7 +759,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			}
 		}
 
-		_, _, err := syncer.findMissingCollections(s.lastFullBlockHeight.Value())
+		err := syncer.requestMissingCollections()
 		s.Require().NoError(err)
 
 		// assert that missing collections are requested
@@ -779,7 +779,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			blkMissingColl[i] = true
 		}
 
-		_, _, err := syncer.findMissingCollections(s.lastFullBlockHeight.Value())
+		err := syncer.requestMissingCollections()
 		s.Require().NoError(err)
 
 		// assert that missing collections are not requested even though there are collections missing
@@ -822,15 +822,15 @@ func (s *Suite) TestProcessBackgroundCalls() {
 	})
 }
 
-//func (s *Suite) TestComponentShutdown() {
-//	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
-//	eng, _ := s.initEngineAndSyncer(irrecoverableCtx)
-//
-//	// start then shut down the engine
-//	unittest.AssertClosesBefore(s.T(), eng.Ready(), 10*time.Millisecond)
-//	s.cancel()
-//	unittest.AssertClosesBefore(s.T(), eng.Done(), 10*time.Millisecond)
-//
-//	err := eng.Process(channels.ReceiveReceipts, unittest.IdentifierFixture(), &flow.ExecutionReceipt{})
-//	s.Assert().ErrorIs(err, component.ErrComponentShutdown)
-//}
+func (s *Suite) TestComponentShutdown() {
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
+	eng, _ := s.initEngineAndSyncer(irrecoverableCtx)
+
+	// start then shut down the engine
+	unittest.AssertClosesBefore(s.T(), eng.Ready(), 10*time.Millisecond)
+	s.cancel()
+	unittest.AssertClosesBefore(s.T(), eng.Done(), 10*time.Millisecond)
+
+	err := eng.Process(channels.ReceiveReceipts, unittest.IdentifierFixture(), &flow.ExecutionReceipt{})
+	s.Assert().ErrorIs(err, component.ErrComponentShutdown)
+}

@@ -109,18 +109,18 @@ func (s *CollectionSyncer) RequestCollections(ctx irrecoverable.SignalerContext,
 
 // requestMissingCollections triggers missing collections downloading process.
 func (s *CollectionSyncer) requestMissingCollections() error {
-	lastFullBlockHeight := s.lastFullBlockHeight.Value() + 1
+	lastFullBlockHeight := s.lastFullBlockHeight.Value()
 	lastFinalizedBlock, err := s.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("failed to get finalized block: %w", err)
 	}
 
-	collections, incompleteBlocksCount, err := s.findMissingCollections(s.lastFullBlockHeight.Value())
+	collections, incompleteBlocksCount, err := s.findMissingCollections(lastFullBlockHeight)
 	if err != nil {
 		return err
 	}
 
-	blocksThresholdReached := incompleteBlocksCount > defaultMissingCollsForBlockThreshold
+	blocksThresholdReached := incompleteBlocksCount >= defaultMissingCollsForBlockThreshold
 	ageThresholdReached := lastFinalizedBlock.Height-lastFullBlockHeight > defaultMissingCollsForAgeThreshold
 	shouldRequest := blocksThresholdReached || ageThresholdReached
 
@@ -137,6 +137,10 @@ func (s *CollectionSyncer) downloadMissingCollections(ctx context.Context) error
 	if err != nil {
 		return err
 	}
+	if len(collections) == 0 {
+		s.logger.Info().Msg("no missing collections found")
+		return nil
+	}
 
 	s.requestCollections(collections, true)
 
@@ -147,12 +151,18 @@ func (s *CollectionSyncer) downloadMissingCollections(ctx context.Context) error
 
 	// wait for all collections to be downloaded
 	collectionStoragePollInterval := time.NewTicker(defaultCollectionCatchupDBPollInterval)
-	for {
+	defer collectionStoragePollInterval.Stop()
+
+	for len(collectionsToBeDownloaded) > 0 {
 		select {
 		case <-ctx.Done():
-			return nil
+			return fmt.Errorf("failed to complete collection retrieval: %w", ctx.Err())
 
 		case <-collectionStoragePollInterval.C:
+			s.logger.Info().
+				Int("total_missing_collections", len(collectionsToBeDownloaded)).
+				Msg("retrieving missing collections...")
+
 			for collectionID := range collectionsToBeDownloaded {
 				downloaded, err := s.isCollectionInStorage(collectionID)
 				if err != nil {
@@ -165,6 +175,9 @@ func (s *CollectionSyncer) downloadMissingCollections(ctx context.Context) error
 			}
 		}
 	}
+
+	s.logger.Info().Msg("collection catchup done")
+	return nil
 }
 
 func (s *CollectionSyncer) findMissingCollections(lastFullBlockHeight uint64) ([]*flow.CollectionGuarantee, int, error) {
@@ -185,6 +198,10 @@ func (s *CollectionSyncer) findMissingCollections(lastFullBlockHeight uint64) ([
 		collections, err := s.findMissingCollectionsAtHeight(currBlockHeight)
 		if err != nil {
 			return nil, 0, err
+		}
+
+		if len(collections) == 0 {
+			continue
 		}
 
 		missingCollections = append(missingCollections, collections...)
