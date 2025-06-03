@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"errors"
 	"sync"
 	"testing"
 
@@ -169,6 +170,40 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			for err := range errChan {
 				require.NoError(t, err, "All receipts should be stored successfully")
 			}
+		})
+	})
+
+	t.Run("store and remove", func(t *testing.T) {
+		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
+			block := unittest.BlockFixture()
+			receipt1 := unittest.ReceiptForBlockFixture(&block)
+
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return myReceipts.BatchStoreMyReceipt(receipt1, rw)
+			})
+			require.NoError(t, err)
+
+			actual, err := myReceipts.MyReceipt(block.ID())
+			require.NoError(t, err)
+
+			require.Equal(t, receipt1, actual)
+
+			// Check after storing my receipts, the result and receipt are stored
+			actualReceipt, err := receipts.ByID(receipt1.ID())
+			require.NoError(t, err)
+			require.Equal(t, receipt1, actualReceipt)
+
+			actualResult, err := results.ByID(receipt1.ExecutionResult.ID())
+			require.NoError(t, err)
+			require.Equal(t, receipt1.ExecutionResult, *actualResult)
+
+			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return myReceipts.BatchRemoveIndexByBlockID(block.ID(), rw)
+			})
+			require.NoError(t, err)
+
+			_, err = myReceipts.MyReceipt(block.ID())
+			require.True(t, errors.Is(err, storage.ErrNotFound))
 		})
 	})
 }

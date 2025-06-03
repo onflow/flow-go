@@ -1007,7 +1007,7 @@ type ExecutionMetrics interface {
 	ExecutionBlockExecuted(dur time.Duration, stats BlockExecutionResultStats)
 
 	// ExecutionBlockExecutionEffortVectorComponent reports the unweighted effort of given ComputationKind at block level
-	ExecutionBlockExecutionEffortVectorComponent(string, uint)
+	ExecutionBlockExecutionEffortVectorComponent(string, uint64)
 
 	// ExecutionBlockCachedPrograms reports the number of cached programs at the end of a block
 	ExecutionBlockCachedPrograms(programs int)

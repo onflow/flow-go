@@ -119,3 +119,44 @@ func TestEventRetrieveWithoutStore(t *testing.T) {
 
 	})
 }
+
+func TestEventStoreAndRemove(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		metrics := metrics.NewNoopCollector()
+		store := store.NewEvents(metrics, db)
+
+		// Create and store an event
+		blockID := unittest.IdentifierFixture()
+		tx1ID := unittest.IdentifierFixture()
+		tx2ID := unittest.IdentifierFixture()
+		evt1_1 := unittest.EventFixture(flow.EventAccountCreated, 0, 0, tx1ID, 0)
+		evt1_2 := unittest.EventFixture(flow.EventAccountCreated, 1, 1, tx2ID, 0)
+
+		evt2_1 := unittest.EventFixture(flow.EventAccountUpdated, 2, 2, tx2ID, 0)
+
+		expected := []flow.EventsList{
+			{evt1_1, evt1_2},
+			{evt2_1},
+		}
+
+		err := store.Store(blockID, expected)
+		require.NoError(t, err)
+
+		// Ensure it exists
+		event, err := store.ByBlockID(blockID)
+		require.NoError(t, err)
+		require.Len(t, event, 3)
+		require.Contains(t, event, evt1_1)
+		require.Contains(t, event, evt1_2)
+		require.Contains(t, event, evt2_1)
+
+		// Remove it
+		err = store.RemoveByBlockID(blockID)
+		require.NoError(t, err)
+
+		// Ensure it no longer exists
+		event, err = store.ByBlockID(blockID)
+		require.NoError(t, err)
+		require.Len(t, event, 0)
+	})
+}
