@@ -274,7 +274,7 @@ type UntrustedEpochRecover EpochRecover
 // NewEpochRecover creates a new instance of EpochRecover.
 // Construction EpochRecover allowed only within the constructor.
 //
-// All errors indicate a valid EpochSetup cannot be constructed from the input.
+// All errors indicate a valid EpochRecover cannot be constructed from the input.
 func NewEpochRecover(untrusted UntrustedEpochRecover) (*EpochRecover, error) {
 	// EpochSetup and must be non-empty and is intended to be constructed solely through the constructor.
 	if untrusted.EpochSetup.EqualTo(new(EpochSetup)) {
