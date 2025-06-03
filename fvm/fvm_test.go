@@ -1459,6 +1459,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				common.ComputationKindStatement:          0,
 				common.ComputationKindLoop:               1 << meter.MeterExecutionInternalPrecisionBytes,
 				common.ComputationKindFunctionInvocation: 0,
+				common.ComputationKindInstructionInvoke:  1 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).withContextOptions(
@@ -1574,11 +1575,10 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithExecutionEffortWeights(
 			meter.ExecutionEffortWeights{
-				common.ComputationKindStatement: 0,
-				// only count loops
-				// the storage check has a loop
-				common.ComputationKindLoop:               1 << meter.MeterExecutionInternalPrecisionBytes,
+				common.ComputationKindStatement:          0,
 				common.ComputationKindFunctionInvocation: 0,
+				common.ComputationKindLoop:               0,
+				common.ComputationKindInstructionInvoke:  1 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).withContextOptions(
