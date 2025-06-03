@@ -303,13 +303,13 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	return root, result, seal
 }
 
-func createPrivateNodeIdentities(n int) []bootstrap.NodeInfo {
+func createPrivateNodeIdentities(t *testing.T, n int) []bootstrap.NodeInfo {
 	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
 	infos := make([]bootstrap.NodeInfo, 0, n)
 	for _, node := range consensus {
 		networkPrivKey := unittest.NetworkingPrivKeyFixture()
 		stakingPrivKey := unittest.StakingPrivKeyFixture()
-		nodeInfo := bootstrap.NewPrivateNodeInfo(
+		nodeInfo, err := bootstrap.NewPrivateNodeInfo(
 			node.NodeID,
 			node.Role,
 			node.Address,
@@ -317,6 +317,7 @@ func createPrivateNodeIdentities(n int) []bootstrap.NodeInfo {
 			networkPrivKey,
 			stakingPrivKey,
 		)
+		require.NoError(t, err)
 		infos = append(infos, nodeInfo)
 	}
 	return infos
@@ -324,7 +325,7 @@ func createPrivateNodeIdentities(n int) []bootstrap.NodeInfo {
 
 func createConsensusIdentities(t *testing.T, n int) *run.ParticipantData {
 	// create n consensus node participants
-	consensus := createPrivateNodeIdentities(n)
+	consensus := createPrivateNodeIdentities(t, n)
 	return completeConsensusIdentities(t, consensus)
 }
 
