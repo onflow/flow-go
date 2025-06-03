@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.5.1
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.15.0
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4
-	github.com/cockroachdb/pebble/v2 v2.0.4 // indirect
+	github.com/cockroachdb/pebble/v2 v2.0.4
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/ef-ds/deque v1.0.4
@@ -93,7 +93,6 @@ require (
 )
 
 require (
-	github.com/cockroachdb/pebble v1.1.2
 	github.com/coreos/go-semver v0.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/dustin/go-humanize v1.0.1
