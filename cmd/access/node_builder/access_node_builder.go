@@ -2141,7 +2141,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				channels.RequestCollections,
 				filter.HasRole[flow.Identity](flow.RoleCollection),
 				func() flow.Entity {
-					return flow.NewCollection(flow.UntrustedCollection{Transactions: nil})
+					return new(flow.Collection)
 				},
 			)
 			if err != nil {
