@@ -51,8 +51,56 @@ func TestEpochProtocolStateEntry_EpochPhase(t *testing.T) {
 
 // TestNewRichProtocolStateEntry checks that NewRichEpochStateEntry creates valid identity tables depending on the state
 // of epoch which is derived from the protocol state entry.
+// It checks for correct handling of both valid and invalid inputs, ensuring that the function
+// correctly validates epoch service event consistency and presence.
+//
+// Valid Cases:
+//  1. staking-root-protocol-state:
+//     - No previous epoch; current epoch is in staking phase.
+//  2. staking-phase:
+//     - Previous and current epochs exist; no next epoch.
+//  3. setup-phase:
+//     - Next epoch setup is present; next epoch commit is nil.
+//  4. setup-after-spork:
+//     - First epoch after spork; no previous epoch; next epoch setup is present.
+//  5. commit-phase:
+//     - Previous, current, and next epochs are fully populated.
+//  6. commit-after-spork:
+//     - First epoch after spork; current and next epochs are committed.
+//
+// Invalid Cases:
+//  7. PreviousEpoch is set but PreviousEpochSetup is nil:
+//     - Should panic or error due to missing required event.
+//  8. PreviousEpoch.SetupID mismatch with PreviousEpochSetup.ID:
+//     - Should return an error for mismatched setup commitment.
+//  9. PreviousEpoch.CommitID mismatch with PreviousEpochCommit.ID:
+//     - Should return an error for mismatched commit commitment.
+//
+// 10. PreviousEpoch is nil but PreviousEpochSetup is non-nil:
+//   - Should return an error for unexpected extra data.
+//
+// 11. PreviousEpoch is nil but PreviousEpochCommit is non-nil:
+//   - Should return an error for unexpected extra data.
+//
+// 12. CurrentEpoch.SetupID mismatch with CurrentEpochSetup.ID:
+//   - Should return an error for mismatched setup event.
+//
+// 13. CurrentEpoch.CommitID mismatch with CurrentEpochCommit.ID:
+//   - Should return an error for mismatched commit event.
+//
+// 14. NextEpoch is nil but NextEpochSetup is non-nil:
+//   - Should return an error for unexpected setup event.
+//
+// 15. NextEpoch is nil but NextEpochCommit is non-nil:
+//   - Should return an error for unexpected commit event.
+//
+// 16. NextEpoch.CommitID is non-zero but mismatches NextEpochCommit.ID:
+//   - Should return an error for mismatched commit event.
+//
+// 17. NextEpoch.CommitID is zero but NextEpochCommit is non-nil:
+//   - Should return an error for unexpected commit event.
 func TestNewRichProtocolStateEntry(t *testing.T) {
-	// Conditions right after a spork:
+	// 1. Conditions right after a spork:
 	//  * no previous epoch exists from the perspective of the freshly-sporked protocol state
 	//  * network is currently in the staking phase for the next epoch, hence no service events for the next epoch exist
 	t.Run("staking-root-protocol-state", func(t *testing.T) {
@@ -102,7 +150,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Equal(t, expectedIdentities, richStateEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants")
 	})
 
-	// Common situation during the staking phase for epoch N+1
+	// 2. Common situation during the staking phase for epoch N+1
 	//  * we are currently in Epoch N
 	//  * previous epoch N-1 is known (specifically EpochSetup and EpochCommit events)
 	//  * network is currently in the staking phase for the next epoch, hence no service events for the next epoch exist
@@ -136,7 +184,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Nil(t, epochRichStateEntry.NextEpoch)
 	})
 
-	// Common situation during the epoch setup phase for epoch N+1
+	// 3. Common situation during the epoch setup phase for epoch N+1
 	//  * we are currently in Epoch N
 	//  * previous epoch N-1 is known (specifically EpochSetup and EpochCommit events)
 	//  * network is currently in the setup phase for the next epoch, i.e. EpochSetup event (starting setup phase) has already been observed
@@ -183,7 +231,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Equal(t, expectedIdentities, richStateEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
 	})
 
-	// Common situation during the epoch setup phase for first epoch after the spork
+	// 4. Common situation during the epoch setup phase for first epoch after the spork
 	//  * we are currently in Epoch N
 	//  * there is no previous epoch as we are in the first epoch after the spork
 	//  * network is currently in the setup phase for the next epoch, i.e. EpochSetup event (starting setup phase) has already been observed
@@ -240,7 +288,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Equal(t, expectedIdentities, richStateEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
 	})
 
-	// Common situation during the epoch commit phase for epoch N+1
+	// 5. Common situation during the epoch commit phase for epoch N+1
 	//  * we are currently in Epoch N
 	//  * previous epoch N-1 is known (specifically EpochSetup and EpochCommit events)
 	//  * The network has completed the epoch commit phase, i.e. published the EpochSetup and EpochCommit events for epoch N+1.
@@ -283,7 +331,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Equal(t, expectedIdentities, richStateEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
 	})
 
-	// Common situation during the epoch commit phase for first epoch after the spork
+	// 6. Common situation during the epoch commit phase for first epoch after the spork
 	//  * we are currently in Epoch N
 	//  * there is no previous epoch as we are in the first epoch after the spork
 	//  * The network has completed the epoch commit phase, i.e. published the EpochSetup and EpochCommit events for epoch N+1.
@@ -333,6 +381,228 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richStateEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
+	})
+
+	// 7. Invalid: PreviousEpoch is set, but PreviousEpochSetup is nil
+	t.Run("invalid - previous epoch set but no setup event", func(t *testing.T) {
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
+			entry.PreviousEpochSetup = nil
+		})
+		_, err := flow.NewEpochStateEntry(
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  stateEntryFixture.MinEpochStateEntry,
+				PreviousEpochSetup:  stateEntryFixture.PreviousEpochSetup,
+				PreviousEpochCommit: stateEntryFixture.PreviousEpochCommit,
+				CurrentEpochSetup:   stateEntryFixture.CurrentEpochSetup,
+				CurrentEpochCommit:  stateEntryFixture.CurrentEpochCommit,
+				NextEpochSetup:      stateEntryFixture.NextEpochSetup,
+				NextEpochCommit:     stateEntryFixture.NextEpochCommit,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "does not match commitment")
+	})
+
+	// 8. Invalid: PreviousEpoch.SetupID doesn't match PreviousEpochSetup.ID()
+	t.Run("invalid - previous setup ID mismatch", func(t *testing.T) {
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
+			entry.PreviousEpoch.SetupID = flow.ZeroID // incorrect
+		})
+		_, err := flow.NewEpochStateEntry(
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  stateEntryFixture.MinEpochStateEntry,
+				PreviousEpochSetup:  stateEntryFixture.PreviousEpochSetup,
+				PreviousEpochCommit: stateEntryFixture.PreviousEpochCommit,
+				CurrentEpochSetup:   stateEntryFixture.CurrentEpochSetup,
+				CurrentEpochCommit:  stateEntryFixture.CurrentEpochCommit,
+				NextEpochSetup:      stateEntryFixture.NextEpochSetup,
+				NextEpochCommit:     stateEntryFixture.NextEpochCommit,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "does not match commitment")
+	})
+
+	// 9. Invalid: PreviousEpoch.CommitID doesn't match PreviousEpochCommit.ID()
+	t.Run("invalid - previous commit ID mismatch", func(t *testing.T) {
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
+			entry.PreviousEpoch.CommitID = flow.ZeroID // incorrect
+		})
+		_, err := flow.NewEpochStateEntry(
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  stateEntryFixture.MinEpochStateEntry,
+				PreviousEpochSetup:  stateEntryFixture.PreviousEpochSetup,
+				PreviousEpochCommit: stateEntryFixture.PreviousEpochCommit,
+				CurrentEpochSetup:   stateEntryFixture.CurrentEpochSetup,
+				CurrentEpochCommit:  stateEntryFixture.CurrentEpochCommit,
+				NextEpochSetup:      stateEntryFixture.NextEpochSetup,
+				NextEpochCommit:     stateEntryFixture.NextEpochCommit,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "does not match commitment")
+	})
+
+	// 10. Invalid: PreviousEpoch is nil, but PreviousEpochSetup is non-nil
+	t.Run("invalid - nil previous epoch but has setup event", func(t *testing.T) {
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
+			entry.PreviousEpoch = nil
+		})
+		_, err := flow.NewEpochStateEntry(
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  stateEntryFixture.MinEpochStateEntry,
+				PreviousEpochSetup:  stateEntryFixture.PreviousEpochSetup,
+				PreviousEpochCommit: stateEntryFixture.PreviousEpochCommit,
+				CurrentEpochSetup:   stateEntryFixture.CurrentEpochSetup,
+				CurrentEpochCommit:  stateEntryFixture.CurrentEpochCommit,
+				NextEpochSetup:      stateEntryFixture.NextEpochSetup,
+				NextEpochCommit:     stateEntryFixture.NextEpochCommit,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no previous epoch but gotten non-nil EpochSetup")
+	})
+
+	// 11. Invalid: PreviousEpoch is nil, but PreviousEpochCommit is non-nil
+	t.Run("invalid - nil previous epoch but has commit event", func(t *testing.T) {
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
+			entry.PreviousEpoch = nil
+			entry.PreviousEpochSetup = nil
+		})
+		_, err := flow.NewEpochStateEntry(
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  stateEntryFixture.MinEpochStateEntry,
+				PreviousEpochSetup:  stateEntryFixture.PreviousEpochSetup,
+				PreviousEpochCommit: stateEntryFixture.PreviousEpochCommit,
+				CurrentEpochSetup:   stateEntryFixture.CurrentEpochSetup,
+				CurrentEpochCommit:  stateEntryFixture.CurrentEpochCommit,
+				NextEpochSetup:      stateEntryFixture.NextEpochSetup,
+				NextEpochCommit:     stateEntryFixture.NextEpochCommit,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no previous epoch but gotten non-nil EpochCommit")
+	})
+
+	// 12. Invalid: CurrentEpoch.SetupID doesn't match CurrentEpochSetup.ID()
+	t.Run("invalid - current setup ID mismatch", func(t *testing.T) {
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
+			entry.CurrentEpoch.SetupID = flow.ZeroID // incorrect
+		})
+		_, err := flow.NewEpochStateEntry(
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  stateEntryFixture.MinEpochStateEntry,
+				PreviousEpochSetup:  stateEntryFixture.PreviousEpochSetup,
+				PreviousEpochCommit: stateEntryFixture.PreviousEpochCommit,
+				CurrentEpochSetup:   stateEntryFixture.CurrentEpochSetup,
+				CurrentEpochCommit:  stateEntryFixture.CurrentEpochCommit,
+				NextEpochSetup:      stateEntryFixture.NextEpochSetup,
+				NextEpochCommit:     stateEntryFixture.NextEpochCommit,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "does not match commitment")
+	})
+
+	// 13. Invalid: CurrentEpoch.CommitID doesn't match CurrentEpochCommit.ID()
+	t.Run("invalid - current commit ID mismatch", func(t *testing.T) {
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
+			entry.CurrentEpoch.CommitID = flow.ZeroID // incorrect
+		})
+		_, err := flow.NewEpochStateEntry(
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  stateEntryFixture.MinEpochStateEntry,
+				PreviousEpochSetup:  stateEntryFixture.PreviousEpochSetup,
+				PreviousEpochCommit: stateEntryFixture.PreviousEpochCommit,
+				CurrentEpochSetup:   stateEntryFixture.CurrentEpochSetup,
+				CurrentEpochCommit:  stateEntryFixture.CurrentEpochCommit,
+				NextEpochSetup:      stateEntryFixture.NextEpochSetup,
+				NextEpochCommit:     stateEntryFixture.NextEpochCommit,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "does not match commitment")
+	})
+
+	// 14. Invalid: NextEpoch is nil, but NextEpochSetup is non-nil
+	t.Run("invalid - nil next epoch but has setup event", func(t *testing.T) {
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
+			entry.NextEpoch = nil
+		})
+		_, err := flow.NewEpochStateEntry(
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  stateEntryFixture.MinEpochStateEntry,
+				PreviousEpochSetup:  stateEntryFixture.PreviousEpochSetup,
+				PreviousEpochCommit: stateEntryFixture.PreviousEpochCommit,
+				CurrentEpochSetup:   stateEntryFixture.CurrentEpochSetup,
+				CurrentEpochCommit:  stateEntryFixture.CurrentEpochCommit,
+				NextEpochSetup:      stateEntryFixture.NextEpochSetup,
+				NextEpochCommit:     stateEntryFixture.NextEpochCommit,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no next epoch but gotten non-nil EpochSetup event")
+	})
+
+	// 15. Invalid: NextEpoch is nil, but NextEpochCommit is non-nil
+	t.Run("invalid - nil next epoch but has commit event", func(t *testing.T) {
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
+			entry.NextEpoch = nil
+			entry.NextEpochSetup = nil
+		})
+		_, err := flow.NewEpochStateEntry(
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  stateEntryFixture.MinEpochStateEntry,
+				PreviousEpochSetup:  stateEntryFixture.PreviousEpochSetup,
+				PreviousEpochCommit: stateEntryFixture.PreviousEpochCommit,
+				CurrentEpochSetup:   stateEntryFixture.CurrentEpochSetup,
+				CurrentEpochCommit:  stateEntryFixture.CurrentEpochCommit,
+				NextEpochSetup:      stateEntryFixture.NextEpochSetup,
+				NextEpochCommit:     stateEntryFixture.NextEpochCommit,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no next epoch but gotten non-nil EpochCommit")
+	})
+
+	// 16. Invalid: NextEpoch.CommitID ≠ ZeroID, but NextEpochCommit.ID doesn't match
+	t.Run("invalid - next commit ID mismatch", func(t *testing.T) {
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
+			entry.NextEpoch.CommitID = unittest.IdentifierFixture() // incorrect
+		})
+		_, err := flow.NewEpochStateEntry(
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  stateEntryFixture.MinEpochStateEntry,
+				PreviousEpochSetup:  stateEntryFixture.PreviousEpochSetup,
+				PreviousEpochCommit: stateEntryFixture.PreviousEpochCommit,
+				CurrentEpochSetup:   stateEntryFixture.CurrentEpochSetup,
+				CurrentEpochCommit:  stateEntryFixture.CurrentEpochCommit,
+				NextEpochSetup:      stateEntryFixture.NextEpochSetup,
+				NextEpochCommit:     stateEntryFixture.NextEpochCommit,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "does not match commitment")
+	})
+
+	// 17. Invalid: NextEpoch.CommitID == ZeroID, but NextEpochCommit is non-nil
+	t.Run("invalid - uncommitted next epoch but has commit event", func(t *testing.T) {
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
+			entry.NextEpoch.CommitID = flow.ZeroID
+		})
+		_, err := flow.NewEpochStateEntry(
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  stateEntryFixture.MinEpochStateEntry,
+				PreviousEpochSetup:  stateEntryFixture.PreviousEpochSetup,
+				PreviousEpochCommit: stateEntryFixture.PreviousEpochCommit,
+				CurrentEpochSetup:   stateEntryFixture.CurrentEpochSetup,
+				CurrentEpochCommit:  stateEntryFixture.CurrentEpochCommit,
+				NextEpochSetup:      stateEntryFixture.NextEpochSetup,
+				NextEpochCommit:     stateEntryFixture.NextEpochCommit,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "next epoch not yet committed but got EpochCommit event")
 	})
 }
 
@@ -557,6 +827,7 @@ func TestNewMinEpochStateEntry(t *testing.T) {
 		ActiveIdentities: identities,
 	}
 
+	// 1. Valid input with all fields
 	t.Run("valid input with all fields", func(t *testing.T) {
 		untrusted := flow.UntrustedMinEpochStateEntry{
 			PreviousEpoch:          previousEpoch,
@@ -570,6 +841,7 @@ func TestNewMinEpochStateEntry(t *testing.T) {
 		require.NotNil(t, entry)
 	})
 
+	// 2. Valid input with nil PreviousEpoch and NextEpoch
 	t.Run("valid input with nil PreviousEpoch and NextEpoch", func(t *testing.T) {
 		untrusted := flow.UntrustedMinEpochStateEntry{
 			PreviousEpoch:          nil,
@@ -583,7 +855,8 @@ func TestNewMinEpochStateEntry(t *testing.T) {
 		require.NotNil(t, entry)
 	})
 
-	t.Run("invalid input with empty CurrentEpoch", func(t *testing.T) {
+	// 3. Invalid input: empty CurrentEpoch
+	t.Run("empty CurrentEpoch", func(t *testing.T) {
 		untrusted := flow.UntrustedMinEpochStateEntry{
 			PreviousEpoch:          nil,
 			CurrentEpoch:           flow.EpochStateContainer{}, // Empty
