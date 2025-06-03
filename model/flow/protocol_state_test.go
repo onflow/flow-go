@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -519,5 +520,80 @@ func TestBuildIdentityTable(t *testing.T) {
 		)
 		assert.Error(t, err)
 		assert.Empty(t, identityList)
+	})
+}
+
+// TestNewMinEpochStateEntry validates the behavior of the NewMinEpochStateEntry constructor function.
+// It checks for correct handling of both valid and invalid inputs.
+//
+// Test Cases:
+//
+// 1. Valid input with all fields:
+//   - Ensures that providing a valid current epoch and optional previous/next epochs creates a MinEpochStateEntry.
+//
+// 2. Valid input with nil PreviousEpoch and NextEpoch:
+//   - Ensures that entry construction still succeeds with only CurrentEpoch.
+//
+// 3. Invalid input: empty CurrentEpoch:
+//   - Verifies that constructor returns an error if CurrentEpoch is not populated.
+func TestNewMinEpochStateEntry(t *testing.T) {
+	identities := unittest.DynamicIdentityEntryListFixture(3)
+
+	currentEpoch := flow.EpochStateContainer{
+		SetupID:          unittest.IdentifierFixture(),
+		CommitID:         unittest.IdentifierFixture(),
+		ActiveIdentities: identities,
+	}
+
+	previousEpoch := &flow.EpochStateContainer{
+		SetupID:          unittest.IdentifierFixture(),
+		CommitID:         unittest.IdentifierFixture(),
+		ActiveIdentities: identities,
+	}
+
+	nextEpoch := &flow.EpochStateContainer{
+		SetupID:          unittest.IdentifierFixture(),
+		CommitID:         unittest.IdentifierFixture(),
+		ActiveIdentities: identities,
+	}
+
+	t.Run("valid input with all fields", func(t *testing.T) {
+		untrusted := flow.UntrustedMinEpochStateEntry{
+			PreviousEpoch:          previousEpoch,
+			CurrentEpoch:           currentEpoch,
+			NextEpoch:              nextEpoch,
+			EpochFallbackTriggered: true,
+		}
+
+		entry, err := flow.NewMinEpochStateEntry(untrusted)
+		require.NoError(t, err)
+		require.NotNil(t, entry)
+	})
+
+	t.Run("valid input with nil PreviousEpoch and NextEpoch", func(t *testing.T) {
+		untrusted := flow.UntrustedMinEpochStateEntry{
+			PreviousEpoch:          nil,
+			CurrentEpoch:           currentEpoch,
+			NextEpoch:              nil,
+			EpochFallbackTriggered: false,
+		}
+
+		entry, err := flow.NewMinEpochStateEntry(untrusted)
+		require.NoError(t, err)
+		require.NotNil(t, entry)
+	})
+
+	t.Run("invalid input with empty CurrentEpoch", func(t *testing.T) {
+		untrusted := flow.UntrustedMinEpochStateEntry{
+			PreviousEpoch:          nil,
+			CurrentEpoch:           flow.EpochStateContainer{}, // Empty
+			NextEpoch:              nil,
+			EpochFallbackTriggered: false,
+		}
+
+		entry, err := flow.NewMinEpochStateEntry(untrusted)
+		require.Error(t, err)
+		require.Nil(t, entry)
+		require.Contains(t, err.Error(), "current epoch must not be empty")
 	})
 }
