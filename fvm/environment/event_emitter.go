@@ -3,6 +3,7 @@ package environment
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/common"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence"
@@ -165,7 +166,12 @@ func (emitter *eventEmitter) EventCollection() *EventCollection {
 }
 
 func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
-	err := emitter.meter.MeterComputation(ComputationKindEncodeEvent, 1)
+	err := emitter.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindEncodeEvent,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("emit event, event encoding failed: %w", err)
 	}
@@ -178,7 +184,12 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 	defer emitter.tracer.StartExtensiveTracingChildSpan(trace.FVMEnvEmitEvent).End()
 
 	payloadSize := len(payload)
-	err = emitter.meter.MeterComputation(ComputationKindEmitEvent, uint(payloadSize))
+	err = emitter.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindEmitEvent,
+			Intensity: uint64(payloadSize),
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("emit event failed: %w", err)
 	}
@@ -288,7 +299,6 @@ func (collection *EventCollection) AppendServiceEvent(
 	collection.convertedServiceEvents = append(
 		collection.convertedServiceEvents,
 		*convertedEvent)
-	collection.eventCounter++
 	return collection.meter.MeterEmittedEvent(size)
 }
 
