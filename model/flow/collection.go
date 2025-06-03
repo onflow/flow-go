@@ -1,6 +1,8 @@
 package flow
 
-import "github.com/onflow/flow-go/model/fingerprint"
+import (
+	"github.com/onflow/flow-go/model/fingerprint"
+)
 
 // Collection is set of transactions.
 type Collection struct {
@@ -18,12 +20,11 @@ func CollectionFromTransactions(transactions []*Transaction) Collection {
 }
 
 // Light returns the light, reference-only version of the collection.
-func (c Collection) Light() LightCollection {
-	lc := LightCollection{Transactions: make([]Identifier, 0, len(c.Transactions))}
-	for _, tx := range c.Transactions {
-		lc.Transactions = append(lc.Transactions, tx.ID())
+func (c Collection) Light() (*LightCollection, error) {
+	encodable := EncodableLightCollection{
+		Transactions: GetIDs(c.Transactions),
 	}
-	return lc
+	return NewLightCollection(encodable)
 }
 
 // Guarantee returns a collection guarantee for this collection.
@@ -61,12 +62,31 @@ func (c Collection) Fingerprint() []byte {
 // LightCollection is a collection containing references to the constituent
 // transactions rather than full transaction bodies. It is used for indexing
 // transactions by collection and for computing the collection fingerprint.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type LightCollection struct {
+	EncodableLightCollection
+	id Identifier
+}
+
+type EncodableLightCollection struct {
 	Transactions []Identifier
 }
 
-func (lc LightCollection) ID() Identifier {
+func (lc EncodableLightCollection) ID() Identifier {
 	return MakeID(lc)
+}
+
+// NewLightCollection constructs a new LightCollection instance.
+func NewLightCollection(encodable EncodableLightCollection) (*LightCollection, error) {
+	return &LightCollection{
+		EncodableLightCollection: encodable,
+		id:                       encodable.ID(),
+	}, nil
+}
+
+func (lc LightCollection) ID() Identifier {
+	return lc.id
 }
 
 func (lc LightCollection) Checksum() Identifier {
