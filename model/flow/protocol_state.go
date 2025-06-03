@@ -50,7 +50,7 @@ type UntrustedMinEpochStateEntry MinEpochStateEntry
 // NewMinEpochStateEntry creates a new instance of MinEpochStateEntry.
 // Construction MinEpochStateEntry allowed only within the constructor.
 //
-// No errors are expected during normal operation.
+// All errors indicate a valid MinEpochStateEntry cannot be constructed from the input.
 func NewMinEpochStateEntry(untrusted UntrustedMinEpochStateEntry) (*MinEpochStateEntry, error) {
 	return &MinEpochStateEntry{
 		PreviousEpoch:          untrusted.PreviousEpoch,
@@ -173,7 +173,7 @@ type UntrustedEpochStateEntry EpochStateEntry
 // NewEpochStateEntry constructs a EpochStateEntry from an MinEpochStateEntry and additional data.
 // No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
 //
-// No errors are expected during normal operation.
+// All errors indicate a valid EpochStateEntry cannot be constructed from the input.
 func NewEpochStateEntry(untrusted UntrustedEpochStateEntry) (*EpochStateEntry, error) {
 	// If previous epoch is specified: ensure respective epoch service events are not nil and consistent with commitments in `MinEpochStateEntry.PreviousEpoch`
 	if untrusted.PreviousEpoch != nil {
@@ -268,12 +268,10 @@ type RichEpochStateEntry struct {
 }
 
 // NewRichEpochStateEntry constructs a RichEpochStateEntry from an EpochStateEntry.
-// No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
+// Construction RichEpochStateEntry allowed only within the constructor.
 //
-// No errors are expected during normal operation.
-func NewRichEpochStateEntry(
-	epochState *EpochStateEntry,
-) (*RichEpochStateEntry, error) {
+// All errors indicate a valid RichEpochStateEntry cannot be constructed from the input.
+func NewRichEpochStateEntry(epochState *EpochStateEntry) (*RichEpochStateEntry, error) {
 	var currentEpochIdentityTable IdentityList
 	nextEpochIdentityTable := IdentityList{}
 	// If we are in staking phase (i.e. epochState.NextEpoch == nil):
