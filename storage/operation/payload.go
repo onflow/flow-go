@@ -77,15 +77,3 @@ func IndexFinalizedSealByBlockID(w storage.Writer, sealedBlockID flow.Identifier
 func LookupBySealedBlockID(r storage.Reader, sealedBlockID flow.Identifier, sealID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeBlockIDToFinalizedSeal, sealedBlockID), &sealID)
 }
-
-func InsertExecutionForkEvidence(w storage.Writer, conflictingSeals []*flow.IncorporatedResultSeal) error {
-	return UpsertByKey(w, MakePrefix(codeExecutionFork), conflictingSeals)
-}
-
-func RemoveExecutionForkEvidence(w storage.Writer) error {
-	return RemoveByKey(w, MakePrefix(codeExecutionFork))
-}
-
-func RetrieveExecutionForkEvidence(r storage.Reader, conflictingSeals *[]*flow.IncorporatedResultSeal) error {
-	return RetrieveByKey(r, MakePrefix(codeExecutionFork), conflictingSeals)
-}
