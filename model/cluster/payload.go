@@ -1,6 +1,8 @@
 package cluster
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -46,8 +48,14 @@ func PayloadFromTransactions(refID flow.Identifier, transactions ...*flow.Transa
 	if len(transactions) == 0 {
 		transactions = []*flow.TransactionBody{}
 	}
+
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: transactions})
+	if err != nil {
+		panic(fmt.Sprintf("invalid collection: %v", err))
+	}
+
 	return Payload{
-		Collection:       *flow.NewCollection(flow.UntrustedCollection{Transactions: transactions}),
+		Collection:       *collection,
 		ReferenceBlockID: refID,
 	}
 }

@@ -250,7 +250,12 @@ func messageToTrustedCollection(
 		transactions[i] = &transaction
 	}
 
-	return flow.NewCollection(flow.UntrustedCollection{Transactions: transactions}), nil
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: transactions})
+	if err != nil {
+		return nil, fmt.Errorf("could not construct collection: %w", err)
+	}
+
+	return collection, nil
 }
 
 // messageToTrustedTransaction converts a transaction message to a transaction body.

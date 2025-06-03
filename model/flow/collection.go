@@ -1,6 +1,8 @@
 package flow
 
 import (
+	"fmt"
+
 	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/model/fingerprint"
@@ -26,8 +28,16 @@ type UntrustedCollection Collection
 
 // NewCollection creates a new instance of Collection.
 // Construction Collection allowed only within the constructor
-func NewCollection(untrustedCollection UntrustedCollection) *Collection {
-	return &Collection{Transactions: untrustedCollection.Transactions}
+//
+// All errors indicate a valid Collection cannot be constructed from the input.
+func NewCollection(untrustedCollection UntrustedCollection) (*Collection, error) {
+	if untrustedCollection.Transactions == nil {
+		return nil, fmt.Errorf("transactions must not be nil")
+	}
+
+	return &Collection{
+		Transactions: untrustedCollection.Transactions,
+	}, nil
 }
 
 // CollectionFromTransactions creates a new collection from the list of
@@ -38,7 +48,13 @@ func CollectionFromTransactions(transactions []*Transaction) Collection {
 	for _, tx := range transactions {
 		txs = append(txs, &tx.TransactionBody)
 	}
-	return *NewCollection(UntrustedCollection{Transactions: txs})
+
+	collection, err := NewCollection(UntrustedCollection{Transactions: txs})
+	if err != nil {
+		panic(fmt.Sprintf("invalid test input in CollectionFromTransactions: %v", err))
+	}
+
+	return *collection
 }
 
 // Light returns the light, reference-only version of the collection.

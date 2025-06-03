@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -48,11 +50,16 @@ func (ub *UntrustedClusterBlock) ToInternal() *cluster.Block {
 		txs = append(txs, &tx)
 	}
 
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: txs})
+	if err != nil {
+		panic(fmt.Sprintf("invalid untrusted input in ToInternal: %v", err))
+	}
+
 	return &cluster.Block{
 		Header: &ub.Header,
 		Payload: &cluster.Payload{
 			ReferenceBlockID: ub.Payload.ReferenceBlockID,
-			Collection:       *flow.NewCollection(flow.UntrustedCollection{Transactions: txs}),
+			Collection:       *collection,
 		},
 	}
 }

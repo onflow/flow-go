@@ -1,6 +1,8 @@
 package entity
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -40,7 +42,11 @@ type BlocksByCollection struct {
 }
 
 func (c CompleteCollection) Collection() flow.Collection {
-	return *flow.NewCollection(flow.UntrustedCollection{Transactions: c.Transactions})
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: c.Transactions})
+	if err != nil {
+		panic(fmt.Sprintf("invalid CompleteCollection: %v", err))
+	}
+	return *collection
 }
 
 func (c CompleteCollection) IsCompleted() bool {
@@ -102,7 +108,11 @@ func (b *ExecutableBlock) CollectionAt(index int) *flow.Collection {
 	if cc == nil {
 		return nil
 	}
-	return flow.NewCollection(flow.UntrustedCollection{Transactions: cc.Transactions})
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: cc.Transactions})
+	if err != nil {
+		panic(fmt.Sprintf("invalid untrusted input in CollectionAt: %v", err))
+	}
+	return collection
 }
 
 // HasAllTransactions returns whether all the transactions for all collections

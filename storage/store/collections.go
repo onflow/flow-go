@@ -83,7 +83,12 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 		txs = append(txs, tx)
 	}
 
-	return flow.NewCollection(flow.UntrustedCollection{Transactions: txs}), nil
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: txs})
+	if err != nil {
+		return nil, fmt.Errorf("could not construct collection: %w", err)
+	}
+
+	return collection, nil
 }
 
 // LightByID retrieves a light collection by its ID.
