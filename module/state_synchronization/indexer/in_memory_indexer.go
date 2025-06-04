@@ -72,6 +72,9 @@ func (i *InMemoryIndexer) IndexTxResultErrorMessagesData(txResultErrMsgs []flow.
 }
 
 // IndexBlockData indexes all execution block data.
+// Expected errors:
+// - convert.UnexpectedLedgerKeyFormat if the key is not in the expected format
+// - storage.ErrHeightNotIndexed if the given height does not match the storage's block height.
 func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionDataEntity) error {
 	log := i.log.With().Hex("block_id", logging.ID(data.BlockID)).Logger()
 	log.Debug().Msg("indexing block data")
@@ -144,6 +147,9 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 }
 
 // indexRegisters processes register payloads and stores them in the register database.
+// Expected errors:
+// - convert.UnexpectedLedgerKeyFormat if the key is not in the expected format
+// - storage.ErrHeightNotIndexed if the given height does not match the storage's block height.
 func (i *InMemoryIndexer) indexRegisters(registers map[ledger.Path]*ledger.Payload, height uint64) error {
 	regEntries := make(flow.RegisterEntries, 0, len(registers))
 
@@ -168,6 +174,7 @@ func (i *InMemoryIndexer) indexRegisters(registers map[ledger.Path]*ledger.Paylo
 }
 
 // indexCollection processes a collection and its associated transactions.
+// No errors are expected during normal operation.
 func (i *InMemoryIndexer) indexCollection(collection *flow.Collection) error {
 	// Store the full collection
 	if err := i.collections.Store(collection); err != nil {
