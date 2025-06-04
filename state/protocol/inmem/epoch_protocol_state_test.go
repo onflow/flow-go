@@ -160,4 +160,28 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, adapter.PreviousEpochExists())
 	})
+
+	// Invalid input with nil Params
+	t.Run("invalid - nil Params", func(t *testing.T) {
+		_, err := inmem.NewEpochProtocolStateAdapter(
+			inmem.UntrustedEpochProtocolStateAdapter{
+				RichEpochStateEntry: unittest.EpochStateFixture(),
+				Params:              nil,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "params must not be nil")
+	})
+
+	// Invalid input with nil RichEpochStateEntry
+	t.Run("invalid - nil RichEpochStateEntry", func(t *testing.T) {
+		_, err := inmem.NewEpochProtocolStateAdapter(
+			inmem.UntrustedEpochProtocolStateAdapter{
+				RichEpochStateEntry: nil,
+				Params:              globalParams,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "rich epoch state must not be nil")
+	})
 }
