@@ -200,7 +200,7 @@ func (s *TxErrorMessagesCoreSuite) TestTransactionErrorMessagesRequester_HappyPa
 	requester := NewTransactionErrorMessagesRequester(core, config, executionResult)
 
 	ctx := context.Background()
-	err := requester.RequestTransactionErrorMessages(ctx)
+	err := requester.RequestErrorMessages(ctx)
 	require.NoError(s.T(), err)
 
 	// Verify that the mock expectations for storing the error messages were met.

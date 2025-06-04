@@ -116,9 +116,11 @@ func (c *TxErrorMessagesCore) FetchAndStoreErrorMessagesFromENs(
 		return fmt.Errorf("could not fetch error messages for block %v: %w", blockID, err)
 	}
 
-	err = c.storeErrorMessages(blockID, errorMessages)
-	if err != nil {
-		return fmt.Errorf("could not store error messages for block %v: %w", blockID, err)
+	if len(errorMessages) > 0 {
+		err = c.storeErrorMessages(blockID, errorMessages)
+		if err != nil {
+			return fmt.Errorf("could not store error messages for block %v: %w", blockID, err)
+		}
 	}
 
 	return nil
@@ -142,7 +144,7 @@ func (c *TxErrorMessagesCore) fetchErrorMessagesFromENs(
 	}
 
 	if exists {
-		return nil, fmt.Errorf("no error messages exist for block %s", blockID)
+		return nil, nil
 	}
 
 	// retrieves error messages from the backend if they do not already exist in storage

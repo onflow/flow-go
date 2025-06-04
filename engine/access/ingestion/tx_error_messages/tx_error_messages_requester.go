@@ -42,9 +42,9 @@ func NewTransactionErrorMessagesRequester(
 	}
 }
 
-// RequestTransactionErrorMessages fetches transaction error messages for the specific
+// RequestErrorMessages fetches transaction error messages for the specific
 // execution result this requester was configured with.
-func (r *TransactionErrorMessagesRequester) RequestTransactionErrorMessages(
+func (r *TransactionErrorMessagesRequester) RequestErrorMessages(
 	ctx context.Context,
 ) ([]flow.TransactionResultErrorMessage, error) {
 	backoff := retry.NewExponential(r.config.RetryDelay)
