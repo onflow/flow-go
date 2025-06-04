@@ -303,15 +303,6 @@ func (e *blockComputer) queueSystemTransaction(
 	return nil
 }
 
-func numberOfTransactionsInBlock(collections []*entity.CompleteCollection) int {
-	numTxns := 1 // there's one system transaction per block
-	for _, collection := range collections {
-		numTxns += len(collection.Transactions)
-	}
-
-	return numTxns
-}
-
 // selectChunkConstructorForProtocolVersion selects a [flow.Chunk] constructor to
 // use when constructing the [flow.ExecutionResult] for the input block. We select
 // based on the protocol version at the input block. When we process the version upgrade
