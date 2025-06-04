@@ -75,19 +75,16 @@ type EpochStateContainer struct {
 // ordering during construction.
 //
 // An instance of UntrustedEpochStateContainer should be validated and converted into
-// a trusted EpochStateContainer using NewMinEpochStateEntry constructor.
+// a trusted EpochStateContainer using NewEpochStateContainer constructor.
 type UntrustedEpochStateContainer EpochStateContainer
 
 // NewEpochStateContainer creates a new instance of EpochStateContainer.
-// Construction MinEpochStateEntry allowed only within the constructor.
+// Construction EpochStateContainer allowed only within the constructor.
 //
 // All errors indicate a valid EpochStateContainer cannot be constructed from the input.
 func NewEpochStateContainer(untrusted UntrustedEpochStateContainer) (*EpochStateContainer, error) {
 	if untrusted.SetupID == ZeroID {
 		return nil, fmt.Errorf("SetupID must not be zero")
-	}
-	if untrusted.CommitID == ZeroID {
-		return nil, fmt.Errorf("CommitID must not be zero")
 	}
 	if untrusted.ActiveIdentities == nil {
 		return nil, fmt.Errorf("ActiveIdentities must not be nil")
