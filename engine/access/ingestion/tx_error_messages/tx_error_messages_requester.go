@@ -44,7 +44,6 @@ func NewTransactionErrorMessagesRequester(
 
 // RequestErrorMessages fetches transaction error messages for the specific
 // execution result this requester was configured with.
-// Returns empty list of error message if they already exist in storage for this block.
 func (r *TransactionErrorMessagesRequester) RequestErrorMessages(
 	ctx context.Context,
 ) ([]flow.TransactionResultErrorMessage, error) {
