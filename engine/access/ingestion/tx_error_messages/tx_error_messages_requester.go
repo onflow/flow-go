@@ -46,7 +46,7 @@ func NewTransactionErrorMessagesRequester(
 // execution result this requester was configured with.
 func (r *TransactionErrorMessagesRequester) RequestTransactionErrorMessages(
 	ctx context.Context,
-) error {
+) ([]flow.TransactionResultErrorMessage, error) {
 	backoff := retry.NewExponential(r.config.RetryDelay)
 	backoff = retry.WithCappedDuration(r.config.MaxRetryDelay, backoff)
 	backoff = retry.WithJitterPercent(15, backoff)
@@ -54,8 +54,13 @@ func (r *TransactionErrorMessagesRequester) RequestTransactionErrorMessages(
 	blockID := r.executionResult.BlockID
 	resultID := r.executionResult.ID()
 
+	var (
+		errMessages []flow.TransactionResultErrorMessage
+		lastErr     error
+	)
+
 	attempt := 0
-	return retry.Do(ctx, backoff, func(context.Context) error {
+	err := retry.Do(ctx, backoff, func(context.Context) error {
 		if attempt > 0 {
 			r.core.log.Debug().
 				Str("block_id", blockID.String()).
@@ -65,11 +70,19 @@ func (r *TransactionErrorMessagesRequester) RequestTransactionErrorMessages(
 		}
 		attempt++
 
-		err := r.core.FetchTransactionResultErrorMessagesByResultID(ctx, blockID, resultID)
+		var err error
+		errMessages, err = r.core.FetchErrorMessages(ctx, blockID, resultID)
 		if errors.Is(err, rpc.ErrNoENsFoundForExecutionResult) || status.Code(err) != codes.Canceled {
+			lastErr = err
 			return retry.RetryableError(err)
 		}
 
+		lastErr = err
 		return err
 	})
+
+	if err != nil {
+		return nil, lastErr
+	}
+	return errMessages, nil
 }

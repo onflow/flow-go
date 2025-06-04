@@ -133,7 +133,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 		Return(nil).Once()
 
 	core := s.initCore()
-	err := core.FetchTransactionResultErrorMessages(context.Background(), blockId)
+	err := core.FetchAndStoreErrorMessages(context.Background(), blockId)
 	require.NoError(s.T(), err)
 
 	// Verify that the mock expectations for storing the error messages were met.
@@ -145,7 +145,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 	s.txErrorMessages.On("Exists", blockId).
 		Return(true, nil).Once()
 	s.proto.state.On("AtBlockID", blockId).Return(s.proto.snapshot).Once()
-	err = core.FetchTransactionResultErrorMessages(context.Background(), blockId)
+	err = core.FetchAndStoreErrorMessages(context.Background(), blockId)
 	require.NoError(s.T(), err)
 
 	// Verify that the mock expectations for storing the error messages were not met.
@@ -212,7 +212,7 @@ func (s *TxErrorMessagesCoreSuite) TestTransactionErrorMessagesRequester_HappyPa
 	s.txErrorMessages.On("Exists", blockId).
 		Return(true, nil).Once()
 	s.proto.state.On("AtBlockID", blockId).Return(s.proto.snapshot).Once()
-	err = core.FetchTransactionResultErrorMessages(ctx, blockId)
+	err = core.FetchAndStoreErrorMessages(ctx, blockId)
 	require.NoError(s.T(), err)
 
 	// Verify that the mock expectations for storing the error messages were not met.
@@ -222,7 +222,7 @@ func (s *TxErrorMessagesCoreSuite) TestTransactionErrorMessagesRequester_HappyPa
 }
 
 // TestHandleTransactionResultErrorMessages_ErrorCases tests the error handling of
-// the FetchTransactionResultErrorMessages function in the following cases:
+// the FetchAndStoreErrorMessages function in the following cases:
 //
 // 1. Execution node fetch error: When fetching transaction error messages from the execution node fails,
 // the function should return an appropriate error and no further actions should be taken.
@@ -251,7 +251,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 			Return(nil, fmt.Errorf("execution node fetch error")).Once()
 
 		core := s.initCore()
-		err := core.FetchTransactionResultErrorMessages(context.Background(), blockId)
+		err := core.FetchAndStoreErrorMessages(context.Background(), blockId)
 
 		// Assert that the function returns an error due to the client fetch error.
 		require.Error(s.T(), err)
@@ -283,7 +283,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 			Return(fmt.Errorf("storage error")).Once()
 
 		core := s.initCore()
-		err := core.FetchTransactionResultErrorMessages(context.Background(), blockId)
+		err := core.FetchAndStoreErrorMessages(context.Background(), blockId)
 
 		// Assert that the function returns an error due to the store error.
 		require.Error(s.T(), err)
