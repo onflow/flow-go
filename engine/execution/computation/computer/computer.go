@@ -415,7 +415,7 @@ func (e *blockComputer) executeBlock(
 	wg := &sync.WaitGroup{}
 	wg.Add(e.maxConcurrency)
 
-	for i := 0; i < e.maxConcurrency; i++ { // execute user transactions
+	for i := 0; i < e.maxConcurrency; i++ {
 		go e.executeTransactions(
 			blockSpan,
 			database,
