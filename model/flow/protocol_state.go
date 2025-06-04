@@ -50,7 +50,7 @@ type MinEpochStateEntry struct {
 	EpochFallbackTriggered bool
 }
 
-// UntrustedMinEpochStateEntry is an untrusted input-only representation of an MinEpochStateEntry,
+// UntrustedMinEpochStateEntry is an untrusted input-only representation of a MinEpochStateEntry,
 // used for construction.
 //
 // This type exists to ensure that constructor functions are invoked explicitly
@@ -238,7 +238,7 @@ type EpochStateEntry struct {
 // a trusted EpochStateEntry using NewEpochStateEntry constructor.
 type UntrustedEpochStateEntry EpochStateEntry
 
-// NewEpochStateEntry constructs a EpochStateEntry from an MinEpochStateEntry and additional data.
+// NewEpochStateEntry constructs an EpochStateEntry from a MinEpochStateEntry and additional data.
 // No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
 //
 // All errors indicate a valid EpochStateEntry cannot be constructed from the input.

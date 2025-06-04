@@ -2,6 +2,7 @@ package flow_test
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -967,5 +968,231 @@ func TestNewMinEpochStateEntry(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, entry)
 		require.Contains(t, err.Error(), "current epoch must not be empty")
+	})
+}
+
+// TestEpochStateContainer_EqualTo verifies the correctness of the EqualTo method on EpochStateContainer.
+// It checks that containers are considered equal if and only if all fields match.
+func TestEpochStateContainer_EqualTo(t *testing.T) {
+	// Create two containers with different values
+	identities1 := unittest.DynamicIdentityEntryListFixture(3)
+	identities2 := unittest.DynamicIdentityEntryListFixture(3)
+
+	c1 := &flow.EpochStateContainer{
+		SetupID:          unittest.IdentifierFixture(),
+		CommitID:         unittest.IdentifierFixture(),
+		ActiveIdentities: identities1,
+		EpochExtensions: []flow.EpochExtension{
+			{
+				FirstView: 201,
+				FinalView: 300,
+			},
+		},
+	}
+
+	c2 := &flow.EpochStateContainer{
+		SetupID:          unittest.IdentifierFixture(),
+		CommitID:         unittest.IdentifierFixture(),
+		ActiveIdentities: identities2,
+		EpochExtensions: []flow.EpochExtension{
+			{
+				FirstView: 301,
+				FinalView: 400,
+			},
+		},
+	}
+
+	require.False(t, c1.EqualTo(c2), "Initially, all fields differ; EqualTo should return false")
+
+	// List of mutations to apply to c1 to gradually make it equal to c2
+	mutations := []func(){
+		func() {
+			c1.SetupID = c2.SetupID
+		},
+		func() {
+			c1.CommitID = c2.CommitID
+		},
+		func() {
+			c1.ActiveIdentities = make(flow.DynamicIdentityEntryList, len(c2.ActiveIdentities))
+			for i := range c2.ActiveIdentities {
+				c1.ActiveIdentities[i] = c2.ActiveIdentities[i]
+			}
+		},
+		func() {
+			c1.EpochExtensions = make([]flow.EpochExtension, len(c2.EpochExtensions))
+			for i := range c2.EpochExtensions {
+				c1.EpochExtensions[i] = c2.EpochExtensions[i]
+			}
+		},
+	}
+
+	// Shuffle the order of mutations
+	rand.Shuffle(len(mutations), func(i, j int) {
+		mutations[i], mutations[j] = mutations[j], mutations[i]
+	})
+
+	// Apply each mutation one at a time, except the last.
+	// After each step, the containers should still not be equal.
+	for _, mutation := range mutations[:len(mutations)-1] {
+		mutation()
+		require.False(t, c1.EqualTo(c2))
+	}
+
+	// Final mutation should make the containers fully equal.
+	mutations[len(mutations)-1]()
+	require.True(t, c1.EqualTo(c2))
+}
+
+// TestEpochStateContainer_EqualTo_Nil verifies the behavior of the EqualTo method on EpochStateContainer when either
+// or both the receiver and the function input are nil.
+func TestEpochStateContainer_EqualTo_Nil(t *testing.T) {
+	var nilContainer *flow.EpochStateContainer
+	nonNil := &flow.EpochStateContainer{
+		SetupID:          unittest.IdentifierFixture(),
+		CommitID:         unittest.IdentifierFixture(),
+		ActiveIdentities: unittest.DynamicIdentityEntryListFixture(3),
+		EpochExtensions: []flow.EpochExtension{
+			{
+				FirstView: 201,
+				FinalView: 300,
+			},
+		},
+	}
+
+	t.Run("nil receiver", func(t *testing.T) {
+		require.False(t, nilContainer.EqualTo(nonNil))
+	})
+
+	t.Run("nil input", func(t *testing.T) {
+		require.False(t, nonNil.EqualTo(nilContainer))
+	})
+
+	t.Run("both nil", func(t *testing.T) {
+		require.True(t, nilContainer.EqualTo(nil))
+	})
+}
+
+// TestEpochExtension_EqualTo verifies the correctness of the EqualTo method on EpochExtension.
+// It checks that EpochExtensions are considered equal if and only if all fields match.
+func TestEpochExtension_EqualTo(t *testing.T) {
+	// Create two extensions with different values
+	ext1 := &flow.EpochExtension{
+		FirstView: 100,
+		FinalView: 200,
+	}
+	ext2 := &flow.EpochExtension{
+		FirstView: 300,
+		FinalView: 400,
+	}
+
+	require.False(t, ext1.EqualTo(ext2), "Initially, all fields differ; EqualTo should return false")
+
+	// List of mutations to apply to ext1 to gradually make it equal to ext2
+	mutations := []func(){
+		func() {
+			ext1.FirstView = ext2.FirstView
+		},
+		func() {
+			ext1.FinalView = ext2.FinalView
+		},
+	}
+
+	// Shuffle the order of mutations
+	rand.Shuffle(len(mutations), func(i, j int) {
+		mutations[i], mutations[j] = mutations[j], mutations[i]
+	})
+
+	// Apply each mutation one at a time, except the last.
+	// After each step, the extensions should still not be equal.
+	for _, mutation := range mutations[:len(mutations)-1] {
+		mutation()
+		require.False(t, ext1.EqualTo(ext2))
+	}
+
+	// Final mutation should make the extensions fully equal.
+	mutations[len(mutations)-1]()
+	require.True(t, ext1.EqualTo(ext2))
+}
+
+// TestEpochExtension_EqualTo_Nil verifies the behavior of the EqualTo method on EpochExtension when either
+// or both the receiver and the function input are nil.
+func TestEpochExtension_EqualTo_Nil(t *testing.T) {
+	var nilExt *flow.EpochExtension
+	nonNil := &flow.EpochExtension{
+		FirstView: 1,
+		FinalView: 2,
+	}
+
+	t.Run("nil receiver", func(t *testing.T) {
+		require.False(t, nilExt.EqualTo(nonNil))
+	})
+
+	t.Run("nil input", func(t *testing.T) {
+		require.False(t, nonNil.EqualTo(nilExt))
+	})
+
+	t.Run("both nil", func(t *testing.T) {
+		require.True(t, nilExt.EqualTo(nil))
+	})
+}
+
+// TestDynamicIdentityEntry_EqualTo verifies the correctness of the EqualTo method on DynamicIdentityEntry.
+// It checks that DynamicIdentityEntries are considered equal if and only if all fields match.
+func TestDynamicIdentityEntry_EqualTo(t *testing.T) {
+	entry1 := &flow.DynamicIdentityEntry{
+		NodeID:  unittest.IdentifierFixture(),
+		Ejected: false,
+	}
+	entry2 := &flow.DynamicIdentityEntry{
+		NodeID:  unittest.IdentifierFixture(),
+		Ejected: true,
+	}
+
+	require.False(t, entry1.EqualTo(entry2), "Initially, all fields differ; EqualTo should return false")
+
+	// List of mutations to gradually make entry1 equal to entry2
+	mutations := []func(){
+		func() {
+			entry1.NodeID = entry2.NodeID
+		},
+		func() {
+			entry1.Ejected = entry2.Ejected
+		},
+	}
+
+	// Shuffle mutation order
+	rand.Shuffle(len(mutations), func(i, j int) {
+		mutations[i], mutations[j] = mutations[j], mutations[i]
+	})
+
+	// Apply each mutation one at a time, except the last.
+	for _, mutation := range mutations[:len(mutations)-1] {
+		mutation()
+		require.False(t, entry1.EqualTo(entry2))
+	}
+
+	// Final mutation: should now be equal
+	mutations[len(mutations)-1]()
+	require.True(t, entry1.EqualTo(entry2))
+}
+
+// TestDynamicIdentityEntry_EqualTo_Nil verifies the behavior of EqualTo on DynamicIdentityEntry when one or both inputs are nil.
+func TestDynamicIdentityEntry_EqualTo_Nil(t *testing.T) {
+	var nilEntry *flow.DynamicIdentityEntry
+	nonNil := &flow.DynamicIdentityEntry{
+		NodeID:  unittest.IdentifierFixture(),
+		Ejected: false,
+	}
+
+	t.Run("nil receiver", func(t *testing.T) {
+		require.False(t, nilEntry.EqualTo(nonNil))
+	})
+
+	t.Run("nil input", func(t *testing.T) {
+		require.False(t, nonNil.EqualTo(nilEntry))
+	})
+
+	t.Run("both nil", func(t *testing.T) {
+		require.True(t, nilEntry.EqualTo(nil))
 	})
 }
