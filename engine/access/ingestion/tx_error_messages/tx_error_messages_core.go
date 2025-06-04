@@ -150,22 +150,7 @@ func (c *TxErrorMessagesCore) fetchErrorMessagesIfNotCached(
 		return []flow.TransactionResultErrorMessage{}, nil
 	}
 
-	// retrieve error messages from the backend if they do not already exist in storage
-	c.log.Debug().
-		Msgf("transaction error messages for block %s are being downloaded", blockID)
-
-	req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
-		BlockId: convert.IdentifierToMessage(blockID),
-	}
-
-	resp, execNode, err := c.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
-	if err != nil {
-		c.log.Error().Err(err).Msg("failed to get transaction error messages from execution nodes")
-		return nil, err
-	}
-
-	errorMessages := c.convertErrorMessagesResponse(resp, execNode)
-	return errorMessages, nil
+	return c.fetchErrorMessages(ctx, blockID, execNodes)
 }
 
 // fetchErrorMessages retrieves transaction result error messages via provided list of execution nodes.
@@ -179,12 +164,12 @@ func (c *TxErrorMessagesCore) fetchErrorMessages(
 	blockID flow.Identifier,
 	execNodes flow.IdentitySkeletonList,
 ) ([]flow.TransactionResultErrorMessage, error) {
+	c.log.Debug().
+		Msgf("transaction error messages for block %s are being downloaded", blockID)
+
 	req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
 		BlockId: convert.IdentifierToMessage(blockID),
 	}
-
-	c.log.Debug().
-		Msgf("transaction error messages for block %s are being downloaded", blockID)
 
 	resp, execNode, err := c.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
 	if err != nil {
