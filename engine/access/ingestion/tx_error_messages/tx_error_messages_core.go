@@ -70,6 +70,7 @@ func (c *TxErrorMessagesCore) FetchAndStoreErrorMessages(
 
 // FetchErrorMessages retrieves tx result error messages for a given execution result ID
 // from execution nodes that generated receipts within a specific block.
+// Returns empty list of error message if they already exist in storage for given block.
 //
 // Parameters:
 // - ctx: The context for managing cancellation and deadlines during the operation.
@@ -100,7 +101,7 @@ func (c *TxErrorMessagesCore) FetchErrorMessages(
 }
 
 // FetchAndStoreErrorMessagesFromENs fetches transaction result error messages via provided list
-// of execution nodes.
+// of execution nodes. Returns empty list of error message if they already exist in storage for given block.
 //
 // Expected errors during normal operation:
 //   - status.Error - GRPC call failed, some of possible codes are:
