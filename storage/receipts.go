@@ -23,7 +23,7 @@ type ExecutionReceipts interface {
 	// (from any Execution Node).
 	//
 	// Expected errors during normal operation:
-	// - storage.ErrNotFound if no receipts was found in the storage
+	// - storage.ErrNotFound if no receipts were found in storage
 	ByBlockID(blockID flow.Identifier) (flow.ExecutionReceiptList, error)
 }
 
