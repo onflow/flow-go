@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
+	clone "github.com/huandu/go-clone/generic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -1013,16 +1014,10 @@ func TestEpochStateContainer_EqualTo(t *testing.T) {
 			c1.CommitID = c2.CommitID
 		},
 		func() {
-			c1.ActiveIdentities = make(flow.DynamicIdentityEntryList, len(c2.ActiveIdentities))
-			for i := range c2.ActiveIdentities {
-				c1.ActiveIdentities[i] = c2.ActiveIdentities[i]
-			}
+			c1.ActiveIdentities = clone.Clone(c2.ActiveIdentities)
 		},
 		func() {
-			c1.EpochExtensions = make([]flow.EpochExtension, len(c2.EpochExtensions))
-			for i := range c2.EpochExtensions {
-				c1.EpochExtensions[i] = c2.EpochExtensions[i]
-			}
+			c1.EpochExtensions = clone.Clone(c2.EpochExtensions)
 		},
 	}
 

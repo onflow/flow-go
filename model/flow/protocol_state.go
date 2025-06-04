@@ -427,7 +427,7 @@ func (e *MinEpochStateEntry) Copy() *MinEpochStateEntry {
 	if e == nil {
 		return nil
 	}
-	// we can omit using constructor here cause we copy already created object
+	// Constructor is skipped since we're copying an already-valid object.
 	//nolint:structwrite
 	return &MinEpochStateEntry{
 		e.PreviousEpoch.Copy(),
@@ -444,25 +444,17 @@ func (e *EpochStateEntry) Copy() *EpochStateEntry {
 		return nil
 	}
 
-	epochStateEntry, err := NewEpochStateEntry(
-		UntrustedEpochStateEntry{
-			MinEpochStateEntry:  e.MinEpochStateEntry.Copy(),
-			PreviousEpochSetup:  e.PreviousEpochSetup,
-			PreviousEpochCommit: e.PreviousEpochCommit,
-			CurrentEpochSetup:   e.CurrentEpochSetup,
-			CurrentEpochCommit:  e.CurrentEpochCommit,
-			NextEpochSetup:      e.NextEpochSetup,
-			NextEpochCommit:     e.NextEpochCommit,
-		},
-	)
-	if err != nil {
-		// observing an error here would be an indication of severe data corruption or bug in our code since
-		// all data should be available and correctly structured at this point.
-		// TODO: should probably return an irrecoverable error
-		panic(err)
+	// Constructor is skipped since we're copying an already-valid object.
+	//nolint:structwrite
+	return &EpochStateEntry{
+		MinEpochStateEntry:  e.MinEpochStateEntry.Copy(),
+		PreviousEpochSetup:  e.PreviousEpochSetup,
+		PreviousEpochCommit: e.PreviousEpochCommit,
+		CurrentEpochSetup:   e.CurrentEpochSetup,
+		CurrentEpochCommit:  e.CurrentEpochCommit,
+		NextEpochSetup:      e.NextEpochSetup,
+		NextEpochCommit:     e.NextEpochCommit,
 	}
-
-	return epochStateEntry
 }
 
 // Copy returns a full copy of the RichEpochStateEntry.
@@ -472,7 +464,7 @@ func (e *RichEpochStateEntry) Copy() *RichEpochStateEntry {
 	if e == nil {
 		return nil
 	}
-	// we can omit using constructor here cause we copy already created object
+	// Constructor is skipped since we're copying an already-valid object.
 	//nolint:structwrite
 	return &RichEpochStateEntry{
 		EpochStateEntry:           e.EpochStateEntry.Copy(),
