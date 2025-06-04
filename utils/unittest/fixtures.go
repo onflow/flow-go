@@ -2310,7 +2310,10 @@ func BootstrapFixtureWithChainID(
 	if err != nil {
 		panic(err)
 	}
-	rootEpochState := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
+	rootEpochState, err := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
+	if err != nil {
+		panic(err)
+	}
 	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, rootEpochState.ID())
 	if err != nil {
 		panic(err)

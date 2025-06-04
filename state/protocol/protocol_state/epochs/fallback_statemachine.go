@@ -92,12 +92,18 @@ func (m *FallbackStateMachine) extendCurrentEpoch(epochExtension flow.EpochExten
 	}
 
 	epochExtensions := append(state.CurrentEpoch.EpochExtensions, epochExtension)
-	state.CurrentEpoch = flow.NewEpochStateContainer(
-		state.CurrentEpoch.SetupID,
-		state.CurrentEpoch.CommitID,
-		state.CurrentEpoch.ActiveIdentities,
-		epochExtensions,
+	currentEpoch, err := flow.NewEpochStateContainer(
+		flow.UntrustedEpochStateContainer{
+			SetupID:          state.CurrentEpoch.SetupID,
+			CommitID:         state.CurrentEpoch.CommitID,
+			ActiveIdentities: state.CurrentEpoch.ActiveIdentities,
+			EpochExtensions:  epochExtensions,
+		},
 	)
+	if err != nil {
+		return fmt.Errorf("could not construct current epoch state: %w", err)
+	}
+	state.CurrentEpoch = *currentEpoch
 
 	return nil
 }
@@ -193,12 +199,17 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), fmt.Errorf("rejecting EpochRecover event: %w", err))
 		return false, nil
 	}
-	nextEpochState := flow.NewEpochStateContainer(
-		epochRecover.EpochSetup.ID(),
-		epochRecover.EpochCommit.ID(),
-		nextEpochParticipants,
-		nil,
+	nextEpochState, err := flow.NewEpochStateContainer(
+		flow.UntrustedEpochStateContainer{
+			SetupID:          epochRecover.EpochSetup.ID(),
+			CommitID:         epochRecover.EpochCommit.ID(),
+			ActiveIdentities: nextEpochParticipants,
+			EpochExtensions:  nil,
+		},
 	)
+	if err != nil {
+		return false, fmt.Errorf("could not construct next epoch state: %w", err)
+	}
 
 	err = m.ejector.TrackDynamicIdentityList(nextEpochState.ActiveIdentities)
 	if err != nil {
@@ -209,7 +220,7 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		return false, fmt.Errorf("unexpected errors tracking identity list: %w", err)
 	}
 	// if we have processed a valid EpochRecover event, we should exit EFM.
-	m.state.NextEpoch = &nextEpochState
+	m.state.NextEpoch = nextEpochState
 	m.state.EpochFallbackTriggered = false
 	m.telemetry.OnServiceEventProcessed(epochRecover.ServiceEvent())
 	return true, nil
