@@ -41,12 +41,12 @@ type BlocksByCollection struct {
 	ExecutableBlocks map[flow.Identifier]*ExecutableBlock
 }
 
-func (c CompleteCollection) Collection() flow.Collection {
+func (c CompleteCollection) Collection() (*flow.Collection, error) {
 	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: c.Transactions})
 	if err != nil {
-		panic(fmt.Sprintf("invalid CompleteCollection: %v", err))
+		return nil, fmt.Errorf("could not construct collection: %w", err)
 	}
-	return *collection
+	return collection, nil
 }
 
 func (c CompleteCollection) IsCompleted() bool {

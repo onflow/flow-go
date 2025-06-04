@@ -38,7 +38,11 @@ type Payload struct {
 // EmptyPayload returns a payload with an empty collection and the given
 // reference block ID.
 func EmptyPayload(refID flow.Identifier) Payload {
-	return PayloadFromTransactions(refID)
+	//nolint:structwrite
+	return Payload{
+		Collection:       flow.Collection{Transactions: []*flow.TransactionBody{}},
+		ReferenceBlockID: refID,
+	}
 }
 
 // PayloadFromTransactions creates a payload given a reference block ID and a
