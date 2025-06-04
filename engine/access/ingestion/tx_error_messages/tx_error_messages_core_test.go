@@ -181,16 +181,12 @@ func (s *TxErrorMessagesCoreSuite) TestTransactionErrorMessagesRequester_HappyPa
 		Return(createTransactionErrorMessagesResponse(resultsByBlockID), nil).
 		Once()
 
-	// 1. Mock the txErrorMessages storage to confirm that error messages do not exist yet.
+	// Mock the txErrorMessages storage to confirm that error messages do not exist yet.
 	s.txErrorMessages.On("Exists", blockId).
 		Return(false, nil).Once()
 
 	// Prepare the expected transaction error messages that should be stored.
-	expectedStoreTxErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
-
-	// Mock the storage of the fetched error messages into the protocol database.
-	s.txErrorMessages.On("Store", blockId, expectedStoreTxErrorMessages).
-		Return(nil).Once()
+	expectedErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
 
 	core := s.initCore()
 	config := &TransactionErrorMessagesRequesterConfig{
@@ -200,8 +196,9 @@ func (s *TxErrorMessagesCoreSuite) TestTransactionErrorMessagesRequester_HappyPa
 	requester := NewTransactionErrorMessagesRequester(core, config, executionResult)
 
 	ctx := context.Background()
-	err := requester.RequestErrorMessages(ctx)
+	actualErrorMessages, err := requester.RequestErrorMessages(ctx)
 	require.NoError(s.T(), err)
+	require.ElementsMatch(s.T(), expectedErrorMessages, actualErrorMessages)
 
 	// Verify that the mock expectations for storing the error messages were met.
 	s.txErrorMessages.AssertExpectations(s.T())
