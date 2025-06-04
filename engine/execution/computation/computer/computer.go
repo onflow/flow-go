@@ -257,7 +257,6 @@ func (e *blockComputer) queueSystemTransaction(
 	blockIdStr string,
 	blockHeader *flow.Header,
 	rawCollections []*entity.CompleteCollection,
-	numTxns int,
 	requestQueue chan TransactionRequest,
 ) error {
 	systemTxn, err := blueprints.SystemChunkTransaction(e.vmCtx.Chain)
@@ -265,19 +264,23 @@ func (e *blockComputer) queueSystemTransaction(
 		return fmt.Errorf("could not get system chunk transaction: %w", err)
 	}
 
+	txCount := uint32(len(requestQueue))
+
 	systemCtx := fvm.NewContextFromParent(
 		e.systemChunkCtx,
 		fvm.WithBlockHeader(blockHeader),
 		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(blockId)),
 	)
+
 	systemCollectionLogger := systemCtx.Logger.With().
 		Str("block_id", blockIdStr).
 		Uint64("height", blockHeader.Height).
 		Bool("system_chunk", true).
 		Bool("system_transaction", true).
 		Int("num_collections", len(rawCollections)).
-		Int("num_txs", numTxns).
+		Uint32("num_txs", txCount+1). // +1 system tx bellow
 		Logger()
+
 	systemCollectionInfo := collectionInfo{
 		blockId:         blockId,
 		blockIdStr:      blockIdStr,
@@ -293,7 +296,7 @@ func (e *blockComputer) queueSystemTransaction(
 		systemCollectionInfo,
 		systemCtx,
 		systemCollectionLogger,
-		uint32(numTxns),
+		txCount,
 		systemTxn,
 		true)
 
@@ -357,8 +360,6 @@ func (e *blockComputer) executeBlock(
 		attribute.Int("collection_counts", len(rawCollections)))
 	defer blockSpan.End()
 
-	numTxns := numberOfTransactionsInBlock(rawCollections)
-
 	// We temporarily support chunk models associated with both protocol versions 1 and 2.
 	// TODO(mainnet27, #6773): remove this https://github.com/onflow/flow-go/issues/6773
 	versionedChunkConstructor, err := e.selectChunkConstructorForProtocolVersion(blockId)
@@ -377,14 +378,13 @@ func (e *blockComputer) executeBlock(
 		e.receiptHasher,
 		parentBlockExecutionResultID,
 		block,
-		numTxns,
 		e.colResCons,
 		baseSnapshot,
 		versionedChunkConstructor,
 	)
 	defer collector.Stop()
 
-	requestQueue := make(chan TransactionRequest, numTxns)
+	requestQueue := make(chan TransactionRequest)
 
 	database := newTransactionCoordinator(
 		e.vm,
@@ -405,7 +405,6 @@ func (e *blockComputer) executeBlock(
 		blockIdStr,
 		block.Block.Header,
 		rawCollections,
-		numTxns,
 		requestQueue,
 	)
 	close(requestQueue)
