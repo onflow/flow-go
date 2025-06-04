@@ -1147,14 +1147,9 @@ func NodeConfigFixture(opts ...func(*flow.Identity)) bootstrap.NodeConfig {
 	}
 }
 
-func NodeInfoFixture(opts ...func(*flow.Identity)) bootstrap.NodeInfo {
-	nodes := NodeInfosFixture(1, opts...)
-	return nodes[0]
-}
-
-// NodeInfoFromIdentity converts an identity to a public NodeInfo
+// NodeInfoPubFromIdentity converts an identity to a public NodeInfo
 // WARNING: the function replaces the staking key from the identity by a freshly generated one.
-func NodeInfoFromIdentity(identity *flow.Identity) bootstrap.NodeInfo {
+func NodeInfoPubFromIdentity(identity *flow.Identity) bootstrap.NodeInfoPub {
 	stakingSK := StakingPrivKeyFixture()
 	stakingPoP, err := crypto.BLSGeneratePOP(stakingSK)
 	if err != nil {
@@ -1172,31 +1167,32 @@ func NodeInfoFromIdentity(identity *flow.Identity) bootstrap.NodeInfo {
 	)
 }
 
-func NodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfo {
+func PublicNodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfoPub {
 	opts = append(opts, WithKeys)
 	il := IdentityListFixture(n, opts...)
-	nodeInfos := make([]bootstrap.NodeInfo, 0, n)
+	nodeInfos := make([]bootstrap.NodeInfoPub, 0, n)
 	for _, identity := range il {
-		nodeInfos = append(nodeInfos, NodeInfoFromIdentity(identity))
+		nodeInfos = append(nodeInfos, NodeInfoPubFromIdentity(identity))
 	}
 	return nodeInfos
+}
+
+func PublicNodeInfoFixture(opts ...func(*flow.Identity)) bootstrap.NodeInfoPub {
+	return PublicNodeInfosFixture(1, opts...)[0]
 }
 
 func PrivateNodeInfoFixture(opts ...func(*flow.Identity)) bootstrap.NodeInfo {
 	return PrivateNodeInfosFixture(1, opts...)[0]
 }
 
-func PrivateNodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfo {
+func PrivateNodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfoPriv {
 	return PrivateNodeInfosFromIdentityList(IdentityListFixture(n, opts...))
 }
 
-func PrivateNodeInfosFromIdentityList(il flow.IdentityList) []bootstrap.NodeInfo {
-	nodeInfos := make([]bootstrap.NodeInfo, 0, len(il))
+func PrivateNodeInfosFromIdentityList(il flow.IdentityList) []bootstrap.NodeInfoPriv {
+	nodeInfos := make([]bootstrap.NodeInfoPriv, 0, len(il))
 	for _, identity := range il {
-		nodeInfo, err := bootstrap.PrivateNodeInfoFromIdentity(identity, KeyFixture(crypto.ECDSAP256), KeyFixture(crypto.BLSBLS12381))
-		if err != nil {
-			panic(err.Error())
-		}
+		nodeInfo := bootstrap.PrivateNodeInfoPubFromIdentity(identity, KeyFixture(crypto.ECDSAP256), KeyFixture(crypto.BLSBLS12381))
 		nodeInfos = append(nodeInfos, nodeInfo)
 	}
 	return nodeInfos

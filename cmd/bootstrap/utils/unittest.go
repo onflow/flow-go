@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -15,7 +16,8 @@ func RunWithSporkBootstrapDir(t testing.TB, f func(bootDir, partnerDir, partnerW
 
 	// make sure constraints are satisfied, 2/3's of con and col nodes are internal
 	internalNodes := GenerateNodeInfos(3, 6, 2, 1, 1)
-	partnerNodes := GenerateNodeInfos(1, 1, 1, 1, 1)
+	partnerNodes, err := bootstrap.ToPublicNodeInfoList(GenerateNodeInfos(1, 1, 1, 1, 1))
+	require.NoError(t, err)
 
 	partnerDir, partnerWeightsPath, err := WritePartnerFiles(partnerNodes, dir)
 	require.NoError(t, err)

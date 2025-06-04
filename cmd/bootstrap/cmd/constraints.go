@@ -30,10 +30,13 @@ func ensureUniformNodeWeightsPerRole(allNodes flow.IdentityList) {
 //   - Internal nodes must comprise >2/3 of each collector cluster.
 //   - for all roles R:
 //     all node with role R must have the same weight
-func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
-	partners := model.ToIdentityList(partnerNodes)
-	internals := model.ToIdentityList(internalNodes)
-	all := append(partners, internals...)
-
+func checkConstraints(partnerNodes []model.NodeInfoPub, internalNodes []model.NodeInfoPriv) {
+	all := make([]*flow.Identity, len(partnerNodes)+len(internalNodes))
+	for _, node := range partnerNodes {
+		all = append(all, node.Identity())
+	}
+	for _, node := range internalNodes {
+		all = append(all, node.Identity())
+	}
 	ensureUniformNodeWeightsPerRole(all)
 }

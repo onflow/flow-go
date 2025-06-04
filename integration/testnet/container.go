@@ -51,7 +51,7 @@ func init() {
 
 // ContainerConfig represents configuration for a node container in the network.
 type ContainerConfig struct {
-	bootstrap.NodeInfo
+	bootstrap.NodeInfoPriv
 	// Corrupted indicates a container is running a binary implementing a malicious node
 	Corrupted           bool
 	ContainerName       string
@@ -100,7 +100,7 @@ func GetPrivateNodeInfoAddress(nodeName string) string {
 
 func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey crypto.PrivateKey,
 ) (ContainerConfig, error) {
-	info, err := bootstrap.NewPrivateNodeInfo(
+	info := bootstrap.NewPrivateNodeInfo(
 		conf.Identifier,
 		conf.Role,
 		GetPrivateNodeInfoAddress(nodeName),
@@ -108,12 +108,9 @@ func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey
 		networkKey,
 		stakingKey,
 	)
-	if err != nil {
-		return ContainerConfig{}, err
-	}
 
 	containerConf := ContainerConfig{
-		NodeInfo:            info,
+		NodeInfoPriv:        info,
 		ContainerName:       nodeName,
 		LogLevel:            conf.LogLevel,
 		Ghost:               conf.Ghost,

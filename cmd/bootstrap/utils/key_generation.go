@@ -172,7 +172,7 @@ type WriteFileFunc func(relativePath string, data []byte) error
 // nodes were registered during execution state bootstrapping.
 //
 // Only applicable for transient test networks.
-func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeInfo, write WriteJSONFileFunc) error {
+func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeInfoPriv, write WriteJSONFileFunc) error {
 
 	// ensure the chain ID is for a transient chain, where it is possible to
 	// infer machine account addresses this way
@@ -186,13 +186,6 @@ func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeIn
 	// the Flow address of the machine account to the key.
 	addressIndex := uint64(systemcontracts.LastSystemAccountIndex)
 	for _, nodeInfo := range nodeInfos {
-
-		// retrieve private representation of the node
-		private, err := nodeInfo.Private()
-		if err != nil {
-			return err
-		}
-
 		// We use the network key for the machine account. Normally it would be
 		// a separate key.
 
@@ -206,7 +199,7 @@ func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeIn
 		//
 		// The accounts are created in the same order defined by the identity list
 		// provided to BootstrapProcedure, which is the same order as this iteration.
-		if nodeInfo.Role == flow.RoleCollection || nodeInfo.Role == flow.RoleConsensus {
+		if nodeInfo.Role() == flow.RoleCollection || nodeInfo.Role() == flow.RoleConsensus {
 			// increment the address index to account for both the staking account
 			// and the machine account.
 			// now addressIndex points to the machine account address index
@@ -225,13 +218,13 @@ func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeIn
 
 		info := bootstrap.NodeMachineAccountInfo{
 			Address:           accountAddress.HexWithPrefix(),
-			EncodedPrivateKey: private.NetworkPrivKey.Encode(),
+			EncodedPrivateKey: nodeInfo.NetworkPrivKey.Encode(),
 			KeyIndex:          0,
-			SigningAlgorithm:  private.NetworkPrivKey.Algorithm(),
+			SigningAlgorithm:  nodeInfo.NetworkPrivKey.Algorithm(),
 			HashAlgorithm:     sdkcrypto.SHA3_256,
 		}
 
-		path := fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeInfo.NodeID)
+		path := fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeInfo.NodeID())
 		err = write(path, info)
 		if err != nil {
 			return err
@@ -266,7 +259,7 @@ func WriteMachineAccountFile(
 
 // WriteSecretsDBEncryptionKeyFiles writes secret db encryption keys to private
 // node info directory.
-func WriteSecretsDBEncryptionKeyFiles(nodeInfos []bootstrap.NodeInfo, write WriteFileFunc) error {
+func WriteSecretsDBEncryptionKeyFiles(nodeInfos []bootstrap.NodeInfoPriv, write WriteFileFunc) error {
 
 	for _, nodeInfo := range nodeInfos {
 
@@ -276,7 +269,7 @@ func WriteSecretsDBEncryptionKeyFiles(nodeInfos []bootstrap.NodeInfo, write Writ
 			return err
 		}
 
-		path := fmt.Sprintf(bootstrap.PathSecretsEncryptionKey, nodeInfo.NodeID)
+		path := fmt.Sprintf(bootstrap.PathSecretsEncryptionKey, nodeInfo.NodeID())
 		err = write(path, encryptionKey)
 		if err != nil {
 			return err
@@ -287,33 +280,24 @@ func WriteSecretsDBEncryptionKeyFiles(nodeInfos []bootstrap.NodeInfo, write Writ
 
 // WriteStakingNetworkingKeyFiles writes staking and networking keys to private
 // node info files.
-func WriteStakingNetworkingKeyFiles(nodeInfos []bootstrap.NodeInfo, write WriteJSONFileFunc) error {
-
+func WriteStakingNetworkingKeyFiles(nodeInfos []bootstrap.NodeInfoPriv, write WriteJSONFileFunc) error {
 	for _, nodeInfo := range nodeInfos {
-
-		// retrieve private representation of the node
-		private, err := nodeInfo.Private()
-		if err != nil {
-			return err
-		}
-
-		path := fmt.Sprintf(bootstrap.PathNodeInfoPriv, nodeInfo.NodeID)
-		err = write(path, private)
+		path := fmt.Sprintf(bootstrap.PathNodeInfoPriv, nodeInfo.NodeID())
+		err := write(path, nodeInfo)
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
 // WriteNodeInternalPubInfos writes the `node-internal-infos.pub.json` file.
 // In a nutshell, this file contains the Role, address and weight for all authorized nodes.
-func WriteNodeInternalPubInfos(nodeInfos []bootstrap.NodeInfo, write WriteJSONFileFunc) error {
+func WriteNodeInternalPubInfos(nodeInfos []bootstrap.NodeInfoPub, write WriteJSONFileFunc) error {
 	configs := make([]model.NodeConfig, len(nodeInfos))
 	for i, nodeInfo := range nodeInfos {
 		configs[i] = model.NodeConfig{
-			Role:    nodeInfo.Role,
+			Role:    nodeInfo.Role(),
 			Address: nodeInfo.Address,
 			Weight:  nodeInfo.Weight,
 		}

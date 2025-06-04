@@ -71,7 +71,7 @@ func GenerateRecoverEpochTxArgs(
 // No errors are expected during normal operation.
 func GenerateRecoverTxArgsWithDKG(
 	log zerolog.Logger,
-	internalNodes []bootstrap.NodeInfo,
+	internalNodes []bootstrap.NodeInfoPriv,
 	collectionClusters int,
 	recoveryEpochCounter uint64,
 	rootChainID flow.ChainID,
@@ -152,17 +152,17 @@ func GenerateRecoverTxArgsWithDKG(
 	internalNodesMap := make(map[flow.Identifier]struct{})
 	for _, node := range internalNodes {
 		if !eligibleEpochIdentities.Exists(node.Identity()) {
-			log.Warn().Msgf("Internal node (role=%s id=%x addr=%s) found in internal directory but does not exist in most recent protocol state snapshot. This node will be excluded from recovery epoch.", node.Role, node.NodeID, node.Address)
+			log.Warn().Msgf("Internal node (role=%s id=%x addr=%s) found in internal directory but does not exist in most recent protocol state snapshot. This node will be excluded from recovery epoch.", node.Role(), node.NodeID(), node.Address)
 			continue
 		}
 		// only add nodes which exist in protocol state snapshot
-		internalNodesMap[node.NodeID] = struct{}{}
+		internalNodesMap[node.NodeID()] = struct{}{}
 	}
 	// Filter internalNodes so it only contains nodes which are valid for inclusion in the epoch
 	// This is a safety measure: just in case subsequent functions don't properly account for additional nodes,
 	// we proactively remove them from consideration here.
-	internalNodes = slices.DeleteFunc(slices.Clone(internalNodes), func(info model.NodeInfo) bool {
-		_, isCurrentEligibleEpochParticipant := internalNodesMap[info.NodeID]
+	internalNodes = slices.DeleteFunc(slices.Clone(internalNodes), func(info model.NodeInfoPriv) bool {
+		_, isCurrentEligibleEpochParticipant := internalNodesMap[info.NodeID()]
 		return !isCurrentEligibleEpochParticipant
 	})
 
@@ -294,12 +294,12 @@ func GenerateRecoverTxArgsWithDKG(
 // Args:
 // - log: the logger instance.
 // - clusterList: list of clusters
-// - nodeInfos: list of NodeInfos (must contain all internal nodes)
+// - nodeInfos: list of NodeInfoPriv (must contain all internal nodes)
 // - clusterBlocks: list of root blocks (one for each cluster)
 // Returns:
 // - flow.AssignmentList: the generated assignment list.
 // - flow.ClusterList: the generate collection cluster list.
-func ConstructRootQCsForClusters(log zerolog.Logger, clusterList flow.ClusterList, nodeInfos []bootstrap.NodeInfo, clusterBlocks []*cluster.Block) []*flow.QuorumCertificate {
+func ConstructRootQCsForClusters(log zerolog.Logger, clusterList flow.ClusterList, nodeInfos []bootstrap.NodeInfoPriv, clusterBlocks []*cluster.Block) []*flow.QuorumCertificate {
 	if len(clusterBlocks) != len(clusterList) {
 		log.Fatal().Int("len(clusterBlocks)", len(clusterBlocks)).Int("len(clusterList)", len(clusterList)).
 			Msg("number of clusters needs to equal number of cluster blocks")
@@ -323,13 +323,12 @@ func ConstructRootQCsForClusters(log zerolog.Logger, clusterList flow.ClusterLis
 // Filters a list of nodes to include only nodes that will sign the QC for the
 // given cluster. The resulting list of nodes is only nodes that are in the
 // given cluster AND are not partner nodes (ie. we have the private keys).
-func filterClusterSigners(cluster flow.IdentitySkeletonList, nodeInfos []model.NodeInfo) []model.NodeInfo {
-	var filtered []model.NodeInfo
+func filterClusterSigners(cluster flow.IdentitySkeletonList, nodeInfos []model.NodeInfoPriv) []model.NodeInfoPriv {
+	var filtered []model.NodeInfoPriv
 	for _, node := range nodeInfos {
-		_, isInCluster := cluster.ByNodeID(node.NodeID)
-		isPrivateKeyAvailable := node.Type() == model.NodeInfoTypePrivate
+		_, isInCluster := cluster.ByNodeID(node.NodeID())
 
-		if isInCluster && isPrivateKeyAvailable {
+		if isInCluster && node.StakingPrivKey.PrivateKey != nil {
 			filtered = append(filtered, node)
 		}
 	}

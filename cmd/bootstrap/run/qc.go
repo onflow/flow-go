@@ -20,7 +20,7 @@ import (
 )
 
 type Participant struct {
-	bootstrap.NodeInfo
+	bootstrap.NodeInfoPriv
 	RandomBeaconPrivKey crypto.PrivateKey
 }
 
@@ -49,7 +49,7 @@ type ParticipantData struct {
 func (pd *ParticipantData) Identities() flow.IdentityList {
 	nodes := make([]bootstrap.NodeInfo, 0, len(pd.Participants))
 	for _, participant := range pd.Participants {
-		nodes = append(nodes, participant.NodeInfo)
+		nodes = append(nodes, participant.NodeInfoPriv)
 	}
 	return bootstrap.ToIdentityList(nodes)
 }
@@ -152,7 +152,7 @@ func GenerateRootBlockVotes(block *flow.Block, participantData *ParticipantData)
 
 	votes := make([]*model.Vote, 0, n)
 	for _, p := range participantData.Participants {
-		fmt.Println("generating votes from consensus participants: ", p.NodeID, p.Address, p.StakingPubKey().String())
+		fmt.Println("generating votes from consensus participants: ", p.NodeID(), p.Address, p.StakingPrivKey.PublicKey())
 
 		// create the participant's local identity
 		keys, err := p.PrivateKeys()
@@ -190,7 +190,7 @@ func createValidator(committee hotstuff.DynamicCommittee) (hotstuff.Validator, e
 // LIMITATION: this function only supports the 'trusted dealer' model, where for the consensus committee (`allNodes`)
 // a trusted dealer generated the threshold-signature key (`dkgData` containing key shares and group key). Therefore,
 // `allNodes` must be in the same order that was used when running the DKG.
-func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkgData dkg.ThresholdKeySet) (*ParticipantData, error) {
+func GenerateQCParticipantData(allNodes []bootstrap.NodeInfo, internalNodes []bootstrap.NodeInfoPriv, dkgData dkg.ThresholdKeySet) (*ParticipantData, error) {
 	// stakingNodes can include external validators, so it can be longer than internalNodes
 	if len(allNodes) < len(internalNodes) {
 		return nil, fmt.Errorf("need at least as many staking public keys as private keys (pub=%d, priv=%d)", len(allNodes), len(internalNodes))
@@ -218,7 +218,7 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 	participantLookup := make(map[flow.Identifier]flow.DKGParticipant)
 	for i, node := range allNodes {
 		// assign a node to a DGKdata entry, using the canonical ordering
-		participantLookup[node.NodeID] = flow.DKGParticipant{
+		participantLookup[node.NodeID()] = flow.DKGParticipant{
 			KeyShare: dkgData.PubKeyShares[i],
 			Index:    uint(i),
 		}
@@ -227,21 +227,21 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 	// the QC will be signed by everyone in internalNodes
 	qcData := &ParticipantData{}
 	for _, node := range internalNodes {
-		if node.NodeID == flow.ZeroID {
+		if node.NodeID() == flow.ZeroID {
 			return nil, fmt.Errorf("node id cannot be zero")
 		}
 		if node.Weight == 0 {
-			return nil, fmt.Errorf("node (id=%s) cannot have 0 weight", node.NodeID)
+			return nil, fmt.Errorf("node (id=%s) cannot have 0 weight", node.NodeID())
 		}
 
-		dkgParticipant, ok := participantLookup[node.NodeID]
+		dkgParticipant, ok := participantLookup[node.NodeID()]
 		if !ok {
-			return nil, fmt.Errorf("nonexistent node id (%x) in participant lookup", node.NodeID)
+			return nil, fmt.Errorf("nonexistent node id (%x) in participant lookup", node.NodeID())
 		}
 		dkgIndex := dkgParticipant.Index
 
 		qcData.Participants = append(qcData.Participants, Participant{
-			NodeInfo:            node,
+			NodeInfoPriv:        node,
 			RandomBeaconPrivKey: dkgData.PrivKeyShares[dkgIndex],
 		})
 	}

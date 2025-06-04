@@ -17,9 +17,9 @@ import (
 // - partnerWeightsPath: path to partner weights configuration file.
 // - partnerNodeInfoDir: path to partner nodes configuration file.
 // Returns:
-// - []bootstrap.NodeInfo: the generated node info list. (public information, private keys not set)
+// - []bootstrap.NodeInfoPub: the generated node info list. (public information, private keys not set)
 // - error: if any error occurs. Any error returned from this function is irrecoverable.
-func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNodeInfoDir string) ([]bootstrap.NodeInfo, error) {
+func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNodeInfoDir string) ([]bootstrap.NodeInfoPub, error) {
 	partners, err := ReadPartnerNodeInfos(partnerNodeInfoDir)
 	if err != nil {
 		return nil, err
@@ -32,10 +32,10 @@ func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNod
 	}
 	log.Info().Msgf("read %d weights for partner nodes", len(weights))
 
-	var nodes []bootstrap.NodeInfo
+	var nodes []bootstrap.NodeInfoPub
 	for _, partner := range partners {
 		// validate every single partner node
-		err = ValidateNodeID(partner.NodeID)
+		err = ValidateNodeID(partner.NodeID())
 		if err != nil {
 			return nil, fmt.Errorf("invalid node ID: %s", partner.NodeID)
 		}
@@ -48,7 +48,7 @@ func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNod
 			return nil, fmt.Errorf("invalid staking public key: %s", partner.StakingPubKey)
 		}
 
-		weight := weights[partner.NodeID]
+		weight := weights[partner.NodeID()]
 		if valid := ValidateWeight(weight); !valid {
 			return nil, fmt.Errorf("invalid partner weight %v: %d", partner.NodeID, weight)
 		}
@@ -58,8 +58,8 @@ func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNod
 		}
 
 		node := bootstrap.NewPublicNodeInfo(
-			partner.NodeID,
-			partner.Role,
+			partner.NodeID(),
+			partner.Role(),
 			partner.Address,
 			weight,
 			partner.NetworkPubKey.PublicKey,
@@ -125,7 +125,7 @@ func ReadPartnerNodeInfos(partnerNodeInfoDir string) ([]bootstrap.NodeInfoPub, e
 // Returns:
 // - []bootstrap.NodeInfo: the generated node info list. Caution: contains private keys!
 // - error: if any error occurs. Any error returned from this function is irrecoverable.
-func ReadFullInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, internalWeightsConfig string) ([]bootstrap.NodeInfo, error) {
+func ReadFullInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, internalWeightsConfig string) ([]bootstrap.NodeInfoPriv, error) {
 	privInternals, err := ReadInternalNodeInfos(internalNodePrivInfoDir)
 	if err != nil {
 		return nil, err
@@ -136,13 +136,13 @@ func ReadFullInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, inte
 	weights := internalWeightsByAddress(log, internalWeightsConfig)
 	log.Info().Msgf("read %d weights for internal nodes", len(weights))
 
-	var nodes []bootstrap.NodeInfo
-	for i, internal := range privInternals {
+	var nodes []bootstrap.NodeInfoPriv
+	for _, internal := range privInternals {
 		// check if address is valid format
 		ValidateAddressFormat(log, internal.Address)
 
 		// validate every single internal node
-		err := ValidateNodeID(internal.NodeID)
+		err := ValidateNodeID(internal.NodeID())
 		if err != nil {
 			return nil, fmt.Errorf("invalid internal node ID: %s", internal.NodeID)
 		}
@@ -155,18 +155,14 @@ func ReadFullInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, inte
 			log.Warn().Msgf("internal node (id=%x) has non-default weight (%d != %d)", internal.NodeID, weight, flow.DefaultInitialWeight)
 		}
 
-		node, err := bootstrap.NewPrivateNodeInfo(
-			internal.NodeID,
-			internal.Role,
+		node := bootstrap.NewPrivateNodeInfo(
+			internal.NodeID(),
+			internal.Role(),
 			internal.Address,
 			weight,
 			internal.NetworkPrivKey.PrivateKey,
 			internal.StakingPrivKey.PrivateKey,
 		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build private node info at index %d: %w", i, err)
-		}
-
 		nodes = append(nodes, node)
 	}
 
@@ -231,15 +227,15 @@ func internalWeightsByAddress(log zerolog.Logger, config string) map[string]uint
 
 // FilterInternalPartners returns the `partners`, dropping any entries that are also in `internal`
 // Formally, this function implements the set difference `partners \ internal`.
-func FilterInternalPartners(partners []bootstrap.NodeInfo, internal []bootstrap.NodeInfo) []bootstrap.NodeInfo {
+func FilterInternalPartners(partners []bootstrap.NodeInfoPub, internal []bootstrap.NodeInfoPriv) []bootstrap.NodeInfoPub {
 	lookup := make(map[flow.Identifier]struct{})
 	for _, node := range internal {
-		lookup[node.NodeID] = struct{}{}
+		lookup[node.NodeID()] = struct{}{}
 	}
 
-	var filtered []bootstrap.NodeInfo
+	var filtered []bootstrap.NodeInfoPub
 	for _, node := range partners {
-		if _, ok := lookup[node.NodeID]; !ok {
+		if _, ok := lookup[node.NodeID()]; !ok {
 			filtered = append(filtered, node)
 		}
 	}

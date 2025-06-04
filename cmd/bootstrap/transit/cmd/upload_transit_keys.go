@@ -53,8 +53,8 @@ func pushTransitKey(_ *cobra.Command, _ []string) {
 		log.Fatal().Err(err).Msg("could not load private node info")
 	}
 
-	if nodeInfo.Role != flow.RoleConsensus {
-		log.Info().Str("role", nodeInfo.Role.String()).Msgf("only consensus nodes are required to push transit keys, exiting.")
+	if nodeInfo.Role() != flow.RoleConsensus {
+		log.Info().Str("role", nodeInfo.Role().String()).Msgf("only consensus nodes are required to push transit keys, exiting.")
 		os.Exit(0)
 	}
 

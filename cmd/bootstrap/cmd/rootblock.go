@@ -183,17 +183,18 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("assembling network and staking keys")
-	stakingNodes, err := mergeNodeInfos(internalNodes, partnerNodes)
+	stakingNodes, err := mergeNodeInfos(partnerNodes, internalNodes)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("failed to merge node infos")
 	}
-	publicInfo, err := model.ToPublicNodeInfoList(stakingNodes)
+	// write files of both partner and internal nodes
+	err = common.WriteJSON(model.PathNodeInfosPub, flagOutdir, partnerNodes)
 	if err != nil {
-		log.Fatal().Msg("failed to read public node info")
+		log.Fatal().Err(err).Msg("failed to write json of partner nodes")
 	}
-	err = common.WriteJSON(model.PathNodeInfosPub, flagOutdir, publicInfo)
+	err = common.WriteJSON(model.PathNodeInfosPub, flagOutdir, internalNodes)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to write json")
+		log.Fatal().Err(err).Msg("failed to write json of internal nodes")
 	}
 	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathNodeInfosPub)
 	log.Info().Msg("")
@@ -206,7 +207,11 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	participants := model.ToIdentityList(stakingNodes).Sort(flow.Canonical[flow.Identity])
 
 	log.Info().Msg("computing collection node clusters")
-	assignments, clusters, err := common.ConstructClusterAssignment(log, model.ToIdentityList(partnerNodes), model.ToIdentityList(internalNodes), int(flagCollectionClusters))
+	assignments, clusters, err := common.ConstructClusterAssignment(
+		log,
+		model.ToIdentityList(model.PubToNodeInfoList(partnerNodes)),
+		model.ToIdentityList(model.PrivToNodeInfoList(internalNodes)),
+		int(flagCollectionClusters))
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
 	}
@@ -268,7 +273,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	constructRootVotes(
 		block,
 		model.FilterByRole(stakingNodes, flow.RoleConsensus),
-		model.FilterByRole(internalNodes, flow.RoleConsensus),
+		model.FilterPrivateByRole(internalNodes, flow.RoleConsensus),
 		randomBeaconData,
 	)
 	log.Info().Msg("")

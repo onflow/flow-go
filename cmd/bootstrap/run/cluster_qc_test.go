@@ -37,25 +37,22 @@ func TestGenerateClusterRootQC(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func createClusterParticipants(t *testing.T, n int) []model.NodeInfo {
+func createClusterParticipants(t *testing.T, n int) []model.NodeInfoPriv {
 	ids := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleCollection))
 
 	networkKeys := unittest.NetworkingKeys(n)
 	stakingKeys := unittest.StakingKeys(n)
 
-	participants := make([]model.NodeInfo, n)
+	participants := make([]model.NodeInfoPriv, n)
 	for i, id := range ids {
-		var err error
-		participants[i], err = model.NewPrivateNodeInfo(
-			id.NodeID,
-			id.Role,
+		participants[i] = model.NewPrivateNodeInfo(
+			id.NodeID(),
+			id.Role(),
 			id.Address,
 			id.InitialWeight,
 			networkKeys[i],
 			stakingKeys[i],
 		)
-		require.NoError(t, err)
 	}
-
 	return participants
 }

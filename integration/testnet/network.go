@@ -1045,8 +1045,8 @@ func (net *FlowNetwork) WriteRootSnapshot(snapshot *inmem.Snapshot) {
 	require.NoError(net.t, err)
 }
 
-func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, error) {
-	var nodeInfos []bootstrap.NodeInfo
+func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfoPriv, error) {
+	var nodeInfos []bootstrap.NodeInfoPriv
 
 	// TODO: currently just stashing a dummy key as staking key to prevent the nodeinfo.Type() function from
 	// returning an error. Eventually, a new key type NodeInfoTypePrivateUnstaked needs to be defined
@@ -1054,7 +1054,7 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 	dummyStakingKey := unittest.StakingPrivKeyFixture()
 
 	for _, conf := range confs {
-		info, err := bootstrap.NewPrivateNodeInfo(
+		info := bootstrap.NewPrivateNodeInfo(
 			conf.NodeID,
 			flow.RoleAccess, // use Access role
 			"",              // no address
@@ -1062,13 +1062,8 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 			conf.NetworkingPrivKey,
 			dummyStakingKey,
 		)
-		if err != nil {
-			return nil, err
-		}
-
 		nodeInfos = append(nodeInfos, info)
 	}
-
 	return nodeInfos, nil
 }
 
@@ -1350,7 +1345,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 		addr := fmt.Sprintf("%s:%d", name, DefaultFlowPort)
 		roleCounter[conf.Role]++
 
-		info, err := bootstrap.NewPrivateNodeInfo(
+		info := bootstrap.NewPrivateNodeInfo(
 			conf.Identifier,
 			conf.Role,
 			addr,
@@ -1358,12 +1353,9 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 			networkKeys[i],
 			stakingKeys[i],
 		)
-		if err != nil {
-			return nil, err
-		}
 
 		containerConf := ContainerConfig{
-			NodeInfo:            info,
+			NodeInfoPriv:        info,
 			ContainerName:       name,
 			LogLevel:            conf.LogLevel,
 			Ghost:               conf.Ghost,

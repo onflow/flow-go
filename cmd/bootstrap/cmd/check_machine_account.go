@@ -91,7 +91,7 @@ func checkMachineAccountRun(_ *cobra.Command, _ []string) {
 	err = epochs.CheckMachineAccountInfo(
 		log,
 		epochs.DefaultMachineAccountValidatorConfig(),
-		nodeInfoPriv.Role,
+		nodeInfoPriv.Role(),
 		machineAccountInfo,
 		onChainAccount,
 	)

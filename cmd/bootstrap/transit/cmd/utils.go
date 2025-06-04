@@ -51,7 +51,7 @@ func readNodeID() (string, error) {
 	return strings.TrimSpace(string(data)), nil
 }
 
-func getAdditionalFilesToDownload(role flow.Role, nodeID string) []string {
+func getAdditionalFilesToDownload(role flow.Role(), nodeID string) []string {
 	switch role {
 	case flow.RoleConsensus:
 		return []string{fmt.Sprintf(filesToDownloadConsensus, nodeID)}

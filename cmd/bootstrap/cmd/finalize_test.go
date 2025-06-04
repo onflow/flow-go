@@ -108,19 +108,25 @@ func TestClusterAssignment(t *testing.T) {
 	// Happy path (limit set-up, can't have one less internal node)
 	partnersLen := 7
 	internalLen := 22
-	partners := unittest.NodeInfosFixture(partnersLen, unittest.WithRole(flow.RoleCollection))
-	internals := unittest.NodeInfosFixture(internalLen, unittest.WithRole(flow.RoleCollection))
+	partners := unittest.PublicNodeInfosFixture(partnersLen, unittest.WithRole(flow.RoleCollection))
+	internals := unittest.PrivateNodeInfosFixture(internalLen, unittest.WithRole(flow.RoleCollection))
 
 	log := zerolog.Nop()
+	pubNodes := model.PubToNodeInfoList(partners)
+	privNodes := model.PrivToNodeInfoList(internals)
 	// should not error
-	_, clusters, err := common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters))
+	_, clusters, err := common.ConstructClusterAssignment(
+		log,
+		model.ToIdentityList(pubNodes),
+		model.ToIdentityList(privNodes),
+		int(flagCollectionClusters))
 	require.NoError(t, err)
-	require.True(t, checkClusterConstraint(clusters, partners, internals))
+	require.True(t, checkClusterConstraint(clusters, pubNodes, privNodes))
 
 	// unhappy Path
 	internals = internals[:21] // reduce one internal node
 	// should error
-	_, _, err = common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters))
+	_, _, err = common.ConstructClusterAssignment(log, model.ToIdentityList(pubNodes), model.ToIdentityList(privNodes), int(flagCollectionClusters))
 	require.Error(t, err)
 	// revert the flag value
 	flagCollectionClusters = tmp
@@ -194,8 +200,8 @@ func checkClusterConstraint(clusters flow.ClusterList, partnersInfo []model.Node
 func TestMergeNodeInfos(t *testing.T) {
 	partnersLen := 7
 	internalLen := 22
-	partners := unittest.NodeInfosFixture(partnersLen, unittest.WithRole(flow.RoleCollection))
-	internals := unittest.NodeInfosFixture(internalLen, unittest.WithRole(flow.RoleCollection))
+	partners := unittest.PublicNodeInfosFixture(partnersLen, unittest.WithRole(flow.RoleCollection))
+	internals := unittest.PrivateNodeInfosFixture(internalLen, unittest.WithRole(flow.RoleCollection))
 
 	// Check if there is no overlap, then should pass
 	merged, err := mergeNodeInfos(partners, internals)
@@ -203,7 +209,9 @@ func TestMergeNodeInfos(t *testing.T) {
 	require.Len(t, merged, partnersLen+internalLen)
 
 	// Check if internals and partners have overlap, then should fail
-	internalAndPartnersHaveOverlap := append(partners, internals[0])
+	overlapPub, err := internals[0].Public()
+	require.NoError(t, err)
+	internalAndPartnersHaveOverlap := append(partners, overlapPub)
 	_, err = mergeNodeInfos(internalAndPartnersHaveOverlap, internals)
 	require.Error(t, err)
 

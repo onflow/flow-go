@@ -63,7 +63,7 @@ func generateVote(c *cobra.Command, args []string) {
 	identity := flow.IdentitySkeleton{
 		NodeID:        nodeID,
 		Address:       nodeInfo.Address,
-		Role:          nodeInfo.Role,
+		Role:          nodeInfo.Role(),
 		InitialWeight: flow.DefaultInitialWeight,
 		StakingPubKey: stakingPrivKey.PublicKey(),
 		NetworkPubKey: nodeInfo.NetworkPrivKey.PrivateKey.PublicKey(),

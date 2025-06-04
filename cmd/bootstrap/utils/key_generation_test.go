@@ -75,7 +75,7 @@ func TestWriteMachineAccountFiles(t *testing.T) {
 			SigningAlgorithm:  private.NetworkPrivKey.Algorithm(),
 			HashAlgorithm:     sdkcrypto.SHA3_256,
 		}
-		nodeIDLookup[addr.HexWithPrefix()] = node.NodeID
+		nodeIDLookup[addr.HexWithPrefix()] = node.NodeID()
 	}
 
 	write := func(path string, value interface{}) error {
@@ -118,15 +118,15 @@ func TestWriteStakingNetworkingKeyFiles(t *testing.T) {
 		actual, ok := value.(bootstrap.NodeInfoPriv)
 		require.True(t, ok)
 
-		expectedInfo, ok := expected[actual.NodeID]
+		expectedInfo, ok := expected[actual.NodeID()]
 		require.True(t, ok)
-		expectedPath := fmt.Sprintf(bootstrap.PathNodeInfoPriv, expectedInfo.NodeID)
+		expectedPath := fmt.Sprintf(bootstrap.PathNodeInfoPriv, expectedInfo.NodeID())
 
 		assert.Equal(t, expectedPath, path)
 		assert.Equal(t, expectedInfo, actual)
 		// remove the value from the mapping, this ensures each one is passed
 		// to the write function exactly once
-		delete(expected, expectedInfo.NodeID)
+		delete(expected, expectedInfo.NodeID())
 
 		return nil
 	}

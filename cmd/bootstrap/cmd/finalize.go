@@ -132,7 +132,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("assembling network and staking keys")
-	stakingNodes, err := mergeNodeInfos(internalNodes, partnerNodes)
+	stakingNodes, err := mergeNodeInfos(partnerNodes, internalNodes)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("failed to merge internal and partner nodes: %v", err)
 	}
@@ -163,7 +163,7 @@ func finalize(cmd *cobra.Command, args []string) {
 		block,
 		votes,
 		model.FilterByRole(stakingNodes, flow.RoleConsensus),
-		model.FilterByRole(internalNodes, flow.RoleConsensus),
+		model.FilterPrivateByRole(internalNodes, flow.RoleConsensus),
 		dkgData,
 	)
 	log.Info().Msg("")
@@ -314,25 +314,32 @@ func readRootBlockVotes() []*hotstuff.Vote {
 //
 // IMPORTANT: node infos are returned in the canonical ordering, meaning this
 // is safe to use as the input to the DKG and protocol state.
-func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) ([]model.NodeInfo, error) {
-	nodes := append(internalNodes, partnerNodes...)
-
-	// test for duplicate Addresses
+func mergeNodeInfos(partnerNodes []model.NodeInfoPub, internalNodes []model.NodeInfoPriv) ([]model.NodeInfo, error) {
+	nodes := make([]model.NodeInfo, 0, len(internalNodes)+len(partnerNodes))
+	// test for duplicate Addresses and build list of nodes
 	addressLookup := make(map[string]struct{})
-	for _, node := range nodes {
+	for _, node := range partnerNodes {
 		if _, ok := addressLookup[node.Address]; ok {
 			return nil, fmt.Errorf("duplicate node address: %v", node.Address)
 		}
 		addressLookup[node.Address] = struct{}{}
+		nodes = append(nodes, node)
+	}
+	for _, node := range internalNodes {
+		if _, ok := addressLookup[node.Address]; ok {
+			return nil, fmt.Errorf("duplicate node address: %v", node.Address)
+		}
+		addressLookup[node.Address] = struct{}{}
+		nodes = append(nodes, node)
 	}
 
 	// test for duplicate node IDs
 	idLookup := make(map[flow.Identifier]struct{})
 	for _, node := range nodes {
-		if _, ok := idLookup[node.NodeID]; ok {
-			return nil, fmt.Errorf("duplicate node ID: %v", node.NodeID.String())
+		if _, ok := idLookup[node.NodeID()]; ok {
+			return nil, fmt.Errorf("duplicate node ID: %v", node.NodeID().String())
 		}
-		idLookup[node.NodeID] = struct{}{}
+		idLookup[node.NodeID()] = struct{}{}
 	}
 
 	// sort nodes using the canonical ordering
