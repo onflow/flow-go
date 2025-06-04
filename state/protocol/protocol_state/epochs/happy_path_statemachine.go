@@ -138,7 +138,6 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 		},
 	)
 	if err != nil {
-		// Should never reach here
 		return false, fmt.Errorf("could not construct epoch state entry: %w", err)
 	}
 
@@ -209,7 +208,6 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 		},
 	)
 	if err != nil {
-		// Should never reach here
 		return false, fmt.Errorf("could not construct epoch state entry: %w", err)
 	}
 	u.telemetry.OnServiceEventProcessed(epochCommit.ServiceEvent())

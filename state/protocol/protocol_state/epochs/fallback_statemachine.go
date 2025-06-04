@@ -264,7 +264,6 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		},
 	)
 	if err != nil {
-		// Should never reach here
 		return false, fmt.Errorf("could not construct epoch state entry: %w", err)
 	}
 	m.telemetry.OnServiceEventProcessed(epochRecover.ServiceEvent())
