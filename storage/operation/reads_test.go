@@ -408,3 +408,26 @@ func TestFindHighestAtOrBelow(t *testing.T) {
 		}
 	})
 }
+
+func TestCommonPrefix(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		startPrefix          []byte
+		endPrefix            []byte
+		expectedCommonPrefix []byte
+	}{
+		{name: "both nil", expectedCommonPrefix: []byte(nil)},
+		{name: "startPrefix nil", endPrefix: []byte{0x00, 0x01}, expectedCommonPrefix: []byte(nil)},
+		{name: "identical", startPrefix: []byte{0x00, 0x01}, endPrefix: []byte{0x00, 0x01}, expectedCommonPrefix: []byte{0x00, 0x01}},
+		{name: "substring", startPrefix: []byte{0x00}, endPrefix: []byte{0x00, 0x01}, expectedCommonPrefix: []byte{0x00}},
+		{name: "has common prefix", startPrefix: []byte{0x00, 0x01, 0x02}, endPrefix: []byte{0x00, 0x01, 0x03}, expectedCommonPrefix: []byte{0x00, 0x01}},
+		{name: "no common prefix", startPrefix: []byte{0x00, 0x01}, endPrefix: []byte{0x02, 0x01}, expectedCommonPrefix: []byte(nil)},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			commonPrefix := operation.CommonPrefix(tc.startPrefix, tc.endPrefix)
+			require.Equal(t, tc.expectedCommonPrefix, commonPrefix)
+		})
+	}
+}
