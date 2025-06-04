@@ -41,7 +41,7 @@ func NewTxErrorMessagesCore(
 	}
 }
 
-// FetchAndStoreErrorMessages retrieves transaction result for a given block ID
+// EnsureErrorMessagesStored retrieves transaction result for a given block ID
 // if they do not already exist in storage.
 //
 // The function first checks if error messages for the given block ID are already present in storage.
@@ -55,7 +55,7 @@ func NewTxErrorMessagesCore(
 //   - status.Error - GRPC call failed, some of possible codes are:
 //   - codes.NotFound - request cannot be served by EN because of absence of data.
 //   - codes.Unavailable - remote node is not unavailable.
-func (c *TxErrorMessagesCore) FetchAndStoreErrorMessages(
+func (c *TxErrorMessagesCore) EnsureErrorMessagesStored(
 	ctx context.Context,
 	blockID flow.Identifier,
 ) error {
@@ -65,12 +65,39 @@ func (c *TxErrorMessagesCore) FetchAndStoreErrorMessages(
 		return fmt.Errorf("could not find execution nodes for block: %w", err)
 	}
 
-	return c.FetchAndStoreErrorMessagesFromENs(ctx, blockID, execNodes)
+	return c.EnsureErrorMessagesFromENsStored(ctx, blockID, execNodes)
+}
+
+// EnsureErrorMessagesFromENsStored retrieves transaction result error messages via provided list
+// of execution nodes if they do not already exist in storage.
+//
+// Expected errors during normal operation:
+//   - status.Error - GRPC call failed, some of possible codes are:
+//   - codes.NotFound - request cannot be served by EN because of absence of data.
+//   - codes.Unavailable - remote node is not unavailable.
+func (c *TxErrorMessagesCore) EnsureErrorMessagesFromENsStored(
+	ctx context.Context,
+	blockID flow.Identifier,
+	execNodes flow.IdentitySkeletonList,
+) error {
+	errorMessages, err := c.fetchErrorMessagesIfNotCached(ctx, blockID, execNodes)
+	if err != nil {
+		return fmt.Errorf("could not fetch error messages for block %v: %w", blockID, err)
+	}
+
+	if len(errorMessages) > 0 {
+		err = c.storeErrorMessages(blockID, errorMessages)
+		if err != nil {
+			return fmt.Errorf("could not store error messages for block %v: %w", blockID, err)
+		}
+	}
+
+	return nil
 }
 
 // FetchErrorMessages retrieves tx result error messages for a given execution result ID
 // from execution nodes that generated receipts within a specific block.
-// Returns empty list of error message if they already exist in storage for given block.
+// Note that list of result error messages can be empty.
 //
 // Parameters:
 // - ctx: The context for managing cancellation and deadlines during the operation.
@@ -97,37 +124,10 @@ func (c *TxErrorMessagesCore) FetchErrorMessages(
 		return nil, fmt.Errorf("could not find execution nodes for result %v in block %v: %w", resultID, blockID, err)
 	}
 
-	return c.fetchErrorMessagesFromENs(ctx, blockID, execNodes)
+	return c.fetchErrorMessages(ctx, blockID, execNodes)
 }
 
-// FetchAndStoreErrorMessagesFromENs fetches transaction result error messages via provided list
-// of execution nodes. Returns empty list of error message if they already exist in storage for given block.
-//
-// Expected errors during normal operation:
-//   - status.Error - GRPC call failed, some of possible codes are:
-//   - codes.NotFound - request cannot be served by EN because of absence of data.
-//   - codes.Unavailable - remote node is not unavailable.
-func (c *TxErrorMessagesCore) FetchAndStoreErrorMessagesFromENs(
-	ctx context.Context,
-	blockID flow.Identifier,
-	execNodes flow.IdentitySkeletonList,
-) error {
-	errorMessages, err := c.fetchErrorMessagesFromENs(ctx, blockID, execNodes)
-	if err != nil {
-		return fmt.Errorf("could not fetch error messages for block %v: %w", blockID, err)
-	}
-
-	if len(errorMessages) > 0 {
-		err = c.storeErrorMessages(blockID, errorMessages)
-		if err != nil {
-			return fmt.Errorf("could not store error messages for block %v: %w", blockID, err)
-		}
-	}
-
-	return nil
-}
-
-// fetchErrorMessagesFromENs fetches transaction result error messages via provided list
+// fetchErrorMessagesIfNotCached retrieves transaction result error messages via provided list
 // of execution nodes. If error messages already exist in storage for this block,
 // return an empty result to indicate no fetch was performed.
 //
@@ -135,7 +135,7 @@ func (c *TxErrorMessagesCore) FetchAndStoreErrorMessagesFromENs(
 //   - status.Error - GRPC call failed, some of possible codes are:
 //   - codes.NotFound - request cannot be served by EN because of absence of data.
 //   - codes.Unavailable - remote node is not unavailable.
-func (c *TxErrorMessagesCore) fetchErrorMessagesFromENs(
+func (c *TxErrorMessagesCore) fetchErrorMessagesIfNotCached(
 	ctx context.Context,
 	blockID flow.Identifier,
 	execNodes flow.IdentitySkeletonList,
@@ -150,7 +150,35 @@ func (c *TxErrorMessagesCore) fetchErrorMessagesFromENs(
 		return []flow.TransactionResultErrorMessage{}, nil
 	}
 
-	// retrieves error messages from the backend if they do not already exist in storage
+	// retrieve error messages from the backend if they do not already exist in storage
+	c.log.Debug().
+		Msgf("transaction error messages for block %s are being downloaded", blockID)
+
+	req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
+		BlockId: convert.IdentifierToMessage(blockID),
+	}
+
+	resp, execNode, err := c.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
+	if err != nil {
+		c.log.Error().Err(err).Msg("failed to get transaction error messages from execution nodes")
+		return nil, err
+	}
+
+	errorMessages := c.convertErrorMessagesResponse(resp, execNode)
+	return errorMessages, nil
+}
+
+// fetchErrorMessages retrieves transaction result error messages via provided list of execution nodes.
+//
+// Expected errors during normal operation:
+//   - status.Error - GRPC call failed, some of possible codes are:
+//   - codes.NotFound - request cannot be served by EN because of absence of data.
+//   - codes.Unavailable - remote node is not unavailable.
+func (c *TxErrorMessagesCore) fetchErrorMessages(
+	ctx context.Context,
+	blockID flow.Identifier,
+	execNodes flow.IdentitySkeletonList,
+) ([]flow.TransactionResultErrorMessage, error) {
 	req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
 		BlockId: convert.IdentifierToMessage(blockID),
 	}
@@ -188,6 +216,7 @@ func (c *TxErrorMessagesCore) storeErrorMessages(
 	return nil
 }
 
+// convertErrorMessagesResponse converts error messages from grpc response to flow type
 func (c *TxErrorMessagesCore) convertErrorMessagesResponse(
 	responseMessages []*execproto.GetTransactionErrorMessagesResponse_Result,
 	execNode *flow.IdentitySkeleton,

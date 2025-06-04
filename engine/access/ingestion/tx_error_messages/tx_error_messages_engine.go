@@ -174,7 +174,7 @@ func (e *Engine) processErrorMessagesForBlock(ctx context.Context, blockID flow.
 
 		}
 		attempt++
-		err := e.txErrorMessagesCore.FetchAndStoreErrorMessages(ctx, blockID)
+		err := e.txErrorMessagesCore.EnsureErrorMessagesStored(ctx, blockID)
 
 		return retry.RetryableError(err)
 	})
