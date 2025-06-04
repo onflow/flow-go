@@ -127,7 +127,8 @@ func (c *TxErrorMessagesCore) FetchAndStoreErrorMessagesFromENs(
 }
 
 // fetchErrorMessagesFromENs fetches transaction result error messages via provided list
-// of execution nodes.
+// of execution nodes. If error messages already exist in storage for this block,
+// return an empty result to indicate no fetch was performed.
 //
 // Expected errors during normal operation:
 //   - status.Error - GRPC call failed, some of possible codes are:
@@ -143,8 +144,9 @@ func (c *TxErrorMessagesCore) fetchErrorMessagesFromENs(
 		return nil, fmt.Errorf("could not check existance of transaction result error messages: %w", err)
 	}
 
+	// skip fetching if error messages already exists
 	if exists {
-		return nil, nil
+		return []flow.TransactionResultErrorMessage{}, nil
 	}
 
 	// retrieves error messages from the backend if they do not already exist in storage
