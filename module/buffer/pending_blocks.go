@@ -5,6 +5,11 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
+// PendingBlocks is a mempool for holding blocks. Furthermore, given a block ID, we can
+// query all children that are currently stored in the mempool. The mempool's backend
+// is intended to work generically for consensus blocks as well as cluster blocks.
+// TODO: this mempool was implemented prior to generics being available in Go. Hence, the
+// backend abstracts the payload as an interface{}. This should be updated to use generics.
 type PendingBlocks struct {
 	backend *backend
 }
@@ -19,7 +24,7 @@ func NewPendingBlocks() *PendingBlocks {
 func (b *PendingBlocks) Add(block flow.Slashable[*flow.BlockProposal]) bool {
 	return b.backend.add(flow.Slashable[*flow.ProposalHeader]{
 		OriginID: block.OriginID,
-		Message:  block.Message.HeaderProposal(),
+		Message:  block.Message.ProposalHeader(),
 	}, block.Message.Block.Payload)
 }
 
@@ -32,10 +37,7 @@ func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*flow.Bloc
 	block := flow.Slashable[*flow.BlockProposal]{
 		OriginID: item.header.OriginID,
 		Message: &flow.BlockProposal{
-			Block: &flow.Block{
-				Header:  item.header.Message.Header,
-				Payload: item.payload.(*flow.Payload),
-			},
+			Block:           *flow.NewBlock(item.header.Message.Header.HeaderBody, item.payload.(flow.Payload)),
 			ProposerSigData: item.header.Message.ProposerSigData,
 		},
 	}
@@ -54,10 +56,7 @@ func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*
 		block := flow.Slashable[*flow.BlockProposal]{
 			OriginID: item.header.OriginID,
 			Message: &flow.BlockProposal{
-				Block: &flow.Block{
-					Header:  item.header.Message.Header,
-					Payload: item.payload.(*flow.Payload),
-				},
+				Block:           *flow.NewBlock(item.header.Message.Header.HeaderBody, item.payload.(flow.Payload)),
 				ProposerSigData: item.header.Message.ProposerSigData,
 			},
 		}

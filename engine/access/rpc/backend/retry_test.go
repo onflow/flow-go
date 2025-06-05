@@ -28,9 +28,9 @@ func (suite *Suite) TestTransactionRetry() {
 	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
-	suite.snapshot.On("Head").Return(headBlock.Header, nil)
+	suite.snapshot.On("Head").Return(headBlock.ToHeader(), nil)
 	snapshotAtBlock := new(protocol.Snapshot)
-	snapshotAtBlock.On("Head").Return(block.Header, nil)
+	snapshotAtBlock.On("Head").Return(block.ToHeader(), nil)
 	suite.state.On("AtBlockID", block.ID()).Return(snapshotAtBlock, nil)
 
 	// collection storage returns a not found error
@@ -76,17 +76,19 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
-	block := unittest.BlockFixture()
-	// Height needs to be at least DefaultTransactionExpiry before we start doing retries
-	block.Header.Height = flow.DefaultTransactionExpiry + 1
+
 	refBlock := unittest.BlockFixture()
 	refBlock.Header.Height = 2
 	transactionBody.SetReferenceBlockID(refBlock.ID())
 
-	block.SetPayload(
-		unittest.PayloadFixture(
+	block := unittest.BlockFixture(
+		// Height needs to be at least DefaultTransactionExpiry before we start doing retries
+		unittest.Block.WithHeight(flow.DefaultTransactionExpiry+1),
+		unittest.Block.WithPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(
-				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
+				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...),
+		)),
+	)
 
 	light := collection.Light()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()

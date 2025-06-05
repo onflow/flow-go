@@ -39,7 +39,7 @@ func (s *RequestTrackerTestSuite) SetupTest() {
 // updated when blackout period has passed.
 func (s *RequestTrackerTestSuite) TestTryUpdate_CreateAndUpdate() {
 	executedBlock := unittest.BlockFixture()
-	s.headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.Header, nil)
+	s.headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.ToHeader(), nil)
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(&executedBlock))
 	chunks := 5
 	for i := 0; i < chunks; i++ {
@@ -65,7 +65,7 @@ func (s *RequestTrackerTestSuite) TestTryUpdate_ConcurrentTracking() {
 	s.tracker.blackoutPeriodMin = 0
 
 	executedBlock := unittest.BlockFixture()
-	s.headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.Header, nil)
+	s.headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.ToHeader(), nil)
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(&executedBlock))
 	chunks := 5
 	var wg sync.WaitGroup
@@ -105,7 +105,7 @@ func (s *RequestTrackerTestSuite) TestTryUpdate_UpdateForInvalidResult() {
 // that are lower than our lowest height.
 func (s *RequestTrackerTestSuite) TestTryUpdate_UpdateForPrunedHeight() {
 	executedBlock := unittest.BlockFixture()
-	s.headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.Header, nil)
+	s.headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.ToHeader(), nil)
 	err := s.tracker.PruneUpToHeight(executedBlock.Header.Height + 1)
 	require.NoError(s.T(), err)
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(&executedBlock))
@@ -118,9 +118,9 @@ func (s *RequestTrackerTestSuite) TestTryUpdate_UpdateForPrunedHeight() {
 // TestPruneUpToHeight_Pruning tests that pruning up to height some height correctly removes needed items
 func (s *RequestTrackerTestSuite) TestPruneUpToHeight_Pruning() {
 	executedBlock := unittest.BlockFixture()
-	nextExecutedBlock := unittest.BlockWithParentFixture(executedBlock.Header)
-	s.headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.Header, nil)
-	s.headers.On("ByBlockID", nextExecutedBlock.ID()).Return(nextExecutedBlock.Header, nil)
+	nextExecutedBlock := unittest.BlockWithParentFixture(executedBlock.ToHeader())
+	s.headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.ToHeader(), nil)
+	s.headers.On("ByBlockID", nextExecutedBlock.ID()).Return(nextExecutedBlock.ToHeader(), nil)
 
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(&executedBlock))
 	nextResult := unittest.ExecutionResultFixture(unittest.WithBlock(nextExecutedBlock))

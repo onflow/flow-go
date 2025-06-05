@@ -139,12 +139,12 @@ func (s *Suite) SetupTest() {
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
 	s.rootBlock = unittest.BlockFixture()
 	s.rootBlock.Header.Height = 0
-	parent := s.rootBlock.Header
+	parent := s.rootBlock.ToHeader()
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
-		parent = block.Header
+		parent = block.ToHeader()
 		s.blockMap[block.Header.Height] = block
 	}
 	s.finalizedBlock = parent
@@ -230,12 +230,13 @@ func (s *Suite) mockCollectionsForBlock(block flow.Block) {
 
 // generateBlock prepares block with payload and specified guarantee.SignerIndices
 func (s *Suite) generateBlock(clusterCommittee flow.IdentitySkeletonList, snap *protocol.Snapshot) flow.Block {
-	block := unittest.BlockFixture()
-	block.SetPayload(unittest.PayloadFixture(
-		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
-		unittest.WithExecutionResults(unittest.ExecutionResultFixture()),
-		unittest.WithSeals(unittest.Seal.Fixture()),
-	))
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(
+			unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
+			unittest.WithExecutionResults(unittest.ExecutionResultFixture()),
+			unittest.WithSeals(unittest.Seal.Fixture()),
+		)),
+	)
 
 	refBlockID := unittest.IdentifierFixture()
 	for _, guarantee := range block.Payload.Guarantees {
@@ -274,7 +275,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	block.Header.Height = s.finalizedBlock.Height + 1
 	s.blockMap[block.Header.Height] = &block
 	s.mockCollectionsForBlock(block)
-	s.finalizedBlock = block.Header
+	s.finalizedBlock = block.ToHeader()
 
 	hotstuffBlock := hotmodel.Block{
 		BlockID: block.ID(),
@@ -337,7 +338,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 		s.blockMap[block.Header.Height] = &block
 		blocks[i] = block
 		s.mockCollectionsForBlock(block)
-		s.finalizedBlock = block.Header
+		s.finalizedBlock = block.ToHeader()
 	}
 
 	// latest of all the new blocks which are newer than the last block processed
@@ -427,10 +428,7 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 
 	// we should store the light collection and index its transactions
 	s.collections.On("StoreLightAndIndexByTransaction", &light).Return(nil).Once()
-	block := &flow.Block{
-		Header:  &flow.Header{HeaderBody: flow.HeaderBody{Height: 0}},
-		Payload: &flow.Payload{Guarantees: []*flow.CollectionGuarantee{}},
-	}
+	block := flow.NewBlock(flow.HeaderBody{Height: 0}, flow.Payload{Guarantees: []*flow.CollectionGuarantee{}})
 	s.blocks.On("ByID", mock.Anything).Return(block, nil)
 
 	// for each transaction in the collection, we should store it
@@ -513,16 +511,14 @@ func (s *Suite) TestRequestMissingCollections() {
 	var collIDs []flow.Identifier
 	refBlockID := unittest.IdentifierFixture()
 	for i := 0; i < blkCnt; i++ {
-		block := unittest.BlockFixture()
-		block.SetPayload(unittest.PayloadFixture(
-			unittest.WithGuarantees(
-				unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(refBlockID))...),
-		))
-		// some blocks may not be present hence add a gap
-		height := startHeight + uint64(i)
-		block.Header.Height = height
+		block := unittest.BlockFixture(
+			// some blocks may not be present hence add a gap
+			unittest.Block.WithHeight(startHeight+uint64(i)),
+			unittest.Block.WithPayload(unittest.PayloadFixture(
+				unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(refBlockID))...)),
+			))
 		s.blockMap[block.Header.Height] = &block
-		s.finalizedBlock = block.Header
+		s.finalizedBlock = block.ToHeader()
 
 		for _, c := range block.Payload.Guarantees {
 			collIDs = append(collIDs, c.CollectionID)
@@ -662,14 +658,13 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			cg.SignerIndices = indices
 			guarantees[j] = cg
 		}
-		block := unittest.BlockFixture()
-		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantees...)))
-		// set the height
-		height := startHeight + uint64(i)
-		block.Header.Height = height
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(startHeight+uint64(i)),
+			unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantees...))),
+		)
 		s.blockMap[block.Header.Height] = &block
 		blocks[i] = block
-		s.finalizedBlock = block.Header
+		s.finalizedBlock = block.ToHeader()
 	}
 
 	finalizedHeight := s.finalizedBlock.Height
@@ -785,7 +780,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 	s.blockMap[height] = &finalizedBlk
 
 	finalizedHeight = finalizedBlk.Header.Height
-	s.finalizedBlock = finalizedBlk.Header
+	s.finalizedBlock = finalizedBlk.ToHeader()
 
 	blockBeforeFinalized := blocks[blkCnt-1].Header
 

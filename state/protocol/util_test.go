@@ -26,7 +26,8 @@ func TestIsSporkRootSnapshot(t *testing.T) {
 
 	t.Run("other snapshot", func(t *testing.T) {
 		snapshot := unittest.RootSnapshotFixture(unittest.IdentityListFixture(10, unittest.WithAllRoles()))
-		snapshot.Encodable().Head().Height += 1 // modify head height to break equivalence with spork root block height
+		blockLen := len(snapshot.Encodable().SealingSegment.Blocks)
+		snapshot.Encodable().SealingSegment.Blocks[blockLen-1].Block.Header.Height += 1 // modify head height to break equivalence with spork root block height
 		isSporkRoot, err := protocol.IsSporkRootSnapshot(snapshot)
 		require.NoError(t, err)
 		assert.False(t, isSporkRoot)
@@ -71,7 +72,7 @@ func TestOrderedSeals(t *testing.T) {
 		seals := unittest.Seal.Fixtures(10)
 		for i, seal := range seals {
 			seal.BlockID = blocks[i].ID()
-			headers.On("ByBlockID", seal.BlockID).Return(blocks[i].Header, nil)
+			headers.On("ByBlockID", seal.BlockID).Return(blocks[i].ToHeader(), nil)
 		}
 		payload := unittest.PayloadFixture(unittest.WithSeals(seals...))
 
@@ -82,11 +83,11 @@ func TestOrderedSeals(t *testing.T) {
 	t.Run("unordered", func(t *testing.T) {
 		headers := storagemock.NewHeaders(t)
 
-		blocks := unittest.ChainFixtureFrom(10, flow.Genesis(flow.Localnet).Header)
+		blocks := unittest.ChainFixtureFrom(10, flow.Genesis(flow.Localnet).ToHeader())
 		orderedSeals := unittest.Seal.Fixtures(len(blocks))
 		for i, seal := range orderedSeals {
 			seal.BlockID = blocks[i].ID()
-			headers.On("ByBlockID", seal.BlockID).Return(blocks[i].Header, nil)
+			headers.On("ByBlockID", seal.BlockID).Return(blocks[i].ToHeader(), nil)
 		}
 		unorderedSeals := make([]*flow.Seal, len(orderedSeals))
 		copy(unorderedSeals, orderedSeals)

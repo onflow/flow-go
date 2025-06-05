@@ -3,55 +3,92 @@ package flow
 import (
 	"fmt"
 	"time"
+
+	"github.com/vmihailenco/msgpack/v4"
 )
 
 func Genesis(chainID ChainID) *Block {
-
 	// create the raw content for the genesis block
 	payload := Payload{}
 
-	// create the header
-	header := Header{
-		HeaderBody: HeaderBody{
-			ChainID:   chainID,
-			ParentID:  ZeroID,
-			Height:    0,
-			Timestamp: GenesisTime,
-			View:      0,
-		},
-		PayloadHash: payload.Hash(),
+	// create the headerBody
+	headerBody := HeaderBody{
+		ChainID:   chainID,
+		ParentID:  ZeroID,
+		Height:    0,
+		Timestamp: GenesisTime,
+		View:      0,
 	}
 
 	// combine to block
-	genesis := Block{
-		Header:  &header,
-		Payload: &payload,
+	return NewBlock(headerBody, payload)
+}
+
+// Block (currently) includes the all block header metadata and the payload content.
+type Block struct {
+	// Header is a container encapsulating most of the header fields - *excluding* the payload hash
+	// and the proposer signature. Generally, the type [HeaderBody] should not be used on its own.
+	// CAUTION regarding security:
+	//  * HeaderBody does not contain the hash of the block payload. Therefore, it is not a cryptographic digest
+	//    of the block and should not be confused with a "proper" header, which commits to the _entire_ content
+	//    of a block.
+	//  * With a byzantine HeaderBody alone, an honest node cannot prove who created that faulty data structure,
+	//    because HeaderBody does not include the proposer's signature.
+	Header  HeaderBody
+	Payload Payload
+}
+
+// NewBlock creates a new block.
+//
+// Parameters:
+// - headerBody: the header fields to use for the block
+// - payload: the payload to associate with the block
+func NewBlock(
+	headerBody HeaderBody,
+	payload Payload,
+) *Block {
+	return &Block{
+		Header:  headerBody,
+		Payload: payload,
+	}
+}
+
+// ID returns a collision-resistant hash of the Block struct.
+func (b Block) ID() Identifier {
+	return b.ToHeader().ID()
+}
+
+// ToHeader converts the block into a compact [flow.Header] representation,
+// where the payload is compressed to a hash reference.
+func (b Block) ToHeader() *Header {
+	return &Header{
+		HeaderBody:  b.Header,
+		PayloadHash: b.Payload.Hash(),
+	}
+}
+
+// TODO(malleability): remove MarshalMsgpack when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
+func (b Block) MarshalMsgpack() ([]byte, error) {
+	if b.Header.Timestamp.Location() != time.UTC {
+		b.Header.Timestamp = b.Header.Timestamp.UTC()
 	}
 
-	return &genesis
+	type Encodable Block
+	return msgpack.Marshal(Encodable(b))
 }
 
-// Block (currently) includes the header, the payload hashes as well as the
-// payload contents.
-type Block struct {
-	Header  *Header
-	Payload *Payload
-}
+// TODO(malleability): remove UnmarshalMsgpack when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
+func (b *Block) UnmarshalMsgpack(data []byte) error {
+	type Decodable Block
+	decodable := Decodable(*b)
+	err := msgpack.Unmarshal(data, &decodable)
+	*b = Block(decodable)
 
-// SetPayload sets the payload and updates the payload hash.
-func (b *Block) SetPayload(payload Payload) {
-	b.Payload = &payload
-	b.Header.PayloadHash = b.Payload.Hash()
-}
+	if b.Header.Timestamp.Location() != time.UTC {
+		b.Header.Timestamp = b.Header.Timestamp.UTC()
+	}
 
-// Valid will check whether the block is valid bottom-up.
-func (b Block) Valid() bool {
-	return b.Header.PayloadHash == b.Payload.Hash()
-}
-
-// ID returns the ID of the header.
-func (b Block) ID() Identifier {
-	return b.Header.ID()
+	return err
 }
 
 // BlockStatus represents the status of a block.
@@ -73,12 +110,14 @@ func (s BlockStatus) String() string {
 
 // BlockProposal is a signed proposal that includes the block payload, in addition to the required header and signature.
 type BlockProposal struct {
-	Block           *Block
+	Block           Block
 	ProposerSigData []byte
 }
 
-func (b *BlockProposal) HeaderProposal() *ProposalHeader {
-	return &ProposalHeader{Header: b.Block.Header, ProposerSigData: b.ProposerSigData}
+// ProposalHeader converts the proposal into a compact [ProposalHeader] representation,
+// where the payload is compressed to a hash reference.
+func (b *BlockProposal) ProposalHeader() *ProposalHeader {
+	return &ProposalHeader{Header: b.Block.ToHeader(), ProposerSigData: b.ProposerSigData}
 }
 
 // CertifiedBlock holds a certified block, which is a block and a Quorum Certificate [QC] pointing

@@ -17,15 +17,14 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		// verify after storing a block should be able to retrieve it back
 		blocks := badgerstorage.InitAll(cacheMetrics, db).Blocks
 		block := unittest.FullBlockFixture()
-		block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
-		prop := unittest.ProposalFromBlock(&block)
+		prop := unittest.ProposalFromBlock(block)
 
 		err := blocks.Store(prop)
 		require.NoError(t, err)
 
 		retrieved, err := blocks.ByID(block.ID())
 		require.NoError(t, err)
-		require.Equal(t, &block, retrieved)
+		require.Equal(t, block, retrieved)
 
 		retrievedp, err := blocks.ProposalByID(block.ID())
 		require.NoError(t, err)
@@ -36,7 +35,7 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		blocksAfterRestart := badgerstorage.InitAll(cacheMetrics, db).Blocks
 		receivedAfterRestart, err := blocksAfterRestart.ByID(block.ID())
 		require.NoError(t, err)
-		require.Equal(t, &block, receivedAfterRestart)
+		require.Equal(t, block, receivedAfterRestart)
 
 		receivedAfterRestartp, err := blocksAfterRestart.ProposalByID(block.ID())
 		require.NoError(t, err)

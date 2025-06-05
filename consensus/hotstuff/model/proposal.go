@@ -73,7 +73,7 @@ func SignedProposalFromFlow(p *flow.ProposalHeader) *SignedProposal {
 func SignedProposalFromBlock(p *flow.BlockProposal) *SignedProposal {
 	proposal := SignedProposal{
 		Proposal: Proposal{
-			Block:      BlockFromFlow(p.Block.Header),
+			Block:      BlockFromFlow(p.Block.ToHeader()),
 			LastViewTC: p.Block.Header.LastViewTC,
 		},
 		SigData: p.ProposerSigData,

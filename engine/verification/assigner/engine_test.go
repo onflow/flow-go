@@ -96,15 +96,16 @@ func createContainerBlock(options ...func(result *flow.ExecutionResult, assignme
 		},
 	}
 	// container block
-	header := unittest.BlockHeaderFixture()
-	block := &flow.Block{
-		Header: header,
-		Payload: &flow.Payload{
-			Receipts: []*flow.ExecutionReceiptStub{receipt.Stub()},
-			Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
-		},
-	}
-	return block, assignment
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(
+			flow.Payload{
+				Receipts: []*flow.ExecutionReceiptStub{receipt.Stub()},
+				Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
+			},
+		),
+	)
+
+	return &block, assignment
 }
 
 // NewAssignerEngine returns an assigner engine for testing.

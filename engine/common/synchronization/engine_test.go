@@ -163,7 +163,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
 				expected := ss.heights[ref-1]
-				actual := res.Blocks[0].ToInternal()
+				actual := res.Blocks[0].DeclareTrusted()
 				assert.Equal(ss.T(), expected, actual, "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
@@ -290,7 +290,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
-				assert.Equal(ss.T(), proposal, res.Blocks[0].ToInternal(), "response should contain right block")
+				assert.Equal(ss.T(), proposal, res.Blocks[0].DeclareTrusted(), "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
@@ -346,17 +346,17 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 
 	// add one block that should be processed
 	processable := unittest.ProposalFixture()
-	ss.core.On("HandleBlock", processable.Block.Header).Return(true)
+	ss.core.On("HandleBlock", processable.Block.ToHeader()).Return(true)
 	res.Blocks = append(res.Blocks, *messages.NewUntrustedProposal(processable))
 
 	// add one block that should not be processed
 	unprocessable := unittest.ProposalFixture()
-	ss.core.On("HandleBlock", unprocessable.Block.Header).Return(false)
+	ss.core.On("HandleBlock", unprocessable.Block.ToHeader()).Return(false)
 	res.Blocks = append(res.Blocks, *messages.NewUntrustedProposal(unprocessable))
 
 	ss.comp.On("OnSyncedBlocks", mock.Anything).Run(func(args mock.Arguments) {
 		res := args.Get(0).(flow.Slashable[[]*messages.UntrustedProposal])
-		converted := res.Message[0].ToInternal()
+		converted := res.Message[0].DeclareTrusted()
 		ss.Assert().Equal(processable.Block.Header, converted.Block.Header)
 		ss.Assert().Equal(processable.Block.Payload, converted.Block.Payload)
 		ss.Assert().Equal(originID, res.OriginID)

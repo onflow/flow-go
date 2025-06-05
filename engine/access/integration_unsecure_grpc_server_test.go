@@ -147,7 +147,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.blockMap = make(map[uint64]*flow.Block, blockCount)
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	rootBlock := unittest.BlockFixture()
-	parent := rootBlock.Header
+	parent := rootBlock.ToHeader()
 	suite.blockMap[rootBlock.Header.Height] = &rootBlock
 
 	for i := 0; i < blockCount; i++ {
@@ -227,7 +227,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(
 		func(height uint64) flow.Identifier {
 			if block, ok := suite.blockMap[height]; ok {
-				return block.Header.ID()
+				return block.ID()
 			}
 			return flow.ZeroID
 		},

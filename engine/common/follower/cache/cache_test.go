@@ -61,10 +61,8 @@ func (s *CacheSuite) TestBlocksEquivocation() {
 	require.NoError(s.T(), err)
 
 	equivocatedBlocks, _, _ := unittest.ChainFixture(len(blocks) - 1)
-	equivocatedProposals := make([]*flow.BlockProposal, 0, len(equivocatedBlocks))
-	for _, block := range equivocatedBlocks {
-		equivocatedProposals = append(equivocatedProposals, unittest.ProposalFromBlock(block))
-	}
+	equivocatedProposals := make([]*flow.BlockProposal, 0, len(equivocatedBlocks)-1)
+
 	// we will skip genesis block as it will be the same
 	for i := 1; i < len(equivocatedBlocks); i++ {
 		block := equivocatedBlocks[i]
@@ -74,7 +72,9 @@ func (s *CacheSuite) TestBlocksEquivocation() {
 		block.Header.ParentID = equivocatedBlocks[i-1].ID()
 		block.Header.ParentView = equivocatedBlocks[i-1].Header.View
 		s.consumer.On("OnDoubleProposeDetected",
-			model.BlockFromFlow(blocks[i].Block.Header), model.BlockFromFlow(block.Header)).Return().Once()
+			model.BlockFromFlow(blocks[i].Block.ToHeader()), model.BlockFromFlow(block.ToHeader())).Return().Once()
+
+		equivocatedProposals = append(equivocatedProposals, unittest.ProposalFromBlock(block))
 	}
 	_, err = s.cache.AddBlocks(equivocatedProposals)
 	require.NoError(s.T(), err)
@@ -97,8 +97,8 @@ func (s *CacheSuite) TestBlocksAreNotConnected() {
 	s.Run("blocks-with-gaps", func() {
 		blocks := unittest.ProposalChainFixtureFrom(10, unittest.BlockHeaderFixture())
 
-		// altering payload hash will break ParentID in next block rendering batch as not sequential
-		blocks[len(blocks)/2].Block.Header.PayloadHash = unittest.IdentifierFixture()
+		// altering Height will break ParentID in next block, rendering batch as not sequential
+		blocks[len(blocks)/2].Block.Header.Height += 1
 
 		_, err := s.cache.AddBlocks(blocks)
 		require.ErrorIs(s.T(), err, ErrDisconnectedBatch)
@@ -114,7 +114,7 @@ func (s *CacheSuite) TestChildCertifiesParent() {
 	certifiedBatch, err := s.cache.AddBlocks([]*flow.BlockProposal{proposal})
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), certifiedBatch)
-	child := unittest.BlockWithParentFixture(block.Header)
+	child := unittest.BlockWithParentFixture(block.ToHeader())
 	certifiedBatch, err = s.cache.AddBlocks([]*flow.BlockProposal{unittest.ProposalFromBlock(child)})
 	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBatch, 1)
@@ -280,8 +280,8 @@ func (s *CacheSuite) TestSecondaryIndexCleanup() {
 // We should be able to certify A since B and C are in cache, any QC will work.
 func (s *CacheSuite) TestMultipleChildrenForSameParent() {
 	A := unittest.BlockFixture()
-	B := unittest.BlockWithParentFixture(A.Header)
-	C := unittest.BlockWithParentFixture(A.Header)
+	B := unittest.BlockWithParentFixture(A.ToHeader())
+	C := unittest.BlockWithParentFixture(A.ToHeader())
 	C.Header.View = B.Header.View + 1 // make sure views are different
 	Ap := unittest.ProposalFromBlock(&A)
 	Bp := unittest.ProposalFromBlock(B)
@@ -308,8 +308,8 @@ func (s *CacheSuite) TestMultipleChildrenForSameParent() {
 // Between 2. and 3. B gets ejected, we should be able to certify A since C is still in cache.
 func (s *CacheSuite) TestChildEjectedBeforeAddingParent() {
 	A := unittest.BlockFixture()
-	B := unittest.BlockWithParentFixture(A.Header)
-	C := unittest.BlockWithParentFixture(A.Header)
+	B := unittest.BlockWithParentFixture(A.ToHeader())
+	C := unittest.BlockWithParentFixture(A.ToHeader())
 	C.Header.View = B.Header.View + 1 // make sure views are different
 
 	Ap := unittest.ProposalFromBlock(&A)

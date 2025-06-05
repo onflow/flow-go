@@ -71,7 +71,7 @@ func (s *MessageHubSuite) SetupTest() {
 	)
 	s.myID = s.participants[0].NodeID
 	block := unittest.BlockFixture()
-	s.head = block.Header
+	s.head = block.ToHeader()
 
 	s.payloads = storage.NewPayloads(s.T())
 	s.me = module.NewLocal(s.T())
@@ -224,13 +224,13 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	block := unittest.BlockWithParentFixture(parent)
 	block.Header.ProposerID = s.myID
 
-	s.payloads.On("ByBlockID", block.Header.ID()).Return(block.Payload, nil)
+	s.payloads.On("ByBlockID", block.ID()).Return(&block.Payload, nil)
 	s.payloads.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)
 
 	s.Run("should fail with wrong proposer", func() {
-		header := *block.Header
+		header := block.ToHeader()
 		header.ProposerID = unittest.IdentifierFixture()
-		proposal := unittest.ProposalFromHeader(&header)
+		proposal := unittest.ProposalFromHeader(header)
 		err := s.hub.sendOwnProposal(proposal)
 		require.Error(s.T(), err, "should fail with wrong proposer")
 		header.ProposerID = s.myID
@@ -238,9 +238,9 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 
 	// should fail with wrong block ID (payload unavailable)
 	s.Run("should fail with wrong block ID", func() {
-		header := *block.Header
+		header := block.ToHeader()
 		header.View++
-		proposal := unittest.ProposalFromHeader(&header)
+		proposal := unittest.ProposalFromHeader(header)
 		err := s.hub.sendOwnProposal(proposal)
 		require.Error(s.T(), err, "should fail with missing payload")
 		header.View--
@@ -266,7 +266,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 		s.pushBlocksCon.On("Publish", expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
 
 		// submit to broadcast proposal
-		s.hub.OnOwnProposal(proposal.HeaderProposal(), time.Now())
+		s.hub.OnOwnProposal(proposal.ProposalHeader(), time.Now())
 
 		unittest.AssertClosesBefore(s.T(), util.AllClosed(broadcast, submitted), time.Second)
 	})
@@ -313,8 +313,8 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		wg.Add(1)
 		// prepare proposal fixture
 		block := unittest.BlockWithParentAndProposerFixture(s.T(), s.head, s.myID)
-		proposal := unittest.ProposalFromBlock(&block)
-		s.payloads.On("ByBlockID", block.Header.ID()).Return(block.Payload, nil)
+		proposal := unittest.ProposalFromBlock(block)
+		s.payloads.On("ByBlockID", block.ID()).Return(&block.Payload, nil)
 
 		// unset chain and height to make sure they are correctly reconstructed
 		hotstuffProposal := model.SignedProposalFromBlock(proposal)
@@ -327,7 +327,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		s.pushBlocksCon.On("Publish", expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
 
 		// submit proposal
-		s.hub.OnOwnProposal(proposal.HeaderProposal(), time.Now())
+		s.hub.OnOwnProposal(proposal.ProposalHeader(), time.Now())
 	})
 
 	unittest.RequireReturnsBefore(s.T(), func() {

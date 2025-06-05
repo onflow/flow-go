@@ -29,7 +29,7 @@ func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
 		return nil, err
 	}
 
-	blockHeader, err := BlockHeaderToMessage(h.Header, signerIDs)
+	blockHeader, err := BlockHeaderToMessage(h.ToHeader(), signerIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -79,10 +79,7 @@ func MessageToBlock(m *entities.Block) (*flow.Block, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert block header: %w", err)
 	}
-	return &flow.Block{
-		Header:  header,
-		Payload: payload,
-	}, nil
+	return flow.NewBlock(header.HeaderBody, *payload), nil
 }
 
 // BlockSealToMessage converts a flow.Seal to a protobuf BlockSeal message.

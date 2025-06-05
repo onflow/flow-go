@@ -268,7 +268,7 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		msg, ok := e.pendingProposals.Pop()
 		if ok {
 			proposalMsg := msg.(flow.Slashable[*messages.UntrustedProposal])
-			proposal := proposalMsg.Message.ToInternal()
+			proposal := proposalMsg.Message.DeclareTrusted()
 			log := e.log.With().
 				Hex("origin_id", proposalMsg.OriginID[:]).
 				Str("chain_id", proposal.Block.Header.ChainID.String()).
@@ -295,7 +295,7 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		}
 		blocks := make([]*flow.BlockProposal, 0, len(batch.Message))
 		for _, block := range batch.Message {
-			blocks = append(blocks, block.ToInternal())
+			blocks = append(blocks, block.DeclareTrusted())
 		}
 
 		firstBlock := blocks[0].Block.Header
@@ -320,7 +320,7 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 				e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, blocks[indexOfLastConnected:i])
 				indexOfLastConnected = i
 			}
-			parentID = block.Block.Header.ID()
+			parentID = block.Block.ID()
 		}
 		e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, blocks[indexOfLastConnected:])
 		e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlocks)

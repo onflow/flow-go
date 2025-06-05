@@ -528,8 +528,10 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHei
 		suite.Require().NoError(err)
 
 		// create a new block with root block as parent
-		newBlock := unittest.BlockWithParentFixture(rootBlock)
-		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		newBlock := unittest.BlockWithParentAndPayload(
+			rootBlock,
+			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+		)
 		ctx := context.Background()
 		// add new block to the chain state
 		err = state.Extend(ctx, unittest.ProposalFromBlock(newBlock))
@@ -567,10 +569,14 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalize
 		suite.Require().NoError(err)
 
 		// create a new block with root block as parent
-		finalizedBlock := unittest.BlockWithParentFixture(rootBlock)
-		finalizedBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-		orphanBlock := unittest.BlockWithParentFixture(rootBlock)
-		orphanBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		finalizedBlock := unittest.BlockWithParentAndPayload(
+			rootBlock,
+			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+		)
+		orphanBlock := unittest.BlockWithParentAndPayload(
+			rootBlock,
+			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+		)
 		ctx := context.Background()
 
 		// add new block to the chain state
@@ -618,8 +624,10 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockID
 		suite.Require().NoError(err)
 
 		// create a new block with root block as parent
-		newBlock := unittest.BlockWithParentFixture(rootBlock)
-		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		newBlock := unittest.BlockWithParentAndPayload(
+			rootBlock,
+			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+		)
 		ctx := context.Background()
 		// add new block to the chain state
 		err = state.Extend(ctx, unittest.ProposalFromBlock(newBlock))
@@ -778,8 +786,10 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
 		// create a new block with root block as parent
-		newBlock := unittest.BlockWithParentFixture(rootBlock)
-		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		newBlock := unittest.BlockWithParentAndPayload(
+			rootBlock,
+			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+		)
 		ctx := context.Background()
 		// add new block to the chain state
 		err = state.Extend(ctx, unittest.ProposalFromBlock(newBlock))
@@ -938,7 +948,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		Return(exeEventResp, nil)
 
 	suite.Run("TestGetTransactionResultByIndex - happy path", func() {
-		suite.snapshot.On("Head").Return(block.Header, nil).Once()
+		suite.snapshot.On("Head").Return(block.ToHeader(), nil).Once()
 		result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.checkResponse(result, err)
 		suite.Assert().Equal(result.BlockHeight, block.Header.Height)
@@ -1003,7 +1013,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		Return(exeEventResp, nil)
 
 	suite.Run("GetTransactionResultsByBlockID - happy path", func() {
-		suite.snapshot.On("Head").Return(block.Header, nil).Once()
+		suite.snapshot.On("Head").Return(block.ToHeader(), nil).Once()
 
 		result, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.checkResponse(result, err)
@@ -1035,18 +1045,22 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
-	block := unittest.BlockFixture()
-	block.Header.Height = 2
-	headBlock := unittest.BlockFixture()
-	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
-	block.SetPayload(
-		unittest.PayloadFixture(
+	block := unittest.BlockFixture(
+		unittest.Block.WithHeight(2),
+		unittest.Block.WithPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(
-				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
+				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...),
+		)),
+	)
+	headBlock := unittest.BlockFixture(
+		unittest.Block.WithHeight(block.Header.Height - 1), // head is behind the current block
+	)
 
 	suite.snapshot.
 		On("Head").
-		Return(headBlock.Header, nil)
+		Return(func() *flow.Header {
+			return headBlock.ToHeader()
+		}, nil)
 
 	light := collection.Light()
 	suite.collections.On("LightByID", light.ID()).Return(&light, nil)
@@ -1163,10 +1177,12 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 
 	suite.snapshot.
 		On("Head").
-		Return(headBlock.Header, nil)
+		Return(func() *flow.Header {
+			return headBlock.ToHeader()
+		}, nil)
 
 	snapshotAtBlock := new(protocol.Snapshot)
-	snapshotAtBlock.On("Head").Return(block.Header, nil)
+	snapshotAtBlock.On("Head").Return(block.ToHeader(), nil)
 
 	suite.state.
 		On("AtBlockID", block.ID()).
@@ -1249,11 +1265,12 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
 	// block which will eventually contain the transaction
-	block := unittest.BlockFixture()
-	block.SetPayload(
-		unittest.PayloadFixture(
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(
-				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
+				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...),
+		)),
+	)
 	blockID := block.ID()
 
 	// reference block to which the transaction points to
@@ -1268,10 +1285,10 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 
 	suite.snapshot.
 		On("Head").
-		Return(headBlock.Header, nil)
+		Return(headBlock.ToHeader(), nil)
 
 	snapshotAtBlock := new(protocol.Snapshot)
-	snapshotAtBlock.On("Head").Return(refBlock.Header, nil)
+	snapshotAtBlock.On("Head").Return(refBlock.ToHeader(), nil)
 
 	_, enIDs := suite.setupReceipts(&block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
@@ -1401,7 +1418,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	suite.Run("GetLatestFinalizedBlock - happy path", func() {
 		// setup the mocks
 		expected := unittest.BlockFixture()
-		header := expected.Header
+		header := expected.ToHeader()
 
 		suite.snapshot.
 			On("Head").
@@ -1730,11 +1747,12 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
 	// block which will eventually contain the transaction
-	block := unittest.BlockFixture()
-	block.SetPayload(
-		unittest.PayloadFixture(
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(
-				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
+				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...),
+		)),
+	)
 	blockId := block.ID()
 
 	// reference block to which the transaction points to
@@ -1752,7 +1770,7 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	light := collection.Light()
 	suite.collections.On("LightByID", mock.Anything).Return(&light, nil)
 
-	suite.snapshot.On("Head").Return(block.Header, nil)
+	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
 
 	// block storage returns the corresponding block
 	suite.blocks.
@@ -1815,7 +1833,7 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 	blockId := block.ID()
 	index := uint32(0)
 
-	suite.snapshot.On("Head").Return(block.Header, nil)
+	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
 
 	// block storage returns the corresponding block
 	suite.blocks.

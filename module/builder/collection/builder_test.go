@@ -335,8 +335,10 @@ func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
 	suite.Require().NoError(err)
 	protocolStateID := protocolState.ID()
 
-	unfinalizedReferenceBlock := unittest.BlockWithParentFixture(genesis)
-	unfinalizedReferenceBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
+	unfinalizedReferenceBlock := unittest.BlockWithParentAndPayload(
+		genesis,
+		unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)),
+	)
 	err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(unfinalizedReferenceBlock))
 	suite.Require().NoError(err)
 
@@ -375,13 +377,17 @@ func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
 	protocolStateID := protocolState.ID()
 
 	// create a block extending genesis which will be orphaned
-	orphan := unittest.BlockWithParentFixture(genesis)
-	orphan.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
+	orphan := unittest.BlockWithParentAndPayload(
+		genesis,
+		unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)),
+	)
 	err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(orphan))
 	suite.Require().NoError(err)
 	// create and finalize a block on top of genesis, orphaning `orphan`
-	block1 := unittest.BlockWithParentFixture(genesis)
-	block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
+	block1 := unittest.BlockWithParentAndPayload(
+		genesis,
+		unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)),
+	)
 	err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block1))
 	suite.Require().NoError(err)
 	err = suite.protoState.Finalize(context.Background(), block1.ID())
@@ -678,13 +684,15 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 
 	head := genesis
 	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
-		block := unittest.BlockWithParentFixture(head)
-		block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
+		block := unittest.BlockWithParentAndPayload(
+			head,
+			unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)),
+		)
 		err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block))
 		suite.Require().NoError(err)
 		err = suite.protoState.Finalize(context.Background(), block.ID())
 		suite.Require().NoError(err)
-		head = block.Header
+		head = block.ToHeader()
 	}
 
 	// reset the pool and builder
