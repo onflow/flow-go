@@ -72,7 +72,7 @@ func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, machineAccountAddr s
 		return WriteFile(filepath.Join(bootstrapDir, relativePath), data)
 	}
 
-	nodeInfos := []bootstrap.NodeInfo{c.NodeInfo}
+	nodeInfos := []bootstrap.NodeInfoPriv{c.NodeInfoPriv}
 	err := utils.WriteStakingNetworkingKeyFiles(nodeInfos, writeJSONFile)
 	if err != nil {
 		return fmt.Errorf("failed to write private key file: %w", err)
@@ -84,7 +84,7 @@ func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, machineAccountAddr s
 	}
 
 	if role == flow.RoleConsensus || role == flow.RoleCollection {
-		err = utils.WriteMachineAccountFile(c.NodeID, machineAccountAddr, machineAccountKey, writeJSONFile)
+		err = utils.WriteMachineAccountFile(c.NodeID(), machineAccountAddr, machineAccountKey, writeJSONFile)
 		if err != nil {
 			return fmt.Errorf("failed to write machine account file: %w", err)
 		}
@@ -135,7 +135,7 @@ func (c *ContainerConfig) ImageName() string {
 		imageSuffix = "-corrupted"
 	}
 
-	return fmt.Sprintf("%s/%s%s:latest", defaultRegistry, c.Role.String(), imageSuffix)
+	return fmt.Sprintf("%s/%s%s:latest", defaultRegistry, c.Role().String(), imageSuffix)
 }
 
 // Container represents a test Docker container for a generic Flow node.
@@ -468,7 +468,7 @@ func (c *Container) waitForCondition(ctx context.Context, condition func(*types.
 
 // TestnetClient returns a testnet client that connects to this node.
 func (c *Container) TestnetClient() (*Client, error) {
-	if c.Config.Role != flow.RoleAccess && c.Config.Role != flow.RoleCollection {
+	if c.Config.Role() != flow.RoleAccess && c.Config.Role() != flow.RoleCollection {
 		return nil, fmt.Errorf("container does not implement flow.access.AccessAPI")
 	}
 
@@ -478,7 +478,7 @@ func (c *Container) TestnetClient() (*Client, error) {
 
 // SDKClient returns a flow-go-sdk client that connects to this node.
 func (c *Container) SDKClient() (*sdkclient.Client, error) {
-	if c.Config.Role != flow.RoleAccess && c.Config.Role != flow.RoleCollection {
+	if c.Config.Role() != flow.RoleAccess && c.Config.Role() != flow.RoleCollection {
 		return nil, fmt.Errorf("container does not implement flow.access.AccessAPI")
 	}
 
@@ -519,7 +519,7 @@ func (c *Container) HealthcheckCallback() func() error {
 			return nil
 		}
 
-		switch c.Config.Role {
+		switch c.Config.Role() {
 		case flow.RoleExecution:
 			apiClient, err := client.NewExecutionClient(c.Addr(GRPCPort))
 			if err != nil {

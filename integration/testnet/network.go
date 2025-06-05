@@ -196,7 +196,7 @@ func (net *FlowNetwork) Identities() flow.IdentityList {
 func (net *FlowNetwork) ContainersByRole(role flow.Role, ghost bool) []*Container {
 	cl := make([]*Container, 0, len(net.Containers))
 	for _, c := range net.Containers {
-		if c.Config.Role == role && c.Config.Ghost == ghost {
+		if c.Config.Role() == role && c.Config.Ghost == ghost {
 			cl = append(cl, c)
 		}
 	}
@@ -313,7 +313,7 @@ func (net *FlowNetwork) Cleanup() {
 // Otherwise fails the test.
 func (net *FlowNetwork) ContainerByID(id flow.Identifier) *Container {
 	for _, c := range net.Containers {
-		if c.Config.NodeID == id {
+		if c.Config.NodeID() == id {
 			return c
 		}
 	}
@@ -621,8 +621,8 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 	// in order to provide a secure GRPC connection for LN & SN nodes
 	accessNodeIDS := make([]string, 0)
 	for _, n := range confs {
-		if n.Role == flow.RoleAccess && !n.Ghost {
-			accessNodeIDS = append(accessNodeIDS, n.NodeID.String())
+		if n.Role() == flow.RoleAccess && !n.Ghost {
+			accessNodeIDS = append(accessNodeIDS, n.NodeID().String())
 		}
 	}
 	require.GreaterOrEqualf(t, len(accessNodeIDS), DefaultMinimumNumOfAccessNodeIDS,
@@ -645,13 +645,13 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 
 		// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
 		// this is required otherwise collection node will fail to startup
-		if nodeConf.Role == flow.RoleCollection || nodeConf.Role == flow.RoleConsensus {
+		if nodeConf.Role() == flow.RoleCollection || nodeConf.Role() == flow.RoleConsensus {
 			nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
 			nodeContainer.AddFlag("insecure-access-api", "false")
 			nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 		}
 		// Increase the maximum view duration to accommodate the default Localnet block rate of 1bps
-		if nodeConf.Role == flow.RoleConsensus {
+		if nodeConf.Role() == flow.RoleConsensus {
 			nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
 			nodeContainer.AddFlag("cruise-ctl-max-view-duration", "2s")
 		}

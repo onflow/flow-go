@@ -400,6 +400,10 @@ func (node NodeInfoPriv) NodeID() flow.Identifier {
 	return node.nodeID
 }
 
+func (node NodeInfoPriv) NetworkPubKey() crypto.PublicKey {
+	return node.NetworkPrivKey.PrivateKey.PublicKey()
+}
+
 // PrivateNodeInfoPubFromIdentity builds a NodeInfo from a flow Identity.
 // WARNING: Nothing enforces that the output NodeInfo's keys are corresponding to the input Identity.
 func PrivateNodeInfoPubFromIdentity(identity *flow.Identity, networkKey, stakingKey crypto.PrivateKey) NodeInfoPriv {
