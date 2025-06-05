@@ -182,18 +182,12 @@ func (c *EpochStateContainer) EqualTo(other *EpochStateContainer) bool {
 	if c.CommitID != other.CommitID {
 		return false
 	}
-	if len(c.ActiveIdentities) != len(other.ActiveIdentities) {
-		return false
-	}
 	if !slices.EqualFunc(c.ActiveIdentities, other.ActiveIdentities, func(e1 *DynamicIdentityEntry, e2 *DynamicIdentityEntry) bool {
 		return e1.EqualTo(e2)
 	}) {
 		return false
 	}
 
-	if len(c.EpochExtensions) != len(other.EpochExtensions) {
-		return false
-	}
 	if !slices.EqualFunc(c.EpochExtensions, other.EpochExtensions, func(e1 EpochExtension, e2 EpochExtension) bool {
 		return e1.EqualTo(&e2)
 	}) {
@@ -239,7 +233,6 @@ type EpochStateEntry struct {
 type UntrustedEpochStateEntry EpochStateEntry
 
 // NewEpochStateEntry constructs an EpochStateEntry from a MinEpochStateEntry and additional data.
-// No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
 //
 // All errors indicate a valid EpochStateEntry cannot be constructed from the input.
 func NewEpochStateEntry(untrusted UntrustedEpochStateEntry) (*EpochStateEntry, error) {
