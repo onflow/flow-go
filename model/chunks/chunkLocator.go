@@ -26,13 +26,10 @@ type Locator struct {
 // a trusted Locator using NewLocator constructor.
 type UntrustedLocator Locator
 
-// NewEpochStateContainer creates a new instance of Locator.
+// NewLocator creates a new instance of Locator.
 // Construction Locator allowed only within the constructor.
 //
 // All errors indicate a valid Locator cannot be constructed from the input.
-
-// NewLocator creates a new instance of Locator.
-// Construction Locator allowed only within the constructor.
 func NewLocator(untrusted UntrustedLocator) (*Locator, error) {
 	if untrusted.ResultID == flow.ZeroID {
 		return nil, fmt.Errorf("ResultID must not be zero")
