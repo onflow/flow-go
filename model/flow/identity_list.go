@@ -172,16 +172,10 @@ func (il GenericIdentityList[T]) PublicStakingKeys() []crypto.PublicKey {
 
 // ID generates a cryptographic commitment to the full IdentityList, including mutable fields.
 // CAUTION:
-//   - The outputs of `IdentityList.ID()` and `IdentityList.Checksum()` are both order-sensitive.
+//   - The outputs of `IdentityList.ID()` are order-sensitive.
 //     Therefore, the `IdentityList` must be in canonical order, unless explicitly specified
 //     otherwise by the protocol.
 func (il GenericIdentityList[T]) ID() Identifier {
-	return MakeID(il)
-}
-
-// Checksum generates a cryptographic commitment to the full IdentityList, including mutable fields.
-// The checksum for the same group of identities (by NodeID) may change from block to block.
-func (il GenericIdentityList[T]) Checksum() Identifier {
 	return MakeID(il)
 }
 

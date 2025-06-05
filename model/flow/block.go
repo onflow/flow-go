@@ -58,13 +58,6 @@ func (b Block) ID() Identifier {
 	return b.ToHeader().ID()
 }
 
-// Checksum returns the checksum of the header.
-// Deprecated: This is needed temporarily until further malleability is done, because many components assume Block implements Entity
-// TODO(malleability): remove this function
-func (b Block) Checksum() Identifier {
-	return b.ToHeader().Checksum()
-}
-
 // ToHeader converts the block into a compact [flow.Header] representation,
 // where the payload is compressed to a hash reference.
 func (b Block) ToHeader() *Header {
