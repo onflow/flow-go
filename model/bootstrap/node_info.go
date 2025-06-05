@@ -227,7 +227,7 @@ type NodePrivateKeys struct {
 // This can be ensured by using only using the provided constructors and NOT
 // manually constructing an instance.
 //
-// WARNING: There is a concern about the current usage pattern of `NodeInfo“.
+// Deprecated: There is a concern about the current usage pattern of `NodeInfo“.
 // There are no build-time enforcements of using `NodeInfo“ for either the private or public usage. The struct
 // can mistakenly be used for both cases. Other than introducing a confusing design, developers can accidentally
 // confuse the private usage as a public one, for instance by writing the private info (including the private
