@@ -243,7 +243,8 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response *verific
 	e.metrics.OnChunkDataPackArrivedAtFetcher()
 
 	// make sure we still need it
-	status, exists := e.pendingChunks.Get(response.Locator.ID())
+	locatorID := response.Locator.ID()
+	status, exists := e.pendingChunks.Get(locatorID)
 	if !exists {
 		lg.Debug().Msg("could not fetch pending status from mempool, dropping chunk data")
 		return
@@ -277,7 +278,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response *verific
 		e.metrics.OnVerifiableChunkSentToVerifier()
 
 		// we need to report that the job has been finished eventually
-		e.chunkConsumerNotifier.Notify(response.Locator.ID())
+		e.chunkConsumerNotifier.Notify(locatorID)
 		lg.Info().Msg("verifiable chunk pushed to verifier engine")
 	}
 
