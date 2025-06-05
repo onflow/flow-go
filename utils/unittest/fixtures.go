@@ -1181,7 +1181,7 @@ func PublicNodeInfoFixture(opts ...func(*flow.Identity)) bootstrap.NodeInfoPub {
 	return PublicNodeInfosFixture(1, opts...)[0]
 }
 
-func PrivateNodeInfoFixture(opts ...func(*flow.Identity)) bootstrap.NodeInfo {
+func PrivateNodeInfoFixture(opts ...func(*flow.Identity)) bootstrap.NodeInfoPriv {
 	return PrivateNodeInfosFixture(1, opts...)[0]
 }
 

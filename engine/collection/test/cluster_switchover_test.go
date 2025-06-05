@@ -38,7 +38,7 @@ type ClusterSwitchoverTestCase struct {
 	t    *testing.T
 	conf ClusterSwitchoverTestConf
 
-	nodeInfos []model.NodeInfo          // identity table
+	nodeInfos []model.NodeInfoPriv      // identity table
 	hub       *stub.Hub                 // mock network hub
 	root      protocol.Snapshot         // shared root snapshot
 	nodes     []testmock.CollectionNode // collection nodes
@@ -61,7 +61,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 		unittest.CompleteIdentitySet(
 			unittest.IdentityListFixture(int(conf.collectors), unittest.WithRole(flow.RoleCollection))...),
 	)
-	identities := model.ToIdentityList(tc.nodeInfos)
+	identities := model.PrivToIdentityList(tc.nodeInfos)
 	collectors := identities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	assignment := unittest.ClusterAssignment(tc.conf.clusters, collectors)
 	clusters, err := factory.NewClusterList(assignment, collectors)
@@ -69,13 +69,13 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	rootClusterBlocks := run.GenerateRootClusterBlocks(1, clusters)
 	rootClusterQCs := make([]flow.ClusterQCVoteData, len(rootClusterBlocks))
 	for i, cluster := range clusters {
-		signers := make([]model.NodeInfo, 0)
+		signers := make([]model.NodeInfoPriv, 0)
 		for _, identity := range tc.nodeInfos {
-			if _, inCluster := cluster.ByNodeID(identity.NodeID); inCluster {
+			if _, inCluster := cluster.ByNodeID(identity.NodeID()); inCluster {
 				signers = append(signers, identity)
 			}
 		}
-		signerIdentities := model.ToIdentityList(signers).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
+		signerIdentities := model.PrivToIdentityList(signers).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 		qc, err := run.GenerateClusterRootQC(signers, signerIdentities, rootClusterBlocks[i])
 		require.NoError(t, err)
 		rootClusterQCs[i] = flow.ClusterQCVoteDataFromQC(&flow.QuorumCertificateWithSignerIDs{
@@ -111,9 +111,9 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	require.NoError(t, err)
 
 	// build a lookup table for node infos
-	nodeInfoLookup := make(map[flow.Identifier]model.NodeInfo)
+	nodeInfoLookup := make(map[flow.Identifier]model.NodeInfoPriv)
 	for _, nodeInfo := range tc.nodeInfos {
-		nodeInfoLookup[nodeInfo.NodeID] = nodeInfo
+		nodeInfoLookup[nodeInfo.NodeID()] = nodeInfo
 	}
 
 	// create a mock node for each collector identity
@@ -157,26 +157,26 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	// to generate them using node infos
 	tc.builder = unittest.NewEpochBuilder(tc.T(), stateMutator, states...).UsingCommitOpts(func(commit *flow.EpochCommit) {
 		// build a lookup table for node infos
-		nodeInfoLookup := make(map[flow.Identifier]model.NodeInfo)
+		nodeInfoLookup := make(map[flow.Identifier]model.NodeInfoPriv)
 		for _, nodeInfo := range tc.nodeInfos {
-			nodeInfoLookup[nodeInfo.NodeID] = nodeInfo
+			nodeInfoLookup[nodeInfo.NodeID()] = nodeInfo
 		}
 
 		// replace cluster QCs, with real data
 		for i, clusterQC := range commit.ClusterQCs {
 			clusterParticipants := flow.IdentifierList(clusterQC.VoterIDs).Lookup()
-			signers := make([]model.NodeInfo, 0, len(clusterParticipants))
+			signers := make([]model.NodeInfoPriv, 0, len(clusterParticipants))
 			for _, signerID := range clusterQC.VoterIDs {
 				signer := nodeInfoLookup[signerID]
 				signers = append(signers, signer)
 			}
 
 			// generate root cluster block
-			rootClusterBlock := cluster.CanonicalRootBlock(commit.Counter, model.ToIdentityList(signers).ToSkeleton())
+			rootClusterBlock := cluster.CanonicalRootBlock(commit.Counter, model.PrivToIdentityList(signers).ToSkeleton())
 			// generate cluster root qc
-			qc, err := run.GenerateClusterRootQC(signers, model.ToIdentityList(signers).ToSkeleton(), rootClusterBlock)
+			qc, err := run.GenerateClusterRootQC(signers, model.PrivToIdentityList(signers).ToSkeleton(), rootClusterBlock)
 			require.NoError(t, err)
-			signerIDs := toSignerIDs(signers)
+			signerIDs := toSignerIDs(model.PrivToNodeInfoList(signers))
 			qcWithSignerIDs := &flow.QuorumCertificateWithSignerIDs{
 				View:      qc.View,
 				BlockID:   qc.BlockID,
@@ -193,7 +193,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 func toSignerIDs(signers []model.NodeInfo) []flow.Identifier {
 	signerIDs := make([]flow.Identifier, 0, len(signers))
 	for _, signer := range signers {
-		signerIDs = append(signerIDs, signer.NodeID)
+		signerIDs = append(signerIDs, signer.NodeID())
 	}
 	return signerIDs
 }

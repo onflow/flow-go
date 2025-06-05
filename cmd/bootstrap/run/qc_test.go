@@ -66,12 +66,12 @@ func createSignerData(t *testing.T, n int) *ParticipantData {
 			Index:    uint(i),
 			KeyShare: randomBPKs[i],
 		}
-		participantLookup[identity.NodeID()] = lookupParticipant
+		participantLookup[identity.NodeID] = lookupParticipant
 
 		// add to participant list
 		nodeInfo := bootstrap.NewPrivateNodeInfo(
-			identity.NodeID(),
-			identity.Role(),
+			identity.NodeID,
+			identity.Role,
 			identity.Address,
 			identity.InitialWeight,
 			networkingKeys[i],

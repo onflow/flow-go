@@ -101,13 +101,13 @@ func TestExecutionFlow(t *testing.T) {
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID.Identity()}.NodeIDs())
 
 	// signed by the only collector
-	block := unittest.BlockWithParentAndProposerFixture(t, genesis.Header, conID.NodeID)
+	block := unittest.BlockWithParentAndProposerFixture(t, genesis.Header, conID.NodeID())
 	voterIndices, err := signature.EncodeSignersToIndices(
-		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
+		[]flow.Identifier{conID.NodeID()}, []flow.Identifier{conID.NodeID()})
 	require.NoError(t, err)
 	block.Header.ParentVoterIndices = voterIndices
 	signerIndices, err := signature.EncodeSignersToIndices(
-		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
+		[]flow.Identifier{colID.NodeID()}, []flow.Identifier{colID.NodeID()})
 	require.NoError(t, err)
 	block.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
@@ -127,7 +127,7 @@ func TestExecutionFlow(t *testing.T) {
 		ProtocolStateID: genesis.Payload.ProtocolStateID,
 	})
 
-	child := unittest.BlockWithParentAndProposerFixture(t, block.Header, conID.NodeID)
+	child := unittest.BlockWithParentAndProposerFixture(t, block.Header, conID.NodeID())
 	// the default signer indices is 2 bytes, but in this test cases
 	// we need 1 byte
 	child.Header.ParentVoterIndices = voterIndices
@@ -146,7 +146,7 @@ func TestExecutionFlow(t *testing.T) {
 	// check collection node received the collection request from execution node
 	providerEngine := new(mocknetwork.Engine)
 	provConduit, _ := collectionNode.Net.Register(channels.ProvideCollections, providerEngine)
-	providerEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID, mock.Anything).
+	providerEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID(), mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID := args.Get(1).(flow.Identifier)
 			req := args.Get(2).(*messages.EntityRequest)
@@ -183,7 +183,7 @@ func TestExecutionFlow(t *testing.T) {
 	// check the verification engine received the ER from execution node
 	verificationEngine := new(mocknetwork.Engine)
 	_, _ = verificationNode.Net.Register(channels.ReceiveReceipts, verificationEngine)
-	verificationEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID, mock.Anything).
+	verificationEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID(), mock.Anything).
 		Run(func(args mock.Arguments) {
 			lock.Lock()
 			defer lock.Unlock()
@@ -198,7 +198,7 @@ func TestExecutionFlow(t *testing.T) {
 	// check the consensus engine has received the result from execution node
 	consensusEngine := new(mocknetwork.Engine)
 	_, _ = consensusNode.Net.Register(channels.ReceiveReceipts, consensusEngine)
-	consensusEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID, mock.Anything).
+	consensusEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID(), mock.Anything).
 		Run(func(args mock.Arguments) {
 			lock.Lock()
 			defer lock.Unlock()
@@ -216,12 +216,12 @@ func TestExecutionFlow(t *testing.T) {
 		Once()
 
 	// submit block from consensus node
-	err = sendBlock(&exeNode, conID.NodeID, unittest.ProposalFromBlock(&block))
+	err = sendBlock(&exeNode, conID.NodeID(), unittest.ProposalFromBlock(&block))
 	require.NoError(t, err)
 
 	// submit the child block from consensus node, which trigger the parent block
 	// to be passed to BlockProcessable
-	err = sendBlock(&exeNode, conID.NodeID, unittest.ProposalFromBlock(&child))
+	err = sendBlock(&exeNode, conID.NodeID(), unittest.ProposalFromBlock(&child))
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
@@ -579,14 +579,14 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	genesis, err := exeNode.Blocks.ByHeight(0)
 	require.NoError(t, err)
 
-	block := unittest.BlockWithParentAndProposerFixture(t, genesis.Header, conID.NodeID)
-	voterIndices, err := signature.EncodeSignersToIndices([]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
+	block := unittest.BlockWithParentAndProposerFixture(t, genesis.Header, conID.NodeID())
+	voterIndices, err := signature.EncodeSignersToIndices([]flow.Identifier{conID.NodeID()}, []flow.Identifier{conID.NodeID()})
 	require.NoError(t, err)
 	block.Header.ParentVoterIndices = voterIndices
 	block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(genesis.Payload.ProtocolStateID)))
 	proposal := unittest.ProposalFromBlock(&block)
 
-	child := unittest.BlockWithParentAndProposerFixture(t, block.Header, conID.NodeID)
+	child := unittest.BlockWithParentAndProposerFixture(t, block.Header, conID.NodeID())
 	child.Header.ParentVoterIndices = voterIndices
 
 	actualCalls := atomic.Uint64{}
@@ -609,10 +609,10 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 		}).
 		Return(nil)
 
-	err = sendBlock(&exeNode, exeID.NodeID, proposal)
+	err = sendBlock(&exeNode, exeID.NodeID(), proposal)
 	require.NoError(t, err)
 
-	err = sendBlock(&exeNode, conID.NodeID, unittest.ProposalFromBlock(&child))
+	err = sendBlock(&exeNode, conID.NodeID(), unittest.ProposalFromBlock(&child))
 	require.NoError(t, err)
 
 	hub.DeliverAllEventually(t, func() bool {

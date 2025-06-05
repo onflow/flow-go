@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	model "github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	io "github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -31,7 +30,7 @@ func WritePartnerFiles(nodeInfos []model.NodeInfoPub, bootDir string) (string, s
 	// write each node info into partners dir
 	for _, node := range nodeInfos {
 		nodePubInfosPath := filepath.Join(partnersDir, fmt.Sprintf(model.PathNodeInfoPub, node.NodeID().String()))
-		err := io.WriteJSON(nodePubInfosPath, node)
+		err := io.WriteJSON(nodePubInfosPath, &node)
 		if err != nil {
 			return "", "", fmt.Errorf("could not write partner node info: %w", err)
 		}
@@ -53,12 +52,6 @@ func WriteInternalFiles(nodeInfos []model.NodeInfoPriv, bootDir string) (string,
 
 	configs := make([]model.NodeConfig, len(nodeInfos))
 	for i, node := range nodeInfos {
-
-		netPriv := unittest.NetworkingPrivKeyFixture()
-		nodeInfos[i].NetworkPrivKey = encodable.NetworkPrivKey{netPriv}
-		stakePriv := unittest.StakingPrivKeyFixture()
-		nodeInfos[i].StakingPrivKey = encodable.StakingPrivKey{stakePriv}
-
 		configs[i] = model.NodeConfig{
 			Role:    node.Role(),
 			Address: node.Address,
@@ -76,7 +69,7 @@ func WriteInternalFiles(nodeInfos []model.NodeInfoPriv, bootDir string) (string,
 	// write node private infos to internal priv dir
 	for _, node := range nodeInfos {
 		internalPrivPath := fmt.Sprintf(model.PathNodeInfoPriv, node.NodeID)
-		err = io.WriteJSON(filepath.Join(bootDir, internalPrivPath), node)
+		err = io.WriteJSON(filepath.Join(bootDir, internalPrivPath), &node)
 		if err != nil {
 			return "", "", fmt.Errorf("could not write internal node info: %w", err)
 		}

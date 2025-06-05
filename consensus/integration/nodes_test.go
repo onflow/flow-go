@@ -79,7 +79,7 @@ type RandomBeaconNodeInfo struct {
 // like staking key, role, network key and random beacon info which changes every epoch
 // Contains a mapping of DKG info per epoch.
 type ConsensusParticipant struct {
-	nodeInfo          bootstrap.NodeInfo
+	nodeInfo          bootstrap.NodeInfoPriv
 	beaconInfoByEpoch map[uint64]RandomBeaconNodeInfo
 }
 
@@ -92,12 +92,12 @@ type ConsensusParticipants struct {
 func NewConsensusParticipants(data *run.ParticipantData) *ConsensusParticipants {
 	lookup := make(map[flow.Identifier]ConsensusParticipant)
 	for _, participant := range data.Participants {
-		lookup[participant.NodeID] = ConsensusParticipant{
-			nodeInfo: participant.NodeInfo,
+		lookup[participant.NodeID()] = ConsensusParticipant{
+			nodeInfo: participant.NodeInfoPriv,
 			beaconInfoByEpoch: map[uint64]RandomBeaconNodeInfo{
 				1: {
 					RandomBeaconPrivKey: participant.RandomBeaconPrivKey,
-					DKGParticipant:      data.DKGCommittee[participant.NodeID],
+					DKGParticipant:      data.DKGCommittee[participant.NodeID()],
 				},
 			},
 		}
@@ -120,11 +120,11 @@ func (p *ConsensusParticipants) Lookup(nodeID flow.Identifier) *ConsensusPartici
 // If this node was part of previous epoch it will get updated, if not created.
 func (p *ConsensusParticipants) Update(epochCounter uint64, data *run.ParticipantData) {
 	for _, participant := range data.Participants {
-		dkgParticipant := data.DKGCommittee[participant.NodeID]
-		entry, ok := p.lookup[participant.NodeID]
+		dkgParticipant := data.DKGCommittee[participant.NodeID()]
+		entry, ok := p.lookup[participant.NodeID()]
 		if !ok {
 			entry = ConsensusParticipant{
-				nodeInfo:          participant.NodeInfo,
+				nodeInfo:          participant.NodeInfoPriv,
 				beaconInfoByEpoch: map[uint64]RandomBeaconNodeInfo{},
 			}
 		}
@@ -133,7 +133,7 @@ func (p *ConsensusParticipants) Update(epochCounter uint64, data *run.Participan
 			RandomBeaconPrivKey: participant.RandomBeaconPrivKey,
 			DKGParticipant:      dkgParticipant,
 		}
-		p.lookup[participant.NodeID] = entry
+		p.lookup[participant.NodeID()] = entry
 	}
 }
 
@@ -326,7 +326,7 @@ func createConsensusIdentities(t *testing.T, n int) *run.ParticipantData {
 }
 
 // completeConsensusIdentities runs KG process and fills nodeInfos with missing random beacon keys
-func completeConsensusIdentities(t *testing.T, nodeInfos []bootstrap.NodeInfo) *run.ParticipantData {
+func completeConsensusIdentities(t *testing.T, nodeInfos []bootstrap.NodeInfoPriv) *run.ParticipantData {
 	dkgData, err := bootstrapDKG.RandomBeaconKG(len(nodeInfos), unittest.RandomBytes(48))
 	require.NoError(t, err)
 
@@ -337,11 +337,11 @@ func completeConsensusIdentities(t *testing.T, nodeInfos []bootstrap.NodeInfo) *
 	}
 	for index, node := range nodeInfos {
 		participant := run.Participant{
-			NodeInfo:            node,
+			NodeInfoPriv:        node,
 			RandomBeaconPrivKey: dkgData.PrivKeyShares[index],
 		}
 		participantData.Participants = append(participantData.Participants, participant)
-		participantData.DKGCommittee[node.NodeID] = flow.DKGParticipant{
+		participantData.DKGCommittee[node.NodeID()] = flow.DKGParticipant{
 			Index:    uint(index),
 			KeyShare: dkgData.PubKeyShares[index],
 		}
@@ -455,7 +455,7 @@ func createNode(
 	hotstuffDistributor.AddConsumer(counterConsumer)
 	hotstuffDistributor.AddConsumer(logConsumer)
 
-	require.Equal(t, participant.nodeInfo.NodeID, localID)
+	require.Equal(t, participant.nodeInfo.NodeID(), localID)
 	privateKeys, err := participant.nodeInfo.PrivateKeys()
 	require.NoError(t, err)
 

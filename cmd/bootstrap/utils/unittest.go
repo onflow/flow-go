@@ -16,7 +16,7 @@ func RunWithSporkBootstrapDir(t testing.TB, f func(bootDir, partnerDir, partnerW
 
 	// make sure constraints are satisfied, 2/3's of con and col nodes are internal
 	internalNodes := GenerateNodeInfos(3, 6, 2, 1, 1)
-	partnerNodes, err := bootstrap.ToPublicNodeInfoList(GenerateNodeInfos(1, 1, 1, 1, 1))
+	partnerNodes, err := bootstrap.ToPubNodeInfoList(GenerateNodeInfos(1, 1, 1, 1, 1))
 	require.NoError(t, err)
 
 	partnerDir, partnerWeightsPath, err := WritePartnerFiles(partnerNodes, dir)

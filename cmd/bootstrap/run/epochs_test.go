@@ -30,7 +30,10 @@ func TestGenerateRecoverTxArgsWithDKG_ExcludeIncludeParticipants(testifyT *testi
 		require.NoError(testifyT, err)
 
 		allNodeIds := make(flow.IdentityList, 0)
-		for _, node := range append(internalNodes, partnerNodes...) {
+		for _, node := range internalNodes {
+			allNodeIds = append(allNodeIds, node.Identity())
+		}
+		for _, node := range partnerNodes {
 			allNodeIds = append(allNodeIds, node.Identity())
 		}
 

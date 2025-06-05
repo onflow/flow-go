@@ -209,8 +209,8 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("computing collection node clusters")
 	assignments, clusters, err := common.ConstructClusterAssignment(
 		log,
-		model.ToIdentityList(model.PubToNodeInfoList(partnerNodes)),
-		model.ToIdentityList(model.PrivToNodeInfoList(internalNodes)),
+		model.PubToIdentityList(partnerNodes),
+		model.PrivToIdentityList(internalNodes),
 		int(flagCollectionClusters))
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
