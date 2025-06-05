@@ -1683,10 +1683,7 @@ func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest
 	ChunkDataPackRequest {
 
 	req := &verification.ChunkDataPackRequest{
-		Locator: chunks.Locator{
-			ResultID: IdentifierFixture(),
-			Index:    0,
-		},
+		Locator: *ChunkLocatorFixture(IdentifierFixture(), 0),
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID:   IdentifierFixture(),
 			Height:    0,
