@@ -44,13 +44,10 @@ func TestChunkLocatorMalleability(t *testing.T) {
 //   - Should return an error indicating ResultID must not be zero.
 func TestNewLocator(t *testing.T) {
 	t.Run("valid input with non-zero ResultID", func(t *testing.T) {
-		resultID := unittest.IdentifierFixture()
-		index := uint64(5)
-
 		locator, err := chunks.NewLocator(
 			chunks.UntrustedLocator{
-				ResultID: resultID,
-				Index:    index,
+				ResultID: unittest.IdentifierFixture(),
+				Index:    1,
 			},
 		)
 		require.NoError(t, err)
@@ -61,7 +58,7 @@ func TestNewLocator(t *testing.T) {
 		_, err := chunks.NewLocator(
 			chunks.UntrustedLocator{
 				ResultID: flow.ZeroID,
-				Index:    10,
+				Index:    1,
 			},
 		)
 		require.Error(t, err)
