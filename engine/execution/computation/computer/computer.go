@@ -369,6 +369,7 @@ func (e *blockComputer) executeBlock(
 		e.receiptHasher,
 		parentBlockExecutionResultID,
 		block,
+		e.maxConcurrency,
 		e.colResCons,
 		baseSnapshot,
 		versionedChunkConstructor,
