@@ -17,7 +17,7 @@ func (s ChunkStatus) Chunk() *flow.Chunk {
 }
 
 func (s ChunkStatus) ChunkLocatorID() flow.Identifier {
-	return chunks.NewLocator(s.ExecutionResult.ID(), s.ChunkIndex).ID()
+	return chunks.ChunkLocatorID(s.ExecutionResult.ID(), s.ChunkIndex)
 }
 
 type ChunkStatusList []*ChunkStatus

@@ -522,8 +522,14 @@ func TestStopAtHeight(t *testing.T) {
 	mockBlockSealingStatus(s.state, s.headers, headerB, false)
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{resultA, resultB})
 
-	locatorA := unittest.ChunkLocatorFixture(resultA.ID(), 0)
-	locatorB := unittest.ChunkLocatorFixture(resultB.ID(), 0)
+	locatorA := chunks.Locator{
+		ResultID: resultA.ID(),
+		Index:    0,
+	}
+	locatorB := chunks.Locator{
+		ResultID: resultB.ID(),
+		Index:    0,
+	}
 
 	// expects processing notifier being invoked upon sealed chunk detected,
 	// which means the termination of processing a sealed chunk on fetcher engine
@@ -534,8 +540,8 @@ func TestStopAtHeight(t *testing.T) {
 		spew.Dump(args[0].(*verification.ChunkStatus).BlockHeight)
 	}).Return(false)
 
-	e.ProcessAssignedChunk(locatorA)
-	e.ProcessAssignedChunk(locatorB)
+	e.ProcessAssignedChunk(&locatorA)
+	e.ProcessAssignedChunk(&locatorB)
 
 	mock.AssertExpectationsForObjects(t, s.results, s.metrics)
 
@@ -731,14 +737,12 @@ func mockVerifierEngine(t *testing.T,
 			require.True(t, ok)
 
 			// verifiable chunk data should be distinct.
-			locatorID := unittest.ChunkLocatorFixture(vc.Result.ID(), vc.Chunk.Index).ID()
-
-			_, ok = seen[locatorID]
+			_, ok = seen[chunks.ChunkLocatorID(vc.Result.ID(), vc.Chunk.Index)]
 			require.False(t, ok, "duplicated verifiable chunk received")
-			seen[locatorID] = struct{}{}
+			seen[chunks.ChunkLocatorID(vc.Result.ID(), vc.Chunk.Index)] = struct{}{}
 
 			// we should expect this verifiable chunk and its fields should match our expectation
-			expected, ok := verifiableChunks[locatorID]
+			expected, ok := verifiableChunks[chunks.ChunkLocatorID(vc.Result.ID(), vc.Chunk.Index)]
 			require.True(t, ok, "verifier engine received an unknown verifiable chunk data")
 
 			if vc.IsSystemChunk {
@@ -872,7 +876,10 @@ func chunkDataPackResponseFixture(t *testing.T,
 	require.Equal(t, collection != nil, !convert.IsSystemChunk(chunk.Index, result), "only non-system chunks must have a collection")
 
 	return &verification.ChunkDataPackResponse{
-		Locator: *unittest.ChunkLocatorFixture(result.ID(), chunk.Index),
+		Locator: chunks.Locator{
+			ResultID: result.ID(),
+			Index:    chunk.Index,
+		},
 		Cdp: unittest.ChunkDataPackFixture(chunk.ID(),
 			unittest.WithStartState(chunk.StartState),
 			unittest.WithChunkDataPackCollection(collection)),
@@ -952,7 +959,10 @@ func chunkRequestFixture(resultID flow.Identifier,
 	disagrees flow.IdentityList) *verification.ChunkDataPackRequest {
 
 	return &verification.ChunkDataPackRequest{
-		Locator: *unittest.ChunkLocatorFixture(resultID, status.ChunkIndex),
+		Locator: chunks.Locator{
+			ResultID: resultID,
+			Index:    status.ChunkIndex,
+		},
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID:   status.Chunk().ID(),
 			Height:    status.BlockHeight,

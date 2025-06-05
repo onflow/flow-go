@@ -347,7 +347,10 @@ func MockChunkAssignmentFixture(t *testing.T,
 
 			for _, chunk := range receipt.ExecutionResult.Chunks {
 				if isAssigned(chunk.Index, len(receipt.ExecutionResult.Chunks)) {
-					locatorID := unittest.ChunkLocatorFixture(receipt.ExecutionResult.ID(), chunk.Index).ID()
+					locatorID := chunks.Locator{
+						ResultID: receipt.ExecutionResult.ID(),
+						Index:    chunk.Index,
+					}.ID()
 					expectedLocatorIds = append(expectedLocatorIds, locatorID)
 					expectedChunkIds = append(expectedChunkIds, chunk.ID())
 					require.NoError(t, a.Add(chunk.Index, verIds.NodeIDs()))
