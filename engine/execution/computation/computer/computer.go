@@ -209,12 +209,12 @@ func (e *blockComputer) ExecuteBlock(
 
 func (e *blockComputer) queueUserTransactions(
 	blockId flow.Identifier,
-	blockIdStr string,
 	blockHeader *flow.Header,
 	rawCollections []*entity.CompleteCollection,
 	requestQueue chan TransactionRequest,
 ) {
 	txnIndex := uint32(0)
+	blockIdStr := blockId.String()
 
 	collectionCtx := fvm.NewContextFromParent(
 		e.vmCtx,
@@ -254,7 +254,6 @@ func (e *blockComputer) queueUserTransactions(
 
 func (e *blockComputer) queueSystemTransaction(
 	blockId flow.Identifier,
-	blockIdStr string,
 	blockHeader *flow.Header,
 	rawCollections []*entity.CompleteCollection,
 	requestQueue chan TransactionRequest,
@@ -265,6 +264,7 @@ func (e *blockComputer) queueSystemTransaction(
 	}
 
 	txCount := uint32(len(requestQueue))
+	blockIDStr := blockId.String()
 
 	systemCtx := fvm.NewContextFromParent(
 		e.systemChunkCtx,
@@ -273,7 +273,7 @@ func (e *blockComputer) queueSystemTransaction(
 	)
 
 	systemCollectionLogger := systemCtx.Logger.With().
-		Str("block_id", blockIdStr).
+		Str("block_id", blockIDStr).
 		Uint64("height", blockHeader.Height).
 		Bool("system_chunk", true).
 		Bool("system_transaction", true).
@@ -283,7 +283,7 @@ func (e *blockComputer) queueSystemTransaction(
 
 	systemCollectionInfo := collectionInfo{
 		blockId:         blockId,
-		blockIdStr:      blockIdStr,
+		blockIdStr:      blockIDStr,
 		blockHeight:     blockHeader.Height,
 		collectionIndex: len(rawCollections),
 		CompleteCollection: &entity.CompleteCollection{
@@ -385,7 +385,6 @@ func (e *blockComputer) executeBlock(
 
 	e.queueUserTransactions(
 		blockId,
-		blockIdStr,
 		block.Block.Header,
 		rawCollections,
 		requestQueue,
@@ -393,7 +392,6 @@ func (e *blockComputer) executeBlock(
 
 	err = e.queueSystemTransaction(
 		blockId,
-		blockIdStr,
 		block.Block.Header,
 		rawCollections,
 		requestQueue,
