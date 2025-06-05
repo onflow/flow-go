@@ -143,6 +143,17 @@ type NodeInfoPriv struct {
 	StakingPrivKey encodable.StakingPrivKey
 }
 
+// encodableNodeInfoPriv provides encoding/decoding methods that include the
+// required fields of `NodeInfoPriv`, including the private fields (private fields aren't accessible to
+// JSON write)
+type encodableNodeInfoPriv struct {
+	Role           flow.Role
+	Address        string
+	NodeID         flow.Identifier
+	NetworkPrivKey encodable.NetworkPrivKey
+	StakingPrivKey encodable.StakingPrivKey
+}
+
 // NodeInfoPub defines the canonical structure for encoding public node info.
 type NodeInfoPub struct {
 	role          flow.Role
@@ -157,7 +168,7 @@ type NodeInfoPub struct {
 // decodableNodeInfoPub provides backward-compatible decoding of old models
 // which use the Stake field in place of Weight.
 type decodableNodeInfoPub struct {
-	role          flow.Role
+	Role          flow.Role
 	Address       string
 	NodeID        flow.Identifier
 	Weight        uint64
@@ -167,6 +178,31 @@ type decodableNodeInfoPub struct {
 	// Stake previously was used in place of the Weight field.
 	// Deprecated: supported in decoding for backward-compatibility
 	Stake uint64
+}
+
+func (info *NodeInfoPriv) MarshalJSON() ([]byte, error) {
+	enc := encodableNodeInfoPriv{
+		Role:           info.role,
+		Address:        info.Address,
+		NodeID:         info.nodeID,
+		NetworkPrivKey: info.NetworkPrivKey,
+		StakingPrivKey: info.StakingPrivKey,
+	}
+	return json.Marshal(enc)
+}
+
+func (info *NodeInfoPriv) UnmarshalJSON(b []byte) error {
+	var dec encodableNodeInfoPriv
+	err := json.Unmarshal(b, &dec)
+	if err != nil {
+		return fmt.Errorf("could not decode json: %w", err)
+	}
+	info.role = dec.Role
+	info.Address = dec.Address
+	info.nodeID = dec.NodeID
+	info.NetworkPrivKey = dec.NetworkPrivKey
+	info.StakingPrivKey = dec.StakingPrivKey
+	return nil
 }
 
 func (info *NodeInfoPub) Equals(other *NodeInfoPub) bool {
@@ -182,6 +218,27 @@ func (info *NodeInfoPub) Equals(other *NodeInfoPub) bool {
 		slices.Equal(info.StakingPoP.Signature, other.StakingPoP.Signature)
 }
 
+func (info *NodeInfoPub) MarshalJSON() ([]byte, error) {
+	enc := struct {
+		Role          flow.Role // role is public
+		Address       string
+		NodeID        flow.Identifier // node ID is public
+		Weight        uint64
+		NetworkPubKey encodable.NetworkPubKey
+		StakingPubKey encodable.StakingPubKey
+		StakingPoP    encodable.StakingKeyPoP
+	}{
+		Role:          info.role,
+		Address:       info.Address,
+		NodeID:        info.nodeID,
+		Weight:        info.Weight,
+		NetworkPubKey: info.NetworkPubKey,
+		StakingPubKey: info.StakingPubKey,
+		StakingPoP:    info.StakingPoP,
+	}
+	return json.Marshal(enc)
+}
+
 func (info *NodeInfoPub) UnmarshalJSON(b []byte) error {
 	var decodable decodableNodeInfoPub
 	err := json.Unmarshal(b, &decodable)
@@ -195,7 +252,7 @@ func (info *NodeInfoPub) UnmarshalJSON(b []byte) error {
 		}
 		decodable.Weight = decodable.Stake
 	}
-	info.role = decodable.role
+	info.role = decodable.Role
 	info.Address = decodable.Address
 	info.nodeID = decodable.NodeID
 	info.Weight = decodable.Weight
@@ -308,8 +365,8 @@ func (node NodeInfoPub) Identity() *flow.Identity {
 			Address:       node.Address,
 			Role:          node.role,
 			InitialWeight: node.Weight,
-			StakingPubKey: node.StakingPubKey,
-			NetworkPubKey: node.NetworkPubKey,
+			StakingPubKey: node.StakingPubKey.PublicKey,
+			NetworkPubKey: node.NetworkPubKey.PublicKey,
 		},
 		DynamicIdentity: flow.DynamicIdentity{
 			EpochParticipationStatus: flow.EpochParticipationStatusActive,
@@ -410,7 +467,15 @@ func ToIdentityList(nodes []NodeInfo) flow.IdentityList {
 	return il
 }
 
-func ToPublicNodeInfoList(nodes []NodeInfoPriv) ([]NodeInfoPub, error) {
+func PrivToIdentityList(nodes []NodeInfoPriv) flow.IdentityList {
+	return ToIdentityList(PrivToNodeInfoList(nodes))
+}
+
+func PubToIdentityList(nodes []NodeInfoPub) flow.IdentityList {
+	return ToIdentityList(PubToNodeInfoList(nodes))
+}
+
+func ToPubNodeInfoList(nodes []NodeInfoPriv) ([]NodeInfoPub, error) {
 	pub := make([]NodeInfoPub, 0, len(nodes))
 	for _, node := range nodes {
 		info, err := node.Public()
