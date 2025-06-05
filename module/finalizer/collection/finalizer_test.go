@@ -85,11 +85,13 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx1.ID(), &tx1))
 
 			// create a new block on genesis
-			block := unittest.ClusterBlockWithParentAndPayload(genesis, model.PayloadFromTransactions(refBlock.ID(), &tx1))
+			payload, err := model.NewPayload(refBlock.ID(), []*flow.TransactionBody{&tx1})
+			require.NoError(t, err)
+			block := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
 			insert(block)
 
 			// finalize the block
-			err := finalizer.MakeFinal(block.ID())
+			err = finalizer.MakeFinal(block.ID())
 			assert.NoError(t, err)
 
 			// finalize the block again - this should be a no-op
@@ -105,7 +107,7 @@ func TestFinalizer(t *testing.T) {
 			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// create a new block that isn't connected to a parent
-			block := unittest.ClusterBlockWithParentAndPayload(genesis, model.EmptyPayload(refBlock.ID()))
+			block := unittest.ClusterBlockWithParentAndPayload(genesis, model.NewEmptyPayload(refBlock.ID()))
 			block.Header.ParentID = unittest.IdentifierFixture()
 			insert(block)
 
@@ -122,7 +124,7 @@ func TestFinalizer(t *testing.T) {
 			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// create a block with empty payload on genesis
-			block := unittest.ClusterBlockWithParentAndPayload(genesis, model.EmptyPayload(refBlock.ID()))
+			block := unittest.ClusterBlockWithParentAndPayload(genesis, model.NewEmptyPayload(refBlock.ID()))
 			insert(block)
 
 			// finalize the block
@@ -153,7 +155,9 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
-			block := unittest.ClusterBlockWithParentAndPayload(genesis, model.PayloadFromTransactions(refBlock.ID(), &tx1))
+			payload, err := model.NewPayload(refBlock.ID(), []*flow.TransactionBody{&tx1})
+			require.NoError(t, err)
+			block := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
 			insert(block)
 
 			// block should be passed to pusher
@@ -166,7 +170,7 @@ func TestFinalizer(t *testing.T) {
 			}).Once()
 
 			// finalize the block
-			err := finalizer.MakeFinal(block.ID())
+			err = finalizer.MakeFinal(block.ID())
 			assert.NoError(t, err)
 
 			// tx1 should have been removed from mempool
@@ -197,11 +201,15 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
-			block1 := unittest.ClusterBlockWithParentAndPayload(genesis, model.PayloadFromTransactions(refBlock.ID(), &tx1))
+			payload, err := model.NewPayload(refBlock.ID(), []*flow.TransactionBody{&tx1})
+			require.NoError(t, err)
+			block1 := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
 			insert(block1)
 
 			// create a block containing tx2 on top of block1
-			block2 := unittest.ClusterBlockWithParentAndPayload(block1, model.PayloadFromTransactions(refBlock.ID(), &tx2))
+			payload, err = model.NewPayload(refBlock.ID(), []*flow.TransactionBody{&tx2})
+			require.NoError(t, err)
+			block2 := unittest.ClusterBlockWithParentAndPayload(block1, *payload)
 			insert(block2)
 
 			// both blocks should be passed to pusher
@@ -221,7 +229,7 @@ func TestFinalizer(t *testing.T) {
 			}).Once()
 
 			// finalize block2 (should indirectly finalize block1 as well)
-			err := finalizer.MakeFinal(block2.ID())
+			err = finalizer.MakeFinal(block2.ID())
 			assert.NoError(t, err)
 
 			// tx1 and tx2 should have been removed from mempool
@@ -250,11 +258,15 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
-			block1 := unittest.ClusterBlockWithParentAndPayload(genesis, model.PayloadFromTransactions(refBlock.ID(), &tx1))
+			payload, err := model.NewPayload(refBlock.ID(), []*flow.TransactionBody{&tx1})
+			require.NoError(t, err)
+			block1 := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
 			insert(block1)
 
 			// create a block containing tx2 on top of block1
-			block2 := unittest.ClusterBlockWithParentAndPayload(block1, model.PayloadFromTransactions(refBlock.ID(), &tx2))
+			payload, err = model.NewPayload(refBlock.ID(), []*flow.TransactionBody{&tx2})
+			require.NoError(t, err)
+			block2 := unittest.ClusterBlockWithParentAndPayload(block1, *payload)
 			insert(block2)
 
 			// block should be passed to pusher
@@ -267,7 +279,7 @@ func TestFinalizer(t *testing.T) {
 			}).Once()
 
 			// finalize block1 (should NOT finalize block2)
-			err := finalizer.MakeFinal(block1.ID())
+			err = finalizer.MakeFinal(block1.ID())
 			assert.NoError(t, err)
 
 			// tx1 should have been removed from mempool
@@ -298,11 +310,15 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
-			block1 := unittest.ClusterBlockWithParentAndPayload(genesis, model.PayloadFromTransactions(refBlock.ID(), &tx1))
+			payload, err := model.NewPayload(refBlock.ID(), []*flow.TransactionBody{&tx1})
+			require.NoError(t, err)
+			block1 := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
 			insert(block1)
 
 			// create a block containing tx2 on top of genesis (conflicting with block1)
-			block2 := unittest.ClusterBlockWithParentAndPayload(genesis, model.PayloadFromTransactions(refBlock.ID(), &tx2))
+			payload, err = model.NewPayload(refBlock.ID(), []*flow.TransactionBody{&tx2})
+			require.NoError(t, err)
+			block2 := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
 			insert(block2)
 
 			// block should be passed to pusher
@@ -315,7 +331,7 @@ func TestFinalizer(t *testing.T) {
 			}).Once()
 
 			// finalize block1
-			err := finalizer.MakeFinal(block1.ID())
+			err = finalizer.MakeFinal(block1.ID())
 			assert.NoError(t, err)
 
 			// tx1 should have been removed from mempool

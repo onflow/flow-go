@@ -214,7 +214,7 @@ func (e *blockComputer) queueTransactionRequests(
 	systemTxnBody *flow.TransactionBody,
 	requestQueue chan TransactionRequest,
 	numTxns int,
-) {
+) error {
 	txnIndex := uint32(0)
 
 	collectionCtx := fvm.NewContextFromParent(
@@ -240,14 +240,14 @@ func (e *blockComputer) queueTransactionRequests(
 			isSystemTransaction: false,
 		}
 
-		for i, txnBody := range collection.Transactions {
+		for i, txnBody := range collection.Collection.Transactions {
 			requestQueue <- newTransactionRequest(
 				collectionInfo,
 				collectionCtx,
 				collectionLogger,
 				txnIndex,
 				txnBody,
-				i == len(collection.Transactions)-1)
+				i == len(collection.Collection.Transactions)-1)
 			txnIndex += 1
 		}
 	}
@@ -265,13 +265,21 @@ func (e *blockComputer) queueTransactionRequests(
 		Int("num_collections", len(rawCollections)).
 		Int("num_txs", numTxns).
 		Logger()
+
+	collection, err := flow.NewCollection(flow.UntrustedCollection{
+		Transactions: []*flow.TransactionBody{systemTxnBody},
+	})
+	if err != nil {
+		return fmt.Errorf("could not construct system collection: %w", err)
+	}
+
 	systemCollectionInfo := collectionInfo{
 		blockId:         blockId,
 		blockIdStr:      blockIdStr,
 		blockHeight:     blockHeader.Height,
 		collectionIndex: len(rawCollections),
 		CompleteCollection: &entity.CompleteCollection{
-			Transactions: []*flow.TransactionBody{systemTxnBody},
+			Collection: collection,
 		},
 		isSystemTransaction: true,
 	}
@@ -283,12 +291,14 @@ func (e *blockComputer) queueTransactionRequests(
 		txnIndex,
 		systemTxnBody,
 		true)
+
+	return nil
 }
 
 func numberOfTransactionsInBlock(collections []*entity.CompleteCollection) int {
 	numTxns := 1 // there's one system transaction per block
 	for _, collection := range collections {
-		numTxns += len(collection.Transactions)
+		numTxns += len(collection.Collection.Transactions)
 	}
 
 	return numTxns
@@ -384,7 +394,7 @@ func (e *blockComputer) executeBlock(
 		derivedBlockData,
 		collector)
 
-	e.queueTransactionRequests(
+	err = e.queueTransactionRequests(
 		blockId,
 		blockIdStr,
 		block.Block.ToHeader(),
@@ -393,6 +403,10 @@ func (e *blockComputer) executeBlock(
 		requestQueue,
 		numTxns,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("could not queue transaction requests: %w", err)
+	}
+
 	close(requestQueue)
 
 	wg := &sync.WaitGroup{}
