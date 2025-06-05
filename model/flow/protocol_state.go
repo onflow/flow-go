@@ -423,10 +423,10 @@ func (e *MinEpochStateEntry) Copy() *MinEpochStateEntry {
 	// Constructor is skipped since we're copying an already-valid object.
 	//nolint:structwrite
 	return &MinEpochStateEntry{
-		e.PreviousEpoch.Copy(),
-		*e.CurrentEpoch.Copy(),
-		e.NextEpoch.Copy(),
-		e.EpochFallbackTriggered,
+		PreviousEpoch:          e.PreviousEpoch.Copy(),
+		CurrentEpoch:           *e.CurrentEpoch.Copy(),
+		NextEpoch:              e.NextEpoch.Copy(),
+		EpochFallbackTriggered: e.EpochFallbackTriggered,
 	}
 }
 
