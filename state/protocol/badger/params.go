@@ -150,7 +150,7 @@ func ReadGlobalParams(db *badger.DB) (*inmem.Params, error) {
 func ReadFinalizedRoot(db *badger.DB) (*flow.Header, error) {
 	var finalizedRootHeight uint64
 	var rootID flow.Identifier
-	var rootHeader flow.ProposalHeader
+	var rootHeader flow.Header
 	err := db.View(func(tx *badger.Txn) error {
 		err := operation.RetrieveRootHeight(&finalizedRootHeight)(tx)
 		if err != nil {
@@ -169,5 +169,5 @@ func ReadFinalizedRoot(db *badger.DB) (*flow.Header, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read root information from database: %w", err)
 	}
-	return rootHeader.Header, nil
+	return &rootHeader, nil
 }
