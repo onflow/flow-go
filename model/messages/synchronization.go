@@ -50,14 +50,14 @@ type BatchRequest struct {
 // that should correspond to the request.
 type BlockResponse struct {
 	Nonce  uint64
-	Blocks []flow.OldBlock
+	Blocks []UntrustedProposal
 }
 
 func (br *BlockResponse) BlocksInternal() []*flow.BlockProposal {
 	internal := make([]*flow.BlockProposal, len(br.Blocks))
 	for i, block := range br.Blocks {
 		block := block
-		internal[i] = block.ConvertToProposal()
+		internal[i] = block.DeclareTrusted()
 	}
 	return internal
 }
