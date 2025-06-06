@@ -85,13 +85,13 @@ func (s *BackendAccountStatusesSuite) SetupTest() {
 	s.accountContractUpdated, err = addressGenerator.NextAddress()
 	require.NoError(s.T(), err)
 
-	parent := s.rootBlock.Header
+	parent := s.rootBlock.ToHeader()
 	events := s.generateProtocolMockEvents()
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
-		parent = block.Header
+		parent = block.ToHeader()
 
 		seal := unittest.BlockSealsFixture(1)[0]
 		result := unittest.ExecutionResultFixture()
@@ -290,7 +290,7 @@ func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
 			// Add "backfill" block - blocks that are already in the database before the test starts
 			// This simulates a subscription on a past block
 			if test.highestBackfill > 0 {
-				s.highestBlockHeader = s.blocks[test.highestBackfill].Header
+				s.highestBlockHeader = s.blocks[test.highestBackfill].ToHeader()
 			}
 
 			// Set up subscription context and cancellation
@@ -305,7 +305,7 @@ func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
 				// Simulate new exec data received.
 				// Exec data for all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.highestBlockHeader = b.Header
+					s.highestBlockHeader = b.ToHeader()
 
 					s.broadcaster.Publish()
 				}
@@ -334,7 +334,7 @@ func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
 					resp, ok := v.(*AccountStatusesResponse)
 					require.True(s.T(), ok, "unexpected response type: %T", v)
 
-					assert.Equal(s.T(), b.Header.ID(), resp.BlockID)
+					assert.Equal(s.T(), b.ID(), resp.BlockID)
 					assert.Equal(s.T(), b.Header.Height, resp.Height)
 					assert.Equal(s.T(), expectedEvents, resp.AccountEvents)
 				}, 60*time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))

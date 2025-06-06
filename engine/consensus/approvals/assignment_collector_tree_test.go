@@ -100,7 +100,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetSize_ConcurrentAccess() {
 	result0 := unittest.ExecutionResultFixture()
 	receipts := unittest.ReceiptChainFor(chain, result0)
 	for _, block := range chain {
-		s.Blocks[block.ID()] = block.Header
+		s.Blocks[block.ID()] = block.ToHeader()
 	}
 	for _, receipt := range receipts {
 		s.prepareMockedCollector(&receipt.ExecutionResult)
@@ -147,7 +147,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetCollectorsByInterval() {
 	chain := unittest.ChainFixtureFrom(10, s.ParentBlock)
 	receipts := unittest.ReceiptChainFor(chain, s.IncorporatedResult.Result)
 	for _, block := range chain {
-		s.Blocks[block.ID()] = block.Header
+		s.Blocks[block.ID()] = block.ToHeader()
 	}
 
 	// Process all receipts except first one. This generates a chain of collectors but all of them will be
@@ -226,12 +226,12 @@ func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_CollectorParentI
 // Leveled forest doesn't accept vertexes lower than the lowest height.
 func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_AddingSealedCollector() {
 	block := unittest.BlockWithParentFixture(s.ParentBlock)
-	s.Blocks[block.ID()] = block.Header
+	s.Blocks[block.ID()] = block.ToHeader()
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 	s.prepareMockedCollector(result)
 
 	// generate a few sealed blocks
-	prevSealedBlock := block.Header
+	prevSealedBlock := block.ToHeader()
 	for i := 0; i < 5; i++ {
 		sealedBlock := unittest.BlockHeaderWithParentFixture(prevSealedBlock)
 		s.MarkFinalized(sealedBlock)
@@ -278,7 +278,7 @@ func (s *AssignmentCollectorTreeSuite) TestFinalizeForkAtLevel_ProcessableAfterS
 			blockID := block.ID()
 
 			// update caches
-			s.Blocks[blockID] = block.Header
+			s.Blocks[blockID] = block.ToHeader()
 			s.IdentitiesCache[blockID] = s.AuthorizedVerifiers
 
 			IR := unittest.IncorporatedResult.Fixture(
@@ -302,7 +302,7 @@ func (s *AssignmentCollectorTreeSuite) TestFinalizeForkAtLevel_ProcessableAfterS
 		}
 	}
 
-	finalized := forks[0][0].Header
+	finalized := forks[0][0].ToHeader()
 
 	s.MarkFinalized(s.IncorporatedBlock)
 	s.MarkFinalized(finalized)

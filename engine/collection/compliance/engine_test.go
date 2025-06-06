@@ -163,16 +163,16 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	wg.Add(1)
 	go func() {
 		for i := 0; i < blockCount; i++ {
-			block := unittest.ClusterBlockWithParent(cs.head)
-			proposal := messages.NewClusterBlockProposal(&block)
-			hotstuffProposal := model.SignedProposalFromFlow(block.Header)
+			block := unittest.ClusterBlockWithParent(cs.head.Block)
+			proposal := unittest.ClusterProposalFromBlock(block)
+			hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 			cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
 			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 			cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 			// execute the block submission
-			cs.engine.OnClusterBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+			cs.engine.OnClusterBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
 				OriginID: unittest.IdentifierFixture(),
-				Message:  proposal,
+				Message:  messages.UntrustedClusterProposalFromInternal(proposal),
 			})
 		}
 		wg.Done()
@@ -180,16 +180,16 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	wg.Add(1)
 	go func() {
 		// create a proposal that directly descends from the latest finalized header
-		block := unittest.ClusterBlockWithParent(cs.head)
-		proposal := messages.NewClusterBlockProposal(&block)
+		block := unittest.ClusterBlockWithParent(cs.head.Block)
+		proposal := unittest.ClusterProposalFromBlock(block)
 
-		hotstuffProposal := model.SignedProposalFromFlow(block.Header)
+		hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
-		cs.engine.OnClusterBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+		cs.engine.OnClusterBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
 			OriginID: unittest.IdentifierFixture(),
-			Message:  proposal,
+			Message:  messages.UntrustedClusterProposalFromInternal(proposal),
 		})
 		wg.Done()
 	}()
@@ -206,8 +206,9 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 // Tests the whole processing pipeline.
 func (cs *EngineSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.ClusterBlockFixture()
-	cs.head = &finalizedBlock
-	cs.headerDB[finalizedBlock.ID()] = &finalizedBlock
+	proposal := unittest.ClusterProposalFromBlock(finalizedBlock)
+	cs.head = proposal
+	cs.headerDB[finalizedBlock.ID()] = proposal.Block.ToHeader()
 
 	*cs.pending = module.PendingClusterBlockBuffer{}
 	// wait for both expected calls before ending the test
@@ -220,7 +221,7 @@ func (cs *EngineSuite) TestOnFinalizedBlock() {
 		Run(func(_ mock.Arguments) { wg.Done() }).
 		Return(uint(0)).Once()
 
-	err := cs.engine.processOnFinalizedBlock(model.BlockFromFlow(finalizedBlock.Header))
+	err := cs.engine.processOnFinalizedBlock(model.BlockFromFlow(finalizedBlock.ToHeader()))
 	require.NoError(cs.T(), err)
 	unittest.AssertReturnsBefore(cs.T(), wg.Wait, time.Second, "an expected call to block buffer wasn't made")
 }

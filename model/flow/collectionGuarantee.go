@@ -14,13 +14,8 @@ type CollectionGuarantee struct {
 	Signature        crypto.Signature // guarantor signatures
 }
 
-// ID returns the fingerprint of the collection guarantee.
+// ID returns a collision-resistant hash of the CollectionGuarantee struct.
+// This is distinct from the ID of the corresponding collection.
 func (cg *CollectionGuarantee) ID() Identifier {
 	return cg.CollectionID
-}
-
-// Checksum returns a checksum of the collection guarantee including the
-// signatures.
-func (cg *CollectionGuarantee) Checksum() Identifier {
-	return MakeID(cg)
 }

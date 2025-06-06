@@ -81,14 +81,15 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 			tst.MsgState.Add(sender, msg)
 
 			switch m := msg.(type) {
-			case *messages.BlockProposal:
+			case *messages.UntrustedProposal:
 				tst.BlockState.Add(t, m)
+				block := m.DeclareTrusted().Block
 				t.Logf("%v block proposal received from %s at height %v, view %v: %x\n",
 					time.Now().UTC(),
 					sender,
-					m.Block.Header.Height,
-					m.Block.Header.View,
-					m.Block.Header.ID())
+					block.Header.Height,
+					block.Header.View,
+					block.ID())
 			case *flow.ResultApproval:
 				tst.ApprovalState.Add(sender, m)
 				t.Logf("%v result approval received from %s for execution result ID %x and chunk index %v\n",

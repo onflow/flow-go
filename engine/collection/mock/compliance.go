@@ -37,12 +37,12 @@ func (_m *Compliance) Done() <-chan struct{} {
 }
 
 // OnClusterBlockProposal provides a mock function with given fields: proposal
-func (_m *Compliance) OnClusterBlockProposal(proposal flow.Slashable[*messages.ClusterBlockProposal]) {
+func (_m *Compliance) OnClusterBlockProposal(proposal flow.Slashable[*messages.UntrustedClusterProposal]) {
 	_m.Called(proposal)
 }
 
 // OnSyncedClusterBlock provides a mock function with given fields: block
-func (_m *Compliance) OnSyncedClusterBlock(block flow.Slashable[*messages.ClusterBlockProposal]) {
+func (_m *Compliance) OnSyncedClusterBlock(block flow.Slashable[*messages.UntrustedClusterProposal]) {
 	_m.Called(block)
 }
 

@@ -64,12 +64,18 @@ func (c *TimeoutCollector) AddTimeout(timeout *model.TimeoutObject) error {
 			c.notifier.OnDoubleTimeoutDetected(doubleTimeoutErr.FirstTimeout, doubleTimeoutErr.ConflictingTimeout)
 			return nil
 		}
-		return fmt.Errorf("internal error adding timeout %v to cache for view: %d: %w", timeout.ID(), timeout.View, err)
+		return fmt.Errorf("internal error adding timeout to cache: %s: %w",
+			timeout.String(),
+			err,
+		)
 	}
 
 	err = c.processTimeout(timeout)
 	if err != nil {
-		return fmt.Errorf("internal error processing TO %v for view: %d: %w", timeout.ID(), timeout.View, err)
+		return fmt.Errorf("internal error processing TO: %s: %w",
+			timeout.String(),
+			err,
+		)
 	}
 	return nil
 }

@@ -16,15 +16,15 @@ import (
 func TestReceipts_InsertRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		receipt := unittest.ExecutionReceiptFixture()
-		expected := receipt.Meta()
+		expected := receipt.Stub()
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertExecutionReceiptMeta(rw.Writer(), receipt.ID(), expected)
+			return operation.InsertExecutionReceiptStub(rw.Writer(), receipt.ID(), expected)
 		})
 		require.Nil(t, err)
 
-		var actual flow.ExecutionReceiptMeta
-		err = operation.RetrieveExecutionReceiptMeta(db.Reader(), receipt.ID(), &actual)
+		var actual flow.ExecutionReceiptStub
+		err = operation.RetrieveExecutionReceiptStub(db.Reader(), receipt.ID(), &actual)
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, &actual)

@@ -405,7 +405,7 @@ func (s *DynamicEpochTransitionSuite) LatestSealedBlockHeader(ctx context.Contex
 	segment, err := snapshot.SealingSegment()
 	require.NoError(s.T(), err)
 	sealed := segment.Sealed()
-	return sealed.Header
+	return sealed.ToHeader()
 }
 
 // SubmitSmokeTestTransaction will submit a create account transaction to smoke test network

@@ -14,23 +14,13 @@ import (
 func TestGenerateClusterRootQC(t *testing.T) {
 	participants := createClusterParticipants(t, 3)
 
-	block := unittest.BlockFixture()
-
-	block.Payload.Seals = nil
-	block.Payload.Guarantees = nil
-	block.Header.ParentID = flow.ZeroID
-	block.Header.View = 3
-	block.Header.Height = 0
-	block.Header.PayloadHash = block.Payload.Hash()
-
-	clusterBlock := cluster.Block{
-		Header: &flow.Header{
+	clusterBlock := cluster.NewBlock(
+		flow.HeaderBody{
 			ParentID: flow.ZeroID,
 			View:     42,
 		},
-	}
-	payload := cluster.EmptyPayload(flow.ZeroID)
-	clusterBlock.SetPayload(payload)
+		cluster.EmptyPayload(flow.ZeroID),
+	)
 
 	orderedParticipants := model.ToIdentityList(participants).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 	_, err := GenerateClusterRootQC(participants, orderedParticipants, &clusterBlock)

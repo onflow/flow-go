@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
-	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
@@ -1436,16 +1436,16 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	blocks := new(envMock.Blocks)
 
 	block1 := unittest.BlockFixture()
-	block2 := unittest.BlockWithParentFixture(block1.Header)
-	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block2 := unittest.BlockWithParentFixture(block1.ToHeader())
+	block3 := unittest.BlockWithParentFixture(block2.ToHeader())
 
-	blocks.On("ByHeightFrom", block1.Header.Height, block1.Header).Return(block1.Header, nil)
-	blocks.On("ByHeightFrom", block2.Header.Height, block1.Header).Return(block2.Header, nil)
+	blocks.On("ByHeightFrom", block1.Header.Height, block1.ToHeader()).Return(block1.ToHeader(), nil)
+	blocks.On("ByHeightFrom", block2.Header.Height, block1.ToHeader()).Return(block2.ToHeader(), nil)
 
 	type logPanic struct{}
-	blocks.On("ByHeightFrom", block3.Header.Height, block1.Header).Run(func(args mock.Arguments) { panic(logPanic{}) })
+	blocks.On("ByHeightFrom", block3.Header.Height, block1.ToHeader()).Run(func(args mock.Arguments) { panic(logPanic{}) })
 
-	blockCtx := fvm.NewContextFromParent(ctx, fvm.WithBlocks(blocks), fvm.WithBlockHeader(block1.Header))
+	blockCtx := fvm.NewContextFromParent(ctx, fvm.WithBlocks(blocks), fvm.WithBlockHeader(block1.ToHeader()))
 
 	t.Run("works as transaction", func(t *testing.T) {
 		txBody := flow.NewTransactionBody().
@@ -1683,7 +1683,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 func TestBlockContext_Random(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
-	header := &flow.Header{Height: 42}
+	header := &flow.Header{HeaderBody: flow.HeaderBody{Height: 42}}
 	source := testutil.EntropyProviderFixture(nil)
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),

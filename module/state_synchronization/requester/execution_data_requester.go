@@ -407,7 +407,7 @@ func (e *executionDataRequester) processFetchRequest(parentCtx irrecoverable.Sig
 	}
 
 	logger.Info().
-		Hex("execution_data_id", logging.ID(execData.ID())).
+		Hex("execution_data_id", logging.ID(execData.ExecutionDataID)).
 		Msg("execution data fetched")
 
 	return nil

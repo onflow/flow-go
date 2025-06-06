@@ -31,13 +31,9 @@ type ChunkAssigner struct {
 // be assigned to each chunk.
 func NewChunkAssigner(alpha uint, protocolState protocol.State) (*ChunkAssigner, error) {
 	// TODO to have limit of assignment mempool as a parameter (2703)
-	assignment, err := stdmap.NewAssignments(1000)
-	if err != nil {
-		return nil, fmt.Errorf("could not create an assignment mempool: %w", err)
-	}
 	return &ChunkAssigner{
 		alpha:         int(alpha),
-		assignments:   assignment,
+		assignments:   stdmap.NewAssignments(1000),
 		protocolState: protocolState,
 	}, nil
 }
@@ -61,7 +57,7 @@ func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identi
 
 	// checks cache against this assignment
 	assignmentFingerprint := flow.HashToID(hash)
-	a, exists := p.assignments.ByID(assignmentFingerprint)
+	a, exists := p.assignments.Get(assignmentFingerprint)
 	if exists {
 		return a, nil
 	}

@@ -282,7 +282,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	cfg := managerCfgFixture(t)
 	sporkId := unittest.IdentifierFixture()
 	fastDecay := false
-	fastDecayFunc := func(record model.ProtocolSpamRecord) float64 {
+	fastDecayFunc := func(record *model.ProtocolSpamRecord) float64 {
 		t.Logf("decayFuc called with record: %+v", record)
 		if fastDecay {
 			// decay to zero in a single heart beat
@@ -1602,7 +1602,7 @@ func TestDecayMisbehaviorPenalty_DecayToZero_AllowListing(t *testing.T) {
 
 	// simulates a disallow-listed peer in cache.
 	originId := unittest.IdentifierFixture()
-	penalty, err := cache.AdjustWithInit(originId, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	penalty, err := cache.AdjustWithInit(originId, func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		record.Penalty = -10 // set the penalty to -10 to simulate that the penalty has already been decayed for a while.
 		record.CutoffCounter = 1
 		record.DisallowListed = true

@@ -67,9 +67,9 @@ func (ir *IncorporatedResultSeals) resultHasMultipleReceipts(incorporatedResult 
 	return receiptsForIncorporatedResults.GroupByExecutorID().NumberGroups() >= 2
 }
 
-// ByID gets an IncorporatedResultSeal by IncorporatedResult ID
-func (ir *IncorporatedResultSeals) ByID(id flow.Identifier) (*flow.IncorporatedResultSeal, bool) {
-	seal, ok := ir.seals.ByID(id)
+// Get gets an IncorporatedResultSeal by IncorporatedResult ID
+func (ir *IncorporatedResultSeals) Get(id flow.Identifier) (*flow.IncorporatedResultSeal, bool) {
+	seal, ok := ir.seals.Get(id)
 	if !ok {
 		return nil, false
 	}

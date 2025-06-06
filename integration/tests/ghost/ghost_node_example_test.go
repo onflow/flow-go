@@ -124,8 +124,8 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 
 		// the following switch should be similar to the one defined in the actual node that is being emulated
 		switch v := event.(type) {
-		case *messages.BlockProposal:
-			fmt.Printf("Received block proposal: %s from %s\n", v.Block.Header.ID().String(), from.String())
+		case *messages.UntrustedProposal:
+			fmt.Printf("Received block proposal: %s from %s\n", v.DeclareTrusted().Block.ID().String(), from.String())
 			i++
 		default:
 			t.Logf(" ignoring event: :%T: %v", v, v)

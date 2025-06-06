@@ -304,13 +304,10 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 		}
 
 		// now re-enqueue the block with parent commit
-		missing, execs, err := e.blockQueue.HandleBlock(block, &parentCommitment)
+		missingColls, executables, err = e.blockQueue.HandleBlock(block, &parentCommitment)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unexpected error while reenqueue block to block queue: %w", err)
 		}
-
-		missingColls = flow.Deduplicate(append(missingColls, missing...))
-		executables = flow.Deduplicate(append(executables, execs...))
 	}
 
 	lg.Info().Bool("parent_is_executed", false).
@@ -345,7 +342,7 @@ func (e *Core) onBlockExecuted(
 		return fmt.Errorf("cannot persist execution state: %w", err)
 	}
 
-	blockID := block.ID()
+	blockID := block.BlockID()
 	lg := e.log.With().
 		Hex("block_id", blockID[:]).
 		Uint64("height", block.Block.Header.Height).
@@ -361,7 +358,7 @@ func (e *Core) onBlockExecuted(
 		return fmt.Errorf("unexpected error while marking block as executed: %w", err)
 	}
 
-	e.stopControl.OnBlockExecuted(block.Block.Header)
+	e.stopControl.OnBlockExecuted(block.Block.ToHeader())
 
 	// notify event consumer so that the event consumer can do tasks
 	// such as broadcasting or uploading the result
@@ -472,12 +469,13 @@ func (e *Core) executeConcurrently(executables []*entity.ExecutableBlock) {
 }
 
 func (e *Core) execute(ctx context.Context, executable *entity.ExecutableBlock) error {
-	if !e.stopControl.ShouldExecuteBlock(executable.Block.Header.ID(), executable.Block.Header.Height) {
+	if !e.stopControl.ShouldExecuteBlock(executable.Block.ID(), executable.Block.Header.Height) {
 		return nil
 	}
 
+	blockID := executable.BlockID()
 	e.log.Info().
-		Hex("block_id", logging.Entity(executable)).
+		Hex("block_id", blockID[:]).
 		Uint64("height", executable.Block.Header.Height).
 		Int("collections", len(executable.CompleteCollections)).
 		Msgf("executing block")
@@ -523,7 +521,7 @@ func (e *Core) fetch(missingColls []*block_queue.MissingCollection) (int, error)
 		err = e.collectionFetcher.FetchCollection(col.BlockID, col.Height, col.Guarantee)
 		if err != nil {
 			return 0, fmt.Errorf("failed to fetch collection %v for block %v (height: %v): %w",
-				col.Guarantee.ID(), col.BlockID, col.Height, err)
+				col.Guarantee.CollectionID, col.BlockID, col.Height, err)
 		}
 		missingCount++
 	}

@@ -14,10 +14,6 @@ type IDEntity interface {
 // of entities.
 type Entity interface {
 	IDEntity
-
-	// Checksum returns a unique checksum for the entity, including the mutable
-	// data such as signatures.
-	Checksum() Identifier
 }
 
 func EntitiesToIDs[T Entity](entities []T) []Identifier {

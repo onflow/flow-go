@@ -1,5 +1,7 @@
 package flow
 
+import "bytes"
+
 // QuorumCertificate represents a quorum certificate for a block proposal as defined in the HotStuff algorithm.
 // A quorum certificate is a collection of votes for a particular block proposal. Valid quorum certificates contain
 // signatures from a super-majority of consensus committee members.
@@ -28,6 +30,22 @@ func (qc *QuorumCertificate) ID() Identifier {
 		return ZeroID
 	}
 	return MakeID(qc)
+}
+
+// Equals returns true if and only if receiver QuorumCertificate is equal to the `other`. Nil values are supported.
+func (qc *QuorumCertificate) Equals(other *QuorumCertificate) bool {
+	// Shortcut if `qc` and `other` point to the same object; covers case where both are nil.
+	if qc == other {
+		return true
+	}
+	if qc == nil || other == nil { // only one is nil, the other not (otherwise we would have returned above)
+		return false
+	}
+	// both are not nil, so we can compare the fields
+	return (qc.View == other.View) &&
+		(qc.BlockID == other.BlockID) &&
+		bytes.Equal(qc.SignerIndices, other.SignerIndices) &&
+		bytes.Equal(qc.SigData, other.SigData)
 }
 
 // QuorumCertificateWithSignerIDs is a QuorumCertificate, where the signing nodes are
