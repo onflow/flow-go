@@ -31,7 +31,7 @@ func ensureUniformNodeWeightsPerRole(allNodes flow.IdentityList) {
 //   - for all roles R:
 //     all node with role R must have the same weight
 func checkConstraints(partnerNodes []model.NodeInfoPub, internalNodes []model.NodeInfoPriv) {
-	all := make([]*flow.Identity, len(partnerNodes)+len(internalNodes))
+	all := make([]*flow.Identity, 0, len(partnerNodes)+len(internalNodes))
 	for _, node := range partnerNodes {
 		all = append(all, node.Identity())
 	}

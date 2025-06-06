@@ -37,7 +37,7 @@ func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNod
 		// validate every single partner node
 		err = ValidateNodeID(partner.NodeID())
 		if err != nil {
-			return nil, fmt.Errorf("invalid node ID: %x", partner.NodeID)
+			return nil, fmt.Errorf("invalid node ID: %x", partner.NodeID())
 		}
 		err = ValidateNetworkPubKey(partner.NetworkPubKey)
 		if err != nil {
@@ -50,11 +50,11 @@ func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNod
 
 		weight := weights[partner.NodeID()]
 		if valid := ValidateWeight(weight); !valid {
-			return nil, fmt.Errorf("invalid partner weight %v: %d", partner.NodeID, weight)
+			return nil, fmt.Errorf("invalid partner weight %v: %d", partner.NodeID(), weight)
 		}
 
 		if weight != flow.DefaultInitialWeight {
-			log.Warn().Msgf("partner node (id=%x) has non-default weight (%d != %d)", partner.NodeID, weight, flow.DefaultInitialWeight)
+			log.Warn().Msgf("partner node (id=%x) has non-default weight (%d != %d)", partner.NodeID(), weight, flow.DefaultInitialWeight)
 		}
 
 		node := bootstrap.NewPublicNodeInfo(
@@ -144,15 +144,15 @@ func ReadFullInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, inte
 		// validate every single internal node
 		err := ValidateNodeID(internal.NodeID())
 		if err != nil {
-			return nil, fmt.Errorf("invalid internal node ID: %x", internal.NodeID)
+			return nil, fmt.Errorf("invalid internal node ID: %x", internal.NodeID())
 		}
 		weight := weights[internal.Address]
 
 		if valid := ValidateWeight(weight); !valid {
-			return nil, fmt.Errorf("invalid partner weight %x: %d", internal.NodeID, weight)
+			return nil, fmt.Errorf("invalid partner weight %x: %d", internal.NodeID(), weight)
 		}
 		if weight != flow.DefaultInitialWeight {
-			log.Warn().Msgf("internal node (id=%x) has non-default weight (%d != %d)", internal.NodeID, weight, flow.DefaultInitialWeight)
+			log.Warn().Msgf("internal node (id=%x) has non-default weight (%d != %d)", internal.NodeID(), weight, flow.DefaultInitialWeight)
 		}
 
 		node := bootstrap.NewPrivateNodeInfo(
