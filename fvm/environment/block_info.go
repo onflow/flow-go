@@ -3,6 +3,7 @@ package environment
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/errors"
@@ -103,8 +104,11 @@ func (info *blockInfo) GetCurrentBlockHeight() (uint64, error) {
 		trace.FVMEnvGetCurrentBlockHeight).End()
 
 	err := info.meter.MeterComputation(
-		ComputationKindGetCurrentBlockHeight,
-		1)
+		common.ComputationUsage{
+			Kind:      ComputationKindGetCurrentBlockHeight,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return 0, fmt.Errorf("get current block height failed: %w", err)
 	}
@@ -126,8 +130,11 @@ func (info *blockInfo) GetBlockAtHeight(
 	defer info.tracer.StartChildSpan(trace.FVMEnvGetBlockAtHeight).End()
 
 	err := info.meter.MeterComputation(
-		ComputationKindGetBlockAtHeight,
-		1)
+		common.ComputationUsage{
+			Kind:      ComputationKindGetBlockAtHeight,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return runtime.Block{}, false, fmt.Errorf(
 			"get block at height failed: %w", err)

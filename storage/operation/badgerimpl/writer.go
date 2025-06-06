@@ -2,6 +2,7 @@ package badgerimpl
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/dgraph-io/badger/v2"
@@ -128,7 +129,26 @@ var _ storage.Writer = (*ReaderBatchWriter)(nil)
 // It is safe to modify the contents of the arguments after Set returns.
 // No errors expected during normal operation
 func (b *ReaderBatchWriter) Set(key, value []byte) error {
-	return b.batch.Set(key, value)
+	// BadgerDB v2 docs for WriteBatch.Set() says:
+	//
+	//   "Set is equivalent of Txn.Set()."
+	//
+	// BadgerDB v2 docs for Txn.Set() says:
+	//
+	//   "Set adds a key-value pair to the database.
+	//   ...
+	//   The current transaction keeps a reference to the key and val byte slice
+	//   arguments. Users must not modify key and val until the end of the transaction."
+
+	// Make copies of given key and value because:
+	// - ReaderBatchWriter.Set() (this function) promises that it is safe to modify
+	//   key and value after Set returns, while
+	// - BadgerDB's WriteBatch.Set() said users must not modify key and value
+	//   until end of transaction.
+	keyCopy := slices.Clone(key)
+	valueCopy := slices.Clone(value)
+
+	return b.batch.Set(keyCopy, valueCopy)
 }
 
 // Delete deletes the value for the given key. Deletes are blind all will
@@ -137,7 +157,24 @@ func (b *ReaderBatchWriter) Set(key, value []byte) error {
 // It is safe to modify the contents of the arguments after Delete returns.
 // No errors expected during normal operation
 func (b *ReaderBatchWriter) Delete(key []byte) error {
-	return b.batch.Delete(key)
+	// BadgerDB v2 docs for WriteBatch.Delete() says:
+	//
+	//   "Set is equivalent of Txn.Delete."
+	//
+	// BadgerDB v2 docs for Txn.Set() says:
+	//
+	//   "Delete deletes a key.
+	//   ...
+	//   The current transaction keeps a reference to the key byte slice argument.
+	//   Users must not modify the key until the end of the transaction."
+
+	// Make copies of given key because:
+	// - ReaderBatchWriter.Delete() (this function) promises that it is safe to modify
+	//   key after Delete returns, while
+	// - BadgerDB's WriteBatch.Delete() says users must not modify key until end of transaction.
+	keyCopy := slices.Clone(key)
+
+	return b.batch.Delete(keyCopy)
 }
 
 // DeleteByRange removes all keys with a prefix that falls within the

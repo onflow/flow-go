@@ -89,7 +89,10 @@ var keygenCmd = &cobra.Command{
 		}
 
 		log.Info().Msg("generating node public information")
-		genNodePubInfo(nodes)
+		err = writeNodePubInfo(nodes)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to generate nodes public info")
+		}
 	},
 }
 
@@ -120,14 +123,19 @@ func isEmptyDir(path string) (bool, error) {
 	return false, err // Either not empty or error, suits both cases
 }
 
-func genNodePubInfo(nodes []model.NodeInfo) {
+func writeNodePubInfo(nodes []model.NodeInfo) error {
 	pubNodes := make([]model.NodeInfoPub, 0, len(nodes))
 	for _, node := range nodes {
-		pubNodes = append(pubNodes, node.Public())
+		pub, err := node.Public()
+		if err != nil {
+			return fmt.Errorf("failed to read public info: %w", err)
+		}
+		pubNodes = append(pubNodes, pub)
 	}
 	err := common.WriteJSON(model.PathInternalNodeInfosPub, flagOutdir, pubNodes)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to write json")
+		return err
 	}
 	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathInternalNodeInfosPub)
+	return nil
 }

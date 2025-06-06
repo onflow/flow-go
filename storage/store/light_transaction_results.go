@@ -14,67 +14,58 @@ var _ storage.LightTransactionResults = (*LightTransactionResults)(nil)
 
 type LightTransactionResults struct {
 	db         storage.DB
-	cache      *Cache[string, flow.LightTransactionResult]
-	indexCache *Cache[string, flow.LightTransactionResult]
-	blockCache *Cache[string, []flow.LightTransactionResult]
+	cache      *Cache[TwoIdentifier, flow.LightTransactionResult]       // Key: blockID + txID
+	indexCache *Cache[IdentifierAndUint32, flow.LightTransactionResult] // Key: blockID + txIndex
+	blockCache *Cache[flow.Identifier, []flow.LightTransactionResult]   // Key: blockID
 }
 
 func NewLightTransactionResults(collector module.CacheMetrics, db storage.DB, transactionResultsCacheSize uint) *LightTransactionResults {
-	retrieve := func(r storage.Reader, key string) (flow.LightTransactionResult, error) {
-		var txResult flow.LightTransactionResult
-		blockID, txID, err := KeyToBlockIDTransactionID(key)
-		if err != nil {
-			return flow.LightTransactionResult{}, fmt.Errorf("could not convert key: %w", err)
-		}
+	retrieve := func(r storage.Reader, key TwoIdentifier) (flow.LightTransactionResult, error) {
+		blockID, txID := KeyToBlockIDTransactionID(key)
 
-		err = operation.RetrieveLightTransactionResult(r, blockID, txID, &txResult)
+		var txResult flow.LightTransactionResult
+		err := operation.RetrieveLightTransactionResult(r, blockID, txID, &txResult)
 		if err != nil {
 			return flow.LightTransactionResult{}, err
 		}
 		return txResult, nil
 	}
-	retrieveIndex := func(r storage.Reader, key string) (flow.LightTransactionResult, error) {
-		var txResult flow.LightTransactionResult
-		blockID, txIndex, err := KeyToBlockIDIndex(key)
-		if err != nil {
-			return flow.LightTransactionResult{}, fmt.Errorf("could not convert index key: %w", err)
-		}
 
-		err = operation.RetrieveLightTransactionResultByIndex(r, blockID, txIndex, &txResult)
+	retrieveIndex := func(r storage.Reader, key IdentifierAndUint32) (flow.LightTransactionResult, error) {
+		blockID, txIndex := KeyToBlockIDIndex(key)
+
+		var txResult flow.LightTransactionResult
+		err := operation.RetrieveLightTransactionResultByIndex(r, blockID, txIndex, &txResult)
 		if err != nil {
 			return flow.LightTransactionResult{}, err
 		}
 		return txResult, nil
 	}
-	retrieveForBlock := func(r storage.Reader, key string) ([]flow.LightTransactionResult, error) {
+
+	retrieveForBlock := func(r storage.Reader, blockID flow.Identifier) ([]flow.LightTransactionResult, error) {
 		var txResults []flow.LightTransactionResult
-
-		blockID, err := KeyToBlockID(key)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert index key: %w", err)
-		}
-
-		err = operation.LookupLightTransactionResultsByBlockIDUsingIndex(r, blockID, &txResults)
+		err := operation.LookupLightTransactionResultsByBlockIDUsingIndex(r, blockID, &txResults)
 		if err != nil {
 			return nil, err
 		}
 		return txResults, nil
 	}
+
 	return &LightTransactionResults{
 		db: db,
 		cache: newCache(collector, metrics.ResourceTransactionResults,
-			withLimit[string, flow.LightTransactionResult](transactionResultsCacheSize),
-			withStore(noopStore[string, flow.LightTransactionResult]),
+			withLimit[TwoIdentifier, flow.LightTransactionResult](transactionResultsCacheSize),
+			withStore(noopStore[TwoIdentifier, flow.LightTransactionResult]),
 			withRetrieve(retrieve),
 		),
 		indexCache: newCache(collector, metrics.ResourceTransactionResultIndices,
-			withLimit[string, flow.LightTransactionResult](transactionResultsCacheSize),
-			withStore(noopStore[string, flow.LightTransactionResult]),
+			withLimit[IdentifierAndUint32, flow.LightTransactionResult](transactionResultsCacheSize),
+			withStore(noopStore[IdentifierAndUint32, flow.LightTransactionResult]),
 			withRetrieve(retrieveIndex),
 		),
 		blockCache: newCache(collector, metrics.ResourceTransactionResultIndices,
-			withLimit[string, []flow.LightTransactionResult](transactionResultsCacheSize),
-			withStore(noopStore[string, []flow.LightTransactionResult]),
+			withLimit[flow.Identifier, []flow.LightTransactionResult](transactionResultsCacheSize),
+			withStore(noopStore[flow.Identifier, []flow.LightTransactionResult]),
 			withRetrieve(retrieveForBlock),
 		),
 	}
@@ -107,8 +98,7 @@ func (tr *LightTransactionResults) BatchStore(blockID flow.Identifier, transacti
 			tr.indexCache.Insert(keyIndex, result)
 		}
 
-		key := KeyFromBlockID(blockID)
-		tr.blockCache.Insert(key, transactionResults)
+		tr.blockCache.Insert(blockID, transactionResults)
 	})
 	return nil
 }
@@ -139,8 +129,7 @@ func (tr *LightTransactionResults) ByBlockIDTransactionIndex(blockID flow.Identi
 
 // ByBlockID gets all transaction results for a block, ordered by transaction index
 func (tr *LightTransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.LightTransactionResult, error) {
-	key := KeyFromBlockID(blockID)
-	transactionResults, err := tr.blockCache.Get(tr.db.Reader(), key)
+	transactionResults, err := tr.blockCache.Get(tr.db.Reader(), blockID)
 	if err != nil {
 		return nil, err
 	}

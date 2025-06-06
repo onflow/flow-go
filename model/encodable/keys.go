@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/fxamacker/cbor/v2"
-	"github.com/vmihailenco/msgpack"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/crypto"
 )
@@ -26,7 +26,7 @@ func toHex(bs []byte) string {
 func fromJSONHex(b []byte) ([]byte, error) {
 	var x string
 	if err := json.Unmarshal(b, &x); err != nil {
-		return nil, fmt.Errorf("could not unmarshal the key: %w", err)
+		return nil, fmt.Errorf("could not unmarshal the value: %w", err)
 	}
 	return hex.DecodeString(x)
 }
@@ -34,7 +34,7 @@ func fromJSONHex(b []byte) ([]byte, error) {
 func fromMsgPackHex(b []byte) ([]byte, error) {
 	var x string
 	if err := msgpack.Unmarshal(b, &x); err != nil {
-		return nil, fmt.Errorf("could not unmarshal the key: %w", err)
+		return nil, fmt.Errorf("could not unmarshal the value: %w", err)
 	}
 	return hex.DecodeString(x)
 }
@@ -42,7 +42,7 @@ func fromMsgPackHex(b []byte) ([]byte, error) {
 func fromCBORPackHex(b []byte) ([]byte, error) {
 	var x string
 	if err := cbor.Unmarshal(b, &x); err != nil {
-		return nil, fmt.Errorf("could not unmarshal the key: %w", err)
+		return nil, fmt.Errorf("could not unmarshal the value: %w", err)
 	}
 	return hex.DecodeString(x)
 }
@@ -301,5 +301,23 @@ func (priv *MachineAccountPrivKey) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	priv.PrivateKey, err = crypto.DecodePrivateKey(crypto.ECDSAP256, bz)
+	return err
+}
+
+// StakingKeyPoP wraps a crypto signature and allows it to be JSON encoded and decoded.
+type StakingKeyPoP struct {
+	crypto.Signature
+}
+
+func (pub StakingKeyPoP) MarshalJSON() ([]byte, error) {
+	if pub.Signature == nil {
+		return json.Marshal(nil)
+	}
+	return json.Marshal(toHex(pub.Signature))
+}
+
+func (pub *StakingKeyPoP) UnmarshalJSON(b []byte) error {
+	var err error
+	pub.Signature, err = fromJSONHex(b)
 	return err
 }

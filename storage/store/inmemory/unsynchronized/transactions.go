@@ -52,3 +52,15 @@ func (t *Transactions) Store(tx *flow.TransactionBody) error {
 
 	return nil
 }
+
+// Data returns a copy of the internal transaction map.
+func (t *Transactions) Data() []flow.TransactionBody {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	out := make([]flow.TransactionBody, 0, len(t.store))
+	for _, tx := range t.store {
+		out = append(out, *tx)
+	}
+	return out
+}
