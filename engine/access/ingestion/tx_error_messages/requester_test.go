@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type TxErrorMessagesRequesterSuite struct {
+type RequesterSuite struct {
 	suite.Suite
 
 	log   zerolog.Logger
@@ -31,9 +31,7 @@ type TxErrorMessagesRequesterSuite struct {
 		params   *protocol.Params
 	}
 
-	receipts        *storage.ExecutionReceipts
-	txErrorMessages *storage.TransactionResultErrorMessages
-
+	receipts    *storage.ExecutionReceipts
 	enNodeIDs   flow.IdentityList
 	execClient  *accessmock.ExecutionAPIClient
 	connFactory *connectionmock.ConnectionFactory
@@ -42,11 +40,11 @@ type TxErrorMessagesRequesterSuite struct {
 	finalizedBlock *flow.Header
 }
 
-func TestTxErrorMessagesRequester(t *testing.T) {
-	suite.Run(t, new(TxErrorMessagesRequesterSuite))
+func TestRequester(t *testing.T) {
+	suite.Run(t, new(RequesterSuite))
 }
 
-func (s *TxErrorMessagesRequesterSuite) SetupTest() {
+func (s *RequesterSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.proto.state = protocol.NewFollowerState(s.T())
 	s.proto.snapshot = protocol.NewSnapshot(s.T())
@@ -54,7 +52,6 @@ func (s *TxErrorMessagesRequesterSuite) SetupTest() {
 	s.execClient = accessmock.NewExecutionAPIClient(s.T())
 	s.connFactory = connectionmock.NewConnectionFactory(s.T())
 	s.receipts = storage.NewExecutionReceipts(s.T())
-	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
 
 	s.rootBlock = unittest.BlockFixture()
 	s.rootBlock.Header.Height = 0
@@ -73,7 +70,7 @@ func (s *TxErrorMessagesRequesterSuite) SetupTest() {
 	s.enNodeIDs = unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
 }
 
-func (s *TxErrorMessagesRequesterSuite) TestTxErrorMessageRequester_RequestErrorMessages() {
+func (s *RequesterSuite) TestRequest_HappyPath() {
 	execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 		s.log,
 		s.proto.state,
@@ -97,11 +94,6 @@ func (s *TxErrorMessagesRequesterSuite) TestTxErrorMessageRequester_RequestError
 	})
 	require.NoError(s.T(), err)
 
-	config := &TransactionErrorMessagesRequesterConfig{
-		RetryDelay:    1 * time.Second,
-		MaxRetryDelay: 5 * time.Second,
-	}
-
 	block := unittest.BlockWithParentFixture(s.finalizedBlock)
 	blockId := block.ID()
 	executionResult := &flow.ExecutionResult{
@@ -123,10 +115,13 @@ func (s *TxErrorMessagesRequesterSuite) TestTxErrorMessageRequester_RequestError
 		Return(createTransactionErrorMessagesResponse(resultsByBlockID), nil).
 		Once()
 
-	// Prepare the expected transaction error messages that should be stored.
 	expectedErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
-	requester := NewTransactionErrorMessagesRequester(s.log, config, back, execNodeIdentitiesProvider, executionResult)
-	actualErrorMessages, err := requester.RequestErrorMessages(context.Background())
+	config := &RequesterConfig{
+		RetryDelay:    1 * time.Second,
+		MaxRetryDelay: 5 * time.Second,
+	}
+	requester := NewRequester(s.log, config, back, execNodeIdentitiesProvider, executionResult)
+	actualErrorMessages, err := requester.Request(context.Background())
 	require.NoError(s.T(), err)
 	require.ElementsMatch(s.T(), expectedErrorMessages, actualErrorMessages)
 }

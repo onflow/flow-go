@@ -19,8 +19,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TransactionErrorMessagesRequesterConfig contains the retry settings for the tx error messages fetch.
-type TransactionErrorMessagesRequesterConfig struct {
+// RequesterConfig contains the retry settings for the tx error messages fetch.
+type RequesterConfig struct {
 	// the initial delay used in the exponential backoff for failed tx error messages download
 	// retries.
 	RetryDelay time.Duration
@@ -28,22 +28,22 @@ type TransactionErrorMessagesRequesterConfig struct {
 	MaxRetryDelay time.Duration
 }
 
-type TransactionErrorMessagesRequester struct {
+type Requester struct {
 	logger                     zerolog.Logger
-	config                     *TransactionErrorMessagesRequesterConfig
+	config                     *RequesterConfig
 	backend                    *backend.Backend
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider
 	executionResult            *flow.ExecutionResult
 }
 
-func NewTransactionErrorMessagesRequester(
+func NewRequester(
 	logger zerolog.Logger,
-	config *TransactionErrorMessagesRequesterConfig,
+	config *RequesterConfig,
 	backend *backend.Backend,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 	executionResult *flow.ExecutionResult,
-) *TransactionErrorMessagesRequester {
-	return &TransactionErrorMessagesRequester{
+) *Requester {
+	return &Requester{
 		logger:                     logger,
 		config:                     config,
 		backend:                    backend,
@@ -52,11 +52,9 @@ func NewTransactionErrorMessagesRequester(
 	}
 }
 
-// RequestErrorMessages fetches transaction error messages for the specific
+// Request fetches transaction error messages for the specific
 // execution result this requester was configured with.
-func (r *TransactionErrorMessagesRequester) RequestErrorMessages(
-	ctx context.Context,
-) ([]flow.TransactionResultErrorMessage, error) {
+func (r *Requester) Request(ctx context.Context) ([]flow.TransactionResultErrorMessage, error) {
 	backoff := retry.NewExponential(r.config.RetryDelay)
 	backoff = retry.WithCappedDuration(r.config.MaxRetryDelay, backoff)
 	backoff = retry.WithJitterPercent(15, backoff)
@@ -81,7 +79,7 @@ func (r *TransactionErrorMessagesRequester) RequestErrorMessages(
 		attempt++
 
 		var err error
-		errMessages, err = r.requestErrorMessages(ctx, blockID, resultID)
+		errMessages, err = r.request(ctx, blockID, resultID)
 		if errors.Is(err, rpc.ErrNoENsFoundForExecutionResult) || status.Code(err) != codes.Canceled {
 			lastErr = err
 			return retry.RetryableError(err)
@@ -97,7 +95,7 @@ func (r *TransactionErrorMessagesRequester) RequestErrorMessages(
 	return errMessages, nil
 }
 
-func (r *TransactionErrorMessagesRequester) requestErrorMessages(
+func (r *Requester) request(
 	ctx context.Context,
 	blockID flow.Identifier,
 	resultID flow.Identifier,
@@ -124,11 +122,11 @@ func (r *TransactionErrorMessagesRequester) requestErrorMessages(
 		return nil, err
 	}
 
-	errorMessages := r.convertErrorMessagesResponse(resp, execNode)
+	errorMessages := r.convertResponse(resp, execNode)
 	return errorMessages, nil
 }
 
-func (r *TransactionErrorMessagesRequester) convertErrorMessagesResponse(
+func (r *Requester) convertResponse(
 	responseMessages []*execproto.GetTransactionErrorMessagesResponse_Result,
 	execNode *flow.IdentitySkeleton,
 ) []flow.TransactionResultErrorMessage {
