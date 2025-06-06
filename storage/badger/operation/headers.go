@@ -10,16 +10,25 @@ import (
 // Error returns:
 //   - storage.ErrAlreadyExists if the key already exists in the database.
 //   - generic error in case of unexpected failure from the database layer or encoding failure.
-func InsertHeader(blockID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
-	return insert(makePrefix(codeHeader, blockID), header)
+func InsertHeader(blockID flow.Identifier, header *flow.ProposalHeader) func(*badger.Txn) error {
+	storable := flow.ConvertToOldHeader(header.Header, header.ProposerSigData)
+	return insert(makePrefix(codeHeader, blockID), storable)
 }
 
 // RetrieveHeader retrieves a header by block ID.
 // Error returns:
 //   - storage.ErrNotFound if the key does not exist in the database
 //   - generic error in case of unexpected failure from the database layer
-func RetrieveHeader(blockID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeHeader, blockID), header)
+func RetrieveHeader(blockID flow.Identifier, header *flow.ProposalHeader) func(*badger.Txn) error {
+	return func(txn *badger.Txn) error {
+		var storable flow.OldHeader
+		err := retrieve(makePrefix(codeHeader, blockID), &storable)(txn)
+		if err != nil {
+			return err
+		}
+		*header = *storable.ConvertToNewHeader()
+		return nil
+	}
 }
 
 // IndexBlockHeight indexes the height of a block. It should only be called on

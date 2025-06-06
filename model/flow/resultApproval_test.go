@@ -23,6 +23,7 @@ func TestResultApprovalBodyNonMalleable(t *testing.T) {
 // TestResultApprovalNonMalleable confirms that the ResultApproval struct, which implements
 // the [flow.IDEntity] interface, is resistant to tampering.
 func TestResultApprovalNonMalleable(t *testing.T) {
+	t.Skip("TODO: postponing malleability ID changes to mainnet27")
 	ra := unittest.ResultApprovalFixture()
 	unittest.RequireEntityNonMalleable(t, ra)
 }

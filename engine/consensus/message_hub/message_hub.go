@@ -368,7 +368,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 // provideProposal is used when we want to broadcast a local block to the rest  of the
 // network (non-consensus nodes).
 func (h *MessageHub) provideProposal(proposal *messages.UntrustedProposal, recipients flow.IdentityList) {
-	header := proposal.Block.ToHeader()
+	header := proposal.Block.Header.ConvertToNewHeader().Header
 	blockID := header.ID()
 	log := h.log.With().
 		Uint64("block_view", header.View).
