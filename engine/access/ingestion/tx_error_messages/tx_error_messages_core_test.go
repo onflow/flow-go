@@ -322,6 +322,20 @@ func setupReceiptsForBlock(receipts *storage.ExecutionReceipts, block *flow.Bloc
 		}, nil)
 }
 
+// setupReceiptsForBlockWithResult sets up mock execution receipts for a block with a specific execution result
+func setupReceiptsForBlockWithResult(receipts *storage.ExecutionReceipts, block *flow.Block, eNodeID flow.Identifier, executionResult flow.ExecutionResult) {
+	receipt1 := unittest.ExecutionReceiptFixture(unittest.WithResult(&executionResult), unittest.WithExecutorID(eNodeID))
+	receipt2 := unittest.ExecutionReceiptFixture(unittest.WithResult(&executionResult), unittest.WithExecutorID(eNodeID))
+
+	receiptsList := flow.ExecutionReceiptList{receipt1, receipt2}
+
+	receipts.
+		On("ByBlockID", block.ID()).
+		Return(func(flow.Identifier) flow.ExecutionReceiptList {
+			return receiptsList
+		}, nil)
+}
+
 // createTransactionErrorMessagesResponse create TransactionErrorMessagesResponse from execution node based on results.
 func createTransactionErrorMessagesResponse(resultsByBlockID []flow.LightTransactionResult) *execproto.GetTransactionErrorMessagesResponse {
 	exeErrMessagesResp := &execproto.GetTransactionErrorMessagesResponse{}
