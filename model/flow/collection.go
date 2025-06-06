@@ -1,7 +1,5 @@
 package flow
 
-import "github.com/onflow/flow-go/model/fingerprint"
-
 // Collection is an ordered list of transactions.
 // Collections form a part of the payload of cluster blocks, produced by Collection Nodes.
 // Every Collection maps 1-1 to a Chunk, which is used for transaction execution.
@@ -22,18 +20,6 @@ func (c Collection) Light() LightCollection {
 // The ID of a Collection is equivalent to the ID of its corresponding LightCollection.
 func (c Collection) ID() Identifier {
 	return c.Light().ID()
-}
-
-func (c Collection) Fingerprint() []byte {
-	var txs []byte
-	for _, tx := range c.Transactions {
-		txs = append(txs, tx.Fingerprint()...)
-	}
-	return fingerprint.Fingerprint(struct {
-		Transactions []byte
-	}{
-		Transactions: txs,
-	})
 }
 
 // Len returns the number of transactions in the collection.
