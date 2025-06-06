@@ -52,13 +52,13 @@ func MessageToExecutionResult(m *entities.ExecutionResult) (
 	if err != nil {
 		return nil, err
 	}
-	return &flow.ExecutionResult{
-		PreviousResultID: MessageToIdentifier(m.PreviousResultId),
-		BlockID:          MessageToIdentifier(m.BlockId),
-		Chunks:           parsedChunks,
-		ServiceEvents:    parsedServiceEvents,
-		ExecutionDataID:  MessageToIdentifier(m.ExecutionDataId),
-	}, nil
+	return flow.NewExecutionResult(
+		MessageToIdentifier(m.PreviousResultId),
+		MessageToIdentifier(m.BlockId),
+		parsedChunks,
+		parsedServiceEvents,
+		MessageToIdentifier(m.ExecutionDataId),
+	), nil
 }
 
 // ExecutionResultsToMessages converts a slice of execution results to a slice of protobuf messages
@@ -181,20 +181,35 @@ func MessageToChunk(m *entities.Chunk) (*flow.Chunk, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse Message end state to Chunk: %w", err)
 	}
-	chunkBody := flow.ChunkBody{
-		CollectionIndex:      uint(m.CollectionIndex),
-		StartState:           startState,
-		EventCollection:      MessageToIdentifier(m.EventCollection),
-		BlockID:              MessageToIdentifier(m.BlockId),
-		TotalComputationUsed: m.TotalComputationUsed,
-		NumberOfTransactions: uint64(m.NumberOfTransactions),
-		ServiceEventCount:    MessageToServiceEventCountField(m.ServiceEventCount),
+
+	serviceEventCountPtr := MessageToServiceEventCountField(m.ServiceEventCount)
+
+	// Branch on nil-vs-non-nil to preserve backward compatibility
+	if serviceEventCountPtr == nil {
+		// Protocol v1: omit ServiceEventCount
+		return flow.NewChunk_ProtocolVersion1(
+			MessageToIdentifier(m.BlockId),
+			int(m.CollectionIndex),
+			startState,
+			int(m.NumberOfTransactions),
+			MessageToIdentifier(m.EventCollection),
+			0,
+			endState,
+			m.TotalComputationUsed,
+		), nil
 	}
-	return &flow.Chunk{
-		ChunkBody: chunkBody,
-		Index:     m.Index,
-		EndState:  endState,
-	}, nil
+
+	// Protocol v2+: include ServiceEventCount
+	return flow.NewChunk(
+		MessageToIdentifier(m.BlockId),
+		int(m.CollectionIndex),
+		startState,
+		int(m.NumberOfTransactions),
+		MessageToIdentifier(m.EventCollection),
+		*serviceEventCountPtr,
+		endState,
+		m.TotalComputationUsed,
+	), nil
 }
 
 // MessagesToChunkList converts a slice of protobuf messages to a chunk list

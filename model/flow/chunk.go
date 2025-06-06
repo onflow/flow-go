@@ -127,6 +127,7 @@ func (ch ChunkBody) EncodeRLP(w io.Writer) error {
 	return nil
 }
 
+//structwrite:immutable - mutations allowed only within the constructor
 type Chunk struct {
 	ChunkBody
 
@@ -137,7 +138,7 @@ type Chunk struct {
 
 // We TEMPORARILY implement the [rlp.Encoder] interface to implement backwards-compatible ID computation.
 // TODO(mainnet27, #6773): remove EncodeRLP methods on Chunk and ChunkBody https://github.com/onflow/flow-go/issues/6773
-var _ rlp.Encoder = &Chunk{}
+var _ rlp.Encoder = (*Chunk)(nil)
 
 // EncodeRLP defines custom encoding logic for the Chunk type.
 // This method exists only so that the embedded ChunkBody's EncodeRLP method is
@@ -170,6 +171,8 @@ type ChunkConstructor func(
 	endState StateCommitment,
 	totalComputationUsed uint64) *Chunk
 
+// NewChunk creates a new instance of MissingCollection.
+// Construction Chunk allowed only within the constructor
 // NewChunk returns a Chunk compliant with Protocol Version 2 and later.
 func NewChunk(
 	blockID Identifier,
@@ -252,6 +255,8 @@ func (ch *Chunk) Checksum() Identifier {
 // during the execution of the chunk.
 // Register proofs order must not be correlated to the order of register reads during
 // the chunk execution in order to enforce the SPoCK secret high entropy.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type ChunkDataPack struct {
 	ChunkID    Identifier      // ID of the chunk this data pack is for
 	StartState StateCommitment // commitment for starting state
@@ -264,7 +269,8 @@ type ChunkDataPack struct {
 	ExecutionDataRoot BlockExecutionDataRoot
 }
 
-// NewChunkDataPack returns an initialized chunk data pack.
+// NewChunkDataPack creates a new instance of ChunkDataPack.
+// Construction ChunkDataPack allowed only within the constructor
 func NewChunkDataPack(
 	chunkID Identifier,
 	startState StateCommitment,

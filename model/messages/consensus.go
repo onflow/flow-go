@@ -20,18 +20,19 @@ type UntrustedExecutionResult struct {
 
 // ToInternal returns the internal representation of the type.
 func (ur *UntrustedExecutionResult) ToInternal() *flow.ExecutionResult {
-	result := flow.ExecutionResult{
-		PreviousResultID: ur.PreviousResultID,
-		BlockID:          ur.BlockID,
-		Chunks:           make(flow.ChunkList, 0, len(ur.Chunks)),
-		ServiceEvents:    ur.ServiceEvents,
-		ExecutionDataID:  ur.ExecutionDataID,
-	}
+	chunks := make(flow.ChunkList, 0, len(ur.Chunks))
 	for _, chunk := range ur.Chunks {
-		chunk := chunk
-		result.Chunks = append(result.Chunks, &chunk)
+		chunks = append(chunks, &chunk)
 	}
-	return &result
+
+	result := flow.NewExecutionResult(
+		ur.PreviousResultID,
+		ur.BlockID,
+		chunks,
+		ur.ServiceEvents,
+		ur.ExecutionDataID,
+	)
+	return result
 }
 
 // UntrustedExecutionResultFromInternal converts the internal flow.ExecutionResult representation
