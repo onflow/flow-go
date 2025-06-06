@@ -41,15 +41,12 @@ func (e Event) ID() Identifier {
 	return MakeID(e)
 }
 
-// Fingerprint returns the RLP-encoded representation of the Event type.
-// It defines a canonical encoding with a specific field order that differs from the Event struct.
-// The fingerprint is used in the construction of EventsMerkleRootHash.
 func (e Event) Fingerprint() []byte {
 	return fingerprint.Fingerprint(struct {
-		TransactionID    Identifier
-		EventIndex       uint32
 		Type             EventType
+		TransactionID    Identifier
 		TransactionIndex uint32
+		EventIndex       uint32
 		Payload          []byte
 	}{
 		TransactionID:    e.TransactionID,
@@ -100,8 +97,8 @@ func EventsMerkleRootHash(el EventsList) (Identifier, error) {
 	for _, event := range el {
 		// event fingerprint is the rlp encoding of the event
 		// eventID is the standard sha3 hash of the event fingerprint
-		fingerPrint := event.Fingerprint()
-		// computing entityID from the fingerprint
+		fingerPrint := fingerprint.Fingerprint(event)
+		// computing entityID from the fingerprint (this is equivalent to `event.ID()`)
 		eventID := MakeIDFromFingerPrint(fingerPrint)
 		_, err = tree.Put(eventID[:], fingerPrint)
 		if err != nil {
