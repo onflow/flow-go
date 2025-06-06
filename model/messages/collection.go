@@ -28,12 +28,33 @@ type UntrustedClusterBlock cluster.Block
 // This type exists only to explicitly differentiate between trusted and untrusted instances of a cluster block proposal.
 // This differentiation is currently largely unused, but eventually untrusted models should use
 // a different type (like this one), until such time as they are fully validated.
-type UntrustedClusterProposal cluster.BlockProposal
+type UntrustedClusterProposal struct {
+	Block oldUntrustedClusterBlock
+}
+
+// OldUntrustedClusterBlock is implemented for network message decoding compatibility.
+// Deprecated, removed in mainnet27
+type oldUntrustedClusterBlock struct {
+	Header  flow.OldHeader
+	Payload oldClusterPayload
+}
+
+// oldClusterPayload is implemented for network message decoding compatibility.
+// Deprecated, removed in mainnet27
+type oldClusterPayload struct {
+	Collection       []*flow.TransactionBody
+	ReferenceBlockID flow.Identifier
+}
 
 func NewUntrustedClusterProposal(internal cluster.Block, proposerSig []byte) *UntrustedClusterProposal {
 	return &UntrustedClusterProposal{
-		Block:           internal,
-		ProposerSigData: proposerSig,
+		Block: oldUntrustedClusterBlock{
+			Header: *flow.ConvertToOldHeader(internal.ToHeader(), proposerSig),
+			Payload: oldClusterPayload{
+				Collection:       internal.Payload.Collection.Transactions,
+				ReferenceBlockID: internal.Payload.ReferenceBlockID,
+			},
+		},
 	}
 }
 
@@ -41,15 +62,19 @@ func NewUntrustedClusterProposal(internal cluster.Block, proposerSig []byte) *Un
 // CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
 // TODO(malleability immutable, #7277): This conversion should eventually be accompanied by a full validation of the untrusted input.
 func (cbp *UntrustedClusterProposal) DeclareTrusted() *cluster.BlockProposal {
+	header := cbp.Block.Header.ConvertToNewHeader()
+	payload := cluster.Payload{
+		Collection:       flow.Collection{Transactions: cbp.Block.Payload.Collection},
+		ReferenceBlockID: cbp.Block.Payload.ReferenceBlockID,
+	}
 	return &cluster.BlockProposal{
-		Block:           cluster.NewBlock(cbp.Block.Header, cbp.Block.Payload),
-		ProposerSigData: cbp.ProposerSigData,
+		Block:           cluster.NewBlock(header.Header.HeaderBody, payload),
+		ProposerSigData: header.ProposerSigData,
 	}
 }
 
 func UntrustedClusterProposalFromInternal(proposal *cluster.BlockProposal) *UntrustedClusterProposal {
-	p := UntrustedClusterProposal(*proposal)
-	return &p
+	return NewUntrustedClusterProposal(proposal.Block, proposal.ProposerSigData)
 }
 
 // ClusterBlockVote is a vote for a proposed block in collection node cluster

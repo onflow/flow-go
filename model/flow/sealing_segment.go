@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -616,4 +617,62 @@ func isRootSegment(latestSeals map[Identifier]Identifier) bool {
 		}
 	}
 	return true
+}
+
+// oldSealingSegment is a temporary interface for marshaling/unmarshaling the sealing segment until mainnet27.
+// See [SealingSegment].
+// Deprecated, removed in mainnet27.
+type oldSealingSegment struct {
+	Blocks               []*OldBlock
+	ExtraBlocks          []*OldBlock
+	ExecutionResults     ExecutionResultList
+	LatestSeals          map[Identifier]Identifier
+	FirstSeal            *Seal
+	ProtocolStateEntries map[Identifier]*ProtocolStateEntryWrapper
+}
+
+// UnmarshalJSON is a temporary implementation to maintain compatibility until mainnet27.
+// Note that it does not perform any validation of the sealing segment.
+func (segment *SealingSegment) UnmarshalJSON(data []byte) error {
+	var oldSegment oldSealingSegment
+	err := json.Unmarshal(data, &oldSegment)
+	if err != nil {
+		return err
+	}
+	proposals := make([]*BlockProposal, 0, len(oldSegment.Blocks))
+	for _, block := range oldSegment.Blocks {
+		proposals = append(proposals, block.ConvertToProposal())
+	}
+	segment.Blocks = proposals
+	extraProposals := make([]*BlockProposal, 0, len(oldSegment.ExtraBlocks))
+	for _, block := range oldSegment.ExtraBlocks {
+		extraProposals = append(extraProposals, block.ConvertToProposal())
+	}
+	segment.ExtraBlocks = extraProposals
+	segment.ExecutionResults = oldSegment.ExecutionResults
+	segment.LatestSeals = oldSegment.LatestSeals
+	segment.FirstSeal = oldSegment.FirstSeal
+	segment.ProtocolStateEntries = oldSegment.ProtocolStateEntries
+	return nil
+}
+
+// MarshalJSON is a temporary implementation to maintain compatibility until mainnet27.
+func (segment *SealingSegment) MarshalJSON() ([]byte, error) {
+	blocks := make([]*OldBlock, 0, len(segment.Blocks))
+	for _, proposal := range segment.Blocks {
+		blocks = append(blocks, OldBlockFromProposal(proposal))
+	}
+	extraBlocks := make([]*OldBlock, 0, len(segment.ExtraBlocks))
+	for _, proposal := range segment.ExtraBlocks {
+		extraBlocks = append(extraBlocks, OldBlockFromProposal(proposal))
+	}
+	oldSegment := &oldSealingSegment{
+		Blocks:               blocks,
+		ExtraBlocks:          extraBlocks,
+		ExecutionResults:     segment.ExecutionResults,
+		LatestSeals:          segment.LatestSeals,
+		FirstSeal:            segment.FirstSeal,
+		ProtocolStateEntries: segment.ProtocolStateEntries,
+	}
+	return json.Marshal(oldSegment)
 }
