@@ -32,21 +32,20 @@ func TestGenerateClusterRootQC(t *testing.T) {
 	payload := cluster.EmptyPayload(flow.ZeroID)
 	clusterBlock.SetPayload(payload)
 
-	orderedParticipants := model.ToIdentityList(participants).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
+	orderedParticipants := model.PrivToIdentityList(participants).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 	_, err := GenerateClusterRootQC(participants, orderedParticipants, &clusterBlock)
 	require.NoError(t, err)
 }
 
-func createClusterParticipants(t *testing.T, n int) []model.NodeInfo {
+func createClusterParticipants(t *testing.T, n int) []model.NodeInfoPriv {
 	ids := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleCollection))
 
 	networkKeys := unittest.NetworkingKeys(n)
 	stakingKeys := unittest.StakingKeys(n)
 
-	participants := make([]model.NodeInfo, n)
+	participants := make([]model.NodeInfoPriv, n)
 	for i, id := range ids {
-		var err error
-		participants[i], err = model.NewPrivateNodeInfo(
+		participants[i] = model.NewPrivateNodeInfo(
 			id.NodeID,
 			id.Role,
 			id.Address,
@@ -54,8 +53,6 @@ func createClusterParticipants(t *testing.T, n int) []model.NodeInfo {
 			networkKeys[i],
 			stakingKeys[i],
 		)
-		require.NoError(t, err)
 	}
-
 	return participants
 }

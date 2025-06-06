@@ -116,18 +116,19 @@ import (
 //
 // CAUTION: Please use GenericNode instead for most use-cases so that multiple nodes
 // may share the same root state snapshot.
-func GenericNodeFromParticipants(t testing.TB, hub *stub.Hub, identity bootstrap.NodeInfo, participants []*flow.Identity, chainID flow.ChainID,
+func GenericNodeFromParticipants(t testing.TB, hub *stub.Hub, identity bootstrap.NodeInfoPriv, participants []*flow.Identity, chainID flow.ChainID,
 	options ...func(protocol.State)) testmock.GenericNode {
 	var i int
 	var participant *flow.Identity
 	for i, participant = range participants {
-		if identity.NodeID == participant.NodeID {
+		if identity.NodeID() == participant.NodeID {
 			break
 		}
 	}
 
 	// creates logger, metrics collector and tracer.
-	log := unittest.Logger().With().Int("index", i).Hex("node_id", identity.NodeID[:]).Str("role", identity.Role.String()).Logger()
+	id := identity.NodeID()
+	log := unittest.Logger().With().Int("index", i).Hex("node_id", id[:]).Str("role", identity.Role().String()).Logger()
 	tracer, err := trace.NewTracer(log, "test", "test", trace.SensitivityCaptureAll)
 	require.NoError(t, err)
 	metrics := metrics.NewNoopCollector()
@@ -150,13 +151,14 @@ func GenericNodeFromParticipants(t testing.TB, hub *stub.Hub, identity bootstrap
 func GenericNode(
 	t testing.TB,
 	hub *stub.Hub,
-	identity bootstrap.NodeInfo,
+	identity bootstrap.NodeInfoPriv,
 	root protocol.Snapshot,
 ) testmock.GenericNode {
 
+	id := identity.NodeID()
 	log := unittest.Logger().With().
-		Hex("node_id", identity.NodeID[:]).
-		Str("role", identity.Role.String()).
+		Hex("node_id", id[:]).
+		Str("role", identity.Role().String()).
 		Logger()
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -173,7 +175,7 @@ func GenericNode(
 func GenericNodeWithStateFixture(t testing.TB,
 	stateFixture *testmock.StateFixture,
 	hub *stub.Hub,
-	bootstrapInfo bootstrap.NodeInfo,
+	bootstrapInfo bootstrap.NodeInfoPriv,
 	log zerolog.Logger,
 	metrics *metrics.NoopCollector,
 	tracer module.Tracer,
@@ -277,7 +279,7 @@ func CompleteStateFixture(
 }
 
 // CollectionNode returns a mock collection node.
-func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, rootSnapshot protocol.Snapshot) testmock.CollectionNode {
+func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfoPriv, rootSnapshot protocol.Snapshot) testmock.CollectionNode {
 
 	node := GenericNode(t, hub, identity, rootSnapshot)
 	privKeys, err := identity.PrivateKeys()
@@ -425,7 +427,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	}
 }
 
-func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, identities []*flow.Identity, chainID flow.ChainID) testmock.ConsensusNode {
+func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfoPriv, identities []*flow.Identity, chainID flow.ChainID) testmock.ConsensusNode {
 
 	node := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
 
@@ -528,7 +530,7 @@ type CheckerMock struct {
 	notifications.NoopConsumer // satisfy the FinalizationConsumer interface
 }
 
-func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, identities []*flow.Identity, syncThreshold int, chainID flow.ChainID) testmock.ExecutionNode {
+func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfoPriv, identities []*flow.Identity, syncThreshold int, chainID flow.ChainID) testmock.ExecutionNode {
 	node := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
 
 	db := badgerimpl.ToDB(node.PublicDB)
@@ -958,7 +960,7 @@ func WithGenericNode(genericNode *testmock.GenericNode) VerificationOpt {
 // (integration) testing.
 func VerificationNode(t testing.TB,
 	hub *stub.Hub,
-	verIdentity bootstrap.NodeInfo, // identity of this verification node.
+	verIdentity bootstrap.NodeInfoPriv, // identity of this verification node.
 	participants flow.IdentityList, // identity of all nodes in system including this verification node.
 	assigner module.ChunkAssigner,
 	chunksLimit uint,

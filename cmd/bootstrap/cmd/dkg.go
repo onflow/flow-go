@@ -27,7 +27,7 @@ func runBeaconKG(nodes []model.NodeInfo) (dkg.ThresholdKeySet, flow.DKGIndexMap)
 
 	encodableParticipants := make([]inmem.ThresholdParticipant, 0, len(nodes))
 	for i, privKey := range randomBeaconData.PrivKeyShares {
-		nodeID := nodes[i].NodeID
+		nodeID := nodes[i].NodeID()
 
 		encKey := encodable.RandomBeaconPrivKey{PrivateKey: privKey}
 		encodableParticipants = append(encodableParticipants, inmem.ThresholdParticipant{
@@ -45,7 +45,7 @@ func runBeaconKG(nodes []model.NodeInfo) (dkg.ThresholdKeySet, flow.DKGIndexMap)
 
 	indexMap := make(flow.DKGIndexMap, len(nodes))
 	for i, node := range nodes {
-		indexMap[node.NodeID] = i
+		indexMap[node.NodeID()] = i
 	}
 
 	// write full DKG info that will be used to construct QC

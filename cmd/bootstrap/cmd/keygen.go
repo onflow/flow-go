@@ -83,7 +83,7 @@ var keygenCmd = &cobra.Command{
 		}
 
 		// count roles
-		roleCounts := common.NodeCountByRole(nodes)
+		roleCounts := common.NodeCountByRole(model.PrivToNodeInfoList(nodes))
 		for role, count := range roleCounts {
 			log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", count, role.String()))
 		}
@@ -123,7 +123,7 @@ func isEmptyDir(path string) (bool, error) {
 	return false, err // Either not empty or error, suits both cases
 }
 
-func writeNodePubInfo(nodes []model.NodeInfo) error {
+func writeNodePubInfo(nodes []model.NodeInfoPriv) error {
 	pubNodes := make([]model.NodeInfoPub, 0, len(nodes))
 	for _, node := range nodes {
 		pub, err := node.Public()

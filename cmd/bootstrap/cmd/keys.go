@@ -18,7 +18,7 @@ import (
 // genNetworkAndStakingKeys generates network and staking keys for all nodes
 // specified in the config and returns a list of NodeInfo objects containing
 // these private keys.
-func genNetworkAndStakingKeys() []model.NodeInfo {
+func genNetworkAndStakingKeys() []model.NodeInfoPriv {
 
 	var nodeConfigs []model.NodeConfig
 	err := common.ReadJSON(flagConfig, &nodeConfigs)
@@ -46,18 +46,18 @@ func genNetworkAndStakingKeys() []model.NodeInfo {
 	}
 	log.Info().Msgf("generated %v staking keys for nodes in config", nodes)
 
-	internalNodes := make([]model.NodeInfo, 0, len(nodeConfigs))
+	internalNodes := make([]model.NodeInfoPriv, 0, len(nodeConfigs))
 	for i, nodeConfig := range nodeConfigs {
 		log.Debug().Int("i", i).Str("address", nodeConfig.Address).Msg("assembling node information")
 		nodeInfo := assembleNodeInfo(nodeConfig, networkKeys[i], stakingKeys[i])
 		internalNodes = append(internalNodes, nodeInfo)
 	}
 
-	return model.Sort(internalNodes, flow.Canonical[flow.Identity])
+	return model.SortPrivate(internalNodes, flow.Canonical[flow.Identity])
 }
 
 func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto.PrivateKey,
-) model.NodeInfo {
+) model.NodeInfoPriv {
 	var err error
 	nodeID, found := getNameID()
 	if !found {
@@ -72,7 +72,7 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto
 		Str("stakingPubKey", stakingKey.PublicKey().String()).
 		Msg("encoded public staking and network keys")
 
-	nodeInfo, err := model.NewPrivateNodeInfo(
+	nodeInfo := model.NewPrivateNodeInfo(
 		nodeID,
 		nodeConfig.Role,
 		nodeConfig.Address,

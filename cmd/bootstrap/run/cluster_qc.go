@@ -18,7 +18,7 @@ import (
 )
 
 // GenerateClusterRootQC creates votes and generates a QC based on participant data
-func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flow.IdentitySkeletonList, clusterBlock *cluster.Block) (*flow.QuorumCertificate, error) {
+func GenerateClusterRootQC(signers []bootstrap.NodeInfoPriv, allCommitteeMembers flow.IdentitySkeletonList, clusterBlock *cluster.Block) (*flow.QuorumCertificate, error) {
 	if !allCommitteeMembers.Sorted(flow.Canonical[flow.IdentitySkeleton]) {
 		return nil, fmt.Errorf("can't create root cluster QC: committee members are not sorted in canonical order")
 	}
@@ -86,7 +86,7 @@ func createClusterValidator(committee hotstuff.DynamicCommittee) (hotstuff.Valid
 }
 
 // createRootBlockVotes generates a vote for the rootBlock from each participant
-func createRootBlockVotes(participants []bootstrap.NodeInfo, rootBlock *model.Block) ([]*model.Vote, error) {
+func createRootBlockVotes(participants []bootstrap.NodeInfoPriv, rootBlock *model.Block) ([]*model.Vote, error) {
 	votes := make([]*model.Vote, 0, len(participants))
 	for _, participant := range participants {
 		// create the participant's local identity

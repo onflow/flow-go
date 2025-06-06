@@ -65,17 +65,15 @@ func TestWriteMachineAccountFiles(t *testing.T) {
 		// See comments in WriteMachineAccountFiles for why addresses take this form
 		addr, err := chain.AddressAtIndex(uint64(systemcontracts.LastSystemAccountIndex + (i+1)*2))
 		require.NoError(t, err)
-		private, err := node.Private()
-		require.NoError(t, err)
 
 		expected[addr.HexWithPrefix()] = bootstrap.NodeMachineAccountInfo{
 			Address:           addr.HexWithPrefix(),
-			EncodedPrivateKey: private.NetworkPrivKey.Encode(),
+			EncodedPrivateKey: node.NetworkPrivKey.Encode(),
 			KeyIndex:          0,
-			SigningAlgorithm:  private.NetworkPrivKey.Algorithm(),
+			SigningAlgorithm:  node.NetworkPrivKey.Algorithm(),
 			HashAlgorithm:     sdkcrypto.SHA3_256,
 		}
-		nodeIDLookup[addr.HexWithPrefix()] = node.NodeID
+		nodeIDLookup[addr.HexWithPrefix()] = node.NodeID()
 	}
 
 	write := func(path string, value interface{}) error {
@@ -108,9 +106,7 @@ func TestWriteStakingNetworkingKeyFiles(t *testing.T) {
 	// track expected calls to the write func
 	expected := make(map[flow.Identifier]bootstrap.NodeInfoPriv)
 	for _, node := range nodes {
-		private, err := node.Private()
-		require.NoError(t, err)
-		expected[node.NodeID] = private
+		expected[node.NodeID()] = node
 	}
 
 	// check that the correct path and value are passed to the write function
@@ -118,15 +114,15 @@ func TestWriteStakingNetworkingKeyFiles(t *testing.T) {
 		actual, ok := value.(bootstrap.NodeInfoPriv)
 		require.True(t, ok)
 
-		expectedInfo, ok := expected[actual.NodeID]
+		expectedInfo, ok := expected[actual.NodeID()]
 		require.True(t, ok)
-		expectedPath := fmt.Sprintf(bootstrap.PathNodeInfoPriv, expectedInfo.NodeID)
+		expectedPath := fmt.Sprintf(bootstrap.PathNodeInfoPriv, expectedInfo.NodeID())
 
 		assert.Equal(t, expectedPath, path)
 		assert.Equal(t, expectedInfo, actual)
 		// remove the value from the mapping, this ensures each one is passed
 		// to the write function exactly once
-		delete(expected, expectedInfo.NodeID)
+		delete(expected, expectedInfo.NodeID())
 
 		return nil
 	}

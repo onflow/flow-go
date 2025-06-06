@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcclient"
 )
@@ -95,8 +94,8 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 		}
 
 		writeNodePubInfoFile(nodePubInfo)
-		partnerWeights[nodePubInfo.NodeID] = flow.DefaultInitialWeight
-		numOfPartnerNodesByRole[nodePubInfo.Role]++
+		partnerWeights[nodePubInfo.NodeID()] = flow.DefaultInitialWeight
+		numOfPartnerNodesByRole[nodePubInfo.Role()]++
 		totalNumOfPartnerNodes++
 	}
 
@@ -174,16 +173,16 @@ func parseNodeInfo(info cadence.Value) (*bootstrap.NodeInfoPub, error) {
 		return nil, fmt.Errorf("failed to decode staking public key: %w", err)
 	}
 
-	// PoP field isn't decoded because it is not stored on-chain
-
-	return &bootstrap.NodeInfoPub{
-		Role:          flow.Role(fields[roleField].(cadence.UInt8)),
-		Address:       string(fields[networkingAddressField].(cadence.String)),
-		NodeID:        nodeID,
-		Weight:        flow.DefaultInitialWeight,
-		NetworkPubKey: encodable.NetworkPubKey{PublicKey: networkPubKey},
-		StakingPubKey: encodable.StakingPubKey{PublicKey: stakingPubKey},
-	}, nil
+	pubInfo := bootstrap.NewPublicNodeInfo(
+		nodeID,
+		flow.Role(fields[roleField].(cadence.UInt8)),
+		string(fields[networkingAddressField].(cadence.String)),
+		flow.DefaultInitialWeight,
+		networkPubKey,
+		stakingPubKey,
+		nil, // PoP field isn't decoded because it is not stored on-chain
+	)
+	return &pubInfo, nil
 }
 
 // isFlowNode returns true if the address contains nodes.onflow.org
@@ -208,7 +207,7 @@ func validateANNetworkKey(key string) error {
 
 // writeNodePubInfoFile writes the node-pub-info file
 func writeNodePubInfoFile(info *bootstrap.NodeInfoPub) {
-	fileOutputPath := fmt.Sprintf(bootstrap.PathNodeInfoPub, info.NodeID)
+	fileOutputPath := fmt.Sprintf(bootstrap.PathNodeInfoPub, info.NodeID())
 	err := common.WriteJSON(fileOutputPath, flagOutdir, info)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")

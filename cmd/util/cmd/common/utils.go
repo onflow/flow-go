@@ -101,7 +101,7 @@ func NodeCountByRole(nodes []bootstrap.NodeInfo) map[flow.Role]uint16 {
 		flow.RoleAccess:       0,
 	}
 	for _, node := range nodes {
-		roleCounts[node.Role] = roleCounts[node.Role] + 1
+		roleCounts[node.Role()] = roleCounts[node.Role()] + 1
 	}
 
 	return roleCounts

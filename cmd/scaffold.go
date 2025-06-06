@@ -1522,7 +1522,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 			return fmt.Errorf("could not load private node info: %w", err)
 		}
 
-		if info.Role != flow.RoleExecution {
+		if info.Role() != flow.RoleExecution {
 			return fmt.Errorf("observer mode is only available for execution nodes")
 		}
 
@@ -1531,7 +1531,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 			// rather than the node id from the node info file
 			NodeID:        myID,
 			Address:       info.Address,
-			Role:          info.Role,
+			Role:          info.Role(),
 			InitialWeight: 0,
 			NetworkPubKey: fnb.NetworkKey.PublicKey(),
 			StakingPubKey: fnb.StakingKey.PublicKey(),

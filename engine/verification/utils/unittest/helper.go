@@ -49,7 +49,7 @@ type MockChunkDataProviderFunc func(*testing.T, CompleteExecutionReceiptList, fl
 // requests should come from a verification node, and should has one of the assigned chunk IDs. Otherwise, it fails the test.
 func SetupChunkDataPackProvider(t *testing.T,
 	hub *stub.Hub,
-	exeIdentity bootstrap.NodeInfo,
+	exeIdentity bootstrap.NodeInfoPriv,
 	participants flow.IdentityList,
 	chainID flow.ChainID,
 	completeERs CompleteExecutionReceiptList,
@@ -153,7 +153,7 @@ func RespondChunkDataPackRequestAfterNTrials(n int) MockChunkDataProviderFunc {
 func SetupMockConsensusNode(t *testing.T,
 	log zerolog.Logger,
 	hub *stub.Hub,
-	conIdentity bootstrap.NodeInfo,
+	conIdentity bootstrap.NodeInfoPriv,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
 	completeERs CompleteExecutionReceiptList,
@@ -488,12 +488,12 @@ func withConsumers(t *testing.T,
 	// bootstraps system with one node of each role.
 	s, verID, bootstrapNodesInfo := bootstrapSystem(t, log, tracer, authorized)
 
-	participants := bootstrap.ToIdentityList(bootstrapNodesInfo)
-	exeIndex := slices.IndexFunc(bootstrapNodesInfo, func(info bootstrap.NodeInfo) bool {
-		return info.Role == flow.RoleExecution
+	participants := bootstrap.PrivToIdentityList(bootstrapNodesInfo)
+	exeIndex := slices.IndexFunc(bootstrapNodesInfo, func(info bootstrap.NodeInfoPriv) bool {
+		return info.Role() == flow.RoleExecution
 	})
-	conIndex := slices.IndexFunc(bootstrapNodesInfo, func(info bootstrap.NodeInfo) bool {
-		return info.Role == flow.RoleConsensus
+	conIndex := slices.IndexFunc(bootstrapNodesInfo, func(info bootstrap.NodeInfoPriv) bool {
+		return info.Role() == flow.RoleConsensus
 	})
 	// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
 	// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
@@ -576,7 +576,7 @@ func withConsumers(t *testing.T,
 		testutil.WithGenericNode(&genericNode))
 
 	// turns on components and network
-	verNet, ok := hub.GetNetwork(verID.NodeID)
+	verNet, ok := hub.GetNetwork(verID.NodeID())
 	require.True(t, ok)
 	unittest.RequireReturnsBefore(t, func() {
 		verNet.StartConDev(100*time.Millisecond, true)
@@ -632,21 +632,21 @@ func bootstrapSystem(
 	authorized bool,
 ) (
 	*enginemock.StateFixture,
-	bootstrap.NodeInfo,
-	[]bootstrap.NodeInfo,
+	bootstrap.NodeInfoPriv,
+	[]bootstrap.NodeInfoPriv,
 ) {
 	// creates bootstrapNodesInfo to bootstrap system with
-	bootstrapNodesInfo := make([]bootstrap.NodeInfo, 0)
-	var verID bootstrap.NodeInfo
+	bootstrapNodesInfo := make([]bootstrap.NodeInfoPriv, 0)
+	var verID bootstrap.NodeInfoPriv
 	for _, missingRole := range unittest.CompleteIdentitySet() {
 		nodeInfo := unittest.PrivateNodeInfoFixture(unittest.WithRole(missingRole.Role))
-		if nodeInfo.Role == flow.RoleVerification {
+		if nodeInfo.Role() == flow.RoleVerification {
 			verID = nodeInfo
 		}
 		bootstrapNodesInfo = append(bootstrapNodesInfo, nodeInfo)
 	}
 	bootstrapNodesInfo = append(bootstrapNodesInfo, unittest.PrivateNodeInfoFixture(unittest.WithRole(flow.RoleExecution))) // adds extra execution node
-	identities := bootstrap.ToIdentityList(bootstrapNodesInfo)
+	identities := bootstrap.PrivToIdentityList(bootstrapNodesInfo)
 
 	collector := &metrics.NoopCollector{}
 	rootSnapshot := unittest.RootSnapshotFixture(identities)

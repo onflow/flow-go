@@ -51,7 +51,7 @@ func init() {
 
 // ContainerConfig represents configuration for a node container in the network.
 type ContainerConfig struct {
-	bootstrap.NodeInfo
+	bootstrap.NodeInfoPriv
 	// Corrupted indicates a container is running a binary implementing a malicious node
 	Corrupted           bool
 	ContainerName       string
@@ -72,7 +72,7 @@ func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, machineAccountAddr s
 		return WriteFile(filepath.Join(bootstrapDir, relativePath), data)
 	}
 
-	nodeInfos := []bootstrap.NodeInfo{c.NodeInfo}
+	nodeInfos := []bootstrap.NodeInfoPriv{c.NodeInfoPriv}
 	err := utils.WriteStakingNetworkingKeyFiles(nodeInfos, writeJSONFile)
 	if err != nil {
 		return fmt.Errorf("failed to write private key file: %w", err)
@@ -84,7 +84,7 @@ func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, machineAccountAddr s
 	}
 
 	if role == flow.RoleConsensus || role == flow.RoleCollection {
-		err = utils.WriteMachineAccountFile(c.NodeID, machineAccountAddr, machineAccountKey, writeJSONFile)
+		err = utils.WriteMachineAccountFile(c.NodeID(), machineAccountAddr, machineAccountKey, writeJSONFile)
 		if err != nil {
 			return fmt.Errorf("failed to write machine account file: %w", err)
 		}
@@ -100,7 +100,7 @@ func GetPrivateNodeInfoAddress(nodeName string) string {
 
 func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey crypto.PrivateKey,
 ) (ContainerConfig, error) {
-	info, err := bootstrap.NewPrivateNodeInfo(
+	info := bootstrap.NewPrivateNodeInfo(
 		conf.Identifier,
 		conf.Role,
 		GetPrivateNodeInfoAddress(nodeName),
@@ -108,12 +108,9 @@ func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey
 		networkKey,
 		stakingKey,
 	)
-	if err != nil {
-		return ContainerConfig{}, err
-	}
 
 	containerConf := ContainerConfig{
-		NodeInfo:            info,
+		NodeInfoPriv:        info,
 		ContainerName:       nodeName,
 		LogLevel:            conf.LogLevel,
 		Ghost:               conf.Ghost,
@@ -138,7 +135,7 @@ func (c *ContainerConfig) ImageName() string {
 		imageSuffix = "-corrupted"
 	}
 
-	return fmt.Sprintf("%s/%s%s:latest", defaultRegistry, c.Role.String(), imageSuffix)
+	return fmt.Sprintf("%s/%s%s:latest", defaultRegistry, c.Role().String(), imageSuffix)
 }
 
 // Container represents a test Docker container for a generic Flow node.
@@ -471,7 +468,7 @@ func (c *Container) waitForCondition(ctx context.Context, condition func(*types.
 
 // TestnetClient returns a testnet client that connects to this node.
 func (c *Container) TestnetClient() (*Client, error) {
-	if c.Config.Role != flow.RoleAccess && c.Config.Role != flow.RoleCollection {
+	if c.Config.Role() != flow.RoleAccess && c.Config.Role() != flow.RoleCollection {
 		return nil, fmt.Errorf("container does not implement flow.access.AccessAPI")
 	}
 
@@ -481,7 +478,7 @@ func (c *Container) TestnetClient() (*Client, error) {
 
 // SDKClient returns a flow-go-sdk client that connects to this node.
 func (c *Container) SDKClient() (*sdkclient.Client, error) {
-	if c.Config.Role != flow.RoleAccess && c.Config.Role != flow.RoleCollection {
+	if c.Config.Role() != flow.RoleAccess && c.Config.Role() != flow.RoleCollection {
 		return nil, fmt.Errorf("container does not implement flow.access.AccessAPI")
 	}
 
@@ -522,7 +519,7 @@ func (c *Container) HealthcheckCallback() func() error {
 			return nil
 		}
 
-		switch c.Config.Role {
+		switch c.Config.Role() {
 		case flow.RoleExecution:
 			apiClient, err := client.NewExecutionClient(c.Addr(GRPCPort))
 			if err != nil {
