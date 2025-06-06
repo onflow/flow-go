@@ -301,18 +301,7 @@ func (e *MinEpochStateEntry) ID() Identifier {
 	if e == nil {
 		return ZeroID
 	}
-	body := struct {
-		PreviousEpochID        Identifier
-		CurrentEpochID         Identifier
-		NextEpochID            Identifier
-		EpochFallbackTriggered bool
-	}{
-		PreviousEpochID:        e.PreviousEpoch.ID(),
-		CurrentEpochID:         e.CurrentEpoch.ID(),
-		NextEpochID:            e.NextEpoch.ID(),
-		EpochFallbackTriggered: e.EpochFallbackTriggered,
-	}
-	return MakeID(body)
+	return MakeID(e)
 }
 
 // Copy returns a full copy of the entry.
