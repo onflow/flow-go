@@ -334,22 +334,21 @@ func TestChunk_FingerprintBackwardCompatibility(t *testing.T) {
 	// The ID calculation for the old and new model version should be the same.
 	t.Run("nil ServiceEventCount fields", func(t *testing.T) {
 		chunk.ServiceEventCount = nil
-		assert.Equal(t, flow.MakeID(chunkV0.ChunkBodyV0), chunk.ID())
-		assert.Equal(t, flow.MakeID(chunkV0.ChunkBodyV0), flow.MakeID(chunk.ChunkBody))
+		assert.Equal(t, flow.MakeID(chunkV0), chunk.ID())
+		assert.Equal(t, flow.MakeID(chunkV0), flow.MakeID(chunk))
 	})
 	// A non-nil ServiceEventCount fields indicates an up-to-date model version.
 	// The ID calculation for the old and new model version should be different,
 	// because the new model should include the ServiceEventCount field value.
 	t.Run("non-nil ServiceEventCount fields", func(t *testing.T) {
 		chunk.ServiceEventCount = unittest.PtrTo[uint16](0)
-		assert.NotEqual(t, flow.MakeID(chunkV0.ChunkBodyV0), chunk.ID())
-		assert.NotEqual(t, flow.MakeID(chunkV0.ChunkBodyV0), flow.MakeID(chunk.ChunkBody))
+		assert.NotEqual(t, flow.MakeID(chunkV0), chunk.ID())
+		assert.NotEqual(t, flow.MakeID(chunkV0), flow.MakeID(chunk))
 	})
 }
 
 // TestChunkMalleability performs sanity checks to ensure that chunk is not malleable.
 func TestChunkMalleability(t *testing.T) {
-	t.Skip("TODO: postponing malleability ID changes to mainnet27")
 	t.Run("Chunk with non-nil ServiceEventCount", func(t *testing.T) {
 		unittest.RequireEntityNonMalleable(t, unittest.ChunkFixture(unittest.IdentifierFixture(), 0, unittest.StateCommitmentFixture()))
 	})
