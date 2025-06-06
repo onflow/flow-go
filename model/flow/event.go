@@ -41,22 +41,6 @@ func (e Event) ID() Identifier {
 	return MakeID(e)
 }
 
-func (e Event) Fingerprint() []byte {
-	return fingerprint.Fingerprint(struct {
-		Type             EventType
-		TransactionID    Identifier
-		TransactionIndex uint32
-		EventIndex       uint32
-		Payload          []byte
-	}{
-		TransactionID:    e.TransactionID,
-		EventIndex:       e.EventIndex,
-		Type:             e.Type,
-		TransactionIndex: e.TransactionIndex,
-		Payload:          e.Payload,
-	})
-}
-
 // byteSize returns the number of bytes needed to store the wrapped version of the event.
 // returned int is an approximate measure, ignoring the number of bytes needed as headers.
 func (e Event) byteSize() int {
