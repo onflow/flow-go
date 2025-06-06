@@ -231,7 +231,7 @@ type NodePrivateKeys struct {
 // There are no build-time enforcements of using `NodeInfo` for either the private or public usage. The struct
 // can mistakenly be used for both cases. Other than introducing a confusing design, developers can accidentally
 // confuse the private usage as a public one, for instance by writing the private info (including the private
-// keys) into a file.
+// keys) into a file that is publicly shared.
 // There is an ongoing attempt to replace `NodeInfo` by the explicit structures `NodeInfoPriv` and `NodeInfoPub`
 // in https://github.com/onflow/flow-go/pull/7476.
 // It is recommended to not use `NodeInfo` in new code development in order to limit the structure usage, and to
