@@ -964,7 +964,36 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 			snapshotTree = snapshotTree.Append(executionSnapshot)
 
-			require.Len(t, output.Events, 20)
+			eventTypes := make([]flow.EventType, 0, len(output.Events))
+			for _, e := range output.Events {
+				eventTypes = append(eventTypes, e.Type)
+			}
+
+			assert.Equal(t,
+				[]flow.EventType{
+					"A.7e60df042a9c0868.FlowToken.TokensWithdrawn",
+					"A.9a0766d93b6608b7.FungibleToken.Withdrawn",
+					"A.7e60df042a9c0868.FlowToken.TokensWithdrawn",
+					"A.9a0766d93b6608b7.FungibleToken.Withdrawn",
+					"A.7e60df042a9c0868.FlowToken.TokensDeposited",
+					"A.9a0766d93b6608b7.FungibleToken.Deposited",
+					"A.912d5440f7e3769e.FlowFees.TokensDeposited",
+					"flow.StorageCapabilityControllerIssued",
+					"flow.CapabilityPublished",
+					"flow.StorageCapabilityControllerIssued",
+					"flow.CapabilityPublished",
+					"A.7e60df042a9c0868.FlowToken.TokensDeposited",
+					"A.9a0766d93b6608b7.FungibleToken.Deposited",
+					"flow.AccountCreated",
+					"flow.AccountKeyAdded",
+					"A.7e60df042a9c0868.FlowToken.TokensWithdrawn",
+					"A.9a0766d93b6608b7.FungibleToken.Withdrawn",
+					"A.7e60df042a9c0868.FlowToken.TokensDeposited",
+					"A.9a0766d93b6608b7.FungibleToken.Deposited",
+					"A.912d5440f7e3769e.FlowFees.FeesDeducted",
+				},
+				eventTypes,
+			)
 			unittest.EnsureEventsIndexSeq(t, output.Events, chain.ChainID())
 
 			accountCreatedEvents := filterAccountCreatedEvents(output.Events)
@@ -1430,6 +1459,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				common.ComputationKindStatement:          0,
 				common.ComputationKindLoop:               1 << meter.MeterExecutionInternalPrecisionBytes,
 				common.ComputationKindFunctionInvocation: 0,
+				common.ComputationKindInstructionInvoke:  1 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).withContextOptions(
@@ -1444,9 +1474,22 @@ func TestSettingExecutionWeights(t *testing.T) {
 			executionEffortNeededToCheckStorage := uint64(1)
 			maxExecutionEffort := uint64(997)
 			txBody := flow.NewTransactionBody().
-				SetScript([]byte(fmt.Sprintf(`
-				transaction() {prepare(signer: &Account){var i=0;  while i < %d {i = i +1 } } execute{}}
-			`, loops))).
+				SetScript([]byte(
+					fmt.Sprintf(`
+							transaction() {
+								prepare(signer: &Account) {
+									var i = 0
+									while i < %d {
+										i = i + 1
+									}
+								}
+
+								execute{}
+							}
+						`,
+						loops,
+					),
+				)).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress()).
@@ -1470,9 +1513,22 @@ func TestSettingExecutionWeights(t *testing.T) {
 			// increasing the number of loops should fail the transaction.
 			loops = loops + 1
 			txBody = flow.NewTransactionBody().
-				SetScript([]byte(fmt.Sprintf(`
-				transaction() {prepare(signer: &Account){var i=0;  while i < %d {i = i +1 } } execute{}}
-			`, loops))).
+				SetScript([]byte(
+					fmt.Sprintf(`
+							transaction() {
+								prepare(signer: &Account) {
+									var i = 0
+									while i < %d {
+										i = i + 1
+									}
+								}
+
+								execute{}
+							}
+						`,
+						loops,
+					),
+				)).
 				SetProposalKey(chain.ServiceAddress(), 0, 1).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress()).
@@ -1519,11 +1575,10 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithExecutionEffortWeights(
 			meter.ExecutionEffortWeights{
-				common.ComputationKindStatement: 0,
-				// only count loops
-				// the storage check has a loop
-				common.ComputationKindLoop:               1 << meter.MeterExecutionInternalPrecisionBytes,
+				common.ComputationKindStatement:          0,
 				common.ComputationKindFunctionInvocation: 0,
+				common.ComputationKindLoop:               0,
+				common.ComputationKindInstructionInvoke:  1 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).withContextOptions(
