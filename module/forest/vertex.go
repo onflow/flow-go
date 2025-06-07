@@ -12,7 +12,7 @@ type Vertex interface {
 	VertexID() flow.Identifier
 	// Level returns the vertex's level
 	Level() uint64
-	// Parent returns the parent's (level, ID)
+	// Parent returns the parent's (ID, level)
 	Parent() (flow.Identifier, uint64)
 }
 
@@ -53,6 +53,12 @@ func (it *VertexIterator) NextVertex() Vertex {
 // HasNext returns true if and only if there is a next Vertex
 func (it *VertexIterator) HasNext() bool {
 	return it.next != nil
+}
+
+// Reset wipes the iterator's internal state so it starts again from the beginning.
+func (it *VertexIterator) Reset() {
+	it.idx = 0
+	it.preLoad()
 }
 
 func newVertexIterator(vertexList VertexList) VertexIterator {
