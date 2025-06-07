@@ -48,10 +48,21 @@ type BlockQueue struct {
 	blockIDsByHeight map[uint64]map[flow.Identifier]*entity.ExecutableBlock
 }
 
+//structwrite:immutable - mutations allowed only within the constructor
 type MissingCollection struct {
 	BlockID   flow.Identifier
 	Height    uint64
 	Guarantee *flow.CollectionGuarantee
+}
+
+// NewMissingCollection creates a new instance of MissingCollection.
+// Construction MissingCollection allowed only within the constructor
+func NewMissingCollection(blockID flow.Identifier, height uint64, guarantee *flow.CollectionGuarantee) *MissingCollection {
+	return &MissingCollection{
+		BlockID:   blockID,
+		Height:    height,
+		Guarantee: guarantee,
+	}
 }
 
 func (m *MissingCollection) ID() flow.Identifier {
@@ -178,7 +189,14 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 				},
 			}
 
-			missingCollections = append(missingCollections, missingCollectionForBlock(executable, guarantee))
+			missingCollections = append(
+				missingCollections,
+				NewMissingCollection(
+					executable.ID(),
+					executable.Block.Header.Height,
+					col.Guarantee,
+				),
+			)
 		}
 	}
 
@@ -434,16 +452,15 @@ func (q *BlockQueue) GetMissingCollections(blockID flow.Identifier) (
 		if col.IsCompleted() {
 			continue
 		}
-		missingCollections = append(missingCollections, missingCollectionForBlock(block, col.Guarantee))
+		missingCollections = append(
+			missingCollections,
+			NewMissingCollection(
+				block.ID(),
+				block.Block.Header.Height,
+				col.Guarantee,
+			),
+		)
 	}
 
 	return missingCollections, block.StartState, nil
-}
-
-func missingCollectionForBlock(block *entity.ExecutableBlock, guarantee *flow.CollectionGuarantee) *MissingCollection {
-	return &MissingCollection{
-		BlockID:   block.ID(),
-		Height:    block.Block.Header.Height,
-		Guarantee: guarantee,
-	}
 }
