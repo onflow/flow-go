@@ -1198,27 +1198,38 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	targetDuration := networkConf.ViewsInEpoch / networkConf.ViewsPerSecond
 
 	// generate epoch service events
-	epochSetup := &flow.EpochSetup{
-		Counter:            epochCounter,
-		FirstView:          rootHeader.View,
-		DKGPhase1FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase,
-		DKGPhase2FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*2,
-		DKGPhase3FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*3,
-		FinalView:          rootHeader.View + networkConf.ViewsInEpoch - 1,
-		Participants:       participants.ToSkeleton(),
-		Assignments:        clusterAssignments,
-		RandomSource:       randomSource,
-		TargetDuration:     targetDuration,
-		TargetEndTime:      uint64(time.Now().Unix()) + targetDuration,
+	epochSetup, err := flow.NewEpochSetup(
+		flow.UntrustedEpochSetup{
+			Counter:            epochCounter,
+			FirstView:          rootHeader.View,
+			DKGPhase1FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase,
+			DKGPhase2FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*2,
+			DKGPhase3FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*3,
+			FinalView:          rootHeader.View + networkConf.ViewsInEpoch - 1,
+			Participants:       participants.ToSkeleton(),
+			Assignments:        clusterAssignments,
+			RandomSource:       randomSource,
+			TargetDuration:     targetDuration,
+			TargetEndTime:      uint64(time.Now().Unix()) + targetDuration,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch setup: %w", err)
 	}
 
-	epochCommit := &flow.EpochCommit{
-		Counter:            epochCounter,
-		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
-		DKGGroupKey:        dkg.PubGroupKey,
-		DKGParticipantKeys: dkg.PubKeyShares,
-		DKGIndexMap:        dkgIndexMap,
+	epochCommit, err := flow.NewEpochCommit(
+		flow.UntrustedEpochCommit{
+			Counter:            epochCounter,
+			ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
+			DKGGroupKey:        dkg.PubGroupKey,
+			DKGParticipantKeys: dkg.PubKeyShares,
+			DKGIndexMap:        dkgIndexMap,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch commit: %w", err)
 	}
+
 	root := &flow.Block{
 		Header: rootHeader,
 	}
