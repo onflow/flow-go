@@ -231,10 +231,13 @@ func TestClusters(t *testing.T) {
 	seal.ResultID = result.ID()
 	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
 	require.NoError(t, err)
+	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
+	require.NoError(t, err)
 	rootProtocolState, err := kvstore.NewDefaultKVStore(
 		safetyParams.FinalizationSafetyThreshold,
 		safetyParams.EpochExtensionViewCount,
-		inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID())
+		minEpochStateEntry.ID(),
+	)
 	require.NoError(t, err)
 	root.Payload.ProtocolStateID = rootProtocolState.ID()
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
