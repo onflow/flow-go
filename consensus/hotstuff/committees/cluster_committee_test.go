@@ -88,9 +88,9 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 	nonRootBlockID := unittest.IdentifierFixture()
 	rootBlockID := suite.root.ID()
 
-	refID := unittest.IdentifierFixture()            // reference block on main chain
-	payload := cluster.EmptyPayload(refID)           // payload referencing main chain
-	rootPayload := cluster.EmptyPayload(flow.ZeroID) // root cluster block payload
+	refID := unittest.IdentifierFixture()               // reference block on main chain
+	payload := cluster.NewEmptyPayload(refID)           // payload referencing main chain
+	rootPayload := cluster.NewEmptyPayload(flow.ZeroID) // root cluster block payload
 
 	suite.payloads.On("ByBlockID", nonRootBlockID).Return(&payload, nil)
 	suite.payloads.On("ByBlockID", rootBlockID).Return(&rootPayload, nil)

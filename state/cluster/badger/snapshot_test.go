@@ -106,7 +106,11 @@ func (suite *SnapshotSuite) Payload(transactions ...*flow.TransactionBody) model
 			minRefID = refBlock.ID()
 		}
 	}
-	return model.PayloadFromTransactions(minRefID, transactions...)
+
+	payload, err := model.NewPayload(minRefID, transactions)
+	suite.Assert().NoError(err)
+
+	return *payload
 }
 
 // ProposalWithParentAndPayload returns a valid block proposal with the given parent and payload.
@@ -177,7 +181,7 @@ func (suite *SnapshotSuite) TestEmptyCollection() {
 	t := suite.T()
 
 	// create a block with an empty collection
-	proposal := suite.ProposalWithParentAndPayload(suite.genesis, model.EmptyPayload(flow.ZeroID))
+	proposal := suite.ProposalWithParentAndPayload(suite.genesis, model.NewEmptyPayload(flow.ZeroID))
 	suite.InsertBlock(proposal)
 
 	snapshot := suite.state.AtBlockID(proposal.Block.ID())

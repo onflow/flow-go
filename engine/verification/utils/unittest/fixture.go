@@ -309,8 +309,8 @@ func ExecutionResultFixture(t *testing.T,
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
 		completeColls[guarantee.CollectionID] = &entity.CompleteCollection{
-			Guarantee:    guarantee,
-			Transactions: collection.Transactions,
+			Guarantee:  guarantee,
+			Collection: &collection,
 		}
 
 		for i := 1; i < chunkCount; i++ {
@@ -327,8 +327,8 @@ func ExecutionResultFixture(t *testing.T,
 			guarantees = append(guarantees, guarantee)
 
 			completeColls[guarantee.CollectionID] = &entity.CompleteCollection{
-				Guarantee:    guarantee,
-				Transactions: collection.Transactions,
+				Guarantee:  guarantee,
+				Collection: &collection,
 			}
 		}
 
