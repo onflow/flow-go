@@ -126,13 +126,14 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	}
 	s.pendingRequests.On("PopAll", response.ChunkDataPack.ChunkID).Return(locators, true).Once()
 
-	s.handler.On("HandleChunkDataPack", originID, &verification.ChunkDataPackResponse{
-		Locator: chunks.Locator{
+	chunkDataPackResponse := verification.NewChunkDataPackResponse(
+		chunks.Locator{
 			ResultID: request.ResultID,
 			Index:    request.Index,
 		},
-		Cdp: &response.ChunkDataPack,
-	}).Return().Once()
+		&response.ChunkDataPack,
+	)
+	s.handler.On("HandleChunkDataPack", originID, &chunkDataPackResponse).Return().Once()
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Once()
 

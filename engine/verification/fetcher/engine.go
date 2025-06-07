@@ -572,21 +572,21 @@ func (e *Engine) requestChunkDataPack(chunkIndex uint64, chunkID flow.Identifier
 		return fmt.Errorf("could not fetch execution node ids at block %x: %w", blockID, err)
 	}
 
-	request := &verification.ChunkDataPackRequest{
-		Locator: chunks.Locator{
+	request := verification.NewChunkDataPackRequest(
+		chunks.Locator{
 			ResultID: resultID,
 			Index:    chunkIndex,
 		},
-		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
+		verification.ChunkDataPackRequestInfo{
 			ChunkID:   chunkID,
 			Height:    header.Height,
 			Agrees:    agrees,
 			Disagrees: disagrees,
 			Targets:   allExecutors,
 		},
-	}
+	)
 
-	e.requester.Request(request)
+	e.requester.Request(&request)
 
 	return nil
 }

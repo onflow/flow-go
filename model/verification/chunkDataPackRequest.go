@@ -10,9 +10,23 @@ import (
 
 // ChunkDataPackRequest is an internal data structure in fetcher engine that is passed between the engine
 // and requester module. It conveys required information for requesting a chunk data pack.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type ChunkDataPackRequest struct {
 	chunks.Locator // uniquely identifies chunk
 	ChunkDataPackRequestInfo
+}
+
+// NewChunkDataPackRequest creates a new instance of ChunkDataPackRequest.
+// Construction ChunkDataPackRequest allowed only within the constructor.
+func NewChunkDataPackRequest(
+	locator chunks.Locator,
+	chunkDataPackRequestInfo ChunkDataPackRequestInfo,
+) ChunkDataPackRequest {
+	return ChunkDataPackRequest{
+		Locator:                  locator,
+		ChunkDataPackRequestInfo: chunkDataPackRequestInfo,
+	}
 }
 
 type ChunkDataPackRequestInfo struct {
