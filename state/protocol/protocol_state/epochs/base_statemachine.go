@@ -106,19 +106,32 @@ func (u *baseStateMachine) TransitionToNextEpoch() error {
 	if u.view < u.state.NextEpochSetup.FirstView {
 		return fmt.Errorf("epoch transition is only allowed when entering next epoch")
 	}
-	u.state = &flow.EpochStateEntry{
-		MinEpochStateEntry: &flow.MinEpochStateEntry{
+	minEpochStateEntry, err := flow.NewMinEpochStateEntry(
+		flow.UntrustedMinEpochStateEntry{
 			PreviousEpoch:          &u.state.CurrentEpoch,
 			CurrentEpoch:           *u.state.NextEpoch,
 			NextEpoch:              nil,
 			EpochFallbackTriggered: u.state.EpochFallbackTriggered,
 		},
-		PreviousEpochSetup:  u.state.CurrentEpochSetup,
-		PreviousEpochCommit: u.state.CurrentEpochCommit,
-		CurrentEpochSetup:   u.state.NextEpochSetup,
-		CurrentEpochCommit:  u.state.NextEpochCommit,
-		NextEpochSetup:      nil,
-		NextEpochCommit:     nil,
+	)
+	if err != nil {
+		return fmt.Errorf("could not create min epoch state: %w", err)
 	}
+
+	u.state, err = flow.NewEpochStateEntry(
+		flow.UntrustedEpochStateEntry{
+			MinEpochStateEntry:  minEpochStateEntry,
+			PreviousEpochSetup:  u.state.CurrentEpochSetup,
+			PreviousEpochCommit: u.state.CurrentEpochCommit,
+			CurrentEpochSetup:   u.state.NextEpochSetup,
+			CurrentEpochCommit:  u.state.NextEpochCommit,
+			NextEpochSetup:      nil,
+			NextEpochCommit:     nil,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not construct epoch state entry: %w", err)
+	}
+
 	return nil
 }
