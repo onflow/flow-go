@@ -235,12 +235,12 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 	}
 
 	rootBlock := cluster.CanonicalRootBlock(epochCounter, members)
-	rootQC := &flow.QuorumCertificate{
+	rootQC := flow.NewQuorumCertificate(flow.UntrustedQuorumCertificate{
 		View:          rootBlock.Header.View,
 		BlockID:       rootBlock.ID(),
 		SignerIndices: signerIndices,
 		SigData:       rootQCVoteData.SigData,
-	}
+	})
 
 	cluster, err := ClusterFromEncodable(EncodableCluster{
 		Index:     index,

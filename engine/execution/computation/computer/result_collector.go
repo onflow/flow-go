@@ -170,9 +170,12 @@ func (collector *resultCollector) commitCollection(
 	txResults := execColRes.TransactionResults()
 	convertedTxResults := execution_data.ConvertTransactionResults(txResults)
 
-	col := collection.Collection()
+	col, err := collection.Collection()
+	if err != nil {
+		return err
+	}
 	chunkExecData := &execution_data.ChunkExecutionData{
-		Collection:         &col,
+		Collection:         col,
 		Events:             events,
 		TrieUpdate:         trieUpdate,
 		TransactionResults: convertedTxResults,

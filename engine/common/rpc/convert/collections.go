@@ -79,9 +79,7 @@ func MessageToFullCollection(m []*entities.Transaction, chain flow.Chain) (*flow
 		transactions[i] = &t
 	}
 
-	return &flow.Collection{
-		Transactions: transactions,
-	}, nil
+	return flow.NewCollection(flow.UntrustedCollection{Transactions: transactions})
 }
 
 // CollectionGuaranteeToMessage converts a collection guarantee to a protobuf message
@@ -99,12 +97,13 @@ func CollectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.Collect
 
 // MessageToCollectionGuarantee converts a protobuf message to a collection guarantee
 func MessageToCollectionGuarantee(m *entities.CollectionGuarantee) *flow.CollectionGuarantee {
-	return &flow.CollectionGuarantee{
+	return flow.NewCollectionGuarantee(flow.UntrustedCollectionGuarantee{
 		CollectionID:     MessageToIdentifier(m.CollectionId),
 		ReferenceBlockID: MessageToIdentifier(m.ReferenceBlockId),
+		ChainID:          flow.ChainID(""),
 		SignerIndices:    m.SignerIndices,
 		Signature:        MessageToSignature(m.Signature),
-	}
+	})
 }
 
 // CollectionGuaranteesToMessages converts a slice of collection guarantees to a slice of protobuf messages

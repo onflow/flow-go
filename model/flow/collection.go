@@ -1,20 +1,60 @@
 package flow
 
-import "github.com/onflow/flow-go/model/fingerprint"
+import (
+	"fmt"
+
+	"github.com/onflow/crypto"
+
+	"github.com/onflow/flow-go/model/fingerprint"
+)
 
 // Collection is set of transactions.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Collection struct {
 	Transactions []*TransactionBody
+}
+
+// UntrustedCollection is an untrusted input-only representation of an Collection,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedCollection should be validated and converted into
+// a trusted Collection using NewCollection constructor.
+type UntrustedCollection Collection
+
+// NewCollection creates a new instance of Collection.
+// Construction Collection allowed only within the constructor
+//
+// All errors indicate a valid Collection cannot be constructed from the input.
+func NewCollection(untrustedCollection UntrustedCollection) (*Collection, error) {
+	if untrustedCollection.Transactions == nil {
+		return nil, fmt.Errorf("transactions must not be nil")
+	}
+
+	return &Collection{
+		Transactions: untrustedCollection.Transactions,
+	}, nil
 }
 
 // CollectionFromTransactions creates a new collection from the list of
 // transactions.
 func CollectionFromTransactions(transactions []*Transaction) Collection {
-	coll := Collection{Transactions: make([]*TransactionBody, 0, len(transactions))}
+	txs := make([]*TransactionBody, 0, len(transactions))
+
 	for _, tx := range transactions {
-		coll.Transactions = append(coll.Transactions, &tx.TransactionBody)
+		txs = append(txs, &tx.TransactionBody)
 	}
-	return coll
+
+	collection, err := NewCollection(UntrustedCollection{Transactions: txs})
+	if err != nil {
+		panic(fmt.Sprintf("invalid test input in CollectionFromTransactions: %v", err))
+	}
+
+	return *collection
 }
 
 // Light returns the light, reference-only version of the collection.
@@ -28,9 +68,14 @@ func (c Collection) Light() LightCollection {
 
 // Guarantee returns a collection guarantee for this collection.
 func (c *Collection) Guarantee() CollectionGuarantee {
-	return CollectionGuarantee{
-		CollectionID: c.ID(),
-	}
+	return *NewCollectionGuarantee(UntrustedCollectionGuarantee{
+		CollectionID:     c.ID(),
+		ReferenceBlockID: Identifier{},
+		ChainID:          ChainID(""),
+		SignerIndices:    nil,
+		Signature:        crypto.Signature{},
+	})
+
 }
 
 func (c Collection) ID() Identifier {

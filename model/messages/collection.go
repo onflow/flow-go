@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -42,17 +44,24 @@ type UntrustedClusterBlock struct {
 
 // ToInternal returns the internal representation of the type.
 func (ub *UntrustedClusterBlock) ToInternal() *cluster.Block {
-	block := &cluster.Block{
+	txs := make([]*flow.TransactionBody, 0, len(ub.Payload.Collection))
+
+	for _, tx := range ub.Payload.Collection {
+		txs = append(txs, &tx)
+	}
+
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: txs})
+	if err != nil {
+		panic(fmt.Sprintf("invalid untrusted input in ToInternal: %v", err))
+	}
+
+	return &cluster.Block{
 		Header: &ub.Header,
 		Payload: &cluster.Payload{
 			ReferenceBlockID: ub.Payload.ReferenceBlockID,
+			Collection:       *collection,
 		},
 	}
-	for _, tx := range ub.Payload.Collection {
-		tx := tx
-		block.Payload.Collection.Transactions = append(block.Payload.Collection.Transactions, &tx)
-	}
-	return block
 }
 
 // UntrustedClusterBlockFromInternal converts the internal cluster.Block representation
