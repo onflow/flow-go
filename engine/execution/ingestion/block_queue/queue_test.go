@@ -431,8 +431,7 @@ func makeChainABCDEFG() (GetBlock, GetCollection, GetCommit) {
 		return cs[name-1]
 	}
 
-	r := unittest.BlockFixture()
-	blockR := &r
+	blockR := unittest.BlockFixture()
 	bs := unittest.ChainBlockFixtureWithRoot(blockR.ToHeader(), 4)
 	blockA, blockB, blockC, blockD := bs[0], bs[1], bs[2], bs[3]
 	unittest.AddCollectionsToBlock(blockA, []*flow.Collection{c1})
@@ -493,8 +492,7 @@ func makeChainABCDEF() (GetBlock, GetCollection, GetCommit) {
 		return cs[name-1]
 	}
 
-	r := unittest.BlockFixture()
-	blockR := &r
+	blockR := unittest.BlockFixture()
 	bs := unittest.ChainBlockFixtureWithRoot(blockR.ToHeader(), 3)
 	blockA, blockB, blockC := bs[0], bs[1], bs[2]
 	unittest.AddCollectionsToBlock(blockB, []*flow.Collection{c1, c2})

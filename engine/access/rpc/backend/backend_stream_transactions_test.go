@@ -81,7 +81,7 @@ type TransactionStatusSuite struct {
 	chainID flow.ChainID
 
 	broadcaster    *engine.Broadcaster
-	rootBlock      flow.Block
+	rootBlock      *flow.Block
 	sealedBlock    *flow.Block
 	finalizedBlock *flow.Block
 
@@ -163,7 +163,7 @@ func (s *TransactionStatusSuite) initializeBackend() {
 	// to ensure the mock library handles the response type correctly
 	var receipts flow.ExecutionReceiptList //nolint:gosimple
 	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-	receipts = unittest.ReceiptsForBlockFixture(&s.rootBlock, executionNodes.NodeIDs())
+	receipts = unittest.ReceiptsForBlockFixture(s.rootBlock, executionNodes.NodeIDs())
 	s.receipts.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(receipts, nil).Maybe()
 	s.finalSnapshot.On("Identities", mock.Anything).Return(executionNodes, nil).Maybe()
 
@@ -172,7 +172,7 @@ func (s *TransactionStatusSuite) initializeBackend() {
 	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(progress)
 	require.NoError(s.T(), err)
 
-	s.sealedBlock = &s.rootBlock
+	s.sealedBlock = s.rootBlock
 	s.finalizedBlock = unittest.BlockWithParentFixture(s.sealedBlock.ToHeader())
 	s.blockMap = map[uint64]*flow.Block{
 		s.sealedBlock.Header.Height:    s.sealedBlock,

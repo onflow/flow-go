@@ -51,7 +51,7 @@ type TxErrorMessagesEngineSuite struct {
 	connFactory *connectionmock.ConnectionFactory
 
 	blockMap    map[uint64]*flow.Block
-	rootBlock   flow.Block
+	rootBlock   *flow.Block
 	sealedBlock *flow.Header
 
 	db    *badger.DB
@@ -89,8 +89,9 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 
 	blockCount := 5
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
-	s.rootBlock = unittest.BlockFixture()
-	s.rootBlock.Header.Height = 0
+	s.rootBlock = unittest.BlockFixture(
+		unittest.Block.WithHeight(0),
+	)
 	parent := s.rootBlock.ToHeader()
 
 	for i := 0; i < blockCount; i++ {

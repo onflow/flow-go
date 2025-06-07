@@ -191,7 +191,7 @@ func TestPendingReceipts(t *testing.T) {
 		pool := NewPendingReceipts(headers, 100)
 		executedBlock := unittest.BlockFixture()
 		nextExecutedBlock := unittest.BlockWithParentFixture(executedBlock.ToHeader())
-		er := unittest.ExecutionResultFixture(unittest.WithBlock(&executedBlock))
+		er := unittest.ExecutionResultFixture(unittest.WithBlock(executedBlock))
 		headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.ToHeader(), nil)
 		headers.On("ByBlockID", nextExecutedBlock.ID()).Return(nextExecutedBlock.ToHeader(), nil)
 		ids := make(map[flow.Identifier]struct{})

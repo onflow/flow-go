@@ -35,7 +35,7 @@ type BlocksProviderSuite struct {
 
 	blocks []*flow.Block
 
-	rootBlock      flow.Block
+	rootBlock      *flow.Block
 	finalizedBlock *flow.Header
 
 	factory       *DataProviderFactoryImpl
@@ -54,8 +54,9 @@ func (s *BlocksProviderSuite) SetupTest() {
 	blockCount := 5
 	s.blocks = make([]*flow.Block, 0, blockCount)
 
-	s.rootBlock = unittest.BlockFixture()
-	s.rootBlock.Header.Height = 0
+	s.rootBlock = unittest.BlockFixture(
+		unittest.Block.WithHeight(0),
+	)
 	parent := s.rootBlock.ToHeader()
 
 	for i := 0; i < blockCount; i++ {

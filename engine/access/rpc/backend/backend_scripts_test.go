@@ -84,9 +84,7 @@ func (s *BackendScriptsSuite) SetupTest() {
 
 	s.execClient = access.NewExecutionAPIClient(s.T())
 	s.executionNodes = unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-
-	block := unittest.BlockFixture()
-	s.block = &block
+	s.block = unittest.BlockFixture()
 
 	s.script = []byte("access(all) fun main() { return 1 }")
 	s.arguments = [][]byte{[]byte("arg1"), []byte("arg2")}

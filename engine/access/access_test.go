@@ -385,11 +385,11 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
-		proposal1 := unittest.ProposalFromBlock(&block1)
+		proposal1 := unittest.ProposalFromBlock(block1)
 		// test block2 get by height
 		block2 := unittest.BlockFixture()
 		block2.Header.Height = 2
-		proposal2 := unittest.ProposalFromBlock(&block2)
+		proposal2 := unittest.ProposalFromBlock(block2)
 
 		require.NoError(suite.T(), all.Blocks.Store(proposal1))
 		require.NoError(suite.T(), all.Blocks.Store(proposal2))
@@ -466,7 +466,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 			resp, err := handler.GetBlockByID(context.Background(), req)
 
-			assertBlockResp(resp, err, &block1)
+			assertBlockResp(resp, err, block1)
 		})
 
 		suite.Run("get block light 1 by ID", func() {
@@ -478,7 +478,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 			resp, err := handler.GetBlockByID(context.Background(), req)
 
-			assertLightBlockResp(resp, err, &block1)
+			assertLightBlockResp(resp, err, block1)
 		})
 
 		suite.Run("get header 2 by height", func() {
@@ -502,7 +502,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 			resp, err := handler.GetBlockByHeight(context.Background(), req)
 
-			assertBlockResp(resp, err, &block2)
+			assertBlockResp(resp, err, block2)
 		})
 
 		suite.Run("get block 2 by height", func() {
@@ -513,7 +513,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 			resp, err := handler.GetBlockByHeight(context.Background(), req)
 
-			assertLightBlockResp(resp, err, &block2)
+			assertLightBlockResp(resp, err, block2)
 		})
 	})
 }

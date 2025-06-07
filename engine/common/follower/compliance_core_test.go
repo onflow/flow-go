@@ -111,9 +111,10 @@ func (s *CoreSuite) TestProcessingSingleBlock() {
 // TestAddFinalizedBlock tests that adding block below finalized height results in processing it, but since cache was pruned
 // to finalized view, it must be rejected by it.
 func (s *CoreSuite) TestAddFinalizedBlock() {
-	block := unittest.BlockFixture()
-	block.Header.View = s.finalizedBlock.View - 1 // block is below finalized view
-	proposal := unittest.ProposalFromBlock(&block)
+	block := unittest.BlockFixture(
+		unittest.Block.WithView(s.finalizedBlock.View - 1), // block is below finalized view
+	)
+	proposal := unittest.ProposalFromBlock(block)
 
 	// incoming block has to be validated
 	s.validator.On("ValidateProposal", model.SignedProposalFromBlock(proposal)).Return(nil).Once()

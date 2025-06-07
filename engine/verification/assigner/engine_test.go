@@ -105,7 +105,7 @@ func createContainerBlock(options ...func(result *flow.ExecutionResult, assignme
 		),
 	)
 
-	return &block, assignment
+	return block, assignment
 }
 
 // NewAssignerEngine returns an assigner engine for testing.

@@ -2737,8 +2737,9 @@ func TestCadenceArch(t *testing.T) {
 				// we must record a new heartbeat with a fixed block, we manually execute a transaction to do so,
 				// since doing this automatically would require a block computer and whole execution setup
 				height := uint64(1)
-				block1 := unittest.BlockFixture()
-				block1.Header.Height = height
+				block1 := unittest.BlockFixture(
+					unittest.Block.WithHeight(height),
+				)
 				ctx.BlockHeader = block1.ToHeader()
 				ctx.EntropyProvider = testutil.EntropyProviderFixture(entropy) // fix the entropy
 
@@ -2834,8 +2835,9 @@ func TestCadenceArch(t *testing.T) {
 				// we must record a new heartbeat with a fixed block, we manually execute a transaction to do so,
 				// since doing this automatically would require a block computer and whole execution setup
 				height := uint64(1)
-				block1 := unittest.BlockFixture()
-				block1.Header.Height = height
+				block1 := unittest.BlockFixture(
+					unittest.Block.WithHeight(height),
+				)
 				ctx.BlockHeader = block1.ToHeader()
 
 				txBody := flow.NewTransactionBody().

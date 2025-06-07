@@ -256,12 +256,12 @@ func Test_ForkDetectionPersisted(t *testing.T) {
 
 		// add seal
 		block := unittest.BlockFixture()
-		sealA := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))))
+		sealA := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(block))))
 		wrappedMempool.On("Add", sealA).Return(true, nil).Once()
 		_, _ = wrapper.Add(sealA)
 
 		// add conflicting seal
-		sealB := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))))
+		sealB := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(block))))
 		wrappedMempool.On("Add", sealB).Return(true, nil).Once()
 		added, _ := wrapper.Add(sealB) // should be rejected because it is conflicting with sealA
 		require.True(t, added)
@@ -366,7 +366,7 @@ func Test_ConflictingSeal_SmokeTest(t *testing.T) {
 		// two of them are non-conflicting but for same block and one is conflicting.
 
 		block := unittest.BlockFixture()
-		sealA := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))))
+		sealA := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(block))))
 		_, _ = wrapper.Add(sealA)
 
 		// different seal but for same result
@@ -390,7 +390,7 @@ func Test_ConflictingSeal_SmokeTest(t *testing.T) {
 		require.ElementsMatch(t, []*flow.IncorporatedResultSeal{sealA, sealB}, seals)
 
 		// add conflicting seal, which doesn't have any receipts yet
-		conflictingSeal := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))))
+		conflictingSeal := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(block))))
 		_, _ = wrapper.Add(conflictingSeal)
 
 		// conflicting seal doesn't have any receipts yet
