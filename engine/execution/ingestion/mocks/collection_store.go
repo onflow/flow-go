@@ -7,6 +7,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+var _ storage.Collections = (*MockCollectionStore)(nil)
+
 type MockCollectionStore struct {
 	byID map[flow.Identifier]*flow.Collection
 }
@@ -49,4 +51,8 @@ func (m *MockCollectionStore) LightByID(id flow.Identifier) (*flow.LightCollecti
 
 func (m *MockCollectionStore) LightByTransactionID(id flow.Identifier) (*flow.LightCollection, error) {
 	panic("LightByTransactionID not implemented")
+}
+
+func (m *MockCollectionStore) BatchStoreLightAndIndexByTransaction(_ []flow.LightCollection, _ storage.ReaderBatchWriter) error {
+	panic("BatchStoreLightAndIndexByTransaction not implemented")
 }
