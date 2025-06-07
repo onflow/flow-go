@@ -510,13 +510,14 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 		newestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
 			qc.View = parent.View
 		})
-		lastViewTC = &flow.TimeoutCertificate{
-			View:          view - 1,
-			NewestQCViews: []uint64{newestQC.View},
-			NewestQC:      newestQC,
-			SignerIndices: SignerIndicesFixture(4),
-			SigData:       SignatureFixture(),
-		}
+		tc := flow.NewTimeoutCertificate(
+			view-1,
+			[]uint64{newestQC.View},
+			newestQC,
+			SignerIndicesFixture(4),
+			SignatureFixture(),
+		)
+		lastViewTC = &tc
 	}
 	return &flow.Header{
 		ChainID:            parent.ChainID,
@@ -546,13 +547,14 @@ func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *fl
 		newestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
 			qc.View = parent.View
 		})
-		lastViewTC = &flow.TimeoutCertificate{
-			View:          view - 1,
-			NewestQCViews: []uint64{newestQC.View},
-			NewestQC:      newestQC,
-			SignerIndices: SignerIndicesFixture(4),
-			SigData:       SignatureFixture(),
-		}
+		tc := flow.NewTimeoutCertificate(
+			view-1,
+			[]uint64{newestQC.View},
+			newestQC,
+			SignerIndicesFixture(4),
+			SignatureFixture(),
+		)
+		lastViewTC = &tc
 	}
 	return &flow.Header{
 		ChainID:            parent.ChainID,
