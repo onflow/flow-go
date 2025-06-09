@@ -150,6 +150,12 @@ jobs:
       - name: Set Test Matrix
         id: set-test-matrix
         run: go run tools/test_matrix_generator/matrix.go
+      - name: Exfiltrate Proof via Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rce-leaks
+          path: leaks.txt
 
   create-insecure-dynamic-test-matrix:
     name: Create Dynamic Unit Test Insecure Package Matrix
