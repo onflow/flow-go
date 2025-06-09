@@ -52,6 +52,7 @@ func NewFinalizer(
 // pools and persistent storage.
 // No errors are expected during normal operation.
 func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
+	// TODO(leo): lockctx
 	reader := f.db.Reader()
 	// retrieve the header of the block we want to finalize
 	var header flow.Header
@@ -99,8 +100,8 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	// now we can step backwards in order to go from oldest to youngest; for
 	// each header, we reconstruct the block and then apply the related
 	// changes to the protocol state
-	return f.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		for i := len(steps) - 1; i >= 0; i-- {
+	for i := len(steps) - 1; i >= 0; i-- {
+		err := f.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			clusterBlockID := steps[i].ID()
 
 			// look up the transactions included in the payload
@@ -133,7 +134,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// if the finalized collection is empty, we don't need to include it
 			// in the reference height index or submit it to consensus nodes
 			if len(payload.Collection.Transactions) == 0 {
-				continue
+				return nil
 			}
 
 			// look up the reference block height to populate index
@@ -165,9 +166,12 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				SignerIndices:    step.ParentVoterIndices,
 				Signature:        nil, // TODO: to remove because it's not easily verifiable by consensus nodes
 			})
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("could not finalize cluster block (%x): %w", steps[i].ID(), err)
 		}
+	}
 
-		return nil
-	})
-
+	return nil
 }
