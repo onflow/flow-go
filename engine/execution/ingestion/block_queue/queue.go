@@ -223,7 +223,8 @@ func (q *BlockQueue) HandleCollection(collection *flow.Collection) ([]*entity.Ex
 	}
 
 	// update collection
-	colInfo.Collection.Collection = collection
+	//nolint:structwrite
+	colInfo.Collection.Transactions = collection.Transactions
 
 	// check if any block, which includes this collection, became executable
 	executables := make([]*entity.ExecutableBlock, 0, len(colInfo.IncludedIn))

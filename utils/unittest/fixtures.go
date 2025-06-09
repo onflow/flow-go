@@ -718,9 +718,10 @@ func CompleteCollectionFixture() *entity.CompleteCollection {
 			ReferenceBlockID: FixedReferenceBlockID(),
 			SignerIndices:    SignerIndicesFixture(1),
 		},
-		Collection: &flow.Collection{
-			Transactions: []*flow.TransactionBody{&txBody},
-		},
+		Transactions: []*flow.TransactionBody{&txBody},
+		//Collection: &flow.Collection{
+		//	Transactions: []*flow.TransactionBody{&txBody},
+		//},
 	}
 }
 
@@ -732,9 +733,10 @@ func CompleteCollectionFromTransactions(txs []*flow.TransactionBody) *entity.Com
 			ReferenceBlockID: IdentifierFixture(),
 			SignerIndices:    SignerIndicesFixture(3),
 		},
-		Collection: &flow.Collection{
-			Transactions: txs,
-		},
+		Transactions: txs,
+		//Collection: &flow.Collection{
+		//	Transactions: txs,
+		//},
 	}
 }
 

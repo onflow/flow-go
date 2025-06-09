@@ -273,8 +273,8 @@ func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colN
 		collections[c] = collection
 		guarantees[c] = guarantee
 		completeCollections[guarantee.CollectionID] = &entity.CompleteCollection{
-			Guarantee:  guarantee,
-			Collection: collection,
+			Guarantee:    guarantee,
+			Transactions: transactions,
 		}
 	}
 

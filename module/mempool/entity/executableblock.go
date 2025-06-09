@@ -1,6 +1,8 @@
 package entity
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -11,8 +13,9 @@ import (
 // when receiving a collection from collection node, the execution node will
 // update the Collection field of a CompleteCollection and make it complete.
 type CompleteCollection struct {
-	Guarantee  *flow.CollectionGuarantee
-	Collection *flow.Collection
+	Guarantee *flow.CollectionGuarantee
+	//Collection   *flow.Collection
+	Transactions []*flow.TransactionBody
 }
 
 // ExecutableBlock represents a block that can be executed by the VM
@@ -29,8 +32,14 @@ type ExecutableBlock struct {
 	Executing           bool // flag used to indicate if block is being executed, to avoid re-execution
 }
 
+func (c CompleteCollection) Collection() flow.Collection {
+	//nolint:structwrite
+	return flow.Collection{Transactions: c.Transactions}
+}
+
 func (c CompleteCollection) IsCompleted() bool {
-	return len(c.Collection.Transactions) > 0
+	//return len(c.Collection.Transactions) > 0
+	return len(c.Transactions) > 0
 }
 
 // BlockID lazy loads the Block.ID() into the private blockID field on the first call, and returns
@@ -72,11 +81,22 @@ func (b *ExecutableBlock) CompleteCollectionAt(index int) *CompleteCollection {
 // CollectionAt returns a collection at the given index,
 // if index out of range, nil will be returned
 func (b *ExecutableBlock) CollectionAt(index int) *flow.Collection {
+	//cc := b.CompleteCollectionAt(index)
+	//if cc == nil {
+	//	return nil
+	//}
+	//return cc.Collection
+
 	cc := b.CompleteCollectionAt(index)
 	if cc == nil {
 		return nil
 	}
-	return cc.Collection
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: cc.Transactions})
+	if err != nil {
+		panic(fmt.Sprintf("invalid untrusted input in CollectionAt: %v", err))
+	}
+	return collection
+
 }
 
 // HasAllTransactions returns whether all the transactions for all collections

@@ -210,9 +210,10 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 		Guarantee: &flow.CollectionGuarantee{
 			CollectionID: testCollectionID,
 		},
-		Collection: &flow.Collection{
-			Transactions: []*flow.TransactionBody{testTransactionBody},
-		},
+		Transactions: []*flow.TransactionBody{testTransactionBody},
+		//Collection: &flow.Collection{
+		//	Transactions: []*flow.TransactionBody{testTransactionBody},
+		//},
 	}
 
 	expectedTestEvents := make([]*flow.Event, len(testEvents))
