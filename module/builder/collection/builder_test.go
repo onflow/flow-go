@@ -33,6 +33,7 @@ import (
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -124,7 +125,7 @@ func (suite *BuilderSuite) SetupTest() {
 
 	state, err := pbadger.Bootstrap(
 		metrics,
-		suite.db,
+		badgerimpl.ToDB(suite.db),
 		all.Headers,
 		all.Seals,
 		all.Results,
