@@ -43,117 +43,87 @@ func IterateExecuteAndCommitInBatch(
 	// in order to minimize the impact on the system
 	sleepAfterEachBatchCommit time.Duration,
 ) error {
-	var batch storage.Batch
-	iteratedCountInCurrentBatch := uint(0)
-	startTime := time.Now()
-	total := 0
+	noMoreBlocks := false
 
-	defer func() {
-		// Iteration ends in one of two cases:
-		// 1. The context is Done
-		// 2. An error occurs during iteration.
-		// In both scenarios, the batch remains open and must be closed here
-		// to prevent memory leaks.
-		if batch != nil {
-			batch.Close()
-		}
-		log.Info().Str("duration", time.Since(startTime).String()).
-			Int("total_block_executed", total).
-			Msg("block iteration and execution completed")
-	}()
-
-	// Helper function to commit and create new batch
-	commitAndCreateNewBatch := func() error {
-		if batch == nil {
-			return nil
-		}
-		err := commitAndCheckpoint(log, metrics, batch, iter)
-		if err != nil {
-			return err
-		}
-		batch.Close()
-		batch = db.NewBatch()
-		iteratedCountInCurrentBatch = 0
-		return nil
-	}
-
-	// Create initial batch
-	batch = db.NewBatch()
-
-	for {
+	for !noMoreBlocks {
 		select {
 		case <-ctx.Done():
-			if iteratedCountInCurrentBatch > 0 {
-				return commitAndCreateNewBatch()
-			}
 			return nil
 		default:
 		}
 
-		blockID, hasNext, err := iter.Next()
+		start := time.Now()
+		iteratedCountInCurrentBatch := uint(0)
+
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			for {
+				select {
+				case <-ctx.Done():
+					return nil
+				default:
+				}
+
+				// if the batch is full, commit it and enter the outer loop to
+				// start a new batch
+				if iteratedCountInCurrentBatch >= batchSize {
+					return nil
+				}
+
+				blockID, hasNext, err := iter.Next()
+				if err != nil {
+					return err
+				}
+				if !hasNext {
+					// no more blocks to iterate, we are done.
+					// update the flag and prepare to exit the loop after committing the last batch
+					noMoreBlocks = true
+					return nil
+				}
+
+				err = executor.ExecuteByBlockID(blockID, rw)
+				if err != nil {
+					return err
+				}
+
+				iteratedCountInCurrentBatch++
+			}
+		})
 		if err != nil {
 			return err
 		}
 
-		if !hasNext {
-			if iteratedCountInCurrentBatch > 0 {
-				return commitAndCreateNewBatch()
-			}
-			break
-		}
-
-		err = executor.ExecuteByBlockID(blockID, batch)
+		// save the progress of the iteration, so that it can be resumed later
+		_, err = iter.Checkpoint()
 		if err != nil {
-			return fmt.Errorf("failed to execute by block ID %v: %w", blockID, err)
+			return fmt.Errorf("failed to checkpoint iterator: %w", err)
 		}
-		iteratedCountInCurrentBatch++
-		total++
 
-		if iteratedCountInCurrentBatch >= batchSize {
-			err := commitAndCreateNewBatch()
-			if err != nil {
-				return err
-			}
+		// report the progress of the iteration
+		startIndex, endIndex, nextIndex := iter.Progress()
+		progress := CalculateProgress(startIndex, endIndex, nextIndex)
 
-			select {
-			case <-ctx.Done():
-				return nil
-			case <-time.After(sleepAfterEachBatchCommit):
+		log.Info().
+			Str("commit-dur", time.Since(start).String()).
+			Uint64("start-index", startIndex).
+			Uint64("end-index", endIndex).
+			Uint64("next-index", nextIndex).
+			Str("progress", fmt.Sprintf("%.2f%%", progress)).
+			Msg("batch committed")
+
+		metrics.ExecutionLastChunkDataPackPrunedHeight(nextIndex - 1)
+
+		// sleep after each batch commit to minimize the impact on the system
+		if sleepAfterEachBatchCommit > 0 {
+			for {
+				select {
+				case <-ctx.Done():
+					return nil
+				case <-time.After(sleepAfterEachBatchCommit):
+					return nil
+				}
 			}
 		}
 	}
-
-	return nil
-}
-
-// commitAndCheckpoint commits the batch and checkpoints the iterator
-// so that the iteration progress can be resumed after restart.
-func commitAndCheckpoint(
-	log zerolog.Logger, metrics module.ExecutionMetrics, batch storage.Batch, iter module.BlockIterator) error {
-	start := time.Now()
-
-	err := batch.Commit()
-	if err != nil {
-		return fmt.Errorf("failed to commit batch: %w", err)
-	}
-
-	_, err = iter.Checkpoint()
-	if err != nil {
-		return fmt.Errorf("failed to checkpoint iterator: %w", err)
-	}
-
-	startIndex, endIndex, nextIndex := iter.Progress()
-	progress := CalculateProgress(startIndex, endIndex, nextIndex)
-
-	log.Info().
-		Str("commit-dur", time.Since(start).String()).
-		Uint64("start-index", startIndex).
-		Uint64("end-index", endIndex).
-		Uint64("next-index", nextIndex).
-		Str("progress", fmt.Sprintf("%.2f%%", progress)).
-		Msg("batch committed")
-
-	metrics.ExecutionLastChunkDataPackPrunedHeight(nextIndex - 1)
 
 	return nil
 }
