@@ -62,6 +62,19 @@ func PayloadFromTransactions(refID flow.Identifier, transactions ...*flow.Transa
 	}
 }
 
+// NewPayload creates a payload given a reference block ID and a
+// list of transaction hashes.
+func NewPayload(refID flow.Identifier, transactions []*flow.TransactionBody) (*Payload, error) {
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: transactions})
+	if err != nil {
+		return nil, fmt.Errorf("could not construct payload: %w", err)
+	}
+	return &Payload{
+		Collection:       *collection,
+		ReferenceBlockID: refID,
+	}, err
+}
+
 // Hash returns the hash of the payload.
 func (p Payload) Hash() flow.Identifier {
 	return flow.MakeID(p)

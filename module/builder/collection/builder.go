@@ -485,8 +485,11 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 	}
 
 	// build the payload from the transactions
-	payload := cluster.PayloadFromTransactions(minRefID, transactions...)
-	return &payload, nil
+	payload, err := cluster.NewPayload(minRefID, transactions)
+	if err != nil {
+		return nil, fmt.Errorf("could not build the payload from the transactions : %w", err)
+	}
+	return payload, nil
 }
 
 // buildHeader constructs the header for the cluster block being built.
