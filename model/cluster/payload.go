@@ -34,9 +34,9 @@ type Payload struct {
 	ReferenceBlockID flow.Identifier
 }
 
-// EmptyPayload returns a payload with an empty collection and the given
+// NewEmptyPayload returns a payload with an empty collection and the given
 // reference block ID.
-func EmptyPayload(refID flow.Identifier) Payload {
+func NewEmptyPayload(refID flow.Identifier) Payload {
 	return Payload{
 		Collection:       flow.NewEmptyCollection(),
 		ReferenceBlockID: refID,
