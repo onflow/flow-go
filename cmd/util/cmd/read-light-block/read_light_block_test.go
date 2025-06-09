@@ -23,7 +23,7 @@ func TestReadClusterRange(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 
 		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertClusterBlock))
+		require.NoError(t, lctx.AcquireLock(storage.LockFinalizeClusterBlock))
 		// add parent as boundary
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.Header.ChainID, parent.Header.Height, parent.ID())
