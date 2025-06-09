@@ -38,11 +38,6 @@ func (er ExecutionResult) ID() Identifier {
 	return MakeID(er)
 }
 
-// Checksum ...
-func (er ExecutionResult) Checksum() Identifier {
-	return MakeID(er)
-}
-
 // ValidateChunksLength checks whether the number of chunks is zero.
 //
 // It returns false if the number of chunks is zero (invalid).
