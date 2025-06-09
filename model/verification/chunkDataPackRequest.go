@@ -33,6 +33,25 @@ type UntrustedChunkDataPackRequest ChunkDataPackRequest
 //
 // All errors indicate a valid ChunkDataPackRequest cannot be constructed from the input.
 func NewChunkDataPackRequest(untrusted UntrustedChunkDataPackRequest) (*ChunkDataPackRequest, error) {
+	if untrusted.Locator.EqualTo(new(chunks.Locator)) {
+		return nil, fmt.Errorf("locator is empty")
+	}
+	if untrusted.ChunkID == flow.ZeroID {
+		return nil, fmt.Errorf("chunk ID must not be zero")
+	}
+	if untrusted.Agrees == nil {
+		return nil, fmt.Errorf("agrees list must not be nil")
+	}
+	if untrusted.Disagrees == nil {
+		return nil, fmt.Errorf("disagrees list must not be nil")
+	}
+	if untrusted.Targets == nil {
+		return nil, fmt.Errorf("targets list must not be nil")
+	}
+	filteredTargets := untrusted.Targets.Filter(filter.HasRole[flow.Identity](flow.RoleExecution))
+	if len(filteredTargets) < len(untrusted.Targets) {
+		return nil, fmt.Errorf("only execution nodes identities must be provided in target list: %v", untrusted.Targets)
+	}
 	return &ChunkDataPackRequest{
 		Locator:                  untrusted.Locator,
 		ChunkDataPackRequestInfo: untrusted.ChunkDataPackRequestInfo,

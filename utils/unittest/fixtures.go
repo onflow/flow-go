@@ -1726,31 +1726,36 @@ func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest
 			ResultID: IdentifierFixture(),
 			Index:    0,
 		},
-		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
-			ChunkID:   IdentifierFixture(),
-			Height:    0,
-			Agrees:    IdentifierListFixture(1),
-			Disagrees: IdentifierListFixture(1),
-		},
+		ChunkDataPackRequestInfo: *ChunkDataPackRequestInfoFixture(),
 	}
 
 	for _, opt := range opts {
 		opt(req)
 	}
 
+	return req
+}
+
+func ChunkDataPackRequestInfoFixture() *verification.ChunkDataPackRequestInfo {
+	agrees := IdentifierListFixture(1)
+	disagrees := IdentifierListFixture(1)
 	// creates identity fixtures for target ids as union of agrees and disagrees
 	// TODO: remove this inner fixture once we have filter for identifier list.
 	targets := flow.IdentityList{}
-	for _, id := range req.Agrees {
+	for _, id := range agrees {
 		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
 	}
-	for _, id := range req.Disagrees {
+	for _, id := range disagrees {
 		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
 	}
 
-	req.Targets = targets
-
-	return req
+	return &verification.ChunkDataPackRequestInfo{
+		ChunkID:   IdentifierFixture(),
+		Height:    0,
+		Agrees:    agrees,
+		Disagrees: disagrees,
+		Targets:   targets,
+	}
 }
 
 func WithChunkDataPackCollection(collection *flow.Collection) func(*flow.ChunkDataPack) {

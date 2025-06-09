@@ -28,7 +28,7 @@ func TestNewChunkDataPackResponse(t *testing.T) {
 	t.Run("valid input with locator and chunk data pack", func(t *testing.T) {
 		response, err := verification.NewChunkDataPackResponse(
 			verification.UntrustedChunkDataPackResponse{
-				Locator: *unittest.ChunkLocatorFixture(unittest.IdentifierFixture(), 1),
+				Locator: *unittest.ChunkLocatorFixture(unittest.IdentifierFixture(), 0),
 				Cdp:     unittest.ChunkDataPackFixture(unittest.IdentifierFixture()),
 			})
 
@@ -51,7 +51,7 @@ func TestNewChunkDataPackResponse(t *testing.T) {
 	t.Run("invalid input with nil chunk data pack", func(t *testing.T) {
 		_, err := verification.NewChunkDataPackResponse(
 			verification.UntrustedChunkDataPackResponse{
-				Locator: *unittest.ChunkLocatorFixture(unittest.IdentifierFixture(), 1),
+				Locator: *unittest.ChunkLocatorFixture(unittest.IdentifierFixture(), 0),
 				Cdp:     nil,
 			},
 		)
