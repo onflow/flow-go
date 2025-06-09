@@ -38,7 +38,8 @@ type ExecutableBlock struct {
 //}
 
 func (c CompleteCollection) IsCompleted() bool {
-	return len(c.Collection.Transactions) > 0
+	//return len(c.Collection.Transactions) > 0
+	return c.Collection != nil && len(c.Collection.Transactions) > 0
 }
 
 // BlockID lazy loads the Block.ID() into the private blockID field on the first call, and returns
@@ -85,6 +86,16 @@ func (b *ExecutableBlock) CollectionAt(index int) *flow.Collection {
 		return nil
 	}
 	return cc.Collection
+
+	//cc := b.CompleteCollectionAt(index)
+	//if cc == nil {
+	//	return nil
+	//}
+	//collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: cc.Collection.Transactions})
+	//if err != nil {
+	//	panic(fmt.Sprintf("invalid untrusted input in CollectionAt: %v", err))
+	//}
+	//return collection
 }
 
 // HasAllTransactions returns whether all the transactions for all collections
