@@ -42,9 +42,6 @@ func NewChunkDataPackRequest(untrusted UntrustedChunkDataPackRequest) (*ChunkDat
 	if untrusted.Agrees == nil {
 		return nil, fmt.Errorf("agrees list must not be nil")
 	}
-	if untrusted.Disagrees == nil {
-		return nil, fmt.Errorf("disagrees list must not be nil")
-	}
 	if untrusted.Targets == nil {
 		return nil, fmt.Errorf("targets list must not be nil")
 	}

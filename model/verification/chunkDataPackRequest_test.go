@@ -86,13 +86,10 @@ func TestChunkDataPackRequestList_UniqueRequestInfo(t *testing.T) {
 // 4. Invalid input with nil Agrees list:
 //   - Should return an error indicating agrees list must not be nil.
 //
-// 5. Invalid input with nil Disagrees list:
-//   - Should return an error indicating disagrees list must not be nil.
-//
-// 6. Invalid input with nil Targets list:
+// 5. Invalid input with nil Targets list:
 //   - Should return an error indicating targets list must not be nil.
 //
-// 7. Invalid input with non-execution node in Targets list:
+// 6. Invalid input with non-execution node in Targets list:
 //   - Should return an error indicating only execution node identities are allowed in the Targets list.
 func TestNewChunkDataPackRequest(t *testing.T) {
 	chunkDataPackRequestInfo := unittest.ChunkDataPackRequestInfoFixture()
@@ -150,21 +147,6 @@ func TestNewChunkDataPackRequest(t *testing.T) {
 
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "agrees list must not be nil")
-	})
-
-	t.Run("invalid input with nil Disagrees", func(t *testing.T) {
-		info := *chunkDataPackRequestInfo
-		info.Disagrees = nil
-
-		_, err := verification.NewChunkDataPackRequest(
-			verification.UntrustedChunkDataPackRequest{
-				Locator:                  locator,
-				ChunkDataPackRequestInfo: info,
-			},
-		)
-
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "disagrees list must not be nil")
 	})
 
 	t.Run("invalid input with nil Targets", func(t *testing.T) {
