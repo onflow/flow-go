@@ -491,15 +491,11 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VoteEquivocation() {
 func (s *SafetyRulesTestSuite) TestProduceVote_AfterTimeout() {
 	view := s.proposal.Block.View
 	newestQC := helper.MakeQC(helper.WithQCView(view - 1))
-	expectedTimeout := model.NewTimeoutObject(
-		view,
-		newestQC,
-		nil,
-		flow.ZeroID,
-		nil,
-		0,
-	)
-	s.signer.On("CreateTimeout", view, newestQC, (*flow.TimeoutCertificate)(nil)).Return(&expectedTimeout, nil).Once()
+	expectedTimeout := &model.TimeoutObject{
+		View:     view,
+		NewestQC: newestQC,
+	}
+	s.signer.On("CreateTimeout", view, newestQC, (*flow.TimeoutCertificate)(nil)).Return(expectedTimeout, nil).Once()
 	s.persister.On("PutSafetyData", mock.Anything).Return(nil).Once()
 
 	// first timeout, then try to vote
@@ -521,31 +517,27 @@ func (s *SafetyRulesTestSuite) TestProduceVote_AfterTimeout() {
 func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 	view := s.proposal.Block.View
 	newestQC := helper.MakeQC(helper.WithQCView(view - 1))
-	expectedTimeout := model.NewTimeoutObject(
-		view,
-		newestQC,
-		nil,
-		flow.ZeroID,
-		nil,
-		0,
-	)
+	expectedTimeout := &model.TimeoutObject{
+		View:     view,
+		NewestQC: newestQC,
+	}
 
 	expectedSafetyData := &hotstuff.SafetyData{
 		LockedOneChainView:      s.safetyData.LockedOneChainView,
 		HighestAcknowledgedView: view,
-		LastTimeout:             &expectedTimeout,
+		LastTimeout:             expectedTimeout,
 	}
-	s.signer.On("CreateTimeout", view, newestQC, (*flow.TimeoutCertificate)(nil)).Return(&expectedTimeout, nil).Once()
+	s.signer.On("CreateTimeout", view, newestQC, (*flow.TimeoutCertificate)(nil)).Return(expectedTimeout, nil).Once()
 	s.persister.On("PutSafetyData", expectedSafetyData).Return(nil).Once()
 	timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), &expectedTimeout, timeout)
+	require.Equal(s.T(), expectedTimeout, timeout)
 
 	s.persister.AssertCalled(s.T(), "PutSafetyData", expectedSafetyData)
 
 	// producing timeout with same arguments should return cached version but with incremented timeout tick
-	expectedSafetyData.LastTimeout = new(model.TimeoutObject)
-	*expectedSafetyData.LastTimeout = expectedTimeout
+	expectedSafetyData.LastTimeout = &model.TimeoutObject{}
+	*expectedSafetyData.LastTimeout = *expectedTimeout
 	expectedSafetyData.LastTimeout.TimeoutTick++
 	s.persister.On("PutSafetyData", expectedSafetyData).Return(nil).Once()
 
@@ -558,19 +550,16 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 	lastViewTC := helper.MakeTC(helper.WithTCView(view),
 		helper.WithTCNewestQC(newestQC))
 
-	expectedTimeout = model.NewTimeoutObject(
-		view,
-		newestQC,
-		lastViewTC,
-		flow.ZeroID,
-		nil,
-		0,
-	)
-	s.signer.On("CreateTimeout", view+1, newestQC, lastViewTC).Return(&expectedTimeout, nil).Once()
+	expectedTimeout = &model.TimeoutObject{
+		View:       view + 1,
+		NewestQC:   newestQC,
+		LastViewTC: lastViewTC,
+	}
+	s.signer.On("CreateTimeout", view+1, newestQC, lastViewTC).Return(expectedTimeout, nil).Once()
 	expectedSafetyData = &hotstuff.SafetyData{
 		LockedOneChainView:      s.safetyData.LockedOneChainView,
 		HighestAcknowledgedView: view + 1,
-		LastTimeout:             &expectedTimeout,
+		LastTimeout:             expectedTimeout,
 	}
 	s.persister.On("PutSafetyData", expectedSafetyData).Return(nil).Once()
 
@@ -685,16 +674,12 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_PersistStateException() {
 
 	view := s.proposal.Block.View
 	newestQC := helper.MakeQC(helper.WithQCView(view - 1))
-	expectedTimeout := model.NewTimeoutObject(
-		view,
-		newestQC,
-		nil,
-		flow.ZeroID,
-		nil,
-		0,
-	)
+	expectedTimeout := &model.TimeoutObject{
+		View:     view,
+		NewestQC: newestQC,
+	}
 
-	s.signer.On("CreateTimeout", view, newestQC, (*flow.TimeoutCertificate)(nil)).Return(&expectedTimeout, nil).Once()
+	s.signer.On("CreateTimeout", view, newestQC, (*flow.TimeoutCertificate)(nil)).Return(expectedTimeout, nil).Once()
 	timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
 	require.Nil(s.T(), timeout)
 	require.ErrorIs(s.T(), err, exception)
@@ -716,16 +701,12 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_AfterVote() {
 
 	newestQC := helper.MakeQC(helper.WithQCView(view - 1))
 
-	expectedTimeout := model.NewTimeoutObject(
-		view,
-		newestQC,
-		nil,
-		flow.ZeroID,
-		nil,
-		0,
-	)
+	expectedTimeout := &model.TimeoutObject{
+		View:     view,
+		NewestQC: newestQC,
+	}
 
-	s.signer.On("CreateTimeout", view, newestQC, (*flow.TimeoutCertificate)(nil)).Return(&expectedTimeout, nil).Once()
+	s.signer.On("CreateTimeout", view, newestQC, (*flow.TimeoutCertificate)(nil)).Return(expectedTimeout, nil).Once()
 
 	// timing out for same view should be possible
 	timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)

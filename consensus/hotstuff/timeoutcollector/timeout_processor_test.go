@@ -354,14 +354,14 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 		newestQC := timeouts[len(timeouts)-1].NewestQC
 		tc := args.Get(0).(*flow.TimeoutCertificate)
 		// ensure that TC contains correct fields
-		expectedTC := flow.NewTimeoutCertificate(
-			s.view,
-			highQCViews,
-			newestQC,
-			signerIndices,
-			expectedSig,
-		)
-		require.Equal(s.T(), &expectedTC, tc)
+		expectedTC := &flow.TimeoutCertificate{
+			View:          s.view,
+			NewestQCViews: highQCViews,
+			NewestQC:      newestQC,
+			SignerIndices: signerIndices,
+			SigData:       expectedSig,
+		}
+		require.Equal(s.T(), expectedTC, tc)
 	}).Return(nil).Once()
 
 	signersData := make([]hotstuff.TimeoutSignerInfo, 0)
