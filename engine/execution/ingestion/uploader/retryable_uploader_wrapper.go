@@ -214,8 +214,10 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 		}
 
 		completeCollections[collectionID] = &entity.CompleteCollection{
-			Guarantee:    guarantees[inx],
-			Transactions: collection.Transactions,
+			Guarantee: guarantees[inx],
+			Collection: &flow.Collection{
+				Transactions: collection.Transactions,
+			},
 		}
 	}
 

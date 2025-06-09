@@ -1,20 +1,18 @@
 package entity
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// A complete collection contains the guarantee and the transactions.
+// CompleteCollection contains the guarantee and the transactions.
 // the guarantee is the hash of all the transactions. The execution node
 // receives the guarantee from the block, and queries the transactions by
 // the guarantee from the collection node.
 // when receiving a collection from collection node, the execution node will
-// update the Transactions field of a CompleteCollection and make it complete.
+// update the Collection field of a CompleteCollection and make it complete.
 type CompleteCollection struct {
-	Guarantee    *flow.CollectionGuarantee
-	Transactions []*flow.TransactionBody
+	Guarantee  *flow.CollectionGuarantee
+	Collection *flow.Collection
 }
 
 // ExecutableBlock represents a block that can be executed by the VM
@@ -31,16 +29,16 @@ type ExecutableBlock struct {
 	Executing           bool // flag used to indicate if block is being executed, to avoid re-execution
 }
 
-func (c CompleteCollection) Collection() (*flow.Collection, error) {
-	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: c.Transactions})
-	if err != nil {
-		return nil, fmt.Errorf("could not construct collection: %w", err)
-	}
-	return collection, nil
-}
+//func (c CompleteCollection) Collection() (*flow.Collection, error) {
+//	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: c.Transactions})
+//	if err != nil {
+//		return nil, fmt.Errorf("could not construct collection: %w", err)
+//	}
+//	return collection, nil
+//}
 
 func (c CompleteCollection) IsCompleted() bool {
-	return len(c.Transactions) > 0
+	return len(c.Collection.Transactions) > 0
 }
 
 // BlockID lazy loads the Block.ID() into the private blockID field on the first call, and returns
@@ -86,11 +84,7 @@ func (b *ExecutableBlock) CollectionAt(index int) *flow.Collection {
 	if cc == nil {
 		return nil
 	}
-	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: cc.Transactions})
-	if err != nil {
-		panic(fmt.Sprintf("invalid untrusted input in CollectionAt: %v", err))
-	}
-	return collection
+	return cc.Collection
 }
 
 // HasAllTransactions returns whether all the transactions for all collections

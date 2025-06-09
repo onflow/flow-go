@@ -240,14 +240,14 @@ func (e *blockComputer) queueTransactionRequests(
 			isSystemTransaction: false,
 		}
 
-		for i, txnBody := range collection.Transactions {
+		for i, txnBody := range collection.Collection.Transactions {
 			requestQueue <- newTransactionRequest(
 				collectionInfo,
 				collectionCtx,
 				collectionLogger,
 				txnIndex,
 				txnBody,
-				i == len(collection.Transactions)-1)
+				i == len(collection.Collection.Transactions)-1)
 			txnIndex += 1
 		}
 	}
@@ -271,7 +271,9 @@ func (e *blockComputer) queueTransactionRequests(
 		blockHeight:     blockHeader.Height,
 		collectionIndex: len(rawCollections),
 		CompleteCollection: &entity.CompleteCollection{
-			Transactions: []*flow.TransactionBody{systemTxnBody},
+			Collection: &flow.Collection{
+				Transactions: []*flow.TransactionBody{systemTxnBody},
+			},
 		},
 		isSystemTransaction: true,
 	}
@@ -288,7 +290,7 @@ func (e *blockComputer) queueTransactionRequests(
 func numberOfTransactionsInBlock(collections []*entity.CompleteCollection) int {
 	numTxns := 1 // there's one system transaction per block
 	for _, collection := range collections {
-		numTxns += len(collection.Transactions)
+		numTxns += len(collection.Collection.Transactions)
 	}
 
 	return numTxns
