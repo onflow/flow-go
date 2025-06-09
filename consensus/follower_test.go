@@ -339,14 +339,13 @@ func (mc *MockConsensus) extendBlock(blockView uint64, parent *flow.Header) *flo
 			qc.View = parent.View
 			qc.SignerIndices = signerIndices
 		})
-		tc := flow.NewTimeoutCertificate(
-			blockView-1,
-			[]uint64{newestQC.View},
-			newestQC,
-			signerIndices,
-			unittest.SignatureFixture(),
-		)
-		nextBlock.LastViewTC = &tc
+		nextBlock.LastViewTC = &flow.TimeoutCertificate{
+			View:          blockView - 1,
+			NewestQCViews: []uint64{newestQC.View},
+			NewestQC:      newestQC,
+			SignerIndices: signerIndices,
+			SigData:       unittest.SignatureFixture(),
+		}
 	}
 	return nextBlock
 }
