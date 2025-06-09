@@ -45,11 +45,6 @@ func (c Locator) ID() flow.Identifier {
 	return flow.MakeID(c)
 }
 
-// Checksum provides a cryptographic commitment for a chunk locator content.
-func (c Locator) Checksum() flow.Identifier {
-	return flow.MakeID(c)
-}
-
 // LocatorMap maps keeps chunk locators based on their locator id.
 type LocatorMap map[flow.Identifier]*Locator
 
