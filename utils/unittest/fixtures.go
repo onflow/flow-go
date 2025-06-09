@@ -1720,7 +1720,6 @@ func WithChunkID(chunkID flow.Identifier) func(*verification.ChunkDataPackReques
 // Use options to customize the request.
 func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest)) *verification.
 	ChunkDataPackRequest {
-
 	req := &verification.ChunkDataPackRequest{
 		Locator: chunks.Locator{
 			ResultID: IdentifierFixture(),
@@ -1733,29 +1732,37 @@ func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest
 		opt(req)
 	}
 
+	// Ensure Targets reflects current Agrees and Disagrees
+	req.Targets = makeTargets(req.Agrees, req.Disagrees)
+
 	return req
 }
 
 func ChunkDataPackRequestInfoFixture() *verification.ChunkDataPackRequestInfo {
 	agrees := IdentifierListFixture(1)
 	disagrees := IdentifierListFixture(1)
-	// creates identity fixtures for target ids as union of agrees and disagrees
-	// TODO: remove this inner fixture once we have filter for identifier list.
-	targets := flow.IdentityList{}
-	for _, id := range agrees {
-		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
-	}
-	for _, id := range disagrees {
-		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
-	}
 
 	return &verification.ChunkDataPackRequestInfo{
 		ChunkID:   IdentifierFixture(),
 		Height:    0,
 		Agrees:    agrees,
 		Disagrees: disagrees,
-		Targets:   targets,
+		Targets:   makeTargets(agrees, disagrees),
 	}
+}
+
+// makeTargets returns a combined IdentityList for the given agrees and disagrees.
+func makeTargets(agrees, disagrees flow.IdentifierList) flow.IdentityList {
+	// creates identity fixtures for target ids as union of agrees and disagrees
+	// TODO: remove this inner fixture once we have filter for identifier list.
+	targets := flow.IdentityList{}
+	for _, id := range append(agrees, disagrees...) {
+		targets = append(targets, IdentityFixture(
+			WithNodeID(id),
+			WithRole(flow.RoleExecution),
+		))
+	}
+	return targets
 }
 
 func WithChunkDataPackCollection(collection *flow.Collection) func(*flow.ChunkDataPack) {
