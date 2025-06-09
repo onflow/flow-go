@@ -77,7 +77,7 @@ unittest-main:
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
-    go install github.com/vektra/mockery/v2@v2.43.2; \
+    go install github.com/vektra/mockery/v2@v2.53.3; \
     go install github.com/golang/mock/mockgen@v1.6.0;
 
 .PHONY: install-tools
@@ -217,6 +217,7 @@ generate-mocks: install-mock-generators
 	mockery --name 'Storage' --dir=module/executiondatasync/tracker --case=underscore --output="module/executiondatasync/tracker/mock" --outpkg="mocktracker"
 	mockery --name 'ScriptExecutor' --dir=module/execution --case=underscore --output="module/execution/mock" --outpkg="mock"
 	mockery --name 'StorageSnapshot' --dir=fvm/storage/snapshot --case=underscore --output="fvm/storage/snapshot/mock" --outpkg="mock"
+	mockery --name 'Core' --dir=module/executiondatasync/optimistic_syncing --case=underscore --output="module/executiondatasync/optimistic_syncing/mock" --outpkg="mock"
 
 	#temporarily make insecure/ a non-module to allow mockery to create mocks
 	mv insecure/go.mod insecure/go2.mod
@@ -235,15 +236,19 @@ tidy:
 	cd insecure; go mod tidy -v
 	git diff --exit-code
 
+# Builds a custom version of the golangci-lint binary which includes custom plugins
+tools/custom-gcl: tools/structwrite .custom-gcl.yml
+	golangci-lint custom
+
 .PHONY: lint
-lint: tidy
+lint: tidy tools/custom-gcl
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	golangci-lint run -v ./...
+	./tools/custom-gcl run -v ./...
 
 .PHONY: fix-lint
 fix-lint:
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	golangci-lint run -v --fix ./...
+	./tools/custom-gcl run -v --fix ./...
 
 # Runs unit tests with different list of packages as passed by CI so they run in parallel
 .PHONY: ci

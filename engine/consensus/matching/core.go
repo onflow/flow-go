@@ -199,7 +199,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		Uint64("block_view", executedBlock.View).
 		Uint64("block_height", executedBlock.Height).
 		Logger()
-	log.Info().Msg("execution receipt received")
+	log.Debug().Msg("execution receipt received")
 
 	// if Execution Receipt is for block whose height is lower or equal to already sealed height
 	//  => drop Receipt
@@ -245,7 +245,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		return false, fmt.Errorf("failed to store receipt: %w", err)
 	}
 	if added {
-		log.Info().Msg("execution result processed and stored")
+		log.Debug().Msg("execution result processed and stored")
 	}
 
 	return added, nil
@@ -382,13 +382,19 @@ func (c *Core) OnBlockFinalization() error {
 			lastSealed.ID(), lastSealed.Height, err)
 	}
 
-	c.log.Info().
+	log := c.log.With().
 		Uint64("first_height_missing_result", firstMissingHeight).
 		Uint("seals_size", c.seals.Size()).
 		Uint("receipts_size", c.receipts.Size()).
 		Int("pending_receipt_requests", pendingReceiptRequests).
 		Int64("duration_ms", time.Since(startTime).Milliseconds()).
-		Msg("finalized block processed successfully")
+		Logger()
+	// this runs frequently, so we only log at info-level if there are pending requests
+	if pendingReceiptRequests > 0 {
+		log.Info().Msg("finalized block processed successfully")
+	} else {
+		log.Debug().Msg("finalized block processed successfully")
+	}
 
 	return nil
 }

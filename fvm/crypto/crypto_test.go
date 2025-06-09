@@ -700,7 +700,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 						require.False(t, sigOk)
 					},
 				}, {
-					description:       "valid client data, empty origin",
+					description:       "empty origin (valid)",
 					authenticatorData: validAuthenticatorData,
 					clientDataJSON: map[string]string{
 						"type":      crypto.WebAuthnTypeGet,

@@ -921,7 +921,7 @@ func (n *Network) handleIncomingStream(s libp2pnet.Stream) {
 	// qualify the logger with local and remote address
 	log := p2putils.StreamLogger(n.logger, s)
 
-	log.Info().Msg("incoming stream received")
+	log.Debug().Msg("incoming stream received")
 
 	success := false
 

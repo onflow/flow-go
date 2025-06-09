@@ -9,7 +9,9 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -66,7 +68,7 @@ func validateFlags(flags byte, extensions []byte) error {
 	// i.e. no extension data but flags are set.
 	if (len(extensions) > 0) != (attestationCredentialData || extensionData) {
 		return errors.New("invalid flags: Attestation Credential Data (AT) or Extension Data (ED) flag are not matching the corresponding extension data")
-	} 
+	}
 
 	// If all checks pass, return nil
 	return nil
@@ -102,8 +104,7 @@ func validateWebAuthNExtensionData(extensionData []byte, message []byte) (bool, 
 	// make sure the challenge is the hash of the transaction payload
 	hasher, err := NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)
 	if err != nil {
-		// could not create hasher for challenge validation
-		// panic here because this is a bug and should not happen in normal operations
+		// could not create hasher for challenge validation, panic here, but should never occur
 		panic(err)
 	}
 

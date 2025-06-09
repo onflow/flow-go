@@ -10,7 +10,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/onflow/flow-go/fvm/accountV2Migration"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm"
@@ -201,11 +200,6 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 		}
 	}
 
-	accountV2Migration.DeclareFunctions(
-		executor.cadenceRuntime.TxRuntimeEnv,
-		chainID,
-	)
-
 	// get meter parameters
 	executionParameters, executionStateRead, err := getExecutionParameters(
 		executor.env.Logger(),
@@ -275,11 +269,6 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 		}
 	}
 
-	accountV2Migration.DeclareFunctions(
-		executor.cadenceRuntime.TxRuntimeEnv,
-		chainID,
-	)
-
 	var invalidator derived.TransactionInvalidator
 	if !executor.errs.CollectedError() {
 
@@ -348,19 +337,19 @@ func (executor *transactionExecutor) logExecutionIntensities() {
 	}
 
 	computation := zerolog.Dict()
-	for s, u := range executor.txnState.ComputationIntensities() {
-		computation.Uint(strconv.FormatUint(uint64(s), 10), u)
+	for kind, intensity := range executor.txnState.ComputationIntensities() {
+		computation.Uint64(strconv.FormatUint(uint64(kind), 10), intensity)
 	}
 	memory := zerolog.Dict()
-	for s, u := range executor.txnState.MemoryIntensities() {
-		memory.Uint(strconv.FormatUint(uint64(s), 10), u)
+	for kind, amount := range executor.txnState.MemoryAmounts() {
+		memory.Uint64(strconv.FormatUint(uint64(kind), 10), amount)
 	}
 	log.Debug().
 		Uint64("ledgerInteractionUsed", executor.txnState.InteractionUsed()).
 		Uint64("computationUsed", executor.txnState.TotalComputationUsed()).
 		Uint64("memoryEstimate", executor.txnState.TotalMemoryEstimate()).
 		Dict("computationIntensities", computation).
-		Dict("memoryIntensities", memory).
+		Dict("memoryAmounts", memory).
 		Msg("transaction execution data")
 }
 
