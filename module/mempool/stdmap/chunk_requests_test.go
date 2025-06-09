@@ -203,30 +203,29 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 
 	// adding another request for the same tuple of (chunkID, resultID, chunkIndex)
 	// is deduplicated.
-	request := verification.NewChunkDataPackRequest(
-		chunks.Locator{
+	require.False(t, requests.Add(&verification.ChunkDataPackRequest{
+		Locator: chunks.Locator{
 			ResultID: thisReq.ResultID,
 			Index:    thisReq.Index,
 		},
-		verification.ChunkDataPackRequestInfo{
+		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID: thisReq.ChunkID,
 		},
-	)
-	require.False(t, requests.Add(&request))
+	}))
 
 	// adding another request for the same chunk ID but different result ID is stored.
-	otherReq := verification.NewChunkDataPackRequest(
-		chunks.Locator{
+	otherReq := &verification.ChunkDataPackRequest{
+		Locator: chunks.Locator{
 			ResultID: unittest.IdentifierFixture(),
 			Index:    thisReq.Index,
 		},
-		verification.ChunkDataPackRequestInfo{
+		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID:   thisReq.ChunkID,
 			Agrees:    unittest.IdentifierListFixture(2),
 			Disagrees: unittest.IdentifierListFixture(2),
 		},
-	)
-	require.True(t, requests.Add(&otherReq))
+	}
+	require.True(t, requests.Add(otherReq))
 
 	// mempool size is based on unique chunk ids, and we only store one
 	// chunk id.

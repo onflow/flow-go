@@ -960,21 +960,19 @@ func chunkRequestFixture(
 	agrees flow.IdentityList,
 	disagrees flow.IdentityList,
 ) *verification.ChunkDataPackRequest {
-
-	request := verification.NewChunkDataPackRequest(
-		chunks.Locator{
+	return &verification.ChunkDataPackRequest{
+		Locator: chunks.Locator{
 			ResultID: resultID,
 			Index:    status.ChunkIndex,
 		},
-		verification.ChunkDataPackRequestInfo{
+		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID:   status.Chunk().ID(),
 			Height:    status.BlockHeight,
 			Agrees:    agrees.NodeIDs(),
 			Disagrees: disagrees.NodeIDs(),
 			Targets:   agrees.Union(disagrees),
 		},
-	)
-	return &request
+	}
 }
 
 // completeChunkStatusListFixture creates a reference block with an execution result associated with it.

@@ -17,16 +17,26 @@ type ChunkDataPackRequest struct {
 	ChunkDataPackRequestInfo
 }
 
+// UntrustedChunkDataPackRequest is an untrusted input-only representation of a ChunkDataPackRequest,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedChunkDataPackRequest should be validated and converted into
+// a trusted ChunkDataPackRequest using NewChunkDataPackRequest constructor.
+type UntrustedChunkDataPackRequest ChunkDataPackRequest
+
 // NewChunkDataPackRequest creates a new instance of ChunkDataPackRequest.
 // Construction ChunkDataPackRequest allowed only within the constructor.
-func NewChunkDataPackRequest(
-	locator chunks.Locator,
-	chunkDataPackRequestInfo ChunkDataPackRequestInfo,
-) ChunkDataPackRequest {
-	return ChunkDataPackRequest{
-		Locator:                  locator,
-		ChunkDataPackRequestInfo: chunkDataPackRequestInfo,
-	}
+//
+// All errors indicate a valid ChunkDataPackRequest cannot be constructed from the input.
+func NewChunkDataPackRequest(untrusted UntrustedChunkDataPackRequest) (*ChunkDataPackRequest, error) {
+	return &ChunkDataPackRequest{
+		Locator:                  untrusted.Locator,
+		ChunkDataPackRequestInfo: untrusted.ChunkDataPackRequestInfo,
+	}, nil
 }
 
 type ChunkDataPackRequestInfo struct {
