@@ -91,6 +91,9 @@ func (b *ReaderBatchWriter) Close() error {
 }
 
 func WithReaderBatchWriter(db *pebble.DB, fn func(storage.ReaderBatchWriter) error) error {
+	if db == nil {
+		panic("WithReaderBatchWriter called on nil pebble.DB")
+	}
 	batch := NewReaderBatchWriter(db)
 	defer batch.Close() // Release batch resource
 
@@ -109,6 +112,9 @@ func WithReaderBatchWriter(db *pebble.DB, fn func(storage.ReaderBatchWriter) err
 }
 
 func NewReaderBatchWriter(db *pebble.DB) *ReaderBatchWriter {
+	if db == nil {
+		panic("WithReaderBatchWriter called on nil pebble.DB")
+	}
 	return &ReaderBatchWriter{
 		globalReader: ToReader(db),
 		batch:        db.NewBatch(),

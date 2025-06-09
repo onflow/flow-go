@@ -7,6 +7,9 @@ import (
 )
 
 func ToDB(db *pebble.DB) storage.DB {
+	if db == nil {
+		panic("dbstore: ToDB called on nil pebble.DB")
+	}
 	return &dbStore{db: db}
 }
 

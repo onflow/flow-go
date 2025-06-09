@@ -65,5 +65,8 @@ func (b dbReader) NewSeeker() storage.Seeker {
 
 // ToReader is a helper function to convert a *pebble.DB to a Reader
 func ToReader(db *pebble.DB) storage.Reader {
+	if db == nil {
+		panic("ToReader called on nil pebble.DB")
+	}
 	return dbReader{db}
 }
