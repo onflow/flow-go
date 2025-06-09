@@ -82,6 +82,7 @@ func (f *BuilderFactory) Create(
 
 	final := finalizer.NewFinalizer(
 		f.db,
+		f.lockManager,
 		pool,
 		f.pusher,
 		f.metrics,

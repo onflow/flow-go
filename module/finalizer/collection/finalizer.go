@@ -3,6 +3,7 @@ package collection
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -19,6 +20,7 @@ import (
 // the cluster state.
 type Finalizer struct {
 	db           storage.DB
+	lockManager  lockctx.Manager
 	transactions mempool.Transactions
 	pusher       collection.GuaranteedCollectionPublisher
 	metrics      module.CollectionMetrics
@@ -27,12 +29,14 @@ type Finalizer struct {
 // NewFinalizer creates a new finalizer for collection nodes.
 func NewFinalizer(
 	db storage.DB,
+	lockManager lockctx.Manager,
 	transactions mempool.Transactions,
 	pusher collection.GuaranteedCollectionPublisher,
 	metrics module.CollectionMetrics,
 ) *Finalizer {
 	f := &Finalizer{
 		db:           db,
+		lockManager:  lockManager,
 		transactions: transactions,
 		pusher:       pusher,
 		metrics:      metrics,
@@ -52,6 +56,7 @@ func NewFinalizer(
 // pools and persistent storage.
 // No errors are expected during normal operation.
 func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
+
 	// TODO(leo): lockctx
 	reader := f.db.Reader()
 	// retrieve the header of the block we want to finalize
