@@ -46,7 +46,7 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		}))
 
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexClusterBlockHeight(rw.Writer(), block.Header.ChainID, parent.Header.Height, parent.ID())
+			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), block.Header.ChainID, parent.Header.Height, parent.ID())
 		}))
 
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -58,7 +58,8 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		}))
 
 		var boundary uint64
-		err := operation.RetrieveClusterFinalizedHeight(db.Reader(), block.Header.ChainID, &boundary)
+		var err error
+		err = operation.RetrieveClusterFinalizedHeight(db.Reader(), block.Header.ChainID, &boundary)
 		require.NoError(t, err)
 		require.Equal(t, block.Header.Height, boundary)
 

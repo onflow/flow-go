@@ -1,6 +1,9 @@
 package operation
 
 import (
+	"fmt"
+
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -12,7 +15,11 @@ import (
 
 // IndexClusterBlockHeight UpsertByKeys a block number to block ID mapping for
 // the given cluster.
-func IndexClusterBlockHeight(w storage.Writer, clusterID flow.ChainID, number uint64, blockID flow.Identifier) error {
+func IndexClusterBlockHeight(lctx lockctx.Proof, w storage.Writer, clusterID flow.ChainID, number uint64, blockID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockFinalizeClusterBlock) {
+		return fmt.Errorf("missing lock: %v", storage.LockFinalizeClusterBlock)
+	}
+
 	return UpsertByKey(w, MakePrefix(codeFinalizedCluster, clusterID, number), blockID)
 }
 

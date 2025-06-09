@@ -131,10 +131,10 @@ func FinalizeClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 		return fmt.Errorf("can't finalize non-child of chain head")
 	}
 
-	// insert block view -> ID mapping
-	err = operation.IndexClusterBlockHeight(writer, chainID, header.Height, header.ID())
+	// index the block by its height
+	err = operation.IndexClusterBlockHeight(lctx, writer, chainID, header.Height, header.ID())
 	if err != nil {
-		return fmt.Errorf("could not insert view->ID mapping: %w", err)
+		return fmt.Errorf("could not index cluster block height: %w", err)
 	}
 
 	// update the finalized boundary
