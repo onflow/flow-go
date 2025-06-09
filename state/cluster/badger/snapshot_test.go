@@ -106,7 +106,16 @@ func (suite *SnapshotSuite) Payload(transactions ...*flow.TransactionBody) model
 			minRefID = refBlock.ID()
 		}
 	}
-	return model.PayloadFromTransactions(minRefID, transactions...)
+
+	// avoid a nil transaction list
+	if len(transactions) == 0 {
+		transactions = []*flow.TransactionBody{}
+	}
+
+	payload, err := model.NewPayload(minRefID, transactions)
+	suite.Assert().NoError(err)
+
+	return *payload
 }
 
 // ProposalWithParentAndPayload returns a valid block proposal with the given parent and payload.

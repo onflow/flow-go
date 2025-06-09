@@ -72,7 +72,7 @@ func NewPayload(refID flow.Identifier, transactions []*flow.TransactionBody) (*P
 	return &Payload{
 		Collection:       *collection,
 		ReferenceBlockID: refID,
-	}, err
+	}, nil
 }
 
 // Hash returns the hash of the payload.
