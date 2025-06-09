@@ -17,6 +17,7 @@ import (
 
 func TestClusterHeights(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		var (
 			clusterID flow.ChainID = "cluster"
 			height    uint64       = 42
@@ -32,9 +33,12 @@ func TestClusterHeights(t *testing.T) {
 		})
 
 		t.Run("insert/retrieve", func(t *testing.T) {
+			lctx := lockManager.NewContext()
+			require.NoError(t, lctx.AcquireLock(storage.LockFinalizeClusterBlock))
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexClusterBlockHeight(rw.Writer(), clusterID, height, expected)
+				return operation.IndexClusterBlockHeight(lctx, rw.Writer(), clusterID, height, expected)
 			})
+			lctx.Release()
 			assert.NoError(t, err)
 
 			var actual flow.Identifier
@@ -54,7 +58,12 @@ func TestClusterHeights(t *testing.T) {
 				assert.ErrorIs(t, err, storage.ErrNotFound)
 
 				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.IndexClusterBlockHeight(rw.Writer(), clusterID, height, expected)
+					lctx := lockManager.NewContext()
+					defer lctx.Release()
+					if err := lctx.AcquireLock(storage.LockFinalizeClusterBlock); err != nil {
+						return err
+					}
+					return operation.IndexClusterBlockHeight(lctx, rw.Writer(), clusterID, height, expected)
 				})
 				assert.NoError(t, err)
 
