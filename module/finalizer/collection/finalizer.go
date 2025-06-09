@@ -57,8 +57,13 @@ func NewFinalizer(
 // pools and persistent storage.
 // No errors are expected during normal operation.
 func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
+	// Acquire a lock for finalizing cluster blocks
+	lctx := f.lockManager.NewContext()
+	defer lctx.Release()
+	if err := lctx.AcquireLock(storage.LockFinalizeClusterBlock); err != nil {
+		return fmt.Errorf("could not acquire lock: %w", err)
+	}
 
-	// TODO(leo): lockctx
 	reader := f.db.Reader()
 	// retrieve the header of the block we want to finalize
 	var header flow.Header
