@@ -82,7 +82,7 @@ func TestFinalizer(t *testing.T) {
 			defer cleanup()
 
 			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
-			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
+			finalizer := collection.NewFinalizer(db, lockManager, pool, pusher, metrics)
 
 			fakeBlockID := unittest.IdentifierFixture()
 			err := finalizer.MakeFinal(fakeBlockID)
@@ -95,7 +95,7 @@ func TestFinalizer(t *testing.T) {
 
 			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
 			pusher.On("SubmitCollectionGuarantee", mock.Anything).Once()
-			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
+			finalizer := collection.NewFinalizer(db, lockManager, pool, pusher, metrics)
 
 			// tx1 is included in the finalized block
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -120,7 +120,7 @@ func TestFinalizer(t *testing.T) {
 			defer cleanup()
 
 			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
-			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
+			finalizer := collection.NewFinalizer(db, lockManager, pool, pusher, metrics)
 
 			// create a new block that isn't connected to a parent
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -138,7 +138,7 @@ func TestFinalizer(t *testing.T) {
 			defer cleanup()
 
 			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
-			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
+			finalizer := collection.NewFinalizer(db, lockManager, pool, pusher, metrics)
 
 			// create a block with empty payload on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -163,7 +163,7 @@ func TestFinalizer(t *testing.T) {
 			defer cleanup()
 
 			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
-			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
+			finalizer := collection.NewFinalizer(db, lockManager, pool, pusher, metrics)
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -208,7 +208,7 @@ func TestFinalizer(t *testing.T) {
 			defer cleanup()
 
 			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
-			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
+			finalizer := collection.NewFinalizer(db, lockManager, pool, pusher, metrics)
 
 			// tx1 is included in the first finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -263,7 +263,7 @@ func TestFinalizer(t *testing.T) {
 			defer cleanup()
 
 			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
-			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
+			finalizer := collection.NewFinalizer(db, lockManager, pool, pusher, metrics)
 
 			// tx1 is included in the finalized parent block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -313,7 +313,7 @@ func TestFinalizer(t *testing.T) {
 			defer cleanup()
 
 			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
-			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
+			finalizer := collection.NewFinalizer(db, lockManager, pool, pusher, metrics)
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
