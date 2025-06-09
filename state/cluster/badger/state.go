@@ -43,6 +43,11 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 
 	genesis := stateRoot.Block()
 	rootQC := stateRoot.QC()
+	err = lctx.AcquireLock(storage.LockFinalizeClusterBlock)
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire lock for finalizing cluster block: %w", err)
+	}
+
 	// bootstrap cluster state
 	err = state.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		chainID := genesis.Header.ChainID
