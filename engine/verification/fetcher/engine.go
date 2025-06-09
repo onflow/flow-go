@@ -496,6 +496,7 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkIndex uint64, resultID flow.Iden
 			Index:    chunkIndex,
 		},
 	)
+	// TODO: update this engine to use SignallerContext and throw an exception here
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("could not construct locator")
 	}
