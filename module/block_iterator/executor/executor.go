@@ -57,12 +57,6 @@ func IterateExecuteAndCommitInBatch(
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for {
-				select {
-				case <-ctx.Done():
-					return nil
-				default:
-				}
-
 				// if the batch is full, commit it and enter the outer loop to
 				// start a new batch
 				if iteratedCountInCurrentBatch >= batchSize {
@@ -113,15 +107,11 @@ func IterateExecuteAndCommitInBatch(
 		metrics.ExecutionLastChunkDataPackPrunedHeight(nextIndex - 1)
 
 		// sleep after each batch commit to minimize the impact on the system
-		if sleepAfterEachBatchCommit > 0 {
-			for {
-				select {
-				case <-ctx.Done():
-					return nil
-				case <-time.After(sleepAfterEachBatchCommit):
-					return nil
-				}
-			}
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(sleepAfterEachBatchCommit):
+			// continue to next iteration
 		}
 	}
 
