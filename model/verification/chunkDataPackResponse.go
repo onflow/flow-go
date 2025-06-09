@@ -1,6 +1,8 @@
 package verification
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -31,6 +33,12 @@ type UntrustedChunkDataPackResponse ChunkDataPackResponse
 //
 // All errors indicate a valid ChunkDataPackResponse cannot be constructed from the input.
 func NewChunkDataPackResponse(untrusted UntrustedChunkDataPackResponse) (*ChunkDataPackResponse, error) {
+	if untrusted.Locator.EqualTo(new(chunks.Locator)) {
+		return nil, fmt.Errorf("locator is empty")
+	}
+	if untrusted.Cdp == nil {
+		return nil, fmt.Errorf("chunk data pack must not be nil")
+	}
 	return &ChunkDataPackResponse{
 		Locator: untrusted.Locator,
 		Cdp:     untrusted.Cdp,
