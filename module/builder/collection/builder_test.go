@@ -198,7 +198,12 @@ func (suite *BuilderSuite) FinalizeBlock(block model.Block) {
 		if err != nil {
 			return err
 		}
-		err = procedure.FinalizeClusterBlock(rw, block.ID())
+		lctx := suite.lockManager.NewContext()
+		defer lctx.Release()
+		if err := lctx.AcquireLock(storage.LockFinalizeClusterBlock); err != nil {
+			return err
+		}
+		err = procedure.FinalizeClusterBlock(lctx, rw, block.ID())
 		if err != nil {
 			return err
 		}
@@ -1120,7 +1125,12 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		// finalize the block 80% of the time, resulting in a fork-rate of 20%
 		if rand.Intn(100) < 80 {
 			err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return procedure.FinalizeClusterBlock(rw, block.ID())
+				lctx := suite.lockManager.NewContext()
+				defer lctx.Release()
+				if err := lctx.AcquireLock(storage.LockFinalizeClusterBlock); err != nil {
+					return err
+				}
+				return procedure.FinalizeClusterBlock(lctx, rw, block.ID())
 			})
 			require.NoError(b, err)
 			final = &block

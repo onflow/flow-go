@@ -227,7 +227,12 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 
 	// finalize the block
 	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return procedure.FinalizeClusterBlock(rw, finalizedBlock1.ID())
+		lctx := suite.lockManager.NewContext()
+		defer lctx.Release()
+		if err := lctx.AcquireLock(storage.LockFinalizeClusterBlock); err != nil {
+			return err
+		}
+		return procedure.FinalizeClusterBlock(lctx, rw, finalizedBlock1.ID())
 	})
 	assert.NoError(t, err)
 

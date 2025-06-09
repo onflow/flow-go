@@ -43,7 +43,12 @@ func TestReadClusterRange(t *testing.T) {
 			require.NoError(t, err)
 
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return procedure.FinalizeClusterBlock(rw, block.Header.ID())
+				lctx := lockManager.NewContext()
+				defer lctx.Release()
+				if err := lctx.AcquireLock(storage.LockFinalizeClusterBlock); err != nil {
+					return err
+				}
+				return procedure.FinalizeClusterBlock(lctx, rw, block.Header.ID())
 			})
 			require.NoError(t, err)
 		}

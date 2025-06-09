@@ -95,8 +95,11 @@ func RetrieveLatestFinalizedClusterHeader(r storage.Reader, chainID flow.ChainID
 }
 
 // FinalizeClusterBlock finalizes a block in cluster consensus.
-func FinalizeClusterBlock(rw storage.ReaderBatchWriter, blockID flow.Identifier) error {
-	// TODO (leo): lockctx
+func FinalizeClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockFinalizeClusterBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockFinalizeClusterBlock)
+	}
+
 	r := rw.GlobalReader()
 	writer := rw.Writer()
 	// retrieve the header to check the parent

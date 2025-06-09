@@ -131,7 +131,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			}
 
 			// finalize the block in cluster state
-			err = procedure.FinalizeClusterBlock(rw, clusterBlockID)
+			err = procedure.FinalizeClusterBlock(lctx, rw, clusterBlockID)
 			if err != nil {
 				return fmt.Errorf("could not finalize cluster block (id=%x): %w", clusterBlockID, err)
 			}

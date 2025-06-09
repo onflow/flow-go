@@ -54,7 +54,7 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		}))
 
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return FinalizeClusterBlock(rw, block.Header.ID())
+			return FinalizeClusterBlock(lctx, rw, block.Header.ID())
 		}))
 
 		var boundary uint64

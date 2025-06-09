@@ -187,7 +187,12 @@ func (suite *MutatorSuite) FinalizeBlock(block model.Block) {
 	suite.Require().Nil(err)
 
 	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		err = procedure.FinalizeClusterBlock(rw, block.ID())
+		lctx := suite.lockManager.NewContext()
+		defer lctx.Release()
+		if err := lctx.AcquireLock(storage.LockFinalizeClusterBlock); err != nil {
+			return err
+		}
+		err = procedure.FinalizeClusterBlock(lctx, rw, block.ID())
 		if err != nil {
 			return err
 		}
