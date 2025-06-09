@@ -24,6 +24,8 @@ import (
 )
 
 func TestFinalizer(t *testing.T) {
+	// This test has to build on top of badgerdb, because the cleanup method depends
+	// on the badgerdb.DropAll method to wipe the database, which pebble does not support.
 	unittest.RunWithBadgerDB(t, func(badgerdb *badger.DB) {
 		db := badgerimpl.ToDB(badgerdb)
 		// reference block on the main consensus chain
