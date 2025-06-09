@@ -43,39 +43,53 @@ func IterateExecuteAndCommitInBatch(
 	// in order to minimize the impact on the system
 	sleepAfterEachBatchCommit time.Duration,
 ) error {
-	batch := db.NewBatch()
-	defer func() {
-		// Close last batch.
-		// NOTE: batch variable is reused, so it refers to the last batch when defer is executed.
-		batch.Close()
-	}()
-
+	var batch storage.Batch
 	iteratedCountInCurrentBatch := uint(0)
-
 	startTime := time.Now()
 	total := 0
+
 	defer func() {
+		// Iteration ends in one of two cases:
+		// 1. The context is Done
+		// 2. An error occurs during iteration.
+		// In both scenarios, the batch remains open and must be closed here
+		// to prevent memory leaks.
+		if batch != nil {
+			batch.Close()
+		}
 		log.Info().Str("duration", time.Since(startTime).String()).
 			Int("total_block_executed", total).
 			Msg("block iteration and execution completed")
 	}()
 
+	// Helper function to commit and create new batch
+	commitAndCreateNewBatch := func() error {
+		if batch == nil {
+			return nil
+		}
+		err := commitAndCheckpoint(log, metrics, batch, iter)
+		if err != nil {
+			return err
+		}
+		batch.Close()
+		batch = db.NewBatch()
+		iteratedCountInCurrentBatch = 0
+		return nil
+	}
+
+	// Create initial batch
+	batch = db.NewBatch()
+
 	for {
 		select {
-		// when the context is done, commit the last batch and return
 		case <-ctx.Done():
 			if iteratedCountInCurrentBatch > 0 {
-				// commit the last batch
-				err := commitAndCheckpoint(log, metrics, batch, iter)
-				if err != nil {
-					return err
-				}
+				return commitAndCreateNewBatch()
 			}
 			return nil
 		default:
 		}
 
-		// iterate over each block until the end
 		blockID, hasNext, err := iter.Next()
 		if err != nil {
 			return err
@@ -83,17 +97,11 @@ func IterateExecuteAndCommitInBatch(
 
 		if !hasNext {
 			if iteratedCountInCurrentBatch > 0 {
-				// commit last batch
-				err := commitAndCheckpoint(log, metrics, batch, iter)
-				if err != nil {
-					return err
-				}
+				return commitAndCreateNewBatch()
 			}
-
 			break
 		}
 
-		// execute all the data indexed by the block
 		err = executor.ExecuteByBlockID(blockID, batch)
 		if err != nil {
 			return fmt.Errorf("failed to execute by block ID %v: %w", blockID, err)
@@ -101,27 +109,17 @@ func IterateExecuteAndCommitInBatch(
 		iteratedCountInCurrentBatch++
 		total++
 
-		// if batch is full, commit and sleep
 		if iteratedCountInCurrentBatch >= batchSize {
-			// commit the batch and save the progress
-			err := commitAndCheckpoint(log, metrics, batch, iter)
+			err := commitAndCreateNewBatch()
 			if err != nil {
 				return err
 			}
 
-			// wait a bit to minimize the impact on the system
 			select {
 			case <-ctx.Done():
 				return nil
 			case <-time.After(sleepAfterEachBatchCommit):
 			}
-
-			// Close previous batch before creating a new batch.
-			batch.Close()
-
-			// create a new batch, and reset iteratedCountInCurrentBatch
-			batch = db.NewBatch()
-			iteratedCountInCurrentBatch = 0
 		}
 	}
 
