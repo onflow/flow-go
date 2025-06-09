@@ -15,14 +15,24 @@ type ChunkDataPackResponse struct {
 	Cdp *flow.ChunkDataPack
 }
 
+// UntrustedChunkDataPackResponse is an untrusted input-only representation of a ChunkDataPackResponse,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedChunkDataPackResponse should be validated and converted into
+// a trusted ChunkDataPackResponse using NewChunkDataPackResponse constructor.
+type UntrustedChunkDataPackResponse ChunkDataPackResponse
+
 // NewChunkDataPackResponse creates a new instance of ChunkDataPackResponse.
 // Construction ChunkDataPackResponse allowed only within the constructor.
-func NewChunkDataPackResponse(
-	locator chunks.Locator,
-	cdp *flow.ChunkDataPack,
-) ChunkDataPackResponse {
-	return ChunkDataPackResponse{
-		Locator: locator,
-		Cdp:     cdp,
-	}
+//
+// All errors indicate a valid ChunkDataPackResponse cannot be constructed from the input.
+func NewChunkDataPackResponse(untrusted UntrustedChunkDataPackResponse) (*ChunkDataPackResponse, error) {
+	return &ChunkDataPackResponse{
+		Locator: untrusted.Locator,
+		Cdp:     untrusted.Cdp,
+	}, nil
 }
