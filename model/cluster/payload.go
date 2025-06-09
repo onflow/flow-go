@@ -43,25 +43,6 @@ func NewEmptyPayload(refID flow.Identifier) Payload {
 	}
 }
 
-// PayloadFromTransactions creates a payload given a reference block ID and a
-// list of transaction hashes.
-func PayloadFromTransactions(refID flow.Identifier, transactions ...*flow.TransactionBody) Payload {
-	// avoid a nil transaction list
-	if len(transactions) == 0 {
-		transactions = []*flow.TransactionBody{}
-	}
-
-	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: transactions})
-	if err != nil {
-		panic(fmt.Sprintf("invalid collection: %v", err))
-	}
-
-	return Payload{
-		Collection:       *collection,
-		ReferenceBlockID: refID,
-	}
-}
-
 // NewPayload creates a payload given a reference block ID and a
 // list of transaction hashes.
 func NewPayload(refID flow.Identifier, transactions []*flow.TransactionBody) (*Payload, error) {

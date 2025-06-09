@@ -566,8 +566,11 @@ func ClusterPayloadFixture(n int) *cluster.Payload {
 		tx := TransactionBodyFixture()
 		transactions[i] = &tx
 	}
-	payload := cluster.PayloadFromTransactions(flow.ZeroID, transactions...)
-	return &payload
+	payload, err := cluster.NewPayload(flow.ZeroID, transactions)
+	if err != nil {
+		panic(err)
+	}
+	return payload
 }
 
 func ClusterBlockFixture() cluster.Block {
