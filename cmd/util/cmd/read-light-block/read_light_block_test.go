@@ -20,11 +20,16 @@ func TestReadClusterRange(t *testing.T) {
 		chain := unittest.ClusterBlockChainFixture(5)
 		parent, blocks := chain[0], chain[1:]
 
+		lockManager := storage.NewTestingLockManager()
+
+		lctx := lockManager.NewContext()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertClusterBlock))
 		// add parent as boundary
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexClusterBlockHeight(rw.Writer(), parent.Header.ChainID, parent.Header.Height, parent.ID())
+			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.Header.ChainID, parent.Header.Height, parent.ID())
 		})
 		require.NoError(t, err)
+		lctx.Release()
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.UpsertClusterFinalizedHeight(rw.Writer(), parent.Header.ChainID, parent.Header.Height)
@@ -32,7 +37,6 @@ func TestReadClusterRange(t *testing.T) {
 		require.NoError(t, err)
 
 		// add blocks
-		lockManager := storage.NewTestingLockManager()
 		for _, block := range blocks {
 			lctx := lockManager.NewContext()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertClusterBlock))
