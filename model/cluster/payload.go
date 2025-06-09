@@ -1,6 +1,8 @@
 package cluster
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -35,7 +37,11 @@ type Payload struct {
 // EmptyPayload returns a payload with an empty collection and the given
 // reference block ID.
 func EmptyPayload(refID flow.Identifier) Payload {
-	return PayloadFromTransactions(refID)
+	//nolint:structwrite
+	return Payload{
+		Collection:       flow.Collection{Transactions: []*flow.TransactionBody{}},
+		ReferenceBlockID: refID,
+	}
 }
 
 // PayloadFromTransactions creates a payload given a reference block ID and a
@@ -45,10 +51,14 @@ func PayloadFromTransactions(refID flow.Identifier, transactions ...*flow.Transa
 	if len(transactions) == 0 {
 		transactions = []*flow.TransactionBody{}
 	}
+
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: transactions})
+	if err != nil {
+		panic(fmt.Sprintf("invalid collection: %v", err))
+	}
+
 	return Payload{
-		Collection: flow.Collection{
-			Transactions: transactions,
-		},
+		Collection:       *collection,
 		ReferenceBlockID: refID,
 	}
 }

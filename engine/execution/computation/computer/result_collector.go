@@ -170,9 +170,12 @@ func (collector *resultCollector) commitCollection(
 	txResults := execColRes.TransactionResults()
 	convertedTxResults := execution_data.ConvertTransactionResults(txResults)
 
-	col := collection.Collection()
+	col, err := collection.Collection()
+	if err != nil {
+		return fmt.Errorf("could not construct collection while committing collection: %w", err)
+	}
 	chunkExecData := &execution_data.ChunkExecutionData{
-		Collection:         &col,
+		Collection:         col,
 		Events:             events,
 		TrieUpdate:         trieUpdate,
 		TransactionResults: convertedTxResults,

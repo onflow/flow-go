@@ -339,8 +339,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	// ChunkExecutionData. Create the collection here using the transaction body from the
 	// transactions list
 	if systemChunk {
-		cedCollection = &flow.Collection{
+
+		cedCollection, err = flow.NewCollection(flow.UntrustedCollection{
 			Transactions: []*flow.TransactionBody{transactions[0].Transaction},
+		})
+
+		if err != nil {
+			return nil, fmt.Errorf("could not construct system collection: %w", err)
 		}
 	}
 
