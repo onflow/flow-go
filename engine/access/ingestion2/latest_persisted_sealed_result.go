@@ -8,14 +8,21 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// LatestPersistedSealedResult tracks the most recently persisted sealed execution result processed
+// by the ingestion engine.
 type LatestPersistedSealedResult struct {
+	// resultID is the execution result ID of the most recently persisted sealed result.
 	resultID flow.Identifier
-	height   uint64
 
+	// height is the height of the most recently persisted sealed result's block.
+	// This is the value stored in the consumer progress index.
+	height uint64
+
+	// cp is the consumer progress instance
 	cp storage.ConsumerProgress
 
 	// writeMu is used to prevent concurrent batch updates to the persisted height.
-	// the critical section is fairly large, so use a separate mutex from the cached values
+	// the critical section is fairly large, so use a separate mutex from the cached values.
 	writeMu sync.Mutex
 
 	// mu is used to protect access to resultID and height.
@@ -26,14 +33,37 @@ type LatestPersistedSealedResult struct {
 // It initializes the consumer progress index using the provided initializer and initial height.
 //
 // No errors are expected during normal operation,
-func NewLatestPersistedSealedResult(resultID flow.Identifier, height uint64, initializer storage.ConsumerProgressInitializer) (*LatestPersistedSealedResult, error) {
-	cp, err := initializer.Initialize(height)
+func NewLatestPersistedSealedResult(
+	initialHeight uint64,
+	initializer storage.ConsumerProgressInitializer,
+	headers storage.Headers,
+	results storage.ExecutionResults,
+) (*LatestPersistedSealedResult, error) {
+	// initialize the consumer progress, and set the initial height if this is the first run
+	cp, err := initializer.Initialize(initialHeight)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize progress initializer: %w", err)
 	}
 
+	// get the actual height stored
+	height, err := cp.ProcessedIndex()
+	if err != nil {
+		return nil, fmt.Errorf("could not get processed index: %w", err)
+	}
+
+	// finally, lookup the sealed resultID for the height
+	header, err := headers.ByHeight(height)
+	if err != nil {
+		return nil, fmt.Errorf("could not get header: %w", err)
+	}
+
+	result, err := results.ByBlockID(header.ID())
+	if err != nil {
+		return nil, fmt.Errorf("could not get result: %w", err)
+	}
+
 	return &LatestPersistedSealedResult{
-		resultID: resultID,
+		resultID: result.ID(),
 		height:   height,
 		cp:       cp,
 	}, nil
@@ -75,7 +105,7 @@ func (l *LatestPersistedSealedResult) BatchSet(resultID flow.Identifier, height 
 	})
 
 	if err := l.cp.BatchSetProcessedIndex(height, batch); err != nil {
-		return fmt.Errorf("could not set processed index: %w", err)
+		return fmt.Errorf("could not add processed index update to batch: %w", err)
 	}
 
 	return nil

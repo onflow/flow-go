@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -21,21 +22,30 @@ import (
 // - All fields are correctly initialized on success
 // - Errors from the initializer are properly propagated
 func TestNewLatestPersistedSealedResult(t *testing.T) {
-	resultID := unittest.IdentifierFixture()
 	height := uint64(100)
 
 	t.Run("successful initialization", func(t *testing.T) {
 		mockInitializer := storagemock.NewConsumerProgressInitializer(t)
 		mockCP := storagemock.NewConsumerProgress(t)
+		mockHeaders := storagemock.NewHeaders(t)
+		mockResults := storagemock.NewExecutionResults(t)
+
+		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
+		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
+			result.BlockID = header.ID()
+		})
 
 		mockInitializer.On("Initialize", height).Return(mockCP, nil)
+		mockCP.On("ProcessedIndex").Return(height, nil)
+		mockHeaders.On("ByHeight", height).Return(header, nil)
+		mockResults.On("ByBlockID", result.BlockID).Return(result, nil)
 
-		result, err := NewLatestPersistedSealedResult(resultID, height, mockInitializer)
+		latest, err := NewLatestPersistedSealedResult(height, mockInitializer, mockHeaders, mockResults)
 		require.NoError(t, err)
 
-		require.NotNil(t, result)
-		assert.Equal(t, resultID, result.ResultID())
-		assert.Equal(t, height, result.Height())
+		require.NotNil(t, latest)
+		assert.Equal(t, result.ID(), latest.ResultID())
+		assert.Equal(t, height, latest.Height())
 	})
 
 	t.Run("initialization error", func(t *testing.T) {
@@ -44,10 +54,63 @@ func TestNewLatestPersistedSealedResult(t *testing.T) {
 
 		mockInitializer.On("Initialize", height).Return(nil, expectedErr)
 
-		result, err := NewLatestPersistedSealedResult(resultID, height, mockInitializer)
+		latest, err := NewLatestPersistedSealedResult(height, mockInitializer, nil, nil)
 
 		require.Error(t, err)
-		require.Nil(t, result)
+		require.Nil(t, latest)
+		assert.ErrorIs(t, err, storage.ErrNotFound)
+	})
+
+	t.Run("processed index error", func(t *testing.T) {
+		mockInitializer := storagemock.NewConsumerProgressInitializer(t)
+		mockCP := storagemock.NewConsumerProgress(t)
+		expectedErr := fmt.Errorf("processed index error: %w", storage.ErrNotFound)
+
+		mockInitializer.On("Initialize", height).Return(mockCP, nil)
+		mockCP.On("ProcessedIndex").Return(uint64(0), expectedErr)
+
+		latest, err := NewLatestPersistedSealedResult(height, mockInitializer, nil, nil)
+
+		require.Error(t, err)
+		require.Nil(t, latest)
+		assert.ErrorIs(t, err, storage.ErrNotFound)
+	})
+
+	t.Run("header lookup error", func(t *testing.T) {
+		mockInitializer := storagemock.NewConsumerProgressInitializer(t)
+		mockCP := storagemock.NewConsumerProgress(t)
+		mockHeaders := storagemock.NewHeaders(t)
+		expectedErr := fmt.Errorf("header lookup error: %w", storage.ErrNotFound)
+
+		mockInitializer.On("Initialize", height).Return(mockCP, nil)
+		mockCP.On("ProcessedIndex").Return(height, nil)
+		mockHeaders.On("ByHeight", height).Return(nil, expectedErr)
+
+		latest, err := NewLatestPersistedSealedResult(height, mockInitializer, mockHeaders, nil)
+
+		require.Error(t, err)
+		require.Nil(t, latest)
+		assert.ErrorIs(t, err, storage.ErrNotFound)
+	})
+
+	t.Run("result lookup error", func(t *testing.T) {
+		mockInitializer := storagemock.NewConsumerProgressInitializer(t)
+		mockCP := storagemock.NewConsumerProgress(t)
+		mockHeaders := storagemock.NewHeaders(t)
+		mockResults := storagemock.NewExecutionResults(t)
+		expectedErr := fmt.Errorf("result lookup error: %w", storage.ErrNotFound)
+
+		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
+
+		mockInitializer.On("Initialize", height).Return(mockCP, nil)
+		mockCP.On("ProcessedIndex").Return(height, nil)
+		mockHeaders.On("ByHeight", height).Return(header, nil)
+		mockResults.On("ByBlockID", header.ID()).Return(nil, expectedErr)
+
+		latest, err := NewLatestPersistedSealedResult(height, mockInitializer, mockHeaders, mockResults)
+
+		require.Error(t, err)
+		require.Nil(t, latest)
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
@@ -59,18 +122,32 @@ func TestNewLatestPersistedSealedResult(t *testing.T) {
 // - State is not updated if BatchSetProcessedIndex fails
 // - State is only updated after the batch callback indicates success
 func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
-	initialResultID := unittest.IdentifierFixture()
 	initialHeight := uint64(100)
 
-	t.Run("successful batch update", func(t *testing.T) {
+	setupResult := func(t *testing.T) (*LatestPersistedSealedResult, *storagemock.ConsumerProgress) {
 		mockInitializer := storagemock.NewConsumerProgressInitializer(t)
 		mockCP := storagemock.NewConsumerProgress(t)
-		mockBatch := storagemock.NewReaderBatchWriter(t)
+		mockHeaders := storagemock.NewHeaders(t)
+		mockResults := storagemock.NewExecutionResults(t)
+
+		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(initialHeight))
+		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
+			result.BlockID = header.ID()
+		})
 
 		mockInitializer.On("Initialize", initialHeight).Return(mockCP, nil)
+		mockCP.On("ProcessedIndex").Return(initialHeight, nil)
+		mockHeaders.On("ByHeight", initialHeight).Return(header, nil)
+		mockResults.On("ByBlockID", result.BlockID).Return(result, nil)
 
-		result, err := NewLatestPersistedSealedResult(initialResultID, initialHeight, mockInitializer)
+		latest, err := NewLatestPersistedSealedResult(initialHeight, mockInitializer, mockHeaders, mockResults)
 		require.NoError(t, err)
+		return latest, mockCP
+	}
+
+	t.Run("successful batch update", func(t *testing.T) {
+		latest, mockCP := setupResult(t)
+		mockBatch := storagemock.NewReaderBatchWriter(t)
 
 		newResultID := unittest.IdentifierFixture()
 		newHeight := uint64(200)
@@ -79,73 +156,54 @@ func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 		callbackCalled.Add(1)
 
 		mockCP.On("BatchSetProcessedIndex", newHeight, mockBatch).Return(nil)
-		// Simulate successful batch commit by calling the callback with nil error
 		mockBatch.On("AddCallback", mock.AnythingOfType("func(error)")).Run(func(args mock.Arguments) {
 			callback := args.Get(0).(func(error))
 			callback(nil)
 			callbackCalled.Done()
 		})
 
-		err = result.BatchSet(newResultID, newHeight, mockBatch)
+		err := latest.BatchSet(newResultID, newHeight, mockBatch)
 		require.NoError(t, err)
 
-		// Wait for the callback to complete before checking state
 		callbackCalled.Wait()
 
-		assert.Equal(t, newResultID, result.ResultID())
-		assert.Equal(t, newHeight, result.Height())
+		assert.Equal(t, newResultID, latest.ResultID())
+		assert.Equal(t, newHeight, latest.Height())
 	})
 
 	t.Run("batch update error during BatchSetProcessedIndex", func(t *testing.T) {
-		mockInitializer := storagemock.NewConsumerProgressInitializer(t)
-		mockCP := storagemock.NewConsumerProgress(t)
+		latest, mockCP := setupResult(t)
 		mockBatch := storagemock.NewReaderBatchWriter(t)
-
-		mockInitializer.On("Initialize", initialHeight).Return(mockCP, nil)
-
-		result, err := NewLatestPersistedSealedResult(initialResultID, initialHeight, mockInitializer)
-		require.NoError(t, err)
 
 		newResultID := unittest.IdentifierFixture()
 		newHeight := uint64(200)
-		expectedErr := fmt.Errorf("batch update error: %w", storage.ErrNotFound)
 
 		var callbackCalled sync.WaitGroup
 		callbackCalled.Add(1)
 
-		// The callback is registered before BatchSetProcessedIndex is called,
-		// so we need to expect it and call it to release the lock
 		mockBatch.On("AddCallback", mock.AnythingOfType("func(error)")).Run(func(args mock.Arguments) {
 			callback := args.Get(0).(func(error))
-			// Call the callback with the same error to ensure locks are released
 			callback(storage.ErrNotFound)
 			callbackCalled.Done()
 		})
 
-		// Simulate a failure in BatchSetProcessedIndex
+		expectedErr := fmt.Errorf("could not set processed index: %w", storage.ErrNotFound)
 		mockCP.On("BatchSetProcessedIndex", newHeight, mockBatch).Return(expectedErr)
 
-		err = result.BatchSet(newResultID, newHeight, mockBatch)
+		err := latest.BatchSet(newResultID, newHeight, mockBatch)
+
 		require.Error(t, err)
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 
-		// Wait for the callback to complete to ensure locks are released
 		callbackCalled.Wait()
 
-		// Verify state remains unchanged on error
-		assert.Equal(t, initialResultID, result.ResultID())
-		assert.Equal(t, initialHeight, result.Height())
+		assert.NotEqual(t, newResultID, latest.ResultID())
+		assert.Equal(t, initialHeight, latest.Height())
 	})
 
 	t.Run("batch update error during callback", func(t *testing.T) {
-		mockInitializer := storagemock.NewConsumerProgressInitializer(t)
-		mockCP := storagemock.NewConsumerProgress(t)
+		latest, mockCP := setupResult(t)
 		mockBatch := storagemock.NewReaderBatchWriter(t)
-
-		mockInitializer.On("Initialize", initialHeight).Return(mockCP, nil)
-
-		result, err := NewLatestPersistedSealedResult(initialResultID, initialHeight, mockInitializer)
-		require.NoError(t, err)
 
 		newResultID := unittest.IdentifierFixture()
 		newHeight := uint64(200)
@@ -154,22 +212,19 @@ func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 		callbackCalled.Add(1)
 
 		mockCP.On("BatchSetProcessedIndex", newHeight, mockBatch).Return(nil)
-		// Simulate batch commit failure
 		mockBatch.On("AddCallback", mock.AnythingOfType("func(error)")).Run(func(args mock.Arguments) {
 			callback := args.Get(0).(func(error))
 			callback(storage.ErrNotFound)
 			callbackCalled.Done()
 		})
 
-		err = result.BatchSet(newResultID, newHeight, mockBatch)
+		err := latest.BatchSet(newResultID, newHeight, mockBatch)
 		require.NoError(t, err)
 
-		// Wait for the callback to complete before checking state
 		callbackCalled.Wait()
 
-		// Verify state remains unchanged when callback returns error
-		assert.Equal(t, initialResultID, result.ResultID())
-		assert.Equal(t, initialHeight, result.Height())
+		assert.NotEqual(t, newResultID, latest.ResultID())
+		assert.Equal(t, initialHeight, latest.Height())
 	})
 }
 
@@ -180,27 +235,35 @@ func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 // - No data races occur under heavy concurrent load
 // - The state remains consistent during concurrent operations
 func TestLatestPersistedSealedResult_ConcurrentAccess(t *testing.T) {
-	initialResultID := unittest.IdentifierFixture()
 	initialHeight := uint64(100)
 	mockInitializer := storagemock.NewConsumerProgressInitializer(t)
 	mockCP := storagemock.NewConsumerProgress(t)
+	mockHeaders := storagemock.NewHeaders(t)
+	mockResults := storagemock.NewExecutionResults(t)
+
+	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(initialHeight))
+	result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
+		result.BlockID = header.ID()
+	})
 
 	mockInitializer.On("Initialize", initialHeight).Return(mockCP, nil)
+	mockCP.On("ProcessedIndex").Return(initialHeight, nil)
+	mockHeaders.On("ByHeight", initialHeight).Return(header, nil)
+	mockResults.On("ByBlockID", result.BlockID).Return(result, nil)
 
-	result, err := NewLatestPersistedSealedResult(initialResultID, initialHeight, mockInitializer)
+	latest, err := NewLatestPersistedSealedResult(initialHeight, mockInitializer, mockHeaders, mockResults)
 	require.NoError(t, err)
 
 	t.Run("concurrent reads", func(t *testing.T) {
 		var wg sync.WaitGroup
-		numGoroutines := 10
+		numGoroutines := 1000
 
-		// Launch multiple goroutines to read values concurrently
 		for i := 0; i < numGoroutines; i++ {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				assert.Equal(t, initialResultID, result.ResultID())
-				assert.Equal(t, initialHeight, result.Height())
+				assert.Equal(t, result.ID(), latest.ResultID())
+				assert.Equal(t, initialHeight, latest.Height())
 			}()
 		}
 
@@ -209,44 +272,37 @@ func TestLatestPersistedSealedResult_ConcurrentAccess(t *testing.T) {
 
 	t.Run("concurrent read/write", func(t *testing.T) {
 		var wg sync.WaitGroup
-		numGoroutines := 10
+		numGoroutines := 1000
 
 		mockBatch := storagemock.NewReaderBatchWriter(t)
-		// Configure mock to accept any height and always succeed
 		mockCP.On("BatchSetProcessedIndex", mock.Anything, mockBatch).Return(nil).Times(numGoroutines)
 
 		var callbacksCompleted sync.WaitGroup
 		callbacksCompleted.Add(numGoroutines)
 
-		// Configure mock to simulate successful batch commits
 		mockBatch.On("AddCallback", mock.AnythingOfType("func(error)")).Run(func(args mock.Arguments) {
 			callback := args.Get(0).(func(error))
 			callback(nil)
 			callbacksCompleted.Done()
 		}).Times(numGoroutines)
 
-		// Launch pairs of goroutines - one writer and one reader
 		for i := 0; i < numGoroutines; i++ {
 			wg.Add(2)
-			// Writer goroutine
 			go func(i int) {
 				defer wg.Done()
 				newResultID := unittest.IdentifierFixture()
 				newHeight := uint64(200 + i)
-				err := result.BatchSet(newResultID, newHeight, mockBatch)
+				err := latest.BatchSet(newResultID, newHeight, mockBatch)
 				require.NoError(t, err)
 			}(i)
-			// Reader goroutine
 			go func() {
 				defer wg.Done()
-				_ = result.ResultID()
-				_ = result.Height()
+				_ = latest.ResultID()
+				_ = latest.Height()
 			}()
 		}
 
-		// Wait for all goroutines to complete their operations
 		wg.Wait()
-		// Wait for all callbacks to complete
 		callbacksCompleted.Wait()
 	})
 }
