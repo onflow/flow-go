@@ -5,12 +5,12 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/rs/zerolog/log"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/module/util"
 )
@@ -219,35 +219,35 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 		util.DefaultLogProgressConfig("migration keys from badger to pebble", len(prefixes)),
 	)
 
-	var readerWg sync.WaitGroup
+	g, ctx := errgroup.WithContext(ctx)
+
+	// Spawn reader workers
 	for i := 0; i < cfg.ReaderWorkerCount; i++ {
-		readerWg.Add(1)
-		go func() {
-			defer readerWg.Done()
-			if err := readerWorker(ctx, lg, badgerDB, prefixJobs, kvChan, cfg.BatchByteSize); err != nil {
-				cancel(err)
-			}
-		}()
+		g.Go(func() error {
+			return readerWorker(ctx, lg, badgerDB, prefixJobs, kvChan, cfg.BatchByteSize)
+		})
 	}
 
-	var writerWg sync.WaitGroup
+	// Spawn writer workers
 	for i := 0; i < cfg.WriterWorkerCount; i++ {
-		writerWg.Add(1)
-		go func() {
-			defer writerWg.Done()
-			if err := writerWorker(ctx, pebbleDB, kvChan); err != nil {
-				cancel(err)
-			}
-		}()
+		g.Go(func() error {
+			return writerWorker(ctx, pebbleDB, kvChan)
+		})
 	}
 
 	// Close kvChan after readers complete
 	go func() {
-		readerWg.Wait()
+		// Wait for all reader workers to complete
+		if err := g.Wait(); err != nil {
+			cancel(err)
+		}
 		close(kvChan)
 	}()
 
-	writerWg.Wait()
+	// Wait for all workers to complete
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("migration failed: %w", err)
+	}
 	return context.Cause(ctx)
 }
 
