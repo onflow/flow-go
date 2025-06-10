@@ -225,7 +225,10 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing intermediary bootstrapping data")
-	epochSetup, epochCommit := constructRootEpochEvents(header.View, participants, assignments, clusterQCs, randomBeaconData, dkgIndexMap)
+	epochSetup, epochCommit, err := constructRootEpochEvents(header.View, participants, assignments, clusterQCs, randomBeaconData, dkgIndexMap)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to construct root epoch events")
+	}
 	epochConfig := generateExecutionStateEpochConfig(epochSetup, clusterQCs, randomBeaconData)
 	intermediaryEpochData := IntermediaryEpochData{
 		RootEpochSetup:       epochSetup,
