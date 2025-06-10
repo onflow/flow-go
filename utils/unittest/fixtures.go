@@ -638,9 +638,10 @@ func AddCollectionsToBlock(block *flow.Block, collections []*flow.Collection) {
 
 func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flow.CollectionGuarantee {
 	guarantee := &flow.CollectionGuarantee{
-		CollectionID:  IdentifierFixture(),
-		SignerIndices: RandomBytes(16),
-		Signature:     SignatureFixture(),
+		CollectionID:     IdentifierFixture(),
+		ReferenceBlockID: IdentifierFixture(),
+		SignerIndices:    RandomBytes(16),
+		Signature:        SignatureFixture(),
 	}
 	for _, option := range options {
 		option(guarantee)
@@ -1687,7 +1688,7 @@ func WithChunkID(chunkID flow.Identifier) func(*verification.ChunkDataPackReques
 // and height of zero.
 // Use options to customize the request.
 func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest)) *verification.
-	ChunkDataPackRequest {
+ChunkDataPackRequest {
 
 	req := &verification.ChunkDataPackRequest{
 		Locator: chunks.Locator{
