@@ -10,6 +10,16 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// ValidationMode defines how thorough the validation should be
+type ValidationMode string
+
+const (
+	// PartialValidation only checks min/max keys for each prefix
+	PartialValidation ValidationMode = "partial"
+	// FullValidation checks all keys in the database
+	FullValidation ValidationMode = "full"
+)
+
 // isDirEmpty checks if a directory exists and is empty.
 // Returns true if the directory is empty, false if it contains files,
 // and an error if the directory doesn't exist or there's an error reading it.
@@ -68,7 +78,7 @@ func validateBadgerFolderExistPebbleFolderEmpty(badgerDir string, pebbleDir stri
 }
 
 func validateMinMaxKeyConsistency(badgerDB *badger.DB, pebbleDB *pebble.DB, prefixBytes int) error {
-	keys, err := collectValidationKeysByPrefix(badgerDB, prefixBytes)
+	keys, err := sampleValidationKeysByPrefix(badgerDB, prefixBytes)
 	if err != nil {
 		return fmt.Errorf("failed to collect validation keys: %w", err)
 	}
@@ -78,14 +88,14 @@ func validateMinMaxKeyConsistency(badgerDB *badger.DB, pebbleDB *pebble.DB, pref
 	return nil
 }
 
-// collectValidationKeysByPrefix takes a prefix bytes number (1 means 1 byte prefix, 2 means 2 bytes prefix, etc.),
+// sampleValidationKeysByPrefix takes a prefix bytes number (1 means 1 byte prefix, 2 means 2 bytes prefix, etc.),
 // and returns a list of keys that are the min and max keys for each prefix.
 // The output will be used to validate the consistency between Badger and Pebble databases.
 // Why? Because we want to validate the consistency between Badger and Pebble databases by selecting
 // some keys and compare their values between the two databases.
 // An easy way to select keys is to go through each prefix, and find the min and max keys for each prefix using
 // the database iterator.
-func collectValidationKeysByPrefix(db *badger.DB, prefixBytes int) ([][]byte, error) {
+func sampleValidationKeysByPrefix(db *badger.DB, prefixBytes int) ([][]byte, error) {
 	// this includes all prefixes that is shorter than or equal to prefixBytes
 	// for instance, if prefixBytes is 2, we will include all prefixes that is 1 byte or 2 bytes:
 	// [
@@ -167,4 +177,36 @@ func compareValuesBetweenDBs(keys [][]byte, badgerDB *badger.DB, pebbleDB *pebbl
 		_ = closer.Close()
 	}
 	return nil
+}
+
+// validateData performs validation based on the configured validation mode
+func validateData(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg MigrationConfig) error {
+	switch cfg.ValidationMode {
+	case PartialValidation:
+		return validateMinMaxKeyConsistency(badgerDB, pebbleDB, cfg.ReaderShardPrefixBytes)
+	case FullValidation:
+		return validateAllKeys(badgerDB, pebbleDB)
+	default:
+		return fmt.Errorf("unknown validation mode: %s", cfg.ValidationMode)
+	}
+}
+
+// validateAllKeys performs a full validation by comparing all keys between Badger and Pebble
+func validateAllKeys(badgerDB *badger.DB, pebbleDB *pebble.DB) error {
+	var allKeys [][]byte
+	err := badgerDB.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Rewind(); it.Valid(); it.Next() {
+			allKeys = append(allKeys, slices.Clone(it.Item().Key()))
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to collect all keys from Badger: %w", err)
+	}
+
+	return compareValuesBetweenDBs(allKeys, badgerDB, pebbleDB)
 }

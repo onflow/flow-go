@@ -17,7 +17,8 @@ var DefaultMigrationConfig = MigrationConfig{
 	BatchByteSize:          32_000_000, // 32 MB
 	ReaderWorkerCount:      2,
 	WriterWorkerCount:      2,
-	ReaderShardPrefixBytes: 2, // better to keep it as 2.
+	ReaderShardPrefixBytes: 2,                 // better to keep it as 2.
+	ValidationMode:         PartialValidation, // Default to partial validation
 }
 
 func RunMigrationAndCompaction(badgerDir string, pebbleDir string, cfg MigrationConfig) error {
@@ -44,9 +45,9 @@ func RunMigrationAndCompaction(badgerDir string, pebbleDir string, cfg Migration
 //  2. Opens both databases and runs the migration using CopyFromBadgerToPebble with the given config.
 //  3. Writes a "MIGRATION_STARTED" marker file with a timestamp in the Pebble directory.
 //  4. After migration, performs validation by:
-//     - Generating a list of prefix shards (based on 2-byte prefixes)
-//     - Finding the min and max keys for each prefix group
-//     - Comparing the values of those keys between Badger and Pebble
+//     - For PartialValidation: Generates a list of prefix shards (based on 2-byte prefixes)
+//     and finds the min and max keys for each prefix group
+//     - For FullValidation: Validates all keys in the database
 //  5. Writes a "MIGRATION_COMPLETED" marker file with a timestamp to signal successful completion.
 //
 // This function returns an error if any part of the process fails, including directory checks,
@@ -108,12 +109,10 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 	}
 	lg.Info().Dur("duration", time.Since(startTime)).Msg("Step 4/6: Data migration completed successfully")
 
-	validatingPrefixBytesCount := 2
-
 	// Step 5: Validate data
-	lg.Info().Int("prefix_bytes", validatingPrefixBytesCount).Msg("Step 5/6: Starting data validation...")
+	lg.Info().Str("mode", string(cfg.ValidationMode)).Msg("Step 5/6: Starting data validation...")
 	startTime = time.Now()
-	if err := validateMinMaxKeyConsistency(badgerDB, pebbleDB, validatingPrefixBytesCount); err != nil {
+	if err := validateData(badgerDB, pebbleDB, cfg); err != nil {
 		return fmt.Errorf("data validation failed: %w", err)
 	}
 	lg.Info().Dur("duration", time.Since(startTime)).Msg("Step 5/6: Data validation completed successfully")
