@@ -52,13 +52,22 @@ func RunMigrationAndCompaction(badgerDir string, pebbleDir string, cfg Migration
 // This function returns an error if any part of the process fails, including directory checks,
 // database operations, or validation mismatches.
 func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error {
+	lg := log.With().
+		Str("from-badger-dir", badgerDir).
+		Str("to-pebble-dir", pebbleDir).
+		Logger()
+
 	// Step 1: Validate directories
+	lg.Info().Msg("Step 1/6: Starting directory validation...")
+	startTime := time.Now()
 	if err := validateBadgerFolderExistPebbleFolderEmpty(badgerDir, pebbleDir); err != nil {
 		return fmt.Errorf("directory validation failed: %w", err)
 	}
+	lg.Info().Dur("duration", time.Since(startTime)).Msg("Step 1/6: Directory validation completed successfully")
 
 	// Step 2: Open Badger and Pebble DBs
-	log.Info().Msgf("Step 2/6 Opening BadgerDB and PebbleDB...")
+	lg.Info().Msg("Step 2/6: Opening BadgerDB and PebbleDB...")
+	startTime = time.Now()
 	badgerOptions := badger.DefaultOptions(badgerDir).
 		WithLogger(util.NewLogger(log.Logger.With().Str("db", "badger").Logger()))
 	badgerDB, err := badger.Open(badgerOptions)
@@ -69,59 +78,56 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 
 	cache := pebble.NewCache(pebblestorage.DefaultPebbleCacheSize)
 	defer cache.Unref()
-	// reuse the same pebble options for opening pebble storage
 	pebbleDBOpts := pebblestorage.DefaultPebbleOptions(log.Logger, cache, pebble.DefaultComparer)
-	pebbleDBOpts.DisableAutomaticCompactions = true // compaction will be done at the end
+	pebbleDBOpts.DisableAutomaticCompactions = true
 
 	pebbleDB, err := pebble.Open(pebbleDir, pebbleDBOpts)
 	if err != nil {
 		return fmt.Errorf("failed to open PebbleDB: %w", err)
 	}
 	defer pebbleDB.Close()
+	lg.Info().Dur("duration", time.Since(startTime)).Msg("Step 2/6: BadgerDB and PebbleDB opened successfully")
 
-	// Step 3: Write MIGRATION_STARTED file with timestamp
-	startTime := time.Now().Format(time.RFC3339)
+	// Step 3: Write MIGRATION_STARTED file
+	lg.Info().Msg("Step 3/6: Writing migration start marker...")
+	startTime = time.Now()
+	startTimeStr := time.Now().Format(time.RFC3339)
 	startMarkerPath := filepath.Join(pebbleDir, "MIGRATION_STARTED")
-	startContent := fmt.Sprintf("migration started at %s\n", startTime)
+	startContent := fmt.Sprintf("migration started at %s\n", startTimeStr)
 	if err := os.WriteFile(startMarkerPath, []byte(startContent), 0644); err != nil {
 		return fmt.Errorf("failed to write MIGRATION_STARTED file: %w", err)
 	}
-
-	lg := log.With().
-		Str("from-badger-dir", badgerDir).
-		Str("to-pebble-dir", pebbleDir).
-		Logger()
-
-	lg.Info().Msgf("Step 3/6 Migration started. created mark file: %s", startMarkerPath)
+	lg.Info().Dur("duration", time.Since(startTime)).Str("file", startMarkerPath).Msg("Step 3/6: Migration start marker written successfully")
 
 	// Step 4: Migrate data
+	lg.Info().Msg("Step 4/6: Starting data migration...")
+	startTime = time.Now()
 	cfg.PebbleDir = pebbleDir
 	if err := CopyFromBadgerToPebbleSSTables(badgerDB, pebbleDB, cfg); err != nil {
 		return fmt.Errorf("failed to migrate data from Badger to Pebble: %w", err)
 	}
+	lg.Info().Dur("duration", time.Since(startTime)).Msg("Step 4/6: Data migration completed successfully")
 
 	validatingPrefixBytesCount := 2
 
-	lg.Info().Msgf("Step 4/6 Migration from BadgerDB to PebbleDB completed successfully. "+
-		"Validating key consistency with %v prefix bytes...", validatingPrefixBytesCount)
-
 	// Step 5: Validate data
+	lg.Info().Int("prefix_bytes", validatingPrefixBytesCount).Msg("Step 5/6: Starting data validation...")
+	startTime = time.Now()
 	if err := validateMinMaxKeyConsistency(badgerDB, pebbleDB, validatingPrefixBytesCount); err != nil {
 		return fmt.Errorf("data validation failed: %w", err)
 	}
+	lg.Info().Dur("duration", time.Since(startTime)).Msg("Step 5/6: Data validation completed successfully")
 
-	log.Info().Msgf("Step 5/6 Data validation between BadgerDB and PebbleDB completed successfully.")
-
-	// Step 6: Write MIGRATION_COMPLETED file with timestamp
+	// Step 6: Write MIGRATION_COMPLETED file
+	lg.Info().Msg("Step 6/6: Writing migration completion marker...")
+	startTime = time.Now()
 	endTime := time.Now().Format(time.RFC3339)
 	completeMarkerPath := filepath.Join(pebbleDir, "MIGRATION_COMPLETED")
 	completeContent := fmt.Sprintf("migration completed at %s\n", endTime)
 	if err := os.WriteFile(completeMarkerPath, []byte(completeContent), 0644); err != nil {
 		return fmt.Errorf("failed to write MIGRATION_COMPLETED file: %w", err)
 	}
-
-	lg.Info().Str("file", completeMarkerPath).
-		Msgf("Step 6/6 Migration marker file written successfully.")
+	lg.Info().Dur("duration", time.Since(startTime)).Str("file", completeMarkerPath).Msg("Step 6/6: Migration completion marker written successfully")
 
 	return nil
 }
