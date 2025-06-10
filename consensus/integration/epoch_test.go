@@ -257,11 +257,16 @@ func withNextEpoch(
 
 	// Construct the new epoch protocol state entry
 	epochStateEntry, err := flow.NewEpochStateEntry(
-		minEpochStateEntry,
-		rootProtocolState.EpochEntry.PreviousEpochSetup,
-		rootProtocolState.EpochEntry.PreviousEpochCommit,
-		currEpochSetup, currEpochCommit,
-		nextEpochSetup, nextEpochCommit)
+		flow.UntrustedEpochStateEntry{
+			MinEpochStateEntry:  minEpochStateEntry,
+			PreviousEpochSetup:  rootProtocolState.EpochEntry.PreviousEpochSetup,
+			PreviousEpochCommit: rootProtocolState.EpochEntry.PreviousEpochCommit,
+			CurrentEpochSetup:   currEpochSetup,
+			CurrentEpochCommit:  currEpochCommit,
+			NextEpochSetup:      nextEpochSetup,
+			NextEpochCommit:     nextEpochCommit,
+		},
+	)
 	require.NoError(t, err)
 	// Re-construct epoch protocol state with modified events (constructs ActiveIdentity fields)
 	epochRichProtocolState, err := flow.NewRichEpochStateEntry(epochStateEntry)
