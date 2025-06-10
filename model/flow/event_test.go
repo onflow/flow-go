@@ -12,24 +12,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type eventWrapper struct {
-	TxID             []byte
-	Index            uint32
-	Type             string
-	TransactionIndex uint32
-	Payload          []byte
-}
-
-func wrapEvent(e flow.Event) eventWrapper {
-	return eventWrapper{
-		TxID:             e.TransactionID[:],
-		Index:            e.EventIndex,
-		Type:             string(e.Type),
-		TransactionIndex: e.TransactionIndex,
-		Payload:          e.Payload,
-	}
-}
-
 // TestEventFingerprint verifies that the Fingerprint function produces
 // a consistent RLP-encoded representation of an Event. It ensures that
 // decoding the fingerprint results in a correctly ordered structure.
