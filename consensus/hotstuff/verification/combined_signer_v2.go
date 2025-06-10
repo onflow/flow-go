@@ -82,15 +82,21 @@ func (c *CombinedSigner) CreateTimeout(curView uint64, newestQC *flow.QuorumCert
 		return nil, fmt.Errorf("could not generate signature for timeout object at view %d: %w", curView, err)
 	}
 
-	timeout := model.NewTimeoutObject(
-		curView,
-		newestQC,
-		lastViewTC,
-		c.staking.NodeID(),
-		sigData,
-		0,
+	timeout, err := model.NewTimeoutObject(
+		model.UntrustedTimeoutObject{
+			View:        curView,
+			NewestQC:    newestQC,
+			LastViewTC:  lastViewTC,
+			SignerID:    c.staking.NodeID(),
+			SigData:     sigData,
+			TimeoutTick: 0,
+		},
 	)
-	return &timeout, nil
+	if err != nil {
+		return nil, fmt.Errorf("could not construct timeout object: %w", err)
+	}
+
+	return timeout, nil
 }
 
 // genSigData generates the signature data for our local node for the given block.

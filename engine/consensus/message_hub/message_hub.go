@@ -465,15 +465,20 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 	case *messages.BlockVote:
 		h.forwardToOwnVoteAggregator(msg, originID)
 	case *messages.TimeoutObject:
-		t := model.NewTimeoutObject(
-			msg.View,
-			msg.NewestQC,
-			msg.LastViewTC,
-			originID,
-			msg.SigData,
-			msg.TimeoutTick,
+		t, err := model.NewTimeoutObject(
+			model.UntrustedTimeoutObject{
+				View:        msg.View,
+				NewestQC:    msg.NewestQC,
+				LastViewTC:  msg.LastViewTC,
+				SignerID:    originID,
+				SigData:     msg.SigData,
+				TimeoutTick: msg.TimeoutTick,
+			},
 		)
-		h.forwardToOwnTimeoutAggregator(&t)
+		if err != nil {
+			return fmt.Errorf("could not construct timeout object: %w", err)
+		}
+		h.forwardToOwnTimeoutAggregator(t)
 	default:
 		h.log.Warn().
 			Bool(logging.KeySuspicious, true).

@@ -63,24 +63,30 @@ type TimeoutObject struct {
 	TimeoutTick uint64
 }
 
+// UntrustedTimeoutObject is an untrusted input-only representation of a TimeoutObject,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedTimeoutObject should be validated and converted into
+// a trusted Locator using NewTimeoutObject constructor.
+type UntrustedTimeoutObject TimeoutObject
+
 // NewTimeoutObject creates a new instance of TimeoutObject.
 // Construction TimeoutObject allowed only within the constructor.
-func NewTimeoutObject(
-	view uint64,
-	newestQC *flow.QuorumCertificate,
-	lastViewTC *flow.TimeoutCertificate,
-	signerID flow.Identifier,
-	sigData crypto.Signature,
-	timeoutTick uint64,
-) TimeoutObject {
-	return TimeoutObject{
-		View:        view,
-		NewestQC:    newestQC,
-		LastViewTC:  lastViewTC,
-		SignerID:    signerID,
-		SigData:     sigData,
-		TimeoutTick: timeoutTick,
-	}
+//
+// All errors indicate a valid TimeoutObject cannot be constructed from the input.
+func NewTimeoutObject(untrusted UntrustedTimeoutObject) (*TimeoutObject, error) {
+	return &TimeoutObject{
+		View:        untrusted.View,
+		NewestQC:    untrusted.NewestQC,
+		LastViewTC:  untrusted.LastViewTC,
+		SignerID:    untrusted.SignerID,
+		SigData:     untrusted.SigData,
+		TimeoutTick: untrusted.TimeoutTick,
+	}, nil
 }
 
 // ID returns the TimeoutObject's identifier
