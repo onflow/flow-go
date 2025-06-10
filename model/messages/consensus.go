@@ -14,21 +14,21 @@ type UntrustedBlock flow.Block
 // of a consensus round pushing a new proposal to the network.
 // This differentiation is currently largely unused, but eventually untrusted models should use
 // a different type (like this one), until such time as they are fully validated
-type UntrustedProposal struct {
-	Block flow.OldBlock
-}
+type UntrustedProposal flow.BlockProposal
 
 func NewUntrustedProposal(internal *flow.BlockProposal) *UntrustedProposal {
-	return &UntrustedProposal{
-		Block: *flow.OldBlockFromProposal(internal),
-	}
+	p := UntrustedProposal(*internal)
+	return &p
 }
 
 // DeclareTrusted converts the UntrustedProposal to a trusted internal flow.BlockProposal.
 // CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
 // TODO(malleability immutable): This conversion should eventually be accompanied by a full validation of the untrusted input.
 func (msg *UntrustedProposal) DeclareTrusted() *flow.BlockProposal {
-	return msg.Block.ConvertToProposal()
+	return &flow.BlockProposal{
+		Block:           *flow.NewBlock(msg.Block.Header, msg.Block.Payload),
+		ProposerSigData: msg.ProposerSigData,
+	}
 }
 
 // BlockVote is part of the consensus protocol and represents a consensus node

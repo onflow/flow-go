@@ -189,31 +189,3 @@ func NewBlockDigest(
 		Timestamp: timestamp,
 	}
 }
-
-// OldBlock is implemented for backwards compatibility of network messages and the sealing segment until mainnet27.
-// It contains the same data as the current [flow.BlockProposal].
-// Deprecated, removed in mainnet27.
-type OldBlock struct {
-	Header  OldHeader
-	Payload Payload
-}
-
-// OldBlockFromProposal is implemented for backwards compatibility until mainnet27. See [flow.OldBlock].
-// Deprecated, removed in mainnet27
-func OldBlockFromProposal(proposal *BlockProposal) *OldBlock {
-	return &OldBlock{
-		Header:  *ConvertToOldHeader(proposal.Block.ToHeader(), proposal.ProposerSigData),
-		Payload: proposal.Block.Payload,
-	}
-}
-
-// ConvertToProposal is implemented for backwards compatibility until mainnet27. See [flow.OldBlock].
-// Deprecated, removed in mainnet27
-func (b *OldBlock) ConvertToProposal() *BlockProposal {
-	header := b.Header.ConvertToNewHeader()
-	payload := b.Payload
-	return &BlockProposal{
-		Block:           *NewBlock(header.Header.HeaderBody, payload),
-		ProposerSigData: b.Header.ProposerSigData,
-	}
-}
