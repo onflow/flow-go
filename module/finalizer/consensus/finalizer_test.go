@@ -85,12 +85,12 @@ func TestMakeFinalValidChain(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		err = db.Update(operation.InsertHeader(final.ID(), unittest.ProposalFromHeader(final)))
+		err = db.Update(operation.InsertHeader(final.ID(), final))
 		require.NoError(t, err)
 
 		// insert all of the pending blocks into the DB
 		for _, header := range pending {
-			err = db.Update(operation.InsertHeader(header.ID(), unittest.ProposalFromHeader(header)))
+			err = db.Update(operation.InsertHeader(header.ID(), header))
 			require.NoError(t, err)
 		}
 
@@ -143,11 +143,11 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		err = db.Update(operation.InsertHeader(final.ID(), unittest.ProposalFromHeader(final)))
+		err = db.Update(operation.InsertHeader(final.ID(), final))
 		require.NoError(t, err)
 
 		// insert all of the pending header into DB
-		err = db.Update(operation.InsertHeader(pending.ID(), unittest.ProposalFromHeader(pending)))
+		err = db.Update(operation.InsertHeader(pending.ID(), pending))
 		require.NoError(t, err)
 
 		// initialize the finalizer with the dependencies and make the call
@@ -195,7 +195,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		err = db.Update(operation.InsertHeader(final.ID(), unittest.ProposalFromHeader(final)))
+		err = db.Update(operation.InsertHeader(final.ID(), final))
 		require.NoError(t, err)
 
 		// initialize the finalizer with the dependencies and make the call

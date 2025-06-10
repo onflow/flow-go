@@ -173,8 +173,8 @@ func (suite *MutatorSuite) Proposal() model.BlockProposal {
 
 func (suite *MutatorSuite) FinalizeBlock(block model.Block) {
 	err := suite.db.Update(func(tx *badger.Txn) error {
-		var refBlockProposal flow.ProposalHeader
-		err := operation.RetrieveHeader(block.Payload.ReferenceBlockID, &refBlockProposal)(tx)
+		var refBlock flow.Header
+		err := operation.RetrieveHeader(block.Payload.ReferenceBlockID, &refBlock)(tx)
 		if err != nil {
 			return err
 		}
@@ -182,7 +182,7 @@ func (suite *MutatorSuite) FinalizeBlock(block model.Block) {
 		if err != nil {
 			return err
 		}
-		err = operation.IndexClusterBlockByReferenceHeight(refBlockProposal.Header.Height, block.ID())(tx)
+		err = operation.IndexClusterBlockByReferenceHeight(refBlock.Height, block.ID())(tx)
 		return err
 	})
 	suite.Assert().NoError(err)
@@ -239,10 +239,10 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
 		// should insert header
-		var proposalHeader flow.ProposalHeader
-		err = operation.RetrieveHeader(suite.genesis.ID(), &proposalHeader)(tx)
+		var header flow.Header
+		err = operation.RetrieveHeader(suite.genesis.ID(), &header)(tx)
 		suite.Assert().Nil(err)
-		suite.Assert().Equal(suite.genesis.ToHeader().ID(), proposalHeader.Header.ID())
+		suite.Assert().Equal(suite.genesis.ToHeader().ID(), header.ID())
 
 		// should insert block height -> ID lookup
 		var blockID flow.Identifier

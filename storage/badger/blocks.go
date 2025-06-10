@@ -58,15 +58,15 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Bl
 
 func (b *Blocks) retrieveProposalTx(blockID flow.Identifier) func(*badger.Txn) (*flow.BlockProposal, error) {
 	return func(tx *badger.Txn) (*flow.BlockProposal, error) {
-		proposalHeader, err := b.headers.retrieveProposalTx(blockID)(tx)
+		block, err := b.retrieveTx(blockID)(tx)
 		if err != nil {
-			return nil, fmt.Errorf("could not retrieve header: %w", err)
+			return nil, fmt.Errorf("could not retrieve block body: %w", err)
 		}
-		payload, err := b.payloads.retrieveTx(blockID)(tx)
+		sig, err := b.headers.sigs.retrieveTx(blockID)(tx)
 		if err != nil {
-			return nil, fmt.Errorf("could not retrieve payload: %w", err)
+			return nil, fmt.Errorf("could not retrieve proposer signature: %w", err)
 		}
-		return &flow.BlockProposal{Block: flow.Block{Header: proposalHeader.Header.HeaderBody, Payload: *payload}, ProposerSigData: proposalHeader.ProposerSigData}, nil
+		return &flow.BlockProposal{Block: *block, ProposerSigData: sig}, nil
 	}
 }
 
