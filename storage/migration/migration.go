@@ -192,23 +192,8 @@ func writerWorker(ctx context.Context, db *pebble.DB, kvChan <-chan KVPairs) err
 // The function blocks until all keys are migrated and written successfully.
 // It returns an error if any part of the process fails.
 func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg MigrationConfig) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	var (
-		errOnce  sync.Once
-		firstErr error
-	)
-
-	// once running into an exception, cancel the context and report the first error
-	reportFirstError := func(err error) {
-		if err != nil {
-			errOnce.Do(func() {
-				firstErr = err
-				cancel()
-			})
-		}
-	}
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
 
 	// Step 1: Copy all keys shorter than prefix
 	keysShorterThanPrefix := GenerateKeysShorterThanPrefix(cfg.ReaderShardPrefixBytes)
@@ -240,7 +225,7 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 		go func() {
 			defer readerWg.Done()
 			if err := readerWorker(ctx, lg, badgerDB, prefixJobs, kvChan, cfg.BatchByteSize); err != nil {
-				reportFirstError(err)
+				cancel(err)
 			}
 		}()
 	}
@@ -251,7 +236,7 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 		go func() {
 			defer writerWg.Done()
 			if err := writerWorker(ctx, pebbleDB, kvChan); err != nil {
-				reportFirstError(err)
+				cancel(err)
 			}
 		}()
 	}
@@ -263,7 +248,7 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 	}()
 
 	writerWg.Wait()
-	return firstErr
+	return context.Cause(ctx)
 }
 
 func copyExactKeysFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, keys [][]byte) (int, error) {
