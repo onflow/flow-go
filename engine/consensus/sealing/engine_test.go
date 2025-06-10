@@ -152,7 +152,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	for i := range receipts {
 		receipt := unittest.ExecutionReceiptFixture(
 			unittest.WithExecutorID(originID),
-			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))),
+			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(block))),
 		)
 		receipts[i] = receipt
 	}
