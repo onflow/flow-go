@@ -46,10 +46,11 @@ func CopyFromBadgerToPebbleSSTables(badgerDB *badger.DB, pebbleDB *pebble.DB, cf
 
 	// Step 1: Copy all keys shorter than prefix
 	keysShorterThanPrefix := GenerateKeysShorterThanPrefix(cfg.ReaderShardPrefixBytes)
-	if err := copyExactKeysFromBadgerToPebble(badgerDB, pebbleDB, keysShorterThanPrefix); err != nil {
+	keyCount, err := copyExactKeysFromBadgerToPebble(badgerDB, pebbleDB, keysShorterThanPrefix)
+	if err != nil {
 		return fmt.Errorf("failed to copy keys shorter than prefix: %w", err)
 	}
-	log.Info().Msgf("Copied %d keys shorter than %v bytes prefix", len(keysShorterThanPrefix), cfg.ReaderShardPrefixBytes)
+	log.Info().Msgf("Copied %d keys shorter than %v bytes prefix", keyCount, cfg.ReaderShardPrefixBytes)
 
 	// Step 2: Copy all keys with prefix by first generating prefix shards and then
 	// using reader and writer workers to copy the keys with the same prefix
