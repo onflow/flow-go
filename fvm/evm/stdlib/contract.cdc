@@ -306,7 +306,7 @@ access(all) contract EVM {
         /// Casts the balance to a UFix64 (rounding down)
         /// Warning! casting a balance to a UFix64 which supports a lower level of precision
         /// (8 decimal points in compare to 18) might result in rounding down error.
-        /// Use the toAttoFlow function if you need more accuracy.
+        /// Use the inAttoFlow function if you need more accuracy.
         access(all)
         view fun inFLOW(): UFix64 {
             return InternalEVM.castToFLOW(balance: self.attoflow)
@@ -472,13 +472,11 @@ access(all) contract EVM {
         /// @return the token decimals of the ERC20
         access(contract)
         fun initAddress(addressBytes: [UInt8; 20]) {
-           // only allow set address for the first time
-           // check address is empty
-            for item in self.addressBytes {
-                assert(
-                    item == 0,
-                    message: "EVM.CadenceOwnedAccount.initAddress(): Cannot initialize the address bytes if it has already been set!"
-                )
+            // only allow set address for the first time
+            // check address is empty
+            pre {
+                self.addressBytes == [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]:
+                    "EVM.CadenceOwnedAccount.initAddress(): Cannot initialize the address bytes if it has already been set!"
             }
            self.addressBytes = addressBytes
         }
@@ -500,7 +498,7 @@ access(all) contract EVM {
 
         /// Deposits the given vault into the cadence owned account's balance
         ///
-        /// @param addressBytes: The 20 byte EVM address
+        /// @param from: The FlowToken Vault to deposit to this cadence owned account
         ///
         /// @return the token decimals of the ERC20
         access(all)
@@ -681,8 +679,9 @@ access(all) contract EVM {
     /// Runs an a RLP-encoded EVM transaction, deducts the gas fees,
     /// and deposits the gas fees into the provided coinbase address.
     ///
-    /// @param tx: The transaction to run
-    /// @param coinbase: The address of the miner who added the block
+    /// @param tx: The rlp-encoded transaction to run
+    /// @param coinbase: The address of entity to receive the transaction fees
+    /// for relaying the transaction
     ///
     /// @return: The transaction result
     access(all)
@@ -902,7 +901,7 @@ access(all) contract EVM {
         if coaRef == nil {
              return ValidationResult(
                  isValid: false,
-                 problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership."
+                 problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership. "
                           .concat("Could not borrow the COA resource for account \(address).")
              )
         }
