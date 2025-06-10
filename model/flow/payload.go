@@ -2,6 +2,9 @@ package flow
 
 import (
 	"encoding/json"
+	"fmt"
+
+	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 )
 
 // Payload is the actual content of each block.
@@ -69,4 +72,41 @@ func (p Payload) Index() *Index {
 		ProtocolStateID: p.ProtocolStateID,
 	}
 	return idx
+}
+
+// UnmarshalCBOR ensures that a Payload received from the network does not contain nil datatypes.
+func (p *Payload) UnmarshalCBOR(data []byte) error {
+	type untrustedPayload Payload
+	var untrusted untrustedPayload
+	err := cborcodec.DefaultDecMode.Unmarshal(data, &untrusted)
+	if err != nil {
+		return err
+	}
+	for _, guarantee := range untrusted.Guarantees {
+		if guarantee == nil {
+			return fmt.Errorf("payload guarantee is nil")
+		}
+	}
+	for _, seal := range untrusted.Seals {
+		if seal == nil {
+			return fmt.Errorf("payload seal is nil")
+		}
+	}
+	for _, receipt := range untrusted.Receipts {
+		if receipt == nil {
+			return fmt.Errorf("payload receipt is nil")
+		}
+	}
+	for _, result := range untrusted.Results {
+		if result == nil {
+			return fmt.Errorf("payload result is nil")
+		}
+		for _, chunk := range result.Chunks {
+			if chunk == nil {
+				return fmt.Errorf("payload result chunk is nil")
+			}
+		}
+	}
+	*p = Payload(untrusted)
+	return nil
 }
