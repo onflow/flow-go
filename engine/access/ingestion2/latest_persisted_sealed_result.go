@@ -14,8 +14,8 @@ type LatestPersistedSealedResult struct {
 
 	cp storage.ConsumerProgress
 
-	// writeMu is used to prevent concurrent writes to the resultID and height.
-	// the critical section is fairly large, so use a separate mutex from the main one used for reads
+	// writeMu is used to prevent concurrent batch updates to the persisted height.
+	// the critical section is fairly large, so use a separate mutex from the cached values
 	writeMu sync.Mutex
 
 	// mu is used to protect access to resultID and height.
