@@ -419,8 +419,18 @@ func (collector *resultCollector) Finalize(
 		return nil, fmt.Errorf("could not sign execution result: %w", err)
 	}
 
-	collector.result.ExecutionReceipt = executionReceipt
-	collector.result.ExecutionDataRoot = executionDataRoot
+	blockExecutionResult := collector.result.BlockExecutionResult
+	blockExecutionResult.ExecutionDataRoot = executionDataRoot
+	collector.result, err = execution.NewComputationResult(
+		execution.UntrustedComputationResult{
+			BlockExecutionResult:   blockExecutionResult,
+			BlockAttestationResult: collector.result.BlockAttestationResult,
+			ExecutionReceipt:       executionReceipt,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct computation result: %w", err)
+	}
 
 	collector.metrics.ExecutionBlockExecuted(
 		time.Since(collector.blockStartTime),
