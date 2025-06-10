@@ -140,7 +140,17 @@ func SnapshotFromBootstrapStateWithParams(
 		return nil, fmt.Errorf("could not encode kvstore: %w", err)
 	}
 
-	rootEpochState, err := flow.NewEpochStateEntry(rootMinEpochState, nil, nil, setup, commit, nil, nil)
+	rootEpochState, err := flow.NewEpochStateEntry(
+		flow.UntrustedEpochStateEntry{
+			MinEpochStateEntry:  rootMinEpochState,
+			PreviousEpochSetup:  nil,
+			PreviousEpochCommit: nil,
+			CurrentEpochSetup:   setup,
+			CurrentEpochCommit:  commit,
+			NextEpochSetup:      nil,
+			NextEpochCommit:     nil,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct root epoch state entry: %w", err)
 	}
@@ -206,10 +216,12 @@ func EpochProtocolStateFromServiceEvents(setup *flow.EpochSetup, commit *flow.Ep
 		return nil, fmt.Errorf("could not construct current epoch state: %w", err)
 	}
 
-	return &flow.MinEpochStateEntry{
-		PreviousEpoch:          nil,
-		CurrentEpoch:           *currentEpoch,
-		NextEpoch:              nil,
-		EpochFallbackTriggered: false,
-	}, nil
+	return flow.NewMinEpochStateEntry(
+		flow.UntrustedMinEpochStateEntry{
+			PreviousEpoch:          nil,
+			CurrentEpoch:           *currentEpoch,
+			NextEpoch:              nil,
+			EpochFallbackTriggered: false,
+		},
+	)
 }

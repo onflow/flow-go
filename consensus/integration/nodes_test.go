@@ -285,7 +285,6 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 			commit.DKGIndexMap = dkgIndexMap
 		},
 	)
-
 	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
 	require.NoError(t, err)
 	epochProtocolStateID := minEpochStateEntry.ID()

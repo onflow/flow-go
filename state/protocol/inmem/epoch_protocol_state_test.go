@@ -90,6 +90,7 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 		entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 		// cleanup the commit event, so we are in setup phase
 		entry.NextEpoch.CommitID = flow.ZeroID
+		entry.NextEpochCommit = nil
 
 		adapter, err := inmem.NewEpochProtocolStateAdapter(
 			inmem.UntrustedEpochProtocolStateAdapter{

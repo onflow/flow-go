@@ -120,8 +120,32 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 		return false, fmt.Errorf("could not construct next epoch state: %w", err)
 	}
 
-	u.state.NextEpoch = nextEpoch
-	u.state.NextEpochSetup = epochSetup
+	newMinEpochStateEntry, err := flow.NewMinEpochStateEntry(
+		flow.UntrustedMinEpochStateEntry{
+			PreviousEpoch:          u.state.PreviousEpoch,
+			CurrentEpoch:           u.state.CurrentEpoch,
+			NextEpoch:              nextEpoch,
+			EpochFallbackTriggered: u.state.EpochFallbackTriggered,
+		},
+	)
+	if err != nil {
+		return false, fmt.Errorf("could not create min epoch state: %w", err)
+	}
+
+	u.state, err = flow.NewEpochStateEntry(
+		flow.UntrustedEpochStateEntry{
+			MinEpochStateEntry:  newMinEpochStateEntry,
+			PreviousEpochSetup:  u.state.PreviousEpochSetup,
+			PreviousEpochCommit: u.state.PreviousEpochCommit,
+			CurrentEpochSetup:   u.state.CurrentEpochSetup,
+			CurrentEpochCommit:  u.state.CurrentEpochCommit,
+			NextEpochSetup:      epochSetup,
+			NextEpochCommit:     u.state.NextEpochCommit,
+		},
+	)
+	if err != nil {
+		return false, fmt.Errorf("could not construct epoch state entry: %w", err)
+	}
 
 	// subsequent epoch commit event and update identities afterwards.
 	err = u.ejector.TrackDynamicIdentityList(u.state.NextEpoch.ActiveIdentities)
@@ -176,8 +200,32 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 		return false, fmt.Errorf("could not construct next epoch state: %w", err)
 	}
 
-	u.state.NextEpoch = nextEpoch
-	u.state.NextEpochCommit = epochCommit
+	newMinEpochStateEntry, err := flow.NewMinEpochStateEntry(
+		flow.UntrustedMinEpochStateEntry{
+			PreviousEpoch:          u.state.PreviousEpoch,
+			CurrentEpoch:           u.state.CurrentEpoch,
+			NextEpoch:              nextEpoch,
+			EpochFallbackTriggered: u.state.EpochFallbackTriggered,
+		},
+	)
+	if err != nil {
+		return false, fmt.Errorf("could not create min epoch state: %w", err)
+	}
+
+	u.state, err = flow.NewEpochStateEntry(
+		flow.UntrustedEpochStateEntry{
+			MinEpochStateEntry:  newMinEpochStateEntry,
+			PreviousEpochSetup:  u.state.PreviousEpochSetup,
+			PreviousEpochCommit: u.state.PreviousEpochCommit,
+			CurrentEpochSetup:   u.state.CurrentEpochSetup,
+			CurrentEpochCommit:  u.state.CurrentEpochCommit,
+			NextEpochSetup:      u.state.NextEpochSetup,
+			NextEpochCommit:     epochCommit,
+		},
+	)
+	if err != nil {
+		return false, fmt.Errorf("could not construct epoch state entry: %w", err)
+	}
 	u.telemetry.OnServiceEventProcessed(epochCommit.ServiceEvent())
 	return true, nil
 }

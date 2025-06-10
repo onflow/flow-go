@@ -12,6 +12,20 @@ type DynamicIdentityEntry struct {
 	Ejected bool
 }
 
+// EqualTo returns true if the two DynamicIdentityEntry are equivalent.
+func (d *DynamicIdentityEntry) EqualTo(other *DynamicIdentityEntry) bool {
+	// Shortcut if `t` and `other` point to the same object; covers case where both are nil.
+	if d == other {
+		return true
+	}
+	if d == nil || other == nil { // only one is nil, the other not (otherwise we would have returned above)
+		return false
+	}
+
+	return d.NodeID == other.NodeID &&
+		d.Ejected == other.Ejected
+}
+
 type DynamicIdentityEntryList []*DynamicIdentityEntry
 
 // MinEpochStateEntry is the most compact snapshot of the epoch state and identity table (set of all notes authorized to
@@ -21,6 +35,8 @@ type DynamicIdentityEntryList []*DynamicIdentityEntry
 // table that is constant throughout an epoch, are only referenced by their hash commitment.
 // Note that a MinEpochStateEntry does not hold the entire data for the identity table directly. It
 // allows reconstructing the identity table with the referenced epoch setup events and dynamic identities.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type MinEpochStateEntry struct {
 	PreviousEpoch *EpochStateContainer // minimal dynamic properties for previous epoch [optional, nil for first epoch after spork, genesis]
 	CurrentEpoch  EpochStateContainer  // minimal dynamic properties for current epoch
@@ -32,6 +48,33 @@ type MinEpochStateEntry struct {
 	// finalized that changes this flag from false to true.
 	// A state transition from true -> false is possible only when protocol undergoes epoch recovery.
 	EpochFallbackTriggered bool
+}
+
+// UntrustedMinEpochStateEntry is an untrusted input-only representation of a MinEpochStateEntry,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedMinEpochStateEntry should be validated and converted into
+// a trusted MinEpochStateEntry using NewMinEpochStateEntry constructor.
+type UntrustedMinEpochStateEntry MinEpochStateEntry
+
+// NewMinEpochStateEntry creates a new instance of MinEpochStateEntry.
+// Construction MinEpochStateEntry allowed only within the constructor.
+//
+// All errors indicate a valid MinEpochStateEntry cannot be constructed from the input.
+func NewMinEpochStateEntry(untrusted UntrustedMinEpochStateEntry) (*MinEpochStateEntry, error) {
+	if untrusted.CurrentEpoch.EqualTo(new(EpochStateContainer)) {
+		return nil, fmt.Errorf("current epoch must not be empty")
+	}
+	return &MinEpochStateEntry{
+		PreviousEpoch:          untrusted.PreviousEpoch,
+		CurrentEpoch:           untrusted.CurrentEpoch,
+		NextEpoch:              untrusted.NextEpoch,
+		EpochFallbackTriggered: untrusted.EpochFallbackTriggered,
+	}, nil
 }
 
 // EpochStateContainer holds the data pertaining to a _single_ epoch but no information about
@@ -107,6 +150,20 @@ type EpochExtension struct {
 	FinalView uint64
 }
 
+// EqualTo returns true if the two EpochExtension are equivalent.
+func (e *EpochExtension) EqualTo(other *EpochExtension) bool {
+	// Shortcut if `t` and `other` point to the same object; covers case where both are nil.
+	if e == other {
+		return true
+	}
+	if e == nil || other == nil { // only one is nil, the other not (otherwise we would have returned above)
+		return false
+	}
+
+	return e.FirstView == other.FirstView &&
+		e.FinalView == other.FinalView
+}
+
 // ID returns an identifier for this EpochStateContainer by hashing internal fields.
 // Per convention, the ID of a `nil` EpochStateContainer is `flow.ZeroID`.
 func (c *EpochStateContainer) ID() Identifier {
@@ -148,6 +205,37 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 	}
 }
 
+// EqualTo returns true if the two EpochStateContainer are equivalent.
+func (c *EpochStateContainer) EqualTo(other *EpochStateContainer) bool {
+	// Shortcut if `t` and `other` point to the same object; covers case where both are nil.
+	if c == other {
+		return true
+	}
+	if c == nil || other == nil { // only one is nil, the other not (otherwise we would have returned above)
+		return false
+	}
+	// both are not nil, so we can compare the fields
+	if c.SetupID != other.SetupID {
+		return false
+	}
+	if c.CommitID != other.CommitID {
+		return false
+	}
+	if !slices.EqualFunc(c.ActiveIdentities, other.ActiveIdentities, func(e1 *DynamicIdentityEntry, e2 *DynamicIdentityEntry) bool {
+		return e1.EqualTo(e2)
+	}) {
+		return false
+	}
+
+	if !slices.EqualFunc(c.EpochExtensions, other.EpochExtensions, func(e1 EpochExtension, e2 EpochExtension) bool {
+		return e1.EqualTo(&e2)
+	}) {
+		return false
+	}
+
+	return true
+}
+
 // EpochStateEntry is a MinEpochStateEntry that has additional fields that are cached from the
 // storage layer for convenience. It holds all the information needed to construct a snapshot of
 // the identity table (set of all notes authorized to be part of the network) at some specific
@@ -158,6 +246,8 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 //   - CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
 //   - PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Can be nil.
 //   - NextEpochSetup and NextEpochCommit are for the same epoch. Can be nil.
+//
+//structwrite:immutable - mutations allowed only within the constructor.
 type EpochStateEntry struct {
 	*MinEpochStateEntry
 
@@ -170,50 +260,44 @@ type EpochStateEntry struct {
 	NextEpochCommit     *EpochCommit
 }
 
-// NewEpochStateEntry constructs a EpochStateEntry from an MinEpochStateEntry and additional data.
-// No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
-func NewEpochStateEntry(
-	epochState *MinEpochStateEntry,
-	previousEpochSetup *EpochSetup,
-	previousEpochCommit *EpochCommit,
-	currentEpochSetup *EpochSetup,
-	currentEpochCommit *EpochCommit,
-	nextEpochSetup *EpochSetup,
-	nextEpochCommit *EpochCommit,
-) (*EpochStateEntry, error) {
-	result := &EpochStateEntry{
-		MinEpochStateEntry:  epochState,
-		PreviousEpochSetup:  previousEpochSetup,
-		PreviousEpochCommit: previousEpochCommit,
-		CurrentEpochSetup:   currentEpochSetup,
-		CurrentEpochCommit:  currentEpochCommit,
-		NextEpochSetup:      nextEpochSetup,
-		NextEpochCommit:     nextEpochCommit,
-	}
+// UntrustedEpochStateEntry is an untrusted input-only representation of an EpochStateEntry,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedEpochStateEntry should be validated and converted into
+// a trusted EpochStateEntry using NewEpochStateEntry constructor.
+type UntrustedEpochStateEntry EpochStateEntry
 
+// NewEpochStateEntry constructs an EpochStateEntry from a MinEpochStateEntry and additional data.
+//
+// All errors indicate a valid EpochStateEntry cannot be constructed from the input.
+func NewEpochStateEntry(untrusted UntrustedEpochStateEntry) (*EpochStateEntry, error) {
 	// If previous epoch is specified: ensure respective epoch service events are not nil and consistent with commitments in `MinEpochStateEntry.PreviousEpoch`
-	if epochState.PreviousEpoch != nil {
-		if epochState.PreviousEpoch.SetupID != previousEpochSetup.ID() { // calling ID() will panic is EpochSetup event is nil
-			return nil, fmt.Errorf("supplied previous epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", previousEpochSetup.ID(), epochState.PreviousEpoch.SetupID)
+	if untrusted.PreviousEpoch != nil {
+		if untrusted.PreviousEpoch.SetupID != untrusted.PreviousEpochSetup.ID() { // calling ID() will panic is EpochSetup event is nil
+			return nil, fmt.Errorf("supplied previous epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", untrusted.PreviousEpochSetup.ID(), untrusted.PreviousEpoch.SetupID)
 		}
-		if epochState.PreviousEpoch.CommitID != previousEpochCommit.ID() { // calling ID() will panic is EpochCommit event is nil
-			return nil, fmt.Errorf("supplied previous epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", previousEpochCommit.ID(), epochState.PreviousEpoch.CommitID)
+		if untrusted.PreviousEpoch.CommitID != untrusted.PreviousEpochCommit.ID() { // calling ID() will panic is EpochCommit event is nil
+			return nil, fmt.Errorf("supplied previous epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", untrusted.PreviousEpochCommit.ID(), untrusted.PreviousEpoch.CommitID)
 		}
 	} else {
-		if previousEpochSetup != nil {
+		if untrusted.PreviousEpochSetup != nil {
 			return nil, fmt.Errorf("no previous epoch but gotten non-nil EpochSetup event")
 		}
-		if previousEpochCommit != nil {
+		if untrusted.PreviousEpochCommit != nil {
 			return nil, fmt.Errorf("no previous epoch but gotten non-nil EpochCommit event")
 		}
 	}
 
 	// For current epoch: ensure respective epoch service events are not nil and consistent with commitments in `MinEpochStateEntry.CurrentEpoch`
-	if epochState.CurrentEpoch.SetupID != currentEpochSetup.ID() { // calling ID() will panic is EpochSetup event is nil
-		return nil, fmt.Errorf("supplied current epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", currentEpochSetup.ID(), epochState.CurrentEpoch.SetupID)
+	if untrusted.CurrentEpoch.SetupID != untrusted.CurrentEpochSetup.ID() { // calling ID() will panic is EpochSetup event is nil
+		return nil, fmt.Errorf("supplied current epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", untrusted.CurrentEpochSetup.ID(), untrusted.CurrentEpoch.SetupID)
 	}
-	if epochState.CurrentEpoch.CommitID != currentEpochCommit.ID() { // calling ID() will panic is EpochCommit event is nil
-		return nil, fmt.Errorf("supplied current epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", currentEpochCommit.ID(), epochState.CurrentEpoch.CommitID)
+	if untrusted.CurrentEpoch.CommitID != untrusted.CurrentEpochCommit.ID() { // calling ID() will panic is EpochCommit event is nil
+		return nil, fmt.Errorf("supplied current epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", untrusted.CurrentEpochCommit.ID(), untrusted.CurrentEpoch.CommitID)
 	}
 
 	// If we are in staking phase (i.e. epochState.NextEpoch == nil):
@@ -223,30 +307,38 @@ func NewEpochStateEntry(
 	//  (2a) Full identity table contains active identities from current epoch + nodes joining in next epoch with `EpochParticipationStatusJoining` status.
 	//  (2b) Furthermore, we also build the full identity table for the next epoch's staking phase:
 	//       active identities from next epoch + nodes from current epoch that are leaving at the end of the current epoch with `flow.EpochParticipationStatusLeaving` status.
-	nextEpoch := epochState.NextEpoch
+	nextEpoch := untrusted.NextEpoch
 	if nextEpoch == nil { // in staking phase: build full identity table for current epoch according to (1)
-		if nextEpochSetup != nil {
+		if untrusted.NextEpochSetup != nil {
 			return nil, fmt.Errorf("no next epoch but gotten non-nil EpochSetup event")
 		}
-		if nextEpochCommit != nil {
+		if untrusted.NextEpochCommit != nil {
 			return nil, fmt.Errorf("no next epoch but gotten non-nil EpochCommit event")
 		}
 	} else { // epochState.NextEpoch ≠ nil, i.e. we are in epoch setup or epoch commit phase
 		// ensure respective epoch service events are not nil and consistent with commitments in `MinEpochStateEntry.NextEpoch`
-		if nextEpoch.SetupID != nextEpochSetup.ID() {
-			return nil, fmt.Errorf("supplied next epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", nextEpoch.SetupID, nextEpochSetup.ID())
+		if nextEpoch.SetupID != untrusted.NextEpochSetup.ID() {
+			return nil, fmt.Errorf("supplied next epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", nextEpoch.SetupID, untrusted.NextEpochSetup.ID())
 		}
 		if nextEpoch.CommitID != ZeroID {
-			if nextEpoch.CommitID != nextEpochCommit.ID() {
-				return nil, fmt.Errorf("supplied next epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", nextEpoch.CommitID, nextEpochCommit.ID())
+			if nextEpoch.CommitID != untrusted.NextEpochCommit.ID() {
+				return nil, fmt.Errorf("supplied next epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", nextEpoch.CommitID, untrusted.NextEpochCommit.ID())
 			}
 		} else {
-			if nextEpochCommit != nil {
+			if untrusted.NextEpochCommit != nil {
 				return nil, fmt.Errorf("next epoch not yet committed but got EpochCommit event")
 			}
 		}
 	}
-	return result, nil
+	return &EpochStateEntry{
+		MinEpochStateEntry:  untrusted.MinEpochStateEntry,
+		PreviousEpochSetup:  untrusted.PreviousEpochSetup,
+		PreviousEpochCommit: untrusted.PreviousEpochCommit,
+		CurrentEpochSetup:   untrusted.CurrentEpochSetup,
+		CurrentEpochCommit:  untrusted.CurrentEpochCommit,
+		NextEpochSetup:      untrusted.NextEpochSetup,
+		NextEpochCommit:     untrusted.NextEpochCommit,
+	}, nil
 }
 
 // RichEpochStateEntry is a EpochStateEntry that additionally holds the canonical representation of the
@@ -266,6 +358,8 @@ func NewEpochStateEntry(
 // the Identity Table additionally contains nodes (with weight zero) from the previous or
 // upcoming epoch, which are transitioning into / out of the network and are only allowed
 // to listen but not to actively contribute.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type RichEpochStateEntry struct {
 	*EpochStateEntry
 
@@ -274,15 +368,15 @@ type RichEpochStateEntry struct {
 }
 
 // NewRichEpochStateEntry constructs a RichEpochStateEntry from an EpochStateEntry.
-// No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
-func NewRichEpochStateEntry(
-	epochState *EpochStateEntry,
-) (*RichEpochStateEntry, error) {
-	result := &RichEpochStateEntry{
-		EpochStateEntry:           epochState,
-		CurrentEpochIdentityTable: IdentityList{},
-		NextEpochIdentityTable:    IdentityList{},
+// Construction RichEpochStateEntry allowed only within the constructor.
+//
+// All errors indicate a valid RichEpochStateEntry cannot be constructed from the input.
+func NewRichEpochStateEntry(epochState *EpochStateEntry) (*RichEpochStateEntry, error) {
+	if epochState == nil {
+		return nil, fmt.Errorf("epoch state must not be nil")
 	}
+	var currentEpochIdentityTable IdentityList
+	nextEpochIdentityTable := IdentityList{}
 	// If we are in staking phase (i.e. epochState.NextEpoch == nil):
 	//  (1) Full identity table contains active identities from current epoch.
 	//      If previous epoch exists, we add nodes from previous epoch that are leaving in the current epoch with status `EpochParticipationStatusLeaving`.
@@ -299,7 +393,7 @@ func NewRichEpochStateEntry(
 			previousEpochIdentitySkeletons = previousEpochSetup.Participants
 			previousEpochDynamicIdentities = epochState.PreviousEpoch.ActiveIdentities
 		}
-		result.CurrentEpochIdentityTable, err = BuildIdentityTable(
+		currentEpochIdentityTable, err = BuildIdentityTable(
 			epochState.CurrentEpochSetup.Participants,
 			epochState.CurrentEpoch.ActiveIdentities,
 			previousEpochIdentitySkeletons,
@@ -310,7 +404,7 @@ func NewRichEpochStateEntry(
 			return nil, fmt.Errorf("could not build identity table for staking phase: %w", err)
 		}
 	} else { // epochState.NextEpoch ≠ nil, i.e. we are in epoch setup or epoch commit phase
-		result.CurrentEpochIdentityTable, err = BuildIdentityTable(
+		currentEpochIdentityTable, err = BuildIdentityTable(
 			epochState.CurrentEpochSetup.Participants,
 			epochState.CurrentEpoch.ActiveIdentities,
 			epochState.NextEpochSetup.Participants,
@@ -321,7 +415,7 @@ func NewRichEpochStateEntry(
 			return nil, fmt.Errorf("could not build identity table for setup/commit phase: %w", err)
 		}
 
-		result.NextEpochIdentityTable, err = BuildIdentityTable(
+		nextEpochIdentityTable, err = BuildIdentityTable(
 			epochState.NextEpochSetup.Participants,
 			nextEpoch.ActiveIdentities,
 			epochState.CurrentEpochSetup.Participants,
@@ -332,7 +426,12 @@ func NewRichEpochStateEntry(
 			return nil, fmt.Errorf("could not build next epoch identity table: %w", err)
 		}
 	}
-	return result, nil
+
+	return &RichEpochStateEntry{
+		EpochStateEntry:           epochState,
+		CurrentEpochIdentityTable: currentEpochIdentityTable,
+		NextEpochIdentityTable:    nextEpochIdentityTable,
+	}, nil
 }
 
 // ID returns hash of entry by hashing all fields.
@@ -360,6 +459,8 @@ func (e *MinEpochStateEntry) Copy() *MinEpochStateEntry {
 	if e == nil {
 		return nil
 	}
+	// Constructor is skipped since we're copying an already-valid object.
+	//nolint:structwrite
 	return &MinEpochStateEntry{
 		PreviousEpoch:          e.PreviousEpoch.Copy(),
 		CurrentEpoch:           *e.CurrentEpoch.Copy(),
@@ -374,6 +475,9 @@ func (e *EpochStateEntry) Copy() *EpochStateEntry {
 	if e == nil {
 		return nil
 	}
+
+	// Constructor is skipped since we're copying an already-valid object.
+	//nolint:structwrite
 	return &EpochStateEntry{
 		MinEpochStateEntry:  e.MinEpochStateEntry.Copy(),
 		PreviousEpochSetup:  e.PreviousEpochSetup,
@@ -392,6 +496,8 @@ func (e *RichEpochStateEntry) Copy() *RichEpochStateEntry {
 	if e == nil {
 		return nil
 	}
+	// Constructor is skipped since we're copying an already-valid object.
+	//nolint:structwrite
 	return &RichEpochStateEntry{
 		EpochStateEntry:           e.EpochStateEntry.Copy(),
 		CurrentEpochIdentityTable: e.CurrentEpochIdentityTable.Copy(),
