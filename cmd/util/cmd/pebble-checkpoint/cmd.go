@@ -38,7 +38,7 @@ func runE(*cobra.Command, []string) error {
 	log.Info().Msgf("creating checkpoint from Pebble database at %v to %v", flagPebbleDir, flagOutput)
 
 	// Initialize Pebble DB
-	db, err := pebble.MustOpenDefaultPebbleDB(log.Logger, flagPebbleDir)
+	db, err := pebble.ShouldOpenDefaultPebbleDB(log.Logger, flagPebbleDir)
 	if err != nil {
 		return fmt.Errorf("failed to initialize Pebble database %v: %w", flagPebbleDir, err)
 	}
