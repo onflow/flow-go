@@ -94,7 +94,7 @@ func CollectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.Collect
 }
 
 // MessageToCollectionGuarantee converts a protobuf message to a collection guarantee
-func MessageToCollectionGuarantee(m *entities.CollectionGuarantee) *flow.CollectionGuarantee {
+func MessageToCollectionGuarantee(m *entities.CollectionGuarantee) (*flow.CollectionGuarantee, error) {
 	return flow.NewCollectionGuarantee(flow.UntrustedCollectionGuarantee{
 		CollectionID:     MessageToIdentifier(m.CollectionId),
 		ReferenceBlockID: MessageToIdentifier(m.ReferenceBlockId),
@@ -114,10 +114,14 @@ func CollectionGuaranteesToMessages(c []*flow.CollectionGuarantee) []*entities.C
 }
 
 // MessagesToCollectionGuarantees converts a slice of protobuf messages to a slice of collection guarantees
-func MessagesToCollectionGuarantees(m []*entities.CollectionGuarantee) []*flow.CollectionGuarantee {
+func MessagesToCollectionGuarantees(m []*entities.CollectionGuarantee) ([]*flow.CollectionGuarantee, error) {
 	cg := make([]*flow.CollectionGuarantee, len(m))
 	for i, g := range m {
-		cg[i] = MessageToCollectionGuarantee(g)
+		guarantee, err := MessageToCollectionGuarantee(g)
+		if err == nil {
+			return nil, fmt.Errorf("invalid collection guarantee: %w", err)
+		}
+		cg[i] = guarantee
 	}
-	return cg
+	return cg, nil
 }

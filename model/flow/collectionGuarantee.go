@@ -1,6 +1,8 @@
 package flow
 
 import (
+	"fmt"
+
 	"github.com/onflow/crypto"
 )
 
@@ -29,14 +31,35 @@ type UntrustedCollectionGuarantee CollectionGuarantee
 
 // NewCollectionGuarantee creates a new instance of CollectionGuarantee.
 // Construction CollectionGuarantee allowed only within the constructor
-func NewCollectionGuarantee(untrustedGuarantee UntrustedCollectionGuarantee) *CollectionGuarantee {
-	return &CollectionGuarantee{
-		CollectionID:     untrustedGuarantee.CollectionID,
-		ReferenceBlockID: untrustedGuarantee.ReferenceBlockID,
-		ChainID:          untrustedGuarantee.ChainID,
-		SignerIndices:    untrustedGuarantee.SignerIndices,
-		Signature:        untrustedGuarantee.Signature,
+//
+// This constructor enforces basic structural validity, ensuring critical fields like
+// CollectionID and ReferenceBlockID are non-zero. Other fields — such as ChainID and Signature —
+// are not validated here for the following reasons:
+//
+//   - ChainID is currently optional or omitted in some upstream models (e.g. protobuf).
+//     This field may be empty and still represent a valid state for certain internal flows.
+//
+//   - Signature is allowed to be nil in intermediate states.(Like MakeFinal method which handles finalization logic for a block.)
+func NewCollectionGuarantee(untrusted UntrustedCollectionGuarantee) (*CollectionGuarantee, error) {
+	if untrusted.CollectionID == ZeroID {
+		return nil, fmt.Errorf("CollectionID must not be empty")
 	}
+
+	if untrusted.ReferenceBlockID == ZeroID {
+		return nil, fmt.Errorf("ReferenceBlockID must not be empty")
+	}
+
+	if len(untrusted.SignerIndices) == 0 {
+		return nil, fmt.Errorf("SignerIndices must not be empty")
+	}
+
+	return &CollectionGuarantee{
+		CollectionID:     untrusted.CollectionID,
+		ReferenceBlockID: untrusted.ReferenceBlockID,
+		ChainID:          untrusted.ChainID,
+		SignerIndices:    untrusted.SignerIndices,
+		Signature:        untrusted.Signature,
+	}, nil
 }
 
 // ID returns a collision-resistant hash of the CollectionGuarantee struct.
