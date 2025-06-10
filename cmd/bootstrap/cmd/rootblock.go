@@ -187,7 +187,11 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msgf("failed to merge node infos")
 	}
-	err = common.WriteJSON(model.PathNodeInfosPub, flagOutdir, model.ToPublicNodeInfoList(stakingNodes))
+	publicInfo, err := model.ToPublicNodeInfoList(stakingNodes)
+	if err != nil {
+		log.Fatal().Msg("failed to read public node info")
+	}
+	err = common.WriteJSON(model.PathNodeInfosPub, flagOutdir, publicInfo)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
@@ -221,7 +225,10 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing intermediary bootstrapping data")
-	epochSetup, epochCommit := constructRootEpochEvents(header.View, participants, assignments, clusterQCs, randomBeaconData, dkgIndexMap)
+	epochSetup, epochCommit, err := constructRootEpochEvents(header.View, participants, assignments, clusterQCs, randomBeaconData, dkgIndexMap)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to construct root epoch events")
+	}
 	epochConfig := generateExecutionStateEpochConfig(epochSetup, clusterQCs, randomBeaconData)
 	intermediaryEpochData := IntermediaryEpochData{
 		RootEpochSetup:       epochSetup,
@@ -244,10 +251,15 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root block")
+	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to construct epoch protocol state")
+	}
+
 	rootProtocolState, err := kvstore.NewDefaultKVStore(
 		flagFinalizationSafetyThreshold,
 		flagEpochExtensionViewCount,
-		inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit).ID(),
+		minEpochStateEntry.ID(),
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to construct root kvstore")
