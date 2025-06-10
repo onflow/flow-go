@@ -236,7 +236,8 @@ func TestClusters(t *testing.T) {
 	rootProtocolState, err := kvstore.NewDefaultKVStore(
 		safetyParams.FinalizationSafetyThreshold,
 		safetyParams.EpochExtensionViewCount,
-		minEpochStateEntry.ID())
+		minEpochStateEntry.ID(),
+	)
 	require.NoError(t, err)
 	root.Payload.ProtocolStateID = rootProtocolState.ID()
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
