@@ -28,6 +28,11 @@ type MigrationConfig struct {
 	// a lot more data than others, we might choose to use 2 or 3 bytes to divide the key space, so that
 	// the redaer worker can concurrently iterate keys with the same prefix bytes (same table).
 	ReaderShardPrefixBytes int
+
+	// ValidationMode determines how thorough the validation should be
+	// - PartialValidation: only checks min/max keys for each prefix (faster)
+	// - FullValidation: checks all keys in the database (more thorough)
+	ValidationMode ValidationMode
 }
 
 type KVPairs struct {
