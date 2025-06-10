@@ -20,15 +20,15 @@ func (id NestedTransactionId) StateForTestingOnly() *ExecutionState {
 }
 
 type Meter interface {
-	MeterComputation(kind common.ComputationKind, intensity uint) error
-	ComputationAvailable(kind common.ComputationKind, intensity uint) bool
-	ComputationRemaining(kind common.ComputationKind) uint
+	MeterComputation(usage common.ComputationUsage) error
+	ComputationAvailable(usage common.ComputationUsage) bool
+	ComputationRemaining(kind common.ComputationKind) uint64
 	ComputationIntensities() meter.MeteredComputationIntensities
-	TotalComputationLimit() uint
+	TotalComputationLimit() uint64
 	TotalComputationUsed() uint64
 
-	MeterMemory(kind common.MemoryKind, intensity uint) error
-	MemoryIntensities() meter.MeteredMemoryIntensities
+	MeterMemory(usage common.MemoryUsage) error
+	MemoryAmounts() meter.MeteredMemoryAmounts
 	TotalMemoryEstimate() uint64
 
 	InteractionUsed() uint64
@@ -445,36 +445,27 @@ func (txnState *transactionState) Set(
 	return txnState.current().Set(id, value)
 }
 
-func (txnState *transactionState) MeterComputation(
-	kind common.ComputationKind,
-	intensity uint,
-) error {
-	return txnState.current().MeterComputation(kind, intensity)
+func (txnState *transactionState) MeterComputation(usage common.ComputationUsage) error {
+	return txnState.current().MeterComputation(usage)
 }
 
-func (txnState *transactionState) ComputationAvailable(
-	kind common.ComputationKind,
-	intensity uint,
-) bool {
-	return txnState.current().ComputationAvailable(kind, intensity)
+func (txnState *transactionState) ComputationAvailable(usage common.ComputationUsage) bool {
+	return txnState.current().ComputationAvailable(usage)
 }
 
-func (txnState *transactionState) ComputationRemaining(kind common.ComputationKind) uint {
+func (txnState *transactionState) ComputationRemaining(kind common.ComputationKind) uint64 {
 	return txnState.current().ComputationRemaining(kind)
 }
 
-func (txnState *transactionState) MeterMemory(
-	kind common.MemoryKind,
-	intensity uint,
-) error {
-	return txnState.current().MeterMemory(kind, intensity)
+func (txnState *transactionState) MeterMemory(usage common.MemoryUsage) error {
+	return txnState.current().MeterMemory(usage)
 }
 
 func (txnState *transactionState) ComputationIntensities() meter.MeteredComputationIntensities {
 	return txnState.current().ComputationIntensities()
 }
 
-func (txnState *transactionState) TotalComputationLimit() uint {
+func (txnState *transactionState) TotalComputationLimit() uint64 {
 	return txnState.current().TotalComputationLimit()
 }
 
@@ -482,8 +473,8 @@ func (txnState *transactionState) TotalComputationUsed() uint64 {
 	return txnState.current().TotalComputationUsed()
 }
 
-func (txnState *transactionState) MemoryIntensities() meter.MeteredMemoryIntensities {
-	return txnState.current().MemoryIntensities()
+func (txnState *transactionState) MemoryAmounts() meter.MeteredMemoryAmounts {
+	return txnState.current().MemoryAmounts()
 }
 
 func (txnState *transactionState) TotalMemoryEstimate() uint64 {

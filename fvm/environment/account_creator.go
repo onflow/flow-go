@@ -253,7 +253,12 @@ func (creator *accountCreator) CreateAccount(
 ) {
 	defer creator.tracer.StartChildSpan(trace.FVMEnvCreateAccount).End()
 
-	err := creator.meter.MeterComputation(ComputationKindCreateAccount, 1)
+	err := creator.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindCreateAccount,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return common.Address{}, err
 	}

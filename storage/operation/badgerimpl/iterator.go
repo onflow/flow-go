@@ -6,6 +6,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 type badgerIterator struct {
@@ -23,6 +24,7 @@ func newBadgerIterator(db *badger.DB, startPrefix, endPrefix []byte, ops storage
 	if ops.BadgerIterateKeyOnly {
 		options.PrefetchValues = false
 	}
+	options.Prefix = operation.CommonPrefix(startPrefix, endPrefix)
 
 	tx := db.NewTransaction(false)
 	iter := tx.NewIterator(options)

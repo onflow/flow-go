@@ -25,12 +25,17 @@ func NewCommits(collector module.CacheMetrics, db storage.DB) *Commits {
 		return commit, err
 	}
 
+	remove := func(rw storage.ReaderBatchWriter, blockID flow.Identifier) error {
+		return operation.RemoveStateCommitment(rw.Writer(), blockID)
+	}
+
 	c := &Commits{
 		db: db,
 		cache: newCache(collector, metrics.ResourceCommit,
 			withLimit[flow.Identifier, flow.StateCommitment](1000),
 			withStore(store),
 			withRetrieve(retrieve),
+			withRemove[flow.Identifier, flow.StateCommitment](remove),
 		),
 	}
 
@@ -70,7 +75,7 @@ func (c *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, erro
 
 func (c *Commits) RemoveByBlockID(blockID flow.Identifier) error {
 	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.RemoveStateCommitment(rw.Writer(), blockID)
+		return c.BatchRemoveByBlockID(blockID, rw)
 	})
 }
 
@@ -78,5 +83,5 @@ func (c *Commits) RemoveByBlockID(blockID flow.Identifier) error {
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (c *Commits) BatchRemoveByBlockID(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-	return operation.RemoveStateCommitment(rw.Writer(), blockID)
+	return c.cache.RemoveTx(rw, blockID)
 }

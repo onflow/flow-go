@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/onflow/cadence/common"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -187,8 +188,11 @@ func (generator *uUIDGenerator) GenerateUUID() (uint64, error) {
 		trace.FVMEnvGenerateUUID).End()
 
 	err := generator.meter.MeterComputation(
-		ComputationKindGenerateUUID,
-		1)
+		common.ComputationUsage{
+			Kind:      ComputationKindGenerateUUID,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return 0, fmt.Errorf("generate uuid failed: %w", err)
 	}

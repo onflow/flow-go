@@ -262,7 +262,7 @@ func _() {
 }
 
 type ExecutionMemoryWeights map[common.MemoryKind]uint64
-type MeteredMemoryIntensities map[common.MemoryKind]uint
+type MeteredMemoryAmounts map[common.MemoryKind]uint64
 
 type MemoryMeterParameters struct {
 	memoryLimit   uint64
@@ -302,33 +302,36 @@ func (params MeterParameters) WithMemoryWeights(
 type MemoryMeter struct {
 	params MemoryMeterParameters
 
-	memoryIntensities MeteredMemoryIntensities
-	memoryEstimate    uint64
+	memoryAmounts  MeteredMemoryAmounts
+	memoryEstimate uint64
 }
 
-// MemoryIntensities returns all the measured memory intensities
-func (m *MemoryMeter) MemoryIntensities() MeteredMemoryIntensities {
-	return m.memoryIntensities
+// MemoryAmounts returns all the measured memory amounts
+func (m *MemoryMeter) MemoryAmounts() MeteredMemoryAmounts {
+	return m.memoryAmounts
 }
 
 // NewMemoryMeter constructs a new Meter
 func NewMemoryMeter(params MemoryMeterParameters) MemoryMeter {
 	m := MemoryMeter{
-		params:            params,
-		memoryIntensities: make(MeteredMemoryIntensities),
+		params:        params,
+		memoryAmounts: make(MeteredMemoryAmounts),
 	}
 
 	return m
 }
 
 // MeterMemory captures memory usage and returns an error if it goes beyond the limit
-func (m *MemoryMeter) MeterMemory(kind common.MemoryKind, intensity uint) error {
-	m.memoryIntensities[kind] += intensity
+func (m *MemoryMeter) MeterMemory(usage common.MemoryUsage) error {
+	kind := usage.Kind
+	amount := usage.Amount
+
+	m.memoryAmounts[kind] += amount
 	w, ok := m.params.memoryWeights[kind]
 	if !ok {
 		return nil
 	}
-	m.memoryEstimate += w * uint64(intensity)
+	m.memoryEstimate += w * amount
 	if m.memoryEstimate > m.params.memoryLimit {
 		return errors.NewMemoryLimitExceededError(m.params.TotalMemoryLimit())
 	}
@@ -344,7 +347,7 @@ func (m *MemoryMeter) TotalMemoryEstimate() uint64 {
 func (m *MemoryMeter) Merge(child MemoryMeter) {
 	m.memoryEstimate = m.memoryEstimate + child.TotalMemoryEstimate()
 
-	for key, intensity := range child.memoryIntensities {
-		m.memoryIntensities[key] += intensity
+	for key, intensity := range child.memoryAmounts {
+		m.memoryAmounts[key] += intensity
 	}
 }

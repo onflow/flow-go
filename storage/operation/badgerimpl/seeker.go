@@ -7,6 +7,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 type badgerSeeker struct {
@@ -32,6 +33,7 @@ func (i *badgerSeeker) SeekLE(startPrefix, key []byte) ([]byte, error) {
 	options := badger.DefaultIteratorOptions
 	options.PrefetchValues = false
 	options.Reverse = true
+	options.Prefix = operation.CommonPrefix(startPrefix, key)
 
 	tx := i.db.NewTransaction(false)
 	iter := tx.NewIterator(options)

@@ -14,18 +14,18 @@ type TransactionResultErrorMessages struct {
 	// before any future reads. However, we're keeping it temporarily during active development
 	// for safety and debugging purposes. It will be removed once the implementation is finalized.
 	lock       sync.RWMutex
-	store      map[string]*flow.TransactionResultErrorMessage
-	indexStore map[string]*flow.TransactionResultErrorMessage
-	blockStore map[string][]flow.TransactionResultErrorMessage
+	store      map[store.TwoIdentifier]*flow.TransactionResultErrorMessage       // Key: blockID + txID
+	indexStore map[store.IdentifierAndUint32]*flow.TransactionResultErrorMessage // Key: blockID + txIndex
+	blockStore map[flow.Identifier][]flow.TransactionResultErrorMessage          // Key: blockID
 }
 
 var _ storage.TransactionResultErrorMessages = (*TransactionResultErrorMessages)(nil)
 
 func NewTransactionResultErrorMessages() *TransactionResultErrorMessages {
 	return &TransactionResultErrorMessages{
-		store:      make(map[string]*flow.TransactionResultErrorMessage),
-		indexStore: make(map[string]*flow.TransactionResultErrorMessage),
-		blockStore: make(map[string][]flow.TransactionResultErrorMessage),
+		store:      make(map[store.TwoIdentifier]*flow.TransactionResultErrorMessage),
+		indexStore: make(map[store.IdentifierAndUint32]*flow.TransactionResultErrorMessage),
+		blockStore: make(map[flow.Identifier][]flow.TransactionResultErrorMessage),
 	}
 }
 
@@ -91,11 +91,10 @@ func (t *TransactionResultErrorMessages) ByBlockIDTransactionIndex(
 // Expected errors during normal operation:
 //   - `storage.ErrNotFound` if no block was found.
 func (t *TransactionResultErrorMessages) ByBlockID(id flow.Identifier) ([]flow.TransactionResultErrorMessage, error) {
-	key := store.KeyFromBlockID(id)
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	val, ok := t.blockStore[key]
+	val, ok := t.blockStore[id]
 	if !ok {
 		return nil, storage.ErrNotFound
 	}
@@ -110,11 +109,10 @@ func (t *TransactionResultErrorMessages) Store(
 	blockID flow.Identifier,
 	transactionResultErrorMessages []flow.TransactionResultErrorMessage,
 ) error {
-	key := store.KeyFromBlockID(blockID)
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	t.blockStore[key] = transactionResultErrorMessages
+	t.blockStore[blockID] = transactionResultErrorMessages
 	for i, txResult := range transactionResultErrorMessages {
 		txIDKey := store.KeyFromBlockIDTransactionID(blockID, txResult.TransactionID)
 		txIndexKey := store.KeyFromBlockIDIndex(blockID, uint32(i))
@@ -124,4 +122,16 @@ func (t *TransactionResultErrorMessages) Store(
 	}
 
 	return nil
+}
+
+// Data returns a copy of all stored transaction result error messages keyed by block ID.
+func (t *TransactionResultErrorMessages) Data() []flow.TransactionResultErrorMessage {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	out := make([]flow.TransactionResultErrorMessage, 0, len(t.blockStore))
+	for _, errorMessages := range t.blockStore {
+		out = append(out, errorMessages...)
+	}
+	return out
 }

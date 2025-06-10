@@ -375,7 +375,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	bc.SealsPL = &mempool.IncorporatedResultSeals{}
 	bc.SealsPL.On("Size").Return(uint(0)).Maybe() // only for metrics
 	bc.SealsPL.On("Limit").Return(uint(1000)).Maybe()
-	bc.SealsPL.On("ByID", mock.Anything).Return(
+	bc.SealsPL.On("Get", mock.Anything).Return(
 		func(sealID flow.Identifier) *flow.IncorporatedResultSeal {
 			return bc.PendingSeals[sealID]
 		},

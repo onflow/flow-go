@@ -55,4 +55,9 @@ func TestEvents_HappyPath(t *testing.T) {
 	assert.Len(t, typeEvents, 2)
 	assert.Contains(t, typeEvents, event1)
 	assert.Contains(t, typeEvents, event3)
+
+	// Extract structured data
+	events := eventsStore.Data()
+	require.Len(t, events, len(expectedStoredEvents))
+	require.ElementsMatch(t, events, expectedStoredEvents)
 }
