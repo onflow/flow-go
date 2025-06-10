@@ -148,7 +148,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	rootBlock := unittest.BlockFixture()
 	parent := rootBlock.ToHeader()
-	suite.blockMap[rootBlock.Header.Height] = &rootBlock
+	suite.blockMap[rootBlock.Header.Height] = rootBlock
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)

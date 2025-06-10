@@ -217,15 +217,15 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// Construct the [first] block:
 	first := unittest.BlockFixture()
-	bs.storeBlock(&first)
+	bs.storeBlock(first)
 	bs.firstID = first.ID()
-	firstResult := unittest.ExecutionResultFixture(unittest.WithBlock(&first))
+	firstResult := unittest.ExecutionResultFixture(unittest.WithBlock(first))
 	bs.lastSeal = unittest.Seal.Fixture(unittest.Seal.WithResult(firstResult))
 	bs.resultForBlock[firstResult.BlockID] = firstResult
 	bs.resultByID[firstResult.ID()] = firstResult
 
 	// Construct finalized blocks [F0] ... [F4]
-	previous := &first
+	previous := first
 	for n := 0; n < numFinalizedBlocks; n++ {
 		finalized := bs.createAndRecordBlock(previous, n > 0) // Do not construct candidate seal for [first], as it is already sealed
 		bs.finalizedBlockIDs = append(bs.finalizedBlockIDs, finalized.ID())

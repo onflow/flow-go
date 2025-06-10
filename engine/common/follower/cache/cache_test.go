@@ -110,7 +110,7 @@ func (s *CacheSuite) TestBlocksAreNotConnected() {
 // We expect that A will get certified after adding B.
 func (s *CacheSuite) TestChildCertifiesParent() {
 	block := unittest.BlockFixture()
-	proposal := unittest.ProposalFromBlock(&block)
+	proposal := unittest.ProposalFromBlock(block)
 	certifiedBatch, err := s.cache.AddBlocks([]*flow.BlockProposal{proposal})
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), certifiedBatch)
@@ -283,7 +283,7 @@ func (s *CacheSuite) TestMultipleChildrenForSameParent() {
 	B := unittest.BlockWithParentFixture(A.ToHeader())
 	C := unittest.BlockWithParentFixture(A.ToHeader())
 	C.Header.View = B.Header.View + 1 // make sure views are different
-	Ap := unittest.ProposalFromBlock(&A)
+	Ap := unittest.ProposalFromBlock(A)
 	Bp := unittest.ProposalFromBlock(B)
 	Cp := unittest.ProposalFromBlock(C)
 
@@ -312,7 +312,7 @@ func (s *CacheSuite) TestChildEjectedBeforeAddingParent() {
 	C := unittest.BlockWithParentFixture(A.ToHeader())
 	C.Header.View = B.Header.View + 1 // make sure views are different
 
-	Ap := unittest.ProposalFromBlock(&A)
+	Ap := unittest.ProposalFromBlock(A)
 	Bp := unittest.ProposalFromBlock(B)
 	Cp := unittest.ProposalFromBlock(C)
 	_, err := s.cache.AddBlocks([]*flow.BlockProposal{Bp})

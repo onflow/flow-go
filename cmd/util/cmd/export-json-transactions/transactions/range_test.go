@@ -23,27 +23,37 @@ func TestFindBlockTransactions(t *testing.T) {
 		col2 := unittest.ClusterPayloadFixture(2)
 		col3 := unittest.ClusterPayloadFixture(3)
 
-		b1 := unittest.BlockFixture()
-		b1.Payload.Guarantees = []*flow.CollectionGuarantee{
-			&flow.CollectionGuarantee{
-				CollectionID:     col1.Collection.ID(),
-				ReferenceBlockID: col1.ReferenceBlockID,
-			},
-			&flow.CollectionGuarantee{
-				CollectionID:     col2.Collection.ID(),
-				ReferenceBlockID: col2.ReferenceBlockID,
-			},
-		}
-		b1.Header.Height = 4
+		b1 := unittest.BlockFixture(
+			unittest.Block.WithHeight(4),
+			unittest.Block.WithPayload(
+				flow.Payload{
+					Guarantees: []*flow.CollectionGuarantee{
+						&flow.CollectionGuarantee{
+							CollectionID:     col1.Collection.ID(),
+							ReferenceBlockID: col1.ReferenceBlockID,
+						},
+						&flow.CollectionGuarantee{
+							CollectionID:     col2.Collection.ID(),
+							ReferenceBlockID: col2.ReferenceBlockID,
+						},
+					},
+				},
+			),
+		)
 
-		b2 := unittest.BlockFixture()
-		b2.Payload.Guarantees = []*flow.CollectionGuarantee{
-			&flow.CollectionGuarantee{
-				CollectionID:     col3.Collection.ID(),
-				ReferenceBlockID: col3.ReferenceBlockID,
-			},
-		}
-		b1.Header.Height = 5
+		b2 := unittest.BlockFixture(
+			unittest.Block.WithHeight(5),
+			unittest.Block.WithPayload(
+				flow.Payload{
+					Guarantees: []*flow.CollectionGuarantee{
+						&flow.CollectionGuarantee{
+							CollectionID:     col3.Collection.ID(),
+							ReferenceBlockID: col3.ReferenceBlockID,
+						},
+					},
+				},
+			),
+		)
 
 		// prepare dependencies
 		storages := common.InitStorages(db)

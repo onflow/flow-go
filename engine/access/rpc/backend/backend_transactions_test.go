@@ -114,7 +114,7 @@ func (suite *Suite) TestGetTransactionResultReturnsTransactionError() {
 
 		suite.blocks.
 			On("ByID", block.ID()).
-			Return(&block, nil).
+			Return(block, nil).
 			Once()
 
 		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
@@ -194,7 +194,7 @@ func (suite *Suite) withGetTransactionCachingTestSetup(f func(b *flow.Block, t *
 
 		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
 
-		f(&block, &tx)
+		f(block, &tx)
 	})
 }
 
@@ -352,7 +352,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_HappyPath()
 	failedTxIndex := rand.Uint32()
 
 	// Setup mock receipts and execution node identities.
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -426,7 +426,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_FailedToFet
 	failedTxId := failedTx.ID()
 
 	// Setup mock receipts and execution node identities.
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -534,7 +534,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 	failedTxIndex := rand.Uint32()
 
 	// Setup mock receipts and execution node identities.
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -609,7 +609,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 	failedTxId := failedTx.ID()
 
 	// Setup mock receipts and execution node identities.
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -725,7 +725,7 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_HappyPath() {
 		})
 	}
 
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -824,7 +824,7 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_FailedToFetch() 
 	blockId := block.ID()
 
 	// Setup mock receipts and execution node identities.
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -1068,7 +1068,7 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 	// Mock the behavior of the blocks and transactionResults objects
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil).
+		Return(block, nil).
 		Once()
 
 	lightTxShouldFail := false
@@ -1237,7 +1237,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 func (suite *Suite) assertTransactionResultResponse(
 	err error,
 	response *accessmodel.TransactionResult,
-	block flow.Block,
+	block *flow.Block,
 	txId flow.Identifier,
 	txFailed bool,
 	eventsForTx []flow.Event,
@@ -1279,7 +1279,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	// Mock the behavior of the blocks and transactionResults objects
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil)
+		Return(block, nil)
 
 	suite.transactionResults.On("ByBlockIDTransactionID", blockId, txId).
 		Return(&flow.LightTransactionResult{
@@ -1308,7 +1308,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	suite.events.On("ByBlockIDTransactionID", blockId, txId).Return(eventsForTx, nil)
 
 	// Set up the state and snapshot mocks
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
@@ -1375,7 +1375,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	// Mock the behavior of the blocks and transactionResults objects
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil)
+		Return(block, nil)
 
 	suite.transactionResults.On("ByBlockIDTransactionIndex", blockId, txIndex).
 		Return(&flow.LightTransactionResult{
@@ -1396,7 +1396,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	suite.events.On("ByBlockIDTransactionIndex", blockId, txIndex).Return(eventsForTx, nil)
 
 	// Set up the state and snapshot mocks
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
@@ -1455,7 +1455,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	// Mock the behavior of the blocks, collections and light transaction results objects
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil)
+		Return(block, nil)
 	lightCol := col.Light()
 	suite.collections.On("LightByID", mock.Anything).Return(&lightCol, nil)
 
@@ -1490,7 +1490,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	suite.events.On("ByBlockIDTransactionID", blockId, mock.Anything).Return(eventsForTx, nil)
 
 	// Set up the state and snapshot mocks
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
