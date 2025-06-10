@@ -11,8 +11,9 @@ import (
 	"github.com/cockroachdb/pebble/sstable"
 	"github.com/cockroachdb/pebble/vfs"
 	"github.com/dgraph-io/badger/v2"
-	"github.com/onflow/flow-go/module/util"
 	"github.com/rs/zerolog/log"
+
+	"github.com/onflow/flow-go/module/util"
 )
 
 // CopyFromBadgerToPebble copies all key-value pairs from a BadgerDB to a PebbleDB
