@@ -251,10 +251,15 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root block")
+	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to construct epoch protocol state")
+	}
+
 	rootProtocolState, err := kvstore.NewDefaultKVStore(
 		flagFinalizationSafetyThreshold,
 		flagEpochExtensionViewCount,
-		inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit).ID(),
+		minEpochStateEntry.ID(),
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to construct root kvstore")
