@@ -1,5 +1,12 @@
 package flow
 
+import (
+	"fmt"
+
+	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
+	"github.com/onflow/flow-go/model/fingerprint"
+)
+
 // Collection is an ordered list of transactions.
 // Collections form a part of the payload of cluster blocks, produced by Collection Nodes.
 // Every Collection maps 1-1 to a Chunk, which is used for transaction execution.
@@ -22,9 +29,38 @@ func (c Collection) ID() Identifier {
 	return c.Light().ID()
 }
 
+func (c Collection) Fingerprint() []byte {
+	var txs []byte
+	for _, tx := range c.Transactions {
+		txs = append(txs, tx.Fingerprint()...)
+	}
+	return fingerprint.Fingerprint(struct {
+		Transactions []byte
+	}{
+		Transactions: txs,
+	})
+}
+
 // Len returns the number of transactions in the collection.
 func (c Collection) Len() int {
 	return len(c.Transactions)
+}
+
+// UnmarshalCBOR ensures that a collection received as part of a network message does not contain nil transactions.
+func (c *Collection) UnmarshalCBOR(data []byte) error {
+	type untrustedCollection Collection
+	var untrusted untrustedCollection
+	err := cborcodec.DefaultDecMode.Unmarshal(data, &untrusted)
+	if err != nil {
+		return err
+	}
+	for _, tx := range untrusted.Transactions {
+		if tx == nil {
+			return fmt.Errorf("collection contains nil transaction")
+		}
+	}
+	*c = Collection(untrusted)
+	return nil
 }
 
 // LightCollection contains cryptographic commitments to the constituent transactions instead of transaction bodies.
