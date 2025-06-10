@@ -428,394 +428,395 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 			}
 		}
 	})
+}
 
-	t.Run("authentication schemes", func(t *testing.T) {
-		h := hash.SHA2_256
-		s := onflowCrypto.ECDSAP256
+// TestTransactionAuthenticationSchemes tests transaction signature verifications
+// with a focus on authentication schemes.
+func TestTransactionAuthenticationSchemes(t *testing.T) {
+	seedLength := 32
+	h := hash.SHA2_256
+	s := onflowCrypto.ECDSAP256
 
-		transactionBody := transactionBodyScaffold{
-			flow.TransactionBody{
-				Script: []byte("some script"),
-				Arguments: [][]byte{
-					[]byte("arg1"),
-				},
-				ReferenceBlockID: flow.HashToID([]byte("some block id")),
-				GasLimit:         1000,
-				Payer:            flow.EmptyAddress,
-				ProposalKey: flow.ProposalKey{
-					Address:        flow.EmptyAddress,
-					KeyIndex:       0,
-					SequenceNumber: 0,
-				},
-				Authorizers: []flow.Address{
-					flow.EmptyAddress,
-				},
-				PayloadSignatures: []flow.TransactionSignature{
-					{
-						Address:     flow.EmptyAddress,
-						KeyIndex:    0,
-						Signature:   []byte("signature"), // Mock signature, not validated
-						SignerIndex: 0,
-					},
-				},
-				EnvelopeSignatures: []flow.TransactionSignature{
-					{
-						Address:     flow.EmptyAddress,
-						KeyIndex:    0,
-						Signature:   []byte("placeholder"),
-						SignerIndex: 0,
-					},
-				},
-			}}
-
-		t.Run("plain authentication schemes", func(t *testing.T) {
-			cases := []struct {
-				payloadExtensionData                   []byte
-				expectedEnvelopeSignatureCanonicalForm func(tb transactionBodyScaffold) []byte
-				require                                func(t *testing.T, sigOk bool, err error)
-			}{
+	transactionBody := transactionBodyScaffold{
+		flow.TransactionBody{
+			Script: []byte("some script"),
+			Arguments: [][]byte{
+				[]byte("arg1"),
+			},
+			ReferenceBlockID: flow.HashToID([]byte("some block id")),
+			GasLimit:         1000,
+			Payer:            flow.EmptyAddress,
+			ProposalKey: flow.ProposalKey{
+				Address:        flow.EmptyAddress,
+				KeyIndex:       0,
+				SequenceNumber: 0,
+			},
+			Authorizers: []flow.Address{
+				flow.EmptyAddress,
+			},
+			PayloadSignatures: []flow.TransactionSignature{
 				{
-					payloadExtensionData: nil,
-					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScaffold) []byte {
-						return fingerprint.Fingerprint(struct {
-							Payload           interface{}
-							PayloadSignatures interface{}
-						}{
-							tb.payloadCanonicalForm(),
-							[]interface{}{
-								// Expected canonical form of payload signature
-								struct {
-									SignerIndex uint
-									KeyID       uint
-									Signature   []byte
-								}{
-									SignerIndex: uint(tb.PayloadSignatures[0].SignerIndex),
-									KeyID:       uint(tb.PayloadSignatures[0].KeyIndex),
-									Signature:   tb.PayloadSignatures[0].Signature,
-								},
-							},
-						})
-					},
-					require: func(t *testing.T, sigOk bool, err error) {
-						require.NoError(t, err)
-						require.True(t, sigOk)
-					},
+					Address:     flow.EmptyAddress,
+					KeyIndex:    0,
+					Signature:   []byte("signature"), // Mock signature, not validated
+					SignerIndex: 0,
 				},
+			},
+			EnvelopeSignatures: []flow.TransactionSignature{
 				{
-					payloadExtensionData: []byte{},
-					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScaffold) []byte {
-						return fingerprint.Fingerprint(struct {
-							Payload           interface{}
-							PayloadSignatures interface{}
-						}{
-							tb.payloadCanonicalForm(),
-							[]interface{}{
-								// Expected canonical form of payload signature
-								struct {
-									SignerIndex uint
-									KeyID       uint
-									Signature   []byte
-								}{
-									SignerIndex: uint(tb.PayloadSignatures[0].SignerIndex),
-									KeyID:       uint(tb.PayloadSignatures[0].KeyIndex),
-									Signature:   tb.PayloadSignatures[0].Signature,
-								},
-							},
-						})
-					},
-					require: func(t *testing.T, sigOk bool, err error) {
-						require.NoError(t, err)
-						require.True(t, sigOk)
-					},
-				}, {
-					payloadExtensionData: []byte{0x0},
-					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScaffold) []byte {
-						return fingerprint.Fingerprint(struct {
-							Payload           interface{}
-							PayloadSignatures interface{}
-						}{
-							tb.payloadCanonicalForm(),
-							[]interface{}{
-								// NON-expected canonical form of payload signature
-								struct {
-									SignerIndex   uint
-									KeyID         uint
-									Signature     []byte
-									ExtensionData []byte
-								}{
-									SignerIndex:   uint(tb.PayloadSignatures[0].SignerIndex),
-									KeyID:         uint(tb.PayloadSignatures[0].KeyIndex),
-									Signature:     tb.PayloadSignatures[0].Signature,
-									ExtensionData: []byte{0x0},
-								},
-							},
-						})
-					},
-					require: func(t *testing.T, sigOk bool, err error) {
-						require.NoError(t, err)
-						require.False(t, sigOk)
-					},
-				}, {
-					payloadExtensionData: []byte{0x0},
-					expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScaffold) []byte {
-						return fingerprint.Fingerprint(struct {
-							Payload           interface{}
-							PayloadSignatures interface{}
-						}{
-							tb.payloadCanonicalForm(),
-							[]interface{}{
-								// Expected canonical form of payload signature
-								struct {
-									SignerIndex uint
-									KeyID       uint
-									Signature   []byte
-								}{
-									SignerIndex: uint(tb.PayloadSignatures[0].SignerIndex),
-									KeyID:       uint(tb.PayloadSignatures[0].KeyIndex),
-									Signature:   tb.PayloadSignatures[0].Signature,
-								},
-							},
-						})
-					},
-					require: func(t *testing.T, sigOk bool, err error) {
-						require.NoError(t, err)
-						require.True(t, sigOk)
-					},
+					Address:     flow.EmptyAddress,
+					KeyIndex:    0,
+					Signature:   []byte("placeholder"),
+					SignerIndex: 0,
 				},
-			}
+			},
+		}}
 
-			for _, c := range cases {
-
-				t.Run(fmt.Sprintf("auth scheme (payloadExtensionData): %v", c.payloadExtensionData), func(t *testing.T) {
-					seed := make([]byte, seedLength)
-					_, err := rand.Read(seed)
-					require.NoError(t, err)
-					sk, err := onflowCrypto.GeneratePrivateKey(s, seed)
-					require.NoError(t, err)
-
-					hasher, err := crypto.NewPrefixedHashing(h, flow.TransactionTagString)
-					require.NoError(t, err)
-
-					transactionBody.PayloadSignatures[0].ExtensionData = c.payloadExtensionData
-					transactionMessage := transactionBody.EnvelopeMessage()
-
-					sig, err := sk.Sign(transactionMessage, hasher)
-					require.NoError(t, err)
-					signature := sig.Bytes()
-
-					// generate expected envelope data
-					expectedEnvelopeMessage := c.expectedEnvelopeSignatureCanonicalForm(transactionBody)
-
-					ok, err := crypto.VerifySignatureFromTransaction(signature, expectedEnvelopeMessage, sk.PublicKey(), h, c.payloadExtensionData)
-					c.require(t, ok, err)
-				})
-
-			}
-		})
-
-		t.Run("authn authentication schemes", func(t *testing.T) {
-			hasher, err := crypto.NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)
-			require.NoError(t, err)
-
-			transactionMessage := transactionBody.EnvelopeMessage()
-			authNChallenge := hasher.ComputeHash(transactionMessage)
-			authNChallengeBase64Url := base64.URLEncoding.EncodeToString(authNChallenge)
-			validUserFlag := byte(0x01)
-			validClientDataOrigin := "https://testing.com"
-			rpIDHash := unittest.RandomBytes(32)
-			sigCounter := unittest.RandomBytes(4)
-
-			// For use in cases where you're testing the other value
-			validAuthenticatorData := slices.Concat(rpIDHash, []byte{validUserFlag}, sigCounter)
-			validClientDataJSON := map[string]string{
-				"type":      crypto.WebAuthnTypeGet,
-				"challenge": authNChallengeBase64Url,
-				"origin":    validClientDataOrigin,
-			}
-
-			cases := []struct {
-				description       string
-				authenticatorData []byte
-				clientDataJSON    map[string]string
-				require           func(t *testing.T, sigOk bool, err error)
-			}{
-				{
-					description:       "Cannot be just the scheme, not enough info",
-					authenticatorData: []byte{},
-					clientDataJSON:    map[string]string{},
-					require: func(t *testing.T, sigOk bool, err error) {
-						require.NoError(t, err)
-						require.False(t, sigOk)
-					},
-				}, {
-					description:       "invalid user flag (UP not set)",
-					authenticatorData: slices.Concat(rpIDHash, []byte{0x0}, sigCounter),
-					clientDataJSON:    validClientDataJSON,
-					require: func(t *testing.T, sigOk bool, err error) {
-						require.NoError(t, err)
-						require.False(t, sigOk)
-					},
-				}, {
-					description:       "invalid user flag (extensions exist but flag (AT and ED) not set)",
-					authenticatorData: slices.Concat(rpIDHash, []byte{validUserFlag}, sigCounter, unittest.RandomBytes(mrand.Intn(20))),
-					clientDataJSON:    validClientDataJSON,
-					require: func(t *testing.T, sigOk bool, err error) {
-						require.NoError(t, err)
-						require.False(t, sigOk)
-					},
-				}, {
-					description:       "invalid user flag (extensions do not exist but flag AT is set)",
-					authenticatorData: slices.Concat(rpIDHash, []byte{validUserFlag | 0x40}, sigCounter),
-					clientDataJSON: map[string]string{
-						"type":      crypto.WebAuthnTypeGet,
-						"challenge": authNChallengeBase64Url,
-						"origin":    validClientDataOrigin,
-					},
-					require: func(t *testing.T, sigOk bool, err error) {
-						require.NoError(t, err)
-						require.False(t, sigOk)
-					},
-				}, {
-					description:       "invalid user flag (extensions do not exist but flag ED is set)",
-					authenticatorData: slices.Concat(rpIDHash, []byte{validUserFlag | 0x80}, sigCounter),
-					clientDataJSON: map[string]string{
-						"type":      crypto.WebAuthnTypeGet,
-						"challenge": authNChallengeBase64Url,
-						"origin":    validClientDataOrigin,
-					},
-					require: func(t *testing.T, sigOk bool, err error) {
-						require.NoError(t, err)
-						require.False(t, sigOk)
-					},
-				}, {
-					description:       "invalid client data type",
-					authenticatorData: validAuthenticatorData,
-					clientDataJSON: map[string]string{
-						"type":      "invalid_type",
-						"challenge": authNChallengeBase64Url,
-						"origin":    validClientDataOrigin,
-					},
-					require: func(t *testing.T, sigOk bool, err error) {
-						require.NoError(t, err)
-						require.False(t, sigOk)
-					},
-				}, {
-					description:       "empty origin (valid)",
-					authenticatorData: validAuthenticatorData,
-					clientDataJSON: map[string]string{
-						"type":      crypto.WebAuthnTypeGet,
-						"challenge": authNChallengeBase64Url,
-						"origin":    "",
-					},
-					require: func(t *testing.T, sigOk bool, err error) {
-						require.NoError(t, err)
-						require.True(t, sigOk)
-					},
-				}, {
-					description:       "valid authn scheme signature",
-					authenticatorData: validAuthenticatorData,
-					clientDataJSON:    validClientDataJSON,
-					require: func(t *testing.T, sigOk bool, err error) {
-						require.NoError(t, err)
-						require.True(t, sigOk)
-					},
+	t.Run("plain authentication schemes", func(t *testing.T) {
+		cases := []struct {
+			payloadExtensionData                   []byte
+			expectedEnvelopeSignatureCanonicalForm func(tb transactionBodyScaffold) []byte
+			require                                func(t *testing.T, sigOk bool, err error)
+		}{
+			{
+				payloadExtensionData: nil,
+				expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScaffold) []byte {
+					return fingerprint.Fingerprint(struct {
+						Payload           interface{}
+						PayloadSignatures interface{}
+					}{
+						tb.payloadCanonicalForm(),
+						[]interface{}{
+							// Expected canonical form of payload signature
+							struct {
+								SignerIndex uint
+								KeyID       uint
+								Signature   []byte
+							}{
+								SignerIndex: uint(tb.PayloadSignatures[0].SignerIndex),
+								KeyID:       uint(tb.PayloadSignatures[0].KeyIndex),
+								Signature:   tb.PayloadSignatures[0].Signature,
+							},
+						},
+					})
 				},
-			}
-
-			for _, c := range cases {
-
-				t.Run(fmt.Sprintf("auth scheme - %s (authenticatorData)", c.description), func(t *testing.T) {
-					// This will be the equivalent of possible client side actions, while mocking out the majority of
-					// the webauthn process.
-					// Could eventually consider using flow-go-sdk here if it makes sense
-					seed := make([]byte, seedLength)
-					_, err := rand.Read(seed)
+				require: func(t *testing.T, sigOk bool, err error) {
 					require.NoError(t, err)
-					sk, err := onflowCrypto.GeneratePrivateKey(s, seed)
-					require.NoError(t, err)
-
-					noPrefixHasher, err := crypto.NewPrefixedHashing(h, "")
-					require.NoError(t, err)
-
-					// generate the extension data, based on the client data and authenticator data indicated by the test case
-					clientDataJsonBytes, err := json.Marshal(c.clientDataJSON)
-					require.NoError(t, err)
-
-					extensionData := crypto.WebAuthnExtensionData{
-						AuthenticatorData: c.authenticatorData,
-						ClientDataJson:    clientDataJsonBytes,
-					}
-
-					// RLP Encode the extension data
-					// This is the equivalent of the client side encoding
-					extensionDataRLPBytes := rlp.NewMarshaler().MustMarshal(extensionData)
-
-					// Construct the message to sign in the same way a client would, as per
-					// https://github.com/onflow/flips/blob/tarak/webauthn/protocol/20250203-webauthn-credential-support.md#fvm-transaction-validation-changes
-					messageToSign := slices.Concat(c.authenticatorData, noPrefixHasher.ComputeHash(clientDataJsonBytes)[:])
-
-					// Sign as "client"
-					noPrefixHasher.Reset()
-					sig, err := sk.Sign(messageToSign, noPrefixHasher)
-					require.NoError(t, err)
-					signature := sig.Bytes()
-
-					// Verify as "server"
-					ok, err := crypto.VerifySignatureFromTransaction(signature, transactionMessage, sk.PublicKey(), h, slices.Concat([]byte{0x01}, extensionDataRLPBytes[:]))
-					c.require(t, ok, err)
-				})
-
-			}
-		})
-
-		t.Run("invalid authentication schemes", func(t *testing.T) {
-
-			cases := []struct {
-				description string
-				scheme      crypto.AuthenticationScheme
-				require     func(t *testing.T, sigOk bool, err error)
-			}{
-				{
-					description: "invalid scheme (0x02)",
-					scheme:      crypto.InvalidScheme,
-					require: func(t *testing.T, sigOk bool, err error) {
-						require.NoError(t, err)
-						require.False(t, sigOk)
-					},
-				}, {
-					description: "invalid scheme, parsed using AuthenticationSchemeFromByte (0xFF)",
-					scheme:      crypto.AuthenticationSchemeFromByte(0xFF),
-					require: func(t *testing.T, sigOk bool, err error) {
-						require.NoError(t, err)
-						require.False(t, sigOk)
-					},
+					require.True(t, sigOk)
 				},
-			}
-
-			for _, c := range cases {
-
-				t.Run(fmt.Sprintf("%s - auth scheme - %v", c.description, c.scheme), func(t *testing.T) {
-					seed := make([]byte, seedLength)
-					_, err := rand.Read(seed)
+			},
+			{
+				payloadExtensionData: []byte{},
+				expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScaffold) []byte {
+					return fingerprint.Fingerprint(struct {
+						Payload           interface{}
+						PayloadSignatures interface{}
+					}{
+						tb.payloadCanonicalForm(),
+						[]interface{}{
+							// Expected canonical form of payload signature
+							struct {
+								SignerIndex uint
+								KeyID       uint
+								Signature   []byte
+							}{
+								SignerIndex: uint(tb.PayloadSignatures[0].SignerIndex),
+								KeyID:       uint(tb.PayloadSignatures[0].KeyIndex),
+								Signature:   tb.PayloadSignatures[0].Signature,
+							},
+						},
+					})
+				},
+				require: func(t *testing.T, sigOk bool, err error) {
 					require.NoError(t, err)
-					sk, err := onflowCrypto.GeneratePrivateKey(s, seed)
+					require.True(t, sigOk)
+				},
+			}, {
+				payloadExtensionData: []byte{0x0},
+				expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScaffold) []byte {
+					return fingerprint.Fingerprint(struct {
+						Payload           interface{}
+						PayloadSignatures interface{}
+					}{
+						tb.payloadCanonicalForm(),
+						[]interface{}{
+							// NON-expected canonical form of payload signature
+							struct {
+								SignerIndex   uint
+								KeyID         uint
+								Signature     []byte
+								ExtensionData []byte
+							}{
+								SignerIndex:   uint(tb.PayloadSignatures[0].SignerIndex),
+								KeyID:         uint(tb.PayloadSignatures[0].KeyIndex),
+								Signature:     tb.PayloadSignatures[0].Signature,
+								ExtensionData: []byte{0x0},
+							},
+						},
+					})
+				},
+				require: func(t *testing.T, sigOk bool, err error) {
 					require.NoError(t, err)
-
-					hasher, err := crypto.NewPrefixedHashing(h, flow.TransactionTagString)
+					require.False(t, sigOk)
+				},
+			}, {
+				payloadExtensionData: []byte{0x0},
+				expectedEnvelopeSignatureCanonicalForm: func(tb transactionBodyScaffold) []byte {
+					return fingerprint.Fingerprint(struct {
+						Payload           interface{}
+						PayloadSignatures interface{}
+					}{
+						tb.payloadCanonicalForm(),
+						[]interface{}{
+							// Expected canonical form of payload signature
+							struct {
+								SignerIndex uint
+								KeyID       uint
+								Signature   []byte
+							}{
+								SignerIndex: uint(tb.PayloadSignatures[0].SignerIndex),
+								KeyID:       uint(tb.PayloadSignatures[0].KeyIndex),
+								Signature:   tb.PayloadSignatures[0].Signature,
+							},
+						},
+					})
+				},
+				require: func(t *testing.T, sigOk bool, err error) {
 					require.NoError(t, err)
+					require.True(t, sigOk)
+				},
+			},
+		}
+		// test all cases
+		for _, c := range cases {
+			t.Run(fmt.Sprintf("auth scheme (payloadExtensionData): %v", c.payloadExtensionData), func(t *testing.T) {
+				seed := make([]byte, seedLength)
+				_, err := rand.Read(seed)
+				require.NoError(t, err)
+				sk, err := onflowCrypto.GeneratePrivateKey(s, seed)
+				require.NoError(t, err)
 
-					transactionMessage := transactionBody.EnvelopeMessage()
+				hasher, err := crypto.NewPrefixedHashing(h, flow.TransactionTagString)
+				require.NoError(t, err)
 
-					sig, err := sk.Sign(transactionMessage, hasher)
+				transactionBody.PayloadSignatures[0].ExtensionData = c.payloadExtensionData
+				transactionMessage := transactionBody.EnvelopeMessage()
+
+				sig, err := sk.Sign(transactionMessage, hasher)
+				require.NoError(t, err)
+				signature := sig.Bytes()
+
+				// generate expected envelope data
+				expectedEnvelopeMessage := c.expectedEnvelopeSignatureCanonicalForm(transactionBody)
+
+				ok, err := crypto.VerifySignatureFromTransaction(signature, expectedEnvelopeMessage, sk.PublicKey(), h, c.payloadExtensionData)
+				c.require(t, ok, err)
+			})
+
+		}
+	})
+
+	t.Run("authn authentication schemes", func(t *testing.T) {
+		hasher, err := crypto.NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)
+		require.NoError(t, err)
+
+		transactionMessage := transactionBody.EnvelopeMessage()
+		authNChallenge := hasher.ComputeHash(transactionMessage)
+		authNChallengeBase64Url := base64.URLEncoding.EncodeToString(authNChallenge)
+		validUserFlag := byte(0x01)
+		validClientDataOrigin := "https://testing.com"
+		rpIDHash := unittest.RandomBytes(32)
+		sigCounter := unittest.RandomBytes(4)
+
+		// For use in cases where you're testing the other value
+		validAuthenticatorData := slices.Concat(rpIDHash, []byte{validUserFlag}, sigCounter)
+		validClientDataJSON := map[string]string{
+			"type":      crypto.WebAuthnTypeGet,
+			"challenge": authNChallengeBase64Url,
+			"origin":    validClientDataOrigin,
+		}
+
+		cases := []struct {
+			description       string
+			authenticatorData []byte
+			clientDataJSON    map[string]string
+			require           func(t *testing.T, sigOk bool, err error)
+		}{
+			{
+				description:       "Cannot be just the scheme, not enough info",
+				authenticatorData: []byte{},
+				clientDataJSON:    map[string]string{},
+				require: func(t *testing.T, sigOk bool, err error) {
 					require.NoError(t, err)
-					signature := sig.Bytes()
+					require.False(t, sigOk)
+				},
+			}, {
+				description:       "invalid user flag (UP not set)",
+				authenticatorData: slices.Concat(rpIDHash, []byte{0x0}, sigCounter),
+				clientDataJSON:    validClientDataJSON,
+				require: func(t *testing.T, sigOk bool, err error) {
+					require.NoError(t, err)
+					require.False(t, sigOk)
+				},
+			}, {
+				description:       "invalid user flag (extensions exist but flag (AT and ED) not set)",
+				authenticatorData: slices.Concat(rpIDHash, []byte{validUserFlag}, sigCounter, unittest.RandomBytes(mrand.Intn(20))),
+				clientDataJSON:    validClientDataJSON,
+				require: func(t *testing.T, sigOk bool, err error) {
+					require.NoError(t, err)
+					require.False(t, sigOk)
+				},
+			}, {
+				description:       "invalid user flag (extensions do not exist but flag AT is set)",
+				authenticatorData: slices.Concat(rpIDHash, []byte{validUserFlag | 0x40}, sigCounter),
+				clientDataJSON: map[string]string{
+					"type":      crypto.WebAuthnTypeGet,
+					"challenge": authNChallengeBase64Url,
+					"origin":    validClientDataOrigin,
+				},
+				require: func(t *testing.T, sigOk bool, err error) {
+					require.NoError(t, err)
+					require.False(t, sigOk)
+				},
+			}, {
+				description:       "invalid user flag (extensions do not exist but flag ED is set)",
+				authenticatorData: slices.Concat(rpIDHash, []byte{validUserFlag | 0x80}, sigCounter),
+				clientDataJSON: map[string]string{
+					"type":      crypto.WebAuthnTypeGet,
+					"challenge": authNChallengeBase64Url,
+					"origin":    validClientDataOrigin,
+				},
+				require: func(t *testing.T, sigOk bool, err error) {
+					require.NoError(t, err)
+					require.False(t, sigOk)
+				},
+			}, {
+				description:       "invalid client data type",
+				authenticatorData: validAuthenticatorData,
+				clientDataJSON: map[string]string{
+					"type":      "invalid_type",
+					"challenge": authNChallengeBase64Url,
+					"origin":    validClientDataOrigin,
+				},
+				require: func(t *testing.T, sigOk bool, err error) {
+					require.NoError(t, err)
+					require.False(t, sigOk)
+				},
+			}, {
+				description:       "empty origin (valid)",
+				authenticatorData: validAuthenticatorData,
+				clientDataJSON: map[string]string{
+					"type":      crypto.WebAuthnTypeGet,
+					"challenge": authNChallengeBase64Url,
+					"origin":    "",
+				},
+				require: func(t *testing.T, sigOk bool, err error) {
+					require.NoError(t, err)
+					require.True(t, sigOk)
+				},
+			}, {
+				description:       "valid authn scheme signature",
+				authenticatorData: validAuthenticatorData,
+				clientDataJSON:    validClientDataJSON,
+				require: func(t *testing.T, sigOk bool, err error) {
+					require.NoError(t, err)
+					require.True(t, sigOk)
+				},
+			},
+		}
 
-					ok, err := crypto.VerifySignatureFromTransaction(signature, transactionMessage, sk.PublicKey(), h, []byte{byte(c.scheme)})
-					c.require(t, ok, err)
-				})
+		// run all cases above
+		for _, c := range cases {
+			t.Run(fmt.Sprintf("auth scheme - %s (authenticatorData)", c.description), func(t *testing.T) {
+				// This will be the equivalent of possible client side actions, while mocking out the majority of
+				// the webauthn process.
+				// Could eventually consider using flow-go-sdk here if it makes sense
+				seed := make([]byte, seedLength)
+				_, err := rand.Read(seed)
+				require.NoError(t, err)
+				sk, err := onflowCrypto.GeneratePrivateKey(s, seed)
+				require.NoError(t, err)
 
-			}
-		})
+				noPrefixHasher, err := crypto.NewPrefixedHashing(h, "")
+				require.NoError(t, err)
+
+				// generate the extension data, based on the client data and authenticator data indicated by the test case
+				clientDataJsonBytes, err := json.Marshal(c.clientDataJSON)
+				require.NoError(t, err)
+
+				extensionData := crypto.WebAuthnExtensionData{
+					AuthenticatorData: c.authenticatorData,
+					ClientDataJson:    clientDataJsonBytes,
+				}
+
+				// RLP Encode the extension data
+				// This is the equivalent of the client side encoding
+				extensionDataRLPBytes := rlp.NewMarshaler().MustMarshal(extensionData)
+
+				// Construct the message to sign in the same way a client would, as per
+				// https://github.com/onflow/flips/blob/tarak/webauthn/protocol/20250203-webauthn-credential-support.md#fvm-transaction-validation-changes
+				messageToSign := slices.Concat(c.authenticatorData, noPrefixHasher.ComputeHash(clientDataJsonBytes)[:])
+
+				// Sign as "client"
+				noPrefixHasher.Reset()
+				sig, err := sk.Sign(messageToSign, noPrefixHasher)
+				require.NoError(t, err)
+				signature := sig.Bytes()
+
+				// Verify as "server"
+				ok, err := crypto.VerifySignatureFromTransaction(signature, transactionMessage, sk.PublicKey(), h, slices.Concat([]byte{0x01}, extensionDataRLPBytes[:]))
+				c.require(t, ok, err)
+			})
+		}
+	})
+
+	t.Run("invalid authentication schemes", func(t *testing.T) {
+
+		cases := []struct {
+			description string
+			scheme      crypto.AuthenticationScheme
+			require     func(t *testing.T, sigOk bool, err error)
+		}{
+			{
+				description: "invalid scheme (0x02)",
+				scheme:      crypto.InvalidScheme,
+				require: func(t *testing.T, sigOk bool, err error) {
+					require.NoError(t, err)
+					require.False(t, sigOk)
+				},
+			}, {
+				description: "invalid scheme, parsed using AuthenticationSchemeFromByte (0xFF)",
+				scheme:      crypto.AuthenticationSchemeFromByte(0xFF),
+				require: func(t *testing.T, sigOk bool, err error) {
+					require.NoError(t, err)
+					require.False(t, sigOk)
+				},
+			},
+		}
+
+		for _, c := range cases {
+
+			t.Run(fmt.Sprintf("%s - auth scheme - %v", c.description, c.scheme), func(t *testing.T) {
+				seed := make([]byte, seedLength)
+				_, err := rand.Read(seed)
+				require.NoError(t, err)
+				sk, err := onflowCrypto.GeneratePrivateKey(s, seed)
+				require.NoError(t, err)
+
+				hasher, err := crypto.NewPrefixedHashing(h, flow.TransactionTagString)
+				require.NoError(t, err)
+
+				transactionMessage := transactionBody.EnvelopeMessage()
+
+				sig, err := sk.Sign(transactionMessage, hasher)
+				require.NoError(t, err)
+				signature := sig.Bytes()
+
+				ok, err := crypto.VerifySignatureFromTransaction(signature, transactionMessage, sk.PublicKey(), h, []byte{byte(c.scheme)})
+				c.require(t, ok, err)
+			})
+
+		}
 	})
 }
 
