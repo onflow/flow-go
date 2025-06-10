@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCollectValidationKeysByPrefix(t *testing.T) {
+func TestSampleValidationKeysByPrefix(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		// Insert test keys
 		testKeys := []string{
@@ -30,7 +30,7 @@ func TestCollectValidationKeysByPrefix(t *testing.T) {
 		}))
 
 		// Run key collection
-		keys, err := collectValidationKeysByPrefix(db, 2)
+		keys, err := sampleValidationKeysByPrefix(db, 2)
 		require.NoError(t, err)
 
 		// Convert to string for easier comparison
