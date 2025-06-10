@@ -290,14 +290,20 @@ func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 	// than the data stored in `sigAggregator`.
 	newestQC := p.newestQCTracker.NewestQC()
 
-	tc := flow.NewTimeoutCertificate(
-		p.view,
-		newestQCViews,
-		newestQC,
-		signerIndices,
-		aggregatedSig,
+	tc, err := flow.NewTimeoutCertificate(
+		flow.UntrustedTimeoutCertificate{
+			View:          p.view,
+			NewestQCViews: newestQCViews,
+			NewestQC:      newestQC,
+			SignerIndices: signerIndices,
+			SigData:       aggregatedSig,
+		},
 	)
-	return &tc, nil
+	if err != nil {
+		return nil, fmt.Errorf("could not construct timeout certificate: %w", err)
+	}
+
+	return tc, nil
 }
 
 // signerIndicesFromIdentities encodes identities into signer indices.

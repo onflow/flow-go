@@ -71,7 +71,7 @@ type TimeoutObject struct {
 // ordering during construction.
 //
 // An instance of UntrustedTimeoutObject should be validated and converted into
-// a trusted Locator using NewTimeoutObject constructor.
+// a trusted TimeoutObject using NewTimeoutObject constructor.
 type UntrustedTimeoutObject TimeoutObject
 
 // NewTimeoutObject creates a new instance of TimeoutObject.

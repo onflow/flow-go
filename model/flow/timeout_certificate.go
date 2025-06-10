@@ -8,7 +8,7 @@ import (
 // At its core, a timeout certificate is an aggregation of TimeoutObjects, which individual nodes send to signal
 // their intent to leave the active view.
 //
-// structwrite:immutable - mutations allowed only within the constructor
+//structwrite:immutable - mutations allowed only within the constructor
 type TimeoutCertificate struct {
 	View uint64
 	// NewestQCViews lists for each signer (in the same order) the view of the newest QC they supplied
@@ -25,22 +25,29 @@ type TimeoutCertificate struct {
 	SigData crypto.Signature
 }
 
+// UntrustedTimeoutCertificate is an untrusted input-only representation of a TimeoutCertificate,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedTimeoutCertificate should be validated and converted into
+// a trusted TimeoutCertificate using NewTimeoutCertificate constructor.
+type UntrustedTimeoutCertificate TimeoutCertificate
+
 // NewTimeoutCertificate creates a new instance of TimeoutCertificate.
 // Construction TimeoutCertificate allowed only within the constructor.
-func NewTimeoutCertificate(
-	view uint64,
-	newestQCViews []uint64,
-	newestQC *QuorumCertificate,
-	signerIndices []byte,
-	sigData crypto.Signature,
-) TimeoutCertificate {
-	return TimeoutCertificate{
-		View:          view,
-		NewestQCViews: newestQCViews,
-		NewestQC:      newestQC,
-		SignerIndices: signerIndices,
-		SigData:       sigData,
-	}
+//
+// All errors indicate a valid TimeoutCertificate cannot be constructed from the input.
+func NewTimeoutCertificate(untrusted UntrustedTimeoutCertificate) (*TimeoutCertificate, error) {
+	return &TimeoutCertificate{
+		View:          untrusted.View,
+		NewestQCViews: untrusted.NewestQCViews,
+		NewestQC:      untrusted.NewestQC,
+		SignerIndices: untrusted.SignerIndices,
+		SigData:       untrusted.SigData,
+	}, nil
 }
 
 // ID returns the TimeoutCertificate's identifier
