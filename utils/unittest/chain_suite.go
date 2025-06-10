@@ -30,7 +30,7 @@ type BaseChainSuite struct {
 	Approvers  flow.IdentityList
 
 	// BLOCKS
-	RootBlock             flow.Block
+	RootBlock             *flow.Block
 	LatestSealedBlock     flow.Block
 	LatestFinalizedBlock  *flow.Block
 	UnfinalizedBlock      flow.Block
@@ -105,7 +105,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	bc.UnfinalizedBlock = *BlockWithParentFixture(bc.LatestFinalizedBlock.ToHeader())
 
 	bc.Blocks = make(map[flow.Identifier]*flow.Block)
-	bc.Blocks[bc.RootBlock.ID()] = &bc.RootBlock
+	bc.Blocks[bc.RootBlock.ID()] = bc.RootBlock
 	bc.Blocks[bc.LatestSealedBlock.ID()] = &bc.LatestSealedBlock
 	bc.Blocks[bc.LatestFinalizedBlock.ID()] = bc.LatestFinalizedBlock
 	bc.Blocks[bc.UnfinalizedBlock.ID()] = &bc.UnfinalizedBlock
@@ -496,7 +496,7 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 	)
 
 	// RESULTS for Blocks:
-	previousResult := ExecutionResultFixture(WithBlock(&parentBlock))
+	previousResult := ExecutionResultFixture(WithBlock(parentBlock))
 	result := ExecutionResultFixture(
 		WithBlock(block),
 		WithPreviousResult(*previousResult),
@@ -524,7 +524,7 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 
 	return subgraphFixture{
 		Block:              block,
-		ParentBlock:        &parentBlock,
+		ParentBlock:        parentBlock,
 		Result:             result,
 		PreviousResult:     previousResult,
 		IncorporatedResult: incorporatedResult,

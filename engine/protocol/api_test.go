@@ -57,7 +57,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock_Success() {
 
 	suite.blocks.
 		On("ByID", header.ID()).
-		Return(&block, nil).
+		Return(block, nil).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -67,7 +67,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock_Success() {
 	suite.checkResponse(responseBlock, err)
 
 	// make sure we got the latest block
-	suite.Require().Equal(block, *responseBlock)
+	suite.Require().Equal(block, responseBlock)
 
 	suite.assertAllExpectations()
 }
@@ -86,7 +86,7 @@ func (suite *Suite) TestGetLatestSealedBlock_Success() {
 
 	suite.blocks.
 		On("ByID", header.ID()).
-		Return(&block, nil).
+		Return(block, nil).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -96,7 +96,7 @@ func (suite *Suite) TestGetLatestSealedBlock_Success() {
 	suite.checkResponse(responseBlock, err)
 
 	// make sure we got the latest block
-	suite.Require().Equal(block, *responseBlock)
+	suite.Require().Equal(block, responseBlock)
 
 	suite.assertAllExpectations()
 }
@@ -173,7 +173,7 @@ func (suite *Suite) TestGetBlockById_Success() {
 
 	suite.blocks.
 		On("ByID", block.ID()).
-		Return(&block, nil).
+		Return(block, nil).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -194,7 +194,7 @@ func (suite *Suite) TestGetBlockById_StorageNotFoundFailure() {
 
 	suite.blocks.
 		On("ByID", block.ID()).
-		Return(&block, storage.ErrNotFound).
+		Return(block, storage.ErrNotFound).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -213,7 +213,7 @@ func (suite *Suite) TestGetBlockById_CodesNotFoundFailure() {
 
 	suite.blocks.
 		On("ByID", block.ID()).
-		Return(&block, CodesNotFoundErr).
+		Return(block, CodesNotFoundErr).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -232,7 +232,7 @@ func (suite *Suite) TestGetBlockById_InternalFailure() {
 
 	suite.blocks.
 		On("ByID", block.ID()).
-		Return(&block, InternalErr).
+		Return(block, InternalErr).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -252,7 +252,7 @@ func (suite *Suite) TestGetBlockByHeight_Success() {
 
 	suite.blocks.
 		On("ByHeight", height).
-		Return(&block, nil).
+		Return(block, nil).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -274,7 +274,7 @@ func (suite *Suite) TestGetBlockByHeight_StorageNotFoundFailure() {
 
 	suite.blocks.
 		On("ByHeight", height).
-		Return(&block, StorageNotFoundErr).
+		Return(block, StorageNotFoundErr).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -294,7 +294,7 @@ func (suite *Suite) TestGetBlockByHeight_CodesNotFoundFailure() {
 
 	suite.blocks.
 		On("ByHeight", height).
-		Return(&block, CodesNotFoundErr).
+		Return(block, CodesNotFoundErr).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -314,7 +314,7 @@ func (suite *Suite) TestGetBlockByHeight_InternalFailure() {
 
 	suite.blocks.
 		On("ByHeight", height).
-		Return(&block, InternalErr).
+		Return(block, InternalErr).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
