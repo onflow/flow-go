@@ -118,7 +118,7 @@ func MessagesToCollectionGuarantees(m []*entities.CollectionGuarantee) ([]*flow.
 	cg := make([]*flow.CollectionGuarantee, len(m))
 	for i, g := range m {
 		guarantee, err := MessageToCollectionGuarantee(g)
-		if err == nil {
+		if err != nil {
 			return nil, fmt.Errorf("invalid collection guarantee: %w", err)
 		}
 		cg[i] = guarantee
