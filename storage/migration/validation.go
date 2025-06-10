@@ -1,7 +1,6 @@
 package migration
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -11,31 +10,58 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// isDirEmpty checks if a directory exists and is empty.
+// Returns true if the directory is empty, false if it contains files,
+// and an error if the directory doesn't exist or there's an error reading it.
+func isDirEmpty(dir string) (bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false, err
+	}
+	return len(entries) == 0, nil
+}
+
+// createDirIfNotExists creates a directory if it doesn't exist.
+// Returns an error if the directory already exists and is not empty,
+// or if there's an error creating the directory.
+func createDirIfNotExists(dir string) error {
+	if stat, err := os.Stat(dir); err == nil {
+		if !stat.IsDir() {
+			return fmt.Errorf("path exists but is not a directory: %s", dir)
+		}
+		isEmpty, err := isDirEmpty(dir)
+		if err != nil {
+			return fmt.Errorf("failed to check if directory is empty: %w", err)
+		}
+		if !isEmpty {
+			return fmt.Errorf("directory exists and is not empty: %s", dir)
+		}
+		return nil
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("error checking directory: %w", err)
+	}
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+	return nil
+}
+
 // validateBadgerFolderExistPebbleFolderEmpty checks if the Badger directory exists and is non-empty,
 // and if the Pebble directory does not exist or is empty.
 func validateBadgerFolderExistPebbleFolderEmpty(badgerDir string, pebbleDir string) error {
 	// Step 1.1: Ensure Badger directory exists and is non-empty
-	badgerEntries, err := os.ReadDir(badgerDir)
-	if err != nil || len(badgerEntries) == 0 {
-		return fmt.Errorf("badger directory invalid or empty: %w", err)
+	isEmpty, err := isDirEmpty(badgerDir)
+	if err != nil {
+		return fmt.Errorf("badger directory invalid: %w", err)
+	}
+	if isEmpty {
+		return fmt.Errorf("badger directory is empty, %v", badgerDir)
 	}
 
 	// Step 1.2: Ensure Pebble directory does not exist or is empty
-	if stat, err := os.Stat(pebbleDir); err == nil && stat.IsDir() {
-		pebbleEntries, err := os.ReadDir(pebbleDir)
-		if err != nil {
-			return fmt.Errorf("failed to read pebble directory: %w", err)
-		}
-		if len(pebbleEntries) > 0 {
-			return errors.New("pebble directory is not empty")
-		}
-	} else if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("error checking pebble directory: %w", err)
-	} else {
-		// Create pebbleDir if it doesn't exist
-		if err := os.MkdirAll(pebbleDir, 0755); err != nil {
-			return fmt.Errorf("failed to create pebble directory: %w", err)
-		}
+	if err := createDirIfNotExists(pebbleDir); err != nil {
+		return fmt.Errorf("pebble directory validation failed %v: %w", pebbleDir, err)
 	}
 
 	return nil
