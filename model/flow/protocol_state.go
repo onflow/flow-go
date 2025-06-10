@@ -80,6 +80,8 @@ func NewMinEpochStateEntry(untrusted UntrustedMinEpochStateEntry) (*MinEpochStat
 // EpochStateContainer holds the data pertaining to a _single_ epoch but no information about
 // any adjacent epochs. To perform a transition from epoch N to N+1, EpochStateContainers for
 // both epochs are necessary.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type EpochStateContainer struct {
 	// ID of setup event for this epoch, never nil.
 	SetupID Identifier
@@ -106,6 +108,40 @@ type EpochStateContainer struct {
 	// and each consecutive pair of slice elements must obey
 	//   EpochExtensions[i].FinalView+1 = EpochExtensions[i+1].FirstView
 	EpochExtensions []EpochExtension
+}
+
+// UntrustedEpochStateContainer is an untrusted input-only representation of a EpochStateContainer,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedEpochStateContainer should be validated and converted into
+// a trusted EpochStateContainer using NewEpochStateContainer constructor.
+type UntrustedEpochStateContainer EpochStateContainer
+
+// NewEpochStateContainer creates a new instance of EpochStateContainer.
+// Construction EpochStateContainer allowed only within the constructor.
+//
+// All errors indicate a valid EpochStateContainer cannot be constructed from the input.
+func NewEpochStateContainer(untrusted UntrustedEpochStateContainer) (*EpochStateContainer, error) {
+	if untrusted.SetupID == ZeroID {
+		return nil, fmt.Errorf("SetupID must not be zero")
+	}
+	if untrusted.ActiveIdentities == nil {
+		return nil, fmt.Errorf("ActiveIdentities must not be nil")
+	}
+	if !untrusted.ActiveIdentities.Sorted(IdentifierCanonical) {
+		return nil, fmt.Errorf("ActiveIdentities are not sorted")
+	}
+
+	return &EpochStateContainer{
+		SetupID:          untrusted.SetupID,
+		CommitID:         untrusted.CommitID,
+		ActiveIdentities: untrusted.ActiveIdentities,
+		EpochExtensions:  untrusted.EpochExtensions,
+	}, nil
 }
 
 // EpochExtension represents a range of views, which contiguously extends this epoch.
@@ -158,6 +194,9 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 		ext = make([]EpochExtension, len(c.EpochExtensions))
 		copy(ext, c.EpochExtensions)
 	}
+
+	// Constructor is skipped since we're copying an already-valid object.
+	//nolint:structwrite
 	return &EpochStateContainer{
 		SetupID:          c.SetupID,
 		CommitID:         c.CommitID,
