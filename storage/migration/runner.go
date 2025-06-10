@@ -8,9 +8,10 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog/log"
+
 	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/util"
-	"github.com/rs/zerolog/log"
 )
 
 var DefaultMigrationConfig = MigrationConfig{
