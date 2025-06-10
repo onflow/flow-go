@@ -170,7 +170,19 @@ type UntrustedEpochSetup EpochSetup
 // All errors indicate a valid EpochSetup cannot be constructed from the input.
 func NewEpochSetup(untrusted UntrustedEpochSetup) (*EpochSetup, error) {
 	if untrusted.FirstView >= untrusted.FinalView {
-		return nil, fmt.Errorf("first view %d is greater than the final view %d", untrusted.FirstView, untrusted.FinalView)
+		return nil, fmt.Errorf("invalid timing - first view (%d) ends after the final view (%d)", untrusted.FirstView, untrusted.FinalView)
+	}
+	if untrusted.FirstView >= untrusted.DKGPhase1FinalView {
+		return nil, fmt.Errorf("invalid timing - first view (%d) ends after dkg phase 1 (%d)", untrusted.FirstView, untrusted.DKGPhase1FinalView)
+	}
+	if untrusted.DKGPhase1FinalView >= untrusted.DKGPhase2FinalView {
+		return nil, fmt.Errorf("invalid dkg timing - phase 1 (%d) ends after phase 2 (%d)", untrusted.DKGPhase1FinalView, untrusted.DKGPhase2FinalView)
+	}
+	if untrusted.DKGPhase2FinalView >= untrusted.DKGPhase3FinalView {
+		return nil, fmt.Errorf("invalid dkg timing - phase 2 (%d) ends after phase 3 (%d)", untrusted.DKGPhase2FinalView, untrusted.DKGPhase3FinalView)
+	}
+	if untrusted.DKGPhase3FinalView >= untrusted.FinalView {
+		return nil, fmt.Errorf("invalid timing - dkg phase 3 (%d) ends after final view (%d)", untrusted.DKGPhase3FinalView, untrusted.FinalView)
 	}
 	if untrusted.Participants == nil {
 		return nil, fmt.Errorf("participants must not be nil")

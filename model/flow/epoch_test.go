@@ -350,16 +350,28 @@ func TestEpochSetup_EqualTo(t *testing.T) {
 // 2. Invalid FirstView and FinalView:
 //   - Verifies that an error is returned when FirstView is not less than FinalView, as this violates the expected chronological order.
 //
-// 3. Invalid participants:
+// 3. Invalid FirstView >= DKGPhase1FinalView:
+//   - Ensures that FirstView must end before DKG Phase 1 ends.
+//
+// 4. Invalid DKGPhase1FinalView >= DKGPhase2FinalView:
+//   - Ensures DKG Phase 1 must end before DKG Phase 2 ends.
+//
+// 5. Invalid DKGPhase2FinalView >= DKGPhase3FinalView:
+//   - Ensures DKG Phase 2 must end before DKG Phase 3 ends.
+//
+// 6. Invalid DKGPhase3FinalView >= FinalView:
+//   - Ensures DKG Phase 3 must end before FinalView.
+//
+// 7. Invalid participants:
 //   - Checks that an error is returned when the Participants field is nil.
 //
-// 4. Invalid assignments:
+// 8. Invalid assignments:
 //   - Ensures that an error is returned when the Assignments field is nil.
 //
-// 5. Invalid RandomSource:
+// 9. Invalid RandomSource:
 //   - Validates that an error is returned when the RandomSource does not meet the required length.
 //
-// 6. Invalid TargetDuration:
+// 10. Invalid TargetDuration:
 //   - Confirms that an error is returned when TargetDuration is zero.
 func TestNewEpochSetup(t *testing.T) {
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
@@ -389,25 +401,103 @@ func TestNewEpochSetup(t *testing.T) {
 
 	t.Run("invalid FirstView and FinalView", func(t *testing.T) {
 		untrusted := flow.UntrustedEpochSetup{
-			FirstView:    100,
-			FinalView:    100,
-			Participants: validParticipants,
-			Assignments:  validAssignments,
-			RandomSource: validRandomSource,
+			FirstView:          100,
+			FinalView:          90,
+			DKGPhase1FinalView: 20,
+			DKGPhase2FinalView: 30,
+			DKGPhase3FinalView: 40,
+			Participants:       validParticipants,
+			Assignments:        validAssignments,
+			RandomSource:       validRandomSource,
 		}
 		setup, err := flow.NewEpochSetup(untrusted)
 		require.Error(t, err)
 		require.Nil(t, setup)
-		require.Contains(t, err.Error(), "first view 100 is greater than the final view 100")
+		require.Contains(t, err.Error(), "invalid timing - first view (100) ends after the final view (90)")
+	})
+
+	t.Run("invalid FirstView >= DKGPhase1FinalView", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochSetup{
+			FirstView:          20,
+			DKGPhase1FinalView: 10,
+			DKGPhase2FinalView: 30,
+			DKGPhase3FinalView: 40,
+			FinalView:          50,
+			Participants:       validParticipants,
+			Assignments:        validAssignments,
+			RandomSource:       validRandomSource,
+			TargetDuration:     60,
+		}
+		setup, err := flow.NewEpochSetup(untrusted)
+		require.Error(t, err)
+		require.Nil(t, setup)
+		require.Contains(t, err.Error(), "invalid timing - first view (20) ends after dkg phase 1 (10)")
+	})
+
+	t.Run("invalid DKGPhase1FinalView >= DKGPhase2FinalView", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochSetup{
+			FirstView:          10,
+			DKGPhase1FinalView: 30,
+			DKGPhase2FinalView: 20,
+			DKGPhase3FinalView: 40,
+			FinalView:          50,
+			Participants:       validParticipants,
+			Assignments:        validAssignments,
+			RandomSource:       validRandomSource,
+			TargetDuration:     60,
+		}
+		setup, err := flow.NewEpochSetup(untrusted)
+		require.Error(t, err)
+		require.Nil(t, setup)
+		require.Contains(t, err.Error(), "invalid dkg timing - phase 1 (30) ends after phase 2 (20)")
+	})
+
+	t.Run("invalid DKGPhase2FinalView >= DKGPhase3FinalView", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochSetup{
+			FirstView:          10,
+			DKGPhase1FinalView: 20,
+			DKGPhase2FinalView: 40,
+			DKGPhase3FinalView: 30,
+			FinalView:          50,
+			Participants:       validParticipants,
+			Assignments:        validAssignments,
+			RandomSource:       validRandomSource,
+			TargetDuration:     60,
+		}
+		setup, err := flow.NewEpochSetup(untrusted)
+		require.Error(t, err)
+		require.Nil(t, setup)
+		require.Contains(t, err.Error(), "invalid dkg timing - phase 2 (40) ends after phase 3 (30)")
+	})
+
+	t.Run("invalid DKGPhase3FinalView >= FinalView", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochSetup{
+			FirstView:          10,
+			DKGPhase1FinalView: 20,
+			DKGPhase2FinalView: 30,
+			DKGPhase3FinalView: 60,
+			FinalView:          50,
+			Participants:       validParticipants,
+			Assignments:        validAssignments,
+			RandomSource:       validRandomSource,
+			TargetDuration:     60,
+		}
+		setup, err := flow.NewEpochSetup(untrusted)
+		require.Error(t, err)
+		require.Nil(t, setup)
+		require.Contains(t, err.Error(), "invalid timing - dkg phase 3 (60) ends after final view (50)")
 	})
 
 	t.Run("invalid participants", func(t *testing.T) {
 		untrusted := flow.UntrustedEpochSetup{
-			FirstView:    10,
-			FinalView:    50,
-			Participants: nil,
-			Assignments:  validAssignments,
-			RandomSource: validRandomSource,
+			FirstView:          10,
+			DKGPhase1FinalView: 20,
+			DKGPhase2FinalView: 30,
+			DKGPhase3FinalView: 40,
+			FinalView:          50,
+			Participants:       nil,
+			Assignments:        validAssignments,
+			RandomSource:       validRandomSource,
 		}
 		setup, err := flow.NewEpochSetup(untrusted)
 		require.Error(t, err)
@@ -417,11 +507,14 @@ func TestNewEpochSetup(t *testing.T) {
 
 	t.Run("invalid assignments", func(t *testing.T) {
 		untrusted := flow.UntrustedEpochSetup{
-			FirstView:    10,
-			FinalView:    50,
-			Participants: validParticipants,
-			Assignments:  nil,
-			RandomSource: validRandomSource,
+			FirstView:          10,
+			DKGPhase1FinalView: 20,
+			DKGPhase2FinalView: 30,
+			DKGPhase3FinalView: 40,
+			FinalView:          50,
+			Participants:       validParticipants,
+			Assignments:        nil,
+			RandomSource:       validRandomSource,
 		}
 		setup, err := flow.NewEpochSetup(untrusted)
 		require.Error(t, err)
@@ -431,11 +524,14 @@ func TestNewEpochSetup(t *testing.T) {
 
 	t.Run("invalid RandomSource", func(t *testing.T) {
 		untrusted := flow.UntrustedEpochSetup{
-			FirstView:    10,
-			FinalView:    50,
-			Participants: validParticipants,
-			Assignments:  validAssignments,
-			RandomSource: make([]byte, flow.EpochSetupRandomSourceLength-1), // too short
+			FirstView:          10,
+			DKGPhase1FinalView: 20,
+			DKGPhase2FinalView: 30,
+			DKGPhase3FinalView: 40,
+			FinalView:          50,
+			Participants:       validParticipants,
+			Assignments:        validAssignments,
+			RandomSource:       make([]byte, flow.EpochSetupRandomSourceLength-1), // too short
 		}
 		setup, err := flow.NewEpochSetup(untrusted)
 		require.Error(t, err)
@@ -444,12 +540,15 @@ func TestNewEpochSetup(t *testing.T) {
 	})
 	t.Run("invalid TargetDuration", func(t *testing.T) {
 		untrusted := flow.UntrustedEpochSetup{
-			FirstView:      10,
-			FinalView:      50,
-			Participants:   validParticipants,
-			Assignments:    validAssignments,
-			RandomSource:   validRandomSource,
-			TargetDuration: 0,
+			FirstView:          10,
+			DKGPhase1FinalView: 20,
+			DKGPhase2FinalView: 30,
+			DKGPhase3FinalView: 40,
+			FinalView:          50,
+			Participants:       validParticipants,
+			Assignments:        validAssignments,
+			RandomSource:       validRandomSource,
+			TargetDuration:     0,
 		}
 		setup, err := flow.NewEpochSetup(untrusted)
 		require.Error(t, err)
