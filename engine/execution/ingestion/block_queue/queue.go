@@ -55,14 +55,38 @@ type MissingCollection struct {
 	Guarantee *flow.CollectionGuarantee
 }
 
+// UntrustedMissingCollection is an untrusted input-only representation of an MissingCollection,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedMissingCollection should be validated and converted into
+// a trusted MissingCollection using NewMissingCollection constructor.
+type UntrustedMissingCollection MissingCollection
+
 // NewMissingCollection creates a new instance of MissingCollection.
 // Construction MissingCollection allowed only within the constructor
-func NewMissingCollection(blockID flow.Identifier, height uint64, guarantee *flow.CollectionGuarantee) *MissingCollection {
-	return &MissingCollection{
-		BlockID:   blockID,
-		Height:    height,
-		Guarantee: guarantee,
+func NewMissingCollection(untrusted UntrustedMissingCollection) (*MissingCollection, error) {
+
+	if untrusted.BlockID == flow.ZeroID {
+		return nil, fmt.Errorf("BlockID must not be empty")
 	}
+
+	if untrusted.Height == 0 {
+		return nil, fmt.Errorf("Height must not be zero")
+	}
+
+	if untrusted.Guarantee == nil {
+		return nil, fmt.Errorf("CollectionGuarantee must not be empty")
+	}
+
+	return &MissingCollection{
+		BlockID:   untrusted.BlockID,
+		Height:    untrusted.Height,
+		Guarantee: untrusted.Guarantee,
+	}, nil
 }
 
 func (m *MissingCollection) ID() flow.Identifier {
@@ -189,13 +213,19 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 				},
 			}
 
+			missingCollection, err := NewMissingCollection(UntrustedMissingCollection{
+				executable.ID(),
+				executable.Block.Header.Height,
+				col.Guarantee,
+			})
+			if err != nil {
+				return nil, nil, fmt.Errorf("could not construct missingCollection: %w",
+					err)
+			}
+
 			missingCollections = append(
 				missingCollections,
-				NewMissingCollection(
-					executable.ID(),
-					executable.Block.Header.Height,
-					col.Guarantee,
-				),
+				missingCollection,
 			)
 		}
 	}
@@ -433,7 +463,7 @@ func (q *BlockQueue) checkIfChildBlockBecomeExecutable(
 
 // GetMissingCollections returns the missing collections and the start state for the given block
 // Useful for debugging what is missing for the next unexecuted block to become executable.
-// It returns an error if the block is not found
+// It returns an error if the block is not found and if could not construct missing collection.
 func (q *BlockQueue) GetMissingCollections(blockID flow.Identifier) (
 	[]*MissingCollection,
 	*flow.StateCommitment,
@@ -452,13 +482,20 @@ func (q *BlockQueue) GetMissingCollections(blockID flow.Identifier) (
 		if col.IsCompleted() {
 			continue
 		}
+
+		missingCollection, err := NewMissingCollection(UntrustedMissingCollection{
+			block.ID(),
+			block.Block.Header.Height,
+			col.Guarantee,
+		})
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not construct missingCollection: %w",
+				err)
+		}
+
 		missingCollections = append(
 			missingCollections,
-			NewMissingCollection(
-				block.ID(),
-				block.Block.Header.Height,
-				col.Guarantee,
-			),
+			missingCollection,
 		)
 	}
 
