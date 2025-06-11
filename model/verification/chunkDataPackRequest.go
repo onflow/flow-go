@@ -39,11 +39,11 @@ func NewChunkDataPackRequest(untrusted UntrustedChunkDataPackRequest) (*ChunkDat
 	if untrusted.ChunkID == flow.ZeroID {
 		return nil, fmt.Errorf("chunk ID must not be zero")
 	}
-	if untrusted.Agrees == nil {
-		return nil, fmt.Errorf("agrees list must not be nil")
+	if len(untrusted.Agrees) == 0 {
+		return nil, fmt.Errorf("agrees list must not be empty")
 	}
-	if untrusted.Targets == nil {
-		return nil, fmt.Errorf("targets list must not be nil")
+	if len(untrusted.Targets) == 0 {
+		return nil, fmt.Errorf("targets list must not be empty")
 	}
 	filteredTargets := untrusted.Targets.Filter(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if len(filteredTargets) < len(untrusted.Targets) {
