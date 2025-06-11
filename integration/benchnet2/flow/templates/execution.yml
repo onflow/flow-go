@@ -1,7 +1,7 @@
 {{- range $k, $v := .Values.execution.nodes }}
 ---
 apiVersion: apps/v1
-kind: StatefulSet
+kind: StatefulSetsomeerrrorrrrrrrr
 metadata:
   # This is the full name of your deployment. It must be unique
   name: {{ $k }}
