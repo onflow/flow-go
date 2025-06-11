@@ -4,7 +4,7 @@ import "fmt"
 
 // Collection is an ordered list of transactions.
 // Collections form a part of the payload of cluster blocks, produced by Collection Nodes.
-// Every Collection maps 1-1 to a Chunk, which is used for transaction execution.\
+// Every Collection maps 1-1 to a Chunk, which is used for transaction execution.
 //
 //structwrite:immutable - mutations allowed only within the constructor
 type Collection struct {

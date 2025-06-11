@@ -237,8 +237,9 @@ func messageToTrustedCollection(
 	chain flow.Chain,
 ) (*flow.Collection, error) {
 	messages := m.GetTransactions()
+	emptyCollection := flow.NewEmptyCollection()
 	if len(messages) == 0 {
-		return new(flow.Collection), nil
+		return &emptyCollection, nil
 	}
 
 	transactions := make([]*flow.TransactionBody, len(messages))

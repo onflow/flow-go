@@ -29,16 +29,9 @@ type ExecutableBlock struct {
 	Executing           bool // flag used to indicate if block is being executed, to avoid re-execution
 }
 
-//func (c CompleteCollection) Collection() (*flow.Collection, error) {
-//	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: c.Transactions})
-//	if err != nil {
-//		return nil, fmt.Errorf("could not construct collection: %w", err)
-//	}
-//	return collection, nil
-//}
-
+// IsCompleted returns true if the collection has been retrieved from the network.
+// This function assumes that the collection is non-empty and that collections are retrieved either in full or not at all.
 func (c CompleteCollection) IsCompleted() bool {
-	//return len(c.Collection.Transactions) > 0
 	return c.Collection != nil && len(c.Collection.Transactions) > 0
 }
 
@@ -86,16 +79,6 @@ func (b *ExecutableBlock) CollectionAt(index int) *flow.Collection {
 		return nil
 	}
 	return cc.Collection
-
-	//cc := b.CompleteCollectionAt(index)
-	//if cc == nil {
-	//	return nil
-	//}
-	//collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: cc.Collection.Transactions})
-	//if err != nil {
-	//	panic(fmt.Sprintf("invalid untrusted input in CollectionAt: %v", err))
-	//}
-	//return collection
 }
 
 // HasAllTransactions returns whether all the transactions for all collections
