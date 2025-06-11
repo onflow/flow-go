@@ -30,10 +30,6 @@ type UntrustedVote Vote
 // NewVote creates a new instance of Vote.
 // Construction Vote allowed only within the constructor
 func NewVote(untrusted UntrustedVote) (*Vote, error) {
-	if untrusted.View == 0 {
-		return nil, fmt.Errorf("View must not be zero")
-	}
-
 	if untrusted.BlockID == flow.ZeroID {
 		return nil, fmt.Errorf("BlockID must not be empty")
 	}
