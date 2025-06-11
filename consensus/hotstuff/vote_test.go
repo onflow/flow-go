@@ -1,11 +1,11 @@
 package hotstuff
 
 import (
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
