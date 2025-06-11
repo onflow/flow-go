@@ -2,6 +2,7 @@ package epochs
 
 import (
 	"context"
+	"github.com/stretchr/testify/require"
 	"math/rand"
 	"testing"
 
@@ -92,8 +93,14 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		hasher := signature.NewBLSHasher(signature.CollectorVoteTag)
 		signature, err := stakingPrivKey.Sign(voteMessage, hasher)
 		s.Require().NoError(err)
-
-		vote := hotstuffmodel.NewVote(view, blockID, nodeID, signature)
+		
+		vote, err := hotstuffmodel.NewVote(hotstuffmodel.UntrustedVote{
+			View:     view,
+			BlockID:  blockID,
+			SignerID: nodeID,
+			SigData:  signature,
+		})
+		require.NoError(s.T(), err)
 
 		hotSigner := &hotstuff.Signer{}
 		hotSigner.On("CreateVote", mock.Anything).Return(vote, nil)

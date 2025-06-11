@@ -71,7 +71,9 @@ func (ps *ProposalSuite) SetupTest() {
 
 	ps.voters = ps.participants.Filter(filter.HasNodeID[flow.Identity](voterIDs...)).ToSkeleton()
 	ps.proposal = helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(helper.WithBlock(ps.block))))
-	ps.vote = ps.proposal.ProposerVote()
+	vote, err := ps.proposal.ProposerVote()
+	require.NoError(ps.T(), err)
+	ps.vote = vote
 	ps.voter = ps.leader
 
 	// set up the mocked hotstuff Replicas state

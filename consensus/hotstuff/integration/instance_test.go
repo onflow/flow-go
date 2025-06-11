@@ -418,7 +418,10 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				minRequiredWeight,
 			)
 
-			err := processor.Process(proposal.ProposerVote())
+			vote, err := proposal.ProposerVote()
+			require.NoError(t, err)
+
+			err = processor.Process(vote)
 			if err != nil {
 				t.Fatalf("invalid vote for own proposal: %v", err)
 			}
