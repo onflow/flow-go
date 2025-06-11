@@ -14,4 +14,5 @@ type PartnerNodeInfoPub struct {
 	NodeID        flow.Identifier
 	NetworkPubKey encodable.NetworkPubKey
 	StakingPubKey encodable.StakingPubKey
+	StakingPoP    []byte
 }

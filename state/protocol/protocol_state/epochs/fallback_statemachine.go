@@ -32,6 +32,11 @@ func NewFallbackStateMachine(
 ) (*FallbackStateMachine, error) {
 	state := parentEpochState.EpochStateEntry.Copy()
 	nextEpochCommitted := state.EpochPhase() == flow.EpochPhaseCommitted
+
+	nextEpoch := state.NextEpoch
+	nextEpochSetup := state.NextEpochSetup
+	nextEpochCommit := state.NextEpochCommit
+
 	// we are entering fallback mode, this logic needs to be executed only once
 	if !state.EpochFallbackTriggered {
 		// The next epoch has not been committed. Though setup event may be in the state, make sure it is cleared.
@@ -41,9 +46,38 @@ func NewFallbackStateMachine(
 		// we go through with that committed epoch. Otherwise, we have tentative values of an epoch
 		// not yet properly specified, which we have to clear out.
 		if !nextEpochCommitted {
-			state.NextEpoch = nil
+			nextEpoch = nil
+			// update corresponding service events
+			nextEpochSetup = nil
+			nextEpochCommit = nil
 		}
-		state.EpochFallbackTriggered = true
+
+		minEpochStateEntry, err := flow.NewMinEpochStateEntry(
+			flow.UntrustedMinEpochStateEntry{
+				PreviousEpoch:          state.PreviousEpoch,
+				CurrentEpoch:           state.CurrentEpoch,
+				NextEpoch:              nextEpoch,
+				EpochFallbackTriggered: true,
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create min epoch state: %w", err)
+		}
+
+		state, err = flow.NewEpochStateEntry(
+			flow.UntrustedEpochStateEntry{
+				MinEpochStateEntry:  minEpochStateEntry,
+				PreviousEpochSetup:  state.PreviousEpochSetup,
+				PreviousEpochCommit: state.PreviousEpochCommit,
+				CurrentEpochSetup:   state.CurrentEpochSetup,
+				CurrentEpochCommit:  state.CurrentEpochCommit,
+				NextEpochSetup:      nextEpochSetup,
+				NextEpochCommit:     nextEpochCommit,
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create epoch state entry: %w", err)
+		}
 	}
 
 	base, err := newBaseStateMachine(telemetry, view, parentEpochState, state)
@@ -91,7 +125,46 @@ func (m *FallbackStateMachine) extendCurrentEpoch(epochExtension flow.EpochExten
 		return fmt.Errorf("cannot extend current epoch when next epoch is present")
 	}
 
-	state.CurrentEpoch.EpochExtensions = append(state.CurrentEpoch.EpochExtensions, epochExtension)
+	epochExtensions := append(state.CurrentEpoch.EpochExtensions, epochExtension)
+	currentEpoch, err := flow.NewEpochStateContainer(
+		flow.UntrustedEpochStateContainer{
+			SetupID:          state.CurrentEpoch.SetupID,
+			CommitID:         state.CurrentEpoch.CommitID,
+			ActiveIdentities: state.CurrentEpoch.ActiveIdentities,
+			EpochExtensions:  epochExtensions,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not construct current epoch state: %w", err)
+	}
+
+	newMinEpochStateEntry, err := flow.NewMinEpochStateEntry(
+		flow.UntrustedMinEpochStateEntry{
+			PreviousEpoch:          state.PreviousEpoch,
+			CurrentEpoch:           *currentEpoch,
+			NextEpoch:              state.NextEpoch,
+			EpochFallbackTriggered: state.EpochFallbackTriggered,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not create min epoch state: %w", err)
+	}
+
+	m.state, err = flow.NewEpochStateEntry(
+		flow.UntrustedEpochStateEntry{
+			MinEpochStateEntry:  newMinEpochStateEntry,
+			PreviousEpochSetup:  m.state.PreviousEpochSetup,
+			PreviousEpochCommit: m.state.PreviousEpochCommit,
+			CurrentEpochSetup:   m.state.CurrentEpochSetup,
+			CurrentEpochCommit:  m.state.CurrentEpochCommit,
+			NextEpochSetup:      m.state.NextEpochSetup,
+			NextEpochCommit:     m.state.NextEpochCommit,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not construct epoch state entry: %w", err)
+	}
+
 	return nil
 }
 
@@ -186,14 +259,23 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), fmt.Errorf("rejecting EpochRecover event: %w", err))
 		return false, nil
 	}
-	nextEpoch = &flow.EpochStateContainer{
-		SetupID:          epochRecover.EpochSetup.ID(),
-		CommitID:         epochRecover.EpochCommit.ID(),
-		ActiveIdentities: nextEpochParticipants,
-		EpochExtensions:  nil,
+	nextEpochState, err := flow.NewEpochStateContainer(
+		flow.UntrustedEpochStateContainer{
+			SetupID:          epochRecover.EpochSetup.ID(),
+			CommitID:         epochRecover.EpochCommit.ID(),
+			ActiveIdentities: nextEpochParticipants,
+			EpochExtensions:  nil,
+		},
+	)
+	if err != nil {
+		return false, fmt.Errorf("could not construct next epoch state: %w", err)
 	}
 
-	err = m.ejector.TrackDynamicIdentityList(nextEpoch.ActiveIdentities)
+	// update corresponding service events
+	nextEpochSetup := epochRecover.EpochSetup
+	nextEpochCommit := epochRecover.EpochCommit
+
+	err = m.ejector.TrackDynamicIdentityList(nextEpochState.ActiveIdentities)
 	if err != nil {
 		if protocol.IsInvalidServiceEventError(err) {
 			m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), fmt.Errorf("rejecting EpochRecover event: %w", err))
@@ -202,8 +284,32 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		return false, fmt.Errorf("unexpected errors tracking identity list: %w", err)
 	}
 	// if we have processed a valid EpochRecover event, we should exit EFM.
-	m.state.NextEpoch = nextEpoch
-	m.state.EpochFallbackTriggered = false
+	newMinEpochStateEntry, err := flow.NewMinEpochStateEntry(
+		flow.UntrustedMinEpochStateEntry{
+			PreviousEpoch:          m.state.PreviousEpoch,
+			CurrentEpoch:           m.state.CurrentEpoch,
+			NextEpoch:              nextEpochState,
+			EpochFallbackTriggered: false,
+		},
+	)
+	if err != nil {
+		return false, fmt.Errorf("could not create min epoch state: %w", err)
+	}
+
+	m.state, err = flow.NewEpochStateEntry(
+		flow.UntrustedEpochStateEntry{
+			MinEpochStateEntry:  newMinEpochStateEntry,
+			PreviousEpochSetup:  m.state.PreviousEpochSetup,
+			PreviousEpochCommit: m.state.PreviousEpochCommit,
+			CurrentEpochSetup:   m.state.CurrentEpochSetup,
+			CurrentEpochCommit:  m.state.CurrentEpochCommit,
+			NextEpochSetup:      &nextEpochSetup,
+			NextEpochCommit:     &nextEpochCommit,
+		},
+	)
+	if err != nil {
+		return false, fmt.Errorf("could not construct epoch state entry: %w", err)
+	}
 	m.telemetry.OnServiceEventProcessed(epochRecover.ServiceEvent())
 	return true, nil
 }
