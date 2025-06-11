@@ -43,6 +43,7 @@ func TestRunMigration(t *testing.T) {
 		ReaderWorkerCount:      2,
 		WriterWorkerCount:      2,
 		ReaderShardPrefixBytes: 2,
+		ValidationMode:         PartialValidation,
 	}
 
 	// Run migration
