@@ -99,17 +99,9 @@ func BenchWithStorages(t *testing.B, fn func(*testing.B, storage.Reader, WithWri
 func runWithBadger(fn func(storage.Reader, WithWriter)) func(*badger.DB) {
 	return func(db *badger.DB) {
 		withWriter := func(writing func(storage.Writer) error) error {
-			writer := badgerimpl.NewReaderBatchWriter(db)
-			err := writing(writer)
-			if err != nil {
-				return err
-			}
-
-			err = writer.Commit()
-			if err != nil {
-				return err
-			}
-			return nil
+			return badgerimpl.ToDB(db).WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return writing(rw.Writer())
+			})
 		}
 
 		reader := badgerimpl.ToReader(db)
@@ -120,17 +112,9 @@ func runWithBadger(fn func(storage.Reader, WithWriter)) func(*badger.DB) {
 func runWithPebble(fn func(storage.Reader, WithWriter)) func(*pebble.DB) {
 	return func(db *pebble.DB) {
 		withWriter := func(writing func(storage.Writer) error) error {
-			writer := pebbleimpl.NewReaderBatchWriter(db)
-			err := writing(writer)
-			if err != nil {
-				return err
-			}
-
-			err = writer.Commit()
-			if err != nil {
-				return err
-			}
-			return nil
+			return pebbleimpl.ToDB(db).WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return writing(rw.Writer())
+			})
 		}
 
 		reader := pebbleimpl.ToReader(db)
