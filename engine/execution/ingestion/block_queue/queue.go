@@ -69,7 +69,6 @@ type UntrustedMissingCollection MissingCollection
 // NewMissingCollection creates a new instance of MissingCollection.
 // Construction MissingCollection allowed only within the constructor
 func NewMissingCollection(untrusted UntrustedMissingCollection) (*MissingCollection, error) {
-
 	if untrusted.BlockID == flow.ZeroID {
 		return nil, fmt.Errorf("BlockID must not be empty")
 	}
@@ -214,9 +213,9 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 			}
 
 			missingCollection, err := NewMissingCollection(UntrustedMissingCollection{
-				executable.ID(),
-				executable.Block.Header.Height,
-				col.Guarantee,
+				BlockID:   executable.ID(),
+				Height:    executable.Block.Header.Height,
+				Guarantee: col.Guarantee,
 			})
 			if err != nil {
 				return nil, nil, fmt.Errorf("could not construct missingCollection: %w",
@@ -484,9 +483,9 @@ func (q *BlockQueue) GetMissingCollections(blockID flow.Identifier) (
 		}
 
 		missingCollection, err := NewMissingCollection(UntrustedMissingCollection{
-			block.ID(),
-			block.Block.Header.Height,
-			col.Guarantee,
+			BlockID:   block.ID(),
+			Height:    block.Block.Header.Height,
+			Guarantee: col.Guarantee,
 		})
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not construct missingCollection: %w",

@@ -1,5 +1,7 @@
 package flow
 
+import "fmt"
+
 // IncorporatedResult is a wrapper around an ExecutionResult which contains the
 // ID of the first block on its fork in which it was incorporated.
 //
@@ -16,13 +18,32 @@ type IncorporatedResult struct {
 	Result *ExecutionResult
 }
 
+// UntrustedIncorporatedResult is an untrusted input-only representation of an IncorporatedResult,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedIncorporatedResult should be validated and converted into
+// a trusted IncorporatedResult using NewIncorporatedResult constructor.
+type UntrustedIncorporatedResult IncorporatedResult
+
 // NewIncorporatedResult creates a new instance of IncorporatedResult.
 // Construction IncorporatedResult allowed only within the constructor
-func NewIncorporatedResult(incorporatedBlockID Identifier, result *ExecutionResult) *IncorporatedResult {
-	return &IncorporatedResult{
-		IncorporatedBlockID: incorporatedBlockID,
-		Result:              result,
+func NewIncorporatedResult(untrusted UntrustedIncorporatedResult) (*IncorporatedResult, error) {
+	if untrusted.IncorporatedBlockID == ZeroID {
+		return nil, fmt.Errorf("IncorporatedBlockID must not be empty")
 	}
+
+	if untrusted.Result == nil {
+		return nil, fmt.Errorf("Result must not be empty")
+	}
+
+	return &IncorporatedResult{
+		IncorporatedBlockID: untrusted.IncorporatedBlockID,
+		Result:              untrusted.Result,
+	}, nil
 }
 
 // ID implements flow.Entity.ID for IncorporatedResult to make it capable of
