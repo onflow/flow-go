@@ -43,6 +43,7 @@ flowdb
 # IDE related files
 .idea
 .vscode
+.cursor
 *.code-workspace
 git
 language/tools/vscode-extension/cadence-*.vsix
