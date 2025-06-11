@@ -87,7 +87,7 @@ func TestShouldOpenDefaultPebbleDB(t *testing.T) {
 		require.Contains(t, err.Error(), "not initialized")
 
 		// bootstrap the db
-		db, err := ShouldOpenDefaultPebbleDB(logger, dir)
+		db, err := OpenDefaultPebbleDB(logger, dir)
 		require.NoError(t, err)
 		require.NoError(t, initHeights(db, uint64(10)))
 		require.NoError(t, db.Close())
