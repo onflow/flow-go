@@ -83,11 +83,11 @@ func TestChunkDataPackRequestList_UniqueRequestInfo(t *testing.T) {
 // 3. Invalid input with zero ChunkID:
 //   - Should return an error indicating chunk ID must not be zero.
 //
-// 4. Invalid input with nil Agrees list:
-//   - Should return an error indicating agrees list must not be nil.
+// 4. Invalid input with empty and nil Agrees list:
+//   - Should return an error indicating agrees list must not be empty.
 //
-// 5. Invalid input with nil Targets list:
-//   - Should return an error indicating targets list must not be nil.
+// 5. Invalid input with empty and nil Targets list:
+//   - Should return an error indicating targets list must not be empty.
 //
 // 6. Invalid input with non-execution node in Targets list:
 //   - Should return an error indicating only execution node identities are allowed in the Targets list.
@@ -119,7 +119,7 @@ func TestNewChunkDataPackRequest(t *testing.T) {
 		require.Contains(t, err.Error(), "locator is empty")
 	})
 
-	t.Run("invalid input with zero ChunkID", func(t *testing.T) {
+	t.Run("invalid input with zero chunk ID", func(t *testing.T) {
 		info := *chunkDataPackRequestInfo
 		info.ChunkID = flow.ZeroID
 
@@ -134,11 +134,23 @@ func TestNewChunkDataPackRequest(t *testing.T) {
 		require.Contains(t, err.Error(), "chunk ID must not be zero")
 	})
 
-	t.Run("invalid input with nil Agrees", func(t *testing.T) {
+	t.Run("input with invalid agrees", func(t *testing.T) {
 		info := *chunkDataPackRequestInfo
+
+		// with nil agrees
 		info.Agrees = nil
-
 		_, err := verification.NewChunkDataPackRequest(
+			verification.UntrustedChunkDataPackRequest{
+				Locator:                  locator,
+				ChunkDataPackRequestInfo: info,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "agrees list must not be empty")
+
+		// with empty agrees
+		info.Agrees = flow.IdentifierList{}
+		_, err = verification.NewChunkDataPackRequest(
 			verification.UntrustedChunkDataPackRequest{
 				Locator:                  locator,
 				ChunkDataPackRequestInfo: info,
@@ -146,14 +158,26 @@ func TestNewChunkDataPackRequest(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "agrees list must not be nil")
+		require.Contains(t, err.Error(), "agrees list must not be empty")
 	})
 
-	t.Run("invalid input with nil Targets", func(t *testing.T) {
+	t.Run("input with invalid targets", func(t *testing.T) {
 		info := *chunkDataPackRequestInfo
-		info.Targets = nil
 
+		// with nil targets
+		info.Targets = nil
 		_, err := verification.NewChunkDataPackRequest(
+			verification.UntrustedChunkDataPackRequest{
+				Locator:                  locator,
+				ChunkDataPackRequestInfo: info,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "targets list must not be empty")
+
+		// with empty targets
+		info.Targets = flow.IdentityList{}
+		_, err = verification.NewChunkDataPackRequest(
 			verification.UntrustedChunkDataPackRequest{
 				Locator:                  locator,
 				ChunkDataPackRequestInfo: info,
@@ -161,10 +185,10 @@ func TestNewChunkDataPackRequest(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "targets list must not be nil")
+		require.Contains(t, err.Error(), "targets list must not be empty")
 	})
 
-	t.Run("invalid input with non-execution node in Targets list", func(t *testing.T) {
+	t.Run("invalid input with non-execution node in targets list", func(t *testing.T) {
 		info := *chunkDataPackRequestInfo
 
 		// Append a non-execution identity
