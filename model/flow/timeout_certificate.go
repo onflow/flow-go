@@ -1,6 +1,8 @@
 package flow
 
 import (
+	"fmt"
+
 	"github.com/onflow/crypto"
 )
 
@@ -41,6 +43,38 @@ type UntrustedTimeoutCertificate TimeoutCertificate
 //
 // All errors indicate a valid TimeoutCertificate cannot be constructed from the input.
 func NewTimeoutCertificate(untrusted UntrustedTimeoutCertificate) (*TimeoutCertificate, error) {
+	if untrusted.NewestQC == nil {
+		return nil, fmt.Errorf("newest QC must not be nil")
+	}
+	if untrusted.SignerIndices == nil {
+		return nil, fmt.Errorf("signer indices must not be nil")
+	}
+	if untrusted.SigData == nil {
+		return nil, fmt.Errorf("signature must not be nil")
+	}
+
+	// The TC's view cannot be smaller than the view of the QC it contains.
+	// Note: we specifically allow for the TC to have the same view as the highest QC.
+	// This is useful as a fallback, because it allows replicas other than the designated
+	// leader to also collect votes and generate a QC.
+	if untrusted.View < untrusted.NewestQC.View {
+		return nil, fmt.Errorf("TC's QC cannot be newer than the TC's view")
+	}
+
+	// verifying that tc.NewestQC is the QC with the highest view.
+	// Note: A byzantine TC could include `nil` for tc.NewestQCViews
+	if untrusted.NewestQCViews != nil {
+		newestQCView := untrusted.NewestQCViews[0]
+		for _, view := range untrusted.NewestQCViews {
+			if newestQCView < view {
+				newestQCView = view
+			}
+		}
+		if newestQCView > untrusted.NewestQC.View {
+			return nil, fmt.Errorf("included QC (view=%d) should be equal or higher to highest contributed view: %d", untrusted.NewestQC.View, newestQCView)
+		}
+	}
+
 	return &TimeoutCertificate{
 		View:          untrusted.View,
 		NewestQCViews: untrusted.NewestQCViews,

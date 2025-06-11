@@ -1,6 +1,8 @@
 package execution
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 )
@@ -32,6 +34,15 @@ type UntrustedComputationResult ComputationResult
 //
 // All errors indicate a valid ComputationResult cannot be constructed from the input.
 func NewComputationResult(untrusted UntrustedComputationResult) (*ComputationResult, error) {
+	if untrusted.BlockExecutionResult == nil {
+		return nil, fmt.Errorf("block execution result must not be nil")
+	}
+	if untrusted.BlockAttestationResult == nil {
+		return nil, fmt.Errorf("block attestation result must not be nil")
+	}
+	if untrusted.ExecutionReceipt == nil {
+		return nil, fmt.Errorf("execution receipt must not be nil")
+	}
 	return &ComputationResult{
 		BlockExecutionResult:   untrusted.BlockExecutionResult,
 		BlockAttestationResult: untrusted.BlockAttestationResult,

@@ -79,6 +79,37 @@ type UntrustedTimeoutObject TimeoutObject
 //
 // All errors indicate a valid TimeoutObject cannot be constructed from the input.
 func NewTimeoutObject(untrusted UntrustedTimeoutObject) (*TimeoutObject, error) {
+	if untrusted.NewestQC == nil {
+		return nil, fmt.Errorf("newest QC must not be nil")
+	}
+	if untrusted.View <= untrusted.NewestQC.View {
+		return nil, fmt.Errorf("TO's QC %d cannot be newer than the TO's view %d", untrusted.NewestQC.View, untrusted.View)
+	}
+
+	// If a TC is included, the TC must be for the past round, no matter whether a QC
+	// for the last round is also included. In some edge cases, a node might observe
+	// _both_ QC and TC for the previous round, in which case it can include both.
+	if untrusted.LastViewTC != nil {
+		if untrusted.View != untrusted.LastViewTC.View+1 {
+			return nil, fmt.Errorf("invalid TC for non-previous view, expected view %d, got view %d", untrusted.View-1, untrusted.LastViewTC.View)
+		}
+		if untrusted.NewestQC.View < untrusted.LastViewTC.NewestQC.View {
+			return nil, fmt.Errorf("timeout.NewestQC is older (view=%d) than the QC in timeout.LastViewTC (view=%d)", untrusted.NewestQC.View, untrusted.LastViewTC.NewestQC.View)
+		}
+	}
+	// The TO must contain a proof that sender legitimately entered View. Transitioning
+	// to round timeout.View is possible either by observing a QC or a TC for the previous round.
+	// If no QC is included, we require a TC to be present, which by check must be for
+	// the previous round.
+	lastViewSuccessful := untrusted.View == untrusted.NewestQC.View+1
+	if !lastViewSuccessful {
+		// The TO's sender did _not_ observe a QC for round timeout.View-1. Hence, it should
+		// include a TC for the previous round. Otherwise, the TO is invalid.
+		if untrusted.LastViewTC == nil {
+			return nil, fmt.Errorf("must include TC")
+		}
+	}
+
 	return &TimeoutObject{
 		View:        untrusted.View,
 		NewestQC:    untrusted.NewestQC,
