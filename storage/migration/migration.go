@@ -237,7 +237,7 @@ func CopyFromBadgerToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg Migrat
 
 	// Close kvChan after readers complete
 	go func() {
-		// Wait for all reader workers to complete
+		// Wait for all workers to complete
 		if err := g.Wait(); err != nil {
 			cancel(err)
 		}
