@@ -31,7 +31,9 @@ func TestPebbleSSTableIngest(t *testing.T) {
 	file, err := vfs.Default.Create(sstPath)
 	require.NoError(t, err)
 	writable := objstorageprovider.NewFileWritable(file)
-	writer := sstable.NewWriter(writable, sstable.WriterOptions{})
+	writer := sstable.NewWriter(writable, sstable.WriterOptions{
+		TableFormat: sstable.TableFormatMax,
+	})
 	data := generateRandomKVData(500, 10, 50)
 
 	// Sort the keys to ensure strictly increasing order
