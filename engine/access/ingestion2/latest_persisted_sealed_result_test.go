@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -12,6 +13,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -22,97 +25,86 @@ import (
 // - All fields are correctly initialized on success
 // - Errors from the initializer are properly propagated
 func TestNewLatestPersistedSealedResult(t *testing.T) {
-	height := uint64(100)
+	initialHeight := uint64(100)
+	missingHeaderHeight := initialHeight + 1
+	missingResultHeight := initialHeight + 2
 
-	t.Run("successful initialization", func(t *testing.T) {
-		mockInitializer := storagemock.NewConsumerProgressInitializer(t)
-		mockCP := storagemock.NewConsumerProgress(t)
-		mockHeaders := storagemock.NewHeaders(t)
-		mockResults := storagemock.NewExecutionResults(t)
+	initialHeader, initialResult, mockHeaders, mockResults := getHeadersResults(t, initialHeight)
 
-		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
-		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
-			result.BlockID = header.ID()
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
+		db := pebbleimpl.ToDB(pdb)
+
+		t.Run("successful initialization", func(t *testing.T) {
+			progress := store.NewConsumerProgress(db, "test_consumer1")
+
+			latest, err := NewLatestPersistedSealedResult(initialHeader.Height, progress, mockHeaders, mockResults)
+			require.NoError(t, err)
+
+			require.NotNil(t, latest)
+
+			actualResultID, actualHeight := latest.Latest()
+
+			assert.Equal(t, initialResult.ID(), actualResultID)
+			assert.Equal(t, initialHeader.Height, actualHeight)
 		})
 
-		mockInitializer.On("Initialize", height).Return(mockCP, nil)
-		mockCP.On("ProcessedIndex").Return(height, nil)
-		mockHeaders.On("ByHeight", height).Return(header, nil)
-		mockResults.On("ByBlockID", result.BlockID).Return(result, nil)
+		t.Run("initialize error", func(t *testing.T) {
+			expectedErr := fmt.Errorf("initialization error")
 
-		latest, err := NewLatestPersistedSealedResult(height, mockInitializer, mockHeaders, mockResults)
-		require.NoError(t, err)
+			mockInitializer := storagemock.NewConsumerProgressInitializer(t)
+			mockInitializer.On("Initialize", initialHeader.Height).Return(nil, expectedErr)
 
-		require.NotNil(t, latest)
-		assert.Equal(t, result.ID(), latest.ResultID())
-		assert.Equal(t, height, latest.Height())
+			latest, err := NewLatestPersistedSealedResult(initialHeader.Height, mockInitializer, nil, nil)
+
+			require.ErrorIs(t, err, expectedErr)
+			require.Nil(t, latest)
+		})
+
+		t.Run("processed index error", func(t *testing.T) {
+			expectedErr := fmt.Errorf("processed index error")
+
+			mockCP := storagemock.NewConsumerProgress(t)
+			mockCP.On("ProcessedIndex").Return(uint64(0), expectedErr)
+
+			mockInitializer := storagemock.NewConsumerProgressInitializer(t)
+			mockInitializer.On("Initialize", initialHeader.Height).Return(mockCP, nil)
+
+			latest, err := NewLatestPersistedSealedResult(initialHeader.Height, mockInitializer, nil, nil)
+
+			assert.ErrorIs(t, err, expectedErr)
+			require.Nil(t, latest)
+		})
+
+		t.Run("header lookup error", func(t *testing.T) {
+			expectedErr := fmt.Errorf("header lookup error")
+
+			progress := store.NewConsumerProgress(db, "test_consumer2")
+
+			mockHeaders.On("ByHeight", missingHeaderHeight).Return(nil, expectedErr)
+
+			latest, err := NewLatestPersistedSealedResult(missingHeaderHeight, progress, mockHeaders, nil)
+
+			assert.ErrorIs(t, err, expectedErr)
+			require.Nil(t, latest)
+		})
+
+		t.Run("result lookup error", func(t *testing.T) {
+			expectedErr := fmt.Errorf("result lookup error")
+
+			progress := store.NewConsumerProgress(db, "test_consumer3")
+
+			header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(missingResultHeight))
+
+			mockHeaders.On("ByHeight", missingResultHeight).Return(header, nil)
+			mockResults.On("ByBlockID", header.ID()).Return(nil, expectedErr)
+
+			latest, err := NewLatestPersistedSealedResult(missingResultHeight, progress, mockHeaders, mockResults)
+
+			assert.ErrorIs(t, err, expectedErr)
+			require.Nil(t, latest)
+		})
 	})
 
-	t.Run("initialization error", func(t *testing.T) {
-		mockInitializer := storagemock.NewConsumerProgressInitializer(t)
-		expectedErr := fmt.Errorf("initialization error: %w", storage.ErrNotFound)
-
-		mockInitializer.On("Initialize", height).Return(nil, expectedErr)
-
-		latest, err := NewLatestPersistedSealedResult(height, mockInitializer, nil, nil)
-
-		require.Error(t, err)
-		require.Nil(t, latest)
-		assert.ErrorIs(t, err, storage.ErrNotFound)
-	})
-
-	t.Run("processed index error", func(t *testing.T) {
-		mockInitializer := storagemock.NewConsumerProgressInitializer(t)
-		mockCP := storagemock.NewConsumerProgress(t)
-		expectedErr := fmt.Errorf("processed index error: %w", storage.ErrNotFound)
-
-		mockInitializer.On("Initialize", height).Return(mockCP, nil)
-		mockCP.On("ProcessedIndex").Return(uint64(0), expectedErr)
-
-		latest, err := NewLatestPersistedSealedResult(height, mockInitializer, nil, nil)
-
-		require.Error(t, err)
-		require.Nil(t, latest)
-		assert.ErrorIs(t, err, storage.ErrNotFound)
-	})
-
-	t.Run("header lookup error", func(t *testing.T) {
-		mockInitializer := storagemock.NewConsumerProgressInitializer(t)
-		mockCP := storagemock.NewConsumerProgress(t)
-		mockHeaders := storagemock.NewHeaders(t)
-		expectedErr := fmt.Errorf("header lookup error: %w", storage.ErrNotFound)
-
-		mockInitializer.On("Initialize", height).Return(mockCP, nil)
-		mockCP.On("ProcessedIndex").Return(height, nil)
-		mockHeaders.On("ByHeight", height).Return(nil, expectedErr)
-
-		latest, err := NewLatestPersistedSealedResult(height, mockInitializer, mockHeaders, nil)
-
-		require.Error(t, err)
-		require.Nil(t, latest)
-		assert.ErrorIs(t, err, storage.ErrNotFound)
-	})
-
-	t.Run("result lookup error", func(t *testing.T) {
-		mockInitializer := storagemock.NewConsumerProgressInitializer(t)
-		mockCP := storagemock.NewConsumerProgress(t)
-		mockHeaders := storagemock.NewHeaders(t)
-		mockResults := storagemock.NewExecutionResults(t)
-		expectedErr := fmt.Errorf("result lookup error: %w", storage.ErrNotFound)
-
-		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
-
-		mockInitializer.On("Initialize", height).Return(mockCP, nil)
-		mockCP.On("ProcessedIndex").Return(height, nil)
-		mockHeaders.On("ByHeight", height).Return(header, nil)
-		mockResults.On("ByBlockID", header.ID()).Return(nil, expectedErr)
-
-		latest, err := NewLatestPersistedSealedResult(height, mockInitializer, mockHeaders, mockResults)
-
-		require.Error(t, err)
-		require.Nil(t, latest)
-		assert.ErrorIs(t, err, storage.ErrNotFound)
-	})
 }
 
 // TestLatestPersistedSealedResult_BatchSet tests the batch update functionality.
@@ -122,25 +114,16 @@ func TestNewLatestPersistedSealedResult(t *testing.T) {
 // - State is not updated if BatchSetProcessedIndex fails
 // - State is only updated after the batch callback indicates success
 func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
-	initialHeight := uint64(100)
+	initialHeader, initialResult, mockHeaders, mockResults := getHeadersResults(t, 100)
 
 	setupResult := func(t *testing.T) (*LatestPersistedSealedResult, *storagemock.ConsumerProgress) {
-		mockInitializer := storagemock.NewConsumerProgressInitializer(t)
 		mockCP := storagemock.NewConsumerProgress(t)
-		mockHeaders := storagemock.NewHeaders(t)
-		mockResults := storagemock.NewExecutionResults(t)
+		mockCP.On("ProcessedIndex").Return(initialHeader.Height, nil)
 
-		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(initialHeight))
-		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
-			result.BlockID = header.ID()
-		})
+		mockInitializer := storagemock.NewConsumerProgressInitializer(t)
+		mockInitializer.On("Initialize", initialHeader.Height).Return(mockCP, nil)
 
-		mockInitializer.On("Initialize", initialHeight).Return(mockCP, nil)
-		mockCP.On("ProcessedIndex").Return(initialHeight, nil)
-		mockHeaders.On("ByHeight", initialHeight).Return(header, nil)
-		mockResults.On("ByBlockID", result.BlockID).Return(result, nil)
-
-		latest, err := NewLatestPersistedSealedResult(initialHeight, mockInitializer, mockHeaders, mockResults)
+		latest, err := NewLatestPersistedSealedResult(initialHeader.Height, mockInitializer, mockHeaders, mockResults)
 		require.NoError(t, err)
 		return latest, mockCP
 	}
@@ -167,8 +150,10 @@ func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 
 		callbackCalled.Wait()
 
-		assert.Equal(t, newResultID, latest.ResultID())
-		assert.Equal(t, newHeight, latest.Height())
+		actualResultID, actualHeight := latest.Latest()
+
+		assert.Equal(t, newResultID, actualResultID)
+		assert.Equal(t, newHeight, actualHeight)
 	})
 
 	t.Run("batch update error during BatchSetProcessedIndex", func(t *testing.T) {
@@ -197,8 +182,10 @@ func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 
 		callbackCalled.Wait()
 
-		assert.NotEqual(t, newResultID, latest.ResultID())
-		assert.Equal(t, initialHeight, latest.Height())
+		actualResultID, actualHeight := latest.Latest()
+
+		assert.Equal(t, initialResult.ID(), actualResultID)
+		assert.Equal(t, initialHeader.Height, actualHeight)
 	})
 
 	t.Run("batch update error during callback", func(t *testing.T) {
@@ -223,8 +210,10 @@ func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 
 		callbackCalled.Wait()
 
-		assert.NotEqual(t, newResultID, latest.ResultID())
-		assert.Equal(t, initialHeight, latest.Height())
+		actualResultID, actualHeight := latest.Latest()
+
+		assert.Equal(t, initialResult.ID(), actualResultID)
+		assert.Equal(t, initialHeader.Height, actualHeight)
 	})
 }
 
@@ -235,74 +224,77 @@ func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 // - No data races occur under heavy concurrent load
 // - The state remains consistent during concurrent operations
 func TestLatestPersistedSealedResult_ConcurrentAccess(t *testing.T) {
-	initialHeight := uint64(100)
-	mockInitializer := storagemock.NewConsumerProgressInitializer(t)
-	mockCP := storagemock.NewConsumerProgress(t)
-	mockHeaders := storagemock.NewHeaders(t)
-	mockResults := storagemock.NewExecutionResults(t)
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
+		db := pebbleimpl.ToDB(pdb)
 
+		progress := store.NewConsumerProgress(db, "test_consumer")
+
+		initialHeader, initialResult, mockHeaders, mockResults := getHeadersResults(t, 100)
+
+		latest, err := NewLatestPersistedSealedResult(initialHeader.Height, progress, mockHeaders, mockResults)
+		require.NoError(t, err)
+
+		t.Run("concurrent reads", func(t *testing.T) {
+			var wg sync.WaitGroup
+			numGoroutines := 1000
+
+			for range numGoroutines {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+
+					actualResultID, actualHeight := latest.Latest()
+
+					assert.Equal(t, initialResult.ID(), actualResultID)
+					assert.Equal(t, initialHeader.Height, actualHeight)
+				}()
+			}
+
+			wg.Wait()
+		})
+
+		t.Run("concurrent read/write", func(t *testing.T) {
+			var wg sync.WaitGroup
+			numGoroutines := 1000
+
+			for i := 0; i < numGoroutines; i++ {
+				wg.Add(2)
+				go func(i int) {
+					defer wg.Done()
+
+					batch := db.NewBatch()
+					defer batch.Close()
+
+					newResultID := unittest.IdentifierFixture()
+					newHeight := uint64(200 + i)
+					err := latest.BatchSet(newResultID, newHeight, batch)
+					require.NoError(t, err)
+
+					err = batch.Commit()
+					require.NoError(t, err)
+				}(i)
+				go func() {
+					defer wg.Done()
+					_, _ = latest.Latest()
+				}()
+			}
+
+			wg.Wait()
+		})
+	})
+}
+
+func getHeadersResults(t *testing.T, initialHeight uint64) (*flow.Header, *flow.ExecutionResult, *storagemock.Headers, *storagemock.ExecutionResults) {
 	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(initialHeight))
 	result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
 		result.BlockID = header.ID()
 	})
 
-	mockInitializer.On("Initialize", initialHeight).Return(mockCP, nil)
-	mockCP.On("ProcessedIndex").Return(initialHeight, nil)
-	mockHeaders.On("ByHeight", initialHeight).Return(header, nil)
-	mockResults.On("ByBlockID", result.BlockID).Return(result, nil)
+	mockHeaders := storagemock.NewHeaders(t)
+	mockHeaders.On("ByHeight", initialHeight).Return(header, nil).Maybe()
 
-	latest, err := NewLatestPersistedSealedResult(initialHeight, mockInitializer, mockHeaders, mockResults)
-	require.NoError(t, err)
+	mockResults := storagemock.NewExecutionResults(t)
+	mockResults.On("ByBlockID", result.BlockID).Return(result, nil).Maybe()
 
-	t.Run("concurrent reads", func(t *testing.T) {
-		var wg sync.WaitGroup
-		numGoroutines := 1000
-
-		for i := 0; i < numGoroutines; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				assert.Equal(t, result.ID(), latest.ResultID())
-				assert.Equal(t, initialHeight, latest.Height())
-			}()
-		}
-
-		wg.Wait()
-	})
-
-	t.Run("concurrent read/write", func(t *testing.T) {
-		var wg sync.WaitGroup
-		numGoroutines := 1000
-
-		mockBatch := storagemock.NewReaderBatchWriter(t)
-		mockCP.On("BatchSetProcessedIndex", mock.Anything, mockBatch).Return(nil).Times(numGoroutines)
-
-		var callbacksCompleted sync.WaitGroup
-		callbacksCompleted.Add(numGoroutines)
-
-		mockBatch.On("AddCallback", mock.AnythingOfType("func(error)")).Run(func(args mock.Arguments) {
-			callback := args.Get(0).(func(error))
-			callback(nil)
-			callbacksCompleted.Done()
-		}).Times(numGoroutines)
-
-		for i := 0; i < numGoroutines; i++ {
-			wg.Add(2)
-			go func(i int) {
-				defer wg.Done()
-				newResultID := unittest.IdentifierFixture()
-				newHeight := uint64(200 + i)
-				err := latest.BatchSet(newResultID, newHeight, mockBatch)
-				require.NoError(t, err)
-			}(i)
-			go func() {
-				defer wg.Done()
-				_ = latest.ResultID()
-				_ = latest.Height()
-			}()
-		}
-
-		wg.Wait()
-		callbacksCompleted.Wait()
-	})
+	return header, result, mockHeaders, mockResults
 }

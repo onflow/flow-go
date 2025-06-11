@@ -21,12 +21,12 @@ type LatestPersistedSealedResult struct {
 	// cp is the consumer progress instance
 	cp storage.ConsumerProgress
 
-	// writeMu is used to prevent concurrent batch updates to the persisted height.
+	// batchMu is used to prevent concurrent batch updates to the persisted height.
 	// the critical section is fairly large, so use a separate mutex from the cached values.
-	writeMu sync.Mutex
+	batchMu sync.Mutex
 
-	// mu is used to protect access to resultID and height.
-	mu sync.RWMutex
+	// cacheMu is used to protect access to resultID and height.
+	cacheMu sync.RWMutex
 }
 
 // NewLatestPersistedSealedResult creates a new LatestPersistedSealedResult instance.
@@ -57,6 +57,7 @@ func NewLatestPersistedSealedResult(
 		return nil, fmt.Errorf("could not get header: %w", err)
 	}
 
+	// the result/block relationship is indexed by the Access ingestion engine when a result is sealed.
 	result, err := results.ByBlockID(header.ID())
 	if err != nil {
 		return nil, fmt.Errorf("could not get result: %w", err)
@@ -69,18 +70,11 @@ func NewLatestPersistedSealedResult(
 	}, nil
 }
 
-// ResultID returns the ID of the latest persisted sealed result.
-func (l *LatestPersistedSealedResult) ResultID() flow.Identifier {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-	return l.resultID
-}
-
-// Height returns the height of the latest persisted sealed result's block.
-func (l *LatestPersistedSealedResult) Height() uint64 {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-	return l.height
+// Latest returns the ID and height of the latest persisted sealed result.
+func (l *LatestPersistedSealedResult) Latest() (flow.Identifier, uint64) {
+	l.cacheMu.RLock()
+	defer l.cacheMu.RUnlock()
+	return l.resultID, l.height
 }
 
 // BatchSet updates the latest persisted sealed result in a batch operation
@@ -89,16 +83,16 @@ func (l *LatestPersistedSealedResult) Height() uint64 {
 //
 // No errors are expected during normal operation,
 func (l *LatestPersistedSealedResult) BatchSet(resultID flow.Identifier, height uint64, batch storage.ReaderBatchWriter) error {
-	l.writeMu.Lock()
+	l.batchMu.Lock()
 
 	batch.AddCallback(func(err error) {
-		defer l.writeMu.Unlock()
+		defer l.batchMu.Unlock()
 		if err != nil {
 			return
 		}
 
-		l.mu.Lock()
-		defer l.mu.Unlock()
+		l.cacheMu.Lock()
+		defer l.cacheMu.Unlock()
 
 		l.resultID = resultID
 		l.height = height
