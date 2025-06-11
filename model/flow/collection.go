@@ -1,6 +1,8 @@
 package flow
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
@@ -20,11 +22,14 @@ func CollectionFromTransactions(transactions []*Transaction) Collection {
 }
 
 // Light returns the light, reference-only version of the collection.
-func (c Collection) Light() (*LightCollection, error) {
-	encodable := EncodableLightCollection{
+func (c Collection) Light() *LightCollection {
+	light, err := NewLightCollection(UntrustedLightCollection{
 		Transactions: GetIDs(c.Transactions),
+	})
+	if err != nil {
+		panic(fmt.Sprintf("sanity check failed: error converting known valid Collection to LightCollection: %v", err))
 	}
-	return NewLightCollection(encodable)
+	return light
 }
 
 // Guarantee returns a collection guarantee for this collection.
@@ -65,28 +70,20 @@ func (c Collection) Fingerprint() []byte {
 //
 //structwrite:immutable - mutations allowed only within the constructor
 type LightCollection struct {
-	EncodableLightCollection
-	id Identifier
-}
-
-type EncodableLightCollection struct {
 	Transactions []Identifier
 }
 
-func (lc EncodableLightCollection) ID() Identifier {
-	return MakeID(lc)
-}
+type UntrustedLightCollection LightCollection
 
 // NewLightCollection constructs a new LightCollection instance.
-func NewLightCollection(encodable EncodableLightCollection) (*LightCollection, error) {
+func NewLightCollection(untrusted UntrustedLightCollection) (*LightCollection, error) {
 	return &LightCollection{
-		EncodableLightCollection: encodable,
-		id:                       encodable.ID(),
+		Transactions: untrusted.Transactions,
 	}, nil
 }
 
 func (lc LightCollection) ID() Identifier {
-	return lc.id
+	return MakeID(lc)
 }
 
 func (lc LightCollection) Checksum() Identifier {
