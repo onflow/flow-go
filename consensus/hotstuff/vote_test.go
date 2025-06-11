@@ -34,20 +34,6 @@ func TestNewVote(t *testing.T) {
 		assert.Equal(t, sigData, v.SigData)
 	})
 
-	//t.Run("zero View", func(t *testing.T) {
-	//	uv := model.UntrustedVote{
-	//		View:     0,
-	//		BlockID:  unittest.IdentifierFixture(),
-	//		SignerID: unittest.IdentifierFixture(),
-	//		SigData:  []byte{0, 1, 2},
-	//	}
-	//
-	//	v, err := model.NewVote(uv)
-	//	assert.Error(t, err)
-	//	assert.Nil(t, v)
-	//	assert.Contains(t, err.Error(), "View")
-	//})
-
 	t.Run("empty BlockID", func(t *testing.T) {
 		uv := model.UntrustedVote{
 			View:     validView,
