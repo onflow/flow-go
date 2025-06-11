@@ -121,7 +121,7 @@ func run(*cobra.Command, []string) {
 		log.Info().Msg("reading trie")
 
 		stateCommitment := util.ParseStateCommitment(flagStateCommitment)
-		payloads, err = util.ReadTrie(flagState, stateCommitment)
+		payloads, err = util.ReadTrieForPayloads(flagState, stateCommitment)
 	}
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read payloads")
