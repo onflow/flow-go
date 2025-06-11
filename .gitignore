@@ -43,8 +43,13 @@ flowdb
 # IDE related files
 .idea
 .vscode
-.cursor
 *.code-workspace
+# ignore all files in the .cursor directory, except for the rules directory
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/*
+# do ignore rules files matching private-*
+.cursor/rules/private-*
 git
 language/tools/vscode-extension/cadence-*.vsix
 language/tools/vscode-extension/out/*
