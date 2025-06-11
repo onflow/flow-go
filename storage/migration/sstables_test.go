@@ -20,7 +20,9 @@ func TestPebbleSSTableIngest(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	// Open Pebble DB
-	db, err := pebble.Open(dir, &pebble.Options{})
+	db, err := pebble.Open(dir, &pebble.Options{
+		FormatMajorVersion: pebble.FormatNewest,
+	})
 	require.NoError(t, err)
 	defer db.Close()
 

@@ -62,7 +62,9 @@ func TestRunMigration(t *testing.T) {
 	require.Contains(t, string(completedContent), "migration completed")
 
 	// Open PebbleDB to confirm migrated values
-	pebbleDB, err := pebble.Open(pebbleDir, &pebble.Options{})
+	pebbleDB, err := pebble.Open(pebbleDir, &pebble.Options{
+		FormatMajorVersion: pebble.FormatNewest,
+	})
 	require.NoError(t, err)
 	defer pebbleDB.Close()
 
