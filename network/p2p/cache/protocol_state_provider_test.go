@@ -68,7 +68,7 @@ func (suite *ProtocolStateProviderTestSuite) triggerUpdate() {
 	suite.participants = unittest.IdentityListFixture(5, unittest.WithAllRoles(), unittest.WithKeys)
 
 	block := unittest.BlockFixture()
-	suite.head = block.Header
+	suite.head = block.ToHeader()
 
 	// set up protocol snapshot mock
 	snapshot := &mockprotocol.Snapshot{}

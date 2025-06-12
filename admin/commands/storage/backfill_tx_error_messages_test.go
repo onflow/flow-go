@@ -57,7 +57,7 @@ type BackfillTxErrorMessagesSuite struct {
 
 	blockHeadersMap map[uint64]*flow.Header
 
-	nodeRootBlock flow.Block
+	nodeRootBlock *flow.Block
 	sealedBlock   *flow.Block
 	blockCount    int
 }
@@ -79,28 +79,29 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 
 	suite.blockCount = 5
 	suite.blockHeadersMap = make(map[uint64]*flow.Header, suite.blockCount)
-	suite.nodeRootBlock = unittest.BlockFixture()
-	suite.nodeRootBlock.Header.Height = 0
-	suite.blockHeadersMap[suite.nodeRootBlock.Header.Height] = suite.nodeRootBlock.Header
+	suite.nodeRootBlock = unittest.BlockFixture(
+		unittest.Block.WithHeight(0),
+	)
+	suite.blockHeadersMap[suite.nodeRootBlock.Header.Height] = suite.nodeRootBlock.ToHeader()
 
-	parent := suite.nodeRootBlock.Header
+	parent := suite.nodeRootBlock.ToHeader()
 
 	for i := 1; i <= suite.blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
-		parent = block.Header
-		suite.blockHeadersMap[block.Header.Height] = block.Header
+		parent = block.ToHeader()
+		suite.blockHeadersMap[block.Header.Height] = block.ToHeader()
 		suite.sealedBlock = block
 	}
 
 	suite.params = protocolmock.NewParams(suite.T())
 	suite.params.On("SealedRoot").Return(
 		func() *flow.Header {
-			return suite.nodeRootBlock.Header
+			return suite.nodeRootBlock.ToHeader()
 		}, nil)
 	suite.state.On("Params").Return(suite.params, nil).Maybe()
 
-	suite.snapshot = createSnapshot(suite.T(), suite.sealedBlock.Header)
+	suite.snapshot = createSnapshot(suite.T(), suite.sealedBlock.ToHeader())
 	suite.state.On("Sealed").Return(suite.snapshot)
 	suite.state.On("Final").Return(suite.snapshot)
 
@@ -195,7 +196,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 
 	// invalid start-height, start-height is less than root block
 	suite.Run("start-height is less than root block", func() {
-		suite.nodeRootBlock.Header = suite.blockHeadersMap[2] // mock sealed root block to height 2
+		suite.nodeRootBlock.Header = suite.blockHeadersMap[2].HeaderBody // mock sealed root block to height 2
 
 		startHeight := 1
 		err := suite.command.Validator(&admin.CommandRequest{
@@ -207,7 +208,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
 			"'start-height' %d must not be less than root block %d", startHeight, suite.nodeRootBlock.Header.Height))
 
-		suite.nodeRootBlock.Header = suite.blockHeadersMap[0] // mock sealed root block back to height 0
+		suite.nodeRootBlock.Header = suite.blockHeadersMap[0].HeaderBody // mock sealed root block back to height 0
 	})
 
 	// invalid end-height

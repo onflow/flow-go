@@ -101,7 +101,7 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	ms.receiptValidator.On("Validate", receipt).Return(nil)
 
 	// Expect the receipt to be added to mempool and persistent storage
-	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
+	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.ToHeader()).Return(true, nil).Once()
 	ms.ReceiptsDB.On("Store", receipt).Return(nil).Once()
 
 	_, err := ms.core.processReceipt(receipt)
@@ -124,7 +124,7 @@ func (ms *MatchingSuite) TestOnReceipt_ReceiptInPersistentStorage() {
 	// Persistent storage layer for Receipts has the receipt already stored
 	ms.ReceiptsDB.On("Store", receipt).Return(storage.ErrAlreadyExists).Once()
 	// The receipt should be added to the receipts mempool
-	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
+	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.ToHeader()).Return(true, nil).Once()
 
 	_, err := ms.core.processReceipt(receipt)
 	ms.Require().NoError(err, "should process receipts, even if it is already in storage")
@@ -143,7 +143,7 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 	ms.receiptValidator.On("Validate", receipt).Return(nil).Once()
 
 	// Expect the receipt to be added to mempool and persistent storage
-	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
+	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.ToHeader()).Return(true, nil).Once()
 	ms.ReceiptsDB.On("Store", receipt).Return(nil).Once()
 
 	// onReceipt should run to completion without throwing an error
@@ -236,7 +236,7 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 	orderedBlocks := make([]flow.Block, 0, n)
 	parentBlock := ms.UnfinalizedBlock
 	for i := 0; i < n; i++ {
-		block := unittest.BlockWithParentFixture(parentBlock.Header)
+		block := unittest.BlockWithParentFixture(parentBlock.ToHeader())
 		ms.Extend(block)
 		orderedBlocks = append(orderedBlocks, *block)
 		parentBlock = *block

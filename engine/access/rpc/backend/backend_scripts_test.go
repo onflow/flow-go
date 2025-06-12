@@ -84,9 +84,7 @@ func (s *BackendScriptsSuite) SetupTest() {
 
 	s.execClient = access.NewExecutionAPIClient(s.T())
 	s.executionNodes = unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-
-	block := unittest.BlockFixture()
-	s.block = &block
+	s.block = unittest.BlockFixture()
 
 	s.script = []byte("access(all) fun main() { return 1 }")
 	s.arguments = [][]byte{[]byte("arg1"), []byte("arg2")}
@@ -440,7 +438,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_Inconsis
 
 func (s *BackendScriptsSuite) testExecuteScriptAtLatestBlock(ctx context.Context, backend *backendScripts, statusCode codes.Code) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
-	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
+	s.snapshot.On("Head").Return(s.block.ToHeader(), nil).Once()
 
 	if statusCode == codes.OK {
 		actual, err := backend.ExecuteScriptAtLatestBlock(ctx, s.script, s.arguments)
@@ -456,7 +454,7 @@ func (s *BackendScriptsSuite) testExecuteScriptAtLatestBlock(ctx context.Context
 
 func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(ctx context.Context, backend *backendScripts, statusCode codes.Code) {
 	blockID := s.block.ID()
-	s.headers.On("ByBlockID", blockID).Return(s.block.Header, nil).Once()
+	s.headers.On("ByBlockID", blockID).Return(s.block.ToHeader(), nil).Once()
 
 	if statusCode == codes.OK {
 		actual, err := backend.ExecuteScriptAtBlockID(ctx, blockID, s.script, s.arguments)
@@ -472,7 +470,7 @@ func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(ctx context.Context, ba
 
 func (s *BackendScriptsSuite) testExecuteScriptAtBlockHeight(ctx context.Context, backend *backendScripts, statusCode codes.Code) {
 	height := s.block.Header.Height
-	s.headers.On("ByHeight", height).Return(s.block.Header, nil).Once()
+	s.headers.On("ByHeight", height).Return(s.block.ToHeader(), nil).Once()
 
 	if statusCode == codes.OK {
 		actual, err := backend.ExecuteScriptAtBlockHeight(ctx, height, s.script, s.arguments)

@@ -121,7 +121,7 @@ func getHeaders(n int) []*flow.Header {
 	headers := make([]*flow.Header, n)
 	for i := range headers {
 		b := unittest.BlockFixture()
-		headers[i] = b.Header
+		headers[i] = b.ToHeader()
 
 	}
 	return headers

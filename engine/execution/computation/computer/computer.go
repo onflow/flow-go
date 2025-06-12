@@ -387,7 +387,7 @@ func (e *blockComputer) executeBlock(
 	e.queueTransactionRequests(
 		blockId,
 		blockIdStr,
-		block.Block.Header,
+		block.Block.ToHeader(),
 		rawCollections,
 		systemTxn,
 		requestQueue,

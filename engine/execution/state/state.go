@@ -371,7 +371,7 @@ func (s *state) SaveExecutionResults(
 	if s.enableRegisterStore {
 		// save registers to register store
 		err = s.registerStore.SaveRegisters(
-			result.BlockExecutionResult.ExecutableBlock.Block.Header,
+			result.BlockExecutionResult.ExecutableBlock.Block.ToHeader(),
 			result.BlockExecutionResult.AllUpdatedRegisters(),
 		)
 

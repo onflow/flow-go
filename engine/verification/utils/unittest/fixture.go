@@ -225,7 +225,7 @@ func ExecutionResultFixture(t *testing.T,
 	log := zerolog.Nop()
 
 	// setups execution outputs:
-	var referenceBlock flow.Block
+	var referenceBlock *flow.Block
 	var spockSecrets [][]byte
 	var chunkDataPacks []*flow.ChunkDataPack
 	var result *flow.ExecutionResult
@@ -336,13 +336,10 @@ func ExecutionResultFixture(t *testing.T,
 			Guarantees:      guarantees,
 			ProtocolStateID: protocolStateID,
 		}
-		referenceBlock = flow.Block{
-			Header: refBlkHeader,
-		}
-		referenceBlock.SetPayload(payload)
+		referenceBlock = flow.NewBlock(refBlkHeader.HeaderBody, payload)
 
 		executableBlock := &entity.ExecutableBlock{
-			Block:               &referenceBlock,
+			Block:               referenceBlock,
 			CompleteCollections: completeColls,
 			StartState:          &startStateCommitment,
 		}
@@ -363,7 +360,7 @@ func ExecutionResultFixture(t *testing.T,
 	})
 
 	return result, &ExecutionReceiptData{
-		ReferenceBlock: &referenceBlock,
+		ReferenceBlock: referenceBlock,
 		ChunkDataPacks: chunkDataPacks,
 		SpockSecrets:   spockSecrets,
 	}
@@ -419,7 +416,7 @@ func CompleteExecutionReceiptChainFixture(t *testing.T,
 			ReceiptsData:   allData,
 		})
 
-		parent = containerBlock.Header
+		parent = containerBlock.ToHeader()
 	}
 	return completeERs
 }
@@ -455,7 +452,7 @@ func ExecutionReceiptsFromParentBlockFixture(t *testing.T,
 
 			allData = append(allData, data)
 		}
-		parent = data.ReferenceBlock.Header
+		parent = data.ReferenceBlock.ToHeader()
 	}
 
 	return allReceipts, allData, parent
@@ -477,12 +474,14 @@ func ExecutionResultFromParentBlockFixture(t *testing.T,
 // ContainerBlockFixture builds and returns a block that contains input execution receipts.
 func ContainerBlockFixture(parent *flow.Header, protocolStateID flow.Identifier, receipts []*flow.ExecutionReceipt, source []byte) *flow.Block {
 	// container block is the block that contains the execution receipt of reference block
-	containerBlock := unittest.BlockWithParentFixture(parent)
+	containerBlock := unittest.BlockWithParentAndPayload(
+		parent,
+		unittest.PayloadFixture(
+			unittest.WithReceipts(receipts...),
+			unittest.WithProtocolStateID(protocolStateID),
+		),
+	)
 	containerBlock.Header.ParentVoterSigData = unittest.QCSigDataWithSoRFixture(source)
-	containerBlock.SetPayload(unittest.PayloadFixture(
-		unittest.WithReceipts(receipts...),
-		unittest.WithProtocolStateID(protocolStateID),
-	))
 
 	return containerBlock
 }

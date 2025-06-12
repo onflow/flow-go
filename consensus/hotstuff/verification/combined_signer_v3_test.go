@@ -31,9 +31,10 @@ func TestCombinedSignWithBeaconKeyV3(t *testing.T) {
 	pk := beaconKey.PublicKey()
 	proposerView := uint64(20)
 
-	fblock := unittest.BlockFixture()
-	fblock.Header.View = proposerView
-	block := model.BlockFromFlow(fblock.Header)
+	fblock := unittest.BlockFixture(
+		unittest.Block.WithView(proposerView),
+	)
+	block := model.BlockFromFlow(fblock.ToHeader())
 	signerID := fblock.Header.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
@@ -90,9 +91,10 @@ func TestCombinedSignWithNoBeaconKeyV3(t *testing.T) {
 	pk := beaconKey.PublicKey()
 	proposerView := uint64(20)
 
-	fblock := unittest.BlockFixture()
-	fblock.Header.View = proposerView
-	block := model.BlockFromFlow(fblock.Header)
+	fblock := unittest.BlockFixture(
+		unittest.Block.WithView(proposerView),
+	)
+	block := model.BlockFromFlow(fblock.ToHeader())
 	signerID := fblock.Header.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)

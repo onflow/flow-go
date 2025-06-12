@@ -121,7 +121,7 @@ func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 	index := &flow.Index{}
 
 	for _, result := range payload.Results {
-		index.ResultIDs = append(index.ReceiptIDs, result.ID())
+		index.ResultIDs = append(index.ResultIDs, result.ID())
 		s.results.On("ByID", result.ID()).Return(result, nil).Once()
 
 		IR := flow.NewIncorporatedResult(parentBlock.ID(), result)
@@ -152,7 +152,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	for i := range receipts {
 		receipt := unittest.ExecutionReceiptFixture(
 			unittest.WithExecutorID(originID),
-			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))),
+			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(block))),
 		)
 		receipts[i] = receipt
 	}

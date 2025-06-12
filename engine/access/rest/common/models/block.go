@@ -21,13 +21,13 @@ func NewBlock(
 	}
 
 	var result Block
-	result.Header = NewBlockHeader(block.Header)
+	result.Header = NewBlockHeader(block.ToHeader())
 
 	// add the payload to the response if it is specified as an expandable field
 	result.Expandable = &BlockExpandable{}
 	if expand[ExpandableFieldPayload] {
 		var payload BlockPayload
-		err := payload.Build(block.Payload)
+		err := payload.Build(&block.Payload)
 		if err != nil {
 			return nil, err
 		}
@@ -83,14 +83,14 @@ func (b *Block) Build(
 	}
 
 	var header BlockHeader
-	header.Build(block.Header)
+	header.Build(block.ToHeader())
 	b.Header = &header
 
 	// add the payload to the response if it is specified as an expandable field
 	b.Expandable = &BlockExpandable{}
 	if expand[ExpandableFieldPayload] {
 		var payload BlockPayload
-		err := payload.Build(block.Payload)
+		err := payload.Build(&block.Payload)
 		if err != nil {
 			return err
 		}

@@ -61,7 +61,7 @@ func RunWithReader(
 		blocksByHeight := make(map[uint64]*flow.Block, blockCount)
 
 		var seals []*flow.Header
-		parent := unittest.GenesisFixture().Header
+		parent := unittest.GenesisFixture().ToHeader()
 		for i := 0; i < blockCount; i++ {
 			seals = []*flow.Header{parent}
 			height := uint64(i) + 1
@@ -69,7 +69,7 @@ func RunWithReader(
 			blocks[i] = unittest.BlockWithParentAndSeals(parent, seals)
 			blocksByHeight[height] = blocks[i]
 
-			parent = blocks[i].Header
+			parent = blocks[i].ToHeader()
 		}
 
 		snapshot := synctest.MockProtocolStateSnapshot(synctest.WithHead(seals[0]))

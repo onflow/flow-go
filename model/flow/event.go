@@ -63,10 +63,6 @@ func (e Event) ID() Identifier {
 	return MakeID(e)
 }
 
-func (e Event) Checksum() Identifier {
-	return MakeID(e)
-}
-
 // byteSize returns the number of bytes needed to store the wrapped version of the event.
 // returned int is an approximate measure, ignoring the number of bytes needed as headers.
 func (e Event) byteSize() int {

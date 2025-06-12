@@ -190,10 +190,10 @@ func TestPendingReceipts(t *testing.T) {
 		headers := &mockstorage.Headers{}
 		pool := NewPendingReceipts(headers, 100)
 		executedBlock := unittest.BlockFixture()
-		nextExecutedBlock := unittest.BlockWithParentFixture(executedBlock.Header)
-		er := unittest.ExecutionResultFixture(unittest.WithBlock(&executedBlock))
-		headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.Header, nil)
-		headers.On("ByBlockID", nextExecutedBlock.ID()).Return(nextExecutedBlock.Header, nil)
+		nextExecutedBlock := unittest.BlockWithParentFixture(executedBlock.ToHeader())
+		er := unittest.ExecutionResultFixture(unittest.WithBlock(executedBlock))
+		headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.ToHeader(), nil)
+		headers.On("ByBlockID", nextExecutedBlock.ID()).Return(nextExecutedBlock.ToHeader(), nil)
 		ids := make(map[flow.Identifier]struct{})
 		for i := 0; i < 10; i++ {
 			receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(er))

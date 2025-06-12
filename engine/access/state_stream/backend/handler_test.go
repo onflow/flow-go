@@ -80,7 +80,7 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 	}
 
 	// notify backend block is available
-	s.highestBlockHeader = s.blocks[len(s.blocks)-1].Header
+	s.highestBlockHeader = s.blocks[len(s.blocks)-1].ToHeader()
 
 	s.Run("All events filter", func() {
 		// create empty event filter
@@ -106,7 +106,7 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 
 				blockID, err := convert.BlockID(resp.BlockId)
 				require.NoError(s.T(), err)
-				require.Equal(s.T(), b.Header.ID(), blockID)
+				require.Equal(s.T(), b.ID(), blockID)
 				require.Equal(s.T(), b.Header.Height, resp.BlockHeight)
 			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
 		}
@@ -141,7 +141,7 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 
 				blockID, err := convert.BlockID(resp.BlockId)
 				require.NoError(s.T(), err)
-				require.Equal(s.T(), b.Header.ID(), blockID)
+				require.Equal(s.T(), b.ID(), blockID)
 				require.Equal(s.T(), b.Header.Height, resp.BlockHeight)
 			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
 		}
@@ -187,7 +187,7 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 				blockID, err := convert.BlockID(resp.BlockId)
 				require.NoError(s.T(), err)
 				require.Equal(s.T(), b.Header.Height, resp.BlockHeight)
-				require.Equal(s.T(), b.Header.ID(), blockID)
+				require.Equal(s.T(), b.ID(), blockID)
 				require.Empty(s.T(), resp.Events)
 			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
 		}

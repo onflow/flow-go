@@ -26,7 +26,7 @@ type blockSignerDecoderSuite struct {
 	committee    *hotstuff.DynamicCommittee
 
 	decoder *BlockSignerDecoder
-	block   flow.Block
+	block   *flow.Block
 }
 
 func (s *blockSignerDecoderSuite) SetupTest() {
@@ -48,7 +48,7 @@ func (s *blockSignerDecoderSuite) SetupTest() {
 
 // Test_SuccessfulDecode tests happy path decoding
 func (s *blockSignerDecoderSuite) Test_SuccessfulDecode() {
-	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
+	ids, err := s.decoder.DecodeSignerIDs(s.block.ToHeader())
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), s.allConsensus.NodeIDs(), ids)
 }
@@ -59,7 +59,7 @@ func (s *blockSignerDecoderSuite) Test_RootBlock() {
 	s.block.Header.ParentVoterSigData = nil
 	s.block.Header.View = 0
 
-	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
+	ids, err := s.decoder.DecodeSignerIDs(s.block.ToHeader())
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), ids)
 }
@@ -73,7 +73,7 @@ func (s *blockSignerDecoderSuite) Test_CommitteeException() {
 		*s.committee = *hotstuff.NewDynamicCommittee(s.T())
 		s.committee.On("IdentitiesByEpoch", mock.Anything).Return(nil, exception)
 
-		ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
+		ids, err := s.decoder.DecodeSignerIDs(s.block.ToHeader())
 		require.Empty(s.T(), ids)
 		require.NotErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
 		require.False(s.T(), signature.IsInvalidSignerIndicesError(err))
@@ -85,7 +85,7 @@ func (s *blockSignerDecoderSuite) Test_CommitteeException() {
 		s.committee.On("IdentitiesByEpoch", mock.Anything).Return(nil, model.ErrViewForUnknownEpoch)
 		s.committee.On("IdentitiesByBlock", mock.Anything).Return(nil, exception)
 
-		ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
+		ids, err := s.decoder.DecodeSignerIDs(s.block.ToHeader())
 		require.Empty(s.T(), ids)
 		require.NotErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
 		require.False(s.T(), signature.IsInvalidSignerIndicesError(err))
@@ -100,7 +100,7 @@ func (s *blockSignerDecoderSuite) Test_UnknownEpoch_KnownBlock() {
 	s.committee.On("IdentitiesByEpoch", s.block.Header.ParentView).Return(nil, model.ErrViewForUnknownEpoch)
 	s.committee.On("IdentitiesByBlock", s.block.Header.ParentID).Return(s.allConsensus, nil)
 
-	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
+	ids, err := s.decoder.DecodeSignerIDs(s.block.ToHeader())
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), s.allConsensus.NodeIDs(), ids)
 }
@@ -112,7 +112,7 @@ func (s *blockSignerDecoderSuite) Test_UnknownEpoch_UnknownBlock() {
 	s.committee.On("IdentitiesByEpoch", s.block.Header.ParentView).Return(nil, model.ErrViewForUnknownEpoch)
 	s.committee.On("IdentitiesByBlock", s.block.Header.ParentID).Return(nil, state.ErrUnknownSnapshotReference)
 
-	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
+	ids, err := s.decoder.DecodeSignerIDs(s.block.ToHeader())
 	require.ErrorIs(s.T(), err, state.ErrUnknownSnapshotReference)
 	require.Empty(s.T(), ids)
 }
@@ -122,7 +122,7 @@ func (s *blockSignerDecoderSuite) Test_UnknownEpoch_UnknownBlock() {
 // are not a valid encoding.
 func (s *blockSignerDecoderSuite) Test_InvalidIndices() {
 	s.block.Header.ParentVoterIndices = unittest.RandomBytes(1)
-	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
+	ids, err := s.decoder.DecodeSignerIDs(s.block.ToHeader())
 	require.Empty(s.T(), ids)
 	require.True(s.T(), signature.IsInvalidSignerIndicesError(err))
 }
@@ -146,7 +146,7 @@ func (s *blockSignerDecoderSuite) Test_EpochTransition() {
 	s.committee.On("IdentitiesByEpoch", parentView).Return(epoch1Committee, nil).Maybe()
 	s.committee.On("IdentitiesByEpoch", blockView).Return(epoch2Committee.ToSkeleton(), nil).Maybe()
 
-	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
+	ids, err := s.decoder.DecodeSignerIDs(s.block.ToHeader())
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), epoch1Committee.NodeIDs(), ids)
 }

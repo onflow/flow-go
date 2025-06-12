@@ -168,10 +168,10 @@ SearchLoop:
 		if !ok {
 			continue
 		}
-		block := proposal.Block.ToInternal()
+		block := proposal.DeclareTrusted().Block
 
 		// make sure we skip duplicates
-		proposalID := block.Header.ID()
+		proposalID := block.ID()
 		_, processed := confirmations[proposalID]
 		if processed {
 			continue
@@ -358,10 +358,10 @@ SealingLoop:
 		if !ok {
 			continue
 		}
-		block := proposal.Block.ToInternal()
+		block := proposal.DeclareTrusted().Block
 
 		// log the proposal details
-		proposalID := block.Header.ID()
+		proposalID := block.ID()
 		seals := block.Payload.Seals
 
 		// if the block seal is included, we add the block to those we

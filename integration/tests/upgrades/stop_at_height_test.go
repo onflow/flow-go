@@ -66,11 +66,11 @@ func (s *TestStopAtHeightSuite) TestStopAtHeight() {
 	shouldExecute := s.BlockState.WaitForBlocksByHeight(s.T(), stopHeight-1)
 	shouldNotExecute := s.BlockState.WaitForBlocksByHeight(s.T(), stopHeight)
 
-	s.ReceiptState.WaitForReceiptFrom(s.T(), shouldExecute[0].Header.ID(), s.exe1ID)
+	s.ReceiptState.WaitForReceiptFrom(s.T(), shouldExecute[0].ID(), s.exe1ID)
 	s.ReceiptState.WaitForNoReceiptFrom(
 		s.T(),
 		5*time.Second,
-		shouldNotExecute[0].Header.ID(),
+		shouldNotExecute[0].ID(),
 		s.exe1ID,
 	)
 

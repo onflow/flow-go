@@ -81,7 +81,7 @@ type TransactionStatusSuite struct {
 	chainID flow.ChainID
 
 	broadcaster    *engine.Broadcaster
-	rootBlock      flow.Block
+	rootBlock      *flow.Block
 	sealedBlock    *flow.Block
 	finalizedBlock *flow.Block
 
@@ -156,14 +156,14 @@ func (s *TransactionStatusSuite) initializeBackend() {
 	s.rootBlock = unittest.BlockFixture()
 
 	params := protocol.NewParams(s.T())
-	params.On("FinalizedRoot").Return(s.rootBlock.Header).Maybe()
+	params.On("FinalizedRoot").Return(s.rootBlock.ToHeader()).Maybe()
 	s.state.On("Params").Return(params).Maybe()
 
 	// this line causes a S1021 lint error because receipts is explicitly declared. this is required
 	// to ensure the mock library handles the response type correctly
 	var receipts flow.ExecutionReceiptList //nolint:gosimple
 	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-	receipts = unittest.ReceiptsForBlockFixture(&s.rootBlock, executionNodes.NodeIDs())
+	receipts = unittest.ReceiptsForBlockFixture(s.rootBlock, executionNodes.NodeIDs())
 	s.receipts.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(receipts, nil).Maybe()
 	s.finalSnapshot.On("Identities", mock.Anything).Return(executionNodes, nil).Maybe()
 
@@ -172,8 +172,8 @@ func (s *TransactionStatusSuite) initializeBackend() {
 	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(progress)
 	require.NoError(s.T(), err)
 
-	s.sealedBlock = &s.rootBlock
-	s.finalizedBlock = unittest.BlockWithParentFixture(s.sealedBlock.Header)
+	s.sealedBlock = s.rootBlock
+	s.finalizedBlock = unittest.BlockWithParentFixture(s.sealedBlock.ToHeader())
 	s.blockMap = map[uint64]*flow.Block{
 		s.sealedBlock.Header.Height:    s.sealedBlock,
 		s.finalizedBlock.Header.Height: s.finalizedBlock,
@@ -255,7 +255,7 @@ func (s *TransactionStatusSuite) initializeMainMockInstructions() {
 		s.tempSnapshot.On("Head").Return(func() *flow.Header {
 			for _, block := range s.blockMap {
 				if block.ID() == blockID {
-					return block.Header
+					return block.ToHeader()
 				}
 			}
 
@@ -266,7 +266,7 @@ func (s *TransactionStatusSuite) initializeMainMockInstructions() {
 	}, nil).Maybe()
 
 	s.finalSnapshot.On("Head").Return(func() *flow.Header {
-		finalizedHeader := s.finalizedBlock.Header
+		finalizedHeader := s.finalizedBlock.ToHeader()
 		return finalizedHeader
 	}, nil).Maybe()
 
@@ -292,7 +292,7 @@ func (s *TransactionStatusSuite) initializeHappyCaseMockInstructions() {
 	}, nil).Maybe()
 
 	s.sealedSnapshot.On("Head").Return(func() *flow.Header {
-		return s.sealedBlock.Header
+		return s.sealedBlock.ToHeader()
 	}, nil).Maybe()
 	s.state.On("Sealed").Return(s.sealedSnapshot, nil).Maybe()
 
@@ -354,8 +354,8 @@ func (s *TransactionStatusSuite) addBlockWithTransaction(transaction *flow.Trans
 	guarantee := flow.CollectionGuarantee{CollectionID: colID}
 	light := col.Light()
 	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.Header, true, func(block *flow.Block) {
-		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
+	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true, func(block *flow.Block) {
+		block = flow.NewBlock(block.Header, unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
 		s.collections.On("LightByID", colID).Return(&light, nil).Maybe()
 		s.collections.On("LightByTransactionID", transaction.ID()).Return(&light, nil)
 		s.blocks.On("ByCollectionID", colID).Return(block, nil)
@@ -421,17 +421,17 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusHappyCase(
 	// 3. Add one more finalized block on top of the transaction block and add execution results to storage
 	// init transaction result for storage
 	hasTransactionResultInStorage = true
-	s.addNewFinalizedBlock(s.finalizedBlock.Header, true)
+	s.addNewFinalizedBlock(s.finalizedBlock.ToHeader(), true)
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusExecuted})
 
 	// 4. Make the transaction block sealed, and add a new finalized block
 	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
+	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true)
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusSealed})
 
 	// 5. Stop subscription
 	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
+	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true)
 
 	s.checkGracefulShutdown(sub)
 }
@@ -470,14 +470,14 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusExpired() 
 
 	for i := startHeight; i <= lastHeight; i++ {
 		s.sealedBlock = s.finalizedBlock
-		s.addNewFinalizedBlock(s.sealedBlock.Header, false)
+		s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), false)
 	}
 
 	// Generate final blocks and check transaction expired
 	s.sealedBlock = s.finalizedBlock
 	err := s.lastFullBlockHeight.Set(s.sealedBlock.Header.Height)
 	s.Require().NoError(err)
-	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
+	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true)
 
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusExpired})
 
@@ -505,15 +505,15 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentPendin
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusFinalized})
 
 	hasTransactionResultInStorage = true
-	s.addNewFinalizedBlock(s.finalizedBlock.Header, true)
+	s.addNewFinalizedBlock(s.finalizedBlock.ToHeader(), true)
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusExecuted})
 
 	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
+	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true)
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusSealed})
 
 	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
+	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true)
 
 	s.checkGracefulShutdown(sub)
 }
@@ -537,15 +537,15 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentFinali
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusPending, flow.TransactionStatusFinalized})
 
 	hasTransactionResultInStorage = true
-	s.addNewFinalizedBlock(s.finalizedBlock.Header, true)
+	s.addNewFinalizedBlock(s.finalizedBlock.ToHeader(), true)
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusExecuted})
 
 	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
+	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true)
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusSealed})
 
 	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
+	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true)
 
 	s.checkGracefulShutdown(sub)
 }
@@ -568,18 +568,18 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentExecut
 	// 3. Add one more finalized block on top of the transaction block and add execution results to storage
 	// init transaction result for storage
 	hasTransactionResultInStorage = true
-	s.addNewFinalizedBlock(s.finalizedBlock.Header, true)
+	s.addNewFinalizedBlock(s.finalizedBlock.ToHeader(), true)
 	sub := s.backend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusPending, flow.TransactionStatusFinalized, flow.TransactionStatusExecuted})
 
 	// 4. Make the transaction block sealed, and add a new finalized block
 	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
+	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true)
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusSealed})
 
 	//// 5. Stop subscription
 	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
+	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true)
 
 	s.checkGracefulShutdown(sub)
 }
@@ -601,10 +601,10 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentSealed
 
 	// init transaction result for storage
 	hasTransactionResultInStorage = true
-	s.addNewFinalizedBlock(s.finalizedBlock.Header, true)
+	s.addNewFinalizedBlock(s.finalizedBlock.ToHeader(), true)
 
 	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
+	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true)
 
 	sub := s.backend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
 
@@ -621,7 +621,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentSealed
 
 	// 5. Stop subscription
 	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
+	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true)
 
 	s.checkGracefulShutdown(sub)
 }
@@ -651,7 +651,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusFailedSubscriptio
 
 	s.Run("if could not get start height", func() {
 		s.sealedSnapshot.On("Head").Return(func() *flow.Header {
-			return s.sealedBlock.Header
+			return s.sealedBlock.ToHeader()
 		}, nil).Once()
 		s.state.On("Sealed").Return(s.sealedSnapshot, nil).Once()
 		expectedError := storage.ErrNotFound

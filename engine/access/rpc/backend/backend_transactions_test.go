@@ -114,7 +114,7 @@ func (suite *Suite) TestGetTransactionResultReturnsTransactionError() {
 
 		suite.blocks.
 			On("ByID", block.ID()).
-			Return(&block, nil).
+			Return(block, nil).
 			Once()
 
 		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
@@ -194,7 +194,7 @@ func (suite *Suite) withGetTransactionCachingTestSetup(f func(b *flow.Block, t *
 
 		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
 
-		f(&block, &tx)
+		f(block, &tx)
 	})
 }
 
@@ -352,7 +352,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_HappyPath()
 	failedTxIndex := rand.Uint32()
 
 	// Setup mock receipts and execution node identities.
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -426,7 +426,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_FailedToFet
 	failedTxId := failedTx.ID()
 
 	// Setup mock receipts and execution node identities.
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -534,7 +534,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 	failedTxIndex := rand.Uint32()
 
 	// Setup mock receipts and execution node identities.
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -609,7 +609,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 	failedTxId := failedTx.ID()
 
 	// Setup mock receipts and execution node identities.
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -725,7 +725,7 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_HappyPath() {
 		})
 	}
 
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -824,7 +824,7 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_FailedToFetch() 
 	blockId := block.ID()
 
 	// Setup mock receipts and execution node identities.
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -984,7 +984,7 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 		block := unittest.BlockWithParentFixture(lastBlock)
 		blockID := block.ID()
 		suite.state.On("AtBlockID", blockID).Return(
-			unittest.StateSnapshotForKnownBlock(block.Header, identities.Lookup()), nil).Once()
+			unittest.StateSnapshotForKnownBlock(block.ToHeader(), identities.Lookup()), nil).Once()
 
 		// block storage returns the corresponding block
 		suite.blocks.
@@ -1068,7 +1068,7 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 	// Mock the behavior of the blocks and transactionResults objects
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil).
+		Return(block, nil).
 		Once()
 
 	lightTxShouldFail := false
@@ -1094,7 +1094,7 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 	// Set up the state and snapshot mocks
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
-	suite.snapshot.On("Head", mock.Anything).Return(block.Header, nil).Once()
+	suite.snapshot.On("Head", mock.Anything).Return(block.ToHeader(), nil).Once()
 
 	// create a mock index reporter
 	reporter := syncmock.NewIndexReporter(suite.T())
@@ -1131,7 +1131,7 @@ func (suite *Suite) TestGetSystemTransactionResult_BlockNotFound() {
 		block := unittest.BlockWithParentFixture(lastBlock)
 		blockID := block.ID()
 		suite.state.On("AtBlockID", blockID).Return(
-			unittest.StateSnapshotForKnownBlock(block.Header, identities.Lookup()), nil).Once()
+			unittest.StateSnapshotForKnownBlock(block.ToHeader(), identities.Lookup()), nil).Once()
 
 		// block storage returns the ErrNotFound error
 		suite.blocks.
@@ -1175,7 +1175,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 		block := unittest.BlockWithParentFixture(lastBlock)
 		blockID := block.ID()
 		suite.state.On("AtBlockID", blockID).Return(
-			unittest.StateSnapshotForKnownBlock(block.Header, identities.Lookup()), nil).Once()
+			unittest.StateSnapshotForKnownBlock(block.ToHeader(), identities.Lookup()), nil).Once()
 
 		// block storage returns the corresponding block
 		suite.blocks.
@@ -1237,7 +1237,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 func (suite *Suite) assertTransactionResultResponse(
 	err error,
 	response *accessmodel.TransactionResult,
-	block flow.Block,
+	block *flow.Block,
 	txId flow.Identifier,
 	txFailed bool,
 	eventsForTx []flow.Event,
@@ -1267,18 +1267,19 @@ func (suite *Suite) assertTransactionResultResponse(
 // instead of requesting it from the Execution Node.
 func (suite *Suite) TestTransactionResultFromStorage() {
 	// Create fixtures for block, transaction, and collection
-	block := unittest.BlockFixture()
 	transaction := unittest.TransactionFixture()
 	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
 	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
-	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+	)
 	txId := transaction.ID()
 	blockId := block.ID()
 
 	// Mock the behavior of the blocks and transactionResults objects
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil)
+		Return(block, nil)
 
 	suite.transactionResults.On("ByBlockIDTransactionID", blockId, txId).
 		Return(&flow.LightTransactionResult{
@@ -1307,11 +1308,11 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	suite.events.On("ByBlockIDTransactionID", blockId, txId).Return(eventsForTx, nil)
 
 	// Set up the state and snapshot mocks
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-	suite.snapshot.On("Head", mock.Anything).Return(block.Header, nil)
+	suite.snapshot.On("Head", mock.Anything).Return(block.ToHeader(), nil)
 
 	// create a mock index reporter
 	reporter := syncmock.NewIndexReporter(suite.T())
@@ -1357,11 +1358,12 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 // and returns it from storage instead of requesting from the Execution Node.
 func (suite *Suite) TestTransactionByIndexFromStorage() {
 	// Create fixtures for block, transaction, and collection
-	block := unittest.BlockFixture()
 	transaction := unittest.TransactionFixture()
 	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
 	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
-	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+	)
 	blockId := block.ID()
 	txId := transaction.ID()
 	txIndex := rand.Uint32()
@@ -1373,7 +1375,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	// Mock the behavior of the blocks and transactionResults objects
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil)
+		Return(block, nil)
 
 	suite.transactionResults.On("ByBlockIDTransactionIndex", blockId, txIndex).
 		Return(&flow.LightTransactionResult{
@@ -1394,11 +1396,11 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	suite.events.On("ByBlockIDTransactionIndex", blockId, txIndex).Return(eventsForTx, nil)
 
 	// Set up the state and snapshot mocks
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-	suite.snapshot.On("Head", mock.Anything).Return(block.Header, nil)
+	suite.snapshot.On("Head", mock.Anything).Return(block.ToHeader(), nil)
 
 	// create a mock index reporter
 	reporter := syncmock.NewIndexReporter(suite.T())
@@ -1443,16 +1445,17 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 // by block ID from storage instead of requesting from the Execution Node.
 func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	// Create fixtures for the block and collection
-	block := unittest.BlockFixture()
 	col := unittest.CollectionFixture(2)
 	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
-	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+	)
 	blockId := block.ID()
 
 	// Mock the behavior of the blocks, collections and light transaction results objects
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil)
+		Return(block, nil)
 	lightCol := col.Light()
 	suite.collections.On("LightByID", mock.Anything).Return(&lightCol, nil)
 
@@ -1487,11 +1490,11 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	suite.events.On("ByBlockIDTransactionID", blockId, mock.Anything).Return(eventsForTx, nil)
 
 	// Set up the state and snapshot mocks
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-	suite.snapshot.On("Head", mock.Anything).Return(block.Header, nil)
+	suite.snapshot.On("Head", mock.Anything).Return(block.ToHeader(), nil)
 
 	// create a mock index reporter
 	reporter := syncmock.NewIndexReporter(suite.T())

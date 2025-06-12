@@ -112,7 +112,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedClu
 
 	proposal := flow.Slashable[*cluster.BlockProposal]{
 		OriginID: proposalMsg.OriginID,
-		Message:  proposalMsg.Message.ToInternal(),
+		Message:  proposalMsg.Message.DeclareTrusted(),
 	}
 	header := proposal.Message.Block.Header
 	payload := proposal.Message.Block.Payload
