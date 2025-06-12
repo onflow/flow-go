@@ -319,6 +319,16 @@ func RunWithTempDir(t testing.TB, f func(string)) {
 	f(dbDir)
 }
 
+func RunWithTempDirs(t testing.TB, f func(string, string)) {
+	dbDir := TempDir(t)
+	dbDir2 := TempDir(t)
+	defer func() {
+		require.NoError(t, os.RemoveAll(dbDir))
+		require.NoError(t, os.RemoveAll(dbDir2))
+	}()
+	f(dbDir, dbDir2)
+}
+
 func badgerDB(t testing.TB, dir string, create func(badger.Options) (*badger.DB, error)) *badger.DB {
 	opts := badger.
 		DefaultOptions(dir).
