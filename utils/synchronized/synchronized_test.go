@@ -25,7 +25,7 @@ func TestSynchronizedUserDefinedType(t *testing.T) {
 
 	expected := Custom{data: 42}
 	synchronized := New(expected)
-	
+
 	synchronized.WithReadLock(func(actual Custom) {
 		require.Equal(t, expected, actual)
 	})
