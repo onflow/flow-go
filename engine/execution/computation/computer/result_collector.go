@@ -421,7 +421,7 @@ func (collector *resultCollector) Finalize(
 
 	blockExecutionResult := collector.result.BlockExecutionResult
 	blockExecutionResult.ExecutionDataRoot = executionDataRoot
-	collector.result, err = execution.NewComputationResult(
+	computationResult, err := execution.NewComputationResult(
 		execution.UntrustedComputationResult{
 			BlockExecutionResult:   blockExecutionResult,
 			BlockAttestationResult: collector.result.BlockAttestationResult,
@@ -431,6 +431,7 @@ func (collector *resultCollector) Finalize(
 	if err != nil {
 		return nil, fmt.Errorf("could not construct computation result: %w", err)
 	}
+	collector.result = computationResult
 
 	collector.metrics.ExecutionBlockExecuted(
 		time.Since(collector.blockStartTime),
