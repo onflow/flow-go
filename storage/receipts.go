@@ -21,9 +21,6 @@ type ExecutionReceipts interface {
 
 	// ByBlockID retrieves all known execution receipts for the given block
 	// (from any Execution Node).
-	//
-	// Expected errors during normal operation:
-	// - storage.ErrNotFound if no receipts was found in the storage
 	ByBlockID(blockID flow.Identifier) (flow.ExecutionReceiptList, error)
 }
 
