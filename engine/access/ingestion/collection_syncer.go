@@ -24,6 +24,8 @@ var (
 	defaultMissingCollsForAgeThreshold   uint64 = missingCollsForAgeThreshold
 )
 
+//TODO: add error for stoarge not found.
+
 // The CollectionSyncer type provides mechanisms for syncing and indexing data
 // from the Flow blockchain into local storage. Specifically, it handles
 // the retrieval and processing of collections and transactions that may
@@ -129,9 +131,7 @@ func (s *CollectionSyncer) RequestCollections(ctx irrecoverable.SignalerContext,
 // requestMissingCollections checks if missing collections should be requested based on configured
 // block or age thresholds and triggers requests if needed.
 //
-// Expected errors during normal operations:
-//   - storage.ErrNotFound if no block is found in storage for any height starting
-//     from the last full block height.
+// No errors expected during normal operation.
 func (s *CollectionSyncer) requestMissingCollections() error {
 	lastFullBlockHeight := s.lastFullBlockHeight.Value()
 	lastFinalizedBlock, err := s.state.Final().Head()
@@ -218,11 +218,7 @@ func (s *CollectionSyncer) requestMissingCollectionsBlocking(ctx context.Context
 // findMissingCollections scans block heights from last known full block up to the latest finalized
 // block and returns all missing collection along with the count of incomplete blocks.
 //
-// Expected errors during normal operations:
-//   - state.ErrUnknownSnapshotReference if the reference point for the snapshot
-//     (height or block ID) does not resolve to a queryable block in the state.
-//   - storage.ErrNotFound if no block is found in storage for any height starting
-//     from the last full block height.
+// No errors expected during normal operations.
 func (s *CollectionSyncer) findMissingCollections(lastFullBlockHeight uint64) ([]*flow.CollectionGuarantee, int, error) {
 	// first block to look up collections at
 	firstBlockHeight := lastFullBlockHeight + 1
@@ -361,9 +357,7 @@ func (s *CollectionSyncer) updateLastFullBlockHeight() error {
 // findLowestBlockHeightWithMissingCollections finds the next block height with missing collections,
 // returning the latest contiguous height where all collections are present.
 //
-// Expected errors during normal operations:
-// - storage.ErrNotFound if no block is found in storage for any height starting
-// from lastKnownFullBlockHeight
+// No errors expected during normal operations.
 func (s *CollectionSyncer) findLowestBlockHeightWithMissingCollections(
 	lastKnownFullBlockHeight uint64,
 	finalizedBlockHeight uint64,
