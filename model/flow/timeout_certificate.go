@@ -58,7 +58,7 @@ func NewTimeoutCertificate(untrusted UntrustedTimeoutCertificate) (*TimeoutCerti
 	// This is useful as a fallback, because it allows replicas other than the designated
 	// leader to also collect votes and generate a QC.
 	if untrusted.View < untrusted.NewestQC.View {
-		return nil, fmt.Errorf("TC's QC cannot be newer than the TC's view")
+		return nil, fmt.Errorf("TC's QC view (%d) cannot be newer than the TC's view (%d)", untrusted.NewestQC.View, untrusted.View)
 	}
 
 	// verifying that tc.NewestQC is the QC with the highest view.

@@ -9,14 +9,15 @@ import (
 )
 
 func MakeTC(options ...func(*flow.TimeoutCertificate)) *flow.TimeoutCertificate {
-	qc := MakeQC()
+	tcView := rand.Uint64()
+	qc := MakeQC(WithQCView(tcView - 1))
 	signerIndices := unittest.SignerIndicesFixture(3)
 	highQCViews := make([]uint64, 3)
 	for i := range highQCViews {
 		highQCViews[i] = qc.View
 	}
 	tc := flow.TimeoutCertificate{
-		View:          rand.Uint64(),
+		View:          tcView,
 		NewestQC:      qc,
 		NewestQCViews: []uint64{qc.View},
 		SignerIndices: signerIndices,
