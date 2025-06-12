@@ -3,6 +3,7 @@ package ingestion2
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -23,6 +24,26 @@ import (
 )
 
 const (
+	// time to wait for the all the missing collections to be received at node startup
+	collectionCatchupTimeout = 30 * time.Second
+
+	// time to poll the storage to check if missing collections have been received
+	collectionCatchupDBPollInterval = 10 * time.Millisecond
+
+	// time to request missing collections from the network
+	missingCollsRequestInterval = 1 * time.Minute
+
+	// a threshold of number of blocks with missing collections beyond which collections should be re-requested
+	// this is to prevent spamming the collection nodes with request
+	missingCollsForBlockThreshold = 100
+
+	// a threshold of block height beyond which collections should be re-requested (regardless of the number of blocks for which collection are missing)
+	// this is to ensure that if a collection is missing for a long time (in terms of block height) it is eventually re-requested
+	missingCollsForAgeThreshold = 100
+
+	// time to update the FullBlockHeight index
+	fullBlockRefreshInterval = 1 * time.Second
+
 	defaultQueueCapacity = 10_000
 
 	// processFinalizedBlocksWorkersCount defines the number of workers that
@@ -50,13 +71,14 @@ type Engine struct {
 	blocks                 storage.Blocks
 
 	errorMessageRequester *ErrorMessageRequester
+
+	collectionSyncer *CollectionSyncer
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
 
 func New(
 	log zerolog.Logger,
-	collectionExecutedMetric module.CollectionExecutedMetric,
 	net network.EngineRegistry,
 	state protocol.State,
 	blocks storage.Blocks,
@@ -64,6 +86,8 @@ func New(
 	executionResults storage.ExecutionResults,
 	finalizedProcessedHeight storage.ConsumerProgressInitializer, //TODO: what does processed mean in this contex?
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore,
+	collectionSyncer *CollectionSyncer,
+	collectionExecutedMetric module.CollectionExecutedMetric,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -94,12 +118,14 @@ func New(
 		executionResults:          executionResults,
 		collectionExecutedMetric:  collectionExecutedMetric,
 		errorMessageRequester:     NewErrorMessageRequester(log, txErrorMessagesCore),
+		collectionSyncer:          collectionSyncer,
 	}
 
 	// Set up component manager
 	builder := component.NewComponentManagerBuilder().
 		AddWorker(e.processExecutionReceipts).
 		AddWorker(e.runFinalizedBlockConsumer).
+		AddWorker(e.collectionSyncer.RequestCollections).
 		AddWorker(e.errorMessageRequester.RequestErrorMessages)
 
 	e.ComponentManager = builder.Build()
@@ -285,18 +311,7 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 		}
 	}
 
-	// skip requesting collections, if this block is below the last full block height
-	// this means that either we have already received these collections, or the block
-	// may contain unverifiable guarantees (in case this node has just joined the network)
-	//lastFullBlockHeight := e.lastFullBlockHeight.Value()
-	//if block.Header.Height <= lastFullBlockHeight {
-	//	e.log.Info().Msgf("skipping requesting collections for finalized block below last full block height (%d<=%d)", block.Header.Height, lastFullBlockHeight)
-	//	return nil
-	//}
-
-	// queue requesting each of the collections from the collection node
-	//e.requestCollectionsInFinalizedBlock(block.Payload.Guarantees)
-
+	e.collectionSyncer.RequestCollectionsForBlock(block.Header.Height, block.Payload.Guarantees)
 	e.collectionExecutedMetric.BlockFinalized(block)
 
 	return nil

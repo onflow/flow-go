@@ -14,7 +14,9 @@ type ErrorMessageRequester struct {
 	log          zerolog.Logger
 	blockIDsChan chan flow.Identifier
 	core         *tx_error_messages.TxErrorMessagesCore
-	exists       *atomic.Bool
+
+	// TODO: maybe just have this requester and a noop one? we could get rid of exists then
+	exists *atomic.Bool
 }
 
 func NewErrorMessageRequester(log zerolog.Logger, core *tx_error_messages.TxErrorMessagesCore) *ErrorMessageRequester {
@@ -22,7 +24,8 @@ func NewErrorMessageRequester(log zerolog.Logger, core *tx_error_messages.TxErro
 		return &ErrorMessageRequester{
 			log:          log,
 			blockIDsChan: nil,
-			core:         core,
+			core:         nil,
+			exists:       atomic.NewBool(false),
 		}
 	}
 
@@ -44,7 +47,6 @@ func (p *ErrorMessageRequester) RequestErrorMessages(ctx irrecoverable.SignalerC
 	ready()
 
 	if !p.exists.Load() {
-		close(p.blockIDsChan)
 		return
 	}
 
