@@ -74,7 +74,7 @@ func validateFlags(flags byte, extensions []byte) error {
 	return nil
 }
 
-func validateWebAuthNExtensionData(extensionData []byte, message []byte) (bool, []byte) {
+func validateWebAuthNExtensionData(extensionData []byte, payload []byte) (bool, []byte) {
 	// See FLIP 264 for more details
 	if len(extensionData) == 0 {
 		return false, nil
@@ -108,7 +108,7 @@ func validateWebAuthNExtensionData(extensionData []byte, message []byte) (bool, 
 		panic(err)
 	}
 
-	computedChallenge := hasher.ComputeHash(message)
+	computedChallenge := hasher.ComputeHash(payload)
 	if !computedChallenge.Equal(clientDataChallenge) {
 		return false, nil
 	}
