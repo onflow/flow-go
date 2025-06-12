@@ -63,7 +63,7 @@ func (b *Store) HeaderByID(id flowgo.Identifier) (*flowgo.Header, error) {
 		}
 		return nil, err
 	}
-	return block.Header, nil
+	return block.ToHeader(), nil
 }
 
 func (b *Store) FinalizedHeader() (*flowgo.Header, error) {
@@ -72,7 +72,7 @@ func (b *Store) FinalizedHeader() (*flowgo.Header, error) {
 		return nil, err
 	}
 
-	return block.Header, nil
+	return block.ToHeader(), nil
 }
 
 func (b *Store) SealedHeader() (*flowgo.Header, error) {
@@ -81,7 +81,7 @@ func (b *Store) SealedHeader() (*flowgo.Header, error) {
 		return nil, err
 	}
 
-	return block.Header, nil
+	return block.ToHeader(), nil
 }
 
 func (b *Store) IndexedHeight() (uint64, error) {
@@ -103,7 +103,7 @@ func (b *Store) ByHeightFrom(height uint64, header *flowgo.Header) (*flowgo.Head
 		return nil, err
 	}
 
-	return block.Header, nil
+	return block.ToHeader(), nil
 }
 
 // New returns a new in-memory Store implementation.
@@ -197,7 +197,7 @@ func (b *Store) BlockByHeight(_ context.Context, height uint64) (*flowgo.Block, 
 
 func (b *Store) CommitBlock(
 	_ context.Context,
-	block flowgo.Block,
+	block *flowgo.Block,
 	collections []*flowgo.LightCollection,
 	transactions map[flowgo.Identifier]*flowgo.TransactionBody,
 	transactionResults map[flowgo.Identifier]*StorableTransactionResult,
@@ -215,7 +215,7 @@ func (b *Store) CommitBlock(
 		)
 	}
 
-	err := b.storeBlock(&block)
+	err := b.storeBlock(block)
 	if err != nil {
 		return err
 	}

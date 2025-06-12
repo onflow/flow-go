@@ -106,7 +106,7 @@ func (f *HotStuffFactory) CreateModules(
 		headers,
 		updater,
 		notifier,
-		cluster.RootBlock().Header,
+		cluster.RootBlock().ToHeader(),
 		cluster.RootQC(),
 	)
 	if err != nil {

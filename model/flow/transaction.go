@@ -2,10 +2,14 @@ package flow
 
 import (
 	"fmt"
+	"io"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
 	"golang.org/x/exp/slices"
+
+	flowrlp "github.com/onflow/flow-go/model/encoding/rlp"
 
 	"github.com/onflow/flow-go/model/fingerprint"
 )
@@ -53,8 +57,17 @@ func NewTransactionBody() *TransactionBody {
 	return &TransactionBody{}
 }
 
+// Fingerprint returns the canonical, unique byte representation for the TransactionBody.
+// As RLP encoding logic for TransactionBody is over-ridden by EncodeRLP below, this is
+// equivalent to directly RLP encoding the TransactionBody.
+// This public function is retained primarily for backward compatibility.
 func (tb TransactionBody) Fingerprint() []byte {
-	return fingerprint.Fingerprint(struct {
+	return flowrlp.NewMarshaler().MustMarshal(tb)
+}
+
+// EncodeRLP defines RLP encoding behaviour for TransactionBody.
+func (tb TransactionBody) EncodeRLP(w io.Writer) error {
+	encodingCanonicalForm := struct {
 		Payload            interface{}
 		PayloadSignatures  interface{}
 		EnvelopeSignatures interface{}
@@ -62,7 +75,8 @@ func (tb TransactionBody) Fingerprint() []byte {
 		Payload:            tb.payloadCanonicalForm(),
 		PayloadSignatures:  signaturesList(tb.PayloadSignatures).canonicalForm(),
 		EnvelopeSignatures: signaturesList(tb.EnvelopeSignatures).canonicalForm(),
-	})
+	}
+	return rlp.Encode(w, encodingCanonicalForm)
 }
 
 func (tb TransactionBody) ByteSize() uint {
@@ -94,10 +108,6 @@ func (tb TransactionBody) InclusionEffort() uint64 {
 }
 
 func (tb TransactionBody) ID() Identifier {
-	return MakeID(tb)
-}
-
-func (tb TransactionBody) Checksum() Identifier {
 	return MakeID(tb)
 }
 
@@ -388,11 +398,6 @@ func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
 
 func (tx *Transaction) PayloadMessage() []byte {
 	return fingerprint.Fingerprint(tx.TransactionBody.payloadCanonicalForm())
-}
-
-// Checksum provides a cryptographic commitment for a chunk content
-func (tx *Transaction) Checksum() Identifier {
-	return MakeID(tx)
 }
 
 func (tx *Transaction) String() string {

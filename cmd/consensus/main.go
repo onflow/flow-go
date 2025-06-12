@@ -383,8 +383,8 @@ func main() {
 			return nil
 		}).
 		Module("collection guarantees mempool", func(node *cmd.NodeConfig) error {
-			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
-			return err
+			guarantees = stdmap.NewGuarantees(guaranteeLimit)
+			return nil
 		}).
 		Module("execution receipts mempool", func(node *cmd.NodeConfig) error {
 			receipts = consensusMempools.NewExecutionTree()
@@ -647,7 +647,7 @@ func main() {
 				node.Storage.Headers,
 				finalize,
 				notifier,
-				node.FinalizedRootBlock.Header,
+				node.FinalizedRootBlock.ToHeader(),
 				node.RootQC,
 			)
 			if err != nil {

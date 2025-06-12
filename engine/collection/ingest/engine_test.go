@@ -102,7 +102,7 @@ func (suite *Suite) SetupTest() {
 	suite.snapshot = new(protocol.Snapshot)
 	suite.state.On("Final").Return(suite.snapshot)
 	suite.snapshot.On("Head").Return(
-		func() *flow.Header { return suite.final.Header },
+		func() *flow.Header { return suite.final.ToHeader() },
 		func() error { return nil },
 	)
 	suite.state.On("AtBlockID", mock.Anything).Return(
@@ -110,7 +110,7 @@ func (suite *Suite) SetupTest() {
 			snap := new(protocol.Snapshot)
 			block, ok := suite.blocks[blockID]
 			if ok {
-				snap.On("Head").Return(block.Header, nil)
+				snap.On("Head").Return(block.ToHeader(), nil)
 			} else {
 				snap.On("Head").Return(nil, storage.ErrNotFound)
 			}
@@ -276,9 +276,9 @@ func (suite *Suite) TestInvalidTransaction() {
 
 	suite.Run("expired reference block ID", func() {
 		// "finalize" a sufficiently high block that root block is expired
-		final := unittest.BlockFixture()
-		final.Header.Height = suite.root.Header.Height + flow.DefaultTransactionExpiry + 1
-		suite.final = &final
+		suite.final = unittest.BlockFixture(
+			unittest.Block.WithHeight(suite.root.Header.Height + flow.DefaultTransactionExpiry + 1),
+		)
 
 		tx := unittest.TransactionBodyFixture()
 		tx.ReferenceBlockID = suite.root.ID()

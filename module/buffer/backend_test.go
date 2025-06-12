@@ -31,9 +31,9 @@ func (suite *BackendSuite) item() *item {
 func (suite *BackendSuite) itemWithParent(parent *flow.Header) *item {
 	header := unittest.BlockHeaderWithParentFixture(parent)
 	return &item{
-		header: flow.Slashable[*flow.Header]{
+		header: flow.Slashable[*flow.ProposalHeader]{
 			OriginID: unittest.IdentifierFixture(),
-			Message:  header,
+			Message:  unittest.ProposalFromHeader(header),
 		},
 		payload: unittest.IdentifierFixture(),
 	}
@@ -47,11 +47,11 @@ func (suite *BackendSuite) TestAdd() {
 	expected := suite.item()
 	suite.backend.add(expected.header, expected.payload)
 
-	actual, ok := suite.backend.byID(expected.header.Message.ID())
+	actual, ok := suite.backend.byID(expected.header.Message.Header.ID())
 	suite.Assert().True(ok)
 	suite.Assert().Equal(expected, actual)
 
-	byParent, ok := suite.backend.byParentID(expected.header.Message.ParentID)
+	byParent, ok := suite.backend.byParentID(expected.header.Message.Header.ParentID)
 	suite.Assert().True(ok)
 	suite.Assert().Len(byParent, 1)
 	suite.Assert().Equal(expected, byParent[0])
@@ -60,9 +60,9 @@ func (suite *BackendSuite) TestAdd() {
 func (suite *BackendSuite) TestChildIndexing() {
 
 	parent := suite.item()
-	child1 := suite.itemWithParent(parent.header.Message)
-	child2 := suite.itemWithParent(parent.header.Message)
-	grandchild := suite.itemWithParent(child1.header.Message)
+	child1 := suite.itemWithParent(parent.header.Message.Header)
+	child2 := suite.itemWithParent(parent.header.Message.Header)
+	grandchild := suite.itemWithParent(child1.header.Message.Header)
 	unrelated := suite.item()
 
 	suite.Add(child1)
@@ -71,7 +71,7 @@ func (suite *BackendSuite) TestChildIndexing() {
 	suite.Add(unrelated)
 
 	suite.Run("retrieve by parent ID", func() {
-		byParent, ok := suite.backend.byParentID(parent.header.Message.ID())
+		byParent, ok := suite.backend.byParentID(parent.header.Message.Header.ID())
 		suite.Assert().True(ok)
 		// should only include direct children
 		suite.Assert().Len(byParent, 2)
@@ -80,22 +80,22 @@ func (suite *BackendSuite) TestChildIndexing() {
 	})
 
 	suite.Run("drop for parent ID", func() {
-		suite.backend.dropForParent(parent.header.Message.ID())
+		suite.backend.dropForParent(parent.header.Message.Header.ID())
 
 		// should only drop direct children
-		_, exists := suite.backend.byID(child1.header.Message.ID())
+		_, exists := suite.backend.byID(child1.header.Message.Header.ID())
 		suite.Assert().False(exists)
-		_, exists = suite.backend.byID(child2.header.Message.ID())
+		_, exists = suite.backend.byID(child2.header.Message.Header.ID())
 		suite.Assert().False(exists)
 
 		// grandchildren should be unaffected
-		_, exists = suite.backend.byParentID(child1.header.Message.ID())
+		_, exists = suite.backend.byParentID(child1.header.Message.Header.ID())
 		suite.Assert().True(exists)
-		_, exists = suite.backend.byID(grandchild.header.Message.ID())
+		_, exists = suite.backend.byID(grandchild.header.Message.Header.ID())
 		suite.Assert().True(exists)
 
 		// nothing else should be affected
-		_, exists = suite.backend.byID(unrelated.header.Message.ID())
+		_, exists = suite.backend.byID(unrelated.header.Message.Header.ID())
 		suite.Assert().True(exists)
 	})
 }
@@ -119,20 +119,20 @@ func (suite *BackendSuite) TestPruneByView() {
 		// 90% of the time, build on an existing header
 		if i%2 == 1 {
 			parent := items[rand.Intn(len(items))]
-			item := suite.itemWithParent(parent.header.Message)
+			item := suite.itemWithParent(parent.header.Message.Header)
 			suite.Add(item)
 			items = append(items, item)
 		}
 	}
 
 	// pick a height to prune that's guaranteed to prune at least one item
-	pruneAt := items[rand.Intn(len(items))].header.Message.View
+	pruneAt := items[rand.Intn(len(items))].header.Message.Header.View
 	suite.backend.pruneByView(pruneAt)
 
 	for _, item := range items {
-		view := item.header.Message.View
-		id := item.header.Message.ID()
-		parentID := item.header.Message.ParentID
+		view := item.header.Message.Header.View
+		id := item.header.Message.Header.ID()
+		parentID := item.header.Message.Header.ParentID
 
 		// check that items below the prune view were removed
 		if view <= pruneAt {
@@ -143,7 +143,7 @@ func (suite *BackendSuite) TestPruneByView() {
 		}
 
 		// check that other items were not removed
-		if view > item.header.Message.View {
+		if view > item.header.Message.Header.View {
 			_, exists := suite.backend.byID(id)
 			suite.Assert().True(exists)
 			_, exists = suite.backend.byParentID(parentID)

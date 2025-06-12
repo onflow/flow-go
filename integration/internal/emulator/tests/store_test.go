@@ -30,7 +30,7 @@ import (
 	"github.com/onflow/flow-go-sdk/test"
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
-	emulator "github.com/onflow/flow-go/integration/internal/emulator"
+	"github.com/onflow/flow-go/integration/internal/emulator"
 	"github.com/onflow/flow-go/integration/internal/emulator/utils/unittest"
 	"github.com/onflow/flow-go/model/flow"
 	flowgo "github.com/onflow/flow-go/model/flow"
@@ -42,16 +42,19 @@ func TestBlocks(t *testing.T) {
 
 	store := setupStore(t)
 
-	block1 := &flowgo.Block{
-		Header: &flowgo.Header{
+	block1 := flowgo.NewBlock(
+		flowgo.HeaderBody{
 			Height: 1,
 		},
-	}
-	block2 := &flowgo.Block{
-		Header: &flowgo.Header{
+		flowgo.Payload{},
+	)
+
+	block2 := flowgo.NewBlock(
+		flowgo.HeaderBody{
 			Height: 2,
 		},
-	}
+		flowgo.Payload{},
+	)
 
 	t.Run("should return error for not found", func(t *testing.T) {
 		t.Run("BlockByID", func(t *testing.T) {

@@ -151,7 +151,7 @@ func (o *Orchestrator) initAuthorizedEvents() {
 func (o *Orchestrator) initUnauthorizedMsgByRoleEvents(n int) {
 	channel := channels.SyncCommittee
 	for i := 0; i < n; i++ {
-		unauthorizedProposal := unittest.ProposalFixture()
+		unauthorizedProposal := messages.NewUntrustedProposal(unittest.ProposalFixture())
 		eventID := unittest.GetFlowProtocolEventID(o.T, channel, unauthorizedProposal)
 		unauthorizedMsgByRole := &insecure.EgressEvent{
 			CorruptOriginId:     o.attackerAN,

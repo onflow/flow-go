@@ -97,19 +97,19 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		Signature:    nil,
 	}
 
-	block := flow.Block{
-		Header: &flow.Header{
+	block := flow.NewBlock(
+		flow.HeaderBody{
 			View: 42,
 		},
-		Payload: &flow.Payload{
+		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
 		},
-	}
+	)
 
 	executableBlock := &entity.ExecutableBlock{
-		Block: &block,
+		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
-			guarantee.ID(): {
+			guarantee.CollectionID: {
 				Guarantee:    &guarantee,
 				Transactions: transactions,
 			},
@@ -792,19 +792,19 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		Signature:    nil,
 	}
 
-	block := flow.Block{
-		Header: &flow.Header{
+	block := flow.NewBlock(
+		flow.HeaderBody{
 			View: 26,
 		},
-		Payload: &flow.Payload{
+		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
 		},
-	}
+	)
 
 	executableBlock := &entity.ExecutableBlock{
-		Block: &block,
+		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
-			guarantee.ID(): {
+			guarantee.CollectionID: {
 				Guarantee:    &guarantee,
 				Transactions: transactions,
 			},

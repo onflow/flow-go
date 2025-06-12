@@ -11,11 +11,11 @@ import (
 // children once the parent is received.
 // Safe for concurrent use.
 type PendingBlockBuffer interface {
-	Add(block flow.Slashable[*flow.Block]) bool
+	Add(block flow.Slashable[*flow.BlockProposal]) bool
 
-	ByID(blockID flow.Identifier) (flow.Slashable[*flow.Block], bool)
+	ByID(blockID flow.Identifier) (flow.Slashable[*flow.BlockProposal], bool)
 
-	ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.Block], bool)
+	ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.BlockProposal], bool)
 
 	DropForParent(parentID flow.Identifier)
 
@@ -29,11 +29,11 @@ type PendingBlockBuffer interface {
 // collection node cluster consensus.
 // Safe for concurrent use.
 type PendingClusterBlockBuffer interface {
-	Add(block flow.Slashable[*cluster.Block]) bool
+	Add(block flow.Slashable[*cluster.BlockProposal]) bool
 
-	ByID(blockID flow.Identifier) (flow.Slashable[*cluster.Block], bool)
+	ByID(blockID flow.Identifier) (flow.Slashable[*cluster.BlockProposal], bool)
 
-	ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.Block], bool)
+	ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.BlockProposal], bool)
 
 	DropForParent(parentID flow.Identifier)
 

@@ -18,17 +18,15 @@ func TestConvertBlock(t *testing.T) {
 	t.Parallel()
 
 	block := unittest.FullBlockFixture()
-	block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
-
 	signerIDs := unittest.IdentifierListFixture(5)
 
-	msg, err := convert.BlockToMessage(&block, signerIDs)
+	msg, err := convert.BlockToMessage(block, signerIDs)
 	require.NoError(t, err)
 
 	converted, err := convert.MessageToBlock(msg)
 	require.NoError(t, err)
 
-	assert.Equal(t, block, *converted)
+	assert.Equal(t, block, converted)
 }
 
 // TestConvertBlockLight tests that converting a block to its light form results in only the correct
@@ -37,9 +35,7 @@ func TestConvertBlockLight(t *testing.T) {
 	t.Parallel()
 
 	block := unittest.FullBlockFixture()
-	block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
-
-	msg := convert.BlockToMessageLight(&block)
+	msg := convert.BlockToMessageLight(block)
 
 	// required fields are set
 	blockID := block.ID()

@@ -14,7 +14,7 @@ import (
 // Execution Receipts.
 // Implements LevelledForest's Vertex interface.
 type ReceiptsOfSameResult struct {
-	receipts    map[flow.Identifier]*flow.ExecutionReceiptMeta // map from ExecutionReceipt.ID -> ExecutionReceiptMeta
+	receipts    map[flow.Identifier]*flow.ExecutionReceiptStub // map from ExecutionReceipt.ID -> ExecutionReceiptStub
 	result      *flow.ExecutionResult
 	resultID    flow.Identifier // precomputed ID of result to avoid expensive hashing on each call
 	blockHeader *flow.Header    // header of the block which the result is for
@@ -28,7 +28,7 @@ func NewReceiptsOfSameResult(result *flow.ExecutionResult, block *flow.Header) (
 	}
 
 	// construct ReceiptsOfSameResult only containing initialReceipt
-	rcpts := make(map[flow.Identifier]*flow.ExecutionReceiptMeta)
+	rcpts := make(map[flow.Identifier]*flow.ExecutionReceiptStub)
 	rs := &ReceiptsOfSameResult{
 		receipts:    rcpts,
 		result:      result,
@@ -52,7 +52,7 @@ func (rsr *ReceiptsOfSameResult) AddReceipt(receipt *flow.ExecutionReceipt) (uin
 	if rsr.Has(receiptID) {
 		return 0, nil
 	}
-	rsr.receipts[receipt.ID()] = receipt.Meta()
+	rsr.receipts[receiptID] = receipt.Stub()
 	return 1, nil
 }
 

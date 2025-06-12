@@ -24,7 +24,7 @@ func TestFetch(t *testing.T) {
 	nodes := unittest.IdentityListFixture(10)
 	guarantee := unittest.CollectionGuaranteeFixture()
 	guarantee.ReferenceBlockID = unittest.IdentifierFixture()
-	signers, err := signature.EncodeSignersToIndices(nodes.NodeIDs(), flow.IdentifierList{nodes[0].ID(), nodes[1].ID()})
+	signers, err := signature.EncodeSignersToIndices(nodes.NodeIDs(), flow.IdentifierList{nodes[0].NodeID, nodes[1].NodeID})
 	require.NoError(t, err)
 	guarantee.SignerIndices = signers
 

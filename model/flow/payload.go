@@ -2,6 +2,9 @@ package flow
 
 import (
 	"encoding/json"
+	"fmt"
+
+	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 )
 
 // Payload is the actual content of each block.
@@ -14,7 +17,7 @@ type Payload struct {
 	// Seals must be internally connected, containing no seals with duplicate block IDs or heights.
 	// Seals may be empty. It presents a set, i.e. there is no protocol-defined ordering.
 	Seals    []*Seal
-	Receipts ExecutionReceiptMetaList
+	Receipts ExecutionReceiptStubList
 	Results  ExecutionResultList
 	// ProtocolStateID is the root hash of protocol state. Per convention, this is the resulting
 	// state after applying all identity-changing operations potentially contained in the block.
@@ -52,21 +55,58 @@ func (p Payload) MarshalJSON() ([]byte, error) {
 
 // Hash returns the root hash of the payload.
 func (p Payload) Hash() Identifier {
-	collHash := MerkleRoot(GetIDs(p.Guarantees)...)
+	guaranteesHash := MerkleRoot(GetIDs(p.Guarantees)...)
 	sealHash := MerkleRoot(GetIDs(p.Seals)...)
 	recHash := MerkleRoot(GetIDs(p.Receipts)...)
 	resHash := MerkleRoot(GetIDs(p.Results)...)
-	return ConcatSum(collHash, sealHash, recHash, resHash, p.ProtocolStateID)
+	return ConcatSum(guaranteesHash, sealHash, recHash, resHash, p.ProtocolStateID)
 }
 
 // Index returns the index for the payload.
 func (p Payload) Index() *Index {
 	idx := &Index{
-		CollectionIDs:   GetIDs(p.Guarantees),
+		GuaranteeIDs:    GetIDs(p.Guarantees),
 		SealIDs:         GetIDs(p.Seals),
 		ReceiptIDs:      GetIDs(p.Receipts),
 		ResultIDs:       GetIDs(p.Results),
 		ProtocolStateID: p.ProtocolStateID,
 	}
 	return idx
+}
+
+// UnmarshalCBOR ensures that a Payload received from the network does not contain nil datatypes.
+func (p *Payload) UnmarshalCBOR(data []byte) error {
+	type untrustedPayload Payload
+	var untrusted untrustedPayload
+	err := cborcodec.DefaultDecMode.Unmarshal(data, &untrusted)
+	if err != nil {
+		return err
+	}
+	for _, guarantee := range untrusted.Guarantees {
+		if guarantee == nil {
+			return fmt.Errorf("payload guarantee is nil")
+		}
+	}
+	for _, seal := range untrusted.Seals {
+		if seal == nil {
+			return fmt.Errorf("payload seal is nil")
+		}
+	}
+	for _, receipt := range untrusted.Receipts {
+		if receipt == nil {
+			return fmt.Errorf("payload receipt is nil")
+		}
+	}
+	for _, result := range untrusted.Results {
+		if result == nil {
+			return fmt.Errorf("payload result is nil")
+		}
+		for _, chunk := range result.Chunks {
+			if chunk == nil {
+				return fmt.Errorf("payload result chunk is nil")
+			}
+		}
+	}
+	*p = Payload(untrusted)
+	return nil
 }

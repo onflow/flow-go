@@ -43,7 +43,7 @@ type TxErrorMessagesCoreSuite struct {
 	connFactory *connectionmock.ConnectionFactory
 
 	blockMap       map[uint64]*flow.Block
-	rootBlock      flow.Block
+	rootBlock      *flow.Block
 	finalizedBlock *flow.Header
 
 	ctx    context.Context
@@ -75,14 +75,15 @@ func (s *TxErrorMessagesCoreSuite) SetupTest() {
 	s.receipts = storage.NewExecutionReceipts(s.T())
 	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
 
-	s.rootBlock = unittest.BlockFixture()
-	s.rootBlock.Header.Height = 0
-	s.finalizedBlock = unittest.BlockWithParentFixture(s.rootBlock.Header).Header
+	s.rootBlock = unittest.BlockFixture(
+		unittest.Block.WithHeight(0),
+	)
+	s.finalizedBlock = unittest.BlockWithParentFixture(s.rootBlock.ToHeader()).ToHeader()
 
 	s.proto.state.On("Params").Return(s.proto.params)
 
 	// Mock the finalized root block header with height 0.
-	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.Header, nil)
+	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.ToHeader(), nil)
 
 	s.proto.snapshot.On("Head").Return(
 		func() *flow.Header {

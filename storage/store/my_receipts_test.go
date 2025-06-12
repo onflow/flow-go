@@ -29,7 +29,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 	t.Run("myReceipts one get one", func(t *testing.T) {
 		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
 			block := unittest.BlockFixture()
-			receipt1 := unittest.ReceiptForBlockFixture(&block)
+			receipt1 := unittest.ReceiptForBlockFixture(block)
 
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return myReceipts.BatchStoreMyReceipt(receipt1, rw)
@@ -56,7 +56,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 		withStore(t, func(myReceipts storage.MyExecutionReceipts, _ storage.ExecutionResults, _ storage.ExecutionReceipts, db storage.DB) {
 			block := unittest.BlockFixture()
 
-			receipt1 := unittest.ReceiptForBlockFixture(&block)
+			receipt1 := unittest.ReceiptForBlockFixture(block)
 
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return myReceipts.BatchStoreMyReceipt(receipt1, rw)
@@ -77,8 +77,8 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			executor1 := unittest.IdentifierFixture()
 			executor2 := unittest.IdentifierFixture()
 
-			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block, executor1)
-			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block, executor2)
+			receipt1 := unittest.ReceiptForBlockExecutorFixture(block, executor1)
+			receipt2 := unittest.ReceiptForBlockExecutorFixture(block, executor2)
 
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return myReceipts.BatchStoreMyReceipt(receipt1, rw)
@@ -101,8 +101,8 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			executor1 := unittest.IdentifierFixture()
 			executor2 := unittest.IdentifierFixture()
 
-			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block, executor1)
-			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block, executor2)
+			receipt1 := unittest.ReceiptForBlockExecutorFixture(block, executor1)
+			receipt2 := unittest.ReceiptForBlockExecutorFixture(block, executor2)
 
 			var wg sync.WaitGroup
 			errChan := make(chan error, 2)
@@ -153,7 +153,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 
 					block := unittest.BlockFixture() // Each iteration gets a new block
 					executor := unittest.IdentifierFixture()
-					receipt := unittest.ReceiptForBlockExecutorFixture(&block, executor)
+					receipt := unittest.ReceiptForBlockExecutorFixture(block, executor)
 
 					err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 						return myReceipts.BatchStoreMyReceipt(receipt, rw)
@@ -176,7 +176,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 	t.Run("store and remove", func(t *testing.T) {
 		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
 			block := unittest.BlockFixture()
-			receipt1 := unittest.ReceiptForBlockFixture(&block)
+			receipt1 := unittest.ReceiptForBlockFixture(block)
 
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return myReceipts.BatchStoreMyReceipt(receipt1, rw)
@@ -216,8 +216,8 @@ func TestMyExecutionReceiptsStorageMultipleStoreInSameBatch(t *testing.T) {
 		myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
 
 		block := unittest.BlockFixture()
-		receipt1 := unittest.ReceiptForBlockFixture(&block)
-		receipt2 := unittest.ReceiptForBlockFixture(&block)
+		receipt1 := unittest.ReceiptForBlockFixture(block)
+		receipt2 := unittest.ReceiptForBlockFixture(block)
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			err := myReceipts.BatchStoreMyReceipt(receipt1, rw)

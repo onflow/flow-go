@@ -26,17 +26,9 @@ func (s *Snapshot) Collection() (*flow.Collection, error) {
 
 	var collection flow.Collection
 	err := s.state.db.View(func(tx *badger.Txn) error {
-
-		// get the header for this snapshot
-		var header flow.Header
-		err := s.head(&header)(tx)
-		if err != nil {
-			return fmt.Errorf("failed to get snapshot header: %w", err)
-		}
-
 		// get the payload
 		var payload cluster.Payload
-		err = procedure.RetrieveClusterPayload(header.ID(), &payload)(tx)
+		err := procedure.RetrieveClusterPayload(s.blockID, &payload)(tx)
 		if err != nil {
 			return fmt.Errorf("failed to get snapshot payload: %w", err)
 		}
@@ -74,11 +66,12 @@ func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// get the snapshot header
-		err := operation.RetrieveHeader(s.blockID, head)(tx)
+		var proposal flow.ProposalHeader
+		err := operation.RetrieveHeader(s.blockID, &proposal)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve header for block (%s): %w", s.blockID, err)
 		}
-
+		*head = *proposal.Header
 		return nil
 	}
 }

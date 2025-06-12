@@ -256,7 +256,7 @@ func createRootQC(t *testing.T, root *flow.Block, participantData *run.Participa
 // createRootBlockData creates genesis block with first epoch and real data node identities.
 // This function requires all participants to pass DKG process.
 func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
-	root := unittest.GenesisFixture()
+	rootHeader := unittest.GenesisFixture().Header
 	consensusParticipants := participantData.Identities()
 
 	// add other roles to create a complete identity list
@@ -273,8 +273,8 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	setup := unittest.EpochSetupFixture(
 		unittest.WithParticipants(participants.ToSkeleton()),
 		unittest.SetupWithCounter(counter),
-		unittest.WithFirstView(root.Header.View),
-		unittest.WithFinalView(root.Header.View+1000),
+		unittest.WithFirstView(rootHeader.View),
+		unittest.WithFinalView(rootHeader.View+1000),
 	)
 	commit := unittest.EpochCommitFixture(
 		unittest.CommitWithCounter(counter),
@@ -288,11 +288,11 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
 	require.NoError(t, err)
 	epochProtocolStateID := minEpochStateEntry.ID()
-	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
+	safetyParams, err := protocol.DefaultEpochSafetyParams(rootHeader.ChainID)
 	require.NoError(t, err)
 	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochProtocolStateID)
 	require.NoError(t, err)
-	root.SetPayload(flow.Payload{ProtocolStateID: rootProtocolState.ID()})
+	root := flow.NewBlock(rootHeader, flow.Payload{ProtocolStateID: rootProtocolState.ID()})
 	result := unittest.BootstrapExecutionResultFixture(root, unittest.GenesisStateCommitment)
 	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
 
@@ -379,7 +379,8 @@ func createNode(
 	tracer := trace.NewNoopTracer()
 
 	headersDB := storage.NewHeaders(metricsCollector, db)
-	guaranteesDB := storage.NewGuarantees(metricsCollector, db, storage.DefaultCacheSize)
+	guaranteesDB := storage.NewGuarantees(metricsCollector, db,
+		storage.DefaultCacheSize, storage.DefaultCacheSize)
 	sealsDB := storage.NewSeals(metricsCollector, db)
 	indexDB := storage.NewIndex(metricsCollector, db)
 	resultsDB := storage.NewExecutionResults(metricsCollector, db)
@@ -391,16 +392,16 @@ func createNode(
 	commitsDB := storage.NewEpochCommits(metricsCollector, db)
 	protocolStateDB := storage.NewEpochProtocolStateEntries(metricsCollector, setupsDB, commitsDB, db,
 		storage.DefaultEpochProtocolStateCacheSize, storage.DefaultProtocolStateIndexCacheSize)
-	protocokKVStoreDB := storage.NewProtocolKVStore(metricsCollector, db,
+	protocolKVStoreDB := storage.NewProtocolKVStore(metricsCollector, db,
 		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeaconDB := store.NewVersionBeacons(badgerimpl.ToDB(db))
 	protocolStateEvents := events.NewDistributor()
 
-	localID := identity.ID()
+	localNodeID := identity.NodeID
 
 	log := unittest.Logger().With().
 		Int("index", index).
-		Hex("node_id", localID[:]).
+		Hex("node_id", localNodeID[:]).
 		Logger()
 
 	state, err := bprotocol.Bootstrap(
@@ -414,7 +415,7 @@ func createNode(
 		setupsDB,
 		commitsDB,
 		protocolStateDB,
-		protocokKVStoreDB,
+		protocolKVStoreDB,
 		versionBeaconDB,
 		rootSnapshot,
 	)
@@ -447,7 +448,7 @@ func createNode(
 
 	counterConsumer := &CounterConsumer{
 		finalized: func(total uint) {
-			stopper.onFinalizedTotal(node.id.ID(), total)
+			stopper.onFinalizedTotal(node.id.NodeID, total)
 		},
 	}
 
@@ -457,7 +458,7 @@ func createNode(
 	hotstuffDistributor.AddConsumer(counterConsumer)
 	hotstuffDistributor.AddConsumer(logConsumer)
 
-	require.Equal(t, participant.nodeInfo.NodeID, localID)
+	require.Equal(t, participant.nodeInfo.NodeID, localNodeID)
 	privateKeys, err := participant.nodeInfo.PrivateKeys()
 	require.NoError(t, err)
 
@@ -466,11 +467,10 @@ func createNode(
 	require.NoError(t, err)
 
 	// add a network for this node to the hub
-	net := hub.AddNetwork(localID, node)
+	net := hub.AddNetwork(localNodeID, node)
 
 	guaranteeLimit, sealLimit := uint(1000), uint(1000)
-	guarantees, err := stdmap.NewGuarantees(guaranteeLimit)
-	require.NoError(t, err)
+	guarantees := stdmap.NewGuarantees(guaranteeLimit)
 
 	receipts := consensusMempools.NewExecutionTree()
 
@@ -479,7 +479,7 @@ func createNode(
 	mutableProtocolState := protocol_state.NewMutableProtocolState(
 		log,
 		protocolStateDB,
-		protocokKVStoreDB,
+		protocolKVStoreDB,
 		state.Params(),
 		headersDB,
 		resultsDB,
@@ -514,7 +514,7 @@ func createNode(
 	rootQC, err := rootSnapshot.QuorumCertificate()
 	require.NoError(t, err)
 
-	committee, err := committees.NewConsensusCommittee(state, localID)
+	committee, err := committees.NewConsensusCommittee(state, localNodeID)
 	require.NoError(t, err)
 	protocolStateEvents.AddConsumer(committee)
 
@@ -628,7 +628,7 @@ func createNode(
 		metricsCollector,
 		build,
 		rootHeader,
-		[]*flow.Header{},
+		[]*flow.ProposalHeader{},
 		hotstuffModules,
 		consensus.WithMinTimeout(hotstuffTimeout),
 		func(cfg *consensus.ParticipantConfig) {

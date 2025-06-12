@@ -81,7 +81,7 @@ func (fl *FollowerLoop) AddCertifiedBlock(certifiedBlock *model.CertifiedBlock) 
 
 	blocksQueued := uint(len(fl.certifiedBlocks))
 	fl.mempoolMetrics.MempoolEntries(metrics.ResourceFollowerLoopCertifiedBlocksChannel, blocksQueued)
-	fl.log.Debug().Hex("block_id", logging.ID(certifiedBlock.ID())).
+	fl.log.Debug().Hex("block_id", logging.ID(certifiedBlock.BlockID())).
 		Uint64("view", certifiedBlock.View()).
 		Uint("blocks_queued", blocksQueued).
 		Dur("wait_time", busyDuration).
@@ -106,9 +106,9 @@ func (fl *FollowerLoop) loop(ctx irrecoverable.SignalerContext, ready component.
 		case b := <-fl.certifiedBlocks:
 			err := fl.forks.AddCertifiedBlock(b)
 			if err != nil { // all errors are fatal
-				err = fmt.Errorf("finalization logic failes to process certified block %v: %w", b.ID(), err)
+				err = fmt.Errorf("finalization logic failes to process certified block %v: %w", b.BlockID(), err)
 				fl.log.Error().
-					Hex("block_id", logging.ID(b.ID())).
+					Hex("block_id", logging.ID(b.BlockID())).
 					Uint64("view", b.View()).
 					Err(err).
 					Msg("irrecoverable follower loop error")
