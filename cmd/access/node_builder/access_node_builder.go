@@ -13,7 +13,6 @@ import (
 
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/onflow/crypto"
@@ -557,7 +556,6 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 }
 
 func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccessNodeBuilder {
-	var ds datastore.Batching
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgressInitializer
 	var processedNotifications storage.ConsumerProgressInitializer
@@ -595,8 +593,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return fmt.Errorf("could not create execution data datastore manager: %w", err)
 			}
 
-			ds = builder.ExecutionDatastoreManager.Datastore()
-
 			builder.ShutdownFunc(builder.ExecutionDatastoreManager.Close)
 
 			return nil
@@ -622,7 +618,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return nil
 		}).
 		Module("execution datastore", func(node *cmd.NodeConfig) error {
-			builder.ExecutionDataBlobstore = blobs.NewBlobstore(ds)
+			builder.ExecutionDataBlobstore = blobs.NewBlobstore(builder.ExecutionDatastoreManager.Datastore())
 			builder.ExecutionDataStore = execution_data.NewExecutionDataStore(builder.ExecutionDataBlobstore, execution_data.DefaultSerializer)
 			return nil
 		}).
@@ -665,7 +661,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 
 			var err error
-			bs, err = node.EngineRegistry.RegisterBlobService(channels.ExecutionDataService, ds, opts...)
+			bs, err = node.EngineRegistry.RegisterBlobService(channels.ExecutionDataService, builder.ExecutionDatastoreManager.Datastore(), opts...)
 			if err != nil {
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
@@ -826,7 +822,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			net := builder.AccessNodeConfig.PublicNetworkConfig.Network
 
 			var err error
-			builder.PublicBlobService, err = net.RegisterBlobService(channels.PublicExecutionDataService, ds, opts...)
+			builder.PublicBlobService, err = net.RegisterBlobService(channels.PublicExecutionDataService, builder.ExecutionDatastoreManager.Datastore(), opts...)
 			if err != nil {
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
