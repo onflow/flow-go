@@ -610,10 +610,10 @@ func (s *Suite) TestRequestMissingCollections() {
 		p = 1
 
 		// timeout after 3 db polls
-		ctx, cancel := context.WithTimeout(context.Background(), 100*defaultCollectionCatchupDBPollInterval)
+		ctx, cancel := context.WithTimeout(context.Background(), 100*collectionCatchupDBPollInterval)
 		defer cancel()
 
-		err := syncer.downloadMissingCollections(ctx)
+		err := syncer.requestMissingCollectionsBlocking(ctx)
 
 		require.Error(s.T(), err)
 		require.Contains(s.T(), err.Error(), "context deadline exceeded")
@@ -626,10 +626,10 @@ func (s *Suite) TestRequestMissingCollections() {
 		// 90% of the time, collections are reported as not received when the collection storage is queried
 		p = 0.9
 
-		ctx, cancel := context.WithTimeout(context.Background(), defaultCollectionCatchupTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), collectionCatchupTimeout)
 		defer cancel()
 
-		err := syncer.downloadMissingCollections(ctx)
+		err := syncer.requestMissingCollectionsBlocking(ctx)
 
 		require.NoError(s.T(), err)
 		require.Len(s.T(), rcvdColl, len(collIDs))
