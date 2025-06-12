@@ -914,7 +914,7 @@ func TestBuildIdentityTable(t *testing.T) {
 //
 // 5. Invalid input with unsorted ActiveIdentities:
 //   - Should return an error indicating ActiveIdentities are not sorted.
-func  (t *testing.T) {
+func TestNewEpochStateContainer(t *testing.T) {
 	identities := unittest.DynamicIdentityEntryListFixture(3)
 	sortedIdentities := identities.Sort(flow.IdentifierCanonical)
 
