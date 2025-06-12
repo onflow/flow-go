@@ -107,7 +107,7 @@ func (suite *SnapshotSuite) Payload(transactions ...*flow.TransactionBody) model
 		}
 	}
 
-	// avoid a nil transaction list
+	// avoid a nil transaction list to match empty (but non-nil) list returned by snapshot query
 	if len(transactions) == 0 {
 		transactions = []*flow.TransactionBody{}
 	}
