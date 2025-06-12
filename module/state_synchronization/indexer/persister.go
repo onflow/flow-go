@@ -14,23 +14,25 @@ import (
 
 // Persister handles transferring data from in-memory storage to permanent storage.
 type Persister struct {
-	log                    zerolog.Logger
+	log zerolog.Logger
+
 	inMemoryRegisters      *unsynchronized.Registers
 	inMemoryEvents         *unsynchronized.Events
 	inMemoryCollections    *unsynchronized.Collections
 	inMemoryTransactions   *unsynchronized.Transactions
 	inMemoryResults        *unsynchronized.LightTransactionResults
 	inMemoryTxResultErrMsg *unsynchronized.TransactionResultErrorMessages
-	registers              storage.RegisterIndex
-	events                 storage.Events
-	collections            storage.Collections
-	transactions           storage.Transactions
-	results                storage.LightTransactionResults
-	txResultErrMsg         storage.TransactionResultErrorMessages
-	executionResult        *flow.ExecutionResult
-	header                 *flow.Header
 
-	LastPersistedSealedExecutionResult *flow.ExecutionResult
+	registers      storage.RegisterIndex
+	events         storage.Events
+	collections    storage.Collections
+	transactions   storage.Transactions
+	results        storage.LightTransactionResults
+	txResultErrMsg storage.TransactionResultErrorMessages
+	protocolDB     storage.DB
+
+	executionResult *flow.ExecutionResult
+	header          *flow.Header
 }
 
 // NewPersister creates a new persister for transferring data from in-memory storage to permanent storage.
@@ -48,6 +50,7 @@ func NewPersister(
 	transactions storage.Transactions,
 	results storage.LightTransactionResults,
 	txResultErrMsg storage.TransactionResultErrorMessages,
+	protocolDB storage.DB,
 	executionResult *flow.ExecutionResult,
 	header *flow.Header,
 ) *Persister {
@@ -67,6 +70,7 @@ func NewPersister(
 		txResultErrMsg:         txResultErrMsg,
 		executionResult:        executionResult,
 		header:                 header,
+		protocolDB:             protocolDB,
 	}
 
 	persister.log.Info().
@@ -76,11 +80,18 @@ func NewPersister(
 	return persister
 }
 
-// AddToBatch adds data from in-memory storage to the provided batch.
+// Persist commits data from in-memory storage to the provided batch.
 // It processes events, transaction results, registers, collections, and transactions
 // from their respective in-memory storages to permanent storage.
-// Note: This method doesn't commit the batch - that should be done by the caller.
-func (p *Persister) AddToBatch(batch storage.Batch) error {
+// Expected errors:
+//   - ErrRecordExists if the register record already exists
+//   - storage.ErrNotFound if the transaction ID does not exist in the database
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
+func (p *Persister) Persist() error {
+	// Create a batch for atomic updates
+	batch := p.protocolDB.NewBatch()
+
 	log := p.log.With().
 		Hex("block_id", logging.ID(p.executionResult.BlockID)).
 		Uint64("height", p.header.Height).
@@ -90,6 +101,10 @@ func (p *Persister) AddToBatch(batch storage.Batch) error {
 
 	start := time.Now()
 
+	if err := p.persistRegisters(); err != nil {
+		return err
+	}
+
 	if err := p.addEventsToBatch(batch); err != nil {
 		return err
 	}
@@ -98,60 +113,42 @@ func (p *Persister) AddToBatch(batch storage.Batch) error {
 		return err
 	}
 
-	if err := p.persistRegisters(); err != nil {
+	if err := p.addCollectionsToBatch(batch); err != nil {
 		return err
 	}
 
-	if err := p.persistCollections(batch); err != nil {
+	if err := p.addTransactionsToBatch(batch); err != nil {
 		return err
 	}
 
-	if err := p.persistTransactions(batch); err != nil {
+	if err := p.addTransactionResultErrorMessagesToBatch(batch); err != nil {
 		return err
 	}
 
-	if err := p.persistTransactionResultErrorMessages(batch); err != nil {
-		return err
-	}
+	// TODO: include update to latestPersistedSealedResultBlockHeight in the batch
 
-	p.LastPersistedSealedExecutionResult = p.executionResult
+	if err := batch.Commit(); err != nil {
+		return fmt.Errorf("failed to commit batch: %w", err)
+	}
 
 	duration := time.Since(start)
-	log.Debug().
+
+	p.log.Debug().
 		Dur("duration_ms", duration).
+		Int("events_count", len(p.inMemoryEvents.Data())).
+		Int("collection_count", len(p.inMemoryCollections.Data())).
+		Int("transactions_count", len(p.inMemoryTransactions.Data())).
+		Int("transaction_results_count", len(p.inMemoryResults.Data())).
+		Int("transaction_result_error_messages_count", len(p.inMemoryTxResultErrMsg.Data())).
 		Msg("successfully prepared execution data for persistence")
-
-	return nil
-}
-
-// addEventsToBatch adds events from in-memory storage to the batch.
-// If there are no events, this is a no-op.
-func (p *Persister) addEventsToBatch(batch storage.Batch) error {
-	if eventsList := p.inMemoryEvents.Data(); len(eventsList) > 0 {
-		if err := p.events.BatchStore(p.executionResult.BlockID, []flow.EventsList{eventsList}, batch); err != nil {
-			return fmt.Errorf("could not add events to batch: %w", err)
-		}
-		p.log.Debug().Int("event_count", len(eventsList)).Msg("added events to batch")
-	}
-
-	return nil
-}
-
-// addResultsToBatch adds transaction results from in-memory storage to the batch.
-// If there are no results, this is a no-op.
-func (p *Persister) addResultsToBatch(batch storage.Batch) error {
-	if results := p.inMemoryResults.Data(); len(results) > 0 {
-		if err := p.results.BatchStore(p.executionResult.BlockID, results, batch); err != nil {
-			return fmt.Errorf("could not add transaction results to batch: %w", err)
-		}
-		p.log.Debug().Int("result_count", len(results)).Msg("added transaction results to batch")
-	}
 
 	return nil
 }
 
 // persistRegisters persists registers from in-memory to permanent storage.
 // Registers must be stored for every height, even if it's an empty set.
+// Expected errors:
+//   - ErrRecordExists if the register record already exists
 func (p *Persister) persistRegisters() error {
 	registerData := p.inMemoryRegisters.Data()
 
@@ -160,42 +157,69 @@ func (p *Persister) persistRegisters() error {
 		return fmt.Errorf("could not persist registers: %w", err)
 	}
 
-	p.log.Debug().
-		Int("register_count", len(registerData)).
-		Msg("persisted registers")
+	return nil
+}
+
+// addEventsToBatch adds events from in-memory storage to the batch.
+// Expected errors:
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
+func (p *Persister) addEventsToBatch(batch storage.Batch) error {
+	if eventsList := p.inMemoryEvents.Data(); len(eventsList) > 0 {
+		if err := p.events.BatchStore(p.executionResult.BlockID, []flow.EventsList{eventsList}, batch); err != nil {
+			return fmt.Errorf("could not add events to batch: %w", err)
+		}
+	}
 
 	return nil
 }
 
-// persistCollections persists collections from in-memory to permanent storage.
-// If there are no collections, this is a no-op.
-func (p *Persister) persistCollections(batch storage.Batch) error {
-	if collections := p.inMemoryCollections.LightCollections(); len(collections) > 0 {
-		if err := p.collections.BatchStoreLightAndIndexByTransaction(collections, batch); err != nil {
+// addResultsToBatch adds transaction results from in-memory storage to the batch.
+// Expected errors:
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
+func (p *Persister) addResultsToBatch(batch storage.Batch) error {
+	if results := p.inMemoryResults.Data(); len(results) > 0 {
+		if err := p.results.BatchStore(p.executionResult.BlockID, results, batch); err != nil {
+			return fmt.Errorf("could not add transaction results to batch: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// addCollectionsToBatch persists collections from in-memory to permanent storage.
+// Expected errors:
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
+func (p *Persister) addCollectionsToBatch(batch storage.Batch) error {
+	for _, collection := range p.inMemoryCollections.LightCollections() {
+		if err := p.collections.BatchStoreLightAndIndexByTransaction(&collection, batch); err != nil {
 			return fmt.Errorf("could not add collections to batch: %w", err)
 		}
-		p.log.Debug().Int("collections_count", len(collections)).Msg("added collections to batch")
 	}
 
 	return nil
 }
 
-// persistTransactions persists transactions from in-memory to permanent storage.
-// If there are no transactions, this is a no-op.
-func (p *Persister) persistTransactions(batch storage.Batch) error {
-	if transactions := p.inMemoryTransactions.Data(); len(transactions) > 0 {
-		if err := p.transactions.BatchStore(transactions, batch); err != nil {
+// addTransactionsToBatch persists transactions from in-memory to permanent storage.
+// Expected errors:
+//   - storage.ErrNotFound if the transaction ID does not exist in the database
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
+func (p *Persister) addTransactionsToBatch(batch storage.Batch) error {
+	for _, transaction := range p.inMemoryTransactions.Data() {
+		if err := p.transactions.BatchStore(&transaction, batch); err != nil {
 			return fmt.Errorf("could not add transactions to batch: %w", err)
 		}
-		p.log.Debug().Int("transactions_count", len(transactions)).Msg("added transactions to batch")
 	}
 
 	return nil
 }
 
-// persistTransactionResultErrorMessages persists transaction result error messages from in-memory to permanent storage.
+// addTransactionResultErrorMessagesToBatch persists transaction result error messages from in-memory to permanent storage.
 // If there are no transaction result error messages, this is a no-op.
-func (p *Persister) persistTransactionResultErrorMessages(batch storage.Batch) error {
+func (p *Persister) addTransactionResultErrorMessagesToBatch(batch storage.Batch) error {
 	if txResultErrMsgs := p.inMemoryTxResultErrMsg.Data(); len(txResultErrMsgs) > 0 {
 		if err := p.txResultErrMsg.BatchStore(p.header.ID(), txResultErrMsgs, batch); err != nil {
 			return fmt.Errorf("could not add transactions to batch: %w", err)

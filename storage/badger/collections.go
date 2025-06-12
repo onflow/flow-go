@@ -146,9 +146,8 @@ func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCol
 	return &collection, nil
 }
 
-// BatchStoreLightAndIndexByTransaction stores multiple light collections and indexes them by transaction ID
-// within a single batch operation.
+// BatchStoreLightAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch operation.
 // No errors are expected during normal operation.
-func (c *Collections) BatchStoreLightAndIndexByTransaction(collections []flow.LightCollection, batch storage.ReaderBatchWriter) error {
+func (c *Collections) BatchStoreLightAndIndexByTransaction(_ *flow.LightCollection, _ storage.ReaderBatchWriter) error {
 	return nil
 }

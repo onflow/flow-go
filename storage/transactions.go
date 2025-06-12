@@ -20,7 +20,7 @@ type Transactions interface {
 	// No errors are expected during normal operation.
 	Store(tx *flow.TransactionBody) error
 
-	// BatchStore stores multiple transactions within a single batch operation.
+	// BatchStore stores transaction within a batch operation.
 	// No errors are expected during normal operation.
-	BatchStore(txs []flow.TransactionBody, batch ReaderBatchWriter) error
+	BatchStore(tx *flow.TransactionBody, batch ReaderBatchWriter) error
 }

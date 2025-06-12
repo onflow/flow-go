@@ -154,8 +154,8 @@ func (c *Collections) LightCollections() []flow.LightCollection {
 	return out
 }
 
-// BatchStoreLightAndIndexByTransaction inserts collections into a batch.
+// BatchStoreLightAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch operation.
 // This method is not implemented and will always return an error.
-func (c *Collections) BatchStoreLightAndIndexByTransaction(_ []flow.LightCollection, _ storage.ReaderBatchWriter) error {
+func (c *Collections) BatchStoreLightAndIndexByTransaction(_ *flow.LightCollection, _ storage.ReaderBatchWriter) error {
 	return fmt.Errorf("not implemented")
 }

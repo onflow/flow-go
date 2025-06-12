@@ -66,8 +66,8 @@ func (t *Transactions) Data() []flow.TransactionBody {
 	return out
 }
 
-// BatchStore inserts a batch of transaction into a batch.
+// BatchStore stores transaction within a batch operation.
 // This method is not implemented and will always return an error.
-func (t *Transactions) BatchStore(_ []flow.TransactionBody, _ storage.ReaderBatchWriter) error {
+func (t *Transactions) BatchStore(_ *flow.TransactionBody, _ storage.ReaderBatchWriter) error {
 	return fmt.Errorf("not implemented")
 }

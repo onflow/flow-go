@@ -14,17 +14,17 @@ type Transactions struct {
 	mock.Mock
 }
 
-// BatchStore provides a mock function with given fields: txs, batch
-func (_m *Transactions) BatchStore(txs []flow.TransactionBody, batch storage.ReaderBatchWriter) error {
-	ret := _m.Called(txs, batch)
+// BatchStore provides a mock function with given fields: tx, batch
+func (_m *Transactions) BatchStore(tx *flow.TransactionBody, batch storage.ReaderBatchWriter) error {
+	ret := _m.Called(tx, batch)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchStore")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func([]flow.TransactionBody, storage.ReaderBatchWriter) error); ok {
-		r0 = rf(txs, batch)
+	if rf, ok := ret.Get(0).(func(*flow.TransactionBody, storage.ReaderBatchWriter) error); ok {
+		r0 = rf(tx, batch)
 	} else {
 		r0 = ret.Error(0)
 	}
