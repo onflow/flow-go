@@ -98,7 +98,7 @@ func TestStaticEpochTransition(t *testing.T) {
 func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 	// must finalize 8 blocks, we specify the epoch transition after 4 views
 	stopper := NewStopper(8, 0)
-	privateNodeInfos := createPrivateNodeIdentities(4)
+	privateNodeInfos := createPrivateNodeIdentities(t, 4)
 	firstEpochConsensusParticipants := completeConsensusIdentities(t, privateNodeInfos[:3])
 	rootSnapshot := createRootSnapshot(t, firstEpochConsensusParticipants)
 	consensusParticipants := NewConsensusParticipants(firstEpochConsensusParticipants)
@@ -257,11 +257,16 @@ func withNextEpoch(
 
 	// Construct the new epoch protocol state entry
 	epochStateEntry, err := flow.NewEpochStateEntry(
-		minEpochStateEntry,
-		rootProtocolState.EpochEntry.PreviousEpochSetup,
-		rootProtocolState.EpochEntry.PreviousEpochCommit,
-		currEpochSetup, currEpochCommit,
-		nextEpochSetup, nextEpochCommit)
+		flow.UntrustedEpochStateEntry{
+			MinEpochStateEntry:  minEpochStateEntry,
+			PreviousEpochSetup:  rootProtocolState.EpochEntry.PreviousEpochSetup,
+			PreviousEpochCommit: rootProtocolState.EpochEntry.PreviousEpochCommit,
+			CurrentEpochSetup:   currEpochSetup,
+			CurrentEpochCommit:  currEpochCommit,
+			NextEpochSetup:      nextEpochSetup,
+			NextEpochCommit:     nextEpochCommit,
+		},
+	)
 	require.NoError(t, err)
 	// Re-construct epoch protocol state with modified events (constructs ActiveIdentity fields)
 	epochRichProtocolState, err := flow.NewRichEpochStateEntry(epochStateEntry)
