@@ -434,6 +434,8 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 	seedLength := 32
 	h := hash.SHA2_256
 	s := onflowCrypto.ECDSAP256
+	payerAddress := unittest.AddressFixture()
+	authorizerAddress := flow.EmptyAddress
 
 	transactionBody := transactionBodyScaffold{
 		flow.TransactionBody{
@@ -443,35 +445,38 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 			},
 			ReferenceBlockID: flow.HashToID([]byte("some block id")),
 			GasLimit:         1000,
-			Payer:            flow.EmptyAddress,
+			Payer:            payerAddress,
 			ProposalKey: flow.ProposalKey{
-				Address:        flow.EmptyAddress,
+				Address:        authorizerAddress,
 				KeyIndex:       0,
 				SequenceNumber: 0,
 			},
 			Authorizers: []flow.Address{
-				flow.EmptyAddress,
+				authorizerAddress,
 			},
 			PayloadSignatures: []flow.TransactionSignature{
 				{
-					Address:     flow.EmptyAddress,
-					KeyIndex:    0,
-					Signature:   []byte("signature"), // Mock signature, not validated
-					SignerIndex: 0,
+					Address:       authorizerAddress,
+					KeyIndex:      0,
+					Signature:     []byte("signature"), // Mock signature, not validated
+					SignerIndex:   0,
+					ExtensionData: unittest.RandomBytes(3),
 				},
 			},
 			EnvelopeSignatures: []flow.TransactionSignature{
 				{
-					Address:     flow.EmptyAddress,
-					KeyIndex:    0,
-					Signature:   []byte("placeholder"),
-					SignerIndex: 0,
+					Address:       payerAddress,
+					KeyIndex:      0,
+					Signature:     []byte("placeholder"),
+					SignerIndex:   0,
+					ExtensionData: unittest.RandomBytes(3),
 				},
 			},
 		}}
 
-	// test canonical form constructions
-	t.Run("Transaction canonical form", func(t *testing.T) {
+	// test transaction envelope canonical form constructions
+	t.Run("Transaction envelope canonical form", func(t *testing.T) {
+
 		legacyEnvelopeSignatureCanonicalForm := func(tb transactionBodyScaffold) []byte {
 			return fingerprint.Fingerprint(struct {
 				Payload           interface{}
@@ -574,6 +579,120 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 				expectedEnvelopeMessage := c.expectedEnvelopeSignatureCanonicalForm(transactionBody)
 				// compare canonical forms
 				require.Equal(t, transactionMessage, expectedEnvelopeMessage)
+			})
+		}
+	})
+
+	// test transaction canonical form constructions (ID computation)
+	t.Run("Transaction canonical form", func(t *testing.T) {
+
+		legacyTransactionCanonicalForm := func(tb transactionBodyScaffold) []byte {
+			return fingerprint.Fingerprint(struct {
+				Payload            interface{}
+				PayloadSignatures  interface{}
+				EnvelopeSignatures interface{}
+			}{
+				tb.payloadCanonicalForm(),
+				[]interface{}{
+					// Expected canonical form of payload signature
+					struct {
+						SignerIndex uint
+						KeyID       uint
+						Signature   []byte
+					}{
+						SignerIndex: uint(tb.PayloadSignatures[0].SignerIndex),
+						KeyID:       uint(tb.PayloadSignatures[0].KeyIndex),
+						Signature:   tb.PayloadSignatures[0].Signature,
+					},
+				},
+				[]interface{}{
+					// Expected canonical form of payload signature
+					struct {
+						SignerIndex uint
+						KeyID       uint
+						Signature   []byte
+					}{
+						SignerIndex: uint(tb.EnvelopeSignatures[0].SignerIndex),
+						KeyID:       uint(tb.EnvelopeSignatures[0].KeyIndex),
+						Signature:   tb.EnvelopeSignatures[0].Signature,
+					},
+				},
+			})
+		}
+
+		randomExtensionData := unittest.RandomBytes(20)
+
+		cases := []struct {
+			payloadExtensionData             []byte
+			expectedTransactionCanonicalForm func(tb transactionBodyScaffold) []byte
+		}{
+			// nil extension data
+			{
+				payloadExtensionData:             nil,
+				expectedTransactionCanonicalForm: legacyTransactionCanonicalForm,
+			},
+			// empty extension data
+			{
+				payloadExtensionData:             []byte{},
+				expectedTransactionCanonicalForm: legacyTransactionCanonicalForm,
+			}, {
+				// zero extension data
+				payloadExtensionData:             []byte{0x0},
+				expectedTransactionCanonicalForm: legacyTransactionCanonicalForm,
+			}, {
+				// webauthn scheme
+				payloadExtensionData: slices.Concat([]byte{0x1}, randomExtensionData[:]),
+				expectedTransactionCanonicalForm: func(tb transactionBodyScaffold) []byte {
+					return fingerprint.Fingerprint(struct {
+						Payload            interface{}
+						PayloadSignatures  interface{}
+						EnvelopeSignatures interface{}
+					}{
+						tb.payloadCanonicalForm(),
+						[]interface{}{
+							// Expected canonical form of payload signature
+							struct {
+								SignerIndex   uint
+								KeyID         uint
+								Signature     []byte
+								ExtensionData []byte
+							}{
+								SignerIndex:   uint(tb.PayloadSignatures[0].SignerIndex),
+								KeyID:         uint(tb.PayloadSignatures[0].KeyIndex),
+								Signature:     tb.PayloadSignatures[0].Signature,
+								ExtensionData: slices.Concat([]byte{0x1}, randomExtensionData[:]),
+							},
+						},
+						[]interface{}{
+							// Expected canonical form of payload signature
+							struct {
+								SignerIndex   uint
+								KeyID         uint
+								Signature     []byte
+								ExtensionData []byte
+							}{
+								SignerIndex:   uint(tb.EnvelopeSignatures[0].SignerIndex),
+								KeyID:         uint(tb.EnvelopeSignatures[0].KeyIndex),
+								Signature:     tb.EnvelopeSignatures[0].Signature,
+								ExtensionData: slices.Concat([]byte{0x1}, randomExtensionData[:]),
+							},
+						},
+					})
+				},
+			},
+		}
+		// test all cases
+		for _, c := range cases[3:] {
+			t.Run(fmt.Sprintf("auth scheme (payloadExtensionData): %v", c.payloadExtensionData), func(t *testing.T) {
+				transactionBody.PayloadSignatures[0].ExtensionData = c.payloadExtensionData
+				transactionBody.EnvelopeSignatures[0].ExtensionData = c.payloadExtensionData
+				transactionID := transactionBody.ID()
+
+				// generate expected envelope data
+				sha3 := hash.NewSHA3_256()
+				expectedID := flow.Identifier(sha3.ComputeHash(c.expectedTransactionCanonicalForm(transactionBody)))
+				// compare canonical forms
+				require.Equal(t, transactionID, expectedID)
 			})
 		}
 	})
