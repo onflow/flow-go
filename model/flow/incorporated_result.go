@@ -31,6 +31,8 @@ type UntrustedIncorporatedResult IncorporatedResult
 
 // NewIncorporatedResult creates a new instance of IncorporatedResult.
 // Construction IncorporatedResult allowed only within the constructor
+//
+// All errors indicate a valid IncorporatedResult cannot be constructed from the input.
 func NewIncorporatedResult(untrusted UntrustedIncorporatedResult) (*IncorporatedResult, error) {
 	if untrusted.IncorporatedBlockID == ZeroID {
 		return nil, fmt.Errorf("IncorporatedBlockID must not be empty")

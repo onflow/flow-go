@@ -68,6 +68,8 @@ type UntrustedMissingCollection MissingCollection
 
 // NewMissingCollection creates a new instance of MissingCollection.
 // Construction MissingCollection allowed only within the constructor
+//
+// All errors indicate a valid MissingCollection cannot be constructed from the input.
 func NewMissingCollection(untrusted UntrustedMissingCollection) (*MissingCollection, error) {
 	if untrusted.BlockID == flow.ZeroID {
 		return nil, fmt.Errorf("BlockID must not be empty")
