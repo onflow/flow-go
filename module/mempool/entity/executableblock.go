@@ -4,15 +4,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// A complete collection contains the guarantee and the transactions.
+// CompleteCollection contains the guarantee and the transactions.
 // the guarantee is the hash of all the transactions. The execution node
 // receives the guarantee from the block, and queries the transactions by
 // the guarantee from the collection node.
 // when receiving a collection from collection node, the execution node will
-// update the Transactions field of a CompleteCollection and make it complete.
+// update the Collection field of a CompleteCollection and make it complete.
 type CompleteCollection struct {
-	Guarantee    *flow.CollectionGuarantee
-	Transactions []*flow.TransactionBody
+	Guarantee  *flow.CollectionGuarantee
+	Collection *flow.Collection
 }
 
 // ExecutableBlock represents a block that can be executed by the VM
@@ -29,12 +29,10 @@ type ExecutableBlock struct {
 	Executing           bool // flag used to indicate if block is being executed, to avoid re-execution
 }
 
-func (c CompleteCollection) Collection() flow.Collection {
-	return flow.Collection{Transactions: c.Transactions}
-}
-
+// IsCompleted returns true if the collection has been retrieved from the network.
+// This function assumes that the collection is non-empty and that collections are retrieved either in full or not at all.
 func (c CompleteCollection) IsCompleted() bool {
-	return len(c.Transactions) > 0
+	return c.Collection != nil && len(c.Collection.Transactions) > 0
 }
 
 // BlockID lazy loads the Block.ID() into the private blockID field on the first call, and returns
@@ -80,7 +78,7 @@ func (b *ExecutableBlock) CollectionAt(index int) *flow.Collection {
 	if cc == nil {
 		return nil
 	}
-	return &flow.Collection{Transactions: cc.Transactions}
+	return cc.Collection
 }
 
 // HasAllTransactions returns whether all the transactions for all collections

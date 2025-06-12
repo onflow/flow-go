@@ -110,8 +110,8 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.CollectionID: {
-				Guarantee:    &guarantee,
-				Transactions: transactions,
+				Guarantee:  &guarantee,
+				Collection: &col,
 			},
 		},
 		StartState: unittest.StateCommitmentPointerFixture(),
@@ -805,8 +805,8 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.CollectionID: {
-				Guarantee:    &guarantee,
-				Transactions: transactions,
+				Guarantee:  &guarantee,
+				Collection: &col,
 			},
 		},
 		StartState: unittest.StateCommitmentPointerFixture(),

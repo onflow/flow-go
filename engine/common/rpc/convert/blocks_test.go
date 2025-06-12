@@ -47,7 +47,8 @@ func TestConvertBlockLight(t *testing.T) {
 
 	guarantees := []*flow.CollectionGuarantee{}
 	for _, g := range msg.CollectionGuarantees {
-		guarantee := convert.MessageToCollectionGuarantee(g)
+		guarantee, err := convert.MessageToCollectionGuarantee(g)
+		require.NoError(t, err)
 		guarantees = append(guarantees, guarantee)
 	}
 

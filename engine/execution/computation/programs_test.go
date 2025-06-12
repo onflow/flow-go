@@ -104,8 +104,8 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.CollectionID: {
-				Guarantee:    &guarantee,
-				Transactions: transactions,
+				Guarantee:  &guarantee,
+				Collection: &col,
 			},
 		},
 		StartState: unittest.StateCommitmentPointerFixture(),
@@ -512,8 +512,8 @@ func createTestBlockAndRun(
 		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.CollectionID: {
-				Guarantee:    &guarantee,
-				Transactions: col.Transactions,
+				Guarantee:  &guarantee,
+				Collection: &col,
 			},
 		},
 		StartState: unittest.StateCommitmentPointerFixture(),

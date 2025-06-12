@@ -796,7 +796,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		expectedResults := make([]flow.TransactionResult, 0)
 		for _, c := range block.CompleteCollections {
-			for _, t := range c.Transactions {
+			for _, t := range c.Collection.Transactions {
 				txResult := flow.TransactionResult{
 					TransactionID: t.ID(),
 					ErrorMessage: fvmErrors.NewInvalidAddressErrorf(
@@ -869,7 +869,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 			transactions := []*flow.TransactionBody{}
 			for _, col := range block.Collections() {
-				transactions = append(transactions, col.Transactions...)
+				transactions = append(transactions, col.Collection.Transactions...)
 			}
 
 			// events to emit for each iteration/transaction
@@ -1118,7 +1118,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		normalTransactions := map[common.Location]struct{}{}
 		for _, col := range block.Collections() {
-			for _, txn := range col.Transactions {
+			for _, txn := range col.Collection.Transactions {
 				loc := common.TransactionLocation(txn.ID())
 				normalTransactions[loc] = struct{}{}
 			}
@@ -1664,8 +1664,8 @@ func generateCollection(
 	guarantee := &flow.CollectionGuarantee{CollectionID: collection.ID()}
 
 	return &entity.CompleteCollection{
-		Guarantee:    guarantee,
-		Transactions: transactions,
+		Guarantee:  guarantee,
+		Collection: &flow.Collection{Transactions: transactions},
 	}
 }
 

@@ -170,9 +170,8 @@ func (collector *resultCollector) commitCollection(
 	txResults := execColRes.TransactionResults()
 	convertedTxResults := execution_data.ConvertTransactionResults(txResults)
 
-	col := collection.Collection()
 	chunkExecData := &execution_data.ChunkExecutionData{
-		Collection:         &col,
+		Collection:         collection.Collection,
 		Events:             events,
 		TrieUpdate:         trieUpdate,
 		TransactionResults: convertedTxResults,
@@ -188,7 +187,7 @@ func (collector *resultCollector) commitCollection(
 
 	collector.metrics.ExecutionChunkDataPackGenerated(
 		len(proof),
-		len(collection.Transactions))
+		len(collection.Collection.Transactions))
 
 	spock, err := collector.signer.SignFunc(
 		collectionExecutionSnapshot.SpockSecret,
