@@ -14,7 +14,6 @@ import (
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/onflow/crypto"
@@ -566,7 +565,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
 	var executionDataStoreCache *execdatacache.ExecutionDataCache
-	var executionDataDBMode execution_data.ExecutionDataDBMode
 
 	// setup dependency chain to ensure indexer starts after the requester
 	requesterDependable := module.NewProxiedReadyDoneAware()
@@ -590,38 +588,16 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return nil
 		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
-			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
-			err := os.MkdirAll(datastoreDir, 0700)
+			var err error
+			builder.ExecutionDatastoreManager, err = edstorage.CreateDatastoreManager(
+				node.Logger, builder.executionDataDir, builder.executionDataDBMode)
 			if err != nil {
-				return err
+				return fmt.Errorf("could not create execution data datastore manager: %w", err)
 			}
 
-			executionDataDBMode, err = execution_data.ParseExecutionDataDBMode(builder.executionDataDBMode)
-			if err != nil {
-				return fmt.Errorf("could not parse execution data DB mode: %w", err)
-			}
-
-			if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
-				builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(
-					node.Logger.With().Str("pebbledb", "endata").Logger(),
-					datastoreDir, nil)
-				if err != nil {
-					return fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
-				}
-			} else {
-				builder.ExecutionDatastoreManager, err = edstorage.NewBadgerDatastoreManager(datastoreDir, &badgerds.DefaultOptions)
-				if err != nil {
-					return fmt.Errorf("could not create BadgerDatastoreManager for execution data: %w", err)
-				}
-			}
 			ds = builder.ExecutionDatastoreManager.Datastore()
 
-			builder.ShutdownFunc(func() error {
-				if err := builder.ExecutionDatastoreManager.Close(); err != nil {
-					return fmt.Errorf("could not close execution data datastore: %w", err)
-				}
-				return nil
-			})
+			builder.ShutdownFunc(builder.ExecutionDatastoreManager.Close)
 
 			return nil
 		}).
