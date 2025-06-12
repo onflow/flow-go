@@ -14,10 +14,6 @@
 // The Synchronized[T] type enforces safe access to the underlying data by requiring
 // access to happen through closures that manage locking automatically.
 //
-// This design is inspired by:
-//   - folly::Synchronized from Facebook’s Folly library (C++)
-//   - std::sync::Mutex<T> from Rust’s standard library
-//
 // It eliminates the risk of forgetting to lock before accessing or modifying the data,
 // by centralizing all access inside closure-based methods.
 package synchronized
