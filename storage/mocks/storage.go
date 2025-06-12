@@ -311,7 +311,7 @@ func (m *MockCollections) EXPECT() *MockCollectionsMockRecorder {
 }
 
 // BatchStoreLightAndIndexByTransaction mocks base method.
-func (m *MockCollections) BatchStoreLightAndIndexByTransaction(arg0 []flow.LightCollection, arg1 storage.ReaderBatchWriter) error {
+func (m *MockCollections) BatchStoreLightAndIndexByTransaction(arg0 *flow.LightCollection, arg1 storage.ReaderBatchWriter) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BatchStoreLightAndIndexByTransaction", arg0, arg1)
 	ret0, _ := ret[0].(error)

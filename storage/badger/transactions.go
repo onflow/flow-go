@@ -68,7 +68,7 @@ func (t *Transactions) retrieveTx(txID flow.Identifier) func(*badger.Txn) (*flow
 	}
 }
 
-// BatchStore stores multiple transactions in a batch operation.
-func (t *Transactions) BatchStore(txs []flow.TransactionBody, batch storage.ReaderBatchWriter) error {
+// BatchStore stores transaction within a batch operation.
+func (t *Transactions) BatchStore(_ *flow.TransactionBody, _ storage.ReaderBatchWriter) error {
 	return nil
 }

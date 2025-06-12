@@ -139,6 +139,10 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 
 // storeLightAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch.
 // This is the common implementation used by both StoreLightAndIndexByTransaction and BatchStoreLightAndIndexByTransaction.
+// Expected errors:
+//   - storage.ErrNotFound if the transaction ID does not exist in the database
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
 func (c *Collections) storeLightAndIndexByTransaction(collection *flow.LightCollection, rw storage.ReaderBatchWriter) error {
 	collectionID := collection.ID()
 
@@ -212,10 +216,12 @@ func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCol
 	return &collection, nil
 }
 
-// BatchStoreLightAndIndexByTransaction stores multiple light collections and indexes them by transaction ID
-// within a single batch operation.
-// No errors are expected during normal operation.
-func (c *Collections) BatchStoreLightAndIndexByTransaction(collections []flow.LightCollection, batch storage.ReaderBatchWriter) error {
+// BatchStoreLightAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch operation.
+// Expected errors:
+//   - storage.ErrNotFound if the transaction ID does not exist in the database
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
+func (c *Collections) BatchStoreLightAndIndexByTransaction(collection *flow.LightCollection, batch storage.ReaderBatchWriter) error {
 	// - This lock is to ensure there is no race condition when indexing collection by transaction ID
 	// - The access node uses this index to report the transaction status. It's done by first
 	//   find the collection for a given transaction ID, and then find the block by the collection,
@@ -233,10 +239,8 @@ func (c *Collections) BatchStoreLightAndIndexByTransaction(collections []flow.Li
 		defer c.indexingByTx.Unlock()
 	})
 
-	for _, collection := range collections {
-		if err := c.storeLightAndIndexByTransaction(&collection, batch); err != nil {
-			return err
-		}
+	if err := c.storeLightAndIndexByTransaction(collection, batch); err != nil {
+		return err
 	}
 
 	return nil

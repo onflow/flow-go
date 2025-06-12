@@ -53,6 +53,6 @@ func (m *MockCollectionStore) LightByTransactionID(id flow.Identifier) (*flow.Li
 	panic("LightByTransactionID not implemented")
 }
 
-func (m *MockCollectionStore) BatchStoreLightAndIndexByTransaction(_ []flow.LightCollection, _ storage.ReaderBatchWriter) error {
+func (m *MockCollectionStore) BatchStoreLightAndIndexByTransaction(_ *flow.LightCollection, _ storage.ReaderBatchWriter) error {
 	panic("BatchStoreLightAndIndexByTransaction not implemented")
 }
