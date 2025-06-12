@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
@@ -11,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -116,97 +116,67 @@ func TestNewLatestPersistedSealedResult(t *testing.T) {
 func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 	initialHeader, initialResult, mockHeaders, mockResults := getHeadersResults(t, 100)
 
-	setupResult := func(t *testing.T) (*LatestPersistedSealedResult, *storagemock.ConsumerProgress) {
+	newResultID := unittest.IdentifierFixture()
+	newHeight := uint64(200)
+
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
+		db := pebbleimpl.ToDB(pdb)
+
+		t.Run("successful batch update", func(t *testing.T) {
+			progress := store.NewConsumerProgress(db, "test_consumer1")
+
+			latest, err := NewLatestPersistedSealedResult(initialHeader.Height, progress, mockHeaders, mockResults)
+			require.NoError(t, err)
+
+			batch := db.NewBatch()
+			defer batch.Close()
+
+			done := make(chan struct{})
+			batch.AddCallback(func(err error) {
+				require.NoError(t, err)
+				close(done)
+			})
+
+			err = latest.BatchSet(newResultID, newHeight, batch)
+			require.NoError(t, err)
+
+			err = batch.Commit()
+			require.NoError(t, err)
+
+			unittest.RequireCloseBefore(t, done, 100*time.Millisecond, "callback not called")
+
+			actualResultID, actualHeight := latest.Latest()
+
+			assert.Equal(t, newResultID, actualResultID)
+			assert.Equal(t, newHeight, actualHeight)
+		})
+	})
+
+	t.Run("batch update error during BatchSetProcessedIndex", func(t *testing.T) {
+		expectedErr := fmt.Errorf("could not set processed index")
+
+		var callbackCalled sync.WaitGroup
+		callbackCalled.Add(1)
+
+		mockBatch := storagemock.NewReaderBatchWriter(t)
+		mockBatch.On("AddCallback", mock.AnythingOfType("func(error)")).Run(func(args mock.Arguments) {
+			callback := args.Get(0).(func(error))
+			callback(expectedErr)
+			callbackCalled.Done()
+		})
+
 		mockCP := storagemock.NewConsumerProgress(t)
 		mockCP.On("ProcessedIndex").Return(initialHeader.Height, nil)
+		mockCP.On("BatchSetProcessedIndex", newHeight, mockBatch).Return(expectedErr)
 
 		mockInitializer := storagemock.NewConsumerProgressInitializer(t)
 		mockInitializer.On("Initialize", initialHeader.Height).Return(mockCP, nil)
 
 		latest, err := NewLatestPersistedSealedResult(initialHeader.Height, mockInitializer, mockHeaders, mockResults)
 		require.NoError(t, err)
-		return latest, mockCP
-	}
 
-	t.Run("successful batch update", func(t *testing.T) {
-		latest, mockCP := setupResult(t)
-		mockBatch := storagemock.NewReaderBatchWriter(t)
-
-		newResultID := unittest.IdentifierFixture()
-		newHeight := uint64(200)
-
-		var callbackCalled sync.WaitGroup
-		callbackCalled.Add(1)
-
-		mockCP.On("BatchSetProcessedIndex", newHeight, mockBatch).Return(nil)
-		mockBatch.On("AddCallback", mock.AnythingOfType("func(error)")).Run(func(args mock.Arguments) {
-			callback := args.Get(0).(func(error))
-			callback(nil)
-			callbackCalled.Done()
-		})
-
-		err := latest.BatchSet(newResultID, newHeight, mockBatch)
-		require.NoError(t, err)
-
-		callbackCalled.Wait()
-
-		actualResultID, actualHeight := latest.Latest()
-
-		assert.Equal(t, newResultID, actualResultID)
-		assert.Equal(t, newHeight, actualHeight)
-	})
-
-	t.Run("batch update error during BatchSetProcessedIndex", func(t *testing.T) {
-		latest, mockCP := setupResult(t)
-		mockBatch := storagemock.NewReaderBatchWriter(t)
-
-		newResultID := unittest.IdentifierFixture()
-		newHeight := uint64(200)
-
-		var callbackCalled sync.WaitGroup
-		callbackCalled.Add(1)
-
-		mockBatch.On("AddCallback", mock.AnythingOfType("func(error)")).Run(func(args mock.Arguments) {
-			callback := args.Get(0).(func(error))
-			callback(storage.ErrNotFound)
-			callbackCalled.Done()
-		})
-
-		expectedErr := fmt.Errorf("could not set processed index: %w", storage.ErrNotFound)
-		mockCP.On("BatchSetProcessedIndex", newHeight, mockBatch).Return(expectedErr)
-
-		err := latest.BatchSet(newResultID, newHeight, mockBatch)
-
-		require.Error(t, err)
-		assert.ErrorIs(t, err, storage.ErrNotFound)
-
-		callbackCalled.Wait()
-
-		actualResultID, actualHeight := latest.Latest()
-
-		assert.Equal(t, initialResult.ID(), actualResultID)
-		assert.Equal(t, initialHeader.Height, actualHeight)
-	})
-
-	t.Run("batch update error during callback", func(t *testing.T) {
-		latest, mockCP := setupResult(t)
-		mockBatch := storagemock.NewReaderBatchWriter(t)
-
-		newResultID := unittest.IdentifierFixture()
-		newHeight := uint64(200)
-
-		var callbackCalled sync.WaitGroup
-		callbackCalled.Add(1)
-
-		mockCP.On("BatchSetProcessedIndex", newHeight, mockBatch).Return(nil)
-		mockBatch.On("AddCallback", mock.AnythingOfType("func(error)")).Run(func(args mock.Arguments) {
-			callback := args.Get(0).(func(error))
-			callback(storage.ErrNotFound)
-			callbackCalled.Done()
-		})
-
-		err := latest.BatchSet(newResultID, newHeight, mockBatch)
-		require.NoError(t, err)
+		err = latest.BatchSet(newResultID, newHeight, mockBatch)
+		assert.ErrorIs(t, err, expectedErr)
 
 		callbackCalled.Wait()
 
