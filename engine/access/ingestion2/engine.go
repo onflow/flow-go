@@ -17,7 +17,6 @@ package ingestion2
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog"
 
@@ -26,37 +25,6 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-)
-
-const (
-	// time to wait for the all the missing collections to be received at node startup
-	collectionCatchupTimeout = 30 * time.Second
-
-	// time to poll the storage to check if missing collections have been received
-	collectionCatchupDBPollInterval = 10 * time.Millisecond
-
-	// time to request missing collections from the network
-	missingCollsRequestInterval = 1 * time.Minute
-
-	// a threshold of number of blocks with missing collections beyond which collections should be re-requested
-	// this is to prevent spamming the collection nodes with request
-	missingCollsForBlockThreshold = 100
-
-	// a threshold of block height beyond which collections should be re-requested (regardless of the number of blocks for which collection are missing)
-	// this is to ensure that if a collection is missing for a long time (in terms of block height) it is eventually re-requested
-	missingCollsForAgeThreshold = 100
-
-	// time to update the FullBlockHeight index
-	fullBlockRefreshInterval = 1 * time.Second
-
-	defaultQueueCapacity = 10_000
-
-	// processFinalizedBlocksWorkersCount defines the number of workers that
-	// concurrently process finalized blocks in the job queue.
-	processFinalizedBlocksWorkersCount = 1
-
-	// searchAhead is a number of blocks that should be processed ahead by jobqueue
-	searchAhead = 1
 )
 
 type Engine struct {

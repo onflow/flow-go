@@ -15,6 +15,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+const defaultQueueCapacity = 10_000
+
 type ExecutionReceiptConsumer struct {
 	log                      zerolog.Logger
 	collectionExecutedMetric module.CollectionExecutedMetric

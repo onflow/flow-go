@@ -17,6 +17,15 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+const (
+	// processFinalizedBlocksWorkersCount defines the number of workers that
+	// concurrently process finalized blocks in the job queue.
+	processFinalizedBlocksWorkersCount = 1
+
+	// searchAhead is a number of blocks that should be processed ahead by jobqueue
+	searchAhead = 1
+)
+
 // FinalizedBlockProcessor handles processing of finalized blocks,
 // including indexing and syncing of related collections and execution results.
 //
