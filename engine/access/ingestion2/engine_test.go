@@ -235,7 +235,6 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 		receiptConsumer,
 		errorMessageRequester,
 		syncer,
-		s.collectionExecutedMetric,
 	)
 
 	require.NoError(s.T(), err)

@@ -61,12 +61,17 @@ func NewExecutionReceiptConsumer(
 	}, nil
 }
 
+// Notify processes a new execution receipt payload and notifies the consumer to begin processing queued messages.
+//
+// No errors are expected during normal operations.
 func (c *ExecutionReceiptConsumer) Notify(originID flow.Identifier, payload interface{}) error {
 	err := c.messageHandler.Process(originID, payload)
 	c.notifier.Notify()
 	return err
 }
 
+// StartConsuming starts the execution receipt processing loop. It waits for notifications
+// and processes available receipts until the context is cancelled or an irrecoverable error occurs.
 func (c *ExecutionReceiptConsumer) StartConsuming(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -111,8 +116,7 @@ func (c *ExecutionReceiptConsumer) processAvailableExecutionReceipts(ctx context
 	}
 }
 
-// persistExecutionReceipt persists the execution receipt locally.
-// Storing the execution receipt and updates the collection executed metric.
+// persistExecutionReceipt persists the execution receipt.
 //
 // No errors are expected during normal operations.
 func (c *ExecutionReceiptConsumer) persistExecutionReceipt(receipt *flow.ExecutionReceipt) error {

@@ -1,3 +1,18 @@
+// Package ingestion2 implements a modular ingestion engine that orchestrates
+// various workers responsible for processing different types of finalized
+// blockchain data.
+//
+// The Engine acts as an orchestrator and coordinator for multiple internal workers,
+// each of which handles a specific responsibility:
+//
+//   - ExecutionReceiptConsumer: processes incoming execution receipts
+//   - FinalizedBlockProcessor: handles finalized block events
+//   - CollectionSyncer: manages the synchronization of missing collections
+//   - ErrorMessageRequester: periodically requests missing transaction result error messages
+//
+// The engine initializes and manages these workers using a component manager pattern.
+// Each worker is started via the `Start*` function and runs independently, while
+// the engine notifies them when relevant data is ready to be processed.
 package ingestion2
 
 import (
@@ -8,7 +23,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -51,13 +65,9 @@ type Engine struct {
 	log zerolog.Logger
 
 	executionReceiptConsumer *ExecutionReceiptConsumer
-
-	finalizedBlockProcessor *FinalizedBlockProcessor
-
-	errorMessageRequester ErrorMessageRequester
-
+	finalizedBlockProcessor  *FinalizedBlockProcessor
+	errorMessageRequester    ErrorMessageRequester
 	collectionSyncer         *CollectionSyncer
-	collectionExecutedMetric module.CollectionExecutedMetric
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -69,18 +79,17 @@ func New(
 	executionReceiptConsumer *ExecutionReceiptConsumer,
 	errorMessageRequester ErrorMessageRequester,
 	collectionSyncer *CollectionSyncer,
-	collectionExecutedMetric module.CollectionExecutedMetric,
 ) (*Engine, error) {
 	e := &Engine{
 		log:                      log.With().Str("engine", "ingestion2").Logger(),
-		collectionExecutedMetric: collectionExecutedMetric,
 		executionReceiptConsumer: executionReceiptConsumer,
 		finalizedBlockProcessor:  finalizedBlockProcessor,
 		errorMessageRequester:    errorMessageRequester,
 		collectionSyncer:         collectionSyncer,
 	}
 
-	// Set up component manager
+	// register our workers which are basically consumers of different kinds of data.
+	// engine notifies workers when new data is available so that they can start processing them.
 	builder := component.NewComponentManagerBuilder().
 		AddWorker(e.executionReceiptConsumer.StartConsuming).
 		AddWorker(e.finalizedBlockProcessor.StartProcessing).
@@ -99,6 +108,8 @@ func New(
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
+//
+// No errors are expected during normal operations.
 func (e *Engine) Process(chanName channels.Channel, originID flow.Identifier, event interface{}) error {
 	select {
 	case <-e.ComponentManager.ShutdownSignal():

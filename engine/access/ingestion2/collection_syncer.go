@@ -165,7 +165,7 @@ func (s *CollectionSyncer) requestMissingCollections() error {
 
 // requestMissingCollectionsBlocking requests and waits for all missing collections to be downloaded,
 // blocking until either completion or context timeout.
-// No errors expected during normal operation.
+// No errors are expected during normal operations.
 func (s *CollectionSyncer) requestMissingCollectionsBlocking(ctx context.Context) error {
 	collections, _, err := s.findMissingCollections(s.lastFullBlockHeight.Value())
 	if err != nil {
@@ -280,7 +280,7 @@ func (s *CollectionSyncer) findMissingCollectionsAtHeight(height uint64) ([]*flo
 }
 
 // isCollectionInStorage checks whether the given collection is present in local storage.
-// No errors expected during normal operation
+// No errors are expected during normal operations.
 func (s *CollectionSyncer) isCollectionInStorage(collectionID flow.Identifier) (bool, error) {
 	_, err := s.collections.LightByID(collectionID)
 	if err == nil {
@@ -327,7 +327,7 @@ func (s *CollectionSyncer) requestCollections(missingCollections []*flow.Collect
 }
 
 // updateLastFullBlockHeight updates the next highest block height where all previous collections have been indexed.
-// No errors expected during normal operation.
+// No errors are expected during normal operations.
 func (s *CollectionSyncer) updateLastFullBlockHeight() error {
 	lastFullBlockHeight := s.lastFullBlockHeight.Value()
 	lastFinalizedBlock, err := s.state.Final().Head()
