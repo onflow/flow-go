@@ -13,6 +13,24 @@ type Core struct {
 	mock.Mock
 }
 
+// Abandon provides a mock function with given fields: ctx
+func (_m *Core) Abandon(ctx context.Context) error {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Abandon")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Download provides a mock function with given fields: ctx
 func (_m *Core) Download(ctx context.Context) error {
 	ret := _m.Called(ctx)

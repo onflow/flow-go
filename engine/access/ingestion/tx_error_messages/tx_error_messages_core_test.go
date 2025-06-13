@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
@@ -17,7 +18,6 @@ import (
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -99,8 +99,6 @@ func (s *TxErrorMessagesCoreSuite) SetupTest() {
 // TestHandleTransactionResultErrorMessages checks that transaction result error messages
 // are properly fetched from the execution nodes, processed, and stored in the protocol database.
 func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
-	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
-
 	block := unittest.BlockWithParentFixture(s.finalizedBlock)
 	blockId := block.ID()
 
@@ -135,7 +133,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 		Return(nil).Once()
 
 	core := s.initCore()
-	err := core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
+	err := core.FetchTransactionResultErrorMessages(context.Background(), blockId)
 	require.NoError(s.T(), err)
 
 	// Verify that the mock expectations for storing the error messages were met.
@@ -147,7 +145,74 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 	s.txErrorMessages.On("Exists", blockId).
 		Return(true, nil).Once()
 	s.proto.state.On("AtBlockID", blockId).Return(s.proto.snapshot).Once()
-	err = core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
+	err = core.FetchTransactionResultErrorMessages(context.Background(), blockId)
+	require.NoError(s.T(), err)
+
+	// Verify that the mock expectations for storing the error messages were not met.
+	s.txErrorMessages.AssertExpectations(s.T())
+	s.execClient.AssertExpectations(s.T())
+	s.proto.state.AssertExpectations(s.T())
+}
+
+func (s *TxErrorMessagesCoreSuite) TestTransactionErrorMessagesRequester_HappyPath() {
+	block := unittest.BlockWithParentFixture(s.finalizedBlock)
+	blockId := block.ID()
+
+	executionResult := &flow.ExecutionResult{
+		BlockID: blockId,
+		Chunks:  unittest.ChunkListFixture(1, blockId, unittest.StateCommitmentFixture()),
+	}
+
+	s.connFactory.On("GetExecutionAPIClient", mock.Anything).Return(s.execClient, &mockCloser{}, nil)
+
+	// Mock the protocol snapshot to return fixed execution node IDs.
+	setupReceiptsForBlockWithResult(s.receipts, block, s.enNodeIDs.NodeIDs()[0], *executionResult)
+	s.proto.snapshot.On("Identities", mock.Anything).Return(s.enNodeIDs, nil)
+
+	// Create mock transaction results with a mix of failed and non-failed transactions.
+	resultsByBlockID := mockTransactionResultsByBlock(5)
+
+	// Prepare a request to fetch transaction error messages by block ID from execution nodes.
+	exeEventReq := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
+		BlockId: blockId[:],
+	}
+
+	s.execClient.On("GetTransactionErrorMessagesByBlockID", mock.Anything, exeEventReq).
+		Return(createTransactionErrorMessagesResponse(resultsByBlockID), nil).
+		Once()
+
+	// 1. Mock the txErrorMessages storage to confirm that error messages do not exist yet.
+	s.txErrorMessages.On("Exists", blockId).
+		Return(false, nil).Once()
+
+	// Prepare the expected transaction error messages that should be stored.
+	expectedStoreTxErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
+
+	// Mock the storage of the fetched error messages into the protocol database.
+	s.txErrorMessages.On("Store", blockId, expectedStoreTxErrorMessages).
+		Return(nil).Once()
+
+	core := s.initCore()
+	config := &TransactionErrorMessagesRequesterConfig{
+		RetryDelay:    1 * time.Second,
+		MaxRetryDelay: 5 * time.Minute,
+	}
+	requester := NewTransactionErrorMessagesRequester(core, config, executionResult)
+
+	ctx := context.Background()
+	err := requester.RequestTransactionErrorMessages(ctx)
+	require.NoError(s.T(), err)
+
+	// Verify that the mock expectations for storing the error messages were met.
+	s.txErrorMessages.AssertExpectations(s.T())
+	s.proto.state.AssertExpectations(s.T())
+
+	// 2. Now simulate the second try when the error messages already exist in storage.
+	// Mock the txErrorMessages storage to confirm that error messages exist.
+	s.txErrorMessages.On("Exists", blockId).
+		Return(true, nil).Once()
+	s.proto.state.On("AtBlockID", blockId).Return(s.proto.snapshot).Once()
+	err = core.FetchTransactionResultErrorMessages(ctx, blockId)
 	require.NoError(s.T(), err)
 
 	// Verify that the mock expectations for storing the error messages were not met.
@@ -157,15 +222,13 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 }
 
 // TestHandleTransactionResultErrorMessages_ErrorCases tests the error handling of
-// the HandleTransactionResultErrorMessages function in the following cases:
+// the FetchTransactionResultErrorMessages function in the following cases:
 //
 // 1. Execution node fetch error: When fetching transaction error messages from the execution node fails,
 // the function should return an appropriate error and no further actions should be taken.
 // 2. Storage store error after fetching results: When fetching transaction error messages succeeds,
 // but storing them in the storage fails, the function should return an error and no further actions should be taken.
 func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_ErrorCases() {
-	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
-
 	block := unittest.BlockWithParentFixture(s.finalizedBlock)
 	blockId := block.ID()
 
@@ -188,7 +251,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 			Return(nil, fmt.Errorf("execution node fetch error")).Once()
 
 		core := s.initCore()
-		err := core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
+		err := core.FetchTransactionResultErrorMessages(context.Background(), blockId)
 
 		// Assert that the function returns an error due to the client fetch error.
 		require.Error(s.T(), err)
@@ -220,7 +283,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 			Return(fmt.Errorf("storage error")).Once()
 
 		core := s.initCore()
-		err := core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
+		err := core.FetchTransactionResultErrorMessages(context.Background(), blockId)
 
 		// Assert that the function returns an error due to the store error.
 		require.Error(s.T(), err)
@@ -312,6 +375,20 @@ func setupReceiptsForBlock(receipts *storage.ExecutionReceipts, block *flow.Bloc
 	receipt2 := unittest.ReceiptForBlockFixture(block)
 	receipt2.ExecutorID = eNodeID
 	receipt1.ExecutionResult = receipt2.ExecutionResult
+
+	receiptsList := flow.ExecutionReceiptList{receipt1, receipt2}
+
+	receipts.
+		On("ByBlockID", block.ID()).
+		Return(func(flow.Identifier) flow.ExecutionReceiptList {
+			return receiptsList
+		}, nil)
+}
+
+// setupReceiptsForBlockWithResult sets up mock execution receipts for a block with a specific execution result
+func setupReceiptsForBlockWithResult(receipts *storage.ExecutionReceipts, block *flow.Block, eNodeID flow.Identifier, executionResult flow.ExecutionResult) {
+	receipt1 := unittest.ExecutionReceiptFixture(unittest.WithResult(&executionResult), unittest.WithExecutorID(eNodeID))
+	receipt2 := unittest.ExecutionReceiptFixture(unittest.WithResult(&executionResult), unittest.WithExecutorID(eNodeID))
 
 	receiptsList := flow.ExecutionReceiptList{receipt1, receipt2}
 
