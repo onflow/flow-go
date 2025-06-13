@@ -54,7 +54,7 @@ func TestBackendAccountStatusesSuite(t *testing.T) {
 // generateProtocolMockEvents generates a set of mock events.
 func (s *BackendAccountStatusesSuite) generateProtocolMockEvents() flow.EventsList {
 	events := make([]flow.Event, 4)
-	events = append(events, unittest.EventFixture(testEventTypes[0], 0, 0, unittest.IdentifierFixture(), 0))
+	events = append(events, unittest.EventFixture(testEventTypes[0], 0, 0, unittest.IdentifierFixture(), []byte{}))
 
 	accountCreateEvent := generator.GenerateAccountCreateEvent(s.T(), s.accountCreatedAddress)
 	accountCreateEvent.TransactionIndex = 1

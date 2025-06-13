@@ -165,7 +165,7 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 				1,
 				2,
 				flow.MustHexStringToIdentifier("95e0929839063afbe334a3d175bea0775cdf5d93f64299e369d16ce21aa423d3"),
-				0,
+				[]byte{},
 			),
 		},
 		TrieUpdate: &ledger.TrieUpdate{

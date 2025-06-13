@@ -126,7 +126,7 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 		},
 	}
 	testEvents := []flow.Event{
-		unittest.EventFixture(flow.EventAccountCreated, 0, 0, flow.HashToID([]byte{11, 22, 33}), 200),
+		unittest.EventFixture(flow.EventAccountCreated, 0, 0, flow.HashToID([]byte{11, 22, 33}), []byte{}),
 	}
 	testCollectionID := flow.HashToID([]byte{0xA, 0xB, 0xC})
 	testBlock := flow.NewBlock(

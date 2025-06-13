@@ -1809,7 +1809,7 @@ func EventsFixture(
 
 	events := make([]flow.Event, n)
 	for i := 0; i < n; i++ {
-		events[i] = EventFixture(types[i%len(types)], 0, uint32(i), IdentifierFixture(), 0)
+		events[i] = EventFixture(types[i%len(types)], 0, uint32(i), IdentifierFixture(), []byte{})
 	}
 
 	return events
@@ -1822,18 +1822,18 @@ func EventTypeFixture(chainID flow.ChainID) flow.EventType {
 
 // EventFixture returns an event
 func EventFixture(
-	eType flow.EventType,
+	eventType flow.EventType,
 	transactionIndex uint32,
 	eventIndex uint32,
 	txID flow.Identifier,
-	_ int,
+	payload []byte,
 ) flow.Event {
 	return flow.Event{
-		Type:             eType,
+		Type:             eventType,
 		TransactionIndex: transactionIndex,
 		EventIndex:       eventIndex,
-		Payload:          []byte{},
 		TransactionID:    txID,
+		Payload:          payload,
 	}
 }
 

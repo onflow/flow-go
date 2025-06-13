@@ -368,12 +368,14 @@ func TestInsertEvents(t *testing.T) {
 			events := test.EventGenerator(eventEncodingVersion)
 
 			t.Run("should be able to insert events", func(t *testing.T) {
-				event, _ := emulator.SDKEventToFlow(events.New())
-				events := []flowgo.Event{event}
+				event, err := emulator.SDKEventToFlow(events.New())
+				assert.NoError(t, err)
+
+				events := []flowgo.Event{*event}
 
 				var blockHeight uint64 = 1
 
-				err := store.InsertEvents(blockHeight, events)
+				err = store.InsertEvents(blockHeight, events)
 				assert.NoError(t, err)
 
 				t.Run("should be able to get inserted events", func(t *testing.T) {

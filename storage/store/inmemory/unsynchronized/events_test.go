@@ -19,9 +19,9 @@ func TestEvents_HappyPath(t *testing.T) {
 	transaction1 := unittest.TransactionFixture()
 	transaction2 := unittest.TransactionFixture()
 
-	event1 := unittest.EventFixture(flow.EventAccountCreated, 0, 0, transaction1.ID(), 200)
-	event2 := unittest.EventFixture(flow.EventAccountUpdated, 0, 1, transaction1.ID(), 201)
-	event3 := unittest.EventFixture(flow.EventAccountCreated, 1, 2, transaction2.ID(), 202)
+	event1 := unittest.EventFixture(flow.EventAccountCreated, 0, 0, transaction1.ID(), []byte{})
+	event2 := unittest.EventFixture(flow.EventAccountUpdated, 0, 1, transaction1.ID(), []byte{})
+	event3 := unittest.EventFixture(flow.EventAccountCreated, 1, 2, transaction2.ID(), []byte{})
 
 	// Store events
 	expectedStoredEvents := flow.EventsList{event1, event2, event3}
