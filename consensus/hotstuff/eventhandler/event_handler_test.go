@@ -433,7 +433,12 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_Vote_NextLeader() {
 	// proposal is safe to vote
 	es.safetyRules.votable[proposal.Block.BlockID] = struct{}{}
 
-	es.notifier.On("OnOwnVote", proposal.Block.BlockID, proposal.Block.View, mock.Anything, mock.Anything).Once()
+	vote := &model.Vote{
+		BlockID: proposal.Block.BlockID,
+		View:    proposal.Block.View,
+	}
+
+	es.notifier.On("OnOwnVote", vote, mock.Anything).Once()
 
 	// vote should be created for this proposal
 	err := es.eventhandler.OnReceiveProposal(proposal)
@@ -449,7 +454,13 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_Vote_NotNextLeader() {
 	// proposal is safe to vote
 	es.safetyRules.votable[proposal.Block.BlockID] = struct{}{}
 
-	es.notifier.On("OnOwnVote", proposal.Block.BlockID, mock.Anything, mock.Anything, mock.Anything).Once()
+	vote := &model.Vote{
+		BlockID:  proposal.Block.BlockID,
+		View:     proposal.Block.View,
+		SignerID: flow.ZeroID,
+	}
+
+	es.notifier.On("OnOwnVote", vote, mock.Anything).Once()
 
 	// vote should be created for this proposal
 	err := es.eventhandler.OnReceiveProposal(proposal)
@@ -809,7 +820,11 @@ func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
 			require.True(es.T(), ok)
 			require.Equal(es.T(), proposal.Block.View+1, header.View)
 		}).Once()
-		es.notifier.On("OnOwnVote", proposal.Block.BlockID, proposal.Block.View, mock.Anything, mock.Anything).Once()
+		vote := &model.Vote{
+			View:    proposal.Block.View,
+			BlockID: proposal.Block.BlockID,
+		}
+		es.notifier.On("OnOwnVote", vote, mock.Anything).Once()
 
 		err := es.eventhandler.OnReceiveProposal(proposal)
 		require.NoError(es.T(), err)

@@ -31,11 +31,11 @@ func (d *CommunicatorDistributor) AddCommunicatorConsumer(consumer hotstuff.Comm
 	d.consumers = append(d.consumers, consumer)
 }
 
-func (d *CommunicatorDistributor) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+func (d *CommunicatorDistributor) OnOwnVote(vote *model.Vote, recipientID flow.Identifier) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, s := range d.consumers {
-		s.OnOwnVote(blockID, view, sigData, recipientID)
+		s.OnOwnVote(vote, recipientID)
 	}
 }
 

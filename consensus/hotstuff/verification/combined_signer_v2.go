@@ -61,12 +61,14 @@ func (c *CombinedSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 		return nil, fmt.Errorf("could not create signature: %w", err)
 	}
 
-	// create the vote
-	vote := &model.Vote{
+	vote, err := model.NewVote(model.UntrustedVote{
 		View:     block.View,
 		BlockID:  block.BlockID,
 		SignerID: c.staking.NodeID(),
 		SigData:  sigData,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not create vote: %w", err)
 	}
 
 	return vote, nil

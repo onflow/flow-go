@@ -3,6 +3,8 @@ package flow_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -13,10 +15,23 @@ import (
 // * grouping should preserve order and multiplicity of elements
 // * group for unknown identifier should be empty
 func TestIncorporatedResultGroupBy(t *testing.T) {
+	ir1, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+		IncorporatedBlockID: unittest.IdentifierFixture(),
+		Result:              unittest.ExecutionResultFixture(),
+	})
+	require.NoError(t, err)
 
-	ir1 := flow.NewIncorporatedResult(unittest.IdentifierFixture(), unittest.ExecutionResultFixture())
-	ir2 := flow.NewIncorporatedResult(unittest.IdentifierFixture(), unittest.ExecutionResultFixture())
-	ir3 := flow.NewIncorporatedResult(unittest.IdentifierFixture(), unittest.ExecutionResultFixture())
+	ir2, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+		IncorporatedBlockID: unittest.IdentifierFixture(),
+		Result:              unittest.ExecutionResultFixture(),
+	})
+	require.NoError(t, err)
+
+	ir3, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+		IncorporatedBlockID: unittest.IdentifierFixture(),
+		Result:              unittest.ExecutionResultFixture(),
+	})
+	require.NoError(t, err)
 
 	idA := unittest.IdentifierFixture()
 	idB := unittest.IdentifierFixture()
@@ -40,4 +55,48 @@ func TestIncorporatedResultGroupBy(t *testing.T) {
 
 	unknown := groups.GetGroup(unittest.IdentifierFixture())
 	assert.Equal(t, 0, unknown.Size())
+}
+
+func TestNewIncorporatedResult(t *testing.T) {
+	t.Run("valid untrusted incorporated result", func(t *testing.T) {
+		id := unittest.IdentifierFixture()
+		// Use a real ExecutionResult fixture and take its address
+		er := unittest.ExecutionResultFixture()
+		uc := flow.UntrustedIncorporatedResult{
+			IncorporatedBlockID: id,
+			Result:              er,
+		}
+
+		ir, err := flow.NewIncorporatedResult(uc)
+		assert.NoError(t, err)
+		assert.NotNil(t, ir)
+		assert.Equal(t, id, ir.IncorporatedBlockID)
+		assert.Equal(t, er, ir.Result)
+	})
+
+	t.Run("missing IncorporatedBlockID", func(t *testing.T) {
+		er := unittest.ExecutionResultFixture()
+		uc := flow.UntrustedIncorporatedResult{
+			IncorporatedBlockID: flow.ZeroID,
+			Result:              er,
+		}
+
+		ir, err := flow.NewIncorporatedResult(uc)
+		assert.Error(t, err)
+		assert.Nil(t, ir)
+		assert.Contains(t, err.Error(), "IncorporatedBlockID")
+	})
+
+	t.Run("nil Result", func(t *testing.T) {
+		id := unittest.IdentifierFixture()
+		uc := flow.UntrustedIncorporatedResult{
+			IncorporatedBlockID: id,
+			Result:              nil,
+		}
+
+		ir, err := flow.NewIncorporatedResult(uc)
+		assert.Error(t, err)
+		assert.Nil(t, ir)
+		assert.Contains(t, err.Error(), "Result")
+	})
 }

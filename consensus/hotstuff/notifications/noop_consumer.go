@@ -85,7 +85,7 @@ type NoopCommunicatorConsumer struct{}
 
 var _ hotstuff.CommunicatorConsumer = (*NoopCommunicatorConsumer)(nil)
 
-func (*NoopCommunicatorConsumer) OnOwnVote(flow.Identifier, uint64, []byte, flow.Identifier) {}
+func (*NoopCommunicatorConsumer) OnOwnVote(*model.Vote, flow.Identifier) {}
 
 func (*NoopCommunicatorConsumer) OnOwnTimeout(*model.TimeoutObject) {}
 

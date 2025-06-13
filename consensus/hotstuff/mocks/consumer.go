@@ -63,9 +63,9 @@ func (_m *Consumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 	_m.Called(timeout)
 }
 
-// OnOwnVote provides a mock function with given fields: blockID, view, sigData, recipientID
-func (_m *Consumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
-	_m.Called(blockID, view, sigData, recipientID)
+// OnOwnVote provides a mock function with given fields: vote, recipientID
+func (_m *Consumer) OnOwnVote(vote *model.Vote, recipientID flow.Identifier) {
+	_m.Called(vote, recipientID)
 }
 
 // OnPartialTc provides a mock function with given fields: currentView, partialTc
