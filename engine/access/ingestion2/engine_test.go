@@ -1,4 +1,4 @@
-package ingestion
+package ingestion2
 
 import (
 	"context"
@@ -185,7 +185,7 @@ func (s *Suite) SetupTest() {
 	require.NoError(s.T(), err)
 }
 
-// initEngineAndSyncer create new instance of ingestion engine and collection syncer.
+// initEngineAndSyncer create new instance of ingestion engine and collection collectionSyncer.
 // It waits until the ingestion engine starts.
 func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine, *CollectionSyncer) {
 	processedHeightInitializer := store.NewConsumerProgress(badgerimpl.ToDB(s.db), module.ConsumeProgressIngestionEngineBlockHeight)
@@ -207,18 +207,34 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 		s.lastFullBlockHeight,
 	)
 
-	eng, err := New(
+	blockProcessor, err := NewFinalizedBlockProcessor(
 		s.log,
-		s.net,
 		s.proto.state,
-		s.me,
 		s.blocks,
 		s.results,
-		s.receipts,
 		processedHeightInitializer,
 		syncer,
 		s.collectionExecutedMetric,
-		nil,
+	)
+	require.NoError(s.T(), err)
+
+	errorMessageRequester := NewNoopErrorMessageRequester()
+
+	receiptConsumer, err := NewExecutionReceiptConsumer(
+		s.log,
+		s.collectionExecutedMetric,
+		s.receipts,
+		errorMessageRequester,
+	)
+	require.NoError(s.T(), err)
+
+	eng, err := New(
+		s.log,
+		s.net,
+		blockProcessor,
+		receiptConsumer,
+		errorMessageRequester,
+		syncer,
 	)
 
 	require.NoError(s.T(), err)
@@ -432,7 +448,6 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
 	eng, _ := s.initEngineAndSyncer(irrecoverableCtx)
 
-	originID := unittest.IdentifierFixture()
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
 
@@ -465,10 +480,10 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 	s.receipts.On("Store", mock.Anything).Return(nil)
 	s.blocks.On("ByID", er2.ExecutionResult.BlockID).Return(nil, storerr.ErrNotFound)
 
-	err := eng.handleExecutionReceipt(originID, er1)
+	err := eng.executionReceiptConsumer.persistExecutionReceipt(er1)
 	require.NoError(s.T(), err)
 
-	err = eng.handleExecutionReceipt(originID, er2)
+	err = eng.executionReceiptConsumer.persistExecutionReceipt(er2)
 	require.NoError(s.T(), err)
 
 	s.receipts.AssertExpectations(s.T())

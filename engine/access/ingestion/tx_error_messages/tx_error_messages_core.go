@@ -41,7 +41,7 @@ func NewTxErrorMessagesCore(
 	}
 }
 
-// HandleTransactionResultErrorMessages processes transaction result error messages for a given block ID.
+// FetchErrorMessages processes transaction result error messages for a given block ID.
 // It retrieves error messages from the backend if they do not already exist in storage.
 //
 // The function first checks if error messages for the given block ID are already present in storage.
@@ -52,17 +52,17 @@ func NewTxErrorMessagesCore(
 // - blockID: The identifier of the block for which transaction result error messages need to be processed.
 //
 // No errors are expected during normal operation.
-func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessages(ctx context.Context, blockID flow.Identifier) error {
+func (c *TxErrorMessagesCore) FetchErrorMessages(ctx context.Context, blockID flow.Identifier) error {
 	execNodes, err := c.execNodeIdentitiesProvider.ExecutionNodesForBlockID(ctx, blockID)
 	if err != nil {
 		c.log.Error().Err(err).Msg(fmt.Sprintf("failed to find execution nodes for block id: %s", blockID))
 		return fmt.Errorf("could not find execution nodes for block: %w", err)
 	}
 
-	return c.HandleTransactionResultErrorMessagesByENs(ctx, blockID, execNodes)
+	return c.FetchErrorMessagesByENs(ctx, blockID, execNodes)
 }
 
-func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessagesByENs(
+func (c *TxErrorMessagesCore) FetchErrorMessagesByENs(
 	ctx context.Context,
 	blockID flow.Identifier,
 	execNodes flow.IdentitySkeletonList,

@@ -185,7 +185,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		indexedCount := 0
 		if len(data.ChunkExecutionDatas) > 0 {
 			for _, chunk := range data.ChunkExecutionDatas[0 : len(data.ChunkExecutionDatas)-1] {
-				err := HandleCollection(chunk.Collection, c.collections, c.transactions, c.log, c.collectionExecutedMetric)
+				err := IndexCollection(chunk.Collection, c.collections, c.transactions, c.log, c.collectionExecutedMetric)
 				if err != nil {
 					return fmt.Errorf("could not handle collection")
 				}
@@ -325,9 +325,9 @@ func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, 
 	return c.registers.Store(regEntries, height)
 }
 
-// HandleCollection handles the response of the collection request made earlier when a block was received.
+// IndexCollection handles the response of the collection request made earlier when a block was received.
 // No errors expected during normal operations.
-func HandleCollection(
+func IndexCollection(
 	collection *flow.Collection,
 	collections storage.Collections,
 	transactions storage.Transactions,
