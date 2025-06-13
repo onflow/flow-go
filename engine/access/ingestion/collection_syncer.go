@@ -24,7 +24,7 @@ var (
 	defaultMissingCollsForAgeThreshold   uint64 = missingCollsForAgeThreshold
 )
 
-//TODO: add error for stoarge not found.
+var ErrMissingCollection = errors.New("collection not found in storage")
 
 // The CollectionSyncer type provides mechanisms for syncing and indexing data
 // from the Flow blockchain into local storage. Specifically, it handles
@@ -236,7 +236,7 @@ func (s *CollectionSyncer) findMissingCollections(lastFullBlockHeight uint64) ([
 	for currBlockHeight := firstBlockHeight; currBlockHeight <= lastBlockHeight; currBlockHeight++ {
 		collections, err := s.findMissingCollectionsAtHeight(currBlockHeight)
 		if err != nil {
-			return nil, 0, err
+			return nil, 0, ErrMissingCollection
 		}
 
 		if len(collections) == 0 {
@@ -367,7 +367,7 @@ func (s *CollectionSyncer) findLowestBlockHeightWithMissingCollections(
 	for currBlockHeight := lastKnownFullBlockHeight + 1; currBlockHeight <= finalizedBlockHeight; currBlockHeight++ {
 		missingCollections, err := s.findMissingCollectionsAtHeight(currBlockHeight)
 		if err != nil {
-			return 0, err
+			return 0, ErrMissingCollection
 		}
 
 		// return when we find the first block with missing collections
