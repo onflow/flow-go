@@ -45,6 +45,8 @@ type FinalizedBlockProcessor struct {
 
 // NewFinalizedBlockProcessor creates and initializes a new FinalizedBlockProcessor,
 // setting up job consumer infrastructure to handle finalized block processing.
+//
+// No errors expected during normal operations.
 func NewFinalizedBlockProcessor(
 	log zerolog.Logger,
 	state protocol.State,
@@ -126,6 +128,8 @@ func (p *FinalizedBlockProcessor) processFinalizedBlockJobCallback(
 
 // indexFinalizedBlock indexes the given finalized block’s collection guarantees and execution results,
 // and requests related collections from the syncer.
+//
+// No errors expected during normal operations.
 func (p *FinalizedBlockProcessor) indexFinalizedBlock(block *flow.Block) error {
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized

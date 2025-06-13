@@ -53,8 +53,7 @@ const (
 type Engine struct {
 	*component.ComponentManager
 
-	log                      zerolog.Logger
-	collectionExecutedMetric module.CollectionExecutedMetric
+	log zerolog.Logger
 
 	messageHandler            *engine.MessageHandler
 	executionReceiptsNotifier engine.Notifier
@@ -65,7 +64,8 @@ type Engine struct {
 
 	errorMessageRequester ErrorMessageRequester
 
-	collectionSyncer *CollectionSyncer
+	collectionSyncer         *CollectionSyncer
+	collectionExecutedMetric module.CollectionExecutedMetric
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -115,7 +115,6 @@ func New(
 		AddWorker(e.finalizedBlockProcessor.StartProcessing).
 		AddWorker(e.collectionSyncer.StartSyncing).
 		AddWorker(e.errorMessageRequester.StartRequesting)
-
 	e.ComponentManager = builder.Build()
 
 	// engine gets execution receipts from channels.ReceiveReceipts channel
