@@ -185,7 +185,7 @@ func (s *Suite) SetupTest() {
 	require.NoError(s.T(), err)
 }
 
-// initEngineAndSyncer create new instance of ingestion engine and collection syncer.
+// initEngineAndSyncer create new instance of ingestion engine and collection collectionSyncer.
 // It waits until the ingestion engine starts.
 func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine, *CollectionSyncer) {
 	processedHeightInitializer := store.NewConsumerProgress(badgerimpl.ToDB(s.db), module.ConsumeProgressIngestionEngineBlockHeight)
@@ -207,14 +207,22 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 		s.lastFullBlockHeight,
 	)
 
+	blockProcessor, err := NewFinalizedBlockProcessor(
+		s.log,
+		s.proto.state,
+		s.blocks,
+		s.results,
+		processedHeightInitializer,
+		syncer,
+		s.collectionExecutedMetric,
+	)
+	require.NoError(s.T(), err)
+
 	eng, err := New(
 		s.log,
 		s.net,
-		s.proto.state,
-		s.blocks,
 		s.receipts,
-		s.results,
-		processedHeightInitializer,
+		blockProcessor,
 		NewNoopErrorMessageRequester(),
 		syncer,
 		s.collectionExecutedMetric,

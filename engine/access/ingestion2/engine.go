@@ -14,11 +14,8 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/jobqueue"
-	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -63,11 +60,8 @@ type Engine struct {
 	executionReceiptsNotifier engine.Notifier
 	executionReceiptsQueue    engine.MessageStore
 	executionReceipts         storage.ExecutionReceipts
-	executionResults          storage.ExecutionResults
 
-	finalizedBlockConsumer *jobqueue.ComponentConsumer
-	finalizedBlockNotifier engine.Notifier
-	blocks                 storage.Blocks
+	finalizedBlockProcessor *FinalizedBlockProcessor
 
 	errorMessageRequester ErrorMessageRequester
 
@@ -79,11 +73,8 @@ var _ network.MessageProcessor = (*Engine)(nil)
 func New(
 	log zerolog.Logger,
 	net network.EngineRegistry,
-	state protocol.State,
-	blocks storage.Blocks,
 	executionReceipts storage.ExecutionReceipts,
-	executionResults storage.ExecutionResults,
-	finalizedProcessedHeight storage.ConsumerProgressInitializer, //TODO: what does processed mean in this contex?
+	finalizedBlockProcessor *FinalizedBlockProcessor,
 	errorMessageRequester ErrorMessageRequester,
 	collectionSyncer *CollectionSyncer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
@@ -111,11 +102,9 @@ func New(
 		messageHandler:            messageHandler,
 		executionReceiptsNotifier: engine.NewNotifier(),
 		executionReceiptsQueue:    executionReceiptsQueue,
-		finalizedBlockNotifier:    engine.NewNotifier(),
-		blocks:                    blocks,
 		executionReceipts:         executionReceipts,
-		executionResults:          executionResults,
 		collectionExecutedMetric:  collectionExecutedMetric,
+		finalizedBlockProcessor:   finalizedBlockProcessor,
 		errorMessageRequester:     errorMessageRequester,
 		collectionSyncer:          collectionSyncer,
 	}
@@ -123,35 +112,11 @@ func New(
 	// Set up component manager
 	builder := component.NewComponentManagerBuilder().
 		AddWorker(e.processExecutionReceipts).
-		AddWorker(e.runFinalizedBlockConsumer).
-		AddWorker(e.collectionSyncer.RequestCollections).
-		AddWorker(e.errorMessageRequester.Request)
+		AddWorker(e.finalizedBlockProcessor.StartProcessing).
+		AddWorker(e.collectionSyncer.StartSyncing).
+		AddWorker(e.errorMessageRequester.StartRequesting)
 
 	e.ComponentManager = builder.Build()
-
-	// Set up finalized block consumer
-	finalizedBlockReader := jobqueue.NewFinalizedBlockReader(state, blocks)
-
-	finalizedBlock, err := state.Final().Head()
-	if err != nil {
-		return nil, fmt.Errorf("could not get finalized block header: %w", err)
-	}
-
-	// create a jobqueue that will process new available finalized block. The `finalizedBlockNotifier` is used to
-	// signal new work, which is being triggered on the `processFinalizedBlockJob` handler.
-	e.finalizedBlockConsumer, err = jobqueue.NewComponentConsumer(
-		e.log.With().Str("module", "ingestion_block_consumer").Logger(),
-		e.finalizedBlockNotifier.Channel(),
-		finalizedProcessedHeight,
-		finalizedBlockReader,
-		finalizedBlock.Height,
-		e.processFinalizedBlockJob,
-		processFinalizedBlocksWorkersCount,
-		searchAhead,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error creating finalizedBlock jobqueue: %w", err)
-	}
 
 	// engine gets execution receipts from channels.ReceiveReceipts channel
 	_, err = net.Register(channels.ReceiveReceipts, e)
@@ -164,12 +129,7 @@ func New(
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-//
-// TODO: I'm curious why we process exec receipts queue in 1 routine (blocking call) instead of multiple goroutines.
-// Is it done to prevent some kind of attack where bigger node (EN) spams
-// smaller AN engines with millions of messages?
 func (e *Engine) Process(chanName channels.Channel, originID flow.Identifier, event interface{}) error {
-	//TODO: explain why we need this check.
 	select {
 	case <-e.ComponentManager.ShutdownSignal():
 		return component.ErrComponentShutdown
@@ -248,70 +208,7 @@ func (e *Engine) persistExecutionReceipt(receipt *flow.ExecutionReceipt) error {
 }
 
 // OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
-// Receives block finalized events from the finalization distributor and forwards them to the finalizedBlockConsumer.
-func (e *Engine) OnFinalizedBlock(_ *model.Block) {
-	e.finalizedBlockNotifier.Notify()
-}
-
-// runFinalizedBlockConsumer runs the finalizedBlockConsumer component
-func (e *Engine) runFinalizedBlockConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	e.finalizedBlockConsumer.Start(ctx)
-
-	err := util.WaitClosed(ctx, e.finalizedBlockConsumer.Ready())
-	if err == nil {
-		ready()
-	}
-
-	<-e.finalizedBlockConsumer.Done()
-}
-
-// processFinalizedBlockJob is a handler function for processing finalized block jobs.
-// It converts the job to a block, processes the block, and logs any errors encountered during processing.
-func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job module.Job, done func()) {
-	block, err := jobqueue.JobToBlock(job)
-	if err != nil {
-		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
-	}
-
-	err = e.processFinalizedBlock(block)
-	if err == nil {
-		done()
-		return
-	}
-
-	e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
-}
-
-// processFinalizedBlock handles an incoming finalized block.
-// It processes the block, indexes it for further processing, and requests missing collections if necessary.
-//
-// Expected errors during normal operation:
-//   - storage.ErrNotFound - if last full block height does not exist in the database.
-//   - storage.ErrAlreadyExists - if the collection within block or an execution result ID already exists in the database.
-//   - generic error in case of unexpected failure from the database layer, or failure
-//     to decode an existing database value.
-func (e *Engine) processFinalizedBlock(block *flow.Block) error {
-	// FIX: we can't index guarantees here, as we might have more than one block
-	// with the same collection as long as it is not finalized
-
-	// TODO: substitute an indexer module as layer between engine and storage
-
-	// index the block storage with each of the collection guarantee
-	err := e.blocks.IndexBlockForCollections(block.Header.ID(), flow.GetIDs(block.Payload.Guarantees))
-	if err != nil {
-		return fmt.Errorf("could not index block for collections: %w", err)
-	}
-
-	// loop through seals and index ID -> result ID
-	for _, seal := range block.Payload.Seals {
-		err := e.executionResults.Index(seal.BlockID, seal.ResultID)
-		if err != nil {
-			return fmt.Errorf("could not index block for execution result: %w", err)
-		}
-	}
-
-	e.collectionSyncer.RequestCollectionsForBlock(block.Header.Height, block.Payload.Guarantees)
-	e.collectionExecutedMetric.BlockFinalized(block)
-
-	return nil
+// Receives block finalized events from the finalization distributor and forwards them to the consumer.
+func (e *Engine) OnFinalizedBlock(block *model.Block) {
+	e.finalizedBlockProcessor.OnFinalizedBlock(block)
 }

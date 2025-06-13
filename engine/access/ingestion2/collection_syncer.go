@@ -83,9 +83,9 @@ func NewCollectionSyncer(
 	}
 }
 
-// RequestCollections continuously monitors and triggers collection sync operations.
+// StartSyncing continuously monitors and triggers collection sync operations.
 // It handles on startup collection catchup, periodic missing collection requests, and full block height updates.
-func (s *CollectionSyncer) RequestCollections(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (s *CollectionSyncer) StartSyncing(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	requestCtx, cancel := context.WithTimeout(ctx, collectionCatchupTimeout)
 	defer cancel()
 
