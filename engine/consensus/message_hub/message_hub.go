@@ -469,7 +469,7 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 		})
 
 		if err != nil {
-			h.log.Warn().Msgf("failed to forward vote %w:", err)
+			h.log.Warn().Err(err).Msgf("failed to forward vote")
 		}
 
 		h.forwardToOwnVoteAggregator(vote)

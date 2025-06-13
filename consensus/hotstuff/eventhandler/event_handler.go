@@ -506,8 +506,6 @@ func (e *EventHandler) ownVote(proposal *model.SignedProposal, curView uint64, n
 		return nil
 	}
 
-	log.Debug().Msg("forwarding vote to compliance engine")
-	// raise a notification to send vote
-	e.notifier.OnOwnVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
+	e.notifier.OnOwnVote(ownVote, nextLeader)
 	return nil
 }
