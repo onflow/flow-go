@@ -207,6 +207,7 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 		return &messages.ApprovalResponse{}, what(&messages.ApprovalResponse{}), nil
 
 	// generic entity exchange engines
+	// TODO: decoding happens within requester engine
 	case CodeEntityRequest:
 		return &messages.EntityRequest{}, what(&messages.EntityRequest{}), nil
 	case CodeEntityResponse:

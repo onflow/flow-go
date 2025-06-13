@@ -6,8 +6,11 @@ import (
 
 // Codec provides factory functions for encoders and decoders.
 type Codec interface {
+	// TODO: unused?
 	NewEncoder(w io.Writer) Encoder
+	// TODO: unused?
 	NewDecoder(r io.Reader) Decoder
+
 	Encode(v interface{}) ([]byte, error)
 
 	// Decode decodes a message.
@@ -19,6 +22,7 @@ type Codec interface {
 }
 
 // Encoder encodes the given message into the underlying writer.
+// TODO: unused?
 type Encoder interface {
 	Encode(v interface{}) error
 }
@@ -28,6 +32,8 @@ type Encoder interface {
 //   - codec.ErrInvalidEncoding if message encoding is invalid.
 //   - codec.ErrUnknownMsgCode if message code byte does not match any of the configured message codes.
 //   - codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
+//
+// TODO: unused?
 type Decoder interface {
 	Decode() (interface{}, error)
 }

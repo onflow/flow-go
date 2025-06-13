@@ -28,12 +28,14 @@ func NewCodec() *Codec {
 }
 
 // NewEncoder creates a new CBOR encoder with the given underlying writer.
+// TODO: unused except in tests
 func (c *Codec) NewEncoder(w io.Writer) network.Encoder {
 	enc := cborcodec.EncMode.NewEncoder(w)
 	return &Encoder{enc: enc}
 }
 
 // NewDecoder creates a new CBOR decoder with the given underlying reader.
+// TODO: unused except in tests
 func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
 	dec := cborcodec.DefaultDecMode.NewDecoder(r)
 	return &Decoder{dec: dec}
