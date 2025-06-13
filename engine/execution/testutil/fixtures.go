@@ -617,29 +617,33 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 		},
 	)
 
-	return &execution.ComputationResult{
-		BlockExecutionResult: blockExecResult,
-		BlockAttestationResult: &execution.BlockAttestationResult{
-			BlockExecutionData: &execution_data.BlockExecutionData{
-				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-					{TrieUpdate: trieUpdate1},
-					{TrieUpdate: trieUpdate2},
-					{TrieUpdate: trieUpdate3},
-					{TrieUpdate: trieUpdate4},
+	result, err := execution.NewComputationResult(
+		execution.UntrustedComputationResult{
+			BlockExecutionResult: blockExecResult,
+			BlockAttestationResult: &execution.BlockAttestationResult{
+				BlockExecutionData: &execution_data.BlockExecutionData{
+					ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+						{TrieUpdate: trieUpdate1},
+						{TrieUpdate: trieUpdate2},
+						{TrieUpdate: trieUpdate3},
+						{TrieUpdate: trieUpdate4},
+					},
+				},
+			},
+			ExecutionReceipt: &flow.ExecutionReceipt{
+				ExecutionResult: flow.ExecutionResult{
+					Chunks: flow.ChunkList{
+						{EndState: unittest.StateCommitmentFixture()},
+						{EndState: unittest.StateCommitmentFixture()},
+						{EndState: unittest.StateCommitmentFixture()},
+						{EndState: unittest.StateCommitmentFixture()},
+					},
 				},
 			},
 		},
-		ExecutionReceipt: &flow.ExecutionReceipt{
-			ExecutionResult: flow.ExecutionResult{
-				Chunks: flow.ChunkList{
-					{EndState: unittest.StateCommitmentFixture()},
-					{EndState: unittest.StateCommitmentFixture()},
-					{EndState: unittest.StateCommitmentFixture()},
-					{EndState: unittest.StateCommitmentFixture()},
-				},
-			},
-		},
-	}
+	)
+	require.NoError(t, err)
+	return result
 }
 
 // EntropyProviderFixture returns an entropy provider mock that

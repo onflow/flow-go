@@ -2,6 +2,7 @@ package uploader
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/rs/zerolog/log"
@@ -266,7 +267,18 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 		nil,
 	)
 
-	compRes.BlockExecutionData = executionData
+	blockAttestationResult := compRes.BlockAttestationResult
+	blockAttestationResult.BlockExecutionData = executionData
+	compRes, err = execution.NewComputationResult(
+		execution.UntrustedComputationResult{
+			BlockExecutionResult:   compRes.BlockExecutionResult,
+			BlockAttestationResult: blockAttestationResult,
+			ExecutionReceipt:       compRes.ExecutionReceipt,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct computation result: %w", err)
+	}
 
 	// for now we only care about fields in BlockData
 	// Warning: this seems so broken just do the job, i only maintained previous behviour
