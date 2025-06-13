@@ -1,6 +1,8 @@
 package flow
 
 import (
+	"fmt"
+
 	"github.com/onflow/crypto"
 )
 
@@ -13,14 +15,36 @@ type Attestation struct {
 	ChunkIndex        uint64     // index of the approved chunk
 }
 
+// UntrustedAttestation is an untrusted input-only representation of an Attestation,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedAttestation should be validated and converted into
+// a trusted Attestation using NewAttestation constructor.
+type UntrustedAttestation Attestation
+
 // NewAttestation creates a new instance of Attestation.
 // Construction Attestation allowed only within the constructor.
-func NewAttestation(blockID Identifier, executionResultID Identifier, chunkIndex uint64) *Attestation {
-	return &Attestation{
-		BlockID:           blockID,
-		ExecutionResultID: executionResultID,
-		ChunkIndex:        chunkIndex,
+//
+// All errors indicate a valid Collection cannot be constructed from the input.
+// ChunkIndex can be zero in principle, so we don’t check it.
+func NewAttestation(untrusted UntrustedAttestation) (*Attestation, error) {
+	if untrusted.BlockID == ZeroID {
+		return nil, fmt.Errorf("BlockID must not be empty")
 	}
+
+	if untrusted.ExecutionResultID == ZeroID {
+		return nil, fmt.Errorf("ExecutionResultID must not be empty")
+	}
+
+	return &Attestation{
+		BlockID:           untrusted.BlockID,
+		ExecutionResultID: untrusted.ExecutionResultID,
+		ChunkIndex:        untrusted.ChunkIndex,
+	}, nil
 }
 
 // ID generates a unique identifier using attestation
@@ -38,19 +62,44 @@ type ResultApprovalBody struct {
 	Spock                crypto.Signature // proof of re-computation, one per each chunk
 }
 
+// UntrustedResultApprovalBody is an untrusted input-only representation of an ResultApprovalBody,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedResultApprovalBody should be validated and converted into
+// a trusted ResultApprovalBody using NewResultApprovalBody constructor.
+type UntrustedResultApprovalBody ResultApprovalBody
+
 // NewResultApprovalBody creates a new instance of ResultApprovalBody.
 // Construction ResultApprovalBody allowed only within the constructor.
-func NewResultApprovalBody(
-	attestation Attestation,
-	approvalID Identifier,
-	attestSignature crypto.Signature,
-	spock crypto.Signature) *ResultApprovalBody {
-	return &ResultApprovalBody{
-		Attestation:          attestation,
-		ApproverID:           approvalID,
-		AttestationSignature: attestSignature,
-		Spock:                spock,
+//
+// All errors indicate a valid Collection cannot be constructed from the input.
+func NewResultApprovalBody(untrusted UntrustedResultApprovalBody) (*ResultApprovalBody, error) {
+	att, err := NewAttestation(UntrustedAttestation(untrusted.Attestation))
+	if err != nil {
+		return nil, fmt.Errorf("invalid attestation: %w", err)
 	}
+
+	if untrusted.ApproverID == ZeroID {
+		return nil, fmt.Errorf("ApproverID must not be empty")
+	}
+
+	if len(untrusted.AttestationSignature.Bytes()) == 0 {
+		return nil, fmt.Errorf("AttestationSignature must not be empty")
+	}
+	if len(untrusted.Spock.Bytes()) == 0 {
+		return nil, fmt.Errorf("Spock proof must not be empty")
+	}
+
+	return &ResultApprovalBody{
+		Attestation:          *att,
+		ApproverID:           untrusted.ApproverID,
+		AttestationSignature: untrusted.AttestationSignature,
+		Spock:                untrusted.Spock,
+	}, nil
 }
 
 // PartialID generates a unique identifier using Attestation + ApproverID

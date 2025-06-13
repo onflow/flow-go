@@ -265,11 +265,14 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 
 	// Generate result approval
 	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERVerGenerateResultApproval)
-	attestation := flow.NewAttestation(
-		vc.Header.ID(),
-		vc.Result.ID(),
-		vc.Chunk.Index,
-	)
+	attestation, err := flow.NewAttestation(flow.UntrustedAttestation{
+		BlockID:           vc.Header.ID(),
+		ExecutionResultID: vc.Result.ID(),
+		ChunkIndex:        vc.Chunk.Index,
+	})
+	if err != nil {
+		return fmt.Errorf("could not build attestation: %w", err)
+	}
 	approval, err := GenerateResultApproval(
 		e.me,
 		e.approvalHasher,
@@ -337,12 +340,15 @@ func GenerateResultApproval(
 	}
 
 	// result approval body
-	body := flow.NewResultApprovalBody(
-		*attestation,
-		me.NodeID(),
-		atstSign,
-		spock,
-	)
+	body, err := flow.NewResultApprovalBody(flow.UntrustedResultApprovalBody{
+		Attestation:          *attestation,
+		ApproverID:           me.NodeID(),
+		AttestationSignature: atstSign,
+		Spock:                spock,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build result approval body: %w", err)
+	}
 
 	// generates a signature over result approval body
 	bodyID := body.ID()
