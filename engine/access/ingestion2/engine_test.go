@@ -215,7 +215,7 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 		s.receipts,
 		s.results,
 		processedHeightInitializer,
-		nil,
+		NewNoopErrorMessageRequester(),
 		syncer,
 		s.collectionExecutedMetric,
 	)

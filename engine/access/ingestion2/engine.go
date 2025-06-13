@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -70,7 +69,7 @@ type Engine struct {
 	finalizedBlockNotifier engine.Notifier
 	blocks                 storage.Blocks
 
-	errorMessageRequester *ErrorMessageRequester
+	errorMessageRequester ErrorMessageRequester
 
 	collectionSyncer *CollectionSyncer
 }
@@ -85,7 +84,7 @@ func New(
 	executionReceipts storage.ExecutionReceipts,
 	executionResults storage.ExecutionResults,
 	finalizedProcessedHeight storage.ConsumerProgressInitializer, //TODO: what does processed mean in this contex?
-	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore,
+	errorMessageRequester ErrorMessageRequester,
 	collectionSyncer *CollectionSyncer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 ) (*Engine, error) {
@@ -117,7 +116,7 @@ func New(
 		executionReceipts:         executionReceipts,
 		executionResults:          executionResults,
 		collectionExecutedMetric:  collectionExecutedMetric,
-		errorMessageRequester:     NewErrorMessageRequester(log, txErrorMessagesCore),
+		errorMessageRequester:     errorMessageRequester,
 		collectionSyncer:          collectionSyncer,
 	}
 
@@ -126,7 +125,7 @@ func New(
 		AddWorker(e.processExecutionReceipts).
 		AddWorker(e.runFinalizedBlockConsumer).
 		AddWorker(e.collectionSyncer.RequestCollections).
-		AddWorker(e.errorMessageRequester.RequestErrorMessages)
+		AddWorker(e.errorMessageRequester.Request)
 
 	e.ComponentManager = builder.Build()
 

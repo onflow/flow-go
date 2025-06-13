@@ -2,7 +2,6 @@ package ingestion2
 
 import (
 	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	"github.com/onflow/flow-go/model/flow"
@@ -10,47 +9,33 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-type ErrorMessageRequester struct {
+type ErrorMessageRequester interface {
+	Notify(identifier flow.Identifier)
+	Request(ctx irrecoverable.SignalerContext, ready component.ReadyFunc)
+}
+
+type ErrorMessageRequesterImpl struct {
 	log          zerolog.Logger
 	blockIDsChan chan flow.Identifier
 	core         *tx_error_messages.TxErrorMessagesCore
-
-	// TODO: maybe just have this requester and a noop one? we could get rid of exists then
-	exists *atomic.Bool
 }
 
-func NewErrorMessageRequester(log zerolog.Logger, core *tx_error_messages.TxErrorMessagesCore) *ErrorMessageRequester {
-	if core == nil {
-		return &ErrorMessageRequester{
-			log:          log,
-			blockIDsChan: nil,
-			core:         nil,
-			exists:       atomic.NewBool(false),
-		}
-	}
-
-	return &ErrorMessageRequester{
+func NewErrorMessageRequester(log zerolog.Logger, core *tx_error_messages.TxErrorMessagesCore) *ErrorMessageRequesterImpl {
+	return &ErrorMessageRequesterImpl{
 		log:          log,
 		blockIDsChan: make(chan flow.Identifier, 1),
 		core:         core,
-		exists:       atomic.NewBool(true),
 	}
 }
 
-func (p *ErrorMessageRequester) Notify(blockID flow.Identifier) {
-	if p.exists.Load() {
-		p.blockIDsChan <- blockID
-	}
+func (p *ErrorMessageRequesterImpl) Notify(blockID flow.Identifier) {
+	p.blockIDsChan <- blockID
 }
 
-func (p *ErrorMessageRequester) RequestErrorMessages(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (p *ErrorMessageRequesterImpl) Request(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
-
-	if !p.exists.Load() {
-		return
-	}
-
 	defer close(p.blockIDsChan)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -67,4 +52,16 @@ func (p *ErrorMessageRequester) RequestErrorMessages(ctx irrecoverable.SignalerC
 			}
 		}
 	}
+}
+
+type NoopErrorMessageRequester struct{}
+
+func NewNoopErrorMessageRequester() *NoopErrorMessageRequester {
+	return &NoopErrorMessageRequester{}
+}
+
+func (*NoopErrorMessageRequester) Notify(flow.Identifier) {}
+
+func (*NoopErrorMessageRequester) Request(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
 }
