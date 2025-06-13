@@ -89,8 +89,8 @@ func NewFinalizedBlockProcessor(
 	return processor, nil
 }
 
-// OnFinalizedBlock notifies the processor that a new finalized block is available for processing.
-func (p *FinalizedBlockProcessor) OnFinalizedBlock(_ *model.Block) {
+// Notify notifies the processor that a new finalized block is available for processing.
+func (p *FinalizedBlockProcessor) Notify(_ *model.Block) {
 	p.consumerNotifier.Notify()
 }
 

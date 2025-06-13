@@ -10,7 +10,7 @@ import (
 )
 
 type ErrorMessageRequester interface {
-	Notify(identifier flow.Identifier)
+	Notify(blockID flow.Identifier)
 	StartRequesting(ctx irrecoverable.SignalerContext, ready component.ReadyFunc)
 }
 
