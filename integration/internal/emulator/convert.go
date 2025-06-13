@@ -182,19 +182,26 @@ func FlowTransactionResultToSDK(result *accessmodel.TransactionResult) (*sdk.Tra
 	return sdkResult, nil
 }
 
-func SDKEventToFlow(event sdk.Event) (flowgo.Event, error) {
+func SDKEventToFlow(event sdk.Event) (*flowgo.Event, error) {
 	payload, err := ccf.EventsEncMode.Encode(event.Value)
 	if err != nil {
-		return flowgo.Event{}, err
+		return nil, err
 	}
 
-	return flowgo.NewEvent(
-		flowgo.EventType(event.Type),
-		SDKIdentifierToFlow(event.TransactionID),
-		uint32(event.TransactionIndex),
-		uint32(event.EventIndex),
-		payload,
-	), nil
+	e, err := flowgo.NewEvent(
+		flowgo.UntrustedEvent{
+			Type:             flowgo.EventType(event.Type),
+			TransactionID:    SDKIdentifierToFlow(event.TransactionID),
+			TransactionIndex: uint32(event.TransactionIndex),
+			EventIndex:       uint32(event.EventIndex),
+			Payload:          payload,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct event: %w", err)
+	}
+
+	return e, nil
 }
 
 func FlowEventToSDK(flowEvent flowgo.Event) (sdk.Event, error) {

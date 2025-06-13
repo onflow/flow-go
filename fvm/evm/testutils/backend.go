@@ -169,14 +169,20 @@ func getSimpleEventEmitter() *testEventEmitter {
 			if err != nil {
 				return err
 			}
-			eventType := flow.EventType(event.EventType.ID())
-			events = append(events, flow.NewEvent(
-				eventType,
-				flow.ZeroID,
-				0,
-				0,
-				payload,
-			))
+			e, err := flow.NewEvent(
+				flow.UntrustedEvent{
+					Type:             flow.EventType(event.EventType.ID()),
+					TransactionID:    flow.ZeroID,
+					TransactionIndex: 0,
+					EventIndex:       0,
+					Payload:          payload,
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("could not construct event: %w", err)
+			}
+
+			events = append(events, *e)
 			return nil
 		},
 		events: func() flow.EventsList {

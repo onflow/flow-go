@@ -34,20 +34,20 @@ import (
 
 // eventsList is the set of events emitted by each transaction, by default
 var eventsList = flow.EventsList{
-	flow.NewEvent(
-		"event.someType",
-		flow.Identifier{2, 3, 2, 3},
-		1,
-		2,
-		[]byte{7, 3, 1, 2},
-	),
-	flow.NewEvent(
-		"event.otherType",
-		flow.Identifier{3, 3, 3},
-		4,
-		4,
-		[]byte{7, 3, 1, 2},
-	),
+	{
+		Type:             "event.someType",
+		TransactionID:    flow.Identifier{2, 3, 2, 3},
+		TransactionIndex: 1,
+		EventIndex:       2,
+		Payload:          []byte{7, 3, 1, 2},
+	},
+	{
+		Type:             "event.otherType",
+		TransactionID:    flow.Identifier{3, 3, 3},
+		TransactionIndex: 4,
+		EventIndex:       4,
+		Payload:          []byte{7, 3, 1, 2},
+	},
 }
 
 const computationUsed = uint64(100)
@@ -235,15 +235,13 @@ func (s *ChunkVerifierTestSuite) TestEventsMismatch() {
 
 	// add an additional event to the list of events produced by FVM
 	output := generateDefaultOutput()
-	output.Events = append(eventsList,
-		flow.NewEvent(
-			"event.Extra",
-			flow.Identifier{2, 3},
-			0,
-			0,
-			[]byte{88},
-		),
-	)
+	output.Events = append(eventsList, flow.Event{
+		Type:             "event.Extra",
+		TransactionID:    flow.Identifier{2, 3},
+		TransactionIndex: 0,
+		EventIndex:       0,
+		Payload:          []byte{88},
+	})
 	s.outputs["eventsMismatch"] = output
 
 	_, err := s.verifier.Verify(vch)

@@ -35,22 +35,30 @@ type Event struct {
 	Payload []byte
 }
 
+// UntrustedEvent is an untrusted input-only representation of an Event,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedEvent should be validated and converted into
+// a trusted Event using NewEvent constructor.
+type UntrustedEvent Event
+
 // NewEvent creates a new instance of Event.
 // Construction Event allowed only within the constructor.
-func NewEvent(
-	eventType EventType,
-	transactionID Identifier,
-	transactionIndex uint32,
-	eventIndex uint32,
-	payload []byte,
-) Event {
-	return Event{
-		Type:             eventType,
-		TransactionID:    transactionID,
-		TransactionIndex: transactionIndex,
-		EventIndex:       eventIndex,
-		Payload:          payload,
-	}
+//
+// All errors indicate a valid Event cannot be constructed from the input.
+func NewEvent(untrusted UntrustedEvent) (*Event, error) {
+	//TODO(Uliana): add validation checks
+	return &Event{
+		Type:             untrusted.Type,
+		TransactionID:    untrusted.TransactionID,
+		TransactionIndex: untrusted.TransactionIndex,
+		EventIndex:       untrusted.EventIndex,
+		Payload:          untrusted.Payload,
+	}, nil
 }
 
 // String returns the string representation of this event.

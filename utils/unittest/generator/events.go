@@ -96,13 +96,13 @@ func (g *Events) New() flow.Event {
 		}
 	}
 
-	event := flow.NewEvent(
-		flow.EventType(typeID),
-		g.ids.New(),
-		g.count,
-		g.count,
-		payload,
-	)
+	event := flow.Event{
+		Type:             flow.EventType(typeID),
+		TransactionID:    g.ids.New(),
+		TransactionIndex: g.count,
+		EventIndex:       g.count,
+		Payload:          payload,
+	}
 
 	g.count++
 
@@ -140,13 +140,14 @@ func GenerateAccountCreateEvent(t *testing.T, address flow.Address) flow.Event {
 	payload, err := ccf.Encode(cadenceEvent)
 	require.NoError(t, err)
 
-	event := flow.NewEvent(
+	event := unittest.EventFixture(
 		flow.EventType(cadenceEvent.EventType.Location.TypeID(nil, cadenceEvent.EventType.QualifiedIdentifier)),
+		0,
+		0,
 		unittest.IdentifierFixture(),
 		0,
-		0,
-		payload,
 	)
+	event.Payload = payload
 
 	return event
 }
@@ -187,13 +188,15 @@ func GenerateAccountContractEvent(t *testing.T, qualifiedIdentifier string, addr
 	payload, err := ccf.Encode(cadenceEvent)
 	require.NoError(t, err)
 
-	event := flow.NewEvent(
+	event := unittest.EventFixture(
 		flow.EventType(cadenceEvent.EventType.Location.TypeID(nil, cadenceEvent.EventType.QualifiedIdentifier)),
+		0,
+		0,
 		unittest.IdentifierFixture(),
 		0,
-		0,
-		payload,
 	)
+
+	event.Payload = payload
 
 	return event
 }

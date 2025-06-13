@@ -105,13 +105,7 @@ func runBenchmark(b *testing.B, compressorName string) {
 func getEvents(n int) []flow.Event {
 	events := make([]flow.Event, n)
 	for i := range events {
-		events[i] = flow.NewEvent(
-			flow.EventAccountCreated,
-			flow.ZeroID,
-			0,
-			0,
-			nil,
-		)
+		events[i] = flow.Event{Type: flow.EventAccountCreated}
 	}
 	return events
 }

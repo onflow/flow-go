@@ -71,21 +71,21 @@ func TestEventsList(t *testing.T) {
 }
 
 func TestEventsMerkleRootHash(t *testing.T) {
-	eventA := flow.NewEvent(
-		"eventTypeString",
-		[flow.IdentifierLen]byte{1, 2, 3},
-		1,
-		2,
-		[]byte("cadence-json encoded data"),
-	)
+	eventA := flow.Event{
+		Type:             "eventTypeString",
+		TransactionIndex: 1,
+		EventIndex:       2,
+		Payload:          []byte("cadence-json encoded data"),
+		TransactionID:    [flow.IdentifierLen]byte{1, 2, 3},
+	}
 
-	eventB := flow.NewEvent(
-		"eventTypeString",
-		[flow.IdentifierLen]byte{1, 2, 3},
-		1,
-		3,
-		[]byte("cadence-json encoded data"),
-	)
+	eventB := flow.Event{
+		Type:             "eventTypeString",
+		TransactionIndex: 1,
+		EventIndex:       3,
+		Payload:          []byte("cadence-json encoded data"),
+		TransactionID:    [flow.IdentifierLen]byte{1, 2, 3},
+	}
 
 	expectedRootHashHex := "c53a6592de573a24547b616172abd9131651d6b7d829e5694a25fa183db7ae01"
 

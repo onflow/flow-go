@@ -420,13 +420,13 @@ func TestEventsByHeight(t *testing.T) {
 				// interleave events of both types
 				if i%2 == 0 {
 					event.Type = "A"
-					eventsA = append(eventsA, event)
+					eventsA = append(eventsA, *event)
 				} else {
 					event.Type = "B"
-					eventsB = append(eventsB, event)
+					eventsB = append(eventsB, *event)
 				}
 
-				allEvents[i] = event
+				allEvents[i] = *event
 			}
 
 			err := store.InsertEvents(nonEmptyBlockHeight, allEvents)
