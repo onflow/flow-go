@@ -377,3 +377,7 @@ func (m *mockProgress) SetProcessedIndex(processed uint64) error {
 	m.index = processed
 	return nil
 }
+
+func (m *mockProgress) BatchSetProcessedIndex(uint64, storage.ReaderBatchWriter) error {
+	return fmt.Errorf("batch not supported")
+}
