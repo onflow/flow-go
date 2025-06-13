@@ -1,6 +1,8 @@
 package store
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -62,4 +64,16 @@ func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error)
 // RemoveBatch removes a transaction by fingerprint.
 func (t *Transactions) RemoveBatch(rw storage.ReaderBatchWriter, txID flow.Identifier) error {
 	return t.cache.RemoveTx(rw, txID)
+}
+
+// BatchStore stores transaction within a batch operation.
+// Error returns:
+//   - generic error in case of unexpected failure from the database layer or
+//     encoding failure.
+func (t *Transactions) BatchStore(tx *flow.TransactionBody, batch storage.ReaderBatchWriter) error {
+	if err := t.storeTx(batch, tx); err != nil {
+		return fmt.Errorf("cannot batch insert transaction: %w", err)
+	}
+
+	return nil
 }
