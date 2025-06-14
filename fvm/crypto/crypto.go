@@ -206,14 +206,14 @@ func VerifySignatureFromRuntime(
 // The signature/hash function combinations accepted are:
 //   - ECDSA (on both curves P-256 and secp256k1) with any of SHA2-256/SHA3-256.
 //
-// The tag is applied to the message as a constant length prefix.
+// The tag is applied to the payload as a constant length prefix.
 //
 // The function errors:
 //   - NewValueErrorf for any user error
 //   - panic for any other unexpected error
 func VerifySignatureFromTransaction(
 	signature []byte,
-	message []byte,
+	payload []byte,
 	pk crypto.PublicKey,
 	hashAlgo hash.HashingAlgorithm,
 	extensionData []byte,
@@ -243,7 +243,7 @@ func VerifySignatureFromTransaction(
 		return false, nil
 	}
 
-	extensionDataValid, reconstructedMessage := validateExtensionDataAndReconstructMessage(scheme, extensionData, message)
+	extensionDataValid, reconstructedMessage := validateExtensionDataAndReconstructMessage(scheme, extensionData, payload)
 	if !extensionDataValid {
 		return false, nil
 	}
@@ -270,17 +270,17 @@ func VerifySignatureFromTransaction(
 	return valid, nil
 }
 
-// validateExtensionDataAndReconstructMessage reconstructs the message based on the authentication scheme and extension data.
+// validateExtensionDataAndReconstructMessage reconstructs the verification message based on the authentication scheme and extension data.
 // simply returns false if the extension data is invalid, could consider adding more visibility into reason of validation failure
-func validateExtensionDataAndReconstructMessage(scheme AuthenticationScheme, extensionData []byte, message []byte) (bool, []byte) {
+func validateExtensionDataAndReconstructMessage(scheme AuthenticationScheme, extensionData []byte, payload []byte) (bool, []byte) {
 	switch scheme {
 	case PlainScheme:
 		if len(extensionData) > 1 {
 			return false, nil
 		}
-		return true, slices.Concat(flow.TransactionDomainTag[:], message)
+		return true, slices.Concat(flow.TransactionDomainTag[:], payload)
 	case WebAuthnScheme: // See FLIP 264 for more details
-		return validateWebAuthNExtensionData(extensionData, message)
+		return validateWebAuthNExtensionData(extensionData, payload)
 	default:
 		// authentication scheme not found
 		return false, nil

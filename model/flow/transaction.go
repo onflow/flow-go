@@ -483,8 +483,9 @@ func (s TransactionSignature) Fingerprint() []byte {
 // We don't check it here, as this is simply checking if the scheme is plain,
 // and not the validity of the info field
 func (s TransactionSignature) isPlainAuthenticationScheme() bool {
+	plainSchemeIdentifier := byte(0)
 	// len check covers nil case
-	return len(s.ExtensionData) == 0 || s.ExtensionData[0] == 0
+	return len(s.ExtensionData) == 0 || s.ExtensionData[0] == plainSchemeIdentifier
 }
 
 func (s TransactionSignature) canonicalForm() interface{} {
