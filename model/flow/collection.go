@@ -1,6 +1,10 @@
 package flow
 
-import "github.com/onflow/flow-go/model/fingerprint"
+import (
+	"fmt"
+
+	"github.com/onflow/flow-go/model/fingerprint"
+)
 
 // Collection is set of transactions.
 type Collection struct {
@@ -18,12 +22,14 @@ func CollectionFromTransactions(transactions []*Transaction) Collection {
 }
 
 // Light returns the light, reference-only version of the collection.
-func (c Collection) Light() LightCollection {
-	lc := LightCollection{Transactions: make([]Identifier, 0, len(c.Transactions))}
-	for _, tx := range c.Transactions {
-		lc.Transactions = append(lc.Transactions, tx.ID())
+func (c Collection) Light() *LightCollection {
+	light, err := NewLightCollection(UntrustedLightCollection{
+		Transactions: GetIDs(c.Transactions),
+	})
+	if err != nil {
+		panic(fmt.Sprintf("sanity check failed: error converting known valid Collection to LightCollection: %v", err))
 	}
-	return lc
+	return light
 }
 
 // Guarantee returns a collection guarantee for this collection.
@@ -61,8 +67,19 @@ func (c Collection) Fingerprint() []byte {
 // LightCollection is a collection containing references to the constituent
 // transactions rather than full transaction bodies. It is used for indexing
 // transactions by collection and for computing the collection fingerprint.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type LightCollection struct {
 	Transactions []Identifier
+}
+
+type UntrustedLightCollection LightCollection
+
+// NewLightCollection constructs a new LightCollection instance.
+func NewLightCollection(untrusted UntrustedLightCollection) (*LightCollection, error) {
+	return &LightCollection{
+		Transactions: untrusted.Transactions,
+	}, nil
 }
 
 func (lc LightCollection) ID() Identifier {
