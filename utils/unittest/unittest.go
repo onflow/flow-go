@@ -397,7 +397,9 @@ func TempPebbleDBWithOpts(t testing.TB, opts *pebble.Options) (*pebble.DB, strin
 
 func RunWithPebbleDB(t testing.TB, f func(*pebble.DB)) {
 	RunWithTempDir(t, func(dir string) {
-		db, err := pebble.Open(dir, &pebble.Options{})
+		db, err := pebble.Open(dir, &pebble.Options{
+			FormatMajorVersion: pebble.FormatNewest,
+		})
 		require.NoError(t, err)
 		defer func() {
 			assert.NoError(t, db.Close())
@@ -423,13 +425,17 @@ func RunWithBadgerDBAndPebbleDB(t testing.TB, f func(*badger.DB, *pebble.DB)) {
 }
 
 func PebbleDB(t testing.TB, dir string) *pebble.DB {
-	db, err := pebble.Open(dir, &pebble.Options{})
+	db, err := pebble.Open(dir, &pebble.Options{
+		FormatMajorVersion: pebble.FormatNewest,
+	})
 	require.NoError(t, err)
 	return db
 }
 
 func TypedPebbleDB(t testing.TB, dir string, create func(string, *pebble.Options) (*pebble.DB, error)) *pebble.DB {
-	db, err := create(dir, &pebble.Options{})
+	db, err := create(dir, &pebble.Options{
+		FormatMajorVersion: pebble.FormatNewest,
+	})
 	require.NoError(t, err)
 	return db
 }

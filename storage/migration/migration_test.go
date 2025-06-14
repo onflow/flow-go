@@ -45,7 +45,7 @@ func runMigrationTestCase(t *testing.T, testData map[string]string, cfg Migratio
 		}))
 
 		// Run migration
-		err := CopyFromBadgerToPebble(badgerDB, pebbleDB, cfg)
+		err := CopyFromBadgerToPebbleSSTables(badgerDB, pebbleDB, cfg)
 		require.NoError(t, err)
 
 		// Validate each key
@@ -81,7 +81,7 @@ func runMigrationTestCase(t *testing.T, testData map[string]string, cfg Migratio
 }
 
 // Simple deterministic dataset
-func TestMigrationWithSimpleData(t *testing.T) {
+func TestMigrationWithSimpleData1(t *testing.T) {
 	data := map[string]string{
 		"a":      "a single key byte",
 		"z":      "a single key byte",
