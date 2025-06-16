@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// Persister handles transferring data from in-memory storage to permanent storage.
+// Persister handles transferring data from in-memory storages to permanent storages.
 type Persister struct {
 	log zerolog.Logger
 
@@ -36,7 +36,7 @@ type Persister struct {
 	header          *flow.Header
 }
 
-// NewPersister creates a new persister for transferring data from in-memory storage to permanent storage.
+// NewPersister creates a new persister.
 func NewPersister(
 	log zerolog.Logger,
 	inMemoryRegisters *unsynchronized.Registers,
@@ -87,9 +87,7 @@ func NewPersister(
 	return persister
 }
 
-// Persist commits data from in-memory storage to the provided batch.
-// It processes events, transaction results, registers, collections, and transactions
-// from their respective in-memory storages to permanent storage.
+// Persist save data from in-memory storages to the provided persisted storages and commit updates to the database.
 // No errors are expected during normal operations
 func (p *Persister) Persist() error {
 	// Create a batch for atomic updates
@@ -211,7 +209,6 @@ func (p *Persister) addTransactionsToBatch(batch storage.Batch) error {
 }
 
 // addTransactionResultErrorMessagesToBatch persists transaction result error messages from in-memory to permanent storage.
-// If there are no transaction result error messages, this is a no-op.
 // No errors are expected during normal operations
 func (p *Persister) addTransactionResultErrorMessagesToBatch(batch storage.Batch) error {
 	if txResultErrMsgs := p.inMemoryTxResultErrMsg.Data(); len(txResultErrMsgs) > 0 {
