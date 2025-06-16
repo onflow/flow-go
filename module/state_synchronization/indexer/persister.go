@@ -54,8 +54,14 @@ func NewPersister(
 	executionResult *flow.ExecutionResult,
 	header *flow.Header,
 ) *Persister {
+	log = log.With().
+		Str("component", "persister").
+		Hex("block_id", logging.ID(executionResult.BlockID)).
+		Uint64("height", header.Height).
+		Logger()
+
 	persister := &Persister{
-		log:                    log.With().Str("component", "persister").Logger(),
+		log:                    log,
 		inMemoryRegisters:      inMemoryRegisters,
 		inMemoryEvents:         inMemoryEvents,
 		inMemoryCollections:    inMemoryCollections,
@@ -83,21 +89,18 @@ func NewPersister(
 // Persist commits data from in-memory storage to the provided batch.
 // It processes events, transaction results, registers, collections, and transactions
 // from their respective in-memory storages to permanent storage.
-// Expected errors:
-//   - ErrRecordExists if the register record already exists
-//   - storage.ErrNotFound if the transaction ID does not exist in the database
-//   - generic error in case of unexpected failure from the database layer, or failure
-//     to decode an existing database value
+// No errors are expected during normal operations
 func (p *Persister) Persist() error {
 	// Create a batch for atomic updates
 	batch := p.protocolDB.NewBatch()
 
-	log := p.log.With().
-		Hex("block_id", logging.ID(p.executionResult.BlockID)).
-		Uint64("height", p.header.Height).
-		Logger()
+	defer func() {
+		if err := batch.Close(); err != nil {
+			p.log.Debug().Err(err).Msg("failed to close batch")
+		}
+	}()
 
-	log.Debug().Msg("adding execution data to batch")
+	p.log.Debug().Msg("adding execution data to batch")
 
 	start := time.Now()
 
@@ -147,8 +150,7 @@ func (p *Persister) Persist() error {
 
 // persistRegisters persists registers from in-memory to permanent storage.
 // Registers must be stored for every height, even if it's an empty set.
-// Expected errors:
-//   - ErrRecordExists if the register record already exists
+// No errors are expected during normal operations
 func (p *Persister) persistRegisters() error {
 	registerData := p.inMemoryRegisters.Data()
 
@@ -161,9 +163,7 @@ func (p *Persister) persistRegisters() error {
 }
 
 // addEventsToBatch adds events from in-memory storage to the batch.
-// Expected errors:
-//   - generic error in case of unexpected failure from the database layer, or failure
-//     to decode an existing database value
+// No errors are expected during normal operations
 func (p *Persister) addEventsToBatch(batch storage.Batch) error {
 	if eventsList := p.inMemoryEvents.Data(); len(eventsList) > 0 {
 		if err := p.events.BatchStore(p.executionResult.BlockID, []flow.EventsList{eventsList}, batch); err != nil {
@@ -175,9 +175,7 @@ func (p *Persister) addEventsToBatch(batch storage.Batch) error {
 }
 
 // addResultsToBatch adds transaction results from in-memory storage to the batch.
-// Expected errors:
-//   - generic error in case of unexpected failure from the database layer, or failure
-//     to decode an existing database value
+// No errors are expected during normal operations
 func (p *Persister) addResultsToBatch(batch storage.Batch) error {
 	if results := p.inMemoryResults.Data(); len(results) > 0 {
 		if err := p.results.BatchStore(p.executionResult.BlockID, results, batch); err != nil {
@@ -189,9 +187,7 @@ func (p *Persister) addResultsToBatch(batch storage.Batch) error {
 }
 
 // addCollectionsToBatch persists collections from in-memory to permanent storage.
-// Expected errors:
-//   - generic error in case of unexpected failure from the database layer, or failure
-//     to decode an existing database value
+// No errors are expected during normal operations
 func (p *Persister) addCollectionsToBatch(batch storage.Batch) error {
 	for _, collection := range p.inMemoryCollections.LightCollections() {
 		if err := p.collections.BatchStoreLightAndIndexByTransaction(&collection, batch); err != nil {
@@ -203,10 +199,7 @@ func (p *Persister) addCollectionsToBatch(batch storage.Batch) error {
 }
 
 // addTransactionsToBatch persists transactions from in-memory to permanent storage.
-// Expected errors:
-//   - storage.ErrNotFound if the transaction ID does not exist in the database
-//   - generic error in case of unexpected failure from the database layer, or failure
-//     to decode an existing database value
+// No errors are expected during normal operations
 func (p *Persister) addTransactionsToBatch(batch storage.Batch) error {
 	for _, transaction := range p.inMemoryTransactions.Data() {
 		if err := p.transactions.BatchStore(&transaction, batch); err != nil {

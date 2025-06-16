@@ -43,6 +43,7 @@ func newPersisterTest(t *testing.T) *persisterTest {
 	database := storagemock.NewDB(t)
 	batch := storagemock.NewBatch(t)
 	batch.On("Commit").Return(nil).Maybe()
+	batch.On("Close").Return(nil)
 	database.On("NewBatch").Return(batch)
 
 	return &persisterTest{
@@ -264,7 +265,8 @@ func TestPersister_AddToBatch_ErrorHandling(t *testing.T) {
 		pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)
 		pt.events.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
 		pt.results.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
-		pt.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil)
+		pt.collections.On("BatchStoreLightAndIndexB"+
+			"yTransaction", mock.Anything, mock.Anything).Return(nil)
 		pt.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(assert.AnError)
 
 		err := pt.persister.Persist()
