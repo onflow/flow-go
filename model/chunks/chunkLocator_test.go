@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -27,4 +29,40 @@ func TestChunkLocatorConvert(t *testing.T) {
 // TestChunkLocatorMalleability verifies that the chunk locator which implements the [flow.IDEntity] interface is not malleable.
 func TestChunkLocatorMalleability(t *testing.T) {
 	unittest.RequireEntityNonMalleable(t, unittest.ChunkLocatorFixture(unittest.IdentifierFixture(), rand.Uint64()))
+}
+
+// TestNewLocator tests the NewLocator constructor with valid and invalid inputs.
+//
+// Valid Case:
+//
+// 1. Valid input with non-zero ResultID and any index:
+//   - Should successfully construct a Locator.
+//
+// Invalid Case:
+//
+// 2. Invalid input with zero ResultID:
+//   - Should return an error indicating ResultID must not be zero.
+func TestNewLocator(t *testing.T) {
+	t.Run("valid input with non-zero ResultID", func(t *testing.T) {
+		locator, err := chunks.NewLocator(
+			chunks.UntrustedLocator{
+				ResultID: unittest.IdentifierFixture(),
+				Index:    1,
+			},
+		)
+		require.NoError(t, err)
+		require.NotNil(t, locator)
+	})
+
+	t.Run("invalid input with zero ResultID", func(t *testing.T) {
+		locator, err := chunks.NewLocator(
+			chunks.UntrustedLocator{
+				ResultID: flow.ZeroID,
+				Index:    1,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "ResultID must not be zero")
+		require.Nil(t, locator)
+	})
 }
