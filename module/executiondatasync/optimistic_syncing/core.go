@@ -38,6 +38,7 @@ var _ Core = (*CoreImpl)(nil)
 
 // CoreImpl implements the Core interface for processing execution data.
 // It coordinates the download, indexing, and persisting of execution data.
+// CoreImpl is not safe for concurrent use. Use only within a single gorountine. 
 type CoreImpl struct {
 	log zerolog.Logger
 
