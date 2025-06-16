@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/multierr"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -12,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// Persister handles transferring data from in-memory storage to permanent storage.
+// Persister handles transferring data from in-memory storages to permanent storages.
 type Persister struct {
 	log zerolog.Logger
 
@@ -35,7 +36,7 @@ type Persister struct {
 	header          *flow.Header
 }
 
-// NewPersister creates a new persister for transferring data from in-memory storage to permanent storage.
+// NewPersister creates a new persister.
 func NewPersister(
 	log zerolog.Logger,
 	inMemoryRegisters *unsynchronized.Registers,
@@ -86,51 +87,48 @@ func NewPersister(
 	return persister
 }
 
-// Persist commits data from in-memory storage to the provided batch.
-// It processes events, transaction results, registers, collections, and transactions
-// from their respective in-memory storages to permanent storage.
+// Persist save data from in-memory storages to the provided persisted storages and commit updates to the database.
 // No errors are expected during normal operations
 func (p *Persister) Persist() error {
 	// Create a batch for atomic updates
 	batch := p.protocolDB.NewBatch()
 
+	var err error
 	defer func() {
-		if err := batch.Close(); err != nil {
-			p.log.Debug().Err(err).Msg("failed to close batch")
-		}
+		err = multierr.Combine(err, batch.Close())
 	}()
 
 	p.log.Debug().Msg("adding execution data to batch")
 
 	start := time.Now()
 
-	if err := p.persistRegisters(); err != nil {
+	if err = p.persistRegisters(); err != nil {
 		return err
 	}
 
-	if err := p.addEventsToBatch(batch); err != nil {
+	if err = p.addEventsToBatch(batch); err != nil {
 		return err
 	}
 
-	if err := p.addResultsToBatch(batch); err != nil {
+	if err = p.addResultsToBatch(batch); err != nil {
 		return err
 	}
 
-	if err := p.addCollectionsToBatch(batch); err != nil {
+	if err = p.addCollectionsToBatch(batch); err != nil {
 		return err
 	}
 
-	if err := p.addTransactionsToBatch(batch); err != nil {
+	if err = p.addTransactionsToBatch(batch); err != nil {
 		return err
 	}
 
-	if err := p.addTransactionResultErrorMessagesToBatch(batch); err != nil {
+	if err = p.addTransactionResultErrorMessagesToBatch(batch); err != nil {
 		return err
 	}
 
 	// TODO: include update to latestPersistedSealedResultBlockHeight in the batch
 
-	if err := batch.Commit(); err != nil {
+	if err = batch.Commit(); err != nil {
 		return fmt.Errorf("failed to commit batch: %w", err)
 	}
 
@@ -145,7 +143,7 @@ func (p *Persister) Persist() error {
 		Int("transaction_result_error_messages_count", len(p.inMemoryTxResultErrMsg.Data())).
 		Msg("successfully prepared execution data for persistence")
 
-	return nil
+	return err
 }
 
 // persistRegisters persists registers from in-memory to permanent storage.
@@ -211,13 +209,12 @@ func (p *Persister) addTransactionsToBatch(batch storage.Batch) error {
 }
 
 // addTransactionResultErrorMessagesToBatch persists transaction result error messages from in-memory to permanent storage.
-// If there are no transaction result error messages, this is a no-op.
+// No errors are expected during normal operations
 func (p *Persister) addTransactionResultErrorMessagesToBatch(batch storage.Batch) error {
 	if txResultErrMsgs := p.inMemoryTxResultErrMsg.Data(); len(txResultErrMsgs) > 0 {
 		if err := p.txResultErrMsg.BatchStore(p.header.ID(), txResultErrMsgs, batch); err != nil {
-			return fmt.Errorf("could not add transactions to batch: %w", err)
+			return fmt.Errorf("could not add transaction result error messages to batch: %w", err)
 		}
-		p.log.Debug().Int("transaction_result_error_messages_count", len(txResultErrMsgs)).Msg("added transaction result error messages to batch")
 	}
 
 	return nil

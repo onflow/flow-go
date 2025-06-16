@@ -67,9 +67,7 @@ func (t *Transactions) RemoveBatch(rw storage.ReaderBatchWriter, txID flow.Ident
 }
 
 // BatchStore stores transaction within a batch operation.
-// Error returns:
-//   - generic error in case of unexpected failure from the database layer or
-//     encoding failure.
+// No errors are expected during normal operations
 func (t *Transactions) BatchStore(tx *flow.TransactionBody, batch storage.ReaderBatchWriter) error {
 	if err := t.storeTx(batch, tx); err != nil {
 		return fmt.Errorf("cannot batch insert transaction: %w", err)
