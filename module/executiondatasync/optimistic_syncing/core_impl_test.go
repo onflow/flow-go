@@ -14,10 +14,8 @@ import (
 	txerrmsgsmock "github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	reqestermock "github.com/onflow/flow-go/module/state_synchronization/requester/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -324,32 +322,6 @@ func TestCoreImpl_IntegrationWorkflow(t *testing.T) {
 
 		execDataRequester.On("RequestExecutionData", ctx).Return(executionData, nil)
 		txResultErrMsgsRequester.On("Request", ctx).Return(txResultErrMsgs, nil)
-
-		registers := unsynchronized.NewRegisters(core.header.Height)
-		events := unsynchronized.NewEvents()
-		collections := unsynchronized.NewCollections()
-		transactions := unsynchronized.NewTransactions()
-		results := unsynchronized.NewLightTransactionResults()
-		txResultErrMsgsStore := unsynchronized.NewTransactionResultErrorMessages()
-
-		core.registers = registers
-		core.events = events
-		core.collections = collections
-		core.transactions = transactions
-		core.results = results
-		core.txResultErrMsgs = txResultErrMsgsStore
-
-		core.indexer = indexer.NewInMemoryIndexer(
-			zerolog.Nop(),
-			registers,
-			events,
-			collections,
-			transactions,
-			results,
-			txResultErrMsgsStore,
-			core.executionResult,
-			core.header,
-		)
 
 		err := core.Download(ctx)
 		require.NoError(t, err)
