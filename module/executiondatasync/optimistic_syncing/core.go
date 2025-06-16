@@ -38,7 +38,7 @@ var _ Core = (*CoreImpl)(nil)
 
 // CoreImpl implements the Core interface for processing execution data.
 // It coordinates the download, indexing, and persisting of execution data.
-// CoreImpl is not safe for concurrent use. Use only within a single gorountine. 
+// CoreImpl is not safe for concurrent use. Use only within a single gorountine.
 type CoreImpl struct {
 	log zerolog.Logger
 
@@ -50,12 +50,12 @@ type CoreImpl struct {
 	executionResult *flow.ExecutionResult
 	header          *flow.Header
 
-	registers       *unsynchronized.Registers
-	events          *unsynchronized.Events
-	collections     *unsynchronized.Collections
-	transactions    *unsynchronized.Transactions
-	results         *unsynchronized.LightTransactionResults
-	txResultErrMsgs *unsynchronized.TransactionResultErrorMessages
+	inmemRegisters       *unsynchronized.Registers
+	inmemEvents          *unsynchronized.Events
+	inmemCollections     *unsynchronized.Collections
+	inmemTransactions    *unsynchronized.Transactions
+	inmemResults         *unsynchronized.LightTransactionResults
+	inmemTxResultErrMsgs *unsynchronized.TransactionResultErrorMessages
 
 	executionData       *execution_data.BlockExecutionDataEntity
 	txResultErrMsgsData []flow.TransactionResultErrorMessage
@@ -83,33 +83,33 @@ func NewCoreImpl(
 		Uint64("height", header.Height).
 		Logger()
 
-	registers := unsynchronized.NewRegisters(header.Height)
-	events := unsynchronized.NewEvents()
-	collections := unsynchronized.NewCollections()
-	transactions := unsynchronized.NewTransactions()
-	results := unsynchronized.NewLightTransactionResults()
-	txResultErrMsgs := unsynchronized.NewTransactionResultErrorMessages()
+	inmemRegisters := unsynchronized.NewRegisters(header.Height)
+	inmemEvents := unsynchronized.NewEvents()
+	inmemCollections := unsynchronized.NewCollections()
+	inmemTransactions := unsynchronized.NewTransactions()
+	inmemResults := unsynchronized.NewLightTransactionResults()
+	inmemTxResultErrMsgs := unsynchronized.NewTransactionResultErrorMessages()
 
 	indexerComponent := indexer.NewInMemoryIndexer(
 		coreLogger,
-		registers,
-		events,
-		collections,
-		transactions,
-		results,
-		txResultErrMsgs,
+		inmemRegisters,
+		inmemEvents,
+		inmemCollections,
+		inmemTransactions,
+		inmemResults,
+		inmemTxResultErrMsgs,
 		executionResult,
 		header,
 	)
 
 	persisterComponent := indexer.NewPersister(
 		coreLogger,
-		registers,
-		events,
-		collections,
-		transactions,
-		results,
-		txResultErrMsgs,
+		inmemRegisters,
+		inmemEvents,
+		inmemCollections,
+		inmemTransactions,
+		inmemResults,
+		inmemTxResultErrMsgs,
 		persistentRegisters,
 		persistentEvents,
 		persistentCollections,
@@ -129,12 +129,12 @@ func NewCoreImpl(
 		persister:                persisterComponent,
 		executionResult:          executionResult,
 		header:                   header,
-		registers:                registers,
-		events:                   events,
-		collections:              collections,
-		transactions:             transactions,
-		results:                  results,
-		txResultErrMsgs:          txResultErrMsgs,
+		inmemRegisters:           inmemRegisters,
+		inmemEvents:              inmemEvents,
+		inmemCollections:         inmemCollections,
+		inmemTransactions:        inmemTransactions,
+		inmemResults:             inmemResults,
+		inmemTxResultErrMsgs:     inmemTxResultErrMsgs,
 	}, nil
 }
 
@@ -154,14 +154,14 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 
 	executionData, err := c.execDataRequester.RequestExecutionData(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to request execution data: %w", err)
 	}
 
 	c.executionData = execution_data.NewBlockExecutionDataEntity(c.executionResult.ExecutionDataID, executionData)
 
 	txResultErrMsgsData, err := c.txResultErrMsgsRequester.Request(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to request transaction result error messages data: %w", err)
 	}
 
 	c.txResultErrMsgsData = txResultErrMsgsData
@@ -172,8 +172,7 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 // Index implements the Core.Index method.
 // It retrieves the downloaded execution data from the cache and indexes it into in-memory storage.
 func (c *CoreImpl) Index(ctx context.Context) error {
-	c.log.Debug().
-		Msg("indexing execution data")
+	c.log.Debug().Msg("indexing execution data")
 
 	if err := c.indexer.IndexBlockData(c.executionData); err != nil {
 		return err
@@ -189,20 +188,14 @@ func (c *CoreImpl) Index(ctx context.Context) error {
 // Persist implements the Core.Persist method.
 // It persists the indexed data to permanent storage atomically.
 func (c *CoreImpl) Persist(ctx context.Context) error {
-	c.log.Debug().
-		Hex("block_id", logging.ID(c.executionResult.BlockID)).
-		Uint64("height", c.header.Height).
-		Msg("persisting execution data")
+	c.log.Debug().Msg("persisting execution data")
 
 	// Add all data to the batch
 	if err := c.persister.Persist(); err != nil {
 		return fmt.Errorf("failed to persist data: %w", err)
 	}
 
-	c.log.Info().
-		Hex("block_id", logging.ID(c.executionResult.BlockID)).
-		Uint64("height", c.header.Height).
-		Msg("successfully persisted execution data")
+	c.log.Info().Msg("successfully persisted execution data")
 
 	return nil
 }
@@ -214,12 +207,12 @@ func (c *CoreImpl) Abandon(ctx context.Context) error {
 
 	// Clear in-memory storage by setting references to nil for garbage collection
 	// Since we don't have Clear() methods, we remove the references to allow GC
-	c.registers = nil
-	c.events = nil
-	c.collections = nil
-	c.transactions = nil
-	c.results = nil
-	c.txResultErrMsgs = nil
+	c.inmemRegisters = nil
+	c.inmemEvents = nil
+	c.inmemCollections = nil
+	c.inmemTransactions = nil
+	c.inmemResults = nil
+	c.inmemTxResultErrMsgs = nil
 
 	// Clear other references
 	c.txResultErrMsgsRequester = nil

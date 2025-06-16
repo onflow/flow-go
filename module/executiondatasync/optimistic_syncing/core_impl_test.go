@@ -95,12 +95,12 @@ func assertCoreInitialized(t *testing.T, core *CoreImpl) {
 	assert.NotNil(t, core.txResultErrMsgsRequester)
 	assert.NotNil(t, core.executionResult)
 	assert.NotNil(t, core.header)
-	assert.NotNil(t, core.registers)
-	assert.NotNil(t, core.events)
-	assert.NotNil(t, core.collections)
-	assert.NotNil(t, core.transactions)
-	assert.NotNil(t, core.results)
-	assert.NotNil(t, core.txResultErrMsgs)
+	assert.NotNil(t, core.inmemRegisters)
+	assert.NotNil(t, core.inmemEvents)
+	assert.NotNil(t, core.inmemCollections)
+	assert.NotNil(t, core.inmemTransactions)
+	assert.NotNil(t, core.inmemResults)
+	assert.NotNil(t, core.inmemTxResultErrMsgs)
 	assert.NotNil(t, core.indexer)
 	assert.NotNil(t, core.persister)
 }
@@ -147,7 +147,7 @@ func TestCoreImpl_Download(t *testing.T) {
 		err := core.Download(ctx)
 
 		assert.Error(t, err)
-		assert.Equal(t, assert.AnError, err)
+		assert.ErrorIs(t, err, assert.AnError)
 		assert.Nil(t, core.executionData)
 
 		txResultErrMsgsRequester.AssertNotCalled(t, "Request")
@@ -165,7 +165,7 @@ func TestCoreImpl_Download(t *testing.T) {
 		err := core.Download(ctx)
 
 		assert.Error(t, err)
-		assert.Equal(t, assert.AnError, err)
+		assert.ErrorIs(t, err, assert.AnError)
 		assert.NotNil(t, core.executionData)
 	})
 }
@@ -278,12 +278,12 @@ func TestCoreImpl_Abandon(t *testing.T) {
 
 		require.NoError(t, err)
 
-		assert.Nil(t, core.registers)
-		assert.Nil(t, core.events)
-		assert.Nil(t, core.collections)
-		assert.Nil(t, core.transactions)
-		assert.Nil(t, core.results)
-		assert.Nil(t, core.txResultErrMsgs)
+		assert.Nil(t, core.inmemRegisters)
+		assert.Nil(t, core.inmemEvents)
+		assert.Nil(t, core.inmemCollections)
+		assert.Nil(t, core.inmemTransactions)
+		assert.Nil(t, core.inmemResults)
+		assert.Nil(t, core.inmemTxResultErrMsgs)
 		assert.Nil(t, core.txResultErrMsgsRequester)
 		assert.Nil(t, core.execDataRequester)
 		assert.Nil(t, core.indexer)
@@ -352,6 +352,6 @@ func TestCoreImpl_ErrorScenarios(t *testing.T) {
 		err := core.Download(ctx)
 
 		assert.Error(t, err)
-		assert.Equal(t, context.Canceled, err)
+		assert.ErrorIs(t, err, context.Canceled)
 	})
 }
