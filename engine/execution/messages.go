@@ -1,50 +1,15 @@
 package execution
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 )
 
-// ComputationResult captures artifacts of execution of block collections, collection attestation results and
-// the full execution receipt, as sent by the Execution Node.
-// CAUTION: This type is used to represent both a complete ComputationResult and a partially constructed ComputationResult.
-// TODO: Consider using a Builder type to represent the partially constructed model.
 type ComputationResult struct {
 	*BlockExecutionResult
 	*BlockAttestationResult
 
 	*flow.ExecutionReceipt
-}
-
-// UntrustedComputationResult is an untrusted input-only representation of a ComputationResult,
-// used for construction.
-//
-// This type exists to ensure that constructor functions are invoked explicitly
-// with named fields, which improves clarity and reduces the risk of incorrect field
-// ordering during construction.
-//
-// An instance of UntrustedComputationResult should be validated and converted into
-// a trusted ComputationResult using NewComputationResult constructor.
-type UntrustedComputationResult ComputationResult
-
-// NewComputationResult creates a new instance of ComputationResult.
-// Construction ComputationResult allowed only within the constructor.
-//
-// All errors indicate a valid ComputationResult cannot be constructed from the input.
-func NewComputationResult(untrusted UntrustedComputationResult) (*ComputationResult, error) {
-	if untrusted.BlockExecutionResult == nil {
-		return nil, fmt.Errorf("block execution result must not be nil")
-	}
-	if untrusted.BlockAttestationResult == nil {
-		return nil, fmt.Errorf("block attestation result must not be nil")
-	}
-	return &ComputationResult{
-		BlockExecutionResult:   untrusted.BlockExecutionResult,
-		BlockAttestationResult: untrusted.BlockAttestationResult,
-		ExecutionReceipt:       untrusted.ExecutionReceipt,
-	}, nil
 }
 
 // NewEmptyComputationResult creates an empty ComputationResult.
