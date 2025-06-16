@@ -55,7 +55,7 @@ func TestNewLocator(t *testing.T) {
 	})
 
 	t.Run("invalid input with zero ResultID", func(t *testing.T) {
-		_, err := chunks.NewLocator(
+		locator, err := chunks.NewLocator(
 			chunks.UntrustedLocator{
 				ResultID: flow.ZeroID,
 				Index:    1,
@@ -63,5 +63,6 @@ func TestNewLocator(t *testing.T) {
 		)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "ResultID must not be zero")
+		require.Nil(t, locator)
 	})
 }
