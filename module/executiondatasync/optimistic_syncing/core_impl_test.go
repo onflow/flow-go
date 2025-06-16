@@ -228,6 +228,7 @@ func TestCoreImpl_Persist(t *testing.T) {
 
 		// Set up successful batch operations
 		mockBatch.On("Commit").Return(nil)
+		mockBatch.On("Close").Return(nil).Maybe()
 		mockDB.On("NewBatch").Return(mockBatch)
 
 		core, _, _ := createTestCoreImpl(t, WithDB(mockDB))
@@ -244,6 +245,7 @@ func TestCoreImpl_Persist(t *testing.T) {
 		mockBatch := storagemock.NewBatch(t)
 
 		mockBatch.On("Commit").Return(errors.New("batch commit failed"))
+		mockBatch.On("Close").Return(nil).Maybe()
 		mockDB.On("NewBatch").Return(mockBatch)
 
 		// Create CoreImpl with the failing DB
@@ -302,6 +304,7 @@ func TestCoreImpl_IntegrationWorkflow(t *testing.T) {
 
 		// Set up successful batch operations
 		mockBatch.On("Commit").Return(nil)
+		mockBatch.On("Close").Return(nil).Maybe()
 		mockDB.On("NewBatch").Return(mockBatch)
 
 		core, execDataRequester, txResultErrMsgsRequester := createTestCoreImpl(t, WithDB(mockDB))

@@ -142,7 +142,8 @@ func NewCoreImpl(
 // It downloads execution data for the block and stores it in the execution data cache.
 // Expected errors:
 // - context.Canceled: if the provided context was canceled before completion
-// All other errors are unexpected exceptions.
+//
+// No other errors are expected during normal operations
 func (c *CoreImpl) Download(ctx context.Context) error {
 	blockID := c.executionResult.BlockID
 	height := c.header.Height
@@ -172,10 +173,9 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 // Index implements the Core.Index method.
 // It retrieves the downloaded execution data from the cache and indexes it into in-memory storage.
 // Expected errors:
-// - convert.UnexpectedLedgerKeyFormat if the key is not in the expected format
 // - storage.ErrHeightNotIndexed if the given height does not match the storage's block height.
 //
-// All other errors are unexpected exceptions.
+// No other errors are expected during normal operations
 func (c *CoreImpl) Index(_ context.Context) error {
 	c.log.Debug().Msg("indexing execution data")
 
@@ -192,9 +192,8 @@ func (c *CoreImpl) Index(_ context.Context) error {
 
 // Persist implements the Core.Persist method.
 // It persists the indexed data to permanent storage atomically.
-//   - ErrRecordExists if the register record already exists
 //
-// All other errors are unexpected exceptions.
+// No errors are expected during normal operations
 func (c *CoreImpl) Persist(_ context.Context) error {
 	c.log.Debug().Msg("persisting execution data")
 
@@ -210,6 +209,8 @@ func (c *CoreImpl) Persist(_ context.Context) error {
 
 // Abandon indicates that the protocol has abandoned this state. Hence processing will be aborted
 // and any data dropped.
+//
+// No errors are expected during normal operations
 func (c *CoreImpl) Abandon(_ context.Context) error {
 	c.log.Debug().Msg("Abandon execution data processing")
 
