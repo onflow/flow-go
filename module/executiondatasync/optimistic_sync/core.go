@@ -1,4 +1,4 @@
-package pipeline
+package optimistic_sync
 
 import (
 	"context"
@@ -16,4 +16,8 @@ type Core interface {
 
 	// Persist stores the indexed data in permanent storage.
 	Persist(ctx context.Context) error
+
+	// Abandon cleans up any resources and stops processing.
+	// This is called when the pipeline is abandoned.
+	Abandon(ctx context.Context) error
 }
