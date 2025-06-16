@@ -1,0 +1,175 @@
+---
+description: 
+globs: *.go
+alwaysApply: false
+---
+# Go Documentation Rule
+
+## General Format
+```go
+// MethodName performs a specific action or returns specific information.
+// 
+// Parameters:
+//   - param1: description of param1
+//   - param2: description of param2
+//
+// Returns:
+//   - return1: description of return1
+//   - return2: description of return2
+//
+// Expected Errors:
+//   - ErrType1: when and why this error occurs
+//   - ErrType2: when and why this error occurs
+//   - All other errors are unexpected and potential indicators of bugs or corrupted internal state
+//
+// Concurrency safety:
+//   - Safe for concurrent access
+//   - Not safe for concurrent access
+```
+
+## Rules
+
+1. **Method Description**
+   - First line must be a complete sentence describing what the method does
+   - Use present tense
+   - Start with the method name
+   - End with a period
+   - Example: `// AddReceipt adds the given execution receipt to the container.`
+
+2. **Parameters**
+   - List all parameters with their types
+   - Describe the purpose and any constraints
+   - Use bullet points for clarity
+   - Example:
+     ```go
+     // Parameters:
+     //   - receipt: the execution receipt to add
+     //   - block: the block header associated with the receipt
+     ```
+
+3. **Returns**
+   - List all return values
+   - Describe the meaning of each return value
+   - Use bullet points for clarity
+   - Example:
+     ```go
+     // Returns:
+     //   - bool: true if the receipt was added, false if it already existed
+     //   - error: any error that occurred during the operation
+     ```
+
+4. **Error Returns**
+   - List all expected errors (sentinel errors)
+   - Describe when and why each error occurs
+   - Always include a catch-all for unexpected errors
+   - Example:
+     ```go
+     // Expected Errors:
+     //   - ErrInvalidReceipt: when the receipt is malformed
+     //   - ErrDuplicateReceipt: when the receipt already exists
+     //   - All other errors are unexpected and potential indicators of bugs or corrupted internal state
+     ```
+   - If there are no expected errors, use:
+     ```go
+     // No errors are expected during normal operation.
+     ```
+
+5. **Concurrency Safety**
+   - Explicitly state whether the method is safe for concurrent access
+   - If not thread-safe, explain why
+   - If all methods are thread-safe, only document this in the struct godocs and mention that all methods are thread-safe. Do not include the line in each 
+   - Example:
+     ```go
+     // Concurrency safety:
+     //   - Safe for concurrent access
+     ```
+
+8. **Special Cases**
+   - For getters/setters, use simplified format:
+     ```go
+     // GetterName returns the value of the field.
+     // Returns:
+     //   - value: description of the returned value
+     ```
+   - For constructors, use:
+     ```go
+     // NewTypeName creates a new instance of TypeName.
+     // Parameters:
+     //   - param1: description of param1
+     // Returns:
+     //   - *TypeName: the newly created instance
+     //   - error: any error that occurred during creation
+     ```
+
+10. **Private Methods**
+    - Private methods should still be documented
+    - Can use more technical language
+    - Focus on implementation details
+    - Must include error documention for any method that returns an error
+
+## Struct Documentions
+1. **Struct Description**
+    - Start with the struct name
+    - Include a brief explaination of the struct and what it is used for
+
+2. **Struct Variable**:
+    - Include comments for each member variable
+      ```go
+      type User structy{
+        // Name is the user's name
+        Name string
+      }
+
+## Examples
+
+### Standard Method
+```go
+// AddReceipt adds the given execution receipt to the container.
+//
+// Parameters:
+//   - receipt: the execution receipt to add
+//   - block: the block header associated with the receipt
+//
+// Returns:
+//   - bool: true if the receipt was added, false if it already existed
+//   - error: any error that occurred during the operation
+//
+// Error returns:
+//   - ErrInvalidReceipt: when the receipt is malformed
+//   - ErrDuplicateReceipt: when the receipt already exists
+//   - All other errors are unexpected and potential indicators of corrupted internal state
+//
+// Concurrency safety:
+//   - Safe for concurrent access
+```
+
+### Getter Method
+```go
+// Pipeline returns the pipeline associated with this execution result container.
+//
+// Returns:
+//   - *Pipeline: the associated pipeline, or nil if no pipeline is set
+//
+// Concurrency safety:
+//   - Safe for concurrent access
+```
+
+### Constructor
+```go
+// NewExecutionResultContainer creates a new instance of ExecutionResultContainer.
+//
+// Parameters:
+//   - result: the execution result to store
+//   - block: the block header associated with the result
+//   - pipeline: the pipeline to process the result
+//
+// Returns:
+//   - *ExecutionResultContainer: the newly created container
+//   - error: any error that occurred during creation
+//
+// Expected Errors:
+//   - ErrInvalidBlock: when the block ID doesn't match the result's block ID
+//   - All other errors are unexpected and potential indicators of corrupted internal state
+```
+
+This rule ensures consistent, comprehensive documentation across all Go methods in the codebase, making it easier for developers to understand and use the code correctly.
