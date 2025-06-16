@@ -51,7 +51,12 @@ type UntrustedEvent Event
 //
 // All errors indicate a valid Event cannot be constructed from the input.
 func NewEvent(untrusted UntrustedEvent) (*Event, error) {
-	//TODO(Uliana): add validation checks
+	if len(untrusted.Type) == 0 {
+		return nil, fmt.Errorf("event type must not be empty")
+	}
+	if untrusted.TransactionID == ZeroID {
+		return nil, fmt.Errorf("transaction ID must not be zero")
+	}
 	return &Event{
 		Type:             untrusted.Type,
 		TransactionID:    untrusted.TransactionID,

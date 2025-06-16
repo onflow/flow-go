@@ -98,3 +98,62 @@ func TestEmptyEventsMerkleRootHash(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, flow.EmptyEventCollectionID, actualHash)
 }
+
+// TestNewEvent verifies the behavior of the NewEvent constructor.
+// It ensures proper handling of both valid and invalid untrusted input fields.
+//
+// Test Cases:
+//
+// 1. Valid input:
+//   - Verifies that a properly populated UntrustedEvent results in a valid Event.
+//
+// 2. Invalid input with empty event type:
+//   - Ensures an error is returned when the Type field is an empty string.
+//
+// 3. Invalid input with zero transaction ID:
+//   - Ensures an error is returned when the TransactionID is zero.
+func TestNewEvent(t *testing.T) {
+	t.Run("valid input", func(t *testing.T) {
+		event, err := flow.NewEvent(
+			flow.UntrustedEvent{
+				Type:             flow.EventAccountCreated,
+				TransactionID:    unittest.IdentifierFixture(),
+				TransactionIndex: 1,
+				EventIndex:       1,
+				Payload:          []byte("cadence-json encoded data"),
+			},
+		)
+		require.NoError(t, err)
+		require.NotNil(t, event)
+	})
+
+	t.Run("invalid input, type is empty", func(t *testing.T) {
+		event, err := flow.NewEvent(
+			flow.UntrustedEvent{
+				Type:             "",
+				TransactionID:    unittest.IdentifierFixture(),
+				TransactionIndex: 1,
+				EventIndex:       1,
+				Payload:          []byte("cadence-json encoded data"),
+			},
+		)
+		require.Error(t, err)
+		require.Nil(t, event)
+		assert.Contains(t, err.Error(), "event type must not be empty")
+	})
+
+	t.Run("invalid input, transaction ID is zero", func(t *testing.T) {
+		event, err := flow.NewEvent(
+			flow.UntrustedEvent{
+				Type:             flow.EventAccountCreated,
+				TransactionID:    flow.ZeroID,
+				TransactionIndex: 1,
+				EventIndex:       1,
+				Payload:          []byte("cadence-json encoded data"),
+			},
+		)
+		require.Error(t, err)
+		require.Nil(t, event)
+		assert.Contains(t, err.Error(), "transaction ID must not be zero")
+	})
+}

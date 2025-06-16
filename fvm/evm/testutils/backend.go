@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var TestFlowEVMRootAddress = flow.Address{1, 2, 3, 4}
@@ -172,7 +173,7 @@ func getSimpleEventEmitter() *testEventEmitter {
 			e, err := flow.NewEvent(
 				flow.UntrustedEvent{
 					Type:             flow.EventType(event.EventType.ID()),
-					TransactionID:    flow.ZeroID,
+					TransactionID:    unittest.IdentifierFixture(),
 					TransactionIndex: 0,
 					EventIndex:       0,
 					Payload:          payload,

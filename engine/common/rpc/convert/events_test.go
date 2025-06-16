@@ -30,7 +30,7 @@ func TestConvertEventWithoutPayloadConversion(t *testing.T) {
 		converted, err := convert.MessageToEvent(msg)
 		require.NoError(t, err)
 
-		require.Equal(t, event, converted)
+		require.Equal(t, event, *converted)
 	})
 
 	t.Run("convert json cdc encoded event", func(t *testing.T) {
@@ -44,7 +44,7 @@ func TestConvertEventWithoutPayloadConversion(t *testing.T) {
 		converted, err := convert.MessageToEvent(msg)
 		require.NoError(t, err)
 
-		require.Equal(t, event, converted)
+		require.Equal(t, event, *converted)
 	})
 
 	t.Run("convert json cdc encoded event", func(t *testing.T) {
