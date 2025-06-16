@@ -9,8 +9,8 @@ import (
 
 // ComputationResult captures artifacts of execution of block collections, collection attestation results and
 // the full execution receipt, as sent by the Execution Node.
-//
-//structwrite:immutable - mutations allowed only within the constructor
+// CAUTION: This type is used to represent both a complete ComputationResult and a partially constructed ComputationResult.
+// TODO: Consider using a Builder type to represent the partially constructed model.
 type ComputationResult struct {
 	*BlockExecutionResult
 	*BlockAttestationResult
