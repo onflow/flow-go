@@ -29,7 +29,7 @@ func EventToMessage(e flow.Event) *entities.Event {
 
 // MessageToEvent converts a protobuf message to a flow.Event
 // Note: this function does not convert the payload encoding
-func MessageToEvent(m *entities.Event) (flow.Event, error) {
+func MessageToEvent(m *entities.Event) (*flow.Event, error) {
 	event, err := flow.NewEvent(
 		flow.UntrustedEvent{
 			Type:             flow.EventType(m.GetType()),
@@ -40,10 +40,10 @@ func MessageToEvent(m *entities.Event) (flow.Event, error) {
 		},
 	)
 	if err != nil {
-		return flow.Event{}, fmt.Errorf("could not construct event: %w", err)
+		return nil, fmt.Errorf("could not construct event: %w", err)
 	}
 
-	return *event, nil
+	return event, nil
 }
 
 // EventsToMessages converts a slice of flow.Events to a slice of protobuf messages
@@ -65,7 +65,7 @@ func MessagesToEvents(l []*entities.Event) ([]flow.Event, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not convert message at index %d to event: %w", i, err)
 		}
-		events[i] = event
+		events[i] = *event
 	}
 
 	return events, nil
@@ -121,7 +121,7 @@ func MessageToEventFromVersion(m *entities.Event, inputVersion entities.EventEnc
 
 		return e, nil
 	case entities.EventEncodingVersion_JSON_CDC_V0:
-		return &event, nil
+		return event, nil
 	default:
 		return nil, fmt.Errorf("invalid encoding format %d", inputVersion)
 	}
