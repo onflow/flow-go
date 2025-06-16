@@ -3,7 +3,6 @@ package pipeline
 import (
 	"context"
 	"errors"
-	"github.com/onflow/flow-go/storage"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -15,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	reqestermock "github.com/onflow/flow-go/module/state_synchronization/requester/mock"
+	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
