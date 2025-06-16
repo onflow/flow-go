@@ -139,6 +139,9 @@ func NewCoreImpl(
 
 // Download implements the Core.Download method.
 // It downloads execution data for the block and stores it in the execution data cache.
+// Expected errors:
+// - context.Canceled: if the provided context was canceled before completion
+// All other errors are unexpected exceptions.
 func (c *CoreImpl) Download(ctx context.Context) error {
 	blockID := c.executionResult.BlockID
 	height := c.header.Height
