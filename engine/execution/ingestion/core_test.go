@@ -183,7 +183,7 @@ type mockExecutor struct {
 func (m *mockExecutor) ExecuteBlock(_ context.Context, block *entity.ExecutableBlock) (*execution.ComputationResult, error) {
 	result := testutil.ComputationResultFixture(m.t)
 	result.ExecutableBlock = block
-	result.ExecutionResult.BlockID = block.BlockID()
+	result.ExecutionReceipt.ExecutionResult.BlockID = block.BlockID()
 	log.Info().Msgf("mockExecutor: block %v executed", block.Block.Header.Height)
 	return result, nil
 }

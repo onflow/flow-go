@@ -356,7 +356,7 @@ func ExecutionResultFixture(t *testing.T,
 		}
 
 		chunkDataPacks = computationResult.AllChunkDataPacks()
-		result = &computationResult.ExecutionResult
+		result = &computationResult.ExecutionReceipt.ExecutionResult
 	})
 
 	return result, &ExecutionReceiptData{
