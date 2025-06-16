@@ -6,7 +6,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -14,8 +14,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type persisterTest struct {
-	t                      *testing.T
+type PersisterSuite struct {
+	suite.Suite
 	persister              *Persister
 	inMemoryRegisters      *unsynchronized.Registers
 	inMemoryEvents         *unsynchronized.Events
@@ -30,91 +30,91 @@ type persisterTest struct {
 	results                *storagemock.LightTransactionResults
 	txResultErrMsg         *storagemock.TransactionResultErrorMessages
 	batch                  *storagemock.Batch
+	database               *storagemock.DB
 	executionResult        *flow.ExecutionResult
 	header                 *flow.Header
-	database               *storagemock.DB
 }
 
-func newPersisterTest(t *testing.T) *persisterTest {
-	header := unittest.BlockHeaderFixture()
-	block := unittest.BlockWithParentFixture(header)
-	executionResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
-
-	database := storagemock.NewDB(t)
-	batch := storagemock.NewBatch(t)
-	batch.On("Commit").Return(nil).Maybe()
-	batch.On("Close").Return(nil)
-	database.On("NewBatch").Return(batch)
-
-	return &persisterTest{
-		t:                      t,
-		inMemoryRegisters:      unsynchronized.NewRegisters(header.Height),
-		inMemoryEvents:         unsynchronized.NewEvents(),
-		inMemoryCollections:    unsynchronized.NewCollections(),
-		inMemoryTransactions:   unsynchronized.NewTransactions(),
-		inMemoryResults:        unsynchronized.NewLightTransactionResults(),
-		inMemoryTxResultErrMsg: unsynchronized.NewTransactionResultErrorMessages(),
-		registers:              storagemock.NewRegisterIndex(t),
-		events:                 storagemock.NewEvents(t),
-		collections:            storagemock.NewCollections(t),
-		transactions:           storagemock.NewTransactions(t),
-		results:                storagemock.NewLightTransactionResults(t),
-		txResultErrMsg:         storagemock.NewTransactionResultErrorMessages(t),
-		batch:                  batch,
-		executionResult:        executionResult,
-		header:                 header,
-		database:               database,
-	}
+func TestPersisterSuite(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(PersisterSuite))
 }
 
-func (pt *persisterTest) initPersister() *persisterTest {
-	pt.persister = NewPersister(
+func (p *PersisterSuite) SetupTest() {
+	t := p.T()
+
+	p.header = unittest.BlockHeaderFixture()
+	p.inMemoryRegisters = unsynchronized.NewRegisters(p.header.Height)
+	p.inMemoryEvents = unsynchronized.NewEvents()
+	p.inMemoryCollections = unsynchronized.NewCollections()
+	p.inMemoryTransactions = unsynchronized.NewTransactions()
+	p.inMemoryResults = unsynchronized.NewLightTransactionResults()
+	p.inMemoryTxResultErrMsg = unsynchronized.NewTransactionResultErrorMessages()
+
+	p.registers = storagemock.NewRegisterIndex(t)
+	p.events = storagemock.NewEvents(t)
+	p.collections = storagemock.NewCollections(t)
+	p.transactions = storagemock.NewTransactions(t)
+	p.results = storagemock.NewLightTransactionResults(t)
+	p.txResultErrMsg = storagemock.NewTransactionResultErrorMessages(t)
+
+	p.batch = storagemock.NewBatch(t)
+	p.batch.On("Commit").Return(nil).Maybe()
+	p.batch.On("Close").Return(nil)
+	p.database = storagemock.NewDB(t)
+	p.database.On("NewBatch").Return(p.batch)
+
+	block := unittest.BlockWithParentFixture(p.header)
+	p.executionResult = unittest.ExecutionResultFixture(unittest.WithBlock(block))
+
+	p.persister = NewPersister(
 		zerolog.Nop(),
-		pt.inMemoryRegisters,
-		pt.inMemoryEvents,
-		pt.inMemoryCollections,
-		pt.inMemoryTransactions,
-		pt.inMemoryResults,
-		pt.inMemoryTxResultErrMsg,
-		pt.registers,
-		pt.events,
-		pt.collections,
-		pt.transactions,
-		pt.results,
-		pt.txResultErrMsg,
-		pt.database,
-		pt.executionResult,
-		pt.header,
+		p.inMemoryRegisters,
+		p.inMemoryEvents,
+		p.inMemoryCollections,
+		p.inMemoryTransactions,
+		p.inMemoryResults,
+		p.inMemoryTxResultErrMsg,
+		p.registers,
+		p.events,
+		p.collections,
+		p.transactions,
+		p.results,
+		p.txResultErrMsg,
+		p.database,
+		p.executionResult,
+		p.header,
 	)
-	return pt
+
+	p.populateInMemoryStorages()
 }
 
-func (pt *persisterTest) populateInMemoryStorages() {
+func (p *PersisterSuite) populateInMemoryStorages() {
 	regEntries := make(flow.RegisterEntries, 3)
 	for i := 0; i < 3; i++ {
 		regEntries[i] = unittest.RegisterEntryFixture()
 	}
-	require.NoError(pt.t, pt.inMemoryRegisters.Store(regEntries, pt.header.Height))
+	p.Require().NoError(p.inMemoryRegisters.Store(regEntries, p.header.Height))
 
 	eventsList := unittest.EventsFixture(5)
-	err := pt.inMemoryEvents.Store(pt.executionResult.BlockID, []flow.EventsList{eventsList})
-	require.NoError(pt.t, err)
+	err := p.inMemoryEvents.Store(p.executionResult.BlockID, []flow.EventsList{eventsList})
+	p.Require().NoError(err)
 
 	for i := 0; i < 2; i++ {
 		collection := unittest.CollectionFixture(2)
 		light := collection.Light()
-		err := pt.inMemoryCollections.StoreLightAndIndexByTransaction(&light)
-		require.NoError(pt.t, err)
+		err := p.inMemoryCollections.StoreLightAndIndexByTransaction(&light)
+		p.Require().NoError(err)
 
 		for _, tx := range collection.Transactions {
-			err := pt.inMemoryTransactions.Store(tx)
-			require.NoError(pt.t, err)
+			err := p.inMemoryTransactions.Store(tx)
+			p.Require().NoError(err)
 		}
 	}
 
 	results := unittest.LightTransactionResultsFixture(4)
-	err = pt.inMemoryResults.Store(pt.executionResult.BlockID, results)
-	require.NoError(pt.t, err)
+	err = p.inMemoryResults.Store(p.executionResult.BlockID, results)
+	p.Require().NoError(err)
 
 	txResultErrMsgs := make([]flow.TransactionResultErrorMessage, 2)
 	executorID := unittest.IdentifierFixture()
@@ -126,184 +126,153 @@ func (pt *persisterTest) populateInMemoryStorages() {
 			ExecutorID:    executorID,
 		}
 	}
-	err = pt.inMemoryTxResultErrMsg.Store(pt.header.ID(), txResultErrMsgs)
-	require.NoError(pt.t, err)
+	err = p.inMemoryTxResultErrMsg.Store(p.header.ID(), txResultErrMsgs)
+	p.Require().NoError(err)
 }
 
-// verifySuccess verifies that the operation completed successfully with no errors
-func (pt *persisterTest) verifySuccess(err error) {
-	assert.NoError(pt.t, err)
+func (p *PersisterSuite) TestPersister_AddToBatch_WithData() {
+	storedRegisters := make([]flow.RegisterEntry, 0)
+	storedEvents := make([]flow.EventsList, 0)
+	storedCollections := make([]flow.LightCollection, 0)
+	storedTransactions := make([]flow.TransactionBody, 0)
+	storedResults := make([]flow.LightTransactionResult, 0)
+	storedTxResultErrMsgs := make([]flow.TransactionResultErrorMessage, 0)
+
+	p.registers.On("Store", mock.Anything, p.header.Height).Run(func(args mock.Arguments) {
+		sr, ok := args.Get(0).(flow.RegisterEntries)
+		p.Require().True(ok)
+		storedRegisters = sr
+	}).Return(nil)
+
+	p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, p.batch).Run(func(args mock.Arguments) {
+		se, ok := args.Get(1).([]flow.EventsList)
+		p.Require().True(ok)
+		storedEvents = se
+	}).Return(nil)
+
+	p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, p.batch).Run(func(args mock.Arguments) {
+		collection, ok := args.Get(0).(*flow.LightCollection)
+		p.Require().True(ok)
+		storedCollections = append(storedCollections, *collection)
+	}).Return(nil)
+
+	p.transactions.On("BatchStore", mock.Anything, p.batch).Run(func(args mock.Arguments) {
+		transaction, ok := args.Get(0).(*flow.TransactionBody)
+		p.Require().True(ok)
+		storedTransactions = append(storedTransactions, *transaction)
+	}).Return(nil)
+
+	p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, p.batch).Run(func(args mock.Arguments) {
+		sr, ok := args.Get(1).([]flow.LightTransactionResult)
+		p.Require().True(ok)
+		storedResults = sr
+	}).Return(nil)
+
+	p.txResultErrMsg.On("BatchStore", p.header.ID(), mock.Anything, p.batch).Run(func(args mock.Arguments) {
+		terrm, ok := args.Get(1).([]flow.TransactionResultErrorMessage)
+		p.Require().True(ok)
+		storedTxResultErrMsgs = terrm
+	}).Return(nil)
+
+	err := p.persister.Persist()
+	p.Assert().NoError(err)
 
 	// Verify all mocks were called as expected
-	pt.events.AssertExpectations(pt.t)
-	pt.results.AssertExpectations(pt.t)
-	pt.registers.AssertExpectations(pt.t)
-	pt.collections.AssertExpectations(pt.t)
-	pt.transactions.AssertExpectations(pt.t)
-	pt.txResultErrMsg.AssertExpectations(pt.t)
+	p.events.AssertExpectations(p.T())
+	p.Assert().ElementsMatch([]flow.EventsList{p.inMemoryEvents.Data()}, storedEvents)
+
+	p.results.AssertExpectations(p.T())
+	p.Assert().ElementsMatch(p.inMemoryResults.Data(), storedResults)
+
+	p.registers.AssertExpectations(p.T())
+	p.Assert().ElementsMatch(p.inMemoryRegisters.Data(), storedRegisters)
+
+	p.collections.AssertExpectations(p.T())
+	p.Assert().ElementsMatch(p.inMemoryCollections.LightCollections(), storedCollections)
+
+	p.transactions.AssertExpectations(p.T())
+	p.Assert().ElementsMatch(p.inMemoryTransactions.Data(), storedTransactions)
+
+	p.txResultErrMsg.AssertExpectations(p.T())
+	p.Assert().ElementsMatch(p.inMemoryTxResultErrMsg.Data(), storedTxResultErrMsgs)
 }
 
-func TestPersister_AddToBatch_EmptyStorages(t *testing.T) {
-	pt := newPersisterTest(t).initPersister()
+func (p *PersisterSuite) TestPersister_Persist_ErrorHandling() {
+	tests := []struct {
+		name          string
+		setupMocks    func()
+		expectedError string
+	}{
+		{
+			name: "RegistersStoreError",
+			setupMocks: func() {
+				p.registers.On("Store", mock.Anything, p.header.Height).Return(assert.AnError).Once()
+			},
+			expectedError: "could not persist registers",
+		},
+		{
+			name: "EventsBatchStoreError",
+			setupMocks: func() {
+				p.registers.On("Store", mock.Anything, p.header.Height).Return(nil).Once()
+				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, p.batch).Return(assert.AnError).Once()
+			},
+			expectedError: "could not add events to batch",
+		},
+		{
+			name: "ResultsBatchStoreError",
+			setupMocks: func() {
+				p.registers.On("Store", mock.Anything, p.header.Height).Return(nil).Once()
+				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, p.batch).Return(nil).Once()
+				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, p.batch).Return(assert.AnError).Once()
+			},
+			expectedError: "could not add transaction results to batch",
+		},
+		{
+			name: "CollectionsStoreError",
+			setupMocks: func() {
+				p.registers.On("Store", mock.Anything, p.header.Height).Return(nil).Once()
+				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, p.batch).Return(nil).Once()
+				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, p.batch).Return(nil).Once()
+				p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(assert.AnError).Once()
+			},
+			expectedError: "could not add collections to batch",
+		},
+		{
+			name: "TransactionsStoreError",
+			setupMocks: func() {
+				p.registers.On("Store", mock.Anything, p.header.Height).Return(nil).Once()
+				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, p.batch).Return(nil).Once()
+				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, p.batch).Return(nil).Once()
+				numberOfCollections := len(p.inMemoryCollections.LightCollections())
+				p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil).Times(numberOfCollections)
+				p.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(assert.AnError).Once()
+			},
+			expectedError: "could not add transactions to batch",
+		},
+		{
+			name: "TxResultErrMsgStoreError",
+			setupMocks: func() {
+				p.registers.On("Store", mock.Anything, p.header.Height).Return(nil).Once()
+				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, p.batch).Return(nil).Once()
+				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, p.batch).Return(nil).Once()
+				numberOfCollections := len(p.inMemoryCollections.LightCollections())
+				p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil).Times(numberOfCollections)
+				numberOfTransactions := len(p.inMemoryTransactions.Data())
+				p.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil).Times(numberOfTransactions)
+				p.txResultErrMsg.On("BatchStore", p.header.ID(), mock.Anything, p.batch).Return(assert.AnError).Once()
+			},
+			expectedError: "could not add transaction result error messages to batch",
+		},
+	}
 
-	pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)
+	for _, test := range tests {
+		p.Run(test.name, func() {
+			test.setupMocks()
 
-	// Test AddToBatch with empty storages
-	err := pt.persister.Persist()
+			err := p.persister.Persist()
 
-	// Verify the function worked as expected
-	pt.verifySuccess(err)
-}
-
-func TestPersister_AddToBatch_WithData(t *testing.T) {
-	pt := newPersisterTest(t).initPersister()
-	pt.populateInMemoryStorages()
-
-	// Set up expectations for populated storages
-	pt.events.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
-	pt.results.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
-	pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)
-	pt.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil)
-	pt.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil)
-	pt.txResultErrMsg.On("BatchStore", pt.header.ID(), mock.Anything, pt.batch).Return(nil)
-
-	err := pt.persister.Persist()
-
-	pt.verifySuccess(err)
-}
-
-func TestPersister_AddToBatch_ErrorHandling(t *testing.T) {
-	t.Run("RegistersStoreError", func(t *testing.T) {
-		pt := newPersisterTest(t).initPersister()
-		pt.populateInMemoryStorages()
-
-		// Only set up the registers mock to return an error
-		pt.registers.On("Store", mock.Anything, pt.header.Height).Return(assert.AnError)
-
-		// No need to set up collections and transactions as we expect early return
-
-		err := pt.persister.Persist()
-
-		// Verify the function worked as expected
-		assert.Error(pt.t, err)
-		assert.Contains(pt.t, err.Error(), "could not persist registers")
-
-		pt.registers.AssertExpectations(pt.t)
-	})
-
-	t.Run("EventsBatchStoreError", func(t *testing.T) {
-		pt := newPersisterTest(t).initPersister()
-		pt.populateInMemoryStorages()
-
-		// Only set up the events mock to return an error
-		pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)
-		pt.events.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(assert.AnError)
-
-		// No need to set up other mocks as we expect early return
-
-		err := pt.persister.Persist()
-
-		// Verify the function worked as expected
-		assert.Error(pt.t, err)
-		assert.Contains(pt.t, err.Error(), "could not add events to batch")
-
-		pt.registers.AssertExpectations(pt.t)
-		pt.events.AssertExpectations(pt.t)
-	})
-
-	t.Run("ResultsBatchStoreError", func(t *testing.T) {
-		pt := newPersisterTest(t).initPersister()
-		pt.populateInMemoryStorages()
-
-		// Set up events to succeed but results to fail
-		pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)
-		pt.events.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
-		pt.results.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(assert.AnError)
-
-		// No need to set up other mocks as we expect early return
-
-		err := pt.persister.Persist()
-
-		// Verify the function worked as expected
-		assert.Error(pt.t, err)
-		assert.Contains(pt.t, err.Error(), "could not add transaction results to batch")
-
-		pt.registers.AssertExpectations(pt.t)
-		pt.events.AssertExpectations(pt.t)
-		pt.results.AssertExpectations(pt.t)
-	})
-
-	t.Run("CollectionsStoreError", func(t *testing.T) {
-		pt := newPersisterTest(t).initPersister()
-		pt.populateInMemoryStorages()
-
-		// Set up everything before collections to succeed, but collections to fail
-		pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)
-		pt.events.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
-		pt.results.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
-		pt.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(assert.AnError)
-
-		// No need to set up transactions as we expect early return
-
-		err := pt.persister.Persist()
-
-		// Verify the function worked as expected
-		assert.Error(pt.t, err)
-		assert.Contains(pt.t, err.Error(), "could not add collections to batch")
-
-		pt.registers.AssertExpectations(pt.t)
-		pt.events.AssertExpectations(pt.t)
-		pt.results.AssertExpectations(pt.t)
-		pt.collections.AssertExpectations(pt.t)
-	})
-
-	t.Run("TransactionsStoreError", func(t *testing.T) {
-		pt := newPersisterTest(t).initPersister()
-		pt.populateInMemoryStorages()
-
-		// Set up everything before transactions to succeed, but transactions to fail
-		pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)
-		pt.events.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
-		pt.results.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
-		pt.collections.On("BatchStoreLightAndIndexB"+
-			"yTransaction", mock.Anything, mock.Anything).Return(nil)
-		pt.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(assert.AnError)
-
-		err := pt.persister.Persist()
-
-		assert.Error(pt.t, err)
-		assert.Contains(pt.t, err.Error(), "could not add transactions to batch")
-
-		pt.registers.AssertExpectations(pt.t)
-		pt.events.AssertExpectations(pt.t)
-		pt.results.AssertExpectations(pt.t)
-		pt.collections.AssertExpectations(pt.t)
-		pt.transactions.AssertExpectations(pt.t)
-	})
-
-	t.Run("TxResultErrMsgStoreError", func(t *testing.T) {
-		pt := newPersisterTest(t).initPersister()
-		pt.populateInMemoryStorages()
-
-		// Set up everything before txResultErrMsg to succeed, but txResultErrMsg to fail
-		pt.registers.On("Store", mock.Anything, pt.header.Height).Return(nil)
-		pt.events.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
-		pt.results.On("BatchStore", pt.executionResult.BlockID, mock.Anything, pt.batch).Return(nil)
-		pt.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil)
-		pt.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil)
-		pt.txResultErrMsg.On("BatchStore", pt.header.ID(), mock.Anything, pt.batch).Return(assert.AnError)
-
-		err := pt.persister.Persist()
-
-		// Verify the function worked as expected
-		assert.Error(pt.t, err)
-		assert.Contains(pt.t, err.Error(), "could not add transactions to batch")
-
-		pt.registers.AssertExpectations(pt.t)
-		pt.events.AssertExpectations(pt.t)
-		pt.results.AssertExpectations(pt.t)
-		pt.collections.AssertExpectations(pt.t)
-		pt.transactions.AssertExpectations(pt.t)
-		pt.txResultErrMsg.AssertExpectations(pt.t)
-	})
+			p.Assert().Error(err)
+			p.Assert().Contains(err.Error(), test.expectedError)
+		})
+	}
 }
