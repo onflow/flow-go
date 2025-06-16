@@ -16,6 +16,7 @@ access:
     {{$val.name}}:
       args:{{template "args" .}}
         - --loglevel=INFO
+        - --admin-addr=0.0.0.0:9002
         - --rpc-addr=0.0.0.0:9000
         - --secure-rpc-addr=0.0.0.0:9001
         - --http-addr=0.0.0.0:8000
@@ -44,6 +45,7 @@ collection:
     {{$val.name}}:
       args:{{template "args" .}}
         - --loglevel=INFO
+        - --admin-addr=0.0.0.0:9002
         - --block-rate-delay=950ms
         - --ingress-addr=0.0.0.0:9000
         - --insecure-access-api=false
@@ -67,6 +69,7 @@ consensus:
     {{$val.name}}:
       args:{{template "args" .}}
         - --loglevel=DEBUG
+        - --admin-addr=0.0.0.0:9002
         - --block-rate-delay=800ms
         - --cruise-ctl-max-view-duration=2s
         - --chunk-alpha=1
@@ -92,6 +95,7 @@ execution:
     {{$val.name}}:
       args:{{template "args" .}}
         - --loglevel=INFO
+        - --admin-addr=0.0.0.0:9002
         - --rpc-addr=0.0.0.0:9000
         - --cadence-tracing=false
         - --extensive-tracing=false
@@ -115,6 +119,7 @@ verification:
     {{$val.name}}:
       args:{{template "args" .}}
         - --loglevel=INFO
+        - --admin-addr=0.0.0.0:9002
         - --chunk-alpha=1
       env:{{template "env" .}}
       image: {{$val.docker_registry}}/verification:{{$val.docker_tag}}
