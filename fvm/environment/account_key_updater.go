@@ -361,8 +361,11 @@ func (updater *accountKeyUpdater) AddAccountKey(
 	defer updater.tracer.StartChildSpan(trace.FVMEnvAddAccountKey).End()
 
 	err := updater.meter.MeterComputation(
-		ComputationKindAddAccountKey,
-		1)
+		common.ComputationUsage{
+			Kind:      ComputationKindAddAccountKey,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("add account key failed: %w", err)
 	}
@@ -389,8 +392,11 @@ func (updater *accountKeyUpdater) RevokeAccountKey(
 	defer updater.tracer.StartChildSpan(trace.FVMEnvRevokeAccountKey).End()
 
 	err := updater.meter.MeterComputation(
-		ComputationKindRevokeAccountKey,
-		1)
+		common.ComputationUsage{
+			Kind:      ComputationKindRevokeAccountKey,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("revoke account key failed: %w", err)
 	}

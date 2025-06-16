@@ -451,8 +451,12 @@ func (h *ContractHandler) dryRun(
 	from types.Address,
 ) (*types.Result, error) {
 	// step 1 - transaction decoding
-	encodedLen := uint(len(rlpEncodedTx))
-	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, encodedLen)
+	err := h.backend.MeterComputation(
+		common.ComputationUsage{
+			Kind:      environment.ComputationKindRLPDecoding,
+			Intensity: uint64(len(rlpEncodedTx)),
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -488,7 +492,11 @@ func (h *ContractHandler) dryRun(
 // before attempting executing a evm operation
 func (h *ContractHandler) checkGasLimit(limit types.GasLimit) error {
 	// check gas limit against what has been left on the transaction side
-	if !h.backend.ComputationAvailable(environment.ComputationKindEVMGasUsage, uint(limit)) {
+	usage := common.ComputationUsage{
+		Kind:      environment.ComputationKindEVMGasUsage,
+		Intensity: uint64(limit),
+	}
+	if !h.backend.ComputationAvailable(usage) {
 		return types.ErrInsufficientComputation
 	}
 	return nil
@@ -496,8 +504,11 @@ func (h *ContractHandler) checkGasLimit(limit types.GasLimit) error {
 
 // decodeTransaction decodes RLP encoded transaction payload and meters the resources used.
 func (h *ContractHandler) decodeTransaction(encodedTx []byte) (*gethTypes.Transaction, error) {
-	encodedLen := uint(len(encodedTx))
-	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, encodedLen)
+	usage := common.ComputationUsage{
+		Kind:      environment.ComputationKindRLPDecoding,
+		Intensity: uint64(len(encodedTx)),
+	}
+	err := h.backend.MeterComputation(usage)
 	if err != nil {
 		return nil, err
 	}
@@ -511,7 +522,11 @@ func (h *ContractHandler) decodeTransaction(encodedTx []byte) (*gethTypes.Transa
 }
 
 func (h *ContractHandler) meterGasUsage(res *types.Result) error {
-	return h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, uint(res.GasConsumed))
+	usage := common.ComputationUsage{
+		Kind:      environment.ComputationKindEVMGasUsage,
+		Intensity: res.GasConsumed,
+	}
+	return h.backend.MeterComputation(usage)
 }
 
 func (h *ContractHandler) emitEvent(event *events.Event) error {

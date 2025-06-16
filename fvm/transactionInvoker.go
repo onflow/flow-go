@@ -337,19 +337,19 @@ func (executor *transactionExecutor) logExecutionIntensities() {
 	}
 
 	computation := zerolog.Dict()
-	for s, u := range executor.txnState.ComputationIntensities() {
-		computation.Uint(strconv.FormatUint(uint64(s), 10), u)
+	for kind, intensity := range executor.txnState.ComputationIntensities() {
+		computation.Uint64(strconv.FormatUint(uint64(kind), 10), intensity)
 	}
 	memory := zerolog.Dict()
-	for s, u := range executor.txnState.MemoryIntensities() {
-		memory.Uint(strconv.FormatUint(uint64(s), 10), u)
+	for kind, amount := range executor.txnState.MemoryAmounts() {
+		memory.Uint64(strconv.FormatUint(uint64(kind), 10), amount)
 	}
 	log.Debug().
 		Uint64("ledgerInteractionUsed", executor.txnState.InteractionUsed()).
 		Uint64("computationUsed", executor.txnState.TotalComputationUsed()).
 		Uint64("memoryEstimate", executor.txnState.TotalMemoryEstimate()).
 		Dict("computationIntensities", computation).
-		Dict("memoryIntensities", memory).
+		Dict("memoryAmounts", memory).
 		Msg("transaction execution data")
 }
 

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/common"
-	"github.com/onflow/cadence/interpreter"
+	"github.com/onflow/cadence/runtime"
 
 	"github.com/stretchr/testify/require"
 
@@ -40,7 +40,7 @@ func TestDerivedChainData(t *testing.T) {
 
 	loc1 := testLocation("0a")
 	prog1 := &Program{
-		Program: &interpreter.Program{},
+		Program: &runtime.Program{},
 	}
 
 	txn, err := block1.NewDerivedTransactionData(0, 0)
@@ -75,7 +75,7 @@ func TestDerivedChainData(t *testing.T) {
 
 	loc2 := testLocation("0b")
 	prog2 := &Program{
-		Program: &interpreter.Program{},
+		Program: &runtime.Program{},
 	}
 
 	txn, err = block2.NewDerivedTransactionData(0, 0)

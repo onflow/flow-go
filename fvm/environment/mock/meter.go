@@ -15,17 +15,17 @@ type Meter struct {
 	mock.Mock
 }
 
-// ComputationAvailable provides a mock function with given fields: _a0, _a1
-func (_m *Meter) ComputationAvailable(_a0 common.ComputationKind, _a1 uint) bool {
-	ret := _m.Called(_a0, _a1)
+// ComputationAvailable provides a mock function with given fields: _a0
+func (_m *Meter) ComputationAvailable(_a0 common.ComputationUsage) bool {
+	ret := _m.Called(_a0)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ComputationAvailable")
 	}
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(common.ComputationKind, uint) bool); ok {
-		r0 = rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(common.ComputationUsage) bool); ok {
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -137,17 +137,17 @@ func (_m *Meter) MemoryUsed() (uint64, error) {
 	return r0, r1
 }
 
-// MeterComputation provides a mock function with given fields: operationType, intensity
-func (_m *Meter) MeterComputation(operationType common.ComputationKind, intensity uint) error {
-	ret := _m.Called(operationType, intensity)
+// MeterComputation provides a mock function with given fields: usage
+func (_m *Meter) MeterComputation(usage common.ComputationUsage) error {
+	ret := _m.Called(usage)
 
 	if len(ret) == 0 {
 		panic("no return value specified for MeterComputation")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(common.ComputationKind, uint) error); ok {
-		r0 = rf(operationType, intensity)
+	if rf, ok := ret.Get(0).(func(common.ComputationUsage) error); ok {
+		r0 = rf(usage)
 	} else {
 		r0 = ret.Error(0)
 	}

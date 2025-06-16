@@ -1,6 +1,8 @@
 package environment
 
 import (
+	"sync"
+
 	"github.com/coreos/go-semver/semver"
 
 	"github.com/onflow/flow-go/fvm/errors"
@@ -15,15 +17,34 @@ type GetVersionBeaconFunc func() (*flow.SealedVersionBeacon, error)
 
 type VersionBeaconExecutionVersionProvider struct {
 	getVersionBeacon GetVersionBeaconFunc
+
+	once          sync.Once
+	cachedVersion semver.Version
+	cachedErr     error
 }
 
-func NewVersionBeaconExecutionVersionProvider(getVersionBeacon GetVersionBeaconFunc) VersionBeaconExecutionVersionProvider {
-	return VersionBeaconExecutionVersionProvider{
+// NewVersionBeaconExecutionVersionProvider creates a new VersionBeaconExecutionVersionProvider
+// It caches the result of the getVersionBeacon function
+// The assumption here is that the GetVersionBeaconFunc will not return a different result for the lifetime of the provider
+// This is safe to make because version beacons change in between blocks and VersionBeaconExecutionVersionProvider are created
+// on every block.
+//
+// This logic will go away once we switch to the cadence component version from the dynamic protocol state
+func NewVersionBeaconExecutionVersionProvider(getVersionBeacon GetVersionBeaconFunc) *VersionBeaconExecutionVersionProvider {
+	return &VersionBeaconExecutionVersionProvider{
 		getVersionBeacon: getVersionBeacon,
 	}
 }
 
-func (v VersionBeaconExecutionVersionProvider) ExecutionVersion() (semver.Version, error) {
+func (v *VersionBeaconExecutionVersionProvider) ExecutionVersion() (semver.Version, error) {
+	v.once.Do(func() {
+		v.cachedVersion, v.cachedErr = v.queryExecutionVersion()
+	})
+
+	return v.cachedVersion, v.cachedErr
+}
+
+func (v *VersionBeaconExecutionVersionProvider) queryExecutionVersion() (semver.Version, error) {
 	vb, err := v.getVersionBeacon()
 	if err != nil {
 		return semver.Version{}, err
@@ -39,7 +60,6 @@ func (v VersionBeaconExecutionVersionProvider) ExecutionVersion() (semver.Versio
 	if err != nil {
 		return semver.Version{}, err
 	}
-
 	return *sv, nil
 }
 

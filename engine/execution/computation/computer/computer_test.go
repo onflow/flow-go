@@ -607,7 +607,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 
 	t.Run("system chunk transaction should not fail", func(t *testing.T) {
-
 		// include all fees. System chunk should ignore them
 		contextOptions := []fvm.Option{
 			fvm.WithEVMEnabled(true),
@@ -1017,14 +1016,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Name:    "Test",
 		}
 
-		contractProgram := &interpreter.Program{}
+		contractProgram := &runtime.Program{}
 
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
 
 				_, err := r.Interface.GetOrLoadProgram(
 					contractLocation,
-					func() (*interpreter.Program, error) {
+					func() (*runtime.Program, error) {
 						return contractProgram, nil
 					},
 				)
@@ -1110,7 +1109,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Name:    "Test",
 		}
 
-		contractProgram := &interpreter.Program{}
+		contractProgram := &runtime.Program{}
 
 		const collectionCount = 2
 		const transactionCount = 2
@@ -1131,7 +1130,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				// system chunk transaction
 				_, err := r.Interface.GetOrLoadProgram(
 					contractLocation,
-					func() (*interpreter.Program, error) {
+					func() (*runtime.Program, error) {
 						return contractProgram, nil
 					},
 				)

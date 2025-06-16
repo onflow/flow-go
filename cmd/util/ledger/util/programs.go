@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/common"
-	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/environment"
@@ -47,14 +46,14 @@ func NewProgramsGetOrLoadProgramFunc(
 
 	return func(
 		location runtime.Location,
-		load func() (*interpreter.Program, error),
+		load func() (*runtime.Program, error),
 	) (
-		program *interpreter.Program,
+		program *runtime.Program,
 		err error,
 	) {
 		return programs.GetOrLoadProgram(
 			location,
-			func() (*interpreter.Program, error) {
+			func() (*runtime.Program, error) {
 				// If the program is already known to be invalid,
 				// then return the error immediately,
 				// without attempting to load the program again

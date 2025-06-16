@@ -239,13 +239,17 @@ func newRichEpochProtocolStateEntry(
 		}
 	}
 
-	epochStateEntry, err := flow.NewEpochStateEntry(minEpochStateEntry,
-		previousEpochSetup,
-		previousEpochCommit,
-		currentEpochSetup,
-		currentEpochCommit,
-		nextEpochSetup,
-		nextEpochCommit)
+	epochStateEntry, err := flow.NewEpochStateEntry(
+		flow.UntrustedEpochStateEntry{
+			MinEpochStateEntry:  minEpochStateEntry,
+			PreviousEpochSetup:  previousEpochSetup,
+			PreviousEpochCommit: previousEpochCommit,
+			CurrentEpochSetup:   currentEpochSetup,
+			CurrentEpochCommit:  currentEpochCommit,
+			NextEpochSetup:      nextEpochSetup,
+			NextEpochCommit:     nextEpochCommit,
+		},
+	)
 	if err != nil {
 		// observing an error here would be an indication of severe data corruption or bug in our code since
 		// all data should be available and correctly structured at this point.

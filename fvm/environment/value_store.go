@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/atree"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -134,7 +135,12 @@ func (store *valueStore) GetValue(
 		return nil, fmt.Errorf("get value failed: %w", err)
 	}
 
-	err = store.meter.MeterComputation(ComputationKindGetValue, uint(len(v)))
+	err = store.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindGetValue,
+			Intensity: uint64(len(v)),
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("get value failed: %w", err)
 	}
@@ -163,8 +169,11 @@ func (store *valueStore) SetValue(
 	}
 
 	err = store.meter.MeterComputation(
-		ComputationKindSetValue,
-		uint(len(value)))
+		common.ComputationUsage{
+			Kind:      ComputationKindSetValue,
+			Intensity: uint64(len(value)),
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("set value failed: %w", err)
 	}
@@ -185,7 +194,12 @@ func (store *valueStore) ValueExists(
 ) {
 	defer store.tracer.StartChildSpan(trace.FVMEnvValueExists).End()
 
-	err = store.meter.MeterComputation(ComputationKindValueExists, 1)
+	err = store.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindValueExists,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return false, fmt.Errorf("check value existence failed: %w", err)
 	}
@@ -208,7 +222,12 @@ func (store *valueStore) AllocateSlabIndex(
 ) {
 	defer store.tracer.StartChildSpan(trace.FVMEnvAllocateSlabIndex).End()
 
-	err := store.meter.MeterComputation(ComputationKindAllocateSlabIndex, 1)
+	err := store.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindAllocateSlabIndex,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return atree.SlabIndex{}, fmt.Errorf(
 			"allocate storage index failed: %w",

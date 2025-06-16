@@ -331,7 +331,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 	require.NoError(s.T(), err)
 	s.setter = setter
 
-	s.SealsPL.On("ByID", mock.Anything).Return(nil, false).Maybe()
+	s.SealsPL.On("Get", mock.Anything).Return(nil, false).Maybe()
 	s.SealsPL.On("Add", mock.Anything).Run(
 		func(args mock.Arguments) {
 			seal := args.Get(0).(*flow.IncorporatedResultSeal)
@@ -523,7 +523,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingSealedRe
 // rate limiting is respected.
 func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	s.core.requestTracker = approvals.NewRequestTracker(s.core.headers, 1, 3)
-	s.SealsPL.On("ByID", mock.Anything).Return(nil, false)
+	s.SealsPL.On("Get", mock.Anything).Return(nil, false)
 
 	// n is the total number of blocks and incorporated-results we add to the
 	// chain and mempool
