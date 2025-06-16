@@ -158,7 +158,7 @@ func TestNewResultApprovalBody(t *testing.T) {
 		att, err := flow.NewAttestation(flow.UntrustedAttestation{
 			BlockID:           blockID,
 			ExecutionResultID: resultID,
-			ChunkIndex:        4,
+			ChunkIndex:        chunkIdx,
 		})
 		assert.NoError(t, err)
 
@@ -173,6 +173,91 @@ func TestNewResultApprovalBody(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, rab)
 		assert.Contains(t, err.Error(), "Spock")
+	})
+}
+
+func TestNewResultApproval(t *testing.T) {
+	blockID := unittest.IdentifierFixture()
+	execResID := unittest.IdentifierFixture()
+	approver := unittest.IdentifierFixture()
+	attestSig := unittest.SignatureFixture()
+	spockSig := unittest.SignatureFixture()
+	verifierSig := unittest.SignatureFixture()
+
+	t.Run("valid result approval", func(t *testing.T) {
+		att, err := flow.NewAttestation(flow.UntrustedAttestation{
+			BlockID:           blockID,
+			ExecutionResultID: execResID,
+			ChunkIndex:        chunkIdx,
+		})
+		assert.NoError(t, err)
+
+		rab, err := flow.NewResultApprovalBody(flow.UntrustedResultApprovalBody{
+			Attestation:          *att,
+			ApproverID:           approver,
+			AttestationSignature: attestSig,
+			Spock:                spockSig,
+		})
+		assert.NoError(t, err)
+
+		uv := flow.UntrustedResultApproval{
+			Body:              *rab,
+			VerifierSignature: verifierSig,
+		}
+
+		ra, err := flow.NewResultApproval(uv)
+		assert.NoError(t, err)
+		assert.NotNil(t, ra)
+		assert.Equal(t, *rab, ra.Body)
+		assert.Equal(t, verifierSig, ra.VerifierSignature)
+	})
+
+	t.Run("invalid body", func(t *testing.T) {
+		uv := flow.UntrustedResultApproval{
+			Body: flow.ResultApprovalBody{
+				Attestation: flow.Attestation{
+					BlockID:           flow.ZeroID,
+					ExecutionResultID: execResID,
+					ChunkIndex:        chunkIdx,
+				},
+				ApproverID:           approver,
+				AttestationSignature: attestSig,
+				Spock:                spockSig,
+			},
+			VerifierSignature: verifierSig,
+		}
+
+		ra, err := flow.NewResultApproval(uv)
+		assert.Error(t, err)
+		assert.Nil(t, ra)
+		assert.Contains(t, err.Error(), "invalid result approval body")
+	})
+
+	t.Run("empty verifier signature", func(t *testing.T) {
+		att, err := flow.NewAttestation(flow.UntrustedAttestation{
+			BlockID:           blockID,
+			ExecutionResultID: execResID,
+			ChunkIndex:        3,
+		})
+		assert.NoError(t, err)
+
+		rab, err := flow.NewResultApprovalBody(flow.UntrustedResultApprovalBody{
+			Attestation:          *att,
+			ApproverID:           approver,
+			AttestationSignature: attestSig,
+			Spock:                spockSig,
+		})
+		assert.NoError(t, err)
+
+		uv := flow.UntrustedResultApproval{
+			Body:              *rab,
+			VerifierSignature: crypto.Signature{},
+		}
+
+		ra, err := flow.NewResultApproval(uv)
+		assert.Error(t, err)
+		assert.Nil(t, ra)
+		assert.Contains(t, err.Error(), "VerifierSignature")
 	})
 }
 

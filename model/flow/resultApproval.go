@@ -87,10 +87,11 @@ func NewResultApprovalBody(untrusted UntrustedResultApprovalBody) (*ResultApprov
 		return nil, fmt.Errorf("ApproverID must not be empty")
 	}
 
-	if len(untrusted.AttestationSignature.Bytes()) == 0 {
+	if len(untrusted.AttestationSignature) == 0 {
 		return nil, fmt.Errorf("AttestationSignature must not be empty")
 	}
-	if len(untrusted.Spock.Bytes()) == 0 {
+
+	if len(untrusted.Spock) == 0 {
 		return nil, fmt.Errorf("Spock proof must not be empty")
 	}
 
@@ -128,15 +129,35 @@ type ResultApproval struct {
 	VerifierSignature crypto.Signature // signature over all above fields
 }
 
+// UntrustedResultApproval is an untrusted input-only representation of an ResultApproval,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedResultApproval should be validated and converted into
+// a trusted ResultApproval using NewResultApproval constructor.
+type UntrustedResultApproval ResultApproval
+
 // NewResultApproval creates a new instance of ResultApproval.
 // Construction ResultApproval allowed only within the constructor.
-func NewResultApproval(
-	body ResultApprovalBody,
-	verifierSignature crypto.Signature) *ResultApproval {
-	return &ResultApproval{
-		Body:              body,
-		VerifierSignature: verifierSignature,
+//
+// All errors indicate a valid Collection cannot be constructed from the input.
+func NewResultApproval(untrusted UntrustedResultApproval) (*ResultApproval, error) {
+	rab, err := NewResultApprovalBody(UntrustedResultApprovalBody(untrusted.Body))
+	if err != nil {
+		return nil, fmt.Errorf("invalid result approval body: %w", err)
 	}
+
+	if len(untrusted.VerifierSignature) == 0 {
+		return nil, fmt.Errorf("VerifierSignature must not be empty")
+	}
+
+	return &ResultApproval{
+		Body:              *rab,
+		VerifierSignature: untrusted.VerifierSignature,
+	}, nil
 }
 
 // ID generates a unique identifier using result approval body

@@ -357,7 +357,13 @@ func GenerateResultApproval(
 		return nil, fmt.Errorf("could not sign result approval body: %w", err)
 	}
 
-	resultApproval := flow.NewResultApproval(*body, bodySign)
+	resultApproval, err := flow.NewResultApproval(flow.UntrustedResultApproval{
+		Body:              *body,
+		VerifierSignature: bodySign,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build result approval: %w", err)
+	}
 
 	return resultApproval, nil
 }
