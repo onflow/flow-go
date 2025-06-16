@@ -19,6 +19,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type TransactionResultErrorMessageRequester interface {
+	Request(ctx context.Context) ([]flow.TransactionResultErrorMessage, error)
+}
+
 // RequesterConfig contains the retry settings for the tx error messages fetch.
 type RequesterConfig struct {
 	// the initial delay used in the exponential backoff for failed tx error messages download
@@ -27,6 +31,8 @@ type RequesterConfig struct {
 	// the max delay used in the exponential backoff for failed tx error messages download.
 	MaxRetryDelay time.Duration
 }
+
+var _ TransactionResultErrorMessageRequester = (*Requester)(nil)
 
 type Requester struct {
 	logger                     zerolog.Logger
