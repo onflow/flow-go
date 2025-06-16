@@ -171,7 +171,12 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 
 // Index implements the Core.Index method.
 // It retrieves the downloaded execution data from the cache and indexes it into in-memory storage.
-func (c *CoreImpl) Index(ctx context.Context) error {
+// Expected errors:
+// - convert.UnexpectedLedgerKeyFormat if the key is not in the expected format
+// - storage.ErrHeightNotIndexed if the given height does not match the storage's block height.
+//
+// All other errors are unexpected exceptions.
+func (c *CoreImpl) Index(_ context.Context) error {
 	c.log.Debug().Msg("indexing execution data")
 
 	if err := c.indexer.IndexBlockData(c.executionData); err != nil {
@@ -187,7 +192,10 @@ func (c *CoreImpl) Index(ctx context.Context) error {
 
 // Persist implements the Core.Persist method.
 // It persists the indexed data to permanent storage atomically.
-func (c *CoreImpl) Persist(ctx context.Context) error {
+//   - ErrRecordExists if the register record already exists
+//
+// All other errors are unexpected exceptions.
+func (c *CoreImpl) Persist(_ context.Context) error {
 	c.log.Debug().Msg("persisting execution data")
 
 	// Add all data to the batch
@@ -202,7 +210,7 @@ func (c *CoreImpl) Persist(ctx context.Context) error {
 
 // Abandon indicates that the protocol has abandoned this state. Hence processing will be aborted
 // and any data dropped.
-func (c *CoreImpl) Abandon(ctx context.Context) error {
+func (c *CoreImpl) Abandon(_ context.Context) error {
 	c.log.Debug().Msg("Abandon execution data processing")
 
 	// Clear in-memory storage by setting references to nil for garbage collection
