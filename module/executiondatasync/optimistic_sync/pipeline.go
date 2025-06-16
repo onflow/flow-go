@@ -103,7 +103,7 @@ func NewPipeline(
 //
 // Expected Errors:
 //   - context.Canceled: when the context is canceled
-//   - All other errors are unexpected and potential indicators bugs or of corrupted internal state
+//   - All other errors are unexpected and potential indicators of bugs or corrupted internal state
 //
 // Concurrency safety:
 //   - Not safe for concurrent access. Run must only be called once.
@@ -239,7 +239,7 @@ func (p *PipelineImpl) setState(newState State) {
 //
 // Expected Errors:
 //   - context.Canceled: when the context is canceled
-//   - All other errors are unexpected and potential indicators bugs or of corrupted internal state
+//   - All other errors are unexpected and potential indicators of bugs or corrupted internal state
 //
 // Concurrency safety:
 //   - Safe for concurrent access.
@@ -316,7 +316,7 @@ func (p *PipelineImpl) processReady() bool {
 //
 // Expected Errors:
 //   - context.Canceled: when the context is canceled
-//   - All other errors are unexpected and potential indicators bugs or of corrupted internal state
+//   - All other errors are unexpected and potential indicators of bugs or corrupted internal state
 //
 // Concurrency safety:
 //   - Safe for concurrent access, but not intended to be called concurrently with other process methods.
@@ -351,7 +351,7 @@ func (p *PipelineImpl) processDownloading(ctx context.Context) (bool, error) {
 //
 // Expected Errors:
 //   - context.Canceled: when the context is canceled
-//   - All other errors are unexpected and potential indicators bugs or of corrupted internal state
+//   - All other errors are unexpected and potential indicators of bugs or corrupted internal state
 //
 // Concurrency safety:
 //   - Safe for concurrent access, but not intended to be called concurrently with other process methods.
@@ -403,7 +403,7 @@ func (p *PipelineImpl) processWaitingPersist() bool {
 //
 // Expected Errors:
 //   - context.Canceled: when the context is canceled
-//   - All other errors are unexpected and potential indicators bugs or of corrupted internal state
+//   - All other errors are unexpected and potential indicators of bugs or corrupted internal state
 //
 // Concurrency safety:
 //   - Safe for concurrent access, but not intended to be called concurrently with other process methods.
@@ -432,7 +432,7 @@ func (p *PipelineImpl) processPersisting(ctx context.Context) (bool, error) {
 //
 // Expected Errors:
 //   - context.Canceled: when the context is canceled
-//   - All other errors are unexpected and potential indicators bugs or of corrupted internal state
+//   - All other errors are unexpected and potential indicators of bugs or corrupted internal state
 //
 // Concurrency safety:
 //   - Safe for concurrent access, but not intended to be called concurrently with other process methods.
