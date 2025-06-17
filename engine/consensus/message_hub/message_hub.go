@@ -470,10 +470,10 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 		if err != nil {
 			h.log.Warn().
 				Hex("origin_id", originID[:]).
-				Hex("block_id", msg.BlockID).
+				Hex("block_id", msg.BlockID[:]).
 				Uint64("view", msg.View).
 				Err(err).Msgf("received invalid vote message")
-			return
+			return err
 		}
 
 		h.forwardToOwnVoteAggregator(vote)
