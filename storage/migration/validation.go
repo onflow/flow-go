@@ -21,6 +21,17 @@ const (
 	FullValidation ValidationMode = "full"
 )
 
+func ParseValidationModeValid(mode string) (ValidationMode, error) {
+	switch mode {
+	case string(PartialValidation):
+		return PartialValidation, nil
+	case string(FullValidation):
+		return FullValidation, nil
+	default:
+		return "", fmt.Errorf("invalid validation mode: %s", mode)
+	}
+}
+
 // isDirEmpty checks if a directory exists and is empty.
 // Returns true if the directory is empty, false if it contains files,
 // and an error if the directory doesn't exist or there's an error reading it.

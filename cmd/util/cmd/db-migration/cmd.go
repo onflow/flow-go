@@ -18,6 +18,7 @@ var (
 	flagReaderCount            int
 	flagWriterCount            int
 	flagReaderShardPrefixBytes int
+	flagValidationMode         string
 )
 
 var Cmd = &cobra.Command{
@@ -44,6 +45,9 @@ func init() {
 
 	Cmd.Flags().IntVar(&flagReaderShardPrefixBytes, "reader_shard_prefix_bytes", migration.DefaultMigrationConfig.ReaderShardPrefixBytes,
 		"the number of prefix bytes used to assign iterator workload")
+
+	Cmd.Flags().StringVar(&flagValidationMode, "validation_mode", string(migration.DefaultMigrationConfig.ValidationMode),
+		"the validation mode to use for migration (partial or full, default is partial)")
 }
 
 func run(*cobra.Command, []string) error {
@@ -54,15 +58,22 @@ func run(*cobra.Command, []string) error {
 		Int("reader_count", flagReaderCount).
 		Int("writer_count", flagWriterCount).
 		Int("reader_shard_prefix_bytes", flagReaderShardPrefixBytes).
+		Str("validation_mode", flagValidationMode).
 		Logger()
+
+	validationMode, err := migration.ParseValidationModeValid(flagValidationMode)
+	if err != nil {
+		return fmt.Errorf("invalid validation mode: %w", err)
+	}
 
 	lg.Info().Msgf("starting migration from badger db to pebble db")
 	start := time.Now()
-	err := migration.RunMigrationAndCompaction(flagBadgerDBdir, flagPebbleDBdir, migration.MigrationConfig{
+	err = migration.RunMigrationAndCompaction(flagBadgerDBdir, flagPebbleDBdir, migration.MigrationConfig{
 		BatchByteSize:          flagBatchByteSize,
 		ReaderWorkerCount:      flagReaderCount,
 		WriterWorkerCount:      flagWriterCount,
 		ReaderShardPrefixBytes: flagReaderShardPrefixBytes,
+		ValidationMode:         validationMode,
 	})
 
 	if err != nil {
