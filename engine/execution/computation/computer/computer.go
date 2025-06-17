@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
@@ -268,7 +269,7 @@ func (e *blockComputer) queueTransactionRequests(
 
 	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: []*flow.TransactionBody{systemTxnBody}})
 	if err != nil {
-		return fmt.Errorf("could not construct collection: %w", err)
+		return irrecoverable.NewExceptionf("could not construct collection for system transacftion: %w", err)
 	}
 
 	systemCollectionInfo := collectionInfo{

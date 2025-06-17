@@ -119,7 +119,7 @@ func MessagesToCollectionGuarantees(m []*entities.CollectionGuarantee) ([]*flow.
 	for i, g := range m {
 		guarantee, err := MessageToCollectionGuarantee(g)
 		if err != nil {
-			return nil, fmt.Errorf("invalid collection guarantee: %w", err)
+			return nil, fmt.Errorf("could not convert message to collection guarantee: %w", err)
 		}
 		cg[i] = guarantee
 	}
