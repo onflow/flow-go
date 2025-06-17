@@ -207,6 +207,17 @@ func (e *blockComputer) ExecuteBlock(
 	return results, nil
 }
 
+// queueTransactionRequests enqueues transaction processing requests for all user and
+// system transactions in the given block.
+//
+// If constructing the Collection for the system transaction fails (for example, because
+// NewCollection returned an error due to invalid input), this method returns an
+// irrecoverable exception. Such an error indicates a fatal, unexpected condition and
+// should abort block execution.
+//
+// Returns:
+//   - nil on success,
+//   - error if an irrecoverable error is received if the system transaction’s Collection cannot be constructed.
 func (e *blockComputer) queueTransactionRequests(
 	blockId flow.Identifier,
 	blockIdStr string,
