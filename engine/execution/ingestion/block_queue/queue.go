@@ -466,7 +466,7 @@ func (q *BlockQueue) checkIfChildBlockBecomeExecutable(
 
 // GetMissingCollections returns the missing collections and the start state for the given block
 // Useful for debugging what is missing for the next unexecuted block to become executable.
-// It returns an error if the block is not found and if could not construct missing collection.
+// It returns an error if the block is not found or if could not construct missing collection.
 func (q *BlockQueue) GetMissingCollections(blockID flow.Identifier) (
 	[]*MissingCollection,
 	*flow.StateCommitment,
