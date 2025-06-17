@@ -211,23 +211,6 @@ func (p *PipelineImpl) OnParentStateUpdated(parentState State) {
 	p.stateNotifier.Notify()
 }
 
-// setState sets the state of the pipeline and logs the transition.
-//
-// Parameters:
-//   - newState: the new state to set
-//
-// Concurrency safety:
-//   - Not safe for concurrent access.
-func (p *PipelineImpl) setState(newState State) {
-	oldState := p.state
-	p.state = newState
-
-	p.log.Debug().
-		Str("old_state", oldState.String()).
-		Str("new_state", newState.String()).
-		Msg("pipeline state transition")
-}
-
 // processCurrentState handles the current state and transitions to the next state if possible.
 //
 // Parameters:
@@ -276,10 +259,7 @@ func (p *PipelineImpl) processCurrentState(ctx context.Context) (bool, error) {
 // Concurrency safety:
 //   - Safe for concurrent access
 func (p *PipelineImpl) transitionTo(newState State) {
-	p.mu.Lock()
 	p.setState(newState)
-	p.mu.Unlock()
-
 	p.statePublisher(newState)
 
 	if newState == StateComplete {
@@ -287,6 +267,26 @@ func (p *PipelineImpl) transitionTo(newState State) {
 	}
 
 	p.stateNotifier.Notify()
+}
+
+// setState sets the state of the pipeline and logs the transition.
+//
+// Parameters:
+//   - newState: the new state to set
+//
+// Concurrency safety:
+//   - Safe for concurrent access
+func (p *PipelineImpl) setState(newState State) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	oldState := p.state
+	p.state = newState
+
+	p.log.Debug().
+		Str("old_state", oldState.String()).
+		Str("new_state", newState.String()).
+		Msg("pipeline state transition")
 }
 
 // processReady handles the Ready state and transitions to StateDownloading if possible.
