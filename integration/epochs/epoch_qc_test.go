@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	sdk "github.com/onflow/flow-go-sdk"
@@ -93,7 +94,14 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		signature, err := stakingPrivKey.Sign(voteMessage, hasher)
 		s.Require().NoError(err)
 
-		vote := hotstuffmodel.VoteFromFlow(nodeID, blockID, view, signature)
+		vote, err := hotstuffmodel.NewVote(hotstuffmodel.UntrustedVote{
+			View:     view,
+			BlockID:  blockID,
+			SignerID: nodeID,
+			SigData:  signature,
+		})
+		require.NoError(s.T(), err)
+
 		hotSigner := &hotstuff.Signer{}
 		hotSigner.On("CreateVote", mock.Anything).Return(vote, nil)
 

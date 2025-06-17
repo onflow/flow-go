@@ -173,7 +173,14 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 			if err != nil {
 				return fmt.Errorf("internal error fetching result %v incorporated in block %v: %w", resultID, blockID, err)
 			}
-			incorporatedResults[resultID] = flow.NewIncorporatedResult(blockID, result)
+			incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+				IncorporatedBlockID: blockID,
+				Result:              result,
+			})
+			if err != nil {
+				return fmt.Errorf("could not create incorporated result: %w", err)
+			}
+			incorporatedResults[resultID] = incorporatedResult
 		}
 		return nil
 	}
