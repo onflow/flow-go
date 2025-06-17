@@ -1,6 +1,8 @@
 package cluster
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -32,25 +34,26 @@ type Payload struct {
 	ReferenceBlockID flow.Identifier
 }
 
-// EmptyPayload returns a payload with an empty collection and the given
+// NewEmptyPayload returns a payload with an empty collection and the given
 // reference block ID.
-func EmptyPayload(refID flow.Identifier) Payload {
-	return PayloadFromTransactions(refID)
-}
-
-// PayloadFromTransactions creates a payload given a reference block ID and a
-// list of transaction hashes.
-func PayloadFromTransactions(refID flow.Identifier, transactions ...*flow.TransactionBody) Payload {
-	// avoid a nil transaction list
-	if len(transactions) == 0 {
-		transactions = []*flow.TransactionBody{}
-	}
-	return Payload{
-		Collection: flow.Collection{
-			Transactions: transactions,
-		},
+func NewEmptyPayload(refID flow.Identifier) *Payload {
+	return &Payload{
+		Collection:       *flow.NewEmptyCollection(),
 		ReferenceBlockID: refID,
 	}
+}
+
+// NewPayload creates a payload given a reference block ID and a
+// list of transaction hashes.
+func NewPayload(refID flow.Identifier, transactions []*flow.TransactionBody) (*Payload, error) {
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: transactions})
+	if err != nil {
+		return nil, fmt.Errorf("could not construct payload: %w", err)
+	}
+	return &Payload{
+		Collection:       *collection,
+		ReferenceBlockID: refID,
+	}, nil
 }
 
 // Hash returns the hash of the payload.

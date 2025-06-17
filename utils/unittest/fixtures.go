@@ -565,8 +565,11 @@ func ClusterPayloadFixture(n int) *cluster.Payload {
 		tx := TransactionBodyFixture()
 		transactions[i] = &tx
 	}
-	payload := cluster.PayloadFromTransactions(flow.ZeroID, transactions...)
-	return &payload
+	payload, err := cluster.NewPayload(flow.ZeroID, transactions)
+	if err != nil {
+		panic(err)
+	}
+	return payload
 }
 
 func ClusterBlockFixture() cluster.Block {
@@ -634,9 +637,10 @@ func AddCollectionsToBlock(block *flow.Block, collections []*flow.Collection) {
 
 func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flow.CollectionGuarantee {
 	guarantee := &flow.CollectionGuarantee{
-		CollectionID:  IdentifierFixture(),
-		SignerIndices: RandomBytes(16),
-		Signature:     SignatureFixture(),
+		CollectionID:     IdentifierFixture(),
+		ReferenceBlockID: IdentifierFixture(),
+		SignerIndices:    RandomBytes(16),
+		Signature:        SignatureFixture(),
 	}
 	for _, option := range options {
 		option(guarantee)
@@ -714,7 +718,9 @@ func CompleteCollectionFixture() *entity.CompleteCollection {
 			ReferenceBlockID: FixedReferenceBlockID(),
 			SignerIndices:    SignerIndicesFixture(1),
 		},
-		Transactions: []*flow.TransactionBody{&txBody},
+		Collection: &flow.Collection{
+			Transactions: []*flow.TransactionBody{&txBody},
+		},
 	}
 }
 
@@ -726,7 +732,9 @@ func CompleteCollectionFromTransactions(txs []*flow.TransactionBody) *entity.Com
 			ReferenceBlockID: IdentifierFixture(),
 			SignerIndices:    SignerIndicesFixture(3),
 		},
-		Transactions: txs,
+		Collection: &flow.Collection{
+			Transactions: txs,
+		},
 	}
 }
 
@@ -1680,7 +1688,6 @@ func WithChunkID(chunkID flow.Identifier) func(*verification.ChunkDataPackReques
 // Use options to customize the request.
 func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest)) *verification.
 	ChunkDataPackRequest {
-
 	req := &verification.ChunkDataPackRequest{
 		Locator: *ChunkLocatorFixture(IdentifierFixture(), 0),
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
