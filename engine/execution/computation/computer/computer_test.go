@@ -316,7 +316,7 @@ func TestBlockExecutor_ExecuteBlock_VersionAwareChunk(t *testing.T) {
 		// (1+totalTransactionCount) /2 * totalTransactionCount
 		assert.LessOrEqual(t, vm.CallCount(), (1+3)/2*3)
 
-		return &result.ExecutionResult
+		return &result.ExecutionReceipt.ExecutionResult
 	}
 
 	// Versions before v1 should have nil ServiceEventCount field

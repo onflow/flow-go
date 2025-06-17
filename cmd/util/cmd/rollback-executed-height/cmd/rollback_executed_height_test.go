@@ -290,7 +290,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 
 			computationResult2 := testutil.ComputationResultFixture(t)
 			computationResult2.ExecutableBlock = executableBlock
-			computationResult2.ExecutionResult.BlockID = header.ID()
+			computationResult2.ExecutionReceipt.ExecutionResult.BlockID = header.ID()
 
 			// re execute result
 			err = es.SaveExecutionResults(context.Background(), computationResult2)
