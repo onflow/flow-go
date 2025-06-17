@@ -45,6 +45,7 @@ type SignedProposal struct {
 }
 
 // ProposerVote extracts the proposer vote from the proposal
+// All errors indicate a valid Vote cannot be constructed from the receiver SignedProposal.
 func (p *SignedProposal) ProposerVote() (*Vote, error) {
 	return NewVote(UntrustedVote{
 		View:     p.Block.View,
