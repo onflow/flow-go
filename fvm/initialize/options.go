@@ -10,7 +10,11 @@ import (
 // InitFvmOptions initializes the FVM options based on the chain ID and headers.
 // This function is extracted so that it can be reused in multiple places,
 // and ensure that the FVM options are consistent across different components.
-func InitFvmOptions(chainID flow.ChainID, headers storage.Headers) []fvm.Option {
+func InitFvmOptions(
+	chainID flow.ChainID,
+	headers storage.Headers,
+	disabledTransactionFees bool,
+) []fvm.Option {
 	blockFinder := environment.NewBlockFinder(headers)
 	vmOpts := []fvm.Option{
 		fvm.WithChain(chainID.Chain()),
@@ -22,8 +26,9 @@ func InitFvmOptions(chainID flow.ChainID, headers storage.Headers) []fvm.Option 
 		flow.Sandboxnet,
 		flow.Previewnet,
 		flow.Mainnet:
+		feesEnabled := !disabledTransactionFees
 		vmOpts = append(vmOpts,
-			fvm.WithTransactionFeesEnabled(true),
+			fvm.WithTransactionFeesEnabled(feesEnabled),
 		)
 	}
 	switch chainID {
