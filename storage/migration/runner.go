@@ -62,8 +62,10 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 	// Step 1: Validate directories
 	lg.Info().Msg("Step 1/6: Starting directory validation...")
 	startTime := time.Now()
-	if err := validateBadgerFolderExistPebbleFolderEmpty(badgerDir, pebbleDir); err != nil {
-		return fmt.Errorf("directory validation failed: %w", err)
+	if !cfg.ValidationOnly { // when ValidationOnly is true, database folders can be not empty
+		if err := validateBadgerFolderExistPebbleFolderEmpty(badgerDir, pebbleDir); err != nil {
+			return fmt.Errorf("directory validation failed: %w", err)
+		}
 	}
 	lg.Info().Dur("duration", time.Since(startTime)).Msg("Step 1/6: Directory validation completed successfully")
 
