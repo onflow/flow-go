@@ -218,13 +218,10 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 	)
 	require.NoError(s.T(), err)
 
-	errorMessageRequester := NewNoopErrorMessageRequester()
-
 	receiptConsumer, err := NewExecutionReceiptConsumer(
 		s.log,
 		s.collectionExecutedMetric,
 		s.receipts,
-		errorMessageRequester,
 	)
 	require.NoError(s.T(), err)
 
@@ -233,7 +230,6 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 		s.net,
 		blockProcessor,
 		receiptConsumer,
-		errorMessageRequester,
 		syncer,
 	)
 

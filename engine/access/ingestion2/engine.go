@@ -34,7 +34,6 @@ type Engine struct {
 
 	executionReceiptConsumer *ExecutionReceiptConsumer
 	finalizedBlockProcessor  *FinalizedBlockProcessor
-	errorMessageRequester    ErrorMessageRequester
 	collectionSyncer         *CollectionSyncer
 }
 
@@ -45,14 +44,12 @@ func New(
 	net network.EngineRegistry,
 	finalizedBlockProcessor *FinalizedBlockProcessor,
 	executionReceiptConsumer *ExecutionReceiptConsumer,
-	errorMessageRequester ErrorMessageRequester,
 	collectionSyncer *CollectionSyncer,
 ) (*Engine, error) {
 	e := &Engine{
 		log:                      log.With().Str("engine", "ingestion2").Logger(),
 		executionReceiptConsumer: executionReceiptConsumer,
 		finalizedBlockProcessor:  finalizedBlockProcessor,
-		errorMessageRequester:    errorMessageRequester,
 		collectionSyncer:         collectionSyncer,
 	}
 
@@ -61,8 +58,7 @@ func New(
 	builder := component.NewComponentManagerBuilder().
 		AddWorker(e.executionReceiptConsumer.StartWorkerLoop).
 		AddWorker(e.finalizedBlockProcessor.StartWorkerLoop).
-		AddWorker(e.collectionSyncer.StartWorkerLoop).
-		AddWorker(e.errorMessageRequester.StartWorkerLoop)
+		AddWorker(e.collectionSyncer.StartWorkerLoop)
 	e.ComponentManager = builder.Build()
 
 	// engine gets execution receipts from channels.ReceiveReceipts channel

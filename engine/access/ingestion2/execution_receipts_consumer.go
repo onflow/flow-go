@@ -24,15 +24,12 @@ type ExecutionReceiptConsumer struct {
 	messageHandler       *engine.MessageHandler
 	receiptsMessageQueue engine.MessageStore
 	receipts             storage.ExecutionReceipts
-
-	errorMessageRequester ErrorMessageRequester
 }
 
 func NewExecutionReceiptConsumer(
 	log zerolog.Logger,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	receipts storage.ExecutionReceipts,
-	errorMessageRequester ErrorMessageRequester,
 ) (*ExecutionReceiptConsumer, error) {
 	receiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -57,7 +54,6 @@ func NewExecutionReceiptConsumer(
 		collectionExecutedMetric: collectionExecutedMetric,
 		receipts:                 receipts,
 		messageHandler:           messageHandler,
-		errorMessageRequester:    errorMessageRequester,
 	}, nil
 }
 
@@ -110,9 +106,6 @@ func (c *ExecutionReceiptConsumer) processAvailableExecutionReceipts(ctx context
 		if err := c.persistExecutionReceipt(receipt); err != nil {
 			return err
 		}
-
-		// Notify to fetch and store transaction result error messages for the block
-		c.errorMessageRequester.Notify(receipt.BlockID)
 	}
 }
 
