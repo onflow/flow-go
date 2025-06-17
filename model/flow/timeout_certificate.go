@@ -46,10 +46,10 @@ func NewTimeoutCertificate(untrusted UntrustedTimeoutCertificate) (*TimeoutCerti
 	if untrusted.NewestQC == nil {
 		return nil, fmt.Errorf("newest QC must not be nil")
 	}
-	if untrusted.SignerIndices == nil {
+	if len(untrusted.SignerIndices) == 0 {
 		return nil, fmt.Errorf("signer indices must not be nil")
 	}
-	if untrusted.SigData == nil {
+	if len(untrusted.SigData) == 0 {
 		return nil, fmt.Errorf("signature must not be nil")
 	}
 
@@ -63,7 +63,7 @@ func NewTimeoutCertificate(untrusted UntrustedTimeoutCertificate) (*TimeoutCerti
 
 	// verifying that tc.NewestQC is the QC with the highest view.
 	// Note: A byzantine TC could include `nil` for tc.NewestQCViews
-	if untrusted.NewestQCViews != nil {
+	if len(untrusted.NewestQCViews) > 0 {
 		newestQCView := untrusted.NewestQCViews[0]
 		for _, view := range untrusted.NewestQCViews {
 			if newestQCView < view {
