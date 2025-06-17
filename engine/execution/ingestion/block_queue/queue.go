@@ -490,8 +490,7 @@ func (q *BlockQueue) GetMissingCollections(blockID flow.Identifier) (
 			Guarantee: col.Guarantee,
 		})
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not construct missingCollection: %w",
-				err)
+			return nil, nil, fmt.Errorf("could not construct missingCollection: %w", err)
 		}
 
 		missingCollections = append(
