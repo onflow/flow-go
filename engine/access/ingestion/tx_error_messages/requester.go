@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/utils/logging"
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/rpc"
@@ -54,6 +55,8 @@ func NewRequester(
 
 // Request fetches transaction error messages for the specific
 // execution result this requester was configured with.
+//
+// No errors are expected during normal operations.
 func (r *Requester) Request(ctx context.Context) ([]flow.TransactionResultErrorMessage, error) {
 	backoff := retry.NewExponential(r.config.RetryDelay)
 	backoff = retry.WithCappedDuration(r.config.MaxRetryDelay, backoff)
@@ -62,10 +65,7 @@ func (r *Requester) Request(ctx context.Context) ([]flow.TransactionResultErrorM
 	blockID := r.executionResult.BlockID
 	resultID := r.executionResult.ID()
 
-	var (
-		errMessages []flow.TransactionResultErrorMessage
-		lastErr     error
-	)
+	var errorMessages []flow.TransactionResultErrorMessage
 
 	attempt := 0
 	err := retry.Do(ctx, backoff, func(context.Context) error {
@@ -79,22 +79,31 @@ func (r *Requester) Request(ctx context.Context) ([]flow.TransactionResultErrorM
 		attempt++
 
 		var err error
-		errMessages, err = r.request(ctx, blockID, resultID)
+		errorMessages, err = r.request(ctx, blockID, resultID)
 		if errors.Is(err, rpc.ErrNoENsFoundForExecutionResult) || status.Code(err) != codes.Canceled {
-			lastErr = err
 			return retry.RetryableError(err)
 		}
 
-		lastErr = err
 		return err
 	})
 
 	if err != nil {
-		return nil, lastErr
+		return nil, err
 	}
-	return errMessages, nil
+	return errorMessages, nil
 }
 
+// request retrieves transaction error messages for a given block and result ID
+// by querying the appropriate execution nodes. It returns a slice of error
+// messages or an error if the retrieval fails.
+//
+// Expected errors during normal operations:
+//   - rpc.ErrNoENsFoundForExecutionResult - if no execution nodes were found that produced
+//     the provided execution result and matched the operators criteria
+//   - status.Error - GRPC call failed, some of possible codes are:
+//   - codes.NotFound - request cannot be served by EN because of absence of data.
+//   - codes.Unavailable - remote node is not unavailable.
+//   - codes.Canceled - if ctx is canceled during request
 func (r *Requester) request(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -110,7 +119,8 @@ func (r *Requester) request(
 	}
 
 	r.logger.Debug().
-		Msgf("transaction error messages for block %s are being downloaded", blockID)
+		Hex("block_id", logging.ID(blockID)).
+		Msg("started downloading transaction error messages for block")
 
 	req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
 		BlockId: convert.IdentifierToMessage(blockID),
@@ -118,7 +128,8 @@ func (r *Requester) request(
 
 	resp, execNode, err := r.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
 	if err != nil {
-		r.logger.Error().Err(err).Msg("failed to get transaction error messages from execution nodes")
+		r.logger.Error().Err(err).
+			Msgf("failed to get transaction error messages from execution nodes for blockID: %s", blockID.String())
 		return nil, err
 	}
 

@@ -103,7 +103,7 @@ func (s *RequesterSuite) TestRequest_HappyPath() {
 	s.connFactory.On("GetExecutionAPIClient", mock.Anything).Return(s.execClient, &mockCloser{}, nil)
 
 	// Mock the protocol snapshot to return fixed execution node IDs.
-	setupReceiptsForBlockWithResult(s.receipts, block, s.enNodeIDs.NodeIDs()[0], *executionResult)
+	setupReceiptsForBlockWithResult(s.receipts, executionResult, s.enNodeIDs.NodeIDs()...)
 	s.proto.snapshot.On("Identities", mock.Anything).Return(s.enNodeIDs, nil)
 
 	// Create mock transaction results with a mix of failed and non-failed transactions.

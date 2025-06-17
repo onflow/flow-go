@@ -147,33 +147,44 @@ func (e *ExecutionNodeIdentitiesProvider) ExecutionNodesForBlockID(
 // for the specific execution result ID within the given block.
 //
 // Expected errors during normal operation:
-//   - storage.ErrNotFound - if no execution receipts were found in storage for the given block
 //   - ErrNoENsFoundForExecutionResult - if no execution nodes were found that produced
 //     the provided execution result and matched the operators criteria
 func (e *ExecutionNodeIdentitiesProvider) ExecutionNodesForResultID(
 	blockID flow.Identifier,
 	resultID flow.Identifier,
 ) (flow.IdentitySkeletonList, error) {
-	allReceipts, err := e.executionReceipts.ByBlockID(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve execution receipts for block ID %v: %w", blockID, err)
-	}
-
-	executionReceiptMetaList := make(flow.ExecutionReceiptMetaList, 0, len(allReceipts))
-	for _, r := range allReceipts {
-		executionReceiptMetaList = append(executionReceiptMetaList, r.Meta())
-	}
-
-	receiptsByResultID := executionReceiptMetaList.GroupByResultID()
-	targetReceipts := receiptsByResultID.GetGroup(resultID)
-
-	if len(targetReceipts) == 0 {
-		return nil, fmt.Errorf("no execution receipts found for result ID %v in block %v", resultID, blockID)
-	}
-
 	var executorIDs flow.IdentifierList
-	for _, receipt := range targetReceipts {
-		executorIDs = append(executorIDs, receipt.ExecutorID)
+	rootBlock := e.state.Params().FinalizedRoot()
+
+	// if block is a root block, don't look for execution receipts as there are none for root block.
+	if rootBlock.ID() == blockID {
+		executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+		if err != nil {
+			return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
+		}
+
+		executorIDs = append(executorIDs, executorIdentities.NodeIDs()...)
+	} else {
+		allReceipts, err := e.executionReceipts.ByBlockID(blockID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve execution receipts for block ID %v: %w", blockID, err)
+		}
+
+		executionReceiptMetaList := make(flow.ExecutionReceiptMetaList, 0, len(allReceipts))
+		for _, r := range allReceipts {
+			executionReceiptMetaList = append(executionReceiptMetaList, r.Meta())
+		}
+
+		receiptsByResultID := executionReceiptMetaList.GroupByResultID()
+		targetReceipts := receiptsByResultID.GetGroup(resultID)
+
+		if len(targetReceipts) == 0 {
+			return nil, fmt.Errorf("no execution receipts found for result ID %v in block %v", resultID, blockID)
+		}
+
+		for _, receipt := range targetReceipts {
+			executorIDs = append(executorIDs, receipt.ExecutorID)
+		}
 	}
 
 	subsetENs, err := e.chooseExecutionNodes(executorIDs)
