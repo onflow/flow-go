@@ -812,7 +812,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		snapshot := res.ExecutionSnapshot()
 		valid, err := crypto.SPOCKVerifyAgainstData(
 			myIdentity.StakingPubKey,
-			computationResult.Spocks[i],
+			computationResult.ExecutionReceipt.Spocks[i],
 			snapshot.SpockSecret,
 			spockHasher)
 		require.NoError(t, err)
@@ -832,7 +832,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	chdps := computationResult.AllChunkDataPacks()
 	require.Equal(t, len(chdps), len(receipt.Spocks))
 
-	er := &computationResult.ExecutionResult
+	er := &computationResult.ExecutionReceipt.ExecutionResult
 
 	verifier := chunks.NewChunkVerifier(vm, fvmContext, logger)
 
