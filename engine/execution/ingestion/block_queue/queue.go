@@ -48,6 +48,8 @@ type BlockQueue struct {
 	blockIDsByHeight map[uint64]map[flow.Identifier]*entity.ExecutableBlock
 }
 
+// MissingCollection stores a collection guarantee for which an Execution Node has not
+// yet received the full collection. It is used for book-keeping while requesting collections.
 //structwrite:immutable - mutations allowed only within the constructor
 type MissingCollection struct {
 	BlockID   flow.Identifier
