@@ -163,7 +163,7 @@ func (t *TransactionResultErrorMessages) ByBlockIDTransactionIndex(blockID flow.
 // ByBlockID gets all transaction result error messages for a block, ordered by transaction index.
 // Note: This method will return an empty slice both if the block is not indexed yet and if the block does not have any errors.
 //
-// - storage.ErrNotFound if no error messages were found for this block.
+// No errors are expected during normal operations.
 func (t *TransactionResultErrorMessages) ByBlockID(blockID flow.Identifier) ([]flow.TransactionResultErrorMessage, error) {
 	transactionResultErrorMessages, err := t.blockCache.Get(t.db.Reader(), blockID)
 	if err != nil {
