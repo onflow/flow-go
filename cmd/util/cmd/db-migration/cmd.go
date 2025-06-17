@@ -19,6 +19,7 @@ var (
 	flagWriterCount            int
 	flagReaderShardPrefixBytes int
 	flagValidationMode         string
+	flagValidationOnly         bool
 )
 
 var Cmd = &cobra.Command{
@@ -48,6 +49,10 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagValidationMode, "validation_mode", string(migration.DefaultMigrationConfig.ValidationMode),
 		"the validation mode to use for migration (partial or full, default is partial)")
+
+	Cmd.Flags().BoolVar(&flagValidationOnly, "validation_only", false,
+		"if set, only validate the data in the badger db without copying it to pebble db. "+
+			"Note: this will not copy any data to pebble db, and will not create any pebble db files.")
 }
 
 func run(*cobra.Command, []string) error {
@@ -59,6 +64,7 @@ func run(*cobra.Command, []string) error {
 		Int("writer_count", flagWriterCount).
 		Int("reader_shard_prefix_bytes", flagReaderShardPrefixBytes).
 		Str("validation_mode", flagValidationMode).
+		Bool("validation_only", flagValidationOnly).
 		Logger()
 
 	validationMode, err := migration.ParseValidationModeValid(flagValidationMode)
@@ -74,6 +80,7 @@ func run(*cobra.Command, []string) error {
 		WriterWorkerCount:      flagWriterCount,
 		ReaderShardPrefixBytes: flagReaderShardPrefixBytes,
 		ValidationMode:         validationMode,
+		ValidationOnly:         flagValidationOnly,
 	})
 
 	if err != nil {

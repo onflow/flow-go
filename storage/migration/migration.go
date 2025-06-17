@@ -33,6 +33,8 @@ type MigrationConfig struct {
 	// - PartialValidation: only checks min/max keys for each prefix (faster)
 	// - FullValidation: checks all keys in the database (more thorough)
 	ValidationMode ValidationMode
+
+	ValidationOnly bool // if true, only validate the data in the badger db without copying it to pebble db
 }
 
 type KVPairs struct {

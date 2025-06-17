@@ -90,6 +90,16 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 	defer pebbleDB.Close()
 	lg.Info().Dur("duration", time.Since(startTime)).Msg("Step 2/6: BadgerDB and PebbleDB opened successfully")
 
+	if cfg.ValidationOnly {
+		lg.Info().Str("mode", string(cfg.ValidationMode)).Msg("Step 6/6 Validation only mode enabled, skipping migration steps, Starting data validation...")
+		startTime = time.Now()
+		if err := validateData(badgerDB, pebbleDB, cfg); err != nil {
+			return fmt.Errorf("data validation failed: %w", err)
+		}
+		lg.Info().Dur("duration", time.Since(startTime)).Msg("Step 6/6: Data validation completed successfully")
+
+		return nil
+	}
 	// Step 3: Write MIGRATION_STARTED file
 	lg.Info().Msg("Step 3/6: Writing migration start marker...")
 	startTime = time.Now()
