@@ -407,6 +407,13 @@ func TestOnBlockWithMissingParentCommit(t *testing.T) {
 	requireQueueIsEmpty(t, q)
 }
 
+// TestNewMissingCollection verifies that NewMissingCollection constructs a valid MissingCollection
+// when given complete, non-zero fields, and returns an error if any required field is missing.
+// It covers:
+//   - valid missing collection creation
+//   - missing BlockID
+//   - zero Height
+//   - nil Guarantee
 func TestNewMissingCollection(t *testing.T) {
 	height := uint64(10)
 

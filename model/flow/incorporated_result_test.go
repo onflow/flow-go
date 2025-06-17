@@ -56,6 +56,13 @@ func TestIncorporatedResultGroupBy(t *testing.T) {
 	assert.Equal(t, 0, unknown.Size())
 }
 
+// TestNewIncorporatedResult verifies that NewIncorporatedResult constructs a valid
+// IncorporatedResult when given complete, non-zero fields, and returns an error
+// if any required field is missing.
+// It covers:
+//   - valid incorporated result creation
+//   - missing IncorporatedBlockID
+//   - nil Result
 func TestNewIncorporatedResult(t *testing.T) {
 	t.Run("valid untrusted incorporated result", func(t *testing.T) {
 		id := unittest.IdentifierFixture()

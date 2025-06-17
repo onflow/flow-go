@@ -10,6 +10,13 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestNewVote verifies that NewVote correctly constructs a Vote from valid input
+// and returns an error when any required field is missing.
+// It covers:
+//   - valid vote creation
+//   - missing BlockID
+//   - missing SignerID
+//   - missing SigData
 func TestNewVote(t *testing.T) {
 	const validView = uint64(1)
 
