@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/verification/requester"
-	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/mempool"
@@ -204,10 +203,7 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 	// adding another request for the same tuple of (chunkID, resultID, chunkIndex)
 	// is deduplicated.
 	require.False(t, requests.Add(&verification.ChunkDataPackRequest{
-		Locator: chunks.Locator{
-			ResultID: thisReq.ResultID,
-			Index:    thisReq.Index,
-		},
+		Locator: *unittest.ChunkLocatorFixture(thisReq.ResultID, thisReq.Index),
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID: thisReq.ChunkID,
 		},
@@ -215,10 +211,7 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 
 	// adding another request for the same chunk ID but different result ID is stored.
 	otherReq := &verification.ChunkDataPackRequest{
-		Locator: chunks.Locator{
-			ResultID: unittest.IdentifierFixture(),
-			Index:    thisReq.Index,
-		},
+		Locator: *unittest.ChunkLocatorFixture(unittest.IdentifierFixture(), thisReq.Index),
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID:   thisReq.ChunkID,
 			Agrees:    unittest.IdentifierListFixture(2),
