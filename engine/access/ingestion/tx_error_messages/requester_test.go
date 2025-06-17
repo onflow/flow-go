@@ -57,6 +57,7 @@ func (s *RequesterSuite) SetupTest() {
 	s.rootBlock.Header.Height = 0
 	s.finalizedBlock = unittest.BlockWithParentFixture(s.rootBlock.Header).Header
 
+	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.Header, nil)
 	s.proto.state.On("Params").Return(s.proto.params)
 
 	s.proto.snapshot.On("Head").Return(
