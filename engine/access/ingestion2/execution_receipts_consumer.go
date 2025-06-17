@@ -57,10 +57,10 @@ func NewExecutionReceiptConsumer(
 	}, nil
 }
 
-// Notify processes a new execution receipt payload and notifies the consumer to begin processing queued messages.
+// Process processes a new execution receipt payload and notifies the consumer to begin processing queued messages.
 //
 // No errors are expected during normal operations.
-func (c *ExecutionReceiptConsumer) Notify(originID flow.Identifier, payload interface{}) error {
+func (c *ExecutionReceiptConsumer) Process(originID flow.Identifier, payload interface{}) error {
 	// call to Process also notifies underlying notifier to which we subscribed in the worker loop
 	err := c.messageHandler.Process(originID, payload)
 	return err

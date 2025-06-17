@@ -83,7 +83,7 @@ func (e *Engine) Process(chanName channels.Channel, originID flow.Identifier, ev
 
 	switch event.(type) {
 	case *flow.ExecutionReceipt:
-		err := e.executionReceiptConsumer.Notify(originID, event)
+		err := e.executionReceiptConsumer.Process(originID, event)
 		return err
 	default:
 		return fmt.Errorf("got invalid event type (%T) from %s channel", event, chanName)
