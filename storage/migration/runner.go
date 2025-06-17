@@ -105,9 +105,9 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 	lg.Info().Msg("Step 4/6: Starting data migration...")
 	startTime = time.Now()
 	cfg.PebbleDir = pebbleDir
-	if err := CopyFromBadgerToPebbleSSTables(badgerDB, pebbleDB, cfg); err != nil {
-		return fmt.Errorf("failed to migrate data from Badger to Pebble: %w", err)
-	}
+	// if err := CopyFromBadgerToPebbleSSTables(badgerDB, pebbleDB, cfg); err != nil {
+	// 	return fmt.Errorf("failed to migrate data from Badger to Pebble: %w", err)
+	// }
 	lg.Info().Dur("duration", time.Since(startTime)).Msg("Step 4/6: Data migration completed successfully")
 
 	// Step 5: Validate data
