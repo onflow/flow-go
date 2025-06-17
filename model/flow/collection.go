@@ -39,8 +39,8 @@ func NewCollection(untrusted UntrustedCollection) (*Collection, error) {
 }
 
 // NewEmptyCollection creates a new empty instance of Collection.
-func NewEmptyCollection() Collection {
-	return Collection{
+func NewEmptyCollection() *Collection {
+	return &Collection{
 		Transactions: []*TransactionBody{},
 	}
 }

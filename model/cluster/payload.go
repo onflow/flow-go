@@ -38,7 +38,7 @@ type Payload struct {
 // reference block ID.
 func NewEmptyPayload(refID flow.Identifier) Payload {
 	return Payload{
-		Collection:       flow.NewEmptyCollection(),
+		Collection:       *flow.NewEmptyCollection(),
 		ReferenceBlockID: refID,
 	}
 }
