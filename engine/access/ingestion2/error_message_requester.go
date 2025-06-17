@@ -11,7 +11,7 @@ import (
 
 type ErrorMessageRequester interface {
 	Notify(blockID flow.Identifier)
-	StartRequesting(ctx irrecoverable.SignalerContext, ready component.ReadyFunc)
+	StartWorkerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc)
 }
 
 type ErrorMessageRequesterImpl struct {
@@ -32,7 +32,7 @@ func (p *ErrorMessageRequesterImpl) Notify(blockID flow.Identifier) {
 	p.blockIDsChan <- blockID
 }
 
-func (p *ErrorMessageRequesterImpl) StartRequesting(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (p *ErrorMessageRequesterImpl) StartWorkerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 	defer close(p.blockIDsChan)
 
@@ -62,6 +62,6 @@ func NewNoopErrorMessageRequester() *NoopErrorMessageRequester {
 
 func (*NoopErrorMessageRequester) Notify(flow.Identifier) {}
 
-func (*NoopErrorMessageRequester) StartRequesting(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (*NoopErrorMessageRequester) StartWorkerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 }

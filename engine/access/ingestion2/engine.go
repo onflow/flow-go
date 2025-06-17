@@ -59,10 +59,10 @@ func New(
 	// register our workers which are basically consumers of different kinds of data.
 	// engine notifies workers when new data is available so that they can start processing them.
 	builder := component.NewComponentManagerBuilder().
-		AddWorker(e.executionReceiptConsumer.StartConsuming).
-		AddWorker(e.finalizedBlockProcessor.StartProcessing).
-		AddWorker(e.collectionSyncer.StartSyncing).
-		AddWorker(e.errorMessageRequester.StartRequesting)
+		AddWorker(e.executionReceiptConsumer.StartWorkerLoop).
+		AddWorker(e.finalizedBlockProcessor.StartWorkerLoop).
+		AddWorker(e.collectionSyncer.StartWorkerLoop).
+		AddWorker(e.errorMessageRequester.StartWorkerLoop)
 	e.ComponentManager = builder.Build()
 
 	// engine gets execution receipts from channels.ReceiveReceipts channel

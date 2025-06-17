@@ -103,8 +103,8 @@ func (p *FinalizedBlockProcessor) Notify(_ *model.Block) {
 	p.consumerNotifier.Notify()
 }
 
-// StartProcessing begins processing of finalized blocks and signals readiness when initialization is complete.
-func (p *FinalizedBlockProcessor) StartProcessing(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// StartWorkerLoop begins processing of finalized blocks and signals readiness when initialization is complete.
+func (p *FinalizedBlockProcessor) StartWorkerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	p.consumer.Start(ctx)
 
 	err := util.WaitClosed(ctx, p.consumer.Ready())
@@ -124,15 +124,16 @@ func (p *FinalizedBlockProcessor) processFinalizedBlockJobCallback(
 	block, err := jobqueue.JobToBlock(job)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
-	}
-
-	err = p.indexFinalizedBlock(block)
-	if err == nil {
-		done()
 		return
 	}
 
-	p.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
+	err = p.indexFinalizedBlock(block)
+	if err != nil {
+		p.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
+		return
+	}
+
+	done()
 }
 
 // indexFinalizedBlock indexes the given finalized block’s collection guarantees and execution results,
@@ -140,12 +141,6 @@ func (p *FinalizedBlockProcessor) processFinalizedBlockJobCallback(
 //
 // No errors are expected during normal operations.
 func (p *FinalizedBlockProcessor) indexFinalizedBlock(block *flow.Block) error {
-	// FIX: we can't index guarantees here, as we might have more than one block
-	// with the same collection as long as it is not finalized
-
-	// TODO: substitute an indexer module as layer between engine and storage
-
-	// index the block storage with each of the collection guarantee
 	err := p.blocks.IndexBlockForCollections(block.Header.ID(), flow.GetIDs(block.Payload.Guarantees))
 	if err != nil {
 		return fmt.Errorf("could not index block for collections: %w", err)

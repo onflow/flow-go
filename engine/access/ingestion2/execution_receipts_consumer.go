@@ -23,7 +23,6 @@ type ExecutionReceiptConsumer struct {
 
 	messageHandler       *engine.MessageHandler
 	receiptsMessageQueue engine.MessageStore
-	notifier             engine.Notifier
 	receipts             storage.ExecutionReceipts
 
 	errorMessageRequester ErrorMessageRequester
@@ -58,7 +57,6 @@ func NewExecutionReceiptConsumer(
 		collectionExecutedMetric: collectionExecutedMetric,
 		receipts:                 receipts,
 		messageHandler:           messageHandler,
-		notifier:                 engine.NewNotifier(),
 		errorMessageRequester:    errorMessageRequester,
 	}, nil
 }
@@ -67,21 +65,21 @@ func NewExecutionReceiptConsumer(
 //
 // No errors are expected during normal operations.
 func (c *ExecutionReceiptConsumer) Notify(originID flow.Identifier, payload interface{}) error {
+	// call to Process also notifies underlying notifier to which we subscribed in the worker loop
 	err := c.messageHandler.Process(originID, payload)
-	c.notifier.Notify()
 	return err
 }
 
-// StartConsuming starts the execution receipt processing loop. It waits for notifications
+// StartWorkerLoop starts the execution receipt processing loop. It waits for notifications
 // and processes available receipts until the context is cancelled or an irrecoverable error occurs.
-func (c *ExecutionReceiptConsumer) StartConsuming(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (c *ExecutionReceiptConsumer) StartWorkerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-c.notifier.Channel():
+		case <-c.messageHandler.GetNotifier():
 			err := c.processAvailableExecutionReceipts(ctx)
 			if err != nil {
 				// if an error reaches this point, it is unexpected
