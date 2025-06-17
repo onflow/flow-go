@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+var _ storage.LatestPersistedSealedResult = (*LatestPersistedSealedResult)(nil)
+
 // LatestPersistedSealedResult tracks the most recently persisted sealed execution result processed
 // by the Access ingestion engine.
 type LatestPersistedSealedResult struct {
