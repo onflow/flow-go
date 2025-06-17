@@ -3,8 +3,10 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	"github.com/onflow/flow-go/model/flow"
@@ -13,25 +15,61 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
-	"github.com/onflow/flow-go/utils/logging"
 )
+
+// TODO: DefaultTxResultErrMsgsRequestTimeout should be configured in future PR`s
+
+const DefaultTxResultErrMsgsRequestTimeout = 5 * time.Second
 
 // Core defines the interface for pipeline processing steps.
 // Each implementation should handle an execution data and implement the three-phase processing:
 // download, index, and persist.
 type Core interface {
 	// Download retrieves all necessary data for processing.
+	// Expected errors:
+	// - context.Canceled: if the provided context was canceled before completion
+	// All other errors are unexpected and may indicate a bug or inconsistent state
 	Download(ctx context.Context) error
 
 	// Index processes the downloaded data and creates in-memory indexes.
-	Index(ctx context.Context) error
+	//
+	// No errors are expected during normal operations
+	Index() error
 
 	// Persist stores the indexed data in permanent storage.
-	Persist(ctx context.Context) error
+	//
+	// No errors are expected during normal operations
+	Persist() error
 
 	// Abandon indicates that the protocol has abandoned this state. Hence processing will be aborted
 	// and any data dropped.
-	Abandon(ctx context.Context) error
+	//
+	// No errors are expected during normal operations
+	Abandon() error
+}
+
+// executionDataProcessor encapsulates all components and temporary storage
+// involved in processing a single block's execution data. When processing
+// is complete or abandoned, the entire processor can be discarded.
+type executionDataProcessor struct {
+	// Temporary in-memory caches
+	inmemRegisters       *unsynchronized.Registers
+	inmemEvents          *unsynchronized.Events
+	inmemCollections     *unsynchronized.Collections
+	inmemTransactions    *unsynchronized.Transactions
+	inmemResults         *unsynchronized.LightTransactionResults
+	inmemTxResultErrMsgs *unsynchronized.TransactionResultErrorMessages
+
+	// Active processing components
+	execDataRequester             requester.ExecutionDataRequester
+	txResultErrMsgsRequester      tx_error_messages.TransactionResultErrorMessageRequester
+	txResultErrMsgsRequestTimeout time.Duration
+	indexer                       *indexer.InMemoryIndexer
+	persister                     *indexer.Persister
+
+	// Working data
+	executionData       *execution_data.BlockExecutionDataEntity
+	txResultErrMsgsData []flow.TransactionResultErrorMessage
 }
 
 var _ Core = (*CoreImpl)(nil)
@@ -42,23 +80,10 @@ var _ Core = (*CoreImpl)(nil)
 type CoreImpl struct {
 	log zerolog.Logger
 
-	execDataRequester        requester.ExecutionDataRequester
-	txResultErrMsgsRequester tx_error_messages.TransactionResultErrorMessageRequester
-	indexer                  *indexer.InMemoryIndexer
-	persister                *indexer.Persister
+	processor *executionDataProcessor
 
 	executionResult *flow.ExecutionResult
 	header          *flow.Header
-
-	inmemRegisters       *unsynchronized.Registers
-	inmemEvents          *unsynchronized.Events
-	inmemCollections     *unsynchronized.Collections
-	inmemTransactions    *unsynchronized.Transactions
-	inmemResults         *unsynchronized.LightTransactionResults
-	inmemTxResultErrMsgs *unsynchronized.TransactionResultErrorMessages
-
-	executionData       *execution_data.BlockExecutionDataEntity
-	txResultErrMsgsData []flow.TransactionResultErrorMessage
 }
 
 // NewCoreImpl creates a new CoreImpl with all necessary dependencies
@@ -68,6 +93,7 @@ func NewCoreImpl(
 	header *flow.Header,
 	execDataRequester requester.ExecutionDataRequester,
 	txResultErrMsgsRequester tx_error_messages.TransactionResultErrorMessageRequester,
+	txResultErrMsgsRequestTimeout time.Duration,
 	persistentRegisters storage.RegisterIndex,
 	persistentEvents storage.Events,
 	persistentCollections storage.Collections,
@@ -75,7 +101,7 @@ func NewCoreImpl(
 	persistentResults storage.LightTransactionResults,
 	persistentTxResultErrMsg storage.TransactionResultErrorMessages,
 	protocolDB storage.DB,
-) (*CoreImpl, error) {
+) *CoreImpl {
 	coreLogger := logger.With().
 		Str("component", "execution_data_core").
 		Str("execution_result_id", executionResult.ID().String()).
@@ -122,87 +148,106 @@ func NewCoreImpl(
 	)
 
 	return &CoreImpl{
-		log:                      coreLogger,
-		execDataRequester:        execDataRequester,
-		txResultErrMsgsRequester: txResultErrMsgsRequester,
-		indexer:                  indexerComponent,
-		persister:                persisterComponent,
-		executionResult:          executionResult,
-		header:                   header,
-		inmemRegisters:           inmemRegisters,
-		inmemEvents:              inmemEvents,
-		inmemCollections:         inmemCollections,
-		inmemTransactions:        inmemTransactions,
-		inmemResults:             inmemResults,
-		inmemTxResultErrMsgs:     inmemTxResultErrMsgs,
-	}, nil
+		log: coreLogger,
+		processor: &executionDataProcessor{
+			execDataRequester:             execDataRequester,
+			txResultErrMsgsRequester:      txResultErrMsgsRequester,
+			txResultErrMsgsRequestTimeout: txResultErrMsgsRequestTimeout,
+			indexer:                       indexerComponent,
+			persister:                     persisterComponent,
+			inmemRegisters:                inmemRegisters,
+			inmemEvents:                   inmemEvents,
+			inmemCollections:              inmemCollections,
+			inmemTransactions:             inmemTransactions,
+			inmemResults:                  inmemResults,
+			inmemTxResultErrMsgs:          inmemTxResultErrMsgs,
+		},
+		executionResult: executionResult,
+		header:          header,
+	}
 }
 
-// Download implements the Core.Download method.
-// It downloads execution data for the block and stores it in the execution data cache.
+// Download downloads execution data for the block
 // Expected errors:
 // - context.Canceled: if the provided context was canceled before completion
-//
-// No other errors are expected during normal operations
+// All other errors are unexpected and may indicate a bug or inconsistent state
 func (c *CoreImpl) Download(ctx context.Context) error {
-	blockID := c.executionResult.BlockID
-	height := c.header.Height
+	c.log.Debug().Msg("downloading execution data")
 
-	c.log.Debug().
-		Hex("block_id", logging.ID(blockID)).
-		Uint64("height", height).
-		Msg("downloading execution data")
+	g, gCtx := errgroup.WithContext(ctx)
 
-	executionData, err := c.execDataRequester.RequestExecutionData(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to request execution data: %w", err)
+	var executionData *execution_data.BlockExecutionData
+	g.Go(func() error {
+		var err error
+		executionData, err = c.processor.execDataRequester.RequestExecutionData(gCtx)
+		if err != nil {
+			return fmt.Errorf("failed to request execution data: %w", err)
+		}
+
+		return nil
+	})
+
+	var txResultErrMsgsData []flow.TransactionResultErrorMessage
+	g.Go(func() error {
+		timeoutCtx, cancel := context.WithTimeout(gCtx, c.processor.txResultErrMsgsRequestTimeout)
+		defer cancel()
+
+		var err error
+		txResultErrMsgsData, err = c.processor.txResultErrMsgsRequester.Request(timeoutCtx)
+		if err != nil {
+			return fmt.Errorf("failed to request transaction result error messages data: %w", err)
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		//TODO: For me executionData and txResultErrMsgsData are not equally important. Could we proceed indexing without `txResultErrMsgsData`?
+		return err
 	}
 
-	c.executionData = execution_data.NewBlockExecutionDataEntity(c.executionResult.ExecutionDataID, executionData)
+	c.processor.executionData = execution_data.NewBlockExecutionDataEntity(c.executionResult.ExecutionDataID, executionData)
+	c.processor.txResultErrMsgsData = txResultErrMsgsData
 
-	txResultErrMsgsData, err := c.txResultErrMsgsRequester.Request(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to request transaction result error messages data: %w", err)
-	}
-
-	c.txResultErrMsgsData = txResultErrMsgsData
+	c.log.Debug().Msg("successfully downloaded execution data")
 
 	return nil
 }
 
 // Index implements the Core.Index method.
 // It retrieves the downloaded execution data from the cache and indexes it into in-memory storage.
-// Expected errors:
-// - storage.ErrHeightNotIndexed if the given height does not match the storage's block height.
 //
-// No other errors are expected during normal operations
-func (c *CoreImpl) Index(_ context.Context) error {
+// No errors are expected during normal operations
+func (c *CoreImpl) Index() error {
+	if c.processor.executionData == nil {
+		return fmt.Errorf("could not index an empty execution data")
+	}
 	c.log.Debug().Msg("indexing execution data")
 
-	if err := c.indexer.IndexBlockData(c.executionData); err != nil {
+	if err := c.processor.indexer.IndexBlockData(c.processor.executionData); err != nil {
 		return err
 	}
 
-	if err := c.indexer.IndexTxResultErrorMessagesData(c.txResultErrMsgsData); err != nil {
+	if err := c.processor.indexer.IndexTxResultErrorMessagesData(c.processor.txResultErrMsgsData); err != nil {
 		return err
 	}
+
+	c.log.Debug().Msg("successfully indexed execution data")
 
 	return nil
 }
 
-// Persist implements the Core.Persist method.
-// It persists the indexed data to permanent storage atomically.
+// Persist persists the indexed data to permanent storage atomically.
 //
 // No errors are expected during normal operations
-func (c *CoreImpl) Persist(_ context.Context) error {
+func (c *CoreImpl) Persist() error {
 	c.log.Debug().Msg("persisting execution data")
 
 	// Add all data to the batch
-	if err := c.persister.Persist(); err != nil {
+	if err := c.processor.persister.Persist(); err != nil {
 		return fmt.Errorf("failed to persist data: %w", err)
 	}
 
-	c.log.Info().Msg("successfully persisted execution data")
+	c.log.Debug().Msg("successfully persisted execution data")
 
 	return nil
 }
@@ -211,25 +256,9 @@ func (c *CoreImpl) Persist(_ context.Context) error {
 // and any data dropped.
 //
 // No errors are expected during normal operations
-func (c *CoreImpl) Abandon(_ context.Context) error {
-	c.log.Debug().Msg("Abandon execution data processing")
-
-	// Clear in-memory storage by setting references to nil for garbage collection
-	// Since we don't have Clear() methods, we remove the references to allow GC
-	c.inmemRegisters = nil
-	c.inmemEvents = nil
-	c.inmemCollections = nil
-	c.inmemTransactions = nil
-	c.inmemResults = nil
-	c.inmemTxResultErrMsgs = nil
-
-	// Clear other references
-	c.txResultErrMsgsRequester = nil
-	c.execDataRequester = nil
-	c.indexer = nil
-	c.persister = nil
-	c.executionData = nil
-	c.txResultErrMsgsData = nil
+func (c *CoreImpl) Abandon() error {
+	// Clear in-memory storage and other processing data by setting processor references to nil for garbage collection
+	c.processor = nil
 
 	return nil
 }
