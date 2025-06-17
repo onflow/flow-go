@@ -307,7 +307,7 @@ func makeVerifier(
 ) module.ChunkVerifier {
 
 	vm := fvm.NewVirtualMachine()
-	fvmOptions := initialize.InitFvmOptions(chainID, headers)
+	fvmOptions := initialize.InitFvmOptions(chainID, headers, false)
 	fvmOptions = append(
 		[]fvm.Option{fvm.WithLogger(logger)},
 		fvmOptions...,
