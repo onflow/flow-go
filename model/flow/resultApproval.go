@@ -29,7 +29,7 @@ type UntrustedAttestation Attestation
 // NewAttestation creates a new instance of Attestation.
 // Construction Attestation allowed only within the constructor.
 //
-// All errors indicate a valid Collection cannot be constructed from the input.
+// All errors indicate a valid Attestation cannot be constructed from the input.
 // ChunkIndex can be zero in principle, so we don’t check it.
 func NewAttestation(untrusted UntrustedAttestation) (*Attestation, error) {
 	if untrusted.BlockID == ZeroID {
