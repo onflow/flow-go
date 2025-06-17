@@ -2747,6 +2747,38 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 	}
 }
 
+// TransactionResultErrorMessageFixture creates a fixture tx result error message with random generated tx ID and executor ID for test purpose.
+func TransactionResultErrorMessageFixture(opts ...func(*flow.TransactionResultErrorMessage)) flow.TransactionResultErrorMessage {
+	txResErrMsg := flow.TransactionResultErrorMessage{
+		TransactionID: IdentifierFixture(),
+		Index:         0,
+		ErrorMessage:  "transaction result error",
+		ExecutorID:    IdentifierFixture(),
+	}
+
+	for _, opt := range opts {
+		opt(&txResErrMsg)
+	}
+
+	return txResErrMsg
+}
+
+// TransactionResultErrorMessagesFixture creates a fixture collection of tx result error messages with n elements.
+func TransactionResultErrorMessagesFixture(n int) []flow.TransactionResultErrorMessage {
+	txResErrMsgs := make([]flow.TransactionResultErrorMessage, 0, n)
+	executorID := IdentifierFixture()
+
+	for i := 0; i < n; i++ {
+		txResErrMsgs = append(txResErrMsgs, flow.TransactionResultErrorMessage{
+			TransactionID: IdentifierFixture(),
+			Index:         uint32(i),
+			ErrorMessage:  fmt.Sprintf("transaction result error %d", i),
+			ExecutorID:    executorID,
+		})
+	}
+	return txResErrMsgs
+}
+
 // RootEpochProtocolStateFixture creates a fixture with correctly structured Epoch sub-state.
 // The epoch substate is part of the overall protocol state (KV store).
 // This can be useful for testing bootstrap when there is no previous epoch.

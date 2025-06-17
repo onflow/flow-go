@@ -76,7 +76,7 @@ func NewTransactionResultErrorMessages(collector module.CacheMetrics, db storage
 // No errors are expected during normal operation.
 func (t *TransactionResultErrorMessages) Store(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error {
 	return t.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return t.batchStore(blockID, transactionResultErrorMessages, rw)
+		return t.BatchStore(blockID, transactionResultErrorMessages, rw)
 	})
 }
 
@@ -101,7 +101,7 @@ func (t *TransactionResultErrorMessages) Exists(blockID flow.Identifier) (bool, 
 // BatchStore inserts a batch of transaction result error messages into a batch
 //
 // No errors are expected during normal operation.
-func (t *TransactionResultErrorMessages) batchStore(
+func (t *TransactionResultErrorMessages) BatchStore(
 	blockID flow.Identifier,
 	transactionResultErrorMessages []flow.TransactionResultErrorMessage,
 	batch storage.ReaderBatchWriter,
@@ -163,7 +163,7 @@ func (t *TransactionResultErrorMessages) ByBlockIDTransactionIndex(blockID flow.
 // ByBlockID gets all transaction result error messages for a block, ordered by transaction index.
 // Note: This method will return an empty slice both if the block is not indexed yet and if the block does not have any errors.
 //
-// No errors are expected during normal operation.
+// - storage.ErrNotFound if no error messages were found for this block.
 func (t *TransactionResultErrorMessages) ByBlockID(blockID flow.Identifier) ([]flow.TransactionResultErrorMessage, error) {
 	transactionResultErrorMessages, err := t.blockCache.Get(t.db.Reader(), blockID)
 	if err != nil {
