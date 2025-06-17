@@ -150,7 +150,7 @@ func TestConvertChunkExecutionData(t *testing.T) {
 			name: "chunk execution data conversions - empty collection",
 			fn: func(t *testing.T) *execution_data.ChunkExecutionData {
 				ced := unittest.ChunkExecutionDataFixture(t, 0)
-				ced.Collection = &flow.Collection{}
+				ced.Collection = flow.NewEmptyCollection()
 				ced.TransactionResults = nil
 				return ced
 			},

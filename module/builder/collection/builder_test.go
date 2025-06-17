@@ -199,7 +199,11 @@ func (suite *BuilderSuite) FinalizeBlock(block model.Block) {
 func (suite *BuilderSuite) Payload(transactions ...*flow.TransactionBody) model.Payload {
 	final, err := suite.protoState.Final().Head()
 	suite.Require().NoError(err)
-	return model.PayloadFromTransactions(final.ID(), transactions...)
+
+	payload, err := model.NewPayload(final.ID(), transactions)
+	suite.Require().NoError(err)
+
+	return *payload
 }
 
 // ProtoStateRoot returns the root block of the protocol state.

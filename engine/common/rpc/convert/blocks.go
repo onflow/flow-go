@@ -134,7 +134,10 @@ func MessagesToBlockSeals(m []*entities.BlockSeal) ([]*flow.Seal, error) {
 
 // PayloadFromMessage converts a protobuf Block message to a flow.Payload.
 func PayloadFromMessage(m *entities.Block) (*flow.Payload, error) {
-	cgs := MessagesToCollectionGuarantees(m.CollectionGuarantees)
+	cgs, err := MessagesToCollectionGuarantees(m.CollectionGuarantees)
+	if err != nil {
+		return nil, err
+	}
 	seals, err := MessagesToBlockSeals(m.BlockSeals)
 	if err != nil {
 		return nil, err
