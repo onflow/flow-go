@@ -403,7 +403,7 @@ func (e *blockComputer) executeBlock(
 		numTxns,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not queue queueTransactionRequests: %w", err)
+		return nil, fmt.Errorf("could not queue transaction requests: %w", err)
 	}
 	close(requestQueue)
 
