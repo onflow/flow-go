@@ -12,6 +12,13 @@ import (
 
 const chunkIdx = uint64(7)
 
+// TestNewAttestation verifies that NewAttestation constructs a valid Attestation
+// when given complete, non-zero fields, and returns an error when any required
+// field is missing.
+// It covers:
+//   - valid attestation creation
+//   - missing BlockID
+//   - missing ExecutionResultID
 func TestNewAttestation(t *testing.T) {
 
 	t.Run("valid attestation", func(t *testing.T) {
@@ -63,6 +70,15 @@ func TestNewAttestation(t *testing.T) {
 	})
 }
 
+// TestNewResultApprovalBody checks that NewResultApprovalBody builds a valid
+// ResultApprovalBody when given a correct Attestation and non-empty
+// fields, and returns errors for invalid nested Attestation or missing fields.
+// It covers:
+//   - valid result approval body creation
+//   - invalid nested Attestation
+//   - missing ApproverID
+//   - missing AttestationSignature
+//   - missing Spock proof
 func TestNewResultApprovalBody(t *testing.T) {
 	blockID := unittest.IdentifierFixture()
 	resultID := unittest.IdentifierFixture()
@@ -176,6 +192,13 @@ func TestNewResultApprovalBody(t *testing.T) {
 	})
 }
 
+// TestNewResultApproval ensures NewResultApproval combines a valid
+// ResultApprovalBody and VerifierSignature into a ResultApproval, and returns
+// errors for invalid ResultApprovalBody or missing VerifierSignature.
+// It covers:
+//   - valid result approval creation
+//   - invalid ResultApprovalBody
+//   - missing verifier signature
 func TestNewResultApproval(t *testing.T) {
 	blockID := unittest.IdentifierFixture()
 	execResID := unittest.IdentifierFixture()
@@ -212,6 +235,7 @@ func TestNewResultApproval(t *testing.T) {
 		assert.Equal(t, verifierSig, ra.VerifierSignature)
 	})
 
+	// An invalid ResultApprovalBody must cause NewResultApproval to error
 	t.Run("invalid body", func(t *testing.T) {
 		uv := flow.UntrustedResultApproval{
 			Body: flow.ResultApprovalBody{
@@ -233,6 +257,7 @@ func TestNewResultApproval(t *testing.T) {
 		assert.Contains(t, err.Error(), "invalid result approval body")
 	})
 
+	// Missing VerifierSignature must cause NewResultApproval to error
 	t.Run("empty verifier signature", func(t *testing.T) {
 		att, err := flow.NewAttestation(flow.UntrustedAttestation{
 			BlockID:           blockID,
