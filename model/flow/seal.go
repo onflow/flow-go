@@ -2,6 +2,7 @@ package flow
 
 import (
 	"encoding/json"
+	"fmt"
 )
 
 // A Seal is produced when an Execution Result (referenced by `ResultID`) for
@@ -61,6 +62,15 @@ type UntrustedSeal Seal
 //
 // All errors indicate a valid Seal cannot be constructed from the input.
 func NewSeal(untrusted UntrustedSeal) (*Seal, error) {
+	if untrusted.BlockID == ZeroID {
+		return nil, fmt.Errorf("block ID must not be zero")
+	}
+	if untrusted.ResultID == ZeroID {
+		return nil, fmt.Errorf("result ID must not be zero")
+	}
+	if untrusted.FinalState == *new(StateCommitment) {
+		return nil, fmt.Errorf("final state must not be empty")
+	}
 	return &Seal{
 		BlockID:                untrusted.BlockID,
 		ResultID:               untrusted.ResultID,
