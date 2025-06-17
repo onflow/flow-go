@@ -2,6 +2,8 @@ package storage
 
 import "github.com/onflow/flow-go/model/flow"
 
+// LatestPersistedSealedResult tracks the most recently persisted sealed execution result processed
+// by the Access ingestion engine.
 type LatestPersistedSealedResult interface {
 	// Latest returns the ID and height of the latest persisted sealed result.
 	Latest() (flow.Identifier, uint64)
