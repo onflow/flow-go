@@ -19,10 +19,8 @@ import (
 
 // TestNewLatestPersistedSealedResult tests the initialization of LatestPersistedSealedResult.
 // It verifies that:
-// - The initializer is called with the correct height
-// - The returned ConsumerProgress is properly stored
+// - The ConsumerProgress is properly stored
 // - All fields are correctly initialized on success
-// - Errors from the initializer are properly propagated
 func TestNewLatestPersistedSealedResult(t *testing.T) {
 	initialHeight := uint64(100)
 	missingHeaderHeight := initialHeight + 1
@@ -34,9 +32,11 @@ func TestNewLatestPersistedSealedResult(t *testing.T) {
 		db := pebbleimpl.ToDB(pdb)
 
 		t.Run("successful initialization", func(t *testing.T) {
-			progress := NewConsumerProgress(db, "test_consumer1")
+			initializer := NewConsumerProgress(db, "test_consumer1")
+			progress, err := initializer.Initialize(initialHeight)
+			require.NoError(t, err)
 
-			latest, err := NewLatestPersistedSealedResult(initialHeader.Height, progress, mockHeaders, mockResults)
+			latest, err := NewLatestPersistedSealedResult(progress, mockHeaders, mockResults)
 			require.NoError(t, err)
 
 			require.NotNil(t, latest)
@@ -47,28 +47,13 @@ func TestNewLatestPersistedSealedResult(t *testing.T) {
 			assert.Equal(t, initialHeader.Height, actualHeight)
 		})
 
-		t.Run("initialize error", func(t *testing.T) {
-			expectedErr := fmt.Errorf("initialization error")
-
-			mockInitializer := storagemock.NewConsumerProgressInitializer(t)
-			mockInitializer.On("Initialize", initialHeader.Height).Return(nil, expectedErr)
-
-			latest, err := NewLatestPersistedSealedResult(initialHeader.Height, mockInitializer, nil, nil)
-
-			require.ErrorIs(t, err, expectedErr)
-			require.Nil(t, latest)
-		})
-
 		t.Run("processed index error", func(t *testing.T) {
 			expectedErr := fmt.Errorf("processed index error")
 
 			mockCP := storagemock.NewConsumerProgress(t)
 			mockCP.On("ProcessedIndex").Return(uint64(0), expectedErr)
 
-			mockInitializer := storagemock.NewConsumerProgressInitializer(t)
-			mockInitializer.On("Initialize", initialHeader.Height).Return(mockCP, nil)
-
-			latest, err := NewLatestPersistedSealedResult(initialHeader.Height, mockInitializer, nil, nil)
+			latest, err := NewLatestPersistedSealedResult(mockCP, nil, nil)
 
 			assert.ErrorIs(t, err, expectedErr)
 			require.Nil(t, latest)
@@ -77,11 +62,13 @@ func TestNewLatestPersistedSealedResult(t *testing.T) {
 		t.Run("header lookup error", func(t *testing.T) {
 			expectedErr := fmt.Errorf("header lookup error")
 
-			progress := NewConsumerProgress(db, "test_consumer2")
+			initializer := NewConsumerProgress(db, "test_consumer2")
+			progress, err := initializer.Initialize(missingHeaderHeight)
+			require.NoError(t, err)
 
 			mockHeaders.On("ByHeight", missingHeaderHeight).Return(nil, expectedErr)
 
-			latest, err := NewLatestPersistedSealedResult(missingHeaderHeight, progress, mockHeaders, nil)
+			latest, err := NewLatestPersistedSealedResult(progress, mockHeaders, nil)
 
 			assert.ErrorIs(t, err, expectedErr)
 			require.Nil(t, latest)
@@ -90,14 +77,16 @@ func TestNewLatestPersistedSealedResult(t *testing.T) {
 		t.Run("result lookup error", func(t *testing.T) {
 			expectedErr := fmt.Errorf("result lookup error")
 
-			progress := NewConsumerProgress(db, "test_consumer3")
+			initializer := NewConsumerProgress(db, "test_consumer3")
+			progress, err := initializer.Initialize(missingResultHeight)
+			require.NoError(t, err)
 
 			header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(missingResultHeight))
 
 			mockHeaders.On("ByHeight", missingResultHeight).Return(header, nil)
 			mockResults.On("ByBlockID", header.ID()).Return(nil, expectedErr)
 
-			latest, err := NewLatestPersistedSealedResult(missingResultHeight, progress, mockHeaders, mockResults)
+			latest, err := NewLatestPersistedSealedResult(progress, mockHeaders, mockResults)
 
 			assert.ErrorIs(t, err, expectedErr)
 			require.Nil(t, latest)
@@ -122,9 +111,11 @@ func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 		db := pebbleimpl.ToDB(pdb)
 
 		t.Run("successful batch update", func(t *testing.T) {
-			progress := NewConsumerProgress(db, "test_consumer1")
+			initializer := NewConsumerProgress(db, "test_consumer1")
+			progress, err := initializer.Initialize(initialHeader.Height)
+			require.NoError(t, err)
 
-			latest, err := NewLatestPersistedSealedResult(initialHeader.Height, progress, mockHeaders, mockResults)
+			latest, err := NewLatestPersistedSealedResult(progress, mockHeaders, mockResults)
 			require.NoError(t, err)
 
 			batch := db.NewBatch()
@@ -168,10 +159,7 @@ func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 		mockCP.On("ProcessedIndex").Return(initialHeader.Height, nil)
 		mockCP.On("BatchSetProcessedIndex", newHeight, mockBatch).Return(expectedErr)
 
-		mockInitializer := storagemock.NewConsumerProgressInitializer(t)
-		mockInitializer.On("Initialize", initialHeader.Height).Return(mockCP, nil)
-
-		latest, err := NewLatestPersistedSealedResult(initialHeader.Height, mockInitializer, mockHeaders, mockResults)
+		latest, err := NewLatestPersistedSealedResult(mockCP, mockHeaders, mockResults)
 		require.NoError(t, err)
 
 		err = latest.BatchSet(newResultID, newHeight, mockBatch)
@@ -196,11 +184,13 @@ func TestLatestPersistedSealedResult_ConcurrentAccess(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		db := pebbleimpl.ToDB(pdb)
 
-		progress := NewConsumerProgress(db, "test_consumer")
-
 		initialHeader, initialResult, mockHeaders, mockResults := getHeadersResults(t, 100)
 
-		latest, err := NewLatestPersistedSealedResult(initialHeader.Height, progress, mockHeaders, mockResults)
+		initializer := NewConsumerProgress(db, "test_consumer")
+		progress, err := initializer.Initialize(initialHeader.Height)
+		require.NoError(t, err)
+
+		latest, err := NewLatestPersistedSealedResult(progress, mockHeaders, mockResults)
 		require.NoError(t, err)
 
 		t.Run("concurrent reads", func(t *testing.T) {
