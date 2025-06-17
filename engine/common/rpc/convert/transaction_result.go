@@ -25,6 +25,7 @@ func TransactionResultToMessage(result *accessmodel.TransactionResult) *access.T
 }
 
 // MessageToTransactionResult converts a protobuf message to a TransactionResult
+// All errors indicate the input cannot be converted to a valid event.
 func MessageToTransactionResult(message *access.TransactionResultResponse) (*accessmodel.TransactionResult, error) {
 	events, err := MessagesToEvents(message.Events)
 	if err != nil {
@@ -56,6 +57,7 @@ func TransactionResultsToMessage(results []*accessmodel.TransactionResult) *acce
 }
 
 // MessageToTransactionResults converts a protobuf message to a slice of TransactionResults
+// All errors indicate the input cannot be converted to a valid event.
 func MessageToTransactionResults(message *access.TransactionResultsResponse) ([]*accessmodel.TransactionResult, error) {
 	results := make([]*accessmodel.TransactionResult, len(message.TransactionResults))
 	var err error

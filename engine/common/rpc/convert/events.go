@@ -29,6 +29,7 @@ func EventToMessage(e flow.Event) *entities.Event {
 
 // MessageToEvent converts a protobuf message to a flow.Event
 // Note: this function does not convert the payload encoding
+// All errors indicate the input cannot be converted to a valid event.
 func MessageToEvent(m *entities.Event) (*flow.Event, error) {
 	event, err := flow.NewEvent(
 		flow.UntrustedEvent{
