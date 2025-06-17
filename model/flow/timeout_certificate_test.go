@@ -33,10 +33,16 @@ import (
 // 6. Invalid input with empty SigData:
 //   - Ensures an error is returned when the SigData field is an empty byte slice.
 //
-// 7. Invalid input when the View is lower than NewestQC's View:
+// 7. Invalid input with nil NewestQCViews:
+//   - Ensures an error is returned when the NewestQCViews field is nil.
+//
+// 8. Invalid input with empty NewestQCViews:
+//   - Ensures an error is returned when the NewestQCViews field is an empty slice.
+//
+// 9. Invalid input when the View is lower than NewestQC's View:
 //   - Ensures an error is returned when the TimeoutCertificate's View is less than the included QuorumCertificate's View.
 //
-// 8. Invalid input when NewestQCViews contains view higher than NewestQC.View:
+// 10. Invalid input when NewestQCViews contains view higher than NewestQC.View:
 //   - Ensures an error is returned if NewestQCViews includes a view that exceeds the view of the NewestQC.
 func TestNewTimeoutCertificate(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
@@ -96,6 +102,26 @@ func TestNewTimeoutCertificate(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, res)
 		assert.Contains(t, err.Error(), "signature must not be empty")
+	})
+
+	t.Run("invalid input with nil NewestQCViews", func(t *testing.T) {
+		tc := helper.MakeTC()
+		tc.NewestQCViews = nil
+
+		res, err := flow.NewTimeoutCertificate(flow.UntrustedTimeoutCertificate(*tc))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "newest QC views must not be empty")
+	})
+
+	t.Run("invalid input with empty NewestQCViews", func(t *testing.T) {
+		tc := helper.MakeTC()
+		tc.NewestQCViews = []uint64{}
+
+		res, err := flow.NewTimeoutCertificate(flow.UntrustedTimeoutCertificate(*tc))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "newest QC views must not be empty")
 	})
 
 	t.Run("invalid input with TC.View < QC.View", func(t *testing.T) {

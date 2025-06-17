@@ -73,6 +73,8 @@ func NewTimeoutCertificate(untrusted UntrustedTimeoutCertificate) (*TimeoutCerti
 		if newestQCView > untrusted.NewestQC.View {
 			return nil, fmt.Errorf("included QC (view=%d) should be equal or higher to highest contributed view: %d", untrusted.NewestQC.View, newestQCView)
 		}
+	} else {
+		return nil, fmt.Errorf("newest QC views must not be empty")
 	}
 
 	return &TimeoutCertificate{
