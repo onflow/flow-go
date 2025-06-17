@@ -100,6 +100,9 @@ func (c *ApprovalCollector) IncorporatedResult() *flow.IncorporatedResult {
 	return c.incorporatedResult
 }
 
+// SealResult generate and store seal into the mempool.
+//
+// All errors indicate the input cannot be converted to a valid event.
 func (c *ApprovalCollector) SealResult() error {
 	// get final state of execution result
 	finalState, err := c.incorporatedResult.Result.FinalStateCommitment()
@@ -111,11 +114,16 @@ func (c *ApprovalCollector) SealResult() error {
 	// TODO: Check SPoCK proofs
 
 	// generate & store seal
-	seal := &flow.Seal{
-		BlockID:                c.incorporatedResult.Result.BlockID,
-		ResultID:               c.incorporatedResult.Result.ID(),
-		FinalState:             finalState,
-		AggregatedApprovalSigs: c.aggregatedSignatures.Collect(),
+	seal, err := flow.NewSeal(
+		flow.UntrustedSeal{
+			BlockID:                c.incorporatedResult.Result.BlockID,
+			ResultID:               c.incorporatedResult.Result.ID(),
+			FinalState:             finalState,
+			AggregatedApprovalSigs: c.aggregatedSignatures.Collect(),
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not construct seal: %w", err)
 	}
 
 	// Adding a seal that already exists in the mempool is a NoOp. But to reduce log
