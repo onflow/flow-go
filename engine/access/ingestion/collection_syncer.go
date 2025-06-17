@@ -24,8 +24,6 @@ var (
 	defaultMissingCollsForAgeThreshold   uint64 = missingCollsForAgeThreshold
 )
 
-var ErrMissingCollection = errors.New("collection not found in storage")
-
 // The CollectionSyncer type provides mechanisms for syncing and indexing data
 // from the Flow blockchain into local storage. Specifically, it handles
 // the retrieval and processing of collections and transactions that may
@@ -59,7 +57,7 @@ type CollectionSyncer struct {
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 }
 
-// NewCollectionSyncer creates a new CollectionSyncer responsible for downloading,
+// NewCollectionSyncer creates a new CollectionSyncer responsible for requesting,
 // tracking, and indexing missing collections.
 func NewCollectionSyncer(
 	logger zerolog.Logger,
@@ -131,7 +129,7 @@ func (s *CollectionSyncer) RequestCollections(ctx irrecoverable.SignalerContext,
 // requestMissingCollections checks if missing collections should be requested based on configured
 // block or age thresholds and triggers requests if needed.
 //
-// No errors expected during normal operation.
+// No errors are expected during normal operations.
 func (s *CollectionSyncer) requestMissingCollections() error {
 	lastFullBlockHeight := s.lastFullBlockHeight.Value()
 	lastFinalizedBlock, err := s.state.Final().Head()
@@ -165,14 +163,15 @@ func (s *CollectionSyncer) requestMissingCollections() error {
 
 // requestMissingCollectionsBlocking requests and waits for all missing collections to be downloaded,
 // blocking until either completion or context timeout.
-// No errors expected during normal operation.
+//
+// No errors are expected during normal operations.
 func (s *CollectionSyncer) requestMissingCollectionsBlocking(ctx context.Context) error {
 	collections, _, err := s.findMissingCollections(s.lastFullBlockHeight.Value())
 	if err != nil {
 		return err
 	}
 	if len(collections) == 0 {
-		s.logger.Info().Msg("skipping downloading missing collections. no missing collections found")
+		s.logger.Info().Msg("skipping requesting missing collections. no missing collections found")
 		return nil
 	}
 
@@ -218,7 +217,7 @@ func (s *CollectionSyncer) requestMissingCollectionsBlocking(ctx context.Context
 // findMissingCollections scans block heights from last known full block up to the latest finalized
 // block and returns all missing collection along with the count of incomplete blocks.
 //
-// No errors expected during normal operations.
+// No errors are expected during normal operations.
 func (s *CollectionSyncer) findMissingCollections(lastFullBlockHeight uint64) ([]*flow.CollectionGuarantee, int, error) {
 	// first block to look up collections at
 	firstBlockHeight := lastFullBlockHeight + 1
@@ -236,7 +235,7 @@ func (s *CollectionSyncer) findMissingCollections(lastFullBlockHeight uint64) ([
 	for currBlockHeight := firstBlockHeight; currBlockHeight <= lastBlockHeight; currBlockHeight++ {
 		collections, err := s.findMissingCollectionsAtHeight(currBlockHeight)
 		if err != nil {
-			return nil, 0, ErrMissingCollection
+			return nil, 0, err
 		}
 
 		if len(collections) == 0 {
@@ -252,8 +251,7 @@ func (s *CollectionSyncer) findMissingCollections(lastFullBlockHeight uint64) ([
 
 // findMissingCollectionsAtHeight returns all missing collections for a specific block height.
 //
-// Expected errors during normal operations:
-// - storage.ErrNotFound if no block is found in storage for the given height
+// No errors are expected during normal operations.
 func (s *CollectionSyncer) findMissingCollectionsAtHeight(height uint64) ([]*flow.CollectionGuarantee, error) {
 	block, err := s.blocks.ByHeight(height)
 	if err != nil {
@@ -276,7 +274,8 @@ func (s *CollectionSyncer) findMissingCollectionsAtHeight(height uint64) ([]*flo
 }
 
 // isCollectionInStorage checks whether the given collection is present in local storage.
-// No errors expected during normal operation
+//
+// No errors are expected during normal operations.
 func (s *CollectionSyncer) isCollectionInStorage(collectionID flow.Identifier) (bool, error) {
 	_, err := s.collections.LightByID(collectionID)
 	if err == nil {
@@ -297,7 +296,7 @@ func (s *CollectionSyncer) RequestCollectionsForBlock(height uint64, missingColl
 	// this means that either we have already received these collections, or the block
 	// may contain unverifiable guarantees (in case this node has just joined the network)
 	if height <= s.lastFullBlockHeight.Value() {
-		s.logger.Info().
+		s.logger.Debug().
 			Msg("skipping requesting collections for finalized block as its collections have been already retrieved")
 		return
 	}
@@ -323,7 +322,8 @@ func (s *CollectionSyncer) requestCollections(missingCollections []*flow.Collect
 }
 
 // updateLastFullBlockHeight updates the next highest block height where all previous collections have been indexed.
-// No errors expected during normal operation.
+//
+// No errors are expected during normal operations.
 func (s *CollectionSyncer) updateLastFullBlockHeight() error {
 	lastFullBlockHeight := s.lastFullBlockHeight.Value()
 	lastFinalizedBlock, err := s.state.Final().Head()
@@ -357,7 +357,7 @@ func (s *CollectionSyncer) updateLastFullBlockHeight() error {
 // findLowestBlockHeightWithMissingCollections finds the next block height with missing collections,
 // returning the latest contiguous height where all collections are present.
 //
-// No errors expected during normal operations.
+// No errors are expected during normal operations.
 func (s *CollectionSyncer) findLowestBlockHeightWithMissingCollections(
 	lastKnownFullBlockHeight uint64,
 	finalizedBlockHeight uint64,
@@ -367,7 +367,7 @@ func (s *CollectionSyncer) findLowestBlockHeightWithMissingCollections(
 	for currBlockHeight := lastKnownFullBlockHeight + 1; currBlockHeight <= finalizedBlockHeight; currBlockHeight++ {
 		missingCollections, err := s.findMissingCollectionsAtHeight(currBlockHeight)
 		if err != nil {
-			return 0, ErrMissingCollection
+			return 0, err
 		}
 
 		// return when we find the first block with missing collections
