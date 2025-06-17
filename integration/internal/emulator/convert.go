@@ -182,6 +182,8 @@ func FlowTransactionResultToSDK(result *accessmodel.TransactionResult) (*sdk.Tra
 	return sdkResult, nil
 }
 
+// SDKEventToFlow converts an SDK event model type to the flow-go internal event model type.
+// All errors indicate the input cannot be converted to a valid event.
 func SDKEventToFlow(event sdk.Event) (*flowgo.Event, error) {
 	payload, err := ccf.EventsEncMode.Encode(event.Value)
 	if err != nil {
