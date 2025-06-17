@@ -92,8 +92,8 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 	payload := cluster.NewEmptyPayload(refID)           // payload referencing main chain
 	rootPayload := cluster.NewEmptyPayload(flow.ZeroID) // root cluster block payload
 
-	suite.payloads.On("ByBlockID", nonRootBlockID).Return(&payload, nil)
-	suite.payloads.On("ByBlockID", rootBlockID).Return(&rootPayload, nil)
+	suite.payloads.On("ByBlockID", nonRootBlockID).Return(payload, nil)
+	suite.payloads.On("ByBlockID", rootBlockID).Return(rootPayload, nil)
 
 	// a real cluster member which continues to be a valid member
 	realClusterMember := suite.members[1]

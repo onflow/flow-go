@@ -107,7 +107,7 @@ func TestFinalizer(t *testing.T) {
 			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// create a new block that isn't connected to a parent
-			block := unittest.ClusterBlockWithParentAndPayload(genesis, model.NewEmptyPayload(refBlock.ID()))
+			block := unittest.ClusterBlockWithParentAndPayload(genesis, *model.NewEmptyPayload(refBlock.ID()))
 			block.Header.ParentID = unittest.IdentifierFixture()
 			insert(block)
 
@@ -124,7 +124,7 @@ func TestFinalizer(t *testing.T) {
 			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// create a block with empty payload on genesis
-			block := unittest.ClusterBlockWithParentAndPayload(genesis, model.NewEmptyPayload(refBlock.ID()))
+			block := unittest.ClusterBlockWithParentAndPayload(genesis, *model.NewEmptyPayload(refBlock.ID()))
 			insert(block)
 
 			// finalize the block

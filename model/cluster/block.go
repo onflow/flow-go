@@ -14,7 +14,7 @@ func Genesis() *Block {
 		ParentID:  flow.ZeroID,
 	}
 
-	block := NewBlock(headerBody, NewEmptyPayload(flow.ZeroID))
+	block := NewBlock(headerBody, *NewEmptyPayload(flow.ZeroID))
 	return &block
 }
 

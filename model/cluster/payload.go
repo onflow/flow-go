@@ -36,8 +36,8 @@ type Payload struct {
 
 // NewEmptyPayload returns a payload with an empty collection and the given
 // reference block ID.
-func NewEmptyPayload(refID flow.Identifier) Payload {
-	return Payload{
+func NewEmptyPayload(refID flow.Identifier) *Payload {
+	return &Payload{
 		Collection:       *flow.NewEmptyCollection(),
 		ReferenceBlockID: refID,
 	}
