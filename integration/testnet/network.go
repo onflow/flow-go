@@ -1054,7 +1054,7 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 	dummyStakingKey := unittest.StakingPrivKeyFixture()
 
 	for _, conf := range confs {
-		info := bootstrap.NewPrivateNodeInfo(
+		info, err := bootstrap.NewPrivateNodeInfo(
 			conf.NodeID,
 			flow.RoleAccess, // use Access role
 			"",              // no address
@@ -1062,6 +1062,9 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 			conf.NetworkingPrivKey,
 			dummyStakingKey,
 		)
+		if err != nil {
+			return nil, err
+		}
 
 		nodeInfos = append(nodeInfos, info)
 	}
@@ -1195,33 +1198,46 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	targetDuration := networkConf.ViewsInEpoch / networkConf.ViewsPerSecond
 
 	// generate epoch service events
-	epochSetup := &flow.EpochSetup{
-		Counter:            epochCounter,
-		FirstView:          rootHeader.View,
-		DKGPhase1FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase,
-		DKGPhase2FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*2,
-		DKGPhase3FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*3,
-		FinalView:          rootHeader.View + networkConf.ViewsInEpoch - 1,
-		Participants:       participants.ToSkeleton(),
-		Assignments:        clusterAssignments,
-		RandomSource:       randomSource,
-		TargetDuration:     targetDuration,
-		TargetEndTime:      uint64(time.Now().Unix()) + targetDuration,
+	epochSetup, err := flow.NewEpochSetup(
+		flow.UntrustedEpochSetup{
+			Counter:            epochCounter,
+			FirstView:          rootHeader.View,
+			DKGPhase1FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase,
+			DKGPhase2FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*2,
+			DKGPhase3FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*3,
+			FinalView:          rootHeader.View + networkConf.ViewsInEpoch - 1,
+			Participants:       participants.ToSkeleton(),
+			Assignments:        clusterAssignments,
+			RandomSource:       randomSource,
+			TargetDuration:     targetDuration,
+			TargetEndTime:      uint64(time.Now().Unix()) + targetDuration,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch setup: %w", err)
 	}
 
-	epochCommit := &flow.EpochCommit{
-		Counter:            epochCounter,
-		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
-		DKGGroupKey:        dkg.PubGroupKey,
-		DKGParticipantKeys: dkg.PubKeyShares,
-		DKGIndexMap:        dkgIndexMap,
+	epochCommit, err := flow.NewEpochCommit(
+		flow.UntrustedEpochCommit{
+			Counter:            epochCounter,
+			ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
+			DKGGroupKey:        dkg.PubGroupKey,
+			DKGParticipantKeys: dkg.PubKeyShares,
+			DKGIndexMap:        dkgIndexMap,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch commit: %w", err)
 	}
+
 	root := &flow.Block{
 		Header: rootHeader,
 	}
-	rootProtocolState, err := networkConf.KVStoreFactory(
-		inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit).ID(),
-	)
+	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch protocol state: %w", err)
+	}
+	rootProtocolState, err := networkConf.KVStoreFactory(minEpochStateEntry.ID())
 	if err != nil {
 		return nil, err
 	}
@@ -1347,7 +1363,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 		addr := fmt.Sprintf("%s:%d", name, DefaultFlowPort)
 		roleCounter[conf.Role]++
 
-		info := bootstrap.NewPrivateNodeInfo(
+		info, err := bootstrap.NewPrivateNodeInfo(
 			conf.Identifier,
 			conf.Role,
 			addr,
@@ -1355,6 +1371,9 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 			networkKeys[i],
 			stakingKeys[i],
 		)
+		if err != nil {
+			return nil, err
+		}
 
 		containerConf := ContainerConfig{
 			NodeInfo:            info,
