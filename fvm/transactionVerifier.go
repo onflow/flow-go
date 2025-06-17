@@ -17,7 +17,7 @@ import (
 )
 
 type signatureType struct {
-	message []byte
+	payload []byte
 
 	errorBuilder func(flow.TransactionSignature, error) errors.CodedError
 
@@ -68,7 +68,7 @@ func (entry *signatureContinuation) verify() errors.CodedError {
 
 	valid, err := crypto.VerifySignatureFromTransaction(
 		entry.Signature,
-		entry.message,
+		entry.payload,
 		entry.accountKey.PublicKey,
 		entry.accountKey.HashAlgo,
 		entry.ExtensionData,
