@@ -82,6 +82,13 @@ func NewTimeoutObject(untrusted UntrustedTimeoutObject) (*TimeoutObject, error) 
 	if untrusted.NewestQC == nil {
 		return nil, fmt.Errorf("newest QC must not be nil")
 	}
+	if untrusted.SignerID == flow.ZeroID {
+		return nil, fmt.Errorf("signer ID must not be zero")
+	}
+	if len(untrusted.SigData) == 0 {
+		return nil, fmt.Errorf("signature must not be empty")
+	}
+
 	if untrusted.View <= untrusted.NewestQC.View {
 		return nil, fmt.Errorf("TO's QC %d cannot be newer than the TO's view %d", untrusted.NewestQC.View, untrusted.View)
 	}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // TestNewTimeoutObject verifies the behavior of the NewTimeoutObject constructor.
@@ -21,16 +22,25 @@ import (
 // 2. Invalid input with nil NewestQC:
 //   - Ensures an error is returned when the NewestQC field is nil.
 //
-// 3. Invalid input when View is lower than or equal to NewestQC.View:
+// 3. Invalid input with zero SignerID:
+//   - Ensures an error is returned when the SignerID is flow.ZeroID.
+//
+// 4. Invalid input with nil SigData:
+//   - Ensures an error is returned when the SigData field is nil.
+//
+// 5. Invalid input with empty SigData:
+//   - Ensures an error is returned when the SigData field is an empty byte slice.
+//
+// 6. Invalid input when View is lower than or equal to NewestQC.View:
 //   - Ensures an error is returned when the TimeoutObject's View is less than or equal to the included QC's View.
 //
-// 4. Invalid input when TC present but for wrong view:
+// 7. Invalid input when TC present but for wrong view:
 //   - Ensures an error is returned when LastViewTC.View is not one less than the TimeoutObject's View.
 //
-// 5. Invalid input when TC's QC newer than TimeoutObject's QC:
+// 8. Invalid input when TC's QC newer than TimeoutObject's QC:
 //   - Ensures an error is returned when TimeoutObject's NewestQC.View is older than LastViewTC.NewestQC.View.
 //
-// 6. Invalid input when LastViewTC missing when QC does not prove previous round:
+// 9. Invalid input when LastViewTC missing when QC does not prove previous round:
 //   - Ensures an error is returned when TimeoutObject lacks both a QC for previous round and a LastViewTC.
 func TestNewTimeoutObject(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
@@ -47,6 +57,36 @@ func TestNewTimeoutObject(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, res)
 		assert.Contains(t, err.Error(), "newest QC must not be nil")
+	})
+
+	t.Run("invalid input with zero SignerID", func(t *testing.T) {
+		to := helper.TimeoutObjectFixture()
+		to.SignerID = flow.ZeroID
+
+		res, err := model.NewTimeoutObject(model.UntrustedTimeoutObject(*to))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "signer ID must not be zero")
+	})
+
+	t.Run("invalid input with nil SigData", func(t *testing.T) {
+		to := helper.TimeoutObjectFixture()
+		to.SigData = nil
+
+		res, err := model.NewTimeoutObject(model.UntrustedTimeoutObject(*to))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "signature must not be empty")
+	})
+
+	t.Run("invalid input with empty SigData", func(t *testing.T) {
+		to := helper.TimeoutObjectFixture()
+		to.SigData = []byte{}
+
+		res, err := model.NewTimeoutObject(model.UntrustedTimeoutObject(*to))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "signature must not be empty")
 	})
 
 	t.Run("invalid input when View <= NewestQC.View", func(t *testing.T) {
