@@ -14,7 +14,13 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
+// ExecutionDataRequester defines the interface for requesting execution data for a block.
 type ExecutionDataRequester interface {
+	// RequestExecutionData requests execution data for a given block.
+	//
+	// Expected errors:
+	// - context.Canceled: if the provided context was canceled before completion
+	// All other errors are unexpected exceptions and may indicate invalid execution data was received.
 	RequestExecutionData(ctx context.Context) (*execution_data.BlockExecutionData, error)
 }
 

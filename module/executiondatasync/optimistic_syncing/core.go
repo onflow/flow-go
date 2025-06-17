@@ -167,10 +167,12 @@ func NewCoreImpl(
 	}
 }
 
-// Download downloads execution data for the block
+// Download downloads execution data and transaction results error for the block
 // Expected errors:
 // - context.Canceled: if the provided context was canceled before completion
-// All other errors are unexpected and may indicate a bug or inconsistent state
+// - context.DeadlineExceeded: if the provided context was canceled due to its deadline reached
+//
+// No other errors are expected during normal operations
 func (c *CoreImpl) Download(ctx context.Context) error {
 	c.log.Debug().Msg("downloading execution data")
 
@@ -213,8 +215,8 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 	return nil
 }
 
-// Index implements the Core.Index method.
-// It retrieves the downloaded execution data from the cache and indexes it into in-memory storage.
+// Index retrieves the downloaded execution data and transaction results error messages from the caches and indexes them
+// into in-memory storage.
 //
 // No errors are expected during normal operations
 func (c *CoreImpl) Index() error {

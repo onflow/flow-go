@@ -19,7 +19,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TransactionResultErrorMessageRequester defines the interface for requesting transaction result error messages.
 type TransactionResultErrorMessageRequester interface {
+	// Request fetches transaction results error messages.
+	// Expected errors:
+	// - context.Canceled: if the provided context was canceled before completion
+	//
+	// No other errors are expected during normal operations
 	Request(ctx context.Context) ([]flow.TransactionResultErrorMessage, error)
 }
 
