@@ -88,10 +88,10 @@ func (l *LatestPersistedSealedResult) Latest() (flow.Identifier, uint64) {
 func (l *LatestPersistedSealedResult) BatchSet(resultID flow.Identifier, height uint64, batch storage.ReaderBatchWriter) error {
 	// there are 2 mutexes used here:
 	// - batchMu is used to prevent concurrent batch updates to the persisted height. Since this
-	//   is a global variable and batches have arbitrarily long setup times, we need to ensure that
-	//   only a single batch is in progress at a time.
+	//   is a global variable, we need to ensure that only a single batch is in progress at a time.
 	// - cacheMu is used to protect access to the cached resultID and height values. This is an
-	//   optimization to avoid readers having to block during the batch operations.
+	//   optimization to avoid readers having to block during the batch operations, since they
+	//   can have arbitrarily long setup times.
 	l.batchMu.Lock()
 
 	batch.AddCallback(func(err error) {
