@@ -1,4 +1,4 @@
-package ingestion2
+package store
 
 import (
 	"fmt"
@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
-	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -35,7 +34,7 @@ func TestNewLatestPersistedSealedResult(t *testing.T) {
 		db := pebbleimpl.ToDB(pdb)
 
 		t.Run("successful initialization", func(t *testing.T) {
-			progress := store.NewConsumerProgress(db, "test_consumer1")
+			progress := NewConsumerProgress(db, "test_consumer1")
 
 			latest, err := NewLatestPersistedSealedResult(initialHeader.Height, progress, mockHeaders, mockResults)
 			require.NoError(t, err)
@@ -78,7 +77,7 @@ func TestNewLatestPersistedSealedResult(t *testing.T) {
 		t.Run("header lookup error", func(t *testing.T) {
 			expectedErr := fmt.Errorf("header lookup error")
 
-			progress := store.NewConsumerProgress(db, "test_consumer2")
+			progress := NewConsumerProgress(db, "test_consumer2")
 
 			mockHeaders.On("ByHeight", missingHeaderHeight).Return(nil, expectedErr)
 
@@ -91,7 +90,7 @@ func TestNewLatestPersistedSealedResult(t *testing.T) {
 		t.Run("result lookup error", func(t *testing.T) {
 			expectedErr := fmt.Errorf("result lookup error")
 
-			progress := store.NewConsumerProgress(db, "test_consumer3")
+			progress := NewConsumerProgress(db, "test_consumer3")
 
 			header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(missingResultHeight))
 
@@ -123,7 +122,7 @@ func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 		db := pebbleimpl.ToDB(pdb)
 
 		t.Run("successful batch update", func(t *testing.T) {
-			progress := store.NewConsumerProgress(db, "test_consumer1")
+			progress := NewConsumerProgress(db, "test_consumer1")
 
 			latest, err := NewLatestPersistedSealedResult(initialHeader.Height, progress, mockHeaders, mockResults)
 			require.NoError(t, err)
@@ -197,7 +196,7 @@ func TestLatestPersistedSealedResult_ConcurrentAccess(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		db := pebbleimpl.ToDB(pdb)
 
-		progress := store.NewConsumerProgress(db, "test_consumer")
+		progress := NewConsumerProgress(db, "test_consumer")
 
 		initialHeader, initialResult, mockHeaders, mockResults := getHeadersResults(t, 100)
 

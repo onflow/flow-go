@@ -1,4 +1,4 @@
-package ingestion2
+package store
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 )
 
 // LatestPersistedSealedResult tracks the most recently persisted sealed execution result processed
-// by the ingestion engine.
+// by the Access ingestion engine.
 type LatestPersistedSealedResult struct {
 	// resultID is the execution result ID of the most recently persisted sealed result.
 	resultID flow.Identifier
@@ -18,8 +18,8 @@ type LatestPersistedSealedResult struct {
 	// This is the value stored in the consumer progress index.
 	height uint64
 
-	// cp is the consumer progress instance
-	cp storage.ConsumerProgress
+	// progress is the consumer progress instance
+	progress storage.ConsumerProgress
 
 	// batchMu is used to prevent concurrent batch updates to the persisted height.
 	// the critical section is fairly large, so use a separate mutex from the cached values.
@@ -31,6 +31,7 @@ type LatestPersistedSealedResult struct {
 
 // NewLatestPersistedSealedResult creates a new LatestPersistedSealedResult instance.
 // It initializes the consumer progress index using the provided initializer and initial height.
+// initialHeight must be for a sealed block.
 //
 // No errors are expected during normal operation,
 func NewLatestPersistedSealedResult(
@@ -40,13 +41,13 @@ func NewLatestPersistedSealedResult(
 	results storage.ExecutionResults,
 ) (*LatestPersistedSealedResult, error) {
 	// initialize the consumer progress, and set the initial height if this is the first run
-	cp, err := initializer.Initialize(initialHeight)
+	progress, err := initializer.Initialize(initialHeight)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize progress initializer: %w", err)
 	}
 
 	// get the actual height stored
-	height, err := cp.ProcessedIndex()
+	height, err := progress.ProcessedIndex()
 	if err != nil {
 		return nil, fmt.Errorf("could not get processed index: %w", err)
 	}
@@ -66,7 +67,7 @@ func NewLatestPersistedSealedResult(
 	return &LatestPersistedSealedResult{
 		resultID: result.ID(),
 		height:   height,
-		cp:       cp,
+		progress: progress,
 	}, nil
 }
 
@@ -83,6 +84,12 @@ func (l *LatestPersistedSealedResult) Latest() (flow.Identifier, uint64) {
 //
 // No errors are expected during normal operation,
 func (l *LatestPersistedSealedResult) BatchSet(resultID flow.Identifier, height uint64, batch storage.ReaderBatchWriter) error {
+	// there are 2 mutexes used here:
+	// - batchMu is used to prevent concurrent batch updates to the persisted height. Since this
+	//   is a global variable and batches have arbitrarily long setup times, we need to ensure that
+	//   only a single batch is in progress at a time.
+	// - cacheMu is used to protect access to the cached resultID and height values. This is an
+	//   optimization to avoid readers having to block during the batch operations.
 	l.batchMu.Lock()
 
 	batch.AddCallback(func(err error) {
@@ -98,7 +105,7 @@ func (l *LatestPersistedSealedResult) BatchSet(resultID flow.Identifier, height 
 		l.height = height
 	})
 
-	if err := l.cp.BatchSetProcessedIndex(height, batch); err != nil {
+	if err := l.progress.BatchSetProcessedIndex(height, batch); err != nil {
 		return fmt.Errorf("could not add processed index update to batch: %w", err)
 	}
 
