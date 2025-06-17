@@ -222,8 +222,7 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 				Guarantee: col.Guarantee,
 			})
 			if err != nil {
-				return nil, nil, fmt.Errorf("could not construct missingCollection: %w",
-					err)
+				return nil, nil, fmt.Errorf("could not construct missingCollection: %w", err)
 			}
 
 			missingCollections = append(
