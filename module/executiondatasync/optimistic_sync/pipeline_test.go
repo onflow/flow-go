@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	osmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_syncing/mock"
+	osmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -18,11 +18,11 @@ import (
 // through states when provided with the correct conditions.
 func TestPipelineStateTransitions(t *testing.T) {
 	// Create channels for state updates
-	updateChan := make(chan StateUpdate, 10)
+	updateChan := make(chan State, 10)
 
 	// Create publisher function
-	publisher := func(update StateUpdate) {
-		updateChan <- update
+	publisher := func(state State) {
+		updateChan <- state
 	}
 
 	// Create mock core
@@ -40,20 +40,17 @@ func TestPipelineStateTransitions(t *testing.T) {
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- pipeline.Run(ctx)
+		errChan <- pipeline.Run(ctx, mockCore)
 	}()
 
 	// Assert initial state
-	assert.Equal(t, StateReady, pipeline.GetState())
+	assert.Equal(t, StatePending, pipeline.GetState())
 
 	// Send parent update to trigger state transition
-	pipeline.UpdateState(StateUpdate{
-		DescendsFromLastPersistedSealed: true,
-		ParentState:                     StateComplete, // Assume that parent is already complete
-	})
+	pipeline.OnParentStateUpdated(StateComplete) // Assume that parent is already complete
 
 	// Wait for pipeline to reach WaitingPersist state
-	waitForStateUpdate(t, updateChan, StateWaitingPersist)
+	waitForStateUpdate(t, pipeline, updateChan, StateWaitingPersist)
 	assert.Equal(t, StateWaitingPersist, pipeline.GetState(), "Pipeline should be in WaitingPersist state")
 	mockCore.AssertCalled(t, "Download", mock.Anything)
 	mockCore.AssertCalled(t, "Index", mock.Anything)
@@ -62,7 +59,7 @@ func TestPipelineStateTransitions(t *testing.T) {
 	// Mark the execution result as sealed to trigger persisting
 	pipeline.SetSealed()
 
-	waitForStateUpdate(t, updateChan, StateComplete)
+	waitForStateUpdate(t, pipeline, updateChan, StateComplete)
 
 	mockCore.AssertCalled(t, "Persist", mock.Anything)
 
@@ -71,23 +68,18 @@ func TestPipelineStateTransitions(t *testing.T) {
 	cancel()
 
 	// Check that the pipeline has completed without errors
-	select {
-	case err := <-errChan:
-		assert.NoError(t, err, "Pipeline should complete without errors")
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("Timeout waiting for pipeline to return")
-	}
+	waitForError(t, errChan, nil)
 }
 
-// TestPipelineCancellation verifies that a pipeline is properly canceled when
-// it no longer descends from the last persisted sealed result.
+// TestPipelineCancellation verifies that a pipeline is properly abandoned when
+// the parent pipeline is abandoned.
 func TestPipelineCancellation(t *testing.T) {
 	// Create channels for state updates
-	updateChan := make(chan StateUpdate, 10)
+	updateChan := make(chan State, 10)
 
 	// Create publisher function
-	publisher := func(update StateUpdate) {
-		updateChan <- update
+	publisher := func(state State) {
+		updateChan <- state
 	}
 
 	// Set up a download function that signals when it starts and sleeps
@@ -101,6 +93,7 @@ func TestPipelineCancellation(t *testing.T) {
 		// Simulate long-running operation
 		time.Sleep(100 * time.Millisecond)
 	}).Return(nil)
+	mockCore.On("Abandon", mock.Anything).Return(nil)
 
 	// Create a pipeline
 	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
@@ -111,71 +104,31 @@ func TestPipelineCancellation(t *testing.T) {
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- pipeline.Run(ctx)
+		errChan <- pipeline.Run(ctx, mockCore)
 	}()
 
 	// Send an update that allows starting
-	pipeline.UpdateState(StateUpdate{
-		DescendsFromLastPersistedSealed: true,
-		ParentState:                     StateComplete,
-	})
+	pipeline.OnParentStateUpdated(StateDownloading)
 
 	// Wait for download to start
-	select {
-	case <-downloadStarted:
-		// Download started
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("Timeout waiting for download to start")
-	}
+	unittest.RequireCloseBefore(t, downloadStarted, 500*time.Millisecond, "Timeout waiting for download to start")
 
-	// Now send an update that causes cancellation
-	pipeline.UpdateState(StateUpdate{
-		DescendsFromLastPersistedSealed: false, // No longer descends from latest
-		ParentState:                     StateComplete,
-	})
+	// Now send an update that causes abandonment
+	pipeline.OnParentStateUpdated(StateAbandoned)
 
-	// Check the error channel
-	select {
-	case err := <-errChan:
-		// Check if we got an error as expected
-		if err != nil {
-			assert.Contains(t, err.Error(), "abandoning due to parent updates",
-				"Error should indicate abandonment")
-		} else {
-			// If no error, just log it - the pipeline was canceled but returned nil
-			t.Log("Pipeline was canceled but returned nil error")
-		}
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("Timeout waiting for pipeline to complete")
-	}
-
-	// Check for state updates
-	found := false
-	timeout := time.After(100 * time.Millisecond)
-
-	for !found {
-		select {
-		case update := <-updateChan:
-			if !update.DescendsFromLastPersistedSealed {
-				found = true
-			}
-		case <-timeout:
-			// It's ok if we don't find it - the pipeline might have been canceled before broadcasting
-			t.Log("No update with descendsFromSealed=false found within timeout")
-			break
-		}
-	}
+	waitForError(t, errChan, context.Canceled)
+	waitForStateUpdate(t, pipeline, updateChan, StateAbandoned)
 }
 
 // TestPipelineParentDependentTransitions verifies that a pipeline's transitions
 // depend on the parent pipeline's state.
 func TestPipelineParentDependentTransitions(t *testing.T) {
 	// Create channels for state updates
-	updateChan := make(chan StateUpdate, 10)
+	updateChan := make(chan State, 10)
 
 	// Create publisher function
-	publisher := func(update StateUpdate) {
-		updateChan <- update
+	publisher := func(state State) {
+		updateChan <- state
 	}
 
 	// Create a mock core
@@ -193,14 +146,11 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- pipeline.Run(ctx)
+		errChan <- pipeline.Run(ctx, mockCore)
 	}()
 
 	// Initial update - parent in Ready state
-	pipeline.UpdateState(StateUpdate{
-		DescendsFromLastPersistedSealed: true,
-		ParentState:                     StateReady,
-	})
+	pipeline.OnParentStateUpdated(StateReady)
 
 	// Sleep a bit to allow processing
 	time.Sleep(50 * time.Millisecond)
@@ -210,29 +160,23 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 	mockCore.AssertNotCalled(t, "Download")
 
 	// Update parent to downloading
-	pipeline.UpdateState(StateUpdate{
-		DescendsFromLastPersistedSealed: true,
-		ParentState:                     StateDownloading,
-	})
+	pipeline.OnParentStateUpdated(StateDownloading)
 
 	// Wait for pipeline to progress to WaitingPersist
-	waitForStateUpdate(t, updateChan, StateWaitingPersist)
+	waitForStateUpdate(t, pipeline, updateChan, StateWaitingPersist)
 	assert.Equal(t, StateWaitingPersist, pipeline.GetState(), "Pipeline should progress to WaitingPersist state")
 	mockCore.AssertCalled(t, "Download", mock.Anything)
 	mockCore.AssertCalled(t, "Index", mock.Anything)
 	mockCore.AssertNotCalled(t, "Persist")
 
 	// Update parent to complete - should allow persisting when sealed
-	pipeline.UpdateState(StateUpdate{
-		DescendsFromLastPersistedSealed: true,
-		ParentState:                     StateComplete,
-	})
+	pipeline.OnParentStateUpdated(StateComplete)
 
 	// Mark the execution result as sealed to trigger persisting
 	pipeline.SetSealed()
 
 	// Wait for pipeline to complete
-	waitForStateUpdate(t, updateChan, StateComplete)
+	waitForStateUpdate(t, pipeline, updateChan, StateComplete)
 	assert.Equal(t, StateComplete, pipeline.GetState(), "Pipeline should reach Complete state")
 	mockCore.AssertCalled(t, "Persist", mock.Anything)
 
@@ -246,19 +190,19 @@ func TestPipelineErrorHandling(t *testing.T) {
 	// Test cases for different stages of processing
 	testCases := []struct {
 		name        string
-		setupMock   func(mock *osmock.Core, expectedErr error)
+		setupMock   func(p *PipelineImpl, mock *osmock.Core, expectedErr error)
 		expectedErr error
 	}{
 		{
 			name: "Download Error",
-			setupMock: func(m *osmock.Core, expectedErr error) {
+			setupMock: func(p *PipelineImpl, m *osmock.Core, expectedErr error) {
 				m.On("Download", mock.Anything).Return(expectedErr)
 			},
 			expectedErr: errors.New("download error"),
 		},
 		{
 			name: "Index Error",
-			setupMock: func(m *osmock.Core, expectedErr error) {
+			setupMock: func(p *PipelineImpl, m *osmock.Core, expectedErr error) {
 				m.On("Download", mock.Anything).Return(nil)
 				m.On("Index", mock.Anything).Return(expectedErr)
 			},
@@ -266,31 +210,45 @@ func TestPipelineErrorHandling(t *testing.T) {
 		},
 		{
 			name: "Persist Error",
-			setupMock: func(m *osmock.Core, expectedErr error) {
+			setupMock: func(p *PipelineImpl, m *osmock.Core, expectedErr error) {
 				m.On("Download", mock.Anything).Return(nil)
-				m.On("Index", mock.Anything).Return(nil)
+				m.On("Index", mock.Anything).Run(func(args mock.Arguments) {
+					p.OnParentStateUpdated(StateComplete)
+					p.SetSealed()
+				}).Return(nil)
 				m.On("Persist", mock.Anything).Return(expectedErr)
 			},
 			expectedErr: errors.New("persist error"),
+		},
+		{
+			name: "Abandon Error",
+			setupMock: func(p *PipelineImpl, m *osmock.Core, expectedErr error) {
+				m.On("Download", mock.Anything).Run(func(args mock.Arguments) {
+					p.OnParentStateUpdated(StateAbandoned)
+				}).Return(nil)
+				m.On("Abandon", mock.Anything).Return(expectedErr)
+			},
+			expectedErr: errors.New("abandon error"),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create channels for state updates
-			updateChan := make(chan StateUpdate, 10)
+			updateChan := make(chan State, 10)
 
 			// Create publisher function
-			publisher := func(update StateUpdate) {
-				updateChan <- update
+			publisher := func(state State) {
+				updateChan <- state
 			}
 
 			// Create a mock core with the specified setup
 			mockCore := osmock.NewCore(t)
-			tc.setupMock(mockCore, tc.expectedErr)
 
 			// Create a pipeline
-			pipeline := NewPipeline(zerolog.Nop(), true, unittest.ExecutionResultFixture(), mockCore, publisher)
+			pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
+
+			tc.setupMock(pipeline, mockCore, tc.expectedErr)
 
 			// Start the pipeline
 			ctx, cancel := context.WithCancel(context.Background())
@@ -298,42 +256,33 @@ func TestPipelineErrorHandling(t *testing.T) {
 
 			errChan := make(chan error)
 			go func() {
-				errChan <- pipeline.Run(ctx)
+				errChan <- pipeline.Run(ctx, mockCore)
 			}()
 
 			// Send parent update to trigger processing
-			pipeline.UpdateState(StateUpdate{
-				DescendsFromLastPersistedSealed: true,
-				ParentState:                     StateComplete,
-			})
+			pipeline.OnParentStateUpdated(StateDownloading)
 
-			// Wait for error
-			select {
-			case err := <-errChan:
-				assert.Error(t, err, "Pipeline should propagate the Core error")
-				assert.ErrorIs(t, err, tc.expectedErr)
-			case <-time.After(500 * time.Millisecond):
-				t.Fatal("Timeout waiting for error")
-			}
+			waitForError(t, errChan, tc.expectedErr)
 		})
 	}
 }
 
-// TestBroadcastStateUpdate verifies that descendsFromSealed is correctly propagated
-// and is based on the pipeline's state, not just forwarded from the parent.
+// TestBroadcastStateUpdate verifies that state updates are properly propagated
+// to child pipelines and that abandonment is handled correctly.
 func TestBroadcastStateUpdate(t *testing.T) {
 	// Create channels for state updates
-	updateChan := make(chan StateUpdate, 10)
+	updateChan := make(chan State, 10)
 
 	// Create publisher function
-	publisher := func(update StateUpdate) {
-		updateChan <- update
+	publisher := func(state State) {
+		updateChan <- state
 	}
 
 	// Create mock core
 	mockCore := osmock.NewCore(t)
 	mockCore.On("Download", mock.Anything).Return(nil)
 	mockCore.On("Index", mock.Anything).Return(nil)
+	mockCore.On("Abandon", mock.Anything).Return(nil)
 
 	// Create a pipeline
 	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
@@ -344,75 +293,44 @@ func TestBroadcastStateUpdate(t *testing.T) {
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- pipeline.Run(ctx)
+		errChan <- pipeline.Run(ctx, mockCore)
 	}()
 
-	// Send a state update to trigger a broadcast to children
-	pipeline.UpdateState(StateUpdate{
-		DescendsFromLastPersistedSealed: true,
-		ParentState:                     StateDownloading,
-	})
+	// Send a state update to trigger processing
+	pipeline.OnParentStateUpdated(StateDownloading)
 
-	// Wait for an update to be sent to children
-	update := waitForStateUpdate(t, updateChan, StateWaitingPersist)
+	// Wait for pipeline to reach WaitingPersist state
+	waitForStateUpdate(t, pipeline, updateChan, StateWaitingPersist)
 
-	// Check that the update has the correct flag
-	assert.True(t, update.DescendsFromLastPersistedSealed, "Initial update should indicate descends=true")
+	// Now simulate parent abandonment
+	pipeline.OnParentStateUpdated(StateAbandoned)
 
-	// Now simulate this pipeline being canceled
-	pipeline.UpdateState(StateUpdate{
-		DescendsFromLastPersistedSealed: false, // No longer descends
-		ParentState:                     StateReady,
-	})
-
-	// Wait for the pipeline to complete
-	select {
-	case err := <-errChan:
-		if err != nil {
-			assert.Contains(t, err.Error(), "abandoning due to parent updates",
-				"Error should indicate abandonment")
-		} else {
-			t.Log("Pipeline was canceled but returned nil error")
-		}
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("Timeout waiting for pipeline to complete")
-	}
-
-	// Verify the pipeline transitioned to canceled state
-	assert.Equal(t, StateCanceled, pipeline.GetState(), "Pipeline should be in canceled state")
-
-	// Drain the update channel to check if any updates indicate descended=false
-	// This approach uses a timeout to prevent hanging
-	canceledUpdateFound := false
-	drainTimeout := time.After(100 * time.Millisecond)
-
-	for !canceledUpdateFound {
-		select {
-		case update := <-updateChan:
-			if !update.DescendsFromLastPersistedSealed && update.ParentState == StateCanceled {
-				canceledUpdateFound = true
-			}
-		case <-drainTimeout:
-			t.Log("No update with descendsFromSealed=false and state=canceled found within timeout")
-			return
-		}
-	}
+	// Wait for the pipeline to complete and verify it transitioned to abandoned state
+	waitForError(t, errChan, context.Canceled)
+	waitForStateUpdate(t, pipeline, updateChan, StateAbandoned)
 }
 
-// Helper function to wait for a specific state update
-func waitForStateUpdate(t *testing.T, updateChan <-chan StateUpdate, expectedState State) StateUpdate {
-	timeoutChan := time.After(500 * time.Millisecond)
-
-	for {
-		select {
-		case update := <-updateChan:
-			if update.ParentState == expectedState {
-				return update
+// waitForStateUpdate waits for a specific state update to occur or timeout after 500ms.
+func waitForStateUpdate(t *testing.T, pipeline *PipelineImpl, updateChan <-chan State, expectedState State) {
+	unittest.RequireReturnsBefore(t, func() {
+		for {
+			update := <-updateChan
+			if update == expectedState {
+				assert.Equal(t, expectedState, pipeline.GetState())
+				return
 			}
-			// Continue waiting if this isn't the state we're looking for
-		case <-timeoutChan:
-			t.Fatalf("Timed out waiting for state update to %s", expectedState)
-			return StateUpdate{} // Never reached, just to satisfy compiler
 		}
-	}
+	}, 500*time.Millisecond, "Timeout waiting for state update")
+}
+
+// waitForError waits for an error to occur or timeout after 500ms.
+func waitForError(t *testing.T, errChan <-chan error, expectedErr error) {
+	unittest.RequireReturnsBefore(t, func() {
+		err := <-errChan
+		if expectedErr == nil {
+			assert.NoError(t, err, "Pipeline should complete without errors")
+		} else {
+			assert.ErrorIs(t, err, expectedErr)
+		}
+	}, 500*time.Millisecond, "Timeout waiting for error")
 }

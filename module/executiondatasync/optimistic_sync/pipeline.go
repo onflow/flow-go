@@ -122,35 +122,35 @@ func (p *PipelineImpl) Run(parentCtx context.Context, core Core) error {
 	// Trigger initial check
 	p.stateNotifier.Notify()
 
-	// handle context cancellation
-	// there are two cases:
-	// 1. parent context was canceled. in this case, we should shutdown without transitioning
-	//    to avoid cascading abandoned state updates since all pipelines may share the same
-	//    root context
-	// 2. pipeline's context was canceled. in this case, we should transition to abandoned
-	//    state which communicates the update to all ancestors
-	shutdown := func() {
-		if parentCtx.Err() == nil && p.GetState() != StateAbandoned {
-			p.transitionTo(StateAbandoned)
-		}
-	}
-
 	for {
 		select {
-		case <-ctx.Done():
-			shutdown()
-			return ctx.Err()
+		case <-parentCtx.Done():
+			return parentCtx.Err()
 
 		case <-notifierChan:
 			processing, err := p.processCurrentState(ctx)
 			if err != nil {
-				if errors.Is(err, context.Canceled) {
-					shutdown()
+				if !errors.Is(err, context.Canceled) {
+					return err
 				}
-				return err
+
+				// the parent context was canceled. shutdown without transitioning to avoid cascading
+				// abandoned state updates since all pipelines may share the same root context
+				if parentCtx.Err() != nil {
+					return err
+				}
+
+				// the pipeline's context was canceled. transition to abandoned and process the state
+				// update before returning
+				if p.GetState() != StateAbandoned {
+					p.transitionTo(StateAbandoned)
+				}
+				continue
 			}
+
 			if !processing {
-				return nil // terminal state reached
+				// terminal state reached
+				return ctx.Err()
 			}
 		}
 	}
@@ -277,8 +277,8 @@ func (p *PipelineImpl) processCurrentState(ctx context.Context) (bool, error) {
 //   - Safe for concurrent access
 func (p *PipelineImpl) transitionTo(newState State) {
 	p.mu.Lock()
-	p.mu.Unlock()
 	p.setState(newState)
+	p.mu.Unlock()
 
 	p.statePublisher(newState)
 
@@ -333,7 +333,7 @@ func (p *PipelineImpl) processDownloading(ctx context.Context) (bool, error) {
 	if !p.canStartIndexing() {
 		// If we can't transition to indexing after successful download, abandon
 		p.transitionTo(StateAbandoned)
-		return false, nil
+		return true, nil
 	}
 	p.transitionTo(StateIndexing)
 	return true, nil
@@ -368,7 +368,7 @@ func (p *PipelineImpl) processIndexing(ctx context.Context) (bool, error) {
 	if !p.canWaitForPersist() {
 		// If we can't transition to waiting for persist after successful indexing, abandon
 		p.transitionTo(StateAbandoned)
-		return false, nil
+		return true, nil
 	}
 
 	p.transitionTo(StateWaitingPersist)
@@ -384,7 +384,12 @@ func (p *PipelineImpl) processIndexing(ctx context.Context) (bool, error) {
 // Concurrency safety:
 //   - Safe for concurrent access, but not intended to be called concurrently with other process methods.
 func (p *PipelineImpl) processWaitingPersist() bool {
-	if p.canStartPersisting() {
+	transitionReady, abandoned := p.canStartPersisting()
+	if abandoned {
+		p.transitionTo(StateAbandoned)
+		return true
+	}
+	if transitionReady {
 		p.transitionTo(StatePersisting)
 		return true
 	}
@@ -521,12 +526,16 @@ func (p *PipelineImpl) canWaitForPersist() bool {
 //
 // Returns:
 //   - bool: true if the pipeline can start persisting
+//   - bool: true if the processing is abandoned and should transition to abandoned state
 //
 // Concurrency safety:
 //   - Safe for concurrent access
-func (p *PipelineImpl) canStartPersisting() bool {
+func (p *PipelineImpl) canStartPersisting() (transitionReady bool, abandoned bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	return p.state == StateWaitingPersist && p.isSealed && p.parentState == StateComplete
+	transitionReady = p.state == StateWaitingPersist && p.isSealed && p.parentState == StateComplete
+	abandoned = p.state == StateAbandoned || p.parentState == StateAbandoned
+
+	return
 }
