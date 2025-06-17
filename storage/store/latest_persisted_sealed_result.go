@@ -32,35 +32,26 @@ type LatestPersistedSealedResult struct {
 }
 
 // NewLatestPersistedSealedResult creates a new LatestPersistedSealedResult instance.
-// It initializes the consumer progress index using the provided initializer and initial height.
-// initialHeight must be for a sealed block.
 //
 // No errors are expected during normal operation,
 func NewLatestPersistedSealedResult(
-	initialHeight uint64,
-	initializer storage.ConsumerProgressInitializer,
+	progress storage.ConsumerProgress,
 	headers storage.Headers,
 	results storage.ExecutionResults,
 ) (*LatestPersistedSealedResult, error) {
-	// initialize the consumer progress, and set the initial height if this is the first run
-	progress, err := initializer.Initialize(initialHeight)
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize progress initializer: %w", err)
-	}
-
-	// get the actual height stored
+	// load the height and resultID of the latest persisted sealed result
 	height, err := progress.ProcessedIndex()
 	if err != nil {
 		return nil, fmt.Errorf("could not get processed index: %w", err)
 	}
 
-	// finally, lookup the sealed resultID for the height
 	header, err := headers.ByHeight(height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get header: %w", err)
 	}
 
-	// the result/block relationship is indexed by the Access ingestion engine when a result is sealed.
+	// Note: the result-to-block relationship is indexed by the Access ingestion engine when a
+	// result is sealed.
 	result, err := results.ByBlockID(header.ID())
 	if err != nil {
 		return nil, fmt.Errorf("could not get result: %w", err)
