@@ -24,13 +24,19 @@ import (
 // 3. Invalid input with nil SignerIndices:
 //   - Ensures an error is returned when the SignerIndices field is nil.
 //
-// 4. Invalid input with nil SigData:
+// 4. Invalid input with empty SignerIndices:
+//   - Ensures an error is returned when the SignerIndices field is an empty slice.
+//
+// 5. Invalid input with nil SigData:
 //   - Ensures an error is returned when the SigData field is nil.
 //
-// 5. Invalid input when the View is lower than NewestQC's View:
+// 6. Invalid input with empty SigData:
+//   - Ensures an error is returned when the SigData field is an empty byte slice.
+//
+// 7. Invalid input when the View is lower than NewestQC's View:
 //   - Ensures an error is returned when the TimeoutCertificate's View is less than the included QuorumCertificate's View.
 //
-// 6. Invalid input when NewestQCViews contains view higher than NewestQC.View:
+// 8. Invalid input when NewestQCViews contains view higher than NewestQC.View:
 //   - Ensures an error is returned if NewestQCViews includes a view that exceeds the view of the NewestQC.
 func TestNewTimeoutCertificate(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
@@ -59,7 +65,17 @@ func TestNewTimeoutCertificate(t *testing.T) {
 		res, err := flow.NewTimeoutCertificate(flow.UntrustedTimeoutCertificate(*tc))
 		require.Error(t, err)
 		require.Nil(t, res)
-		assert.Contains(t, err.Error(), "signer indices must not be nil")
+		assert.Contains(t, err.Error(), "signer indices must not be empty")
+	})
+
+	t.Run("invalid input with empty SignerIndices", func(t *testing.T) {
+		tc := helper.MakeTC()
+		tc.SignerIndices = []byte{}
+
+		res, err := flow.NewTimeoutCertificate(flow.UntrustedTimeoutCertificate(*tc))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "signer indices must not be empty")
 	})
 
 	t.Run("invalid input with nil SigData", func(t *testing.T) {
@@ -69,7 +85,17 @@ func TestNewTimeoutCertificate(t *testing.T) {
 		res, err := flow.NewTimeoutCertificate(flow.UntrustedTimeoutCertificate(*tc))
 		require.Error(t, err)
 		require.Nil(t, res)
-		assert.Contains(t, err.Error(), "signature must not be nil")
+		assert.Contains(t, err.Error(), "signature must not be empty")
+	})
+
+	t.Run("invalid input with empty SigData", func(t *testing.T) {
+		tc := helper.MakeTC()
+		tc.SigData = []byte{}
+
+		res, err := flow.NewTimeoutCertificate(flow.UntrustedTimeoutCertificate(*tc))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "signature must not be empty")
 	})
 
 	t.Run("invalid input with TC.View < QC.View", func(t *testing.T) {

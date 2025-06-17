@@ -47,10 +47,10 @@ func NewTimeoutCertificate(untrusted UntrustedTimeoutCertificate) (*TimeoutCerti
 		return nil, fmt.Errorf("newest QC must not be nil")
 	}
 	if len(untrusted.SignerIndices) == 0 {
-		return nil, fmt.Errorf("signer indices must not be nil")
+		return nil, fmt.Errorf("signer indices must not be empty")
 	}
 	if len(untrusted.SigData) == 0 {
-		return nil, fmt.Errorf("signature must not be nil")
+		return nil, fmt.Errorf("signature must not be empty")
 	}
 
 	// The TC's view cannot be smaller than the view of the QC it contains.
