@@ -1,6 +1,7 @@
 package unsynchronized
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -37,11 +38,12 @@ func (r *Registers) Get(registerID flow.RegisterID, height uint64) (flow.Registe
 		return flow.RegisterValue{}, storage.ErrHeightNotIndexed
 	}
 
-	if reg, ok := r.store[registerID]; ok {
-		return reg, nil
+	reg, ok := r.store[registerID]
+	if !ok {
+		return flow.RegisterValue{}, storage.ErrNotFound
 	}
 
-	return flow.RegisterValue{}, storage.ErrNotFound
+	return reg, nil
 }
 
 // LatestHeight returns the latest indexed height.
@@ -55,15 +57,13 @@ func (r *Registers) FirstHeight() uint64 {
 }
 
 // Store stores a batch of register entries at the storage's block height.
-//
-// Expected errors:
-// - storage.ErrHeightNotIndexed if the given height does not match the storage's block height.
+// No errors are expected during normal operation.
 func (r *Registers) Store(registers flow.RegisterEntries, height uint64) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
 	if r.blockHeight != height {
-		return storage.ErrHeightNotIndexed
+		return fmt.Errorf("failed to store registers: height mismatch: expected %d, got %d", r.blockHeight, height)
 	}
 
 	for _, reg := range registers {
