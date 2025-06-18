@@ -13,7 +13,7 @@ import (
 func InitFvmOptions(
 	chainID flow.ChainID,
 	headers storage.Headers,
-	disabledTransactionFees bool,
+	transactionFeesDisabled bool,
 ) []fvm.Option {
 	blockFinder := environment.NewBlockFinder(headers)
 	vmOpts := []fvm.Option{
@@ -26,7 +26,7 @@ func InitFvmOptions(
 		flow.Sandboxnet,
 		flow.Previewnet,
 		flow.Mainnet:
-		feesEnabled := !disabledTransactionFees
+		feesEnabled := !transactionFeesDisabled
 		vmOpts = append(vmOpts,
 			fvm.WithTransactionFeesEnabled(feesEnabled),
 		)

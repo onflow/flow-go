@@ -307,7 +307,13 @@ func makeVerifier(
 ) module.ChunkVerifier {
 
 	vm := fvm.NewVirtualMachine()
-	fvmOptions := initialize.InitFvmOptions(chainID, headers, false)
+	fvmOptions := initialize.InitFvmOptions(
+		chainID,
+		headers,
+		// transactionFeesDisabled are just an option for testing cadence compiler, so we don't need to have it
+		// set to true here, because we don't expect to use the CLI execution verification tooling for that scenario.
+		false,
+	)
 	fvmOptions = append(
 		[]fvm.Option{fvm.WithLogger(logger)},
 		fvmOptions...,
