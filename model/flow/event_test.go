@@ -16,7 +16,7 @@ import (
 // a consistent RLP-encoded representation of an Event. It ensures that
 // decoding the fingerprint results in a correctly ordered structure.
 func TestEventFingerprint(t *testing.T) {
-	evt := unittest.EventFixture(flow.EventAccountCreated, 13, 12, unittest.IdentifierFixture())
+	evt := unittest.EventFixture(flow.EventAccountCreated, 13, 12)
 
 	data := fingerprint.Fingerprint(evt)
 	var decoded flow.Event
@@ -28,15 +28,15 @@ func TestEventFingerprint(t *testing.T) {
 // should result in a different ID.
 func TestEventMalleability(t *testing.T) {
 	txID := unittest.IdentifierFixture()
-	event := unittest.EventFixture(flow.EventAccountUpdated, 21, 37, txID)
+	event := unittest.EventFixture(flow.EventAccountUpdated, 21, 37, unittest.Event.WithTransactionID(txID))
 
 	unittest.RequireEntityNonMalleable(t, &event)
 }
 
 func TestEventsList(t *testing.T) {
-	eventA := unittest.EventFixture(flow.EventAccountUpdated, 21, 37, unittest.IdentifierFixture())
-	eventB := unittest.EventFixture(flow.EventAccountCreated, 0, 37, unittest.IdentifierFixture())
-	eventC := unittest.EventFixture(flow.EventAccountCreated, 0, 37, unittest.IdentifierFixture())
+	eventA := unittest.EventFixture(flow.EventAccountUpdated, 21, 37)
+	eventB := unittest.EventFixture(flow.EventAccountCreated, 0, 37)
+	eventC := unittest.EventFixture(flow.EventAccountCreated, 0, 37)
 
 	listAB := flow.EventsList{
 		eventA,

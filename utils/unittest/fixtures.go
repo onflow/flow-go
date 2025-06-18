@@ -1813,7 +1813,7 @@ func EventsFixture(
 
 	events := make([]flow.Event, n)
 	for i := 0; i < n; i++ {
-		events[i] = EventFixture(types[i%len(types)], 0, uint32(i), IdentifierFixture())
+		events[i] = EventFixture(types[i%len(types)], 0, uint32(i))
 	}
 
 	return events

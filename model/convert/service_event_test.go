@@ -275,7 +275,7 @@ func TestVersionBeaconEventConversion(t *testing.T) {
 			events := systemcontracts.ServiceEventsForChain(chainID)
 
 			var err error
-			event := unittest.EventFixture(events.VersionBeacon.EventType(), 1, 1, unittest.IdentifierFixture())
+			event := unittest.EventFixture(events.VersionBeacon.EventType(), 1, 1)
 			event.Payload, err = ccf.Encode(test.event)
 			require.NoError(t, err)
 

@@ -24,7 +24,7 @@ func TestConvertEventWithoutPayloadConversion(t *testing.T) {
 	cadenceValue := cadence.NewInt(2)
 
 	t.Run("convert empty event", func(t *testing.T) {
-		event := unittest.EventFixture(flow.EventAccountCreated, 2, 3, txID)
+		event := unittest.EventFixture(flow.EventAccountCreated, 2, 3, unittest.Event.WithTransactionID(txID))
 
 		msg := convert.EventToMessage(event)
 		converted, err := convert.MessageToEvent(msg)
@@ -37,7 +37,7 @@ func TestConvertEventWithoutPayloadConversion(t *testing.T) {
 		ccfPayload, err := ccf.Encode(cadenceValue)
 		require.NoError(t, err)
 
-		event := unittest.EventFixture(flow.EventAccountCreated, 2, 3, txID)
+		event := unittest.EventFixture(flow.EventAccountCreated, 2, 3, unittest.Event.WithTransactionID(txID))
 		event.Payload = ccfPayload
 
 		msg := convert.EventToMessage(event)
@@ -51,7 +51,7 @@ func TestConvertEventWithoutPayloadConversion(t *testing.T) {
 		jsonPayload, err := jsoncdc.Encode(cadenceValue)
 		require.NoError(t, err)
 
-		event := unittest.EventFixture(flow.EventAccountCreated, 2, 3, txID)
+		event := unittest.EventFixture(flow.EventAccountCreated, 2, 3, unittest.Event.WithTransactionID(txID))
 		event.Payload = jsonPayload
 
 		msg := convert.EventToMessage(event)
@@ -71,11 +71,11 @@ func TestConvertEventWithPayloadConversion(t *testing.T) {
 	cadenceValue := cadence.NewInt(2)
 
 	var err error
-	ccfEvent := unittest.EventFixture(flow.EventAccountCreated, 2, 3, txID)
+	ccfEvent := unittest.EventFixture(flow.EventAccountCreated, 2, 3, unittest.Event.WithTransactionID(txID))
 	ccfEvent.Payload, err = ccf.Encode(cadenceValue)
 	require.NoError(t, err)
 
-	jsonEvent := unittest.EventFixture(flow.EventAccountCreated, 2, 3, txID)
+	jsonEvent := unittest.EventFixture(flow.EventAccountCreated, 2, 3, unittest.Event.WithTransactionID(txID))
 	jsonEvent.Payload, err = jsoncdc.Encode(cadenceValue)
 	require.NoError(t, err)
 
@@ -110,9 +110,9 @@ func TestConvertEvents(t *testing.T) {
 
 		eventIndex := 3 + uint32(i)
 
-		event := unittest.EventFixture(flow.EventAccountCreated, 2, eventIndex, txID)
-		ccfEvent := unittest.EventFixture(flow.EventAccountCreated, 2, eventIndex, txID)
-		jsonEvent := unittest.EventFixture(flow.EventAccountCreated, 2, eventIndex, txID)
+		event := unittest.EventFixture(flow.EventAccountCreated, 2, eventIndex, unittest.Event.WithTransactionID(txID))
+		ccfEvent := unittest.EventFixture(flow.EventAccountCreated, 2, eventIndex, unittest.Event.WithTransactionID(txID))
+		jsonEvent := unittest.EventFixture(flow.EventAccountCreated, 2, eventIndex, unittest.Event.WithTransactionID(txID))
 
 		var err error
 		ccfEvent.Payload, err = ccf.Encode(cadenceValue)

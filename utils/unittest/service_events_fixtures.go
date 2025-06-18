@@ -35,7 +35,7 @@ func EpochSetupRandomSourceFixture() []byte {
 func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 	events := systemcontracts.ServiceEventsForChain(chain)
 	randomSource := EpochSetupRandomSourceFixture()
-	event := EventFixture(events.EpochSetup.EventType(), 1, 1, IdentifierFixture(), Event.WithPayload(EpochSetupFixtureCCF(randomSource)))
+	event := EventFixture(events.EpochSetup.EventType(), 1, 1, Event.WithPayload(EpochSetupFixtureCCF(randomSource)))
 
 	expected := &flow.EpochSetup{
 		Counter:            1,
@@ -125,7 +125,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
 	events := systemcontracts.ServiceEventsForChain(chain)
 
-	event := EventFixture(events.EpochCommit.EventType(), 1, 1, IdentifierFixture(), Event.WithPayload(EpochCommitFixtureCCF))
+	event := EventFixture(events.EpochCommit.EventType(), 1, 1, Event.WithPayload(EpochCommitFixtureCCF))
 	expected := &flow.EpochCommit{
 		Counter: 1,
 		ClusterQCs: []flow.ClusterQCVoteData{
@@ -162,7 +162,7 @@ func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCom
 func EpochCommitV0FixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
 	events := systemcontracts.ServiceEventsForChain(chain)
 
-	event := EventFixture(events.EpochCommit.EventType(), 1, 1, IdentifierFixture(), Event.WithPayload(EpochCommitV0FixtureCCF))
+	event := EventFixture(events.EpochCommit.EventType(), 1, 1, Event.WithPayload(EpochCommitV0FixtureCCF))
 	expected := &flow.EpochCommit{
 		Counter: 1,
 		ClusterQCs: []flow.ClusterQCVoteData{
@@ -197,7 +197,7 @@ func EpochRecoverFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochRe
 	events := systemcontracts.ServiceEventsForChain(chain)
 	randomSource := EpochSetupRandomSourceFixture()
 
-	event := EventFixture(events.EpochRecover.EventType(), 1, 1, IdentifierFixture(), Event.WithPayload(EpochRecoverFixtureCCF(randomSource)))
+	event := EventFixture(events.EpochRecover.EventType(), 1, 1, Event.WithPayload(EpochRecoverFixtureCCF(randomSource)))
 	expected := &flow.EpochRecover{
 		EpochSetup: flow.EpochSetup{
 			Counter:            1,
@@ -314,7 +314,7 @@ func EpochRecoverFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochRe
 func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.VersionBeacon) {
 	events := systemcontracts.ServiceEventsForChain(chain)
 
-	event := EventFixture(events.VersionBeacon.EventType(), 1, 1, IdentifierFixture(), Event.WithPayload(VersionBeaconFixtureCCF))
+	event := EventFixture(events.VersionBeacon.EventType(), 1, 1, Event.WithPayload(VersionBeaconFixtureCCF))
 	expected := &flow.VersionBeacon{
 		VersionBoundaries: []flow.VersionBoundary{
 			{
@@ -331,7 +331,7 @@ func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.Versio
 func ProtocolStateVersionUpgradeFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.ProtocolStateVersionUpgrade) {
 	events := systemcontracts.ServiceEventsForChain(chain)
 
-	event := EventFixture(events.ProtocolStateVersionUpgrade.EventType(), 1, 1, IdentifierFixture(), Event.WithPayload(ProtocolStateVersionUpgradeFixtureCCF))
+	event := EventFixture(events.ProtocolStateVersionUpgrade.EventType(), 1, 1, Event.WithPayload(ProtocolStateVersionUpgradeFixtureCCF))
 	expected := &flow.ProtocolStateVersionUpgrade{
 		NewProtocolStateVersion: 1,
 		ActiveView:              1000,

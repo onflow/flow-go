@@ -23,10 +23,10 @@ func TestEventStoreRetrieve(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		tx1ID := unittest.IdentifierFixture()
 		tx2ID := unittest.IdentifierFixture()
-		evt1_1 := unittest.EventFixture(flow.EventAccountCreated, 0, 0, tx1ID)
-		evt1_2 := unittest.EventFixture(flow.EventAccountCreated, 1, 1, tx2ID)
+		evt1_1 := unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.Event.WithTransactionID(tx1ID))
+		evt1_2 := unittest.EventFixture(flow.EventAccountCreated, 1, 1, unittest.Event.WithTransactionID(tx2ID))
 
-		evt2_1 := unittest.EventFixture(flow.EventAccountUpdated, 2, 2, tx2ID)
+		evt2_1 := unittest.EventFixture(flow.EventAccountUpdated, 2, 2, unittest.Event.WithTransactionID(tx2ID))
 
 		expected := []flow.EventsList{
 			{evt1_1, evt1_2},

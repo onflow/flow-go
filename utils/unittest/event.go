@@ -20,14 +20,13 @@ func EventFixture(
 	eventType flow.EventType,
 	transactionIndex uint32,
 	eventIndex uint32,
-	txID flow.Identifier,
 	opts ...func(*flow.Event),
 ) flow.Event {
 	event := &flow.Event{
 		Type:             eventType,
 		TransactionIndex: transactionIndex,
 		EventIndex:       eventIndex,
-		TransactionID:    txID,
+		TransactionID:    IdentifierFixture(),
 		Payload:          RandomEventPayloadCCFFixture(),
 	}
 
@@ -36,6 +35,12 @@ func EventFixture(
 	}
 
 	return *event
+}
+
+func (f *eventFactory) WithTransactionID(txID flow.Identifier) func(*flow.Event) {
+	return func(e *flow.Event) {
+		e.TransactionID = txID
+	}
 }
 
 func (f *eventFactory) WithPayload(payload []byte) func(*flow.Event) {
