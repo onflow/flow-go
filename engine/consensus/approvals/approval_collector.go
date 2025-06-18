@@ -100,9 +100,8 @@ func (c *ApprovalCollector) IncorporatedResult() *flow.IncorporatedResult {
 	return c.incorporatedResult
 }
 
-// SealResult generate and store seal into the mempool.
-//
-// All errors indicate the input cannot be converted to a valid event.
+// SealResult generates and stores the seal into the mempool.
+// No errors are expected during normal operation.
 func (c *ApprovalCollector) SealResult() error {
 	// get final state of execution result
 	finalState, err := c.incorporatedResult.Result.FinalStateCommitment()
@@ -123,7 +122,7 @@ func (c *ApprovalCollector) SealResult() error {
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("could not construct seal: %w", err)
+		return irrecoverable.NewExceptionf("could not construct seal : %w", err)
 	}
 
 	// Adding a seal that already exists in the mempool is a NoOp. But to reduce log

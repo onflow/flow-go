@@ -6,9 +6,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// GenerateRootSeal generates a seal based on execution result
-//
-// All errors indicate the input cannot be converted to a valid event.
+// GenerateRootSeal generates a root seal matching the input root result.
+// The input is assumed to be a valid root result.
+// No errors are expected during normal operation. 
 func GenerateRootSeal(result *flow.ExecutionResult) (*flow.Seal, error) {
 	finalState, err := result.FinalStateCommitment()
 	if err != nil {

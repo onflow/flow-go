@@ -43,6 +43,7 @@ type Seal struct {
 	BlockID                Identifier
 	ResultID               Identifier
 	FinalState             StateCommitment
+	// AggregatedApprovalSigs can be nil/empty when verification is disabled or for the root seal.
 	AggregatedApprovalSigs []AggregatedSignature // one AggregatedSignature per chunk
 }
 

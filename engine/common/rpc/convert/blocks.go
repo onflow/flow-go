@@ -101,7 +101,7 @@ func BlockSealToMessage(s *flow.Seal) *entities.BlockSeal {
 
 // MessageToBlockSeal converts a protobuf BlockSeal message to a flow.Seal.
 //
-// All errors indicate the input cannot be converted to a valid event.
+// All errors indicate the input cannot be converted to a valid seal.
 func MessageToBlockSeal(m *entities.BlockSeal) (*flow.Seal, error) {
 	finalState, err := MessageToStateCommitment(m.FinalState)
 	if err != nil {
