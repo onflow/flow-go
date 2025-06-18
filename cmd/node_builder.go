@@ -189,6 +189,8 @@ type BaseConfig struct {
 	// BitswapReprovideEnabled configures whether the Bitswap reprovide mechanism is enabled.
 	// This is only meaningful to Access and Execution nodes.
 	BitswapReprovideEnabled bool
+
+	TransactionFeesDisabled bool
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
