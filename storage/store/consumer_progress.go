@@ -62,7 +62,7 @@ func newConsumerProgress(db storage.DB, consumer string) *consumerProgress {
 }
 
 // ProcessedIndex returns the processed index for the consumer
-// any error would be exception
+// No errors are expected during normal operation
 func (cp *consumerProgress) ProcessedIndex() (uint64, error) {
 	var processed uint64
 	err := operation.RetrieveProcessedIndex(cp.db.Reader(), cp.consumer, &processed)
@@ -73,8 +73,8 @@ func (cp *consumerProgress) ProcessedIndex() (uint64, error) {
 }
 
 // SetProcessedIndex updates the processed index for the consumer
-// any error would be exception
 // The caller must use ConsumerProgressInitializer to initialize the progress index in storage
+// No errors are expected during normal operation
 func (cp *consumerProgress) SetProcessedIndex(processed uint64) error {
 	err := cp.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return operation.SetProcessedIndex(rw.Writer(), cp.consumer, processed)
@@ -84,4 +84,11 @@ func (cp *consumerProgress) SetProcessedIndex(processed uint64) error {
 	}
 
 	return nil
+}
+
+// BatchSetProcessedIndex updates the processed index for the consumer within a batch operation
+// The caller must use ConsumerProgressInitializer to initialize the progress index in storage
+// No errors are expected during normal operation
+func (cp *consumerProgress) BatchSetProcessedIndex(processed uint64, batch storage.ReaderBatchWriter) error {
+	return operation.SetProcessedIndex(batch.Writer(), cp.consumer, processed)
 }
