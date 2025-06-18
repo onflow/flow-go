@@ -29,7 +29,6 @@ func EventFixture(
 		TransactionID:    IdentifierFixture(),
 		Payload:          RandomEventPayloadCCFFixture(),
 	}
-
 	for _, opt := range opts {
 		opt(event)
 	}
@@ -68,7 +67,6 @@ func createRandomEvent(randomSourceHex string) cadence.Event {
 		panic(fmt.Sprintf("unexpected error while creating random address: %s", err))
 	}
 	location := common.NewAddressLocation(nil, address, "TestContract")
-
 	testEventType := cadence.NewEventType(
 		location,
 		IdentifierFixture().String(),
