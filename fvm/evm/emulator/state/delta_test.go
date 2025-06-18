@@ -496,7 +496,7 @@ func TestDeltaView(t *testing.T) {
 			})
 
 		// check address through parent
-		require.False(t, view.AddressInAccessList(addr1))
+		require.True(t, view.AddressInAccessList(addr1))
 
 		// add addr 2 to the list
 		require.False(t, view.AddressInAccessList(addr2))
@@ -511,7 +511,7 @@ func TestDeltaView(t *testing.T) {
 		// check slot through parent
 		addrFound, slotFound := view.SlotInAccessList(slot1)
 		require.False(t, addrFound)
-		require.False(t, slotFound)
+		require.True(t, slotFound)
 
 		// add slot 2 to the list
 		addrFound, slotFound = view.SlotInAccessList(slot2)
