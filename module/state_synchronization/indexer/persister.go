@@ -89,11 +89,10 @@ func NewPersister(
 
 // Persist save data from in-memory storages to the provided persisted storages and commit updates to the database.
 // No errors are expected during normal operations
-func (p *Persister) Persist() error {
+func (p *Persister) Persist() (err error) {
 	// Create a batch for atomic updates
 	batch := p.protocolDB.NewBatch()
 
-	var err error
 	defer func() {
 		err = multierr.Combine(err, batch.Close())
 	}()
@@ -103,33 +102,34 @@ func (p *Persister) Persist() error {
 	start := time.Now()
 
 	if err = p.persistRegisters(); err != nil {
-		return err
+		return
 	}
 
 	if err = p.addEventsToBatch(batch); err != nil {
-		return err
+		return
 	}
 
 	if err = p.addResultsToBatch(batch); err != nil {
-		return err
+		return
 	}
 
 	if err = p.addCollectionsToBatch(batch); err != nil {
-		return err
+		return
 	}
 
 	if err = p.addTransactionsToBatch(batch); err != nil {
-		return err
+		return
 	}
 
 	if err = p.addTransactionResultErrorMessagesToBatch(batch); err != nil {
-		return err
+		return
 	}
 
 	// TODO: include update to latestPersistedSealedResultBlockHeight in the batch
 
 	if err = batch.Commit(); err != nil {
-		return fmt.Errorf("failed to commit batch: %w", err)
+		err = fmt.Errorf("failed to commit batch: %w", err)
+		return
 	}
 
 	duration := time.Since(start)
@@ -143,7 +143,7 @@ func (p *Persister) Persist() error {
 		Int("transaction_result_error_messages_count", len(p.inMemoryTxResultErrMsg.Data())).
 		Msg("successfully prepared execution data for persistence")
 
-	return err
+	return
 }
 
 // persistRegisters persists registers from in-memory to permanent storage.
