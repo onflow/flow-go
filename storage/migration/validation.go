@@ -9,6 +9,7 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/storage"
 )
@@ -22,6 +23,8 @@ const (
 	// FullValidation checks all keys in the database
 	FullValidation ValidationMode = "full"
 )
+
+const batchSize = 10
 
 func ParseValidationModeValid(mode string) (ValidationMode, error) {
 	switch mode {
@@ -207,22 +210,78 @@ func validateData(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg MigrationConfig)
 
 // validateAllKeys performs a full validation by comparing all keys between Badger and Pebble
 func validateAllKeys(badgerDB *badger.DB, pebbleDB *pebble.DB) error {
-	// var allKeys [][]byte
-	// err := badgerDB.View(func(txn *badger.Txn) error {
-	// 	opts := badger.DefaultIteratorOptions
-	// 	it := txn.NewIterator(opts)
-	// 	defer it.Close()
-	//
-	// 	for it.Rewind(); it.Valid(); it.Next() {
-	// 		allKeys = append(allKeys, slices.Clone(it.Item().Key()))
-	// 	}
-	// 	return nil
-	// })
-	// if err != nil {
-	// 	return fmt.Errorf("failed to collect all keys from Badger: %w", err)
-	// }
-	//
-	// return compareValuesBetweenDBs(allKeys, badgerDB, pebbleDB)
+	// Use the same prefix sharding as migration.go (default: 1 byte, but could be configurable)
+	const prefixBytes = 1 // or make this configurable if needed
+	prefixes := GeneratePrefixes(prefixBytes)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	eg, ctx := errgroup.WithContext(ctx)
+
+	for _, prefix := range prefixes {
+		prefix := prefix // capture range variable
+
+		eg.Go(func() error {
+			// Channels for key-value pairs from Badger and Pebble
+			kvChanBadger := make(chan KVPairs, 10)
+			kvChanPebble := make(chan KVPairs, 10)
+
+			// Progress logger (no-op for now)
+			lgProgress := func(int) {}
+
+			// Start Badger reader worker
+			badgerErrCh := make(chan error, 1)
+
+			// By wrapping a single prefix in a channel, badger worker and pebble worker can work on the same prefix.
+			go func() {
+				err := readerWorker(ctx, lgProgress, badgerDB, singlePrefixChan(prefix), kvChanBadger, batchSize)
+				close(kvChanBadger)
+				badgerErrCh <- err
+			}()
+
+			// Start Pebble reader worker
+			pebbleErrCh := make(chan error, 1)
+			go func() {
+				err := pebbleReaderWorker(ctx, lgProgress, pebbleDB, singlePrefixChan(prefix), kvChanPebble, batchSize)
+				close(kvChanPebble)
+				pebbleErrCh <- err
+			}()
+
+			// Compare outputs
+			err := compareKeyValuePairsFromChannels(ctx, kvChanBadger, kvChanPebble)
+
+			// Wait for workers to finish and check for errors
+			badgerErr := <-badgerErrCh
+			pebbleErr := <-pebbleErrCh
+
+			if badgerErr != nil {
+				return fmt.Errorf("badger reader error for prefix %x: %w", prefix, badgerErr)
+			}
+			if pebbleErr != nil {
+				return fmt.Errorf("pebble reader error for prefix %x: %w", prefix, pebbleErr)
+			}
+			if err != nil {
+				return fmt.Errorf("comparison error for prefix %x: %w", prefix, err)
+			}
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// singlePrefixChan returns a channel that yields a single prefix and then closes.
+// Usage: This function is used in validateAllKeys when launching reader workers (e.g., readerWorker and pebbleReaderWorker)
+// for the same prefix.
+func singlePrefixChan(prefix []byte) <-chan []byte {
+	ch := make(chan []byte, 1)
+	ch <- prefix
+	close(ch)
+	return ch
 }
 
 // compare the key value pairs from both channel, and return error if any pair is different,
