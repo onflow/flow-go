@@ -1,6 +1,7 @@
 package migration
 
 import (
+	"context"
 	"sort"
 	"testing"
 
@@ -52,4 +53,91 @@ func TestSampleValidationKeysByPrefix(t *testing.T) {
 		sort.Strings(expected)
 		require.ElementsMatch(t, expected, keyStrs)
 	})
+}
+
+func TestCompareKeyValuePairsFromChannels(t *testing.T) {
+	type testCase struct {
+		name      string
+		badgerKVs []KVPairs
+		pebbleKVs []KVPairs
+		expectErr string // substring to match in error, or empty for no error
+	}
+
+	prefix := []byte("pfx")
+	key1 := []byte("key1")
+	val1 := []byte("val1")
+	key2 := []byte("key2")
+	val2 := []byte("val2")
+	val2diff := []byte("DIFF")
+
+	tests := []testCase{
+		{
+			name:      "matching pairs",
+			badgerKVs: []KVPairs{{Prefix: prefix, Pairs: []KVPair{{Key: key1, Value: val1}, {Key: key2, Value: val2}}}},
+			pebbleKVs: []KVPairs{{Prefix: prefix, Pairs: []KVPair{{Key: key1, Value: val1}, {Key: key2, Value: val2}}}},
+			expectErr: "",
+		},
+		{
+			name:      "value mismatch",
+			badgerKVs: []KVPairs{{Prefix: prefix, Pairs: []KVPair{{Key: key1, Value: val1}, {Key: key2, Value: val2}}}},
+			pebbleKVs: []KVPairs{{Prefix: prefix, Pairs: []KVPair{{Key: key1, Value: val1}, {Key: key2, Value: val2diff}}}},
+			expectErr: "value mismatch for key",
+		},
+		{
+			name:      "key missing in pebble",
+			badgerKVs: []KVPairs{{Prefix: prefix, Pairs: []KVPair{{Key: key1, Value: val1}, {Key: key2, Value: val2}}}},
+			pebbleKVs: []KVPairs{{Prefix: prefix, Pairs: []KVPair{{Key: key1, Value: val1}}}},
+			expectErr: "key 6b657932 exists in badger but not in pebble",
+		},
+		{
+			name:      "key missing in badger",
+			badgerKVs: []KVPairs{{Prefix: prefix, Pairs: []KVPair{{Key: key1, Value: val1}}}},
+			pebbleKVs: []KVPairs{{Prefix: prefix, Pairs: []KVPair{{Key: key1, Value: val1}, {Key: key2, Value: val2}}}},
+			expectErr: "key 6b657932 exists in pebble but not in badger",
+		},
+		{
+			name:      "prefix mismatch",
+			badgerKVs: []KVPairs{{Prefix: []byte("pfx1"), Pairs: []KVPair{{Key: key1, Value: val1}}}},
+			pebbleKVs: []KVPairs{{Prefix: []byte("pfx2"), Pairs: []KVPair{{Key: key1, Value: val1}}}},
+			expectErr: "prefix mismatch",
+		},
+		{
+			name:      "context cancelled",
+			badgerKVs: []KVPairs{{Prefix: prefix, Pairs: []KVPair{{Key: key1, Value: val1}}}},
+			pebbleKVs: []KVPairs{{Prefix: prefix, Pairs: []KVPair{{Key: key1, Value: val1}}}},
+			expectErr: "context cancelled",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			badgerCh := make(chan KVPairs, len(tc.badgerKVs))
+			pebbleCh := make(chan KVPairs, len(tc.pebbleKVs))
+
+			for _, kv := range tc.badgerKVs {
+				badgerCh <- kv
+			}
+			close(badgerCh)
+			for _, kv := range tc.pebbleKVs {
+				pebbleCh <- kv
+			}
+			close(pebbleCh)
+
+			if tc.name == "context cancelled" {
+				// Cancel context before running
+				cancel()
+			}
+
+			err := compareKeyValuePairsFromChannels(ctx, badgerCh, pebbleCh)
+			if tc.expectErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.expectErr)
+			}
+		})
+	}
 }
