@@ -8,7 +8,7 @@ import (
 
 // GenerateRootSeal generates a root seal matching the input root result.
 // The input is assumed to be a valid root result.
-// No errors are expected during normal operation. 
+// No errors are expected during normal operation.
 func GenerateRootSeal(result *flow.ExecutionResult) (*flow.Seal, error) {
 	finalState, err := result.FinalStateCommitment()
 	if err != nil {

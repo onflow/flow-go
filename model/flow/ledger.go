@@ -253,6 +253,9 @@ type StorageProof = []byte
 // TODO: solve the circular dependency and define StateCommitment as ledger.State
 type StateCommitment hash.Hash
 
+// EmptyStateCommitment is the zero-value state commitment.
+var EmptyStateCommitment = StateCommitment{}
+
 // DummyStateCommitment is an arbitrary value used in function failure cases,
 // although it can represent a valid state commitment.
 var DummyStateCommitment = StateCommitment(hash.DummyHash)

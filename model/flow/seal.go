@@ -40,9 +40,9 @@ import (
 //
 //structwrite:immutable - mutations allowed only within the constructor
 type Seal struct {
-	BlockID                Identifier
-	ResultID               Identifier
-	FinalState             StateCommitment
+	BlockID    Identifier
+	ResultID   Identifier
+	FinalState StateCommitment
 	// AggregatedApprovalSigs can be nil/empty when verification is disabled or for the root seal.
 	AggregatedApprovalSigs []AggregatedSignature // one AggregatedSignature per chunk
 }
@@ -69,7 +69,7 @@ func NewSeal(untrusted UntrustedSeal) (*Seal, error) {
 	if untrusted.ResultID == ZeroID {
 		return nil, fmt.Errorf("result ID must not be zero")
 	}
-	if untrusted.FinalState == *new(StateCommitment) {
+	if untrusted.FinalState == EmptyStateCommitment {
 		return nil, fmt.Errorf("final state must not be empty")
 	}
 	return &Seal{

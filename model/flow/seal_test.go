@@ -90,7 +90,7 @@ func TestNewSeal(t *testing.T) {
 			flow.UntrustedSeal{
 				BlockID:                unittest.IdentifierFixture(),
 				ResultID:               unittest.IdentifierFixture(),
-				FinalState:             flow.StateCommitment{}, // empty
+				FinalState:             flow.EmptyStateCommitment,
 				AggregatedApprovalSigs: unittest.Seal.AggregatedSignatureFixtures(3),
 			},
 		)
