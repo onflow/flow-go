@@ -63,18 +63,18 @@ func NewTimeoutCertificate(untrusted UntrustedTimeoutCertificate) (*TimeoutCerti
 
 	// verifying that tc.NewestQC is the QC with the highest view.
 	// Note: A byzantine TC could include `nil` for tc.NewestQCViews
-	if len(untrusted.NewestQCViews) > 0 {
-		newestQCView := untrusted.NewestQCViews[0]
-		for _, view := range untrusted.NewestQCViews {
-			if newestQCView < view {
-				newestQCView = view
-			}
-		}
-		if newestQCView > untrusted.NewestQC.View {
-			return nil, fmt.Errorf("included QC (view=%d) should be equal or higher to highest contributed view: %d", untrusted.NewestQC.View, newestQCView)
-		}
-	} else {
+	if len(untrusted.NewestQCViews) == 0 {
 		return nil, fmt.Errorf("newest QC views must not be empty")
+	}
+	
+	newestQCView := untrusted.NewestQCViews[0]
+	for _, view := range untrusted.NewestQCViews {
+		if newestQCView < view {
+			newestQCView = view
+		}
+	}
+	if newestQCView > untrusted.NewestQC.View {
+		return nil, fmt.Errorf("included QC (view=%d) should be equal or higher to highest contributed view: %d", untrusted.NewestQC.View, newestQCView)
 	}
 
 	return &TimeoutCertificate{

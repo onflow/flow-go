@@ -88,7 +88,6 @@ func NewTimeoutObject(untrusted UntrustedTimeoutObject) (*TimeoutObject, error) 
 	if len(untrusted.SigData) == 0 {
 		return nil, fmt.Errorf("signature must not be empty")
 	}
-
 	if untrusted.View <= untrusted.NewestQC.View {
 		return nil, fmt.Errorf("TO's QC %d cannot be newer than the TO's view %d", untrusted.NewestQC.View, untrusted.View)
 	}
