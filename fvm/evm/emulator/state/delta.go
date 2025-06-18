@@ -476,15 +476,7 @@ func (d *DeltaView) SubRefund(amount uint64) error {
 	return nil
 }
 
-// AddressInAccessList checks if the address is in the access list of
-// the current view.
-// NOTE: Due to resource constraints (such as CPU & memory), and the
-// high-frequency usage of this function from EVM, we do not look up
-// the parents until the root view or until we find a view that has
-// the address in its local access list.
-// As an optimization, the `StateDB.AddressInAccessList` is responsible
-// for optimally traversing the views, to check if the address is in
-// the access list.
+// AddressInAccessList checks if the address is in the access list
 func (d *DeltaView) AddressInAccessList(addr gethCommon.Address) bool {
 	if d.accessListAddresses != nil {
 		_, addressFound := d.accessListAddresses[addr]
@@ -492,7 +484,7 @@ func (d *DeltaView) AddressInAccessList(addr gethCommon.Address) bool {
 			return true
 		}
 	}
-	return false
+	return d.parent.AddressInAccessList(addr)
 }
 
 // AddAddressToAccessList adds an address to the access list
@@ -506,15 +498,7 @@ func (d *DeltaView) AddAddressToAccessList(addr gethCommon.Address) bool {
 	return !addrPresent
 }
 
-// SlotInAccessList checks if the slot is in the access list of the
-// current view.
-// NOTE: Due to resource constraints (such as CPU & memory), and the
-// high-frequency usage of this function from EVM, we do not look up
-// the parents until the root view or until we find a view that has
-// the slot in its local access list.
-// As an optimization, the `StateDB.SlotInAccessList` is responsible
-// for optimally traversing the views, to check if the slot is in
-// the access list.
+// SlotInAccessList checks if the slot is in the access list
 func (d *DeltaView) SlotInAccessList(sk types.SlotAddress) (addressOk bool, slotOk bool) {
 	addressFound := d.AddressInAccessList(sk.Address)
 	if d.accessListSlots != nil {
@@ -523,7 +507,8 @@ func (d *DeltaView) SlotInAccessList(sk types.SlotAddress) (addressOk bool, slot
 			return addressFound, true
 		}
 	}
-	return addressFound, false
+	_, slotFound := d.parent.SlotInAccessList(sk)
+	return addressFound, slotFound
 }
 
 // AddSlotToAccessList adds a slot to the access list

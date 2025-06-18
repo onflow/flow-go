@@ -308,50 +308,12 @@ func (db *StateDB) SetTransientState(addr gethCommon.Address, key, value gethCom
 
 // AddressInAccessList checks if an address is in the access list
 func (db *StateDB) AddressInAccessList(addr gethCommon.Address) bool {
-	// For each static call / call / delegate call, the EVM will create
-	// a snapshot, so that it can revert to it in case of execution errors,
-	// such as out of gas etc, using `Snapshot` & `RevertToSnapshot`.
-	// This can create a long list of views, in the order of 4K for certain
-	// large transactions. To avoid performance issues with DeltaView checking parents,
-	// which causes deep stacks and function call overhead, we use a plain for-loop instead.
-	// We iterate through the views in ascending order (from lowest to highest) as an optimization.
-	// Since addresses are typically added to the AccessList early during transaction execution,
-	// this allows us to return early when the needed addresses are found in the initial views.
-	end := len(db.views)
-	for i := range end {
-		view := db.views[i]
-		if view.AddressInAccessList(addr) {
-			return true
-		}
-	}
-
-	return false
+	return db.latestView().AddressInAccessList(addr)
 }
 
 // SlotInAccessList checks if the given (address,slot) is in the access list
 func (db *StateDB) SlotInAccessList(addr gethCommon.Address, key gethCommon.Hash) (addressOk bool, slotOk bool) {
-	slotKey := types.SlotAddress{Address: addr, Key: key}
-
-	// For each static call / call / delegate call, the EVM will create
-	// a snapshot, so that it can revert to it in case of execution errors,
-	// such as out of gas etc, using `Snapshot` & `RevertToSnapshot`.
-	// This can create a long list of views, in the order of 4K for certain
-	// large transactions. To avoid performance issues with DeltaView checking parents,
-	// which causes deep stacks and function call overhead, we use a plain for-loop instead.
-	// We iterate through the views in ascending order (from lowest to highest) as an optimization.
-	// Since slots are typically added to the AccessList early during transaction execution,
-	// this allows us to return early when the needed slots are found in the initial views.
-	addressFound := false
-	end := len(db.views)
-	for i := range end {
-		view := db.views[i]
-		addressFound, slotFound := view.SlotInAccessList(slotKey)
-		if slotFound {
-			return addressFound, true
-		}
-	}
-
-	return addressFound, false
+	return db.latestView().SlotInAccessList(types.SlotAddress{Address: addr, Key: key})
 }
 
 // AddAddressToAccessList adds the given address to the access list.
