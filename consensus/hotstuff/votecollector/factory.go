@@ -46,7 +46,12 @@ func (f *VoteProcessorFactory) Create(log zerolog.Logger, proposal *model.Signed
 		return nil, fmt.Errorf("instantiating vote processor for block %v failed: %w", proposal.Block.BlockID, err)
 	}
 
-	err = processor.Process(proposal.ProposerVote())
+	vote, err := proposal.ProposerVote()
+	if err != nil {
+		return nil, fmt.Errorf("could not get vote from proposer vote: %w", err)
+	}
+
+	err = processor.Process(vote)
 	if err != nil {
 		if model.IsInvalidVoteError(err) {
 			return nil, model.NewInvalidProposalErrorf(proposal, "invalid proposer vote: %w", err)
