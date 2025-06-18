@@ -145,7 +145,7 @@ func GenerateAccountCreateEvent(t *testing.T, address flow.Address) flow.Event {
 		0,
 		0,
 		unittest.IdentifierFixture(),
-		payload,
+		unittest.Event.WithPayload(payload),
 	)
 }
 
@@ -190,6 +190,6 @@ func GenerateAccountContractEvent(t *testing.T, qualifiedIdentifier string, addr
 		0,
 		0,
 		unittest.IdentifierFixture(),
-		payload,
+		unittest.Event.WithPayload(payload),
 	)
 }

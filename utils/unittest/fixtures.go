@@ -1813,7 +1813,7 @@ func EventsFixture(
 
 	events := make([]flow.Event, n)
 	for i := 0; i < n; i++ {
-		events[i] = EventFixture(types[i%len(types)], 0, uint32(i), IdentifierFixture(), []byte{})
+		events[i] = EventFixture(types[i%len(types)], 0, uint32(i), IdentifierFixture())
 	}
 
 	return events
@@ -1822,23 +1822,6 @@ func EventsFixture(
 func EventTypeFixture(chainID flow.ChainID) flow.EventType {
 	eventType := fmt.Sprintf("A.%s.TestContract.TestEvent1", RandomAddressFixtureForChain(chainID))
 	return flow.EventType(eventType)
-}
-
-// EventFixture returns an event
-func EventFixture(
-	eventType flow.EventType,
-	transactionIndex uint32,
-	eventIndex uint32,
-	txID flow.Identifier,
-	payload []byte,
-) flow.Event {
-	return flow.Event{
-		Type:             eventType,
-		TransactionIndex: transactionIndex,
-		EventIndex:       eventIndex,
-		TransactionID:    txID,
-		Payload:          payload,
-	}
 }
 
 func EmulatorRootKey() (*flow.AccountPrivateKey, error) {

@@ -57,6 +57,9 @@ func NewEvent(untrusted UntrustedEvent) (*Event, error) {
 	if untrusted.TransactionID == ZeroID {
 		return nil, fmt.Errorf("transaction ID must not be zero")
 	}
+	if len(untrusted.Payload) == 0 {
+		return nil, fmt.Errorf("payload must not be empty")
+	}
 	return &Event{
 		Type:             untrusted.Type,
 		TransactionID:    untrusted.TransactionID,

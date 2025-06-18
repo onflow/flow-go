@@ -131,7 +131,7 @@ func backendTransactionStatusesResponse(block *flow.Block) []*accessmodel.Transa
 		Status:     flow.TransactionStatusSealed,
 		StatusCode: 10,
 		Events: []flow.Event{
-			unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, []byte{}),
+			unittest.EventFixture(flow.EventAccountCreated, 1, 0, id),
 		},
 		ErrorMessage: "",
 		BlockID:      block.ID(),
