@@ -32,9 +32,7 @@ type ExecutionResultContainer struct {
 //   - *ExecutionResultContainer: the newly created container
 //   - error: any error that occurred during creation
 //
-// Expected Errors:
-//   - ErrInvalidBlock: when the block ID doesn't match the result's block ID
-//   - All other errors are unexpected and potential indicators of corrupted internal state
+// No errors are expected during normal operation.
 //
 // Concurrency safety:
 //   - Not safe for concurrent access
@@ -62,9 +60,7 @@ func NewExecutionResultContainer(result *flow.ExecutionResult, header *flow.Head
 //   - uint: number of receipts added (0 or 1)
 //   - error: any error that occurred during the operation
 //
-// Expected Errors:
-//   - ErrInvalidReceipt: when the receipt is for a different result
-//   - All other errors are unexpected and potential indicators of corrupted internal state
+// No errors are expected during normal operation.
 //
 // Concurrency safety:
 //   - Not safe for concurrent access
@@ -90,9 +86,7 @@ func (c *ExecutionResultContainer) AddReceipt(receipt *flow.ExecutionReceipt) (u
 //   - uint: total number of receipts added
 //   - error: any error that occurred during the operation
 //
-// Expected Errors:
-//   - ErrInvalidReceipt: when any receipt is for a different result
-//   - All other errors are unexpected and potential indicators of corrupted internal state
+// No errors are expected during normal operation.
 //
 // Concurrency safety:
 //   - Not safe for concurrent access

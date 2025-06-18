@@ -74,7 +74,7 @@ func NewResultsForest(
 //   - error: any error that occurred during the operation
 //
 // Expected Errors:
-//   - ErrInvalidBlock: when the block ID doesn't match the result's block ID
+//   - ErrMaxSizeExceeded: when adding a new container would exceed the maximum size
 //   - All other errors are unexpected and potential indicators of corrupted internal state
 //
 // Concurrency safety:
@@ -112,7 +112,7 @@ func (rf *ResultsForest) AddResult(result *flow.ExecutionResult, header *flow.He
 //   - error: any error that occurred during the operation
 //
 // Expected Errors:
-//   - ErrInvalidBlock: when the block ID doesn't match the receipt's block ID
+//   - ErrMaxSizeExceeded: when adding a new container would exceed the maximum size
 //   - All other errors are unexpected and potential indicators of corrupted internal state
 //
 // Concurrency safety:
@@ -156,7 +156,6 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, header *flow
 //   - error: any error that occurred during the operation
 //
 // Expected Errors:
-//   - ErrInvalidBlock: when the block ID doesn't match the result's block ID
 //   - ErrMaxSizeExceeded: when adding a new container would exceed the maximum size
 //   - All other errors are unexpected and potential indicators of corrupted internal state
 //
@@ -221,9 +220,7 @@ func (rf *ResultsForest) HasReceipt(receipt *flow.ExecutionReceipt) bool {
 // Returns:
 //   - error: any error that occurred during the operation
 //
-// Expected Errors:
-//   - mempool.BelowPrunedThresholdError: when limit is lower than the current lowest view
-//   - All other errors are unexpected and potential indicators of corrupted internal state
+// No errors are expected during normal operation.
 //
 // Concurrency safety:
 //   - Not safe for concurrent access, caller must hold lock
@@ -324,9 +321,7 @@ func (rf *ResultsForest) iterateChildren(resultID flow.Identifier, fn func(*Exec
 // Returns:
 //   - error: any error that occurred during the operation
 //
-// Expected Errors:
-//   - ErrMissingAncestor: when a required ancestor result is not found in the forest
-//   - All other errors are unexpected and potential indicators of corrupted internal state
+// No errors are expected during normal operation.
 //
 // Concurrency safety:
 //   - Safe for concurrent access
