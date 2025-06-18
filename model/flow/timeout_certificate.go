@@ -66,7 +66,7 @@ func NewTimeoutCertificate(untrusted UntrustedTimeoutCertificate) (*TimeoutCerti
 	if len(untrusted.NewestQCViews) == 0 {
 		return nil, fmt.Errorf("newest QC views must not be empty")
 	}
-	
+
 	newestQCView := untrusted.NewestQCViews[0]
 	for _, view := range untrusted.NewestQCViews {
 		if newestQCView < view {
