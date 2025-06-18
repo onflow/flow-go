@@ -84,6 +84,7 @@ func (r *Requester) Request(ctx context.Context) ([]flow.TransactionResultErrorM
 			return retry.RetryableError(err)
 		}
 
+		// retry any grpc error except context canceled and deadline exceeded
 		if status, ok := status.FromError(err); ok {
 			if status.Code() != codes.DeadlineExceeded && status.Code() != codes.Canceled {
 				return retry.RetryableError(err)
