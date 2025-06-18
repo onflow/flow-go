@@ -108,8 +108,8 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 		err := core.Download(ctx)
 		c.Require().NoError(err)
 
-		c.Assert().Equal(expectedExecutionData, core.processor.executionData.BlockExecutionData)
-		c.Assert().Equal(expectedTxResultErrMsgs, core.processor.txResultErrMsgsData)
+		c.Assert().Equal(expectedExecutionData, core.workingData.executionData.BlockExecutionData)
+		c.Assert().Equal(expectedTxResultErrMsgs, core.workingData.txResultErrMsgsData)
 	})
 
 	c.Run("execution data request error", func() {
@@ -123,8 +123,8 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 
 		c.Assert().ErrorIs(err, assert.AnError)
 		c.Assert().Contains(err.Error(), "failed to request execution data")
-		c.Assert().Nil(core.processor.executionData)
-		c.Assert().Nil(core.processor.txResultErrMsgsData)
+		c.Assert().Nil(core.workingData.executionData)
+		c.Assert().Nil(core.workingData.txResultErrMsgsData)
 	})
 
 	c.Run("transaction result error messages request error", func() {
@@ -140,8 +140,8 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 
 		c.Assert().ErrorIs(err, assert.AnError)
 		c.Assert().Contains(err.Error(), "failed to request transaction result error messages data")
-		c.Assert().Nil(core.processor.executionData)
-		c.Assert().Nil(core.processor.txResultErrMsgsData)
+		c.Assert().Nil(core.workingData.executionData)
+		c.Assert().Nil(core.workingData.txResultErrMsgsData)
 	})
 
 	c.Run("context cancellation", func() {
@@ -159,8 +159,8 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 		c.Require().Error(err)
 
 		c.Assert().ErrorIs(err, context.Canceled)
-		c.Assert().Nil(core.processor.executionData)
-		c.Assert().Nil(core.processor.txResultErrMsgsData)
+		c.Assert().Nil(core.workingData.executionData)
+		c.Assert().Nil(core.workingData.txResultErrMsgsData)
 	})
 
 	c.Run("txResultErrMsgsRequestTimeout expiration", func() {
@@ -196,8 +196,8 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 
 		c.Assert().ErrorIs(err, context.DeadlineExceeded)
 		c.Assert().Contains(err.Error(), "failed to request transaction result error messages data")
-		c.Assert().Nil(core.processor.executionData)
-		c.Assert().Nil(core.processor.txResultErrMsgsData)
+		c.Assert().Nil(core.workingData.executionData)
+		c.Assert().Nil(core.workingData.txResultErrMsgsData)
 	})
 }
 
@@ -228,7 +228,7 @@ func (c *CoreImplSuite) TestCoreImpl_Index() {
 
 		// Create execution data with a DIFFERENT block ID than expected
 		executionData := unittest.BlockExecutionDataFixture()
-		core.processor.executionData = execution_data.NewBlockExecutionDataEntity(
+		core.workingData.executionData = execution_data.NewBlockExecutionDataEntity(
 			unittest.IdentifierFixture(),
 			executionData,
 		)
@@ -295,13 +295,13 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 func (c *CoreImplSuite) TestCoreImpl_Abandon() {
 	core := c.createTestCoreImpl()
 
-	core.processor.executionData = unittest.BlockExecutionDatEntityFixture()
-	core.processor.txResultErrMsgsData = unittest.TransactionResultErrorMessagesFixture(1)
+	core.workingData.executionData = unittest.BlockExecutionDatEntityFixture()
+	core.workingData.txResultErrMsgsData = unittest.TransactionResultErrorMessagesFixture(1)
 
 	err := core.Abandon()
 	c.Require().NoError(err)
 
-	c.Assert().Nil(core.processor)
+	c.Assert().Nil(core.workingData)
 }
 
 // TestCoreImpl_IntegrationWorkflow tests the complete workflow of download -> index -> persist operations.
@@ -338,7 +338,7 @@ func (c *CoreImplSuite) TestCoreImpl_IntegrationWorkflow() {
 	err = core.Persist()
 	c.Require().NoError(err)
 
-	c.Assert().NotNil(core.processor.executionData)
-	c.Assert().Equal(executionData, core.processor.executionData.BlockExecutionData)
-	c.Assert().Equal(txResultErrMsgs, core.processor.txResultErrMsgsData)
+	c.Assert().NotNil(core.workingData.executionData)
+	c.Assert().Equal(executionData, core.workingData.executionData.BlockExecutionData)
+	c.Assert().Equal(txResultErrMsgs, core.workingData.txResultErrMsgsData)
 }

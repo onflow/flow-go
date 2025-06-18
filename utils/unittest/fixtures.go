@@ -2747,6 +2747,30 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 	}
 }
 
+func WithTxResultErrorMessageTxID(id flow.Identifier) func(txResErrMsg *flow.TransactionResultErrorMessage) {
+	return func(txResErrMsg *flow.TransactionResultErrorMessage) {
+		txResErrMsg.TransactionID = id
+	}
+}
+
+func WithTxResultErrorMessageIndex(index uint32) func(txResErrMsg *flow.TransactionResultErrorMessage) {
+	return func(txResErrMsg *flow.TransactionResultErrorMessage) {
+		txResErrMsg.Index = index
+	}
+}
+
+func WithTxResultErrorMessageTxMsg(message string) func(txResErrMsg *flow.TransactionResultErrorMessage) {
+	return func(txResErrMsg *flow.TransactionResultErrorMessage) {
+		txResErrMsg.ErrorMessage = message
+	}
+}
+
+func WithTxResultErrorMessageExecutorID(id flow.Identifier) func(txResErrMsg *flow.TransactionResultErrorMessage) {
+	return func(txResErrMsg *flow.TransactionResultErrorMessage) {
+		txResErrMsg.ExecutorID = id
+	}
+}
+
 // TransactionResultErrorMessageFixture creates a fixture tx result error message with random generated tx ID and executor ID for test purpose.
 func TransactionResultErrorMessageFixture(opts ...func(*flow.TransactionResultErrorMessage)) flow.TransactionResultErrorMessage {
 	txResErrMsg := flow.TransactionResultErrorMessage{
@@ -2769,12 +2793,11 @@ func TransactionResultErrorMessagesFixture(n int) []flow.TransactionResultErrorM
 	executorID := IdentifierFixture()
 
 	for i := 0; i < n; i++ {
-		txResErrMsgs = append(txResErrMsgs, flow.TransactionResultErrorMessage{
-			TransactionID: IdentifierFixture(),
-			Index:         uint32(i),
-			ErrorMessage:  fmt.Sprintf("transaction result error %d", i),
-			ExecutorID:    executorID,
-		})
+		txResErrMsgs = append(txResErrMsgs, TransactionResultErrorMessageFixture(
+			WithTxResultErrorMessageIndex(uint32(i)),
+			WithTxResultErrorMessageTxMsg(fmt.Sprintf("transaction result error %d", i)),
+			WithTxResultErrorMessageExecutorID(executorID),
+		))
 	}
 	return txResErrMsgs
 }

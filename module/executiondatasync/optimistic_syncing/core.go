@@ -49,10 +49,10 @@ type Core interface {
 	Abandon() error
 }
 
-// executionDataProcessor encapsulates all components and temporary storage
+// workingData encapsulates all components and temporary storage
 // involved in processing a single block's execution data. When processing
-// is complete or abandoned, the entire processor can be discarded.
-type executionDataProcessor struct {
+// is complete or abandoned, the entire workingData can be discarded.
+type workingData struct {
 	// Temporary in-memory caches
 	inmemRegisters       *unsynchronized.Registers
 	inmemEvents          *unsynchronized.Events
@@ -81,7 +81,7 @@ var _ Core = (*CoreImpl)(nil)
 type CoreImpl struct {
 	log zerolog.Logger
 
-	processor *executionDataProcessor
+	workingData *workingData
 
 	executionResult *flow.ExecutionResult
 	header          *flow.Header
@@ -150,7 +150,7 @@ func NewCoreImpl(
 
 	return &CoreImpl{
 		log: coreLogger,
-		processor: &executionDataProcessor{
+		workingData: &workingData{
 			execDataRequester:             execDataRequester,
 			txResultErrMsgsRequester:      txResultErrMsgsRequester,
 			txResultErrMsgsRequestTimeout: txResultErrMsgsRequestTimeout,
@@ -173,7 +173,7 @@ func NewCoreImpl(
 // - context.Canceled: if the provided context was canceled before completion
 // - context.DeadlineExceeded: if the provided context was canceled due to its deadline reached
 //
-// No other errors are expected during normal operations
+// All other errors are unexpected and may indicate a bug or inconsistent state
 func (c *CoreImpl) Download(ctx context.Context) error {
 	c.log.Debug().Msg("downloading execution data")
 
@@ -182,7 +182,7 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 	var executionData *execution_data.BlockExecutionData
 	g.Go(func() error {
 		var err error
-		executionData, err = c.processor.execDataRequester.RequestExecutionData(gCtx)
+		executionData, err = c.workingData.execDataRequester.RequestExecutionData(gCtx)
 		if err != nil {
 			return fmt.Errorf("failed to request execution data: %w", err)
 		}
@@ -192,11 +192,11 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 
 	var txResultErrMsgsData []flow.TransactionResultErrorMessage
 	g.Go(func() error {
-		timeoutCtx, cancel := context.WithTimeout(gCtx, c.processor.txResultErrMsgsRequestTimeout)
+		timeoutCtx, cancel := context.WithTimeout(gCtx, c.workingData.txResultErrMsgsRequestTimeout)
 		defer cancel()
 
 		var err error
-		txResultErrMsgsData, err = c.processor.txResultErrMsgsRequester.Request(timeoutCtx)
+		txResultErrMsgsData, err = c.workingData.txResultErrMsgsRequester.Request(timeoutCtx)
 		if err != nil {
 			return fmt.Errorf("failed to request transaction result error messages data: %w", err)
 		}
@@ -204,12 +204,26 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 	})
 
 	if err := g.Wait(); err != nil {
-		//TODO: For me executionData and txResultErrMsgsData are not equally important. Could we proceed indexing without `txResultErrMsgsData`?
+		// TODO: Improve error handling to allow partial success scenarios.
+		//
+		// Currently, this method uses errgroup with fail-fast semantics, meaning if either
+		// execution data OR transaction error messages download fails, the entire operation fails.
+		// However, these two types of data have different criticality levels:
+		//
+		// - executionData: CRITICAL - Required for block processing and indexing
+		// - txResultErrMsgsData: OPTIONAL - Nice-to-have
+		//
+		// Allow the download to succeed if execution data is retrieved
+		// successfully, even if transaction error messages fail or timeout. The system should:
+		//
+		// 1. Continue processing with empty/nil txResultErrMsgsData if that download fails
+		// 2. Log the failure appropriately
+		// 3. Allow operators to backfill missing error messages later
 		return err
 	}
 
-	c.processor.executionData = execution_data.NewBlockExecutionDataEntity(c.executionResult.ExecutionDataID, executionData)
-	c.processor.txResultErrMsgsData = txResultErrMsgsData
+	c.workingData.executionData = execution_data.NewBlockExecutionDataEntity(c.executionResult.ExecutionDataID, executionData)
+	c.workingData.txResultErrMsgsData = txResultErrMsgsData
 
 	c.log.Debug().Msg("successfully downloaded execution data")
 
@@ -221,16 +235,16 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 //
 // No errors are expected during normal operations
 func (c *CoreImpl) Index() error {
-	if c.processor.executionData == nil {
+	if c.workingData.executionData == nil {
 		return fmt.Errorf("could not index an empty execution data")
 	}
 	c.log.Debug().Msg("indexing execution data")
 
-	if err := c.processor.indexer.IndexBlockData(c.processor.executionData); err != nil {
+	if err := c.workingData.indexer.IndexBlockData(c.workingData.executionData); err != nil {
 		return err
 	}
 
-	if err := c.processor.indexer.IndexTxResultErrorMessagesData(c.processor.txResultErrMsgsData); err != nil {
+	if err := c.workingData.indexer.IndexTxResultErrorMessagesData(c.workingData.txResultErrMsgsData); err != nil {
 		return err
 	}
 
@@ -246,7 +260,7 @@ func (c *CoreImpl) Persist() error {
 	c.log.Debug().Msg("persisting execution data")
 
 	// Add all data to the batch
-	if err := c.processor.persister.Persist(); err != nil {
+	if err := c.workingData.persister.Persist(); err != nil {
 		return fmt.Errorf("failed to persist data: %w", err)
 	}
 
@@ -260,8 +274,8 @@ func (c *CoreImpl) Persist() error {
 //
 // No errors are expected during normal operations
 func (c *CoreImpl) Abandon() error {
-	// Clear in-memory storage and other processing data by setting processor references to nil for garbage collection
-	c.processor = nil
+	// Clear in-memory storage and other processing data by setting workingData references to nil for garbage collection
+	c.workingData = nil
 
 	return nil
 }
