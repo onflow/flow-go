@@ -1,6 +1,7 @@
 package migration
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -150,6 +151,76 @@ func readerWorker(
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func pebbleReaderWorker(
+	ctx context.Context,
+	lgProgress func(int),
+	db *pebble.DB,
+	jobs <-chan []byte, // each job is a prefix to iterate over
+	kvChan chan<- KVPairs, // channel to send key-value pairs to writer workers
+	batchSize int,
+) error {
+	for prefix := range jobs {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		iter, err := db.NewIter(&pebble.IterOptions{
+			LowerBound: prefix,
+			UpperBound: append(prefix, 0xff),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create iterator: %w", err)
+		}
+		defer iter.Close()
+
+		var (
+			kvBatch  []KVPair
+			currSize int
+		)
+
+		for iter.First(); iter.Valid(); iter.Next() {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+
+			key := iter.Key()
+			value := iter.Value()
+
+			// Only process keys that start with our prefix
+			if !bytes.HasPrefix(key, prefix) {
+				break
+			}
+
+			kvBatch = append(kvBatch, KVPair{
+				Key:   append([]byte(nil), key...),
+				Value: append([]byte(nil), value...),
+			})
+			currSize += len(key) + len(value)
+
+			if currSize >= batchSize {
+				select {
+				case kvChan <- KVPairs{Prefix: prefix, Pairs: kvBatch}:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+				kvBatch = nil
+				currSize = 0
+			}
+		}
+
+		if len(kvBatch) > 0 {
+			select {
+			case kvChan <- KVPairs{Prefix: prefix, Pairs: kvBatch}:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+
+		lgProgress(1)
 	}
 	return nil
 }

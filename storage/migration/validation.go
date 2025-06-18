@@ -1,6 +1,8 @@
 package migration
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"slices"
@@ -205,20 +207,110 @@ func validateData(badgerDB *badger.DB, pebbleDB *pebble.DB, cfg MigrationConfig)
 
 // validateAllKeys performs a full validation by comparing all keys between Badger and Pebble
 func validateAllKeys(badgerDB *badger.DB, pebbleDB *pebble.DB) error {
-	var allKeys [][]byte
-	err := badgerDB.View(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		it := txn.NewIterator(opts)
-		defer it.Close()
+	// var allKeys [][]byte
+	// err := badgerDB.View(func(txn *badger.Txn) error {
+	// 	opts := badger.DefaultIteratorOptions
+	// 	it := txn.NewIterator(opts)
+	// 	defer it.Close()
+	//
+	// 	for it.Rewind(); it.Valid(); it.Next() {
+	// 		allKeys = append(allKeys, slices.Clone(it.Item().Key()))
+	// 	}
+	// 	return nil
+	// })
+	// if err != nil {
+	// 	return fmt.Errorf("failed to collect all keys from Badger: %w", err)
+	// }
+	//
+	// return compareValuesBetweenDBs(allKeys, badgerDB, pebbleDB)
+}
 
-		for it.Rewind(); it.Valid(); it.Next() {
-			allKeys = append(allKeys, slices.Clone(it.Item().Key()))
+// compare the key value pairs from both channel, and return error if any pair is different,
+// and return error if ctx is Done
+func compareKeyValuePairsFromChannels(ctx context.Context, kvChanBadger <-chan KVPairs, kvChanPebble <-chan KVPairs) error {
+	var (
+		kvBadger, kvPebble KVPairs
+		okBadger, okPebble bool
+	)
+
+	for {
+		// Read from both channels
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("context cancelled while reading from badger: %w", ctx.Err())
+		case kvBadger, okBadger = <-kvChanBadger:
+			if !okBadger {
+				kvBadger = KVPairs{}
+			}
 		}
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("failed to collect all keys from Badger: %w", err)
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("context cancelled while reading from pebble: %w", ctx.Err())
+		case kvPebble, okPebble = <-kvChanPebble:
+			if !okPebble {
+				kvPebble = KVPairs{}
+			}
+		}
+
+		// If both channels are closed, we're done
+		if !okBadger && !okPebble {
+			break
+		}
+
+		// Handle case where Badger channel is closed, Pebble channel is not.
+		if !okBadger && okPebble {
+			if len(kvPebble.Pairs) > 0 {
+				return fmt.Errorf("key %x exists in pebble but not in badger", kvPebble.Pairs[0].Key)
+			}
+			return fmt.Errorf("okBadger == false, okPebble == true, but okPebble has no keys")
+		}
+
+		// Handle case where Pebble channel is closed, Badger channel is not.
+		if okBadger && !okPebble {
+			if len(kvBadger.Pairs) > 0 {
+				return fmt.Errorf("key %x exists in badger but not in pebble", kvBadger.Pairs[0].Key)
+			}
+			return fmt.Errorf("okBadger == true, okPebble == false, but okBadger has no keys")
+		}
+
+		// Both channels are open, compare prefixes
+		if !bytes.Equal(kvBadger.Prefix, kvPebble.Prefix) {
+			return fmt.Errorf("prefix mismatch: badger=%x, pebble=%x", kvBadger.Prefix, kvPebble.Prefix)
+		}
+
+		// Compare key-value pairs
+		i, j := 0, 0
+		for i < len(kvBadger.Pairs) && j < len(kvPebble.Pairs) {
+			pairBadger := kvBadger.Pairs[i]
+			pairPebble := kvPebble.Pairs[j]
+
+			cmp := bytes.Compare(pairBadger.Key, pairPebble.Key)
+			if cmp < 0 {
+				return fmt.Errorf("key %x exists in badger but not in pebble", pairBadger.Key)
+			}
+			if cmp > 0 {
+				return fmt.Errorf("key %x exists in pebble but not in badger", pairPebble.Key)
+			}
+
+			// Keys are equal, compare values
+			if !bytes.Equal(pairBadger.Value, pairPebble.Value) {
+				return fmt.Errorf("value mismatch for key %x: badger=%x, pebble=%x",
+					pairBadger.Key, pairBadger.Value, pairPebble.Value)
+			}
+
+			i++
+			j++
+		}
+
+		// Check if there are remaining pairs in either channel
+		if i < len(kvBadger.Pairs) {
+			return fmt.Errorf("key %x exists in badger but not in pebble", kvBadger.Pairs[i].Key)
+		}
+		if j < len(kvPebble.Pairs) {
+			return fmt.Errorf("key %x exists in pebble but not in badger", kvPebble.Pairs[j].Key)
+		}
 	}
 
-	return compareValuesBetweenDBs(allKeys, badgerDB, pebbleDB)
+	return nil
 }
