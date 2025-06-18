@@ -485,7 +485,7 @@ func (s TransactionSignature) Fingerprint() []byte {
 // and not the validity of the info field
 func (s TransactionSignature) isPlainAuthenticationScheme() bool {
 	// len check covers nil case
-	return len(s.ExtensionData) == 0 || s.ExtensionData[0] == byte(PlainScheme)
+	return len(s.ExtensionData) == 0 || (len(s.ExtensionData) == 1 && s.ExtensionData[0] == byte(PlainScheme))
 }
 
 // ValidateExtensionDataAndReconstructMessage checks the format validity of the extension data and reconstructs the verification

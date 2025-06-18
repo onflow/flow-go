@@ -138,26 +138,49 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 				},
 			})
 		}
-
 		randomExtensionData := unittest.RandomBytes(20)
 
 		cases := []struct {
 			payloadExtensionData                   []byte
 			expectedEnvelopeSignatureCanonicalForm func(tb flow.TransactionBody) []byte
 		}{
-			// nil extension data
 			{
+				// nil extension data
 				payloadExtensionData:                   nil,
 				expectedEnvelopeSignatureCanonicalForm: legacyEnvelopeSignatureCanonicalForm,
-			},
-			// empty extension data
-			{
+			}, {
+				// empty extension data
 				payloadExtensionData:                   []byte{},
 				expectedEnvelopeSignatureCanonicalForm: legacyEnvelopeSignatureCanonicalForm,
 			}, {
-				// zero extension data
+				// zero scheme identifier
 				payloadExtensionData:                   []byte{0x0},
 				expectedEnvelopeSignatureCanonicalForm: legacyEnvelopeSignatureCanonicalForm,
+			}, {
+				// zero scheme identifier but invalid extension (should be taken into account in the canonical form)
+				payloadExtensionData: []byte{0x0, 1, 2, 3},
+				expectedEnvelopeSignatureCanonicalForm: func(tb flow.TransactionBody) []byte {
+					return fingerprint.Fingerprint(struct {
+						Payload           interface{}
+						PayloadSignatures interface{}
+					}{
+						tb.PayloadCanonicalForm(),
+						[]interface{}{
+							// Expected canonical form of payload signature
+							struct {
+								SignerIndex   uint
+								KeyID         uint
+								Signature     []byte
+								ExtensionData []byte
+							}{
+								SignerIndex:   uint(tb.PayloadSignatures[0].SignerIndex),
+								KeyID:         uint(tb.PayloadSignatures[0].KeyIndex),
+								Signature:     tb.PayloadSignatures[0].Signature,
+								ExtensionData: []byte{0x0, 1, 2, 3},
+							},
+						},
+					})
+				},
 			}, {
 				// non-plain authentication scheme
 				payloadExtensionData: slices.Concat([]byte{0x5}, randomExtensionData[:]),
@@ -357,13 +380,18 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 				extensionOk:          true,
 				signatureOk:          true,
 			}, {
-				// empty extension data - happy path
+				// correct extension data
 				payloadExtensionData: []byte{0x0},
 				extensionOk:          true,
 				signatureOk:          true,
 			}, {
 				// incorrect extension data
 				payloadExtensionData: []byte{0x1},
+				extensionOk:          false,
+				signatureOk:          false,
+			}, {
+				// incorrect extension data: correct identifier but with extra bytes
+				payloadExtensionData: []byte{0, 1, 2, 3},
 				extensionOk:          false,
 				signatureOk:          false,
 			},
@@ -390,9 +418,9 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 				signatureValid, err := fvmCrypto.VerifySignatureFromTransaction(signature, message, sk.PublicKey(), h)
 
 				require.NoError(t, err)
-				require.Equal(t, extensionDataValid, c.extensionOk)
-				if extensionDataValid {
-					require.Equal(t, signatureValid, c.signatureOk)
+				require.Equal(t, c.extensionOk, extensionDataValid)
+				if c.extensionOk {
+					require.Equal(t, c.signatureOk, signatureValid)
 				}
 			})
 		}
@@ -413,6 +441,7 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 
 		// For use in cases where you're testing the other value
 		validAuthenticatorData := slices.Concat(rpIDHash, []byte{validUserFlag}, sigCounter)
+		_ = slices.Concat(rpIDHash, []byte{validUserFlag}, sigCounter)
 		validClientDataJSON := map[string]string{
 			"type":      flow.WebAuthnTypeGet,
 			"challenge": authNChallengeBase64Url,
@@ -433,19 +462,19 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 				extensionOk:       false,
 				signatureOk:       false,
 			}, {
-				description:       "invalid user flag (UP not set)",
+				description:       "invalid user flag, UP not set",
 				authenticatorData: slices.Concat(rpIDHash, []byte{0x0}, sigCounter),
 				clientDataJSON:    validClientDataJSON,
 				extensionOk:       false,
 				signatureOk:       false,
 			}, {
-				description:       "invalid user flag (extensions exist but flag (AT and ED) not set)",
-				authenticatorData: slices.Concat(rpIDHash, []byte{validUserFlag}, sigCounter, unittest.RandomBytes(mrand.Intn(20))),
+				description:       "invalid user flag, extensions exist but flag AT and ED are not set",
+				authenticatorData: slices.Concat(rpIDHash, []byte{validUserFlag}, sigCounter, unittest.RandomBytes(1+mrand.Intn(20))),
 				clientDataJSON:    validClientDataJSON,
 				extensionOk:       false,
 				signatureOk:       false,
 			}, {
-				description:       "invalid user flag (extensions do not exist but flag AT is set)",
+				description:       "invalid user flag, extensions do not exist but flag AT is set",
 				authenticatorData: slices.Concat(rpIDHash, []byte{validUserFlag | 0x40}, sigCounter),
 				clientDataJSON: map[string]string{
 					"type":      flow.WebAuthnTypeGet,
@@ -455,7 +484,7 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 				extensionOk: false,
 				signatureOk: false,
 			}, {
-				description:       "invalid user flag (extensions do not exist but flag ED is set)",
+				description:       "invalid user flag, extensions do not exist but flag ED is set",
 				authenticatorData: slices.Concat(rpIDHash, []byte{validUserFlag | 0x80}, sigCounter),
 				clientDataJSON: map[string]string{
 					"type":      flow.WebAuthnTypeGet,
@@ -549,11 +578,10 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 
 				extensionDataValid, message := transactionBody.PayloadSignatures[0].ValidateExtensionDataAndReconstructMessage(transactionMessage)
 				signatureValid, err := fvmCrypto.VerifySignatureFromTransaction(signature, message, sk.PublicKey(), h)
-
 				require.NoError(t, err)
-				require.Equal(t, extensionDataValid, c.extensionOk)
-				if extensionDataValid {
-					require.Equal(t, signatureValid, c.signatureOk)
+				require.Equal(t, c.extensionOk, extensionDataValid)
+				if c.extensionOk {
+					require.Equal(t, c.signatureOk, signatureValid)
 				}
 			})
 		}
@@ -586,7 +614,7 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 				transactionMessage := unittest.RandomBytes(20)
 				extensionDataValid, message := transactionBody.PayloadSignatures[0].ValidateExtensionDataAndReconstructMessage(transactionMessage)
 				require.Nil(t, message)
-				require.Equal(t, extensionDataValid, c.extensionOk)
+				require.Equal(t, c.extensionOk, extensionDataValid)
 			})
 
 		}
