@@ -1320,7 +1320,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 				return nil
 			}
 			collLight := collection.Light()
-			return &collLight
+			return collLight
 		},
 			func(txID flow.Identifier) error {
 				if currentState == flow.TransactionStatusPending {

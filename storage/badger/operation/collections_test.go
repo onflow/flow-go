@@ -25,8 +25,8 @@ func TestCollections(t *testing.T) {
 			err := db.Update(InsertCollection(expected))
 			require.NoError(t, err)
 
-			var actual flow.LightCollection
-			err = db.View(RetrieveCollection(expected.ID(), &actual))
+			actual := new(flow.LightCollection)
+			err = db.View(RetrieveCollection(expected.ID(), actual))
 			assert.NoError(t, err)
 
 			assert.Equal(t, expected, actual)
@@ -53,7 +53,7 @@ func TestCollections(t *testing.T) {
 				return nil
 			})
 
-			var actual flow.LightCollection
+			actual := new(flow.LightCollection)
 			err := db.View(LookupCollectionPayload(blockID, &actual.Transactions))
 			assert.NoError(t, err)
 

@@ -30,8 +30,8 @@ func TestCollections(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			var actual flow.LightCollection
-			err = operation.RetrieveCollection(db.Reader(), expected.ID(), &actual)
+			actual := new(flow.LightCollection)
+			err = operation.RetrieveCollection(db.Reader(), expected.ID(), actual)
 			assert.NoError(t, err)
 
 			assert.Equal(t, expected, actual)
@@ -43,8 +43,8 @@ func TestCollections(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			var actual flow.LightCollection
-			err = operation.RetrieveCollection(db.Reader(), expected.ID(), &actual)
+			actual := new(flow.LightCollection)
+			err = operation.RetrieveCollection(db.Reader(), expected.ID(), actual)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, storage.ErrNotFound)
 
@@ -67,7 +67,7 @@ func TestCollections(t *testing.T) {
 				return nil
 			})
 
-			var actual flow.LightCollection
+			actual := new(flow.LightCollection)
 			err := operation.LookupCollectionPayload(db.Reader(), blockID, &actual.Transactions)
 			assert.NoError(t, err)
 			assert.Equal(t, expected, actual)
