@@ -2,10 +2,10 @@ package flow
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
-	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/model/fingerprint"
 )
@@ -59,7 +59,7 @@ func (tb TransactionBody) Fingerprint() []byte {
 		PayloadSignatures  interface{}
 		EnvelopeSignatures interface{}
 	}{
-		Payload:            tb.payloadCanonicalForm(),
+		Payload:            tb.PayloadCanonicalForm(),
 		PayloadSignatures:  signaturesList(tb.PayloadSignatures).canonicalForm(),
 		EnvelopeSignatures: signaturesList(tb.EnvelopeSignatures).canonicalForm(),
 	})
@@ -338,10 +338,10 @@ func (tb *TransactionBody) createSignature(address Address, keyID uint32, sig []
 }
 
 func (tb *TransactionBody) PayloadMessage() []byte {
-	return fingerprint.Fingerprint(tb.payloadCanonicalForm())
+	return fingerprint.Fingerprint(tb.PayloadCanonicalForm())
 }
 
-func (tb *TransactionBody) payloadCanonicalForm() interface{} {
+func (tb *TransactionBody) PayloadCanonicalForm() interface{} {
 	authorizers := make([][]byte, len(tb.Authorizers))
 	for i, auth := range tb.Authorizers {
 		authorizers[i] = auth.Bytes()
@@ -382,13 +382,13 @@ func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
 		Payload           interface{}
 		PayloadSignatures interface{}
 	}{
-		tb.payloadCanonicalForm(),
+		tb.PayloadCanonicalForm(),
 		signaturesList(tb.PayloadSignatures).canonicalForm(),
 	}
 }
 
 func (tx *Transaction) PayloadMessage() []byte {
-	return fingerprint.Fingerprint(tx.TransactionBody.payloadCanonicalForm())
+	return fingerprint.Fingerprint(tx.TransactionBody.PayloadCanonicalForm())
 }
 
 // Checksum provides a cryptographic commitment for a chunk content
@@ -484,9 +484,39 @@ func (s TransactionSignature) Fingerprint() []byte {
 // We don't check it here, as this is simply checking if the scheme is plain,
 // and not the validity of the info field
 func (s TransactionSignature) isPlainAuthenticationScheme() bool {
-	plainSchemeIdentifier := byte(0)
 	// len check covers nil case
-	return len(s.ExtensionData) == 0 || s.ExtensionData[0] == plainSchemeIdentifier
+	return len(s.ExtensionData) == 0 || s.ExtensionData[0] == byte(PlainScheme)
+}
+
+// ValidateExtensionDataAndReconstructMessage checks the format validity of the extension data and reconstructs the verification
+// message based on the authentication scheme and extension data. The output message is the message that will be cryptographically
+// checked against the account public key and signature.
+//
+// returns
+// - (false, nil) if the extension data is not formed correctly
+// - (true, message) if the extension data is valid
+//
+// The current implementation simply returns false if the extension data is invalid, could consider adding more visibility
+// into reason of validation failure
+func (s TransactionSignature) ValidateExtensionDataAndReconstructMessage(payload []byte) (bool, []byte) {
+	// Default to Plain scheme if extension data is nil or empty
+	scheme := PlainScheme
+	if len(s.ExtensionData) > 0 {
+		scheme = AuthenticationSchemeFromByte(s.ExtensionData[0])
+	}
+
+	switch scheme {
+	case PlainScheme:
+		if len(s.ExtensionData) > 1 {
+			return false, nil
+		}
+		return true, slices.Concat(TransactionDomainTag[:], payload)
+	case WebAuthnScheme: // See FLIP 264 for more details
+		return validateWebAuthNExtensionData(s.ExtensionData, payload)
+	default:
+		// authentication scheme not found
+		return false, nil
+	}
 }
 
 func (s TransactionSignature) canonicalForm() interface{} {

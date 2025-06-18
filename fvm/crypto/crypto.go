@@ -3,14 +3,12 @@ package crypto
 import (
 	"encoding/hex"
 	"fmt"
-	"slices"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
 )
 
@@ -206,57 +204,40 @@ func VerifySignatureFromRuntime(
 // The signature/hash function combinations accepted are:
 //   - ECDSA (on both curves P-256 and secp256k1) with any of SHA2-256/SHA3-256.
 //
-// The tag is applied to the payload as a constant length prefix.
+// No tagging is applied to the input `message`, any tagging/prefixing should be applied to the message.
 //
 // The function errors:
 //   - NewValueErrorf for any user error
 //   - panic for any other unexpected error
 func VerifySignatureFromTransaction(
 	signature []byte,
-	payload []byte,
+	message []byte,
 	pk crypto.PublicKey,
 	hashAlgo hash.HashingAlgorithm,
-	extensionData []byte,
 ) (bool, error) {
 
 	// check ECDSA compatibilites
 	if pk.Algorithm() != crypto.ECDSAP256 && pk.Algorithm() != crypto.ECDSASecp256k1 {
-		// TODO: check if we should panic
-		// This case only happens in production if there is a bug
+		// should not happen
 		return false, errors.NewUnknownFailure(fmt.Errorf(
 			pk.Algorithm().String(), "is not supported in transactions"))
 	}
 	// hashing compatibility
 	if hashAlgo != hash.SHA2_256 && hashAlgo != hash.SHA3_256 {
-		// TODO: check if we should panic
-		// This case only happens in production if there is a bug
+		// should not happen
 		return false, errors.NewUnknownFailure(fmt.Errorf(
 			hashAlgo.String(), "is not supported in transactions"))
 	}
 
-	// Default to Plain scheme if extension data is nil or empty
-	scheme := flow.PlainScheme
-	if len(extensionData) > 0 {
-		scheme = flow.AuthenticationSchemeFromByte(extensionData[0])
-	}
-	if scheme == flow.InvalidScheme {
-		return false, nil
-	}
-
-	extensionDataValid, reconstructedMessage := validateExtensionDataAndReconstructMessage(scheme, extensionData, payload)
-	if !extensionDataValid {
-		return false, nil
-	}
-
-	// Prefix has been moved into validateExtensionDataAndReconstructMessage, could consider simply using a regular hasher,
-	// Leaving this here for now incase we need to add more prefixing in the future
-	hasher, err := NewPrefixedHashing(hashAlgo, "")
+	// No prefix logic is implemented here, any prefixing shoulf be applied directly to the `message` input
+	hasher, err := NewHashing(hashAlgo)
 	if err != nil {
+		// should not happen
 		return false, errors.NewUnknownFailure(fmt.Errorf(
 			hashAlgo.String(), "is not supported in transactions"))
 	}
 
-	valid, err := pk.Verify(signature, reconstructedMessage, hasher)
+	valid, err := pk.Verify(signature, message, hasher)
 	if err != nil {
 		// All inputs are guaranteed to be valid at this stage.
 		// The check for crypto.InvalidInputs is only a sanity check
@@ -268,23 +249,6 @@ func VerifySignatureFromTransaction(
 	}
 
 	return valid, nil
-}
-
-// validateExtensionDataAndReconstructMessage reconstructs the verification message based on the authentication scheme and extension data.
-// simply returns false if the extension data is invalid, could consider adding more visibility into reason of validation failure
-func validateExtensionDataAndReconstructMessage(scheme flow.AuthenticationScheme, extensionData []byte, payload []byte) (bool, []byte) {
-	switch scheme {
-	case flow.PlainScheme:
-		if len(extensionData) > 1 {
-			return false, nil
-		}
-		return true, slices.Concat(flow.TransactionDomainTag[:], payload)
-	case flow.WebAuthnScheme: // See FLIP 264 for more details
-		return validateWebAuthNExtensionData(extensionData, payload)
-	default:
-		// authentication scheme not found
-		return false, nil
-	}
 }
 
 // VerifyPOP verifies a proof of possession (PoP) for the receiver public key; currently only works for BLS
