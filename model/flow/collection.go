@@ -46,10 +46,17 @@ func NewEmptyCollection() *Collection {
 }
 
 // Light returns a LightCollection, which contains only the list of transaction IDs from the Collection.
-func (c Collection) Light() LightCollection {
-	lc := LightCollection{Transactions: make([]Identifier, 0, len(c.Transactions))}
+// This method may panic if invoked on a malformed receiver Collection.
+func (c Collection) Light() *LightCollection {
+	txIDs := make([]Identifier, 0, len(c.Transactions))
 	for _, tx := range c.Transactions {
-		lc.Transactions = append(lc.Transactions, tx.ID())
+		txIDs = append(txIDs, tx.ID())
+	}
+	lc, err := NewLightCollection(UntrustedLightCollection{
+		Transactions: txIDs,
+	})
+	if err != nil {
+		panic(fmt.Sprintf("sanity check failed: creating light collection from collection: %v", err))
 	}
 	return lc
 }
@@ -67,8 +74,29 @@ func (c Collection) Len() int {
 
 // LightCollection contains cryptographic commitments to the constituent transactions instead of transaction bodies.
 // It is used for indexing transactions by collection and for computing the collection fingerprint.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type LightCollection struct {
 	Transactions []Identifier
+}
+
+// UntrustedLightCollection is an untrusted input-only representation of a LightCollection,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedLightCollection should be validated and converted into
+// a trusted LightCollection using NewLightCollection constructor.
+type UntrustedLightCollection LightCollection
+
+// NewLightCollection constructs a new LightCollection instance.
+// Any errors indicate the input cannot be used to construct a valid LightCollection.
+func NewLightCollection(untrusted UntrustedLightCollection) (*LightCollection, error) {
+	return &LightCollection{
+		Transactions: untrusted.Transactions,
+	}, nil
 }
 
 // ID returns a cryptographic commitment to the LightCollection.
