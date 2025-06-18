@@ -32,7 +32,7 @@ func TestGetCollections(t *testing.T) {
 	backend := &mock.API{}
 
 	t.Run("get by ID", func(t *testing.T) {
-		inputs := []flow.LightCollection{
+		inputs := []*flow.LightCollection{
 			unittest.CollectionFixture(1).Light(),
 			unittest.CollectionFixture(10).Light(),
 			unittest.CollectionFixture(100).Light(),

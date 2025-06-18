@@ -646,7 +646,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 		guarantees := make([]*flow.CollectionGuarantee, collPerBlk)
 		for j := 0; j < collPerBlk; j++ {
 			coll := unittest.CollectionFixture(2).Light()
-			collMap[coll.ID()] = &coll
+			collMap[coll.ID()] = coll
 			cg := unittest.CollectionGuaranteeFixture(func(cg *flow.CollectionGuarantee) {
 				cg.CollectionID = coll.ID()
 				cg.ReferenceBlockID = refBlockID

@@ -22,7 +22,7 @@ func TestCollections(t *testing.T) {
 		})
 
 		t.Run("Save", func(t *testing.T) {
-			err := db.Update(InsertCollection(&expected))
+			err := db.Update(InsertCollection(expected))
 			require.NoError(t, err)
 
 			var actual flow.LightCollection
@@ -46,7 +46,7 @@ func TestCollections(t *testing.T) {
 			blockID := unittest.IdentifierFixture()
 
 			_ = db.Update(func(tx *badger.Txn) error {
-				err := InsertCollection(&expected)(tx)
+				err := InsertCollection(expected)(tx)
 				assert.NoError(t, err)
 				err = IndexCollectionPayload(blockID, expected.Transactions)(tx)
 				assert.NoError(t, err)
