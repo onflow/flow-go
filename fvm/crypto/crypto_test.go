@@ -803,7 +803,7 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 				},
 			}, {
 				description:       "invalid user flag (extensions exist but flag (AT and ED) not set)",
-				authenticatorData: slices.Concat(rpIDHash, []byte{validUserFlag}, sigCounter, unittest.RandomBytes(mrand.Intn(20))),
+				authenticatorData: slices.Concat(rpIDHash, []byte{validUserFlag}, sigCounter, unittest.RandomBytes(1+mrand.Intn(20))),
 				clientDataJSON:    validClientDataJSON,
 				require: func(t *testing.T, sigOk bool, err error) {
 					require.NoError(t, err)
