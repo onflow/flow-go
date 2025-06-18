@@ -29,7 +29,7 @@ type Core interface {
 	// Expected errors:
 	// - context.Canceled: if the provided context was canceled before completion
 	//
-	// No other errors are expected during normal operations
+	// All other errors are unexpected and may indicate a bug or inconsistent state
 	Download(ctx context.Context) error
 
 	// Index processes the downloaded data and creates in-memory indexes.
