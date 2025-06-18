@@ -80,6 +80,11 @@ func (r *Requester) Request(ctx context.Context) ([]flow.TransactionResultErrorM
 
 		var err error
 		errorMessages, err = r.request(ctx, blockID, resultID)
+		if err == nil {
+			return nil
+		}
+
+		// retry if there are no acceptable ENs to download messages from at this point
 		if errors.Is(err, rpc.ErrNoENsFoundForExecutionResult) {
 			return retry.RetryableError(err)
 		}
