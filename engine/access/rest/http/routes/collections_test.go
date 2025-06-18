@@ -41,7 +41,7 @@ func TestGetCollections(t *testing.T) {
 		for _, col := range inputs {
 			backend.Mock.
 				On("GetCollectionByID", mocks.Anything, col.ID()).
-				Return(&col, nil).
+				Return(col, nil).
 				Once()
 
 			txs := make([]string, len(col.Transactions))
@@ -82,7 +82,7 @@ func TestGetCollections(t *testing.T) {
 
 		backend.Mock.
 			On("GetCollectionByID", mocks.Anything, col.ID()).
-			Return(&col, nil).
+			Return(col, nil).
 			Once()
 
 		req := getCollectionReq(col.ID().String(), true)
