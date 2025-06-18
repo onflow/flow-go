@@ -22,6 +22,8 @@ const maxAttemptsForExecutionReceipt = 3
 // MaxNodesCnt is the maximum number of nodes that will be contacted to complete an API request.
 const MaxNodesCnt = 3
 
+// ErrNoENsFoundForExecutionResult is returned when no execution nodes were found that produced
+// the requested execution result and matches all operator's criteria.
 var ErrNoENsFoundForExecutionResult = fmt.Errorf("no execution nodes found for execution result")
 
 // ExecutionNodeIdentitiesProvider is a container for elements required to retrieve

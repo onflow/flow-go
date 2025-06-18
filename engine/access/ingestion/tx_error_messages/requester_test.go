@@ -2,6 +2,7 @@ package tx_error_messages
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
@@ -125,4 +128,112 @@ func (s *RequesterSuite) TestRequest_HappyPath() {
 	actualErrorMessages, err := requester.Request(context.Background())
 	require.NoError(s.T(), err)
 	require.ElementsMatch(s.T(), expectedErrorMessages, actualErrorMessages)
+}
+
+func (s *RequesterSuite) TestRequest_ErrorCases() {
+	execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+		s.log,
+		s.proto.state,
+		s.receipts,
+		flow.IdentifierList{},
+		s.enNodeIDs.NodeIDs(),
+	)
+
+	back, err := backend.New(backend.Params{
+		State:                      s.proto.state,
+		ExecutionReceipts:          s.receipts,
+		ConnFactory:                s.connFactory,
+		MaxHeightRange:             backend.DefaultMaxHeightRange,
+		Log:                        s.log,
+		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
+		Communicator:               backend.NewNodeCommunicator(false),
+		ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+		ChainID:                    flow.Testnet,
+		ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
+	})
+	require.NoError(s.T(), err)
+
+	block := unittest.BlockWithParentFixture(s.finalizedBlock)
+	blockId := block.ID()
+	executionResult := &flow.ExecutionResult{
+		BlockID: blockId,
+		Chunks:  unittest.ChunkListFixture(1, blockId, unittest.StateCommitmentFixture()),
+	}
+	config := &RequesterConfig{
+		RetryDelay:    1 * time.Second,
+		MaxRetryDelay: 5 * time.Second,
+	}
+
+	s.connFactory.On("GetExecutionAPIClient", mock.Anything).Return(s.execClient, &mockCloser{}, nil)
+
+	// Mock the protocol snapshot to return fixed execution node IDs.
+	setupReceiptsForBlockWithResult(s.receipts, executionResult, s.enNodeIDs.NodeIDs()...)
+	s.proto.snapshot.On("Identities", mock.Anything).Return(s.enNodeIDs, nil)
+
+	exeEventReq := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
+		BlockId: blockId[:],
+	}
+
+	s.T().Run("Non-retryable error", func(t *testing.T) {
+		expectedError := errors.New("non-retryable error")
+		s.execClient.On("GetTransactionErrorMessagesByBlockID", mock.Anything, exeEventReq).
+			Return(nil, expectedError).
+			Once()
+
+		requester := NewRequester(s.log, config, back, execNodeIdentitiesProvider, executionResult)
+		actualErrorMessages, err := requester.Request(context.Background())
+		require.ErrorIs(s.T(), err, expectedError)
+		require.Nil(s.T(), actualErrorMessages)
+	})
+
+	s.T().Run("Non-retryable grpc error", func(t *testing.T) {
+		expectedError := status.Error(codes.DeadlineExceeded, "deadline exceeded")
+		s.execClient.On("GetTransactionErrorMessagesByBlockID", mock.Anything, exeEventReq).
+			Return(nil, expectedError).
+			Once()
+
+		requester := NewRequester(s.log, config, back, execNodeIdentitiesProvider, executionResult)
+		actualErrorMessages, err := requester.Request(context.Background())
+		require.ErrorIs(s.T(), err, expectedError)
+		require.Nil(s.T(), actualErrorMessages)
+	})
+
+	s.T().Run("Retryable ErrNoENsFoundForExecutionResult error", func(t *testing.T) {
+		// first time return retryable error
+		s.execClient.On("GetTransactionErrorMessagesByBlockID", mock.Anything, exeEventReq).
+			Return(nil, commonrpc.ErrNoENsFoundForExecutionResult).
+			Once()
+
+		// second time return error messages
+		resultsByBlockID := mockTransactionResultsByBlock(5)
+		s.execClient.On("GetTransactionErrorMessagesByBlockID", mock.Anything, exeEventReq).
+			Return(createTransactionErrorMessagesResponse(resultsByBlockID), nil).
+			Once()
+
+		expectedErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
+		requester := NewRequester(s.log, config, back, execNodeIdentitiesProvider, executionResult)
+		actualErrorMessages, err := requester.Request(context.Background())
+		require.NoError(s.T(), err)
+		require.ElementsMatch(s.T(), expectedErrorMessages, actualErrorMessages)
+	})
+
+	s.T().Run("Retryable valid grpc error", func(t *testing.T) {
+		// first time return retryable error
+		s.execClient.On("GetTransactionErrorMessagesByBlockID", mock.Anything, exeEventReq).
+			Return(nil, status.Error(codes.NotFound, "not found")).
+			Once()
+
+		// second time return error messages
+		resultsByBlockID := mockTransactionResultsByBlock(5)
+		s.execClient.On("GetTransactionErrorMessagesByBlockID", mock.Anything, exeEventReq).
+			Return(createTransactionErrorMessagesResponse(resultsByBlockID), nil).
+			Once()
+
+		expectedErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
+		requester := NewRequester(s.log, config, back, execNodeIdentitiesProvider, executionResult)
+		actualErrorMessages, err := requester.Request(context.Background())
+		require.NoError(s.T(), err)
+		require.ElementsMatch(s.T(), expectedErrorMessages, actualErrorMessages)
+	})
 }

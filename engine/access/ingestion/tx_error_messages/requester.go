@@ -80,8 +80,14 @@ func (r *Requester) Request(ctx context.Context) ([]flow.TransactionResultErrorM
 
 		var err error
 		errorMessages, err = r.request(ctx, blockID, resultID)
-		if errors.Is(err, rpc.ErrNoENsFoundForExecutionResult) || status.Code(err) != codes.Canceled {
+		if errors.Is(err, rpc.ErrNoENsFoundForExecutionResult) {
 			return retry.RetryableError(err)
+		}
+
+		if status, ok := status.FromError(err); ok {
+			if status.Code() != codes.DeadlineExceeded && status.Code() != codes.Canceled {
+				return retry.RetryableError(err)
+			}
 		}
 
 		return err
@@ -98,12 +104,12 @@ func (r *Requester) Request(ctx context.Context) ([]flow.TransactionResultErrorM
 // messages or an error if the retrieval fails.
 //
 // Expected errors during normal operations:
-//   - rpc.ErrNoENsFoundForExecutionResult - if no execution nodes were found that produced
+//  1. rpc.ErrNoENsFoundForExecutionResult - if no execution nodes were found that produced
 //     the provided execution result and matched the operators criteria
-//   - status.Error - GRPC call failed, some of possible codes are:
-//   - codes.NotFound - request cannot be served by EN because of absence of data.
-//   - codes.Unavailable - remote node is not unavailable.
-//   - codes.Canceled - if ctx is canceled during request
+//  2. status.Error - GRPC call failed, some of possible codes are:
+//     - codes.NotFound - request cannot be served by EN because of absence of data.
+//     - codes.Unavailable - remote node is not unavailable.
+//     - codes.Canceled - if ctx is canceled during request
 func (r *Requester) request(
 	ctx context.Context,
 	blockID flow.Identifier,
