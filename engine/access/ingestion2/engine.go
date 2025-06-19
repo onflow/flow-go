@@ -92,6 +92,6 @@ func (e *Engine) Process(chanName channels.Channel, originID flow.Identifier, ev
 
 // OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
 // Receives block finalized events from the finalization distributor and forwards them to the consumer.
-func (e *Engine) OnFinalizedBlock(block *model.Block) {
-	e.finalizedBlockProcessor.Notify(block)
+func (e *Engine) OnFinalizedBlock(_ *model.Block) {
+	e.finalizedBlockProcessor.Notify()
 }

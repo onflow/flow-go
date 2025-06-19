@@ -5,7 +5,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -18,11 +17,13 @@ import (
 )
 
 const (
-	// processFinalizedBlocksWorkersCount defines the number of workers that
+	// finalizedBlockProcessorWorkerCount defines the number of workers that
 	// concurrently process finalized blocks in the job queue.
-	processFinalizedBlocksWorkersCount = 1
+	// MUST be 1 to ensure sequential processing
+	finalizedBlockProcessorWorkerCount = 1
 
 	// searchAhead is a number of blocks that should be processed ahead by jobqueue
+	// MUST be 1 to ensure sequential processing
 	searchAhead = 1
 )
 
@@ -88,7 +89,7 @@ func NewFinalizedBlockProcessor(
 		reader,
 		finalizedBlock.Height,
 		processor.processFinalizedBlockJobCallback,
-		processFinalizedBlocksWorkersCount,
+		finalizedBlockProcessorWorkerCount,
 		searchAhead,
 	)
 	if err != nil {
@@ -99,7 +100,7 @@ func NewFinalizedBlockProcessor(
 }
 
 // Notify notifies the processor that a new finalized block is available for processing.
-func (p *FinalizedBlockProcessor) Notify(_ *model.Block) {
+func (p *FinalizedBlockProcessor) Notify() {
 	p.consumerNotifier.Notify()
 }
 
@@ -129,7 +130,10 @@ func (p *FinalizedBlockProcessor) processFinalizedBlockJobCallback(
 
 	err = p.indexFinalizedBlock(block)
 	if err != nil {
-		p.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
+		p.log.Error().Err(err).
+			Str("job_id", string(job.ID())).
+			Msg("unexpected error during finalized block processing job")
+		irrecoverable.Throw(ctx, err)
 		return
 	}
 

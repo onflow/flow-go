@@ -87,7 +87,7 @@ func (c *ExecutionReceiptConsumer) StartWorkerLoop(ctx irrecoverable.SignalerCon
 }
 
 // processAvailableExecutionReceipts processes available execution receipts in the queue and handles it.
-// It continues processing until the context is canceled.
+// // It continues processing until all enqueued receipts are handled or the context is canceled.
 //
 // No errors are expected during normal operations.
 func (c *ExecutionReceiptConsumer) processAvailableExecutionReceipts(ctx context.Context) error {

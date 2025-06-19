@@ -91,7 +91,7 @@ func (s *Suite) TearDownTest() {
 }
 
 func (s *Suite) SetupTest() {
-	s.log = zerolog.New(os.Stderr)
+	s.log = unittest.Logger()
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
 
@@ -183,6 +183,19 @@ func (s *Suite) SetupTest() {
 		blockTransactions,
 	)
 	require.NoError(s.T(), err)
+}
+
+func (s *Suite) TestComponentShutdown() {
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
+	eng, _ := s.initEngineAndSyncer(irrecoverableCtx)
+
+	// start then shut down the engine
+	unittest.AssertClosesBefore(s.T(), eng.Ready(), 10*time.Millisecond)
+	s.cancel()
+	unittest.AssertClosesBefore(s.T(), eng.Done(), 10*time.Millisecond)
+
+	err := eng.Process(channels.ReceiveReceipts, unittest.IdentifierFixture(), &flow.ExecutionReceipt{})
+	s.Assert().ErrorIs(err, component.ErrComponentShutdown)
 }
 
 // initEngineAndSyncer create new instance of ingestion engine and collection collectionSyncer.
@@ -277,10 +290,10 @@ func (s *Suite) generateBlock(clusterCommittee flow.IdentitySkeletonList, snap *
 
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
 func (s *Suite) TestOnFinalizedBlockSingle() {
-	cluster := new(protocol.Cluster)
-	epoch := new(protocol.CommittedEpoch)
-	epochs := new(protocol.EpochQuery)
-	snap := new(protocol.Snapshot)
+	cluster := protocol.NewCluster(s.T())
+	epoch := protocol.NewCommittedEpoch(s.T())
+	epochs := protocol.NewEpochQuery(s.T())
+	snap := protocol.NewSnapshot(s.T())
 
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs.On("Current").Return(epoch, nil)
@@ -333,10 +346,10 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 
 // TestOnFinalizedBlockSeveralBlocksAhead checks OnFinalizedBlock with a block several blocks newer than the last block processed
 func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
-	cluster := new(protocol.Cluster)
-	epoch := new(protocol.CommittedEpoch)
-	epochs := new(protocol.EpochQuery)
-	snap := new(protocol.Snapshot)
+	cluster := protocol.NewCluster(s.T())
+	epoch := protocol.NewCommittedEpoch(s.T())
+	epochs := protocol.NewEpochQuery(s.T())
+	snap := protocol.NewSnapshot(s.T())
 
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs.On("Current").Return(epoch, nil)
@@ -597,13 +610,13 @@ func (s *Suite) TestRequestMissingCollections() {
 	// force should be called once
 	s.request.On("Force").Return()
 
-	cluster := new(protocol.Cluster)
+	cluster := protocol.NewCluster(s.T())
 	cluster.On("Members").Return(clusterCommittee, nil)
-	epoch := new(protocol.CommittedEpoch)
+	epoch := protocol.NewCommittedEpoch(s.T())
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
-	epochs := new(protocol.EpochQuery)
+	epochs := protocol.NewEpochQuery(s.T())
 	epochs.On("Current").Return(epoch, nil)
-	snap := new(protocol.Snapshot)
+	snap := protocol.NewSnapshot(s.T())
 	snap.On("Epochs").Return(epochs)
 	s.proto.state.On("AtBlockID", refBlockID).Return(snap)
 
@@ -696,13 +709,13 @@ func (s *Suite) TestProcessBackgroundCalls() {
 
 	finalizedHeight := s.finalizedBlock.Height
 
-	cluster := new(protocol.Cluster)
+	cluster := protocol.NewCluster(s.T())
 	cluster.On("Members").Return(clusterCommittee, nil)
-	epoch := new(protocol.CommittedEpoch)
+	epoch := protocol.NewCommittedEpoch(s.T())
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
-	epochs := new(protocol.EpochQuery)
+	epochs := protocol.NewEpochQuery(s.T())
 	epochs.On("Current").Return(epoch, nil)
-	snap := new(protocol.Snapshot)
+	snap := protocol.NewSnapshot(s.T())
 	snap.On("Epochs").Return(epochs)
 	s.proto.state.On("AtBlockID", refBlockID).Return(snap)
 
@@ -831,17 +844,4 @@ func (s *Suite) TestProcessBackgroundCalls() {
 		s.Require().Equal(finalizedHeight, s.lastFullBlockHeight.Value())
 		s.blocks.AssertExpectations(s.T())
 	})
-}
-
-func (s *Suite) TestComponentShutdown() {
-	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
-	eng, _ := s.initEngineAndSyncer(irrecoverableCtx)
-
-	// start then shut down the engine
-	unittest.AssertClosesBefore(s.T(), eng.Ready(), 10*time.Millisecond)
-	s.cancel()
-	unittest.AssertClosesBefore(s.T(), eng.Done(), 10*time.Millisecond)
-
-	err := eng.Process(channels.ReceiveReceipts, unittest.IdentifierFixture(), &flow.ExecutionReceipt{})
-	s.Assert().ErrorIs(err, component.ErrComponentShutdown)
 }
