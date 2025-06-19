@@ -235,7 +235,7 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 		}
 		// test all cases
 		for _, c := range cases {
-			t.Run(fmt.Sprintf("auth scheme (payloadExtensionData): %v", c.payloadExtensionData), func(t *testing.T) {
+			t.Run(fmt.Sprintf("auth scheme, payloadExtensionData: %v", c.payloadExtensionData), func(t *testing.T) {
 				transactionBody.PayloadSignatures[0].ExtensionData = c.payloadExtensionData
 				transactionMessage := transactionBody.EnvelopeMessage()
 
