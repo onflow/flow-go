@@ -85,8 +85,6 @@ func (p *PersisterSuite) SetupTest() {
 		p.executionResult,
 		p.header,
 	)
-
-	p.populateInMemoryStorages()
 }
 
 func (p *PersisterSuite) populateInMemoryStorages() {
@@ -94,10 +92,11 @@ func (p *PersisterSuite) populateInMemoryStorages() {
 	for i := 0; i < 3; i++ {
 		regEntries[i] = unittest.RegisterEntryFixture()
 	}
-	p.Require().NoError(p.inMemoryRegisters.Store(regEntries, p.header.Height))
+	err := p.inMemoryRegisters.Store(regEntries, p.header.Height)
+	p.Require().NoError(err)
 
 	eventsList := unittest.EventsFixture(5)
-	err := p.inMemoryEvents.Store(p.executionResult.BlockID, []flow.EventsList{eventsList})
+	err = p.inMemoryEvents.Store(p.executionResult.BlockID, []flow.EventsList{eventsList})
 	p.Require().NoError(err)
 
 	for i := 0; i < 2; i++ {
@@ -130,7 +129,31 @@ func (p *PersisterSuite) populateInMemoryStorages() {
 	p.Require().NoError(err)
 }
 
-func (p *PersisterSuite) TestPersister_AddToBatch_WithData() {
+func (p *PersisterSuite) TestPersister_PersistWithEmptyData() {
+	t := p.T()
+
+	// This is needed as registers must be stored for every height, even if it's an empty set.
+	storedRegisters := make([]flow.RegisterEntry, 0)
+	p.registers.On("Store", mock.Anything, p.header.Height).Run(func(args mock.Arguments) {
+		sr, ok := args.Get(0).(flow.RegisterEntries)
+		p.Require().True(ok)
+		storedRegisters = sr
+	}).Return(nil).Once()
+
+	err := p.persister.Persist()
+	p.Require().NoError(err)
+
+	p.Assert().Empty(storedRegisters)
+	p.events.AssertNotCalled(t, "BatchStore")
+	p.results.AssertNotCalled(t, "BatchStore")
+	p.collections.AssertNotCalled(t, "BatchStoreLightAndIndexByTransaction")
+	p.transactions.AssertNotCalled(t, "BatchStore")
+	p.txResultErrMsg.AssertNotCalled(t, "BatchStore")
+}
+
+func (p *PersisterSuite) TestPersister_PersistWithData() {
+	p.populateInMemoryStorages()
+
 	storedRegisters := make([]flow.RegisterEntry, 0)
 	storedEvents := make([]flow.EventsList, 0)
 	storedCollections := make([]flow.LightCollection, 0)
@@ -175,29 +198,18 @@ func (p *PersisterSuite) TestPersister_AddToBatch_WithData() {
 	}).Return(nil)
 
 	err := p.persister.Persist()
-	p.Assert().NoError(err)
+	p.Require().NoError(err)
 
 	// Verify all mocks were called as expected
-	p.events.AssertExpectations(p.T())
 	p.Assert().ElementsMatch([]flow.EventsList{p.inMemoryEvents.Data()}, storedEvents)
-
-	p.results.AssertExpectations(p.T())
 	p.Assert().ElementsMatch(p.inMemoryResults.Data(), storedResults)
-
-	p.registers.AssertExpectations(p.T())
 	p.Assert().ElementsMatch(p.inMemoryRegisters.Data(), storedRegisters)
-
-	p.collections.AssertExpectations(p.T())
 	p.Assert().ElementsMatch(p.inMemoryCollections.LightCollections(), storedCollections)
-
-	p.transactions.AssertExpectations(p.T())
 	p.Assert().ElementsMatch(p.inMemoryTransactions.Data(), storedTransactions)
-
-	p.txResultErrMsg.AssertExpectations(p.T())
 	p.Assert().ElementsMatch(p.inMemoryTxResultErrMsg.Data(), storedTxResultErrMsgs)
 }
 
-func (p *PersisterSuite) TestPersister_Persist_ErrorHandling() {
+func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 	tests := []struct {
 		name          string
 		setupMocks    func()
@@ -265,13 +277,15 @@ func (p *PersisterSuite) TestPersister_Persist_ErrorHandling() {
 		},
 	}
 
+	p.populateInMemoryStorages()
+
 	for _, test := range tests {
 		p.Run(test.name, func() {
 			test.setupMocks()
 
 			err := p.persister.Persist()
+			p.Require().Error(err)
 
-			p.Assert().Error(err)
 			p.Assert().Contains(err.Error(), test.expectedError)
 		})
 	}
