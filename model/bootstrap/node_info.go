@@ -226,6 +226,16 @@ type NodePrivateKeys struct {
 // A NodeInfo instance can contain EITHER public keys OR private keys, not both.
 // This can be ensured by using only using the provided constructors and NOT
 // manually constructing an instance.
+//
+// Deprecated: There is a concern about the current usage pattern of `NodeInfo“.
+// There are no build-time enforcements of using `NodeInfo` for either the private or public usage. The struct
+// can mistakenly be used for both cases. Other than introducing a confusing design, developers can accidentally
+// confuse the private usage as a public one, for instance by writing the private info (including the private
+// keys) into a file that is publicly shared.
+// There is an ongoing attempt to replace `NodeInfo` by the explicit structures `NodeInfoPriv` and `NodeInfoPub`
+// in https://github.com/onflow/flow-go/pull/7476.
+// It is recommended to not use `NodeInfo` in new code development in order to limit the structure usage, and to
+// use `NodeInfoPriv` and `NodeInfoPub` instead.
 type NodeInfo struct {
 
 	// NodeID is the unique identifier of the node in the network

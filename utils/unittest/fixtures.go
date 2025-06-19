@@ -1720,37 +1720,49 @@ func WithChunkID(chunkID flow.Identifier) func(*verification.ChunkDataPackReques
 // Use options to customize the request.
 func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest)) *verification.
 	ChunkDataPackRequest {
-
 	req := &verification.ChunkDataPackRequest{
 		Locator: chunks.Locator{
 			ResultID: IdentifierFixture(),
 			Index:    0,
 		},
-		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
-			ChunkID:   IdentifierFixture(),
-			Height:    0,
-			Agrees:    IdentifierListFixture(1),
-			Disagrees: IdentifierListFixture(1),
-		},
+		ChunkDataPackRequestInfo: *ChunkDataPackRequestInfoFixture(),
 	}
 
 	for _, opt := range opts {
 		opt(req)
 	}
 
+	// Ensure Targets reflects current Agrees and Disagrees
+	req.Targets = makeTargets(req.Agrees, req.Disagrees)
+
+	return req
+}
+
+func ChunkDataPackRequestInfoFixture() *verification.ChunkDataPackRequestInfo {
+	agrees := IdentifierListFixture(1)
+	disagrees := IdentifierListFixture(1)
+
+	return &verification.ChunkDataPackRequestInfo{
+		ChunkID:   IdentifierFixture(),
+		Height:    0,
+		Agrees:    agrees,
+		Disagrees: disagrees,
+		Targets:   makeTargets(agrees, disagrees),
+	}
+}
+
+// makeTargets returns a combined IdentityList for the given agrees and disagrees.
+func makeTargets(agrees, disagrees flow.IdentifierList) flow.IdentityList {
 	// creates identity fixtures for target ids as union of agrees and disagrees
 	// TODO: remove this inner fixture once we have filter for identifier list.
 	targets := flow.IdentityList{}
-	for _, id := range req.Agrees {
-		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
+	for _, id := range append(agrees, disagrees...) {
+		targets = append(targets, IdentityFixture(
+			WithNodeID(id),
+			WithRole(flow.RoleExecution),
+		))
 	}
-	for _, id := range req.Disagrees {
-		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
-	}
-
-	req.Targets = targets
-
-	return req
+	return targets
 }
 
 func WithChunkDataPackCollection(collection *flow.Collection) func(*flow.ChunkDataPack) {
@@ -2181,11 +2193,10 @@ func EpochRecoverFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochRecove
 		WithClusterQCsFromAssignments(setup.Assignments),
 	)
 
-	ev := &flow.EpochRecover{
+	return &flow.EpochRecover{
 		EpochSetup:  *setup,
 		EpochCommit: *commit,
 	}
-	return ev
 }
 
 func IndexFixture() *flow.Index {
@@ -2313,7 +2324,10 @@ func BootstrapFixtureWithChainID(
 	if err != nil {
 		panic(err)
 	}
-	rootEpochState := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
+	rootEpochState, err := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
+	if err != nil {
+		panic(err)
+	}
 	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, rootEpochState.ID())
 	if err != nil {
 		panic(err)
@@ -2918,6 +2932,8 @@ func WithValidDKG() func(*flow.RichEpochStateEntry) {
 			commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, KeyFixture(crypto.BLSBLS12381).PublicKey())
 			commit.DKGIndexMap[nodeID] = index
 		}
+		// update CommitID according to new CurrentEpochCommit object
+		entry.MinEpochStateEntry.CurrentEpoch.CommitID = entry.CurrentEpochCommit.ID()
 	}
 }
 
