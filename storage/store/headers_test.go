@@ -23,16 +23,21 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 
 		block := unittest.BlockFixture()
 
+		manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		// store block which will also store header
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(rw, &block)
+			return blocks.BatchStore(lctx, rw, &block)
 		})
+		lctx.Release()
 		require.NoError(t, err)
 
+		lctx2 := manager.NewContext()
+		require.NoError(t, lctx2.AcquireLock(storage.LockFinalizeBlock))
 		// index the header
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexBlockHeight(rw, block.Header.Height, block.ID())
+			return operation.IndexBlockHeight(lctx2, rw, block.Header.Height, block.ID())
 		})
+		lctx2.Release()
 		require.NoError(t, err)
 
 		// retrieve header by height
