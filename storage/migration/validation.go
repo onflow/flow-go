@@ -228,15 +228,15 @@ func validateAllKeys(badgerDB *badger.DB, pebbleDB *pebble.DB) error {
 	)
 
 	for _, prefix := range prefixes {
-		prefix := prefix // capture range variable
+		curPrefix := prefix // capture range variable
 
 		eg.Go(func() error {
 			defer lg(1)
 			start := time.Now()
 
 			// Channels for key-value pairs from Badger and Pebble
-			kvChanBadger := make(chan KVPairs, 10)
-			kvChanPebble := make(chan KVPairs, 10)
+			kvChanBadger := make(chan KVPairs, 1)
+			kvChanPebble := make(chan KVPairs, 1)
 
 			// Progress logger (no-op for now)
 			// Start Badger reader worker
@@ -244,7 +244,7 @@ func validateAllKeys(badgerDB *badger.DB, pebbleDB *pebble.DB) error {
 
 			// By wrapping a single prefix in a channel, badger worker and pebble worker can work on the same prefix.
 			go func() {
-				err := readerWorker(ctx, lg, badgerDB, singlePrefixChan(prefix), kvChanBadger, batchSize)
+				err := readerWorker(ctx, lg, badgerDB, singlePrefixChan(curPrefix), kvChanBadger, batchSize)
 				close(kvChanBadger)
 				badgerErrCh <- err
 			}()
@@ -255,7 +255,7 @@ func validateAllKeys(badgerDB *badger.DB, pebbleDB *pebble.DB) error {
 			// Start Pebble reader worker
 			pebbleErrCh := make(chan error, 1)
 			go func() {
-				err := pebbleReaderWorker(ctx, noopLogging, pebbleDB, singlePrefixChan(prefix), kvChanPebble, batchSize)
+				err := pebbleReaderWorker(ctx, noopLogging, pebbleDB, singlePrefixChan(curPrefix), kvChanPebble, batchSize)
 				close(kvChanPebble)
 				pebbleErrCh <- err
 			}()
@@ -268,16 +268,16 @@ func validateAllKeys(badgerDB *badger.DB, pebbleDB *pebble.DB) error {
 			pebbleErr := <-pebbleErrCh
 
 			if badgerErr != nil {
-				return fmt.Errorf("badger reader error for prefix %x: %w", prefix, badgerErr)
+				return fmt.Errorf("badger reader error for prefix %x: %w", curPrefix, badgerErr)
 			}
 			if pebbleErr != nil {
-				return fmt.Errorf("pebble reader error for prefix %x: %w", prefix, pebbleErr)
+				return fmt.Errorf("pebble reader error for prefix %x: %w", curPrefix, pebbleErr)
 			}
 			if err != nil {
-				return fmt.Errorf("comparison error for prefix %x: %w", prefix, err)
+				return fmt.Errorf("comparison error for prefix %x: %w", curPrefix, err)
 			}
 
-			log.Info().Str("prefix", fmt.Sprintf("%x", prefix)).
+			log.Info().Str("prefix", fmt.Sprintf("%x", curPrefix)).
 				Msgf("successfully validated prefix in %s", time.Since(start))
 			return nil
 		})
