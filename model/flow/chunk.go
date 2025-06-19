@@ -194,10 +194,6 @@ func NewChunk(untrusted UntrustedChunk) (*Chunk, error) {
 		return nil, fmt.Errorf("EventCollection must not be empty")
 	}
 
-	if untrusted.NumberOfTransactions == 0 {
-		return nil, fmt.Errorf("NumberOfTransactions must not be zero")
-	}
-
 	if untrusted.EndState == (StateCommitment{}) {
 		return nil, fmt.Errorf("EndState must not be zero-value")
 	}
