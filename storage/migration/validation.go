@@ -9,8 +9,10 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -228,22 +230,27 @@ func validateAllKeys(badgerDB *badger.DB, pebbleDB *pebble.DB) error {
 			kvChanPebble := make(chan KVPairs, 10)
 
 			// Progress logger (no-op for now)
-			lgProgress := func(int) {}
+			lg := util.LogProgress(
+				log.Logger,
+				util.DefaultLogProgressConfig("verifying progress", len(prefixes)),
+			)
 
 			// Start Badger reader worker
 			badgerErrCh := make(chan error, 1)
 
 			// By wrapping a single prefix in a channel, badger worker and pebble worker can work on the same prefix.
 			go func() {
-				err := readerWorker(ctx, lgProgress, badgerDB, singlePrefixChan(prefix), kvChanBadger, batchSize)
+				err := readerWorker(ctx, lg, badgerDB, singlePrefixChan(prefix), kvChanBadger, batchSize)
 				close(kvChanBadger)
 				badgerErrCh <- err
 			}()
 
+			// logging badger progress is enough
+			noopLogging := func(int) {}
 			// Start Pebble reader worker
 			pebbleErrCh := make(chan error, 1)
 			go func() {
-				err := pebbleReaderWorker(ctx, lgProgress, pebbleDB, singlePrefixChan(prefix), kvChanPebble, batchSize)
+				err := pebbleReaderWorker(ctx, noopLogging, pebbleDB, singlePrefixChan(prefix), kvChanPebble, batchSize)
 				close(kvChanPebble)
 				pebbleErrCh <- err
 			}()

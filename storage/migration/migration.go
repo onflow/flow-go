@@ -14,6 +14,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/module/util"
+	"github.com/onflow/flow-go/storage"
 )
 
 type MigrationConfig struct {
@@ -168,10 +169,17 @@ func pebbleReaderWorker(
 			return ctx.Err()
 		}
 
-		iter, err := db.NewIter(&pebble.IterOptions{
-			LowerBound: prefix,
-			UpperBound: append(prefix, 0xff),
-		})
+		lowerBound, upperBound, hasUpperBound := storage.StartEndPrefixToLowerUpperBound(prefix, prefix)
+		options := pebble.IterOptions{
+			LowerBound: lowerBound,
+			UpperBound: upperBound,
+		}
+
+		if !hasUpperBound {
+			options.UpperBound = nil
+		}
+
+		iter, err := db.NewIter(&options)
 		if err != nil {
 			return fmt.Errorf("failed to create iterator: %w", err)
 		}
