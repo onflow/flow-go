@@ -30,8 +30,16 @@ import (
 // It assumes the latest sealed block has been executed, and the chunk data packs have not been
 // pruned.
 // Note, it returns nil if certain block is not executed, in this case warning will be logged
-func VerifyLastKHeight(k uint64, chainID flow.ChainID, protocolDataDir string, chunkDataPackDir string, nWorker uint, stopOnMismatch bool) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir)
+func VerifyLastKHeight(
+	k uint64,
+	chainID flow.ChainID,
+	protocolDataDir string,
+	chunkDataPackDir string,
+	nWorker uint,
+	stopOnMismatch bool,
+	transactionFeesDisabled bool,
+) (err error) {
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -83,8 +91,9 @@ func VerifyRange(
 	protocolDataDir string, chunkDataPackDir string,
 	nWorker uint,
 	stopOnMismatch bool,
+	transactionFeesDisabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -207,7 +216,12 @@ func verifyConcurrently(
 	return nil
 }
 
-func initStorages(chainID flow.ChainID, dataDir string, chunkDataPackDir string) (
+func initStorages(
+	chainID flow.ChainID,
+	dataDir string,
+	chunkDataPackDir string,
+	transactionFeesDisabled bool,
+) (
 	func() error,
 	*storage.All,
 	storage.ChunkDataPacks,
@@ -232,7 +246,7 @@ func initStorages(chainID flow.ChainID, dataDir string, chunkDataPackDir string)
 	chunkDataPacks := store.NewChunkDataPacks(metrics.NewNoopCollector(),
 		pebbleimpl.ToDB(chunkDataPackDB), storages.Collections, 1000)
 
-	verifier := makeVerifier(log.Logger, chainID, storages.Headers)
+	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled)
 	closer := func() error {
 		var dbErr, chunkDataPackDBErr error
 
@@ -304,15 +318,14 @@ func makeVerifier(
 	logger zerolog.Logger,
 	chainID flow.ChainID,
 	headers storage.Headers,
+	transactionFeesDisabled bool,
 ) module.ChunkVerifier {
 
 	vm := fvm.NewVirtualMachine()
 	fvmOptions := initialize.InitFvmOptions(
 		chainID,
 		headers,
-		// transactionFeesDisabled are just an option for testing cadence compiler, so we don't need to have it
-		// set to true here, because we don't expect to use the CLI execution verification tooling for that scenario.
-		false,
+		transactionFeesDisabled,
 	)
 	fvmOptions = append(
 		[]fvm.Option{fvm.WithLogger(logger)},
