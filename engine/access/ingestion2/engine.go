@@ -1,18 +1,11 @@
-// Package ingestion2 implements a modular ingestion engine that orchestrates
-// various workers responsible for processing different types of finalized
-// blockchain data.
+// Package ingestion2 implements a modular ingestion engine responsible for
+// orchestrating the processing of finalized blockchain data and receiving
+// execution receipts from the network.
 //
-// The Engine acts as an orchestrator and coordinator for multiple internal workers,
-// each of which handles a specific responsibility:
-//
-//   - ExecutionReceiptProcessor: processes incoming execution receipts
-//   - FinalizedBlockProcessor: handles finalized block events
-//   - CollectionSyncer: manages the synchronization of missing collections
-//   - ErrorMessageRequester: periodically requests missing transaction result error receiptNotifier
-//
-// The engine initializes and manages these workers using a component manager pattern.
-// Each worker is started via the `Start*` function and runs independently, while
-// the engine notifies them when relevant data is ready to be processed.
+// The Engine coordinates several internal workers, each dedicated to a specific task:
+//   - Receiving and persisting execution receipts from the network.
+//   - Subscribing to finalized block events.
+//   - Synchronizing collections associated with finalized blocks.
 package ingestion2
 
 import (
