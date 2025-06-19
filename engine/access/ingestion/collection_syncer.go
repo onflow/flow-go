@@ -166,19 +166,19 @@ func (s *CollectionSyncer) requestMissingCollections() error {
 //
 // No errors are expected during normal operations.
 func (s *CollectionSyncer) requestMissingCollectionsBlocking(ctx context.Context) error {
-	collections, _, err := s.findMissingCollections(s.lastFullBlockHeight.Value())
+	missingCollections, _, err := s.findMissingCollections(s.lastFullBlockHeight.Value())
 	if err != nil {
 		return err
 	}
-	if len(collections) == 0 {
+	if len(missingCollections) == 0 {
 		s.logger.Info().Msg("skipping requesting missing collections. no missing collections found")
 		return nil
 	}
 
-	s.requestCollections(collections, true)
+	s.requestCollections(missingCollections, true)
 
 	collectionsToBeDownloaded := make(map[flow.Identifier]struct{})
-	for _, collection := range collections {
+	for _, collection := range missingCollections {
 		collectionsToBeDownloaded[collection.CollectionID] = struct{}{}
 	}
 
@@ -224,7 +224,7 @@ func (s *CollectionSyncer) findMissingCollections(lastFullBlockHeight uint64) ([
 
 	lastFinalizedBlock, err := s.state.Final().Head()
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("failed to get finalized block: %w", err)
 	}
 	// last block to look up collections at
 	lastBlockHeight := lastFinalizedBlock.Height
@@ -306,8 +306,8 @@ func (s *CollectionSyncer) RequestCollectionsForBlock(height uint64, missingColl
 
 // requestCollections registers collection download requests in the requester engine,
 // optionally forcing immediate dispatch.
-func (s *CollectionSyncer) requestCollections(missingCollections []*flow.CollectionGuarantee, immediately bool) {
-	for _, collection := range missingCollections {
+func (s *CollectionSyncer) requestCollections(collections []*flow.CollectionGuarantee, immediately bool) {
+	for _, collection := range collections {
 		guarantors, err := protocol.FindGuarantors(s.state, collection)
 		if err != nil {
 			// failed to find guarantors for guarantees contained in a finalized block is fatal error
