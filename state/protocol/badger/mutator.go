@@ -196,7 +196,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 		// TODO: we might not need the deferred db updates, because the candidate passed into
 		// the Extend method has already been fully constructed.
 		// evolve protocol state and verify consistency with commitment included in
-		dbUpdates, err := m.evolveProtocolState(ctx, candidate, rw)
+		dbUpdates, err := m.evolveProtocolState(ctx, candidate)
 		if err != nil {
 			return fmt.Errorf("evolving protocol state failed: %w", err)
 		}
@@ -287,7 +287,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 		}
 
 		// evolve protocol state and verify consistency with commitment included in payload
-		dbUpdatesFromEvolveProtocolState, err := m.evolveProtocolState(ctx, candidate, rw)
+		dbUpdatesFromEvolveProtocolState, err := m.evolveProtocolState(ctx, candidate)
 		if err != nil {
 			return fmt.Errorf("evolving protocol state failed: %w", err)
 		}
@@ -660,7 +660,7 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (latestSeal *flow.Seal
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the Protocol State commitment in the candidate block does
 //     not match the Protocol State we constructed locally
-func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow.Block, rw storage.ReaderBatchWriter) ([]storage.BlockIndexingBatchWrite, error) {
+func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow.Block) ([]storage.BlockIndexingBatchWrite, error) {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorEvolveProtocolState)
 	defer span.End()
 

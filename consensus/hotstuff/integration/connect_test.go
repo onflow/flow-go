@@ -64,19 +64,12 @@ func Connect(t *testing.T, instances []*Instance) {
 				}
 			},
 		)
-		sender.notifier.On("OnOwnVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(
+		sender.notifier.On("OnOwnVote", mock.Anything, mock.Anything).Run(
 			func(args mock.Arguments) {
-				blockID, ok := args[0].(flow.Identifier)
+				vote, ok := args[0].(*model.Vote)
 				require.True(t, ok)
-				view, ok := args[1].(uint64)
+				recipientID, ok := args[1].(flow.Identifier)
 				require.True(t, ok)
-				sigData, ok := args[2].([]byte)
-				require.True(t, ok)
-				recipientID, ok := args[3].(flow.Identifier)
-				require.True(t, ok)
-				// convert into vote
-				vote := model.VoteFromFlow(sender.localID, blockID, view, sigData)
-
 				// get the receiver
 				receiver, exists := lookup[recipientID]
 				if !exists {

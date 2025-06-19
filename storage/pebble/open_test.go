@@ -77,12 +77,12 @@ func TestNewBootstrappedRegistersWithPath(t *testing.T) {
 	})
 }
 
-func TestMustOpenDefaultPebbleDB(t *testing.T) {
+func TestShouldOpenDefaultPebbleDB(t *testing.T) {
 	t.Parallel()
 	unittest.RunWithTempDir(t, func(dir string) {
 		logger := unittest.Logger()
 		// verify error is returned when the db is not bootstrapped
-		_, err := MustOpenDefaultPebbleDB(logger, dir)
+		_, err := ShouldOpenDefaultPebbleDB(logger, dir)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "not initialized")
 
@@ -94,7 +94,7 @@ func TestMustOpenDefaultPebbleDB(t *testing.T) {
 		fmt.Println(dir)
 
 		// verify no error is returned when the db is bootstrapped
-		db, err = MustOpenDefaultPebbleDB(logger, dir)
+		db, err = ShouldOpenDefaultPebbleDB(logger, dir)
 		require.NoError(t, err)
 
 		h, err := latestStoredHeight(db)

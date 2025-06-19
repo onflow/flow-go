@@ -3,6 +3,7 @@ package unsynchronized
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -45,7 +46,8 @@ func TestRegisters_HappyPath(t *testing.T) {
 
 	// Try storing at the wrong height
 	err = registers.Store(entries, height+1)
-	require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to store registers: height mismatch:")
 
 	// Try getting a non-existent key
 	_, err = registers.Get(unittest.RegisterIDFixture(), height)
