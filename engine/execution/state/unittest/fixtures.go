@@ -86,13 +86,17 @@ func ComputationResultForBlockFixture(
 		convertedServiceEvents,
 		executionDataID)
 
-	computationResult.ExecutionReceipt = &flow.ExecutionReceipt{
-		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
-			ExecutionResult: *executionResult,
-			Spocks:          make([]crypto.Signature, numberOfChunks),
+	receipt, err := flow.NewExecutionReceipt(
+		flow.UntrustedExecutionReceipt{
+			UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
+				ExecutionResult: *executionResult,
+				Spocks:          make([]crypto.Signature, numberOfChunks),
+			},
+			ExecutorSignature: unittest.SignatureFixture(),
 		},
-		ExecutorSignature: crypto.Signature{},
-	}
+	)
+	require.NoError(t, err)
+	computationResult.ExecutionReceipt = receipt
 
 	return computationResult
 }

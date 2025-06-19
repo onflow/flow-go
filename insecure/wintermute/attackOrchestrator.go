@@ -225,17 +225,27 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 
 	// sends corrupted execution result to all corrupted execution nodes.
 	for _, corruptedExecutionId := range corruptedExecutionIds {
+		// wrapping execution result in an execution receipt for sake of encoding and decoding.
+		executionReceipt, err := flow.NewExecutionReceipt(
+			flow.UntrustedExecutionReceipt{
+				UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{ExecutionResult: *corruptedResult},
+				ExecutorSignature:        receipt.ExecutorSignature,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("could not construct execution receipt: %w", err)
+		}
+
 		// sets executor id of the result as the same corrupted execution node id that
 		// is meant to send this message to the flow network.
-		err := o.network.SendEgress(&insecure.EgressEvent{
+		err = o.network.SendEgress(&insecure.EgressEvent{
 			CorruptOriginId: corruptedExecutionId,
 			Channel:         receiptEvent.Channel,
 			Protocol:        receiptEvent.Protocol,
 			TargetNum:       receiptEvent.TargetNum,
 			TargetIds:       receiptEvent.TargetIds,
 
-			// wrapping execution result in an execution receipt for sake of encoding and decoding.
-			FlowProtocolEvent: &flow.ExecutionReceipt{UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{ExecutionResult: *corruptedResult}},
+			FlowProtocolEvent: executionReceipt,
 		})
 		if err != nil {
 			return fmt.Errorf("could not send rpc on channel: %w", err)

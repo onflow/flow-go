@@ -251,7 +251,7 @@ func makeComputationResult(
 			ExecutionResult: *executionResult,
 			Spocks:          make([]crypto.Signature, numberOfChunks),
 		},
-		ExecutorSignature: crypto.Signature{},
+		ExecutorSignature: unittest.SignatureFixture(),
 	}
 	return computationResult
 }

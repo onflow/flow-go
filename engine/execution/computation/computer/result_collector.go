@@ -456,8 +456,15 @@ func GenerateExecutionReceipt(
 		return nil, fmt.Errorf("could not sign execution result: %w", err)
 	}
 
-	return &flow.ExecutionReceipt{
-		UnsignedExecutionReceipt: body,
-		ExecutorSignature:        sig,
-	}, nil
+	executionReceipt, err := flow.NewExecutionReceipt(
+		flow.UntrustedExecutionReceipt{
+			UnsignedExecutionReceipt: body,
+			ExecutorSignature:        sig,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct execution receipt: %w", err)
+	}
+
+	return executionReceipt, nil
 }

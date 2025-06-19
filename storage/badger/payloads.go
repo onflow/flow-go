@@ -58,7 +58,12 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 					return err
 				}
 			}
-			fullReceipts = append(fullReceipts, flow.ExecutionReceiptFromStub(*meta, *result))
+			executionReceipt, err := flow.ExecutionReceiptFromStub(*meta, *result)
+			if err != nil {
+				return fmt.Errorf("could not create execution receipt from stub: %w", err)
+			}
+
+			fullReceipts = append(fullReceipts, executionReceipt)
 		}
 
 		// make sure all payload guarantees are stored
