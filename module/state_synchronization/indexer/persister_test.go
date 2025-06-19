@@ -1,8 +1,9 @@
 package indexer
 
 import (
-	"github.com/onflow/flow-go/storage"
 	"testing"
+
+	"github.com/onflow/flow-go/storage"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"

@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
 	"github.com/onflow/flow-go/utils/logging"
-	"github.com/rs/zerolog"
 )
 
 // BlockPersister handles transferring data from in-memory storages to permanent storages
