@@ -165,7 +165,12 @@ func (p *BlockPersister) persistRegisters() error {
 // addEventsToBatch adds events from in-memory storage to the batch.
 // No errors are expected during normal operations
 func (p *BlockPersister) addEventsToBatch(batch storage.ReaderBatchWriter) error {
-	if eventsList := p.inMemoryEvents.Data(); len(eventsList) > 0 {
+	eventsList, err := p.inMemoryEvents.ByBlockID(p.executionResult.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not get events: %w", err)
+	}
+
+	if len(eventsList) > 0 {
 		if err := p.events.BatchStore(p.executionResult.BlockID, []flow.EventsList{eventsList}, batch); err != nil {
 			return fmt.Errorf("could not add events to batch: %w", err)
 		}
@@ -177,7 +182,12 @@ func (p *BlockPersister) addEventsToBatch(batch storage.ReaderBatchWriter) error
 // addResultsToBatch adds transaction results from in-memory storage to the batch.
 // No errors are expected during normal operations
 func (p *BlockPersister) addResultsToBatch(batch storage.ReaderBatchWriter) error {
-	if results := p.inMemoryResults.Data(); len(results) > 0 {
+	results, err := p.inMemoryResults.ByBlockID(p.executionResult.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not get results: %w", err)
+	}
+
+	if len(results) > 0 {
 		if err := p.results.BatchStore(p.executionResult.BlockID, results, batch); err != nil {
 			return fmt.Errorf("could not add transaction results to batch: %w", err)
 		}
@@ -213,8 +223,13 @@ func (p *BlockPersister) addTransactionsToBatch(batch storage.ReaderBatchWriter)
 // addTransactionResultErrorMessagesToBatch persists transaction result error messages from in-memory to permanent storage.
 // No errors are expected during normal operations
 func (p *BlockPersister) addTransactionResultErrorMessagesToBatch(batch storage.ReaderBatchWriter) error {
-	if txResultErrMsgs := p.inMemoryTxResultErrMsg.Data(); len(txResultErrMsgs) > 0 {
-		if err := p.txResultErrMsg.BatchStore(p.header.ID(), txResultErrMsgs, batch); err != nil {
+	txResultErrMsgs, err := p.inMemoryTxResultErrMsg.ByBlockID(p.executionResult.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not get transaction result error messages: %w", err)
+	}
+
+	if len(txResultErrMsgs) > 0 {
+		if err := p.txResultErrMsg.BatchStore(p.executionResult.BlockID, txResultErrMsgs, batch); err != nil {
 			return fmt.Errorf("could not add transaction result error messages to batch: %w", err)
 		}
 	}

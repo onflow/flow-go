@@ -43,7 +43,10 @@ func TestPersisterSuite(t *testing.T) {
 func (p *PersisterSuite) SetupTest() {
 	t := p.T()
 
-	p.header = unittest.BlockHeaderFixture()
+	block := unittest.BlockFixture()
+	p.header = block.Header
+	p.executionResult = unittest.ExecutionResultFixture(unittest.WithBlock(&block))
+
 	p.inMemoryRegisters = unsynchronized.NewRegisters(p.header.Height)
 	p.inMemoryEvents = unsynchronized.NewEvents()
 	p.inMemoryCollections = unsynchronized.NewCollections()
@@ -64,9 +67,6 @@ func (p *PersisterSuite) SetupTest() {
 			return fn(storagemock.NewBatch(t))
 		},
 	)
-
-	block := unittest.BlockWithParentFixture(p.header)
-	p.executionResult = unittest.ExecutionResultFixture(unittest.WithBlock(block))
 
 	p.persister = NewPersister(
 		zerolog.Nop(),
@@ -126,14 +126,22 @@ func (p *PersisterSuite) populateInMemoryStorages() {
 			ExecutorID:    executorID,
 		}
 	}
-	err = p.inMemoryTxResultErrMsg.Store(p.header.ID(), txResultErrMsgs)
+	err = p.inMemoryTxResultErrMsg.Store(p.executionResult.BlockID, txResultErrMsgs)
 	p.Require().NoError(err)
 }
 
 func (p *PersisterSuite) TestPersister_PersistWithEmptyData() {
 	t := p.T()
 
-	// This is needed as registers must be stored for every height, even if it's an empty set.
+	err := p.inMemoryEvents.Store(p.executionResult.BlockID, []flow.EventsList{})
+	p.Require().NoError(err)
+
+	err = p.inMemoryResults.Store(p.executionResult.BlockID, []flow.LightTransactionResult{})
+	p.Require().NoError(err)
+
+	err = p.inMemoryTxResultErrMsg.Store(p.executionResult.BlockID, []flow.TransactionResultErrorMessage{})
+	p.Require().NoError(err)
+
 	storedRegisters := make([]flow.RegisterEntry, 0)
 	p.registers.On("Store", mock.Anything, p.header.Height).Run(func(args mock.Arguments) {
 		sr, ok := args.Get(0).(flow.RegisterEntries)
@@ -141,10 +149,13 @@ func (p *PersisterSuite) TestPersister_PersistWithEmptyData() {
 		storedRegisters = sr
 	}).Return(nil).Once()
 
-	err := p.persister.Persist()
+	err = p.persister.Persist()
 	p.Require().NoError(err)
 
+	// Verify registers were stored (even if empty)
 	p.Assert().Empty(storedRegisters)
+
+	// Verify other storages were not called since the data is empty
 	p.events.AssertNotCalled(t, "BatchStore")
 	p.results.AssertNotCalled(t, "BatchStore")
 	p.collections.AssertNotCalled(t, "BatchStoreLightAndIndexByTransaction")
@@ -192,7 +203,7 @@ func (p *PersisterSuite) TestPersister_PersistWithData() {
 		storedResults = sr
 	}).Return(nil)
 
-	p.txResultErrMsg.On("BatchStore", p.header.ID(), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	p.txResultErrMsg.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		terrm, ok := args.Get(1).([]flow.TransactionResultErrorMessage)
 		p.Require().True(ok)
 		storedTxResultErrMsgs = terrm
@@ -208,7 +219,7 @@ func (p *PersisterSuite) TestPersister_PersistWithData() {
 	registers, err := p.inMemoryRegisters.Data(p.header.Height)
 	p.Require().NoError(err)
 	p.Assert().ElementsMatch(registers, storedRegisters)
-	
+
 	p.Assert().ElementsMatch(p.inMemoryCollections.LightCollections(), storedCollections)
 	p.Assert().ElementsMatch(p.inMemoryTransactions.Data(), storedTransactions)
 	p.Assert().ElementsMatch(p.inMemoryTxResultErrMsg.Data(), storedTxResultErrMsgs)
@@ -276,7 +287,7 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 				p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil).Times(numberOfCollections)
 				numberOfTransactions := len(p.inMemoryTransactions.Data())
 				p.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil).Times(numberOfTransactions)
-				p.txResultErrMsg.On("BatchStore", p.header.ID(), mock.Anything, mock.Anything).Return(assert.AnError).Once()
+				p.txResultErrMsg.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(assert.AnError).Once()
 			},
 			expectedError: "could not add transaction result error messages to batch",
 		},
