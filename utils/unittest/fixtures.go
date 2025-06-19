@@ -815,12 +815,22 @@ func WithSpocks(spocks []crypto.Signature) func(*flow.ExecutionReceipt) {
 
 func ExecutionReceiptFixture(opts ...func(*flow.ExecutionReceipt)) *flow.ExecutionReceipt {
 	receipt := &flow.ExecutionReceipt{
-		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
-			ExecutorID:      IdentifierFixture(),
-			ExecutionResult: *ExecutionResultFixture(),
-			Spocks:          nil,
-		},
-		ExecutorSignature: SignatureFixture(),
+		UnsignedExecutionReceipt: *UnsignedExecutionReceiptFixture(),
+		ExecutorSignature:        SignatureFixture(),
+	}
+
+	for _, apply := range opts {
+		apply(receipt)
+	}
+
+	return receipt
+}
+
+func UnsignedExecutionReceiptFixture(opts ...func(*flow.UnsignedExecutionReceipt)) *flow.UnsignedExecutionReceipt {
+	receipt := &flow.UnsignedExecutionReceipt{
+		ExecutorID:      IdentifierFixture(),
+		ExecutionResult: *ExecutionResultFixture(),
+		Spocks:          nil,
 	}
 
 	for _, apply := range opts {

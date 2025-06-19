@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -31,7 +32,6 @@ func TestExecutionReceiptID_Malleability(t *testing.T) {
 // * grouping should preserve order and multiplicity of elements
 // * group for unknown identifier should be empty
 func TestExecutionReceiptGroupBy(t *testing.T) {
-
 	er1 := unittest.ExecutionReceiptFixture()
 	er2 := unittest.ExecutionReceiptFixture()
 	er3 := unittest.ExecutionReceiptFixture()
@@ -64,7 +64,6 @@ func TestExecutionReceiptGroupBy(t *testing.T) {
 // * grouping should preserve order and multiplicity of elements
 // * group for unknown identifier should be empty
 func TestExecutionReceiptStubGroupBy(t *testing.T) {
-
 	er1 := unittest.ExecutionReceiptFixture().Stub()
 	er2 := unittest.ExecutionReceiptFixture().Stub()
 	er3 := unittest.ExecutionReceiptFixture().Stub()
@@ -91,4 +90,46 @@ func TestExecutionReceiptStubGroupBy(t *testing.T) {
 
 	unknown := groups.GetGroup(unittest.IdentifierFixture())
 	assert.Equal(t, 0, unknown.Size())
+}
+
+// TestNewExecutionReceipt verifies the behavior of the NewExecutionReceipt constructor.
+// It ensures proper handling of both valid and invalid untrusted input fields.
+//
+// Test Cases:
+//
+// 1. Valid input:
+//   - Verifies that a properly populated UntrustedExecutionReceipt results in a valid ExecutionReceipt.
+//
+// 2. Invalid input with nil ExecutorSignature:
+//   - Ensures an error is returned when the ExecutorSignature is nil.
+//
+// 3. Invalid input with empty ExecutorSignature:
+//   - Ensures an error is returned when the ExecutorSignature is an empty byte slice.
+func TestNewExecutionReceipt(t *testing.T) {
+	t.Run("valid input", func(t *testing.T) {
+		receipt := unittest.ExecutionReceiptFixture()
+		res, err := flow.NewExecutionReceipt(flow.UntrustedExecutionReceipt(*receipt))
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	})
+
+	t.Run("invalid input with nil ExecutorSignature", func(t *testing.T) {
+		receipt := unittest.ExecutionReceiptFixture()
+		receipt.ExecutorSignature = nil
+
+		res, err := flow.NewExecutionReceipt(flow.UntrustedExecutionReceipt(*receipt))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "executor signature must not be empty")
+	})
+
+	t.Run("invalid input with empty ExecutorSignature", func(t *testing.T) {
+		receipt := unittest.ExecutionReceiptFixture()
+		receipt.ExecutorSignature = []byte{}
+
+		res, err := flow.NewExecutionReceipt(flow.UntrustedExecutionReceipt(*receipt))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "executor signature must not be empty")
+	})
 }
