@@ -178,6 +178,30 @@ type ChunkConstructor func(UntrustedChunk) (*Chunk, error)
 // Construction Chunk allowed only within the constructor
 // NewChunk returns a Chunk compliant with Protocol Version 2 and later.
 func NewChunk(untrusted UntrustedChunk) (*Chunk, error) {
+	if untrusted.BlockID == ZeroID {
+		return nil, fmt.Errorf("BlockID must not be empty")
+	}
+
+	if untrusted.StartState == (StateCommitment{}) {
+		return nil, fmt.Errorf("StartState must not be zero-value")
+	}
+
+	if untrusted.ServiceEventCount == nil {
+		return nil, fmt.Errorf("ServiceEventCount must not be nil for protocol v2")
+	}
+
+	if untrusted.EventCollection == ZeroID {
+		return nil, fmt.Errorf("EventCollection must not be empty")
+	}
+
+	if untrusted.NumberOfTransactions == 0 {
+		return nil, fmt.Errorf("NumberOfTransactions must not be zero")
+	}
+
+	if untrusted.EndState == (StateCommitment{}) {
+		return nil, fmt.Errorf("EndState must not be zero-value")
+	}
+
 	return &Chunk{
 		ChunkBody: ChunkBody{
 			BlockID:              untrusted.BlockID,
