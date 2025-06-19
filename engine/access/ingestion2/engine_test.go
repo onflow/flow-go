@@ -231,19 +231,13 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 	)
 	require.NoError(s.T(), err)
 
-	receiptConsumer, err := NewExecutionReceiptConsumer(
-		s.log,
-		s.collectionExecutedMetric,
-		s.receipts,
-	)
-	require.NoError(s.T(), err)
-
 	eng, err := New(
 		s.log,
 		s.net,
 		blockProcessor,
-		receiptConsumer,
 		syncer,
+		s.receipts,
+		s.collectionExecutedMetric,
 	)
 
 	require.NoError(s.T(), err)
@@ -489,10 +483,10 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 	s.receipts.On("Store", mock.Anything).Return(nil)
 	s.blocks.On("ByID", er2.ExecutionResult.BlockID).Return(nil, storerr.ErrNotFound)
 
-	err := eng.executionReceiptConsumer.persistExecutionReceipt(er1)
+	err := eng.persistExecutionReceipt(er1)
 	require.NoError(s.T(), err)
 
-	err = eng.executionReceiptConsumer.persistExecutionReceipt(er2)
+	err = eng.persistExecutionReceipt(er2)
 	require.NoError(s.T(), err)
 
 	s.receipts.AssertExpectations(s.T())

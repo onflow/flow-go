@@ -5,10 +5,10 @@
 // The Engine acts as an orchestrator and coordinator for multiple internal workers,
 // each of which handles a specific responsibility:
 //
-//   - ExecutionReceiptConsumer: processes incoming execution receipts
+//   - ExecutionReceiptProcessor: processes incoming execution receipts
 //   - FinalizedBlockProcessor: handles finalized block events
 //   - CollectionSyncer: manages the synchronization of missing collections
-//   - ErrorMessageRequester: periodically requests missing transaction result error messages
+//   - ErrorMessageRequester: periodically requests missing transaction result error receiptNotifier
 //
 // The engine initializes and manages these workers using a component manager pattern.
 // Each worker is started via the `Start*` function and runs independently, while
@@ -16,25 +16,37 @@
 package ingestion2
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/storage"
 )
+
+const defaultQueueCapacity = 10_000
 
 type Engine struct {
 	*component.ComponentManager
 
 	log zerolog.Logger
 
-	executionReceiptConsumer *ExecutionReceiptConsumer
-	finalizedBlockProcessor  *FinalizedBlockProcessor
-	collectionSyncer         *CollectionSyncer
+	finalizedBlockProcessor *FinalizedBlockProcessor
+	collectionSyncer        *CollectionSyncer
+
+	messageHandler           *engine.MessageHandler
+	executionReceiptsQueue   *engine.FifoMessageStore
+	receipts                 storage.ExecutionReceipts
+	collectionExecutedMetric module.CollectionExecutedMetric
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -43,26 +55,47 @@ func New(
 	log zerolog.Logger,
 	net network.EngineRegistry,
 	finalizedBlockProcessor *FinalizedBlockProcessor,
-	executionReceiptConsumer *ExecutionReceiptConsumer,
 	collectionSyncer *CollectionSyncer,
+	receipts storage.ExecutionReceipts,
+	collectionExecutedMetric module.CollectionExecutedMetric,
 ) (*Engine, error) {
+	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
+	if err != nil {
+		return nil, fmt.Errorf("could not create execution receipts queue: %w", err)
+	}
+	executionReceiptsQueue := &engine.FifoMessageStore{FifoQueue: executionReceiptsRawQueue}
+	messageHandler := engine.NewMessageHandler(
+		log,
+		engine.NewNotifier(),
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*flow.ExecutionReceipt)
+				return ok
+			},
+			Store: executionReceiptsQueue,
+		},
+	)
+
 	e := &Engine{
 		log:                      log.With().Str("engine", "ingestion2").Logger(),
-		executionReceiptConsumer: executionReceiptConsumer,
 		finalizedBlockProcessor:  finalizedBlockProcessor,
 		collectionSyncer:         collectionSyncer,
+		messageHandler:           messageHandler,
+		executionReceiptsQueue:   executionReceiptsQueue,
+		receipts:                 receipts,
+		collectionExecutedMetric: collectionExecutedMetric,
 	}
 
 	// register our workers which are basically consumers of different kinds of data.
 	// engine notifies workers when new data is available so that they can start processing them.
 	builder := component.NewComponentManagerBuilder().
-		AddWorker(e.executionReceiptConsumer.StartWorkerLoop).
+		AddWorker(e.StartWorkerLoop).
 		AddWorker(e.finalizedBlockProcessor.StartWorkerLoop).
 		AddWorker(e.collectionSyncer.StartWorkerLoop)
 	e.ComponentManager = builder.Build()
 
 	// engine gets execution receipts from channels.ReceiveReceipts channel
-	_, err := net.Register(channels.ReceiveReceipts, e)
+	_, err = net.Register(channels.ReceiveReceipts, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine in network to receive execution receipts: %w", err)
 	}
@@ -83,11 +116,68 @@ func (e *Engine) Process(chanName channels.Channel, originID flow.Identifier, ev
 
 	switch event.(type) {
 	case *flow.ExecutionReceipt:
-		err := e.executionReceiptConsumer.Process(originID, event)
+		err := e.messageHandler.Process(originID, event)
 		return err
 	default:
 		return fmt.Errorf("got invalid event type (%T) from %s channel", event, chanName)
 	}
+}
+
+// StartWorkerLoop reacts to message handler notifications and processes available execution receipts
+// once notification has arrived.
+func (e *Engine) StartWorkerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-e.messageHandler.GetNotifier():
+			err := e.processAvailableExecutionReceipts(ctx)
+			if err != nil {
+				// if an error reaches this point, it is unexpected
+				ctx.Throw(err)
+				return
+			}
+		}
+	}
+}
+
+// processAvailableExecutionReceipts processes available execution receipts in the queue and handles it.
+// It continues processing until all enqueued receipts are handled or the context is canceled.
+//
+// No errors are expected during normal operations.
+func (e *Engine) processAvailableExecutionReceipts(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+		msg, ok := e.executionReceiptsQueue.Get()
+		if !ok {
+			return nil
+		}
+
+		receipt := msg.Payload.(*flow.ExecutionReceipt)
+		if err := e.persistExecutionReceipt(receipt); err != nil {
+			return err
+		}
+	}
+}
+
+// persistExecutionReceipt persists the execution receipt.
+//
+// No errors are expected during normal operations.
+func (e *Engine) persistExecutionReceipt(receipt *flow.ExecutionReceipt) error {
+	// persist the execution receipt locally, storing will also index the receipt
+	err := e.receipts.Store(receipt)
+	if err != nil {
+		return fmt.Errorf("failed to store execution receipt: %w", err)
+	}
+
+	e.collectionExecutedMetric.ExecutionReceiptReceived(receipt)
+	return nil
 }
 
 // OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
