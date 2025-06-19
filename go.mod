@@ -48,12 +48,12 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.4.1
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/onflow/atree v0.10.0
-	github.com/onflow/cadence v1.6.0
+	github.com/onflow/cadence v1.6.2
 	github.com/onflow/crypto v0.25.3
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.6.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.6.1
-	github.com/onflow/flow-go-sdk v1.6.0
+	github.com/onflow/flow-go-sdk v1.6.1
 	github.com/onflow/flow/protobuf/go/flow v0.4.10
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pierrec/lz4 v2.6.1+incompatible
@@ -114,7 +114,7 @@ require (
 	github.com/slok/go-http-metrics v0.12.0
 	github.com/sony/gobreaker v0.5.0
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da
-	google.golang.org/genproto/googleapis/api v0.0.0-20250414145226-207652e42e2e
+	google.golang.org/genproto/googleapis/api v0.0.0-20250505200425-f936aa4a68b2
 	google.golang.org/genproto/googleapis/bytestream v0.0.0-20250428153025-10db94c68c34
 	gopkg.in/yaml.v2 v2.4.0
 )
@@ -124,7 +124,7 @@ require (
 	cloud.google.com/go v0.120.0 // indirect
 	cloud.google.com/go/auth v0.16.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
-	cloud.google.com/go/iam v1.5.0 // indirect
+	cloud.google.com/go/iam v1.5.2 // indirect
 	cloud.google.com/go/monitoring v1.24.0 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.26.0 // indirect
@@ -355,5 +355,3 @@ require (
 
 // Using custom fork until https://github.com/onflow/flow-go/issues/5338 is resolved
 replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483
-
-replace github.com/hashicorp/golang-lru/v2 => github.com/fxamacker/golang-lru/v2 v2.0.0-20250430153159-6f72f038a30f

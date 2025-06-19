@@ -8,18 +8,41 @@ import (
 )
 
 // EpochProtocolStateAdapter implements protocol.EpochProtocolState by wrapping a flow.RichEpochStateEntry.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type EpochProtocolStateAdapter struct {
 	*flow.RichEpochStateEntry
-	params protocol.GlobalParams
+	Params protocol.GlobalParams
 }
 
 var _ protocol.EpochProtocolState = (*EpochProtocolStateAdapter)(nil)
 
-func NewEpochProtocolStateAdapter(entry *flow.RichEpochStateEntry, params protocol.GlobalParams) *EpochProtocolStateAdapter {
-	return &EpochProtocolStateAdapter{
-		RichEpochStateEntry: entry,
-		params:              params,
+// UntrustedEpochProtocolStateAdapter is an untrusted input-only representation of a EpochProtocolStateAdapter,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedEpochProtocolStateAdapter should be validated and converted into
+// a trusted EpochProtocolStateAdapter using NewEpochProtocolStateAdapter constructor.
+type UntrustedEpochProtocolStateAdapter EpochProtocolStateAdapter
+
+// NewEpochProtocolStateAdapter creates a new instance of EpochProtocolStateAdapter.
+// Construction EpochProtocolStateAdapter allowed only within the constructor.
+//
+// All errors indicate a valid EpochProtocolStateAdapter cannot be constructed from the input.
+func NewEpochProtocolStateAdapter(untrusted UntrustedEpochProtocolStateAdapter) (*EpochProtocolStateAdapter, error) {
+	if untrusted.Params == nil {
+		return nil, fmt.Errorf("params must not be nil")
 	}
+	if untrusted.RichEpochStateEntry == nil {
+		return nil, fmt.Errorf("rich epoch state must not be nil")
+	}
+	return &EpochProtocolStateAdapter{
+		RichEpochStateEntry: untrusted.RichEpochStateEntry,
+		Params:              untrusted.Params,
+	}, nil
 }
 
 // Epoch returns the current epoch counter.
@@ -69,7 +92,7 @@ func (s *EpochProtocolStateAdapter) Identities() flow.IdentityList {
 
 // GlobalParams returns spork-scoped global network parameters.
 func (s *EpochProtocolStateAdapter) GlobalParams() protocol.GlobalParams {
-	return s.params
+	return s.Params
 }
 
 // EpochFallbackTriggered denotes whether an invalid epoch state transition was attempted

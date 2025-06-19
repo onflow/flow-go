@@ -191,7 +191,3 @@ func (c *Cache[K, V]) RemoveTx(rw storage.ReaderBatchWriter, key K) error {
 
 	return nil
 }
-
-func (c *Cache[K, V]) RemoveFunc(del func(key K) bool) {
-	_ = c.cache.RemoveFunc(del)
-}

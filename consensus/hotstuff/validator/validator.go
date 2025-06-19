@@ -206,7 +206,11 @@ func (v *Validator) ValidateProposal(proposal *model.SignedProposal) error {
 	block := proposal.Block
 
 	// validate the proposer's vote and get his identity
-	_, err := v.ValidateVote(proposal.ProposerVote())
+	vote, err := proposal.ProposerVote()
+	if err != nil {
+		return fmt.Errorf("could not get vote from proposer vote: %w", err)
+	}
+	_, err = v.ValidateVote(vote)
 	if model.IsInvalidVoteError(err) {
 		return model.NewInvalidProposalErrorf(proposal, "invalid proposer signature: %w", err)
 	}

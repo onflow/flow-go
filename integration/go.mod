@@ -20,12 +20,12 @@ require (
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ds-pebble v0.3.1-0.20240828032824-d745b9d3200b
 	github.com/libp2p/go-libp2p v0.38.2
-	github.com/onflow/cadence v1.6.0
+	github.com/onflow/cadence v1.6.2
 	github.com/onflow/crypto v0.25.3
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.6.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.6.1
 	github.com/onflow/flow-go v0.38.0-preview.0.0.20241021221952-af9cd6e99de1
-	github.com/onflow/flow-go-sdk v1.6.0
+	github.com/onflow/flow-go-sdk v1.6.1
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.4.10
 	github.com/onflow/go-ethereum v1.15.10
@@ -51,7 +51,7 @@ require (
 	cloud.google.com/go/auth v0.16.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
-	cloud.google.com/go/iam v1.5.0 // indirect
+	cloud.google.com/go/iam v1.5.2 // indirect
 	cloud.google.com/go/monitoring v1.24.0 // indirect
 	cloud.google.com/go/storage v1.50.0 // indirect
 	dario.cat/mergo v1.0.0 // indirect
@@ -371,7 +371,7 @@ require (
 	google.golang.org/api v0.232.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250414145226-207652e42e2e // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250505200425-f936aa4a68b2 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250428153025-10db94c68c34 // indirect
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
