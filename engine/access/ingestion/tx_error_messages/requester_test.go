@@ -187,8 +187,20 @@ func (s *RequesterSuite) TestRequest_ErrorCases() {
 		require.Nil(s.T(), actualErrorMessages)
 	})
 
-	s.T().Run("Non-retryable grpc error", func(t *testing.T) {
+	s.T().Run("Non-retryable grpc DeadlineExceeded error", func(t *testing.T) {
 		expectedError := status.Error(codes.DeadlineExceeded, "deadline exceeded")
+		s.execClient.On("GetTransactionErrorMessagesByBlockID", mock.Anything, exeEventReq).
+			Return(nil, expectedError).
+			Once()
+
+		requester := NewRequester(s.log, config, back, execNodeIdentitiesProvider, executionResult)
+		actualErrorMessages, err := requester.Request(context.Background())
+		require.ErrorIs(s.T(), err, expectedError)
+		require.Nil(s.T(), actualErrorMessages)
+	})
+
+	s.T().Run("Non-retryable grpc Canceled error", func(t *testing.T) {
+		expectedError := status.Error(codes.Canceled, "context canceled")
 		s.execClient.On("GetTransactionErrorMessagesByBlockID", mock.Anything, exeEventReq).
 			Return(nil, expectedError).
 			Once()

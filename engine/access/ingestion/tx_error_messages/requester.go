@@ -56,7 +56,9 @@ func NewRequester(
 // Request fetches transaction error messages for the specific
 // execution result this requester was configured with.
 //
-// No errors are expected during normal operations.
+// Expected errors expected during normal operations:
+// - context.DeadlineExceeded - if context timeouts
+// - context.Canceled - if context was canceled
 func (r *Requester) Request(ctx context.Context) ([]flow.TransactionResultErrorMessage, error) {
 	backoff := retry.NewExponential(r.config.RetryDelay)
 	backoff = retry.WithCappedDuration(r.config.MaxRetryDelay, backoff)
@@ -91,9 +93,11 @@ func (r *Requester) Request(ctx context.Context) ([]flow.TransactionResultErrorM
 
 		// retry any grpc error except context canceled and deadline exceeded
 		if status, ok := status.FromError(err); ok {
-			if status.Code() != codes.DeadlineExceeded && status.Code() != codes.Canceled {
-				return retry.RetryableError(err)
+			if status.Code() == codes.DeadlineExceeded || status.Code() == codes.Canceled {
+				return errors.Join(err, ctx.Err())
 			}
+
+			return retry.RetryableError(err)
 		}
 
 		return err
