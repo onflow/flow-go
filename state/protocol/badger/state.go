@@ -254,6 +254,9 @@ func bootstrapProtocolState(
 				Params:              params,
 			},
 		)
+		if err != nil {
+			return fmt.Errorf("could not construct epoch protocol state adapter: %w", err)
+		}
 		err = bootstrapEpochForProtocolStateEntry(rw, epochProtocolStateSnapshots, epochSetups, epochCommits, dynamicEpochProtocolState, verifyNetworkAddress)
 		if err != nil {
 			return fmt.Errorf("could not store epoch service events for state entry (id=%x): %w", stateEntry.EpochEntry.ID(), err)
