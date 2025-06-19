@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"time"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
@@ -221,20 +222,23 @@ func validateAllKeys(badgerDB *badger.DB, pebbleDB *pebble.DB) error {
 
 	eg, ctx := errgroup.WithContext(ctx)
 
+	lg := util.LogProgress(
+		log.Logger,
+		util.DefaultLogProgressConfig("verifying progress", len(prefixes)),
+	)
+
 	for _, prefix := range prefixes {
 		prefix := prefix // capture range variable
 
 		eg.Go(func() error {
+			defer lg(1)
+			start := time.Now()
+
 			// Channels for key-value pairs from Badger and Pebble
 			kvChanBadger := make(chan KVPairs, 10)
 			kvChanPebble := make(chan KVPairs, 10)
 
 			// Progress logger (no-op for now)
-			lg := util.LogProgress(
-				log.Logger,
-				util.DefaultLogProgressConfig("verifying progress", len(prefixes)),
-			)
-
 			// Start Badger reader worker
 			badgerErrCh := make(chan error, 1)
 
@@ -245,7 +249,8 @@ func validateAllKeys(badgerDB *badger.DB, pebbleDB *pebble.DB) error {
 				badgerErrCh <- err
 			}()
 
-			// logging badger progress is enough
+			// each worker only process 1 prefix, so no need to log the progress.
+			// The progress is logged by the main goroutine
 			noopLogging := func(int) {}
 			// Start Pebble reader worker
 			pebbleErrCh := make(chan error, 1)
@@ -271,6 +276,9 @@ func validateAllKeys(badgerDB *badger.DB, pebbleDB *pebble.DB) error {
 			if err != nil {
 				return fmt.Errorf("comparison error for prefix %x: %w", prefix, err)
 			}
+
+			log.Info().Str("prefix", fmt.Sprintf("%x", prefix)).
+				Msgf("successfully validated prefix in %s", time.Since(start))
 			return nil
 		})
 	}
