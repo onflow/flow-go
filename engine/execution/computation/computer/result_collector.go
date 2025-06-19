@@ -402,10 +402,15 @@ func (collector *resultCollector) Finalize(
 		return nil, fmt.Errorf("failed to provide execution data: %w", err)
 	}
 
+	chunks, err := collector.result.AllChunks()
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve chunks data: %w", err)
+	}
+
 	executionResult := flow.NewExecutionResult(
 		collector.parentBlockExecutionResultID,
 		collector.result.ExecutableBlock.BlockID(),
-		collector.result.AllChunks(),
+		chunks,
 		collector.result.AllConvertedServiceEvents(),
 		executionDataID)
 

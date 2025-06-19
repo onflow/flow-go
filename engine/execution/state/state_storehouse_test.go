@@ -234,10 +234,13 @@ func makeComputationResult(
 	executionDataID, err := execution_data.CalculateID(context.Background(), bed, execution_data.DefaultSerializer)
 	require.NoError(t, err)
 
+	chunks, err := computationResult.AllChunks()
+	require.NoError(t, err)
+
 	executionResult := flow.NewExecutionResult(
 		unittest.IdentifierFixture(),
 		completeBlock.BlockID(),
-		computationResult.AllChunks(),
+		chunks,
 		flow.ServiceEventList{},
 		executionDataID)
 

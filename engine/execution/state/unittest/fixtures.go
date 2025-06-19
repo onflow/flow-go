@@ -79,10 +79,13 @@ func ComputationResultForBlockFixture(
 		serviceEventVersionBeaconProtocol.ServiceEvent(),
 	}
 
+	chunks, err := computationResult.AllChunks()
+	require.NoError(t, err)
+
 	executionResult := flow.NewExecutionResult(
 		parentBlockExecutionResultID,
 		completeBlock.BlockID(),
-		computationResult.AllChunks(),
+		chunks,
 		convertedServiceEvents,
 		executionDataID)
 
