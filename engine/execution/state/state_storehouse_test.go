@@ -10,8 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/crypto"
-
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
@@ -249,7 +247,7 @@ func makeComputationResult(
 	computationResult.ExecutionReceipt = &flow.ExecutionReceipt{
 		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
 			ExecutionResult: *executionResult,
-			Spocks:          make([]crypto.Signature, numberOfChunks),
+			Spocks:          unittest.SignaturesFixture(numberOfChunks),
 		},
 		ExecutorSignature: unittest.SignatureFixture(),
 	}

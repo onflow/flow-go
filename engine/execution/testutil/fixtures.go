@@ -616,19 +616,25 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 			MemoryUsed:      22,
 		},
 	)
-	executionReceipt, err := flow.NewExecutionReceipt(
-		flow.UntrustedExecutionReceipt{
-			UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
-				ExecutionResult: flow.ExecutionResult{
-					Chunks: flow.ChunkList{
-						{EndState: unittest.StateCommitmentFixture()},
-						{EndState: unittest.StateCommitmentFixture()},
-						{EndState: unittest.StateCommitmentFixture()},
-						{EndState: unittest.StateCommitmentFixture()},
-					},
+	unsignedExecutionResult, err := flow.NewUnsignedExecutionReceipt(
+		flow.UntrustedUnsignedExecutionReceipt{
+			ExecutorID: unittest.IdentifierFixture(),
+			ExecutionResult: flow.ExecutionResult{
+				Chunks: flow.ChunkList{
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
 				},
 			},
-			ExecutorSignature: unittest.SignatureFixture(),
+			Spocks: unittest.SignaturesFixture(1),
+		},
+	)
+	require.NoError(t, err)
+	executionReceipt, err := flow.NewExecutionReceipt(
+		flow.UntrustedExecutionReceipt{
+			UnsignedExecutionReceipt: *unsignedExecutionResult,
+			ExecutorSignature:        unittest.SignatureFixture(),
 		},
 	)
 	require.NoError(t, err)

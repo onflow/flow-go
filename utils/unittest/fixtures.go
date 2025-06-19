@@ -830,7 +830,7 @@ func UnsignedExecutionReceiptFixture(opts ...func(*flow.UnsignedExecutionReceipt
 	receipt := &flow.UnsignedExecutionReceipt{
 		ExecutorID:      IdentifierFixture(),
 		ExecutionResult: *ExecutionResultFixture(),
-		Spocks:          nil,
+		Spocks:          SignaturesFixture(1),
 	}
 
 	for _, apply := range opts {

@@ -447,6 +447,7 @@ func ExecutionReceiptsFromParentBlockFixture(t *testing.T,
 				UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
 					ExecutorID:      builder.executorIDs[cp],
 					ExecutionResult: *result,
+					Spocks:          unittest.SignaturesFixture(1),
 				},
 				ExecutorSignature: unittest.SignatureFixture(),
 			})

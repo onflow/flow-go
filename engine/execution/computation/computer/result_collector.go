@@ -443,10 +443,15 @@ func GenerateExecutionReceipt(
 	*flow.ExecutionReceipt,
 	error,
 ) {
-	body := flow.UnsignedExecutionReceipt{
-		ExecutionResult: *result,
-		Spocks:          spockSignatures,
-		ExecutorID:      signer.NodeID(),
+	body, err := flow.NewUnsignedExecutionReceipt(
+		flow.UntrustedUnsignedExecutionReceipt{
+			ExecutionResult: *result,
+			Spocks:          spockSignatures,
+			ExecutorID:      signer.NodeID(),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct unsigned execution receipt: %w", err)
 	}
 
 	// generates a signature over the execution receipt's body
@@ -458,7 +463,7 @@ func GenerateExecutionReceipt(
 
 	executionReceipt, err := flow.NewExecutionReceipt(
 		flow.UntrustedExecutionReceipt{
-			UnsignedExecutionReceipt: body,
+			UnsignedExecutionReceipt: *body,
 			ExecutorSignature:        sig,
 		},
 	)
