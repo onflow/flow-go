@@ -177,6 +177,9 @@ type ChunkConstructor func(UntrustedChunk) (*Chunk, error)
 // NewChunk creates a new instance of MissingCollection.
 // Construction Chunk allowed only within the constructor
 // NewChunk returns a Chunk compliant with Protocol Version 2 and later.
+// Construction Chunk allowed only within the constructor.
+//
+// All errors indicate a valid Chunk cannot be constructed from the input.
 func NewChunk(untrusted UntrustedChunk) (*Chunk, error) {
 	if untrusted.BlockID == ZeroID {
 		return nil, fmt.Errorf("BlockID must not be empty")
@@ -303,21 +306,53 @@ type ChunkDataPack struct {
 	ExecutionDataRoot BlockExecutionDataRoot
 }
 
+// UntrustedChunkDataPack is an untrusted input-only representation of an ChunkDataPack,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedChunkDataPack should be validated and converted into
+// a trusted ChunkDataPack using NewChunkDataPack constructor.
+type UntrustedChunkDataPack ChunkDataPack
+
 // NewChunkDataPack returns an initialized chunk data pack.
-func NewChunkDataPack(
-	chunkID Identifier,
-	startState StateCommitment,
-	proof StorageProof,
-	collection *Collection,
-	execDataRoot BlockExecutionDataRoot,
-) *ChunkDataPack {
-	return &ChunkDataPack{
-		ChunkID:           chunkID,
-		StartState:        startState,
-		Proof:             proof,
-		Collection:        collection,
-		ExecutionDataRoot: execDataRoot,
+// Construction ChunkDataPack allowed only within the constructor.
+//
+// All errors indicate a valid ChunkDataPack cannot be constructed from the input.
+func NewChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPack, error) {
+	if untrusted.ChunkID == ZeroID {
+		return nil, fmt.Errorf("ChunkID must not be empty")
 	}
+
+	if untrusted.StartState == (StateCommitment{}) {
+		return nil, fmt.Errorf("StartState must not be zero-value")
+	}
+
+	if len(untrusted.Proof) == 0 {
+		return nil, fmt.Errorf("Proof must not be empty")
+	}
+
+	if untrusted.Collection == nil {
+		return nil, fmt.Errorf("Collection must not be nil")
+	}
+
+	if untrusted.ExecutionDataRoot.BlockID == ZeroID {
+		return nil, fmt.Errorf("ExecutionDataRoot.BlockID must not be empty")
+	}
+
+	if len(untrusted.ExecutionDataRoot.ChunkExecutionDataIDs) == 0 {
+		return nil, fmt.Errorf("ExecutionDataRoot.ChunkExecutionDataIDs must not be empty")
+	}
+
+	return &ChunkDataPack{
+		ChunkID:           untrusted.ChunkID,
+		StartState:        untrusted.StartState,
+		Proof:             untrusted.Proof,
+		Collection:        untrusted.Collection,
+		ExecutionDataRoot: untrusted.ExecutionDataRoot,
+	}, nil
 }
 
 // ID returns a collision-resistant hash of the ChunkDataPack struct.

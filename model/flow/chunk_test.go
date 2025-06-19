@@ -395,6 +395,106 @@ func TestChunkDataPackMalleability(t *testing.T) {
 	)
 }
 
+// TestNewChunkDataPack verifies that NewChunkDataPack constructs a valid ChunkDataPack
+// from complete, non-zero inputs and returns errors when any required field is missing.
+// It covers:
+//   - valid chunk data pack creation
+//   - missing ChunkID
+//   - zero StartState
+//   - empty Proof
+//   - nil Collection
+//   - missing ExecutionDataRoot.BlockID
+//   - empty ExecutionDataRoot.ChunkExecutionDataIDs
+func TestNewChunkDataPack(t *testing.T) {
+	chunkID := unittest.IdentifierFixture()
+	startState := unittest.StateCommitmentFixture()
+	proof := []byte{0x1, 0x2}
+	collection := unittest.CollectionFixture(1)
+	root := flow.BlockExecutionDataRoot{
+		BlockID:               unittest.IdentifierFixture(),
+		ChunkExecutionDataIDs: []cid.Cid{flow.IdToCid(unittest.IdentifierFixture())},
+	}
+
+	baseChunkDataPack := flow.UntrustedChunkDataPack{
+		ChunkID:           chunkID,
+		StartState:        startState,
+		Proof:             proof,
+		Collection:        &collection,
+		ExecutionDataRoot: root,
+	}
+
+	t.Run("valid chunk data pack", func(t *testing.T) {
+		pack, err := flow.NewChunkDataPack(baseChunkDataPack)
+		assert.NoError(t, err)
+		assert.NotNil(t, pack)
+		assert.Equal(t, chunkID, pack.ChunkID)
+		assert.Equal(t, startState, pack.StartState)
+		assert.Equal(t, proof, pack.Proof)
+		assert.Equal(t, &collection, pack.Collection)
+		assert.Equal(t, root, pack.ExecutionDataRoot)
+	})
+
+	t.Run("missing ChunkID", func(t *testing.T) {
+		untrusted := baseChunkDataPack
+		untrusted.ChunkID = flow.ZeroID
+
+		pack, err := flow.NewChunkDataPack(untrusted)
+		assert.Error(t, err)
+		assert.Nil(t, pack)
+		assert.Contains(t, err.Error(), "ChunkID")
+	})
+
+	t.Run("zero StartState", func(t *testing.T) {
+		untrusted := baseChunkDataPack
+		untrusted.StartState = flow.StateCommitment{}
+
+		pack, err := flow.NewChunkDataPack(untrusted)
+		assert.Error(t, err)
+		assert.Nil(t, pack)
+		assert.Contains(t, err.Error(), "StartState")
+	})
+
+	t.Run("empty Proof", func(t *testing.T) {
+		untrusted := baseChunkDataPack
+		untrusted.Proof = nil
+
+		pack, err := flow.NewChunkDataPack(untrusted)
+		assert.Error(t, err)
+		assert.Nil(t, pack)
+		assert.Contains(t, err.Error(), "Proof")
+	})
+
+	t.Run("nil Collection", func(t *testing.T) {
+		untrusted := baseChunkDataPack
+		untrusted.Collection = nil
+
+		pack, err := flow.NewChunkDataPack(untrusted)
+		assert.Error(t, err)
+		assert.Nil(t, pack)
+		assert.Contains(t, err.Error(), "Collection")
+	})
+
+	t.Run("missing ExecutionDataRoot.BlockID", func(t *testing.T) {
+		untrusted := baseChunkDataPack
+		untrusted.ExecutionDataRoot.BlockID = flow.ZeroID
+
+		pack, err := flow.NewChunkDataPack(untrusted)
+		assert.Error(t, err)
+		assert.Nil(t, pack)
+		assert.Contains(t, err.Error(), "ExecutionDataRoot.BlockID")
+	})
+
+	t.Run("empty ExecutionDataRoot.ChunkExecutionDataIDs", func(t *testing.T) {
+		untrusted := baseChunkDataPack
+		untrusted.ExecutionDataRoot.ChunkExecutionDataIDs = nil
+
+		pack, err := flow.NewChunkDataPack(untrusted)
+		assert.Error(t, err)
+		assert.Nil(t, pack)
+		assert.Contains(t, err.Error(), "ExecutionDataRoot.ChunkExecutionDataIDs")
+	})
+}
+
 // TestNewChunk verifies that NewChunk constructs a valid Chunk when given
 // complete, nonzero fields, and returns an error if any required field is
 // missing or zero. It covers:
@@ -500,7 +600,7 @@ func TestNewChunk(t *testing.T) {
 //   - zero EndState
 func TestNewChunk_ProtocolVersion1(t *testing.T) {
 	validID := unittest.IdentifierFixture()
-	validState := flow.StateCommitment{1}
+	validState := unittest.StateCommitmentFixture()
 
 	base := flow.UntrustedChunk{
 		ChunkBody: flow.ChunkBody{

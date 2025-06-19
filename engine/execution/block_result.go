@@ -272,13 +272,18 @@ func (ar *BlockAttestationResult) ChunkDataPackAt(index int) (*flow.ChunkDataPac
 		return nil, fmt.Errorf("could not build chunk: %w", err)
 	}
 
-	return flow.NewChunkDataPack(
-		chunk.ID(), // TODO(ramtin): optimize this
-		attestRes.startStateCommit,
-		attestRes.stateProof,
-		collection,
-		*ar.ExecutionDataRoot,
-	), nil
+	chunkDataPack, err := flow.NewChunkDataPack(flow.UntrustedChunkDataPack{
+		ChunkID:           chunk.ID(), // TODO(ramtin): optimize this
+		StartState:        attestRes.startStateCommit,
+		Proof:             attestRes.stateProof,
+		Collection:        collection,
+		ExecutionDataRoot: *ar.ExecutionDataRoot,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build chunk data pack: %w", err)
+	}
+
+	return chunkDataPack, nil
 }
 
 func (ar *BlockAttestationResult) AllEventCommitments() []flow.Identifier {
