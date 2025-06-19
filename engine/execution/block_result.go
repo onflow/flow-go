@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -214,16 +215,27 @@ func (ar *BlockAttestationResult) ChunkAt(index int) *flow.Chunk {
 	}
 
 	// TODO(mainnet27, #6773): replace with flow.NewChunk https://github.com/onflow/flow-go/issues/6773
-	return ar.versionAwareChunkConstructor(
-		ar.Block.ID(),
-		index,
-		attestRes.startStateCommit,
-		len(execRes.TransactionResults()),
-		attestRes.eventCommit,
-		ar.ServiceEventCountForChunk(index),
-		attestRes.endStateCommit,
-		execRes.executionSnapshot.TotalComputationUsed(),
-	)
+	serviceEventCountPtr := convert.MessageToServiceEventCountField(uint32(ar.ServiceEventCountForChunk(index)))
+
+	chunk, err := ar.versionAwareChunkConstructor(flow.UntrustedChunk{
+		ChunkBody: flow.ChunkBody{
+			BlockID:              ar.Block.ID(),
+			CollectionIndex:      uint(index),
+			StartState:           attestRes.startStateCommit,
+			EventCollection:      attestRes.eventCommit,
+			ServiceEventCount:    serviceEventCountPtr,
+			TotalComputationUsed: execRes.executionSnapshot.TotalComputationUsed(),
+			NumberOfTransactions: uint64(len(execRes.TransactionResults())),
+		},
+		Index:    uint64(index),
+		EndState: attestRes.endStateCommit,
+	})
+	if err != nil {
+		// handle error
+		panic(err)
+	}
+
+	return chunk
 }
 
 func (ar *BlockAttestationResult) AllChunkDataPacks() []*flow.ChunkDataPack {

@@ -127,6 +127,7 @@ func (ch ChunkBody) EncodeRLP(w io.Writer) error {
 	return nil
 }
 
+//structwrite:immutable - mutations allowed only within the constructor
 type Chunk struct {
 	ChunkBody
 
@@ -135,9 +136,20 @@ type Chunk struct {
 	EndState StateCommitment
 }
 
+// UntrustedChunk is an untrusted input-only representation of an Chunk,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedChunk should be validated and converted into
+// a trusted Chunk using NewChunk constructor.
+type UntrustedChunk Chunk
+
 // We TEMPORARILY implement the [rlp.Encoder] interface to implement backwards-compatible ID computation.
 // TODO(mainnet27, #6773): remove EncodeRLP methods on Chunk and ChunkBody https://github.com/onflow/flow-go/issues/6773
-var _ rlp.Encoder = &Chunk{}
+var _ rlp.Encoder = (*Chunk)(nil)
 
 // EncodeRLP defines custom encoding logic for the Chunk type.
 // This method exists only so that the embedded ChunkBody's EncodeRLP method is
@@ -160,39 +172,54 @@ func (ch *Chunk) EncodeRLP(w io.Writer) error {
 // to the old or the new protocol version model (without or with field [Chunk.ServiceEventCount] respectively),
 // depending on the block's view that this chunk belongs to.
 // TODO(mainnet27, #6773): remove this type https://github.com/onflow/flow-go/issues/6773
-type ChunkConstructor func(
-	blockID Identifier,
-	collectionIndex int,
-	startState StateCommitment,
-	numberOfTransactions int,
-	eventCollection Identifier,
-	serviceEventCount uint16,
-	endState StateCommitment,
-	totalComputationUsed uint64) *Chunk
+type ChunkConstructor func(UntrustedChunk) (*Chunk, error)
 
+//type ChunkConstructor func(
+//	blockID Identifier,
+//	collectionIndex int,
+//	startState StateCommitment,
+//	numberOfTransactions int,
+//	eventCollection Identifier,
+//	serviceEventCount uint16,
+//	endState StateCommitment,
+//	totalComputationUsed uint64) *Chunk
+
+// NewChunk creates a new instance of MissingCollection.
+// Construction Chunk allowed only within the constructor
 // NewChunk returns a Chunk compliant with Protocol Version 2 and later.
-func NewChunk(
-	blockID Identifier,
-	collectionIndex int,
-	startState StateCommitment,
-	numberOfTransactions int,
-	eventCollection Identifier,
-	serviceEventCount uint16,
-	endState StateCommitment,
-	totalComputationUsed uint64,
-) *Chunk {
+func NewChunk(untrusted UntrustedChunk) (*Chunk, error) {
 	return &Chunk{
 		ChunkBody: ChunkBody{
-			BlockID:              blockID,
-			CollectionIndex:      uint(collectionIndex),
-			StartState:           startState,
-			NumberOfTransactions: uint64(numberOfTransactions),
-			EventCollection:      eventCollection,
-			ServiceEventCount:    &serviceEventCount,
-			TotalComputationUsed: totalComputationUsed,
+			BlockID:              untrusted.BlockID,
+			CollectionIndex:      untrusted.CollectionIndex,
+			StartState:           untrusted.StartState,
+			NumberOfTransactions: untrusted.NumberOfTransactions,
+			EventCollection:      untrusted.EventCollection,
+			ServiceEventCount:    untrusted.ServiceEventCount,
+			TotalComputationUsed: untrusted.TotalComputationUsed,
 		},
-		Index:    uint64(collectionIndex),
-		EndState: endState,
+		Index:    untrusted.Index,
+		EndState: untrusted.EndState,
+	}, nil
+}
+
+// NewCommitChunk creates a cnunk who's final state is the commit
+func NewCommitChunk(
+	commit StateCommitment,
+) *Chunk {
+	zeroCount := uint16(0)
+	return &Chunk{
+		ChunkBody: ChunkBody{
+			BlockID:              Identifier{},
+			CollectionIndex:      0,
+			StartState:           StateCommitment{},
+			EventCollection:      Identifier{},
+			ServiceEventCount:    &zeroCount,
+			TotalComputationUsed: 0,
+			NumberOfTransactions: 0,
+		},
+		Index:    0,
+		EndState: commit,
 	}
 }
 
@@ -200,29 +227,20 @@ func NewChunk(
 // omitting the value of the field [Chunk.ServiceEventCount] respectively).
 // TODO(mainnet27, #6773): remove this function https://github.com/onflow/flow-go/issues/6773
 // Deprecated: for backward compatibility only until upgrade to Protocol Version 2.
-func NewChunk_ProtocolVersion1(
-	blockID Identifier,
-	collectionIndex int,
-	startState StateCommitment,
-	numberOfTransactions int,
-	eventCollection Identifier,
-	serviceEventCount uint16, // ignored
-	endState StateCommitment,
-	totalComputationUsed uint64,
-) *Chunk {
+func NewChunk_ProtocolVersion1(untrusted UntrustedChunk) (*Chunk, error) {
 	return &Chunk{
 		ChunkBody: ChunkBody{
-			BlockID:              blockID,
-			CollectionIndex:      uint(collectionIndex),
-			StartState:           startState,
-			NumberOfTransactions: uint64(numberOfTransactions),
-			EventCollection:      eventCollection,
+			BlockID:              untrusted.BlockID,
+			CollectionIndex:      untrusted.CollectionIndex,
+			StartState:           untrusted.StartState,
+			NumberOfTransactions: untrusted.NumberOfTransactions,
+			EventCollection:      untrusted.EventCollection,
 			ServiceEventCount:    nil,
-			TotalComputationUsed: totalComputationUsed,
+			TotalComputationUsed: untrusted.TotalComputationUsed,
 		},
-		Index:    uint64(collectionIndex),
-		EndState: endState,
-	}
+		Index:    untrusted.Index,
+		EndState: untrusted.EndState,
+	}, nil
 }
 
 // ID returns the unique identifier of the Chunk

@@ -60,57 +60,75 @@ func TestChunkList_Indices(t *testing.T) {
 }
 
 func TestChunkIndexIsSet(t *testing.T) {
-
 	i, err := rand.Uint()
 	require.NoError(t, err)
-	chunk := flow.NewChunk(
-		unittest.IdentifierFixture(),
-		int(i),
-		unittest.StateCommitmentFixture(),
-		21,
-		unittest.IdentifierFixture(),
-		0,
-		unittest.StateCommitmentFixture(),
-		17995,
-	)
 
+	var serviceCount uint16 = 0
+
+	chunk, err := flow.NewChunk(flow.UntrustedChunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex:      i,
+			StartState:           unittest.StateCommitmentFixture(),
+			EventCollection:      unittest.IdentifierFixture(),
+			ServiceEventCount:    &serviceCount,
+			BlockID:              unittest.IdentifierFixture(),
+			TotalComputationUsed: 17995,
+			NumberOfTransactions: uint64(21),
+		},
+		Index:    uint64(i),
+		EndState: unittest.StateCommitmentFixture(),
+	})
+
+	require.NoError(t, err)
 	assert.Equal(t, i, uint(chunk.Index))
 	assert.Equal(t, i, uint(chunk.CollectionIndex))
 }
 
 func TestChunkNumberOfTxsIsSet(t *testing.T) {
-
 	i, err := rand.Uint32()
 	require.NoError(t, err)
-	chunk := flow.NewChunk(
-		unittest.IdentifierFixture(),
-		3,
-		unittest.StateCommitmentFixture(),
-		int(i),
-		unittest.IdentifierFixture(),
-		0,
-		unittest.StateCommitmentFixture(),
-		17995,
-	)
 
+	var serviceCount uint16 = 0
+
+	chunk, err := flow.NewChunk(flow.UntrustedChunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex:      3,
+			StartState:           unittest.StateCommitmentFixture(),
+			EventCollection:      unittest.IdentifierFixture(),
+			ServiceEventCount:    &serviceCount,
+			BlockID:              unittest.IdentifierFixture(),
+			TotalComputationUsed: 17995,
+			NumberOfTransactions: uint64(i),
+		},
+		Index:    3,
+		EndState: unittest.StateCommitmentFixture(),
+	})
+
+	require.NoError(t, err)
 	assert.Equal(t, i, uint32(chunk.NumberOfTransactions))
 }
 
 func TestChunkTotalComputationUsedIsSet(t *testing.T) {
-
 	i, err := rand.Uint64()
 	require.NoError(t, err)
-	chunk := flow.NewChunk(
-		unittest.IdentifierFixture(),
-		3,
-		unittest.StateCommitmentFixture(),
-		21,
-		unittest.IdentifierFixture(),
-		0,
-		unittest.StateCommitmentFixture(),
-		i,
-	)
 
+	var serviceCount uint16 = 0
+
+	chunk, err := flow.NewChunk(flow.UntrustedChunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex:      3,
+			StartState:           unittest.StateCommitmentFixture(),
+			EventCollection:      unittest.IdentifierFixture(),
+			ServiceEventCount:    &serviceCount,
+			BlockID:              unittest.IdentifierFixture(),
+			TotalComputationUsed: i,
+			NumberOfTransactions: uint64(21),
+		},
+		Index:    3,
+		EndState: unittest.StateCommitmentFixture(),
+	})
+
+	require.NoError(t, err)
 	assert.Equal(t, i, chunk.TotalComputationUsed)
 }
 
