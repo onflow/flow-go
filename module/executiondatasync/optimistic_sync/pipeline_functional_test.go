@@ -116,6 +116,7 @@ func (p *PipelineFunctionalSuite) TearDownTest() {
 // 2. All data types are correctly persisted to storage
 // 3. State transitions occur in the expected order
 func (p *PipelineFunctionalSuite) TestPipelineHappyCase() {
+	// TODO: Data creation could be moved to separate function
 	expectedChunkExecutionData := unittest.ChunkExecutionDataFixture(
 		p.T(),
 		0,
@@ -136,18 +137,14 @@ func (p *PipelineFunctionalSuite) TestPipelineHappyCase() {
 	expectedTxResultErrMsgs := unittest.TransactionResultErrorMessagesFixture(5)
 	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(expectedTxResultErrMsgs, nil).Once()
 
-	// Create channels for state updates
 	updateChan := make(chan State, 10)
 
-	// Create publisher function
 	publisher := func(state State) {
 		updateChan <- state
 	}
 
-	// Create a pipeline
 	pipeline := NewPipeline(p.logger, false, p.executionResult, p.core, publisher)
 
-	// Start the pipeline in a goroutine
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -178,10 +175,10 @@ mainLoop:
 		}
 	}
 
-	// Verify all data was actually persisted to storage
 	p.verifyDataPersistence(expectedChunkExecutionData, expectedTxResultErrMsgs)
 }
 
+// TODO: tests to finish up
 // 2. Various error conditions are handled
 // 3. Cancelation during various stages
 // 4. Graceful shutdowns
@@ -254,6 +251,8 @@ func (p *PipelineFunctionalSuite) verifyTxResultErrorMessagesPersisted(expectedT
 
 	p.Assert().ElementsMatch(expectedTxResultErrMsgs, storedErrMsgs)
 }
+
+// TODO: All create methods are copied from in_memory_indexer test, and should be moved to common place for access
 
 func createTestTrieUpdate(t *testing.T) *ledger.TrieUpdate {
 	return createTestTrieWithPayloads(
