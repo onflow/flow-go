@@ -238,6 +238,22 @@ func NewCommitChunk(
 // TODO(mainnet27, #6773): remove this function https://github.com/onflow/flow-go/issues/6773
 // Deprecated: for backward compatibility only until upgrade to Protocol Version 2.
 func NewChunk_ProtocolVersion1(untrusted UntrustedChunk) (*Chunk, error) {
+	if untrusted.BlockID == ZeroID {
+		return nil, fmt.Errorf("BlockID must not be empty")
+	}
+
+	if untrusted.StartState == (StateCommitment{}) {
+		return nil, fmt.Errorf("StartState must not be zero-value")
+	}
+
+	if untrusted.EventCollection == ZeroID {
+		return nil, fmt.Errorf("EventCollection must not be empty")
+	}
+
+	if untrusted.EndState == (StateCommitment{}) {
+		return nil, fmt.Errorf("EndState must not be zero-value")
+	}
+
 	return &Chunk{
 		ChunkBody: ChunkBody{
 			BlockID:              untrusted.BlockID,
