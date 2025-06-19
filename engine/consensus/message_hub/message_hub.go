@@ -478,13 +478,18 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 
 		h.forwardToOwnVoteAggregator(vote)
 	case *messages.TimeoutObject:
-		t := &model.TimeoutObject{
-			View:        msg.View,
-			NewestQC:    msg.NewestQC,
-			LastViewTC:  msg.LastViewTC,
-			SignerID:    originID,
-			SigData:     msg.SigData,
-			TimeoutTick: msg.TimeoutTick,
+		t, err := model.NewTimeoutObject(
+			model.UntrustedTimeoutObject{
+				View:        msg.View,
+				NewestQC:    msg.NewestQC,
+				LastViewTC:  msg.LastViewTC,
+				SignerID:    originID,
+				SigData:     msg.SigData,
+				TimeoutTick: msg.TimeoutTick,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("could not construct timeout object: %w", err)
 		}
 		h.forwardToOwnTimeoutAggregator(t)
 	default:
