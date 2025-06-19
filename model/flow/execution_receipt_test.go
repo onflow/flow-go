@@ -3,6 +3,7 @@ package flow_test
 import (
 	"testing"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -131,5 +132,61 @@ func TestNewExecutionReceipt(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, res)
 		assert.Contains(t, err.Error(), "executor signature must not be empty")
+	})
+}
+
+// TestNewUnsignedExecutionReceipt verifies the behavior of the NewUnsignedExecutionReceipt constructor.
+// It ensures proper handling of both valid and invalid untrusted input fields.
+//
+// Test Cases:
+//
+// 1. Valid input:
+//   - Verifies that a properly populated UntrustedUnsignedExecutionReceipt results in a valid UnsignedExecutionReceipt.
+//
+// 2. Invalid input with zero ExecutorID:
+//   - Ensures an error is returned when the ExecutorID is flow.ZeroID.
+//
+// 3. Invalid input with nil Spocks:
+//   - Ensures an error is returned when the Spocks field is nil.
+//
+// 4. Invalid input with empty Spocks:
+//   - Ensures an error is returned when the Spocks field is an empty slice.
+func TestNewUnsignedExecutionReceipt(t *testing.T) {
+	t.Run("valid input", func(t *testing.T) {
+		receipt := unittest.UnsignedExecutionReceiptFixture()
+		res, err := flow.NewUnsignedExecutionReceipt(flow.UntrustedUnsignedExecutionReceipt(*receipt))
+
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	})
+
+	t.Run("invalid input with zero ExecutorID", func(t *testing.T) {
+		receipt := unittest.UnsignedExecutionReceiptFixture()
+		receipt.ExecutorID = flow.ZeroID
+
+		res, err := flow.NewUnsignedExecutionReceipt(flow.UntrustedUnsignedExecutionReceipt(*receipt))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "executor ID must not be zero")
+	})
+
+	t.Run("invalid input with nil Spocks", func(t *testing.T) {
+		receipt := unittest.UnsignedExecutionReceiptFixture()
+		receipt.Spocks = nil
+
+		res, err := flow.NewUnsignedExecutionReceipt(flow.UntrustedUnsignedExecutionReceipt(*receipt))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "spocks must not be empty")
+	})
+
+	t.Run("invalid input with empty Spocks", func(t *testing.T) {
+		receipt := unittest.UnsignedExecutionReceiptFixture()
+		receipt.Spocks = []crypto.Signature{}
+
+		res, err := flow.NewUnsignedExecutionReceipt(flow.UntrustedUnsignedExecutionReceipt(*receipt))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "spocks must not be empty")
 	})
 }
