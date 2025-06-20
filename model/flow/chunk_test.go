@@ -397,7 +397,7 @@ func TestChunkDataPackMalleability(t *testing.T) {
 
 // TestNewChunkDataPack verifies that NewChunkDataPack constructs a valid ChunkDataPack
 // from complete, non-zero inputs and returns errors when any required field is missing.
-// It covers:
+// This test covers the test cases:
 //   - valid chunk data pack creation
 //   - missing ChunkID
 //   - zero StartState
@@ -487,7 +487,8 @@ func TestNewChunkDataPack(t *testing.T) {
 
 // TestNewChunk verifies that NewChunk constructs a valid Chunk when given
 // complete, nonzero fields, and returns an error if any required field is
-// missing or zero. It covers:
+// missing or zero.
+// It covers:
 //   - valid chunk creation
 //   - missing BlockID
 //   - zero StartState
@@ -582,7 +583,7 @@ func TestNewChunk(t *testing.T) {
 // TestNewChunk_ProtocolVersion1 verifies that NewChunk_ProtocolVersion1 constructs a
 // valid Chunk for protocol version 1 when given complete, non-zero fields, and
 // returns an error if any required field is missing.
-// It covers:
+// This test covers the test cases:
 //   - valid chunk creation (ServiceEventCount must be nil)
 //   - missing BlockID
 //   - zero StartState

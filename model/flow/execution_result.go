@@ -3,6 +3,7 @@ package flow
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 var ErrNoChunks = errors.New("execution result has no chunks")
@@ -17,20 +18,45 @@ type ExecutionResult struct {
 	ExecutionDataID  Identifier // hash commitment to flow.BlockExecutionDataRoot
 }
 
-func NewExecutionResult(
-	previousResultID Identifier,
-	blockID Identifier,
-	chunks ChunkList,
-	serviceEvents ServiceEventList,
-	executionDataID Identifier,
-) *ExecutionResult {
-	return &ExecutionResult{
-		PreviousResultID: previousResultID,
-		BlockID:          blockID,
-		Chunks:           chunks,
-		ServiceEvents:    serviceEvents,
-		ExecutionDataID:  executionDataID,
+// UntrustedExecutionResult is an untrusted input-only representation of an ExecutionResult,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedExecutionResult should be validated and converted into
+// a trusted ExecutionResult using NewExecutionResult constructor.
+type UntrustedExecutionResult ExecutionResult
+
+// NewExecutionResult creates a new instance of ExecutionResult.
+// Construction ExecutionResult allowed only within the constructor.
+//
+// All errors indicate a valid ExecutionResult cannot be constructed from the input.
+func NewExecutionResult(untrusted UntrustedExecutionResult) (*ExecutionResult, error) {
+	if untrusted.PreviousResultID == ZeroID {
+		return nil, fmt.Errorf("PreviousResultID must not be empty")
 	}
+
+	if untrusted.BlockID == ZeroID {
+		return nil, fmt.Errorf("BlockID must not be empty")
+	}
+
+	if untrusted.Chunks == nil {
+		return nil, fmt.Errorf("Chunks must not be empty")
+	}
+
+	if untrusted.ExecutionDataID == ZeroID {
+		return nil, fmt.Errorf("ExecutionDataID must not be empty")
+	}
+
+	return &ExecutionResult{
+		PreviousResultID: untrusted.PreviousResultID,
+		BlockID:          untrusted.BlockID,
+		Chunks:           untrusted.Chunks,
+		ServiceEvents:    untrusted.ServiceEvents,
+		ExecutionDataID:  untrusted.ExecutionDataID,
+	}, nil
 }
 
 // ID returns the hash of the execution result body

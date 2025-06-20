@@ -190,3 +190,103 @@ func TestExecutionResult_ServiceEventsByChunk(t *testing.T) {
 		}
 	})
 }
+
+// TestNewExecutionResult verifies that NewExecutionResult constructs a valid
+// ExecutionResult when given all required fields, and returns an error if any
+// required field is missing.
+// This test covers the test cases:
+//   - valid result with non-nil Chunks and ServiceEvents
+//   - valid result with nil ServiceEvents
+//   - missing PreviousResultID
+//   - missing BlockID
+//   - nil Chunks
+//   - missing ExecutionDataID
+func TestNewExecutionResult(t *testing.T) {
+	validPrevID := unittest.IdentifierFixture()
+	validBlockID := unittest.IdentifierFixture()
+	validExecDataID := unittest.IdentifierFixture()
+
+	t.Run("valid result with non-nil slices", func(t *testing.T) {
+		u := flow.UntrustedExecutionResult{
+			PreviousResultID: validPrevID,
+			BlockID:          validBlockID,
+			Chunks:           flow.ChunkList{},
+			ServiceEvents:    flow.ServiceEventList{},
+			ExecutionDataID:  validExecDataID,
+		}
+		res, err := flow.NewExecutionResult(u)
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, validPrevID, res.PreviousResultID)
+		assert.Equal(t, validBlockID, res.BlockID)
+		assert.Equal(t, flow.ChunkList{}, res.Chunks)
+		assert.Equal(t, flow.ServiceEventList{}, res.ServiceEvents)
+		assert.Equal(t, validExecDataID, res.ExecutionDataID)
+	})
+
+	t.Run("valid result with nil ServiceEvents", func(t *testing.T) {
+		u := flow.UntrustedExecutionResult{
+			PreviousResultID: validPrevID,
+			BlockID:          validBlockID,
+			Chunks:           flow.ChunkList{},
+			// ServiceEvents left nil
+			ExecutionDataID: validExecDataID,
+		}
+		res, err := flow.NewExecutionResult(u)
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Nil(t, res.ServiceEvents)
+	})
+
+	t.Run("missing PreviousResultID", func(t *testing.T) {
+		u := flow.UntrustedExecutionResult{
+			PreviousResultID: flow.ZeroID,
+			BlockID:          validBlockID,
+			Chunks:           flow.ChunkList{},
+			ExecutionDataID:  validExecDataID,
+		}
+		res, err := flow.NewExecutionResult(u)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assert.Contains(t, err.Error(), "PreviousResultID")
+	})
+
+	t.Run("missing BlockID", func(t *testing.T) {
+		u := flow.UntrustedExecutionResult{
+			PreviousResultID: validPrevID,
+			BlockID:          flow.ZeroID,
+			Chunks:           flow.ChunkList{},
+			ExecutionDataID:  validExecDataID,
+		}
+		res, err := flow.NewExecutionResult(u)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assert.Contains(t, err.Error(), "BlockID")
+	})
+
+	t.Run("nil Chunks", func(t *testing.T) {
+		u := flow.UntrustedExecutionResult{
+			PreviousResultID: validPrevID,
+			BlockID:          validBlockID,
+			Chunks:           nil,
+			ExecutionDataID:  validExecDataID,
+		}
+		res, err := flow.NewExecutionResult(u)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assert.Contains(t, err.Error(), "Chunks")
+	})
+
+	t.Run("missing ExecutionDataID", func(t *testing.T) {
+		u := flow.UntrustedExecutionResult{
+			PreviousResultID: validPrevID,
+			BlockID:          validBlockID,
+			Chunks:           flow.ChunkList{},
+			ExecutionDataID:  flow.ZeroID,
+		}
+		res, err := flow.NewExecutionResult(u)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assert.Contains(t, err.Error(), "ExecutionDataID")
+	})
+}

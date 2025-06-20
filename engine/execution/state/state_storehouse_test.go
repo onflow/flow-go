@@ -237,12 +237,14 @@ func makeComputationResult(
 	chunks, err := computationResult.AllChunks()
 	require.NoError(t, err)
 
-	executionResult := flow.NewExecutionResult(
-		unittest.IdentifierFixture(),
-		completeBlock.BlockID(),
-		chunks,
-		flow.ServiceEventList{},
-		executionDataID)
+	executionResult, err := flow.NewExecutionResult(flow.UntrustedExecutionResult{
+		PreviousResultID: unittest.IdentifierFixture(),
+		BlockID:          completeBlock.BlockID(),
+		Chunks:           chunks,
+		ServiceEvents:    flow.ServiceEventList{},
+		ExecutionDataID:  executionDataID,
+	})
+	require.NoError(t, err)
 
 	computationResult.BlockAttestationResult.BlockExecutionResult.ExecutionDataRoot = &flow.BlockExecutionDataRoot{
 		BlockID:               completeBlock.BlockID(),

@@ -174,8 +174,7 @@ func (ch *Chunk) EncodeRLP(w io.Writer) error {
 // TODO(mainnet27, #6773): remove this type https://github.com/onflow/flow-go/issues/6773
 type ChunkConstructor func(UntrustedChunk) (*Chunk, error)
 
-// NewChunk creates a new instance of MissingCollection.
-// Construction Chunk allowed only within the constructor
+// NewChunk creates a new instance of Chunk.
 // NewChunk returns a Chunk compliant with Protocol Version 2 and later.
 // Construction Chunk allowed only within the constructor.
 //
