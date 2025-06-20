@@ -421,7 +421,10 @@ func (r *ResponseTracker[T]) Add(t *testing.T, blockHeight uint64, name string, 
 }
 
 func eventsResponseHandler(msg *executiondata.SubscribeEventsResponse) (*SubscribeEventsResponse, error) {
-	events := convert.MessagesToEvents(msg.GetEvents())
+	events, err := convert.MessagesToEvents(msg.GetEvents())
+	if err != nil {
+		return nil, err
+	}
 
 	return &SubscribeEventsResponse{
 		EventsResponse: backend.EventsResponse{

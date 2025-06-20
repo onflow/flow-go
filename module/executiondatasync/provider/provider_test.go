@@ -164,8 +164,9 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 				"A.0123456789abcdef.SomeContract.SomeEvent",
 				1,
 				2,
-				flow.MustHexStringToIdentifier("95e0929839063afbe334a3d175bea0775cdf5d93f64299e369d16ce21aa423d3"),
-				0,
+				unittest.Event.WithTransactionID(flow.MustHexStringToIdentifier("95e0929839063afbe334a3d175bea0775cdf5d93f64299e369d16ce21aa423d3")),
+				// do not care about Payload
+				unittest.Event.WithPayload([]byte{}),
 			),
 		},
 		TrieUpdate: &ledger.TrieUpdate{

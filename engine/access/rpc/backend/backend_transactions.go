@@ -731,7 +731,7 @@ func (b *backendTransactions) getHistoricalTransactionResult(
 				result.Status = entities.TransactionStatus_EXPIRED
 			}
 
-			return convert.MessageToTransactionResult(result), nil
+			return convert.MessageToTransactionResult(result)
 		}
 		// Otherwise, if not found, just continue
 		if status.Code(err) == codes.NotFound {

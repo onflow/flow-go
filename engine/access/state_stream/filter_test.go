@@ -87,9 +87,9 @@ func TestFilter(t *testing.T) {
 	assert.NoError(t, err)
 
 	events := flow.EventsList{
-		unittest.EventFixture("A.0000000000000001.Contract1.EventA", 0, 0, unittest.IdentifierFixture(), 0),
-		unittest.EventFixture("A.0000000000000001.Contract2.EventA", 0, 0, unittest.IdentifierFixture(), 0),
-		unittest.EventFixture("flow.AccountCreated", 0, 0, unittest.IdentifierFixture(), 0),
+		unittest.EventFixture("A.0000000000000001.Contract1.EventA", 0, 0),
+		unittest.EventFixture("A.0000000000000001.Contract2.EventA", 0, 0),
+		unittest.EventFixture("flow.AccountCreated", 0, 0),
 	}
 
 	matched := filter.Filter(events)

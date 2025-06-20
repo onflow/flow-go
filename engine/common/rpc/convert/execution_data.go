@@ -136,7 +136,10 @@ func MessageToChunkExecutionData(
 		}
 	}
 
-	events := MessagesToEvents(m.GetEvents())
+	events, err := MessagesToEvents(m.GetEvents())
+	if err != nil {
+		return nil, err
+	}
 	if len(events) == 0 {
 		events = nil
 	}
