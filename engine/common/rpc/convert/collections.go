@@ -53,7 +53,7 @@ func MessageToLightCollection(m *entities.Collection) (*flow.LightCollection, er
 
 	return flow.NewLightCollection(flow.UntrustedLightCollection{
 		Transactions: transactions,
-	})
+	}), nil
 }
 
 func FullCollectionToMessage(c *flow.Collection) ([]*entities.Transaction, error) {
