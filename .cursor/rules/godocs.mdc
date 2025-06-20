@@ -5,7 +5,16 @@ alwaysApply: false
 ---
 # Go Documentation Rule
 
-## General Format
+## General Guidance
+
+- Add godocs comments for all types, variables, constants, functions, and interfaces.
+- Begin with the name of the entity.
+- Use complete sentences.
+- **ALL** methods that return an error **MUST** document expected error conditions!
+- When updating existing code, if godocs exist, keep the existing content and improve formating and expand with additional details to conform with these rules.
+- If any details are unclear, DO NOT make something up. Add the section and leave a TODO to fill in the missing details or ask the user for clarification.
+
+## Method Rules
 ```go
 // MethodName performs a specific action or returns specific information.
 // 
@@ -26,8 +35,6 @@ alwaysApply: false
 //   - Safe for concurrent access
 //   - Not safe for concurrent access
 ```
-
-## Rules
 
 1. **Method Description**
    - First line must be a complete sentence describing what the method does
@@ -60,6 +67,7 @@ alwaysApply: false
 
 4. **Error Returns**
    - List all expected errors (sentinel errors)
+   - DO NOT make up sentinel errors. Only document errors that are returned by the method. If you don't know, add a TODO for the user to complete.
    - Describe when and why each error occurs
    - Always include a catch-all for unexpected errors
    - Example:
@@ -106,19 +114,6 @@ alwaysApply: false
     - Can use more technical language
     - Focus on implementation details
     - Must include error documention for any method that returns an error
-
-## Struct Documentions
-1. **Struct Description**
-    - Start with the struct name
-    - Include a brief explaination of the struct and what it is used for
-
-2. **Struct Variable**:
-    - Include comments for each member variable
-      ```go
-      type User structy{
-        // Name is the user's name
-        Name string
-      }
 
 ## Examples
 
@@ -172,4 +167,101 @@ alwaysApply: false
 //   - All other errors are unexpected and potential indicators of corrupted internal state
 ```
 
+## Interface Documentation
+1. **Interface Description**
+   - Start with the interface name
+   - Describe the purpose and behavior of the interface
+   - Explain any invariants or guarantees the interface provides
+   - Example:
+     ```go
+     // Executor defines the interface for executing transactions.
+     // Implementations must guarantee thread-safety and handle all error cases.
+     type Executor interface {
+         // ... methods ...
+     }
+     ```
+
+2. **Interface Methods**
+   - Document each method in the interface
+   - Focus on the contract/behavior rather than implementation details
+   - Include error documentation for methods that return errors
+   - Example:
+     ```go
+     // Execute processes the given transaction and returns the result.
+     // The method must be idempotent and handle all error cases gracefully.
+     //
+     // Parameters:
+     //   - tx: the transaction to execute
+     //
+     // Returns:
+     //   - *Result: the execution result
+     //   - error: any error that occurred during execution
+     //
+     // Expected Errors:
+     //   - ErrInvalidTransaction: when the transaction is malformed
+     //   - ErrExecutionFailed: when the transaction execution fails
+     Execute(tx *Transaction) (*Result, error)
+     ```
+
+## Constants and Variables
+1. **Constants**
+   - Document the purpose and usage of each constant
+   - Include any constraints or invariants
+   - Example:
+     ```go
+     // MaxBlockSize defines the maximum size of a block in bytes.
+     // This value must be a power of 2 and cannot be changed after initialization.
+     const MaxBlockSize = 1024 * 1024
+     ```
+
+2. **Variables**
+   - Document the purpose and lifecycle of each variable
+   - Include any thread-safety considerations
+   - Example:
+     ```go
+     // defaultConfig holds the default configuration for the system.
+     // This variable is read-only after initialization and safe for concurrent access.
+     var defaultConfig = &Config{
+         // ... fields ...
+     }
+     ```
+
+## Type Documentation
+1. **Type Description**
+   - Start with the type name
+   - Describe the purpose and behavior of the type
+   - Include any invariants or guarantees
+   - Example:
+     ```go
+     // Block represents a block in the Flow blockchain.
+     // Blocks are immutable once created and contain a list of transactions.
+     // All exported methods are safe for concurrent access.
+     type Block struct {
+         // ... fields ...
+     }
+     ```
+
+2. **Type Fields**
+   - Document each field with its purpose and constraints
+   - Include any thread-safety considerations
+   - Example:
+     ```go
+     type Block struct {
+         // Header contains the block's metadata and cryptographic commitments.
+         // This field is immutable after block creation.
+         Header *BlockHeader
+
+         // Payload contains the block's transactions and execution results.
+         // This field is immutable after block creation.
+         Payload *BlockPayload
+
+         // Signature is the cryptographic signature of the block proposer.
+         // This field must be set before the block is considered valid.
+         Signature []byte
+     }
+     ```
+
+3. **Type Methods**
+   - Document each method following the method documentation rules
+   - Include error documentation for methods that return errors
 This rule ensures consistent, comprehensive documentation across all Go methods in the codebase, making it easier for developers to understand and use the code correctly.
