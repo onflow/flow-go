@@ -14,6 +14,7 @@ import (
 	exepruner "github.com/onflow/flow-go/engine/execution/pruner"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/utils/grpcutils"
 
@@ -58,6 +59,7 @@ type ExecutionConfig struct {
 	importCheckpointWorkerCount           int
 	transactionExecutionMetricsEnabled    bool
 	transactionExecutionMetricsBufferSize uint
+	executionDataDBMode                   string
 
 	computationConfig        computation.ComputationConfig
 	receiptRequestWorkers    uint   // common provider engine workers
@@ -129,6 +131,10 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.IntVar(&exeConf.importCheckpointWorkerCount, "import-checkpoint-worker-count", 10, "number of workers to import checkpoint file during bootstrap")
 	flags.BoolVar(&exeConf.transactionExecutionMetricsEnabled, "tx-execution-metrics", true, "enable collection of transaction execution metrics")
 	flags.UintVar(&exeConf.transactionExecutionMetricsBufferSize, "tx-execution-metrics-buffer-size", 200, "buffer size for transaction execution metrics. The buffer size is the number of blocks that are kept in memory by the metrics provider engine")
+	flags.StringVar(&exeConf.executionDataDBMode,
+		"execution-data-db",
+		execution_data.ExecutionDataDBModeBadger.String(),
+		"[experimental] the DB type for execution datastore. One of [badger, pebble]")
 
 	flags.BoolVar(&exeConf.onflowOnlyLNs, "temp-onflow-only-lns", false, "do not use unless required. forces node to only request collections from onflow collection nodes")
 	flags.BoolVar(&exeConf.enableStorehouse, "enable-storehouse", false, "enable storehouse to store registers on disk, default is false")
