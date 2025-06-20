@@ -27,7 +27,7 @@ import (
 // The state machine is designed to be run in a single goroutine, and is not safe for concurrent access.
 // The Run method must only be called once.
 type Pipeline interface {
-	Run(context.Context, Core) error
+	Run(context.Context, Core, State) error
 	GetState() State
 	SetSealed()
 	OnParentStateUpdated(State)
@@ -97,6 +97,7 @@ func NewPipeline(
 // Parameters:
 //   - ctx: the context to use for process lifecycle
 //   - core: the core implementation to use for processing
+//   - parentState: the initial state of the parent pipeline
 //
 // Returns:
 //   - error: any error that occurred during processing, including context cancellation
@@ -107,13 +108,14 @@ func NewPipeline(
 //
 // Concurrency safety:
 //   - Not safe for concurrent access. Run must only be called once.
-func (p *PipelineImpl) Run(parentCtx context.Context, core Core) error {
+func (p *PipelineImpl) Run(parentCtx context.Context, core Core, parentState State) error {
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
 
 	p.mu.Lock()
 	p.core = core
 	p.state = StateReady
+	p.parentState = parentState
 	p.cancel = cancel
 	p.mu.Unlock()
 

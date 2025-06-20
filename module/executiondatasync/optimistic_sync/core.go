@@ -2,6 +2,7 @@ package optimistic_sync
 
 import (
 	"context"
+	"fmt"
 )
 
 // Core defines the interface for pipeline processing steps.
@@ -20,4 +21,28 @@ type Core interface {
 	// Abandon cleans up any resources and stops processing.
 	// This is called when the pipeline is abandoned.
 	Abandon(ctx context.Context) error
+}
+
+var _ Core = (*CoreImpl)(nil)
+
+type CoreImpl struct{}
+
+func NewCore() *CoreImpl {
+	return &CoreImpl{}
+}
+
+func (c *CoreImpl) Download(ctx context.Context) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (c *CoreImpl) Index(ctx context.Context) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (c *CoreImpl) Persist(ctx context.Context) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (c *CoreImpl) Abandon(ctx context.Context) error {
+	return fmt.Errorf("not implemented")
 }
