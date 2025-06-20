@@ -160,7 +160,7 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, header *flow
 //   - All other errors are unexpected and potential indicators of corrupted internal state
 //
 // Concurrency safety:
-//   - Not safe for concurrent access, caller must hold read lock
+//   - Not safe for concurrent access, caller must hold lock
 func (rf *ResultsForest) getOrCreateExecutionResultContainer(result *flow.ExecutionResult, block *flow.Header, pipeline optimistic_sync.Pipeline) (*ExecutionResultContainer, error) {
 	// First try to get existing container
 	container, found := rf.getContainer(result.ID())
