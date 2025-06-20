@@ -19,4 +19,8 @@ type Transactions interface {
 	// Store inserts the transaction, keyed by fingerprint. Duplicate transaction insertion is ignored
 	// No errors are expected during normal operation.
 	Store(tx *flow.TransactionBody) error
+
+	// BatchStore stores transaction within a batch operation.
+	// No errors are expected during normal operation.
+	BatchStore(tx *flow.TransactionBody, batch ReaderBatchWriter) error
 }

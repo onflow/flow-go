@@ -2,6 +2,7 @@ package unsynchronized
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -134,4 +135,10 @@ func (t *TransactionResultErrorMessages) Data() []flow.TransactionResultErrorMes
 		out = append(out, errorMessages...)
 	}
 	return out
+}
+
+// BatchStore inserts a batch of transaction result error messages into a batch
+// This method is not implemented and will always return an error.
+func (t *TransactionResultErrorMessages) BatchStore(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage, batch storage.ReaderBatchWriter) error {
+	return fmt.Errorf("not implemented")
 }

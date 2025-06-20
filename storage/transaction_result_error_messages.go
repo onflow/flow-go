@@ -36,4 +36,9 @@ type TransactionResultErrorMessages interface {
 	//
 	// No errors are expected during normal operation.
 	Store(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error
+
+	// BatchStore inserts a batch of transaction result error messages into a batch
+	//
+	// No errors are expected during normal operation.
+	BatchStore(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage, batch ReaderBatchWriter) error
 }
