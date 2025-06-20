@@ -130,7 +130,7 @@ func TestBlockExecutor_ExecuteBlock_VersionAwareChunk(t *testing.T) {
 
 	me := new(modulemock.Local)
 	me.On("NodeID").Return(executorID)
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -357,7 +357,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	me := new(modulemock.Local)
 	me.On("NodeID").Return(executorID)
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -1558,7 +1558,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	me := new(modulemock.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 

@@ -113,7 +113,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -225,7 +225,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 

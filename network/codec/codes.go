@@ -191,7 +191,7 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 
 	// core messages for execution & verification
 	case CodeExecutionReceipt:
-		return &flow.ExecutionReceipt{}, what(&flow.ExecutionReceipt{}), nil
+		return new(flow.ExecutionReceipt), what(new(flow.ExecutionReceipt)), nil
 	case CodeResultApproval:
 		return &flow.ResultApproval{}, what(&flow.ResultApproval{}), nil
 

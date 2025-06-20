@@ -36,6 +36,7 @@ type SealingSuite struct {
 	exe2SK crypto.PrivateKey
 	verID  flow.Identifier
 	verSK  crypto.PrivateKey
+	spocks []crypto.Signature
 	reader *client.FlowMessageStreamReader
 }
 
@@ -93,6 +94,8 @@ func (ss *SealingSuite) SetupTest() {
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(ss.verID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, verConfig)
 	ss.log.Info().Msgf("verification ID: %v\n", ss.verID)
+
+	ss.spocks = unittest.SignaturesFixture(1)
 
 	nodeConfigs = append(nodeConfigs,
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
@@ -246,9 +249,9 @@ SearchLoop:
 
 	// create the execution receipt for the only execution node
 	receiptBody := flow.UnsignedExecutionReceipt{
-		ExecutorID:      ss.exeID, // our fake execution node
-		ExecutionResult: result,   // result for target block
-		Spocks:          nil,      // ignored
+		ExecutorID:      ss.exeID,  // our fake execution node
+		ExecutionResult: result,    // result for target block
+		Spocks:          ss.spocks, // our fake spocks
 	}
 
 	// create Full Execution Receipt by signing the previously-created receipt's body
@@ -264,7 +267,7 @@ SearchLoop:
 	receiptBody2 := flow.UnsignedExecutionReceipt{
 		ExecutorID:      ss.exe2ID, // our fake execution node
 		ExecutionResult: result,    // result for target block
-		Spocks:          nil,       // ignored
+		Spocks:          ss.spocks, // our fake spocks
 	}
 
 	unsignedReceiptID2 := receiptBody2.ID()

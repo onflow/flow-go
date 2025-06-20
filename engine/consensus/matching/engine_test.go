@@ -99,7 +99,8 @@ func (s *MatchingEngineSuite) TestOnBlockIncorporated() {
 	resultsByID := payload.Results.Lookup()
 	for _, receipt := range payload.Receipts {
 		index.ReceiptIDs = append(index.ReceiptIDs, receipt.ID())
-		fullReceipt := flow.ExecutionReceiptFromStub(*receipt, *resultsByID[receipt.ResultID])
+		fullReceipt, err := flow.ExecutionReceiptFromStub(*receipt, *resultsByID[receipt.ResultID])
+		s.Require().NoError(err)
 		s.receipts.On("ByID", receipt.ID()).Return(fullReceipt, nil).Once()
 		s.core.On("ProcessReceipt", fullReceipt).Return(nil).Once()
 	}

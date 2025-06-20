@@ -94,6 +94,7 @@ func createContainerBlock(options ...func(result *flow.ExecutionResult, assignme
 			ExecutorID:      unittest.IdentifierFixture(),
 			ExecutionResult: *result,
 		},
+		ExecutorSignature: unittest.SignatureFixture(),
 	}
 	// container block
 	block := unittest.BlockFixture(

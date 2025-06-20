@@ -447,7 +447,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	require.NoError(t, err)
 
 	// request receipts from execution nodes
-	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, channels.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
+	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, channels.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return new(flow.ExecutionReceipt) })
 	require.NoError(t, err)
 
 	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
