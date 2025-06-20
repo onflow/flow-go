@@ -210,7 +210,7 @@ func MessageToChunk(m *entities.Chunk) (*flow.Chunk, error) {
 		return chunk, nil
 	}
 
-	// Protocol v2+: include ServiceEventCount\
+	// Protocol v2+: include ServiceEventCount
 	chunk, err = flow.NewChunk(flow.UntrustedChunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex:      uint(m.CollectionIndex),
