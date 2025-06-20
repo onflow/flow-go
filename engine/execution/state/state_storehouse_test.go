@@ -221,7 +221,7 @@ func makeComputationResult(
 	computationResult.AppendCollectionAttestationResult(
 		*completeBlock.StartState,
 		commit,
-		nil,
+		[]byte{'p'},
 		unittest.IdentifierFixture(),
 		ceds[0],
 	)

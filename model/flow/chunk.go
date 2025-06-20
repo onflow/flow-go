@@ -333,7 +333,7 @@ func NewChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPack, error) 
 	if len(untrusted.Proof) == 0 {
 		return nil, fmt.Errorf("Proof must not be empty")
 	}
-	
+
 	if untrusted.ExecutionDataRoot.BlockID == ZeroID {
 		return nil, fmt.Errorf("ExecutionDataRoot.BlockID must not be empty")
 	}
