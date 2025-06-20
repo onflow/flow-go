@@ -8,11 +8,15 @@ import (
 // Blocks represents persistent storage for blocks.
 type Blocks interface {
 
-	// Store will atomically store a block with all its dependencies.
+	// Store persists a block with all its dependencies.
+	// Expected errors during normal operation:
+	//   - storage.ErrAlreadyExists if the block has already been persisted
 	Store(block *flow.Block) error
 
 	// StoreTx allows us to store a new block, including its payload & header, as part of a DB transaction, while
 	// still going through the caching layer.
+	// Expected errors during normal operation:
+	//   - storage.ErrAlreadyExists if the block has already been persisted
 	StoreTx(block *flow.Block) func(*transaction.Tx) error
 
 	// ByID returns the block with the given hash. It is available for
@@ -24,6 +28,16 @@ type Blocks interface {
 	// Expected errors during normal operations:
 	// - storage.ErrNotFound if no block is found for the given height
 	ByHeight(height uint64) (*flow.Block, error)
+
+	// ByView returns the block with the given view. It is only available for certified blocks.
+	// certified blocks are the blocks that have received QC. Hotstuff guarantees that for each view,
+	// at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
+	// even for non-finalized blocks.
+	// Expected errors during normal operations:
+	//   - `storage.ErrNotFound` if no certified block is known at given view.	
+	//
+	// TODO: this method is not available until next spork (mainnet27) or a migration that builds the index.
+	// ByView(view uint64) (*flow.Header, error)
 
 	// ByCollectionID returns the block for the given collection ID.
 	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
