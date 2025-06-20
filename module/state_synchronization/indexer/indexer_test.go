@@ -176,10 +176,6 @@ func (w *mockProgress) WaitForIndex(n uint64) <-chan struct{} {
 	return w.doneChan
 }
 
-func (w *mockProgress) BatchSetProcessedIndex(index uint64, batch storage.ReaderBatchWriter) error {
-	return fmt.Errorf("not implemented")
-}
-
 func TestIndexer_Success(t *testing.T) {
 	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
 	blocks := 10
