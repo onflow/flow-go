@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"go.uber.org/multierr"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -13,8 +12,12 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// Persister handles transferring data from in-memory storages to permanent storages.
-type Persister struct {
+// BlockPersister handles transferring data from in-memory storages to permanent storages
+// for a single block.
+//
+// - Each BlockPersister instance is created for ONE specific block
+// - All `inMemory*` storages contain data ONLY for this specific block, they are not shared
+type BlockPersister struct {
 	log zerolog.Logger
 
 	inMemoryRegisters      *unsynchronized.Registers
@@ -54,14 +57,14 @@ func NewPersister(
 	protocolDB storage.DB,
 	executionResult *flow.ExecutionResult,
 	header *flow.Header,
-) *Persister {
+) *BlockPersister {
 	log = log.With().
-		Str("component", "persister").
+		Str("component", "block_persister").
 		Hex("block_id", logging.ID(executionResult.BlockID)).
 		Uint64("height", header.Height).
 		Logger()
 
-	persister := &Persister{
+	persister := &BlockPersister{
 		log:                    log,
 		inMemoryRegisters:      inMemoryRegisters,
 		inMemoryEvents:         inMemoryEvents,
@@ -82,55 +85,52 @@ func NewPersister(
 
 	persister.log.Info().
 		Uint64("height", header.Height).
-		Msg("persister initialized")
+		Msg("block persister initialized")
 
 	return persister
 }
 
 // Persist save data from in-memory storages to the provided persisted storages and commit updates to the database.
 // No errors are expected during normal operations
-func (p *Persister) Persist() (err error) {
-	// Create a batch for atomic updates
-	batch := p.protocolDB.NewBatch()
-
-	defer func() {
-		err = multierr.Combine(err, batch.Close())
-	}()
-
+func (p *BlockPersister) Persist() error {
 	p.log.Debug().Msg("adding execution data to batch")
 
 	start := time.Now()
 
-	if err = p.persistRegisters(); err != nil {
-		return
+	if err := p.persistRegisters(); err != nil {
+		return err
 	}
 
-	if err = p.addEventsToBatch(batch); err != nil {
-		return
-	}
+	err := p.protocolDB.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
+		if err := p.addEventsToBatch(batch); err != nil {
+			return err
+		}
 
-	if err = p.addResultsToBatch(batch); err != nil {
-		return
-	}
+		if err := p.addResultsToBatch(batch); err != nil {
+			return err
+		}
 
-	if err = p.addCollectionsToBatch(batch); err != nil {
-		return
-	}
+		if err := p.addCollectionsToBatch(batch); err != nil {
+			return err
+		}
 
-	if err = p.addTransactionsToBatch(batch); err != nil {
-		return
-	}
+		if err := p.addTransactionsToBatch(batch); err != nil {
+			return err
+		}
 
-	if err = p.addTransactionResultErrorMessagesToBatch(batch); err != nil {
-		return
+		if err := p.addTransactionResultErrorMessagesToBatch(batch); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		err = fmt.Errorf("failed to commit batch: %w", err)
+		return err
 	}
 
 	// TODO: include update to latestPersistedSealedResultBlockHeight in the batch
-
-	if err = batch.Commit(); err != nil {
-		err = fmt.Errorf("failed to commit batch: %w", err)
-		return
-	}
 
 	duration := time.Since(start)
 
@@ -143,17 +143,20 @@ func (p *Persister) Persist() (err error) {
 		Int("transaction_result_error_messages_count", len(p.inMemoryTxResultErrMsg.Data())).
 		Msg("successfully prepared execution data for persistence")
 
-	return
+	return nil
 }
 
 // persistRegisters persists registers from in-memory to permanent storage.
 // Registers must be stored for every height, even if it's an empty set.
 // No errors are expected during normal operations
-func (p *Persister) persistRegisters() error {
-	registerData := p.inMemoryRegisters.Data()
+func (p *BlockPersister) persistRegisters() error {
+	registerData, err := p.inMemoryRegisters.Data(p.header.Height)
+	if err != nil {
+		return fmt.Errorf("could not get data from registers: %w", err)
+	}
 
 	// Always store registers for every height to maintain height continuity
-	if err := p.registers.Store(registerData, p.header.Height); err != nil {
+	if err = p.registers.Store(registerData, p.header.Height); err != nil {
 		return fmt.Errorf("could not persist registers: %w", err)
 	}
 
@@ -162,8 +165,13 @@ func (p *Persister) persistRegisters() error {
 
 // addEventsToBatch adds events from in-memory storage to the batch.
 // No errors are expected during normal operations
-func (p *Persister) addEventsToBatch(batch storage.Batch) error {
-	if eventsList := p.inMemoryEvents.Data(); len(eventsList) > 0 {
+func (p *BlockPersister) addEventsToBatch(batch storage.ReaderBatchWriter) error {
+	eventsList, err := p.inMemoryEvents.ByBlockID(p.executionResult.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not get events: %w", err)
+	}
+
+	if len(eventsList) > 0 {
 		if err := p.events.BatchStore(p.executionResult.BlockID, []flow.EventsList{eventsList}, batch); err != nil {
 			return fmt.Errorf("could not add events to batch: %w", err)
 		}
@@ -174,8 +182,13 @@ func (p *Persister) addEventsToBatch(batch storage.Batch) error {
 
 // addResultsToBatch adds transaction results from in-memory storage to the batch.
 // No errors are expected during normal operations
-func (p *Persister) addResultsToBatch(batch storage.Batch) error {
-	if results := p.inMemoryResults.Data(); len(results) > 0 {
+func (p *BlockPersister) addResultsToBatch(batch storage.ReaderBatchWriter) error {
+	results, err := p.inMemoryResults.ByBlockID(p.executionResult.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not get results: %w", err)
+	}
+
+	if len(results) > 0 {
 		if err := p.results.BatchStore(p.executionResult.BlockID, results, batch); err != nil {
 			return fmt.Errorf("could not add transaction results to batch: %w", err)
 		}
@@ -186,7 +199,7 @@ func (p *Persister) addResultsToBatch(batch storage.Batch) error {
 
 // addCollectionsToBatch persists collections from in-memory to permanent storage.
 // No errors are expected during normal operations
-func (p *Persister) addCollectionsToBatch(batch storage.Batch) error {
+func (p *BlockPersister) addCollectionsToBatch(batch storage.ReaderBatchWriter) error {
 	for _, collection := range p.inMemoryCollections.LightCollections() {
 		if err := p.collections.BatchStoreLightAndIndexByTransaction(&collection, batch); err != nil {
 			return fmt.Errorf("could not add collections to batch: %w", err)
@@ -198,7 +211,7 @@ func (p *Persister) addCollectionsToBatch(batch storage.Batch) error {
 
 // addTransactionsToBatch persists transactions from in-memory to permanent storage.
 // No errors are expected during normal operations
-func (p *Persister) addTransactionsToBatch(batch storage.Batch) error {
+func (p *BlockPersister) addTransactionsToBatch(batch storage.ReaderBatchWriter) error {
 	for _, transaction := range p.inMemoryTransactions.Data() {
 		if err := p.transactions.BatchStore(&transaction, batch); err != nil {
 			return fmt.Errorf("could not add transactions to batch: %w", err)
@@ -210,9 +223,14 @@ func (p *Persister) addTransactionsToBatch(batch storage.Batch) error {
 
 // addTransactionResultErrorMessagesToBatch persists transaction result error messages from in-memory to permanent storage.
 // No errors are expected during normal operations
-func (p *Persister) addTransactionResultErrorMessagesToBatch(batch storage.Batch) error {
-	if txResultErrMsgs := p.inMemoryTxResultErrMsg.Data(); len(txResultErrMsgs) > 0 {
-		if err := p.txResultErrMsg.BatchStore(p.header.ID(), txResultErrMsgs, batch); err != nil {
+func (p *BlockPersister) addTransactionResultErrorMessagesToBatch(batch storage.ReaderBatchWriter) error {
+	txResultErrMsgs, err := p.inMemoryTxResultErrMsg.ByBlockID(p.executionResult.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not get transaction result error messages: %w", err)
+	}
+
+	if len(txResultErrMsgs) > 0 {
+		if err := p.txResultErrMsg.BatchStore(p.executionResult.BlockID, txResultErrMsgs, batch); err != nil {
 			return fmt.Errorf("could not add transaction result error messages to batch: %w", err)
 		}
 	}
