@@ -73,13 +73,19 @@ func (r *Registers) Store(registers flow.RegisterEntries, height uint64) error {
 	return nil
 }
 
-func (r *Registers) Data() []flow.RegisterEntry {
+// Data returns all register entries for the specified height.
+// No errors are expected during normal operation.
+func (r *Registers) Data(height uint64) ([]flow.RegisterEntry, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
+
+	if r.blockHeight != height {
+		return nil, fmt.Errorf("failed to get registers: height mismatch: expected %d, got %d", r.blockHeight, height)
+	}
 
 	out := make([]flow.RegisterEntry, 0, len(r.store))
 	for k, v := range r.store {
 		out = append(out, flow.RegisterEntry{Key: k, Value: v})
 	}
-	return out
+	return out, nil
 }

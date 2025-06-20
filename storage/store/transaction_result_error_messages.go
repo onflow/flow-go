@@ -76,7 +76,7 @@ func NewTransactionResultErrorMessages(collector module.CacheMetrics, db storage
 // No errors are expected during normal operation.
 func (t *TransactionResultErrorMessages) Store(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error {
 	return t.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return t.batchStore(blockID, transactionResultErrorMessages, rw)
+		return t.BatchStore(blockID, transactionResultErrorMessages, rw)
 	})
 }
 
@@ -101,7 +101,7 @@ func (t *TransactionResultErrorMessages) Exists(blockID flow.Identifier) (bool, 
 // BatchStore inserts a batch of transaction result error messages into a batch
 //
 // No errors are expected during normal operation.
-func (t *TransactionResultErrorMessages) batchStore(
+func (t *TransactionResultErrorMessages) BatchStore(
 	blockID flow.Identifier,
 	transactionResultErrorMessages []flow.TransactionResultErrorMessage,
 	batch storage.ReaderBatchWriter,
