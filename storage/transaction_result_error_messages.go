@@ -24,8 +24,7 @@ type TransactionResultErrorMessagesReader interface {
 	// ByBlockID gets all transaction result error messages for a block, ordered by transaction index.
 	// Note: This method will return an empty slice both if the block is not indexed yet and if the block does not have any errors.
 	//
-	// Expected errors during normal operation:
-	// - storage.ErrNotFound if no error messages were found for this block.
+	// No errors are expected during normal operations.
 	ByBlockID(id flow.Identifier) ([]flow.TransactionResultErrorMessage, error)
 }
 
