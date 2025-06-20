@@ -39,13 +39,11 @@ func TestNewCollection(t *testing.T) {
 		assert.Len(t, col.Transactions, 1)
 
 		t.Run("convert to LightCollection", func(t *testing.T) {
-			assert.NotPanics(t, func() {
-				light := col.Light()
-				assert.Equal(t, light.Len(), col.Len())
-				for i := range light.Len() {
-					assert.Equal(t, col.Transactions[i].ID(), light.Transactions[i])
-				}
-			})
+			light := col.Light()
+			assert.Equal(t, light.Len(), col.Len())
+			for i := range light.Len() {
+				assert.Equal(t, col.Transactions[i].ID(), light.Transactions[i])
+			}
 		})
 	})
 
@@ -83,23 +81,23 @@ func TestNewCollection(t *testing.T) {
 	})
 }
 
+// TestNewLightCollection tests creating a new LightCollection.
+// All possible inputs should produce a valid LightCollection, including nil/empty transaction lists.
 func TestNewLightCollection(t *testing.T) {
 	t.Run("valid untrusted light collection", func(t *testing.T) {
 		untrusted := flow.UntrustedLightCollection{
 			Transactions: []flow.Identifier{unittest.IdentifierFixture()},
 		}
 
-		col, err := flow.NewLightCollection(untrusted)
-		assert.NoError(t, err)
+		col := flow.NewLightCollection(untrusted)
 		assert.NotNil(t, col)
-		assert.Len(t, col.Transactions, 1)
+		assert.Equal(t, untrusted.Transactions, col.Transactions)
 	})
 
 	t.Run("valid empty untrusted light collection", func(t *testing.T) {
 		untrusted := flow.UntrustedLightCollection{}
 
-		col, err := flow.NewLightCollection(untrusted)
-		assert.NoError(t, err)
+		col := flow.NewLightCollection(untrusted)
 		assert.NotNil(t, col)
 		assert.Len(t, col.Transactions, 0)
 	})

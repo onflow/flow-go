@@ -46,19 +46,14 @@ func NewEmptyCollection() *Collection {
 }
 
 // Light returns a LightCollection, which contains only the list of transaction IDs from the Collection.
-// This method may panic if invoked on a malformed receiver Collection.
 func (c Collection) Light() *LightCollection {
 	txIDs := make([]Identifier, 0, len(c.Transactions))
 	for _, tx := range c.Transactions {
 		txIDs = append(txIDs, tx.ID())
 	}
-	lc, err := NewLightCollection(UntrustedLightCollection{
+	return NewLightCollection(UntrustedLightCollection{
 		Transactions: txIDs,
 	})
-	if err != nil {
-		panic(fmt.Sprintf("sanity check failed: creating light collection from collection: %v", err))
-	}
-	return lc
 }
 
 // ID returns a cryptographic commitment to the Collection.
@@ -92,11 +87,10 @@ type LightCollection struct {
 type UntrustedLightCollection LightCollection
 
 // NewLightCollection constructs a new LightCollection instance.
-// Any errors indicate the input cannot be used to construct a valid LightCollection.
-func NewLightCollection(untrusted UntrustedLightCollection) (*LightCollection, error) {
+func NewLightCollection(untrusted UntrustedLightCollection) *LightCollection {
 	return &LightCollection{
 		Transactions: untrusted.Transactions,
-	}, nil
+	}
 }
 
 // ID returns a cryptographic commitment to the LightCollection.
