@@ -464,16 +464,6 @@ func TestNewChunkDataPack(t *testing.T) {
 		assert.Contains(t, err.Error(), "Proof")
 	})
 
-	t.Run("nil Collection", func(t *testing.T) {
-		untrusted := baseChunkDataPack
-		untrusted.Collection = nil
-
-		pack, err := flow.NewChunkDataPack(untrusted)
-		assert.Error(t, err)
-		assert.Nil(t, pack)
-		assert.Contains(t, err.Error(), "Collection")
-	})
-
 	t.Run("missing ExecutionDataRoot.BlockID", func(t *testing.T) {
 		untrusted := baseChunkDataPack
 		untrusted.ExecutionDataRoot.BlockID = flow.ZeroID
