@@ -82,12 +82,14 @@ func ComputationResultForBlockFixture(
 	chunks, err := computationResult.AllChunks()
 	require.NoError(t, err)
 
-	executionResult := flow.NewExecutionResult(
-		parentBlockExecutionResultID,
-		completeBlock.BlockID(),
-		chunks,
-		convertedServiceEvents,
-		executionDataID)
+	executionResult, err := flow.NewExecutionResult(flow.UntrustedExecutionResult{
+		PreviousResultID: parentBlockExecutionResultID,
+		BlockID:          completeBlock.BlockID(),
+		Chunks:           chunks,
+		ServiceEvents:    convertedServiceEvents,
+		ExecutionDataID:  executionDataID,
+	})
+	require.NoError(t, err)
 
 	computationResult.ExecutionReceipt = &flow.ExecutionReceipt{
 		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
