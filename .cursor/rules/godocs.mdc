@@ -11,8 +11,8 @@ alwaysApply: false
 - Begin with the name of the entity.
 - Use complete sentences.
 - **ALL** methods that return an error **MUST** document expected error conditions!
-- When updating existing code, if godocs exist, keep the existing content and improve formating and expand with additional details to conform with these rules.
-- If any details are unclear, DO NOT make something up. Add the section and leave a TODO to fill in the missing details or ask the user for clarification.
+- When updating existing code, if godocs exist, keep the existing content and improve formating/expand with additional details to conform with these rules.
+- If any details are unclear, **DO NOT make something up**. Add a TODO to fill in the missing details or ask the user for clarification.
 
 ## Method Rules
 ```go
@@ -67,7 +67,7 @@ alwaysApply: false
 
 4. **Error Returns**
    - List all expected errors (sentinel errors)
-   - DO NOT make up sentinel errors. Only document errors that are returned by the method. If you don't know, add a TODO for the user to complete.
+   - **DO NOT make up sentinel errors**. Only document errors that are returned by the method. If you don't know, add a TODO for the user to complete.
    - Describe when and why each error occurs
    - Always include a catch-all for unexpected errors
    - Example:
@@ -264,4 +264,5 @@ alwaysApply: false
 3. **Type Methods**
    - Document each method following the method documentation rules
    - Include error documentation for methods that return errors
+
 This rule ensures consistent, comprehensive documentation across all Go methods in the codebase, making it easier for developers to understand and use the code correctly.
