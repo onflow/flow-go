@@ -24,6 +24,7 @@ import (
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 func getTransactionReq(id string, expandResult bool, blockIdQuery string, collectionIdQuery string) *http.Request {
@@ -215,11 +216,18 @@ func TestGetTransactionResult(t *testing.T) {
 	id := unittest.IdentifierFixture()
 	bid := unittest.IdentifierFixture()
 	cid := unittest.IdentifierFixture()
+	g := generator.EventGenerator(generator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
+
 	txr := &accessmodel.TransactionResult{
 		Status:     flow.TransactionStatusSealed,
 		StatusCode: 10,
 		Events: []flow.Event{
-			unittest.EventFixture(flow.EventAccountCreated, 1, 0, unittest.Event.WithTransactionID(id)),
+			g.New(
+				generator.Event.WithEventType(flow.EventAccountCreated),
+				generator.Event.WithTransactionIndex(1),
+				generator.Event.WithEventIndex(0),
+				generator.Event.WithTransactionID(id),
+			),
 		},
 		ErrorMessage: "",
 		BlockID:      bid,
@@ -427,16 +435,18 @@ func TestCreateTransaction(t *testing.T) {
 
 func transactionResultFixture(tx flow.Transaction) *accessmodel.TransactionResult {
 	cid := unittest.IdentifierFixture()
+	g := generator.EventGenerator(generator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
+
 	return &accessmodel.TransactionResult{
 		Status:     flow.TransactionStatusSealed,
 		StatusCode: 1,
 		Events: []flow.Event{
-			unittest.EventFixture(
-				flow.EventAccountCreated,
-				0,
-				0,
-				unittest.Event.WithTransactionID(tx.ID()),
-				unittest.Event.WithPayload([]byte{}),
+			g.New(
+				generator.Event.WithEventType(flow.EventAccountCreated),
+				generator.Event.WithTransactionIndex(0),
+				generator.Event.WithEventIndex(0),
+				generator.Event.WithTransactionID(tx.ID()),
+				generator.Event.WithPayload([]byte{}),
 			),
 		},
 		ErrorMessage: "",

@@ -45,7 +45,43 @@ func EventGenerator(opts ...EventGeneratorOption) *Events {
 	return g
 }
 
-func (g *Events) New() flow.Event {
+var Event eventFactory
+
+type eventFactory struct{}
+
+type EventOption func(*flow.Event)
+
+func (f *eventFactory) WithEventType(eventType flow.EventType) EventOption {
+	return func(e *flow.Event) {
+		e.Type = eventType
+	}
+}
+
+func (f *eventFactory) WithTransactionIndex(transactionIndex uint32) EventOption {
+	return func(e *flow.Event) {
+		e.TransactionIndex = transactionIndex
+	}
+}
+
+func (f *eventFactory) WithEventIndex(eventIndex uint32) EventOption {
+	return func(e *flow.Event) {
+		e.EventIndex = eventIndex
+	}
+}
+
+func (f *eventFactory) WithTransactionID(txID flow.Identifier) EventOption {
+	return func(e *flow.Event) {
+		e.TransactionID = txID
+	}
+}
+
+func (f *eventFactory) WithPayload(payload []byte) EventOption {
+	return func(e *flow.Event) {
+		e.Payload = payload
+	}
+}
+
+func (g *Events) New(opts ...EventOption) flow.Event {
 	address, err := common.BytesToAddress(unittest.RandomAddressFixture().Bytes())
 	if err != nil {
 		panic(fmt.Sprintf("unexpected error while creating random address: %s", err))
@@ -55,6 +91,23 @@ func (g *Events) New() flow.Event {
 	identifier := fmt.Sprintf("TestContract.FooEvent%d", g.count)
 	typeID := location.TypeID(nil, identifier)
 
+	event := &flow.Event{
+		Type:             flow.EventType(typeID),
+		TransactionID:    g.ids.New(),
+		TransactionIndex: g.count,
+		EventIndex:       g.count,
+		Payload:          g.createNewEventPayload(location, identifier),
+	}
+
+	for _, opt := range opts {
+		opt(event)
+	}
+	g.count++
+
+	return *event
+}
+
+func (g *Events) createNewEventPayload(location common.AddressLocation, identifier string) []byte {
 	testEventType := cadence.NewEventType(
 		location,
 		identifier,
@@ -96,17 +149,7 @@ func (g *Events) New() flow.Event {
 		}
 	}
 
-	event := flow.Event{
-		Type:             flow.EventType(typeID),
-		TransactionID:    g.ids.New(),
-		TransactionIndex: g.count,
-		EventIndex:       g.count,
-		Payload:          payload,
-	}
-
-	g.count++
-
-	return event
+	return payload
 }
 
 // GetEventsWithEncoding generates a specified number of events with a given encoding version.
@@ -140,12 +183,13 @@ func GenerateAccountCreateEvent(t *testing.T, address flow.Address) flow.Event {
 	payload, err := ccf.Encode(cadenceEvent)
 	require.NoError(t, err)
 
-	return unittest.EventFixture(
-		flow.EventType(cadenceEvent.EventType.Location.TypeID(nil, cadenceEvent.EventType.QualifiedIdentifier)),
-		0,
-		0,
-		unittest.Event.WithPayload(payload),
-	)
+	return flow.Event{
+		Type:             flow.EventType(cadenceEvent.EventType.Location.TypeID(nil, cadenceEvent.EventType.QualifiedIdentifier)),
+		TransactionID:    unittest.IdentifierFixture(),
+		TransactionIndex: 0,
+		EventIndex:       0,
+		Payload:          payload,
+	}
 }
 
 // GenerateAccountContractEvent returns a mock account contract event.
@@ -184,10 +228,11 @@ func GenerateAccountContractEvent(t *testing.T, qualifiedIdentifier string, addr
 	payload, err := ccf.Encode(cadenceEvent)
 	require.NoError(t, err)
 
-	return unittest.EventFixture(
-		flow.EventType(cadenceEvent.EventType.Location.TypeID(nil, cadenceEvent.EventType.QualifiedIdentifier)),
-		0,
-		0,
-		unittest.Event.WithPayload(payload),
-	)
+	return flow.Event{
+		Type:             flow.EventType(cadenceEvent.EventType.Location.TypeID(nil, cadenceEvent.EventType.QualifiedIdentifier)),
+		TransactionID:    unittest.IdentifierFixture(),
+		TransactionIndex: 0,
+		EventIndex:       0,
+		Payload:          payload,
+	}
 }
