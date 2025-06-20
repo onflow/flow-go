@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -66,7 +67,7 @@ type workingData struct {
 	txResultErrMsgsRequester      tx_error_messages.TransactionResultErrorMessageRequester
 	txResultErrMsgsRequestTimeout time.Duration
 	indexer                       *indexer.InMemoryIndexer
-	persister                     *indexer.Persister
+	persister                     *indexer.BlockPersister
 
 	// Working data
 	executionData       *execution_data.BlockExecutionDataEntity
@@ -198,6 +199,13 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 		var err error
 		txResultErrMsgsData, err = c.workingData.txResultErrMsgsRequester.Request(timeoutCtx)
 		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				c.log.Debug().
+					Dur("timeout", c.workingData.txResultErrMsgsRequestTimeout).
+					Msg("transaction result error messages request timed out")
+				return nil
+			}
+
 			return fmt.Errorf("failed to request transaction result error messages data: %w", err)
 		}
 		return nil

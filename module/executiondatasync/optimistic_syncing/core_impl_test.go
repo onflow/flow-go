@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"github.com/onflow/flow-go/storage"
 	"testing"
 	"time"
 
@@ -48,6 +49,11 @@ func (c *CoreImplSuite) SetupTest() {
 	c.txResultErrMsgsRequestTimeout = DefaultTxResultErrMsgsRequestTimeout
 
 	c.db = storagemock.NewDB(t)
+	c.db.On("WithReaderBatchWriter", mock.Anything).Return(
+		func(fn func(storage.ReaderBatchWriter) error) error {
+			return fn(storagemock.NewBatch(t))
+		},
+	).Maybe()
 
 	// Create storage mocks with proper expectations for persist operations
 	c.persistentRegisters = storagemock.NewRegisterIndex(t)
@@ -192,11 +198,8 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 			err = core.Download(ctx)
 		}, time.Second)
 
-		c.Require().Error(err)
-
-		c.Assert().ErrorIs(err, context.DeadlineExceeded)
-		c.Assert().Contains(err.Error(), "failed to request transaction result error messages data")
-		c.Assert().Nil(core.workingData.executionData)
+		c.Require().NoError(err)
+		c.Assert().Equal(expectedExecutionData, core.workingData.executionData.BlockExecutionData)
 		c.Assert().Nil(core.workingData.txResultErrMsgsData)
 	})
 }
@@ -258,12 +261,7 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 	c.Run("successful persistence", func() {
 		// Create mocks with proper expectations
 		c.db = storagemock.NewDB(t)
-		mockBatch := storagemock.NewBatch(t)
-
-		// Set up successful batch operations
-		mockBatch.On("Commit").Return(nil).Once()
-		mockBatch.On("Close").Return(nil).Once()
-		c.db.On("NewBatch").Return(mockBatch).Once()
+		c.db.On("WithReaderBatchWriter", mock.Anything).Return(nil)
 
 		core := c.createTestCoreImpl()
 		err := core.Persist()
@@ -274,11 +272,7 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 	c.Run("persistence with batch commit failure", func() {
 		// Create a failing DB
 		c.db = storagemock.NewDB(t)
-		mockBatch := storagemock.NewBatch(t)
-
-		mockBatch.On("Commit").Return(assert.AnError).Once()
-		mockBatch.On("Close").Return(nil).Once()
-		c.db.On("NewBatch").Return(mockBatch).Once()
+		c.db.On("WithReaderBatchWriter", mock.Anything).Return(assert.AnError)
 
 		// Create CoreImpl with the failing DB
 		core := c.createTestCoreImpl()
@@ -310,12 +304,11 @@ func (c *CoreImplSuite) TestCoreImpl_IntegrationWorkflow() {
 
 	// Set up mocks with proper expectations
 	c.db = storagemock.NewDB(t)
-	mockBatch := storagemock.NewBatch(t)
-
-	// Set up successful batch operations
-	mockBatch.On("Commit").Return(nil).Once()
-	mockBatch.On("Close").Return(nil).Once()
-	c.db.On("NewBatch").Return(mockBatch).Once()
+	c.db.On("WithReaderBatchWriter", mock.Anything).Return(
+		func(fn func(storage.ReaderBatchWriter) error) error {
+			return fn(storagemock.NewBatch(t))
+		},
+	).Maybe()
 
 	core := c.createTestCoreImpl()
 	ctx := context.Background()
