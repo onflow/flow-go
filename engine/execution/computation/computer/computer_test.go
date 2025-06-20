@@ -277,7 +277,8 @@ func TestBlockExecutor_ExecuteBlock_VersionAwareChunk(t *testing.T) {
 
 		// Verify ChunkDataPacks
 
-		chunkDataPacks := result.AllChunkDataPacks()
+		chunkDataPacks, err := result.AllChunkDataPacks()
+		require.NoError(t, err)
 		assert.Len(t, chunkDataPacks, 1+1) // +1 system chunk
 
 		chunkDataPack1 := chunkDataPacks[0]
@@ -501,7 +502,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// Verify ChunkDataPacks
 
-		chunkDataPacks := result.AllChunkDataPacks()
+		chunkDataPacks, err := result.AllChunkDataPacks()
+		require.NoError(t, err)
 		assert.Len(t, chunkDataPacks, 1+1) // +1 system chunk
 
 		chunkDataPack1 := chunkDataPacks[0]

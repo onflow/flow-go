@@ -394,7 +394,12 @@ func (s *state) saveExecutionResults(
 ) (err error) {
 	blockID := result.ExecutableBlock.BlockID()
 
-	err = s.chunkDataPacks.Store(result.AllChunkDataPacks())
+	chunks, err := result.AllChunkDataPacks()
+	if err != nil {
+		return fmt.Errorf("can not retrieve chunk data packs: %w", err)
+	}
+
+	err = s.chunkDataPacks.Store(chunks)
 	if err != nil {
 		return fmt.Errorf("can not store multiple chunk data pack: %w", err)
 	}
@@ -409,7 +414,6 @@ func (s *state) saveExecutionResults(
 		batch.AddCallback(func(err error) {
 			// Rollback if an error occurs during batch operations
 			if err != nil {
-				chunks := result.AllChunkDataPacks()
 				chunkIDs := make([]flow.Identifier, 0, len(chunks))
 				for _, chunk := range chunks {
 					chunkIDs = append(chunkIDs, chunk.ChunkID)

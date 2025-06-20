@@ -221,7 +221,7 @@ func makeComputationResult(
 	computationResult.AppendCollectionAttestationResult(
 		*completeBlock.StartState,
 		commit,
-		nil,
+		[]byte{'p'},
 		unittest.IdentifierFixture(),
 		ceds[0],
 	)
@@ -234,12 +234,17 @@ func makeComputationResult(
 	executionDataID, err := execution_data.CalculateID(context.Background(), bed, execution_data.DefaultSerializer)
 	require.NoError(t, err)
 
-	executionResult := flow.NewExecutionResult(
-		unittest.IdentifierFixture(),
-		completeBlock.BlockID(),
-		computationResult.AllChunks(),
-		flow.ServiceEventList{},
-		executionDataID)
+	chunks, err := computationResult.AllChunks()
+	require.NoError(t, err)
+
+	executionResult, err := flow.NewExecutionResult(flow.UntrustedExecutionResult{
+		PreviousResultID: unittest.IdentifierFixture(),
+		BlockID:          completeBlock.BlockID(),
+		Chunks:           chunks,
+		ServiceEvents:    flow.ServiceEventList{},
+		ExecutionDataID:  executionDataID,
+	})
+	require.NoError(t, err)
 
 	computationResult.BlockAttestationResult.BlockExecutionResult.ExecutionDataRoot = &flow.BlockExecutionDataRoot{
 		BlockID:               completeBlock.BlockID(),

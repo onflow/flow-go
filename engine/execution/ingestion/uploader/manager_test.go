@@ -13,6 +13,7 @@ import (
 	executionUnittest "github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestManagerSetEnabled(t *testing.T) {
@@ -29,7 +30,7 @@ func TestManagerSetEnabled(t *testing.T) {
 func TestManagerUploadsWithAllUploaders(t *testing.T) {
 	result := executionUnittest.ComputationResultFixture(
 		t,
-		flow.ZeroID,
+		unittest.IdentifierFixture(),
 		[][]flow.Identifier{
 			{flow.ZeroID},
 			{flow.ZeroID},

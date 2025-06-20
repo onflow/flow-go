@@ -402,12 +402,21 @@ func (collector *resultCollector) Finalize(
 		return nil, fmt.Errorf("failed to provide execution data: %w", err)
 	}
 
-	executionResult := flow.NewExecutionResult(
-		collector.parentBlockExecutionResultID,
-		collector.result.ExecutableBlock.BlockID(),
-		collector.result.AllChunks(),
-		collector.result.AllConvertedServiceEvents(),
-		executionDataID)
+	chunks, err := collector.result.AllChunks()
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve chunks data: %w", err)
+	}
+
+	executionResult, err := flow.NewExecutionResult(flow.UntrustedExecutionResult{
+		PreviousResultID: collector.parentBlockExecutionResultID,
+		BlockID:          collector.result.ExecutableBlock.BlockID(),
+		Chunks:           chunks,
+		ServiceEvents:    collector.result.AllConvertedServiceEvents(),
+		ExecutionDataID:  executionDataID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build execution result: %w", err)
+	}
 
 	executionReceipt, err := GenerateExecutionReceipt(
 		collector.signer,

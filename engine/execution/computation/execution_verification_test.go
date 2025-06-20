@@ -829,7 +829,8 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	require.NoError(t, err)
 	require.True(t, valid)
 
-	chdps := computationResult.AllChunkDataPacks()
+	chdps, err := computationResult.AllChunkDataPacks()
+	require.NoError(t, err)
 	require.Equal(t, len(chdps), len(receipt.Spocks))
 
 	er := &computationResult.ExecutionReceipt.ExecutionResult
