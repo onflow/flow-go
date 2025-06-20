@@ -1789,36 +1789,6 @@ func SeedFixtures(m int, n int) [][]byte {
 	return seeds
 }
 
-// BlockEventsFixture returns a block events model populated with random events of length n.
-func BlockEventsFixture(
-	header *flow.Header,
-	n int,
-	types ...flow.EventType,
-) flow.BlockEvents {
-	return flow.BlockEvents{
-		BlockID:        header.ID(),
-		BlockHeight:    header.Height,
-		BlockTimestamp: header.Timestamp,
-		Events:         EventsFixture(n, types...),
-	}
-}
-
-func EventsFixture(
-	n int,
-	types ...flow.EventType,
-) []flow.Event {
-	if len(types) == 0 {
-		types = []flow.EventType{"A.0x1.Foo.Bar", "A.0x2.Zoo.Moo", "A.0x3.Goo.Hoo"}
-	}
-
-	events := make([]flow.Event, n)
-	for i := 0; i < n; i++ {
-		events[i] = EventFixture(types[i%len(types)], 0, uint32(i))
-	}
-
-	return events
-}
-
 func EventTypeFixture(chainID flow.ChainID) flow.EventType {
 	eventType := fmt.Sprintf("A.%s.TestContract.TestEvent1", RandomAddressFixtureForChain(chainID))
 	return flow.EventType(eventType)

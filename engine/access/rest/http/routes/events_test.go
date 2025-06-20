@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
@@ -166,7 +167,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(i)))
 		ids[i] = header.ID()
 
-		events[i] = unittest.BlockEventsFixture(header, 2)
+		events[i] = generator.BlockEventsFixture(header, 2)
 
 		backend.Mock.
 			On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, []flow.Identifier{header.ID()}, entities.EventEncodingVersion_JSON_CDC_V0).
@@ -197,7 +198,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		events[0].BlockHeight,
 		events[len(events)-1].BlockHeight+5,
 		entities.EventEncodingVersion_JSON_CDC_V0,
-	).Return(append(events[:len(events)-1], unittest.BlockEventsFixture(lastHeader, 0)), nil)
+	).Return(append(events[:len(events)-1], generator.BlockEventsFixture(lastHeader, 0)), nil)
 
 	latestBlock := unittest.BlockHeaderFixture()
 	latestBlock.Height = uint64(n - 1)

@@ -236,3 +236,39 @@ func GenerateAccountContractEvent(t *testing.T, qualifiedIdentifier string, addr
 		Payload:          payload,
 	}
 }
+
+// EventFixture returns a single event
+func EventFixture(
+	opts ...EventOption,
+) flow.Event {
+	g := EventGenerator(WithEncoding(entities.EventEncodingVersion_CCF_V0))
+	return g.New(opts...)
+}
+
+func EventsFixture(
+	n int,
+) []flow.Event {
+	events := make([]flow.Event, n)
+	g := EventGenerator(WithEncoding(entities.EventEncodingVersion_CCF_V0))
+	for i := 0; i < n; i++ {
+		events[i] = g.New(
+			Event.WithTransactionIndex(0),
+			Event.WithEventIndex(uint32(i)),
+		)
+	}
+
+	return events
+}
+
+// BlockEventsFixture returns a block events model populated with random events of length n.
+func BlockEventsFixture(
+	header *flow.Header,
+	n int,
+) flow.BlockEvents {
+	return flow.BlockEvents{
+		BlockID:        header.ID(),
+		BlockHeight:    header.Height,
+		BlockTimestamp: header.Timestamp,
+		Events:         EventsFixture(n),
+	}
+}

@@ -216,13 +216,12 @@ func TestGetTransactionResult(t *testing.T) {
 	id := unittest.IdentifierFixture()
 	bid := unittest.IdentifierFixture()
 	cid := unittest.IdentifierFixture()
-	g := generator.EventGenerator(generator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
 
 	txr := &accessmodel.TransactionResult{
 		Status:     flow.TransactionStatusSealed,
 		StatusCode: 10,
 		Events: []flow.Event{
-			g.New(
+			generator.EventFixture(
 				generator.Event.WithEventType(flow.EventAccountCreated),
 				generator.Event.WithTransactionIndex(1),
 				generator.Event.WithEventIndex(0),
@@ -435,13 +434,11 @@ func TestCreateTransaction(t *testing.T) {
 
 func transactionResultFixture(tx flow.Transaction) *accessmodel.TransactionResult {
 	cid := unittest.IdentifierFixture()
-	g := generator.EventGenerator(generator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
-
 	return &accessmodel.TransactionResult{
 		Status:     flow.TransactionStatusSealed,
 		StatusCode: 1,
 		Events: []flow.Event{
-			g.New(
+			generator.EventFixture(
 				generator.Event.WithEventType(flow.EventAccountCreated),
 				generator.Event.WithTransactionIndex(0),
 				generator.Event.WithEventIndex(0),
