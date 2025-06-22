@@ -76,12 +76,17 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) (*flow.Block, error) {
 
 // ByID returns the block with the given hash. It is available for
 // finalized and ambiguous blocks.
+// Expected errors during normal operations:
+// - storage.ErrNotFound if no block is found
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	return b.retrieveTx(blockID)
 }
 
 // ByHeight returns the block at the given height. It is only available
 // for finalized blocks.
+//
+// Expected errors during normal operations:
+// - storage.ErrNotFound if no block is found for the given height
 func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	blockID, err := b.headers.retrieveIdByHeightTx(height)
 	if err != nil {
