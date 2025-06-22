@@ -31,7 +31,7 @@ func InitWithDBFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVar(&flagPebbleDir, "pebble-dir", DefaultPebbleDir,
 		"directory to the pebble dababase")
 
-	cmd.PersistentFlags().StringVar(&flagUseDB, "use-db", DefaultDB, "the database type to use, --badger or --pebble")
+	cmd.PersistentFlags().StringVar(&flagUseDB, "use-db", DefaultDB, "the database type to use, badger or pebble")
 }
 
 // ReadDBFlags is to read the database flags
