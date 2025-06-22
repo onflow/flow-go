@@ -16,7 +16,7 @@ var (
 var rootCmd = &cobra.Command{
 	Use:   "rollback-executed-height",
 	Short: "rollback executed height",
-	Run:   run,
+	RunE:  runE,
 }
 
 func Execute() {
