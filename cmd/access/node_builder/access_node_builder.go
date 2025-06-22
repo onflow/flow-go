@@ -2156,28 +2156,35 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				)
 			}
 
+			collectionSyncer := ingestion.NewCollectionSyncer(
+				node.Logger,
+				notNil(builder.collectionExecutedMetric),
+				builder.RequestEng,
+				node.State,
+				node.Storage.Blocks,
+				notNil(builder.collections),
+				notNil(builder.transactions),
+				lastFullBlockHeight,
+			)
+			builder.RequestEng.WithHandle(collectionSyncer.OnCollectionDownloaded)
+
 			builder.IngestEng, err = ingestion.New(
 				node.Logger,
 				node.EngineRegistry,
 				node.State,
 				node.Me,
-				builder.RequestEng,
 				node.Storage.Blocks,
-				node.Storage.Headers,
-				notNil(builder.collections),
-				notNil(builder.transactions),
 				node.Storage.Results,
 				node.Storage.Receipts,
-				notNil(builder.collectionExecutedMetric),
 				processedFinalizedBlockHeight,
-				lastFullBlockHeight,
+				notNil(collectionSyncer),
+				notNil(builder.collectionExecutedMetric),
 				notNil(builder.TxResultErrorMessagesCore),
 			)
 			if err != nil {
 				return nil, err
 			}
 			ingestionDependable.Init(builder.IngestEng)
-			builder.RequestEng.WithHandle(builder.IngestEng.OnCollection)
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
 
 			return builder.IngestEng, nil
