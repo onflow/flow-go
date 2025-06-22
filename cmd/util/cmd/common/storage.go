@@ -127,7 +127,7 @@ func InitStorage(datadir string) (storage.DB, error) {
 	}
 
 	if ok {
-		db, err := pebblestorage.MustOpenDefaultPebbleDB(log.Logger, datadir)
+		db, err := pebblestorage.ShouldOpenDefaultPebbleDB(log.Logger, datadir)
 		if err != nil {
 			return nil, fmt.Errorf("could not open pebble db at %s: %w", datadir, err)
 		}
