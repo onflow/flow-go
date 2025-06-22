@@ -1384,6 +1384,8 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 		return fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
 	}
 
+	node.Logger.Info().Msgf("execution database bootstrapped: %v, commit: %v", bootstrapped, commit)
+
 	// if the execution database does not exist, then we need to bootstrap the execution database.
 	if !bootstrapped {
 
