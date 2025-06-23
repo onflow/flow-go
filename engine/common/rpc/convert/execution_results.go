@@ -188,6 +188,7 @@ func MessageToChunk(m *entities.Chunk) (*flow.Chunk, error) {
 	var chunk *flow.Chunk
 
 	// Branch on nil-vs-non-nil to preserve backward compatibility
+	//TODO(mainnet27, #6773): remove the v1 branch here
 	if serviceEventCountPtr == nil {
 		// Protocol v1: omit ServiceEventCount
 		chunk, err = flow.NewChunk_ProtocolVersion1(flow.UntrustedChunk{
