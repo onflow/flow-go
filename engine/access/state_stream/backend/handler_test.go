@@ -450,7 +450,8 @@ func TestEventStream(t *testing.T) {
 		}
 
 		for _, resp := range responses {
-			convertedEvents := convert.MessagesToEvents(resp.GetEvents())
+			convertedEvents, err := convert.MessagesToEvents(resp.GetEvents())
+			require.NoError(t, err)
 
 			assert.Equal(t, blockHeight, resp.GetBlockHeight())
 			assert.Equal(t, blockID, convert.MessageToIdentifier(resp.GetBlockId()))
