@@ -20,6 +20,7 @@ import (
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
@@ -125,14 +126,11 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 }
 
 func backendTransactionStatusesResponse(block *flow.Block) []*accessmodel.TransactionResult {
-	id := unittest.IdentifierFixture()
 	cid := unittest.IdentifierFixture()
 	txr := accessmodel.TransactionResult{
-		Status:     flow.TransactionStatusSealed,
-		StatusCode: 10,
-		Events: []flow.Event{
-			unittest.EventFixture(flow.EventAccountCreated, 1, 0, unittest.Event.WithTransactionID(id)),
-		},
+		Status:       flow.TransactionStatusSealed,
+		StatusCode:   10,
+		Events:       generator.EventsFixture(1),
 		ErrorMessage: "",
 		BlockID:      block.ID(),
 		CollectionID: cid,

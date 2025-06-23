@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
@@ -17,7 +18,7 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			// insert random events
 			b := unittest.IdentifierFixture()
-			events := unittest.EventsFixture(30)
+			events := generator.EventsFixture(30)
 			for _, evt := range events {
 				err := operation.InsertEvent(rw.Writer(), b, evt)
 				if err != nil {

@@ -10,13 +10,14 @@ import (
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 // TestEventFingerprint verifies that the Fingerprint function produces
 // a consistent RLP-encoded representation of an Event. It ensures that
 // decoding the fingerprint results in a correctly ordered structure.
 func TestEventFingerprint(t *testing.T) {
-	evt := unittest.EventFixture(flow.EventAccountCreated, 13, 12)
+	evt := generator.EventFixture()
 
 	data := fingerprint.Fingerprint(evt)
 	var decoded flow.Event
@@ -27,16 +28,15 @@ func TestEventFingerprint(t *testing.T) {
 // TestEventMalleability checks that Event is not malleable: any change in its data
 // should result in a different ID.
 func TestEventMalleability(t *testing.T) {
-	txID := unittest.IdentifierFixture()
-	event := unittest.EventFixture(flow.EventAccountUpdated, 21, 37, unittest.Event.WithTransactionID(txID))
+	event := generator.EventFixture()
 
 	unittest.RequireEntityNonMalleable(t, &event)
 }
 
 func TestEventsList(t *testing.T) {
-	eventA := unittest.EventFixture(flow.EventAccountUpdated, 21, 37)
-	eventB := unittest.EventFixture(flow.EventAccountCreated, 0, 37)
-	eventC := unittest.EventFixture(flow.EventAccountCreated, 0, 37)
+	eventA := generator.EventFixture()
+	eventB := generator.EventFixture()
+	eventC := generator.EventFixture()
 
 	listAB := flow.EventsList{
 		eventA,

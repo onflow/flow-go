@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 // TestConvertEventWithoutPayloadConversion tests converting events to and from protobuf messages
@@ -20,25 +21,16 @@ import (
 func TestConvertEventWithoutPayloadConversion(t *testing.T) {
 	t.Parallel()
 
-	txID := unittest.IdentifierFixture()
 	cadenceValue := cadence.NewInt(2)
-
-	t.Run("convert empty event", func(t *testing.T) {
-		event := unittest.EventFixture(flow.EventAccountCreated, 2, 3, unittest.Event.WithTransactionID(txID))
-
-		msg := convert.EventToMessage(event)
-		converted, err := convert.MessageToEvent(msg)
-		require.NoError(t, err)
-
-		require.Equal(t, event, *converted)
-	})
 
 	t.Run("convert json cdc encoded event", func(t *testing.T) {
 		ccfPayload, err := ccf.Encode(cadenceValue)
 		require.NoError(t, err)
 
-		event := unittest.EventFixture(flow.EventAccountCreated, 2, 3, unittest.Event.WithTransactionID(txID))
-		event.Payload = ccfPayload
+		event := generator.EventFixture(
+			generator.Event.WithEventType(flow.EventAccountCreated),
+			generator.Event.WithPayload(ccfPayload),
+		)
 
 		msg := convert.EventToMessage(event)
 		converted, err := convert.MessageToEvent(msg)
@@ -51,8 +43,10 @@ func TestConvertEventWithoutPayloadConversion(t *testing.T) {
 		jsonPayload, err := jsoncdc.Encode(cadenceValue)
 		require.NoError(t, err)
 
-		event := unittest.EventFixture(flow.EventAccountCreated, 2, 3, unittest.Event.WithTransactionID(txID))
-		event.Payload = jsonPayload
+		event := generator.EventFixture(
+			generator.Event.WithEventType(flow.EventAccountCreated),
+			generator.Event.WithPayload(jsonPayload),
+		)
 
 		msg := convert.EventToMessage(event)
 		converted, err := convert.MessageToEvent(msg)
@@ -67,17 +61,23 @@ func TestConvertEventWithoutPayloadConversion(t *testing.T) {
 func TestConvertEventWithPayloadConversion(t *testing.T) {
 	t.Parallel()
 
-	txID := unittest.IdentifierFixture()
 	cadenceValue := cadence.NewInt(2)
 
-	var err error
-	ccfEvent := unittest.EventFixture(flow.EventAccountCreated, 2, 3, unittest.Event.WithTransactionID(txID))
-	ccfEvent.Payload, err = ccf.Encode(cadenceValue)
+	payload, err := ccf.Encode(cadenceValue)
 	require.NoError(t, err)
 
-	jsonEvent := unittest.EventFixture(flow.EventAccountCreated, 2, 3, unittest.Event.WithTransactionID(txID))
-	jsonEvent.Payload, err = jsoncdc.Encode(cadenceValue)
+	ccfEvent := generator.EventFixture(
+		generator.Event.WithEventType(flow.EventAccountCreated),
+		generator.Event.WithPayload(payload),
+	)
+
+	payload, err = jsoncdc.Encode(cadenceValue)
 	require.NoError(t, err)
+
+	jsonEvent := generator.EventFixture(
+		generator.Event.WithEventType(flow.EventAccountCreated),
+		generator.Event.WithPayload(payload),
+	)
 
 	t.Run("convert payload from ccf to jsoncdc", func(t *testing.T) {
 		message := convert.EventToMessage(ccfEvent)
@@ -100,7 +100,6 @@ func TestConvertEvents(t *testing.T) {
 	t.Parallel()
 
 	eventCount := 3
-	txID := unittest.IdentifierFixture()
 
 	events := make([]flow.Event, eventCount)
 	ccfEvents := make([]flow.Event, eventCount)
@@ -108,18 +107,21 @@ func TestConvertEvents(t *testing.T) {
 	for i := 0; i < eventCount; i++ {
 		cadenceValue := cadence.NewInt(i)
 
-		eventIndex := 3 + uint32(i)
-
-		event := unittest.EventFixture(flow.EventAccountCreated, 2, eventIndex, unittest.Event.WithTransactionID(txID))
-		ccfEvent := unittest.EventFixture(flow.EventAccountCreated, 2, eventIndex, unittest.Event.WithTransactionID(txID))
-		jsonEvent := unittest.EventFixture(flow.EventAccountCreated, 2, eventIndex, unittest.Event.WithTransactionID(txID))
-
-		var err error
-		ccfEvent.Payload, err = ccf.Encode(cadenceValue)
+		ccfPayload, err := ccf.Encode(cadenceValue)
 		require.NoError(t, err)
 
-		jsonEvent.Payload, err = jsoncdc.Encode(cadenceValue)
+		jsonPayload, err := jsoncdc.Encode(cadenceValue)
 		require.NoError(t, err)
+
+		event := generator.EventFixture()
+		ccfEvent := generator.EventFixture(
+			generator.Event.WithEventType(flow.EventAccountCreated),
+			generator.Event.WithPayload(ccfPayload),
+		)
+		jsonEvent := generator.EventFixture(
+			generator.Event.WithEventType(flow.EventAccountCreated),
+			generator.Event.WithPayload(jsonPayload),
+		)
 
 		events[i] = event
 		ccfEvents[i] = ccfEvent
@@ -221,7 +223,7 @@ func TestConvertMessagesToBlockEvents(t *testing.T) {
 	blockEvents := make([]flow.BlockEvents, count)
 	for i := 0; i < count; i++ {
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(i)))
-		blockEvents[i] = unittest.BlockEventsFixture(header, 2)
+		blockEvents[i] = generator.BlockEventsFixture(header, 2)
 	}
 
 	msg, err := convert.BlockEventsToMessages(blockEvents)

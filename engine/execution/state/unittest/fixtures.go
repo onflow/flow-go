@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 func StateInteractionsFixture() *snapshot.ExecutionSnapshot {
@@ -67,10 +68,10 @@ func ComputationResultForBlockFixture(
 	executionDataID, err := execution_data.CalculateID(context.Background(), bed, execution_data.DefaultSerializer)
 	require.NoError(t, err)
 
-	_, serviceEventEpochCommitProtocol := unittest.EpochCommitFixtureByChainID(flow.Localnet)
-	_, serviceEventEpochSetupProtocol := unittest.EpochSetupFixtureByChainID(flow.Localnet)
-	_, serviceEventEpochRecoverProtocol := unittest.EpochRecoverFixtureByChainID(flow.Localnet)
-	_, serviceEventVersionBeaconProtocol := unittest.VersionBeaconFixtureByChainID(flow.Localnet)
+	_, serviceEventEpochCommitProtocol := generator.EpochCommitFixtureByChainID(flow.Localnet)
+	_, serviceEventEpochSetupProtocol := generator.EpochSetupFixtureByChainID(flow.Localnet)
+	_, serviceEventEpochRecoverProtocol := generator.EpochRecoverFixtureByChainID(flow.Localnet)
+	_, serviceEventVersionBeaconProtocol := generator.VersionBeaconFixtureByChainID(flow.Localnet)
 
 	convertedServiceEvents := flow.ServiceEventList{
 		serviceEventEpochCommitProtocol.ServiceEvent(),

@@ -1298,7 +1298,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 
 	// Set up the events storage mock
 	totalEvents := 5
-	eventsForTx := unittest.EventsFixture(totalEvents, flow.EventAccountCreated)
+	eventsForTx := generator.EventsFixture(totalEvents)
 	eventMessages := make([]*entities.Event, totalEvents)
 	for j, event := range eventsForTx {
 		eventMessages[j] = convert.EventToMessage(event)
@@ -1386,7 +1386,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 
 	// Set up the events storage mock
 	totalEvents := 5
-	eventsForTx := unittest.EventsFixture(totalEvents, flow.EventAccountCreated)
+	eventsForTx := generator.EventsFixture(totalEvents)
 	eventMessages := make([]*entities.Event, totalEvents)
 	for j, event := range eventsForTx {
 		eventMessages[j] = convert.EventToMessage(event)
@@ -1480,7 +1480,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 
 	// Set up the events storage mock
 	totalEvents := 5
-	eventsForTx := unittest.EventsFixture(totalEvents, flow.EventAccountCreated)
+	eventsForTx := generator.EventsFixture(totalEvents)
 	eventMessages := make([]*entities.Event, totalEvents)
 	for j, event := range eventsForTx {
 		eventMessages[j] = convert.EventToMessage(event)

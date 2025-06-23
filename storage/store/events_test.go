@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 func TestEventStoreRetrieve(t *testing.T) {
@@ -23,10 +24,25 @@ func TestEventStoreRetrieve(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		tx1ID := unittest.IdentifierFixture()
 		tx2ID := unittest.IdentifierFixture()
-		evt1_1 := unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.Event.WithTransactionID(tx1ID))
-		evt1_2 := unittest.EventFixture(flow.EventAccountCreated, 1, 1, unittest.Event.WithTransactionID(tx2ID))
+		evt1_1 := generator.EventFixture(
+			generator.Event.WithEventType(flow.EventAccountCreated),
+			generator.Event.WithTransactionIndex(0),
+			generator.Event.WithEventIndex(0),
+			generator.Event.WithTransactionID(tx1ID),
+		)
+		evt1_2 := generator.EventFixture(
+			generator.Event.WithEventType(flow.EventAccountCreated),
+			generator.Event.WithTransactionIndex(1),
+			generator.Event.WithEventIndex(1),
+			generator.Event.WithTransactionID(tx2ID),
+		)
 
-		evt2_1 := unittest.EventFixture(flow.EventAccountUpdated, 2, 2, unittest.Event.WithTransactionID(tx2ID))
+		evt2_1 := generator.EventFixture(
+			generator.Event.WithEventType(flow.EventAccountUpdated),
+			generator.Event.WithTransactionIndex(2),
+			generator.Event.WithEventIndex(2),
+			generator.Event.WithTransactionID(tx2ID),
+		)
 
 		expected := []flow.EventsList{
 			{evt1_1, evt1_2},

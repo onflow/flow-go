@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 func TestEvents_HappyPath(t *testing.T) {
@@ -19,9 +20,24 @@ func TestEvents_HappyPath(t *testing.T) {
 	transaction1 := unittest.TransactionFixture()
 	transaction2 := unittest.TransactionFixture()
 
-	event1 := unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.Event.WithTransactionID(transaction1.ID()))
-	event2 := unittest.EventFixture(flow.EventAccountUpdated, 0, 1, unittest.Event.WithTransactionID(transaction1.ID()))
-	event3 := unittest.EventFixture(flow.EventAccountCreated, 1, 2, unittest.Event.WithTransactionID(transaction2.ID()))
+	event1 := generator.EventFixture(
+		generator.Event.WithEventType(flow.EventAccountCreated),
+		generator.Event.WithTransactionIndex(0),
+		generator.Event.WithEventIndex(0),
+		generator.Event.WithTransactionID(transaction1.ID()),
+	)
+	event2 := generator.EventFixture(
+		generator.Event.WithEventType(flow.EventAccountUpdated),
+		generator.Event.WithTransactionIndex(0),
+		generator.Event.WithEventIndex(1),
+		generator.Event.WithTransactionID(transaction1.ID()),
+	)
+	event3 := generator.EventFixture(
+		generator.Event.WithEventType(flow.EventAccountCreated),
+		generator.Event.WithTransactionIndex(1),
+		generator.Event.WithEventIndex(2),
+		generator.Event.WithTransactionID(transaction2.ID()),
+	)
 
 	// Store events
 	expectedStoredEvents := flow.EventsList{event1, event2, event3}

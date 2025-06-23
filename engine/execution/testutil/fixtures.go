@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	protocolMock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 func CreateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
@@ -588,8 +589,14 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 	blockExecResult := execution.NewPopulatedBlockExecutionResult(executableBlock)
 	blockExecResult.CollectionExecutionResultAt(0).AppendTransactionResults(
 		flow.EventsList{
-			unittest.EventFixture("what", 0, 0),
-			unittest.EventFixture("ever", 0, 1),
+			generator.EventFixture(
+				generator.Event.WithTransactionIndex(0),
+				generator.Event.WithEventIndex(0),
+			),
+			generator.EventFixture(
+				generator.Event.WithTransactionIndex(0),
+				generator.Event.WithEventIndex(1),
+			),
 		},
 		nil,
 		nil,
@@ -602,10 +609,22 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 	)
 	blockExecResult.CollectionExecutionResultAt(1).AppendTransactionResults(
 		flow.EventsList{
-			unittest.EventFixture("what", 2, 0),
-			unittest.EventFixture("ever", 2, 1),
-			unittest.EventFixture("ever", 2, 2),
-			unittest.EventFixture("ever", 2, 3),
+			generator.EventFixture(
+				generator.Event.WithTransactionIndex(2),
+				generator.Event.WithEventIndex(0),
+			),
+			generator.EventFixture(
+				generator.Event.WithTransactionIndex(2),
+				generator.Event.WithEventIndex(1),
+			),
+			generator.EventFixture(
+				generator.Event.WithTransactionIndex(2),
+				generator.Event.WithEventIndex(2),
+			),
+			generator.EventFixture(
+				generator.Event.WithTransactionIndex(2),
+				generator.Event.WithEventIndex(3),
+			),
 		},
 		nil,
 		nil,

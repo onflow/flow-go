@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 func TestEventsOnlyFirstHave(t *testing.T) {
@@ -22,7 +23,7 @@ func TestEventsOnlyFirstHave(t *testing.T) {
 		pevents := store.NewEvents(metrics.NewNoopCollector(), pebbleimpl.ToDB(pdb))
 
 		blockID := unittest.IdentifierFixture()
-		events := unittest.EventsFixture(3)
+		events := generator.EventsFixture(3)
 
 		chained := NewEvents(pevents, bevents)
 
@@ -46,7 +47,7 @@ func TestEventsOnlySecondHave(t *testing.T) {
 		pevents := store.NewEvents(metrics.NewNoopCollector(), pebbleimpl.ToDB(pdb))
 
 		blockID := unittest.IdentifierFixture()
-		events := unittest.EventsFixture(3)
+		events := generator.EventsFixture(3)
 
 		chained := NewEvents(pevents, bevents)
 		// only stored in second

@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/utils/slices"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 // makeBlockExecutionResultFixture makes a BlockExecutionResult fixture
@@ -17,7 +18,7 @@ func makeBlockExecutionResultFixture(serviceEventsPerChunk []int) *BlockExecutio
 	for _, nServiceEvents := range serviceEventsPerChunk {
 		fixture.collectionExecutionResults = append(fixture.collectionExecutionResults,
 			CollectionExecutionResult{
-				serviceEvents:          unittest.EventsFixture(nServiceEvents),
+				serviceEvents:          generator.EventsFixture(nServiceEvents),
 				convertedServiceEvents: unittest.ServiceEventsFixture(nServiceEvents),
 			})
 	}

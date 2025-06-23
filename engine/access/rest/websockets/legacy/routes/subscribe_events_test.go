@@ -44,6 +44,11 @@ type testType struct {
 }
 
 var chainID = flow.Testnet
+var testEventTypes = []flow.EventType{
+	unittest.EventTypeFixture(chainID),
+	unittest.EventTypeFixture(chainID),
+	unittest.EventTypeFixture(chainID),
+}
 
 type SubscribeEventsSuite struct {
 	suite.Suite
@@ -73,7 +78,15 @@ func (s *SubscribeEventsSuite) SetupTest() {
 		result := unittest.ExecutionResultFixture()
 
 		s.blocks = append(s.blocks, block)
-		s.blockEvents[block.ID()] = generator.EventsFixture(5)
+
+		var events []flow.Event
+		for j := 0; j < len(testEventTypes); j++ {
+			events = append(events, generator.EventFixture(
+				generator.Event.WithEventType(testEventTypes[j]),
+			))
+		}
+
+		s.blockEvents[block.ID()] = events
 
 		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Header.Height, block.ID(), result.ExecutionDataID)
 	}
@@ -140,11 +153,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 		t2 := test
 		t2.name = fmt.Sprintf("%s - some events", test.name)
-		var eventTypesBlock0 []string
-		for _, event := range s.blockEvents[s.blocks[0].ID()] {
-			eventTypesBlock0 = append(eventTypesBlock0, string(event.Type))
-		}
-		t2.eventTypes = eventTypesBlock0
+		t2.eventTypes = []string{string(testEventTypes[0])}
 		tests = append(tests, t2)
 
 		t3 := test

@@ -9,6 +9,7 @@ import (
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 func TestConvertTransactionResult(t *testing.T) {
@@ -42,7 +43,7 @@ func txResultFixture() *accessmodel.TransactionResult {
 	return &accessmodel.TransactionResult{
 		Status:        flow.TransactionStatusExecuted,
 		StatusCode:    0,
-		Events:        unittest.EventsFixture(3),
+		Events:        generator.EventsFixture(3),
 		ErrorMessage:  "",
 		BlockID:       unittest.IdentifierFixture(),
 		TransactionID: unittest.IdentifierFixture(),

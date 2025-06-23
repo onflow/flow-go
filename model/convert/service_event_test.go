@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 func TestEventConversion(t *testing.T) {
@@ -20,8 +21,7 @@ func TestEventConversion(t *testing.T) {
 	chainID := flow.Emulator
 
 	t.Run("epoch setup", func(t *testing.T) {
-
-		fixture, expected := unittest.EpochSetupFixtureByChainID(chainID)
+		fixture, expected := generator.EpochSetupFixtureByChainID(chainID)
 
 		// convert Cadence types to Go types
 		event, err := convert.ServiceEvent(chainID, fixture)
@@ -39,11 +39,11 @@ func TestEventConversion(t *testing.T) {
 
 	t.Run("epoch setup with random source with leading zeroes", func(t *testing.T) {
 
-		fixture, _ := unittest.EpochSetupFixtureByChainID(chainID)
+		fixture, _ := generator.EpochSetupFixtureByChainID(chainID)
 		// all zero source to cover all cases of endiannesses
 		randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
 		// update the random source in event fixture
-		fixture.Payload = unittest.EpochSetupFixtureCCF(randomSource)
+		fixture.Payload = generator.EpochSetupFixtureCCF(randomSource)
 
 		// convert Cadence types to Go types
 		event, err := convert.ServiceEvent(chainID, fixture)
@@ -58,10 +58,10 @@ func TestEventConversion(t *testing.T) {
 
 	t.Run("epoch setup with short random source", func(t *testing.T) {
 
-		fixture, _ := unittest.EpochSetupFixtureByChainID(chainID)
+		fixture, _ := generator.EpochSetupFixtureByChainID(chainID)
 		// update the random source in event fixture
 		randomSource := unittest.EpochSetupRandomSourceFixture()
-		fixture.Payload = unittest.EpochSetupFixtureCCF(randomSource[:flow.EpochSetupRandomSourceLength-1])
+		fixture.Payload = generator.EpochSetupFixtureCCF(randomSource[:flow.EpochSetupRandomSourceLength-1])
 
 		// convert Cadence types to Go types
 		event, err := convert.ServiceEvent(chainID, fixture)
@@ -72,9 +72,9 @@ func TestEventConversion(t *testing.T) {
 
 	t.Run("epoch setup with non-hex random source", func(t *testing.T) {
 
-		fixture, _ := unittest.EpochSetupFixtureByChainID(chainID)
+		fixture, _ := generator.EpochSetupFixtureByChainID(chainID)
 		// update the random source in event fixture
-		fixture.Payload = unittest.EpochSetupCCFWithNonHexRandomSource()
+		fixture.Payload = generator.EpochSetupCCFWithNonHexRandomSource()
 
 		// convert Cadence types to Go types
 		event, err := convert.ServiceEvent(chainID, fixture)
@@ -85,7 +85,7 @@ func TestEventConversion(t *testing.T) {
 
 	t.Run("epoch commit", func(t *testing.T) {
 
-		fixture, expected := unittest.EpochCommitFixtureByChainID(chainID)
+		fixture, expected := generator.EpochCommitFixtureByChainID(chainID)
 
 		// convert Cadence types to Go types
 		event, err := convert.ServiceEvent(chainID, fixture)
@@ -104,7 +104,7 @@ func TestEventConversion(t *testing.T) {
 	//  backward compatibility of EpochCommit service event
 	t.Run("epoch commit, backward compatibility", func(t *testing.T) {
 
-		fixture, expected := unittest.EpochCommitV0FixtureByChainID(chainID)
+		fixture, expected := generator.EpochCommitV0FixtureByChainID(chainID)
 
 		// convert Cadence types to Go types
 		event, err := convert.ServiceEvent(chainID, fixture)
@@ -120,7 +120,7 @@ func TestEventConversion(t *testing.T) {
 	)
 
 	t.Run("epoch recover", func(t *testing.T) {
-		fixture, expected := unittest.EpochRecoverFixtureByChainID(chainID)
+		fixture, expected := generator.EpochRecoverFixtureByChainID(chainID)
 
 		// convert Cadence types to Go types
 		event, err := convert.ServiceEvent(chainID, fixture)
@@ -136,7 +136,7 @@ func TestEventConversion(t *testing.T) {
 
 	t.Run("version beacon", func(t *testing.T) {
 
-		fixture, expected := unittest.VersionBeaconFixtureByChainID(chainID)
+		fixture, expected := generator.VersionBeaconFixtureByChainID(chainID)
 
 		// convert Cadence types to Go types
 		event, err := convert.ServiceEvent(chainID, fixture)
@@ -152,7 +152,7 @@ func TestEventConversion(t *testing.T) {
 	)
 
 	t.Run("protocol state version upgrade", func(t *testing.T) {
-		fixture, expected := unittest.ProtocolStateVersionUpgradeFixtureByChainID(chainID)
+		fixture, expected := generator.ProtocolStateVersionUpgradeFixtureByChainID(chainID)
 
 		// convert Cadence types to Go types
 		event, err := convert.ServiceEvent(chainID, fixture)
@@ -258,9 +258,9 @@ func TestDecodeCadenceValue(t *testing.T) {
 }
 
 func TestVersionBeaconEventConversion(t *testing.T) {
-	versionBoundaryType := unittest.NewNodeVersionBeaconVersionBoundaryStructType()
-	semverType := unittest.NewNodeVersionBeaconSemverStructType()
-	eventType := unittest.NewNodeVersionBeaconVersionBeaconEventType()
+	versionBoundaryType := generator.NewNodeVersionBeaconVersionBoundaryStructType()
+	semverType := generator.NewNodeVersionBeaconSemverStructType()
+	eventType := generator.NewNodeVersionBeaconVersionBeaconEventType()
 
 	type vbTestCase struct {
 		name                 string
@@ -274,10 +274,12 @@ func TestVersionBeaconEventConversion(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			events := systemcontracts.ServiceEventsForChain(chainID)
 
-			var err error
-			event := unittest.EventFixture(events.VersionBeacon.EventType(), 1, 1)
-			event.Payload, err = ccf.Encode(test.event)
+			payload, err := ccf.Encode(test.event)
 			require.NoError(t, err)
+			event := generator.EventFixture(
+				generator.Event.WithEventType(events.VersionBeacon.EventType()),
+				generator.Event.WithPayload(payload),
+			)
 
 			// convert Cadence types to Go types
 			serviceEvent, err := convert.ServiceEvent(chainID, event)

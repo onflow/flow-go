@@ -3166,3 +3166,12 @@ func EpochStateContainerFixture() *flow.EpochStateContainer {
 		EpochExtensions:  []flow.EpochExtension{EpochExtensionFixture()},
 	}
 }
+
+func EpochSetupRandomSourceFixture() []byte {
+	source := make([]byte, flow.EpochSetupRandomSourceLength)
+	_, err := rand.Read(source)
+	if err != nil {
+		panic(err)
+	}
+	return source
+}

@@ -44,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
@@ -296,8 +297,9 @@ func (s *TransactionStatusSuite) initializeHappyCaseMockInstructions() {
 	}, nil).Maybe()
 	s.state.On("Sealed").Return(s.sealedSnapshot, nil).Maybe()
 
-	eventsForTx := unittest.EventsFixture(1, flow.EventAccountCreated)
-	eventMessages := make([]*entities.Event, 1)
+	eventsCount := 1
+	eventsForTx := generator.EventsFixture(eventsCount)
+	eventMessages := make([]*entities.Event, eventsCount)
 	for j, event := range eventsForTx {
 		eventMessages[j] = convert.EventToMessage(event)
 	}

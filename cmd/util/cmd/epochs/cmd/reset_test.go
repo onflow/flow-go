@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 // TestReset_LocalSnapshot tests the command with a local snapshot file.
@@ -47,7 +48,7 @@ func TestReset_LocalSnapshot(t *testing.T) {
 
 			// compare to expected values
 			expectedArgs := extractResetEpochArgs(rootSnapshot)
-			unittest.VerifyCdcArguments(t, expectedArgs, outputTxArgs)
+			generator.VerifyCdcArguments(t, expectedArgs, outputTxArgs)
 		})
 	})
 
@@ -95,7 +96,7 @@ func TestReset_BucketSnapshot(t *testing.T) {
 		rootSnapshot, err := getSnapshotFromBucket(fmt.Sprintf(rootSnapshotBucketURL, flagBucketNetworkName))
 		require.NoError(t, err)
 		expectedArgs := extractResetEpochArgs(rootSnapshot)
-		unittest.VerifyCdcArguments(t, expectedArgs, outputTxArgs)
+		generator.VerifyCdcArguments(t, expectedArgs, outputTxArgs)
 	})
 
 	// should output arguments to stdout, including specified payout
@@ -117,7 +118,7 @@ func TestReset_BucketSnapshot(t *testing.T) {
 		rootSnapshot, err := getSnapshotFromBucket(fmt.Sprintf(rootSnapshotBucketURL, flagBucketNetworkName))
 		require.NoError(t, err)
 		expectedArgs := extractResetEpochArgs(rootSnapshot)
-		unittest.VerifyCdcArguments(t, expectedArgs, outputTxArgs)
+		generator.VerifyCdcArguments(t, expectedArgs, outputTxArgs)
 	})
 
 	// with a missing snapshot, should log an error

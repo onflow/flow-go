@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -126,7 +127,12 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 		},
 	}
 	testEvents := []flow.Event{
-		unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.Event.WithTransactionID(flow.HashToID([]byte{11, 22, 33}))),
+		generator.EventFixture(
+			generator.Event.WithEventType(flow.EventAccountUpdated),
+			generator.Event.WithTransactionIndex(0),
+			generator.Event.WithEventIndex(0),
+			generator.Event.WithTransactionID(flow.HashToID([]byte{11, 22, 33})),
+		),
 	}
 	testCollectionID := flow.HashToID([]byte{0xA, 0xB, 0xC})
 	testBlock := flow.NewBlock(

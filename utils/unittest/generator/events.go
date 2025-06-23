@@ -1,6 +1,7 @@
 package generator
 
 import (
+	"encoding/hex"
 	"fmt"
 	"testing"
 
@@ -124,18 +125,16 @@ func (g *Events) createNewEventPayload(location common.AddressLocation, identifi
 		nil,
 	)
 
-	fooString, err := cadence.NewString("foo")
-	if err != nil {
-		panic(fmt.Sprintf("unexpected error while creating cadence string: %s", err))
-	}
+	randomString := cadence.String(hex.EncodeToString(unittest.RandomBytes(100)))
 
 	testEvent := cadence.NewEvent(
 		[]cadence.Value{
 			cadence.NewInt(int(g.count)),
-			fooString,
+			randomString,
 		}).WithType(testEventType)
 
 	var payload []byte
+	var err error
 	switch g.encoding {
 	case entities.EventEncodingVersion_CCF_V0:
 		payload, err = ccf.Encode(testEvent)

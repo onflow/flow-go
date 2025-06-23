@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/internal"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 func TestSerializeDeserializeChunkExecutionData(t *testing.T) {
@@ -18,7 +19,7 @@ func TestSerializeDeserializeChunkExecutionData(t *testing.T) {
 	// Test serializing the current ChunkExecutionData version, then deserializing it back to the
 	// same type. Make sure the start and end data structures are the same.
 	t.Run("serialize and deserialize ChunkExecutionData", func(t *testing.T) {
-		ced := unittest.ChunkExecutionDataFixture(t, 1024, unittest.WithChunkEvents(unittest.EventsFixture(5)))
+		ced := unittest.ChunkExecutionDataFixture(t, 1024, unittest.WithChunkEvents(generator.EventsFixture(5)))
 
 		buf := new(bytes.Buffer)
 		err := serializer.Serialize(buf, ced)
@@ -40,7 +41,7 @@ func TestSerializeDeserializeChunkExecutionData(t *testing.T) {
 	// the data structure. It does NOT ensure that the current data structure is backwards compatible
 	// with the previous code.
 	t.Run("serialize ChunkExecutionDataV1 and deserialize to ChunkExecutionData", func(t *testing.T) {
-		cedV2 := unittest.ChunkExecutionDataFixture(t, 1024, unittest.WithChunkEvents(unittest.EventsFixture(5)))
+		cedV2 := unittest.ChunkExecutionDataFixture(t, 1024, unittest.WithChunkEvents(generator.EventsFixture(5)))
 		cedV2.TransactionResults = nil
 		cedV1 := &internal.ChunkExecutionDataV1{
 			Collection: cedV2.Collection,

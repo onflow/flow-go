@@ -129,9 +129,13 @@ func TestAccountStatusFilterFiltering(t *testing.T) {
 	accountContractAdded := generator.GenerateAccountContractEvent(t, "AccountContractAdded", accountContractAddedAddress)
 
 	events := flow.EventsList{
-		unittest.EventFixture("A.0000000000000001.Contract1.EventA", 0, 0),
+		generator.EventFixture(
+			generator.Event.WithEventType("A.0000000000000001.Contract1.EventA"),
+		),
 		accountCreateEvent,
-		unittest.EventFixture("A.0000000000000001.Contract2.EventA", 0, 0),
+		generator.EventFixture(
+			generator.Event.WithEventType("A.0000000000000001.Contract2.EventA"),
+		),
 		accountContractAdded,
 	}
 

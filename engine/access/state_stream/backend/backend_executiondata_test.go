@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
@@ -302,7 +303,12 @@ func generateMockEvents(header *flow.Header, eventCount int) flow.BlockEvents {
 			eventIndex = 0
 		}
 
-		events[i] = unittest.EventFixture(testEventTypes[i%len(testEventTypes)], txIndex, eventIndex, unittest.Event.WithTransactionID(txID))
+		events[i] = generator.EventFixture(
+			generator.Event.WithEventType(testEventTypes[i%len(testEventTypes)]),
+			generator.Event.WithTransactionIndex(txIndex),
+			generator.Event.WithEventIndex(eventIndex),
+			generator.Event.WithTransactionID(txID),
+		)
 	}
 
 	return flow.BlockEvents{

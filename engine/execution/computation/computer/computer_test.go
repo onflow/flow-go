@@ -56,6 +56,7 @@ import (
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 const (
@@ -834,7 +835,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			serviceEvents := systemcontracts.ServiceEventsForChain(chainID)
 
 			randomSource := unittest.EpochSetupRandomSourceFixture()
-			payload, err := ccf.Decode(nil, unittest.EpochSetupFixtureCCF(randomSource))
+			payload, err := ccf.Decode(nil, generator.EpochSetupFixtureCCF(randomSource))
 			require.NoError(t, err)
 
 			serviceEventA, ok := payload.(cadence.Event)
@@ -845,7 +846,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}
 			serviceEventA.EventType.QualifiedIdentifier = serviceEvents.EpochSetup.QualifiedIdentifier()
 
-			payload, err = ccf.Decode(nil, unittest.EpochCommitFixtureCCF)
+			payload, err = ccf.Decode(nil, generator.EpochCommitFixtureCCF)
 			require.NoError(t, err)
 
 			serviceEventB, ok := payload.(cadence.Event)
@@ -856,7 +857,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}
 			serviceEventB.EventType.QualifiedIdentifier = serviceEvents.EpochCommit.QualifiedIdentifier()
 
-			payload, err = ccf.Decode(nil, unittest.VersionBeaconFixtureCCF)
+			payload, err = ccf.Decode(nil, generator.VersionBeaconFixtureCCF)
 			require.NoError(t, err)
 
 			serviceEventC, ok := payload.(cadence.Event)

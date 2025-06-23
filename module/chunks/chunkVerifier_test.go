@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 // eventsList is the set of events emitted by each transaction, by default
@@ -57,8 +58,8 @@ var id5 = flow.NewRegisterID(unittest.RandomAddressFixture(), "")
 
 // the chain we use for this test suite
 var testChain = flow.Emulator
-var epochSetupEvent, _ = unittest.EpochSetupFixtureByChainID(testChain)
-var epochCommitEvent, _ = unittest.EpochCommitFixtureByChainID(testChain)
+var epochSetupEvent, _ = generator.EpochSetupFixtureByChainID(testChain)
+var epochCommitEvent, _ = generator.EpochCommitFixtureByChainID(testChain)
 
 // serviceEventsList is the list of service events emitted by default.
 var serviceEventsList = []flow.Event{
@@ -264,7 +265,7 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch_SystemChunk() {
 	s.snapshots[string(serviceTxBody.Script)] = &snapshot.ExecutionSnapshot{}
 	s.outputs[string(serviceTxBody.Script)] = fvm.ProcedureOutput{
 		ComputationUsed:        computationUsed,
-		ServiceEvents:          unittest.EventsFixture(1),
+		ServiceEvents:          generator.EventsFixture(1),
 		ConvertedServiceEvents: flow.ServiceEventList{*epochCommitServiceEvent},
 		Events:                 meta.ChunkEvents,
 	}

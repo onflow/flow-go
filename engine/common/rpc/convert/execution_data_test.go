@@ -74,7 +74,7 @@ func TestConvertBlockExecutionData(t *testing.T) {
 	t.Parallel()
 
 	chain := flow.Testnet.Chain() // this is used by the AddressFixture
-	events := unittest.EventsFixture(5)
+	events := generator.EventsFixture(5)
 
 	chunks := 5
 	chunkData := make([]*execution_data.ChunkExecutionData, 0, chunks)
@@ -128,7 +128,7 @@ func TestConvertChunkExecutionData(t *testing.T) {
 			fn: func(t *testing.T) *execution_data.ChunkExecutionData {
 				return unittest.ChunkExecutionDataFixture(t,
 					0, // updates set explicitly to target 160-320KB per chunk
-					unittest.WithChunkEvents(unittest.EventsFixture(5)),
+					unittest.WithChunkEvents(generator.EventsFixture(5)),
 					unittest.WithTrieUpdate(testutils.TrieUpdateFixture(5, 32*1024, 64*1024)),
 				)
 			},

@@ -25,6 +25,7 @@ import (
 	realstorage "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 type Suite struct {
@@ -135,7 +136,11 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		eventsForBlock := make([]flow.Event, eventsPerBlock)
 		eventMessages := make([]*entities.Event, eventsPerBlock)
 		for j := range eventsForBlock {
-			e := unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j))
+			e := generator.EventFixture(
+				generator.Event.WithEventType(flow.EventAccountCreated),
+				generator.Event.WithTransactionIndex(uint32(j)),
+				generator.Event.WithEventIndex(uint32(j)),
+			)
 			eventsForBlock[j] = e
 			eventMessages[j] = convert.EventToMessage(e)
 		}
@@ -414,7 +419,11 @@ func (suite *Suite) TestGetTransactionResult() {
 	eventsForTx := make([]flow.Event, totalEvents)
 	eventMessages := make([]*entities.Event, totalEvents)
 	for j := range eventsForTx {
-		e := unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j))
+		e := generator.EventFixture(
+			generator.Event.WithEventType(flow.EventAccountCreated),
+			generator.Event.WithTransactionIndex(uint32(j)),
+			generator.Event.WithEventIndex(uint32(j)),
+		)
 		eventsForTx[j] = e
 		eventMessages[j] = convert.EventToMessage(e)
 	}
@@ -750,13 +759,23 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	convertedEventsForTx2 := make([]*entities.Event, len(eventsForTx2))
 
 	for j := 0; j < len(eventsForTx1); j++ {
-		e := unittest.EventFixture(flow.EventAccountCreated, uint32(0), uint32(j), unittest.Event.WithTransactionID(tx1ID))
+		e := generator.EventFixture(
+			generator.Event.WithEventType(flow.EventAccountCreated),
+			generator.Event.WithTransactionIndex(0),
+			generator.Event.WithEventIndex(uint32(j)),
+			generator.Event.WithTransactionID(tx1ID),
+		)
 		eventsForTx1[j] = e
 		eventsForBlock[j] = e
 		convertedEventsForTx1[j] = convert.EventToMessage(e)
 	}
 	for j := 0; j < len(eventsForTx2); j++ {
-		e := unittest.EventFixture(flow.EventAccountCreated, uint32(1), uint32(j), unittest.Event.WithTransactionID(tx2ID))
+		e := generator.EventFixture(
+			generator.Event.WithEventType(flow.EventAccountCreated),
+			generator.Event.WithTransactionIndex(1),
+			generator.Event.WithEventIndex(uint32(j)),
+			generator.Event.WithTransactionID(tx2ID),
+		)
 		eventsForTx2[j] = e
 		eventsForBlock[len(eventsForTx1)+j] = e
 		convertedEventsForTx2[j] = convert.EventToMessage(e)

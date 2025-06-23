@@ -151,6 +151,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
 	github.com/google/flatbuffers v23.5.26+incompatible // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
@@ -360,6 +361,7 @@ require (
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
+	gotest.tools v2.2.0+incompatible // indirect
 	lukechampine.com/blake3 v1.4.0 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
