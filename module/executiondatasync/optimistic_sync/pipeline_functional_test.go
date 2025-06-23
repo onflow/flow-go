@@ -11,6 +11,7 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -31,6 +32,8 @@ import (
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+//TODO: The code of tests needs to be simplified and unified. This is WIP changes.
 
 type PipelineFunctionalSuite struct {
 	suite.Suite
@@ -160,7 +163,7 @@ mainLoop:
 		select {
 		case err := <-errChan:
 			p.Require().NoError(err)
-			return // Exit after pipeline completes
+			return
 		case newState := <-updateChan:
 			p.Require().NotEqual(StateAbandoned, newState)
 
@@ -178,10 +181,214 @@ mainLoop:
 	p.verifyDataPersistence(expectedChunkExecutionData, expectedTxResultErrMsgs)
 }
 
-// TODO: tests to finish up
-// 2. Various error conditions are handled
-// 3. Cancelation during various stages
-// 4. Graceful shutdowns
+// TestPipelineDownloadError tests error handling during the download phase
+func (p *PipelineFunctionalSuite) TestPipelineDownloadError() {
+	// Test execution data request failure
+	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return((*execution_data.BlockExecutionData)(nil), assert.AnError).Once()
+	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(([]flow.TransactionResultErrorMessage)(nil), nil).Maybe()
+
+	updateChan := make(chan State, 10)
+	publisher := func(state State) {
+		updateChan <- state
+	}
+
+	pipeline := NewPipeline(p.logger, false, p.executionResult, p.core, publisher)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	errChan := make(chan error)
+	go func() {
+		errChan <- pipeline.Run(ctx, p.core)
+	}()
+
+	pipeline.OnParentStateUpdated(StateComplete)
+
+	err := <-errChan
+	p.Require().ErrorIs(err, assert.AnError)
+	p.Assert().Contains(err.Error(), "failed to request execution data")
+}
+
+func (p *PipelineFunctionalSuite) TestPipelineIndexingError() {
+	// Setup successful download
+	expectedExecutionData := unittest.BlockExecutionDataFixture(
+		unittest.WithBlockExecutionDataBlockID(unittest.IdentifierFixture()), // Wrong block ID to cause indexing error
+	)
+	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
+
+	expectedTxResultErrMsgs := unittest.TransactionResultErrorMessagesFixture(5)
+	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(expectedTxResultErrMsgs, nil).Once()
+
+	updateChan := make(chan State, 10)
+	publisher := func(state State) {
+		updateChan <- state
+	}
+
+	pipeline := NewPipeline(p.logger, false, p.executionResult, p.core, publisher)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	errChan := make(chan error)
+	go func() {
+		errChan <- pipeline.Run(ctx, p.core)
+	}()
+
+	pipeline.OnParentStateUpdated(StateComplete)
+
+	// Should get error from pipeline during indexing
+	err := <-errChan
+	p.Require().Error(err)
+	p.Assert().Contains(err.Error(), "invalid block execution data")
+}
+
+// TestPipelinePersistError tests error handling during the persist phase
+func (p *PipelineFunctionalSuite) TestPipelinePersistError() {
+	expectedChunkExecutionData := unittest.ChunkExecutionDataFixture(
+		p.T(),
+		0,
+		unittest.WithChunkEvents(unittest.EventsFixture(5)),
+		unittest.WithTrieUpdate(createTestTrieUpdate(p.T())),
+	)
+	systemChunkCollection := unittest.CollectionFixture(1)
+	systemChunkData := &execution_data.ChunkExecutionData{
+		Collection: &systemChunkCollection,
+	}
+
+	expectedExecutionData := unittest.BlockExecutionDataFixture(
+		unittest.WithBlockExecutionDataBlockID(p.block.ID()),
+		unittest.WithChunkExecutionDatas(expectedChunkExecutionData, systemChunkData),
+	)
+	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
+
+	expectedTxResultErrMsgs := unittest.TransactionResultErrorMessagesFixture(5)
+	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(expectedTxResultErrMsgs, nil).Once()
+
+	updateChan := make(chan State, 10)
+
+	publisher := func(state State) {
+		updateChan <- state
+	}
+
+	pipeline := NewPipeline(p.logger, false, p.executionResult, p.core, publisher)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	errChan := make(chan error)
+	go func() {
+		errChan <- pipeline.Run(ctx, p.core)
+	}()
+
+	pipeline.OnParentStateUpdated(StateComplete)
+
+mainLoop:
+	for {
+		select {
+		case err := <-errChan:
+			p.Require().Error(err)
+			p.Assert().Contains(err.Error(), "could not get events")
+			return
+		case newState := <-updateChan:
+			switch newState {
+			case StateWaitingPersist:
+				{
+					err := p.persistentEvents.RemoveByBlockID(p.block.ID())
+					p.Require().NoError(err)
+					pipeline.SetSealed()
+				}
+			case StateComplete:
+				break mainLoop
+			default:
+				continue
+			}
+		}
+	}
+}
+
+// TestPipelineCancellationDuringDownload tests context cancellation during download phase
+func (p *PipelineFunctionalSuite) TestPipelineParentCtxCancellationDuringDownload() {
+	// Set up mocks to simulate slow operations
+	p.execDataRequester.On("RequestExecutionData", mock.Anything).Run(func(args mock.Arguments) {
+		ctx := args.Get(0).(context.Context)
+		// Wait for cancellation
+		<-ctx.Done()
+	}).Return((*execution_data.BlockExecutionData)(nil), context.Canceled).Once()
+
+	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return([]flow.TransactionResultErrorMessage{}, context.Canceled).Maybe()
+
+	updateChan := make(chan State, 10)
+	publisher := func(state State) {
+		updateChan <- state
+	}
+
+	pipeline := NewPipeline(p.logger, false, p.executionResult, p.core, publisher)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	errChan := make(chan error)
+	go func() {
+		errChan <- pipeline.Run(ctx, p.core)
+	}()
+
+	pipeline.OnParentStateUpdated(StateComplete)
+
+	go func() {
+		for state := range updateChan {
+			if state == StateDownloading {
+				// Cancel context during download
+				cancel()
+				return
+			}
+		}
+	}()
+
+	err := <-errChan
+	p.Require().Error(err)
+
+	p.Assert().ErrorIs(err, context.Canceled)
+	p.Assert().Equal(StateDownloading, pipeline.GetState())
+}
+
+func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
+	// Set up mocks to simulate slow operations
+	p.execDataRequester.On("RequestExecutionData", mock.Anything).Run(func(args mock.Arguments) {
+		ctx := args.Get(0).(context.Context)
+		// Wait for cancellation
+		<-ctx.Done()
+	}).Return((*execution_data.BlockExecutionData)(nil), context.Canceled).Once()
+
+	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return([]flow.TransactionResultErrorMessage{}, context.Canceled).Maybe()
+
+	updateChan := make(chan State, 10)
+	publisher := func(state State) {
+		updateChan <- state
+	}
+
+	pipeline := NewPipeline(p.logger, false, p.executionResult, p.core, publisher)
+
+	errChan := make(chan error)
+	go func() {
+		errChan <- pipeline.Run(context.Background(), p.core)
+	}()
+
+	pipeline.OnParentStateUpdated(StateWaitingPersist)
+
+	go func() {
+		for state := range updateChan {
+			if state == StateWaitingPersist {
+				pipeline.OnParentStateUpdated(StateAbandoned)
+				return
+			}
+		}
+	}()
+
+	err := <-errChan
+	p.Require().NoError(err)
+
+	p.Assert().Equal(StateAbandoned, pipeline.GetState())
+	p.Assert().Nil(p.core.workingData)
+}
 
 // verifyDataPersistence checks that all expected data was actually persisted to storage
 func (p *PipelineFunctionalSuite) verifyDataPersistence(
