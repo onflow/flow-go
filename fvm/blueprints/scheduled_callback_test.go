@@ -18,12 +18,16 @@ func TestProcessCallbacksTransaction(t *testing.T) {
 	t.Parallel()
 
 	chain := flow.Mainnet.Chain()
-	tx := blueprints.ProcessCallbacksTransaction(chain)
+	const effortLeft = 100
+	tx, err := blueprints.ProcessCallbacksTransaction(chain, effortLeft)
+	require.NoError(t, err)
 
 	assert.NotNil(t, tx)
 	assert.NotEmpty(t, tx.Script)
 	assert.Equal(t, uint64(blueprints.SystemChunkTransactionGasLimit), tx.GasLimit)
-	assert.Empty(t, tx.Arguments)
+	encodedEffort, err := ccf.Encode(cadence.UInt64(effortLeft))
+	require.NoError(t, err)
+	assert.Equal(t, encodedEffort, tx.Arguments[0])
 }
 
 func TestExecuteCallbacksTransactions(t *testing.T) {
