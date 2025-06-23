@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 // TestRecoverEpochHappyPath ensures recover epoch transaction arguments are generated as expected.
@@ -74,7 +73,7 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		require.NoError(t, err)
 
 		// verify each argument
-		decodedValues := generator.InterfafceToCdcValues(t, outputTxArgs)
+		decodedValues := unittest.InterfaceToCdcValues(t, outputTxArgs)
 		currEpoch, err := rootSnapshot.Epochs().Current()
 		require.NoError(t, err)
 		finalView := currEpoch.FinalView()

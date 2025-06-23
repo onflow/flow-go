@@ -2,16 +2,10 @@ package generator
 
 import (
 	"encoding/hex"
-	"encoding/json"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -1631,41 +1625,6 @@ var ProtocolStateVersionUpgradeFixtureCCF = func() []byte {
 	}
 	return b
 }()
-
-func VerifyCdcArguments(t *testing.T, expected []cadence.Value, actual []interface{}) {
-
-	for index, arg := range actual {
-
-		// marshal to bytes
-		bz, err := json.Marshal(arg)
-		require.NoError(t, err)
-
-		// parse cadence value
-		decoded, err := jsoncdc.Decode(nil, bz)
-		require.NoError(t, err)
-
-		assert.Equal(t, expected[index], decoded)
-	}
-}
-
-// InterfafceToCdcValues decodes jsoncdc encoded values from interface -> cadence value.
-func InterfafceToCdcValues(t *testing.T, vals []interface{}) []cadence.Value {
-	decoded := make([]cadence.Value, len(vals))
-	for index, val := range vals {
-
-		// marshal to bytes
-		bz, err := json.Marshal(val)
-		require.NoError(t, err)
-
-		// parse cadence value
-		cdcVal, err := jsoncdc.Decode(nil, bz)
-		require.NoError(t, err)
-
-		decoded[index] = cdcVal
-	}
-
-	return decoded
-}
 
 func NewFlowClusterQCClusterStructType() *cadence.StructType {
 
