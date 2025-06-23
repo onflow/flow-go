@@ -44,7 +44,7 @@ func NewExecutionResult(untrusted UntrustedExecutionResult) (*ExecutionResult, e
 		return nil, fmt.Errorf("BlockID must not be empty")
 	}
 
-	if untrusted.Chunks == nil {
+	if len(untrusted.Chunks) == 0 {
 		return nil, fmt.Errorf("Chunks must not be empty")
 	}
 
