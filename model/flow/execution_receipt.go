@@ -34,12 +34,10 @@ func (er *ExecutionReceipt) ID() Identifier {
 func (er *ExecutionReceipt) Stub() *ExecutionReceiptStub {
 	// Constructor is skipped since we're using an already-valid ExecutionReceipt object.
 	//nolint:structwrite
-	executionReceiptStub := &ExecutionReceiptStub{
+	return &ExecutionReceiptStub{
 		UnsignedExecutionReceiptStub: er.UnsignedExecutionReceipt.Stub(),
 		ExecutorSignature:            er.ExecutorSignature,
 	}
-
-	return executionReceiptStub
 }
 
 // ID returns a hash over the data of the execution receipt.
