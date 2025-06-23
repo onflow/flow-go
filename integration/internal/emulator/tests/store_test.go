@@ -143,7 +143,7 @@ func TestCollections(t *testing.T) {
 		t.Run("should be able to get inserted collection", func(t *testing.T) {
 			storedCol, err := store.CollectionByID(context.Background(), col.ID())
 			require.NoError(t, err)
-			assert.Equal(t, col.Light(), storedCol)
+			assert.Equal(t, *col.Light(), storedCol)
 		})
 	})
 }
