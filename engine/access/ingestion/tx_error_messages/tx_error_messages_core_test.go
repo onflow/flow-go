@@ -323,16 +323,19 @@ func setupReceiptsForBlock(receipts *storage.ExecutionReceipts, block *flow.Bloc
 }
 
 // setupReceiptsForBlockWithResult sets up mock execution receipts for a block with a specific execution result
-func setupReceiptsForBlockWithResult(receipts *storage.ExecutionReceipts, block *flow.Block, eNodeID flow.Identifier, executionResult flow.ExecutionResult) {
-	receipt1 := unittest.ExecutionReceiptFixture(unittest.WithResult(&executionResult), unittest.WithExecutorID(eNodeID))
-	receipt2 := unittest.ExecutionReceiptFixture(unittest.WithResult(&executionResult), unittest.WithExecutorID(eNodeID))
-
-	receiptsList := flow.ExecutionReceiptList{receipt1, receipt2}
+func setupReceiptsForBlockWithResult(receipts *storage.ExecutionReceipts, executionResult *flow.ExecutionResult, executorIDs ...flow.Identifier) {
+	receiptList := make(flow.ExecutionReceiptList, 0, len(executorIDs))
+	for _, enID := range executorIDs {
+		receiptList = append(receiptList, unittest.ExecutionReceiptFixture(
+			unittest.WithResult(executionResult),
+			unittest.WithExecutorID(enID),
+		))
+	}
 
 	receipts.
-		On("ByBlockID", block.ID()).
+		On("ByBlockID", executionResult.BlockID).
 		Return(func(flow.Identifier) flow.ExecutionReceiptList {
-			return receiptsList
+			return receiptList
 		}, nil)
 }
 

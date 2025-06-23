@@ -1,7 +1,6 @@
 package store
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -78,7 +77,7 @@ func (r *ExecutionReceipts) byID(receiptID flow.Identifier) (*flow.ExecutionRece
 func (r *ExecutionReceipts) byBlockID(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
 	var receiptIDs []flow.Identifier
 	err := operation.LookupExecutionReceipts(r.db.Reader(), blockID, &receiptIDs)
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+	if err != nil {
 		return nil, fmt.Errorf("could not find receipt index for block: %w", err)
 	}
 
@@ -109,8 +108,7 @@ func (r *ExecutionReceipts) ByID(receiptID flow.Identifier) (*flow.ExecutionRece
 
 // ByBlockID retrieves list of execution receipts from the storage
 //
-// Expected errors during normal operation:
-// - storage.ErrNotFound if no receipts were found in storage
+// No errors are expected errors during normal operations.
 func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (flow.ExecutionReceiptList, error) {
 	return r.byBlockID(blockID)
 }
