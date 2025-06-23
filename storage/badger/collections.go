@@ -28,7 +28,7 @@ func NewCollections(db *badger.DB, transactions *Transactions) *Collections {
 func (c *Collections) Store(collection *flow.Collection) error {
 	return operation.RetryOnConflictTx(c.db, transaction.Update, func(ttx *transaction.Tx) error {
 		light := collection.Light()
-		err := transaction.WithTx(operation.SkipDuplicates(operation.InsertCollection(&light)))(ttx)
+		err := transaction.WithTx(operation.SkipDuplicates(operation.InsertCollection(light)))(ttx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}

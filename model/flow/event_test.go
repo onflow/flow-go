@@ -16,7 +16,7 @@ import (
 // a consistent RLP-encoded representation of an Event. It ensures that
 // decoding the fingerprint results in a correctly ordered structure.
 func TestEventFingerprint(t *testing.T) {
-	evt := unittest.EventFixture(flow.EventAccountCreated, 13, 12, unittest.IdentifierFixture(), 32)
+	evt := unittest.EventFixture(flow.EventAccountCreated, 13, 12)
 
 	data := fingerprint.Fingerprint(evt)
 	var decoded flow.Event
@@ -28,16 +28,15 @@ func TestEventFingerprint(t *testing.T) {
 // should result in a different ID.
 func TestEventMalleability(t *testing.T) {
 	txID := unittest.IdentifierFixture()
-	event := unittest.EventFixture(flow.EventAccountUpdated, 21, 37, txID, 2)
+	event := unittest.EventFixture(flow.EventAccountUpdated, 21, 37, unittest.Event.WithTransactionID(txID))
 
 	unittest.RequireEntityNonMalleable(t, &event)
 }
 
 func TestEventsList(t *testing.T) {
-
-	eventA := unittest.EventFixture(flow.EventAccountUpdated, 21, 37, unittest.IdentifierFixture(), 2)
-	eventB := unittest.EventFixture(flow.EventAccountCreated, 0, 37, unittest.IdentifierFixture(), 22)
-	eventC := unittest.EventFixture(flow.EventAccountCreated, 0, 37, unittest.IdentifierFixture(), 22)
+	eventA := unittest.EventFixture(flow.EventAccountUpdated, 21, 37)
+	eventB := unittest.EventFixture(flow.EventAccountCreated, 0, 37)
+	eventC := unittest.EventFixture(flow.EventAccountCreated, 0, 37)
 
 	listAB := flow.EventsList{
 		eventA,
@@ -98,4 +97,99 @@ func TestEmptyEventsMerkleRootHash(t *testing.T) {
 	actualHash, err := flow.EventsMerkleRootHash([]flow.Event{})
 	require.NoError(t, err)
 	require.Equal(t, flow.EmptyEventCollectionID, actualHash)
+}
+
+// TestNewEvent verifies the behavior of the NewEvent constructor.
+// It ensures proper handling of both valid and invalid untrusted input fields.
+//
+// Test Cases:
+//
+// 1. Valid input:
+//   - Verifies that a properly populated UntrustedEvent results in a valid Event.
+//
+// 2. Invalid input with empty event type:
+//   - Ensures an error is returned when the Type field is an empty string.
+//
+// 3. Invalid input with zero transaction ID:
+//   - Ensures an error is returned when the TransactionID is zero.
+//
+// 4. Invalid input with nil Payload:
+//   - Ensures an error is returned when the Payload field is nil.
+//
+// 5. Invalid input with empty Payload:
+//   - Ensures an error is returned when the Payload field is an empty byte slice.
+func TestNewEvent(t *testing.T) {
+	t.Run("valid input", func(t *testing.T) {
+		event, err := flow.NewEvent(
+			flow.UntrustedEvent{
+				Type:             flow.EventAccountCreated,
+				TransactionID:    unittest.IdentifierFixture(),
+				TransactionIndex: 1,
+				EventIndex:       1,
+				Payload:          []byte("cadence-json encoded data"),
+			},
+		)
+		require.NoError(t, err)
+		require.NotNil(t, event)
+	})
+
+	t.Run("invalid input, type is empty", func(t *testing.T) {
+		event, err := flow.NewEvent(
+			flow.UntrustedEvent{
+				Type:             "",
+				TransactionID:    unittest.IdentifierFixture(),
+				TransactionIndex: 1,
+				EventIndex:       1,
+				Payload:          []byte("cadence-json encoded data"),
+			},
+		)
+		require.Error(t, err)
+		require.Nil(t, event)
+		assert.Contains(t, err.Error(), "event type must not be empty")
+	})
+
+	t.Run("invalid input, transaction ID is zero", func(t *testing.T) {
+		event, err := flow.NewEvent(
+			flow.UntrustedEvent{
+				Type:             flow.EventAccountCreated,
+				TransactionID:    flow.ZeroID,
+				TransactionIndex: 1,
+				EventIndex:       1,
+				Payload:          []byte("cadence-json encoded data"),
+			},
+		)
+		require.Error(t, err)
+		require.Nil(t, event)
+		assert.Contains(t, err.Error(), "transaction ID must not be zero")
+	})
+
+	t.Run("invalid input with nil payload", func(t *testing.T) {
+		event, err := flow.NewEvent(
+			flow.UntrustedEvent{
+				Type:             flow.EventAccountCreated,
+				TransactionID:    unittest.IdentifierFixture(),
+				TransactionIndex: 1,
+				EventIndex:       1,
+				Payload:          nil,
+			},
+		)
+		require.Error(t, err)
+		require.Nil(t, event)
+		assert.Contains(t, err.Error(), "payload must not be empty")
+	})
+
+	t.Run("invalid input with empty payload", func(t *testing.T) {
+		event, err := flow.NewEvent(
+			flow.UntrustedEvent{
+				Type:             flow.EventAccountCreated,
+				TransactionID:    unittest.IdentifierFixture(),
+				TransactionIndex: 1,
+				EventIndex:       1,
+				Payload:          []byte{},
+			},
+		)
+		require.Error(t, err)
+		require.Nil(t, event)
+		assert.Contains(t, err.Error(), "payload must not be empty")
+	})
 }
