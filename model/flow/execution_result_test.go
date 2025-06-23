@@ -205,12 +205,13 @@ func TestNewExecutionResult(t *testing.T) {
 	validPrevID := unittest.IdentifierFixture()
 	validBlockID := unittest.IdentifierFixture()
 	validExecDataID := unittest.IdentifierFixture()
+	chunks := unittest.ChunkListFixture(5, unittest.IdentifierFixture(), unittest.StateCommitmentFixture())
 
 	t.Run("valid result with non-nil slices", func(t *testing.T) {
 		u := flow.UntrustedExecutionResult{
 			PreviousResultID: validPrevID,
 			BlockID:          validBlockID,
-			Chunks:           flow.ChunkList{},
+			Chunks:           chunks,
 			ServiceEvents:    flow.ServiceEventList{},
 			ExecutionDataID:  validExecDataID,
 		}
@@ -219,7 +220,7 @@ func TestNewExecutionResult(t *testing.T) {
 		assert.NotNil(t, res)
 		assert.Equal(t, validPrevID, res.PreviousResultID)
 		assert.Equal(t, validBlockID, res.BlockID)
-		assert.Equal(t, flow.ChunkList{}, res.Chunks)
+		assert.Equal(t, chunks, res.Chunks)
 		assert.Equal(t, flow.ServiceEventList{}, res.ServiceEvents)
 		assert.Equal(t, validExecDataID, res.ExecutionDataID)
 	})
@@ -228,7 +229,7 @@ func TestNewExecutionResult(t *testing.T) {
 		u := flow.UntrustedExecutionResult{
 			PreviousResultID: validPrevID,
 			BlockID:          validBlockID,
-			Chunks:           flow.ChunkList{},
+			Chunks:           chunks,
 			// ServiceEvents left nil
 			ExecutionDataID: validExecDataID,
 		}
@@ -242,7 +243,7 @@ func TestNewExecutionResult(t *testing.T) {
 		u := flow.UntrustedExecutionResult{
 			PreviousResultID: flow.ZeroID,
 			BlockID:          validBlockID,
-			Chunks:           flow.ChunkList{},
+			Chunks:           chunks,
 			ExecutionDataID:  validExecDataID,
 		}
 		res, err := flow.NewExecutionResult(u)
@@ -255,7 +256,7 @@ func TestNewExecutionResult(t *testing.T) {
 		u := flow.UntrustedExecutionResult{
 			PreviousResultID: validPrevID,
 			BlockID:          flow.ZeroID,
-			Chunks:           flow.ChunkList{},
+			Chunks:           chunks,
 			ExecutionDataID:  validExecDataID,
 		}
 		res, err := flow.NewExecutionResult(u)
@@ -281,7 +282,7 @@ func TestNewExecutionResult(t *testing.T) {
 		u := flow.UntrustedExecutionResult{
 			PreviousResultID: validPrevID,
 			BlockID:          validBlockID,
-			Chunks:           flow.ChunkList{},
+			Chunks:           chunks,
 			ExecutionDataID:  flow.ZeroID,
 		}
 		res, err := flow.NewExecutionResult(u)
