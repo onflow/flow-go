@@ -82,7 +82,7 @@ func New(
 	// register our workers which are basically consumers of different kinds of data.
 	// engine notifies workers when new data is available so that they can start processing them.
 	builder := component.NewComponentManagerBuilder().
-		AddWorker(e.StartWorkerLoop).
+		AddWorker(e.startMessageHandlerLoop).
 		AddWorker(e.finalizedBlockProcessor.StartWorkerLoop).
 		AddWorker(e.collectionSyncer.StartWorkerLoop)
 	e.ComponentManager = builder.Build()
@@ -116,9 +116,9 @@ func (e *Engine) Process(chanName channels.Channel, originID flow.Identifier, ev
 	}
 }
 
-// StartWorkerLoop reacts to message handler notifications and processes available execution receipts
+// startMessageHandlerLoop reacts to message handler notifications and processes available execution receipts
 // once notification has arrived.
-func (e *Engine) StartWorkerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (e *Engine) startMessageHandlerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	for {

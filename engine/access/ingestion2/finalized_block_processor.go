@@ -133,7 +133,7 @@ func (p *FinalizedBlockProcessor) processFinalizedBlockJobCallback(
 		p.log.Error().Err(err).
 			Str("job_id", string(job.ID())).
 			Msg("unexpected error during finalized block processing job")
-		irrecoverable.Throw(ctx, err)
+		ctx.Throw(fmt.Errorf("failed to index finalized block: %w", err))
 		return
 	}
 
