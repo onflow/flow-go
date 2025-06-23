@@ -128,6 +128,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 	// generic entity exchange engines
 	case *messages.EntityRequest:
 		return CodeEntityRequest, s, nil
+	// NOTE(7449): contains encoded message (application level: Block, Collection, etc.)
 	case *messages.EntityResponse:
 		return CodeEntityResponse, s, nil
 
@@ -136,6 +137,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 		return CodeEcho, s, nil
 
 	// dkg
+	// NOTE(7449): contains encoded message (sub-application level)
 	case *messages.DKGMessage:
 		return CodeDKGMessage, s, nil
 

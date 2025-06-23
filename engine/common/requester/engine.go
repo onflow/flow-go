@@ -495,6 +495,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 	// build a list of needed entities; if not available, process anyway,
 	// but in that case we can't re-queue missing items
 	needed := make(map[flow.Identifier]struct{})
+	// undocumented requirement that response nonce matches (?)
 	req, exists := e.requests[res.Nonce]
 	if exists {
 		delete(e.requests, req.Nonce)
