@@ -30,6 +30,7 @@ type ResultsForest struct {
 	log                         zerolog.Logger
 	forest                      forest.LevelledForest
 	maxSize                     uint64
+	manager                     *ForestManager
 	lastSealedResultID          flow.Identifier
 	latestPersistedSealedResult storage.LatestPersistedSealedResult
 	mu                          sync.RWMutex
@@ -50,6 +51,7 @@ type ResultsForest struct {
 func NewResultsForest(
 	log zerolog.Logger,
 	maxSize uint64,
+	manager *ForestManager,
 	latestPersistedSealedResult storage.LatestPersistedSealedResult,
 ) *ResultsForest {
 	resultID, _ := latestPersistedSealedResult.Latest()
@@ -57,6 +59,7 @@ func NewResultsForest(
 		log:                         log.With().Str("component", "results_forest").Logger(),
 		forest:                      *forest.NewLevelledForest(0),
 		maxSize:                     maxSize,
+		manager:                     manager,
 		lastSealedResultID:          resultID,
 		latestPersistedSealedResult: latestPersistedSealedResult,
 		mu:                          sync.RWMutex{},
@@ -139,6 +142,11 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, header *flow
 	added, err := container.AddReceipt(receipt)
 	if err != nil {
 		return false, fmt.Errorf("failed to add receipt to its container: %w", err)
+	}
+
+	err = rf.manager.OnReceiptAdded(container)
+	if err != nil {
+		return false, fmt.Errorf("failed to notify manager of new receipt: %w", err)
 	}
 
 	return added > 0, nil
@@ -295,6 +303,21 @@ func (rf *ResultsForest) getContainer(resultID flow.Identifier) (*ExecutionResul
 	return container.(*ExecutionResultContainer), true
 }
 
+// IterateChildren iterates over all children of the given result ID and calls the provided function on each child.
+//
+// Parameters:
+//   - resultID: the ID of the result whose children to iterate
+//   - fn: function to call on each child, return false to stop iteration
+//
+// Concurrency safety:
+//   - Safe for concurrent access
+func (rf *ResultsForest) IterateChildren(resultID flow.Identifier, fn func(*ExecutionResultContainer) bool) {
+	rf.mu.RLock()
+	defer rf.mu.RUnlock()
+
+	rf.iterateChildren(resultID, fn)
+}
+
 // iterateChildren iterates over all children of the given result ID and calls the provided function on each child.
 //
 // Parameters:
@@ -413,16 +436,17 @@ func (rf *ResultsForest) markResultSealed(container *ExecutionResultContainer) {
 	})
 }
 
-// OnBlockFinalized signals that the given block is finalized.
+// OnBlockStatusUpdated signals that the block status has been updated.
 // It finds all vertices for results of blocks that conflict with the finalized block and abort them.
 //
 // Parameters:
-//   - finalizedBlockID: the ID of the block that was finalized
-//   - parentBlockResultIDs: list of IDs for results for the finalized block's parent
+//   - finalized: the finalized block header
+//   - sealed: the sealed block header
+//   - parentBlockResultIDs: list of IDs of results for the finalized block's parent
 //
 // Concurrency safety:
 //   - Safe for concurrent access
-func (rf *ResultsForest) OnBlockFinalized(finalizedBlockID flow.Identifier, parentBlockResultIDs []flow.Identifier) {
+func (rf *ResultsForest) OnBlockStatusUpdated(finalized *flow.Header, sealed *flow.Header, parentBlockResultIDs []flow.Identifier) error {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
@@ -430,14 +454,19 @@ func (rf *ResultsForest) OnBlockFinalized(finalizedBlockID flow.Identifier, pare
 	// 2. For each of these results, get all child vertices
 	// 3. For each child vertex, cancel if it does not reference the finalized block
 
+	finalizedBlockID := finalized.ID()
+
 	for _, parentResultID := range parentBlockResultIDs {
 		rf.iterateChildren(parentResultID, func(child *ExecutionResultContainer) bool {
-			if child.blockHeader.ID() != finalizedBlockID {
+			if child.result.BlockID != finalizedBlockID {
 				child.Pipeline().OnParentStateUpdated(optimistic_sync.StateAbandoned)
 			}
 			return true
 		})
 	}
+
+	rf.manager.OnBlockStatusUpdated(finalized, sealed)
+	return nil
 }
 
 // OnStateUpdated is called by pipeline state machines when their state changes, and propagates the
@@ -450,13 +479,11 @@ func (rf *ResultsForest) OnBlockFinalized(finalizedBlockID flow.Identifier, pare
 // Concurrency safety:
 //   - Safe for concurrent access
 func (rf *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState optimistic_sync.State) {
-	// send state update to all children.
-	rf.mu.RLock()
-	rf.iterateChildren(resultID, func(child *ExecutionResultContainer) bool {
+	// propagate state update to all children.
+	rf.IterateChildren(resultID, func(child *ExecutionResultContainer) bool {
 		child.Pipeline().OnParentStateUpdated(newState)
 		return true
 	})
-	rf.mu.RUnlock()
 
 	// process completed pipelines
 	if newState == optimistic_sync.StateComplete {

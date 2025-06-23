@@ -3,6 +3,8 @@ package ingestion2
 import (
 	"fmt"
 
+	"go.uber.org/atomic"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
@@ -19,6 +21,7 @@ type ExecutionResultContainer struct {
 	resultID    flow.Identifier // precomputed ID of result to avoid expensive hashing on each call
 	blockHeader *flow.Header    // header of the block which the result is for
 	pipeline    optimistic_sync.Pipeline
+	enqueued    *atomic.Bool
 }
 
 // NewExecutionResultContainer creates a new instance of ExecutionResultContainer.
@@ -48,7 +51,30 @@ func NewExecutionResultContainer(result *flow.ExecutionResult, header *flow.Head
 		resultID:    result.ID(),
 		blockHeader: header,
 		pipeline:    pipeline,
+		enqueued:    atomic.NewBool(false),
 	}, nil
+}
+
+// IsEnqueued returns true if the container is enqueued for processing.
+//
+// Returns:
+//   - bool: true if the container is enqueued, false otherwise
+//
+// Concurrency safety:
+//   - Safe for concurrent access
+func (c *ExecutionResultContainer) IsEnqueued() bool {
+	return c.enqueued.Load()
+}
+
+// SetEnqueued sets the container as enqueued for processing.
+//
+// Returns:
+//   - bool: true if the container was successfully set as enqueued, false if it was already enqueued
+//
+// Concurrency safety:
+//   - Safe for concurrent access
+func (c *ExecutionResultContainer) SetEnqueued() bool {
+	return c.enqueued.CompareAndSwap(false, true)
 }
 
 // AddReceipt adds the given execution receipt to the container.
