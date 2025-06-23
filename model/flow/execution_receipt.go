@@ -2,6 +2,7 @@ package flow
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/onflow/crypto"
 )
@@ -31,10 +32,14 @@ func (er *ExecutionReceipt) ID() Identifier {
 
 // Stub returns a stub of the full ExecutionReceipt, where the ExecutionResult is replaced by its cryptographic hash.
 func (er *ExecutionReceipt) Stub() *ExecutionReceiptStub {
-	return &ExecutionReceiptStub{
+	// Constructor is skipped since we're using an already-valid object.
+	//nolint:structwrite
+	executionReceiptStub := &ExecutionReceiptStub{
 		UnsignedExecutionReceiptStub: er.UnsignedExecutionReceipt.Stub(),
 		ExecutorSignature:            er.ExecutorSignature,
 	}
+
+	return executionReceiptStub
 }
 
 // ID returns a hash over the data of the execution receipt.
@@ -58,9 +63,36 @@ func (erb UnsignedExecutionReceipt) Stub() UnsignedExecutionReceiptStub {
 // result). It only contains the ID (cryptographic hash) of the execution
 // result the receipt commits to. The ExecutionReceiptStub is useful for
 // storing results and receipts separately in a composable way.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type ExecutionReceiptStub struct {
 	UnsignedExecutionReceiptStub
 	ExecutorSignature crypto.Signature
+}
+
+// UntrustedExecutionReceiptStub is an untrusted input-only representation of a ExecutionReceiptStub,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedExecutionReceiptStub should be validated and converted into
+// a trusted ExecutionReceiptStub using NewExecutionReceiptStub constructor.
+type UntrustedExecutionReceiptStub ExecutionReceiptStub
+
+// NewExecutionReceiptStub creates a new instance of ExecutionReceiptStub.
+// Construction ExecutionReceiptStub allowed only within the constructor.
+//
+// All errors indicate a valid ExecutionReceiptStub cannot be constructed from the input.
+func NewExecutionReceiptStub(untrusted UntrustedExecutionReceiptStub) (*ExecutionReceiptStub, error) {
+	if len(untrusted.ExecutorSignature) == 0 {
+		return nil, fmt.Errorf("executor signature must not be empty")
+	}
+	return &ExecutionReceiptStub{
+		UnsignedExecutionReceiptStub: untrusted.UnsignedExecutionReceiptStub,
+		ExecutorSignature:            untrusted.ExecutorSignature,
+	}, nil
 }
 
 // UnsignedExecutionReceiptStub contains the fields of ExecutionReceiptStub that are signed by the executor.

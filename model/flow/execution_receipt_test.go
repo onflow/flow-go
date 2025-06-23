@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -91,4 +92,46 @@ func TestExecutionReceiptStubGroupBy(t *testing.T) {
 
 	unknown := groups.GetGroup(unittest.IdentifierFixture())
 	assert.Equal(t, 0, unknown.Size())
+}
+
+// TestNewExecutionReceiptStub verifies the behavior of the NewExecutionReceiptStub constructor.
+// It ensures proper handling of both valid and invalid untrusted input fields.
+//
+// Test Cases:
+//
+// 1. Valid input:
+//   - Verifies that a properly populated UntrustedExecutionReceiptStub results in a valid ExecutionReceiptStub.
+//
+// 2. Invalid input with nil ExecutorSignature:
+//   - Ensures an error is returned when the ExecutorSignature is nil.
+//
+// 3. Invalid input with empty ExecutorSignature:
+//   - Ensures an error is returned when the ExecutorSignature is an empty byte slice.
+func TestNewExecutionReceiptStub(t *testing.T) {
+	t.Run("valid input", func(t *testing.T) {
+		receipt := unittest.ExecutionReceiptFixture()
+		res, err := flow.NewExecutionReceiptStub(flow.UntrustedExecutionReceiptStub(*receipt.Stub()))
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	})
+
+	t.Run("invalid input with nil ExecutorSignature", func(t *testing.T) {
+		receipt := unittest.ExecutionReceiptFixture()
+		receipt.ExecutorSignature = nil
+
+		res, err := flow.NewExecutionReceiptStub(flow.UntrustedExecutionReceiptStub(*receipt.Stub()))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "executor signature must not be empty")
+	})
+
+	t.Run("invalid input with empty ExecutorSignature", func(t *testing.T) {
+		receipt := unittest.ExecutionReceiptFixture()
+		receipt.ExecutorSignature = []byte{}
+
+		res, err := flow.NewExecutionReceiptStub(flow.UntrustedExecutionReceiptStub(*receipt.Stub()))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "executor signature must not be empty")
+	})
 }

@@ -108,19 +108,26 @@ func ExecutionResultMetaListToMessages(e flow.ExecutionReceiptStubList) []*entit
 }
 
 // MessagesToExecutionResultMetaList converts a slice of protobuf messages to an execution result meta list
-func MessagesToExecutionResultMetaList(m []*entities.ExecutionReceiptMeta) flow.ExecutionReceiptStubList {
+func MessagesToExecutionResultMetaList(m []*entities.ExecutionReceiptMeta) (flow.ExecutionReceiptStubList, error) {
 	execMetaList := make([]*flow.ExecutionReceiptStub, len(m))
+	var err error
 	for i, message := range m {
-		execMetaList[i] = &flow.ExecutionReceiptStub{
-			UnsignedExecutionReceiptStub: flow.UnsignedExecutionReceiptStub{
-				ExecutorID: MessageToIdentifier(message.ExecutorId),
-				ResultID:   MessageToIdentifier(message.ResultId),
-				Spocks:     MessagesToSignatures(message.Spocks),
+		execMetaList[i], err = flow.NewExecutionReceiptStub(
+			flow.UntrustedExecutionReceiptStub{
+				UnsignedExecutionReceiptStub: flow.UnsignedExecutionReceiptStub{
+					ExecutorID: MessageToIdentifier(message.ExecutorId),
+					ResultID:   MessageToIdentifier(message.ResultId),
+					Spocks:     MessagesToSignatures(message.Spocks),
+				},
+				ExecutorSignature: MessageToSignature(message.ExecutorSignature),
 			},
-			ExecutorSignature: MessageToSignature(message.ExecutorSignature),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not construct execution receipt stub at index: %d: %w", i, err)
 		}
 	}
-	return execMetaList[:]
+
+	return execMetaList[:], nil
 }
 
 // ServiceEventCountFieldToMessage converts the [flow.Chunk.ServiceEventCount] field
