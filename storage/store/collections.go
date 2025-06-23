@@ -45,7 +45,7 @@ func (c *Collections) StoreLight(collection *flow.LightCollection) error {
 func (c *Collections) Store(collection *flow.Collection) error {
 	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		light := collection.Light()
-		err := operation.UpsertCollection(rw.Writer(), &light)
+		err := operation.UpsertCollection(rw.Writer(), light)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}

@@ -233,13 +233,13 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 	err := suite.db.View(func(tx *badger.Txn) error {
 
 		// should insert collection
-		var collection flow.LightCollection
-		err := operation.RetrieveCollection(suite.genesis.Payload.Collection.ID(), &collection)(tx)
+		collection := new(flow.LightCollection)
+		err := operation.RetrieveCollection(suite.genesis.Payload.Collection.ID(), collection)(tx)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
 		// should index collection
-		collection = flow.LightCollection{} // reset the collection
+		collection = new(flow.LightCollection) // reset the collection
 		err = operation.LookupCollectionPayload(suite.genesis.ID(), &collection.Transactions)(tx)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)

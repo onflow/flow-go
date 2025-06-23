@@ -1294,7 +1294,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 
 	// Set up the light collection and mock the behavior of the collections object
 	lightCol := col.Light()
-	suite.collections.On("LightByID", col.ID()).Return(&lightCol, nil)
+	suite.collections.On("LightByID", col.ID()).Return(lightCol, nil)
 
 	// Set up the events storage mock
 	totalEvents := 5
@@ -1370,7 +1370,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 
 	// Set up the light collection and mock the behavior of the collections object
 	lightCol := col.Light()
-	suite.collections.On("LightByID", col.ID()).Return(&lightCol, nil)
+	suite.collections.On("LightByID", col.ID()).Return(lightCol, nil)
 
 	// Mock the behavior of the blocks and transactionResults objects
 	suite.blocks.
@@ -1457,7 +1457,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 		On("ByID", blockId).
 		Return(block, nil)
 	lightCol := col.Light()
-	suite.collections.On("LightByID", mock.Anything).Return(&lightCol, nil)
+	suite.collections.On("LightByID", mock.Anything).Return(lightCol, nil)
 
 	lightTxResults := make([]flow.LightTransactionResult, len(lightCol.Transactions))
 	for i, txID := range lightCol.Transactions {
