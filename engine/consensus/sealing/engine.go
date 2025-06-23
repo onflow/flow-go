@@ -485,7 +485,13 @@ func (e *Engine) processIncorporatedBlock(incorporatedBlockID flow.Identifier) e
 			return fmt.Errorf("could not retrieve receipt incorporated in block %v: %w", incorporatedBlock.ParentID, err)
 		}
 
-		incorporatedResult := flow.NewIncorporatedResult(incorporatedBlock.ParentID, result)
+		incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+			IncorporatedBlockID: incorporatedBlock.ParentID,
+			Result:              result,
+		})
+		if err != nil {
+			return fmt.Errorf("could not create incorporated result for block (%x): %w", incorporatedBlock.ParentID, err)
+		}
 		added := e.pendingIncorporatedResults.Push(incorporatedResult)
 		if !added {
 			// Not being able to queue an incorporated result is a fatal edge case. It might happen, if the

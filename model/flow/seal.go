@@ -1,6 +1,9 @@
 package flow
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // A Seal is produced when an Execution Result (referenced by `ResultID`) for
 // particular block (referenced by `BlockID`) is committed into the chain.
@@ -34,11 +37,47 @@ import "encoding/json"
 // Therefore, to retrieve valid blocks from storage, it is required that
 // the Seal.ID includes all fields with independent degrees of freedom
 // (such as AggregatedApprovalSigs).
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Seal struct {
-	BlockID                Identifier
-	ResultID               Identifier
-	FinalState             StateCommitment
+	BlockID    Identifier
+	ResultID   Identifier
+	FinalState StateCommitment
+	// AggregatedApprovalSigs can be nil/empty when verification is disabled or for the root seal.
 	AggregatedApprovalSigs []AggregatedSignature // one AggregatedSignature per chunk
+}
+
+// UntrustedSeal is an untrusted input-only representation of a Seal,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedSeal should be validated and converted into
+// a trusted Seal using NewSeal constructor.
+type UntrustedSeal Seal
+
+// NewSeal creates a new instance of Seal.
+// Construction Seal allowed only within the constructor.
+//
+// All errors indicate a valid Seal cannot be constructed from the input.
+func NewSeal(untrusted UntrustedSeal) (*Seal, error) {
+	if untrusted.BlockID == ZeroID {
+		return nil, fmt.Errorf("block ID must not be zero")
+	}
+	if untrusted.ResultID == ZeroID {
+		return nil, fmt.Errorf("result ID must not be zero")
+	}
+	if untrusted.FinalState == EmptyStateCommitment {
+		return nil, fmt.Errorf("final state must not be empty")
+	}
+	return &Seal{
+		BlockID:                untrusted.BlockID,
+		ResultID:               untrusted.ResultID,
+		FinalState:             untrusted.FinalState,
+		AggregatedApprovalSigs: untrusted.AggregatedApprovalSigs,
+	}, nil
 }
 
 func (s Seal) Body() interface{} {
