@@ -35,6 +35,10 @@ type UntrustedExecutionReceipt ExecutionReceipt
 //
 // All errors indicate a valid ExecutionReceipt cannot be constructed from the input.
 func NewExecutionReceipt(untrusted UntrustedExecutionReceipt) (*ExecutionReceipt, error) {
+	_, err := NewUnsignedExecutionReceipt(UntrustedUnsignedExecutionReceipt(untrusted.UnsignedExecutionReceipt))
+	if err != nil {
+		return nil, fmt.Errorf("invalid unsigned execution receipt: %w", err)
+	}
 	if len(untrusted.ExecutorSignature) == 0 {
 		return nil, fmt.Errorf("executor signature must not be empty")
 	}
@@ -86,6 +90,11 @@ func NewUnsignedExecutionReceipt(untrusted UntrustedUnsignedExecutionReceipt) (*
 	if untrusted.ExecutorID == ZeroID {
 		return nil, fmt.Errorf("executor ID must not be zero")
 	}
+	//TODO: uncomment this code then constructor for ExecutionResult will be added (when PR #7525 will be merged)
+	//_, err := NewExecutionResult(UntrustedExecutionResult(untrusted.ExecutionResult))
+	//if err != nil {
+	//	return nil, fmt.Errorf("invalid execution result: %w", err)
+	//}
 	if len(untrusted.Spocks) == 0 {
 		return nil, fmt.Errorf("spocks must not be empty")
 	}
