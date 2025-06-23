@@ -140,7 +140,6 @@ func (er ExecutionReceiptStub) MarshalJSON() ([]byte, error) {
 }
 
 // ExecutionReceiptFromStub creates ExecutionReceipt from execution result and ExecutionReceiptStub.
-//
 // No errors are expected during normal operation.
 func ExecutionReceiptFromStub(stub ExecutionReceiptStub, result ExecutionResult) (*ExecutionReceipt, error) {
 	unsignedExecutionReceipt, err := NewUnsignedExecutionReceipt(
