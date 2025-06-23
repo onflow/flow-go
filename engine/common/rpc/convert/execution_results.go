@@ -52,13 +52,19 @@ func MessageToExecutionResult(m *entities.ExecutionResult) (
 	if err != nil {
 		return nil, err
 	}
-	return &flow.ExecutionResult{
+
+	executionResult, err := flow.NewExecutionResult(flow.UntrustedExecutionResult{
 		PreviousResultID: MessageToIdentifier(m.PreviousResultId),
 		BlockID:          MessageToIdentifier(m.BlockId),
 		Chunks:           parsedChunks,
 		ServiceEvents:    parsedServiceEvents,
 		ExecutionDataID:  MessageToIdentifier(m.ExecutionDataId),
-	}, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build execution result: %w", err)
+	}
+
+	return executionResult, nil
 }
 
 // ExecutionResultsToMessages converts a slice of execution results to a slice of protobuf messages

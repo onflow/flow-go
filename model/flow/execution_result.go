@@ -10,6 +10,8 @@ var ErrNoChunks = errors.New("execution result has no chunks")
 
 // ExecutionResult is cryptographic commitment to the computation
 // result(s) from executing a block
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type ExecutionResult struct {
 	PreviousResultID Identifier // commit of the previous ER
 	BlockID          Identifier // commit of the current block

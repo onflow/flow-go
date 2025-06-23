@@ -66,6 +66,7 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 
 	s.VerID = verifiers[0]
 	result := unittest.ExecutionResultFixture()
+	//nolint:structwrite
 	result.BlockID = s.Block.ID()
 	result.Chunks = s.Chunks
 
