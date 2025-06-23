@@ -215,8 +215,10 @@ func NewChunk(untrusted UntrustedChunk) (*Chunk, error) {
 	}, nil
 }
 
-// NewCommitChunk creates a cnunk who's final state is the commit
-func NewCommitChunk(
+// NewRootChunk creates a chunk whose final state is the given commit, with all other fields set to zero.
+// This is a special kind of chunk used only as the sole chunk of a root execution result, which forms
+// a part of the root protocol state snapshot used as the trusted root for a spork.
+func NewRootChunk(
 	commit StateCommitment,
 ) *Chunk {
 	zeroCount := uint16(0)

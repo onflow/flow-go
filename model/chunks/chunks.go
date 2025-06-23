@@ -8,7 +8,7 @@ import (
 // the commit
 func ChunkListFromCommit(commit flow.StateCommitment) flow.ChunkList {
 	chunks := flow.ChunkList{}
-	chunk := flow.NewCommitChunk(commit)
+	chunk := flow.NewRootChunk(commit)
 	chunks.Insert(chunk)
 
 	return chunks
