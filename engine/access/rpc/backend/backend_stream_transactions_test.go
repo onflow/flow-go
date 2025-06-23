@@ -358,8 +358,8 @@ func (s *TransactionStatusSuite) addBlockWithTransaction(transaction *flow.Trans
 	s.sealedBlock = s.finalizedBlock
 	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true, func(block *flow.Block) {
 		block = flow.NewBlock(block.Header, unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
-		s.collections.On("LightByID", colID).Return(&light, nil).Maybe()
-		s.collections.On("LightByTransactionID", transaction.ID()).Return(&light, nil)
+		s.collections.On("LightByID", colID).Return(light, nil).Maybe()
+		s.collections.On("LightByTransactionID", transaction.ID()).Return(light, nil)
 		s.blocks.On("ByCollectionID", colID).Return(block, nil)
 	})
 }

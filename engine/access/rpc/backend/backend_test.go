@@ -891,7 +891,7 @@ func (suite *Suite) TestGetCollection() {
 
 	suite.collections.
 		On("LightByID", expected.ID()).
-		Return(&expected, nil).
+		Return(expected, nil).
 		Once()
 
 	params := suite.defaultBackendParams()
@@ -903,7 +903,7 @@ func (suite *Suite) TestGetCollection() {
 	suite.transactions.AssertExpectations(suite.T())
 	suite.checkResponse(actual, err)
 
-	suite.Equal(expected, *actual)
+	suite.Equal(expected, actual)
 	suite.assertAllExpectations()
 }
 
@@ -1064,7 +1064,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		}, nil)
 
 	light := collection.Light()
-	suite.collections.On("LightByID", light.ID()).Return(&light, nil)
+	suite.collections.On("LightByID", light.ID()).Return(light, nil)
 
 	// transaction storage returns the corresponding transaction
 	suite.transactions.
@@ -1074,7 +1074,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	// collection storage returns the corresponding collection
 	suite.collections.
 		On("LightByTransactionID", transactionBody.ID()).
-		Return(&light, nil)
+		Return(light, nil)
 
 	// block storage returns the corresponding block
 	suite.blocks.
@@ -1320,7 +1320,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 				return nil
 			}
 			collLight := collection.Light()
-			return &collLight
+			return collLight
 		},
 			func(txID flow.Identifier) error {
 				if currentState == flow.TransactionStatusPending {
@@ -1330,7 +1330,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 			})
 
 	light := collection.Light()
-	suite.collections.On("LightByID", mock.Anything).Return(&light, nil)
+	suite.collections.On("LightByID", mock.Anything).Return(light, nil)
 
 	// refBlock storage returns the corresponding refBlock
 	suite.blocks.
@@ -1773,7 +1773,7 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 		Return(transactionBody, nil)
 
 	light := collection.Light()
-	suite.collections.On("LightByID", mock.Anything).Return(&light, nil)
+	suite.collections.On("LightByID", mock.Anything).Return(light, nil)
 
 	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
 

@@ -51,9 +51,9 @@ func MessageToLightCollection(m *entities.Collection) (*flow.LightCollection, er
 		transactions = append(transactions, MessageToIdentifier(txId))
 	}
 
-	return &flow.LightCollection{
+	return flow.NewLightCollection(flow.UntrustedLightCollection{
 		Transactions: transactions,
-	}, nil
+	}), nil
 }
 
 func FullCollectionToMessage(c *flow.Collection) ([]*entities.Transaction, error) {
