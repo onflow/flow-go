@@ -253,6 +253,9 @@ func (ar *BlockAttestationResult) AllChunkDataPacks() ([]*flow.ChunkDataPack, er
 	return chunkDataPacks, nil
 }
 
+// ChunkDataPackAt returns the ChunkDataPack for the collection at the given index.
+// Receiver BlockAttestationResult is expected to be well-formed; callers must use an index that exists.
+// No errors are expected during normal operation. 
 func (ar *BlockAttestationResult) ChunkDataPackAt(index int) (*flow.ChunkDataPack, error) {
 	if index < 0 || index >= len(ar.collectionAttestationResults) {
 		return nil, fmt.Errorf("chunk collection index is not valid: %v", index)
