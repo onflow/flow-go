@@ -127,7 +127,7 @@ func writerSSTableWorker(ctx context.Context, workerIndex int, db *pebble.DB, ss
 				return fmt.Errorf("fail to close writer: %w", err)
 			}
 
-			err = db.Ingest([]string{filePath})
+			err = db.Ingest(ctx, []string{filePath})
 			if err != nil {
 				return fmt.Errorf("fail to ingest file %v: %w", filePath, err)
 			}
@@ -137,7 +137,7 @@ func writerSSTableWorker(ctx context.Context, workerIndex int, db *pebble.DB, ss
 	}
 }
 func createSSTableWriter(filePath string) (*sstable.Writer, error) {
-	f, err := vfs.Default.Create(filePath)
+	f, err := vfs.Default.Create(filePath, vfs.WriteCategoryUnspecified)
 	if err != nil {
 		return nil, err
 	}
