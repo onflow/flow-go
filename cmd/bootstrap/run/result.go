@@ -11,7 +11,6 @@ func GenerateRootResult(
 	epochSetup *flow.EpochSetup,
 	epochCommit *flow.EpochCommit,
 ) *flow.ExecutionResult {
-
 	//nolint:structwrite
 	result := &flow.ExecutionResult{
 		PreviousResultID: flow.ZeroID,

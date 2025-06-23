@@ -199,7 +199,6 @@ func (ar *BlockAttestationResult) AllChunks() ([]*flow.Chunk, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not find chunk: %w", err)
 		}
-
 		chunks[i] = chunk // TODO(ramtin): cache and optimize this
 	}
 	return chunks, nil
