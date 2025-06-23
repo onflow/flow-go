@@ -368,12 +368,14 @@ func TestInsertEvents(t *testing.T) {
 			events := test.EventGenerator(eventEncodingVersion)
 
 			t.Run("should be able to insert events", func(t *testing.T) {
-				event, _ := emulator.SDKEventToFlow(events.New())
-				events := []flowgo.Event{event}
+				event, err := emulator.SDKEventToFlow(events.New())
+				assert.NoError(t, err)
+
+				events := []flowgo.Event{*event}
 
 				var blockHeight uint64 = 1
 
-				err := store.InsertEvents(blockHeight, events)
+				err = store.InsertEvents(blockHeight, events)
 				assert.NoError(t, err)
 
 				t.Run("should be able to get inserted events", func(t *testing.T) {
@@ -420,13 +422,13 @@ func TestEventsByHeight(t *testing.T) {
 				// interleave events of both types
 				if i%2 == 0 {
 					event.Type = "A"
-					eventsA = append(eventsA, event)
+					eventsA = append(eventsA, *event)
 				} else {
 					event.Type = "B"
-					eventsB = append(eventsB, event)
+					eventsB = append(eventsB, *event)
 				}
 
-				allEvents[i] = event
+				allEvents[i] = *event
 			}
 
 			err := store.InsertEvents(nonEmptyBlockHeight, allEvents)
