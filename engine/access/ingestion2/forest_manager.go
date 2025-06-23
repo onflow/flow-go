@@ -83,25 +83,6 @@ func (c ForestManagerConfig) Validate() error {
 	return nil
 }
 
-// TODO: how to opimize this to avoid doing traversals?
-//
-// Reasons a result may not be processable:
-// - does not have enough agreeing executors
-// - does not have receipts from required executors
-// - result's block is not in the required status
-// - queue is full
-//
-// naive approach:
-// any time a new result is added, a new block is finalized, or space becomes available in the queue,
-// we traverse the forest and add processable results to the queue.
-//
-// better approach:
-// * when a receipt is added, check if the result was not processable before, and is now processable
-// * if so, enqueue the result and check its descendants
-// * when a block is finalized, check if any results are now processable
-// * when the queue was full and now has space, check if any results are now processable
-// * we can merge the two full checks into one by adding a periodic check
-
 // ForestManager iterates the ResultsForest starting from the latest persisted sealed result
 // to find processable ancestors that are not running yet. It uses a breadth-first traversal
 // approach to ensure ancestors are processed before descendants.
@@ -170,13 +151,6 @@ func NewForestManager(
 		maxQueueSize:       maxQueueSize,
 	}, nil
 }
-
-// TODO: remove me and/or format this into a better comment
-//
-// General rationale for this approach:
-// * we will most likely NOT be able to start processing results as soon as they are added to the forest
-//   since we require a certain number of receipts and the block status may not be set to certified
-// * I want to avoid maintaining a second queue for results that are not yet processable
 
 // WorkerLoop is a component.ComponentWorker that adds processable containers to the work queue.
 //
