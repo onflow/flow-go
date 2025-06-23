@@ -27,7 +27,6 @@ func CreateDatastoreManager(
 	}
 
 	// parse the execution data DB mode
-	// TODO(leo): automatically parse the DB mode from the data in the database folder
 	executionDataDBMode, err := execution_data.ParseExecutionDataDBMode(executionDataDBModeStr)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse execution data DB mode: %w", err)
@@ -36,6 +35,7 @@ func CreateDatastoreManager(
 	// create the appropriate datastore manager based on the DB mode
 	var executionDatastoreManager DatastoreManager
 	if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
+		logger.Info().Msgf("Using Pebble datastore for execution data at %s", datastoreDir)
 		executionDatastoreManager, err = NewPebbleDatastoreManager(
 			logger.With().Str("pebbledb", "endata").Logger(),
 			datastoreDir, nil)
@@ -43,6 +43,7 @@ func CreateDatastoreManager(
 			return nil, fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
 		}
 	} else {
+		logger.Info().Msgf("Using Badger datastore for execution data at %s", datastoreDir)
 		executionDatastoreManager, err = NewBadgerDatastoreManager(datastoreDir, &badgerds.DefaultOptions)
 		if err != nil {
 			return nil, fmt.Errorf("could not create BadgerDatastoreManager for execution data: %w", err)
