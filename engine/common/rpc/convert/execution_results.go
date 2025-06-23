@@ -110,16 +110,22 @@ func ExecutionResultMetaListToMessages(e flow.ExecutionReceiptStubList) []*entit
 // MessagesToExecutionResultMetaList converts a slice of protobuf messages to an execution result meta list
 func MessagesToExecutionResultMetaList(m []*entities.ExecutionReceiptMeta) (flow.ExecutionReceiptStubList, error) {
 	execMetaList := make([]*flow.ExecutionReceiptStub, len(m))
-	var err error
 	for i, message := range m {
+		unsignedExecutionReceiptStub, err := flow.NewUnsignedExecutionReceiptStub(
+			flow.UntrustedUnsignedExecutionReceiptStub{
+				ExecutorID: MessageToIdentifier(message.ExecutorId),
+				ResultID:   MessageToIdentifier(message.ResultId),
+				Spocks:     MessagesToSignatures(message.Spocks),
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not construct unsigned execution receipt stub at index: %d: %w", i, err)
+		}
+
 		execMetaList[i], err = flow.NewExecutionReceiptStub(
 			flow.UntrustedExecutionReceiptStub{
-				UnsignedExecutionReceiptStub: flow.UnsignedExecutionReceiptStub{
-					ExecutorID: MessageToIdentifier(message.ExecutorId),
-					ResultID:   MessageToIdentifier(message.ResultId),
-					Spocks:     MessagesToSignatures(message.Spocks),
-				},
-				ExecutorSignature: MessageToSignature(message.ExecutorSignature),
+				UnsignedExecutionReceiptStub: *unsignedExecutionReceiptStub,
+				ExecutorSignature:            MessageToSignature(message.ExecutorSignature),
 			},
 		)
 		if err != nil {
