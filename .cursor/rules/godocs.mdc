@@ -17,23 +17,18 @@ alwaysApply: false
 ## Method Rules
 ```go
 // MethodName performs a specific action or returns specific information.
-// 
-// Parameters:
-//   - param1: description of param1
-//   - param2: description of param2
 //
-// Returns:
-//   - return1: description of return1
-//   - return2: description of return2
+// Returns: (only if additional interpretation of return values is needed beyond the method / function signature)
+//   - return1: description of non-obvious aspects
+//   - return2: description of non-obvious aspects
 //
-// Expected Errors:
+// Expected errors during normal operations:
 //   - ErrType1: when and why this error occurs
 //   - ErrType2: when and why this error occurs
-//   - All other errors are unexpected and potential indicators of bugs or corrupted internal state
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 //
-// Concurrency safety:
-//   - Safe for concurrent access
-//   - Not safe for concurrent access
+// Safe for concurrent access (default, may be omitted)
+// CAUTION: not concurrency safe! (if applicable, documentation is obligatory)
 ```
 
 1. **Method Description**
@@ -41,41 +36,59 @@ alwaysApply: false
    - Use present tense
    - Start with the method name
    - End with a period
-   - Example: `// AddReceipt adds the given execution receipt to the container.`
+   - Prefer a concise description that naturally incorporates the meaning of parameters
+   - Example:
+     ```go
+     // ByBlockID returns the header with the given ID. It is available for finalized and ambiguous blocks.
+     // Error returns:
+     //  - ErrNotFound if no block header with the given ID exists
+     ByBlockID(blockID flow.Identifier) (*flow.Header, error)
+     ```
 
 2. **Parameters**
-   - List all parameters with their types
-   - Describe the purpose and any constraints
-   - Use bullet points for clarity
-   - Example:
-     ```go
-     // Parameters:
-     //   - receipt: the execution receipt to add
-     //   - block: the block header associated with the receipt
-     ```
+   - Only document parameters separately when they have non-obvious aspects:
+     - Complex constraints or requirements
+     - Special relationships with other parameters
+     - Formatting or validation rules
+     - Example:
+       ```go
+       // ValidateTransaction validates the transaction against the current state.
+       //
+       // Parameters:
+       //   - script: must be valid BPL-encoded script with max size of 64KB
+       //   - accounts: must contain at least one account with signing capability
+       ```
 
 3. **Returns**
-   - List all return values
-   - Describe the meaning of each return value
-   - Use bullet points for clarity
-   - Example:
+   - Only document return values if there is **additional information** necessary to interpret the function's or method's return values, which is not apparent from the method signature's return values
+   - When documenting non-error returns, be concise and focus only on non-obvious aspects:
      ```go
+     // Example 1 - No return docs needed (self-explanatory):
+     // GetHeight returns the block's height.
+     
+     // Example 2 - Additional context needed:
+     // GetPipeline returns the execution pipeline, or nil if not configured.
+     
+     // Example 3 - Complex return value needs explanation:
+     // GetBlockStatus returns the block's current status.
      // Returns:
-     //   - bool: true if the receipt was added, false if it already existed
-     //   - error: any error that occurred during the operation
+     //   - status: PENDING if still processing, FINALIZED if complete, INVALID if failed validation
      ```
+   - Error returns documentation is mandatory (see section `Error Returns` below)
+
 
 4. **Error Returns**
    - List all expected errors (sentinel errors)
    - **DO NOT make up sentinel errors**. Only document errors that are returned by the method. If you don't know, add a TODO for the user to complete.
    - Describe when and why each error occurs
+   - by convention, they should be the last part of a method's or function's documentation.    
    - Always include a catch-all for unexpected errors
    - Example:
      ```go
-     // Expected Errors:
+     // Expected errors during normal operations:
      //   - ErrInvalidReceipt: when the receipt is malformed
      //   - ErrDuplicateReceipt: when the receipt already exists
-     //   - All other errors are unexpected and potential indicators of bugs or corrupted internal state
+     //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
      ```
    - If there are no expected errors, use:
      ```go
@@ -83,16 +96,19 @@ alwaysApply: false
      ```
 
 5. **Concurrency Safety**
-   - Explicitly state whether the method is safe for concurrent access
+   - By default, we assume methods and functions to be concurrency safe. 
+   - Every struct and interface must explicitly state whether it is safe for concurrent access
    - If not thread-safe, explain why
-   - If all methods are thread-safe, only document this in the struct godocs and mention that all methods are thread-safe. Do not include the line in each 
-   - Example:
+   - For methods or functions that are not concurrency safe (deviating from the default), it is **mandatory** to diligently document this by indlucing the following call-out:
      ```go
-     // Concurrency safety:
-     //   - Safe for concurrent access
+     // CAUTION: not concurrency safe! 
+     ```
+   - If **all methods** of a struct or interface are thread-safe, only document this in the struct's or interface's godoc and mention that all methods are thread-safe. Do not include the line in each method:
+     ```go
+     // Safe for concurrent access
      ```
 
-8. **Special Cases**
+6. **Special Cases**
    - For getters/setters, use simplified format:
      ```go
      // GetterName returns the value of the field.
@@ -109,7 +125,7 @@ alwaysApply: false
      //   - error: any error that occurred during creation
      ```
 
-10. **Private Methods**
+7. **Private Methods**
     - Private methods should still be documented
     - Can use more technical language
     - Focus on implementation details
@@ -119,52 +135,28 @@ alwaysApply: false
 
 ### Standard Method
 ```go
-// AddReceipt adds the given execution receipt to the container.
+// AddReceipt adds the given execution receipt to the container and associates it with the block.
+// Returns true if the receipt was added, false if it already existed. Safe for concurrent access.
 //
-// Parameters:
-//   - receipt: the execution receipt to add
-//   - block: the block header associated with the receipt
-//
-// Returns:
-//   - bool: true if the receipt was added, false if it already existed
-//   - error: any error that occurred during the operation
-//
-// Error returns:
+// Expected errors during normal operations:
 //   - ErrInvalidReceipt: when the receipt is malformed
 //   - ErrDuplicateReceipt: when the receipt already exists
-//   - All other errors are unexpected and potential indicators of corrupted internal state
-//
-// Concurrency safety:
-//   - Safe for concurrent access
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 ```
 
 ### Getter Method
 ```go
 // Pipeline returns the pipeline associated with this execution result container.
-//
-// Returns:
-//   - *Pipeline: the associated pipeline, or nil if no pipeline is set
-//
-// Concurrency safety:
-//   - Safe for concurrent access
+// Returns nil if no pipeline is set. Safe for concurrent access
 ```
 
 ### Constructor
 ```go
-// NewExecutionResultContainer creates a new instance of ExecutionResultContainer.
-//
-// Parameters:
-//   - result: the execution result to store
-//   - block: the block header associated with the result
-//   - pipeline: the pipeline to process the result
-//
-// Returns:
-//   - *ExecutionResultContainer: the newly created container
-//   - error: any error that occurred during creation
+// NewExecutionResultContainer creates a new instance of ExecutionResultContainer with the given result and pipeline.
 //
 // Expected Errors:
 //   - ErrInvalidBlock: when the block ID doesn't match the result's block ID
-//   - All other errors are unexpected and potential indicators of corrupted internal state
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 ```
 
 ## Interface Documentation
@@ -172,10 +164,11 @@ alwaysApply: false
    - Start with the interface name
    - Describe the purpose and behavior of the interface
    - Explain any invariants or guarantees the interface provides
+   - Explicitly state whether it is safe for concurrent access
    - Example:
      ```go
      // Executor defines the interface for executing transactions.
-     // Implementations must guarantee thread-safety and handle all error cases.
+     // Implementations must guarantee thread-safety and handle byzantine inputs gracefully.
      type Executor interface {
          // ... methods ...
      }
@@ -185,17 +178,12 @@ alwaysApply: false
    - Document each method in the interface
    - Focus on the contract/behavior rather than implementation details
    - Include error documentation for methods that return errors
+   - Ensure that the interface documentation is consistent with the structs' documentations implementing this interface
+      - Every sentinel error that can be returned by any of the implementations must also be documented by the interface. 
    - Example:
      ```go
-     // Execute processes the given transaction and returns the result.
-     // The method must be idempotent and handle all error cases gracefully.
-     //
-     // Parameters:
-     //   - tx: the transaction to execute
-     //
-     // Returns:
-     //   - *Result: the execution result
-     //   - error: any error that occurred during execution
+     // Execute processes the given transaction and returns its execution result.
+     // The method must be idempotent and handle byzantine inputs gracefully.
      //
      // Expected Errors:
      //   - ErrInvalidTransaction: when the transaction is malformed
