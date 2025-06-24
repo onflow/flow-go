@@ -36,17 +36,6 @@ type ResultsForest struct {
 }
 
 // NewResultsForest creates a new instance of ResultsForest.
-//
-// Parameters:
-//   - log: logger instance
-//   - maxSize: the maximum number of containers allowed in the forest
-//   - latestPersistedSealedResult: the latest persisted sealed result
-//
-// Returns:
-//   - *ResultsForest: the newly created forest
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func NewResultsForest(
 	log zerolog.Logger,
 	maxSize uint64,
@@ -65,35 +54,24 @@ func NewResultsForest(
 
 // AddResult adds an execution result to the forest without any receipts.
 //
-// Parameters:
-//   - result: the execution result to add
-//   - header: the block header associated with the result
-//   - pipeline: the pipeline to process the result
-//
-// Returns:
-//   - error: any error that occurred during the operation
-//
-// Expected Errors:
+// Expected errors during normal operations:
 //   - ErrMaxSizeExceeded: when adding a new container would exceed the maximum size
-//   - All other errors are unexpected and potential indicators of corrupted internal state
-//
-// Concurrency safety:
-//   - Safe for concurrent access
-func (rf *ResultsForest) AddResult(result *flow.ExecutionResult, header *flow.Header, pipeline optimistic_sync.Pipeline) error {
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+func (rf *ResultsForest) AddResult(result *flow.ExecutionResult, executedBlock *flow.Header, pipeline optimistic_sync.Pipeline) error {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
 	// drop receipts for block views lower than the lowest view.
-	if header.View < rf.forest.LowestLevel {
+	if executedBlock.View < rf.forest.LowestLevel {
 		return nil
 	}
 
 	// sanity check: result must be for block
-	if header.ID() != result.BlockID {
+	if executedBlock.ID() != result.BlockID {
 		return fmt.Errorf("receipt is for different block")
 	}
 
-	_, err := rf.getOrCreateExecutionResultContainer(result, header, pipeline)
+	_, err := rf.getOrCreateExecutionResultContainer(result, executedBlock, pipeline)
 	if err != nil {
 		return fmt.Errorf("failed to get container for result (%s): %w", result.ID(), err)
 	}
@@ -102,36 +80,24 @@ func (rf *ResultsForest) AddResult(result *flow.ExecutionResult, header *flow.He
 
 // AddReceipt adds the given execution receipt to the forest.
 //
-// Parameters:
-//   - receipt: the execution receipt to add
-//   - header: the block header associated with the receipt
-//   - pipeline: the pipeline to process the receipt
-//
-// Returns:
-//   - bool: true if the receipt was added, false if it already existed
-//   - error: any error that occurred during the operation
-//
-// Expected Errors:
+// Expected errors during normal operations:
 //   - ErrMaxSizeExceeded: when adding a new container would exceed the maximum size
-//   - All other errors are unexpected and potential indicators of corrupted internal state
-//
-// Concurrency safety:
-//   - Safe for concurrent access
-func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, header *flow.Header, pipeline optimistic_sync.Pipeline) (bool, error) {
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, executedBlock *flow.Header, pipeline optimistic_sync.Pipeline) (bool, error) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
 	// drop receipts for block views lower than the lowest view.
-	if header.View < rf.forest.LowestLevel {
+	if executedBlock.View < rf.forest.LowestLevel {
 		return false, nil
 	}
 
 	// sanity check: result must be for block
-	if header.ID() != receipt.ExecutionResult.BlockID {
+	if executedBlock.ID() != receipt.ExecutionResult.BlockID {
 		return false, fmt.Errorf("receipt is for different block")
 	}
 
-	container, err := rf.getOrCreateExecutionResultContainer(&receipt.ExecutionResult, header, pipeline)
+	container, err := rf.getOrCreateExecutionResultContainer(&receipt.ExecutionResult, executedBlock, pipeline)
 	if err != nil {
 		return false, fmt.Errorf("failed to get container for result (%s): %w", receipt.ExecutionResult.ID(), err)
 	}
@@ -146,21 +112,11 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, header *flow
 
 // getOrCreateExecutionResultContainer retrieves or creates the container for the given result.
 //
-// Parameters:
-//   - result: the execution result
-//   - block: the block header associated with the result
-//   - pipeline: the pipeline to process the result
-//
-// Returns:
-//   - *ExecutionResultContainer: the container for the result
-//   - error: any error that occurred during the operation
-//
-// Expected Errors:
+// Expected errors during normal operations:
 //   - ErrMaxSizeExceeded: when adding a new container would exceed the maximum size
-//   - All other errors are unexpected and potential indicators of corrupted internal state
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 //
-// Concurrency safety:
-//   - Not safe for concurrent access, caller must hold lock
+// CAUTION: not concurrency safe!
 func (rf *ResultsForest) getOrCreateExecutionResultContainer(result *flow.ExecutionResult, block *flow.Header, pipeline optimistic_sync.Pipeline) (*ExecutionResultContainer, error) {
 	// First try to get existing container
 	container, found := rf.getContainer(result.ID())
@@ -189,15 +145,6 @@ func (rf *ResultsForest) getOrCreateExecutionResultContainer(result *flow.Execut
 }
 
 // HasReceipt checks if a receipt exists in the forest.
-//
-// Parameters:
-//   - receipt: the execution receipt to check
-//
-// Returns:
-//   - bool: true if the receipt exists, false otherwise
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (rf *ResultsForest) HasReceipt(receipt *flow.ExecutionReceipt) bool {
 	resultID := receipt.ExecutionResult.ID()
 	receiptID := receipt.ID()
@@ -212,34 +159,7 @@ func (rf *ResultsForest) HasReceipt(receipt *flow.ExecutionReceipt) bool {
 	return vertex.(*ExecutionResultContainer).Has(receiptID)
 }
 
-// pruneUpToView prunes all results for all blocks with view up to but not including the given limit.
-//
-// Parameters:
-//   - limit: the view up to which to prune (exclusive)
-//
-// Returns:
-//   - error: any error that occurred during the operation
-//
-// No errors are expected during normal operation.
-//
-// Concurrency safety:
-//   - Not safe for concurrent access, caller must hold lock
-func (rf *ResultsForest) pruneUpToView(level uint64) error {
-	err := rf.forest.PruneUpToLevel(level)
-	if err != nil {
-		return fmt.Errorf("pruning Levelled Forest up to view (aka level) %d failed: %w", level, err)
-	}
-
-	return nil
-}
-
-// Size returns the number of receipts stored in the forest.
-//
-// Returns:
-//   - uint: the number of receipts stored
-//
-// Concurrency safety:
-//   - Safe for concurrent access
+// Size returns the number of results stored in the forest.
 func (rf *ResultsForest) Size() uint {
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
@@ -247,12 +167,6 @@ func (rf *ResultsForest) Size() uint {
 }
 
 // LowestView returns the lowest view where results are still stored in the mempool.
-//
-// Returns:
-//   - uint64: the lowest view
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (rf *ResultsForest) LowestView() uint64 {
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
@@ -260,33 +174,14 @@ func (rf *ResultsForest) LowestView() uint64 {
 }
 
 // GetContainer retrieves the ExecutionResultContainer for the given result ID.
-//
-// Parameters:
-//   - resultID: the ID of the result to retrieve
-//
-// Returns:
-//   - *ExecutionResultContainer: the container for the result, or nil if not found
-//   - bool: true if the container was found, false otherwise
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (rf *ResultsForest) GetContainer(resultID flow.Identifier) (*ExecutionResultContainer, bool) {
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
 	return rf.getContainer(resultID)
 }
 
-// getContainer retrieves the ExecutionResultContainer for the given result ID.
-//
-// Parameters:
-//   - resultID: the ID of the result to retrieve
-//
-// Returns:
-//   - *ExecutionResultContainer: the container for the result, or nil if not found
-//   - bool: true if the container was found, false otherwise
-//
-// Concurrency safety:
-//   - Not safe for concurrent access, caller must hold read lock
+// getContainer retrieves the ExecutionResultContainer for the given result ID without locking.
+// CAUTION: not concurrency safe! Caller must hold a lock.
 func (rf *ResultsForest) getContainer(resultID flow.Identifier) (*ExecutionResultContainer, bool) {
 	container, ok := rf.forest.GetVertex(resultID)
 	if !ok {
@@ -295,14 +190,17 @@ func (rf *ResultsForest) getContainer(resultID flow.Identifier) (*ExecutionResul
 	return container.(*ExecutionResultContainer), true
 }
 
+// IterateChildren iterates over all children of the given result ID and calls the provided function on each child.
+// Callback function should return false to stop iteration
+func (rf *ResultsForest) IterateChildren(resultID flow.Identifier, fn func(*ExecutionResultContainer) bool) {
+	rf.mu.RLock()
+	defer rf.mu.RUnlock()
+	rf.iterateChildren(resultID, fn)
+}
+
 // iterateChildren iterates over all children of the given result ID and calls the provided function on each child.
-//
-// Parameters:
-//   - resultID: the ID of the result whose children to iterate
-//   - fn: function to call on each child, return false to stop iteration
-//
-// Concurrency safety:
-//   - Not safe for concurrent access, caller must hold read lock
+// Callback function should return false to stop iteration
+// CAUTION: not concurrency safe! Caller must hold a lock.
 func (rf *ResultsForest) iterateChildren(resultID flow.Identifier, fn func(*ExecutionResultContainer) bool) {
 	siblings := rf.forest.GetChildren(resultID)
 	for siblings.HasNext() {
@@ -315,16 +213,7 @@ func (rf *ResultsForest) iterateChildren(resultID flow.Identifier, fn func(*Exec
 
 // OnResultSealed marks the execution result as sealed and updates the state of related pipelines.
 //
-// Parameters:
-//   - resultID: the ID of the result that was sealed
-//
-// Returns:
-//   - error: any error that occurred during the operation
-//
 // No errors are expected during normal operation.
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (rf *ResultsForest) OnResultSealed(resultID flow.Identifier) error {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -355,18 +244,9 @@ func (rf *ResultsForest) OnResultSealed(resultID flow.Identifier) error {
 // to the last sealed container (exclusive). The returned containers are sorted by block header view
 // in ascending order. Returns an error if any ancestor is not found in the forest.
 //
-// Parameters:
-//   - current: the current container
+// No errors are expected during normal operation.
 //
-// Returns:
-//   - []*ExecutionResultContainer: list of unsealed containers sorted by view in ascending order
-//   - error: any error that occurred during the operation
-//
-// No errors are expected during normal operation. An error indicates the forest's internal state is
-// corrupted.
-//
-// Concurrency safety:
-//   - Not safe for concurrent access, caller must hold read lock
+// CAUTION: not concurrency safe! Caller must hold a lock.
 func (rf *ResultsForest) findUnsealedContainersInPath(current *ExecutionResultContainer) ([]*ExecutionResultContainer, error) {
 	unsealedContainers := []*ExecutionResultContainer{current}
 
@@ -394,12 +274,7 @@ func (rf *ResultsForest) findUnsealedContainersInPath(current *ExecutionResultCo
 }
 
 // markResultSealed marks a result as sealed and updates its siblings' pipelines to abandoned.
-//
-// Parameters:
-//   - container: the container to mark as sealed
-//
-// Concurrency safety:
-//   - Not safe for concurrent access, caller must hold read lock
+// CAUTION: not concurrency safe! Caller must hold a lock.
 func (rf *ResultsForest) markResultSealed(container *ExecutionResultContainer) {
 	container.Pipeline().SetSealed()
 
@@ -415,13 +290,6 @@ func (rf *ResultsForest) markResultSealed(container *ExecutionResultContainer) {
 
 // OnBlockFinalized signals that the given block is finalized.
 // It finds all vertices for results of blocks that conflict with the finalized block and abort them.
-//
-// Parameters:
-//   - finalizedBlockID: the ID of the block that was finalized
-//   - parentBlockResultIDs: list of IDs for results for the finalized block's parent
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (rf *ResultsForest) OnBlockFinalized(finalizedBlockID flow.Identifier, parentBlockResultIDs []flow.Identifier) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -442,24 +310,18 @@ func (rf *ResultsForest) OnBlockFinalized(finalizedBlockID flow.Identifier, pare
 
 // OnStateUpdated is called by pipeline state machines when their state changes, and propagates the
 // state update to all children of the result.
-//
-// Parameters:
-//   - resultID: the ID of the result whose state was updated
-//   - newState: the new state of the pipeline
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (rf *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState optimistic_sync.State) {
 	// send state update to all children.
-	rf.mu.RLock()
-	rf.iterateChildren(resultID, func(child *ExecutionResultContainer) bool {
+	rf.IterateChildren(resultID, func(child *ExecutionResultContainer) bool {
 		child.Pipeline().OnParentStateUpdated(newState)
 		return true
 	})
-	rf.mu.RUnlock()
 
 	// process completed pipelines
 	if newState == optimistic_sync.StateComplete {
+		rf.mu.Lock()
+		defer rf.mu.Unlock()
+
 		if err := rf.processCompleted(resultID); err != nil {
 			// TODO: handle with a irrecoverable error
 			rf.log.Fatal().Err(err).Msg("irrecoverable exception: failed to process completed pipeline")
@@ -469,21 +331,10 @@ func (rf *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState optim
 
 // processCompleted processes a completed pipeline and prunes the forest.
 //
-// Parameters:
-//   - resultID: the ID of the result whose pipeline completed
+// No errors are expected during normal operation.
 //
-// Returns:
-//   - error: any error that occurred during the operation
-//
-// No errors are expected during normal operation. An error indicates the forest's internal state is
-// corrupted.
-//
-// Concurrency safety:
-//   - Safe for concurrent access
+// CAUTION: not concurrency safe! Caller must hold a lock.
 func (rf *ResultsForest) processCompleted(resultID flow.Identifier) error {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
 	// first, ensure that the result ID is in the forest, otherwise the forest is in an inconsistent state
 	container, found := rf.getContainer(resultID)
 	if !found {
