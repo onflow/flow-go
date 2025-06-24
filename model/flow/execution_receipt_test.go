@@ -101,10 +101,13 @@ func TestExecutionReceiptStubGroupBy(t *testing.T) {
 // 1. Valid input:
 //   - Verifies that a properly populated UntrustedExecutionReceipt results in a valid ExecutionReceipt.
 //
-// 2. Invalid input with nil ExecutorSignature:
+// 2. Invalid input with invalid UnsignedExecutionReceipt:
+//   - Ensures an error is returned when the UnsignedExecutionReceipt.ExecutorID is flow.ZeroID.
+//
+// 3. Invalid input with nil ExecutorSignature:
 //   - Ensures an error is returned when the ExecutorSignature is nil.
 //
-// 3. Invalid input with empty ExecutorSignature:
+// 4. Invalid input with empty ExecutorSignature:
 //   - Ensures an error is returned when the ExecutorSignature is an empty byte slice.
 func TestNewExecutionReceipt(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
