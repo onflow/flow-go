@@ -11,9 +11,7 @@ import (
 )
 
 func VerifyCdcArguments(t *testing.T, expected []cadence.Value, actual []interface{}) {
-
 	for index, arg := range actual {
-
 		// marshal to bytes
 		bz, err := json.Marshal(arg)
 		require.NoError(t, err)
@@ -30,7 +28,6 @@ func VerifyCdcArguments(t *testing.T, expected []cadence.Value, actual []interfa
 func InterfaceToCdcValues(t *testing.T, vals []interface{}) []cadence.Value {
 	decoded := make([]cadence.Value, len(vals))
 	for index, val := range vals {
-
 		// marshal to bytes
 		bz, err := json.Marshal(val)
 		require.NoError(t, err)
