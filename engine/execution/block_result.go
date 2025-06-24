@@ -222,15 +222,13 @@ func (ar *BlockAttestationResult) ChunkAt(index int) (*flow.Chunk, error) {
 	}
 
 	// TODO(mainnet27, #6773): replace with flow.NewChunk https://github.com/onflow/flow-go/issues/6773
-	serviceEventCountPtr := convert.MessageToServiceEventCountField(uint32(ar.ServiceEventCountForChunk(index)))
-
 	chunk, err := ar.versionAwareChunkConstructor(flow.UntrustedChunk{
 		ChunkBody: flow.ChunkBody{
 			BlockID:              ar.Block.ID(),
 			CollectionIndex:      uint(index),
 			StartState:           attestRes.startStateCommit,
 			EventCollection:      attestRes.eventCommit,
-			ServiceEventCount:    serviceEventCountPtr,
+			ServiceEventCount: convert.MessageToServiceEventCountField(uint32(ar.ServiceEventCountForChunk(index))),
 			TotalComputationUsed: execRes.executionSnapshot.TotalComputationUsed(),
 			NumberOfTransactions: uint64(len(execRes.TransactionResults())),
 		},
