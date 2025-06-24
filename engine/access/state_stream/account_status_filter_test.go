@@ -5,10 +5,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
@@ -125,16 +124,16 @@ func TestAccountStatusFilterFiltering(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	accountCreateEvent := generator.GenerateAccountCreateEvent(t, addressAccountCreate)
-	accountContractAdded := generator.GenerateAccountContractEvent(t, "AccountContractAdded", accountContractAddedAddress)
+	accountCreateEvent := unittest.EventGenerator.GenerateAccountCreateEvent(t, addressAccountCreate)
+	accountContractAdded := unittest.EventGenerator.GenerateAccountContractEvent(t, "AccountContractAdded", accountContractAddedAddress)
 
 	events := flow.EventsList{
-		generator.EventFixture(
-			generator.Event.WithEventType("A.0000000000000001.Contract1.EventA"),
+		unittest.EventFixture(
+			unittest.Event.WithEventType("A.0000000000000001.Contract1.EventA"),
 		),
 		accountCreateEvent,
-		generator.EventFixture(
-			generator.Event.WithEventType("A.0000000000000001.Contract2.EventA"),
+		unittest.EventFixture(
+			unittest.Event.WithEventType("A.0000000000000001.Contract2.EventA"),
 		),
 		accountContractAdded,
 	}

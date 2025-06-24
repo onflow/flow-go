@@ -24,7 +24,6 @@ import (
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 func getTransactionReq(id string, expandResult bool, blockIdQuery string, collectionIdQuery string) *http.Request {
@@ -221,11 +220,11 @@ func TestGetTransactionResult(t *testing.T) {
 		Status:     flow.TransactionStatusSealed,
 		StatusCode: 10,
 		Events: []flow.Event{
-			generator.EventFixture(
-				generator.Event.WithEventType(flow.EventAccountCreated),
-				generator.Event.WithTransactionIndex(1),
-				generator.Event.WithEventIndex(0),
-				generator.Event.WithTransactionID(id),
+			unittest.EventFixture(
+				unittest.Event.WithEventType(flow.EventAccountCreated),
+				unittest.Event.WithTransactionIndex(1),
+				unittest.Event.WithEventIndex(0),
+				unittest.Event.WithTransactionID(id),
 			),
 		},
 		ErrorMessage: "",
@@ -438,12 +437,12 @@ func transactionResultFixture(tx flow.Transaction) *accessmodel.TransactionResul
 		Status:     flow.TransactionStatusSealed,
 		StatusCode: 1,
 		Events: []flow.Event{
-			generator.EventFixture(
-				generator.Event.WithEventType(flow.EventAccountCreated),
-				generator.Event.WithTransactionIndex(0),
-				generator.Event.WithEventIndex(0),
-				generator.Event.WithTransactionID(tx.ID()),
-				generator.Event.WithPayload([]byte{}),
+			unittest.EventFixture(
+				unittest.Event.WithEventType(flow.EventAccountCreated),
+				unittest.Event.WithTransactionIndex(0),
+				unittest.Event.WithEventIndex(0),
+				unittest.Event.WithTransactionID(tx.ID()),
+				unittest.Event.WithPayload([]byte{}),
 			),
 		},
 		ErrorMessage: "",

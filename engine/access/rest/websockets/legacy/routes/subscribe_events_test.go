@@ -26,7 +26,6 @@ import (
 	mockstatestream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 type testType struct {
@@ -81,8 +80,8 @@ func (s *SubscribeEventsSuite) SetupTest() {
 
 		var events []flow.Event
 		for j := 0; j < len(testEventTypes); j++ {
-			events = append(events, generator.EventFixture(
-				generator.Event.WithEventType(testEventTypes[j]),
+			events = append(events, unittest.EventFixture(
+				unittest.Event.WithEventType(testEventTypes[j]),
 			))
 		}
 

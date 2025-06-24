@@ -28,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
@@ -1007,7 +1006,7 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 
 		// Generating events with event generator
 		exeNodeEventEncodingVersion := entities.EventEncodingVersion_CCF_V0
-		events := generator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
+		events := unittest.EventGenerator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
 		eventMessages := convert.EventsToMessages(events)
 
 		exeEventResp := &execproto.GetTransactionResultsResponse{
@@ -1298,7 +1297,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 
 	// Set up the events storage mock
 	totalEvents := 5
-	eventsForTx := generator.EventsFixture(totalEvents)
+	eventsForTx := unittest.EventsFixture(totalEvents)
 	eventMessages := make([]*entities.Event, totalEvents)
 	for j, event := range eventsForTx {
 		eventMessages[j] = convert.EventToMessage(event)
@@ -1386,7 +1385,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 
 	// Set up the events storage mock
 	totalEvents := 5
-	eventsForTx := generator.EventsFixture(totalEvents)
+	eventsForTx := unittest.EventsFixture(totalEvents)
 	eventMessages := make([]*entities.Event, totalEvents)
 	for j, event := range eventsForTx {
 		eventMessages[j] = convert.EventToMessage(event)
@@ -1480,7 +1479,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 
 	// Set up the events storage mock
 	totalEvents := 5
-	eventsForTx := generator.EventsFixture(totalEvents)
+	eventsForTx := unittest.EventsFixture(totalEvents)
 	eventMessages := make([]*entities.Event, totalEvents)
 	for j, event := range eventsForTx {
 		eventMessages[j] = convert.EventToMessage(event)

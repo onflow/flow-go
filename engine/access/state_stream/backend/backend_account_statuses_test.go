@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 var testProtocolEventTypes = []flow.EventType{
@@ -54,19 +53,19 @@ func TestBackendAccountStatusesSuite(t *testing.T) {
 // generateProtocolMockEvents generates a set of mock events.
 func (s *BackendAccountStatusesSuite) generateProtocolMockEvents() flow.EventsList {
 	events := make([]flow.Event, 4)
-	events = append(events, generator.EventFixture(
-		generator.Event.WithEventType(testEventTypes[0]),
+	events = append(events, unittest.EventFixture(
+		unittest.Event.WithEventType(testEventTypes[0]),
 	))
 
-	accountCreateEvent := generator.GenerateAccountCreateEvent(s.T(), s.accountCreatedAddress)
+	accountCreateEvent := unittest.GenerateAccountCreateEvent(s.T(), s.accountCreatedAddress)
 	accountCreateEvent.TransactionIndex = 1
 	events = append(events, accountCreateEvent)
 
-	accountContractAdded := generator.GenerateAccountContractEvent(s.T(), "AccountContractAdded", s.accountContractAdded)
+	accountContractAdded := unittest.GenerateAccountContractEvent(s.T(), "AccountContractAdded", s.accountContractAdded)
 	accountContractAdded.TransactionIndex = 2
 	events = append(events, accountContractAdded)
 
-	accountContractUpdated := generator.GenerateAccountContractEvent(s.T(), "AccountContractUpdated", s.accountContractUpdated)
+	accountContractUpdated := unittest.GenerateAccountContractEvent(s.T(), "AccountContractUpdated", s.accountContractUpdated)
 	accountContractUpdated.TransactionIndex = 3
 	events = append(events, accountContractUpdated)
 

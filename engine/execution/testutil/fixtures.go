@@ -31,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	protocolMock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 func CreateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
@@ -589,13 +588,13 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 	blockExecResult := execution.NewPopulatedBlockExecutionResult(executableBlock)
 	blockExecResult.CollectionExecutionResultAt(0).AppendTransactionResults(
 		flow.EventsList{
-			generator.EventFixture(
-				generator.Event.WithTransactionIndex(0),
-				generator.Event.WithEventIndex(0),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(0),
+				unittest.Event.WithEventIndex(0),
 			),
-			generator.EventFixture(
-				generator.Event.WithTransactionIndex(0),
-				generator.Event.WithEventIndex(1),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(0),
+				unittest.Event.WithEventIndex(1),
 			),
 		},
 		nil,
@@ -609,21 +608,21 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 	)
 	blockExecResult.CollectionExecutionResultAt(1).AppendTransactionResults(
 		flow.EventsList{
-			generator.EventFixture(
-				generator.Event.WithTransactionIndex(2),
-				generator.Event.WithEventIndex(0),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(2),
+				unittest.Event.WithEventIndex(0),
 			),
-			generator.EventFixture(
-				generator.Event.WithTransactionIndex(2),
-				generator.Event.WithEventIndex(1),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(2),
+				unittest.Event.WithEventIndex(1),
 			),
-			generator.EventFixture(
-				generator.Event.WithTransactionIndex(2),
-				generator.Event.WithEventIndex(2),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(2),
+				unittest.Event.WithEventIndex(2),
 			),
-			generator.EventFixture(
-				generator.Event.WithTransactionIndex(2),
-				generator.Event.WithEventIndex(3),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(2),
+				unittest.Event.WithEventIndex(3),
 			),
 		},
 		nil,

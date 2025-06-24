@@ -7,7 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest/generator"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var eventTypes = map[flow.EventType]bool{
@@ -87,14 +87,14 @@ func TestFilter(t *testing.T) {
 	assert.NoError(t, err)
 
 	events := flow.EventsList{
-		generator.EventFixture(
-			generator.Event.WithEventType("A.0000000000000001.Contract1.EventA"),
+		unittest.EventFixture(
+			unittest.Event.WithEventType("A.0000000000000001.Contract1.EventA"),
 		),
-		generator.EventFixture(
-			generator.Event.WithEventType("A.0000000000000001.Contract2.EventA"),
+		unittest.EventFixture(
+			unittest.Event.WithEventType("A.0000000000000001.Contract2.EventA"),
 		),
-		generator.EventFixture(
-			generator.Event.WithEventType("flow.AccountCreated"),
+		unittest.EventFixture(
+			unittest.Event.WithEventType("flow.AccountCreated"),
 		),
 	}
 

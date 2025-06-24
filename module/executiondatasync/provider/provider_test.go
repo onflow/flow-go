@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 func getDatastore() datastore.Batching {
@@ -161,13 +160,13 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 			},
 		},
 		Events: []flow.Event{
-			generator.EventFixture(
-				generator.Event.WithEventType("A.0123456789abcdef.SomeContract.SomeEvent"),
-				generator.Event.WithTransactionIndex(1),
-				generator.Event.WithEventIndex(2),
-				generator.Event.WithTransactionID(flow.MustHexStringToIdentifier("95e0929839063afbe334a3d175bea0775cdf5d93f64299e369d16ce21aa423d3")),
+			unittest.EventFixture(
+				unittest.Event.WithEventType("A.0123456789abcdef.SomeContract.SomeEvent"),
+				unittest.Event.WithTransactionIndex(1),
+				unittest.Event.WithEventIndex(2),
+				unittest.Event.WithTransactionID(flow.MustHexStringToIdentifier("95e0929839063afbe334a3d175bea0775cdf5d93f64299e369d16ce21aa423d3")),
 				// do not care about Payload
-				generator.Event.WithPayload([]byte{}),
+				unittest.Event.WithPayload([]byte{}),
 			),
 		},
 		TrieUpdate: &ledger.TrieUpdate{

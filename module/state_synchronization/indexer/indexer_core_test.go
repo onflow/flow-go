@@ -28,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 type indexCoreTest struct {
@@ -338,7 +337,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	})
 
 	t.Run("Index Events", func(t *testing.T) {
-		expectedEvents := generator.EventsFixture(20)
+		expectedEvents := unittest.EventsFixture(20)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: block.ID(),
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
@@ -471,7 +470,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	})
 
 	t.Run("Index AllTheThings", func(t *testing.T) {
-		expectedEvents := generator.EventsFixture(20)
+		expectedEvents := unittest.EventsFixture(20)
 		expectedResults := unittest.LightTransactionResultsFixture(20)
 		expectedCollections := unittest.CollectionListFixture(2)
 		expectedTries := []*ledger.TrieUpdate{trieUpdateFixture(t), trieUpdateFixture(t)}

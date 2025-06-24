@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestRetrieveEventByBlockIDTxID tests event insertion, event retrieval by block id, block id and transaction id,
@@ -45,11 +45,11 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 
 					eEvents := make([]flow.Event, 0)
 
-					event := generator.EventFixture(
-						generator.Event.WithEventType(etype),
-						generator.Event.WithTransactionIndex(uint32(i)),
-						generator.Event.WithEventIndex(uint32(j)),
-						generator.Event.WithTransactionID(tx),
+					event := unittest.EventFixture(
+						unittest.Event.WithEventType(etype),
+						unittest.Event.WithTransactionIndex(uint32(i)),
+						unittest.Event.WithEventIndex(uint32(j)),
+						unittest.Event.WithTransactionID(tx),
 					)
 
 					// insert event into the db

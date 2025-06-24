@@ -20,7 +20,6 @@ import (
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
@@ -130,7 +129,7 @@ func backendTransactionStatusesResponse(block *flow.Block) []*accessmodel.Transa
 	txr := accessmodel.TransactionResult{
 		Status:       flow.TransactionStatusSealed,
 		StatusCode:   10,
-		Events:       generator.EventsFixture(1),
+		Events:       unittest.EventsFixture(1),
 		ErrorMessage: "",
 		BlockID:      block.ID(),
 		CollectionID: cid,

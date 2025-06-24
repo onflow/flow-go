@@ -1,4 +1,4 @@
-package generator
+package unittest
 
 import (
 	"encoding/hex"
@@ -15,24 +15,20 @@ import (
 
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// EventGeneratorOption configures an Events generator.
 type EventGeneratorOption func(*Events)
 
-func WithEncoding(encoding entities.EventEncodingVersion) EventGeneratorOption {
-	return func(g *Events) {
-		g.encoding = encoding
-	}
-}
-
+// Events generates mock Flow events with incremental count and optional encoding.
 type Events struct {
 	count    uint32
 	ids      *Identifiers
 	encoding entities.EventEncodingVersion
 }
 
-func EventGenerator(opts ...EventGeneratorOption) *Events {
+// NewEventGenerator creates a new Events generator.
+func NewEventGenerator(opts ...EventGeneratorOption) *Events {
 	g := &Events{
 		count:    1,
 		ids:      IdentifierGenerator(),
@@ -46,69 +42,34 @@ func EventGenerator(opts ...EventGeneratorOption) *Events {
 	return g
 }
 
-var Event eventFactory
-
-type eventFactory struct{}
-
-type EventOption func(*flow.Event)
-
-func (f *eventFactory) WithEventType(eventType flow.EventType) EventOption {
-	return func(e *flow.Event) {
-		e.Type = eventType
-	}
-}
-
-func (f *eventFactory) WithTransactionIndex(transactionIndex uint32) EventOption {
-	return func(e *flow.Event) {
-		e.TransactionIndex = transactionIndex
-	}
-}
-
-func (f *eventFactory) WithEventIndex(eventIndex uint32) EventOption {
-	return func(e *flow.Event) {
-		e.EventIndex = eventIndex
-	}
-}
-
-func (f *eventFactory) WithTransactionID(txID flow.Identifier) EventOption {
-	return func(e *flow.Event) {
-		e.TransactionID = txID
-	}
-}
-
-func (f *eventFactory) WithPayload(payload []byte) EventOption {
-	return func(e *flow.Event) {
-		e.Payload = payload
-	}
-}
-
-func (g *Events) New(opts ...EventOption) flow.Event {
-	address, err := common.BytesToAddress(unittest.RandomAddressFixture().Bytes())
+// New creates a new flow.Event.
+func (e *Events) New(opts ...EventOption) flow.Event {
+	address, err := common.BytesToAddress(RandomAddressFixture().Bytes())
 	if err != nil {
 		panic(fmt.Sprintf("unexpected error while creating random address: %s", err))
 	}
 
 	location := common.NewAddressLocation(nil, address, "TestContract")
-	identifier := fmt.Sprintf("TestContract.FooEvent%d", g.count)
+	identifier := fmt.Sprintf("TestContract.FooEvent%d", e.count)
 	typeID := location.TypeID(nil, identifier)
 
 	event := &flow.Event{
 		Type:             flow.EventType(typeID),
-		TransactionID:    g.ids.New(),
-		TransactionIndex: g.count,
-		EventIndex:       g.count,
-		Payload:          g.createNewEventPayload(location, identifier),
+		TransactionID:    e.ids.New(),
+		TransactionIndex: e.count,
+		EventIndex:       e.count,
+		Payload:          e.createNewEventPayload(location, identifier),
 	}
 
 	for _, opt := range opts {
 		opt(event)
 	}
-	g.count++
+	e.count++
 
 	return *event
 }
 
-func (g *Events) createNewEventPayload(location common.AddressLocation, identifier string) []byte {
+func (e *Events) createNewEventPayload(location common.AddressLocation, identifier string) []byte {
 	testEventType := cadence.NewEventType(
 		location,
 		identifier,
@@ -125,17 +86,17 @@ func (g *Events) createNewEventPayload(location common.AddressLocation, identifi
 		nil,
 	)
 
-	randomString := cadence.String(hex.EncodeToString(unittest.RandomBytes(100)))
+	randomString := cadence.String(hex.EncodeToString(RandomBytes(100)))
 
 	testEvent := cadence.NewEvent(
 		[]cadence.Value{
-			cadence.NewInt(int(g.count)),
+			cadence.NewInt(int(e.count)),
 			randomString,
 		}).WithType(testEventType)
 
 	var payload []byte
 	var err error
-	switch g.encoding {
+	switch e.encoding {
 	case entities.EventEncodingVersion_CCF_V0:
 		payload, err = ccf.Encode(testEvent)
 		if err != nil {
@@ -151,9 +112,20 @@ func (g *Events) createNewEventPayload(location common.AddressLocation, identifi
 	return payload
 }
 
+var EventGenerator eventGeneratorFactory
+
+type eventGeneratorFactory struct{}
+
+// WithEncoding sets event encoding (CCF or JSON).
+func (e *eventGeneratorFactory) WithEncoding(encoding entities.EventEncodingVersion) EventGeneratorOption {
+	return func(g *Events) {
+		g.encoding = encoding
+	}
+}
+
 // GetEventsWithEncoding generates a specified number of events with a given encoding version.
-func GetEventsWithEncoding(n int, version entities.EventEncodingVersion) []flow.Event {
-	eventGenerator := EventGenerator(WithEncoding(version))
+func (e *eventGeneratorFactory) GetEventsWithEncoding(n int, version entities.EventEncodingVersion) []flow.Event {
+	eventGenerator := NewEventGenerator(EventGenerator.WithEncoding(version))
 	events := make([]flow.Event, 0, n)
 	for i := 0; i < n; i++ {
 		events = append(events, eventGenerator.New())
@@ -162,7 +134,7 @@ func GetEventsWithEncoding(n int, version entities.EventEncodingVersion) []flow.
 }
 
 // GenerateAccountCreateEvent returns a mock account creation event.
-func GenerateAccountCreateEvent(t *testing.T, address flow.Address) flow.Event {
+func (e *eventGeneratorFactory) GenerateAccountCreateEvent(t *testing.T, address flow.Address) flow.Event {
 	cadenceEvent := cadence.NewEvent(
 		[]cadence.Value{
 			cadence.NewAddress(address),
@@ -184,7 +156,7 @@ func GenerateAccountCreateEvent(t *testing.T, address flow.Address) flow.Event {
 
 	return flow.Event{
 		Type:             flow.EventType(cadenceEvent.EventType.Location.TypeID(nil, cadenceEvent.EventType.QualifiedIdentifier)),
-		TransactionID:    unittest.IdentifierFixture(),
+		TransactionID:    IdentifierFixture(),
 		TransactionIndex: 0,
 		EventIndex:       0,
 		Payload:          payload,
@@ -192,7 +164,7 @@ func GenerateAccountCreateEvent(t *testing.T, address flow.Address) flow.Event {
 }
 
 // GenerateAccountContractEvent returns a mock account contract event.
-func GenerateAccountContractEvent(t *testing.T, qualifiedIdentifier string, address flow.Address) flow.Event {
+func (e *eventGeneratorFactory) GenerateAccountContractEvent(t *testing.T, qualifiedIdentifier string, address flow.Address) flow.Event {
 	contractName, err := cadence.NewString("EventContract")
 	require.NoError(t, err)
 
@@ -229,10 +201,47 @@ func GenerateAccountContractEvent(t *testing.T, qualifiedIdentifier string, addr
 
 	return flow.Event{
 		Type:             flow.EventType(cadenceEvent.EventType.Location.TypeID(nil, cadenceEvent.EventType.QualifiedIdentifier)),
-		TransactionID:    unittest.IdentifierFixture(),
+		TransactionID:    IdentifierFixture(),
 		TransactionIndex: 0,
 		EventIndex:       0,
 		Payload:          payload,
+	}
+}
+
+var Event eventFactory
+
+type eventFactory struct{}
+
+// EventOption configures a flow.Event fields.
+type EventOption func(*flow.Event)
+
+func (f *eventFactory) WithEventType(eventType flow.EventType) EventOption {
+	return func(e *flow.Event) {
+		e.Type = eventType
+	}
+}
+
+func (f *eventFactory) WithTransactionIndex(transactionIndex uint32) EventOption {
+	return func(e *flow.Event) {
+		e.TransactionIndex = transactionIndex
+	}
+}
+
+func (f *eventFactory) WithEventIndex(eventIndex uint32) EventOption {
+	return func(e *flow.Event) {
+		e.EventIndex = eventIndex
+	}
+}
+
+func (f *eventFactory) WithTransactionID(txID flow.Identifier) EventOption {
+	return func(e *flow.Event) {
+		e.TransactionID = txID
+	}
+}
+
+func (f *eventFactory) WithPayload(payload []byte) EventOption {
+	return func(e *flow.Event) {
+		e.Payload = payload
 	}
 }
 
@@ -240,7 +249,7 @@ func GenerateAccountContractEvent(t *testing.T, qualifiedIdentifier string, addr
 func EventFixture(
 	opts ...EventOption,
 ) flow.Event {
-	g := EventGenerator(WithEncoding(entities.EventEncodingVersion_CCF_V0))
+	g := NewEventGenerator(EventGenerator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
 	return g.New(opts...)
 }
 
@@ -248,7 +257,7 @@ func EventsFixture(
 	n int,
 ) []flow.Event {
 	events := make([]flow.Event, n)
-	g := EventGenerator(WithEncoding(entities.EventEncodingVersion_CCF_V0))
+	g := NewEventGenerator(EventGenerator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
 	for i := 0; i < n; i++ {
 		events[i] = g.New(
 			Event.WithTransactionIndex(0),
@@ -257,17 +266,4 @@ func EventsFixture(
 	}
 
 	return events
-}
-
-// BlockEventsFixture returns a block events model populated with random events of length n.
-func BlockEventsFixture(
-	header *flow.Header,
-	n int,
-) flow.BlockEvents {
-	return flow.BlockEvents{
-		BlockID:        header.ID(),
-		BlockHeight:    header.Height,
-		BlockTimestamp: header.Timestamp,
-		Events:         EventsFixture(n),
-	}
 }
