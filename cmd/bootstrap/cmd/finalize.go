@@ -433,7 +433,7 @@ func generateEmptyExecutionState(
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithEpochConfig(epochConfig),
-		fvm.WithIdentities(identities),
+		fvm.WithNodes(identities),
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate execution state")
