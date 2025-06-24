@@ -86,7 +86,7 @@ type UntrustedExecutionReceiptStub ExecutionReceiptStub
 //
 // All errors indicate a valid ExecutionReceiptStub cannot be constructed from the input.
 func NewExecutionReceiptStub(untrusted UntrustedExecutionReceiptStub) (*ExecutionReceiptStub, error) {
-	_, err := NewUnsignedExecutionReceiptStub(UntrustedUnsignedExecutionReceiptStub(untrusted.UnsignedExecutionReceiptStub))
+	unsignedExecutionReceiptStub, err := NewUnsignedExecutionReceiptStub(UntrustedUnsignedExecutionReceiptStub(untrusted.UnsignedExecutionReceiptStub))
 	if err != nil {
 		return nil, fmt.Errorf("invalid unsigned execution receipt stub: %w", err)
 	}
@@ -94,7 +94,7 @@ func NewExecutionReceiptStub(untrusted UntrustedExecutionReceiptStub) (*Executio
 		return nil, fmt.Errorf("executor signature must not be empty")
 	}
 	return &ExecutionReceiptStub{
-		UnsignedExecutionReceiptStub: untrusted.UnsignedExecutionReceiptStub,
+		UnsignedExecutionReceiptStub: *unsignedExecutionReceiptStub,
 		ExecutorSignature:            untrusted.ExecutorSignature,
 	}, nil
 }
