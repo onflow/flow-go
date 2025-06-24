@@ -616,8 +616,8 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 			MemoryUsed:      22,
 		},
 	)
-	unsignedExecutionResult, err := flow.NewUnsignedExecutionReceipt(
-		flow.UntrustedUnsignedExecutionReceipt{
+	executionReceipt := &flow.ExecutionReceipt{
+		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
 			ExecutorID: unittest.IdentifierFixture(),
 			ExecutionResult: flow.ExecutionResult{
 				Chunks: flow.ChunkList{
@@ -629,15 +629,8 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 			},
 			Spocks: unittest.SignaturesFixture(1),
 		},
-	)
-	require.NoError(t, err)
-	executionReceipt, err := flow.NewExecutionReceipt(
-		flow.UntrustedExecutionReceipt{
-			UnsignedExecutionReceipt: *unsignedExecutionResult,
-			ExecutorSignature:        unittest.SignatureFixture(),
-		},
-	)
-	require.NoError(t, err)
+		ExecutorSignature: unittest.SignatureFixture(),
+	}
 
 	return &execution.ComputationResult{
 		BlockExecutionResult: blockExecResult,
