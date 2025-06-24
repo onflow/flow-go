@@ -5,11 +5,12 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/forest"
 	"github.com/onflow/flow-go/storage"
-	"github.com/rs/zerolog"
 )
 
 var (
@@ -17,13 +18,21 @@ var (
 	ErrMaxSizeExceeded = fmt.Errorf("adding new result would exceed maximum size")
 )
 
-// ResultsForest is a mempool holding execution results and receipts, which is aware of the tree structure
-// formed by the results. The mempool supports pruning by view: only results
-// descending from the latest sealed and finalized result are relevant. Hence, we
-// can prune all results for blocks _below_ the latest block with a finalized seal.
-// Results of sufficient view for forks that conflict with the finalized fork are
-// retained. However, such orphaned forks do not grow anymore and their results
-// will be progressively flushed out with increasing sealed-finalized view.
+// ResultsForest is a mempool holding execution results and receipts, which is aware of the tree
+// structure formed by the results. The mempool supports pruning by view (of the executed block):
+// only results descending from the latest sealed and finalized result are relevant.
+// By convention, the ResultsForest always contains the latest sealed result. Thereby, the
+// ResultsForest is able to determine whether results for a block still need to be processed or
+// can be orphaned (processing abandoned). Hence, we prune all results for blocks _below_ the
+// latest block with a finalized seal.
+// All results for views at or above the pruning threshold are retained, explicitly including results
+// from execution forks or orphaned blocks even if they conflict with the finalized seal. However, such
+// orphaned forks will eventually stop growing, because either (i) a conflicting fork of blocks is
+// finalized, which means that the orphaned forks can no longer be extended by new blocks or (ii) a
+// rogue execution node pursuing its own execution fork will eventually be slashed and can no longer
+// submit new results.
+// Nevertheless, to utilize resources efficiently, the ResultsForest tried to avoid processing execution
+// forks that conflict with the finalized seal.
 //
 // Safe for concurrent access. Internally, the mempool utilizes the LevelledForrest.
 type ResultsForest struct {
@@ -63,7 +72,12 @@ func NewResultsForest(
 	}
 }
 
-// AddResult adds an execution result to the forest without any receipts.
+// AddResult adds an Execution Result to the Result Forest (without any receipts), in
+// case the result is not already stored in the tree.
+// This is useful for crash recovery:
+// After recovering from a crash, the mempools are wiped and the sealed results will not
+// be stored in the Execution Tree anymore. Adding the result to the tree allows to create
+// a vertex in the tree without attaching any Execution Receipts to it.
 //
 // Parameters:
 //   - result: the execution result to add
@@ -79,18 +93,20 @@ func NewResultsForest(
 //
 // Concurrency safety:
 //   - Safe for concurrent access
+//
+// TODO: during normal operations we should never add a result without a receipt, this is only used for crash recovery
 func (rf *ResultsForest) AddResult(result *flow.ExecutionResult, header *flow.Header, pipeline optimistic_sync.Pipeline) error {
+	// front-load sanity checks before locking: result must be for block
+	if header.ID() != result.BlockID {
+		return fmt.Errorf("receipt is for different block")
+	}
+
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
 	// drop receipts for block views lower than the lowest view.
 	if header.View < rf.forest.LowestLevel {
 		return nil
-	}
-
-	// sanity check: result must be for block
-	if header.ID() != result.BlockID {
-		return fmt.Errorf("receipt is for different block")
 	}
 
 	_, err := rf.getOrCreateExecutionResultContainer(result, header, pipeline)
@@ -118,17 +134,17 @@ func (rf *ResultsForest) AddResult(result *flow.ExecutionResult, header *flow.He
 // Concurrency safety:
 //   - Safe for concurrent access
 func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, header *flow.Header, pipeline optimistic_sync.Pipeline) (bool, error) {
+	// front-load sanity checks before locking: result must be for block
+	if header.ID() != receipt.ExecutionResult.BlockID {
+		return false, fmt.Errorf("receipt is for different block")
+	}
+
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
 	// drop receipts for block views lower than the lowest view.
 	if header.View < rf.forest.LowestLevel {
 		return false, nil
-	}
-
-	// sanity check: result must be for block
-	if header.ID() != receipt.ExecutionResult.BlockID {
-		return false, fmt.Errorf("receipt is for different block")
 	}
 
 	container, err := rf.getOrCreateExecutionResultContainer(&receipt.ExecutionResult, header, pipeline)
@@ -205,11 +221,11 @@ func (rf *ResultsForest) HasReceipt(receipt *flow.ExecutionReceipt) bool {
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
 
-	vertex, found := rf.forest.GetVertex(resultID)
+	container, found := rf.getContainer(resultID)
 	if !found {
 		return false
 	}
-	return vertex.(*ExecutionResultContainer).Has(receiptID)
+	return container.Has(receiptID)
 }
 
 // pruneUpToView prunes all results for all blocks with view up to but not including the given limit.
@@ -337,7 +353,7 @@ func (rf *ResultsForest) OnResultSealed(resultID flow.Identifier) error {
 		return nil
 	}
 
-	unsealedContainers, err := rf.findUnsealedContainersInPath(sealedResult)
+	unsealedContainers, err := rf.findUnsealedAncestors(sealedResult)
 	if err != nil {
 		return err
 	}
@@ -351,38 +367,29 @@ func (rf *ResultsForest) OnResultSealed(resultID flow.Identifier) error {
 	return nil
 }
 
-// findUnsealedContainersInPath finds all unsealed containers in the path from the current container
-// to the last sealed container (exclusive). The returned containers are sorted by block header view
-// in ascending order. Returns an error if any ancestor is not found in the forest.
+// findUnsealedAncestors returns all unsealed containers between the last sealed container (excluded)
+// and the provided `head` of an execution fork. The returned containers are ordered by ascending views
+// of the executed blocks.
+// CAUTION: not concurrency safe!
 //
-// Parameters:
-//   - current: the current container
-//
-// Returns:
-//   - []*ExecutionResultContainer: list of unsealed containers sorted by view in ascending order
-//   - error: any error that occurred during the operation
-//
-// No errors are expected during normal operation. An error indicates the forest's internal state is
-// corrupted.
-//
-// Concurrency safety:
-//   - Not safe for concurrent access, caller must hold read lock
-func (rf *ResultsForest) findUnsealedContainersInPath(current *ExecutionResultContainer) ([]*ExecutionResultContainer, error) {
-	unsealedContainers := []*ExecutionResultContainer{current}
+// findUnsealedAncestors expects that `head` is a descendant of the last sealed result and that all
+// intermediate results are also in the forest. Otherwise, an exception is returned.
+func (rf *ResultsForest) findUnsealedAncestors(head *ExecutionResultContainer) ([]*ExecutionResultContainer, error) {
+	unsealedContainers := []*ExecutionResultContainer{head}
 
 	for {
-		parentID, _ := current.Parent()
+		parentID, _ := head.Parent()
 		if parentID == rf.lastSealedResultID {
 			break
 		}
 
 		parent, found := rf.getContainer(parentID)
 		if !found {
-			return nil, fmt.Errorf("ancestor result %s of %s not found in forest", parentID, current.resultID)
+			return nil, fmt.Errorf("ancestor result %s of %s not found in forest", parentID, head.resultID)
 		}
 
 		unsealedContainers = append(unsealedContainers, parent)
-		current = parent
+		head = parent
 	}
 
 	// Sort containers by view in ascending order
