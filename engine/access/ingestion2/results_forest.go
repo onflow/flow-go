@@ -29,6 +29,7 @@ var (
 type ResultsForest struct {
 	log                         zerolog.Logger
 	forest                      forest.LevelledForest
+	headers                     storage.Headers
 	maxSize                     uint64
 	lastSealedResultID          flow.Identifier
 	latestPersistedSealedResult storage.LatestPersistedSealedResult
@@ -38,18 +39,27 @@ type ResultsForest struct {
 // NewResultsForest creates a new instance of ResultsForest.
 func NewResultsForest(
 	log zerolog.Logger,
-	maxSize uint64,
+	headers storage.Headers,
 	latestPersistedSealedResult storage.LatestPersistedSealedResult,
-) *ResultsForest {
-	resultID, _ := latestPersistedSealedResult.Latest()
-	return &ResultsForest{
+	maxSize uint64,
+) (*ResultsForest, error) {
+	resultID, sealedHeight := latestPersistedSealedResult.Latest()
+
+	sealedHeader, err := headers.ByHeight(sealedHeight)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get block header for latest persisted sealed result (height: %d): %w", sealedHeight, err)
+	}
+
+	rf := &ResultsForest{
 		log:                         log.With().Str("component", "results_forest").Logger(),
-		forest:                      *forest.NewLevelledForest(0),
+		forest:                      *forest.NewLevelledForest(sealedHeader.View),
+		headers:                     headers,
 		maxSize:                     maxSize,
 		lastSealedResultID:          resultID,
 		latestPersistedSealedResult: latestPersistedSealedResult,
-		mu:                          sync.RWMutex{},
 	}
+
+	return rf, nil
 }
 
 // AddResult adds an execution result to the forest without any receipts.
