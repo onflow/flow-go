@@ -44,3 +44,11 @@ func InterfaceToCdcValues(t *testing.T, vals []interface{}) []cadence.Value {
 
 	return decoded
 }
+
+func ConvertToCadence(data []byte) []cadence.Value {
+	ret := make([]cadence.Value, len(data))
+	for i, v := range data {
+		ret[i] = cadence.UInt8(v)
+	}
+	return ret
+}
