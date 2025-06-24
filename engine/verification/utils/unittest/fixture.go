@@ -355,7 +355,8 @@ func ExecutionResultFixture(t *testing.T,
 			spockSecrets = append(spockSecrets, snapshot.SpockSecret)
 		}
 
-		chunkDataPacks = computationResult.AllChunkDataPacks()
+		chunkDataPacks, err = computationResult.AllChunkDataPacks()
+		require.NoError(t, err)
 		result = &computationResult.ExecutionReceipt.ExecutionResult
 	})
 

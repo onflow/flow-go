@@ -78,12 +78,17 @@ func ComputationResultForBlockFixture(
 		serviceEventVersionBeaconProtocol.ServiceEvent(),
 	}
 
-	executionResult := flow.NewExecutionResult(
-		parentBlockExecutionResultID,
-		completeBlock.BlockID(),
-		computationResult.AllChunks(),
-		convertedServiceEvents,
-		executionDataID)
+	chunks, err := computationResult.AllChunks()
+	require.NoError(t, err)
+
+	executionResult, err := flow.NewExecutionResult(flow.UntrustedExecutionResult{
+		PreviousResultID: parentBlockExecutionResultID,
+		BlockID:          completeBlock.BlockID(),
+		Chunks:           chunks,
+		ServiceEvents:    convertedServiceEvents,
+		ExecutionDataID:  executionDataID,
+	})
+	require.NoError(t, err)
 
 	unsignedExecutionReceipt, err := flow.NewUnsignedExecutionReceipt(
 		flow.UntrustedUnsignedExecutionReceipt{
