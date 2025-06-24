@@ -42,10 +42,6 @@ type UntrustedQuorumCertificate QuorumCertificate
 //
 // All errors indicate a valid Collection cannot be constructed from the input.
 func NewQuorumCertificate(untrusted UntrustedQuorumCertificate) (*QuorumCertificate, error) {
-	if untrusted.View == 0 {
-		return nil, fmt.Errorf("View must not be zero")
-	}
-
 	if untrusted.BlockID == ZeroID {
 		return nil, fmt.Errorf("BlockID must not be empty")
 	}
