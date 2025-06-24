@@ -1,5 +1,7 @@
 package flow
 
+import "fmt"
+
 // QuorumCertificate represents a quorum certificate for a block proposal as defined in the HotStuff algorithm.
 // A quorum certificate is a collection of votes for a particular block proposal. Valid quorum certificates contain
 // signatures from a super-majority of consensus committee members.
@@ -40,6 +42,22 @@ type UntrustedQuorumCertificate QuorumCertificate
 //
 // All errors indicate a valid Collection cannot be constructed from the input.
 func NewQuorumCertificate(untrusted UntrustedQuorumCertificate) (*QuorumCertificate, error) {
+	if untrusted.View == 0 {
+		return nil, fmt.Errorf("View must not be zero")
+	}
+
+	if untrusted.BlockID == ZeroID {
+		return nil, fmt.Errorf("BlockID must not be empty")
+	}
+
+	if len(untrusted.SignerIndices) == 0 {
+		return nil, fmt.Errorf("SignerIndices must not be empty")
+	}
+
+	if len(untrusted.SigData) == 0 {
+		return nil, fmt.Errorf("SigData must not be empty")
+	}
+
 	return &QuorumCertificate{
 		View:          untrusted.View,
 		BlockID:       untrusted.BlockID,
