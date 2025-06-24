@@ -1,4 +1,4 @@
-package pipeline
+package persisters
 
 import (
 	"testing"
@@ -227,7 +227,7 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
 				p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(assert.AnError).Once()
 			},
-			expectedError: "could not add collections to batch",
+			expectedError: "could not add light collections to batch",
 		},
 		{
 			name: "TransactionsStoreError",

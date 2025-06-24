@@ -1,4 +1,4 @@
-package pipeline
+package persisters
 
 import (
 	"testing"
@@ -50,7 +50,7 @@ func (r *RegistersPersisterSuite) TestRegistersPersister_PersistWithEmptyData() 
 		storedRegisters = sr
 	}).Return(nil).Once()
 
-	err := r.persister.PersistDirectly()
+	err := r.persister.Persist()
 	r.Require().NoError(err)
 
 	// Verify empty registers were stored
@@ -75,7 +75,7 @@ func (r *RegistersPersisterSuite) TestRegistersPersister_PersistWithData() {
 		storedRegisters = sr
 	}).Return(nil).Once()
 
-	err = r.persister.PersistDirectly()
+	err = r.persister.Persist()
 	r.Require().NoError(err)
 
 	// Verify the correct data was stored
@@ -101,7 +101,7 @@ func (r *RegistersPersisterSuite) TestRegistersPersister_ErrorHandling() {
 		{
 			name: "RegistersDataError",
 			setupMocks: func() {
-				// Create a persister with wrong height to trigger data error
+				// Create a persisters with wrong height to trigger data error
 				wrongPersister := NewRegistersPersister(
 					r.inMemoryRegisters,
 					r.registers,
@@ -117,7 +117,7 @@ func (r *RegistersPersisterSuite) TestRegistersPersister_ErrorHandling() {
 		r.Run(test.name, func() {
 			test.setupMocks()
 
-			err := r.persister.PersistDirectly()
+			err := r.persister.Persist()
 			r.Require().Error(err)
 
 			r.Assert().Contains(err.Error(), test.expectedError)

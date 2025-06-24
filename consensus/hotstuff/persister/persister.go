@@ -29,7 +29,7 @@ var _ hotstuff.PersisterReader = (*Persister)(nil)
 func New(db storage.DB, chainID flow.ChainID) (*Persister, error) {
 	err := ensureSafetyDataAndLivenessDataAreBootstrapped(db, chainID)
 	if err != nil {
-		return nil, fmt.Errorf("fail to check persister was properly bootstrapped: %w", err)
+		return nil, fmt.Errorf("fail to check persisters was properly bootstrapped: %w", err)
 	}
 
 	p := &Persister{

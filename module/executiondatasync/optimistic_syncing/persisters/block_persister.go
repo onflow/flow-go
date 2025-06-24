@@ -1,4 +1,4 @@
-package pipeline
+package persisters
 
 import (
 	"fmt"
@@ -11,11 +11,8 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// BlockPersister handles transferring data from in-memory storages to permanent storages
-// for a single block.
-//
-// - Each BlockPersister instance is created for ONE specific block
-// - All `inMemory*` storages contain data ONLY for this specific block, they are not shared
+// BlockPersister handles persisting of execution data for all PersisterStore-s to database.
+// Each BlockPersister instance is created for ONE specific block
 type BlockPersister struct {
 	log zerolog.Logger
 
@@ -25,7 +22,7 @@ type BlockPersister struct {
 	header          *flow.Header
 }
 
-// NewBlockPersister creates a new persister with dependency injection.
+// NewBlockPersister creates a new block persister.
 func NewBlockPersister(
 	log zerolog.Logger,
 	persisterStores []PersisterStore,
@@ -50,15 +47,15 @@ func NewBlockPersister(
 	persister.log.Info().
 		Uint64("height", header.Height).
 		Int("batch_persisters_count", len(persisterStores)).
-		Msg("block persister initialized")
+		Msg("block persisters initialized")
 
 	return persister
 }
 
-// Persist save data from in-memory storages to the provided persisted storages and commit updates to the database.
+// Persist save data in provided persisted stores and commit updates to the database.
 // No errors are expected during normal operations
 func (p *BlockPersister) Persist() error {
-	p.log.Debug().Msg("adding execution data to batch")
+	p.log.Debug().Msg("started to persist execution data")
 	start := time.Now()
 
 	err := p.protocolDB.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {

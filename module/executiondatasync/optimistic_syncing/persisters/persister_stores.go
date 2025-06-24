@@ -1,17 +1,16 @@
-package pipeline
+package persisters
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
 )
 
-// PersisterStore is the interface for all data type persisters that use batch operations.
-// Each implementation handles persistence of a specific data type (events, results, collections, etc.)
-// to permanent storage using batch operations for the efficient database writes.
+// PersisterStore is the interface to handle persisting of a data type to permanent storage using batch operation.
 type PersisterStore interface {
-	// Persist adds this data type to the batch for later commitment.
+	// Persist adds data to the batch for later commitment.
 	// No errors are expected during normal operations
 	Persist(batch storage.ReaderBatchWriter) error
 }
@@ -37,6 +36,8 @@ func NewEventsPersister(
 	}
 }
 
+// Persist adds events to the batch.
+// No errors are expected during normal operations
 func (e *EventsPersister) Persist(batch storage.ReaderBatchWriter) error {
 	eventsList, err := e.inMemoryEvents.ByBlockID(e.blockID)
 	if err != nil {
@@ -73,6 +74,8 @@ func NewResultsPersister(
 	}
 }
 
+// Persist adds results to the batch.
+// No errors are expected during normal operations
 func (r *ResultsPersister) Persist(batch storage.ReaderBatchWriter) error {
 	results, err := r.inMemoryResults.ByBlockID(r.blockID)
 	if err != nil {
@@ -88,10 +91,10 @@ func (r *ResultsPersister) Persist(batch storage.ReaderBatchWriter) error {
 	return nil
 }
 
-var _ PersisterStore = (*CollectionsPersister)(nil)
+var _ PersisterStore = (*LightCollectionsPersister)(nil)
 
-// CollectionsPersister handles persisting collections
-type CollectionsPersister struct {
+// LightCollectionsPersister handles persisting light collections
+type LightCollectionsPersister struct {
 	inMemoryCollections  *unsynchronized.Collections
 	permanentCollections storage.Collections
 }
@@ -99,23 +102,19 @@ type CollectionsPersister struct {
 func NewCollectionsPersister(
 	inMemoryCollections *unsynchronized.Collections,
 	permanentCollections storage.Collections,
-) *CollectionsPersister {
-	return &CollectionsPersister{
+) *LightCollectionsPersister {
+	return &LightCollectionsPersister{
 		inMemoryCollections:  inMemoryCollections,
 		permanentCollections: permanentCollections,
 	}
 }
 
-func (c *CollectionsPersister) Persist(batch storage.ReaderBatchWriter) error {
-	collections := c.inMemoryCollections.LightCollections()
-
-	if len(collections) == 0 {
-		return nil
-	}
-
-	for _, collection := range collections {
+// Persist adds light collections to the batch.
+// No errors are expected during normal operations
+func (c *LightCollectionsPersister) Persist(batch storage.ReaderBatchWriter) error {
+	for _, collection := range c.inMemoryCollections.LightCollections() {
 		if err := c.permanentCollections.BatchStoreLightAndIndexByTransaction(&collection, batch); err != nil {
-			return fmt.Errorf("could not add collections to batch: %w", err)
+			return fmt.Errorf("could not add light collections to batch: %w", err)
 		}
 	}
 
@@ -140,14 +139,10 @@ func NewTransactionsPersister(
 	}
 }
 
+// Persist adds transactions to the batch.
+// No errors are expected during normal operations
 func (t *TransactionsPersister) Persist(batch storage.ReaderBatchWriter) error {
-	transactions := t.inMemoryTransactions.Data()
-
-	if len(transactions) == 0 {
-		return nil
-	}
-
-	for _, transaction := range transactions {
+	for _, transaction := range t.inMemoryTransactions.Data() {
 		if err := t.permanentTransactions.BatchStore(&transaction, batch); err != nil {
 			return fmt.Errorf("could not add transactions to batch: %w", err)
 		}
@@ -177,6 +172,8 @@ func NewTxResultErrMsgPersister(
 	}
 }
 
+// Persist adds transaction result error messages to the batch.
+// No errors are expected during normal operations
 func (t *TxResultErrMsgPersister) Persist(batch storage.ReaderBatchWriter) error {
 	txResultErrMsgs, err := t.inMemoryTxResultErrMsg.ByBlockID(t.blockID)
 	if err != nil {
@@ -187,39 +184,6 @@ func (t *TxResultErrMsgPersister) Persist(batch storage.ReaderBatchWriter) error
 		if err := t.permanentTxResultErrMsg.BatchStore(t.blockID, txResultErrMsgs, batch); err != nil {
 			return fmt.Errorf("could not add transaction result error messages to batch: %w", err)
 		}
-	}
-
-	return nil
-}
-
-// RegistersPersister handles registers
-type RegistersPersister struct {
-	inMemoryRegisters  *unsynchronized.Registers
-	permanentRegisters storage.RegisterIndex
-	height             uint64
-}
-
-func NewRegistersPersister(
-	inMemoryRegisters *unsynchronized.Registers,
-	permanentRegisters storage.RegisterIndex,
-	height uint64,
-) *RegistersPersister {
-	return &RegistersPersister{
-		inMemoryRegisters:  inMemoryRegisters,
-		permanentRegisters: permanentRegisters,
-		height:             height,
-	}
-}
-
-// PersistDirectly persists registers directly (not using batch since it's a different DB)
-func (r *RegistersPersister) PersistDirectly() error {
-	registerData, err := r.inMemoryRegisters.Data(r.height)
-	if err != nil {
-		return fmt.Errorf("could not get data from registers: %w", err)
-	}
-
-	if err := r.permanentRegisters.Store(registerData, r.height); err != nil {
-		return fmt.Errorf("could not persist registers: %w", err)
 	}
 
 	return nil
