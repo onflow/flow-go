@@ -18,6 +18,10 @@ var (
 	ErrMaxViewDeltaExceeded = fmt.Errorf("results block view exceeds accepted range")
 )
 
+type PipelineFactory interface {
+	NewPipeline(result *flow.ExecutionResult, isSealed bool) optimistic_sync.Pipeline
+}
+
 // ResultsForest is a mempool holding execution results and receipts, which is aware of the tree structure
 // formed by the results. The mempool supports pruning by view: only results
 // descending from the latest sealed and finalized result are relevant. Hence, we
@@ -34,6 +38,7 @@ type ResultsForest struct {
 	maxViewDelta                uint64
 	lastSealedResultID          flow.Identifier
 	latestPersistedSealedResult storage.LatestPersistedSealedResult
+	pipelineFactory             PipelineFactory
 	mu                          sync.RWMutex
 }
 
@@ -68,21 +73,11 @@ func NewResultsForest(
 // Expected errors during normal operations:
 //   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-func (rf *ResultsForest) AddResult(result *flow.ExecutionResult, executedBlock *flow.Header, pipeline optimistic_sync.Pipeline) error {
+func (rf *ResultsForest) AddResult(result *flow.ExecutionResult) error {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	// drop receipts for block views lower than the lowest view.
-	if executedBlock.View < rf.forest.LowestLevel {
-		return nil
-	}
-
-	// sanity check: result must be for block
-	if executedBlock.ID() != result.BlockID {
-		return fmt.Errorf("receipt is for different block")
-	}
-
-	_, err := rf.getOrCreateExecutionResultContainer(result, executedBlock, pipeline)
+	_, err := rf.getOrCreateExecutionResultContainer(result)
 	if err != nil {
 		return fmt.Errorf("failed to get container for result (%s): %w", result.ID(), err)
 	}
@@ -94,23 +89,18 @@ func (rf *ResultsForest) AddResult(result *flow.ExecutionResult, executedBlock *
 // Expected errors during normal operations:
 //   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, executedBlock *flow.Header, pipeline optimistic_sync.Pipeline) (bool, error) {
+func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	// drop receipts for block views lower than the lowest view.
-	if executedBlock.View < rf.forest.LowestLevel {
-		return false, nil
-	}
-
-	// sanity check: result must be for block
-	if executedBlock.ID() != receipt.ExecutionResult.BlockID {
-		return false, fmt.Errorf("receipt is for different block")
-	}
-
-	container, err := rf.getOrCreateExecutionResultContainer(&receipt.ExecutionResult, executedBlock, pipeline)
+	container, err := rf.getOrCreateExecutionResultContainer(&receipt.ExecutionResult)
 	if err != nil {
 		return false, fmt.Errorf("failed to get container for result (%s): %w", receipt.ExecutionResult.ID(), err)
+	}
+
+	if container == nil {
+		// noop if the result's block view is lower than the lowest view.
+		return false, nil
 	}
 
 	added, err := container.AddReceipt(receipt)
@@ -127,22 +117,38 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, executedBloc
 //   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 //
-// CAUTION: not concurrency safe!
-func (rf *ResultsForest) getOrCreateExecutionResultContainer(result *flow.ExecutionResult, executedBlock *flow.Header, pipeline optimistic_sync.Pipeline) (*ExecutionResultContainer, error) {
+// CAUTION: not concurrency safe! Caller must hold a lock.
+func (rf *ResultsForest) getOrCreateExecutionResultContainer(result *flow.ExecutionResult) (*ExecutionResultContainer, error) {
 	// First try to get existing container
-	container, found := rf.getContainer(result.ID())
+	resultID := result.ID()
+	container, found := rf.getContainer(resultID)
 	if found {
 		return container, nil
 	}
 
-	// Check if adding new container would exceed max size
+	executedBlock, err := rf.headers.ByBlockID(result.BlockID)
+	if err != nil {
+		// this is an exception since only results for certified blocks should be added to the forest
+		return nil, fmt.Errorf("failed to get block header for result (%s): %w", resultID, err)
+	}
+
+	// drop receipts for block views lower than the lowest view.
+	if executedBlock.View < rf.forest.LowestLevel {
+		return nil, nil
+	}
+
+	// make sure the result's block view is within the accepted range
 	if executedBlock.View > rf.forest.LowestLevel+rf.maxViewDelta {
 		return nil, ErrMaxViewDeltaExceeded
 	}
 
-	container, err := NewExecutionResultContainer(result, executedBlock, pipeline)
+	// TODO: determine if the result is sealed
+	// implement this when adding the loader functionality
+	var isSealed bool
+	pipeline := rf.pipelineFactory.NewPipeline(result, isSealed)
+	container, err = NewExecutionResultContainer(result, executedBlock, pipeline)
 	if err != nil {
-		return nil, fmt.Errorf("constructing container for receipt failed: %w", err)
+		return nil, fmt.Errorf("failed to create container for result (%s): %w", resultID, err)
 	}
 
 	// Verify and add to forest
@@ -362,7 +368,7 @@ func (rf *ResultsForest) processCompleted(resultID flow.Identifier) error {
 
 	// finally, prune the forest up to the latest persisted result's block view
 	latestPersistedView := container.blockHeader.View
-	err := rf.pruneUpToView(latestPersistedView)
+	err := rf.forest.PruneUpToLevel(latestPersistedView)
 	if err != nil {
 		return fmt.Errorf("failed to prune results forest (view: %d): %w", latestPersistedView, err)
 	}
