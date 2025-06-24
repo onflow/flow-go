@@ -52,13 +52,19 @@ func MessageToExecutionResult(m *entities.ExecutionResult) (
 	if err != nil {
 		return nil, err
 	}
-	return &flow.ExecutionResult{
+
+	executionResult, err := flow.NewExecutionResult(flow.UntrustedExecutionResult{
 		PreviousResultID: MessageToIdentifier(m.PreviousResultId),
 		BlockID:          MessageToIdentifier(m.BlockId),
 		Chunks:           parsedChunks,
 		ServiceEvents:    parsedServiceEvents,
 		ExecutionDataID:  MessageToIdentifier(m.ExecutionDataId),
-	}, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build execution result: %w", err)
+	}
+
+	return executionResult, nil
 }
 
 // ExecutionResultsToMessages converts a slice of execution results to a slice of protobuf messages
@@ -196,20 +202,53 @@ func MessageToChunk(m *entities.Chunk) (*flow.Chunk, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse Message end state to Chunk: %w", err)
 	}
-	chunkBody := flow.ChunkBody{
-		CollectionIndex:      uint(m.CollectionIndex),
-		StartState:           startState,
-		EventCollection:      MessageToIdentifier(m.EventCollection),
-		BlockID:              MessageToIdentifier(m.BlockId),
-		TotalComputationUsed: m.TotalComputationUsed,
-		NumberOfTransactions: uint64(m.NumberOfTransactions),
-		ServiceEventCount:    MessageToServiceEventCountField(m.ServiceEventCount),
+
+	serviceEventCountPtr := MessageToServiceEventCountField(m.ServiceEventCount)
+	var chunk *flow.Chunk
+
+	// Branch on nil-vs-non-nil to preserve backward compatibility
+	//TODO(mainnet27, #6773): remove the v1 branch here
+	if serviceEventCountPtr == nil {
+		// Protocol v1: omit ServiceEventCount
+		chunk, err = flow.NewChunk_ProtocolVersion1(flow.UntrustedChunk{
+			ChunkBody: flow.ChunkBody{
+				CollectionIndex:      uint(m.CollectionIndex),
+				StartState:           startState,
+				EventCollection:      MessageToIdentifier(m.EventCollection),
+				ServiceEventCount:    nil,
+				BlockID:              MessageToIdentifier(m.BlockId),
+				TotalComputationUsed: m.TotalComputationUsed,
+				NumberOfTransactions: uint64(m.NumberOfTransactions),
+			},
+			Index:    m.Index,
+			EndState: endState,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("could not build chunk protocol version1: %w", err)
+		}
+
+		return chunk, nil
 	}
-	return &flow.Chunk{
-		ChunkBody: chunkBody,
-		Index:     m.Index,
-		EndState:  endState,
-	}, nil
+
+	// Protocol v2+: include ServiceEventCount
+	chunk, err = flow.NewChunk(flow.UntrustedChunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex:      uint(m.CollectionIndex),
+			StartState:           startState,
+			EventCollection:      MessageToIdentifier(m.EventCollection),
+			ServiceEventCount:    serviceEventCountPtr,
+			BlockID:              MessageToIdentifier(m.BlockId),
+			TotalComputationUsed: m.TotalComputationUsed,
+			NumberOfTransactions: uint64(m.NumberOfTransactions),
+		},
+		Index:    m.Index,
+		EndState: endState,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build chunk: %w", err)
+	}
+
+	return chunk, nil
 }
 
 // MessagesToChunkList converts a slice of protobuf messages to a chunk list
