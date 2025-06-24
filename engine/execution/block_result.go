@@ -228,7 +228,7 @@ func (ar *BlockAttestationResult) ChunkAt(index int) (*flow.Chunk, error) {
 			CollectionIndex:      uint(index),
 			StartState:           attestRes.startStateCommit,
 			EventCollection:      attestRes.eventCommit,
-			ServiceEventCount: convert.MessageToServiceEventCountField(uint32(ar.ServiceEventCountForChunk(index))),
+			ServiceEventCount:    convert.MessageToServiceEventCountField(uint32(ar.ServiceEventCountForChunk(index))),
 			TotalComputationUsed: execRes.executionSnapshot.TotalComputationUsed(),
 			NumberOfTransactions: uint64(len(execRes.TransactionResults())),
 		},
