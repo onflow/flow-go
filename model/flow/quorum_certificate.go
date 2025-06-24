@@ -62,6 +62,15 @@ func NewQuorumCertificate(untrusted UntrustedQuorumCertificate) (*QuorumCertific
 	}, nil
 }
 
+func NewHeaderQuorumCertificate(untrusted UntrustedQuorumCertificate) (*QuorumCertificate, error) {
+	return &QuorumCertificate{
+		View:          untrusted.View,
+		BlockID:       untrusted.BlockID,
+		SignerIndices: untrusted.SignerIndices,
+		SigData:       untrusted.SigData,
+	}, nil
+}
+
 // ID returns the QuorumCertificate's identifier
 func (qc *QuorumCertificate) ID() Identifier {
 	if qc == nil {
