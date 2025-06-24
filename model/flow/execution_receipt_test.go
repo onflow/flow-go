@@ -173,7 +173,6 @@ func TestNewUnsignedExecutionReceiptStub(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
 		receipt := unittest.UnsignedExecutionReceiptFixture().Stub()
 		res, err := flow.NewUnsignedExecutionReceiptStub(flow.UntrustedUnsignedExecutionReceiptStub(receipt))
-
 		require.NoError(t, err)
 		require.NotNil(t, res)
 	})
