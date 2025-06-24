@@ -2,25 +2,22 @@ package optimistic_sync
 
 import (
 	"context"
-	"crypto/rand"
-	"fmt"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	txerrmsgsmock "github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages/mock"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -117,53 +114,6 @@ func (p *PipelineFunctionalSuite) TearDownTest() {
 	p.Require().NoError(p.pdb.Close())
 	p.Require().NoError(p.bdb.Close())
 	p.Require().NoError(os.RemoveAll(p.tmpDir))
-}
-
-// WithRunningPipeline is a test helper that sets up and runs a pipeline instance
-// with proper channel communication and context management. It provides the test
-// function with access to the running pipeline, state update channel, error channel,
-// and cancellation function for comprehensive testing scenarios.
-func (p *PipelineFunctionalSuite) WithRunningPipeline(testFunc func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc)) {
-	updateChan := make(chan State, 10)
-
-	publisher := func(state State) {
-		updateChan <- state
-	}
-
-	pipeline := NewPipeline(p.logger, false, p.executionResult, p.core, publisher)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	errChan := make(chan error)
-	go func() {
-		errChan <- pipeline.Run(ctx, p.core)
-	}()
-
-	testFunc(pipeline, updateChan, errChan, cancel)
-}
-
-// initializeTestData creates and returns test execution data and transaction result
-// error messages for use in test cases. It generates realistic test data including
-// chunk execution data with events, trie updates, collections, and system chunks.
-func (p *PipelineFunctionalSuite) initializeTestData() (*execution_data.BlockExecutionData, []flow.TransactionResultErrorMessage) {
-	expectedChunkExecutionData := unittest.ChunkExecutionDataFixture(
-		p.T(),
-		0,
-		unittest.WithChunkEvents(unittest.EventsFixture(5)),
-		unittest.WithTrieUpdate(createTestTrieUpdate(p.T())),
-	)
-	systemChunkCollection := unittest.CollectionFixture(1)
-	systemChunkData := &execution_data.ChunkExecutionData{
-		Collection: &systemChunkCollection,
-	}
-
-	expectedExecutionData := unittest.BlockExecutionDataFixture(
-		unittest.WithBlockExecutionDataBlockID(p.block.ID()),
-		unittest.WithChunkExecutionDatas(expectedChunkExecutionData, systemChunkData),
-	)
-	expectedTxResultErrMsgs := unittest.TransactionResultErrorMessagesFixture(5)
-	return expectedExecutionData, expectedTxResultErrMsgs
 }
 
 // TestPipelineHappyCase verifies the complete happy path flow of the pipeline.
@@ -344,6 +294,53 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 	})
 }
 
+// WithRunningPipeline is a test helper that sets up and runs a pipeline instance
+// with proper channel communication and context management. It provides the test
+// function with access to the running pipeline, state update channel, error channel,
+// and cancellation function for comprehensive testing scenarios.
+func (p *PipelineFunctionalSuite) WithRunningPipeline(testFunc func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc)) {
+	updateChan := make(chan State, 10)
+
+	publisher := func(state State) {
+		updateChan <- state
+	}
+
+	pipeline := NewPipeline(p.logger, false, p.executionResult, p.core, publisher)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	errChan := make(chan error)
+	go func() {
+		errChan <- pipeline.Run(ctx, p.core)
+	}()
+
+	testFunc(pipeline, updateChan, errChan, cancel)
+}
+
+// initializeTestData creates and returns test execution data and transaction result
+// error messages for use in test cases. It generates realistic test data including
+// chunk execution data with events, trie updates, collections, and system chunks.
+func (p *PipelineFunctionalSuite) initializeTestData() (*execution_data.BlockExecutionData, []flow.TransactionResultErrorMessage) {
+	expectedChunkExecutionData := unittest.ChunkExecutionDataFixture(
+		p.T(),
+		0,
+		unittest.WithChunkEvents(unittest.EventsFixture(5)),
+		unittest.WithTrieUpdate(indexer.CreateTestTrieUpdate(p.T())),
+	)
+	systemChunkCollection := unittest.CollectionFixture(1)
+	systemChunkData := &execution_data.ChunkExecutionData{
+		Collection: &systemChunkCollection,
+	}
+
+	expectedExecutionData := unittest.BlockExecutionDataFixture(
+		unittest.WithBlockExecutionDataBlockID(p.block.ID()),
+		unittest.WithChunkExecutionDatas(expectedChunkExecutionData, systemChunkData),
+	)
+	expectedTxResultErrMsgs := unittest.TransactionResultErrorMessagesFixture(5)
+	return expectedExecutionData, expectedTxResultErrMsgs
+}
+
 // verifyDataPersistence checks that all expected data was actually persisted to storage.
 // It verifies the persistence of events, collections, transaction results, registers,
 // and transaction result error messages by comparing stored data with expected values.
@@ -420,68 +417,4 @@ func (p *PipelineFunctionalSuite) verifyTxResultErrorMessagesPersisted(expectedT
 	p.Require().NoError(err, "Should be able to retrieve tx result error messages by block ID")
 
 	p.Assert().ElementsMatch(expectedTxResultErrMsgs, storedErrMsgs)
-}
-
-// TODO: All create methods are copied from in_memory_indexer test, and should be moved to common place for access
-
-// createTestTrieUpdate creates a test trie update with multiple test payloads
-// for use in testing register persistence functionality.
-func createTestTrieUpdate(t *testing.T) *ledger.TrieUpdate {
-	return createTestTrieWithPayloads(
-		[]*ledger.Payload{
-			createTestPayload(t),
-			createTestPayload(t),
-			createTestPayload(t),
-			createTestPayload(t),
-		})
-}
-
-// createTestTrieWithPayloads creates a trie update from the provided payloads.
-// It extracts keys and values from payloads and constructs a proper ledger update
-// and trie update structure for testing purposes.
-func createTestTrieWithPayloads(payloads []*ledger.Payload) *ledger.TrieUpdate {
-	keys := make([]ledger.Key, 0)
-	values := make([]ledger.Value, 0)
-	for _, payload := range payloads {
-		key, _ := payload.Key()
-		keys = append(keys, key)
-		values = append(values, payload.Value())
-	}
-
-	update, _ := ledger.NewUpdate(ledger.DummyState, keys, values)
-	trie, _ := pathfinder.UpdateToTrieUpdate(update, complete.DefaultPathFinderVersion)
-	return trie
-}
-
-// createTestPayload creates a single test payload with random owner, key, and value
-// for use in ledger and register testing scenarios.
-func createTestPayload(t *testing.T) *ledger.Payload {
-	owner := unittest.RandomAddressFixture()
-	key := make([]byte, 8)
-	_, err := rand.Read(key)
-	require.NoError(t, err)
-	val := make([]byte, 8)
-	_, err = rand.Read(val)
-	require.NoError(t, err)
-	return createTestLedgerPayload(owner.String(), fmt.Sprintf("%x", key), val)
-}
-
-// createTestLedgerPayload creates a ledger payload with the specified owner, key, and value.
-// It constructs a proper ledger key with owner and key parts and returns a payload
-// suitable for testing ledger operations.
-func createTestLedgerPayload(owner string, key string, value []byte) *ledger.Payload {
-	k := ledger.Key{
-		KeyParts: []ledger.KeyPart{
-			{
-				Type:  ledger.KeyPartOwner,
-				Value: []byte(owner),
-			},
-			{
-				Type:  ledger.KeyPartKey,
-				Value: []byte(key),
-			},
-		},
-	}
-
-	return ledger.NewPayload(k, value)
 }
