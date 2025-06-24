@@ -54,6 +54,8 @@ func TestFinalizedReader(t *testing.T) {
 		require.Equal(t, block2.ID(), finalized)
 
 		// should noop and no panic
-		reader.BlockProcessable(block.Header, block2.Header.QuorumCertificate())
+		qc, err := block2.Header.QuorumCertificate()
+		require.NoError(t, err)
+		reader.BlockProcessable(block.Header, qc)
 	})
 }

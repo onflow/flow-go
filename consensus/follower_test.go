@@ -168,7 +168,10 @@ func (s *HotStuffFollowerSuite) TestOnBlockIncorporated() {
 	child := s.mockConsensus.extendBlock(rootBlockView+2, s.rootHeader)
 	grandChild := s.mockConsensus.extendBlock(child.View+2, child)
 
-	certifiedChild := toCertifiedBlock(s.T(), child, grandChild.QuorumCertificate())
+	qc, err := grandChild.QuorumCertificate()
+	require.NoError(s.T(), err)
+
+	certifiedChild := toCertifiedBlock(s.T(), child, qc)
 	blockIngested := make(chan struct{}) // close when child was ingested
 	s.notifier.On("OnBlockIncorporated", blockWithID(child.ID())).Run(func(_ mock.Arguments) {
 		close(blockIngested)
@@ -204,14 +207,19 @@ func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 	c := s.mockConsensus.extendBlock(b.View+1, b)
 	d := s.mockConsensus.extendBlock(c.View+1, c)
 
+	qc, err := c.QuorumCertificate()
+	require.NoError(s.T(), err)
+
 	// adding b should not advance finality
-	bCertified := toCertifiedBlock(s.T(), b, c.QuorumCertificate())
+	bCertified := toCertifiedBlock(s.T(), b, qc)
 	s.notifier.On("OnBlockIncorporated", blockWithID(b.ID())).Return().Once()
 	s.follower.AddCertifiedBlock(bCertified)
 
 	// adding the certified child of b should advance finality to b
 	finalityAdvanced := make(chan struct{}) // close when finality has advanced to b
-	certifiedChild := toCertifiedBlock(s.T(), c, d.QuorumCertificate())
+	qc, err = d.QuorumCertificate()
+	require.NoError(s.T(), err)
+	certifiedChild := toCertifiedBlock(s.T(), c, qc)
 	s.notifier.On("OnBlockIncorporated", blockWithID(certifiedChild.ID())).Return().Once()
 	s.finalizer.On("MakeFinal", blockID(b.ID())).Return(nil).Once()
 	s.notifier.On("OnFinalizedBlock", blockWithID(b.ID())).Run(func(_ mock.Arguments) {
@@ -279,13 +287,27 @@ func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 
 	// now we feed the blocks in some wild view order into the Follower
 	// (Caution: we still have to make sure the parent is known, before we give its child to the Follower)
-	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block03, block04.QuorumCertificate()))
-	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block07, block08.QuorumCertificate()))
-	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block11, block17.QuorumCertificate()))
-	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block01, block02.QuorumCertificate()))
-	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block05, block06.QuorumCertificate()))
-	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block09, block10.QuorumCertificate()))
-	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block13, block14.QuorumCertificate()))
+	qc4, err := block04.QuorumCertificate()
+	require.NoError(s.T(), err)
+	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block03, qc4))
+	qc8, err := block08.QuorumCertificate()
+	require.NoError(s.T(), err)
+	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block07, qc8))
+	qc17, err := block17.QuorumCertificate()
+	require.NoError(s.T(), err)
+	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block11, qc17))
+	qc2, err := block02.QuorumCertificate()
+	require.NoError(s.T(), err)
+	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block01, qc2))
+	qc6, err := block06.QuorumCertificate()
+	require.NoError(s.T(), err)
+	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block05, qc6))
+	qc10, err := block10.QuorumCertificate()
+	require.NoError(s.T(), err)
+	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block09, qc10))
+	qc14, err := block14.QuorumCertificate()
+	require.NoError(s.T(), err)
+	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block13, qc14))
 
 	// Block 20 should now finalize the fork up to and including block13
 	finalityAdvanced := make(chan struct{}) // close when finality has advanced to b
@@ -300,7 +322,9 @@ func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 		close(finalityAdvanced)
 	}).Return(nil).Once()
 
-	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block14, block20.QuorumCertificate()))
+	qc20, err := block20.QuorumCertificate()
+	require.NoError(s.T(), err)
+	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block14, qc20))
 	unittest.RequireCloseBefore(s.T(), finalityAdvanced, time.Second, "expect finality progress before timeout")
 }
 

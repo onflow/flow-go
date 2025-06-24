@@ -353,7 +353,10 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 	}
 
 	// STEP 5:
-	qc := candidate.Header.QuorumCertificate()
+	qc, err := candidate.Header.QuorumCertificate()
+	if err != nil {
+		return fmt.Errorf("could not construct qc for candidate block with blockID %x, %w:", blockID, err)
+	}
 	deferredDbOps.AddDbOp(func(tx *transaction.Tx) error {
 		// STEP 5a: Store QC for parent block and emit `BlockProcessable` notification if and only if
 		//  - the QC for the parent has not been stored before (otherwise, we already emitted the notification) and

@@ -135,7 +135,9 @@ func (s *CoreSuite) TestProcessingRangeHappyPath() {
 	var wg sync.WaitGroup
 	wg.Add(len(blocks) - 1)
 	for i := 1; i < len(blocks); i++ {
-		s.state.On("ExtendCertified", mock.Anything, blocks[i-1], blocks[i].Header.QuorumCertificate()).Return(nil).Once()
+		qc, err := blocks[i].Header.QuorumCertificate()
+		require.NoError(s.T(), err)
+		s.state.On("ExtendCertified", mock.Anything, blocks[i-1], qc).Return(nil).Once()
 		s.follower.On("AddCertifiedBlock", blockWithID(blocks[i-1].ID())).Run(func(args mock.Arguments) {
 			wg.Done()
 		}).Return().Once()

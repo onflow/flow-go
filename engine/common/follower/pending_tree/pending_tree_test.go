@@ -86,9 +86,11 @@ func (s *PendingTreeSuite) TestAllConnectedForksAreCollected() {
 	// make sure short fork doesn't have conflicting views, so we don't trigger exception
 	B2.Header.View = longestFork[len(longestFork)-1].Block.Header.View + 1
 	B3 := unittest.BlockWithParentFixture(B2.Header)
+	qc, err := B3.Header.QuorumCertificate()
+	require.NoError(s.T(), err)
 	shortFork := []flow.CertifiedBlock{{
 		Block:        B2,
-		CertifyingQC: B3.Header.QuorumCertificate(),
+		CertifyingQC: qc,
 	}, certifiedBlockFixture(B3)}
 
 	connectedBlocks, err := s.pendingTree.AddBlocks(shortFork)
@@ -177,9 +179,11 @@ func (s *PendingTreeSuite) TestResolveBlocksAfterFinalization() {
 	// make sure short fork doesn't have conflicting views, so we don't trigger exception
 	B2.Header.View = longestFork[len(longestFork)-1].Block.Header.View + 1
 	B3 := unittest.BlockWithParentFixture(B2.Header)
+	qc, err := B3.Header.QuorumCertificate()
+	require.NoError(s.T(), err)
 	shortFork := []flow.CertifiedBlock{{
 		Block:        B2,
-		CertifyingQC: B3.Header.QuorumCertificate(),
+		CertifyingQC: qc,
 	}, certifiedBlockFixture(B3)}
 
 	connectedBlocks, err := s.pendingTree.AddBlocks(shortFork)
@@ -261,7 +265,12 @@ func certifiedBlocksFixture(count int, parent *flow.Header) []flow.CertifiedBloc
 	result := make([]flow.CertifiedBlock, 0, count)
 	blocks := unittest.ChainFixtureFrom(count, parent)
 	for i := 0; i < count-1; i++ {
-		certBlock, err := flow.NewCertifiedBlock(blocks[i], blocks[i+1].Header.QuorumCertificate())
+		qc, err := blocks[i+1].Header.QuorumCertificate()
+		if err != nil {
+			// this should never happen, as we are specifically constructing  QC for the input block
+			panic(fmt.Sprintf("unexpected error constructing qc: %s", err.Error()))
+		}
+		certBlock, err := flow.NewCertifiedBlock(blocks[i], qc)
 		if err != nil {
 			// this should never happen, as we are specifically constructing a certifying QC for the input block
 			panic(fmt.Sprintf("unexpected error constructing certified block: %s", err.Error()))
