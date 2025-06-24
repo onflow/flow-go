@@ -191,16 +191,34 @@ func TestExecutionResult_ServiceEventsByChunk(t *testing.T) {
 	})
 }
 
-// TestNewExecutionResult verifies that NewExecutionResult constructs a valid
-// ExecutionResult when given all required fields, and returns an error if any
-// required field is missing.
-// This test covers the test cases:
-//   - valid result with non-nil Chunks and ServiceEvents
-//   - valid result with nil ServiceEvents
-//   - missing PreviousResultID
-//   - missing BlockID
-//   - nil Chunks
-//   - missing ExecutionDataID
+// TestNewExecutionResult verifies the behavior of the NewExecutionResult constructor.
+// It ensures that a fully populated UntrustedExecutionResult yields a valid ExecutionResult,
+// and that missing or invalid required fields produce an error.
+//
+// Test Cases:
+//
+// 1. Valid input with non‐nil Chunks and non‐nil ServiceEvents:
+//   - PreviousResultID, BlockID, Chunks, ServiceEvents, and ExecutionDataID are all set.
+//   - Expect no error and a properly populated ExecutionResult.
+//
+// 2. Valid input with non‐nil Chunks and nil ServiceEvents:
+//   - ServiceEvents omitted (nil) but all other fields valid.
+//   - Expect no error and ExecutionResult.ServiceEvents == nil.
+//
+// 3. Invalid input: PreviousResultID is ZeroID:
+//   - Ensures error when the previous result ID is missing.
+//
+// 4. Invalid input: BlockID is ZeroID:
+//   - Ensures error when the block ID is missing.
+//
+// 5. Invalid input: Chunks is nil:
+//   - Ensures error when the chunk list is nil.
+//
+// 6. Invalid input: Chunks are empty:
+//   - Ensures error when the chunk list is empty.
+//
+// 7. Invalid input: ExecutionDataID is ZeroID:
+//   - Ensures error when the execution data ID is missing.
 func TestNewExecutionResult(t *testing.T) {
 	validPrevID := unittest.IdentifierFixture()
 	validBlockID := unittest.IdentifierFixture()
@@ -218,11 +236,7 @@ func TestNewExecutionResult(t *testing.T) {
 		res, err := flow.NewExecutionResult(u)
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
-		assert.Equal(t, validPrevID, res.PreviousResultID)
-		assert.Equal(t, validBlockID, res.BlockID)
-		assert.Equal(t, chunks, res.Chunks)
-		assert.Equal(t, flow.ServiceEventList{}, res.ServiceEvents)
-		assert.Equal(t, validExecDataID, res.ExecutionDataID)
+		assert.Equal(t, *res, flow.ExecutionResult(u))
 	})
 
 	t.Run("valid result with nil ServiceEvents", func(t *testing.T) {
@@ -278,6 +292,19 @@ func TestNewExecutionResult(t *testing.T) {
 		assert.Contains(t, err.Error(), "Chunks")
 	})
 
+	t.Run("empty Chunks", func(t *testing.T) {
+		u := flow.UntrustedExecutionResult{
+			PreviousResultID: validPrevID,
+			BlockID:          validBlockID,
+			Chunks:           flow.ChunkList{},
+			ExecutionDataID:  validExecDataID,
+		}
+		res, err := flow.NewExecutionResult(u)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assert.Contains(t, err.Error(), "Chunks")
+	})
+
 	t.Run("missing ExecutionDataID", func(t *testing.T) {
 		u := flow.UntrustedExecutionResult{
 			PreviousResultID: validPrevID,
@@ -292,16 +319,25 @@ func TestNewExecutionResult(t *testing.T) {
 	})
 }
 
-// TestNewRootExecutionResult verifies that NewRootExecutionResult constructs a valid root
-// ExecutionResult when given all required fields, and returns an error if any
-// required field is missing.
-// This test covers the test cases:
-//   - valid result with non-nil Chunks and ServiceEvents
-//   - valid result with nil ServiceEvents
-//   - missing PreviousResultID
-//   - missing BlockID
-//   - nil Chunks
-//   - missing ExecutionDataID
+// TestNewRootExecutionResult verifies the behavior of the NewRootExecutionResult constructor.
+// It ensures that a “root” ExecutionResult can be created with an empty PreviousResultID
+// and ExecutionDataID, given a valid BlockID and non‐empty Chunks, and that missing
+// required fields produce an error.
+//
+// Test Cases:
+//
+// 1. Valid root input with non‐empty Chunks:
+//   - BlockID set, Chunks non‐empty, PreviousResultID and ExecutionDataID left at ZeroID.
+//   - Expect no error and ExecutionResult with zero PreviousResultID/ExecutionDataID.
+//
+// 2. Invalid input: BlockID is ZeroID:
+//   - Ensures error when the block ID is missing.
+//
+// 3. Invalid input: Chunks are empty:
+//   - Ensures error when the chunk list is empty.
+//
+// 4. Invalid input: Chunks is nil:
+//   - Ensures error when the chunk list is nil.
 func TestNewRootExecutionResult(t *testing.T) {
 	validPrevID := unittest.IdentifierFixture()
 	validBlockID := unittest.IdentifierFixture()
@@ -319,11 +355,7 @@ func TestNewRootExecutionResult(t *testing.T) {
 		res, err := flow.NewRootExecutionResult(u)
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
-		assert.Equal(t, flow.ZeroID, res.PreviousResultID)
-		assert.Equal(t, validBlockID, res.BlockID)
-		assert.Equal(t, chunks, res.Chunks)
-		assert.Equal(t, flow.ServiceEventList{}, res.ServiceEvents)
-		assert.Equal(t, flow.ZeroID, res.ExecutionDataID)
+		assert.Equal(t, *res, flow.ExecutionResult(u))
 	})
 
 	t.Run("missing BlockID", func(t *testing.T) {
@@ -345,6 +377,19 @@ func TestNewRootExecutionResult(t *testing.T) {
 			PreviousResultID: validPrevID,
 			BlockID:          validBlockID,
 			Chunks:           nil,
+			ExecutionDataID:  validExecDataID,
+		}
+		res, err := flow.NewRootExecutionResult(u)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assert.Contains(t, err.Error(), "Chunks")
+	})
+
+	t.Run("empty Chunks", func(t *testing.T) {
+		u := flow.UntrustedExecutionResult{
+			PreviousResultID: validPrevID,
+			BlockID:          validBlockID,
+			Chunks:           flow.ChunkList{},
 			ExecutionDataID:  validExecDataID,
 		}
 		res, err := flow.NewRootExecutionResult(u)
