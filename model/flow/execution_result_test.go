@@ -291,3 +291,65 @@ func TestNewExecutionResult(t *testing.T) {
 		assert.Contains(t, err.Error(), "ExecutionDataID")
 	})
 }
+
+// TestNewRootExecutionResult verifies that NewRootExecutionResult constructs a valid root
+// ExecutionResult when given all required fields, and returns an error if any
+// required field is missing.
+// This test covers the test cases:
+//   - valid result with non-nil Chunks and ServiceEvents
+//   - valid result with nil ServiceEvents
+//   - missing PreviousResultID
+//   - missing BlockID
+//   - nil Chunks
+//   - missing ExecutionDataID
+func TestNewRootExecutionResult(t *testing.T) {
+	validPrevID := unittest.IdentifierFixture()
+	validBlockID := unittest.IdentifierFixture()
+	validExecDataID := unittest.IdentifierFixture()
+	chunks := unittest.ChunkListFixture(5, unittest.IdentifierFixture(), unittest.StateCommitmentFixture())
+
+	t.Run("valid root result with non-nil slices", func(t *testing.T) {
+		u := flow.UntrustedExecutionResult{
+			PreviousResultID: flow.ZeroID,
+			BlockID:          validBlockID,
+			Chunks:           chunks,
+			ServiceEvents:    flow.ServiceEventList{},
+			ExecutionDataID:  flow.ZeroID,
+		}
+		res, err := flow.NewRootExecutionResult(u)
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, flow.ZeroID, res.PreviousResultID)
+		assert.Equal(t, validBlockID, res.BlockID)
+		assert.Equal(t, chunks, res.Chunks)
+		assert.Equal(t, flow.ServiceEventList{}, res.ServiceEvents)
+		assert.Equal(t, flow.ZeroID, res.ExecutionDataID)
+	})
+
+	t.Run("missing BlockID", func(t *testing.T) {
+		u := flow.UntrustedExecutionResult{
+			PreviousResultID: validPrevID,
+			BlockID:          flow.ZeroID,
+			Chunks:           chunks,
+			ServiceEvents:    flow.ServiceEventList{},
+			ExecutionDataID:  validExecDataID,
+		}
+		res, err := flow.NewRootExecutionResult(u)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assert.Contains(t, err.Error(), "BlockID")
+	})
+
+	t.Run("nil Chunks", func(t *testing.T) {
+		u := flow.UntrustedExecutionResult{
+			PreviousResultID: validPrevID,
+			BlockID:          validBlockID,
+			Chunks:           nil,
+			ExecutionDataID:  validExecDataID,
+		}
+		res, err := flow.NewRootExecutionResult(u)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assert.Contains(t, err.Error(), "Chunks")
+	})
+}

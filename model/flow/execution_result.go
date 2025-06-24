@@ -61,6 +61,29 @@ func NewExecutionResult(untrusted UntrustedExecutionResult) (*ExecutionResult, e
 	}, nil
 }
 
+// NewRootExecutionResult creates a new instance of root ExecutionResult
+// with empty PreviousResultID and ExecutionDataID fields.
+// Construction ExecutionResult allowed only within the constructor.
+//
+// All errors indicate a valid root ExecutionResult cannot be constructed from the input.
+func NewRootExecutionResult(untrusted UntrustedExecutionResult) (*ExecutionResult, error) {
+	if untrusted.BlockID == ZeroID {
+		return nil, fmt.Errorf("BlockID must not be empty")
+	}
+
+	if len(untrusted.Chunks) == 0 {
+		return nil, fmt.Errorf("Chunks must not be empty")
+	}
+
+	return &ExecutionResult{
+		PreviousResultID: untrusted.PreviousResultID,
+		BlockID:          untrusted.BlockID,
+		Chunks:           untrusted.Chunks,
+		ServiceEvents:    untrusted.ServiceEvents,
+		ExecutionDataID:  untrusted.ExecutionDataID,
+	}, nil
+}
+
 // ID returns the hash of the execution result body
 func (er ExecutionResult) ID() Identifier {
 	return MakeID(er)
