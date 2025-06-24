@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	// ErrMaxSizeExceeded is returned when adding a new container would exceed the maximum size
-	ErrMaxSizeExceeded = fmt.Errorf("adding new result would exceed maximum size")
+	// ErrMaxViewDeltaExceeded is returned when attempting to add a results who's block view is
+	// more than maxViewDelta views ahead of the last sealed view.
+	ErrMaxViewDeltaExceeded = fmt.Errorf("results block view exceeds accepted range")
 )
 
 // ResultsForest is a mempool holding execution results and receipts, which is aware of the tree structure
@@ -30,7 +31,7 @@ type ResultsForest struct {
 	log                         zerolog.Logger
 	forest                      forest.LevelledForest
 	headers                     storage.Headers
-	maxSize                     uint64
+	maxViewDelta                uint64
 	lastSealedResultID          flow.Identifier
 	latestPersistedSealedResult storage.LatestPersistedSealedResult
 	mu                          sync.RWMutex
@@ -41,7 +42,7 @@ func NewResultsForest(
 	log zerolog.Logger,
 	headers storage.Headers,
 	latestPersistedSealedResult storage.LatestPersistedSealedResult,
-	maxSize uint64,
+	maxViewDelta uint64,
 ) (*ResultsForest, error) {
 	resultID, sealedHeight := latestPersistedSealedResult.Latest()
 
@@ -54,7 +55,7 @@ func NewResultsForest(
 		log:                         log.With().Str("component", "results_forest").Logger(),
 		forest:                      *forest.NewLevelledForest(sealedHeader.View),
 		headers:                     headers,
-		maxSize:                     maxSize,
+		maxViewDelta:                maxViewDelta,
 		lastSealedResultID:          resultID,
 		latestPersistedSealedResult: latestPersistedSealedResult,
 	}
@@ -65,7 +66,7 @@ func NewResultsForest(
 // AddResult adds an execution result to the forest without any receipts.
 //
 // Expected errors during normal operations:
-//   - ErrMaxSizeExceeded: when adding a new container would exceed the maximum size
+//   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (rf *ResultsForest) AddResult(result *flow.ExecutionResult, executedBlock *flow.Header, pipeline optimistic_sync.Pipeline) error {
 	rf.mu.Lock()
@@ -91,7 +92,7 @@ func (rf *ResultsForest) AddResult(result *flow.ExecutionResult, executedBlock *
 // AddReceipt adds the given execution receipt to the forest.
 //
 // Expected errors during normal operations:
-//   - ErrMaxSizeExceeded: when adding a new container would exceed the maximum size
+//   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, executedBlock *flow.Header, pipeline optimistic_sync.Pipeline) (bool, error) {
 	rf.mu.Lock()
@@ -123,11 +124,11 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, executedBloc
 // getOrCreateExecutionResultContainer retrieves or creates the container for the given result.
 //
 // Expected errors during normal operations:
-//   - ErrMaxSizeExceeded: when adding a new container would exceed the maximum size
+//   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 //
 // CAUTION: not concurrency safe!
-func (rf *ResultsForest) getOrCreateExecutionResultContainer(result *flow.ExecutionResult, block *flow.Header, pipeline optimistic_sync.Pipeline) (*ExecutionResultContainer, error) {
+func (rf *ResultsForest) getOrCreateExecutionResultContainer(result *flow.ExecutionResult, executedBlock *flow.Header, pipeline optimistic_sync.Pipeline) (*ExecutionResultContainer, error) {
 	// First try to get existing container
 	container, found := rf.getContainer(result.ID())
 	if found {
@@ -135,11 +136,11 @@ func (rf *ResultsForest) getOrCreateExecutionResultContainer(result *flow.Execut
 	}
 
 	// Check if adding new container would exceed max size
-	if rf.forest.GetSize() >= rf.maxSize {
-		return nil, ErrMaxSizeExceeded
+	if executedBlock.View > rf.forest.LowestLevel+rf.maxViewDelta {
+		return nil, ErrMaxViewDeltaExceeded
 	}
 
-	container, err := NewExecutionResultContainer(result, block, pipeline)
+	container, err := NewExecutionResultContainer(result, executedBlock, pipeline)
 	if err != nil {
 		return nil, fmt.Errorf("constructing container for receipt failed: %w", err)
 	}
