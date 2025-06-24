@@ -35,7 +35,7 @@ type UntrustedExecutionReceipt ExecutionReceipt
 //
 // All errors indicate a valid ExecutionReceipt cannot be constructed from the input.
 func NewExecutionReceipt(untrusted UntrustedExecutionReceipt) (*ExecutionReceipt, error) {
-	_, err := NewUnsignedExecutionReceipt(UntrustedUnsignedExecutionReceipt(untrusted.UnsignedExecutionReceipt))
+	unsignedExecutionReceipt, err := NewUnsignedExecutionReceipt(UntrustedUnsignedExecutionReceipt(untrusted.UnsignedExecutionReceipt))
 	if err != nil {
 		return nil, fmt.Errorf("invalid unsigned execution receipt: %w", err)
 	}
@@ -43,7 +43,7 @@ func NewExecutionReceipt(untrusted UntrustedExecutionReceipt) (*ExecutionReceipt
 		return nil, fmt.Errorf("executor signature must not be empty")
 	}
 	return &ExecutionReceipt{
-		UnsignedExecutionReceipt: untrusted.UnsignedExecutionReceipt,
+		UnsignedExecutionReceipt: *unsignedExecutionReceipt,
 		ExecutorSignature:        untrusted.ExecutorSignature,
 	}, nil
 }
@@ -91,7 +91,7 @@ func NewUnsignedExecutionReceipt(untrusted UntrustedUnsignedExecutionReceipt) (*
 		return nil, fmt.Errorf("executor ID must not be zero")
 	}
 	//TODO: uncomment this code then constructor for ExecutionResult will be added (when PR #7525 will be merged)
-	//_, err := NewExecutionResult(UntrustedExecutionResult(untrusted.ExecutionResult))
+	//executionResult, err := NewExecutionResult(UntrustedExecutionResult(untrusted.ExecutionResult))
 	//if err != nil {
 	//	return nil, fmt.Errorf("invalid execution result: %w", err)
 	//}
