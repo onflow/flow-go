@@ -3,14 +3,12 @@ package state_stream_test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/stretchr/testify/assert"
-
-	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestAccountStatusFilterConstructor tests the constructor of the AccountStatusFilter with different scenarios.

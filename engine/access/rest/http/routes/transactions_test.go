@@ -215,7 +215,6 @@ func TestGetTransactionResult(t *testing.T) {
 	id := unittest.IdentifierFixture()
 	bid := unittest.IdentifierFixture()
 	cid := unittest.IdentifierFixture()
-
 	txr := &accessmodel.TransactionResult{
 		Status:     flow.TransactionStatusSealed,
 		StatusCode: 10,

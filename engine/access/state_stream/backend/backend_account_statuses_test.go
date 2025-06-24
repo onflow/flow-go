@@ -57,15 +57,15 @@ func (s *BackendAccountStatusesSuite) generateProtocolMockEvents() flow.EventsLi
 		unittest.Event.WithEventType(testEventTypes[0]),
 	))
 
-	accountCreateEvent := unittest.GenerateAccountCreateEvent(s.T(), s.accountCreatedAddress)
+	accountCreateEvent := unittest.EventGenerator.GenerateAccountCreateEvent(s.T(), s.accountCreatedAddress)
 	accountCreateEvent.TransactionIndex = 1
 	events = append(events, accountCreateEvent)
 
-	accountContractAdded := unittest.GenerateAccountContractEvent(s.T(), "AccountContractAdded", s.accountContractAdded)
+	accountContractAdded := unittest.EventGenerator.GenerateAccountContractEvent(s.T(), "AccountContractAdded", s.accountContractAdded)
 	accountContractAdded.TransactionIndex = 2
 	events = append(events, accountContractAdded)
 
-	accountContractUpdated := unittest.GenerateAccountContractEvent(s.T(), "AccountContractUpdated", s.accountContractUpdated)
+	accountContractUpdated := unittest.EventGenerator.GenerateAccountContractEvent(s.T(), "AccountContractUpdated", s.accountContractUpdated)
 	accountContractUpdated.TransactionIndex = 3
 	events = append(events, accountContractUpdated)
 
