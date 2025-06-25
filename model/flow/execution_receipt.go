@@ -35,7 +35,7 @@ func (er *ExecutionReceipt) Stub() *ExecutionReceiptStub {
 	// Constructor is skipped since we're using an already-valid ExecutionReceipt object.
 	//nolint:structwrite
 	return &ExecutionReceiptStub{
-		UnsignedExecutionReceiptStub: er.UnsignedExecutionReceipt.Stub(),
+		UnsignedExecutionReceiptStub: *er.UnsignedExecutionReceipt.Stub(),
 		ExecutorSignature:            er.ExecutorSignature,
 	}
 }
@@ -48,10 +48,10 @@ func (erb UnsignedExecutionReceipt) ID() Identifier {
 }
 
 // Stub returns a stub of the UnsignedExecutionReceipt, where the ExecutionResult is replaced by its cryptographic hash.
-func (erb UnsignedExecutionReceipt) Stub() UnsignedExecutionReceiptStub {
+func (erb UnsignedExecutionReceipt) Stub() *UnsignedExecutionReceiptStub {
 	// Constructor is skipped since we're using an already-valid UnsignedExecutionReceipt object.
 	//nolint:structwrite
-	return UnsignedExecutionReceiptStub{
+	return &UnsignedExecutionReceiptStub{
 		ExecutorID: erb.ExecutorID,
 		ResultID:   erb.ExecutionResult.ID(),
 		Spocks:     erb.Spocks,

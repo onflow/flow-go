@@ -172,7 +172,7 @@ func TestNewExecutionReceiptStub(t *testing.T) {
 func TestNewUnsignedExecutionReceiptStub(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
 		receipt := unittest.UnsignedExecutionReceiptFixture().Stub()
-		res, err := flow.NewUnsignedExecutionReceiptStub(flow.UntrustedUnsignedExecutionReceiptStub(receipt))
+		res, err := flow.NewUnsignedExecutionReceiptStub(flow.UntrustedUnsignedExecutionReceiptStub(*receipt))
 		require.NoError(t, err)
 		require.NotNil(t, res)
 	})
@@ -181,7 +181,7 @@ func TestNewUnsignedExecutionReceiptStub(t *testing.T) {
 		receipt := unittest.UnsignedExecutionReceiptFixture().Stub()
 		receipt.ExecutorID = flow.ZeroID
 
-		res, err := flow.NewUnsignedExecutionReceiptStub(flow.UntrustedUnsignedExecutionReceiptStub(receipt))
+		res, err := flow.NewUnsignedExecutionReceiptStub(flow.UntrustedUnsignedExecutionReceiptStub(*receipt))
 		require.Error(t, err)
 		require.Nil(t, res)
 		assert.Contains(t, err.Error(), "executor ID must not be zero")
@@ -191,7 +191,7 @@ func TestNewUnsignedExecutionReceiptStub(t *testing.T) {
 		receipt := unittest.UnsignedExecutionReceiptFixture().Stub()
 		receipt.ResultID = flow.ZeroID
 
-		res, err := flow.NewUnsignedExecutionReceiptStub(flow.UntrustedUnsignedExecutionReceiptStub(receipt))
+		res, err := flow.NewUnsignedExecutionReceiptStub(flow.UntrustedUnsignedExecutionReceiptStub(*receipt))
 		require.Error(t, err)
 		require.Nil(t, res)
 		assert.Contains(t, err.Error(), "result ID must not be zero")
@@ -201,7 +201,7 @@ func TestNewUnsignedExecutionReceiptStub(t *testing.T) {
 		receipt := unittest.UnsignedExecutionReceiptFixture().Stub()
 		receipt.Spocks = nil
 
-		res, err := flow.NewUnsignedExecutionReceiptStub(flow.UntrustedUnsignedExecutionReceiptStub(receipt))
+		res, err := flow.NewUnsignedExecutionReceiptStub(flow.UntrustedUnsignedExecutionReceiptStub(*receipt))
 		require.Error(t, err)
 		require.Nil(t, res)
 		assert.Contains(t, err.Error(), "spocks must not be empty")
@@ -211,7 +211,7 @@ func TestNewUnsignedExecutionReceiptStub(t *testing.T) {
 		receipt := unittest.UnsignedExecutionReceiptFixture().Stub()
 		receipt.Spocks = []crypto.Signature{}
 
-		res, err := flow.NewUnsignedExecutionReceiptStub(flow.UntrustedUnsignedExecutionReceiptStub(receipt))
+		res, err := flow.NewUnsignedExecutionReceiptStub(flow.UntrustedUnsignedExecutionReceiptStub(*receipt))
 		require.Error(t, err)
 		require.Nil(t, res)
 		assert.Contains(t, err.Error(), "spocks must not be empty")
