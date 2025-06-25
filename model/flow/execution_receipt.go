@@ -92,17 +92,16 @@ func NewUnsignedExecutionReceipt(untrusted UntrustedUnsignedExecutionReceipt) (*
 	if untrusted.ExecutorID == ZeroID {
 		return nil, fmt.Errorf("executor ID must not be zero")
 	}
-	//TODO: uncomment this code then constructor for ExecutionResult will be added (when PR #7525 will be merged)
-	//executionResult, err := NewExecutionResult(UntrustedExecutionResult(untrusted.ExecutionResult))
-	//if err != nil {
-	//	return nil, fmt.Errorf("invalid execution result: %w", err)
-	//}
+	executionResult, err := NewExecutionResult(UntrustedExecutionResult(untrusted.ExecutionResult))
+	if err != nil {
+		return nil, fmt.Errorf("invalid execution result: %w", err)
+	}
 	if len(untrusted.Spocks) == 0 {
 		return nil, fmt.Errorf("spocks must not be empty")
 	}
 	return &UnsignedExecutionReceipt{
 		ExecutorID:      untrusted.ExecutorID,
-		ExecutionResult: untrusted.ExecutionResult,
+		ExecutionResult: *executionResult,
 		Spocks:          untrusted.Spocks,
 	}, nil
 }

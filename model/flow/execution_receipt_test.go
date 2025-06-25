@@ -186,16 +186,15 @@ func TestNewUnsignedExecutionReceipt(t *testing.T) {
 		assert.Contains(t, err.Error(), "executor ID must not be zero")
 	})
 
-	// TODO: add a test case for the case where the execution result is invalid, after PR #7525 will be merged
-	//t.Run("invalid input with invalid execution result", func(t *testing.T) {
-	//	receipt := unittest.UnsignedExecutionReceiptFixture()
-	//	receipt.ExecutionResult.BlockID = flow.ZeroID
-	//
-	//	res, err := flow.NewUnsignedExecutionReceipt(flow.UntrustedUnsignedExecutionReceipt(*receipt))
-	//	require.Error(t, err)
-	//	require.Nil(t, res)
-	//	assert.Contains(t, err.Error(), "invalid execution result: BlockID must not be empty")
-	//})
+	t.Run("invalid input with invalid execution result", func(t *testing.T) {
+		receipt := unittest.UnsignedExecutionReceiptFixture()
+		receipt.ExecutionResult.BlockID = flow.ZeroID
+
+		res, err := flow.NewUnsignedExecutionReceipt(flow.UntrustedUnsignedExecutionReceipt(*receipt))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "invalid execution result: BlockID must not be empty")
+	})
 
 	t.Run("invalid input with nil Spocks", func(t *testing.T) {
 		receipt := unittest.UnsignedExecutionReceiptFixture()

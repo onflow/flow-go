@@ -240,9 +240,10 @@ SearchLoop:
 
 	// create the execution result for the target block
 	result := flow.ExecutionResult{
-		PreviousResultID: resultID,               // need genesis result
-		BlockID:          targetID,               // refer the target block
-		Chunks:           flow.ChunkList{&chunk}, // include only chunk
+		PreviousResultID: resultID,                     // need genesis result
+		BlockID:          targetID,                     // refer the target block
+		Chunks:           flow.ChunkList{&chunk},       // include only chunk
+		ExecutionDataID:  unittest.IdentifierFixture(), // our fake execution data ID
 	}
 
 	ss.T().Logf("execution result generated (result: %x)\n", result.ID())
