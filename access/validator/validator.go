@@ -429,6 +429,20 @@ func (v *TransactionValidator) checkSignatureDuplications(tx *flow.TransactionBo
 }
 
 func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) error {
+	for _, signature := range append(tx.PayloadSignatures) {
+		valid, _ := signature.ValidateExtensionDataAndReconstructMessage(tx.PayloadMessage())
+		if !valid {
+			return InvalidSignatureError{Signature: signature}
+		}
+	}
+
+	for _, signature := range append(tx.EnvelopeSignatures) {
+		valid, _ := signature.ValidateExtensionDataAndReconstructMessage(tx.EnvelopeMessage())
+		if !valid {
+			return InvalidSignatureError{Signature: signature}
+		}
+	}
+
 	for _, signature := range append(tx.PayloadSignatures, tx.EnvelopeSignatures...) {
 		// check the format of the signature is valid.
 		// a valid signature is an ECDSA signature of either P-256 or secp256k1 curve.
