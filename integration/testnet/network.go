@@ -1267,7 +1267,10 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	}
 
 	// generate execution result and block seal
-	result := run.GenerateRootResult(root, commit, epochSetup, epochCommit)
+	result, err := run.GenerateRootResult(root, commit, epochSetup, epochCommit)
+	if err != nil {
+		return nil, fmt.Errorf("generating root result failed: %w", err)
+	}
 	seal, err := run.GenerateRootSeal(result)
 	if err != nil {
 		return nil, fmt.Errorf("generating root seal failed: %w", err)
