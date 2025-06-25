@@ -2,6 +2,7 @@ package flow
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/onflow/crypto"
 )
@@ -11,17 +12,40 @@ type Spock []byte
 // ExecutionReceipt is the full execution receipt, as sent by the Execution Node.
 // Specifically, it contains the detailed execution result. The `ExecutorSignature`
 // signs the `UnsignedExecutionReceipt`.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type ExecutionReceipt struct {
 	UnsignedExecutionReceipt
 	ExecutorSignature crypto.Signature
 }
 
-// UnsignedExecutionReceipt represents the unsigned execution receipt, whose contents the
-// Execution Node testifies to be correct by its signature.
-type UnsignedExecutionReceipt struct {
-	ExecutorID Identifier
-	ExecutionResult
-	Spocks []crypto.Signature
+// UntrustedExecutionReceipt is an untrusted input-only representation of a ExecutionReceipt,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedExecutionReceipt should be validated and converted into
+// a trusted ExecutionReceipt using NewExecutionReceipt constructor.
+type UntrustedExecutionReceipt ExecutionReceipt
+
+// NewExecutionReceipt creates a new instance of ExecutionReceipt.
+// Construction ExecutionReceipt allowed only within the constructor.
+//
+// All errors indicate a valid ExecutionReceipt cannot be constructed from the input.
+func NewExecutionReceipt(untrusted UntrustedExecutionReceipt) (*ExecutionReceipt, error) {
+	unsignedExecutionReceipt, err := NewUnsignedExecutionReceipt(UntrustedUnsignedExecutionReceipt(untrusted.UnsignedExecutionReceipt))
+	if err != nil {
+		return nil, fmt.Errorf("invalid unsigned execution receipt: %w", err)
+	}
+	if len(untrusted.ExecutorSignature) == 0 {
+		return nil, fmt.Errorf("executor signature must not be empty")
+	}
+	return &ExecutionReceipt{
+		UnsignedExecutionReceipt: *unsignedExecutionReceipt,
+		ExecutorSignature:        untrusted.ExecutorSignature,
+	}, nil
 }
 
 // ID returns the canonical ID of the execution receipt.
@@ -35,6 +59,50 @@ func (er *ExecutionReceipt) Stub() *ExecutionReceiptStub {
 		UnsignedExecutionReceiptStub: er.UnsignedExecutionReceipt.Stub(),
 		ExecutorSignature:            er.ExecutorSignature,
 	}
+}
+
+// UnsignedExecutionReceipt represents the unsigned execution receipt, whose contents the
+// Execution Node testifies to be correct by its signature.
+//
+//structwrite:immutable - mutations allowed only within the constructor
+type UnsignedExecutionReceipt struct {
+	ExecutorID Identifier
+	ExecutionResult
+	Spocks []crypto.Signature
+}
+
+// UntrustedUnsignedExecutionReceipt is an untrusted input-only representation of a UnsignedExecutionReceipt,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedUnsignedExecutionReceipt should be validated and converted into
+// a trusted UnsignedExecutionReceipt using NewUnsignedExecutionReceipt constructor.
+type UntrustedUnsignedExecutionReceipt UnsignedExecutionReceipt
+
+// NewUnsignedExecutionReceipt creates a new instance of UnsignedExecutionReceipt.
+// Construction UnsignedExecutionReceipt allowed only within the constructor.
+//
+// All errors indicate a valid UnsignedExecutionReceipt cannot be constructed from the input.
+func NewUnsignedExecutionReceipt(untrusted UntrustedUnsignedExecutionReceipt) (*UnsignedExecutionReceipt, error) {
+	if untrusted.ExecutorID == ZeroID {
+		return nil, fmt.Errorf("executor ID must not be zero")
+	}
+	//TODO: uncomment this code then constructor for ExecutionResult will be added (when PR #7525 will be merged)
+	//executionResult, err := NewExecutionResult(UntrustedExecutionResult(untrusted.ExecutionResult))
+	//if err != nil {
+	//	return nil, fmt.Errorf("invalid execution result: %w", err)
+	//}
+	if len(untrusted.Spocks) == 0 {
+		return nil, fmt.Errorf("spocks must not be empty")
+	}
+	return &UnsignedExecutionReceipt{
+		ExecutorID:      untrusted.ExecutorID,
+		ExecutionResult: untrusted.ExecutionResult,
+		Spocks:          untrusted.Spocks,
+	}, nil
 }
 
 // ID returns a hash over the data of the execution receipt.
@@ -63,31 +131,6 @@ type ExecutionReceiptStub struct {
 	ExecutorSignature crypto.Signature
 }
 
-// UnsignedExecutionReceiptStub contains the fields of ExecutionReceiptStub that are signed by the executor.
-type UnsignedExecutionReceiptStub struct {
-	ExecutorID Identifier
-	ResultID   Identifier
-	Spocks     []crypto.Signature
-}
-
-func ExecutionReceiptFromStub(stub ExecutionReceiptStub, result ExecutionResult) *ExecutionReceipt {
-	return &ExecutionReceipt{
-		UnsignedExecutionReceipt: UnsignedExecutionReceipt{
-			ExecutorID:      stub.ExecutorID,
-			ExecutionResult: result,
-			Spocks:          stub.Spocks,
-		},
-		ExecutorSignature: stub.ExecutorSignature,
-	}
-}
-
-// ID returns cryptographic hash of unsigned execution receipt.
-// This is what is signed by the executor and verified by recipients.
-// It is identical to the ID of the full UnsignedExecutionReceipt.
-func (erb UnsignedExecutionReceiptStub) ID() Identifier {
-	return MakeID(erb)
-}
-
 // ID returns the canonical ID of the execution receipt.
 // It is identical to the ID of the full receipt.
 func (er *ExecutionReceiptStub) ID() Identifier {
@@ -103,6 +146,47 @@ func (er ExecutionReceiptStub) MarshalJSON() ([]byte, error) {
 		Alias: Alias(er),
 		ID:    er.ID().String(),
 	})
+}
+
+// ExecutionReceiptFromStub creates ExecutionReceipt from execution result and ExecutionReceiptStub.
+// No errors are expected during normal operation.
+func ExecutionReceiptFromStub(stub ExecutionReceiptStub, result ExecutionResult) (*ExecutionReceipt, error) {
+	unsignedExecutionReceipt, err := NewUnsignedExecutionReceipt(
+		UntrustedUnsignedExecutionReceipt{
+			ExecutorID:      stub.ExecutorID,
+			ExecutionResult: result,
+			Spocks:          stub.Spocks,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct unsigned execution receipt: %w", err)
+	}
+
+	executionReceipt, err := NewExecutionReceipt(
+		UntrustedExecutionReceipt{
+			UnsignedExecutionReceipt: *unsignedExecutionReceipt,
+			ExecutorSignature:        stub.ExecutorSignature,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct execution receipt: %w", err)
+	}
+
+	return executionReceipt, nil
+}
+
+// UnsignedExecutionReceiptStub contains the fields of ExecutionReceiptStub that are signed by the executor.
+type UnsignedExecutionReceiptStub struct {
+	ExecutorID Identifier
+	ResultID   Identifier
+	Spocks     []crypto.Signature
+}
+
+// ID returns cryptographic hash of unsigned execution receipt.
+// This is what is signed by the executor and verified by recipients.
+// It is identical to the ID of the full UnsignedExecutionReceipt.
+func (erb UnsignedExecutionReceiptStub) ID() Identifier {
+	return MakeID(erb)
 }
 
 /*******************************************************************************

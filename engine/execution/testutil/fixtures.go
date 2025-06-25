@@ -616,6 +616,21 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 			MemoryUsed:      22,
 		},
 	)
+	executionReceipt := &flow.ExecutionReceipt{
+		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
+			ExecutorID: unittest.IdentifierFixture(),
+			ExecutionResult: flow.ExecutionResult{
+				Chunks: flow.ChunkList{
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
+				},
+			},
+			Spocks: unittest.SignaturesFixture(1),
+		},
+		ExecutorSignature: unittest.SignatureFixture(),
+	}
 
 	return &execution.ComputationResult{
 		BlockExecutionResult: blockExecResult,
@@ -629,18 +644,7 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 				},
 			},
 		},
-		ExecutionReceipt: &flow.ExecutionReceipt{
-			UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
-				ExecutionResult: flow.ExecutionResult{
-					Chunks: flow.ChunkList{
-						{EndState: unittest.StateCommitmentFixture()},
-						{EndState: unittest.StateCommitmentFixture()},
-						{EndState: unittest.StateCommitmentFixture()},
-						{EndState: unittest.StateCommitmentFixture()},
-					},
-				},
-			},
-		},
+		ExecutionReceipt: executionReceipt,
 	}
 }
 

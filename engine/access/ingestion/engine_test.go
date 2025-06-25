@@ -817,6 +817,6 @@ func (s *Suite) TestComponentShutdown() {
 	s.cancel()
 	unittest.AssertClosesBefore(s.T(), eng.Done(), 10*time.Millisecond)
 
-	err := eng.Process(channels.ReceiveReceipts, unittest.IdentifierFixture(), &flow.ExecutionReceipt{})
+	err := eng.Process(channels.ReceiveReceipts, unittest.IdentifierFixture(), new(flow.ExecutionReceipt))
 	s.Assert().ErrorIs(err, component.ErrComponentShutdown)
 }
