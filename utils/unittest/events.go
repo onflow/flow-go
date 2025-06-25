@@ -172,7 +172,7 @@ func (e *eventGeneratorFactory) GenerateAccountContractEvent(t *testing.T, quali
 		[]cadence.Value{
 			cadence.NewAddress(address),
 			cadence.NewArray(
-				BytesToCdcUInt8([]byte{111, 43, 164, 202, 220, 174, 148, 17, 253, 161, 9, 124, 237, 83, 227, 75, 115, 149, 141, 83, 129, 145, 252, 68, 122, 137, 80, 155, 89, 233, 136, 213}),
+				BytesToCdcUInt8(RandomBytes(32)),
 			).WithType(cadence.NewConstantSizedArrayType(32, cadence.UInt8Type)),
 			contractName,
 		}).
