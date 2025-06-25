@@ -479,18 +479,21 @@ func (s TransactionSignature) Fingerprint() []byte {
 	return fingerprint.Fingerprint(s.canonicalForm())
 }
 
-// checks if the scheme is plain authentication scheme.
-// While the expectation is that s.ExtensionData == []byte{0} if it is not nil,
-// We don't check it here, as this is simply checking if the scheme is plain,
-// and not the validity of the info field
-func (s TransactionSignature) isPlainAuthenticationScheme() bool {
+// Checks if the scheme is plain authentication scheme, and indicate that it
+// is required to use the legacy canonical form.
+// We check for a valid scheme identifier, as this should be the only case
+// where the extension data can be left out of the cannonical form.
+// All other non-valid cases that are similar to the plain scheme, but is not valid,
+// should be included in the canonical form, as they are not valid signatures
+func (s TransactionSignature) shouldUseLegacyCanonicalForm() bool {
+	plainSchemeIdentifier := byte(0)
 	// len check covers nil case
-	return len(s.ExtensionData) == 0 || s.ExtensionData[0] == 0
+	return len(s.ExtensionData) == 0 || (len(s.ExtensionData) == 1 && s.ExtensionData[0] == plainSchemeIdentifier)
 }
 
 func (s TransactionSignature) canonicalForm() interface{} {
 	// int is not RLP-serializable, therefore s.SignerIndex and s.KeyIndex are converted to uint
-	if s.isPlainAuthenticationScheme() {
+	if s.shouldUseLegacyCanonicalForm() {
 		// This is the legacy cononical form, mainly here for backward compatibility
 		return struct {
 			SignerIndex uint
