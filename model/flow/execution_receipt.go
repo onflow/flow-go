@@ -55,8 +55,10 @@ func (er *ExecutionReceipt) ID() Identifier {
 
 // Stub returns a stub of the full ExecutionReceipt, where the ExecutionResult is replaced by its cryptographic hash.
 func (er *ExecutionReceipt) Stub() *ExecutionReceiptStub {
+	// Constructor is skipped since we're using an already-valid ExecutionReceipt object.
+	//nolint:structwrite
 	return &ExecutionReceiptStub{
-		UnsignedExecutionReceiptStub: er.UnsignedExecutionReceipt.Stub(),
+		UnsignedExecutionReceiptStub: *er.UnsignedExecutionReceipt.Stub(),
 		ExecutorSignature:            er.ExecutorSignature,
 	}
 }
@@ -113,8 +115,10 @@ func (erb UnsignedExecutionReceipt) ID() Identifier {
 }
 
 // Stub returns a stub of the UnsignedExecutionReceipt, where the ExecutionResult is replaced by its cryptographic hash.
-func (erb UnsignedExecutionReceipt) Stub() UnsignedExecutionReceiptStub {
-	return UnsignedExecutionReceiptStub{
+func (erb UnsignedExecutionReceipt) Stub() *UnsignedExecutionReceiptStub {
+	// Constructor is skipped since we're using an already-valid UnsignedExecutionReceipt object.
+	//nolint:structwrite
+	return &UnsignedExecutionReceiptStub{
 		ExecutorID: erb.ExecutorID,
 		ResultID:   erb.ExecutionResult.ID(),
 		Spocks:     erb.Spocks,
@@ -126,9 +130,40 @@ func (erb UnsignedExecutionReceipt) Stub() UnsignedExecutionReceiptStub {
 // result). It only contains the ID (cryptographic hash) of the execution
 // result the receipt commits to. The ExecutionReceiptStub is useful for
 // storing results and receipts separately in a composable way.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type ExecutionReceiptStub struct {
 	UnsignedExecutionReceiptStub
 	ExecutorSignature crypto.Signature
+}
+
+// UntrustedExecutionReceiptStub is an untrusted input-only representation of a ExecutionReceiptStub,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedExecutionReceiptStub should be validated and converted into
+// a trusted ExecutionReceiptStub using NewExecutionReceiptStub constructor.
+type UntrustedExecutionReceiptStub ExecutionReceiptStub
+
+// NewExecutionReceiptStub creates a new instance of ExecutionReceiptStub.
+// Construction ExecutionReceiptStub allowed only within the constructor.
+//
+// All errors indicate a valid ExecutionReceiptStub cannot be constructed from the input.
+func NewExecutionReceiptStub(untrusted UntrustedExecutionReceiptStub) (*ExecutionReceiptStub, error) {
+	unsignedExecutionReceiptStub, err := NewUnsignedExecutionReceiptStub(UntrustedUnsignedExecutionReceiptStub(untrusted.UnsignedExecutionReceiptStub))
+	if err != nil {
+		return nil, fmt.Errorf("invalid unsigned execution receipt stub: %w", err)
+	}
+	if len(untrusted.ExecutorSignature) == 0 {
+		return nil, fmt.Errorf("executor signature must not be empty")
+	}
+	return &ExecutionReceiptStub{
+		UnsignedExecutionReceiptStub: *unsignedExecutionReceiptStub,
+		ExecutorSignature:            untrusted.ExecutorSignature,
+	}, nil
 }
 
 // ID returns the canonical ID of the execution receipt.
@@ -176,10 +211,44 @@ func ExecutionReceiptFromStub(stub ExecutionReceiptStub, result ExecutionResult)
 }
 
 // UnsignedExecutionReceiptStub contains the fields of ExecutionReceiptStub that are signed by the executor.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type UnsignedExecutionReceiptStub struct {
 	ExecutorID Identifier
 	ResultID   Identifier
 	Spocks     []crypto.Signature
+}
+
+// UntrustedUnsignedExecutionReceiptStub is an untrusted input-only representation of a UnsignedExecutionReceiptStub,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedUnsignedExecutionReceiptStub should be validated and converted into
+// a trusted UnsignedExecutionReceiptStub using NewUnsignedExecutionReceiptStub constructor.
+type UntrustedUnsignedExecutionReceiptStub UnsignedExecutionReceiptStub
+
+// NewUnsignedExecutionReceiptStub creates a new instance of UnsignedExecutionReceiptStub.
+// Construction UnsignedExecutionReceiptStub allowed only within the constructor.
+//
+// All errors indicate a valid UnsignedExecutionReceiptStub cannot be constructed from the input.
+func NewUnsignedExecutionReceiptStub(untrusted UntrustedUnsignedExecutionReceiptStub) (*UnsignedExecutionReceiptStub, error) {
+	if untrusted.ExecutorID == ZeroID {
+		return nil, fmt.Errorf("executor ID must not be zero")
+	}
+	if untrusted.ResultID == ZeroID {
+		return nil, fmt.Errorf("result ID must not be zero")
+	}
+	if len(untrusted.Spocks) == 0 {
+		return nil, fmt.Errorf("spocks must not be empty")
+	}
+	return &UnsignedExecutionReceiptStub{
+		ExecutorID: untrusted.ExecutorID,
+		ResultID:   untrusted.ResultID,
+		Spocks:     untrusted.Spocks,
+	}, nil
 }
 
 // ID returns cryptographic hash of unsigned execution receipt.

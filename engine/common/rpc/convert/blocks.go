@@ -142,7 +142,10 @@ func PayloadFromMessage(m *entities.Block) (*flow.Payload, error) {
 	if err != nil {
 		return nil, err
 	}
-	receipts := MessagesToExecutionResultMetaList(m.ExecutionReceiptMetaList)
+	receipts, err := MessagesToExecutionResultMetaList(m.ExecutionReceiptMetaList)
+	if err != nil {
+		return nil, err
+	}
 	results, err := MessagesToExecutionResults(m.ExecutionResultList)
 	if err != nil {
 		return nil, err

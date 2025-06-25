@@ -92,7 +92,8 @@ func TestConvertExecutionResultMetaList(t *testing.T) {
 	metaList := block.Payload.Receipts
 
 	msg := convert.ExecutionResultMetaListToMessages(metaList)
-	converted := convert.MessagesToExecutionResultMetaList(msg)
+	converted, err := convert.MessagesToExecutionResultMetaList(msg)
+	require.NoError(t, err)
 
 	assert.Equal(t, metaList, converted)
 }
