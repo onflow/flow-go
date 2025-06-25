@@ -14,12 +14,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 func TestConvertBlockExecutionDataEventPayloads(t *testing.T) {
 	// generators will produce identical event payloads (before encoding)
-	ccfEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_CCF_V0)
+	ccfEvents := unittest.EventGenerator.GetEventsWithEncoding(3, entities.EventEncodingVersion_CCF_V0)
 	jsonEvents := make([]flow.Event, len(ccfEvents))
 	for i, e := range ccfEvents {
 		jsonEvent, err := convert.CcfEventToJsonEvent(e)

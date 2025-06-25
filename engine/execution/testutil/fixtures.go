@@ -588,8 +588,14 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 	blockExecResult := execution.NewPopulatedBlockExecutionResult(executableBlock)
 	blockExecResult.CollectionExecutionResultAt(0).AppendTransactionResults(
 		flow.EventsList{
-			unittest.EventFixture("what", 0, 0),
-			unittest.EventFixture("ever", 0, 1),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(0),
+				unittest.Event.WithEventIndex(0),
+			),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(0),
+				unittest.Event.WithEventIndex(1),
+			),
 		},
 		nil,
 		nil,
@@ -602,10 +608,22 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 	)
 	blockExecResult.CollectionExecutionResultAt(1).AppendTransactionResults(
 		flow.EventsList{
-			unittest.EventFixture("what", 2, 0),
-			unittest.EventFixture("ever", 2, 1),
-			unittest.EventFixture("ever", 2, 2),
-			unittest.EventFixture("ever", 2, 3),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(2),
+				unittest.Event.WithEventIndex(0),
+			),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(2),
+				unittest.Event.WithEventIndex(1),
+			),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(2),
+				unittest.Event.WithEventIndex(2),
+			),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(2),
+				unittest.Event.WithEventIndex(3),
+			),
 		},
 		nil,
 		nil,

@@ -45,7 +45,12 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 
 					eEvents := make([]flow.Event, 0)
 
-					event := unittest.EventFixture(etype, uint32(i), uint32(j), unittest.Event.WithTransactionID(tx))
+					event := unittest.EventFixture(
+						unittest.Event.WithEventType(etype),
+						unittest.Event.WithTransactionIndex(uint32(i)),
+						unittest.Event.WithEventIndex(uint32(j)),
+						unittest.Event.WithTransactionID(tx),
+					)
 
 					// insert event into the db
 					err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

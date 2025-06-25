@@ -302,7 +302,12 @@ func generateMockEvents(header *flow.Header, eventCount int) flow.BlockEvents {
 			eventIndex = 0
 		}
 
-		events[i] = unittest.EventFixture(testEventTypes[i%len(testEventTypes)], txIndex, eventIndex, unittest.Event.WithTransactionID(txID))
+		events[i] = unittest.EventFixture(
+			unittest.Event.WithEventType(testEventTypes[i%len(testEventTypes)]),
+			unittest.Event.WithTransactionIndex(txIndex),
+			unittest.Event.WithEventIndex(eventIndex),
+			unittest.Event.WithTransactionID(txID),
+		)
 	}
 
 	return flow.BlockEvents{

@@ -125,14 +125,11 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 }
 
 func backendTransactionStatusesResponse(block *flow.Block) []*accessmodel.TransactionResult {
-	id := unittest.IdentifierFixture()
 	cid := unittest.IdentifierFixture()
 	txr := accessmodel.TransactionResult{
-		Status:     flow.TransactionStatusSealed,
-		StatusCode: 10,
-		Events: []flow.Event{
-			unittest.EventFixture(flow.EventAccountCreated, 1, 0, unittest.Event.WithTransactionID(id)),
-		},
+		Status:       flow.TransactionStatusSealed,
+		StatusCode:   10,
+		Events:       unittest.EventsFixture(1),
 		ErrorMessage: "",
 		BlockID:      block.ID(),
 		CollectionID: cid,

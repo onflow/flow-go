@@ -219,7 +219,12 @@ func TestGetTransactionResult(t *testing.T) {
 		Status:     flow.TransactionStatusSealed,
 		StatusCode: 10,
 		Events: []flow.Event{
-			unittest.EventFixture(flow.EventAccountCreated, 1, 0, unittest.Event.WithTransactionID(id)),
+			unittest.EventFixture(
+				unittest.Event.WithEventType(flow.EventAccountCreated),
+				unittest.Event.WithTransactionIndex(1),
+				unittest.Event.WithEventIndex(0),
+				unittest.Event.WithTransactionID(id),
+			),
 		},
 		ErrorMessage: "",
 		BlockID:      bid,
@@ -432,9 +437,9 @@ func transactionResultFixture(tx flow.Transaction) *accessmodel.TransactionResul
 		StatusCode: 1,
 		Events: []flow.Event{
 			unittest.EventFixture(
-				flow.EventAccountCreated,
-				0,
-				0,
+				unittest.Event.WithEventType(flow.EventAccountCreated),
+				unittest.Event.WithTransactionIndex(0),
+				unittest.Event.WithEventIndex(0),
 				unittest.Event.WithTransactionID(tx.ID()),
 				unittest.Event.WithPayload([]byte{}),
 			),

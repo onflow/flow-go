@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 // EventsProviderSuite is a test suite for testing the events providers functionality.
@@ -69,7 +68,7 @@ func (s *EventsProviderSuite) SetupTest() {
 // validates that events are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
-	eventGenerator := generator.EventGenerator(generator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
+	eventGenerator := unittest.NewEventGenerator(unittest.EventGenerator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
 	events := []flow.Event{
 		eventGenerator.New(),
 		eventGenerator.New(),
