@@ -95,6 +95,131 @@ func TestExecutionReceiptStubGroupBy(t *testing.T) {
 	assert.Equal(t, 0, unknown.Size())
 }
 
+// TestNewExecutionReceipt verifies the behavior of the NewExecutionReceipt constructor.
+// It ensures proper handling of both valid and invalid untrusted input fields.
+//
+// Test Cases:
+//
+// 1. Valid input:
+//   - Verifies that a properly populated UntrustedExecutionReceipt results in a valid ExecutionReceipt.
+//
+// 2. Invalid input with invalid UnsignedExecutionReceipt:
+//   - Ensures an error is returned when the UnsignedExecutionReceipt.ExecutorID is flow.ZeroID.
+//
+// 3. Invalid input with nil ExecutorSignature:
+//   - Ensures an error is returned when the ExecutorSignature is nil.
+//
+// 4. Invalid input with empty ExecutorSignature:
+//   - Ensures an error is returned when the ExecutorSignature is an empty byte slice.
+func TestNewExecutionReceipt(t *testing.T) {
+	t.Run("valid input", func(t *testing.T) {
+		receipt := unittest.ExecutionReceiptFixture()
+		res, err := flow.NewExecutionReceipt(flow.UntrustedExecutionReceipt(*receipt))
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	})
+
+	t.Run("invalid input with invalid unsigned execution receipt", func(t *testing.T) {
+		receipt := unittest.ExecutionReceiptFixture()
+		receipt.UnsignedExecutionReceipt.ExecutorID = flow.ZeroID
+
+		res, err := flow.NewExecutionReceipt(flow.UntrustedExecutionReceipt(*receipt))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "invalid unsigned execution receipt: executor ID must not be zero")
+	})
+
+	t.Run("invalid input with nil ExecutorSignature", func(t *testing.T) {
+		receipt := unittest.ExecutionReceiptFixture()
+		receipt.ExecutorSignature = nil
+
+		res, err := flow.NewExecutionReceipt(flow.UntrustedExecutionReceipt(*receipt))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "executor signature must not be empty")
+	})
+
+	t.Run("invalid input with empty ExecutorSignature", func(t *testing.T) {
+		receipt := unittest.ExecutionReceiptFixture()
+		receipt.ExecutorSignature = []byte{}
+
+		res, err := flow.NewExecutionReceipt(flow.UntrustedExecutionReceipt(*receipt))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "executor signature must not be empty")
+	})
+}
+
+// TestNewUnsignedExecutionReceipt verifies the behavior of the NewUnsignedExecutionReceipt constructor.
+// It ensures proper handling of both valid and invalid untrusted input fields.
+//
+// Test Cases:
+//
+// 1. Valid input:
+//   - Verifies that a properly populated UntrustedUnsignedExecutionReceipt results in a valid UnsignedExecutionReceipt.
+//
+// 2. Invalid input with zero ExecutorID:
+//   - Ensures an error is returned when the ExecutorID is flow.ZeroID.
+//
+// 3. Invalid input with invalid ExecutionResult:
+//   - Ensures an error is returned when the ExecutionResult.BlockID is flow.ZeroID.
+//
+// 4. Invalid input with nil Spocks:
+//   - Ensures an error is returned when the Spocks field is nil.
+//
+// 5. Invalid input with empty Spocks:
+//   - Ensures an error is returned when the Spocks field is an empty slice.
+func TestNewUnsignedExecutionReceipt(t *testing.T) {
+	t.Run("valid input", func(t *testing.T) {
+		receipt := unittest.UnsignedExecutionReceiptFixture()
+		res, err := flow.NewUnsignedExecutionReceipt(flow.UntrustedUnsignedExecutionReceipt(*receipt))
+
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	})
+
+	t.Run("invalid input with zero ExecutorID", func(t *testing.T) {
+		receipt := unittest.UnsignedExecutionReceiptFixture()
+		receipt.ExecutorID = flow.ZeroID
+
+		res, err := flow.NewUnsignedExecutionReceipt(flow.UntrustedUnsignedExecutionReceipt(*receipt))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "executor ID must not be zero")
+	})
+
+	// TODO: add a test case for the case where the execution result is invalid, after PR #7525 will be merged
+	//t.Run("invalid input with invalid execution result", func(t *testing.T) {
+	//	receipt := unittest.UnsignedExecutionReceiptFixture()
+	//	receipt.ExecutionResult.BlockID = flow.ZeroID
+	//
+	//	res, err := flow.NewUnsignedExecutionReceipt(flow.UntrustedUnsignedExecutionReceipt(*receipt))
+	//	require.Error(t, err)
+	//	require.Nil(t, res)
+	//	assert.Contains(t, err.Error(), "invalid execution result: BlockID must not be empty")
+	//})
+
+	t.Run("invalid input with nil Spocks", func(t *testing.T) {
+		receipt := unittest.UnsignedExecutionReceiptFixture()
+		receipt.Spocks = nil
+
+		res, err := flow.NewUnsignedExecutionReceipt(flow.UntrustedUnsignedExecutionReceipt(*receipt))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "spocks must not be empty")
+	})
+
+	t.Run("invalid input with empty Spocks", func(t *testing.T) {
+		receipt := unittest.UnsignedExecutionReceiptFixture()
+		receipt.Spocks = []crypto.Signature{}
+
+		res, err := flow.NewUnsignedExecutionReceipt(flow.UntrustedUnsignedExecutionReceipt(*receipt))
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "spocks must not be empty")
+	})
+}
+
 // TestNewExecutionReceiptStub verifies the behavior of the NewExecutionReceiptStub constructor.
 // It ensures proper handling of both valid and invalid untrusted input fields.
 //

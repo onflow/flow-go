@@ -1019,7 +1019,8 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipDuplicatedReceipts() {
 				resultByID := block.Payload.Results.Lookup()
 				for _, meta := range block.Payload.Receipts {
 					result := resultByID[meta.ResultID]
-					rcpt := flow.ExecutionReceiptFromStub(*meta, *result)
+					rcpt, err := flow.ExecutionReceiptFromStub(*meta, *result)
+					bs.NoError(err)
 					assert.False(bs.T(), receiptFilter(rcpt))
 				}
 			}
@@ -1164,8 +1165,9 @@ func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
 		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
-			rcpt := flow.ExecutionReceiptFromStub(*meta, *result)
-			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
+			rcpt, err := flow.ExecutionReceiptFromStub(*meta, *result)
+			bs.NoError(err)
+			_, err = bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
 			bs.NoError(err)
 		}
 	}
@@ -1222,8 +1224,9 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
-			rcpt := flow.ExecutionReceiptFromStub(*meta, *result)
-			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
+			rcpt, err := flow.ExecutionReceiptFromStub(*meta, *result)
+			bs.NoError(err)
+			_, err = bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
 			bs.NoError(err)
 		}
 	}
@@ -1312,8 +1315,9 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
-			rcpt := flow.ExecutionReceiptFromStub(*meta, *result)
-			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
+			rcpt, err := flow.ExecutionReceiptFromStub(*meta, *result)
+			bs.NoError(err)
+			_, err = bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
 			bs.NoError(err)
 		}
 	}
@@ -1372,8 +1376,9 @@ func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
-			rcpt := flow.ExecutionReceiptFromStub(*meta, *result)
-			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
+			rcpt, err := flow.ExecutionReceiptFromStub(*meta, *result)
+			bs.NoError(err)
+			_, err = bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
 			bs.NoError(err)
 		}
 	}
@@ -1411,8 +1416,9 @@ func (bs *BuilderSuite) TestIntegration_ResultAlreadyIncorporated() {
 		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
-			rcpt := flow.ExecutionReceiptFromStub(*meta, *result)
-			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
+			rcpt, err := flow.ExecutionReceiptFromStub(*meta, *result)
+			bs.NoError(err)
+			_, err = bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
 			bs.NoError(err)
 		}
 	}
@@ -1485,7 +1491,8 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 			bs.resultByID[result.ID()] = result
 		}
 		for _, meta := range block.Payload.Receipts {
-			receipt := flow.ExecutionReceiptFromStub(*meta, *bs.resultByID[meta.ResultID])
+			receipt, err := flow.ExecutionReceiptFromStub(*meta, *bs.resultByID[meta.ResultID])
+			bs.NoError(err)
 			bs.receiptsByID[meta.ID()] = receipt
 			bs.receiptsByBlockID[receipt.ExecutionResult.BlockID] = append(bs.receiptsByBlockID[receipt.ExecutionResult.BlockID], receipt)
 		}
