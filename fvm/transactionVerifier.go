@@ -71,6 +71,7 @@ func (entry *signatureContinuation) verify() errors.CodedError {
 		entry.message,
 		entry.accountKey.PublicKey,
 		entry.accountKey.HashAlgo,
+		entry.ExtensionData,
 	)
 	if err != nil {
 		entry.verifyErr = entry.newError(err)
@@ -206,7 +207,8 @@ func (v *TransactionVerifier) verifyTransaction(
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
 		tx.EnvelopeSignatures,
-		tx.EnvelopeMessage())
+		tx.EnvelopeMessage(),
+	)
 	if err != nil {
 		return err
 	}

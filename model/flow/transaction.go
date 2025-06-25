@@ -454,38 +454,66 @@ func (p ProposalKey) ByteSize() int {
 
 // A TransactionSignature is a signature associated with a specific account key.
 type TransactionSignature struct {
-	Address     Address
-	SignerIndex int
-	KeyIndex    uint32
-	Signature   []byte
+	Address       Address
+	SignerIndex   int
+	KeyIndex      uint32
+	Signature     []byte
+	ExtensionData []byte
 }
 
 // String returns the string representation of a transaction signature.
 func (s TransactionSignature) String() string {
-	return fmt.Sprintf("Address: %s. SignerIndex: %d. KeyID: %d. Signature: %s",
-		s.Address, s.SignerIndex, s.KeyIndex, s.Signature)
+	return fmt.Sprintf("Address: %s. SignerIndex: %d. KeyID: %d. Signature: %s. Info: %s",
+		s.Address, s.SignerIndex, s.KeyIndex, s.Signature, s.ExtensionData)
 }
 
 // ByteSize returns the byte size of the transaction signature
 func (s TransactionSignature) ByteSize() int {
 	signerIndexLen := 8
 	keyIDLen := 8
-	return len(s.Address) + signerIndexLen + keyIDLen + len(s.Signature)
+	return len(s.Address) + signerIndexLen + keyIDLen + len(s.Signature) + len(s.ExtensionData)
 }
 
 func (s TransactionSignature) Fingerprint() []byte {
 	return fingerprint.Fingerprint(s.canonicalForm())
 }
 
+// Checks if the scheme is plain authentication scheme, and indicate that it
+// is required to use the legacy canonical form.
+// We check for a valid scheme identifier, as this should be the only case
+// where the extension data can be left out of the cannonical form.
+// All other non-valid cases that are similar to the plain scheme, but is not valid,
+// should be included in the canonical form, as they are not valid signatures
+func (s TransactionSignature) shouldUseLegacyCanonicalForm() bool {
+	plainSchemeIdentifier := byte(0)
+	// len check covers nil case
+	return len(s.ExtensionData) == 0 || (len(s.ExtensionData) == 1 && s.ExtensionData[0] == plainSchemeIdentifier)
+}
+
 func (s TransactionSignature) canonicalForm() interface{} {
+	// int is not RLP-serializable, therefore s.SignerIndex and s.KeyIndex are converted to uint
+	if s.shouldUseLegacyCanonicalForm() {
+		// This is the legacy cononical form, mainly here for backward compatibility
+		return struct {
+			SignerIndex uint
+			KeyID       uint
+			Signature   []byte
+		}{
+			SignerIndex: uint(s.SignerIndex),
+			KeyID:       uint(s.KeyIndex),
+			Signature:   s.Signature,
+		}
+	}
 	return struct {
-		SignerIndex uint
-		KeyID       uint
-		Signature   []byte
+		SignerIndex   uint
+		KeyID         uint
+		Signature     []byte
+		ExtensionData []byte
 	}{
-		SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
-		KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
-		Signature:   s.Signature,
+		SignerIndex:   uint(s.SignerIndex),
+		KeyID:         uint(s.KeyIndex),
+		Signature:     s.Signature,
+		ExtensionData: s.ExtensionData,
 	}
 }
 
