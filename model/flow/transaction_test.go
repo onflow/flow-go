@@ -27,13 +27,13 @@ func TestTransaction_SignatureOrdering(t *testing.T) {
 	payerSignature := []byte{7, 8, 9}
 
 	tx.SetProposalKey(proposerAddress, proposerKeyIndex, proposerSequenceNumber)
-	tx.AddPayloadSignature(proposerAddress, proposerKeyIndex, proposerSignature)
+	tx.AddPayloadSignature(proposerAddress, proposerKeyIndex, proposerSignature, nil)
 
 	tx.SetPayer(payerAddress)
-	tx.AddEnvelopeSignature(payerAddress, payerKeyIndex, payerSignature)
+	tx.AddEnvelopeSignature(payerAddress, payerKeyIndex, payerSignature, nil)
 
 	tx.AddAuthorizer(authorizerAddress)
-	tx.AddPayloadSignature(authorizerAddress, authorizerKeyIndex, authorizerSignature)
+	tx.AddPayloadSignature(authorizerAddress, authorizerKeyIndex, authorizerSignature, nil)
 
 	require.Len(t, tx.PayloadSignatures, 2)
 
