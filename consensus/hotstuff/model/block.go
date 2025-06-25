@@ -21,10 +21,7 @@ type Block struct {
 // BlockFromFlow converts a flow header to a hotstuff block.
 func BlockFromFlow(header *flow.Header) *Block {
 	qc, _ := header.QuorumCertificate()
-	//if err != nil {
-	//	return fmt.Errorf("could not construct qc for header: %w", err)
-	//}
-
+	
 	block := Block{
 		BlockID:     header.ID(),
 		View:        header.View,

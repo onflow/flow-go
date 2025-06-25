@@ -334,7 +334,7 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment extra block (id=%x): %w", blockID, err)
 			}
-			qc, err := block.Header.QuorumCertificate()
+			qc, err := block.Header.TrustedQuorumCertificate()
 			if err != nil {
 				return fmt.Errorf("could not construct qc for header: %w", err)
 			}
@@ -356,7 +356,7 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment block (id=%x): %w", blockID, err)
 			}
-			qc, err := block.Header.QuorumCertificate()
+			qc, err := block.Header.TrustedQuorumCertificate()
 			if err != nil {
 				return fmt.Errorf("could not construct qc for header: %w", err)
 			}

@@ -79,6 +79,21 @@ func (h Header) Body() interface{} {
 
 // QuorumCertificate returns quorum certificate that is incorporated in the block header.
 func (h Header) QuorumCertificate() (*QuorumCertificate, error) {
+	qc, err := NewQuorumCertificate(UntrustedQuorumCertificate{
+		BlockID:       h.ParentID,
+		View:          h.ParentView,
+		SignerIndices: h.ParentVoterIndices,
+		SigData:       h.ParentVoterSigData,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build quorum certificate: %w", err)
+	}
+
+	return qc, nil
+}
+
+// QuorumCertificate returns quorum certificate that is incorporated in the block header.
+func (h Header) TrustedQuorumCertificate() (*QuorumCertificate, error) {
 	qc, err := NewHeaderQuorumCertificate(UntrustedQuorumCertificate{
 		BlockID:       h.ParentID,
 		View:          h.ParentView,
