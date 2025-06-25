@@ -7,10 +7,19 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+type PipelineStateProvider interface {
+	GetState() State
+}
+
+type PipelineStateReceiver interface {
+	OnStateUpdated(State)
+}
 
 // Pipeline represents a processing pipelined state machine for a single ExecutionResult.
 //
@@ -19,14 +28,27 @@ import (
 //
 // The state machine is designed to be run in a single goroutine. The Run method must only be called once.
 type Pipeline interface {
-	Run(context.Context, Core) error
-	GetState() State
-	SetSealed()
-	OnParentStateUpdated(State)
-}
+	// Run starts the pipeline processing and blocks until completion or context cancellation.
+	//
+	// Expected Errors:
+	//   - context.Canceled: when the context is canceled
+	//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+	//
+	// CAUTION: not concurrency safe! Run must only be called once.
+	Run(context.Context) error
 
-// StateUpdatePublisher is a function that publishes state updates
-type StateUpdatePublisher func(state State)
+	// GetState returns the current state of the pipeline.
+	GetState() State
+
+	// SetSealed marks the pipeline's result as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.
+	SetSealed()
+
+	// OnParentStateUpdated updates the pipeline's parent's state.
+	OnParentStateUpdated(State)
+
+	// Abandon marks the pipeline as abandoned.
+	Abandon()
+}
 
 var _ Pipeline = (*PipelineImpl)(nil)
 
@@ -34,15 +56,18 @@ var _ Pipeline = (*PipelineImpl)(nil)
 type PipelineImpl struct {
 	log             zerolog.Logger
 	executionResult *flow.ExecutionResult
-	statePublisher  StateUpdatePublisher
+	statePublisher  PipelineStateReceiver
+	parent          PipelineStateProvider
 	core            Core
+	state           State
 
-	state       State
-	parentState State
-	isSealed    bool
+	// externally managed state
+	// stored using atomics to avoid blocking the result forest during updates
+	isSealed    *atomic.Bool
+	isAbandoned *atomic.Bool
 
 	stateNotifier engine.Notifier
-	cancel        context.CancelFunc
+	cancelFn      *atomic.Pointer[context.CancelFunc]
 
 	mu sync.RWMutex
 }
@@ -51,10 +76,11 @@ type PipelineImpl struct {
 // The pipeline is initialized in the Pending state.
 func NewPipeline(
 	log zerolog.Logger,
-	isSealed bool,
 	executionResult *flow.ExecutionResult,
 	core Core,
-	statePublisher StateUpdatePublisher,
+	isSealed bool,
+	parent PipelineStateProvider,
+	statePublisher PipelineStateReceiver,
 ) *PipelineImpl {
 	log = log.With().
 		Str("component", "pipeline").
@@ -64,12 +90,15 @@ func NewPipeline(
 
 	return &PipelineImpl{
 		log:             log,
-		statePublisher:  statePublisher,
-		state:           StatePending,
-		isSealed:        isSealed,
-		stateNotifier:   engine.NewNotifier(),
-		core:            core,
 		executionResult: executionResult,
+		statePublisher:  statePublisher,
+		core:            core,
+		state:           StatePending,
+		parent:          parent,
+		isSealed:        atomic.NewBool(isSealed),
+		isAbandoned:     atomic.NewBool(false),
+		stateNotifier:   engine.NewNotifier(),
+		cancelFn:        atomic.NewPointer[context.CancelFunc](nil),
 	}
 }
 
@@ -80,21 +109,25 @@ func NewPipeline(
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 //
 // CAUTION: not concurrency safe! Run must only be called once.
-func (p *PipelineImpl) Run(parentCtx context.Context, core Core) error {
+func (p *PipelineImpl) Run(parentCtx context.Context) error {
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
 
-	p.mu.Lock()
-	p.core = core
-	p.state = StateReady
-	p.cancel = cancel
-	p.mu.Unlock()
+	p.cancelFn.Store(&cancel)
 
-	notifierChan := p.stateNotifier.Channel()
+	if p.isAbandoned.Load() {
+		cancel()
+		p.transitionTo(StateAbandoned)
+	} else {
+		p.mu.Lock()
+		p.state = StateReady
+		p.mu.Unlock()
+	}
 
 	// Trigger initial check
 	p.stateNotifier.Notify()
 
+	notifierChan := p.stateNotifier.Channel()
 	for {
 		select {
 		case <-parentCtx.Done():
@@ -138,35 +171,43 @@ func (p *PipelineImpl) GetState() State {
 
 // SetSealed marks the data as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.
 func (p *PipelineImpl) SetSealed() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if !p.isSealed {
-		p.isSealed = true
+	if p.isSealed.CompareAndSwap(false, true) {
 		p.stateNotifier.Notify()
 	}
 }
 
 // OnParentStateUpdated updates the pipeline's state based on the provided parent state.
-//
-// Side effects:
-//   - If the parent pipeline is abandoned and the current pipeline is not already in the abandoned state,
-//     1. this pipeline's context will be canceled.
-//     2. the state update will eventually be broadcast to children pipelines.
 func (p *PipelineImpl) OnParentStateUpdated(parentState State) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	p.parentState = parentState
-
-	// If parent is abandoned, abandon this pipeline
 	if parentState == StateAbandoned {
-		if p.cancel != nil {
-			p.cancel()
-		}
+		p.abandon()
 	}
 
 	p.stateNotifier.Notify()
+}
+
+// Abandon marks the pipeline as abandoned
+func (p *PipelineImpl) Abandon() {
+	p.abandon()
+	p.stateNotifier.Notify()
+}
+
+// abandon marks the pipeline as abandoned and cancels its context.
+// if the pipeline is already abandoned, this is a no-op.
+func (p *PipelineImpl) abandon() {
+	p.isAbandoned.Store(true)
+	p.cancel()
+}
+
+// cancel cancels the pipeline's context if it has been initialized.
+func (p *PipelineImpl) cancel() {
+	cancelFn := p.cancelFn.Load()
+	if cancelFn != nil {
+		cancel := *cancelFn
+		cancel()
+	}
 }
 
 // processCurrentState handles the current state and transitions to the next state if possible.
@@ -202,7 +243,7 @@ func (p *PipelineImpl) processCurrentState(ctx context.Context) (bool, error) {
 // the state change to children pipelines.
 func (p *PipelineImpl) transitionTo(newState State) {
 	p.setState(newState)
-	p.statePublisher(newState)
+	p.statePublisher.OnStateUpdated(newState)
 
 	if newState == StateComplete {
 		return
@@ -338,6 +379,8 @@ func (p *PipelineImpl) processAbandoned() (bool, error) {
 //  2. The parent pipeline must be in an active state (StateDownloading, StateIndexing,
 //     StateWaitingPersist, StatePersisting, or StateComplete)
 func (p *PipelineImpl) canStartDownloading() bool {
+	parentState := p.parent.GetState()
+
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -345,7 +388,7 @@ func (p *PipelineImpl) canStartDownloading() bool {
 		return false
 	}
 
-	switch p.parentState {
+	switch parentState {
 	case StateDownloading, StateIndexing, StateWaitingPersist, StatePersisting, StateComplete:
 		return true
 	default:
@@ -359,10 +402,12 @@ func (p *PipelineImpl) canStartDownloading() bool {
 // 1. The current state must be Downloading
 // 2. The parent pipeline must not be abandoned
 func (p *PipelineImpl) canStartIndexing() bool {
+	parentState := p.parent.GetState()
+
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	return p.state == StateDownloading && p.parentState != StateAbandoned
+	return p.state == StateDownloading && parentState != StateAbandoned
 }
 
 // canWaitForPersist checks if the pipeline can transition from Indexing to WaitingPersist.
@@ -371,10 +416,12 @@ func (p *PipelineImpl) canStartIndexing() bool {
 // 1. The current state must be Indexing
 // 2. The parent pipeline must not be abandoned
 func (p *PipelineImpl) canWaitForPersist() bool {
+	parentState := p.parent.GetState()
+
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	return p.state == StateIndexing && p.parentState != StateAbandoned
+	return p.state == StateIndexing && parentState != StateAbandoned
 }
 
 // canStartPersisting checks if the pipeline can transition from WaitingPersist to Persisting.
@@ -384,11 +431,13 @@ func (p *PipelineImpl) canWaitForPersist() bool {
 // 2. The result must be sealed
 // 3. The parent pipeline must be complete
 func (p *PipelineImpl) canStartPersisting() (transitionReady bool, abandoned bool) {
+	parentState := p.parent.GetState()
+
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	transitionReady = p.state == StateWaitingPersist && p.isSealed && p.parentState == StateComplete
-	abandoned = p.state == StateAbandoned || p.parentState == StateAbandoned
+	transitionReady = p.state == StateWaitingPersist && p.isSealed.Load() && parentState == StateComplete
+	abandoned = p.state == StateAbandoned || parentState == StateAbandoned
 
 	return
 }
