@@ -113,7 +113,8 @@ func ExecutionResultMetaListToMessages(e flow.ExecutionReceiptStubList) []*entit
 	return messageList
 }
 
-// MessagesToExecutionResultMetaList converts a slice of protobuf messages to an execution result meta list
+// MessagesToExecutionResultMetaList converts a slice of protobuf messages to an execution result meta list.
+// All errors indicate the input cannot be converted to a valid [flow.ExecutionReceiptStubList].
 func MessagesToExecutionResultMetaList(m []*entities.ExecutionReceiptMeta) (flow.ExecutionReceiptStubList, error) {
 	execMetaList := make([]*flow.ExecutionReceiptStub, len(m))
 	for i, message := range m {
