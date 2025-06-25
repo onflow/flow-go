@@ -83,11 +83,11 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					unittest.ConvertToCadence(coinbaseAddr.Bytes()),
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				tx := fvm.Transaction(
@@ -179,7 +179,7 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				innerTx = cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
@@ -244,11 +244,11 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					unittest.ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				tx := fvm.Transaction(
@@ -291,7 +291,7 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				innerTx = cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
@@ -353,11 +353,11 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					unittest.ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				tx := fvm.Transaction(
@@ -435,11 +435,11 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					unittest.ConvertToCadence(coinbaseAddr.Bytes()),
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				tx := fvm.Transaction(
@@ -518,11 +518,11 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					unittest.ConvertToCadence(coinbaseAddr.Bytes()),
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				tx := fvm.Transaction(
@@ -618,12 +618,12 @@ func TestEVMBatchRun(t *testing.T) {
 
 					// build txs argument
 					txBytes[i] = cadence.NewArray(
-						unittest.ConvertToCadence(tx),
+						unittest.BytesToCdcUInt8(tx),
 					).WithType(stdlib.EVMTransactionBytesCadenceType)
 				}
 
 				coinbase := cadence.NewArray(
-					unittest.ConvertToCadence(coinbaseAddr.Bytes()),
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				txs := cadence.NewArray(txBytes).
@@ -724,7 +724,7 @@ func TestEVMBatchRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				script := fvm.Script(retrieveCode).WithArguments(
@@ -813,12 +813,12 @@ func TestEVMBatchRun(t *testing.T) {
 
 					// build txs argument
 					txBytes[i] = cadence.NewArray(
-						unittest.ConvertToCadence(tx),
+						unittest.BytesToCdcUInt8(tx),
 					).WithType(stdlib.EVMTransactionBytesCadenceType)
 				}
 
 				coinbase := cadence.NewArray(
-					unittest.ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				txs := cadence.NewArray(txBytes).
@@ -864,7 +864,7 @@ func TestEVMBatchRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				script := fvm.Script(retrieveCode).WithArguments(
@@ -957,12 +957,12 @@ func TestEVMBatchRun(t *testing.T) {
 
 					// build txs argument
 					txBytes[i] = cadence.NewArray(
-						unittest.ConvertToCadence(tx),
+						unittest.BytesToCdcUInt8(tx),
 					).WithType(stdlib.EVMTransactionBytesCadenceType)
 				}
 
 				coinbase := cadence.NewArray(
-					unittest.ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				txs := cadence.NewArray(txBytes).
@@ -1008,7 +1008,7 @@ func TestEVMBatchRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				script := fvm.Script(retrieveCode).WithArguments(
@@ -1070,11 +1070,11 @@ func TestEVMBlockData(t *testing.T) {
 			)
 
 			coinbase := cadence.NewArray(
-				unittest.ConvertToCadence(testAccount.Address().Bytes()),
+				unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 			).WithType(stdlib.EVMAddressBytesCadenceType)
 
 			innerTx := cadence.NewArray(
-				unittest.ConvertToCadence(innerTxBytes),
+				unittest.BytesToCdcUInt8(innerTxBytes),
 			).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 			script := fvm.Script(code).WithArguments(
@@ -1143,7 +1143,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 					SetScript(code).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					AddArgument(json.MustEncode(cadence.NewArray(
-						unittest.ConvertToCadence(addr.Bytes()),
+						unittest.BytesToCdcUInt8(addr.Bytes()),
 					).WithType(stdlib.EVMAddressBytesCadenceType))),
 				0)
 
@@ -1416,7 +1416,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				))
 
 				addr := cadence.NewArray(
-					unittest.ConvertToCadence(RandomAddress(t).Bytes()),
+					unittest.BytesToCdcUInt8(RandomAddress(t).Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
@@ -1528,7 +1528,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				script := fvm.Script(code).
 					WithArguments(json.MustEncode(
 						cadence.NewArray(
-							unittest.ConvertToCadence(testContract.ByteCode),
+							unittest.BytesToCdcUInt8(testContract.ByteCode),
 						).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
 					))
 
@@ -1590,11 +1590,11 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					unittest.ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				tx := fvm.Transaction(
@@ -1663,7 +1663,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				data := json.MustEncode(
 					cadence.NewArray(
-						unittest.ConvertToCadence(testContract.MakeCallData(t, "retrieve")),
+						unittest.BytesToCdcUInt8(testContract.MakeCallData(t, "retrieve")),
 					).WithType(stdlib.EVMTransactionBytesCadenceType),
 				)
 				toAddress, err := cadence.NewString(testContract.DeployedAt.ToCommon().Hex())
@@ -1726,7 +1726,7 @@ func TestDryRun(t *testing.T) {
 		script := fvm.Script(code).WithArguments(
 			json.MustEncode(
 				cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType),
 			),
 		)
@@ -1833,11 +1833,11 @@ func TestDryRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					unittest.ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
@@ -1898,11 +1898,11 @@ func TestDryRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					unittest.ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				tx := fvm.Transaction(
@@ -1960,11 +1960,11 @@ func TestDryRun(t *testing.T) {
 				)
 
 				innerTx = cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase = cadence.NewArray(
-					unittest.ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
@@ -2024,11 +2024,11 @@ func TestDryRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					unittest.ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				tx := fvm.Transaction(
@@ -2086,11 +2086,11 @@ func TestDryRun(t *testing.T) {
 				)
 
 				innerTx = cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase = cadence.NewArray(
-					unittest.ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
@@ -2163,11 +2163,11 @@ func TestDryRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					unittest.ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
@@ -2281,7 +2281,7 @@ func TestDryCall(t *testing.T) {
 		script := fvm.Script(code).WithArguments(
 			json.MustEncode(
 				cadence.NewArray(
-					unittest.ConvertToCadence(tx.Data()),
+					unittest.BytesToCdcUInt8(tx.Data()),
 				).WithType(stdlib.EVMTransactionBytesCadenceType),
 			),
 			json.MustEncode(toAddress),
@@ -2383,11 +2383,11 @@ func TestDryCall(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					unittest.ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				tx := fvm.Transaction(
@@ -2444,7 +2444,7 @@ func TestDryCall(t *testing.T) {
 
 				data := json.MustEncode(
 					cadence.NewArray(
-						unittest.ConvertToCadence(testContract.MakeCallData(t, "retrieve")),
+						unittest.BytesToCdcUInt8(testContract.MakeCallData(t, "retrieve")),
 					).WithType(stdlib.EVMTransactionBytesCadenceType),
 				)
 				toAddress, err := cadence.NewString(testContract.DeployedAt.ToCommon().Hex())
@@ -2524,11 +2524,11 @@ func TestDryCall(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					unittest.ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					unittest.ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
@@ -2634,12 +2634,12 @@ func TestCadenceArch(t *testing.T) {
 				script := fvm.Script(code).WithArguments(
 					json.MustEncode(
 						cadence.NewArray(
-							unittest.ConvertToCadence(innerTxBytes),
+							unittest.BytesToCdcUInt8(innerTxBytes),
 						).WithType(stdlib.EVMTransactionBytesCadenceType),
 					),
 					json.MustEncode(
 						cadence.NewArray(
-							unittest.ConvertToCadence(testAccount.Address().Bytes()),
+							unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 						).WithType(stdlib.EVMAddressBytesCadenceType),
 					),
 				)
@@ -2687,12 +2687,12 @@ func TestCadenceArch(t *testing.T) {
 				script := fvm.Script(code).WithArguments(
 					json.MustEncode(
 						cadence.NewArray(
-							unittest.ConvertToCadence(innerTxBytes),
+							unittest.BytesToCdcUInt8(innerTxBytes),
 						).WithType(stdlib.EVMTransactionBytesCadenceType),
 					),
 					json.MustEncode(
 						cadence.NewArray(
-							unittest.ConvertToCadence(testAccount.Address().Bytes()),
+							unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 						).WithType(stdlib.EVMAddressBytesCadenceType),
 					),
 				)
@@ -2794,12 +2794,12 @@ func TestCadenceArch(t *testing.T) {
 				script := fvm.Script(code).WithArguments(
 					json.MustEncode(
 						cadence.NewArray(
-							unittest.ConvertToCadence(innerTxBytes),
+							unittest.BytesToCdcUInt8(innerTxBytes),
 						).WithType(stdlib.EVMTransactionBytesCadenceType),
 					),
 					json.MustEncode(
 						cadence.NewArray(
-							unittest.ConvertToCadence(testAccount.Address().Bytes()),
+							unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 						).WithType(stdlib.EVMAddressBytesCadenceType),
 					),
 				)
@@ -2891,12 +2891,12 @@ func TestCadenceArch(t *testing.T) {
 				script := fvm.Script(code).WithArguments(
 					json.MustEncode(
 						cadence.NewArray(
-							unittest.ConvertToCadence(innerTxBytes),
+							unittest.BytesToCdcUInt8(innerTxBytes),
 						).WithType(stdlib.EVMTransactionBytesCadenceType),
 					),
 					json.MustEncode(
 						cadence.NewArray(
-							unittest.ConvertToCadence(testAccount.Address().Bytes()),
+							unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 						).WithType(stdlib.EVMAddressBytesCadenceType),
 					),
 				)
@@ -2989,13 +2989,13 @@ func TestCadenceArch(t *testing.T) {
 				verifyScript := fvm.Script(code).WithArguments(
 					json.MustEncode(
 						cadence.NewArray(
-							unittest.ConvertToCadence(innerTxBytes),
+							unittest.BytesToCdcUInt8(innerTxBytes),
 						).WithType(
 							stdlib.EVMTransactionBytesCadenceType,
 						)),
 					json.MustEncode(
 						cadence.NewArray(
-							unittest.ConvertToCadence(
+							unittest.BytesToCdcUInt8(
 								testAccount.Address().Bytes(),
 							),
 						).WithType(
@@ -3037,13 +3037,13 @@ func TestCadenceArch(t *testing.T) {
 				verifyScript = fvm.Script(code).WithArguments(
 					json.MustEncode(
 						cadence.NewArray(
-							unittest.ConvertToCadence(innerTxBytes),
+							unittest.BytesToCdcUInt8(innerTxBytes),
 						).WithType(
 							stdlib.EVMTransactionBytesCadenceType,
 						)),
 					json.MustEncode(
 						cadence.NewArray(
-							unittest.ConvertToCadence(
+							unittest.BytesToCdcUInt8(
 								testAccount.Address().Bytes(),
 							),
 						).WithType(
@@ -3287,7 +3287,7 @@ func getEVMAccountBalance(
 	script := fvm.Script(code).WithArguments(
 		json.MustEncode(
 			cadence.NewArray(
-				unittest.ConvertToCadence(address.Bytes()),
+				unittest.BytesToCdcUInt8(address.Bytes()),
 			).WithType(stdlib.EVMAddressBytesCadenceType),
 		),
 	)
@@ -3325,7 +3325,7 @@ func getEVMAccountNonce(
 	script := fvm.Script(code).WithArguments(
 		json.MustEncode(
 			cadence.NewArray(
-				unittest.ConvertToCadence(address.Bytes()),
+				unittest.BytesToCdcUInt8(address.Bytes()),
 			).WithType(stdlib.EVMAddressBytesCadenceType),
 		),
 	)

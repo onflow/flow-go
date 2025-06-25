@@ -45,7 +45,8 @@ func InterfaceToCdcValues(t *testing.T, vals []interface{}) []cadence.Value {
 	return decoded
 }
 
-func ConvertToCadence(data []byte) []cadence.Value {
+// BytesToCdcUInt8 converts a Go []byte to a Cadence []UInt8 with equal content.
+func BytesToCdcUInt8(data []byte) []cadence.Value {
 	ret := make([]cadence.Value, len(data))
 	for i, v := range data {
 		ret[i] = cadence.UInt8(v)

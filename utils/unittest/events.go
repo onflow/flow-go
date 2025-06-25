@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/stdlib"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -171,7 +172,7 @@ func (e *eventGeneratorFactory) GenerateAccountContractEvent(t *testing.T, quali
 		[]cadence.Value{
 			cadence.NewAddress(address),
 			cadence.NewArray(
-				ConvertToCadence([]byte{111, 43, 164, 202, 220, 174, 148, 17, 253, 161, 9, 124, 237, 83, 227, 75, 115, 149, 141, 83, 129, 145, 252, 68, 122, 137, 80, 155, 89, 233, 136, 213}),
+				BytesToCdcUInt8([]byte{111, 43, 164, 202, 220, 174, 148, 17, 253, 161, 9, 124, 237, 83, 227, 75, 115, 149, 141, 83, 129, 145, 252, 68, 122, 137, 80, 155, 89, 233, 136, 213}),
 			).WithType(cadence.NewConstantSizedArrayType(32, cadence.UInt8Type)),
 			contractName,
 		}).
