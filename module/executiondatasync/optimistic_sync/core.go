@@ -9,15 +9,25 @@ import (
 // download, index, and persist.
 type Core interface {
 	// Download retrieves all necessary data for processing.
+	// Expected errors:
+	// - context.Canceled: if the provided context was canceled before completion
+	//
+	// All other errors are unexpected and may indicate a bug or inconsistent state
 	Download(ctx context.Context) error
 
 	// Index processes the downloaded data and creates in-memory indexes.
-	Index(ctx context.Context) error
+	//
+	// No errors are expected during normal operations
+	Index() error
 
 	// Persist stores the indexed data in permanent storage.
-	Persist(ctx context.Context) error
+	//
+	// No errors are expected during normal operations
+	Persist() error
 
-	// Abandon cleans up any resources and stops processing.
-	// This is called when the pipeline is abandoned.
-	Abandon(ctx context.Context) error
+	// Abandon indicates that the protocol has abandoned this state. Hence processing will be aborted
+	// and any data dropped.
+	//
+	// No errors are expected during normal operations
+	Abandon() error
 }

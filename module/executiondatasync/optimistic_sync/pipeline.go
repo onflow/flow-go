@@ -12,20 +12,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Pipeline represents a processing pipelined state machine with the following sequence of states:
-// 1. Pending
-// 2. Ready
-// 3. Downloading
-// 4. Indexing
-// 5. WaitingPersist
-// 6. Persisting
-// 7. Complete
+// Pipeline represents a processing pipelined state machine for a single ExecutionResult.
 //
 // The state machine is initialized in the Pending state, and can transition to Abandoned at any time
 // if the parent pipeline is abandoned.
 //
-// The state machine is designed to be run in a single goroutine, and is not safe for concurrent access.
-// The Run method must only be called once.
+// The state machine is designed to be run in a single goroutine. The Run method must only be called once.
 type Pipeline interface {
 	Run(context.Context, Core) error
 	GetState() State
@@ -56,18 +48,7 @@ type PipelineImpl struct {
 }
 
 // NewPipeline creates a new processing pipeline.
-// Pipelines must only be created for ExecutionResults that descend from the latest persisted sealed result.
 // The pipeline is initialized in the Pending state.
-//
-// Parameters:
-//   - log: the logger to use for the pipeline
-//   - isSealed: indicates if the pipeline's ExecutionResult is sealed
-//   - executionResult: processed execution result
-//   - core: implements the processing logic for the pipeline
-//   - statePublisher: called when the pipeline needs to broadcast state updates
-//
-// Returns:
-//   - *PipelineImpl: the newly created pipeline
 func NewPipeline(
 	log zerolog.Logger,
 	isSealed bool,
@@ -94,19 +75,11 @@ func NewPipeline(
 
 // Run starts the pipeline processing and blocks until completion or context cancellation.
 //
-// Parameters:
-//   - ctx: the context to use for process lifecycle
-//   - core: the core implementation to use for processing
-//
-// Returns:
-//   - error: any error that occurred during processing, including context cancellation
-//
 // Expected Errors:
 //   - context.Canceled: when the context is canceled
-//   - All other errors are unexpected and potential indicators of bugs or corrupted internal state
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 //
-// Concurrency safety:
-//   - Not safe for concurrent access. Run must only be called once.
+// CAUTION: not concurrency safe! Run must only be called once.
 func (p *PipelineImpl) Run(parentCtx context.Context, core Core) error {
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
@@ -157,12 +130,6 @@ func (p *PipelineImpl) Run(parentCtx context.Context, core Core) error {
 }
 
 // GetState returns the current state of the pipeline.
-//
-// Returns:
-//   - State: the current state of the pipeline
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (p *PipelineImpl) GetState() State {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -170,9 +137,6 @@ func (p *PipelineImpl) GetState() State {
 }
 
 // SetSealed marks the data as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (p *PipelineImpl) SetSealed() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -189,12 +153,6 @@ func (p *PipelineImpl) SetSealed() {
 //   - If the parent pipeline is abandoned and the current pipeline is not already in the abandoned state,
 //     1. this pipeline's context will be canceled.
 //     2. the state update will eventually be broadcast to children pipelines.
-//
-// Parameters:
-//   - parentState: the new state of the parent pipeline
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (p *PipelineImpl) OnParentStateUpdated(parentState State) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -213,19 +171,9 @@ func (p *PipelineImpl) OnParentStateUpdated(parentState State) {
 
 // processCurrentState handles the current state and transitions to the next state if possible.
 //
-// Parameters:
-//   - ctx: the context to use for cancellation
-//
-// Returns:
-//   - bool: true if processing should continue, false if a terminal state was reached
-//   - error: any error that occurred during processing
-//
 // Expected Errors:
 //   - context.Canceled: when the context is canceled
-//   - All other errors are unexpected and potential indicators of bugs or corrupted internal state
-//
-// Concurrency safety:
-//   - Safe for concurrent access.
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (p *PipelineImpl) processCurrentState(ctx context.Context) (bool, error) {
 	currentState := p.GetState()
 
@@ -235,13 +183,13 @@ func (p *PipelineImpl) processCurrentState(ctx context.Context) (bool, error) {
 	case StateDownloading:
 		return p.processDownloading(ctx)
 	case StateIndexing:
-		return p.processIndexing(ctx)
+		return p.processIndexing()
 	case StateWaitingPersist:
 		return p.processWaitingPersist(), nil
 	case StatePersisting:
-		return p.processPersisting(ctx)
+		return p.processPersisting()
 	case StateAbandoned:
-		return p.processAbandoned(ctx)
+		return p.processAbandoned()
 	case StateComplete:
 		// Terminal state
 		return false, nil
@@ -252,12 +200,6 @@ func (p *PipelineImpl) processCurrentState(ctx context.Context) (bool, error) {
 
 // transitionTo transitions the pipeline to the given state and broadcasts
 // the state change to children pipelines.
-//
-// Parameters:
-//   - newState: the state to transition to
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (p *PipelineImpl) transitionTo(newState State) {
 	p.setState(newState)
 	p.statePublisher(newState)
@@ -270,12 +212,6 @@ func (p *PipelineImpl) transitionTo(newState State) {
 }
 
 // setState sets the state of the pipeline and logs the transition.
-//
-// Parameters:
-//   - newState: the new state to set
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (p *PipelineImpl) setState(newState State) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -290,12 +226,6 @@ func (p *PipelineImpl) setState(newState State) {
 }
 
 // processReady handles the Ready state and transitions to StateDownloading if possible.
-//
-// Returns:
-//   - bool: true if processing should continue, false if a terminal state was reached
-//
-// Concurrency safety:
-//   - Safe for concurrent access, but not intended to be called concurrently with other process methods.
 func (p *PipelineImpl) processReady() bool {
 	if p.canStartDownloading() {
 		p.transitionTo(StateDownloading)
@@ -307,19 +237,9 @@ func (p *PipelineImpl) processReady() bool {
 // processDownloading handles the Downloading state.
 // It executes the download function and transitions to StateIndexing if successful.
 //
-// Parameters:
-//   - ctx: the context to use for cancellation
-//
-// Returns:
-//   - bool: true if processing should continue, false if a terminal state was reached
-//   - error: any error that occurred during processing
-//
 // Expected Errors:
 //   - context.Canceled: when the context is canceled
-//   - All other errors are unexpected and potential indicators of bugs or corrupted internal state
-//
-// Concurrency safety:
-//   - Safe for concurrent access, but not intended to be called concurrently with other process methods.
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (p *PipelineImpl) processDownloading(ctx context.Context) (bool, error) {
 	p.log.Debug().Msg("starting download step")
 
@@ -342,23 +262,11 @@ func (p *PipelineImpl) processDownloading(ctx context.Context) (bool, error) {
 // processIndexing handles the Indexing state.
 // It executes the index function and transitions to StateWaitingPersist if possible.
 //
-// Parameters:
-//   - ctx: the context to use for cancellation
-//
-// Returns:
-//   - bool: true if processing should continue, false if a terminal state was reached
-//   - error: any error that occurred during processing
-//
-// Expected Errors:
-//   - context.Canceled: when the context is canceled
-//   - All other errors are unexpected and potential indicators of bugs or corrupted internal state
-//
-// Concurrency safety:
-//   - Safe for concurrent access, but not intended to be called concurrently with other process methods.
-func (p *PipelineImpl) processIndexing(ctx context.Context) (bool, error) {
+// No errors are expected during normal operations
+func (p *PipelineImpl) processIndexing() (bool, error) {
 	p.log.Debug().Msg("starting index step")
 
-	if err := p.core.Index(ctx); err != nil {
+	if err := p.core.Index(); err != nil {
 		p.log.Error().Err(err).Msg("index step failed")
 		return false, err
 	}
@@ -377,12 +285,6 @@ func (p *PipelineImpl) processIndexing(ctx context.Context) (bool, error) {
 
 // processWaitingPersist handles the WaitingPersist state.
 // It checks if the conditions for persisting are met and transitions to StatePersisting if possible.
-//
-// Returns:
-//   - bool: true if processing should continue, false if a terminal state was reached
-//
-// Concurrency safety:
-//   - Safe for concurrent access, but not intended to be called concurrently with other process methods.
 func (p *PipelineImpl) processWaitingPersist() bool {
 	transitionReady, abandoned := p.canStartPersisting()
 	if abandoned {
@@ -399,23 +301,11 @@ func (p *PipelineImpl) processWaitingPersist() bool {
 // processPersisting handles the Persisting state.
 // It executes the persist function and transitions to StateComplete if successful.
 //
-// Parameters:
-//   - ctx: the context to use for cancellation
-//
-// Returns:
-//   - bool: true if processing should continue, false if a terminal state was reached
-//   - error: any error that occurred during processing
-//
-// Expected Errors:
-//   - context.Canceled: when the context is canceled
-//   - All other errors are unexpected and potential indicators of bugs or corrupted internal state
-//
-// Concurrency safety:
-//   - Safe for concurrent access, but not intended to be called concurrently with other process methods.
-func (p *PipelineImpl) processPersisting(ctx context.Context) (bool, error) {
+// No errors are expected during normal operations
+func (p *PipelineImpl) processPersisting() (bool, error) {
 	p.log.Debug().Msg("starting persist step")
 
-	if err := p.core.Persist(ctx); err != nil {
+	if err := p.core.Persist(); err != nil {
 		p.log.Error().Err(err).Msg("persist step failed")
 		return false, err
 	}
@@ -428,23 +318,11 @@ func (p *PipelineImpl) processPersisting(ctx context.Context) (bool, error) {
 // processAbandoned handles the Abandoned state.
 // It cancels the pipeline context and calls core.Abandon.
 //
-// Parameters:
-//   - ctx: the context to use for cancellation
-//
-// Returns:
-//   - bool: false to indicate terminal state reached
-//   - error: any error that occurred during processing
-//
-// Expected Errors:
-//   - context.Canceled: when the context is canceled
-//   - All other errors are unexpected and potential indicators of bugs or corrupted internal state
-//
-// Concurrency safety:
-//   - Safe for concurrent access, but not intended to be called concurrently with other process methods.
-func (p *PipelineImpl) processAbandoned(ctx context.Context) (bool, error) {
+// No errors are expected during normal operations
+func (p *PipelineImpl) processAbandoned() (bool, error) {
 	p.log.Debug().Msg("processing abandoned state")
 
-	if err := p.core.Abandon(ctx); err != nil {
+	if err := p.core.Abandon(); err != nil {
 		p.log.Error().Err(err).Msg("abandon step failed")
 		return false, err
 	}
@@ -459,12 +337,6 @@ func (p *PipelineImpl) processAbandoned(ctx context.Context) (bool, error) {
 //  1. The current state must be Ready
 //  2. The parent pipeline must be in an active state (StateDownloading, StateIndexing,
 //     StateWaitingPersist, StatePersisting, or StateComplete)
-//
-// Returns:
-//   - bool: true if the pipeline can start downloading
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (p *PipelineImpl) canStartDownloading() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -486,12 +358,6 @@ func (p *PipelineImpl) canStartDownloading() bool {
 // Conditions for transition:
 // 1. The current state must be Downloading
 // 2. The parent pipeline must not be abandoned
-//
-// Returns:
-//   - bool: true if the pipeline can start indexing
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (p *PipelineImpl) canStartIndexing() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -504,12 +370,6 @@ func (p *PipelineImpl) canStartIndexing() bool {
 // Conditions for transition:
 // 1. The current state must be Indexing
 // 2. The parent pipeline must not be abandoned
-//
-// Returns:
-//   - bool: true if the pipeline can wait for persist
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (p *PipelineImpl) canWaitForPersist() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -523,13 +383,6 @@ func (p *PipelineImpl) canWaitForPersist() bool {
 // 1. The current state must be WaitingPersist
 // 2. The result must be sealed
 // 3. The parent pipeline must be complete
-//
-// Returns:
-//   - bool: true if the pipeline can start persisting
-//   - bool: true if the processing is abandoned and should transition to abandoned state
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (p *PipelineImpl) canStartPersisting() (transitionReady bool, abandoned bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

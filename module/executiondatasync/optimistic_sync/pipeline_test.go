@@ -28,8 +28,8 @@ func TestPipelineStateTransitions(t *testing.T) {
 	// Create mock core
 	mockCore := osmock.NewCore(t)
 	mockCore.On("Download", mock.Anything).Return(nil)
-	mockCore.On("Index", mock.Anything).Return(nil)
-	mockCore.On("Persist", mock.Anything).Return(nil)
+	mockCore.On("Index").Return(nil)
+	mockCore.On("Persist").Return(nil)
 
 	// Create a pipeline
 	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
@@ -53,7 +53,7 @@ func TestPipelineStateTransitions(t *testing.T) {
 	waitForStateUpdate(t, pipeline, updateChan, StateWaitingPersist)
 	assert.Equal(t, StateWaitingPersist, pipeline.GetState(), "Pipeline should be in WaitingPersist state")
 	mockCore.AssertCalled(t, "Download", mock.Anything)
-	mockCore.AssertCalled(t, "Index", mock.Anything)
+	mockCore.AssertCalled(t, "Index")
 	mockCore.AssertNotCalled(t, "Persist")
 
 	// Mark the execution result as sealed to trigger persisting
@@ -61,7 +61,7 @@ func TestPipelineStateTransitions(t *testing.T) {
 
 	waitForStateUpdate(t, pipeline, updateChan, StateComplete)
 
-	mockCore.AssertCalled(t, "Persist", mock.Anything)
+	mockCore.AssertCalled(t, "Persist")
 
 	// Cancel the context after the pipeline is already complete
 	// At this point, the pipeline has already finished successfully and returned nil
@@ -93,7 +93,7 @@ func TestPipelineCancellation(t *testing.T) {
 		// Simulate long-running operation
 		time.Sleep(100 * time.Millisecond)
 	}).Return(nil)
-	mockCore.On("Abandon", mock.Anything).Return(nil)
+	mockCore.On("Abandon").Return(nil)
 
 	// Create a pipeline
 	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
@@ -134,8 +134,8 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 	// Create a mock core
 	mockCore := osmock.NewCore(t)
 	mockCore.On("Download", mock.Anything).Return(nil)
-	mockCore.On("Index", mock.Anything).Return(nil)
-	mockCore.On("Persist", mock.Anything).Return(nil)
+	mockCore.On("Index").Return(nil)
+	mockCore.On("Persist").Return(nil)
 
 	// Create a pipeline
 	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
@@ -166,7 +166,7 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 	waitForStateUpdate(t, pipeline, updateChan, StateWaitingPersist)
 	assert.Equal(t, StateWaitingPersist, pipeline.GetState(), "Pipeline should progress to WaitingPersist state")
 	mockCore.AssertCalled(t, "Download", mock.Anything)
-	mockCore.AssertCalled(t, "Index", mock.Anything)
+	mockCore.AssertCalled(t, "Index")
 	mockCore.AssertNotCalled(t, "Persist")
 
 	// Update parent to complete - should allow persisting when sealed
@@ -178,7 +178,7 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 	// Wait for pipeline to complete
 	waitForStateUpdate(t, pipeline, updateChan, StateComplete)
 	assert.Equal(t, StateComplete, pipeline.GetState(), "Pipeline should reach Complete state")
-	mockCore.AssertCalled(t, "Persist", mock.Anything)
+	mockCore.AssertCalled(t, "Persist")
 
 	// Cancel the context to end the goroutine
 	cancel()
@@ -204,7 +204,7 @@ func TestPipelineErrorHandling(t *testing.T) {
 			name: "Index Error",
 			setupMock: func(p *PipelineImpl, m *osmock.Core, expectedErr error) {
 				m.On("Download", mock.Anything).Return(nil)
-				m.On("Index", mock.Anything).Return(expectedErr)
+				m.On("Index").Return(expectedErr)
 			},
 			expectedErr: errors.New("index error"),
 		},
@@ -212,11 +212,11 @@ func TestPipelineErrorHandling(t *testing.T) {
 			name: "Persist Error",
 			setupMock: func(p *PipelineImpl, m *osmock.Core, expectedErr error) {
 				m.On("Download", mock.Anything).Return(nil)
-				m.On("Index", mock.Anything).Run(func(args mock.Arguments) {
+				m.On("Index").Run(func(args mock.Arguments) {
 					p.OnParentStateUpdated(StateComplete)
 					p.SetSealed()
 				}).Return(nil)
-				m.On("Persist", mock.Anything).Return(expectedErr)
+				m.On("Persist").Return(expectedErr)
 			},
 			expectedErr: errors.New("persist error"),
 		},
@@ -226,7 +226,7 @@ func TestPipelineErrorHandling(t *testing.T) {
 				m.On("Download", mock.Anything).Run(func(args mock.Arguments) {
 					p.OnParentStateUpdated(StateAbandoned)
 				}).Return(nil)
-				m.On("Abandon", mock.Anything).Return(expectedErr)
+				m.On("Abandon").Return(expectedErr)
 			},
 			expectedErr: errors.New("abandon error"),
 		},
@@ -281,8 +281,8 @@ func TestBroadcastStateUpdate(t *testing.T) {
 	// Create mock core
 	mockCore := osmock.NewCore(t)
 	mockCore.On("Download", mock.Anything).Return(nil)
-	mockCore.On("Index", mock.Anything).Return(nil)
-	mockCore.On("Abandon", mock.Anything).Return(nil)
+	mockCore.On("Index").Return(nil)
+	mockCore.On("Abandon").Return(nil)
 
 	// Create a pipeline
 	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
