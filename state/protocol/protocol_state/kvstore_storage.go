@@ -3,7 +3,7 @@ package protocol_state
 import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage"
 )
 
 // ProtocolKVStore persists different snapshots of the Protocol State's Key-Calue stores [KV-stores].
@@ -14,19 +14,17 @@ import (
 // supported by the current software version. There might be serialized snapshots with legacy versions
 // in the database that are not supported anymore by this software version.
 type ProtocolKVStore interface {
-	// StoreTx returns an anonymous function (intended to be executed as part of a database transaction),
-	// which persists the given KV-store snapshot as part of a DB tx. Per convention, all implementations
+	// BatchStore writes the given KV-store snapshot to the input write batch. Per convention, all implementations
 	// of `protocol.KVStoreReader` should be able to successfully encode their state into a data blob.
 	// If the encoding fails, the anonymous function returns an error upon call.
 	//
 	// Expected errors of the returned anonymous function:
 	//   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
-	StoreTx(stateID flow.Identifier, kvStore protocol.KVStoreReader) func(*transaction.Tx) error
+	BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, kvStore protocol.KVStoreReader) error
 
-	// IndexTx returns an anonymous function intended to be executed as part of a database transaction.
+	// BatchIndex writes the blockID->stateID index to the input write batch.
 	// In a nutshell, we want to maintain a map from `blockID` to `stateID`, where `blockID` references the
 	// block that _proposes_ the updated key-value store.
-	// Upon call, the anonymous function persists the specific map entry in the node's database.
 	// Protocol convention:
 	//   - Consider block B, whose ingestion might potentially lead to an updated KV store. For example,
 	//     the KV store changes if we seal some execution results emitting specific service events.
@@ -36,7 +34,7 @@ type ProtocolKVStore interface {
 	//
 	// Expected errors of the returned anonymous function:
 	//   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
-	IndexTx(blockID flow.Identifier, stateID flow.Identifier) func(*transaction.Tx) error
+	BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error
 
 	// ByID retrieves the KV store snapshot with the given ID.
 	// Expected errors during normal operations:
