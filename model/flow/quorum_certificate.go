@@ -63,6 +63,10 @@ func NewQuorumCertificate(untrusted UntrustedQuorumCertificate) (*QuorumCertific
 }
 
 func NewHeaderQuorumCertificate(untrusted UntrustedQuorumCertificate) (*QuorumCertificate, error) {
+	if len(untrusted.SignerIndices) == 0 {
+		return nil, fmt.Errorf("SignerIndices must not be empty")
+	}
+
 	return &QuorumCertificate{
 		View:          untrusted.View,
 		BlockID:       untrusted.BlockID,
