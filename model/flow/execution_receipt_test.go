@@ -33,7 +33,6 @@ func TestExecutionReceiptID_Malleability(t *testing.T) {
 // * grouping should preserve order and multiplicity of elements
 // * group for unknown identifier should be empty
 func TestExecutionReceiptGroupBy(t *testing.T) {
-
 	er1 := unittest.ExecutionReceiptFixture()
 	er2 := unittest.ExecutionReceiptFixture()
 	er3 := unittest.ExecutionReceiptFixture()
@@ -66,7 +65,6 @@ func TestExecutionReceiptGroupBy(t *testing.T) {
 // * grouping should preserve order and multiplicity of elements
 // * group for unknown identifier should be empty
 func TestExecutionReceiptStubGroupBy(t *testing.T) {
-
 	er1 := unittest.ExecutionReceiptFixture().Stub()
 	er2 := unittest.ExecutionReceiptFixture().Stub()
 	er3 := unittest.ExecutionReceiptFixture().Stub()
