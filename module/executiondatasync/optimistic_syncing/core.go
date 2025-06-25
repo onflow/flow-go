@@ -184,6 +184,7 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 	g.Go(func() error {
 		var err error
 		executionData, err = c.workingData.execDataRequester.RequestExecutionData(gCtx)
+		//  executionData are CRITICAL. Any failure here causes the entire download to fail.
 		if err != nil {
 			return fmt.Errorf("failed to request execution data: %w", err)
 		}
@@ -199,6 +200,12 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 		var err error
 		txResultErrMsgsData, err = c.workingData.txResultErrMsgsRequester.Request(timeoutCtx)
 		if err != nil {
+			// txResultErrMsgsData are OPTIONAL. Timeout error `context.DeadlineExceeded` is handled gracefully by
+			// returning nil, allowing processing to continue with empty error messages data. Other errors still cause
+			// failure.
+			//
+			// This approach ensures that temporary unavailability of transaction result error messages doesn't block
+			// critical execution data processing.
 			if errors.Is(err, context.DeadlineExceeded) {
 				c.log.Debug().
 					Dur("timeout", c.workingData.txResultErrMsgsRequestTimeout).
@@ -212,21 +219,6 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 	})
 
 	if err := g.Wait(); err != nil {
-		// TODO: Improve error handling to allow partial success scenarios.
-		//
-		// Currently, this method uses errgroup with fail-fast semantics, meaning if either
-		// execution data OR transaction error messages download fails, the entire operation fails.
-		// However, these two types of data have different criticality levels:
-		//
-		// - executionData: CRITICAL - Required for block processing and indexing
-		// - txResultErrMsgsData: OPTIONAL - Nice-to-have
-		//
-		// Allow the download to succeed if execution data is retrieved
-		// successfully, even if transaction error messages fail or timeout. The system should:
-		//
-		// 1. Continue processing with empty/nil txResultErrMsgsData if that download fails
-		// 2. Log the failure appropriately
-		// 3. Allow operators to backfill missing error messages later
 		return err
 	}
 
@@ -252,8 +244,11 @@ func (c *CoreImpl) Index() error {
 		return err
 	}
 
-	if err := c.workingData.indexer.IndexTxResultErrorMessagesData(c.workingData.txResultErrMsgsData); err != nil {
-		return err
+	// Only index transaction result error messages when they are available
+	if len(c.workingData.txResultErrMsgsData) > 0 {
+		if err := c.workingData.indexer.IndexTxResultErrorMessagesData(c.workingData.txResultErrMsgsData); err != nil {
+			return err
+		}
 	}
 
 	c.log.Debug().Msg("successfully indexed execution data")
