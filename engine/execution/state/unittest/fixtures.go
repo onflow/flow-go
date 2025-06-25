@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution"
@@ -91,13 +90,22 @@ func ComputationResultForBlockFixture(
 	})
 	require.NoError(t, err)
 
-	computationResult.ExecutionReceipt = &flow.ExecutionReceipt{
-		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
+	unsignedExecutionReceipt, err := flow.NewUnsignedExecutionReceipt(
+		flow.UntrustedUnsignedExecutionReceipt{
 			ExecutionResult: *executionResult,
-			Spocks:          make([]crypto.Signature, numberOfChunks),
+			ExecutorID:      unittest.IdentifierFixture(),
+			Spocks:          unittest.SignaturesFixture(numberOfChunks),
 		},
-		ExecutorSignature: crypto.Signature{},
-	}
+	)
+	require.NoError(t, err)
+	receipt, err := flow.NewExecutionReceipt(
+		flow.UntrustedExecutionReceipt{
+			UnsignedExecutionReceipt: *unsignedExecutionReceipt,
+			ExecutorSignature:        unittest.SignatureFixture(),
+		},
+	)
+	require.NoError(t, err)
+	computationResult.ExecutionReceipt = receipt
 
 	return computationResult
 }

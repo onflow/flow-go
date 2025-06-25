@@ -562,7 +562,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 	// TODO: we should probably remove this edge case by _synchronously_ populating
 	//       the Execution Tree in the Fork's finalizationCallback
 	if err != nil && !mempool.IsUnknownExecutionResultError(err) {
-		return nil, fmt.Errorf("failed to retrieve reachable receipts from memool: %w", err)
+		return nil, fmt.Errorf("failed to retrieve reachable receipts from mempool: %w", err)
 	}
 
 	insertables := toInsertables(receipts, includedResults, b.cfg.maxReceiptCount)
