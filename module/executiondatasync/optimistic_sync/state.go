@@ -1,7 +1,7 @@
 package optimistic_sync
 
 // State represents the state of the processing pipeline
-type State int
+type State int32
 
 const (
 	// StatePending is the initial state after instantiation, before Run is called
