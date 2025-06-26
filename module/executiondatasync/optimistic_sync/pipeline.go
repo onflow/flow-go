@@ -138,9 +138,6 @@ func (p *PipelineImpl) Run(ctx context.Context) error {
 		}
 	}
 
-	// Trigger initial check
-	p.stateNotifier.Notify()
-
 	notifierChan := p.stateNotifier.Channel()
 	for {
 		select {
