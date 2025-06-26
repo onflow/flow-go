@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// defaultQueueCapacity is a capacity for the execution receipt message queue
 const defaultQueueCapacity = 10_000
 
 type Engine struct {
@@ -82,7 +83,7 @@ func New(
 	// register our workers which are basically consumers of different kinds of data.
 	// engine notifies workers when new data is available so that they can start processing them.
 	builder := component.NewComponentManagerBuilder().
-		AddWorker(e.startMessageHandlerLoop).
+		AddWorker(e.messageHandlerLoop).
 		AddWorker(e.finalizedBlockProcessor.StartWorkerLoop).
 		AddWorker(e.collectionSyncer.StartWorkerLoop)
 	e.ComponentManager = builder.Build()
@@ -116,9 +117,9 @@ func (e *Engine) Process(chanName channels.Channel, originID flow.Identifier, ev
 	}
 }
 
-// startMessageHandlerLoop reacts to message handler notifications and processes available execution receipts
+// messageHandlerLoop reacts to message handler notifications and processes available execution receipts
 // once notification has arrived.
-func (e *Engine) startMessageHandlerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (e *Engine) messageHandlerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	for {
