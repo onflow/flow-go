@@ -22,13 +22,21 @@ type PipelineFactory interface {
 	NewPipeline(result *flow.ExecutionResult, isSealed bool) optimistic_sync.Pipeline
 }
 
-// ResultsForest is a mempool holding execution results and receipts, which is aware of the tree structure
-// formed by the results. The mempool supports pruning by view: only results
-// descending from the latest sealed and finalized result are relevant. Hence, we
-// can prune all results for blocks _below_ the latest block with a finalized seal.
-// Results of sufficient view for forks that conflict with the finalized fork are
-// retained. However, such orphaned forks do not grow anymore and their results
-// will be progressively flushed out with increasing sealed-finalized view.
+// ResultsForest is a mempool holding execution results and receipts, which is aware of the tree
+// structure formed by the results. The mempool supports pruning by view (of the executed block):
+// only results descending from the latest sealed and finalized result are relevant.
+// By convention, the ResultsForest always contains the latest sealed result. Thereby, the
+// ResultsForest is able to determine whether results for a block still need to be processed or
+// can be orphaned (processing abandoned). Hence, we prune all results for blocks _below_ the
+// latest block with a finalized seal.
+// All results for views at or above the pruning threshold are retained, explicitly including results
+// from execution forks or orphaned blocks even if they conflict with the finalized seal. However, such
+// orphaned forks will eventually stop growing, because either (i) a conflicting fork of blocks is
+// finalized, which means that the orphaned forks can no longer be extended by new blocks or (ii) a
+// rogue execution node pursuing its own execution fork will eventually be slashed and can no longer
+// submit new results.
+// Nevertheless, to utilize resources efficiently, the ResultsForest tried to avoid processing execution
+// forks that conflict with the finalized seal.
 //
 // Safe for concurrent access. Internally, the mempool utilizes the LevelledForrest.
 type ResultsForest struct {
@@ -69,11 +77,18 @@ func NewResultsForest(
 	return rf, nil
 }
 
-// AddResult adds an execution result to the forest without any receipts.
+// AddResult adds an Execution Result to the Result Forest (without any receipts), in
+// case the result is not already stored in the tree.
+// This is useful for crash recovery:
+// After recovering from a crash, the mempools are wiped and the sealed results will not
+// be stored in the Execution Tree anymore. Adding the result to the tree allows to create
+// a vertex in the tree without attaching any Execution Receipts to it.
 //
 // Expected errors during normal operations:
 //   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+//
+// TODO: during normal operations we should never add a result without a receipt, this is only used for crash recovery
 func (rf *ResultsForest) AddResult(result *flow.ExecutionResult) error {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -113,12 +128,11 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt) (bool, error
 }
 
 // getOrCreateExecutionResultContainer retrieves or creates the container for the given result.
+// CAUTION: not concurrency safe! Caller must hold a lock.
 //
 // Expected errors during normal operations:
 //   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-//
-// CAUTION: not concurrency safe! Caller must hold a lock.
 func (rf *ResultsForest) getOrCreateExecutionResultContainer(result *flow.ExecutionResult) (*ExecutionResultContainer, error) {
 	// First try to get existing container
 	resultID := result.ID()
@@ -196,11 +210,11 @@ func (rf *ResultsForest) HasReceipt(receipt *flow.ExecutionReceipt) bool {
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
 
-	vertex, found := rf.forest.GetVertex(resultID)
+	container, found := rf.getContainer(resultID)
 	if !found {
 		return false
 	}
-	return vertex.(*ExecutionResultContainer).Has(receiptID)
+	return container.Has(receiptID)
 }
 
 // Size returns the number of results stored in the forest.
@@ -275,7 +289,7 @@ func (rf *ResultsForest) OnResultSealed(resultID flow.Identifier) error {
 	// 1. the newly sealed result descends from the last sealed result (state is consistent)
 	// 2. any sealing notifications that were missed due to undiscovered results are handled
 	// 3. sealing notifications are processed in sealing order
-	unsealedContainers, err := rf.findUnsealedContainersInPath(sealedResult)
+	unsealedContainers, err := rf.findUnsealedAncestors(sealedResult)
 	if err != nil {
 		return err
 	}
@@ -295,35 +309,36 @@ func (rf *ResultsForest) OnResultSealed(resultID flow.Identifier) error {
 	return nil
 }
 
-// findUnsealedContainersInPath finds all unsealed containers in the path from the current container
-// to the last sealed container (exclusive). The returned containers are sorted by block header view
-// in ascending order. Returns an error if any ancestor is not found in the forest. Returns an empty
-// slice if the current container is already sealed.
+// findUnsealedAncestors returns all unsealed containers between the last sealed container (excluded)
+// and the provided `head` of an execution fork. The returned containers are ordered by ascending views
+// of the executed blocks.
+// CAUTION: not concurrency safe!
+//
+// findUnsealedAncestors expects that `head` is a descendant of the last sealed result and that all
+// intermediate results are also in the forest. Otherwise, an exception is returned.
 //
 // No errors are expected during normal operation.
-//
-// CAUTION: not concurrency safe! Caller must hold a lock.
-func (rf *ResultsForest) findUnsealedContainersInPath(current *ExecutionResultContainer) ([]*ExecutionResultContainer, error) {
+func (rf *ResultsForest) findUnsealedAncestors(head *ExecutionResultContainer) ([]*ExecutionResultContainer, error) {
 	unsealedContainers := make([]*ExecutionResultContainer, 0)
 
-	if rf.lastSealedView >= current.blockHeader.View {
+	if rf.lastSealedView >= head.blockHeader.View {
 		return unsealedContainers, nil
 	}
-	unsealedContainers = append(unsealedContainers, current)
+	unsealedContainers = append(unsealedContainers, head)
 
 	for {
-		parentID, _ := current.Parent()
+		parentID, _ := head.Parent()
 		if parentID == rf.lastSealedResultID {
 			break
 		}
 
 		parent, found := rf.getContainer(parentID)
 		if !found {
-			return nil, fmt.Errorf("ancestor result %s of %s not found in forest", parentID, current.resultID)
+			return nil, fmt.Errorf("ancestor result %s of %s not found in forest", parentID, head.resultID)
 		}
 
 		unsealedContainers = append(unsealedContainers, parent)
-		current = parent
+		head = parent
 	}
 
 	// Sort containers by view in ascending order
@@ -370,7 +385,6 @@ func (rf *ResultsForest) OnBlockFinalized(finalizedBlockID flow.Identifier, pare
 }
 
 // abandonFork recursively abandons a container and all its descendants.
-//
 // CAUTION: not concurrency safe! Caller must hold a lock.
 func (rf *ResultsForest) abandonFork(container *ExecutionResultContainer) {
 	container.Pipeline().Abandon()
@@ -407,10 +421,9 @@ func (rf *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState optim
 }
 
 // processCompleted processes a completed pipeline and prunes the forest.
+// CAUTION: not concurrency safe! Caller must hold a lock.
 //
 // No errors are expected during normal operation.
-//
-// CAUTION: not concurrency safe! Caller must hold a lock.
 func (rf *ResultsForest) processCompleted(resultID flow.Identifier) error {
 	// first, ensure that the result ID is in the forest, otherwise the forest is in an inconsistent state
 	container, found := rf.getContainer(resultID)
@@ -437,12 +450,11 @@ func (rf *ResultsForest) processCompleted(resultID flow.Identifier) error {
 }
 
 // descendsFromLatestSealedResult checks if a container's result is a descendant of the latest sealed result.
+// CAUTION: not concurrency safe! Caller must hold a lock.
 //
 // Returns:
 //   - descends: true if the container's result descends from the latest sealed result, otherwise false
 //   - connected: true if the container's result descends from a sealed or abandoned result, otherwise false
-//
-// CAUTION: not concurrency safe! Caller must hold a lock.
 func (rf *ResultsForest) descendsFromLatestSealedResult(container *ExecutionResultContainer) (descends bool, connected bool) {
 	current := container
 	for {
