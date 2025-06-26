@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -67,21 +66,18 @@ type PipelineImpl struct {
 	parent          PipelineStateProvider
 	stateNotifier   engine.Notifier
 	core            Core
-	state           State
 
-	// externally managed state
-	// stored using atomics to avoid blocking the result forest during updates
+	// The following fields are accessed externally. they are stored using atomics to avoid
+	// blocking the caller.
+
+	state       *atomic.Int32
 	isSealed    *atomic.Bool
 	isAbandoned *atomic.Bool
 
 	// cancelFn is used to cancel the pipeline's context to abort processing.
 	// it is initialized during Run, but can be called at any time via the abandon method which is
 	// called by the results forest
-	// stored using atomics to avoid blocking the result forest during updates
 	cancelFn *atomic.Pointer[context.CancelFunc]
-
-	// mu protects the state variable
-	mu sync.RWMutex
 }
 
 // NewPipeline creates a new processing pipeline.
@@ -105,8 +101,8 @@ func NewPipeline(
 		executionResult: executionResult,
 		stateReceiver:   stateReceiver,
 		core:            core,
-		state:           StatePending,
 		parent:          parent,
+		state:           atomic.NewInt32(int32(StatePending)),
 		isSealed:        atomic.NewBool(isSealed),
 		isAbandoned:     atomic.NewBool(false),
 		cancelFn:        atomic.NewPointer[context.CancelFunc](nil),
@@ -183,9 +179,7 @@ func (p *PipelineImpl) Run(ctx context.Context) error {
 
 // GetState returns the current state of the pipeline.
 func (p *PipelineImpl) GetState() State {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return p.state
+	return State(p.state.Load())
 }
 
 // SetSealed marks the data as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.
@@ -274,9 +268,11 @@ func (p *PipelineImpl) processReady() error {
 		// this pipeline should not be started before the parent, but it's possible there is a race
 		// starting the pipelines in the worker pool. pause and wait for the parent to start.
 		return nil
+	case StateAbandoned:
+		return p.transitionTo(StateAbandoned)
 	default:
 		// its unexpected for the parent to be in any other state. this most likely indicates there's a bug
-		return p.transitionTo(StateAbandoned)
+		return fmt.Errorf("unexpected parent state: %s", p.parent.GetState())
 	}
 }
 
@@ -372,24 +368,30 @@ func (p *PipelineImpl) transitionTo(newState State) error {
 }
 
 // setState sets the state of the pipeline and logs the transition.
+// Returns true if the state was changed, false otherwise.
+//
+// Expected Errors:
+//   - ErrInvalidTransition: when the state transition is invalid
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (p *PipelineImpl) setState(newState State) (bool, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	currentState := p.GetState()
 
 	// transitioning to the same state is a no-op
-	if p.state == newState {
+	if currentState == newState {
 		return false, nil
 	}
 
-	if err := p.validateTransition(p.state, newState); err != nil {
-		return false, fmt.Errorf("failed to transition from %s to %s: %w", p.state, newState, err)
+	if err := p.validateTransition(currentState, newState); err != nil {
+		return false, fmt.Errorf("failed to transition from %s to %s: %w", currentState, newState, err)
 	}
 
-	oldState := p.state
-	p.state = newState
+	if !p.state.CompareAndSwap(int32(currentState), int32(newState)) {
+		// Note: this should never happen since state is only updated within the Run goroutine.
+		return false, fmt.Errorf("failed to transition from %s to %s: state update race", currentState, newState)
+	}
 
 	p.log.Debug().
-		Str("old_state", oldState.String()).
+		Str("old_state", currentState.String()).
 		Str("new_state", newState.String()).
 		Msg("pipeline state transition")
 
@@ -406,10 +408,7 @@ func (p *PipelineImpl) checkAbandoned() bool {
 		return true
 	}
 
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	return p.state == StateAbandoned
+	return p.GetState() == StateAbandoned
 }
 
 // validateTransition validates the transition from the current state to the new state.

@@ -281,6 +281,24 @@ func TestPipelineContextCancellation(t *testing.T) {
 				return ctx
 			},
 		},
+		{
+			name: "Cancel during abandon",
+			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+
+				mockCore.On("Download", mock.Anything).Return(nil)
+				mockCore.On("Index").Run(func(args mock.Arguments) {
+					pipeline.Abandon()
+				}).Return(nil)
+				mockCore.On("Abandon").Run(func(args mock.Arguments) {
+					cancel()
+				}).Return(func() error {
+					return ctx.Err()
+				})
+
+				return ctx
+			},
+		},
 	}
 
 	for _, tc := range testCases {
