@@ -312,11 +312,7 @@ func rangeToCertifiedBlocks(certifiedRange []*flow.Block, certifyingQC *flow.Quo
 	for i, block := range certifiedRange {
 		var qc *flow.QuorumCertificate
 		if i < lastIndex {
-			var err error
-			qc, err = certifiedRange[i+1].Header.QuorumCertificate()
-			if err != nil {
-				return nil, fmt.Errorf("could not construct qc for header: %w", err)
-			}
+			qc = certifiedRange[i+1].Header.ParentQC()
 		} else {
 			qc = certifyingQC
 		}

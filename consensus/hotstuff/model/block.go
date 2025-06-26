@@ -20,12 +20,10 @@ type Block struct {
 
 // BlockFromFlow converts a flow header to a hotstuff block.
 func BlockFromFlow(header *flow.Header) *Block {
-	qc, _ := header.QuorumCertificate()
-
 	block := Block{
 		BlockID:     header.ID(),
 		View:        header.View,
-		QC:          qc,
+		QC:          header.ParentQC(),
 		ProposerID:  header.ProposerID,
 		PayloadHash: header.PayloadHash,
 		Timestamp:   header.Timestamp,

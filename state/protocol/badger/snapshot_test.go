@@ -872,9 +872,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 			b1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			b2 := unittest.BlockWithParentFixture(b1.Header)
 			b2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-			qcBlock2, err := b2.Header.QuorumCertificate()
-			require.NoError(t, err)
-			require.NoError(t, state.ExtendCertified(context.Background(), b1, qcBlock2))
+			require.NoError(t, state.ExtendCertified(context.Background(), b1, b2.Header.ParentQC()))
 			require.NoError(t, state.ExtendCertified(context.Background(), b2, unittest.CertifyBlock(b2.Header))) // adding block b5 (providing required QC for b1)
 
 			// consistency check: there should be no finalized block in the protocol state at height `b1.Height`
@@ -893,9 +891,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 			orphaned := unittest.BlockWithParentFixture(sporkRoot)
 			orphaned.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			orphanedChild := unittest.BlockWithParentProtocolState(orphaned)
-			qcOrphanedChild, err := orphanedChild.Header.QuorumCertificate()
-			require.NoError(t, err)
-			require.NoError(t, state.ExtendCertified(context.Background(), orphaned, qcOrphanedChild))
+			require.NoError(t, state.ExtendCertified(context.Background(), orphaned, orphanedChild.Header.ParentQC()))
 			require.NoError(t, state.ExtendCertified(context.Background(), orphanedChild, unittest.CertifyBlock(orphanedChild.Header)))
 			block := unittest.BlockWithParentFixture(sporkRoot)
 			block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
@@ -1051,19 +1047,13 @@ func TestLatestSealedResult(t *testing.T) {
 				unittest.WithProtocolStateID(rootProtocolStateID),
 			))
 
-			qcBlock2, err := block2.Header.QuorumCertificate()
-			require.NoError(t, err)
-			err = state.ExtendCertified(context.Background(), block1, qcBlock2)
+			err = state.ExtendCertified(context.Background(), block1, block2.Header.ParentQC())
 			require.NoError(t, err)
 
-			qcBlock3, err := block3.Header.QuorumCertificate()
-			require.NoError(t, err)
-			err = state.ExtendCertified(context.Background(), block2, qcBlock3)
+			err = state.ExtendCertified(context.Background(), block2, block3.Header.ParentQC())
 			require.NoError(t, err)
 
-			qcBlock4, err := block4.Header.QuorumCertificate()
-			require.NoError(t, err)
-			err = state.ExtendCertified(context.Background(), block3, qcBlock4)
+			err = state.ExtendCertified(context.Background(), block3, block4.Header.ParentQC())
 			require.NoError(t, err)
 
 			// B1 <- B2(R1) <- B3(S1)
@@ -1075,9 +1065,7 @@ func TestLatestSealedResult(t *testing.T) {
 				assert.Equal(t, block3.Payload.Seals[0], gotSeal)
 			})
 
-			qcBlock5, err := block5.Header.QuorumCertificate()
-			require.NoError(t, err)
-			err = state.ExtendCertified(context.Background(), block4, qcBlock5)
+			err = state.ExtendCertified(context.Background(), block4, block5.Header.ParentQC())
 			require.NoError(t, err)
 
 			// B1 <- B2(S1) <- B3(S1) <- B4(R2,R3)
