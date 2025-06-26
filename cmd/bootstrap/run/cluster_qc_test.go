@@ -14,16 +14,17 @@ import (
 func TestGenerateClusterRootQC(t *testing.T) {
 	participants := createClusterParticipants(t, 3)
 
-	clusterBlock := cluster.NewBlock(
+	clusterBlock, err := cluster.NewBlock(
 		flow.HeaderBody{
 			ParentID: flow.ZeroID,
 			View:     42,
 		},
 		*cluster.NewEmptyPayload(flow.ZeroID),
 	)
+	require.NoError(t, err)
 
 	orderedParticipants := model.ToIdentityList(participants).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
-	_, err := GenerateClusterRootQC(participants, orderedParticipants, &clusterBlock)
+	_, err = GenerateClusterRootQC(participants, orderedParticipants, clusterBlock)
 	require.NoError(t, err)
 }
 

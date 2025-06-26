@@ -14,12 +14,18 @@ func Genesis() *Block {
 		ParentID:  flow.ZeroID,
 	}
 
-	block := NewBlock(headerBody, *NewEmptyPayload(flow.ZeroID))
-	return &block
+	//TODO(Uliana: malleability immutable): decide if we need separate constuctor or do not use constructor here at all
+	//nolint:structwrite
+	return &Block{
+		Header:  headerBody,
+		Payload: *NewEmptyPayload(flow.ZeroID),
+	}
 }
 
 // Block represents a block in collection node cluster consensus. It contains
 // a standard block header with a payload containing only a single collection.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Block struct {
 	Header  flow.HeaderBody
 	Payload Payload
@@ -33,11 +39,11 @@ type Block struct {
 func NewBlock(
 	headerBody flow.HeaderBody,
 	payload Payload,
-) Block {
-	return Block{
+) (*Block, error) {
+	return &Block{
 		Header:  headerBody,
 		Payload: payload,
-	}
+	}, nil
 }
 
 // ID returns a collision-resistant hash of the cluster.Block struct.

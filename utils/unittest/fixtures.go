@@ -576,7 +576,12 @@ func ClusterBlockFixture() cluster.Block {
 	payload := ClusterPayloadFixture(3)
 	headerBody := HeaderBodyFixture()
 
-	return cluster.NewBlock(headerBody, *payload)
+	block, err := cluster.NewBlock(headerBody, *payload)
+	if err != nil {
+		panic(fmt.Errorf("can not build cluster block: %v", err))
+	}
+
+	return *block
 }
 
 func ClusterBlockChainFixture(n int) []cluster.Block {
@@ -611,7 +616,11 @@ func ClusterBlockWithParentAndPayload(parent cluster.Block, payload cluster.Payl
 	headerBody.ParentID = parent.ID()
 	headerBody.ParentView = parent.Header.View
 
-	return cluster.NewBlock(headerBody, payload)
+	block, err := cluster.NewBlock(headerBody, payload)
+	if err != nil {
+		panic("can not build cluster block")
+	}
+	return *block
 }
 
 func WithCollRef(refID flow.Identifier) func(*flow.CollectionGuarantee) {

@@ -212,7 +212,8 @@ func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
 
 		switch val := msg.(type) {
 		case *messages.UntrustedClusterProposal:
-			internalClusterProposal := val.DeclareTrusted()
+			internalClusterProposal, err := val.DeclareTrusted()
+			require.NoError(suite.T(), err)
 			blocks = append(blocks, internalClusterProposal.Block)
 			if len(blocks) == int(n) {
 				return blocks
@@ -261,7 +262,8 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 
 		switch val := msg.(type) {
 		case *messages.UntrustedClusterProposal:
-			internalClusterProposal := val.DeclareTrusted()
+			internalClusterProposal, err := val.DeclareTrusted()
+			require.NoError(suite.T(), err)
 			block := internalClusterProposal.Block
 			header := block.Header
 			collection := block.Payload.Collection

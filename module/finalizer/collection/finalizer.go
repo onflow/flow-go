@@ -125,8 +125,12 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				return fmt.Errorf("could not finalize cluster block (id=%x): %w", clusterBlockID, err)
 			}
 
-			block := cluster.NewBlock(step.HeaderBody, payload)
-			f.metrics.ClusterBlockFinalized(&block)
+			block, err := cluster.NewBlock(step.HeaderBody, payload)
+			if err != nil {
+				return fmt.Errorf("could not build cluster block: %w", err)
+			}
+
+			f.metrics.ClusterBlockFinalized(block)
 
 			// if the finalized collection is empty, we don't need to include it
 			// in the reference height index or submit it to consensus nodes

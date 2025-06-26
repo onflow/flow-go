@@ -62,7 +62,11 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 		}
 
 		// overwrite block
-		*block = cluster.NewBlock(header.HeaderBody, payload)
+		newBlock, err := cluster.NewBlock(header.HeaderBody, payload)
+		if err != nil {
+			return fmt.Errorf("could not build cluster block: %w", err)
+		}
+		*block = *newBlock
 
 		return nil
 	}

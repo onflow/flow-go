@@ -31,7 +31,11 @@ func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) *c
 		ParentVoterSigData: nil,
 		ProposerID:         flow.ZeroID,
 	}
-	block := cluster.NewBlock(headerBody, *rootBlockPayload)
 
-	return &block
+	//TODO(Uliana: malleability immutable): decide if we need separate constuctor or do not use constructor here at all
+	//nolint:structwrite
+	return &cluster.Block{
+		Header:  headerBody,
+		Payload: *rootBlockPayload,
+	}
 }
