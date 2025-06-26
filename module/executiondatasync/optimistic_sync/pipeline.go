@@ -111,12 +111,11 @@ func NewPipeline(
 }
 
 // Run starts the pipeline processing and blocks until completion or context cancellation.
+// CAUTION: not concurrency safe! Run must only be called once.
 //
 // Expected Errors:
 //   - context.Canceled: when the context is canceled
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-//
-// CAUTION: not concurrency safe! Run must only be called once.
 func (p *PipelineImpl) Run(ctx context.Context) error {
 	pipelineCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
