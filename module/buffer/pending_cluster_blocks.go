@@ -27,8 +27,10 @@ func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cl
 		return flow.Slashable[*cluster.BlockProposal]{}, false
 	}
 	block, err := cluster.NewBlock(
-		item.header.Message.Header.HeaderBody,
-		item.payload.(cluster.Payload),
+		cluster.UntrustedBlock{
+			Header:  item.header.Message.Header.HeaderBody,
+			Payload: item.payload.(cluster.Payload),
+		},
 	)
 	if err != nil {
 		return flow.Slashable[*cluster.BlockProposal]{}, false
@@ -54,8 +56,10 @@ func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slas
 	proposals := make([]flow.Slashable[*cluster.BlockProposal], 0, len(items))
 	for _, item := range items {
 		block, err := cluster.NewBlock(
-			item.header.Message.Header.HeaderBody,
-			item.payload.(cluster.Payload),
+			cluster.UntrustedBlock{
+				Header:  item.header.Message.Header.HeaderBody,
+				Payload: item.payload.(cluster.Payload),
+			},
 		)
 		if err != nil {
 			return nil, false

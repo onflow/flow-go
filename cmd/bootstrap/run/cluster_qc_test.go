@@ -15,11 +15,13 @@ func TestGenerateClusterRootQC(t *testing.T) {
 	participants := createClusterParticipants(t, 3)
 
 	clusterBlock, err := cluster.NewBlock(
-		flow.HeaderBody{
-			ParentID: flow.ZeroID,
-			View:     42,
+		cluster.UntrustedBlock{
+			Header: flow.HeaderBody{
+				ParentID: flow.ZeroID,
+				View:     42,
+			},
+			Payload: *cluster.NewEmptyPayload(flow.ZeroID),
 		},
-		*cluster.NewEmptyPayload(flow.ZeroID),
 	)
 	require.NoError(t, err)
 

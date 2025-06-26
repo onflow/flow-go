@@ -125,7 +125,12 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				return fmt.Errorf("could not finalize cluster block (id=%x): %w", clusterBlockID, err)
 			}
 
-			block, err := cluster.NewBlock(step.HeaderBody, payload)
+			block, err := cluster.NewBlock(
+				cluster.UntrustedBlock{
+					Header:  step.HeaderBody,
+					Payload: payload,
+				},
+			)
 			if err != nil {
 				return fmt.Errorf("could not build cluster block: %w", err)
 			}

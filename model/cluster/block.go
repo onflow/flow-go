@@ -31,18 +31,25 @@ type Block struct {
 	Payload Payload
 }
 
-// NewBlock creates a new block in collection node cluster consensus.
+// UntrustedBlock is an untrusted input-only representation of a cluster Block,
+// used for construction.
 //
-// Parameters:
-// - headerBody: the header fields to use for the block
-// - payload: the payload to associate with the block
-func NewBlock(
-	headerBody flow.HeaderBody,
-	payload Payload,
-) (*Block, error) {
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedBlock should be validated and converted into
+// a trusted cluster Block using NewBlock constructor.
+type UntrustedBlock Block
+
+// NewBlock creates a new block in collection node cluster consensus.
+// Construction cluster Block allowed only within the constructor.
+//
+// All errors indicate a valid ExecutionReceipt cannot be constructed from the input.
+func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	return &Block{
-		Header:  headerBody,
-		Payload: payload,
+		Header:  untrusted.Header,
+		Payload: untrusted.Payload,
 	}, nil
 }
 

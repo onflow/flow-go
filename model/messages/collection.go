@@ -42,7 +42,12 @@ func NewUntrustedClusterProposal(internal cluster.Block, proposerSig []byte) *Un
 // DeclareTrusted converts the UntrustedClusterProposal to a trusted internal cluster.BlockProposal.
 // CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
 func (cbp *UntrustedClusterProposal) DeclareTrusted() (*cluster.BlockProposal, error) {
-	block, err := cluster.NewBlock(cbp.Block.Header, cbp.Block.Payload)
+	block, err := cluster.NewBlock(
+		cluster.UntrustedBlock{
+			Header:  cbp.Block.Header,
+			Payload: cbp.Block.Payload,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not build cluster block: %w", err)
 	}
