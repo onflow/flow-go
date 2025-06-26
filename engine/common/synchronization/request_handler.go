@@ -221,7 +221,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	}
 
 	// get all the blocks, one by one
-	blocks := make([]messages.UntrustedBlock, 0, req.ToHeight-req.FromHeight+1)
+	blocks := make([]*flow.Block, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
 		block, err := r.blocks.ByHeight(height)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -231,7 +231,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 		if err != nil {
 			return fmt.Errorf("could not get block for height (%d): %w", height, err)
 		}
-		blocks = append(blocks, messages.UntrustedBlockFromInternal(block))
+		blocks = append(blocks, block)
 	}
 
 	// if there are no blocks to send, skip network message
@@ -293,7 +293,7 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 	}
 
 	// try to get all the blocks by ID
-	blocks := make([]messages.UntrustedBlock, 0, len(blockIDs))
+	blocks := make([]*flow.Block, 0, len(blockIDs))
 	for blockID := range blockIDs {
 		block, err := r.blocks.ByID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -303,7 +303,7 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 		if err != nil {
 			return fmt.Errorf("could not get block by ID (%s): %w", blockID, err)
 		}
-		blocks = append(blocks, messages.UntrustedBlockFromInternal(block))
+		blocks = append(blocks, block)
 	}
 
 	// if there are no blocks to send, skip network message

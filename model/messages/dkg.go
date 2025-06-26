@@ -7,9 +7,34 @@ import (
 )
 
 // DKGMessage is the type of message exchanged between DKG nodes.
+//
+//structwrite:immutable
 type DKGMessage struct {
 	Data          []byte
 	DKGInstanceID string
+}
+
+// UntrustedDKGMessage is an untrusted input-only representation of a DKGMessage,
+// used for construction.
+//
+// An instance of UntrustedDKGMessage should be validated and converted into
+// a trusted DKGMessage using NewDKGMessage constructor.
+type UntrustedDKGMessage DKGMessage
+
+// NewDKGMessage creates a new DKGMessage.
+//
+// Parameters:
+//   - untrusted: untrusted DKGMessage to be validated
+//
+// Returns:
+//   - DKGMessage: the newly created instance
+//   - error: any error that occurred during creation
+//
+// Expected Errors:
+//   - TODO: add validation errors
+func NewDKGMessage(untrusted UntrustedDKGMessage) (DKGMessage, error) {
+	// TODO: add validation logic
+	return DKGMessage{Data: untrusted.Data, DKGInstanceID: untrusted.DKGInstanceID}, nil
 }
 
 // NewDKGMessage creates a new DKGMessage.
