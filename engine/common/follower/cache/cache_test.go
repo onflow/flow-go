@@ -176,7 +176,6 @@ func (s *CacheSuite) TestDuplicatedBatch() {
 	certifiedBatch, certifyingQC, err := s.cache.AddBlocks(blocks[1:])
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocks[1:len(blocks)-1], certifiedBatch)
-	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocks[len(blocks)-1].Header.ParentQC(), certifyingQC)
 
 	// add same batch again, this has to be rejected as redundant input
