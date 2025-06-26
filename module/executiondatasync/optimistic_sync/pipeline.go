@@ -201,6 +201,7 @@ func (p *PipelineImpl) OnParentStateUpdated(parentState State) {
 }
 
 // Abandon marks the pipeline as abandoned
+// This will cause the pipeline to eventually transition to the Abandoned state and halt processing
 func (p *PipelineImpl) Abandon() {
 	// Note: do not add locking here to avoid blocking the results forest.
 	p.abandon()

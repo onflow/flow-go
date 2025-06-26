@@ -37,6 +37,7 @@ type ResultsForest struct {
 	headers                     storage.Headers
 	maxViewDelta                uint64
 	lastSealedResultID          flow.Identifier
+	lastSealedView              uint64
 	latestPersistedSealedResult storage.LatestPersistedSealedResult
 	pipelineFactory             PipelineFactory
 	mu                          sync.RWMutex
@@ -158,6 +159,32 @@ func (rf *ResultsForest) getOrCreateExecutionResultContainer(result *flow.Execut
 	}
 	rf.forest.AddVertex(container)
 
+	// mark the container as abandoned if it does not descend from the latest sealed result.
+	//
+	// consider the following case:
+	// X is the result that was just added
+	// A was previously sealed, and B was sealed before X was added
+	//
+	//   ↙ X
+	// A ← B ← C
+	//
+	// in this case, we know that X conflicts with B and will never be sealed. We should abandon X
+	// immediately.
+	//
+	// consider another case:
+	// Y is the result that was just added
+	// X is its parent, but does not exist in the forest yet
+	//
+	//   ↙ [X] ← Y
+	// A ← B ← C
+	//
+	// in this case, we do not know if Y will eventually be sealed since we don't know which result
+	// X will descend from. We must wait until we eventually receive X to determine if X and Y should
+	// be abandoned.
+	if descends, connected := rf.descendsFromLatestSealedResult(container); connected && !descends {
+		rf.abandonFork(container)
+	}
+
 	return container, nil
 }
 
@@ -243,9 +270,19 @@ func (rf *ResultsForest) OnResultSealed(resultID flow.Identifier) error {
 		return nil
 	}
 
+	// collect all unsealed containers in the path from the sealed result to the last sealed result.
+	// this ensures:
+	// 1. the newly sealed result descends from the last sealed result (state is consistent)
+	// 2. any sealing notifications that were missed due to undiscovered results are handled
+	// 3. sealing notifications are processed in sealing order
 	unsealedContainers, err := rf.findUnsealedContainersInPath(sealedResult)
 	if err != nil {
 		return err
+	}
+
+	// if this notification is for an already sealed result, we can ignore it.
+	if len(unsealedContainers) == 0 {
+		return nil
 	}
 
 	for _, container := range unsealedContainers {
@@ -253,19 +290,26 @@ func (rf *ResultsForest) OnResultSealed(resultID flow.Identifier) error {
 	}
 
 	rf.lastSealedResultID = resultID
+	rf.lastSealedView = sealedResult.blockHeader.View
 
 	return nil
 }
 
 // findUnsealedContainersInPath finds all unsealed containers in the path from the current container
 // to the last sealed container (exclusive). The returned containers are sorted by block header view
-// in ascending order. Returns an error if any ancestor is not found in the forest.
+// in ascending order. Returns an error if any ancestor is not found in the forest. Returns an empty
+// slice if the current container is already sealed.
 //
 // No errors are expected during normal operation.
 //
 // CAUTION: not concurrency safe! Caller must hold a lock.
 func (rf *ResultsForest) findUnsealedContainersInPath(current *ExecutionResultContainer) ([]*ExecutionResultContainer, error) {
-	unsealedContainers := []*ExecutionResultContainer{current}
+	unsealedContainers := make([]*ExecutionResultContainer, 0)
+
+	if rf.lastSealedView >= current.blockHeader.View {
+		return unsealedContainers, nil
+	}
+	unsealedContainers = append(unsealedContainers, current)
 
 	for {
 		parentID, _ := current.Parent()
@@ -295,11 +339,11 @@ func (rf *ResultsForest) findUnsealedContainersInPath(current *ExecutionResultCo
 func (rf *ResultsForest) markResultSealed(container *ExecutionResultContainer) {
 	container.Pipeline().SetSealed()
 
-	// Mark siblings' pipelines as abandoned
+	// abandon all conflicting forks
 	parentID, _ := container.Parent()
 	rf.iterateChildren(parentID, func(sibling *ExecutionResultContainer) bool {
 		if sibling.resultID != container.resultID {
-			sibling.Pipeline().OnParentStateUpdated(optimistic_sync.StateAbandoned)
+			rf.abandonFork(sibling)
 		}
 		return true
 	})
@@ -318,16 +362,32 @@ func (rf *ResultsForest) OnBlockFinalized(finalizedBlockID flow.Identifier, pare
 	for _, parentResultID := range parentBlockResultIDs {
 		rf.iterateChildren(parentResultID, func(child *ExecutionResultContainer) bool {
 			if child.blockHeader.ID() != finalizedBlockID {
-				child.Pipeline().OnParentStateUpdated(optimistic_sync.StateAbandoned)
+				rf.abandonFork(child)
 			}
 			return true
 		})
 	}
 }
 
+// abandonFork recursively abandons a container and all its descendants.
+//
+// CAUTION: not concurrency safe! Caller must hold a lock.
+func (rf *ResultsForest) abandonFork(container *ExecutionResultContainer) {
+	container.Pipeline().Abandon()
+	rf.iterateChildren(container.resultID, func(child *ExecutionResultContainer) bool {
+		rf.abandonFork(child)
+		return true
+	})
+}
+
 // OnStateUpdated is called by pipeline state machines when their state changes, and propagates the
 // state update to all children of the result.
 func (rf *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState optimistic_sync.State) {
+	// abandoned status is propagated to all descendants synchronously, so no need to traverse again here.
+	if newState == optimistic_sync.StateAbandoned {
+		return
+	}
+
 	// send state update to all children.
 	rf.IterateChildren(resultID, func(child *ExecutionResultContainer) bool {
 		child.Pipeline().OnParentStateUpdated(newState)
@@ -374,4 +434,44 @@ func (rf *ResultsForest) processCompleted(resultID flow.Identifier) error {
 	}
 
 	return nil
+}
+
+// descendsFromLatestSealedResult checks if a container's result is a descendant of the latest sealed result.
+//
+// Returns:
+//   - descends: true if the container's result descends from the latest sealed result, otherwise false
+//   - connected: true if the container's result descends from a sealed or abandoned result, otherwise false
+//
+// CAUTION: not concurrency safe! Caller must hold a lock.
+func (rf *ResultsForest) descendsFromLatestSealedResult(container *ExecutionResultContainer) (descends bool, connected bool) {
+	current := container
+	for {
+		parentID, parentView := current.Parent()
+		if parentID == rf.lastSealedResultID {
+			return true, true
+		}
+
+		// sealed views are strictly increasing, so if we find a parent view that is lower than the
+		// last sealed view, and we have not yet found the latest sealed result, then we are guaranteed
+		// to never find it.
+		if parentView < rf.lastSealedView {
+			return false, true
+		}
+
+		// if the parent is not found, that means either the parent has not been added to the forest yet,
+		// or it has already been pruned. either way, we can't confirm that the container descends
+		// from the latest sealed result.
+		parent, found := rf.getContainer(parentID)
+		if !found {
+			return false, false
+		}
+
+		// if the parent is abandoned, then the container does not descend from the latest sealed
+		// result, and we can guarantee that the container will never be started.
+		if parent.Pipeline().GetState() == optimistic_sync.StateAbandoned {
+			return false, true
+		}
+
+		current = parent
+	}
 }
