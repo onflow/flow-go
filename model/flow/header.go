@@ -92,16 +92,6 @@ func (h Header) QuorumCertificate() (*QuorumCertificate, error) {
 	return qc, nil
 }
 
-// RootQuorumCertificate returns a root quorum certificate that is incorporated in the block header.
-func (h Header) RootQuorumCertificate() *QuorumCertificate {
-	return NewTrustedQuorumCertificate(UntrustedQuorumCertificate{
-		BlockID:       h.ParentID,
-		View:          h.ParentView,
-		SignerIndices: h.ParentVoterIndices,
-		SigData:       h.ParentVoterSigData,
-	})
-}
-
 func (h Header) Fingerprint() []byte {
 	return fingerprint.Fingerprint(h.Body())
 }

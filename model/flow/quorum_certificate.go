@@ -38,9 +38,9 @@ type QuorumCertificate struct {
 type UntrustedQuorumCertificate QuorumCertificate
 
 // NewQuorumCertificate creates a new instance of QuorumCertificate.
-// Construction Collection allowed only within the constructor
+// Construction of QuorumCertificate is allowed only within the constructor
 //
-// All errors indicate a valid Collection cannot be constructed from the input.
+// All errors indicate a valid QuorumCertificate cannot be constructed from the input.
 func NewQuorumCertificate(untrusted UntrustedQuorumCertificate) (*QuorumCertificate, error) {
 	if untrusted.BlockID == ZeroID {
 		return nil, fmt.Errorf("BlockID must not be empty")
@@ -60,15 +60,6 @@ func NewQuorumCertificate(untrusted UntrustedQuorumCertificate) (*QuorumCertific
 		SignerIndices: untrusted.SignerIndices,
 		SigData:       untrusted.SigData,
 	}, nil
-}
-
-func NewTrustedQuorumCertificate(untrusted UntrustedQuorumCertificate) *QuorumCertificate {
-	return &QuorumCertificate{
-		View:          untrusted.View,
-		BlockID:       untrusted.BlockID,
-		SignerIndices: untrusted.SignerIndices,
-		SigData:       untrusted.SigData,
-	}
 }
 
 // ID returns the QuorumCertificate's identifier
