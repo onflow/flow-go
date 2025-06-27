@@ -23,8 +23,8 @@ func BlockFromFlow(header *flow.Header) *Block {
 	block := Block{
 		BlockID:     header.ID(),
 		View:        header.View,
-		QC:          header.QuorumCertificate(),
 		ProposerID:  header.ProposerID,
+		QC:          header.ParentQC(),
 		PayloadHash: header.PayloadHash,
 		Timestamp:   header.Timestamp,
 	}

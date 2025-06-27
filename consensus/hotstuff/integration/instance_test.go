@@ -352,7 +352,12 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	notifier.AddConsumer(in.notifier)
 
 	// initialize the finalizer
-	rootBlock := model.BlockFromFlow(cfg.Root)
+	var rootBlock *model.Block
+	if cfg.Root.ContainsParentQC() {
+		rootBlock = model.BlockFromFlow(cfg.Root)
+	} else {
+		rootBlock = model.GenesisBlockFromFlow(cfg.Root)
+	}
 
 	signerIndices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), in.participants.NodeIDs())
 	require.NoError(t, err, "could not encode signer indices")
@@ -361,6 +366,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		View:          rootBlock.View,
 		BlockID:       rootBlock.BlockID,
 		SignerIndices: signerIndices,
+		SigData:       unittest.SignatureFixture(),
 	}
 	certifiedRootBlock, err := model.NewCertifiedBlock(rootBlock, rootQC)
 	require.NoError(t, err)

@@ -1044,8 +1044,8 @@ func createQC(parent *model.Block) *flow.QuorumCertificate {
 	qc := &flow.QuorumCertificate{
 		BlockID:       parent.BlockID,
 		View:          parent.View,
-		SignerIndices: nil,
-		SigData:       nil,
+		SignerIndices: unittest.SignerIndicesFixture(3),
+		SigData:       unittest.SignatureFixture(),
 	}
 	return qc
 }
