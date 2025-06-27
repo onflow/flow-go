@@ -123,10 +123,7 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt) (bool, error
 		return false, fmt.Errorf("failed to add receipt to its container: %w", err)
 	}
 
-	err = rf.manager.OnReceiptAdded(container)
-	if err != nil {
-		return false, fmt.Errorf("failed to notify manager of new receipt: %w", err)
-	}
+	rf.manager.OnReceiptAdded(container)
 
 	return added > 0, nil
 }

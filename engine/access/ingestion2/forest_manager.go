@@ -17,10 +17,15 @@ import (
 )
 
 const (
+	// forestManagerCheckInterval is the interval at which the forest manager checks for new
+	// processable results. This is used to ensure that the forest manager makes progress even
+	// if block finalization halts.
+	//
+	// This value should be greater than the block production rate.
 	forestManagerCheckInterval = 10 * time.Second
 )
 
-// BlockStatus represents the state of a block in the system
+// BlockStatus represents the state of a block in the forest.
 type BlockStatus int
 
 const (
@@ -49,6 +54,7 @@ func (bs BlockStatus) String() string {
 // ForestManagerConfig contains configuration for processing execution result containers
 type ForestManagerConfig struct {
 	// RequiredAgreeingExecutors is the minimum number of executors that must agree on the result
+	// Must be 1 or greater.
 	RequiredAgreeingExecutors uint
 	// RequiredExecutors is the set of executor IDs that must have provided receipts
 	// At least one of these executors must have produced a receipt for the result to be processed
@@ -58,9 +64,6 @@ type ForestManagerConfig struct {
 }
 
 // DefaultForestManagerConfig returns the default configuration for the forest manager.
-//
-// Returns:
-//   - ForestManagerConfig: the default configuration
 func DefaultForestManagerConfig() ForestManagerConfig {
 	return ForestManagerConfig{
 		RequiredAgreeingExecutors: 2,
@@ -88,9 +91,6 @@ func (c ForestManagerConfig) Validate() error {
 // approach to ensure ancestors are processed before descendants.
 // The forest manager is intended to be run in a single goroutine as a component.ComponentWorker
 // via the WorkerLoop method.
-//
-// Concurrency-safety:
-//   - Not safe for concurrent access. Must be run in a single goroutine.
 type ForestManager struct {
 	log           zerolog.Logger
 	resultsForest *ResultsForest
@@ -100,11 +100,6 @@ type ForestManager struct {
 
 	// maxQueueSize is the maximum size of the work queue
 	maxQueueSize uint
-
-	// queueFillThreshold is the threshold below which new results are added to the work queue
-	// this is used to avoid performing tree traversals when there is only a small amount of
-	// space left in the queue.
-	queueFillThreshold uint
 
 	// sealedHeight is the latest sealed block height passed to OnBlockStatusUpdated
 	sealedHeight uint64
@@ -116,25 +111,12 @@ type ForestManager struct {
 }
 
 // NewForestManager creates a new instance of ForestManager.
-//
-// Parameters:
-//   - log: logger instance
-//   - resultsForest: the results forest to manage
-//   - workQueue: the priority queue for work items
-//   - config: configuration for processing requirements
-//   - notifier: notifier for notifications
-//   - queueFillThreshold: the threshold at which the work queue is considered full
-//   - maxQueueSize: the maximum size of the work queue
-//
-// Returns:
-//   - *ForestManager: the newly created forest manager
 func NewForestManager(
 	log zerolog.Logger,
 	resultsForest *ResultsForest,
 	workQueue *queue.PriorityMessageQueue[*ExecutionResultContainer],
 	config ForestManagerConfig,
 	notifier engine.Notifier,
-	queueFillThreshold uint,
 	maxQueueSize uint,
 ) (*ForestManager, error) {
 	if err := config.Validate(); err != nil {
@@ -142,13 +124,12 @@ func NewForestManager(
 	}
 
 	return &ForestManager{
-		log:                log.With().Str("component", "forest_manager").Logger(),
-		resultsForest:      resultsForest,
-		workQueue:          workQueue,
-		config:             config,
-		notifier:           notifier,
-		queueFillThreshold: queueFillThreshold,
-		maxQueueSize:       maxQueueSize,
+		log:           log.With().Str("component", "forest_manager").Logger(),
+		resultsForest: resultsForest,
+		workQueue:     workQueue,
+		config:        config,
+		notifier:      notifier,
+		maxQueueSize:  maxQueueSize,
 	}, nil
 }
 
@@ -156,14 +137,9 @@ func NewForestManager(
 //
 // This is the main loop that runs in a single goroutine. It periodically checks for processable
 // results and adds them to the work queue. It also listens for notifications from the OnBlockStatusUpdated
-// handler.
+// and OnReceiptAdded handlers.
 //
-// Parameters:
-//   - ctx: the context for the operation
-//   - ready: a function to call when the goroutine is ready
-//
-// Concurrency-safety:
-//   - Not safe for concurrent access. Must be run in a single goroutine.
+// CAUTION: not concurrency safe! Only one instance of this should be run at a time.
 func (fm *ForestManager) WorkerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -179,13 +155,18 @@ func (fm *ForestManager) WorkerLoop(ctx irrecoverable.SignalerContext, ready com
 			return
 		case <-notifierChan:
 		case <-periodicCheck.C:
+			// skip if we already checked recently
+			// Note: this check will always be skipped on the happy path since block finalization
+			// should happen more frequently than the check interval.
 			if time.Since(lastChecked) < forestManagerCheckInterval {
-				continue // skip if we already checked recently
+				continue
 			}
 		}
 		lastChecked = time.Now()
 
-		if uint(fm.workQueue.Len()) > fm.queueFillThreshold {
+		// TODO: we may want to only run the full check after dropping below some threshold to reduce
+		// the overhead of a full traversal when only a few results can be added to the queue.
+		if uint(fm.workQueue.Len()) >= fm.maxQueueSize {
 			continue
 		}
 
@@ -200,53 +181,32 @@ func (fm *ForestManager) WorkerLoop(ctx irrecoverable.SignalerContext, ready com
 }
 
 // OnReceiptAdded is called when a new receipt is added to the forest.
-// This is used to notify the forest that a result and its descendants may be processable.
-//
-// Parameters:
-//   - container: the container that the receipt was added to
-//
-// Returns:
-//   - error: any error that occurred during the operation
-//
-// No errors are expected during normal operation.
-func (fm *ForestManager) OnReceiptAdded(container *ExecutionResultContainer) error {
+// This is used to notify the manager that a result and its descendants may be processable.
+func (fm *ForestManager) OnReceiptAdded(container *ExecutionResultContainer) {
 	if container.IsEnqueued() {
-		return nil // already enqueued, adding this receipt will not change processability
+		return // already enqueued, adding this receipt will not change processability
 	}
 
-	if uint(fm.workQueue.Len()) > fm.queueFillThreshold {
-		return nil
+	if uint(fm.workQueue.Len()) >= fm.maxQueueSize {
+		return
 	}
 
-	parent, found := fm.resultsForest.GetContainer(container.result.PreviousResultID)
+	parentID, _ := container.Parent()
+	parent, found := fm.resultsForest.GetContainer(parentID)
 	if !found {
-		return fmt.Errorf("parent %s for result %s not found in forest", container.result.PreviousResultID, container.resultID)
-	}
-
-	processable := fm.canProcessContainer(container, parent)
-	if !processable {
-		return nil
+		return // parent does not exist in the forest yet, this result is not processable
 	}
 
 	// result previously was not enqueued and is now processable. this means that either this receipt
 	// caused the result to become processable, or there is more room in the queue.
 	// enqueue the result and check its descendants
-	fm.workQueue.Push(container, container.blockHeader.View)
-	_ = container.SetEnqueued()
-
-	fm.traverseDescendants(container)
-	return nil
+	if fm.checkAndEnqueueContainer(container, parent) {
+		fm.traverseDescendants(container)
+	}
 }
 
 // OnBlockStatusUpdated is called when a new block is finalized.
 // This is used to notify the forest that some results may now be processable.
-//
-// Parameters:
-//   - finalized: the finalized block header
-//   - sealed: the sealed block header
-//
-// Concurrency-safety:
-//   - Safe for concurrent access.
 func (fm *ForestManager) OnBlockStatusUpdated(finalized, sealed *flow.Header) {
 	fm.mu.Lock()
 	defer fm.mu.Unlock()
@@ -259,57 +219,41 @@ func (fm *ForestManager) OnBlockStatusUpdated(finalized, sealed *flow.Header) {
 
 // getLatestPersistedSealedResultContainer returns the latest persisted sealed result's container.
 //
-// Returns:
-//   - *ExecutionResultContainer: the latest persisted sealed result container
-//   - error: any error that occurred during the operation
-//
 // No errors are expected during normal operation.
 func (fm *ForestManager) getLatestPersistedSealedResultContainer() (*ExecutionResultContainer, error) {
 	latestPersistedSealedResultID, _ := fm.resultsForest.latestPersistedSealedResult.Latest()
 	latestPersistedSealedResultContainer, found := fm.resultsForest.GetContainer(latestPersistedSealedResultID)
 	if !found {
+		// the latest persisted sealed result must be in the forest, otherwise the forest is in an
+		// inconsistent state.
 		return nil, fmt.Errorf("latest persisted sealed result not found in forest")
 	}
 	return latestPersistedSealedResultContainer, nil
 }
 
-// traverseDescendants performs a breadth-first traversal starting from the startContainer and adds
+// traverseDescendants performs a breadth-first traversal of descendants of `head`, and adds
 // processable containers to the work queue.
-//
-// Parameters:
-//   - startContainer: the container to start traversal from
-func (fm *ForestManager) traverseDescendants(startContainer *ExecutionResultContainer) {
-	// queue used for BFS traversal
-	// Note: we intentionally do not check or enqueue the startContainer
-	// when traversing from the latest persisted sealed result, we must skip it since it is by
-	// definition completed and no further processing is needed.
+func (fm *ForestManager) traverseDescendants(head *ExecutionResultContainer) {
 	queue := list.New()
-	queue.PushBack(startContainer)
+	queue.PushBack(head)
 
+	// Note: only descendents of head are added to the queue, not head itself.
 	for queue.Len() > 0 && uint(fm.workQueue.Len()) < fm.maxQueueSize {
 		element := queue.Front()
 		queue.Remove(element)
 		parent := element.Value.(*ExecutionResultContainer)
 		fm.resultsForest.IterateChildren(parent.resultID, func(child *ExecutionResultContainer) bool {
-			processable := fm.checkAndEnqueueContainer(child, parent)
-
 			// Enqueue processable children for further iteration
-			if processable {
+			if fm.checkAndEnqueueContainer(child, parent) {
 				queue.PushBack(child)
 			}
-
-			return true
+			return uint(fm.workQueue.Len()) < fm.maxQueueSize
 		})
 	}
 }
 
 // checkAndEnqueueContainer checks if a container can be processed and enqueues it if it can.
-//
-// Parameters:
-//   - container: the container to check
-//
-// Returns:
-//   - bool: true if the container is processable, false otherwise
+// Returns true if the container was enqueued, false if it was not.
 func (fm *ForestManager) checkAndEnqueueContainer(container, parentContainer *ExecutionResultContainer) bool {
 	if container.IsEnqueued() {
 		return true // already enqueued, no need to check again
@@ -320,13 +264,12 @@ func (fm *ForestManager) checkAndEnqueueContainer(container, parentContainer *Ex
 		Uint64("view", container.blockHeader.View).
 		Logger()
 
-	processable := fm.canProcessContainer(container, parentContainer)
-	if !processable {
+	if !fm.canProcessResult(container, parentContainer) {
 		lg.Debug().Msg("container not ready for processing, skipping fork")
 		return false
 	}
 
-	// Add to work queue with priority based on level (lower level = higher priority)
+	// Add to work queue with priority based on view (lower view processed first)
 	fm.workQueue.Push(container, container.blockHeader.View)
 	_ = container.SetEnqueued()
 
@@ -335,20 +278,14 @@ func (fm *ForestManager) checkAndEnqueueContainer(container, parentContainer *Ex
 	return true
 }
 
-// canProcessContainer determines if a container can be processed.
-//
-// Parameters:
-//   - container: the container to check
-//   - parentContainer: the parent container of the container to check
-//
-// Returns:
-//   - bool: true if the container can be processed, false otherwise
-func (fm *ForestManager) canProcessContainer(container, parentContainer *ExecutionResultContainer) bool {
+// canProcessResult determines if a result can be processed.
+func (fm *ForestManager) canProcessResult(container, parentContainer *ExecutionResultContainer) bool {
 	lg := fm.log.With().
 		Hex("result_id", logging.ID(container.resultID)).
 		Logger()
 
 	// 1. Container must be pending
+	// Any other state means the container is either already running or abandoned.
 	if container.Pipeline().GetState() != optimistic_sync.StatePending {
 		lg.Debug().
 			Str("state", container.Pipeline().GetState().String()).
@@ -356,9 +293,9 @@ func (fm *ForestManager) canProcessContainer(container, parentContainer *Executi
 		return false
 	}
 
-	// 2. Parent must not be in pending or abandoned state
+	// 2. Parent must already be enqueued and not abandoned
 	parentState := parentContainer.Pipeline().GetState()
-	if parentState == optimistic_sync.StatePending || parentState == optimistic_sync.StateAbandoned {
+	if parentContainer.IsEnqueued() && parentState != optimistic_sync.StateAbandoned {
 		lg.Debug().
 			Hex("parent_id", logging.ID(parentContainer.resultID)).
 			Str("parent_state", parentState.String()).
@@ -408,14 +345,7 @@ func (fm *ForestManager) canProcessContainer(container, parentContainer *Executi
 	return true
 }
 
-// checkBlockStatus checks if a block is processable based on the block status and the required block status.
-//
-// Parameters:
-//   - height: the height to check
-//
-// Returns:
-//   - BlockStatus: the block status
-//   - bool: true if the block meets the required block status, false otherwise
+// checkBlockStatus checks if a block is processable based on the required block status.
 func (fm *ForestManager) checkBlockStatus(height uint64) (BlockStatus, bool) {
 	fm.mu.RLock()
 	defer fm.mu.RUnlock()
@@ -423,6 +353,13 @@ func (fm *ForestManager) checkBlockStatus(height uint64) (BlockStatus, bool) {
 	if height > fm.finalizedHeight {
 		return BlockStatusCertified, fm.config.RequiredBlockStatus == BlockStatusCertified
 	}
+
+	// Note: it is possible that there are results in the forest for unfinalized blocks that conflict
+	// with finalized blocks. it is OK to accept them as processable here because
+	// 1. finalized/sealed blocks are provided by the results forest, so the manager and forest are in sync.
+	// 2. the results forest will abandon any results that conflict with finalized or sealed results.
+	// 3. the pipeline logic will detect if the result is abandoned and exit with minimal overhead.
+	// We are trading off a small amount of work by the workers for lower code complexity.
 
 	if height > fm.sealedHeight {
 		return BlockStatusFinalized, fm.config.RequiredBlockStatus == BlockStatusCertified || fm.config.RequiredBlockStatus == BlockStatusFinalized
