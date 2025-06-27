@@ -38,6 +38,7 @@ var (
 type ResultsForest struct {
 	log                         zerolog.Logger
 	forest                      forest.LevelledForest
+	manager                     *ForestManager
 	headers                     storage.Headers
 	maxViewDelta                uint64
 	lastSealedResultID          flow.Identifier
@@ -52,6 +53,7 @@ func NewResultsForest(
 	log zerolog.Logger,
 	headers storage.Headers,
 	latestPersistedSealedResult storage.LatestPersistedSealedResult,
+	manager *ForestManager,
 	maxViewDelta uint64,
 ) (*ResultsForest, error) {
 	resultID, sealedHeight := latestPersistedSealedResult.Latest()
@@ -64,6 +66,7 @@ func NewResultsForest(
 	rf := &ResultsForest{
 		log:                         log.With().Str("component", "results_forest").Logger(),
 		forest:                      *forest.NewLevelledForest(sealedHeader.View),
+		manager:                     manager,
 		headers:                     headers,
 		maxViewDelta:                maxViewDelta,
 		lastSealedResultID:          resultID,
@@ -119,6 +122,8 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt) (bool, error
 	if err != nil {
 		return false, fmt.Errorf("failed to add receipt to its container: %w", err)
 	}
+
+	rf.manager.OnReceiptAdded(container)
 
 	return added > 0, nil
 }
@@ -357,15 +362,17 @@ func (rf *ResultsForest) markResultSealed(container *ExecutionResultContainer) {
 	})
 }
 
-// OnBlockFinalized signals that the given block is finalized.
+// OnBlockStatusUpdated signals that the block status has been updated.
 // It finds all vertices for results of blocks that conflict with the finalized block and abort them.
-func (rf *ResultsForest) OnBlockFinalized(finalizedBlockID flow.Identifier, parentBlockResultIDs []flow.Identifier) {
+func (rf *ResultsForest) OnBlockStatusUpdated(finalized *flow.Header, sealed *flow.Header, parentBlockResultIDs []flow.Identifier) error {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
 	// 1. Get all ExecutionResults for the finalized block's parent (done by caller)
 	// 2. For each of these results, get all child vertices
 	// 3. For each child vertex, cancel if it does not reference the finalized block
+
+	finalizedBlockID := finalized.ID()
 
 	for _, parentResultID := range parentBlockResultIDs {
 		rf.iterateChildren(parentResultID, func(child *ExecutionResultContainer) bool {
@@ -375,6 +382,9 @@ func (rf *ResultsForest) OnBlockFinalized(finalizedBlockID flow.Identifier, pare
 			return true
 		})
 	}
+
+	rf.manager.OnBlockStatusUpdated(finalized, sealed)
+	return nil
 }
 
 // abandonFork recursively abandons a container and all its descendants.
