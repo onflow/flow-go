@@ -16,7 +16,7 @@ func Genesis() *Block {
 		ParentID:  flow.ZeroID,
 	}
 
-	//TODO(Uliana: malleability immutable): decide if we need separate constuctor or do not use constructor here at all
+	// Constructor is skipped for genesis block
 	//nolint:structwrite
 	return &Block{
 		Header:  headerBody,
@@ -47,7 +47,7 @@ type UntrustedBlock Block
 // NewBlock creates a new block in collection node cluster consensus.
 // Construction cluster Block allowed only within the constructor.
 //
-// All errors indicate a valid ExecutionReceipt cannot be constructed from the input.
+// All errors indicate a valid Block cannot be constructed from the input.
 func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	// validate header body
 	untrustedHeaderBody := untrusted.Header
@@ -71,12 +71,12 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	}
 	_, err := flow.NewCollection(flow.UntrustedCollection(untrustedPayload.Collection))
 	if err != nil {
-		return nil, fmt.Errorf("invalid payload collection: %w", err)
+		return nil, fmt.Errorf("invalid collection: %w", err)
 	}
 
 	return &Block{
-		Header:  untrusted.Header,
-		Payload: untrusted.Payload,
+		Header:  untrustedHeaderBody,
+		Payload: untrustedPayload,
 	}, nil
 }
 
