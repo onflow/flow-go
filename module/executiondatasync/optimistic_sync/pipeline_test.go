@@ -30,7 +30,7 @@ func TestPipelineStateTransitions(t *testing.T) {
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- pipeline.Run(context.Background())
+		errChan <- pipeline.Run(context.Background(), mockCore, parent)
 	}()
 
 	// Wait for pipeline to reach WaitingPersist state
@@ -55,7 +55,7 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- pipeline.Run(context.Background())
+		errChan <- pipeline.Run(context.Background(), mockCore, parent)
 	}()
 
 	// Initial update - parent in Ready state
@@ -104,7 +104,7 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 // the parent pipeline is abandoned.
 func TestAbandoned(t *testing.T) {
 	t.Run("starts already abandoned", func(t *testing.T) {
-		pipeline, mockCore, updateChan, _ := createPipeline(t)
+		pipeline, mockCore, updateChan, parent := createPipeline(t)
 
 		mockCore.On("Abandon").Return(nil)
 
@@ -112,7 +112,7 @@ func TestAbandoned(t *testing.T) {
 
 		errChan := make(chan error)
 		go func() {
-			errChan <- pipeline.Run(context.Background())
+			errChan <- pipeline.Run(context.Background(), mockCore, parent)
 		}()
 
 		// first state must be abandoned
@@ -225,7 +225,7 @@ func TestAbandoned(t *testing.T) {
 
 			errChan := make(chan error)
 			go func() {
-				errChan <- pipeline.Run(context.Background())
+				errChan <- pipeline.Run(context.Background(), mockCore, parent)
 			}()
 
 			// Send parent update to start processing
@@ -312,7 +312,7 @@ func TestPipelineContextCancellation(t *testing.T) {
 
 			errChan := make(chan error)
 			go func() {
-				errChan <- pipeline.Run(ctx)
+				errChan <- pipeline.Run(ctx, mockCore, parent)
 			}()
 
 			waitForError(t, errChan, context.Canceled)
@@ -379,7 +379,7 @@ func TestPipelineErrorHandling(t *testing.T) {
 
 			errChan := make(chan error)
 			go func() {
-				errChan <- pipeline.Run(context.Background())
+				errChan <- pipeline.Run(context.Background(), mockCore, parent)
 			}()
 
 			// Send parent update to trigger processing
@@ -519,7 +519,7 @@ func createPipeline(t *testing.T) (*PipelineImpl, *osmock.Core, <-chan State, *m
 	parent := NewMockStateProvider()
 	stateReceiver := NewMockStateReceiver()
 
-	pipeline := NewPipeline(zerolog.Nop(), unittest.ExecutionResultFixture(), mockCore, false, parent, stateReceiver)
+	pipeline := NewPipeline(zerolog.Nop(), unittest.ExecutionResultFixture(), false, stateReceiver)
 
 	return pipeline, mockCore, stateReceiver.updateChan, parent
 }
