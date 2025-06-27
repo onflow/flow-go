@@ -312,7 +312,7 @@ func (e *Engine) processTransactionResultErrorMessagesByReceipts(ctx irrecoverab
 		case <-ctx.Done():
 			return
 		case blockID := <-e.txResultErrorMessagesChan:
-			err := e.txErrorMessagesCore.HandleTransactionResultErrorMessages(ctx, blockID)
+			err := e.txErrorMessagesCore.FetchErrorMessages(ctx, blockID)
 			if err != nil {
 				// TODO: we should revisit error handling here.
 				// Errors that come from querying the EN and possibly ExecutionNodesForBlockID should be logged and
