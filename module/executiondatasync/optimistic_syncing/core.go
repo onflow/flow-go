@@ -27,24 +27,29 @@ const DefaultTxResultErrMsgsRequestTimeout = 5 * time.Second
 // download, index, and persist.
 type Core interface {
 	// Download retrieves all necessary data for processing.
+	// CAUTION: not concurrency safe!
+	//
 	// Expected errors:
 	// - context.Canceled: if the provided context was canceled before completion
-	//
-	// All other errors are unexpected and may indicate a bug or inconsistent state
+	// - context.DeadlineExceeded: if the provided context was canceled due to its deadline reached
+	// - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 	Download(ctx context.Context) error
 
 	// Index processes the downloaded data and creates in-memory indexes.
+	// CAUTION: not concurrency safe!
 	//
 	// No errors are expected during normal operations
 	Index() error
 
 	// Persist stores the indexed data in permanent storage.
+	// CAUTION: not concurrency safe!
 	//
 	// No errors are expected during normal operations
 	Persist() error
 
 	// Abandon indicates that the protocol has abandoned this state. Hence processing will be aborted
 	// and any data dropped.
+	// CAUTION: not concurrency safe!
 	//
 	// No errors are expected during normal operations
 	Abandon() error
@@ -78,7 +83,7 @@ var _ Core = (*CoreImpl)(nil)
 
 // CoreImpl implements the Core interface for processing execution data.
 // It coordinates the download, indexing, and persisting of execution data.
-// CoreImpl is not safe for concurrent use. Use only within a single gorountine.
+// CAUTION: not concurrency safe!
 type CoreImpl struct {
 	log zerolog.Logger
 
@@ -89,6 +94,7 @@ type CoreImpl struct {
 }
 
 // NewCoreImpl creates a new CoreImpl with all necessary dependencies
+// CAUTION: not concurrency safe!
 func NewCoreImpl(
 	logger zerolog.Logger,
 	executionResult *flow.ExecutionResult,
@@ -170,11 +176,12 @@ func NewCoreImpl(
 }
 
 // Download downloads execution data and transaction results error for the block
+// CAUTION: not concurrency safe!
+//
 // Expected errors:
 // - context.Canceled: if the provided context was canceled before completion
 // - context.DeadlineExceeded: if the provided context was canceled due to its deadline reached
-//
-// All other errors are unexpected and may indicate a bug or inconsistent state
+// - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (c *CoreImpl) Download(ctx context.Context) error {
 	c.log.Debug().Msg("downloading execution data")
 
@@ -232,6 +239,7 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 
 // Index retrieves the downloaded execution data and transaction results error messages from the caches and indexes them
 // into in-memory storage.
+// CAUTION: not concurrency safe!
 //
 // No errors are expected during normal operations
 func (c *CoreImpl) Index() error {
@@ -257,6 +265,7 @@ func (c *CoreImpl) Index() error {
 }
 
 // Persist persists the indexed data to permanent storage atomically.
+// CAUTION: not concurrency safe!
 //
 // No errors are expected during normal operations
 func (c *CoreImpl) Persist() error {
@@ -274,6 +283,7 @@ func (c *CoreImpl) Persist() error {
 
 // Abandon indicates that the protocol has abandoned this state. Hence processing will be aborted
 // and any data dropped.
+// CAUTION: not concurrency safe!
 //
 // No errors are expected during normal operations
 func (c *CoreImpl) Abandon() error {
