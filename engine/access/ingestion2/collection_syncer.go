@@ -133,6 +133,8 @@ func (s *CollectionSyncer) StartWorkerLoop(ctx irrecoverable.SignalerContext, re
 	updateLastFullBlockHeightTicker := time.NewTicker(fullBlockRefreshInterval)
 	defer updateLastFullBlockHeightTicker.Stop()
 
+	defer close(s.pendingCollections)
+
 	for {
 		select {
 		case <-ctx.Done():
