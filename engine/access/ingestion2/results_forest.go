@@ -166,13 +166,14 @@ func (rf *ResultsForest) getOrCreateExecutionResultContainer(result *flow.Execut
 	}
 	rf.forest.AddVertex(container)
 
-	// mark the container as abandoned if it does not descend from the latest sealed result.
+	// mark the container and all its descendants as abandoned if it descends from an abandoned result.
+	// This handles the case where a result is added after a sibling result was sealed.
 	//
 	// consider the following case:
 	// X is the result that was just added
 	// A was previously sealed, and B was sealed before X was added
 	//
-	//   ↙ X
+	//   ↙ X ← Y ← Z
 	// A ← B ← C
 	//
 	// in this case, we know that X conflicts with B and will never be sealed. We should abandon X
@@ -182,13 +183,13 @@ func (rf *ResultsForest) getOrCreateExecutionResultContainer(result *flow.Execut
 	// Y is the result that was just added
 	// X is its parent, but does not exist in the forest yet
 	//
-	//   ↙ [X] ← Y
-	// A ← B ← C
+	//   ↙ [X] ← Y ← Z
+	// A ←  B  ← C
 	//
 	// in this case, we do not know if Y will eventually be sealed since we don't know which result
 	// X will descend from. We must wait until we eventually receive X to determine if X and Y should
 	// be abandoned.
-	if descends, connected := rf.descendsFromLatestSealedResult(container); connected && !descends {
+	if rf.isAbandonedFork(container) {
 		rf.abandonFork(container)
 	}
 
@@ -357,15 +358,17 @@ func (rf *ResultsForest) markResultSealed(container *ExecutionResultContainer) {
 	})
 }
 
-// OnBlockFinalized signals that the given block is finalized.
+// OnBlockStatusUpdated signals that the block status has been updated.
 // It finds all vertices for results of blocks that conflict with the finalized block and abort them.
-func (rf *ResultsForest) OnBlockFinalized(finalizedBlockID flow.Identifier, parentBlockResultIDs []flow.Identifier) {
+func (rf *ResultsForest) OnBlockStatusUpdated(finalized *flow.Header, sealed *flow.Header, parentBlockResultIDs []flow.Identifier) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
 	// 1. Get all ExecutionResults for the finalized block's parent (done by caller)
 	// 2. For each of these results, get all child vertices
 	// 3. For each child vertex, cancel if it does not reference the finalized block
+
+	finalizedBlockID := finalized.ID()
 
 	for _, parentResultID := range parentBlockResultIDs {
 		rf.iterateChildren(parentResultID, func(child *ExecutionResultContainer) bool {
@@ -442,41 +445,40 @@ func (rf *ResultsForest) processCompleted(resultID flow.Identifier) error {
 	return nil
 }
 
-// descendsFromLatestSealedResult checks if a container's result is a descendant of the latest sealed result.
-// CAUTION: not concurrency safe! Caller must hold a lock.
+// isAbandonedFork checks if a container's result descends from an abandoned result.
+// This requires that there is a direct path from the container's result to an abandoned result
+// within the forest, a sibling of a sealed result.
+// If any result is missing, the fork is not known to be abandoned and the function returns false.
 //
-// Returns:
-//   - descends: true if the container's result descends from the latest sealed result, otherwise false
-//   - connected: true if the container's result descends from a sealed or abandoned result, otherwise false
-func (rf *ResultsForest) descendsFromLatestSealedResult(container *ExecutionResultContainer) (descends bool, connected bool) {
-	current := container
-	for {
-		parentID, parentView := current.Parent()
-		if parentID == rf.lastSealedResultID {
-			return true, true
-		}
+// Since it is possible that the result's sibling is sealed (thus its parent is also sealed), we need
+// to traverse to the latest sealed result to determine if the fork is abandoned.
+//
+// CAUTION: not concurrency safe! Caller must hold a lock.
+func (rf *ResultsForest) isAbandonedFork(container *ExecutionResultContainer) bool {
+	parentID, parentView := container.Parent()
 
-		// sealed views are strictly increasing, so if we find a parent view that is lower than the
-		// last sealed view, and we have not yet found the latest sealed result, then we are guaranteed
-		// to never find it.
-		if parentView < rf.lastSealedView {
-			return false, true
-		}
-
-		// if the parent is not found, that means either the parent has not been added to the forest yet,
-		// or it has already been pruned. either way, we can't confirm that the container descends
-		// from the latest sealed result.
-		parent, found := rf.getContainer(parentID)
-		if !found {
-			return false, false
-		}
-
-		// if the parent is abandoned, then the container does not descend from the latest sealed
-		// result, and we can guarantee that the container will never be started.
-		if parent.Pipeline().GetState() == optimistic_sync.StateAbandoned {
-			return false, true
-		}
-
-		current = parent
+	// the parent is the latest sealed result, so the fork is most likely not abandoned.
+	// the only exception is if the result's block conflicts with a finalized block.
+	// TODO: how to handle conflicting block case?
+	if parentID == rf.lastSealedResultID {
+		return false
 	}
+
+	// sealed views are strictly increasing, so if we find a parent view that is lower than the
+	// last sealed view, and we have not yet found the latest sealed result, then we are guaranteed
+	// to never find it. This catches the case where the result's sibling is sealed.
+	if parentView < rf.lastSealedView {
+		return true
+	}
+
+	// if the parent is not found, that means either the parent has not been added to the forest yet,
+	// or it has already been pruned. either way, we can't confirm if the fork is abandoned.
+	parent, found := rf.getContainer(parentID)
+	if !found {
+		return false
+	}
+
+	// if the parent is abandoned, then the container does not descend from the latest sealed
+	// result, and we can guarantee that the container will never be started.
+	return parent.Pipeline().GetState() == optimistic_sync.StateAbandoned
 }
