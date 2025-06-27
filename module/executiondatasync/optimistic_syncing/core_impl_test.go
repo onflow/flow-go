@@ -24,7 +24,7 @@ type CoreImplSuite struct {
 	suite.Suite
 	logger                        zerolog.Logger
 	execDataRequester             *reqestermock.ExecutionDataRequester
-	txResultErrMsgsRequester      *txerrmsgsmock.TransactionResultErrorMessageRequester
+	txResultErrMsgsRequester      *txerrmsgsmock.Requester
 	txResultErrMsgsRequestTimeout time.Duration
 	db                            *storagemock.DB
 	persistentRegisters           *storagemock.RegisterIndex
@@ -46,7 +46,7 @@ func (c *CoreImplSuite) SetupTest() {
 	c.logger = zerolog.Nop()
 
 	c.execDataRequester = reqestermock.NewExecutionDataRequester(t)
-	c.txResultErrMsgsRequester = txerrmsgsmock.NewTransactionResultErrorMessageRequester(t)
+	c.txResultErrMsgsRequester = txerrmsgsmock.NewRequester(t)
 	c.txResultErrMsgsRequestTimeout = DefaultTxResultErrMsgsRequestTimeout
 
 	c.db = storagemock.NewDB(t)
