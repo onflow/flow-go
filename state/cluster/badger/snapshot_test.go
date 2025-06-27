@@ -191,7 +191,7 @@ func (suite *SnapshotSuite) TestEmptyCollection() {
 	t := suite.T()
 
 	// create a block with an empty collection
-	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(unittest.IdentifierFixture()))
+	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(flow.ZeroID))
 	suite.InsertBlock(proposal)
 
 	snapshot := suite.state.AtBlockID(proposal.Block.ID())

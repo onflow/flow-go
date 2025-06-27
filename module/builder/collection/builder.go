@@ -507,7 +507,7 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not build a payload from the transactions: %w", err)
+		return nil, fmt.Errorf("could not build a payload: %w", err)
 	}
 	return payload, nil
 }
