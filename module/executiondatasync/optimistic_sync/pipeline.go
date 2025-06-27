@@ -38,13 +38,12 @@ type Pipeline interface {
 	PipelineStateProvider
 
 	// Run starts the pipeline processing and blocks until completion or context cancellation.
+	// CAUTION: not concurrency safe! Run must only be called once.
 	//
 	// Expected Errors:
 	//   - context.Canceled: when the context is canceled
 	//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-	//
-	// CAUTION: not concurrency safe! Run must only be called once.
-	Run(context.Context) error
+	Run(context.Context, Core, PipelineStateProvider) error
 
 	// SetSealed marks the pipeline's result as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.
 	SetSealed()
@@ -63,9 +62,9 @@ type PipelineImpl struct {
 	log             zerolog.Logger
 	executionResult *flow.ExecutionResult
 	stateReceiver   PipelineStateReceiver
-	parent          PipelineStateProvider
 	stateNotifier   engine.Notifier
 	core            Core
+	parent          PipelineStateProvider
 
 	// The following fields are accessed externally. they are stored using atomics to avoid
 	// blocking the caller.
@@ -85,9 +84,7 @@ type PipelineImpl struct {
 func NewPipeline(
 	log zerolog.Logger,
 	executionResult *flow.ExecutionResult,
-	core Core,
 	isSealed bool,
-	parent PipelineStateProvider,
 	stateReceiver PipelineStateReceiver,
 ) *PipelineImpl {
 	log = log.With().
@@ -100,8 +97,6 @@ func NewPipeline(
 		log:             log,
 		executionResult: executionResult,
 		stateReceiver:   stateReceiver,
-		core:            core,
-		parent:          parent,
 		state:           atomic.NewInt32(int32(StatePending)),
 		isSealed:        atomic.NewBool(isSealed),
 		isAbandoned:     atomic.NewBool(false),
@@ -116,21 +111,16 @@ func NewPipeline(
 // Expected Errors:
 //   - context.Canceled: when the context is canceled
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-func (p *PipelineImpl) Run(ctx context.Context) error {
+func (p *PipelineImpl) Run(ctx context.Context, core Core, parent PipelineStateProvider) error {
 	pipelineCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	p.core = core
+	p.parent = parent
 	p.cancelFn.Store(&cancel)
 
-	if p.isAbandoned.Load() {
-		cancel()
-		if err := p.transitionTo(StateAbandoned); err != nil {
-			return fmt.Errorf("failed to transition to abandoned state during initialization: %w", err)
-		}
-	} else {
-		if err := p.transitionTo(StateReady); err != nil {
-			return fmt.Errorf("failed to transition to ready state during initialization: %w", err)
-		}
+	if err := p.transitionTo(StateReady); err != nil {
+		return fmt.Errorf("failed to transition to ready state during initialization: %w", err)
 	}
 
 	notifierChan := p.stateNotifier.Channel()
@@ -144,6 +134,13 @@ func (p *PipelineImpl) Run(ctx context.Context) error {
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
+			}
+
+			if p.checkAbandoned() {
+				cancel()
+				if err := p.transitionTo(StateAbandoned); err != nil {
+					return fmt.Errorf("failed to transition to abandoned state during initialization: %w", err)
+				}
 			}
 
 			state := p.GetState()
@@ -183,7 +180,7 @@ func (p *PipelineImpl) GetState() State {
 
 // SetSealed marks the data as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.
 func (p *PipelineImpl) SetSealed() {
-	// Note: do not add locking here to avoid blocking the results forest.
+	// Note: do not use a mutex here to avoid blocking the results forest.
 	if p.isSealed.CompareAndSwap(false, true) {
 		p.stateNotifier.Notify()
 	}
@@ -191,7 +188,7 @@ func (p *PipelineImpl) SetSealed() {
 
 // OnParentStateUpdated updates the pipeline's state based on the provided parent state.
 func (p *PipelineImpl) OnParentStateUpdated(parentState State) {
-	// Note: do not add locking here to avoid blocking the results forest.
+	// Note: do not use a mutex here to avoid blocking the results forest.
 	if parentState == StateAbandoned {
 		p.abandon()
 	}
@@ -202,7 +199,7 @@ func (p *PipelineImpl) OnParentStateUpdated(parentState State) {
 // Abandon marks the pipeline as abandoned
 // This will cause the pipeline to eventually transition to the Abandoned state and halt processing
 func (p *PipelineImpl) Abandon() {
-	// Note: do not add locking here to avoid blocking the results forest.
+	// Note: do not use a mutex here to avoid blocking the results forest.
 	p.abandon()
 	p.stateNotifier.Notify()
 }
@@ -282,10 +279,6 @@ func (p *PipelineImpl) processReady() error {
 //   - context.Canceled: when the context is canceled
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (p *PipelineImpl) processDownloading(ctx context.Context) error {
-	if p.checkAbandoned() {
-		return p.transitionTo(StateAbandoned)
-	}
-
 	if err := p.core.Download(ctx); err != nil {
 		return err
 	}
@@ -297,10 +290,6 @@ func (p *PipelineImpl) processDownloading(ctx context.Context) error {
 //
 // No errors are expected during normal operations
 func (p *PipelineImpl) processIndexing() error {
-	if p.checkAbandoned() {
-		return p.transitionTo(StateAbandoned)
-	}
-
 	if err := p.core.Index(); err != nil {
 		return err
 	}
@@ -315,10 +304,6 @@ func (p *PipelineImpl) processIndexing() error {
 //
 // No errors are expected during normal operations
 func (p *PipelineImpl) processWaitingPersist() error {
-	if p.checkAbandoned() {
-		return p.transitionTo(StateAbandoned)
-	}
-
 	if p.isSealed.Load() && p.parent.GetState() == StateComplete {
 		return p.transitionTo(StatePersisting)
 	}

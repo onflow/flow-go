@@ -18,10 +18,6 @@ var (
 	ErrMaxViewDeltaExceeded = fmt.Errorf("results block view exceeds accepted range")
 )
 
-type PipelineFactory interface {
-	NewPipeline(result *flow.ExecutionResult, isSealed bool) optimistic_sync.Pipeline
-}
-
 // ResultsForest is a mempool holding execution results and receipts, which is aware of the tree
 // structure formed by the results. The mempool supports pruning by view (of the executed block):
 // only results descending from the latest sealed and finalized result are relevant.
@@ -47,7 +43,7 @@ type ResultsForest struct {
 	lastSealedResultID          flow.Identifier
 	lastSealedView              uint64
 	latestPersistedSealedResult storage.LatestPersistedSealedResult
-	pipelineFactory             PipelineFactory
+	pipelineFactory             optimistic_sync.PipelineFactory
 	mu                          sync.RWMutex
 }
 
@@ -77,7 +73,7 @@ func NewResultsForest(
 	return rf, nil
 }
 
-// AddResult adds an Execution Result to the Result Forest (without any receipts), in
+// AddSealedResult adds a sealed Execution Result to the Result Forest (without any receipts), in
 // case the result is not already stored in the tree.
 // This is useful for crash recovery:
 // After recovering from a crash, the mempools are wiped and the sealed results will not
@@ -89,11 +85,11 @@ func NewResultsForest(
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 //
 // TODO: during normal operations we should never add a result without a receipt, this is only used for crash recovery
-func (rf *ResultsForest) AddResult(result *flow.ExecutionResult) error {
+func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	_, err := rf.getOrCreateExecutionResultContainer(result)
+	_, err := rf.getOrCreateExecutionResultContainer(result, true)
 	if err != nil {
 		return fmt.Errorf("failed to get container for result (%s): %w", result.ID(), err)
 	}
@@ -109,7 +105,7 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt) (bool, error
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	container, err := rf.getOrCreateExecutionResultContainer(&receipt.ExecutionResult)
+	container, err := rf.getOrCreateExecutionResultContainer(&receipt.ExecutionResult, false)
 	if err != nil {
 		return false, fmt.Errorf("failed to get container for result (%s): %w", receipt.ExecutionResult.ID(), err)
 	}
@@ -133,7 +129,7 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt) (bool, error
 // Expected errors during normal operations:
 //   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-func (rf *ResultsForest) getOrCreateExecutionResultContainer(result *flow.ExecutionResult) (*ExecutionResultContainer, error) {
+func (rf *ResultsForest) getOrCreateExecutionResultContainer(result *flow.ExecutionResult, isSealed bool) (*ExecutionResultContainer, error) {
 	// First try to get existing container
 	resultID := result.ID()
 	container, found := rf.getContainer(resultID)
@@ -157,9 +153,6 @@ func (rf *ResultsForest) getOrCreateExecutionResultContainer(result *flow.Execut
 		return nil, ErrMaxViewDeltaExceeded
 	}
 
-	// TODO: determine if the result is sealed
-	// implement this when adding the loader functionality
-	var isSealed bool
 	pipeline := rf.pipelineFactory.NewPipeline(result, isSealed)
 	container, err = NewExecutionResultContainer(result, executedBlock, pipeline)
 	if err != nil {
