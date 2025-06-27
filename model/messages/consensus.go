@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -128,30 +130,102 @@ func UntrustedBlockFromInternal(flowBlock *flow.Block) UntrustedBlock {
 
 // BlockProposal is part of the consensus protocol and represents the leader
 // of a consensus round pushing a new proposal to the network.
+//
 type BlockProposal struct {
-	Block UntrustedBlock
+	Block flow.Block
 }
 
-func NewBlockProposal(internal *flow.Block) *BlockProposal {
+// UntrustedBlockProposal is an untrusted input-only representation of a BlockProposal,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+type UntrustedBlockProposal BlockProposal
+
+//
+func NewBlockProposal(untrusted UntrustedBlockProposal) (*BlockProposal, error) {
+	if untrusted.Block.Header == nil {
+		return nil, fmt.Errorf("block header must not be nil")
+	}
+	if untrusted.Block.Payload == nil {
+		return nil, fmt.Errorf("block payload must not be nil")
+	}
 	return &BlockProposal{
-		Block: UntrustedBlockFromInternal(internal),
+		Block: untrusted.Block,
+	}, nil
+}
+
+func NewBlockProposalFromInternal(internal *flow.Block) *BlockProposal {
+	return &BlockProposal{
+		Block: *internal,
 	}
 }
 
 // BlockVote is part of the consensus protocol and represents a consensus node
 // voting on the proposal of the leader of a given round.
+//
 type BlockVote struct {
 	BlockID flow.Identifier
 	View    uint64
 	SigData []byte
 }
 
+// UntrustedBlockVote is an untrusted input-only representation of a BlockVote,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+type UntrustedBlockVote BlockVote
+
+//
+func NewBlockVote(untrusted UntrustedBlockVote) (*BlockVote, error) {
+	if untrusted.BlockID == flow.ZeroID {
+		return nil, fmt.Errorf("block ID must not be zero")
+	}
+	if len(untrusted.SigData) == 0 {
+		return nil, fmt.Errorf("signature data must not be empty")
+	}
+	return &BlockVote{
+		BlockID: untrusted.BlockID,
+		View:    untrusted.View,
+		SigData: untrusted.SigData,
+	}, nil
+}
+
 // TimeoutObject is part of the consensus protocol and represents a consensus node
 // timing out in given round. Contains a sequential number for deduplication purposes.
+//
 type TimeoutObject struct {
 	TimeoutTick uint64
 	View        uint64
 	NewestQC    *flow.QuorumCertificate
 	LastViewTC  *flow.TimeoutCertificate
 	SigData     []byte
+}
+
+// UntrustedTimeoutObject is an untrusted input-only representation of a TimeoutObject,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+type UntrustedTimeoutObject TimeoutObject
+
+//
+func NewTimeoutObject(untrusted UntrustedTimeoutObject) (*TimeoutObject, error) {
+	if len(untrusted.SigData) == 0 {
+		return nil, fmt.Errorf("signature data must not be empty")
+	}
+	return &TimeoutObject{
+		TimeoutTick: untrusted.TimeoutTick,
+		View:        untrusted.View,
+		NewestQC:    untrusted.NewestQC,
+		LastViewTC:  untrusted.LastViewTC,
+		SigData:     untrusted.SigData,
+	}, nil
 }

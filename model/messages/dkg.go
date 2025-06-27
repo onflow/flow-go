@@ -1,23 +1,49 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // DKGMessage is the type of message exchanged between DKG nodes.
+//
 type DKGMessage struct {
 	Data          []byte
 	DKGInstanceID string
 }
 
-// NewDKGMessage creates a new DKGMessage.
-func NewDKGMessage(data []byte, dkgInstanceID string) DKGMessage {
-	return DKGMessage{
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+type UntrustedDKGMessage DKGMessage
+
+// NewDKGMessage creates a new instance of DKGMessage.
+//
+func NewDKGMessage(untrusted UntrustedDKGMessage) (*DKGMessage, error) {
+	if len(untrusted.Data) == 0 {
+		return nil, fmt.Errorf("data must not be empty")
+	}
+	if untrusted.DKGInstanceID == "" {
+		return nil, fmt.Errorf("DKG instance ID must not be empty")
+	}
+	return &DKGMessage{
+		Data:          untrusted.Data,
+		DKGInstanceID: untrusted.DKGInstanceID,
+	}, nil
+}
+
+// NewDKGMessageFromFields creates a new DKGMessage from individual fields.
+func NewDKGMessageFromFields(data []byte, dkgInstanceID string) (*DKGMessage, error) {
+	return NewDKGMessage(UntrustedDKGMessage{
 		Data:          data,
 		DKGInstanceID: dkgInstanceID,
-	}
+	})
 }
 
 // PrivDKGMessageIn is a wrapper around a DKGMessage containing the network ID
