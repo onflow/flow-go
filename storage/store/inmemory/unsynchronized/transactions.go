@@ -1,6 +1,7 @@
 package unsynchronized
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -63,4 +64,10 @@ func (t *Transactions) Data() []flow.TransactionBody {
 		out = append(out, *tx)
 	}
 	return out
+}
+
+// BatchStore stores transaction within a batch operation.
+// This method is not implemented and will always return an error.
+func (t *Transactions) BatchStore(_ *flow.TransactionBody, _ storage.ReaderBatchWriter) error {
+	return fmt.Errorf("not implemented")
 }
