@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -74,20 +76,92 @@ func UntrustedClusterBlockFromInternal(clusterBlock *cluster.Block) UntrustedClu
 // ClusterBlockProposal is a proposal for a block in collection node cluster
 // consensus. The header contains information about consensus state and the
 // payload contains the proposed collection (may be empty).
+//
 type ClusterBlockProposal struct {
-	Block UntrustedClusterBlock
+	Block cluster.Block
 }
 
-func NewClusterBlockProposal(internal *cluster.Block) *ClusterBlockProposal {
+// UntrustedClusterBlockProposal is an untrusted input-only representation of a ClusterBlockProposal,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+type UntrustedClusterBlockProposal ClusterBlockProposal
+
+//
+func NewClusterBlockProposal(untrusted UntrustedClusterBlockProposal) (*ClusterBlockProposal, error) {
+	if untrusted.Block.Header == nil {
+		return nil, fmt.Errorf("block header must not be nil")
+	}
+	if untrusted.Block.Payload == nil {
+		return nil, fmt.Errorf("block payload must not be nil")
+	}
 	return &ClusterBlockProposal{
-		Block: UntrustedClusterBlockFromInternal(internal),
+		Block: untrusted.Block,
+	}, nil
+}
+
+func NewClusterBlockProposalFromInternal(internal *cluster.Block) *ClusterBlockProposal {
+	return &ClusterBlockProposal{
+		Block: *internal,
 	}
 }
 
 // ClusterBlockVote is a vote for a proposed block in collection node cluster
 // consensus; effectively a vote for a particular collection.
+//
 type ClusterBlockVote BlockVote
+
+// UntrustedClusterBlockVote is an untrusted input-only representation of a ClusterBlockVote,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+type UntrustedClusterBlockVote ClusterBlockVote
+
+//
+func NewClusterBlockVote(untrusted UntrustedClusterBlockVote) (*ClusterBlockVote, error) {
+	if untrusted.BlockID == flow.ZeroID {
+		return nil, fmt.Errorf("block ID must not be zero")
+	}
+	if len(untrusted.SigData) == 0 {
+		return nil, fmt.Errorf("signature data must not be empty")
+	}
+	return &ClusterBlockVote{
+		BlockID: untrusted.BlockID,
+		View:    untrusted.View,
+		SigData: untrusted.SigData,
+	}, nil
+}
 
 // ClusterTimeoutObject is part of the collection cluster protocol and represents a collection node
 // timing out in given round. Contains a sequential number for deduplication purposes.
+//
 type ClusterTimeoutObject TimeoutObject
+
+// UntrustedClusterTimeoutObject is an untrusted input-only representation of a ClusterTimeoutObject,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+type UntrustedClusterTimeoutObject ClusterTimeoutObject
+
+//
+func NewClusterTimeoutObject(untrusted UntrustedClusterTimeoutObject) (*ClusterTimeoutObject, error) {
+	if len(untrusted.SigData) == 0 {
+		return nil, fmt.Errorf("signature data must not be empty")
+	}
+	return &ClusterTimeoutObject{
+		TimeoutTick: untrusted.TimeoutTick,
+		View:        untrusted.View,
+		NewestQC:    untrusted.NewestQC,
+		LastViewTC:  untrusted.LastViewTC,
+		SigData:     untrusted.SigData,
+	}, nil
+}
