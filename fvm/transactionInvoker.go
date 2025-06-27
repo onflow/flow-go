@@ -232,7 +232,9 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 			Source:    executor.proc.Transaction.Script,
 			Arguments: executor.proc.Transaction.Arguments,
 		},
-		common.TransactionLocation(executor.proc.ID))
+		common.TransactionLocation(executor.proc.ID),
+		executor.ctx.VMTransactionExecutionEnabled,
+	)
 
 	// This initializes various cadence variables and parses the programs used
 	// by the transaction body.
