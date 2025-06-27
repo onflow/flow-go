@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_syncing/persisters/stores"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/persisters/stores"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"

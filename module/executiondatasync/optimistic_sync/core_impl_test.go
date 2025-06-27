@@ -1,4 +1,4 @@
-package pipeline
+package optimistic_sync
 
 import (
 	"context"
