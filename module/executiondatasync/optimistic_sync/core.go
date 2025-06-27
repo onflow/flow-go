@@ -1,4 +1,4 @@
-package pipeline
+package optimistic_sync
 
 import (
 	"context"
@@ -12,8 +12,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_syncing/persisters"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_syncing/persisters/stores"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/persisters"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/persisters/stores"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/storage"
@@ -28,13 +28,13 @@ const DefaultTxResultErrMsgsRequestTimeout = 5 * time.Second
 // Each implementation should handle an execution data and implement the three-phase processing:
 // download, index, and persist.
 // CAUTION: The Core instance should not be used after Abandon is called as it could cause panic due to cleared data.
+// CAUTION: not concurrency safe!
 type Core interface {
 	// Download retrieves all necessary data for processing.
 	// CAUTION: not concurrency safe!
 	//
 	// Expected errors:
 	// - context.Canceled: if the provided context was canceled before completion
-	// - context.DeadlineExceeded: if the provided context was canceled due to its deadline reached
 	// - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 	Download(ctx context.Context) error
 
@@ -188,7 +188,6 @@ func NewCoreImpl(
 //
 // Expected errors:
 // - context.Canceled: if the provided context was canceled before completion
-// - context.DeadlineExceeded: if the provided context was canceled due to its deadline reached
 // - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (c *CoreImpl) Download(ctx context.Context) error {
 	c.log.Debug().Msg("downloading execution data")
