@@ -27,8 +27,11 @@ var randomSourceFunctionType = &sema.FunctionType{
 
 type ReusableCadenceRuntime struct {
 	runtime.Runtime
-	TxRuntimeEnv     runtime.Environment
-	ScriptRuntimeEnv runtime.Environment
+
+	TxRuntimeEnv       runtime.Environment
+	ScriptRuntimeEnv   runtime.Environment
+	VMTxRuntimeEnv     runtime.Environment
+	VMScriptRuntimeEnv runtime.Environment
 
 	fvmEnv Environment
 }
@@ -38,9 +41,11 @@ func NewReusableCadenceRuntime(
 	config runtime.Config,
 ) *ReusableCadenceRuntime {
 	reusable := &ReusableCadenceRuntime{
-		Runtime:          rt,
-		TxRuntimeEnv:     runtime.NewBaseInterpreterEnvironment(config),
-		ScriptRuntimeEnv: runtime.NewScriptInterpreterEnvironment(config),
+		Runtime:            rt,
+		TxRuntimeEnv:       runtime.NewBaseInterpreterEnvironment(config),
+		ScriptRuntimeEnv:   runtime.NewScriptInterpreterEnvironment(config),
+		VMTxRuntimeEnv:     runtime.NewBaseVMEnvironment(config),
+		VMScriptRuntimeEnv: runtime.NewScriptVMEnvironment(config),
 	}
 
 	reusable.declareRandomSourceHistory()
@@ -128,10 +133,18 @@ func (reusable *ReusableCadenceRuntime) InvokeContractFunction(
 	functionName string,
 	arguments []cadence.Value,
 	argumentTypes []sema.Type,
+	useVM bool,
 ) (
 	cadence.Value,
 	error,
 ) {
+	var environment runtime.Environment
+	if useVM {
+		environment = reusable.VMTxRuntimeEnv
+	} else {
+		environment = reusable.TxRuntimeEnv
+	}
+
 	return reusable.Runtime.InvokeContractFunction(
 		contractLocation,
 		functionName,
@@ -139,7 +152,8 @@ func (reusable *ReusableCadenceRuntime) InvokeContractFunction(
 		argumentTypes,
 		runtime.Context{
 			Interface:   reusable.fvmEnv,
-			Environment: reusable.TxRuntimeEnv,
+			Environment: environment,
+			UseVM:       useVM,
 		},
 	)
 }
@@ -147,13 +161,21 @@ func (reusable *ReusableCadenceRuntime) InvokeContractFunction(
 func (reusable *ReusableCadenceRuntime) NewTransactionExecutor(
 	script runtime.Script,
 	location common.Location,
+	useVM bool,
 ) runtime.Executor {
+	var environment runtime.Environment
+	if useVM {
+		environment = reusable.VMTxRuntimeEnv
+	} else {
+		environment = reusable.TxRuntimeEnv
+	}
+
 	return reusable.Runtime.NewTransactionExecutor(
 		script,
 		runtime.Context{
 			Interface:   reusable.fvmEnv,
 			Location:    location,
-			Environment: reusable.TxRuntimeEnv,
+			Environment: environment,
 		},
 	)
 }
@@ -161,16 +183,24 @@ func (reusable *ReusableCadenceRuntime) NewTransactionExecutor(
 func (reusable *ReusableCadenceRuntime) ExecuteScript(
 	script runtime.Script,
 	location common.Location,
+	useVM bool,
 ) (
 	cadence.Value,
 	error,
 ) {
+	var environment runtime.Environment
+	if useVM {
+		environment = reusable.VMScriptRuntimeEnv
+	} else {
+		environment = reusable.ScriptRuntimeEnv
+	}
+
 	return reusable.Runtime.ExecuteScript(
 		script,
 		runtime.Context{
 			Interface:   reusable.fvmEnv,
 			Location:    location,
-			Environment: reusable.ScriptRuntimeEnv,
+			Environment: environment,
 		},
 	)
 }
