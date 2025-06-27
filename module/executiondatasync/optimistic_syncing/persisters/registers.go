@@ -27,6 +27,7 @@ func NewRegistersPersister(
 }
 
 // Persist persists registers
+// No errors are expected during normal operations
 func (r *RegistersPersister) Persist() error {
 	registerData, err := r.inMemoryRegisters.Data(r.height)
 	if err != nil {

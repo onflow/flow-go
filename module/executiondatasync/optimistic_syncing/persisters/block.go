@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_syncing/persisters/stores"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -16,7 +17,7 @@ import (
 type BlockPersister struct {
 	log zerolog.Logger
 
-	persisterStores []PersisterStore
+	persisterStores []stores.PersisterStore
 	protocolDB      storage.DB
 	executionResult *flow.ExecutionResult
 	header          *flow.Header
@@ -25,10 +26,10 @@ type BlockPersister struct {
 // NewBlockPersister creates a new block persister.
 func NewBlockPersister(
 	log zerolog.Logger,
-	persisterStores []PersisterStore,
 	protocolDB storage.DB,
 	executionResult *flow.ExecutionResult,
 	header *flow.Header,
+	persisterStores []stores.PersisterStore,
 ) *BlockPersister {
 	log = log.With().
 		Str("component", "block_persister").
@@ -45,7 +46,6 @@ func NewBlockPersister(
 	}
 
 	persister.log.Info().
-		Uint64("height", header.Height).
 		Int("batch_persisters_count", len(persisterStores)).
 		Msg("block persisters initialized")
 
@@ -71,12 +71,8 @@ func (p *BlockPersister) Persist() error {
 		return fmt.Errorf("failed to commit batch: %w", err)
 	}
 
-	// TODO: include update to latestPersistedSealedResultBlockHeight in the batch
-
-	duration := time.Since(start)
-
 	p.log.Debug().
-		Dur("duration_ms", duration).
+		Dur("duration_ms", time.Since(start)).
 		Msg("successfully prepared execution data for persistence")
 
 	return nil
