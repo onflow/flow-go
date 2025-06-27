@@ -20,8 +20,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TransactionResultErrorMessageRequester defines the interface for requesting transaction result error messages.
-type TransactionResultErrorMessageRequester interface {
+// Requester defines the interface for requesting transaction result error messages.
+type Requester interface {
 	// Request fetches transaction results error messages.
 	// Expected errors:
 	// - context.Canceled: if the provided context was canceled before completion
@@ -39,9 +39,9 @@ type RequesterConfig struct {
 	MaxRetryDelay time.Duration
 }
 
-var _ TransactionResultErrorMessageRequester = (*Requester)(nil)
+var _ Requester = (*RequesterImpl)(nil)
 
-type Requester struct {
+type RequesterImpl struct {
 	logger                     zerolog.Logger
 	config                     *RequesterConfig
 	backend                    *backend.Backend
@@ -55,8 +55,8 @@ func NewRequester(
 	backend *backend.Backend,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 	executionResult *flow.ExecutionResult,
-) *Requester {
-	return &Requester{
+) *RequesterImpl {
+	return &RequesterImpl{
 		logger:                     logger,
 		config:                     config,
 		backend:                    backend,
@@ -71,7 +71,7 @@ func NewRequester(
 // Expected errors expected during normal operations:
 // - context.DeadlineExceeded - if context timeouts
 // - context.Canceled - if context was canceled
-func (r *Requester) Request(ctx context.Context) ([]flow.TransactionResultErrorMessage, error) {
+func (r *RequesterImpl) Request(ctx context.Context) ([]flow.TransactionResultErrorMessage, error) {
 	backoff := retry.NewExponential(r.config.RetryDelay)
 	backoff = retry.WithCappedDuration(r.config.MaxRetryDelay, backoff)
 	backoff = retry.WithJitterPercent(15, backoff)
@@ -132,7 +132,7 @@ func (r *Requester) Request(ctx context.Context) ([]flow.TransactionResultErrorM
 //     - codes.NotFound - request cannot be served by EN because of absence of data.
 //     - codes.Unavailable - remote node is not unavailable.
 //     - codes.Canceled - if ctx is canceled during request
-func (r *Requester) request(
+func (r *RequesterImpl) request(
 	ctx context.Context,
 	blockID flow.Identifier,
 	resultID flow.Identifier,
@@ -165,7 +165,7 @@ func (r *Requester) request(
 	return errorMessages, nil
 }
 
-func (r *Requester) convertResponse(
+func (r *RequesterImpl) convertResponse(
 	responseMessages []*execproto.GetTransactionErrorMessagesResponse_Result,
 	execNode *flow.IdentitySkeleton,
 ) []flow.TransactionResultErrorMessage {

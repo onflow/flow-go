@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_syncing/persisters"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_syncing/persisters/stores"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -25,6 +27,7 @@ const DefaultTxResultErrMsgsRequestTimeout = 5 * time.Second
 // Core defines the interface for pipeline processing steps.
 // Each implementation should handle an execution data and implement the three-phase processing:
 // download, index, and persist.
+// CAUTION: The Core instance should not be used after Abandon is called as it could cause panic due to cleared data.
 type Core interface {
 	// Download retrieves all necessary data for processing.
 	// CAUTION: not concurrency safe!
@@ -49,6 +52,7 @@ type Core interface {
 
 	// Abandon indicates that the protocol has abandoned this state. Hence processing will be aborted
 	// and any data dropped.
+	// CAUTION: The Core instance should not be used after Abandon is called as it could cause panic due to cleared data.
 	// CAUTION: not concurrency safe!
 	//
 	// No errors are expected during normal operations
@@ -69,10 +73,11 @@ type workingData struct {
 
 	// Active processing components
 	execDataRequester             requester.ExecutionDataRequester
-	txResultErrMsgsRequester      tx_error_messages.TransactionResultErrorMessageRequester
+	txResultErrMsgsRequester      tx_error_messages.Requester
 	txResultErrMsgsRequestTimeout time.Duration
 	indexer                       *indexer.InMemoryIndexer
-	persister                     *indexer.BlockPersister
+	blockPersister                *persisters.BlockPersister
+	registersPersister            *persisters.RegistersPersister
 
 	// Working data
 	executionData       *execution_data.BlockExecutionDataEntity
@@ -83,6 +88,7 @@ var _ Core = (*CoreImpl)(nil)
 
 // CoreImpl implements the Core interface for processing execution data.
 // It coordinates the download, indexing, and persisting of execution data.
+// CAUTION: The CoreImpl instance should not be used after Abandon is called as it could cause panic due to cleared data.
 // CAUTION: not concurrency safe!
 type CoreImpl struct {
 	log zerolog.Logger
@@ -100,7 +106,7 @@ func NewCoreImpl(
 	executionResult *flow.ExecutionResult,
 	header *flow.Header,
 	execDataRequester requester.ExecutionDataRequester,
-	txResultErrMsgsRequester tx_error_messages.TransactionResultErrorMessageRequester,
+	txResultErrMsgsRequester tx_error_messages.Requester,
 	txResultErrMsgsRequestTimeout time.Duration,
 	persistentRegisters storage.RegisterIndex,
 	persistentEvents storage.Events,
@@ -108,6 +114,7 @@ func NewCoreImpl(
 	persistentTransactions storage.Transactions,
 	persistentResults storage.LightTransactionResults,
 	persistentTxResultErrMsg storage.TransactionResultErrorMessages,
+	latestPersistedSealedResult storage.LatestPersistedSealedResult,
 	protocolDB storage.DB,
 ) *CoreImpl {
 	coreLogger := logger.With().
@@ -136,24 +143,24 @@ func NewCoreImpl(
 		header,
 	)
 
-	persisterComponent := indexer.NewPersister(
+	persisterStores := []stores.PersisterStore{
+		stores.NewEventsStore(inmemEvents, persistentEvents, executionResult.BlockID),
+		stores.NewResultsStore(inmemResults, persistentResults, executionResult.BlockID),
+		stores.NewCollectionsStore(inmemCollections, persistentCollections),
+		stores.NewTransactionsStore(inmemTransactions, persistentTransactions),
+		stores.NewTxResultErrMsgStore(inmemTxResultErrMsgs, persistentTxResultErrMsg, executionResult.BlockID),
+		stores.NewLatestSealedResultStore(latestPersistedSealedResult, executionResult.ID(), header.Height),
+	}
+
+	blockPersister := persisters.NewBlockPersister(
 		coreLogger,
-		inmemRegisters,
-		inmemEvents,
-		inmemCollections,
-		inmemTransactions,
-		inmemResults,
-		inmemTxResultErrMsgs,
-		persistentRegisters,
-		persistentEvents,
-		persistentCollections,
-		persistentTransactions,
-		persistentResults,
-		persistentTxResultErrMsg,
 		protocolDB,
 		executionResult,
 		header,
+		persisterStores,
 	)
+
+	registerPersister := persisters.NewRegistersPersister(inmemRegisters, persistentRegisters, header.Height)
 
 	return &CoreImpl{
 		log: coreLogger,
@@ -162,7 +169,8 @@ func NewCoreImpl(
 			txResultErrMsgsRequester:      txResultErrMsgsRequester,
 			txResultErrMsgsRequestTimeout: txResultErrMsgsRequestTimeout,
 			indexer:                       indexerComponent,
-			persister:                     persisterComponent,
+			blockPersister:                blockPersister,
+			registersPersister:            registerPersister,
 			inmemRegisters:                inmemRegisters,
 			inmemEvents:                   inmemEvents,
 			inmemCollections:              inmemCollections,
@@ -271,9 +279,12 @@ func (c *CoreImpl) Index() error {
 func (c *CoreImpl) Persist() error {
 	c.log.Debug().Msg("persisting execution data")
 
-	// Add all data to the batch
-	if err := c.workingData.persister.Persist(); err != nil {
-		return fmt.Errorf("failed to persist data: %w", err)
+	if err := c.workingData.registersPersister.Persist(); err != nil {
+		return fmt.Errorf("failed to persist register data: %w", err)
+	}
+
+	if err := c.workingData.blockPersister.Persist(); err != nil {
+		return fmt.Errorf("failed to persist block data: %w", err)
 	}
 
 	c.log.Debug().Msg("successfully persisted execution data")
@@ -283,6 +294,7 @@ func (c *CoreImpl) Persist() error {
 
 // Abandon indicates that the protocol has abandoned this state. Hence processing will be aborted
 // and any data dropped.
+// CAUTION: The CoreImpl instance should not be used after Abandon is called as it could cause panic due to cleared data.
 // CAUTION: not concurrency safe!
 //
 // No errors are expected during normal operations

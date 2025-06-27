@@ -33,6 +33,7 @@ type CoreImplSuite struct {
 	persistentTransactions        *storagemock.Transactions
 	persistentResults             *storagemock.LightTransactionResults
 	persistentTxResultErrMsg      *storagemock.TransactionResultErrorMessages
+	latestPersistedSealedResult   *storagemock.LatestPersistedSealedResult
 }
 
 func TestCoreImplSuiteSuite(t *testing.T) {
@@ -62,6 +63,7 @@ func (c *CoreImplSuite) SetupTest() {
 	c.persistentTransactions = storagemock.NewTransactions(t)
 	c.persistentResults = storagemock.NewLightTransactionResults(t)
 	c.persistentTxResultErrMsg = storagemock.NewTransactionResultErrorMessages(t)
+	c.latestPersistedSealedResult = storagemock.NewLatestPersistedSealedResult(t)
 
 	// Set up default expectations for persist operations
 	// These will be called by the real Persister during Persist()
@@ -71,6 +73,7 @@ func (c *CoreImplSuite) SetupTest() {
 	c.persistentTransactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil).Maybe()
 	c.persistentResults.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	c.persistentTxResultErrMsg.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	c.latestPersistedSealedResult.On("BatchSet", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 }
 
 // createTestCoreImpl creates a CoreImpl instance with mocked dependencies for testing.
@@ -93,6 +96,7 @@ func (c *CoreImplSuite) createTestCoreImpl() *CoreImpl {
 		c.persistentTransactions,
 		c.persistentResults,
 		c.persistentTxResultErrMsg,
+		c.latestPersistedSealedResult,
 		c.db,
 	)
 
@@ -258,7 +262,7 @@ func (c *CoreImplSuite) TestCoreImpl_Index() {
 func (c *CoreImplSuite) TestCoreImpl_Persist() {
 	t := c.T()
 
-	c.Run("successful persistence", func() {
+	c.Run("successful persistence of empty data", func() {
 		// Create mocks with proper expectations
 		c.db = storagemock.NewDB(t)
 		c.db.On("WithReaderBatchWriter", mock.Anything).Return(nil)
@@ -281,7 +285,7 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 		c.Require().Error(err)
 
 		c.Assert().ErrorIs(err, assert.AnError)
-		c.Assert().Contains(err.Error(), "failed to persist data")
+		c.Assert().Contains(err.Error(), "failed to persist block data")
 	})
 }
 
