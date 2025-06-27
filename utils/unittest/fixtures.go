@@ -559,17 +559,11 @@ func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *fl
 	}
 }
 
-func ClusterPayloadFixture(n int) *cluster.Payload {
-	transactions := make([]*flow.TransactionBody, n)
-	for i := 0; i < n; i++ {
-		tx := TransactionBodyFixture()
-		transactions[i] = &tx
+func ClusterPayloadFixture(transactionsCount int) *cluster.Payload {
+	return &cluster.Payload{
+		ReferenceBlockID: IdentifierFixture(),
+		Collection:       CollectionFixture(transactionsCount),
 	}
-	payload, err := cluster.NewPayload(IdentifierFixture(), transactions)
-	if err != nil {
-		panic(err)
-	}
-	return payload
 }
 
 func ClusterBlockFixture() cluster.Block {

@@ -32,7 +32,7 @@ func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) *c
 		ProposerID:         flow.ZeroID,
 	}
 
-	//TODO(Uliana: malleability immutable): decide if we need separate constuctor or do not use constructor here at all
+	// Constructor is skipped for root block
 	//nolint:structwrite
 	return &cluster.Block{
 		Header:  headerBody,

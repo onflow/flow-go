@@ -205,7 +205,12 @@ func (suite *BuilderSuite) Payload(transactions ...*flow.TransactionBody) model.
 	final, err := suite.protoState.Final().Head()
 	suite.Require().NoError(err)
 
-	payload, err := model.NewPayload(final.ID(), transactions)
+	payload, err := model.NewPayload(
+		model.UntrustedPayload{
+			ReferenceBlockID: final.ID(),
+			Collection:       flow.Collection{Transactions: transactions},
+		},
+	)
 	suite.Require().NoError(err)
 
 	return *payload

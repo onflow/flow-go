@@ -112,7 +112,12 @@ func (suite *SnapshotSuite) Payload(transactions ...*flow.TransactionBody) model
 		transactions = []*flow.TransactionBody{}
 	}
 
-	payload, err := model.NewPayload(minRefID, transactions)
+	payload, err := model.NewPayload(
+		model.UntrustedPayload{
+			ReferenceBlockID: minRefID,
+			Collection:       flow.Collection{Transactions: transactions},
+		},
+	)
 	suite.Assert().NoError(err)
 
 	return *payload
@@ -186,7 +191,7 @@ func (suite *SnapshotSuite) TestEmptyCollection() {
 	t := suite.T()
 
 	// create a block with an empty collection
-	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(flow.ZeroID))
+	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(unittest.IdentifierFixture()))
 	suite.InsertBlock(proposal)
 
 	snapshot := suite.state.AtBlockID(proposal.Block.ID())

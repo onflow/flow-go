@@ -85,7 +85,12 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx1.ID(), &tx1))
 
 			// create a new block on genesis
-			payload, err := model.NewPayload(refBlock.ID(), []*flow.TransactionBody{&tx1})
+			payload, err := model.NewPayload(
+				model.UntrustedPayload{
+					ReferenceBlockID: refBlock.ID(),
+					Collection:       flow.Collection{Transactions: []*flow.TransactionBody{&tx1}},
+				},
+			)
 			require.NoError(t, err)
 			block := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
 			insert(block)
@@ -155,7 +160,12 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
-			payload, err := model.NewPayload(refBlock.ID(), []*flow.TransactionBody{&tx1})
+			payload, err := model.NewPayload(
+				model.UntrustedPayload{
+					ReferenceBlockID: refBlock.ID(),
+					Collection:       flow.Collection{Transactions: []*flow.TransactionBody{&tx1}},
+				},
+			)
 			require.NoError(t, err)
 			block := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
 			insert(block)
@@ -201,13 +211,23 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
-			payload, err := model.NewPayload(refBlock.ID(), []*flow.TransactionBody{&tx1})
+			payload, err := model.NewPayload(
+				model.UntrustedPayload{
+					ReferenceBlockID: refBlock.ID(),
+					Collection:       flow.Collection{Transactions: []*flow.TransactionBody{&tx1}},
+				},
+			)
 			require.NoError(t, err)
 			block1 := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
 			insert(block1)
 
 			// create a block containing tx2 on top of block1
-			payload, err = model.NewPayload(refBlock.ID(), []*flow.TransactionBody{&tx2})
+			payload, err = model.NewPayload(
+				model.UntrustedPayload{
+					ReferenceBlockID: refBlock.ID(),
+					Collection:       flow.Collection{Transactions: []*flow.TransactionBody{&tx2}},
+				},
+			)
 			require.NoError(t, err)
 			block2 := unittest.ClusterBlockWithParentAndPayload(block1, *payload)
 			insert(block2)
@@ -258,13 +278,23 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
-			payload, err := model.NewPayload(refBlock.ID(), []*flow.TransactionBody{&tx1})
+			payload, err := model.NewPayload(
+				model.UntrustedPayload{
+					ReferenceBlockID: refBlock.ID(),
+					Collection:       flow.Collection{Transactions: []*flow.TransactionBody{&tx1}},
+				},
+			)
 			require.NoError(t, err)
 			block1 := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
 			insert(block1)
 
 			// create a block containing tx2 on top of block1
-			payload, err = model.NewPayload(refBlock.ID(), []*flow.TransactionBody{&tx2})
+			payload, err = model.NewPayload(
+				model.UntrustedPayload{
+					ReferenceBlockID: refBlock.ID(),
+					Collection:       flow.Collection{Transactions: []*flow.TransactionBody{&tx2}},
+				},
+			)
 			require.NoError(t, err)
 			block2 := unittest.ClusterBlockWithParentAndPayload(block1, *payload)
 			insert(block2)
@@ -310,13 +340,23 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
-			payload, err := model.NewPayload(refBlock.ID(), []*flow.TransactionBody{&tx1})
+			payload, err := model.NewPayload(
+				model.UntrustedPayload{
+					ReferenceBlockID: refBlock.ID(),
+					Collection:       flow.Collection{Transactions: []*flow.TransactionBody{&tx1}},
+				},
+			)
 			require.NoError(t, err)
 			block1 := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
 			insert(block1)
 
 			// create a block containing tx2 on top of genesis (conflicting with block1)
-			payload, err = model.NewPayload(refBlock.ID(), []*flow.TransactionBody{&tx2})
+			payload, err = model.NewPayload(
+				model.UntrustedPayload{
+					ReferenceBlockID: refBlock.ID(),
+					Collection:       flow.Collection{Transactions: []*flow.TransactionBody{&tx2}},
+				},
+			)
 			require.NoError(t, err)
 			block2 := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
 			insert(block2)

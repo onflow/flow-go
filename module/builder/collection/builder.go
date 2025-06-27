@@ -495,7 +495,12 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 	}
 
 	// build the payload from the transactions
-	payload, err := cluster.NewPayload(minRefID, transactions)
+	payload, err := cluster.NewPayload(
+		cluster.UntrustedPayload{
+			ReferenceBlockID: minRefID,
+			Collection:       flow.Collection{Transactions: transactions},
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not build a payload from the transactions: %w", err)
 	}
