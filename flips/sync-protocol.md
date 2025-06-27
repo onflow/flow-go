@@ -45,7 +45,7 @@ Each time the Sync Engine receives a Block Response, it calls [`HandleBlock`](ht
     * [Select a subset of these Ranges and Batches to return](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/module/synchronization/core.go#L441-L454) based on a configurable limit on the maximum number of in-flight requests. 
 
   While conceptually easy to understand, this implementation is inefficient and performs many more loop iterations than necessary.
-* `HandleHeight` iterates over the entire range from the local finalized height to the received height, queueing all new heights and requeueing heights which have already been received. This can be expensive if the node is very far behind.
+* `HandleHeight` iterates over the entire range from the local finalized height to the received height, queueing all new heights and requeuing heights which have already been received. This can be expensive if the node is very far behind.
 * The Sync Core optimistically sets the status of an item in `Heights` as Received as soon as *any* block with the corresponding height is received, even though it has no way of knowing whether the received block has actually been finalized by consensus. This could cause the height to stop being requested before the finalized block has actually been received. It's also possible that this could cause `Heights` to become fragmented (smaller requestable ranges).
 * Processing a Range Request response may or may not advance the local finalized height. There are two reasons why it may not progress:
   * The response contains blocks that are not actually finalized (e.g. received from a malicious node).
