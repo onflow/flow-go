@@ -15,6 +15,7 @@ import (
 type Collections struct {
 	db           storage.DB
 	transactions *Transactions
+	// TODO(7355): lockctx
 	indexingByTx sync.Mutex
 }
 
