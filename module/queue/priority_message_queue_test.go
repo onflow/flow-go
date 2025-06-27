@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestNewPriorityMessageQueue tests the constructor
