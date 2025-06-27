@@ -14,6 +14,16 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
+// ExecutionDataRequester defines the interface for requesting execution data for a block.
+type ExecutionDataRequester interface {
+	// RequestExecutionData requests execution data for a given block.
+	//
+	// Expected errors:
+	// - context.Canceled: if the provided context was canceled before completion
+	// All other errors are unexpected exceptions and may indicate invalid execution data was received.
+	RequestExecutionData(ctx context.Context) (*execution_data.BlockExecutionData, error)
+}
+
 // OneshotExecutionDataConfig is a config for the oneshot execution data requester.
 // It contains the retry settings for the execution data fetch.
 type OneshotExecutionDataConfig struct {
@@ -28,6 +38,8 @@ type OneshotExecutionDataConfig struct {
 	// the max delay used in the exponential backoff for failed execution data download.
 	MaxRetryDelay time.Duration
 }
+
+var _ ExecutionDataRequester = (*OneshotExecutionDataRequester)(nil)
 
 // OneshotExecutionDataRequester is a component that requests execution data for a block.
 // It uses a retry mechanism to retry the download execution data if they are not found.
