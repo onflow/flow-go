@@ -40,6 +40,7 @@ type Core interface {
 
 var _ Core = (*CoreImpl)(nil)
 
+// TODO: dummy implementation. fill in complete implementation later.
 type CoreImpl struct{}
 
 func NewCore() *CoreImpl {
@@ -50,14 +51,14 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 	return fmt.Errorf("not implemented")
 }
 
-func (c *CoreImpl) Index(ctx context.Context) error {
+func (c *CoreImpl) Index() error {
 	return fmt.Errorf("not implemented")
 }
 
-func (c *CoreImpl) Persist(ctx context.Context) error {
+func (c *CoreImpl) Persist() error {
 	return fmt.Errorf("not implemented")
 }
 
-func (c *CoreImpl) Abandon(ctx context.Context) error {
+func (c *CoreImpl) Abandon() error {
 	return fmt.Errorf("not implemented")
 }
