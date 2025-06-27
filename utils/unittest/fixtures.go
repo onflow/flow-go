@@ -262,11 +262,11 @@ func ProposalFixture() *messages.BlockProposal {
 }
 
 func ProposalFromBlock(block *flow.Block) *messages.BlockProposal {
-	return messages.NewBlockProposal(block)
+	return messages.NewBlockProposalFromInternal(block)
 }
 
 func ClusterProposalFromBlock(block *cluster.Block) *messages.ClusterBlockProposal {
-	return messages.NewClusterBlockProposal(block)
+	return messages.NewClusterBlockProposalFromInternal(block)
 }
 
 func BlockchainFixture(length int) []*flow.Block {

@@ -69,7 +69,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	go func() {
 		for i := 0; i < blockCount; i++ {
 			block := unittest.BlockWithParentFixture(cs.head)
-			proposal := messages.NewBlockProposal(block)
+			proposal := messages.NewBlockProposalFromInternal(block)
 			hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 			cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
 			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()

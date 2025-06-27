@@ -120,7 +120,7 @@ func (s *EngineSuite) TestProcessGossipedBlock() {
 		close(done)
 	}).Once()
 
-	err := s.engine.Process(channels.ReceiveBlocks, originID, messages.NewBlockProposal(block))
+	err := s.engine.Process(channels.ReceiveBlocks, originID, messages.NewBlockProposalFromInternal(block))
 	require.NoError(s.T(), err)
 
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
@@ -138,7 +138,7 @@ func (s *EngineSuite) TestProcessBlockFromComplianceInterface() {
 
 	s.engine.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
 		OriginID: originID,
-		Message:  messages.NewBlockProposal(block),
+		Message:  messages.NewBlockProposalFromInternal(block),
 	})
 
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
@@ -220,7 +220,7 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 func flowBlocksToBlockProposals(blocks ...*flow.Block) []*messages.BlockProposal {
 	result := make([]*messages.BlockProposal, 0, len(blocks))
 	for _, block := range blocks {
-		result = append(result, messages.NewBlockProposal(block))
+		result = append(result, messages.NewBlockProposalFromInternal(block))
 	}
 	return result
 }

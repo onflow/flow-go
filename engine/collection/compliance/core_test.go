@@ -201,7 +201,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 	originID := unittest.IdentifierFixture()
 	block := unittest.ClusterBlockWithParent(cs.head)
 
-	proposal := messages.NewClusterBlockProposal(&block)
+	proposal := messages.NewClusterBlockProposalFromInternal(&block)
 
 	// store the data for retrieval
 	cs.headerDB[block.Header.ParentID] = cs.head
@@ -226,7 +226,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	ancestor := unittest.ClusterBlockWithParent(cs.head)
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
-	proposal := messages.NewClusterBlockProposal(&block)
+	proposal := messages.NewClusterBlockProposalFromInternal(&block)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent
@@ -279,7 +279,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 	ancestor := unittest.ClusterBlockWithParent(cs.head)
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
-	proposal := messages.NewClusterBlockProposal(&block)
+	proposal := messages.NewClusterBlockProposalFromInternal(&block)
 	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 
 	// store the data for retrieval
@@ -362,7 +362,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 	ancestor := unittest.ClusterBlockWithParent(cs.head)
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
-	proposal := messages.NewClusterBlockProposal(&block)
+	proposal := messages.NewClusterBlockProposalFromInternal(&block)
 	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 
 	// store the data for retrieval
@@ -528,7 +528,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 			},
 		)
 
-		proposal := messages.NewClusterBlockProposal(block)
+		proposal := messages.NewClusterBlockProposalFromInternal(block)
 
 		// process and make sure no error occurs (as they are unverifiable)
 		err := cs.core.OnBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
@@ -561,7 +561,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	cs.voteAggregator.On("AddBlock", mock.Anything).Times(4)
 	cs.validator.On("ValidateProposal", mock.Anything).Times(4).Return(nil)
 
-	missingProposal := messages.NewClusterBlockProposal(missing)
+	missingProposal := messages.NewClusterBlockProposalFromInternal(missing)
 
 	proposalsLookup[missing.ID()] = missing
 
