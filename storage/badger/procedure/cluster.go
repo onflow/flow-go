@@ -228,14 +228,18 @@ func RetrieveClusterPayload(blockID flow.Identifier, payload *cluster.Payload) f
 			colTransactions = append(colTransactions, &nextTx)
 		}
 
+		collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: colTransactions})
+		if err != nil {
+			return fmt.Errorf("could not build the collection from the transactions: %w", err)
+		}
 		newPayload, err := cluster.NewPayload(
 			cluster.UntrustedPayload{
 				ReferenceBlockID: refID,
-				Collection:       flow.Collection{Transactions: colTransactions},
+				Collection:       *collection,
 			},
 		)
 		if err != nil {
-			return fmt.Errorf("could not build the payload from the transactions: %w", err)
+			return fmt.Errorf("could not build the payload: %w", err)
 		}
 
 		*payload = *newPayload
