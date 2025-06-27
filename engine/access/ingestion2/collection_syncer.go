@@ -73,6 +73,9 @@ type CollectionSyncer struct {
 	state     protocol.State
 	requester module.Requester
 
+	// channel of collections to be indexed
+	pendingCollections chan flow.Entity
+
 	blocks       storage.Blocks
 	collections  storage.Collections
 	transactions storage.Transactions
@@ -98,6 +101,7 @@ func NewCollectionSyncer(
 		logger:                   logger,
 		state:                    state,
 		requester:                requester,
+		pendingCollections:       make(chan flow.Entity),
 		blocks:                   blocks,
 		collections:              collections,
 		transactions:             transactions,
@@ -144,6 +148,19 @@ func (s *CollectionSyncer) StartWorkerLoop(ctx irrecoverable.SignalerContext, re
 			err := s.updateLastFullBlockHeight()
 			if err != nil {
 				ctx.Throw(err)
+			}
+
+		case entity := <-s.pendingCollections:
+			collection, ok := entity.(*flow.Collection)
+			if !ok {
+				ctx.Throw(fmt.Errorf("expected a *flow.Collection but got %T", entity))
+				return
+			}
+
+			err := indexer.IndexCollection(collection, s.collections, s.transactions, s.logger, s.collectionExecutedMetric)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("error indexing collection: %w", err))
+				return
 			}
 		}
 	}
@@ -405,17 +422,14 @@ func (s *CollectionSyncer) findLowestBlockHeightWithMissingCollections(
 }
 
 // OnCollectionDownloaded indexes and persists a downloaded collection.
-// This is a callback intended to be used with the requester engine.
+// This function is a callback intended to be used by the requester engine.
+//
+// Note: You might wonder what happens if the ingestion engine crashes,
+// but the requester engine continues to invoke this callback and writes
+// to a closed channel. In our current design, we intentionally ignore such cases.
+//
+// If any engine crashes, we treat it as a sign of possible state corruption,
+// and the node is expected to restart. Thus, this edge case is not handled explicitly.
 func (s *CollectionSyncer) OnCollectionDownloaded(_ flow.Identifier, entity flow.Entity) {
-	collection, ok := entity.(*flow.Collection)
-	if !ok {
-		s.logger.Error().Msgf("invalid entity type (%T)", entity)
-		return
-	}
-
-	err := indexer.IndexCollection(collection, s.collections, s.transactions, s.logger, s.collectionExecutedMetric)
-	if err != nil {
-		s.logger.Error().Err(err).Msg("could not index collection after it has been downloaded")
-		return
-	}
+	s.pendingCollections <- entity
 }
