@@ -294,7 +294,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.Cluster
 	// process the blocks one by one
 	for _, block := range res.Blocks {
 		header := block.Header
-		if !e.core.HandleBlock(&header) {
+		if !e.core.HandleBlock(header) {
 			continue
 		}
 		synced := flow.Slashable[*messages.ClusterBlockProposal]{

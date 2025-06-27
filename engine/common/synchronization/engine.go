@@ -310,7 +310,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 	filteredBlocks := make([]*messages.BlockProposal, 0, len(res.Blocks))
 	for _, block := range res.Blocks {
 		header := block.Header
-		if !e.core.HandleBlock(&header) {
+		if !e.core.HandleBlock(header) {
 			e.log.Debug().Uint64("height", header.Height).Msg("block handler rejected")
 			continue
 		}

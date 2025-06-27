@@ -112,7 +112,7 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.ClusterBlockPro
 
 	block := flow.Slashable[*cluster.Block]{
 		OriginID: proposal.OriginID,
-		Message:  proposal.Message.Block.ToInternal(),
+		Message:  &proposal.Message.Block,
 	}
 	header := block.Message.Header
 	blockID := header.ID()
