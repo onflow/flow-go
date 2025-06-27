@@ -335,6 +335,10 @@ func (p *PipelineImpl) processAbandoned() error {
 
 // transitionTo transitions the pipeline to the given state and broadcasts
 // the state change to children pipelines.
+//
+// Expected Errors:
+//   - ErrInvalidTransition: when the transition is invalid
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (p *PipelineImpl) transitionTo(newState State) error {
 	hasChange, err := p.setState(newState)
 	if err != nil {
