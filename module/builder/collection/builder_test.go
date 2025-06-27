@@ -36,7 +36,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var noopSetter = func(*flow.Header) error { return nil }
+var noopSetter = func(header *flow.Header) error {
+	header.ParentVoterIndices = unittest.SignerIndicesFixture(4)
+	header.ParentVoterSigData = unittest.SignatureFixture()
+	header.ProposerID = unittest.IdentifierFixture()
+	return nil
+}
 var noopSigner = func(*flow.Header) ([]byte, error) { return nil, nil }
 
 type BuilderSuite struct {
@@ -200,7 +205,12 @@ func (suite *BuilderSuite) Payload(transactions ...*flow.TransactionBody) model.
 	final, err := suite.protoState.Final().Head()
 	suite.Require().NoError(err)
 
-	payload, err := model.NewPayload(final.ID(), transactions)
+	payload, err := model.NewPayload(
+		model.UntrustedPayload{
+			ReferenceBlockID: final.ID(),
+			Collection:       flow.Collection{Transactions: transactions},
+		},
+	)
 	suite.Require().NoError(err)
 
 	return *payload
@@ -237,10 +247,12 @@ func (suite *BuilderSuite) TestBuildOn_NonExistentParent() {
 }
 
 func (suite *BuilderSuite) TestBuildOn_Success() {
-
 	var expectedHeight uint64 = 42
 	setter := func(h *flow.Header) error {
 		h.Height = expectedHeight
+		h.ParentVoterIndices = unittest.SignerIndicesFixture(4)
+		h.ParentVoterSigData = unittest.SignatureFixture()
+		h.ProposerID = unittest.IdentifierFixture()
 		return nil
 	}
 

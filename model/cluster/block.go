@@ -3,6 +3,8 @@
 package cluster
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -14,30 +16,68 @@ func Genesis() *Block {
 		ParentID:  flow.ZeroID,
 	}
 
-	block := NewBlock(headerBody, *NewEmptyPayload(flow.ZeroID))
-	return &block
+	// Constructor is skipped for genesis block
+	//nolint:structwrite
+	return &Block{
+		Header:  headerBody,
+		Payload: *NewEmptyPayload(flow.ZeroID),
+	}
 }
 
 // Block represents a block in collection node cluster consensus. It contains
 // a standard block header with a payload containing only a single collection.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Block struct {
 	Header  flow.HeaderBody
 	Payload Payload
 }
 
-// NewBlock creates a new block in collection node cluster consensus.
+// UntrustedBlock is an untrusted input-only representation of a cluster Block,
+// used for construction.
 //
-// Parameters:
-// - headerBody: the header fields to use for the block
-// - payload: the payload to associate with the block
-func NewBlock(
-	headerBody flow.HeaderBody,
-	payload Payload,
-) Block {
-	return Block{
-		Header:  headerBody,
-		Payload: payload,
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedBlock should be validated and converted into
+// a trusted cluster Block using NewBlock constructor.
+type UntrustedBlock Block
+
+// NewBlock creates a new block in collection node cluster consensus.
+// Construction cluster Block allowed only within the constructor.
+//
+// All errors indicate a valid Block cannot be constructed from the input.
+func NewBlock(untrusted UntrustedBlock) (*Block, error) {
+	// validate header body
+	untrustedHeaderBody := untrusted.Header
+	if untrustedHeaderBody.ParentID == flow.ZeroID {
+		return nil, fmt.Errorf("parent ID must not be zero")
 	}
+	if len(untrustedHeaderBody.ParentVoterIndices) == 0 {
+		return nil, fmt.Errorf("parent voter indices must not be empty")
+	}
+	if len(untrustedHeaderBody.ParentVoterSigData) == 0 {
+		return nil, fmt.Errorf("parent voter signature must not be empty")
+	}
+	if untrustedHeaderBody.ProposerID == flow.ZeroID {
+		return nil, fmt.Errorf("proposer ID must not be zero")
+	}
+
+	// validate payload
+	untrustedPayload := untrusted.Payload
+	if untrustedPayload.ReferenceBlockID == flow.ZeroID {
+		return nil, fmt.Errorf("reference block ID must not be zero")
+	}
+	_, err := flow.NewCollection(flow.UntrustedCollection(untrustedPayload.Collection))
+	if err != nil {
+		return nil, fmt.Errorf("invalid collection: %w", err)
+	}
+
+	return &Block{
+		Header:  untrustedHeaderBody,
+		Payload: untrustedPayload,
+	}, nil
 }
 
 // ID returns a collision-resistant hash of the cluster.Block struct.

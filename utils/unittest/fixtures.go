@@ -559,24 +559,18 @@ func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *fl
 	}
 }
 
-func ClusterPayloadFixture(n int) *cluster.Payload {
-	transactions := make([]*flow.TransactionBody, n)
-	for i := 0; i < n; i++ {
-		tx := TransactionBodyFixture()
-		transactions[i] = &tx
+func ClusterPayloadFixture(transactionsCount int) *cluster.Payload {
+	return &cluster.Payload{
+		ReferenceBlockID: IdentifierFixture(),
+		Collection:       CollectionFixture(transactionsCount),
 	}
-	payload, err := cluster.NewPayload(flow.ZeroID, transactions)
-	if err != nil {
-		panic(err)
-	}
-	return payload
 }
 
 func ClusterBlockFixture() cluster.Block {
-	payload := ClusterPayloadFixture(3)
-	headerBody := HeaderBodyFixture()
-
-	return cluster.NewBlock(headerBody, *payload)
+	return cluster.Block{
+		Header:  HeaderBodyFixture(),
+		Payload: *ClusterPayloadFixture(3),
+	}
 }
 
 func ClusterBlockChainFixture(n int) []cluster.Block {
@@ -611,7 +605,10 @@ func ClusterBlockWithParentAndPayload(parent cluster.Block, payload cluster.Payl
 	headerBody.ParentID = parent.ID()
 	headerBody.ParentView = parent.Header.View
 
-	return cluster.NewBlock(headerBody, payload)
+	return cluster.Block{
+		Header:  headerBody,
+		Payload: payload,
+	}
 }
 
 func WithCollRef(refID flow.Identifier) func(*flow.CollectionGuarantee) {

@@ -43,16 +43,30 @@ func NewEmptyPayload(refID flow.Identifier) *Payload {
 	}
 }
 
+// UntrustedPayload is an untrusted input-only representation of a cluster Payload,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedPayload should be validated and converted into
+// a trusted cluster Payload using NewPayload constructor.
+type UntrustedPayload Payload
+
 // NewPayload creates a payload given a reference block ID and a
 // list of transaction hashes.
-func NewPayload(refID flow.Identifier, transactions []*flow.TransactionBody) (*Payload, error) {
-	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: transactions})
+// Construction cluster Payload allowed only within the constructor.
+//
+// All errors indicate a valid Payload cannot be constructed from the input.
+func NewPayload(untrusted UntrustedPayload) (*Payload, error) {
+	collection, err := flow.NewCollection(flow.UntrustedCollection(untrusted.Collection))
 	if err != nil {
-		return nil, fmt.Errorf("could not construct payload: %w", err)
+		return nil, fmt.Errorf("could not construct collection: %w", err)
 	}
 	return &Payload{
 		Collection:       *collection,
-		ReferenceBlockID: refID,
+		ReferenceBlockID: untrusted.ReferenceBlockID,
 	}, nil
 }
 

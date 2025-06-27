@@ -160,7 +160,12 @@ func (suite *MutatorSuite) Payload(transactions ...*flow.TransactionBody) model.
 		transactions = []*flow.TransactionBody{}
 	}
 
-	payload, err := model.NewPayload(minRefID, transactions)
+	payload, err := model.NewPayload(
+		model.UntrustedPayload{
+			ReferenceBlockID: minRefID,
+			Collection:       flow.Collection{Transactions: transactions},
+		},
+	)
 	suite.Assert().NoError(err)
 
 	return *payload
