@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_syncing/persisters"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_syncing/persisters/stores"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -14,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_syncing/persisters"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_syncing/persisters/stores"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/storage"
