@@ -3,6 +3,8 @@
 package cluster
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -47,6 +49,31 @@ type UntrustedBlock Block
 //
 // All errors indicate a valid ExecutionReceipt cannot be constructed from the input.
 func NewBlock(untrusted UntrustedBlock) (*Block, error) {
+	// validate header body
+	untrustedHeaderBody := untrusted.Header
+	if untrustedHeaderBody.ParentID == flow.ZeroID {
+		return nil, fmt.Errorf("parent ID must not be zero")
+	}
+	if len(untrustedHeaderBody.ParentVoterIndices) == 0 {
+		return nil, fmt.Errorf("parent voter indices must not be empty")
+	}
+	if len(untrustedHeaderBody.ParentVoterSigData) == 0 {
+		return nil, fmt.Errorf("parent voter signature must not be empty")
+	}
+	if untrustedHeaderBody.ProposerID == flow.ZeroID {
+		return nil, fmt.Errorf("proposer ID must not be zero")
+	}
+
+	// validate payload
+	untrustedPayload := untrusted.Payload
+	if untrustedPayload.ReferenceBlockID == flow.ZeroID {
+		return nil, fmt.Errorf("reference block ID must not be zero")
+	}
+	_, err := flow.NewCollection(flow.UntrustedCollection(untrustedPayload.Collection))
+	if err != nil {
+		return nil, fmt.Errorf("invalid payload collection: %w", err)
+	}
+
 	return &Block{
 		Header:  untrusted.Header,
 		Payload: untrusted.Payload,
