@@ -28,8 +28,8 @@ func TestPipelineStateTransitions(t *testing.T) {
 	// Create mock core
 	mockCore := osmock.NewCore(t)
 	mockCore.On("Download", mock.Anything).Return(nil)
-	mockCore.On("Index", mock.Anything).Return(nil)
-	mockCore.On("Persist", mock.Anything).Return(nil)
+	mockCore.On("Index").Return(nil)
+	mockCore.On("Persist").Return(nil)
 
 	// Create a pipeline
 	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
@@ -181,8 +181,8 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 	// Create a mock core
 	mockCore := osmock.NewCore(t)
 	mockCore.On("Download", mock.Anything).Return(nil)
-	mockCore.On("Index", mock.Anything).Return(nil)
-	mockCore.On("Persist", mock.Anything).Return(nil)
+	mockCore.On("Index").Return(nil)
+	mockCore.On("Persist").Return(nil)
 
 	// Create a pipeline
 	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
@@ -333,7 +333,7 @@ func TestBroadcastStateUpdate(t *testing.T) {
 	// Create mock core
 	mockCore := osmock.NewCore(t)
 	mockCore.On("Download", mock.Anything).Return(nil)
-	mockCore.On("Index", mock.Anything).Return(nil)
+	mockCore.On("Index").Return(nil)
 
 	// Create a pipeline
 	pipeline := NewPipeline(zerolog.Nop(), false, unittest.ExecutionResultFixture(), mockCore, publisher)
