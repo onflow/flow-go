@@ -162,7 +162,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
 				expected := ss.heights[ref-1]
-				actual := res.Blocks[0].ToInternal()
+				actual := &res.Blocks[0]
 				assert.Equal(ss.T(), expected, actual, "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
@@ -288,7 +288,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
-				assert.Equal(ss.T(), &block, res.Blocks[0].ToInternal(), "response should contain right block")
+				assert.Equal(ss.T(), &block, &res.Blocks[0], "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")

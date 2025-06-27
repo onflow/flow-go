@@ -267,7 +267,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.ClusterBlockResponse)
 				expected := ss.heights[ref-1]
-				actual := res.Blocks[0].ToInternal()
+				actual := &res.Blocks[0]
 				assert.Equal(ss.T(), expected.ID(), actual.ID(), "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
@@ -377,7 +377,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.ClusterBlockResponse)
-				assert.Equal(ss.T(), &block, res.Blocks[0].ToInternal(), "response should contain right block")
+				assert.Equal(ss.T(), &block, &res.Blocks[0], "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
@@ -427,7 +427,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	originID := unittest.IdentifierFixture()
 	res := &messages.ClusterBlockResponse{
 		Nonce:  rand.Uint64(),
-		Blocks: []messages.UntrustedClusterBlock{},
+		Blocks: []clustermodel.Block{},
 	}
 
 	// add one block that should be processed
