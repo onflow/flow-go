@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/merr"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 )
 
 type pebbleSeeker struct {

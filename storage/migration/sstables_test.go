@@ -1,15 +1,16 @@
 package migration
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"sort"
 	"testing"
 
-	"github.com/cockroachdb/pebble"
-	"github.com/cockroachdb/pebble/objstorage/objstorageprovider"
-	"github.com/cockroachdb/pebble/sstable"
-	"github.com/cockroachdb/pebble/vfs"
+	"github.com/cockroachdb/pebble/v2"
+	"github.com/cockroachdb/pebble/v2/objstorage/objstorageprovider"
+	"github.com/cockroachdb/pebble/v2/sstable"
+	"github.com/cockroachdb/pebble/v2/vfs"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,7 +29,7 @@ func TestPebbleSSTableIngest(t *testing.T) {
 
 	// Create an SSTable with a few key-values
 	sstPath := filepath.Join(dir, "test.sst")
-	file, err := vfs.Default.Create(sstPath)
+	file, err := vfs.Default.Create(sstPath, vfs.WriteCategoryUnspecified)
 	require.NoError(t, err)
 	writable := objstorageprovider.NewFileWritable(file)
 	writer := sstable.NewWriter(writable, sstable.WriterOptions{
@@ -50,7 +51,7 @@ func TestPebbleSSTableIngest(t *testing.T) {
 	require.NoError(t, writer.Close())
 
 	// Ingest the SSTable into Pebble DB
-	require.NoError(t, db.Ingest([]string{sstPath}))
+	require.NoError(t, db.Ingest(context.Background(), []string{sstPath}))
 
 	// Verify the data exists
 	for _, k := range keys {
