@@ -65,7 +65,7 @@ type CommonSuite struct {
 
 func (cs *CommonSuite) SetupTest() {
 	block := unittest.ClusterBlockFixture()
-	cs.head = unittest.ClusterProposalFromBlock(block)
+	cs.head = unittest.ClusterProposalFromBlock(*block)
 
 	// initialize the storage data
 	cs.headerDB = make(map[flow.Identifier]*flow.Header)
@@ -249,7 +249,7 @@ func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 	originID := unittest.IdentifierFixture()
 	block := unittest.ClusterBlockFixture()
 	block.Header.Height = cs.head.Block.Header.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
-	proposal := unittest.ClusterProposalFromBlock(block)
+	proposal := unittest.ClusterProposalFromBlock(*block)
 
 	err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
 		OriginID: originID,

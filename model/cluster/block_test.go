@@ -15,10 +15,9 @@ import (
 // TestClusterBlockMalleability checks that cluster.Block is not malleable: any change in its data
 // should result in a different ID.
 func TestClusterBlockMalleability(t *testing.T) {
-	block := unittest.ClusterBlockFixture()
 	unittest.RequireEntityNonMalleable(
 		t,
-		&block,
+		unittest.ClusterBlockFixture(),
 		unittest.WithFieldGenerator("Header.Timestamp", func() time.Time { return time.Now().UTC() }),
 		unittest.WithFieldGenerator("Payload.Collection", func() flow.Collection {
 			return unittest.CollectionFixture(3)
@@ -61,7 +60,7 @@ func TestNewBlock(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 
-		res, err := cluster.NewBlock(cluster.UntrustedBlock(block))
+		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.NoError(t, err)
 		require.NotNil(t, res)
 	})
@@ -70,7 +69,7 @@ func TestNewBlock(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 		block.Header.ParentID = flow.ZeroID
 
-		res, err := cluster.NewBlock(cluster.UntrustedBlock(block))
+		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
 		assert.Contains(t, err.Error(), "parent ID must not be zero")
@@ -80,7 +79,7 @@ func TestNewBlock(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 		block.Header.ParentVoterIndices = nil
 
-		res, err := cluster.NewBlock(cluster.UntrustedBlock(block))
+		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
 		assert.Contains(t, err.Error(), "parent voter indices must not be empty")
@@ -90,7 +89,7 @@ func TestNewBlock(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 		block.Header.ParentVoterIndices = []byte{}
 
-		res, err := cluster.NewBlock(cluster.UntrustedBlock(block))
+		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
 		assert.Contains(t, err.Error(), "parent voter indices must not be empty")
@@ -100,7 +99,7 @@ func TestNewBlock(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 		block.Header.ParentVoterSigData = nil
 
-		res, err := cluster.NewBlock(cluster.UntrustedBlock(block))
+		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
 		assert.Contains(t, err.Error(), "parent voter signature must not be empty")
@@ -110,7 +109,7 @@ func TestNewBlock(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 		block.Header.ParentVoterSigData = []byte{}
 
-		res, err := cluster.NewBlock(cluster.UntrustedBlock(block))
+		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
 		assert.Contains(t, err.Error(), "parent voter signature must not be empty")
@@ -120,7 +119,7 @@ func TestNewBlock(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 		block.Header.ProposerID = flow.ZeroID
 
-		res, err := cluster.NewBlock(cluster.UntrustedBlock(block))
+		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
 		assert.Contains(t, err.Error(), "proposer ID must not be zero")
@@ -130,7 +129,7 @@ func TestNewBlock(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 		block.Payload.ReferenceBlockID = flow.ZeroID
 
-		res, err := cluster.NewBlock(cluster.UntrustedBlock(block))
+		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
 		assert.Contains(t, err.Error(), "reference block ID must not be zero")
@@ -142,7 +141,7 @@ func TestNewBlock(t *testing.T) {
 		collection.Transactions[2] = nil
 		block.Payload.Collection = collection
 
-		res, err := cluster.NewBlock(cluster.UntrustedBlock(block))
+		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
 		assert.Contains(t, err.Error(), "invalid collection")

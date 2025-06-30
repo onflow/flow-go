@@ -74,8 +74,7 @@ func (s *MessageHubSuite) SetupTest() {
 	)
 	s.myID = s.cluster[0].NodeID
 	s.clusterID = "cluster-id"
-	block := unittest.ClusterBlockFixture()
-	s.head = &block
+	s.head = unittest.ClusterBlockFixture()
 
 	s.payloads = storage.NewClusterPayloads(s.T())
 	s.me = module.NewLocal(s.T())
@@ -186,7 +185,7 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 	var channel channels.Channel
 	originID := unittest.IdentifierFixture()
 	s.Run("to-compliance-engine", func() {
-		blockProposalMsg := messages.NewUntrustedClusterProposal(unittest.ClusterBlockFixture(), unittest.SignatureFixture())
+		blockProposalMsg := messages.NewUntrustedClusterProposal(*unittest.ClusterBlockFixture(), unittest.SignatureFixture())
 		expectedComplianceMsg := flow.Slashable[*messages.UntrustedClusterProposal]{
 			OriginID: originID,
 			Message:  blockProposalMsg,
@@ -235,16 +234,16 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	parent.Header.Height = 10
 
 	// create a block with the parent and store the payload with correct ID
-	block := unittest.ClusterBlockWithParent(parent)
+	block := unittest.ClusterBlockWithParent(*parent)
 	block.Header.ProposerID = s.myID
 
 	s.payloads.On("ByBlockID", block.ID()).Return(&block.Payload, nil)
 	s.payloads.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)
 
 	s.Run("should fail with wrong proposer", func() {
-		header := *block.ToHeader()
+		header := block.ToHeader()
 		header.ProposerID = unittest.IdentifierFixture()
-		err := s.hub.sendOwnProposal(unittest.ProposalFromHeader(&header))
+		err := s.hub.sendOwnProposal(unittest.ProposalFromHeader(header))
 		require.Error(s.T(), err, "should fail with wrong proposer")
 		header.ProposerID = s.myID
 	})

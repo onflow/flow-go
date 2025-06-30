@@ -206,7 +206,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 // Tests the whole processing pipeline.
 func (cs *EngineSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.ClusterBlockFixture()
-	proposal := unittest.ClusterProposalFromBlock(finalizedBlock)
+	proposal := unittest.ClusterProposalFromBlock(*finalizedBlock)
 	cs.head = proposal
 	cs.headerDB[finalizedBlock.ID()] = proposal.Block.ToHeader()
 

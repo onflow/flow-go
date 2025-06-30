@@ -566,8 +566,8 @@ func ClusterPayloadFixture(transactionsCount int) *cluster.Payload {
 	}
 }
 
-func ClusterBlockFixture() cluster.Block {
-	return cluster.Block{
+func ClusterBlockFixture() *cluster.Block {
+	return &cluster.Block{
 		Header:  HeaderBodyFixture(),
 		Payload: *ClusterPayloadFixture(3),
 	}
@@ -579,9 +579,9 @@ func ClusterBlockChainFixture(n int) []cluster.Block {
 	parent := ClusterBlockFixture()
 
 	for i := 0; i < n; i++ {
-		block := ClusterBlockWithParent(parent)
+		block := ClusterBlockWithParent(*parent)
 		clusterBlocks = append(clusterBlocks, block)
-		parent = block
+		parent = &block
 	}
 
 	return clusterBlocks
