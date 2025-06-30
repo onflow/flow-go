@@ -1117,15 +1117,17 @@ func benchmarkBuildOn(b *testing.B, size int) {
 	// create a block history to test performance against
 	final := suite.genesis
 	for i := 0; i < size; i++ {
-		block := unittest.ClusterBlockWithParent(*final)
-		err := suite.db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
+		block := unittest.ClusterBlockFixture(
+			unittest.ClusterBlock.WithParent(final),
+		)
+		err := suite.db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(*block)))
 		require.NoError(b, err)
 
 		// finalize the block 80% of the time, resulting in a fork-rate of 20%
 		if rand.Intn(100) < 80 {
 			err = suite.db.Update(procedure.FinalizeClusterBlock(block.ID()))
 			require.NoError(b, err)
-			final = &block
+			final = block
 		}
 	}
 

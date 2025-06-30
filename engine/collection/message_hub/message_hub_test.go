@@ -229,14 +229,16 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	s.cluster = append(s.cluster, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)))
 
 	// generate a parent with height and chain ID set
-	parent := unittest.ClusterBlockFixture()
-	parent.Header.ChainID = "test"
-	parent.Header.Height = 10
+	parent := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithHeight(10),
+		unittest.ClusterBlock.WithChainID("test"),
+	)
 
 	// create a block with the parent and store the payload with correct ID
-	block := unittest.ClusterBlockWithParent(*parent)
-	block.Header.ProposerID = s.myID
-
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+		unittest.ClusterBlock.WithProposerID(s.myID),
+	)
 	s.payloads.On("ByBlockID", block.ID()).Return(&block.Payload, nil)
 	s.payloads.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)
 
@@ -267,7 +269,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	})
 
 	s.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
-		expectedBroadcastMsg := messages.NewUntrustedClusterProposal(block, unittest.SignatureFixture())
+		expectedBroadcastMsg := messages.NewUntrustedClusterProposal(*block, unittest.SignatureFixture())
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
 		headerProposal := &flow.ProposalHeader{Header: block.ToHeader(), ProposerSigData: expectedBroadcastMsg.ProposerSigData}
@@ -327,8 +329,10 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 	s.Run("proposal", func() {
 		wg.Add(1)
 		// prepare proposal fixture
-		block := unittest.ClusterBlockWithParent(*s.head)
-		block.Header.ProposerID = s.myID
+		block := unittest.ClusterBlockFixture(
+			unittest.ClusterBlock.WithParent(s.head),
+			unittest.ClusterBlock.WithProposerID(s.myID),
+		)
 		s.payloads.On("ByBlockID", block.ID()).Return(&block.Payload, nil)
 		proposal := unittest.ProposalFromHeader(block.ToHeader())
 
@@ -336,7 +340,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		hotstuffProposal := model.SignedProposalFromFlow(proposal)
 		s.voteAggregator.On("AddBlock", hotstuffProposal)
 		s.hotstuff.On("SubmitProposal", hotstuffProposal)
-		expectedBroadcastMsg := messages.NewUntrustedClusterProposal(block, proposal.ProposerSigData)
+		expectedBroadcastMsg := messages.NewUntrustedClusterProposal(*block, proposal.ProposerSigData)
 		s.con.On("Publish", expectedBroadcastMsg, s.cluster[1].NodeID, s.cluster[2].NodeID).
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)

@@ -276,8 +276,10 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 }
 
 func (suite *MutatorSuite) TestExtend_WithoutBootstrap() {
-	block := unittest.ClusterBlockWithParent(*suite.genesis)
-	err := suite.state.Extend(unittest.ClusterProposalFromBlock(block))
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(suite.genesis),
+	)
+	err := suite.state.Extend(unittest.ClusterProposalFromBlock(*block))
 	suite.Assert().Error(err)
 }
 

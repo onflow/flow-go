@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var ClusterBlock clusterBlockFactory
@@ -35,6 +36,18 @@ func (f *clusterBlockFactory) WithParent(parent *cluster.Block) func(*cluster.Bl
 func (f *clusterBlockFactory) WithHeight(height uint64) func(*cluster.Block) {
 	return func(block *cluster.Block) {
 		block.Header.Height = height
+	}
+}
+
+func (f *clusterBlockFactory) WithChainID(chainID flow.ChainID) func(*cluster.Block) {
+	return func(block *cluster.Block) {
+		block.Header.ChainID = chainID
+	}
+}
+
+func (f *clusterBlockFactory) WithProposerID(proposerID flow.Identifier) func(*cluster.Block) {
+	return func(block *cluster.Block) {
+		block.Header.ProposerID = proposerID
 	}
 }
 

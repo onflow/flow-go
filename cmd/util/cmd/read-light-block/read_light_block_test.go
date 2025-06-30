@@ -16,7 +16,7 @@ import (
 func TestReadClusterRange(t *testing.T) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		chain := unittest.ClusterBlockChainFixture(5)
+		chain := unittest.ClusterBlockFixtures(5)
 		parent, blocks := chain[0], chain[1:]
 
 		// add parent as boundary
@@ -28,7 +28,7 @@ func TestReadClusterRange(t *testing.T) {
 
 		// add blocks
 		for _, block := range blocks {
-			err := db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
+			err := db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(*block)))
 			require.NoError(t, err)
 
 			err = db.Update(procedure.FinalizeClusterBlock(block.ID()))
