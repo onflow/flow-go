@@ -38,8 +38,17 @@ func VerifyLastKHeight(
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
+	vmScriptExecutionEnabled bool,
+	vmTransactionExecutionEnabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(
+		chainID,
+		protocolDataDir,
+		chunkDataPackDir,
+		transactionFeesDisabled,
+		vmScriptExecutionEnabled,
+		vmTransactionExecutionEnabled,
+	)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -88,12 +97,22 @@ func VerifyLastKHeight(
 func VerifyRange(
 	from, to uint64,
 	chainID flow.ChainID,
-	protocolDataDir string, chunkDataPackDir string,
+	protocolDataDir string,
+	chunkDataPackDir string,
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
+	vmScriptExecutionEnabled bool,
+	vmTransactionExecutionEnabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(
+		chainID,
+		protocolDataDir,
+		chunkDataPackDir,
+		transactionFeesDisabled,
+		vmScriptExecutionEnabled,
+		vmTransactionExecutionEnabled,
+	)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -221,6 +240,8 @@ func initStorages(
 	dataDir string,
 	chunkDataPackDir string,
 	transactionFeesDisabled bool,
+	vmScriptExecutionEnabled bool,
+	vmTransactionExecutionEnabled bool,
 ) (
 	func() error,
 	*storage.All,
@@ -246,7 +267,14 @@ func initStorages(
 	chunkDataPacks := store.NewChunkDataPacks(metrics.NewNoopCollector(),
 		pebbleimpl.ToDB(chunkDataPackDB), storages.Collections, 1000)
 
-	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled)
+	verifier := makeVerifier(
+		log.Logger,
+		chainID,
+		storages.Headers,
+		transactionFeesDisabled,
+		vmScriptExecutionEnabled,
+		vmTransactionExecutionEnabled,
+	)
 	closer := func() error {
 		var dbErr, chunkDataPackDBErr error
 
@@ -319,6 +347,8 @@ func makeVerifier(
 	chainID flow.ChainID,
 	headers storage.Headers,
 	transactionFeesDisabled bool,
+	vmScriptExecutionEnabled bool,
+	vmTransactionExecutionEnabled bool,
 ) module.ChunkVerifier {
 
 	vm := fvm.NewVirtualMachine()
@@ -326,6 +356,8 @@ func makeVerifier(
 		chainID,
 		headers,
 		transactionFeesDisabled,
+		vmScriptExecutionEnabled,
+		vmTransactionExecutionEnabled,
 	)
 	fvmOptions = append(
 		[]fvm.Option{fvm.WithLogger(logger)},

@@ -13,14 +13,16 @@ import (
 )
 
 var (
-	flagLastK                   uint64
-	flagDatadir                 string
-	flagChunkDataPackDir        string
-	flagChain                   string
-	flagFromTo                  string
-	flagWorkerCount             uint // number of workers to verify the blocks concurrently
-	flagStopOnMismatch          bool
-	flagtransactionFeesDisabled bool
+	flagLastK                         uint64
+	flagDatadir                       string
+	flagChunkDataPackDir              string
+	flagChain                         string
+	flagFromTo                        string
+	flagWorkerCount                   uint // number of workers to verify the blocks concurrently
+	flagStopOnMismatch                bool
+	flagTransactionFeesDisabled       bool
+	flagVMScriptExecutionEnabled      bool
+	flagVMTransactionExecutionEnabled bool
 )
 
 // # verify the last 100 sealed blocks
@@ -56,7 +58,21 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagStopOnMismatch, "stop_on_mismatch", false, "stop verification on first mismatch")
 
-	Cmd.Flags().BoolVar(&flagtransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
+	Cmd.Flags().BoolVar(&flagTransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
+
+	Cmd.Flags().BoolVar(
+		&flagVMScriptExecutionEnabled,
+		"vm_script_execution_enabled",
+		false,
+		"enable script execution with VM",
+	)
+
+	Cmd.Flags().BoolVar(
+		&flagVMTransactionExecutionEnabled,
+		"vm_transaction_execution_enabled",
+		false,
+		"enable transaction execution with VM",
+	)
 }
 
 func run(*cobra.Command, []string) {
@@ -84,7 +100,18 @@ func run(*cobra.Command, []string) {
 		}
 
 		lg.Info().Msgf("verifying range from %d to %d", from, to)
-		err = verifier.VerifyRange(from, to, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled)
+		err = verifier.VerifyRange(
+			from,
+			to,
+			chainID,
+			flagDatadir,
+			flagChunkDataPackDir,
+			flagWorkerCount,
+			flagStopOnMismatch,
+			flagTransactionFeesDisabled,
+			flagVMScriptExecutionEnabled,
+			flagVMTransactionExecutionEnabled,
+		)
 		if err != nil {
 			lg.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
 		}
@@ -92,7 +119,17 @@ func run(*cobra.Command, []string) {
 
 	} else {
 		lg.Info().Msgf("verifying last %d sealed blocks", flagLastK)
-		err := verifier.VerifyLastKHeight(flagLastK, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled)
+		err := verifier.VerifyLastKHeight(
+			flagLastK,
+			chainID,
+			flagDatadir,
+			flagChunkDataPackDir,
+			flagWorkerCount,
+			flagStopOnMismatch,
+			flagTransactionFeesDisabled,
+			flagVMScriptExecutionEnabled,
+			flagVMTransactionExecutionEnabled,
+		)
 		if err != nil {
 			lg.Fatal().Err(err).Msg("could not verify last k height")
 		}
