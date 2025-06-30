@@ -225,7 +225,7 @@ func ExecutionResultFixture(t *testing.T,
 	log := zerolog.Nop()
 
 	// setups execution outputs:
-	var referenceBlock flow.Block
+	var referenceBlock *flow.Block
 	var spockSecrets [][]byte
 	var chunkDataPacks []*flow.ChunkDataPack
 	var result *flow.ExecutionResult
@@ -286,7 +286,7 @@ func ExecutionResultFixture(t *testing.T,
 
 		me := new(moduleMock.Local)
 		me.On("NodeID").Return(unittest.IdentifierFixture())
-		me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+		me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 		me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, nil)
 
@@ -309,8 +309,8 @@ func ExecutionResultFixture(t *testing.T,
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
 		completeColls[guarantee.CollectionID] = &entity.CompleteCollection{
-			Guarantee:    guarantee,
-			Transactions: collection.Transactions,
+			Guarantee:  guarantee,
+			Collection: &collection,
 		}
 
 		for i := 1; i < chunkCount; i++ {
@@ -327,8 +327,8 @@ func ExecutionResultFixture(t *testing.T,
 			guarantees = append(guarantees, guarantee)
 
 			completeColls[guarantee.CollectionID] = &entity.CompleteCollection{
-				Guarantee:    guarantee,
-				Transactions: collection.Transactions,
+				Guarantee:  guarantee,
+				Collection: &collection,
 			}
 		}
 
@@ -336,10 +336,10 @@ func ExecutionResultFixture(t *testing.T,
 			Guarantees:      guarantees,
 			ProtocolStateID: protocolStateID,
 		}
-		referenceBlock = *flow.NewBlock(refBlkHeader.HeaderBody, payload)
+		referenceBlock = flow.NewBlock(refBlkHeader.HeaderBody, payload)
 
 		executableBlock := &entity.ExecutableBlock{
-			Block:               &referenceBlock,
+			Block:               referenceBlock,
 			CompleteCollections: completeColls,
 			StartState:          &startStateCommitment,
 		}
@@ -355,12 +355,13 @@ func ExecutionResultFixture(t *testing.T,
 			spockSecrets = append(spockSecrets, snapshot.SpockSecret)
 		}
 
-		chunkDataPacks = computationResult.AllChunkDataPacks()
-		result = &computationResult.ExecutionResult
+		chunkDataPacks, err = computationResult.AllChunkDataPacks()
+		require.NoError(t, err)
+		result = &computationResult.ExecutionReceipt.ExecutionResult
 	})
 
 	return result, &ExecutionReceiptData{
-		ReferenceBlock: &referenceBlock,
+		ReferenceBlock: referenceBlock,
 		ChunkDataPacks: chunkDataPacks,
 		SpockSecrets:   spockSecrets,
 	}
@@ -447,7 +448,9 @@ func ExecutionReceiptsFromParentBlockFixture(t *testing.T,
 				UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
 					ExecutorID:      builder.executorIDs[cp],
 					ExecutionResult: *result,
+					Spocks:          unittest.SignaturesFixture(1),
 				},
+				ExecutorSignature: unittest.SignatureFixture(),
 			})
 
 			allData = append(allData, data)

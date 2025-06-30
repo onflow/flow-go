@@ -104,8 +104,8 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.CollectionID: {
-				Guarantee:    &guarantee,
-				Transactions: transactions,
+				Guarantee:  &guarantee,
+				Collection: &col,
 			},
 		},
 		StartState: unittest.StateCommitmentPointerFixture(),
@@ -113,7 +113,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -209,9 +209,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	execCtx := fvm.NewContext(
 		fvm.WithEVMEnabled(true),
 		fvm.WithBlockHeader(block.ToHeader()),
-		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: &block}}),
+		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: block}}),
 		fvm.WithChain(chain))
-
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	snapshotTree, accounts, err := testutil.CreateAccounts(
@@ -226,7 +225,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -513,8 +512,8 @@ func createTestBlockAndRun(
 		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.CollectionID: {
-				Guarantee:    &guarantee,
-				Transactions: col.Transactions,
+				Guarantee:  &guarantee,
+				Collection: &col,
 			},
 		},
 		StartState: unittest.StateCommitmentPointerFixture(),

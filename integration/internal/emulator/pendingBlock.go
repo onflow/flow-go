@@ -92,7 +92,6 @@ func (b *pendingBlock) Block() *flowgo.Block {
 			CollectionID: collection.ID(),
 		}
 	}
-
 	return flowgo.NewBlock(
 		flowgo.HeaderBody{
 			Height:    b.height,

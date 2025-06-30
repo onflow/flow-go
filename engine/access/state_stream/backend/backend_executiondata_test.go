@@ -76,7 +76,7 @@ type BackendExecutionDataSuite struct {
 	resultMap   map[flow.Identifier]*flow.ExecutionResult
 	registerID  flow.RegisterID
 
-	rootBlock          flow.Block
+	rootBlock          *flow.Block
 	highestBlockHeader *flow.Header
 }
 
@@ -171,7 +171,7 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
-	s.blockMap[s.rootBlock.Header.Height] = &s.rootBlock
+	s.blockMap[s.rootBlock.Header.Height] = s.rootBlock
 	s.highestBlockHeader = s.rootBlock.ToHeader()
 
 	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Header.Height, s.rootBlock.ID())
@@ -302,7 +302,7 @@ func generateMockEvents(header *flow.Header, eventCount int) flow.BlockEvents {
 			eventIndex = 0
 		}
 
-		events[i] = unittest.EventFixture(testEventTypes[i%len(testEventTypes)], txIndex, eventIndex, txID, 0)
+		events[i] = unittest.EventFixture(testEventTypes[i%len(testEventTypes)], txIndex, eventIndex, unittest.Event.WithTransactionID(txID))
 	}
 
 	return flow.BlockEvents{

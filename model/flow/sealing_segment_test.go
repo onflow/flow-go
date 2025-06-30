@@ -90,17 +90,17 @@ func (suite *SealingSegmentSuite) SetupTest() {
 	suite.protocolStateEntries[suite.defaultProtocolStateID] = suite.ProtocolStateEntryWrapperFixture()
 
 	priorBlock := suite.BlockFixture()
-	priorReceipt, priorSeal := unittest.ReceiptAndSealForBlock(&priorBlock)
+	priorReceipt, priorSeal := unittest.ReceiptAndSealForBlock(priorBlock)
 	suite.results[priorReceipt.ExecutionResult.ID()] = &priorReceipt.ExecutionResult
-	suite.priorBlock = &priorBlock
+	suite.priorBlock = priorBlock
 	suite.priorReceipt = priorReceipt
 	suite.priorSeal = priorSeal
 }
 
 // BlockFixture returns a Block fixture with the default protocol state ID.
-func (suite *SealingSegmentSuite) BlockFixture() flow.Block {
+func (suite *SealingSegmentSuite) BlockFixture() *flow.Block {
 	return unittest.BlockFixture(
-		unittest.WithPayload(suite.PayloadFixture()),
+		unittest.Block.WithPayload(suite.PayloadFixture()),
 	)
 }
 
@@ -125,13 +125,13 @@ func (suite *SealingSegmentSuite) ProtocolStateEntryWrapperFixture() *flow.Proto
 // priorBlock (this is the simplest case for a sealing segment).
 func (suite *SealingSegmentSuite) FirstBlock() *flow.Block {
 	block := unittest.BlockFixture(
-		unittest.WithPayload(suite.PayloadFixture(
+		unittest.Block.WithPayload(suite.PayloadFixture(
 			unittest.WithSeals(suite.priorSeal),
 			unittest.WithReceipts(suite.priorReceipt),
 		)),
 	)
 	suite.addSeal(block.ID(), suite.priorSeal)
-	return &block
+	return block
 }
 
 // AddBlocks is a short-hand for adding a sequence of blocks, in order.
@@ -155,16 +155,15 @@ func (suite *SealingSegmentSuite) AddBlocks(blocks ...*flow.Block) {
 //
 // B1(R*,S*) <- B2(R1) <- B4(S1)
 func (suite *SealingSegmentSuite) TestBuild_MissingResultFromReceipt() {
-
 	// B1 contains a receipt (but no result) and seal for a prior block
 	block1 := unittest.BlockFixture(
-		unittest.WithPayload(suite.PayloadFixture(
+		unittest.Block.WithPayload(suite.PayloadFixture(
 			unittest.WithReceiptsAndNoResults(suite.priorReceipt),
 			unittest.WithSeals(suite.priorSeal),
 		)),
 	)
 
-	receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+	receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 	block2 := unittest.BlockWithParentAndPayload(
 		block1.ToHeader(),
 		suite.PayloadFixture(unittest.WithReceipts(receipt1)),
@@ -175,13 +174,13 @@ func (suite *SealingSegmentSuite) TestBuild_MissingResultFromReceipt() {
 		suite.PayloadFixture(unittest.WithSeals(seal1)),
 	)
 
-	suite.AddBlocks(&block1, block2, block3)
+	suite.AddBlocks(block1, block2, block3)
 
 	segment, err := suite.builder.SealingSegment()
 	require.NoError(suite.T(), err)
 	require.NoError(suite.T(), segment.Validate())
 
-	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{&block1, block2, block3}, segment.Blocks)
+	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{block1, block2, block3}, segment.Blocks)
 	require.Equal(suite.T(), 1, segment.ExecutionResults.Size())
 	require.Equal(suite.T(), suite.priorReceipt.ExecutionResult.ID(), segment.ExecutionResults[0].ID())
 }
@@ -197,7 +196,7 @@ func (suite *SealingSegmentSuite) TestBuild_MissingFirstBlockSeal() {
 	// latest seal as of B1 is priorSeal
 	suite.sealsByBlockID[block1.ID()] = suite.priorSeal
 
-	receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+	receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 	block2 := unittest.BlockWithParentAndPayload(
 		block1.ToHeader(),
 		suite.PayloadFixture(unittest.WithReceipts(receipt1)),
@@ -208,13 +207,13 @@ func (suite *SealingSegmentSuite) TestBuild_MissingFirstBlockSeal() {
 		suite.PayloadFixture(unittest.WithSeals(seal1)),
 	)
 
-	suite.AddBlocks(&block1, block2, block3)
+	suite.AddBlocks(block1, block2, block3)
 
 	segment, err := suite.builder.SealingSegment()
 	require.NoError(suite.T(), err)
 	require.NoError(suite.T(), segment.Validate())
 
-	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{&block1, block2, block3}, segment.Blocks)
+	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{block1, block2, block3}, segment.Blocks)
 	// should contain priorSeal as first seal
 	require.Equal(suite.T(), suite.priorSeal, segment.FirstSeal)
 	// should contain result referenced by first seal
@@ -464,7 +463,7 @@ func (suite *SealingSegmentSuite) TestBuild_HighestAncestorContainsWrongSeal() {
 // B1(R*,S*) <- B2(R1,PS2) <- B3(S1,PS2)
 func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_Blocks() {
 	block1 := unittest.BlockFixture(
-		unittest.WithPayload(suite.PayloadFixture(
+		unittest.Block.WithPayload(suite.PayloadFixture(
 			unittest.WithReceipts(suite.priorReceipt),
 			unittest.WithSeals(suite.priorSeal),
 		)),
@@ -473,7 +472,7 @@ func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_Blocks() {
 	protocolStateID2 := unittest.IdentifierFixture()
 	suite.addProtocolStateEntry(protocolStateID2, suite.ProtocolStateEntryWrapperFixture())
 
-	receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+	receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 	block2 := unittest.BlockWithParentAndPayload(
 		block1.ToHeader(),
 		unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithProtocolStateID(protocolStateID2)),
@@ -484,13 +483,13 @@ func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_Blocks() {
 		suite.PayloadFixture(unittest.WithSeals(seal1), unittest.WithProtocolStateID(protocolStateID2)),
 	)
 
-	suite.AddBlocks(&block1, block2, block3)
+	suite.AddBlocks(block1, block2, block3)
 
 	segment, err := suite.builder.SealingSegment()
 	require.NoError(suite.T(), err)
 	require.NoError(suite.T(), segment.Validate())
 
-	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{&block1, block2, block3}, segment.Blocks)
+	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{block1, block2, block3}, segment.Blocks)
 	// resulting segment must contain both protocol state IDs
 	assert.Len(suite.T(), segment.ProtocolStateEntries, 2)
 	_, ok := segment.ProtocolStateEntries[suite.defaultProtocolStateID]
@@ -506,13 +505,13 @@ func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_Blocks() {
 // EB2(PS2) <- EB1 <- B1(R*,S*) <- B2(R1) <- B3(S1)
 func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_ExtraBlocks() {
 	block1 := unittest.BlockFixture(
-		unittest.WithPayload(suite.PayloadFixture(
+		unittest.Block.WithPayload(suite.PayloadFixture(
 			unittest.WithReceipts(suite.priorReceipt),
 			unittest.WithSeals(suite.priorSeal),
 		)),
 	)
 
-	receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+	receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 	block2 := unittest.BlockWithParentAndPayload(
 		block1.ToHeader(),
 		suite.PayloadFixture(unittest.WithReceipts(receipt1)),
@@ -523,24 +522,24 @@ func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_ExtraBlocks(
 		suite.PayloadFixture(unittest.WithSeals(seal1)),
 	)
 
-	suite.AddBlocks(&block1, block2, block3)
+	suite.AddBlocks(block1, block2, block3)
 
 	// construct two extra blocks that connect to the lowest block and add them to builder
 	protocolStateID2 := unittest.IdentifierFixture()
 	suite.addProtocolStateEntry(protocolStateID2, suite.ProtocolStateEntryWrapperFixture())
 
 	extraBlock1 := unittest.BlockFixture(
-		unittest.WithPayload(unittest.PayloadFixture(
+		unittest.Block.WithHeight(block1.Header.Height-1),
+		unittest.Block.WithPayload(unittest.PayloadFixture(
 			unittest.WithProtocolStateID(protocolStateID2),
 		)),
 	)
-	extraBlock1.Header.Height = block1.Header.Height - 1
-	err := suite.builder.AddExtraBlock(unittest.ProposalFromBlock(&extraBlock1))
+	err := suite.builder.AddExtraBlock(unittest.ProposalFromBlock(extraBlock1))
 	require.NoError(suite.T(), err)
 
 	extraBlock2 := suite.BlockFixture()
 	extraBlock2.Header.Height = extraBlock1.Header.Height - 1
-	err = suite.builder.AddExtraBlock(unittest.ProposalFromBlock(&extraBlock2))
+	err = suite.builder.AddExtraBlock(unittest.ProposalFromBlock(extraBlock2))
 	require.NoError(suite.T(), err)
 
 	segment, err := suite.builder.SealingSegment()
@@ -548,8 +547,8 @@ func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_ExtraBlocks(
 	err = segment.Validate()
 	require.NoError(suite.T(), err)
 
-	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{&block1, block2, block3}, segment.Blocks)
-	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{&extraBlock2, &extraBlock1}, segment.ExtraBlocks)
+	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{block1, block2, block3}, segment.Blocks)
+	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{extraBlock2, extraBlock1}, segment.ExtraBlocks)
 	// resulting segment must contain both protocol state IDs
 	assert.Len(suite.T(), segment.ProtocolStateEntries, 2)
 	_, ok := segment.ProtocolStateEntries[suite.defaultProtocolStateID]
@@ -577,7 +576,7 @@ func (suite *SealingSegmentSuite) TestAddBlock_InvalidHeight() {
 	err := suite.builder.AddBlock(unittest.ProposalFromBlock(block1))
 	require.NoError(suite.T(), err)
 
-	err = suite.builder.AddBlock(unittest.ProposalFromBlock(&block2))
+	err = suite.builder.AddBlock(unittest.ProposalFromBlock(block2))
 	require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 }
 
@@ -596,13 +595,13 @@ func TestAddBlock_StorageError(t *testing.T) {
 		}
 		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
 		block1 := unittest.BlockFixture(
-			unittest.WithPayload(unittest.PayloadFixture(
+			unittest.Block.WithPayload(unittest.PayloadFixture(
 				unittest.WithReceiptsAndNoResults(missingReceipt),
 				unittest.WithSeals(unittest.Seal.Fixture(unittest.Seal.WithResult(&missingReceipt.ExecutionResult))),
 			)),
 		)
 
-		err := builder.AddBlock(unittest.ProposalFromBlock(&block1))
+		err := builder.AddBlock(unittest.ProposalFromBlock(block1))
 		require.ErrorIs(t, err, exception)
 	})
 
@@ -615,11 +614,11 @@ func TestAddBlock_StorageError(t *testing.T) {
 			return &flow.ProtocolStateEntryWrapper{}, nil
 		}
 		block1 := unittest.BlockFixture(
-			unittest.WithPayload(flow.EmptyPayload()),
+			unittest.Block.WithPayload(flow.EmptyPayload()),
 		)
 		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
 
-		err := builder.AddBlock(unittest.ProposalFromBlock(&block1))
+		err := builder.AddBlock(unittest.ProposalFromBlock(block1))
 		require.ErrorIs(t, err, exception)
 	})
 
@@ -629,11 +628,11 @@ func TestAddBlock_StorageError(t *testing.T) {
 		sealLookup := func(flow.Identifier) (*flow.Seal, error) { return unittest.Seal.Fixture(), nil }
 		protocolStateEntryLookup := func(flow.Identifier) (*flow.ProtocolStateEntryWrapper, error) { return nil, exception }
 		block1 := unittest.BlockFixture(
-			unittest.WithPayload(flow.EmptyPayload()),
+			unittest.Block.WithPayload(flow.EmptyPayload()),
 		)
 		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
 
-		err := builder.AddBlock(unittest.ProposalFromBlock(&block1))
+		err := builder.AddBlock(unittest.ProposalFromBlock(block1))
 		require.ErrorIs(t, err, exception)
 	})
 }
@@ -649,14 +648,14 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 	suite.T().Run("empty-segment", func(t *testing.T) {
 		builder := flow.NewSealingSegmentBuilder(nil, nil, nil)
 		block := suite.BlockFixture()
-		err := builder.AddExtraBlock(unittest.ProposalFromBlock(&block))
+		err := builder.AddExtraBlock(unittest.ProposalFromBlock(block))
 		require.Error(t, err)
 	})
 	suite.T().Run("extra-block-does-not-connect", func(t *testing.T) {
 		// adding extra block that doesn't connect to the lowest is an error
 		extraBlock := suite.BlockFixture()
 		extraBlock.Header.Height = firstBlock.Header.Height + 10 // make sure it doesn't connect by height
-		err := suite.builder.AddExtraBlock(unittest.ProposalFromBlock(&extraBlock))
+		err := suite.builder.AddExtraBlock(unittest.ProposalFromBlock(extraBlock))
 		require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 	})
 	suite.T().Run("extra-block-not-continuous", func(t *testing.T) {
@@ -665,11 +664,11 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 		require.NoError(t, err)
 		extraBlock := suite.BlockFixture()
 		extraBlock.Header.Height = firstBlock.Header.Height - 1 // make it connect
-		err = builder.AddExtraBlock(unittest.ProposalFromBlock(&extraBlock))
+		err = builder.AddExtraBlock(unittest.ProposalFromBlock(extraBlock))
 		require.NoError(t, err)
 		extraBlockWithSkip := suite.BlockFixture()
 		extraBlockWithSkip.Header.Height = extraBlock.Header.Height - 2 // skip one height
-		err = builder.AddExtraBlock(unittest.ProposalFromBlock(&extraBlockWithSkip))
+		err = builder.AddExtraBlock(unittest.ProposalFromBlock(extraBlockWithSkip))
 		require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 	})
 	suite.T().Run("root-segment-extra-blocks", func(t *testing.T) {
@@ -679,7 +678,7 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 
 		extraBlock := suite.BlockFixture()
 		extraBlock.Header.Height = firstBlock.Header.Height - 1
-		err = builder.AddExtraBlock(unittest.ProposalFromBlock(&extraBlock))
+		err = builder.AddExtraBlock(unittest.ProposalFromBlock(extraBlock))
 		require.NoError(t, err)
 		_, err = builder.SealingSegment()
 		// root segment cannot have extra blocks
@@ -707,11 +706,11 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 		// EB2 <- EB1 <- B1(S*) <- B2(R1) <- B3(S1)
 		extraBlock := suite.BlockFixture()
 		extraBlock.Header.Height = firstBlock.Header.Height - 1
-		err := suite.builder.AddExtraBlock(unittest.ProposalFromBlock(&extraBlock))
+		err := suite.builder.AddExtraBlock(unittest.ProposalFromBlock(extraBlock))
 		require.NoError(t, err)
 		secondExtraBlock := suite.BlockFixture()
 		secondExtraBlock.Header.Height = extraBlock.Header.Height - 1
-		err = suite.builder.AddExtraBlock(unittest.ProposalFromBlock(&secondExtraBlock))
+		err = suite.builder.AddExtraBlock(unittest.ProposalFromBlock(secondExtraBlock))
 		require.NoError(t, err)
 		segment, err := suite.builder.SealingSegment()
 		require.NoError(t, err)

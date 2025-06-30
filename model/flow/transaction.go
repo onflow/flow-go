@@ -111,10 +111,6 @@ func (tb TransactionBody) ID() Identifier {
 	return MakeID(tb)
 }
 
-func (tb TransactionBody) Checksum() Identifier {
-	return MakeID(tb)
-}
-
 // SetScript sets the Cadence script for this transaction.
 func (tb *TransactionBody) SetScript(script []byte) *TransactionBody {
 	tb.Script = script
@@ -402,11 +398,6 @@ func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
 
 func (tx *Transaction) PayloadMessage() []byte {
 	return fingerprint.Fingerprint(tx.TransactionBody.payloadCanonicalForm())
-}
-
-// Checksum provides a cryptographic commitment for a chunk content
-func (tx *Transaction) Checksum() Identifier {
-	return MakeID(tx)
 }
 
 func (tx *Transaction) String() string {

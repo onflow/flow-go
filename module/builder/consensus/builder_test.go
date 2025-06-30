@@ -217,15 +217,15 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// Construct the [first] block:
 	first := unittest.BlockFixture()
-	bs.storeBlock(&first)
+	bs.storeBlock(first)
 	bs.firstID = first.ID()
-	firstResult := unittest.ExecutionResultFixture(unittest.WithBlock(&first))
+	firstResult := unittest.ExecutionResultFixture(unittest.WithBlock(first))
 	bs.lastSeal = unittest.Seal.Fixture(unittest.Seal.WithResult(firstResult))
 	bs.resultForBlock[firstResult.BlockID] = firstResult
 	bs.resultByID[firstResult.ID()] = firstResult
 
 	// Construct finalized blocks [F0] ... [F4]
-	previous := &first
+	previous := first
 	for n := 0; n < numFinalizedBlocks; n++ {
 		finalized := bs.createAndRecordBlock(previous, n > 0) // Do not construct candidate seal for [first], as it is already sealed
 		bs.finalizedBlockIDs = append(bs.finalizedBlockIDs, finalized.ID())
@@ -289,7 +289,7 @@ func (bs *BuilderSuite) SetupTest() {
 		return unittest.StateSnapshotForUnknownBlock()
 	})
 	params := new(protocol.Params)
-	params.On("FinalizedRoot").Return(first.Header)
+	params.On("FinalizedRoot").Return(first.ToHeader())
 	bs.state.On("Params").Return(params)
 
 	// set up storage mocks for tests
@@ -675,21 +675,19 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 
 	// create blocks B1 to B4:
 	b1 := bs.createAndRecordBlock(bs.blocks[bs.parentID], true)
-	bchain := unittest.ChainFixtureFrom(3, b1.ToHeader()) // creates blocks b2, b3, b4
-	b4 := bchain[2]
+	bchain := unittest.ChainFixtureFrom(2, b1.ToHeader()) // creates blocks b2, b3
 
-	// Incorporate result for block B1 into payload of block B4
+	// create block B4: includes result for block B1 in its payload
 	resultB1 := bs.resultForBlock[b1.ID()]
 	receiptB1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultB1))
-	b4 = flow.NewBlock(
-		b4.Header,
+	b4 := unittest.BlockWithParentAndPayload(
+		bchain[1].ToHeader(),
 		flow.Payload{
 			Results:  []*flow.ExecutionResult{&receiptB1.ExecutionResult},
 			Receipts: []*flow.ExecutionReceiptStub{receiptB1.Stub()},
 		},
 	)
-	// update bchain
-	bchain[2] = b4
+	bchain = append(bchain, b4)
 
 	// add blocks B2, B3, B4, A5 to the mocked storage layer (block b0 and b1 are already added):
 	a5 := unittest.BlockWithParentFixture(b4.ToHeader())
@@ -858,7 +856,7 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 	)
 	for i := 0; i <= 4; i++ {
 		// we need to run this several times, as in each iteration as we have _multiple_ execution chains.
-		// In each iteration, we only mange to reconnect one additional height
+		// In each iteration, we only manage to reconnect one additional height
 		unittest.ReconnectBlocksAndReceipts(blocks, receiptChain1)
 		unittest.ReconnectBlocksAndReceipts(blocks, receiptChain2)
 	}
@@ -1021,7 +1019,8 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipDuplicatedReceipts() {
 				resultByID := block.Payload.Results.Lookup()
 				for _, meta := range block.Payload.Receipts {
 					result := resultByID[meta.ResultID]
-					rcpt := flow.ExecutionReceiptFromStub(*meta, *result)
+					rcpt, err := flow.ExecutionReceiptFromStub(*meta, *result)
+					bs.NoError(err)
 					assert.False(bs.T(), receiptFilter(rcpt))
 				}
 			}
@@ -1166,8 +1165,9 @@ func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
 		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
-			rcpt := flow.ExecutionReceiptFromStub(*meta, *result)
-			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
+			rcpt, err := flow.ExecutionReceiptFromStub(*meta, *result)
+			bs.NoError(err)
+			_, err = bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
 			bs.NoError(err)
 		}
 	}
@@ -1224,8 +1224,9 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
-			rcpt := flow.ExecutionReceiptFromStub(*meta, *result)
-			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
+			rcpt, err := flow.ExecutionReceiptFromStub(*meta, *result)
+			bs.NoError(err)
+			_, err = bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
 			bs.NoError(err)
 		}
 	}
@@ -1314,8 +1315,9 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
-			rcpt := flow.ExecutionReceiptFromStub(*meta, *result)
-			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
+			rcpt, err := flow.ExecutionReceiptFromStub(*meta, *result)
+			bs.NoError(err)
+			_, err = bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
 			bs.NoError(err)
 		}
 	}
@@ -1374,8 +1376,9 @@ func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
-			rcpt := flow.ExecutionReceiptFromStub(*meta, *result)
-			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
+			rcpt, err := flow.ExecutionReceiptFromStub(*meta, *result)
+			bs.NoError(err)
+			_, err = bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
 			bs.NoError(err)
 		}
 	}
@@ -1413,8 +1416,9 @@ func (bs *BuilderSuite) TestIntegration_ResultAlreadyIncorporated() {
 		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
-			rcpt := flow.ExecutionReceiptFromStub(*meta, *result)
-			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
+			rcpt, err := flow.ExecutionReceiptFromStub(*meta, *result)
+			bs.NoError(err)
+			_, err = bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].ToHeader())
 			bs.NoError(err)
 		}
 	}
@@ -1487,7 +1491,8 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 			bs.resultByID[result.ID()] = result
 		}
 		for _, meta := range block.Payload.Receipts {
-			receipt := flow.ExecutionReceiptFromStub(*meta, *bs.resultByID[meta.ResultID])
+			receipt, err := flow.ExecutionReceiptFromStub(*meta, *bs.resultByID[meta.ResultID])
+			bs.NoError(err)
 			bs.receiptsByID[meta.ID()] = receipt
 			bs.receiptsByBlockID[receipt.ExecutionResult.BlockID] = append(bs.receiptsByBlockID[receipt.ExecutionResult.BlockID], receipt)
 		}

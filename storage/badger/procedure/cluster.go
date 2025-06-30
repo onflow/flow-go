@@ -156,7 +156,7 @@ func InsertClusterPayload(blockID flow.Identifier, payload *cluster.Payload) fun
 		// SkipDuplicates here is to ignore the error if the collection already exists
 		// This means the Insert operation is actually a Upsert operation.
 		// The upsert is ok, because the data is unique by its ID
-		err := operation.SkipDuplicates(operation.InsertCollection(&light))(tx)
+		err := operation.SkipDuplicates(operation.InsertCollection(light))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert payload collection: %w", err)
 		}
@@ -219,7 +219,12 @@ func RetrieveClusterPayload(blockID flow.Identifier, payload *cluster.Payload) f
 			colTransactions = append(colTransactions, &nextTx)
 		}
 
-		*payload = cluster.PayloadFromTransactions(refID, colTransactions...)
+		newPayload, err := cluster.NewPayload(refID, colTransactions)
+		if err != nil {
+			return fmt.Errorf("could not build the payload from the transactions: %w", err)
+		}
+
+		*payload = *newPayload
 
 		return nil
 	}

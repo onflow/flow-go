@@ -662,7 +662,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 //
 //		           ↙ B[ER{A}] ← C[ER{B}] ← D[ER{C}] ← E[ER{D}]
 //	P ←── A[ER{P}]
-//		  ^        ↖F[ER{A}] ← G[ER{B}] ← H[ER{G}]
+//		  ^        ↖ F[ER{A}] ← G[ER{B}] ← H[ER{G}]
 //		  |
 //	   finalized
 //
@@ -683,7 +683,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	rootSnapshot.On("SealingSegment").Return(
 		&flow.SealingSegment{Blocks: []*flow.BlockProposal{
 			{
-				Block: flow.NewBlock(s.finalizedRootHeader.HeaderBody, flow.Payload{}),
+				Block: *flow.NewBlock(s.finalizedRootHeader.HeaderBody, flow.Payload{}),
 				// By convention, root block has no proposer signature - implementation has to handle this edge case
 				ProposerSigData: nil,
 			},

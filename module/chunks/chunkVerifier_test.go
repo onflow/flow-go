@@ -447,7 +447,12 @@ func newLedger(t *testing.T) *completeLedger.Ledger {
 
 func blockFixture(collection *flow.Collection) *flow.Block {
 	guarantee := &flow.CollectionGuarantee{CollectionID: collection.ID()}
-	return flow.NewBlock(unittest.HeaderBodyFixture(), flow.Payload{Guarantees: []*flow.CollectionGuarantee{guarantee}})
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(
+			flow.Payload{Guarantees: []*flow.CollectionGuarantee{guarantee}},
+		),
+	)
+	return block
 }
 
 func generateStateUpdates(t *testing.T, f *completeLedger.Ledger) (ledger.State, ledger.Proof, *ledger.Update) {

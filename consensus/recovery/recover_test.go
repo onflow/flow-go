@@ -15,7 +15,7 @@ func TestRecover(t *testing.T) {
 	proposals := unittest.ProposalChainFixtureFrom(100, finalized)
 	pending := make([]*flow.ProposalHeader, 0)
 	for _, b := range proposals {
-		pending = append(pending, b.HeaderProposal())
+		pending = append(pending, b.ProposalHeader())
 	}
 
 	// Recover with `pending` blocks and record what blocks are forwarded to `onProposal`

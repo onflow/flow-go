@@ -131,9 +131,10 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	// fill in blocks at heights -1 to -4 from head
 	ref := ss.head.Height
 	for height := ref; height >= ref-4; height-- {
-		block := unittest.BlockFixture()
-		block.Header.Height = height
-		ss.heights[height] = unittest.ProposalFromBlock(&block)
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(height),
+		)
+		ss.heights[height] = unittest.ProposalFromBlock(block)
 		ss.blockIDs[block.ID()] = ss.heights[height]
 	}
 
@@ -163,7 +164,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
 				expected := ss.heights[ref-1]
-				actual := res.Blocks[0].ToInternal()
+				actual := res.Blocks[0].DeclareTrusted()
 				assert.Equal(ss.T(), expected, actual, "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
@@ -282,15 +283,16 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 
 	// a non-empty request for existing block IDs should send right response
 	ss.T().Run("request for existing blocks", func(t *testing.T) {
-		block := unittest.BlockFixture()
-		block.Header.Height = ss.head.Height - 1
-		proposal := unittest.ProposalFromBlock(&block)
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(ss.head.Height - 1),
+		)
+		proposal := unittest.ProposalFromBlock(block)
 		req.BlockIDs = []flow.Identifier{block.ID()}
 		ss.blockIDs[block.ID()] = proposal
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
-				assert.Equal(ss.T(), proposal, res.Blocks[0].ToInternal(), "response should contain right block")
+				assert.Equal(ss.T(), proposal, res.Blocks[0].DeclareTrusted(), "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
@@ -306,10 +308,11 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		ss.blockIDs = make(map[flow.Identifier]*flow.BlockProposal)
 		req.BlockIDs = make([]flow.Identifier, 5)
 		for i := 0; i < len(req.BlockIDs); i++ {
-			b := unittest.BlockFixture()
-			b.Header.Height = ss.head.Height - uint64(i)
+			b := unittest.BlockFixture(
+				unittest.Block.WithHeight(ss.head.Height - uint64(i)),
+			)
 			req.BlockIDs[i] = b.ID()
-			ss.blockIDs[b.ID()] = unittest.ProposalFromBlock(&b)
+			ss.blockIDs[b.ID()] = unittest.ProposalFromBlock(b)
 		}
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 			func(args mock.Arguments) {
@@ -356,7 +359,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 
 	ss.comp.On("OnSyncedBlocks", mock.Anything).Run(func(args mock.Arguments) {
 		res := args.Get(0).(flow.Slashable[[]*messages.UntrustedProposal])
-		converted := res.Message[0].ToInternal()
+		converted := res.Message[0].DeclareTrusted()
 		ss.Assert().Equal(processable.Block.Header, converted.Block.Header)
 		ss.Assert().Equal(processable.Block.Payload, converted.Block.Payload)
 		ss.Assert().Equal(originID, res.OriginID)

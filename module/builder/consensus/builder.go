@@ -156,7 +156,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not extend state with built proposal: %w", err)
 	}
 
-	return blockProposal.HeaderProposal(), nil
+	return blockProposal.ProposalHeader(), nil
 }
 
 // repopulateExecutionTree restores latest state of execution tree mempool based on local chain state information.
@@ -562,7 +562,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 	// TODO: we should probably remove this edge case by _synchronously_ populating
 	//       the Execution Tree in the Fork's finalizationCallback
 	if err != nil && !mempool.IsUnknownExecutionResultError(err) {
-		return nil, fmt.Errorf("failed to retrieve reachable receipts from memool: %w", err)
+		return nil, fmt.Errorf("failed to retrieve reachable receipts from mempool: %w", err)
 	}
 
 	insertables := toInsertables(receipts, includedResults, b.cfg.maxReceiptCount)
@@ -650,7 +650,6 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		Results:         insertableReceipts.results,
 		ProtocolStateID: protocolStateID,
 	}
-
 	block := flow.NewBlock(header.HeaderBody, payload)
 
 	// sign the proposal
@@ -659,7 +658,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		return nil, fmt.Errorf("could not sign the block: %w", err)
 	}
 	proposal := &flow.BlockProposal{
-		Block:           block,
+		Block:           *block,
 		ProposerSigData: sig,
 	}
 

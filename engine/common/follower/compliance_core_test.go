@@ -111,9 +111,10 @@ func (s *CoreSuite) TestProcessingSingleBlock() {
 // TestAddFinalizedBlock tests that adding block below finalized height results in processing it, but since cache was pruned
 // to finalized view, it must be rejected by it.
 func (s *CoreSuite) TestAddFinalizedBlock() {
-	block := unittest.BlockFixture()
-	block.Header.View = s.finalizedBlock.View - 1 // block is below finalized view
-	proposal := unittest.ProposalFromBlock(&block)
+	block := unittest.BlockFixture(
+		unittest.Block.WithView(s.finalizedBlock.View - 1), // block is below finalized view
+	)
+	proposal := unittest.ProposalFromBlock(block)
 
 	// incoming block has to be validated
 	s.validator.On("ValidateProposal", model.SignedProposalFromBlock(proposal)).Return(nil).Once()
@@ -139,7 +140,7 @@ func (s *CoreSuite) TestProcessingRangeHappyPath() {
 	for i := 1; i < len(proposals); i++ {
 		expectCertified := &flow.CertifiedBlock{
 			Proposal:     proposals[i-1],
-			CertifyingQC: proposals[i].Block.ToHeader().QuorumCertificate(),
+			CertifyingQC: proposals[i].Block.Header.QuorumCertificate(),
 		}
 		s.state.On("ExtendCertified", mock.Anything, expectCertified).Return(nil).Once()
 		s.follower.On("AddCertifiedBlock", blockWithID(proposals[i-1].Block.ID())).Run(func(args mock.Arguments) {

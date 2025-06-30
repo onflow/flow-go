@@ -266,7 +266,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 		s.pushBlocksCon.On("Publish", expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
 
 		// submit to broadcast proposal
-		s.hub.OnOwnProposal(proposal.HeaderProposal(), time.Now())
+		s.hub.OnOwnProposal(proposal.ProposalHeader(), time.Now())
 
 		unittest.AssertClosesBefore(s.T(), util.AllClosed(broadcast, submitted), time.Second)
 	})
@@ -313,7 +313,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		wg.Add(1)
 		// prepare proposal fixture
 		block := unittest.BlockWithParentAndProposerFixture(s.T(), s.head, s.myID)
-		proposal := unittest.ProposalFromBlock(&block)
+		proposal := unittest.ProposalFromBlock(block)
 		s.payloads.On("ByBlockID", block.ID()).Return(&block.Payload, nil)
 
 		// unset chain and height to make sure they are correctly reconstructed
@@ -327,7 +327,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		s.pushBlocksCon.On("Publish", expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
 
 		// submit proposal
-		s.hub.OnOwnProposal(proposal.HeaderProposal(), time.Now())
+		s.hub.OnOwnProposal(proposal.ProposalHeader(), time.Now())
 	})
 
 	unittest.RequireReturnsBefore(s.T(), func() {

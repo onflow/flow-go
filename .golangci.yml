@@ -40,6 +40,15 @@ issues:
       linters:
         - unused
         - structwrite
+    - path: 'utils/unittest/*' # disable some linters on test files
+      linters:
+        - structwrite
+    - path: 'consensus/hotstuff/helper/*' # disable some linters on test files
+      linters:
+        - structwrite
+    - path: 'engine/execution/testutil/*' # disable some linters on test files
+      linters:
+        - structwrite
     # typecheck currently not handling the way we do function inheritance well
     # disabling for now
     - path: 'cmd/access/node_build/*'

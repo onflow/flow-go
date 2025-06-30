@@ -218,7 +218,6 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 			Seals:    sealsForPrev,
 		},
 	)
-
 	builder.addBlock(B)
 
 	// create a receipt for block B, to be included in block C
@@ -228,7 +227,6 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
 	// insert block C with a receipt for block B, and a seal for the receipt in
 	// block B if there was one
-
 	var sealsForA []*flow.Seal
 	if receiptA != nil {
 		sealsForA = []*flow.Seal{
@@ -249,7 +247,6 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
 	// build block D
 	// D contains a seal for block B and a receipt for block C
-
 	sealForB := Seal.Fixture(
 		Seal.WithResult(&receiptB.ExecutionResult),
 	)

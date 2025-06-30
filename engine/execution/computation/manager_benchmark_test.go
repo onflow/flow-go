@@ -175,7 +175,7 @@ func benchmarkComputeBlock(
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -273,8 +273,8 @@ func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colN
 		collections[c] = collection
 		guarantees[c] = guarantee
 		completeCollections[guarantee.CollectionID] = &entity.CompleteCollection{
-			Guarantee:    guarantee,
-			Transactions: transactions,
+			Guarantee:  guarantee,
+			Collection: collection,
 		}
 	}
 

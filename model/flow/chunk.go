@@ -127,6 +127,7 @@ func (ch ChunkBody) EncodeRLP(w io.Writer) error {
 	return nil
 }
 
+//structwrite:immutable - mutations allowed only within the constructor
 type Chunk struct {
 	ChunkBody
 
@@ -135,9 +136,20 @@ type Chunk struct {
 	EndState StateCommitment
 }
 
+// UntrustedChunk is an untrusted input-only representation of an Chunk,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedChunk should be validated and converted into
+// a trusted Chunk using NewChunk constructor.
+type UntrustedChunk Chunk
+
 // We TEMPORARILY implement the [rlp.Encoder] interface to implement backwards-compatible ID computation.
 // TODO(mainnet27, #6773): remove EncodeRLP methods on Chunk and ChunkBody https://github.com/onflow/flow-go/issues/6773
-var _ rlp.Encoder = &Chunk{}
+var _ rlp.Encoder = (*Chunk)(nil)
 
 // EncodeRLP defines custom encoding logic for the Chunk type.
 // This method exists only so that the embedded ChunkBody's EncodeRLP method is
@@ -160,39 +172,68 @@ func (ch *Chunk) EncodeRLP(w io.Writer) error {
 // to the old or the new protocol version model (without or with field [Chunk.ServiceEventCount] respectively),
 // depending on the block's view that this chunk belongs to.
 // TODO(mainnet27, #6773): remove this type https://github.com/onflow/flow-go/issues/6773
-type ChunkConstructor func(
-	blockID Identifier,
-	collectionIndex int,
-	startState StateCommitment,
-	numberOfTransactions int,
-	eventCollection Identifier,
-	serviceEventCount uint16,
-	endState StateCommitment,
-	totalComputationUsed uint64) *Chunk
+type ChunkConstructor func(UntrustedChunk) (*Chunk, error)
 
+// NewChunk creates a new instance of Chunk.
 // NewChunk returns a Chunk compliant with Protocol Version 2 and later.
-func NewChunk(
-	blockID Identifier,
-	collectionIndex int,
-	startState StateCommitment,
-	numberOfTransactions int,
-	eventCollection Identifier,
-	serviceEventCount uint16,
-	endState StateCommitment,
-	totalComputationUsed uint64,
-) *Chunk {
+// Construction Chunk allowed only within the constructor.
+//
+// All errors indicate a valid Chunk cannot be constructed from the input.
+func NewChunk(untrusted UntrustedChunk) (*Chunk, error) {
+	if untrusted.BlockID == ZeroID {
+		return nil, fmt.Errorf("BlockID must not be empty")
+	}
+
+	if untrusted.StartState == (StateCommitment{}) {
+		return nil, fmt.Errorf("StartState must not be zero-value")
+	}
+
+	if untrusted.ServiceEventCount == nil {
+		return nil, fmt.Errorf("ServiceEventCount must not be nil for protocol v2")
+	}
+
+	if untrusted.EventCollection == ZeroID {
+		return nil, fmt.Errorf("EventCollection must not be empty")
+	}
+
+	if untrusted.EndState == (StateCommitment{}) {
+		return nil, fmt.Errorf("EndState must not be zero-value")
+	}
+
 	return &Chunk{
 		ChunkBody: ChunkBody{
-			BlockID:              blockID,
-			CollectionIndex:      uint(collectionIndex),
-			StartState:           startState,
-			NumberOfTransactions: uint64(numberOfTransactions),
-			EventCollection:      eventCollection,
-			ServiceEventCount:    &serviceEventCount,
-			TotalComputationUsed: totalComputationUsed,
+			BlockID:              untrusted.BlockID,
+			CollectionIndex:      untrusted.CollectionIndex,
+			StartState:           untrusted.StartState,
+			NumberOfTransactions: untrusted.NumberOfTransactions,
+			EventCollection:      untrusted.EventCollection,
+			ServiceEventCount:    untrusted.ServiceEventCount,
+			TotalComputationUsed: untrusted.TotalComputationUsed,
 		},
-		Index:    uint64(collectionIndex),
-		EndState: endState,
+		Index:    untrusted.Index,
+		EndState: untrusted.EndState,
+	}, nil
+}
+
+// NewRootChunk creates a chunk whose final state is the given commit, with all other fields set to zero.
+// This is a special kind of chunk used only as the sole chunk of a root execution result, which forms
+// a part of the root protocol state snapshot used as the trusted root for a spork.
+func NewRootChunk(
+	commit StateCommitment,
+) *Chunk {
+	zeroCount := uint16(0)
+	return &Chunk{
+		ChunkBody: ChunkBody{
+			BlockID:              Identifier{},
+			CollectionIndex:      0,
+			StartState:           StateCommitment{},
+			EventCollection:      Identifier{},
+			ServiceEventCount:    &zeroCount,
+			TotalComputationUsed: 0,
+			NumberOfTransactions: 0,
+		},
+		Index:    0,
+		EndState: commit,
 	}
 }
 
@@ -200,38 +241,40 @@ func NewChunk(
 // omitting the value of the field [Chunk.ServiceEventCount] respectively).
 // TODO(mainnet27, #6773): remove this function https://github.com/onflow/flow-go/issues/6773
 // Deprecated: for backward compatibility only until upgrade to Protocol Version 2.
-func NewChunk_ProtocolVersion1(
-	blockID Identifier,
-	collectionIndex int,
-	startState StateCommitment,
-	numberOfTransactions int,
-	eventCollection Identifier,
-	serviceEventCount uint16, // ignored
-	endState StateCommitment,
-	totalComputationUsed uint64,
-) *Chunk {
+func NewChunk_ProtocolVersion1(untrusted UntrustedChunk) (*Chunk, error) {
+	if untrusted.BlockID == ZeroID {
+		return nil, fmt.Errorf("BlockID must not be empty")
+	}
+
+	if untrusted.StartState == (StateCommitment{}) {
+		return nil, fmt.Errorf("StartState must not be zero-value")
+	}
+
+	if untrusted.EventCollection == ZeroID {
+		return nil, fmt.Errorf("EventCollection must not be empty")
+	}
+
+	if untrusted.EndState == (StateCommitment{}) {
+		return nil, fmt.Errorf("EndState must not be zero-value")
+	}
+
 	return &Chunk{
 		ChunkBody: ChunkBody{
-			BlockID:              blockID,
-			CollectionIndex:      uint(collectionIndex),
-			StartState:           startState,
-			NumberOfTransactions: uint64(numberOfTransactions),
-			EventCollection:      eventCollection,
+			BlockID:              untrusted.BlockID,
+			CollectionIndex:      untrusted.CollectionIndex,
+			StartState:           untrusted.StartState,
+			NumberOfTransactions: untrusted.NumberOfTransactions,
+			EventCollection:      untrusted.EventCollection,
 			ServiceEventCount:    nil,
-			TotalComputationUsed: totalComputationUsed,
+			TotalComputationUsed: untrusted.TotalComputationUsed,
 		},
-		Index:    uint64(collectionIndex),
-		EndState: endState,
-	}
+		Index:    untrusted.Index,
+		EndState: untrusted.EndState,
+	}, nil
 }
 
 // ID returns the unique identifier of the Chunk
 func (ch *Chunk) ID() Identifier {
-	return MakeID(ch)
-}
-
-// Checksum provides a cryptographic commitment for a chunk content
-func (ch *Chunk) Checksum() Identifier {
 	return MakeID(ch)
 }
 
@@ -264,30 +307,53 @@ type ChunkDataPack struct {
 	ExecutionDataRoot BlockExecutionDataRoot
 }
 
+// UntrustedChunkDataPack is an untrusted input-only representation of an ChunkDataPack,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedChunkDataPack should be validated and converted into
+// a trusted ChunkDataPack using NewChunkDataPack constructor.
+type UntrustedChunkDataPack ChunkDataPack
+
 // NewChunkDataPack returns an initialized chunk data pack.
-func NewChunkDataPack(
-	chunkID Identifier,
-	startState StateCommitment,
-	proof StorageProof,
-	collection *Collection,
-	execDataRoot BlockExecutionDataRoot,
-) *ChunkDataPack {
-	return &ChunkDataPack{
-		ChunkID:           chunkID,
-		StartState:        startState,
-		Proof:             proof,
-		Collection:        collection,
-		ExecutionDataRoot: execDataRoot,
+// Construction ChunkDataPack allowed only within the constructor.
+//
+// All errors indicate a valid ChunkDataPack cannot be constructed from the input.
+func NewChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPack, error) {
+	if untrusted.ChunkID == ZeroID {
+		return nil, fmt.Errorf("ChunkID must not be empty")
 	}
+
+	if untrusted.StartState == (StateCommitment{}) {
+		return nil, fmt.Errorf("StartState must not be zero-value")
+	}
+
+	if len(untrusted.Proof) == 0 {
+		return nil, fmt.Errorf("Proof must not be empty")
+	}
+
+	if untrusted.ExecutionDataRoot.BlockID == ZeroID {
+		return nil, fmt.Errorf("ExecutionDataRoot.BlockID must not be empty")
+	}
+
+	if len(untrusted.ExecutionDataRoot.ChunkExecutionDataIDs) == 0 {
+		return nil, fmt.Errorf("ExecutionDataRoot.ChunkExecutionDataIDs must not be empty")
+	}
+
+	return &ChunkDataPack{
+		ChunkID:           untrusted.ChunkID,
+		StartState:        untrusted.StartState,
+		Proof:             untrusted.Proof,
+		Collection:        untrusted.Collection,
+		ExecutionDataRoot: untrusted.ExecutionDataRoot,
+	}, nil
 }
 
 // ID returns a collision-resistant hash of the ChunkDataPack struct.
 func (c *ChunkDataPack) ID() Identifier {
-	return MakeID(c)
-}
-
-// Checksum returns the checksum of the chunk data pack.
-func (c *ChunkDataPack) Checksum() Identifier {
 	return MakeID(c)
 }
 

@@ -114,7 +114,7 @@ func (suite *Suite) TestGetTransactionResultReturnsTransactionError() {
 
 		suite.blocks.
 			On("ByID", block.ID()).
-			Return(&block, nil).
+			Return(block, nil).
 			Once()
 
 		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
@@ -194,7 +194,7 @@ func (suite *Suite) withGetTransactionCachingTestSetup(f func(b *flow.Block, t *
 
 		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
 
-		f(&block, &tx)
+		f(block, &tx)
 	})
 }
 
@@ -352,7 +352,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_HappyPath()
 	failedTxIndex := rand.Uint32()
 
 	// Setup mock receipts and execution node identities.
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -426,7 +426,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_FailedToFet
 	failedTxId := failedTx.ID()
 
 	// Setup mock receipts and execution node identities.
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -534,7 +534,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 	failedTxIndex := rand.Uint32()
 
 	// Setup mock receipts and execution node identities.
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -609,7 +609,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 	failedTxId := failedTx.ID()
 
 	// Setup mock receipts and execution node identities.
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -725,7 +725,7 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_HappyPath() {
 		})
 	}
 
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -824,7 +824,7 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_FailedToFetch() 
 	blockId := block.ID()
 
 	// Setup mock receipts and execution node identities.
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -1068,7 +1068,7 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 	// Mock the behavior of the blocks and transactionResults objects
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil).
+		Return(block, nil).
 		Once()
 
 	lightTxShouldFail := false
@@ -1237,7 +1237,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 func (suite *Suite) assertTransactionResultResponse(
 	err error,
 	response *accessmodel.TransactionResult,
-	block flow.Block,
+	block *flow.Block,
 	txId flow.Identifier,
 	txFailed bool,
 	eventsForTx []flow.Event,
@@ -1271,7 +1271,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
 	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
 	block := unittest.BlockFixture(
-		unittest.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
 	)
 	txId := transaction.ID()
 	blockId := block.ID()
@@ -1279,7 +1279,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	// Mock the behavior of the blocks and transactionResults objects
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil)
+		Return(block, nil)
 
 	suite.transactionResults.On("ByBlockIDTransactionID", blockId, txId).
 		Return(&flow.LightTransactionResult{
@@ -1294,7 +1294,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 
 	// Set up the light collection and mock the behavior of the collections object
 	lightCol := col.Light()
-	suite.collections.On("LightByID", col.ID()).Return(&lightCol, nil)
+	suite.collections.On("LightByID", col.ID()).Return(lightCol, nil)
 
 	// Set up the events storage mock
 	totalEvents := 5
@@ -1308,7 +1308,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	suite.events.On("ByBlockIDTransactionID", blockId, txId).Return(eventsForTx, nil)
 
 	// Set up the state and snapshot mocks
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
@@ -1362,7 +1362,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
 	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
 	block := unittest.BlockFixture(
-		unittest.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
 	)
 	blockId := block.ID()
 	txId := transaction.ID()
@@ -1370,12 +1370,12 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 
 	// Set up the light collection and mock the behavior of the collections object
 	lightCol := col.Light()
-	suite.collections.On("LightByID", col.ID()).Return(&lightCol, nil)
+	suite.collections.On("LightByID", col.ID()).Return(lightCol, nil)
 
 	// Mock the behavior of the blocks and transactionResults objects
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil)
+		Return(block, nil)
 
 	suite.transactionResults.On("ByBlockIDTransactionIndex", blockId, txIndex).
 		Return(&flow.LightTransactionResult{
@@ -1396,7 +1396,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	suite.events.On("ByBlockIDTransactionIndex", blockId, txIndex).Return(eventsForTx, nil)
 
 	// Set up the state and snapshot mocks
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
@@ -1448,16 +1448,16 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	col := unittest.CollectionFixture(2)
 	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
 	block := unittest.BlockFixture(
-		unittest.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
 	)
 	blockId := block.ID()
 
 	// Mock the behavior of the blocks, collections and light transaction results objects
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil)
+		Return(block, nil)
 	lightCol := col.Light()
-	suite.collections.On("LightByID", mock.Anything).Return(&lightCol, nil)
+	suite.collections.On("LightByID", mock.Anything).Return(lightCol, nil)
 
 	lightTxResults := make([]flow.LightTransactionResult, len(lightCol.Transactions))
 	for i, txID := range lightCol.Transactions {
@@ -1490,7 +1490,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	suite.events.On("ByBlockIDTransactionID", blockId, mock.Anything).Return(eventsForTx, nil)
 
 	// Set up the state and snapshot mocks
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)

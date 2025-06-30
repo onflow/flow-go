@@ -891,7 +891,7 @@ func (suite *Suite) TestGetCollection() {
 
 	suite.collections.
 		On("LightByID", expected.ID()).
-		Return(&expected, nil).
+		Return(expected, nil).
 		Once()
 
 	params := suite.defaultBackendParams()
@@ -903,7 +903,7 @@ func (suite *Suite) TestGetCollection() {
 	suite.transactions.AssertExpectations(suite.T())
 	suite.checkResponse(actual, err)
 
-	suite.Equal(expected, *actual)
+	suite.Equal(expected, actual)
 	suite.assertAllExpectations()
 }
 
@@ -919,9 +919,9 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	// block storage returns the corresponding block
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil)
+		Return(block, nil)
 
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -977,17 +977,18 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 
 	ctx := context.Background()
 
-	block := unittest.BlockFixture()
 	sporkRootBlockHeight := suite.state.Params().SporkRootBlockHeight()
-	block.Header.Height = sporkRootBlockHeight + 1
+	block := unittest.BlockFixture(
+		unittest.Block.WithHeight(sporkRootBlockHeight + 1),
+	)
 	blockId := block.ID()
 
 	// block storage returns the corresponding block
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil)
+		Return(block, nil)
 
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -1046,14 +1047,15 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
 	block := unittest.BlockFixture(
-		unittest.WithPayload(unittest.PayloadFixture(
+		unittest.Block.WithHeight(2),
+		unittest.Block.WithPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(
 				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...),
 		)),
 	)
-	block.Header.Height = 2
-	headBlock := unittest.BlockFixture()
-	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
+	headBlock := unittest.BlockFixture(
+		unittest.Block.WithHeight(block.Header.Height - 1), // head is behind the current block
+	)
 
 	suite.snapshot.
 		On("Head").
@@ -1062,7 +1064,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		}, nil)
 
 	light := collection.Light()
-	suite.collections.On("LightByID", light.ID()).Return(&light, nil)
+	suite.collections.On("LightByID", light.ID()).Return(light, nil)
 
 	// transaction storage returns the corresponding transaction
 	suite.transactions.
@@ -1072,16 +1074,16 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	// collection storage returns the corresponding collection
 	suite.collections.
 		On("LightByTransactionID", transactionBody.ID()).
-		Return(&light, nil)
+		Return(light, nil)
 
 	// block storage returns the corresponding block
 	suite.blocks.
 		On("ByCollectionID", collection.ID()).
-		Return(&block, nil)
+		Return(block, nil)
 
 	txID := transactionBody.ID()
 	blockID := block.ID()
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -1164,12 +1166,14 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
-	block := unittest.BlockFixture()
-	block.Header.Height = 2
+	block := unittest.BlockFixture(
+		unittest.Block.WithHeight(2),
+	)
 	transactionBody.SetReferenceBlockID(block.ID())
 
-	headBlock := unittest.BlockFixture()
-	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
+	headBlock := unittest.BlockFixture(
+		unittest.Block.WithHeight(block.Header.Height - 1), // head is behind the current block
+	)
 
 	// set up GetLastFullBlockHeight mock
 	fullHeight := headBlock.Header.Height
@@ -1265,7 +1269,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	transactionBody := collection.Transactions[0]
 	// block which will eventually contain the transaction
 	block := unittest.BlockFixture(
-		unittest.WithPayload(unittest.PayloadFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(
 				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...),
 		)),
@@ -1273,14 +1277,16 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	blockID := block.ID()
 
 	// reference block to which the transaction points to
-	refBlock := unittest.BlockFixture()
+	refBlock := unittest.BlockFixture(
+		unittest.Block.WithHeight(2),
+	)
 	refBlockID := refBlock.ID()
-	refBlock.Header.Height = 2
 	transactionBody.SetReferenceBlockID(refBlockID)
 	txID := transactionBody.ID()
 
-	headBlock := unittest.BlockFixture()
-	headBlock.Header.Height = refBlock.Header.Height - 1 // head is behind the current refBlock
+	headBlock := unittest.BlockFixture(
+		unittest.Block.WithHeight(refBlock.Header.Height - 1), // head is behind the current refBlock
+	)
 
 	suite.snapshot.
 		On("Head").
@@ -1289,7 +1295,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	snapshotAtBlock := new(protocol.Snapshot)
 	snapshotAtBlock.On("Head").Return(refBlock.ToHeader(), nil)
 
-	_, enIDs := suite.setupReceipts(&block)
+	_, enIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	suite.snapshot.On("Identities", mock.Anything).Return(enIDs, nil)
@@ -1314,7 +1320,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 				return nil
 			}
 			collLight := collection.Light()
-			return &collLight
+			return collLight
 		},
 			func(txID flow.Identifier) error {
 				if currentState == flow.TransactionStatusPending {
@@ -1324,14 +1330,14 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 			})
 
 	light := collection.Light()
-	suite.collections.On("LightByID", mock.Anything).Return(&light, nil)
+	suite.collections.On("LightByID", mock.Anything).Return(light, nil)
 
 	// refBlock storage returns the corresponding refBlock
 	suite.blocks.
 		On("ByCollectionID", collection.ID()).
-		Return(&block, nil)
+		Return(block, nil)
 
-	receipts, _ := suite.setupReceipts(&block)
+	receipts, _ := suite.setupReceipts(block)
 
 	exeEventReq := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
@@ -1433,14 +1439,14 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 
 		suite.blocks.
 			On("ByHeight", header.Height).
-			Return(&expected, nil)
+			Return(expected, nil)
 
 		// query the handler for the latest finalized header
 		actual, stat, err := backend.GetLatestBlock(context.Background(), false)
 		suite.checkResponse(actual, err)
 
 		// make sure we got the latest header
-		suite.Require().Equal(expected, *actual)
+		suite.Require().Equal(expected, actual)
 		suite.Assert().Equal(stat, flow.BlockStatusFinalized)
 
 		suite.assertAllExpectations()
@@ -1747,7 +1753,7 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	transactionBody := collection.Transactions[0]
 	// block which will eventually contain the transaction
 	block := unittest.BlockFixture(
-		unittest.WithPayload(unittest.PayloadFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(
 				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...),
 		)),
@@ -1755,10 +1761,10 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	blockId := block.ID()
 
 	// reference block to which the transaction points to
-	refBlock := unittest.BlockFixture()
-	refBlockID := refBlock.ID()
-	refBlock.Header.Height = 2
-	transactionBody.SetReferenceBlockID(refBlockID)
+	refBlock := unittest.BlockFixture(
+		unittest.Block.WithHeight(2),
+	)
+	transactionBody.SetReferenceBlockID(refBlock.ID())
 	txId := transactionBody.ID()
 
 	// transaction storage returns the corresponding transaction
@@ -1767,16 +1773,16 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 		Return(transactionBody, nil)
 
 	light := collection.Light()
-	suite.collections.On("LightByID", mock.Anything).Return(&light, nil)
+	suite.collections.On("LightByID", mock.Anything).Return(light, nil)
 
 	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
 
 	// block storage returns the corresponding block
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil)
+		Return(block, nil)
 
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -1837,9 +1843,9 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 	// block storage returns the corresponding block
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil)
+		Return(block, nil)
 
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
@@ -1934,9 +1940,9 @@ func (suite *Suite) TestNodeCommunicator() {
 	// block storage returns the corresponding block
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil)
+		Return(block, nil)
 
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
