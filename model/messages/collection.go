@@ -52,6 +52,10 @@ func (cbp *UntrustedClusterProposal) DeclareTrusted() (*cluster.BlockProposal, e
 		return nil, fmt.Errorf("could not build cluster block: %w", err)
 	}
 
+	// validate ProposerSigData
+	if len(cbp.ProposerSigData) == 0 {
+		return nil, fmt.Errorf("proposer signature must not be empty")
+	}
 	return &cluster.BlockProposal{
 		Block:           *block,
 		ProposerSigData: cbp.ProposerSigData,
