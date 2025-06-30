@@ -70,7 +70,7 @@ type BuilderSuite struct {
 func (suite *BuilderSuite) SetupTest() {
 	var err error
 
-	suite.genesis = model.Genesis()
+	suite.genesis = unittest.ClusterBlock.Genesis()
 	suite.chainID = suite.genesis.Header.ChainID
 
 	suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
@@ -1073,7 +1073,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 	{
 		var err error
 
-		suite.genesis = model.Genesis()
+		suite.genesis = unittest.ClusterBlock.Genesis()
 		suite.chainID = suite.genesis.Header.ChainID
 
 		suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())

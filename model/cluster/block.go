@@ -8,22 +8,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func Genesis() *Block {
-	headerBody := flow.HeaderBody{
-		View:      0,
-		ChainID:   "cluster",
-		Timestamp: flow.GenesisTime,
-		ParentID:  flow.ZeroID,
-	}
-
-	// Constructor is skipped for genesis block
-	//nolint:structwrite
-	return &Block{
-		Header:  headerBody,
-		Payload: *NewEmptyPayload(flow.ZeroID),
-	}
-}
-
 // Block represents a block in collection node cluster consensus. It contains
 // a standard block header with a payload containing only a single collection.
 //
