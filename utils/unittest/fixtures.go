@@ -844,9 +844,14 @@ func WithPreviousResult(prevResult flow.ExecutionResult) func(*flow.ExecutionRes
 	}
 }
 
+func WithPreviousResultID(previousResultID flow.Identifier) func(*flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		result.PreviousResultID = previousResultID
+	}
+}
+
 func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	chunks := 1 // tailing chunk is always system chunk
-	var previousResultID flow.Identifier
 	chunks += len(block.Payload.Guarantees)
 	blockID := block.ID()
 
@@ -854,7 +859,7 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 		startState := result.Chunks[0].StartState // retain previous start state in case it was user-defined
 		result.BlockID = blockID
 		result.Chunks = ChunkListFixture(uint(chunks), blockID, startState)
-		result.PreviousResultID = previousResultID
+		result.PreviousResultID = IdentifierFixture()
 	}
 }
 
@@ -1553,8 +1558,9 @@ func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.HeaderBody
 	}
 
 	result := flow.ExecutionResult{
-		BlockID: block.ID(),
-		Chunks:  chunks,
+		PreviousResultID: IdentifierFixture(),
+		BlockID:          block.ID(),
+		Chunks:           chunks,
 	}
 
 	// computes chunk end state
