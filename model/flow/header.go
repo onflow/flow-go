@@ -75,10 +75,30 @@ func (h HeaderBody) QuorumCertificate() *QuorumCertificate {
 // CAUTION regarding security:
 //   - With a byzantine HeaderBody alone, an honest node cannot prove who created that faulty data structure,
 //     because HeaderBody does not include the proposer's signature.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Header struct {
 	HeaderBody
 	// PayloadHash is a hash of the payload of this block.
 	PayloadHash Identifier
+}
+
+// UntrustedHeader is an untrusted input-only representation of a Header,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedHeader should be validated and converted into
+// a trusted Header using NewHeader constructor.
+type UntrustedHeader Header
+
+func NewHeader(untrusted UntrustedHeader) (*Header, error) {
+	return &Header{
+		HeaderBody:  untrusted.HeaderBody,
+		PayloadHash: untrusted.PayloadHash,
+	}, nil
 }
 
 // Fingerprint defines custom encoding for the header to calculate its ID.
@@ -124,7 +144,7 @@ func (h Header) MarshalJSON() ([]byte, error) {
 	// NOTE: this is just a sanity check to make sure that we don't get
 	// different encodings if someone forgets to use UTC timestamps
 	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
+		h.Timestamp = h.Timestamp.UTC() //nolint:structwrite
 	}
 
 	// we use an alias to avoid endless recursion; the alias will not have the
@@ -151,7 +171,7 @@ func (h *Header) UnmarshalJSON(data []byte) error {
 	// timezones, but it doesn't hurt to add it in case someone messes with the
 	// raw encoded format
 	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
+		h.Timestamp = h.Timestamp.UTC() //nolint:structwrite
 	}
 
 	return err
@@ -163,7 +183,7 @@ func (h Header) MarshalCBOR() ([]byte, error) {
 	// NOTE: this is just a sanity check to make sure that we don't get
 	// different encodings if someone forgets to use UTC timestamps
 	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
+		h.Timestamp = h.Timestamp.UTC() //nolint:structwrite
 	}
 
 	// we use an alias to avoid endless recursion; the alias will not have the
@@ -188,7 +208,7 @@ func (h *Header) UnmarshalCBOR(data []byte) error {
 	// timezones, but it doesn't hurt to add it in case someone messes with the
 	// raw encoded format
 	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
+		h.Timestamp = h.Timestamp.UTC() //nolint:structwrite
 	}
 
 	return err
@@ -200,7 +220,7 @@ func (h Header) MarshalMsgpack() ([]byte, error) {
 	// NOTE: this is just a sanity check to make sure that we don't get
 	// different encodings if someone forgets to use UTC timestamps
 	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
+		h.Timestamp = h.Timestamp.UTC() //nolint:structwrite
 	}
 
 	// we use an alias to avoid endless recursion; the alias will not have the
@@ -229,4 +249,63 @@ func (h *Header) UnmarshalMsgpack(data []byte) error {
 	}
 
 	return err
+}
+
+type HeaderBuilder struct {
+	u UntrustedHeader
+}
+
+// NewHeaderBuilder helps to build a new Header.
+func NewHeaderBuilder() *HeaderBuilder {
+	return &HeaderBuilder{}
+}
+
+// Build validates and returns an immutable Header.
+func (b *HeaderBuilder) Build() (*Header, error) {
+	return NewHeader(b.u)
+}
+
+func (h *HeaderBuilder) WithChainID(id ChainID) *HeaderBuilder {
+	h.u.ChainID = id
+	return h
+}
+func (h *HeaderBuilder) WithParentID(pid Identifier) *HeaderBuilder {
+	h.u.ParentID = pid
+	return h
+}
+func (h *HeaderBuilder) WithHeight(height uint64) *HeaderBuilder {
+	h.u.Height = height
+	return h
+}
+func (h *HeaderBuilder) WithTimestamp(t time.Time) *HeaderBuilder {
+	h.u.Timestamp = t
+	return h
+}
+func (h *HeaderBuilder) WithView(v uint64) *HeaderBuilder {
+	h.u.View = v
+	return h
+}
+func (h *HeaderBuilder) WithParentView(pv uint64) *HeaderBuilder {
+	h.u.ParentView = pv
+	return h
+}
+func (h *HeaderBuilder) WithParentVoterIndices(idx []byte) *HeaderBuilder {
+	h.u.ParentVoterIndices = idx
+	return h
+}
+func (h *HeaderBuilder) WithParentVoterSigData(sig []byte) *HeaderBuilder {
+	h.u.ParentVoterSigData = sig
+	return h
+}
+func (h *HeaderBuilder) WithProposerID(id Identifier) *HeaderBuilder {
+	h.u.ProposerID = id
+	return h
+}
+func (h *HeaderBuilder) WithLastViewTC(tc *TimeoutCertificate) *HeaderBuilder {
+	h.u.LastViewTC = tc
+	return h
+}
+func (h *HeaderBuilder) WithPayloadHash(payloadHash Identifier) *HeaderBuilder {
+	h.u.PayloadHash = payloadHash
+	return h
 }

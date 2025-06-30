@@ -79,7 +79,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 		}
 	}
 
-	return &flow.Header{
+	header, err := flow.NewHeader(flow.UntrustedHeader{
 		HeaderBody: flow.HeaderBody{
 			ParentID:           MessageToIdentifier(m.ParentId),
 			Height:             m.Height,
@@ -93,5 +93,10 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 			LastViewTC:         lastViewTC,
 		},
 		PayloadHash: MessageToIdentifier(m.PayloadHash),
-	}, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build header: %w", err)
+	}
+
+	return header, nil
 }
