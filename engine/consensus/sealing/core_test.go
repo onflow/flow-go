@@ -838,7 +838,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	// Create block B with results for both X and S
 	receiptS := unittest.ExecutionReceiptFixture(unittest.WithResult(unittest.ExecutionResultFixture(
 		unittest.WithPreviousResult(receiptX.ExecutionResult),
-		unittest.WithBlock(&blockS),
+		unittest.WithBlock(blockS),
 	)))
 	blockB := unittest.BlockWithParentAndPayload(
 		blockS.ToHeader(),
@@ -892,19 +892,19 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 		&flow.SealingSegment{
 			Blocks: []*flow.BlockProposal{
 				{
-					Block:           &blockS,
+					Block:           *blockS,
 					ProposerSigData: nil, // combination of (i) and (ii): spork root block without proposer signature; but with ancestor blocks
 				},
 				{
-					Block:           blockB,
+					Block:           *blockB,
 					ProposerSigData: unittest.SignatureFixture(),
 				},
 				{
-					Block:           blockC,
+					Block:           *blockC,
 					ProposerSigData: unittest.SignatureFixture(),
 				},
 				{
-					Block:           blockD,
+					Block:           *blockD,
 					ProposerSigData: unittest.SignatureFixture(),
 				},
 			},
