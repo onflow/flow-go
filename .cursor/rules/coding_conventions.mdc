@@ -242,6 +242,8 @@ func (e *engine) Process(chan network.Channel, originID flow.Identifier, event i
         if errors.Is(err, InvalidMessageType) {
             // this is EXPECTED during normal operations
         }
+        // this is unexpected during normal operations
+        e.log.Fatal().Err(err).Msg("unexpected internal error")
     }
 }
 
@@ -251,6 +253,8 @@ func (e *engine) ProcessLocal(event interface{}) {
         if errors.Is(err, InvalidMessageType) {
             // this is a CRITICAL BUG
         }
+        // this is unexpected during normal operations
+        e.log.Fatal().Err(err).Msg("unexpected internal error")
     }
 }
 ```
