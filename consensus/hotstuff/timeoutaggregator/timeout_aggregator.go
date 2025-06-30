@@ -140,7 +140,7 @@ func (t *TimeoutAggregator) processQueuedTimeoutObjects(ctx context.Context) err
 			)
 		}
 
-		t.log.Info().
+		t.log.Debug().
 			Uint64("view", timeoutObject.View).
 			Hex("signer", timeoutObject.SignerID[:]).
 			Msg("TimeoutObject processed successfully")

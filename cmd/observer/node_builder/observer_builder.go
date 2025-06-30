@@ -50,6 +50,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	subscriptiontracker "github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/engine/common/follower"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/stop"
@@ -203,7 +204,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
 			CompressorName:            grpcutils.NoCompressor,
 			WebSocketConfig:           websockets.NewDefaultWebsocketConfig(),
-			EnableWebSocketsStreamAPI: false,
+			EnableWebSocketsStreamAPI: true,
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
@@ -841,9 +842,9 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		)
 		flags.BoolVar(
 			&builder.rpcConf.EnableWebSocketsStreamAPI,
-			"experimental-enable-websockets-stream-api",
+			"websockets-stream-api-enabled",
 			defaultConfig.rpcConf.EnableWebSocketsStreamAPI,
-			"[experimental] enables WebSockets Stream API that operates under /ws endpoint. this flag may change in a future release.",
+			"whether to enable the WebSockets Stream API.",
 		)
 	}).ValidateFlags(func() error {
 		if builder.executionDataSyncEnabled {
@@ -952,11 +953,15 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
-		builder.IdentityProvider, err = cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
-			return builder.NetworkUnderlay
-		})
+		builder.IdentityProvider, err = cache.NewNodeDisallowListWrapper(
+			idCache,
+			node.ProtocolDB,
+			func() network.DisallowListNotificationConsumer {
+				return builder.NetworkUnderlay
+			},
+		)
 		if err != nil {
-			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
+			return fmt.Errorf("could not initialize NodeDisallowListWrapper: %w", err)
 		}
 
 		// use the default identifier provider
@@ -1149,6 +1154,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
 			db := builder.ExecutionDatastoreManager.DB()
+
 			processedNotifications = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
@@ -1538,7 +1544,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			useIndex := builder.executionDataIndexingEnabled &&
 				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
 
-			executionDataTracker := subscription.NewExecutionDataTracker(
+			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
 				builder.Logger,
 				node.State,
 				builder.executionDataConfig.InitialBlockHeight,
@@ -1892,7 +1898,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		broadcaster := engine.NewBroadcaster()
 		// create BlockTracker that will track for new blocks (finalized and sealed) and
 		// handles block-related operations.
-		blockTracker, err := subscription.NewBlockTracker(
+		blockTracker, err := subscriptiontracker.NewBlockTracker(
 			node.State,
 			builder.FinalizedRootBlock.Header.Height,
 			node.Storage.Headers,

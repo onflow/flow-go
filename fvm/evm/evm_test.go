@@ -1613,7 +1613,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 				assert.Len(t, output.Events, 3)
-				assert.Len(t, state.UpdatedRegisterIDs(), 12)
+				assert.Len(t, state.UpdatedRegisterIDs(), 13)
 				assert.Equal(
 					t,
 					flow.EventType("A.f8d6e0586b0a20c7.EVM.TransactionExecuted"),
@@ -1770,7 +1770,7 @@ func TestDryRun(t *testing.T) {
 				require.Less(t, result.GasConsumed, limit)
 
 				// gas limit too low, but still bigger than intrinsic gas value
-				limit = uint64(21216)
+				limit = uint64(24_216)
 				tx = gethTypes.NewTransaction(
 					0,
 					testContract.DeployedAt.ToCommon(),
@@ -2330,7 +2330,7 @@ func TestDryCall(t *testing.T) {
 				require.Less(t, result.GasConsumed, limit)
 
 				// gas limit too low, but still bigger than intrinsic gas value
-				limit = uint64(21216)
+				limit = uint64(24_216)
 				tx = gethTypes.NewTransaction(
 					0,
 					testContract.DeployedAt.ToCommon(),
