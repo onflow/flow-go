@@ -7,7 +7,7 @@ import (
 )
 
 func GenerateRootHeader(chainID flow.ChainID, parentID flow.Identifier, height uint64, timestamp time.Time) *flow.Header {
-	return &flow.Header{
+	return flow.NewRootHeader(flow.UntrustedHeader{
 		HeaderBody: flow.HeaderBody{
 			ChainID:            chainID,
 			ParentID:           parentID,
@@ -19,5 +19,5 @@ func GenerateRootHeader(chainID flow.ChainID, parentID flow.Identifier, height u
 			ProposerID:         flow.ZeroID,
 		},
 		PayloadHash: flow.ZeroID,
-	}
+	})
 }

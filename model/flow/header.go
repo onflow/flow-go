@@ -101,6 +101,13 @@ func NewHeader(untrusted UntrustedHeader) (*Header, error) {
 	}, nil
 }
 
+func NewRootHeader(untrusted UntrustedHeader) *Header {
+	return &Header{
+		HeaderBody:  untrusted.HeaderBody,
+		PayloadHash: untrusted.PayloadHash,
+	}
+}
+
 // Fingerprint defines custom encoding for the header to calculate its ID.
 // Timestamp is converted from time.Time to unix time (uint64), which is necessary
 // because time.Time is not RLP-encodable (due to having private fields).
@@ -245,7 +252,7 @@ func (h *Header) UnmarshalMsgpack(data []byte) error {
 	// that a block ID would suddenly be different after encoding and decoding
 	// on a machine with non-UTC local time
 	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
+		h.Timestamp = h.Timestamp.UTC() //nolint:structwrite
 	}
 
 	return err

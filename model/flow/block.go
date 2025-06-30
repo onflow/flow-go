@@ -61,10 +61,15 @@ func (b Block) ID() Identifier {
 // ToHeader converts the block into a compact [flow.Header] representation,
 // where the payload is compressed to a hash reference.
 func (b Block) ToHeader() *Header {
-	return &Header{
+	header, err := NewHeader(UntrustedHeader{
 		HeaderBody:  b.Header,
 		PayloadHash: b.Payload.Hash(),
+	})
+	if err != nil {
+		panic(fmt.Errorf("could not build header from block: %w", err))
 	}
+
+	return header
 }
 
 // TODO(malleability): remove MarshalMsgpack when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
