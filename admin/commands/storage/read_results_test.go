@@ -50,7 +50,7 @@ func (suite *ReadResultsSuite) SetupTest() {
 	var results []*flow.ExecutionResult
 
 	genesis := unittest.GenesisFixture()
-	genesisResult := unittest.ExecutionResultFixture(unittest.WithBlock(genesis))
+	genesisResult := unittest.ExecutionResultFixture(unittest.WithBlock(genesis), unittest.WithPreviousResultID(flow.ZeroID))
 	blocks = append(blocks, genesis)
 	results = append(results, genesisResult)
 
