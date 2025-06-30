@@ -64,6 +64,15 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	}, nil
 }
 
+// NewRootBlock creates a root block in collection node cluster consensus.
+// Construction cluster Block allowed only within the constructor.
+func NewRootBlock(untrusted UntrustedBlock) *Block {
+	return &Block{
+		Header:  untrusted.Header,
+		Payload: untrusted.Payload,
+	}
+}
+
 // ID returns a collision-resistant hash of the cluster.Block struct.
 func (b *Block) ID() flow.Identifier {
 	return b.ToHeader().ID()

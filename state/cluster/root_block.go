@@ -32,10 +32,10 @@ func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) *c
 		ProposerID:         flow.ZeroID,
 	}
 
-	// Constructor is skipped for root block
-	//nolint:structwrite
-	return &cluster.Block{
-		Header:  headerBody,
-		Payload: *rootBlockPayload,
-	}
+	return cluster.NewRootBlock(
+		cluster.UntrustedBlock{
+			Header:  headerBody,
+			Payload: *rootBlockPayload,
+		},
+	)
 }
