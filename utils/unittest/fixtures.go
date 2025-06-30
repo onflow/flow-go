@@ -566,13 +566,6 @@ func ClusterPayloadFixture(transactionsCount int) *cluster.Payload {
 	}
 }
 
-func ClusterBlockFixture() *cluster.Block {
-	return &cluster.Block{
-		Header:  HeaderBodyFixture(),
-		Payload: *ClusterPayloadFixture(3),
-	}
-}
-
 func ClusterBlockChainFixture(n int) []cluster.Block {
 	clusterBlocks := make([]cluster.Block, 0, n)
 

@@ -25,7 +25,7 @@ func TestFinalizer(t *testing.T) {
 		// reference block on the main consensus chain
 		refBlock := unittest.ClusterBlockFixture()
 		// genesis block for the cluster chain
-		genesis := *model.Genesis()
+		genesis := model.Genesis()
 
 		metrics := metrics.NewNoopCollector()
 
@@ -46,7 +46,7 @@ func TestFinalizer(t *testing.T) {
 
 		// a helper function to bootstrap with the genesis block
 		bootstrap := func() {
-			stateRoot, err := cluster.NewStateRoot(&genesis, unittest.QuorumCertificateFixture(), 0)
+			stateRoot, err := cluster.NewStateRoot(genesis, unittest.QuorumCertificateFixture(), 0)
 			require.NoError(t, err)
 			state, err = cluster.Bootstrap(db, stateRoot)
 			require.NoError(t, err)
@@ -92,8 +92,11 @@ func TestFinalizer(t *testing.T) {
 				},
 			)
 			require.NoError(t, err)
-			block := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
-			insert(block)
+			block := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(genesis),
+				unittest.ClusterBlock.WithPayload(*payload),
+			)
+			insert(*block)
 
 			// finalize the block
 			err = finalizer.MakeFinal(block.ID())
@@ -112,9 +115,12 @@ func TestFinalizer(t *testing.T) {
 			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// create a new block that isn't connected to a parent
-			block := unittest.ClusterBlockWithParentAndPayload(genesis, *model.NewEmptyPayload(refBlock.ID()))
+			block := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(genesis),
+				unittest.ClusterBlock.WithPayload(*model.NewEmptyPayload(refBlock.ID())),
+			)
 			block.Header.ParentID = unittest.IdentifierFixture()
-			insert(block)
+			insert(*block)
 
 			// try to finalize - this should fail
 			err := finalizer.MakeFinal(block.ID())
@@ -129,8 +135,11 @@ func TestFinalizer(t *testing.T) {
 			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// create a block with empty payload on genesis
-			block := unittest.ClusterBlockWithParentAndPayload(genesis, *model.NewEmptyPayload(refBlock.ID()))
-			insert(block)
+			block := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(genesis),
+				unittest.ClusterBlock.WithPayload(*model.NewEmptyPayload(refBlock.ID())),
+			)
+			insert(*block)
 
 			// finalize the block
 			err := finalizer.MakeFinal(block.ID())
@@ -167,8 +176,11 @@ func TestFinalizer(t *testing.T) {
 				},
 			)
 			require.NoError(t, err)
-			block := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
-			insert(block)
+			block := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(genesis),
+				unittest.ClusterBlock.WithPayload(*payload),
+			)
+			insert(*block)
 
 			// block should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
@@ -218,8 +230,11 @@ func TestFinalizer(t *testing.T) {
 				},
 			)
 			require.NoError(t, err)
-			block1 := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
-			insert(block1)
+			block1 := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(genesis),
+				unittest.ClusterBlock.WithPayload(*payload),
+			)
+			insert(*block1)
 
 			// create a block containing tx2 on top of block1
 			payload, err = model.NewPayload(
@@ -229,8 +244,11 @@ func TestFinalizer(t *testing.T) {
 				},
 			)
 			require.NoError(t, err)
-			block2 := unittest.ClusterBlockWithParentAndPayload(block1, *payload)
-			insert(block2)
+			block2 := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(block1),
+				unittest.ClusterBlock.WithPayload(*payload),
+			)
+			insert(*block2)
 
 			// both blocks should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
@@ -285,8 +303,11 @@ func TestFinalizer(t *testing.T) {
 				},
 			)
 			require.NoError(t, err)
-			block1 := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
-			insert(block1)
+			block1 := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(genesis),
+				unittest.ClusterBlock.WithPayload(*payload),
+			)
+			insert(*block1)
 
 			// create a block containing tx2 on top of block1
 			payload, err = model.NewPayload(
@@ -296,8 +317,11 @@ func TestFinalizer(t *testing.T) {
 				},
 			)
 			require.NoError(t, err)
-			block2 := unittest.ClusterBlockWithParentAndPayload(block1, *payload)
-			insert(block2)
+			block2 := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(block1),
+				unittest.ClusterBlock.WithPayload(*payload),
+			)
+			insert(*block2)
 
 			// block should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
@@ -347,8 +371,11 @@ func TestFinalizer(t *testing.T) {
 				},
 			)
 			require.NoError(t, err)
-			block1 := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
-			insert(block1)
+			block1 := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(genesis),
+				unittest.ClusterBlock.WithPayload(*payload),
+			)
+			insert(*block1)
 
 			// create a block containing tx2 on top of genesis (conflicting with block1)
 			payload, err = model.NewPayload(
@@ -358,8 +385,11 @@ func TestFinalizer(t *testing.T) {
 				},
 			)
 			require.NoError(t, err)
-			block2 := unittest.ClusterBlockWithParentAndPayload(genesis, *payload)
-			insert(block2)
+			block2 := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(genesis),
+				unittest.ClusterBlock.WithPayload(*payload),
+			)
+			insert(*block2)
 
 			// block should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
