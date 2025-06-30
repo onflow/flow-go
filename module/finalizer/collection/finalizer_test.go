@@ -55,7 +55,7 @@ func TestFinalizer(t *testing.T) {
 		}
 
 		// a helper function to insert a block
-		insert := func(block model.Block) {
+		insert := func(block *model.Block) {
 			err := db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
 			assert.NoError(t, err)
 		}
@@ -96,7 +96,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(genesis),
 				unittest.ClusterBlock.WithPayload(*payload),
 			)
-			insert(*block)
+			insert(block)
 
 			// finalize the block
 			err = finalizer.MakeFinal(block.ID())
@@ -120,7 +120,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithPayload(*model.NewEmptyPayload(refBlock.ID())),
 			)
 			block.Header.ParentID = unittest.IdentifierFixture()
-			insert(*block)
+			insert(block)
 
 			// try to finalize - this should fail
 			err := finalizer.MakeFinal(block.ID())
@@ -139,7 +139,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(genesis),
 				unittest.ClusterBlock.WithPayload(*model.NewEmptyPayload(refBlock.ID())),
 			)
-			insert(*block)
+			insert(block)
 
 			// finalize the block
 			err := finalizer.MakeFinal(block.ID())
@@ -180,7 +180,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(genesis),
 				unittest.ClusterBlock.WithPayload(*payload),
 			)
-			insert(*block)
+			insert(block)
 
 			// block should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
@@ -234,7 +234,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(genesis),
 				unittest.ClusterBlock.WithPayload(*payload),
 			)
-			insert(*block1)
+			insert(block1)
 
 			// create a block containing tx2 on top of block1
 			payload, err = model.NewPayload(
@@ -248,7 +248,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(block1),
 				unittest.ClusterBlock.WithPayload(*payload),
 			)
-			insert(*block2)
+			insert(block2)
 
 			// both blocks should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
@@ -307,7 +307,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(genesis),
 				unittest.ClusterBlock.WithPayload(*payload),
 			)
-			insert(*block1)
+			insert(block1)
 
 			// create a block containing tx2 on top of block1
 			payload, err = model.NewPayload(
@@ -321,7 +321,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(block1),
 				unittest.ClusterBlock.WithPayload(*payload),
 			)
-			insert(*block2)
+			insert(block2)
 
 			// block should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
@@ -375,7 +375,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(genesis),
 				unittest.ClusterBlock.WithPayload(*payload),
 			)
-			insert(*block1)
+			insert(block1)
 
 			// create a block containing tx2 on top of genesis (conflicting with block1)
 			payload, err = model.NewPayload(
@@ -389,7 +389,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(genesis),
 				unittest.ClusterBlock.WithPayload(*payload),
 			)
-			insert(*block2)
+			insert(block2)
 
 			// block should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{

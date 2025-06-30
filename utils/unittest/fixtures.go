@@ -257,9 +257,9 @@ func ProposalFromBlock(block *flow.Block) *flow.BlockProposal {
 	}
 }
 
-func ClusterProposalFromBlock(block cluster.Block) *cluster.BlockProposal {
+func ClusterProposalFromBlock(block *cluster.Block) *cluster.BlockProposal {
 	return &cluster.BlockProposal{
-		Block:           block,
+		Block:           *block,
 		ProposerSigData: SignatureFixture(),
 	}
 }

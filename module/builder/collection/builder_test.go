@@ -177,7 +177,7 @@ func (suite *BuilderSuite) TearDownTest() {
 	suite.Assert().NoError(err)
 }
 
-func (suite *BuilderSuite) InsertBlock(block model.Block) {
+func (suite *BuilderSuite) InsertBlock(block *model.Block) {
 	err := suite.db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
 	suite.Assert().NoError(err)
 }
@@ -446,7 +446,7 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 		unittest.ClusterBlock.WithPayload(suite.Payload(tx1)),
 	)
 	// insert block on fork 1
-	suite.InsertBlock(*block1)
+	suite.InsertBlock(block1)
 
 	// build second fork on top of genesis
 	block2 := unittest.ClusterBlockFixture(
@@ -454,7 +454,7 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 		unittest.ClusterBlock.WithPayload(suite.Payload(tx2)),
 	)
 	// insert block on fork 2
-	suite.InsertBlock(*block2)
+	suite.InsertBlock(block2)
 
 	// build on top of fork 1
 	header, err := suite.builder.BuildOn(block1.ID(), noopSetter, noopSigner)
@@ -488,7 +488,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 		unittest.ClusterBlock.WithParent(suite.genesis),
 		unittest.ClusterBlock.WithPayload(finalizedPayload),
 	)
-	suite.InsertBlock(*finalizedBlock)
+	suite.InsertBlock(finalizedBlock)
 	t.Logf("finalized: height=%d id=%s txs=%s parent_id=%s\t\n", finalizedBlock.Header.Height, finalizedBlock.ID(), finalizedPayload.Collection.Light(), finalizedBlock.Header.ParentID)
 
 	// build a block containing tx2 on the first block
@@ -497,7 +497,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 		unittest.ClusterBlock.WithParent(finalizedBlock),
 		unittest.ClusterBlock.WithPayload(unFinalizedPayload),
 	)
-	suite.InsertBlock(*unFinalizedBlock)
+	suite.InsertBlock(unFinalizedBlock)
 	t.Logf("finalized: height=%d id=%s txs=%s parent_id=%s\t\n", unFinalizedBlock.Header.Height, unFinalizedBlock.ID(), unFinalizedPayload.Collection.Light(), unFinalizedBlock.Header.ParentID)
 
 	// finalize first block
@@ -539,7 +539,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 		unittest.ClusterBlock.WithParent(suite.genesis),
 		unittest.ClusterBlock.WithPayload(suite.Payload(tx1)),
 	)
-	suite.InsertBlock(*finalizedBlock)
+	suite.InsertBlock(finalizedBlock)
 	t.Logf("finalized: id=%s\tparent_id=%s\theight=%d\n", finalizedBlock.ID(), finalizedBlock.Header.ParentID, finalizedBlock.Header.Height)
 
 	// build a block containing tx2 ALSO on genesis - will be invalidated
@@ -547,7 +547,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 		unittest.ClusterBlock.WithParent(suite.genesis),
 		unittest.ClusterBlock.WithPayload(suite.Payload(tx2)),
 	)
-	suite.InsertBlock(*invalidatedBlock)
+	suite.InsertBlock(invalidatedBlock)
 	t.Logf("invalidated: id=%s\tparent_id=%s\theight=%d\n", invalidatedBlock.ID(), invalidatedBlock.Header.ParentID, invalidatedBlock.Header.Height)
 
 	// finalize first block - this indirectly invalidates the second block
@@ -619,7 +619,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 			unittest.ClusterBlock.WithParent(head),
 			unittest.ClusterBlock.WithPayload(suite.Payload(&tx)),
 		)
-		suite.InsertBlock(*block)
+		suite.InsertBlock(block)
 
 		// reset the valid head if we aren't building a conflicting fork
 		if !conflicting {
@@ -1120,7 +1120,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		block := unittest.ClusterBlockFixture(
 			unittest.ClusterBlock.WithParent(final),
 		)
-		err := suite.db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(*block)))
+		err := suite.db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
 		require.NoError(b, err)
 
 		// finalize the block 80% of the time, resulting in a fork-rate of 20%

@@ -166,7 +166,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 			block := unittest.ClusterBlockFixture(
 				unittest.ClusterBlock.WithParent(&cs.head.Block),
 			)
-			proposal := unittest.ClusterProposalFromBlock(*block)
+			proposal := unittest.ClusterProposalFromBlock(block)
 			hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 			cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
 			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
@@ -185,7 +185,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		block := unittest.ClusterBlockFixture(
 			unittest.ClusterBlock.WithParent(&cs.head.Block),
 		)
-		proposal := unittest.ClusterProposalFromBlock(*block)
+		proposal := unittest.ClusterProposalFromBlock(block)
 
 		hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
@@ -210,7 +210,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 // Tests the whole processing pipeline.
 func (cs *EngineSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.ClusterBlockFixture()
-	proposal := unittest.ClusterProposalFromBlock(*finalizedBlock)
+	proposal := unittest.ClusterProposalFromBlock(finalizedBlock)
 	cs.head = proposal
 	cs.headerDB[finalizedBlock.ID()] = proposal.Block.ToHeader()
 

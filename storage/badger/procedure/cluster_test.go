@@ -16,7 +16,7 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		block := unittest.ClusterBlockFixture()
 
-		err := db.Update(InsertClusterBlock(unittest.ClusterProposalFromBlock(*block)))
+		err := db.Update(InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
 		require.NoError(t, err)
 
 		var retrieved cluster.Block
@@ -35,7 +35,7 @@ func TestFinalizeClusterBlock(t *testing.T) {
 			unittest.ClusterBlock.WithParent(parent),
 		)
 
-		err := db.Update(InsertClusterBlock(unittest.ClusterProposalFromBlock(*block)))
+		err := db.Update(InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
 		require.NoError(t, err)
 
 		err = db.Update(operation.IndexClusterBlockHeight(block.Header.ChainID, parent.Header.Height, parent.ID()))

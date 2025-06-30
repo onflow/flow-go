@@ -129,7 +129,7 @@ func (suite *SnapshotSuite) ProposalWithParentAndPayload(parent *model.Block, pa
 		unittest.ClusterBlock.WithParent(parent),
 		unittest.ClusterBlock.WithPayload(payload),
 	)
-	return *unittest.ClusterProposalFromBlock(*block)
+	return *unittest.ClusterProposalFromBlock(block)
 }
 
 // Proposal returns a valid cluster block proposal with genesis as parent.

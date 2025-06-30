@@ -177,7 +177,7 @@ func (suite *MutatorSuite) ProposalWithParentAndPayload(parent *model.Block, pay
 		unittest.ClusterBlock.WithParent(parent),
 		unittest.ClusterBlock.WithPayload(payload),
 	)
-	return *unittest.ClusterProposalFromBlock(*block)
+	return *unittest.ClusterProposalFromBlock(block)
 }
 
 // Proposal returns a valid cluster block proposal with genesis as parent.
@@ -279,7 +279,7 @@ func (suite *MutatorSuite) TestExtend_WithoutBootstrap() {
 	block := unittest.ClusterBlockFixture(
 		unittest.ClusterBlock.WithParent(suite.genesis),
 	)
-	err := suite.state.Extend(unittest.ClusterProposalFromBlock(*block))
+	err := suite.state.Extend(unittest.ClusterProposalFromBlock(block))
 	suite.Assert().Error(err)
 }
 
@@ -518,7 +518,7 @@ func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
 		unittest.ClusterBlock.WithPayload(suite.Payload(&tx1)),
 	)
 	// should be unable to extend block 2, as it contains a dupe transaction
-	err = suite.state.Extend(unittest.ClusterProposalFromBlock(*block2))
+	err = suite.state.Extend(unittest.ClusterProposalFromBlock(block2))
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
@@ -590,7 +590,7 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 			unittest.ClusterBlock.WithParent(head),
 			unittest.ClusterBlock.WithPayload(suite.Payload(&tx)),
 		)
-		err = suite.state.Extend(unittest.ClusterProposalFromBlock(*block))
+		err = suite.state.Extend(unittest.ClusterProposalFromBlock(block))
 		assert.NoError(t, err)
 
 		// reset the valid head if we aren't building a conflicting fork
@@ -615,7 +615,7 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 			unittest.ClusterBlock.WithParent(head),
 			unittest.ClusterBlock.WithPayload(suite.Payload(invalidatedTransactions...)),
 		)
-		err = suite.state.Extend(unittest.ClusterProposalFromBlock(*block))
+		err = suite.state.Extend(unittest.ClusterProposalFromBlock(block))
 		assert.NoError(t, err)
 	})
 
@@ -624,7 +624,7 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 			unittest.ClusterBlock.WithParent(head),
 			unittest.ClusterBlock.WithPayload(suite.Payload(oldTransactions...)),
 		)
-		err = suite.state.Extend(unittest.ClusterProposalFromBlock(*block))
+		err = suite.state.Extend(unittest.ClusterProposalFromBlock(block))
 		assert.Error(t, err)
 		suite.Assert().True(state.IsInvalidExtensionError(err))
 	})
