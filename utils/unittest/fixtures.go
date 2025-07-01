@@ -23,7 +23,6 @@ import (
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rest/util"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/testutils"
@@ -392,14 +391,6 @@ func BlockWithGuaranteesFixture(guarantees []*flow.CollectionGuarantee) *flow.Bl
 		Header:  HeaderBodyFixture(),
 		Payload: PayloadFixture(WithGuarantees(guarantees...)),
 	}
-}
-
-func WithoutGuarantee(payload *flow.Payload) {
-	payload.Guarantees = nil
-}
-
-func StateInteractionsFixture() *snapshot.ExecutionSnapshot {
-	return &snapshot.ExecutionSnapshot{}
 }
 
 func BlockWithParentAndProposerFixture(
