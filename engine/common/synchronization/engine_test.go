@@ -162,7 +162,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
 				expected := ss.heights[ref-1]
-				actual := res.Blocks[0].ToInternal()
+				actual := &res.Blocks[0]
 				assert.Equal(ss.T(), expected, actual, "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
@@ -288,7 +288,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
-				assert.Equal(ss.T(), &block, res.Blocks[0].ToInternal(), "response should contain right block")
+				assert.Equal(ss.T(), &block, &res.Blocks[0], "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
@@ -339,22 +339,22 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	originID := unittest.IdentifierFixture()
 	res := &messages.BlockResponse{
 		Nonce:  nonce,
-		Blocks: []messages.UntrustedBlock{},
+		Blocks: []flow.Block{},
 	}
 
 	// add one block that should be processed
 	processable := unittest.BlockFixture()
 	ss.core.On("HandleBlock", processable.Header).Return(true)
-	res.Blocks = append(res.Blocks, messages.UntrustedBlockFromInternal(&processable))
+	res.Blocks = append(res.Blocks, processable)
 
 	// add one block that should not be processed
 	unprocessable := unittest.BlockFixture()
 	ss.core.On("HandleBlock", unprocessable.Header).Return(false)
-	res.Blocks = append(res.Blocks, messages.UntrustedBlockFromInternal(&unprocessable))
+	res.Blocks = append(res.Blocks, unprocessable)
 
 	ss.comp.On("OnSyncedBlocks", mock.Anything).Run(func(args mock.Arguments) {
 		res := args.Get(0).(flow.Slashable[[]*messages.BlockProposal])
-		converted := res.Message[0].Block.ToInternal()
+		converted := res.Message[0].Block
 		ss.Assert().Equal(processable.Header, converted.Header)
 		ss.Assert().Equal(processable.Payload, converted.Payload)
 		ss.Assert().Equal(originID, res.OriginID)

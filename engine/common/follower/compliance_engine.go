@@ -275,9 +275,9 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		// Priority 1: ingest fresh proposals
 		msg, ok := e.pendingProposals.Pop()
 		if ok {
-			blockMsg := msg.(flow.Slashable[*messages.BlockProposal])
-			block := blockMsg.Message.Block.ToInternal()
-			log := e.log.With().
+		blockMsg := msg.(flow.Slashable[*messages.BlockProposal])
+		block := &blockMsg.Message.Block
+		log := e.log.With().
 				Hex("origin_id", blockMsg.OriginID[:]).
 				Str("chain_id", block.Header.ChainID.String()).
 				Uint64("view", block.Header.View).
@@ -301,10 +301,10 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		if len(batch.Message) < 1 {
 			continue
 		}
-		blocks := make([]*flow.Block, 0, len(batch.Message))
-		for _, block := range batch.Message {
-			blocks = append(blocks, block.Block.ToInternal())
-		}
+	blocks := make([]*flow.Block, 0, len(batch.Message))
+	for _, block := range batch.Message {
+		blocks = append(blocks, &block.Block)
+	}
 
 		firstBlock := blocks[0].Header
 		lastBlock := blocks[len(blocks)-1].Header
