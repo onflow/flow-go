@@ -1,6 +1,7 @@
 package slices
 
 import (
+	"slices"
 	"sort"
 
 	"golang.org/x/exp/constraints"
@@ -71,11 +72,5 @@ func AreStringSlicesEqual(a, b []string) bool {
 
 // StringSliceContainsElement returns true if the string slice contains the element.
 func StringSliceContainsElement(a []string, v string) bool {
-	for _, x := range a {
-		if x == v {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(a, v)
 }
