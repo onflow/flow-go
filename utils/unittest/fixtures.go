@@ -216,9 +216,18 @@ func RechainBlocks(blocks []*flow.Block) {
 }
 
 func FullBlockFixture() *flow.Block {
-	block := BlockFixture()
-	payload := PayloadFixture(WithAllTheFixins)
-	return flow.NewBlock(block.Header, payload)
+	b := BlockFixture()
+	block, err := flow.NewBlock(
+		flow.UntrustedBlock{
+			Header:  b.Header,
+			Payload: PayloadFixture(WithAllTheFixins),
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	return block
 }
 
 func BlockFixtures(number int) []*flow.Block {
@@ -372,20 +381,45 @@ func BlockWithParentFixture(parent *flow.Header) *flow.Block {
 // BlockWithParentAndPayload creates a new block that is valid
 // with respect to the given parent block and with given payload.
 func BlockWithParentAndPayload(parent *flow.Header, payload flow.Payload) *flow.Block {
-	return flow.NewBlock(HeaderBodyWithParentFixture(parent), payload)
+	block, err := flow.NewBlock(
+		flow.UntrustedBlock{
+			Header:  HeaderBodyWithParentFixture(parent),
+			Payload: payload,
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	return block
 }
 
 func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
-	payload := PayloadFixture(WithProtocolStateID(parent.Payload.ProtocolStateID))
-	headerBody := HeaderBodyWithParentFixture(parent.ToHeader())
-	return flow.NewBlock(headerBody, payload)
+	block, err := flow.NewBlock(
+		flow.UntrustedBlock{
+			Header:  HeaderBodyWithParentFixture(parent.ToHeader()),
+			Payload: PayloadFixture(WithProtocolStateID(parent.Payload.ProtocolStateID)),
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	return block
 }
 
 func BlockWithGuaranteesFixture(guarantees []*flow.CollectionGuarantee) *flow.Block {
-	payload := PayloadFixture(WithGuarantees(guarantees...))
-	headerBody := HeaderBodyFixture()
+	block, err := flow.NewBlock(
+		flow.UntrustedBlock{
+			Header:  HeaderBodyFixture(),
+			Payload: PayloadFixture(WithGuarantees(guarantees...)),
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
 
-	return flow.NewBlock(headerBody, payload)
+	return block
 }
 
 func WithoutGuarantee(payload *flow.Payload) {
@@ -1571,7 +1605,15 @@ func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.HeaderBody
 		opt(&headerBody)
 	}
 
-	block := flow.NewBlock(headerBody, payload)
+	block, err := flow.NewBlock(
+		flow.UntrustedBlock{
+			Header:  headerBody,
+			Payload: payload,
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
 
 	chunks := make([]*flow.Chunk, 0)
 
@@ -2316,7 +2358,15 @@ func BootstrapFixtureWithSetupAndCommit(
 		panic(err)
 	}
 
-	root := flow.NewBlock(header, flow.Payload{ProtocolStateID: rootProtocolState.ID()})
+	root, err := flow.NewBlock(
+		flow.UntrustedBlock{
+			Header:  header,
+			Payload: flow.Payload{ProtocolStateID: rootProtocolState.ID()},
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
 	stateCommit := GenesisStateCommitmentByChainID(header.ChainID)
 
 	result := BootstrapExecutionResultFixture(root, stateCommit)

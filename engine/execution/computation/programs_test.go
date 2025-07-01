@@ -91,14 +91,14 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		Signature:    nil,
 	}
 
-	block := flow.NewBlock(
-		flow.HeaderBody{
+	block := &flow.Block{
+		Header: flow.HeaderBody{
 			View: 26,
 		},
-		flow.Payload{
+		Payload: flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
 		},
-	)
+	}
 
 	executableBlock := &entity.ExecutableBlock{
 		Block: block,
@@ -273,14 +273,14 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	)
 
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
-		block1 = flow.NewBlock(
-			flow.HeaderBody{
+		block1 = &flow.Block{
+			Header: flow.HeaderBody{
 				View: 1,
 			},
-			flow.Payload{
+			Payload: flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{},
 			},
-		)
+		}
 		block1Snapshot = snapshotTree
 		executableBlock := &entity.ExecutableBlock{
 			Block:      block1,
@@ -497,16 +497,16 @@ func createTestBlockAndRun(
 		Signature:    nil,
 	}
 
-	block := flow.NewBlock(
-		flow.HeaderBody{
+	block := &flow.Block{
+		Header: flow.HeaderBody{
 			ParentID:  parentBlock.ID(),
 			View:      parentBlock.Header.Height + 1,
 			Timestamp: time.Now(),
 		},
-		flow.Payload{
+		Payload: flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
 		},
-	)
+	}
 
 	executableBlock := &entity.ExecutableBlock{
 		Block: block,

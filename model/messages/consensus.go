@@ -23,10 +23,24 @@ func NewUntrustedProposal(internal *flow.BlockProposal) *UntrustedProposal {
 
 // DeclareTrusted converts the UntrustedProposal to a trusted internal flow.BlockProposal.
 // CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
-// TODO(malleability immutable): This conversion should eventually be accompanied by a full validation of the untrusted input.
 func (msg *UntrustedProposal) DeclareTrusted() *flow.BlockProposal {
+	block, err := flow.NewBlock(
+		flow.UntrustedBlock{
+			Header:  msg.Block.Header,
+			Payload: msg.Block.Payload,
+		},
+	)
+	if err != nil {
+		// TODO: Uliana
+		//return nil, fmt.Errorf("could not build block: %w", err)
+	}
+	// validate ProposerSigData
+	if len(msg.ProposerSigData) == 0 {
+		// TODO: Uliana
+		//return nil, fmt.Errorf("proposer signature must not be empty")
+	}
 	return &flow.BlockProposal{
-		Block:           *flow.NewBlock(msg.Block.Header, msg.Block.Payload),
+		Block:           *block,
 		ProposerSigData: msg.ProposerSigData,
 	}
 }

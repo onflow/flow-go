@@ -102,7 +102,10 @@ func (s *BackendEventsSuite) SetupTest() {
 
 		payload := unittest.PayloadFixture()
 		header.PayloadHash = payload.Hash()
-		block := flow.NewBlock(header.HeaderBody, payload)
+		block := &flow.Block{
+			Header:  header.HeaderBody,
+			Payload: payload,
+		}
 		// the last block is sealed
 		if i == blockCount-1 {
 			s.sealedHead = header

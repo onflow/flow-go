@@ -677,10 +677,14 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 
 	rootSnapshot := unittest.StateSnapshotForKnownBlock(s.rootHeader, nil)
 	s.Snapshots[s.rootHeader.ID()] = rootSnapshot
+	block := &flow.Block{
+		Header:  s.rootHeader.HeaderBody,
+		Payload: flow.Payload{},
+	}
 	rootSnapshot.On("SealingSegment").Return(
 		&flow.SealingSegment{Blocks: []*flow.BlockProposal{
 			{
-				Block: *flow.NewBlock(s.rootHeader.HeaderBody, flow.Payload{}),
+				Block: *block,
 				// By convention, root block has no proposer signature - implementation has to handle this edge case
 				ProposerSigData: nil,
 			},
@@ -805,7 +809,10 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	finalSnapShot.On("Descendants").Return(nil, nil)
 
 	// create candidate block for SealingSegment setup
-	block := flow.NewBlock(s.Block.HeaderBody, candidatePayload)
+	block := flow.Block{
+		Header:  s.Block.HeaderBody,
+		Payload: candidatePayload,
+	}
 
 	// update block id for result according to new block id
 	s.IncorporatedResult.Result.BlockID = block.ID()
@@ -818,8 +825,15 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	payloads.On("ByBlockID", s.IncorporatedBlock.ID()).Return(&incorporatedBlockPayload, nil)
 
 	// create blocks for SealingSegment setup
-	parent := flow.NewBlock(s.ParentBlock.HeaderBody, flow.Payload{})
-	incorporated := flow.NewBlock(s.IncorporatedBlock.HeaderBody, incorporatedBlockPayload)
+	parent := flow.Block{
+		Header:  s.ParentBlock.HeaderBody,
+		Payload: flow.Payload{},
+	}
+
+	incorporated := flow.Block{
+		Header:  s.IncorporatedBlock.HeaderBody,
+		Payload: incorporatedBlockPayload,
+	}
 
 	// update headers according to new payload hash
 	s.Block = block.ToHeader()
@@ -840,16 +854,16 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 		&flow.SealingSegment{
 			Blocks: []*flow.BlockProposal{
 				{
-					Block: *block,
+					Block: block,
 					// By convention, root block has no proposer signature - implementation has to handle this edge case
 					ProposerSigData: nil,
 				},
 				{
-					Block:           *parent,
+					Block:           parent,
 					ProposerSigData: unittest.SignatureFixture(),
 				},
 				{
-					Block:           *incorporated,
+					Block:           incorporated,
 					ProposerSigData: unittest.SignatureFixture(),
 				},
 			},

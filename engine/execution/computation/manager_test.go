@@ -97,14 +97,14 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		Signature:    nil,
 	}
 
-	block := flow.NewBlock(
-		flow.HeaderBody{
+	block := &flow.Block{
+		Header: flow.HeaderBody{
 			View: 42,
 		},
-		flow.Payload{
+		Payload: flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
 		},
-	)
+	}
 
 	executableBlock := &entity.ExecutableBlock{
 		Block: block,
@@ -792,14 +792,14 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		Signature:    nil,
 	}
 
-	block := flow.NewBlock(
-		flow.HeaderBody{
+	block := &flow.Block{
+		Header: flow.HeaderBody{
 			View: 26,
 		},
-		flow.Payload{
+		Payload: flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
 		},
-	)
+	}
 
 	executableBlock := &entity.ExecutableBlock{
 		Block: block,

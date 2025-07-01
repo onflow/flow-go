@@ -42,19 +42,19 @@ func TestBlocks(t *testing.T) {
 
 	store := setupStore(t)
 
-	block1 := flowgo.NewBlock(
-		flowgo.HeaderBody{
+	block1 := &flowgo.Block{
+		Header: flowgo.HeaderBody{
 			Height: 1,
 		},
-		flowgo.Payload{},
-	)
+		Payload: flowgo.Payload{},
+	}
 
-	block2 := flowgo.NewBlock(
-		flowgo.HeaderBody{
+	block2 := &flowgo.Block{
+		Header: flowgo.HeaderBody{
 			Height: 2,
 		},
-		flowgo.Payload{},
-	)
+		Payload: flowgo.Payload{},
+	}
 
 	t.Run("should return error for not found", func(t *testing.T) {
 		t.Run("BlockByID", func(t *testing.T) {

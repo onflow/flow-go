@@ -30,7 +30,12 @@ func constructRootBlock(rootHeader *flow.Header, protocolStateID flow.Identifier
 		ProtocolStateID: protocolStateID,
 	}
 
-	return flow.NewBlock(rootHeader.HeaderBody, payload)
+	return flow.NewRootBlock(
+		flow.UntrustedBlock{
+			Header:  rootHeader.HeaderBody,
+			Payload: payload,
+		},
+	)
 }
 
 // constructRootEpochEvents constructs the epoch setup and commit events for the first epoch after spork.

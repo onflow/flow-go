@@ -1621,16 +1621,16 @@ func generateBlockWithVisitor(
 		completeCollections[collection.Guarantee.CollectionID] = collection
 	}
 
-	block := flow.NewBlock(
-		flow.HeaderBody{
+	block := &flow.Block{
+		Header: flow.HeaderBody{
 			Timestamp: flow.GenesisTime,
 			Height:    42,
 			View:      42,
 		},
-		flow.Payload{
+		Payload: flow.Payload{
 			Guarantees: guarantees,
 		},
-	)
+	}
 
 	return &entity.ExecutableBlock{
 		Block:               block,

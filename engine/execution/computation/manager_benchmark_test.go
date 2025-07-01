@@ -214,7 +214,7 @@ func benchmarkComputeBlock(
 		derivedChainData: derivedChainData,
 	}
 
-	parentBlock := flow.NewBlock(flow.HeaderBody{}, flow.Payload{})
+	parentBlock := &flow.Block{Header: flow.HeaderBody{}, Payload: flow.Payload{}}
 
 	b.StopTimer()
 	b.ResetTimer()
@@ -278,15 +278,15 @@ func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colN
 		}
 	}
 
-	block := flow.NewBlock(
-		flow.HeaderBody{
+	block := &flow.Block{
+		Header: flow.HeaderBody{
 			ParentID: parentBlock.ID(),
 			View:     parentBlock.Header.Height + 1,
 		},
-		flow.Payload{
+		Payload: flow.Payload{
 			Guarantees: guarantees,
 		},
-	)
+	}
 
 	return &entity.ExecutableBlock{
 		Block:               block,

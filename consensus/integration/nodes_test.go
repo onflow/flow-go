@@ -291,7 +291,12 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	require.NoError(t, err)
 	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochProtocolStateID)
 	require.NoError(t, err)
-	root := flow.NewBlock(rootHeader, flow.Payload{ProtocolStateID: rootProtocolState.ID()})
+	root := flow.NewRootBlock(
+		flow.UntrustedBlock{
+			Header:  rootHeader,
+			Payload: flow.Payload{ProtocolStateID: rootProtocolState.ID()},
+		},
+	)
 	result := unittest.BootstrapExecutionResultFixture(root, unittest.GenesisStateCommitment)
 	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
 

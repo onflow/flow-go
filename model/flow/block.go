@@ -21,10 +21,17 @@ func Genesis(chainID ChainID) *Block {
 	}
 
 	// combine to block
-	return NewBlock(headerBody, payload)
+	return NewRootBlock(
+		UntrustedBlock{
+			Header:  headerBody,
+			Payload: payload,
+		},
+	)
 }
 
 // Block (currently) includes the all block header metadata and the payload content.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Block struct {
 	// Header is a container encapsulating most of the header fields - *excluding* the payload hash
 	// and the proposer signature. Generally, the type [HeaderBody] should not be used on its own.
@@ -38,18 +45,34 @@ type Block struct {
 	Payload Payload
 }
 
-// NewBlock creates a new block.
+// UntrustedBlock is an untrusted input-only representation of a Block,
+// used for construction.
 //
-// Parameters:
-// - headerBody: the header fields to use for the block
-// - payload: the payload to associate with the block
-func NewBlock(
-	headerBody HeaderBody,
-	payload Payload,
-) *Block {
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedBlock should be validated and converted into
+// a trusted Block using NewBlock constructor.
+type UntrustedBlock Block
+
+// NewBlock creates a new block.
+// Construction Block allowed only within the constructor.
+//
+// All errors indicate a valid Block cannot be constructed from the input.
+func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	return &Block{
-		Header:  headerBody,
-		Payload: payload,
+		Header:  untrusted.Header,
+		Payload: untrusted.Payload,
+	}, nil
+}
+
+// NewRootBlock creates a root block.
+// Construction Block allowed only within the constructor.
+func NewRootBlock(untrusted UntrustedBlock) *Block {
+	return &Block{
+		Header:  untrusted.Header,
+		Payload: untrusted.Payload,
 	}
 }
 

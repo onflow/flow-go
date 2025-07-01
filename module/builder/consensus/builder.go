@@ -650,7 +650,15 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		Results:         insertableReceipts.results,
 		ProtocolStateID: protocolStateID,
 	}
-	block := flow.NewBlock(header.HeaderBody, payload)
+	block, err := flow.NewBlock(
+		flow.UntrustedBlock{
+			Header:  header.HeaderBody,
+			Payload: payload,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build the block: %w", err)
+	}
 
 	// sign the proposal
 	sig, err := sign(block.ToHeader())

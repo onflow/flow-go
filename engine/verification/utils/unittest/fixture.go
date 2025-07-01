@@ -336,8 +336,13 @@ func ExecutionResultFixture(t *testing.T,
 			Guarantees:      guarantees,
 			ProtocolStateID: protocolStateID,
 		}
-		referenceBlock = flow.NewBlock(refBlkHeader.HeaderBody, payload)
-
+		referenceBlock, err = flow.NewBlock(
+			flow.UntrustedBlock{
+				Header:  refBlkHeader.HeaderBody,
+				Payload: payload,
+			},
+		)
+		require.NoError(t, err)
 		executableBlock := &entity.ExecutableBlock{
 			Block:               referenceBlock,
 			CompleteCollections: completeColls,
