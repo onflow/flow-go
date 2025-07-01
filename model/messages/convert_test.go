@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -15,7 +16,8 @@ func TestBlockProposal(t *testing.T) {
 	block := unittest.FullBlockFixture()
 	proposal := unittest.ProposalFromBlock(block)
 	proposalMsg := messages.NewUntrustedProposal(proposal)
-	converted := proposalMsg.DeclareTrusted()
+	converted, err := proposalMsg.DeclareTrusted()
+	require.NoError(t, err)
 	assert.Equal(t, proposal, converted)
 }
 
@@ -35,7 +37,8 @@ func TestBlockResponse(t *testing.T) {
 			*messages.NewUntrustedProposal(expected[1]),
 		},
 	}
-	converted := res.BlocksInternal()
+	converted, err := res.BlocksInternal()
+	require.NoError(t, err)
 	assert.Equal(t, expected, converted)
 }
 

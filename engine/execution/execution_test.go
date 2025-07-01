@@ -323,6 +323,7 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 
 	signerIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
+	require.NoError(t, err)
 
 	block, err = flow.NewBlock(
 		flow.UntrustedBlock{

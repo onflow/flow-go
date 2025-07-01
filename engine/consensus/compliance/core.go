@@ -112,9 +112,13 @@ func NewCore(
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
 func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedProposal]) error {
+	blockProposal, err := proposalMsg.Message.DeclareTrusted()
+	if err != nil {
+		return fmt.Errorf("could not convert proposal: %w", err)
+	}
 	proposal := flow.Slashable[*flow.BlockProposal]{
 		OriginID: proposalMsg.OriginID,
-		Message:  proposalMsg.Message.DeclareTrusted(),
+		Message:  blockProposal,
 	}
 	block := proposal.Message.Block
 	header := block.ToHeader()
@@ -181,7 +185,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedPro
 	}
 
 	// ignore proposals that were already processed
-	_, err := c.headers.ByBlockID(blockID)
+	_, err = c.headers.ByBlockID(blockID)
 	if err == nil {
 		log.Debug().Msg("skipping already processed proposal")
 		return nil

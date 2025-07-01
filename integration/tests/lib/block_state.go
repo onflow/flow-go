@@ -70,11 +70,15 @@ func (bs *BlockState) WaitForHalt(t *testing.T, requiredDurationWithoutProgress,
 	t.Logf("successfully observed progress halt for %s after %s of waiting", requiredDurationWithoutProgress, time.Since(start))
 }
 
-func (bs *BlockState) Add(t *testing.T, msg *messages.UntrustedProposal) {
+func (bs *BlockState) Add(t *testing.T, msg *messages.UntrustedProposal) error {
 	bs.Lock()
 	defer bs.Unlock()
 
-	b := &msg.DeclareTrusted().Block
+	proposal, err := msg.DeclareTrusted()
+	if err != nil {
+		return fmt.Errorf("could not convert proposal: %w", err)
+	}
+	b := &proposal.Block
 	bs.blocksByID[b.ID()] = b
 	bs.blocksByHeight[b.Header.Height] = append(bs.blocksByHeight[b.Header.Height], b)
 	if bs.highestProposed == nil {
@@ -84,15 +88,16 @@ func (bs *BlockState) Add(t *testing.T, msg *messages.UntrustedProposal) {
 	}
 
 	if b.Header.Height < 3 {
-		return
+		return nil
 	}
 
 	confirmsHeight := b.Header.Height - uint64(3)
 	if confirmsHeight < bs.highestFinalized {
-		return
+		return nil
 	}
 
 	bs.processAncestors(t, b, confirmsHeight)
+	return nil
 }
 
 func (bs *BlockState) WaitForBlockById(t *testing.T, blockId flow.Identifier) *flow.Block {

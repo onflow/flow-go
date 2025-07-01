@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
@@ -125,7 +126,9 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 		// the following switch should be similar to the one defined in the actual node that is being emulated
 		switch v := event.(type) {
 		case *messages.UntrustedProposal:
-			fmt.Printf("Received block proposal: %s from %s\n", v.DeclareTrusted().Block.ID().String(), from.String())
+			proposalTrusted, err := v.DeclareTrusted()
+			require.NoError(t, err)
+			fmt.Printf("Received block proposal: %s from %s\n", proposalTrusted.Block.ID().String(), from.String())
 			i++
 		default:
 			t.Logf(" ignoring event: :%T: %v", v, v)
