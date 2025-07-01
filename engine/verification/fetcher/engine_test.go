@@ -981,8 +981,10 @@ func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount in
 
 	collections := unittest.CollectionListFixture(chunkCount)
 
-	block := unittest.BlockWithGuaranteesFixture(
-		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(unittest.CollectionGuaranteesWithCollectionIDFixture(collections)...)),
+		),
 	)
 
 	result := unittest.ExecutionResultFixture(

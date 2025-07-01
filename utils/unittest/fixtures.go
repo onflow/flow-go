@@ -386,13 +386,6 @@ func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
 	}
 }
 
-func BlockWithGuaranteesFixture(guarantees []*flow.CollectionGuarantee) *flow.Block {
-	return &flow.Block{
-		Header:  HeaderBodyFixture(),
-		Payload: PayloadFixture(WithGuarantees(guarantees...)),
-	}
-}
-
 func BlockWithParentAndProposerFixture(
 	t *testing.T,
 	parent *flow.Header,

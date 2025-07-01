@@ -501,8 +501,10 @@ func ContainerBlockFixture(parent *flow.Header, protocolStateID flow.Identifier,
 func ExecutionResultForkFixture(t *testing.T) (*flow.ExecutionResult, *flow.ExecutionResult, *flow.Collection, *flow.Block) {
 	// collection and block
 	collections := unittest.CollectionListFixture(1)
-	block := unittest.BlockWithGuaranteesFixture(
-		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(unittest.CollectionGuaranteesWithCollectionIDFixture(collections)...)),
+		),
 	)
 
 	// execution fork at block with resultA and resultB that share first chunk
