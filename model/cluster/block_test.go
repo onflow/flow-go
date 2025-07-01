@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/cluster"
@@ -72,7 +71,7 @@ func TestNewBlock(t *testing.T) {
 		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
-		assert.Contains(t, err.Error(), "parent ID must not be zero")
+		require.Contains(t, err.Error(), "parent ID must not be zero")
 	})
 
 	t.Run("invalid input with nil ParentVoterIndices", func(t *testing.T) {
@@ -82,7 +81,7 @@ func TestNewBlock(t *testing.T) {
 		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
-		assert.Contains(t, err.Error(), "parent voter indices must not be empty")
+		require.Contains(t, err.Error(), "parent voter indices must not be empty")
 	})
 
 	t.Run("invalid input with empty ParentVoterIndices", func(t *testing.T) {
@@ -92,7 +91,7 @@ func TestNewBlock(t *testing.T) {
 		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
-		assert.Contains(t, err.Error(), "parent voter indices must not be empty")
+		require.Contains(t, err.Error(), "parent voter indices must not be empty")
 	})
 
 	t.Run("invalid input with nil ParentVoterSigData", func(t *testing.T) {
@@ -102,7 +101,7 @@ func TestNewBlock(t *testing.T) {
 		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
-		assert.Contains(t, err.Error(), "parent voter signature must not be empty")
+		require.Contains(t, err.Error(), "parent voter signature must not be empty")
 	})
 
 	t.Run("invalid input with empty ParentVoterSigData", func(t *testing.T) {
@@ -112,7 +111,7 @@ func TestNewBlock(t *testing.T) {
 		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
-		assert.Contains(t, err.Error(), "parent voter signature must not be empty")
+		require.Contains(t, err.Error(), "parent voter signature must not be empty")
 	})
 
 	t.Run("invalid input with zero ProposerID", func(t *testing.T) {
@@ -122,7 +121,7 @@ func TestNewBlock(t *testing.T) {
 		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
-		assert.Contains(t, err.Error(), "proposer ID must not be zero")
+		require.Contains(t, err.Error(), "proposer ID must not be zero")
 	})
 
 	t.Run("invalid input with zero ReferenceBlockID in payload", func(t *testing.T) {
@@ -132,7 +131,7 @@ func TestNewBlock(t *testing.T) {
 		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
-		assert.Contains(t, err.Error(), "reference block ID must not be zero")
+		require.Contains(t, err.Error(), "reference block ID must not be zero")
 	})
 
 	t.Run("invalid input with malformed Collection in payload", func(t *testing.T) {
@@ -144,6 +143,6 @@ func TestNewBlock(t *testing.T) {
 		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
-		assert.Contains(t, err.Error(), "invalid collection")
+		require.Contains(t, err.Error(), "invalid collection")
 	})
 }
