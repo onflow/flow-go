@@ -36,7 +36,7 @@ func NewQuorumCertificates(collector module.CacheMetrics, db *badger.DB, cacheSi
 
 	return &QuorumCertificates{
 		db: db,
-		cache: newCache[flow.Identifier, *flow.QuorumCertificate](collector, metrics.ResourceQC,
+		cache: newCache(collector, metrics.ResourceQC,
 			withLimit[flow.Identifier, *flow.QuorumCertificate](cacheSize),
 			withStore(store),
 			withRetrieve(retrieve)),

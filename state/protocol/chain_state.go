@@ -53,7 +53,16 @@ type FollowerState interface {
 	// CAUTION:
 	//   - This function expects that `qc` has been validated. (otherwise, the state will be corrupted)
 	//   - The parent block must already be stored.
+	//   - Attempts to extend the state with the _same block concurrently_ are not allowed.
+	//     (will not corrupt the state, but may lead to an exception)
 	// Orphaned blocks are excepted.
+	//
+	// Note: To ensure that all ancestors of a candidate block are correct and known to the FollowerState, some external
+	// ordering and queuing of incoming blocks is generally necessary (responsibility of Compliance Layer). Once a block
+	// is successfully ingested, repeated extension requests with this block are no-ops. This is convenient for the
+	// Compliance Layer after a crash, so it doesn't have to worry about which blocks have already been ingested before
+	// the crash. However, while running it is very easy for the Compliance Layer to avoid concurrent extension requests
+	// with the same block. Hence, for simplicity, the FollowerState may reject such requests with an exception.
 	//
 	// No errors are expected during normal operations.
 	ExtendCertified(ctx context.Context, candidate *flow.Block, qc *flow.QuorumCertificate) error
@@ -79,8 +88,19 @@ type ParticipantState interface {
 	// still checking that the given block is a valid extension of the protocol state.
 	// The candidate block must have passed HotStuff validation before being passed to Extend.
 	//
-	// CAUTION: per convention, the protocol state requires that the candidate's
-	// parent has already been ingested. Otherwise, an exception is returned.
+	// CAUTION:
+	//   - per convention, the protocol state requires that the candidate's
+	//     parent has already been ingested. Otherwise, an exception is returned.
+	//   - Attempts to extend the state with the _same block concurrently_ are not allowed.
+	//     (will not corrupt the state, but may lead to an exception)
+	// Orphaned blocks are excepted.
+	//
+	// Note: To ensure that all ancestors of a candidate block are correct and known to the Protocol State, some external
+	// ordering and queuing of incoming blocks is generally necessary (responsibility of Compliance Layer). Once a block
+	// is successfully ingested, repeated extension requests with this block are no-ops. This is convenient for the
+	// Compliance Layer after a crash, so it doesn't have to worry about which blocks have already been ingested before
+	// the crash. However, while running it is very easy for the Compliance Layer to avoid concurrent extension requests
+	// with the same block. Hence, for simplicity, the FollowerState may reject such requests with an exception.
 	//
 	// Expected errors during normal operations:
 	//  * state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
