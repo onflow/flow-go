@@ -3,7 +3,6 @@ package cluster_test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/cluster"
@@ -53,6 +52,6 @@ func TestNewPayload(t *testing.T) {
 		res, err := cluster.NewPayload(cluster.UntrustedPayload(*payload))
 		require.Error(t, err)
 		require.Nil(t, res)
-		assert.Contains(t, err.Error(), "could not construct collection")
+		require.Contains(t, err.Error(), "could not construct collection")
 	})
 }
