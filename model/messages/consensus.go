@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -128,30 +130,121 @@ func UntrustedBlockFromInternal(flowBlock *flow.Block) UntrustedBlock {
 
 // BlockProposal is part of the consensus protocol and represents the leader
 // of a consensus round pushing a new proposal to the network.
+//
+//structwrite:immutable
 type BlockProposal struct {
-	Block UntrustedBlock
+	Block *flow.Block
 }
 
-func NewBlockProposal(internal *flow.Block) *BlockProposal {
-	return &BlockProposal{
-		Block: UntrustedBlockFromInternal(internal),
+// UntrustedBlockProposal is an untrusted input-only representation of a BlockProposal,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedBlockProposal should be validated and converted into
+// a trusted BlockProposal using NewBlockProposal constructor.
+type UntrustedBlockProposal BlockProposal
+
+// NewBlockProposal creates a new instance of BlockProposal.
+// Construction BlockProposal allowed only within the constructor.
+//
+// Parameters:
+//   - untrusted: untrusted BlockProposal to be validated
+//
+// Returns:
+//   - *BlockProposal: the newly created instance
+//   - error: any error that occurred during creation
+//
+// Expected Errors:
+//   - TODO: add validation errors
+func NewBlockProposal(untrusted UntrustedBlockProposal) (*BlockProposal, error) {
+	// TODO: add validation logic
+	if untrusted.Block == nil {
+		return nil, fmt.Errorf("block must not be nil")
 	}
+	return &BlockProposal{Block: untrusted.Block}, nil
+}
+
+func NewBlockProposalFromInternal(internal *flow.Block) *BlockProposal {
+	return &BlockProposal{Block: internal}
 }
 
 // BlockVote is part of the consensus protocol and represents a consensus node
 // voting on the proposal of the leader of a given round.
+//
+//structwrite:immutable
 type BlockVote struct {
 	BlockID flow.Identifier
 	View    uint64
 	SigData []byte
 }
 
+// UntrustedBlockVote is an untrusted input-only representation of a BlockVote,
+// used for construction.
+//
+// An instance of UntrustedBlockVote should be validated and converted into
+// a trusted BlockVote using NewBlockVote constructor.
+type UntrustedBlockVote BlockVote
+
+// NewBlockVote creates a new instance of BlockVote.
+//
+// Parameters:
+//   - untrusted: untrusted BlockVote to be validated
+//
+// Returns:
+//   - *BlockVote: the newly created instance
+//   - error: any error that occurred during creation
+//
+// Expected Errors:
+//   - TODO: add validation errors
+func NewBlockVote(untrusted UntrustedBlockVote) (*BlockVote, error) {
+	// TODO: add validation logic
+	return &BlockVote{
+		BlockID: untrusted.BlockID,
+		View:    untrusted.View,
+		SigData: untrusted.SigData,
+	}, nil
+}
+
 // TimeoutObject is part of the consensus protocol and represents a consensus node
 // timing out in given round. Contains a sequential number for deduplication purposes.
+//
+//structwrite:immutable
 type TimeoutObject struct {
 	TimeoutTick uint64
 	View        uint64
 	NewestQC    *flow.QuorumCertificate
 	LastViewTC  *flow.TimeoutCertificate
 	SigData     []byte
+}
+
+// UntrustedTimeoutObject is an untrusted input-only representation of a TimeoutObject,
+// used for construction.
+//
+// An instance of UntrustedTimeoutObject should be validated and converted into
+// a trusted TimeoutObject using NewTimeoutObject constructor.
+type UntrustedTimeoutObject TimeoutObject
+
+// NewTimeoutObject creates a new instance of TimeoutObject.
+//
+// Parameters:
+//   - untrusted: untrusted TimeoutObject to be validated
+//
+// Returns:
+//   - *TimeoutObject: the newly created instance
+//   - error: any error that occurred during creation
+//
+// Expected Errors:
+//   - TODO: add validation errors
+func NewTimeoutObject(untrusted UntrustedTimeoutObject) (*TimeoutObject, error) {
+	// TODO: add validation logic
+	return &TimeoutObject{
+		TimeoutTick: untrusted.TimeoutTick,
+		View:        untrusted.View,
+		NewestQC:    untrusted.NewestQC,
+		LastViewTC:  untrusted.LastViewTC,
+		SigData:     untrusted.SigData,
+	}, nil
 }
