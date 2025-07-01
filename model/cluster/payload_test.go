@@ -41,7 +41,7 @@ func TestNewPayload(t *testing.T) {
 		res, err := cluster.NewPayload(cluster.UntrustedPayload(*payload))
 		require.NoError(t, err)
 		require.NotNil(t, res)
-		assert.Equal(t, flow.ZeroID, res.ReferenceBlockID)
+		require.Equal(t, flow.ZeroID, res.ReferenceBlockID)
 	})
 
 	t.Run("invalid input with malformed collection", func(t *testing.T) {
