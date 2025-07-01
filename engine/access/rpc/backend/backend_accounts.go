@@ -69,7 +69,7 @@ func (b *backendAccounts) GetAccountAtBlockHeight(
 ) (*flow.Account, error) {
 	blockID, err := b.headers.BlockIDByHeight(height)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), height, err))
+		return nil, rpc.ConvertStorageError(ResolveHeightError(b.state.Params(), height, err))
 	}
 
 	account, err := b.getAccountAtBlock(ctx, address, blockID, height)
@@ -109,7 +109,7 @@ func (b *backendAccounts) GetAccountBalanceAtBlockHeight(
 ) (uint64, error) {
 	blockID, err := b.headers.BlockIDByHeight(height)
 	if err != nil {
-		return 0, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), height, err))
+		return 0, rpc.ConvertStorageError(ResolveHeightError(b.state.Params(), height, err))
 	}
 
 	balance, err := b.getAccountBalanceAtBlock(ctx, address, blockID, height)
@@ -177,7 +177,7 @@ func (b *backendAccounts) GetAccountKeyAtBlockHeight(
 ) (*flow.AccountPublicKey, error) {
 	blockID, err := b.headers.BlockIDByHeight(height)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), height, err))
+		return nil, rpc.ConvertStorageError(ResolveHeightError(b.state.Params(), height, err))
 	}
 
 	accountKey, err := b.getAccountKeyAtBlock(ctx, address, keyIndex, blockID, height)
@@ -197,7 +197,7 @@ func (b *backendAccounts) GetAccountKeysAtBlockHeight(
 ) ([]flow.AccountPublicKey, error) {
 	blockID, err := b.headers.BlockIDByHeight(height)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), height, err))
+		return nil, rpc.ConvertStorageError(ResolveHeightError(b.state.Params(), height, err))
 	}
 
 	accountKeys, err := b.getAccountKeysAtBlock(ctx, address, blockID, height)
@@ -401,7 +401,7 @@ func (b *backendAccounts) getAccountFromLocalStorage(
 	// make sure data is available for the requested block
 	account, err := b.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height)
 	if err != nil {
-		return nil, convertAccountError(resolveHeightError(b.state.Params(), height, err), address, height)
+		return nil, convertAccountError(ResolveHeightError(b.state.Params(), height, err), address, height)
 	}
 	return account, nil
 }
@@ -503,7 +503,7 @@ func (b *backendAccounts) compareAccountResults(
 		Str("address", address.String())
 
 	// errors are different
-	if execErr != localErr {
+	if !errors.Is(execErr, localErr) {
 		lgCtx = lgCtx.
 			AnErr("execution_node_error", execErr).
 			AnErr("local_error", localErr)
