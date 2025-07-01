@@ -61,6 +61,20 @@ type UntrustedBlock Block
 //
 // All errors indicate a valid Block cannot be constructed from the input.
 func NewBlock(untrusted UntrustedBlock) (*Block, error) {
+	// validate header body
+	untrustedHeaderBody := untrusted.Header
+	if untrustedHeaderBody.ParentID == ZeroID {
+		return nil, fmt.Errorf("parent ID must not be zero")
+	}
+	if len(untrustedHeaderBody.ParentVoterIndices) == 0 {
+		return nil, fmt.Errorf("parent voter indices must not be empty")
+	}
+	if len(untrustedHeaderBody.ParentVoterSigData) == 0 {
+		return nil, fmt.Errorf("parent voter signature must not be empty")
+	}
+	if untrustedHeaderBody.ProposerID == ZeroID {
+		return nil, fmt.Errorf("proposer ID must not be zero")
+	}
 	return &Block{
 		Header:  untrusted.Header,
 		Payload: untrusted.Payload,
