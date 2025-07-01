@@ -112,7 +112,7 @@ func NewBuilder(
 // However, it will pass through all errors returned by `setter` and `sign`.
 // Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
 // and handle them accordingly when handling errors returned from BuildOn.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBuilder) error, sign func(*flow.Header) ([]byte, error)) (*flow.ProposalHeader, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBodyBuilder) error, sign func(*flow.Header) ([]byte, error)) (*flow.ProposalHeader, error) {
 
 	// since we don't know the blockID when building the block we track the
 	// time indirectly and insert the span directly at the end
@@ -607,7 +607,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	guarantees []*flow.CollectionGuarantee,
 	seals []*flow.Seal,
 	insertableReceipts *InsertableReceipts,
-	setter func(*flow.HeaderBuilder) error,
+	setter func(*flow.HeaderBodyBuilder) error,
 	sign func(*flow.Header) ([]byte, error),
 ) (*flow.BlockProposal, error) {
 	parent, err := b.headers.ByBlockID(parentID)
@@ -618,27 +618,26 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	timestamp := b.cfg.blockTimer.Build(parent.Timestamp)
 
 	// construct default block on top of the provided parent
-	headerBuilder := flow.NewHeaderBuilder().
+	headerBodyBuilder := flow.NewHeaderBodyBuilder().
 		WithChainID(parent.ChainID).
 		WithParentID(parentID).
 		WithHeight(parent.Height + 1).
-		WithTimestamp(timestamp).
-		WithPayloadHash(flow.ZeroID)
+		WithTimestamp(timestamp)
 
 	// apply the custom fields setter of the consensus algorithm, we must do this before applying service events
 	// since we need to know the correct view of the block.
-	err = setter(headerBuilder)
+	err = setter(headerBodyBuilder)
 	if err != nil {
 		return nil, fmt.Errorf("could not apply setter: %w", err)
 	}
-	header, err := headerBuilder.Build()
+	headerBody, err := headerBodyBuilder.Build()
 	if err != nil {
 		return nil, fmt.Errorf("could not build header: %w", err)
 	}
 
 	// Evolve the Protocol State starting from the parent block's state. Information that may change the state is:
 	// the candidate block's view and Service Events from execution results sealed in the candidate block.
-	protocolStateID, _, err := b.mutableProtocolState.EvolveState(header.ParentID, header.View, seals)
+	protocolStateID, _, err := b.mutableProtocolState.EvolveState(headerBody.ParentID, headerBody.View, seals)
 	if err != nil {
 		return nil, fmt.Errorf("evolving protocol state failed: %w", err)
 	}
@@ -650,7 +649,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		Results:         insertableReceipts.results,
 		ProtocolStateID: protocolStateID,
 	}
-	block := flow.NewBlock(header.HeaderBody, payload)
+	block := flow.NewBlock(*headerBody, payload)
 
 	// sign the proposal
 	sig, err := sign(block.ToHeader())

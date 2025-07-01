@@ -79,19 +79,23 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 		}
 	}
 
+	headerBody, err := flow.NewHeaderBody(flow.UntrustedHeaderBody{
+		ParentID:           MessageToIdentifier(m.ParentId),
+		Height:             m.Height,
+		Timestamp:          m.Timestamp.AsTime(),
+		View:               m.View,
+		ParentView:         m.ParentView,
+		ParentVoterIndices: m.ParentVoterIndices,
+		ParentVoterSigData: m.ParentVoterSigData,
+		ProposerID:         MessageToIdentifier(m.ProposerId),
+		ChainID:            *chainId,
+		LastViewTC:         lastViewTC,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build header body: %w", err)
+	}
 	header, err := flow.NewHeader(flow.UntrustedHeader{
-		HeaderBody: flow.HeaderBody{
-			ParentID:           MessageToIdentifier(m.ParentId),
-			Height:             m.Height,
-			Timestamp:          m.Timestamp.AsTime(),
-			View:               m.View,
-			ParentView:         m.ParentView,
-			ParentVoterIndices: m.ParentVoterIndices,
-			ParentVoterSigData: m.ParentVoterSigData,
-			ProposerID:         MessageToIdentifier(m.ProposerId),
-			ChainID:            *chainId,
-			LastViewTC:         lastViewTC,
-		},
+		HeaderBody:  *headerBody,
 		PayloadHash: MessageToIdentifier(m.PayloadHash),
 	})
 	if err != nil {

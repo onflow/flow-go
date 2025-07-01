@@ -12,16 +12,16 @@ func Genesis(chainID ChainID) *Block {
 	payload := Payload{}
 
 	// create the headerBody
-	headerBody := HeaderBody{
+	headerBody := NewRootHeaderBody(UntrustedHeaderBody{
 		ChainID:   chainID,
 		ParentID:  ZeroID,
 		Height:    0,
 		Timestamp: GenesisTime,
 		View:      0,
-	}
+	})
 
 	// combine to block
-	return NewBlock(headerBody, payload)
+	return NewBlock(*headerBody, payload)
 }
 
 // Block (currently) includes the all block header metadata and the payload content.
@@ -61,13 +61,22 @@ func (b Block) ID() Identifier {
 // ToHeader converts the block into a compact [flow.Header] representation,
 // where the payload is compressed to a hash reference.
 func (b Block) ToHeader() *Header {
-	header, err := NewHeader(UntrustedHeader{
+	if b.Header.ContainsParentQC() {
+		header, err := NewHeader(UntrustedHeader{
+			HeaderBody:  b.Header,
+			PayloadHash: b.Payload.Hash(),
+		})
+		if err != nil {
+			panic(fmt.Errorf("could not build header from block: %w", err))
+		}
+
+		return header
+	}
+
+	header := NewRootHeader(UntrustedHeader{
 		HeaderBody:  b.Header,
 		PayloadHash: b.Payload.Hash(),
 	})
-	if err != nil {
-		panic(fmt.Errorf("could not build header from block: %w", err))
-	}
 
 	return header
 }
@@ -75,7 +84,7 @@ func (b Block) ToHeader() *Header {
 // TODO(malleability): remove MarshalMsgpack when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
 func (b Block) MarshalMsgpack() ([]byte, error) {
 	if b.Header.Timestamp.Location() != time.UTC {
-		b.Header.Timestamp = b.Header.Timestamp.UTC()
+		b.Header.Timestamp = b.Header.Timestamp.UTC() //nolint:structwrite
 	}
 
 	type Encodable Block
@@ -90,7 +99,7 @@ func (b *Block) UnmarshalMsgpack(data []byte) error {
 	*b = Block(decodable)
 
 	if b.Header.Timestamp.Location() != time.UTC {
-		b.Header.Timestamp = b.Header.Timestamp.UTC()
+		b.Header.Timestamp = b.Header.Timestamp.UTC() //nolint:structwrite
 	}
 
 	return err

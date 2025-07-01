@@ -20,18 +20,18 @@ var rootBlockPayload = cluster.NewEmptyPayload(flow.ZeroID)
 // cluster in the given epoch. It contains an empty collection referencing
 func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) *cluster.Block {
 	chainID := CanonicalClusterID(epoch, participants.NodeIDs())
-
-	headerBody := flow.HeaderBody{
+	headerBody := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
 		ChainID:            chainID,
 		ParentID:           flow.ZeroID,
 		Height:             0,
 		Timestamp:          flow.GenesisTime,
 		View:               0,
+		ParentView:         0,
 		ParentVoterIndices: nil,
 		ParentVoterSigData: nil,
 		ProposerID:         flow.ZeroID,
-	}
-	block := cluster.NewBlock(headerBody, *rootBlockPayload)
+	})
+	block := cluster.NewBlock(*headerBody, *rootBlockPayload)
 
 	return &block
 }

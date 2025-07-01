@@ -68,7 +68,7 @@ type BuilderSuite struct {
 	dir      string
 	db       *badger.DB
 	sentinel uint64
-	setter   func(*flow.HeaderBuilder) error
+	setter   func(*flow.HeaderBodyBuilder) error
 	sign     func(*flow.Header) ([]byte, error)
 
 	// mocked dependencies
@@ -266,7 +266,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	bs.sentinel = 1337
 
-	bs.setter = func(header *flow.HeaderBuilder) error {
+	bs.setter = func(header *flow.HeaderBodyBuilder) error {
 		header.WithView(1337)
 		return nil
 	}
@@ -468,7 +468,7 @@ func (bs *BuilderSuite) TestPayloadEmptyValid() {
 // TestSetterErrorPassthrough validates that errors from the setter function are passed through to the caller.
 func (bs *BuilderSuite) TestSetterErrorPassthrough() {
 	sentinel := errors.New("sentinel")
-	setter := func(header *flow.HeaderBuilder) error {
+	setter := func(header *flow.HeaderBodyBuilder) error {
 		return sentinel
 	}
 	_, err := bs.build.BuildOn(bs.parentID, setter, bs.sign)

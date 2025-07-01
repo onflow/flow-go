@@ -99,7 +99,7 @@ func NewBuilder(
 // However, it will pass through all errors returned by `setter` and `sign`.
 // Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
 // and handle them accordingly when handling errors returned from BuildOn.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBuilder) error, sign func(*flow.Header) ([]byte, error)) (*flow.ProposalHeader, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBodyBuilder) error, sign func(*flow.Header) ([]byte, error)) (*flow.ProposalHeader, error) {
 	parentSpan, ctx := b.tracer.StartSpanFromContext(context.Background(), trace.COLBuildOn)
 	defer parentSpan.End()
 
@@ -498,24 +498,30 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 func (b *Builder) buildHeader(
 	ctx *blockBuildContext,
 	payload *cluster.Payload,
-	setter func(header *flow.HeaderBuilder) error,
+	setter func(header *flow.HeaderBodyBuilder) error,
 	sign func(header *flow.Header) ([]byte, error),
 ) (*flow.ProposalHeader, error) {
 	// NOTE: we rely on the HotStuff-provided setter to set the other
 	// fields, which are related to signatures and HotStuff internals
-	headerBuilder := flow.NewHeaderBuilder().
+	headerBodyBuilder := flow.NewHeaderBodyBuilder().
 		WithChainID(ctx.parent.ChainID).
 		WithParentID(ctx.parentID).
 		WithHeight(ctx.parent.Height + 1).
-		WithTimestamp(time.Now().UTC()).
-		WithPayloadHash(payload.Hash())
+		WithTimestamp(time.Now().UTC())
 
 	// set fields specific to the consensus algorithm
-	err := setter(headerBuilder)
+	err := setter(headerBodyBuilder)
 	if err != nil {
 		return nil, fmt.Errorf("could not set fields to header: %w", err)
 	}
-	header, err := headerBuilder.Build()
+	headerBody, err := headerBodyBuilder.Build()
+	if err != nil {
+		return nil, fmt.Errorf("could not build header body: %w", err)
+	}
+	header, err := flow.NewHeader(flow.UntrustedHeader{
+		HeaderBody:  *headerBody,
+		PayloadHash: payload.Hash(),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("could not build header: %w", err)
 	}

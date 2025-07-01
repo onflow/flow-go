@@ -190,7 +190,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything, mock.Anything).Return(
-		func(parentID flow.Identifier, setter func(builder *flow.HeaderBuilder) error, sign func(*flow.Header) ([]byte, error)) *flow.ProposalHeader {
+		func(parentID flow.Identifier, setter func(builder *flow.HeaderBodyBuilder) error, sign func(*flow.Header) ([]byte, error)) *flow.ProposalHeader {
 			in.updatingBlocks.Lock()
 			defer in.updatingBlocks.Unlock()
 
@@ -199,15 +199,19 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				return nil
 			}
 
-			headerBuilder := flow.NewHeaderBuilder().
+			headerBuilder := flow.NewHeaderBodyBuilder().
 				WithChainID("chain").
 				WithParentID(parentID).
 				WithParentView(parent.View).
 				WithHeight(parent.Height + 1).
-				WithTimestamp(time.Now().UTC()).
-				WithPayloadHash(unittest.IdentifierFixture())
+				WithTimestamp(time.Now().UTC())
 			require.NoError(t, setter(headerBuilder))
-			header, err := headerBuilder.Build()
+			headerBody, err := headerBuilder.Build()
+			require.NoError(t, err)
+			header, err := flow.NewHeader(flow.UntrustedHeader{
+				HeaderBody:  *headerBody,
+				PayloadHash: unittest.IdentifierFixture(),
+			})
 			require.NoError(t, err)
 			sig, err := sign(header)
 			require.NoError(t, err)
@@ -218,7 +222,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			in.headers[header.ID()] = header
 			return proposal
 		},
-		func(parentID flow.Identifier, _ func(*flow.HeaderBuilder) error, _ func(*flow.Header) ([]byte, error)) error {
+		func(parentID flow.Identifier, _ func(*flow.HeaderBodyBuilder) error, _ func(*flow.Header) ([]byte, error)) error {
 			in.updatingBlocks.RLock()
 			_, ok := in.headers[parentID]
 			in.updatingBlocks.RUnlock()

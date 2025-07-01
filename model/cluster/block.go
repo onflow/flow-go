@@ -9,14 +9,14 @@ import (
 )
 
 func Genesis() *Block {
-	headerBody := flow.HeaderBody{
+	headerBody := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
 		View:      0,
 		ChainID:   "cluster",
 		Timestamp: flow.GenesisTime,
 		ParentID:  flow.ZeroID,
-	}
+	})
 
-	block := NewBlock(headerBody, *NewEmptyPayload(flow.ZeroID))
+	block := NewBlock(*headerBody, *NewEmptyPayload(flow.ZeroID))
 	return &block
 }
 
@@ -50,13 +50,21 @@ func (b *Block) ID() flow.Identifier {
 // ToHeader converts the block into a compact [flow.Header] representation,
 // where the payload is compressed to a hash reference.
 func (b *Block) ToHeader() *flow.Header {
-	header, err := flow.NewHeader(flow.UntrustedHeader{
+	if b.Header.ContainsParentQC() {
+		header, err := flow.NewHeader(flow.UntrustedHeader{
+			HeaderBody:  b.Header,
+			PayloadHash: b.Payload.Hash(),
+		})
+		if err != nil {
+			panic(fmt.Errorf("could not build header from block: %w", err))
+		}
+		return header
+	}
+
+	header := flow.NewRootHeader(flow.UntrustedHeader{
 		HeaderBody:  b.Header,
 		PayloadHash: b.Payload.Hash(),
 	})
-	if err != nil {
-		panic(fmt.Errorf("could not build header from block: %w", err))
-	}
 
 	return header
 }

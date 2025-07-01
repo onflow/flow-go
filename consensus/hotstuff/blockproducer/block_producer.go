@@ -51,17 +51,7 @@ func New(safetyRules hotstuff.SafetyRules, committee hotstuff.Replicas, builder 
 func (bp *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.ProposalHeader, error) {
 	// the custom functions allows us to set some custom fields on the block;
 	// in hotstuff, we use this for view number and signature-related fields
-	//setHotstuffFields := func(header *flow.Header) error {
-	//	header.View = view
-	//	header.ParentView = qc.View
-	//	header.ParentVoterIndices = qc.SignerIndices
-	//	header.ParentVoterSigData = qc.SigData
-	//	header.ProposerID = bp.committee.Self()
-	//	header.LastViewTC = lastViewTC
-	//	return nil
-	//}
-
-	setHotstuffFields := func(headerBuilder *flow.HeaderBuilder) error {
+	setHotstuffFields := func(headerBuilder *flow.HeaderBodyBuilder) error {
 		headerBuilder.WithView(view).
 			WithParentView(qc.View).
 			WithParentVoterIndices(qc.SignerIndices).

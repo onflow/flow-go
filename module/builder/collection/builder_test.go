@@ -36,7 +36,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var noopSetter = func(*flow.HeaderBuilder) error { return nil }
+var noopSetter = func(builder *flow.HeaderBodyBuilder) error { return nil }
 var noopSigner = func(*flow.Header) ([]byte, error) { return nil, nil }
 
 type BuilderSuite struct {
@@ -239,8 +239,15 @@ func (suite *BuilderSuite) TestBuildOn_NonExistentParent() {
 func (suite *BuilderSuite) TestBuildOn_Success() {
 
 	var expectedHeight uint64 = 42
-	setter := func(h *flow.HeaderBuilder) error {
-		h.WithHeight(expectedHeight)
+	setter := func(h *flow.HeaderBodyBuilder) error {
+		h.WithHeight(expectedHeight).
+			WithChainID(flow.Emulator).
+			WithParentID(unittest.IdentifierFixture()).
+			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
+			WithParentVoterSigData(unittest.QCSigDataFixture()).
+			WithProposerID(unittest.IdentifierFixture())
+		//WithPayloadHash(unittest.IdentifierFixture())
+
 		return nil
 	}
 
@@ -271,7 +278,7 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 // TestBuildOn_SetterErrorPassthrough validates that errors from the setter function are passed through to the caller.
 func (suite *BuilderSuite) TestBuildOn_SetterErrorPassthrough() {
 	sentinel := errors.New("sentinel")
-	setter := func(h *flow.HeaderBuilder) error {
+	setter := func(h *flow.HeaderBodyBuilder) error {
 		return sentinel
 	}
 	_, err := suite.builder.BuildOn(suite.genesis.ID(), setter, noopSigner)
