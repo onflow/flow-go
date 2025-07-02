@@ -173,29 +173,6 @@ func (a *Accounts) GetAccountKeyAtLatestBlock(
 	return accountKey, nil
 }
 
-// GetAccountKeysAtLatestBlock returns the account public keys at the latest sealed block.
-func (a *Accounts) GetAccountKeysAtLatestBlock(
-	ctx context.Context,
-	address flow.Address,
-) ([]flow.AccountPublicKey, error) {
-	sealed, err := a.state.Sealed().Head()
-	if err != nil {
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return nil, err
-	}
-
-	sealedBlockID := sealed.ID()
-	accountKeys, err := a.endpointHandler.GetAccountKeysAtBlockHeight(ctx, address, sealedBlockID, sealed.Height)
-	if err != nil {
-		a.log.Debug().Err(err).Msgf("failed to get account keys at blockID: %v", sealedBlockID)
-		return nil, err
-	}
-
-	return accountKeys, nil
-
-}
-
 // GetAccountKeyAtBlockHeight returns the account public key by key index at the given block height.
 func (a *Accounts) GetAccountKeyAtBlockHeight(
 	ctx context.Context,
@@ -217,6 +194,28 @@ func (a *Accounts) GetAccountKeyAtBlockHeight(
 	return accountKey, nil
 }
 
+// GetAccountKeysAtLatestBlock returns the account public keys at the latest sealed block.
+func (a *Accounts) GetAccountKeysAtLatestBlock(
+	ctx context.Context,
+	address flow.Address,
+) ([]flow.AccountPublicKey, error) {
+	sealed, err := a.state.Sealed().Head()
+	if err != nil {
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, err
+	}
+
+	sealedBlockID := sealed.ID()
+	accountKeys, err := a.endpointHandler.GetAccountKeysAtBlockHeight(ctx, address, sealedBlockID, sealed.Height)
+	if err != nil {
+		a.log.Debug().Err(err).Msgf("failed to get account keys at blockID: %v", sealedBlockID)
+		return nil, err
+	}
+
+	return accountKeys, nil
+}
+
 // GetAccountKeysAtBlockHeight returns the account public keys at the given block height.
 func (a *Accounts) GetAccountKeysAtBlockHeight(
 	ctx context.Context,
@@ -235,5 +234,4 @@ func (a *Accounts) GetAccountKeysAtBlockHeight(
 	}
 
 	return accountKeys, nil
-
 }

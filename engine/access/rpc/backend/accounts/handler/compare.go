@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"errors"
 
 	"github.com/rs/zerolog"
 
@@ -10,60 +12,160 @@ import (
 )
 
 type Compare struct {
-	log   zerolog.Logger
-	state protocol.State
+	Failover
 }
 
 var _ Handler = (*Compare)(nil)
 
-func NewCompareHandler(log zerolog.Logger, state protocol.State) *Compare {
+func NewCompareHandler(
+	log zerolog.Logger,
+	state protocol.State,
+	localRequester Handler,
+	execNodeRequester Handler,
+) *Compare {
 	return &Compare{
-		log:   log,
-		state: state,
+		Failover: Failover{
+			log:               zerolog.New(log).With().Str("handler", "compare").Logger(),
+			state:             state,
+			localRequester:    localRequester,
+			execNodeRequester: execNodeRequester,
+		},
 	}
 }
 
-func (c *Compare) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *Compare) GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (c *Compare) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, blockID flow.Identifier, height uint64) (*flow.Account, error) {
-	//TODO implement me
-	panic("implement me")
+	localAccount, localErr := c.localRequester.GetAccount(ctx, address)
+	if localErr == nil {
+		return localAccount, nil
+	}
+
+	ENAccount, ENErr := c.execNodeRequester.GetAccount(ctx, address)
+	// We want to compare accounts fetched from both local and execution node storages.
+	c.compareAccountResults(ENAccount, ENErr, localAccount, localErr, blockID, address)
+
+	return ENAccount, ENErr
 }
 
-func (c *Compare) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error) {
-	//TODO implement me
-	panic("implement me")
+// compareAccountResults compares the result and error returned from local and remote getAccount calls
+// and logs the results if they are different
+func (c *Compare) compareAccountResults(
+	execNodeResult *flow.Account,
+	execErr error,
+	localResult *flow.Account,
+	localErr error,
+	blockID flow.Identifier,
+	address flow.Address,
+) {
+	if c.log.GetLevel() > zerolog.DebugLevel {
+		return
+	}
+
+	lgCtx := c.log.With().
+		Hex("block_id", blockID[:]).
+		Str("address", address.String())
+
+	// errors are different
+	if !errors.Is(execErr, localErr) {
+		lgCtx = lgCtx.
+			AnErr("execution_node_error", execErr).
+			AnErr("local_error", localErr)
+
+		lg := lgCtx.Logger()
+		lg.Debug().Msg("errors from getting account on local and EN do not match")
+		return
+	}
+
+	// both errors are nil, compare the accounts
+	if execErr == nil {
+		lgCtx, ok := compareAccountsLogger(execNodeResult, localResult, lgCtx)
+		if !ok {
+			lg := lgCtx.Logger()
+			lg.Debug().Msg("accounts from local and EN do not match")
+		}
+	}
 }
 
-func (c *Compare) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, blockID flow.Identifier, height uint64) (uint64, error) {
-	//TODO implement me
-	panic("implement me")
-}
+// compareAccountsLogger compares accounts produced by the execution node and local storage and
+// return a logger configured to log the differences
+func compareAccountsLogger(exec, local *flow.Account, lgCtx zerolog.Context) (zerolog.Context, bool) {
+	different := false
 
-func (c *Compare) GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex uint32) (*flow.AccountPublicKey, error) {
-	//TODO implement me
-	panic("implement me")
-}
+	if exec.Address != local.Address {
+		lgCtx = lgCtx.
+			Str("exec_node_address", exec.Address.String()).
+			Str("local_address", local.Address.String())
+		different = true
+	}
 
-func (c *Compare) GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex uint32, blockID flow.Identifier, height uint64) (*flow.AccountPublicKey, error) {
-	//TODO implement me
-	panic("implement me")
-}
+	if exec.Balance != local.Balance {
+		lgCtx = lgCtx.
+			Uint64("exec_node_balance", exec.Balance).
+			Uint64("local_balance", local.Balance)
+		different = true
+	}
 
-func (c *Compare) GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error) {
-	//TODO implement me
-	panic("implement me")
-}
+	contractListMatches := true
+	if len(exec.Contracts) != len(local.Contracts) {
+		lgCtx = lgCtx.
+			Int("exec_node_contract_count", len(exec.Contracts)).
+			Int("local_contract_count", len(local.Contracts))
+		contractListMatches = false
+		different = true
+	}
 
-func (c *Compare) GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, blockID flow.Identifier, height uint64) ([]flow.AccountPublicKey, error) {
-	//TODO implement me
-	panic("implement me")
+	missingContracts := zerolog.Arr()
+	mismatchContracts := zerolog.Arr()
+
+	for name, execContract := range exec.Contracts {
+		localContract, ok := local.Contracts[name]
+
+		if !ok {
+			missingContracts.Str(name)
+			contractListMatches = false
+			different = true
+		}
+
+		if !bytes.Equal(execContract, localContract) {
+			mismatchContracts.Str(name)
+			different = true
+		}
+	}
+
+	lgCtx = lgCtx.
+		Array("missing_contracts", missingContracts).
+		Array("mismatch_contracts", mismatchContracts)
+
+	// only check if there were any missing
+	if !contractListMatches {
+		extraContracts := zerolog.Arr()
+		for name := range local.Contracts {
+			if _, ok := exec.Contracts[name]; !ok {
+				extraContracts.Str(name)
+				different = true
+			}
+		}
+		lgCtx = lgCtx.Array("extra_contracts", extraContracts)
+	}
+
+	if len(exec.Keys) != len(local.Keys) {
+		lgCtx = lgCtx.
+			Int("exec_node_key_count", len(exec.Keys)).
+			Int("local_key_count", len(local.Keys))
+		different = true
+	}
+
+	mismatchKeys := zerolog.Arr()
+
+	for i, execKey := range exec.Keys {
+		localKey := local.Keys[i]
+
+		if !execKey.PublicKey.Equals(localKey.PublicKey) {
+			mismatchKeys.Uint32(execKey.Index)
+			different = true
+		}
+	}
+
+	lgCtx = lgCtx.Array("mismatch_keys", mismatchKeys)
+
+	return lgCtx, !different
 }

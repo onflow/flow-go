@@ -38,7 +38,7 @@ func NewExecutionNodeHandler(
 	execNodeIdentityProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 ) *ExecutionNode {
 	return &ExecutionNode{
-		log:                        log,
+		log:                        zerolog.New(log).With().Str("handler", "execution_node").Logger(),
 		state:                      state,
 		connFactory:                connFactory,
 		nodeCommunicator:           nodeCommunicator,

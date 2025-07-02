@@ -33,7 +33,7 @@ func NewLocalHandler(
 	scriptExecutor execution.ScriptExecutor,
 ) *Local {
 	return &Local{
-		log:            log,
+		log:            zerolog.New(log).With().Str("handler", "local").Logger(),
 		state:          state,
 		scriptExecutor: scriptExecutor,
 	}
