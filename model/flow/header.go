@@ -109,6 +109,8 @@ func NewHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 	}, nil
 }
 
+// NewRootHeaderBody creates a new instance of root HeaderBody.
+// It omits validity checks as fields may be zero/nil.
 func NewRootHeaderBody(untrusted UntrustedHeaderBody) *HeaderBody {
 	return &HeaderBody{
 		ChainID:            untrusted.ChainID,
@@ -135,11 +137,9 @@ func (h HeaderBody) QuorumCertificate() *QuorumCertificate {
 	}
 }
 
-// ContainsParentQC reports whether this header carries a valid parent QC.
-// It returns true only if all of the fields required to build a QC are non-zero/nil,
-// indicating that ParentQC() can be safely called without panicking.
-// Only spork root blocks or network genesis blocks do not contain a parent QC.
-func (h HeaderBody) ContainsParentQC() bool {
+// IsRootHeaderBody reports whether this is a root header.
+// It returns true only if all of the fields required to build a root Header are non-zero/nil,
+func (h HeaderBody) IsRootHeaderBody() bool {
 	return h.ParentID != ZeroID && h.ParentVoterIndices != nil && h.ParentVoterSigData != nil && h.ProposerID != ZeroID
 }
 

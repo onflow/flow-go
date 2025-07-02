@@ -50,7 +50,7 @@ func (b *Block) ID() flow.Identifier {
 // ToHeader converts the block into a compact [flow.Header] representation,
 // where the payload is compressed to a hash reference.
 func (b *Block) ToHeader() *flow.Header {
-	if b.Header.ContainsParentQC() {
+	if b.Header.IsRootHeaderBody() {
 		header, err := flow.NewHeader(flow.UntrustedHeader{
 			HeaderBody:  b.Header,
 			PayloadHash: b.Payload.Hash(),

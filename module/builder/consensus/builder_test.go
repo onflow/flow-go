@@ -265,9 +265,15 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.Require().NoError(err)
 
 	bs.sentinel = 1337
+	bs.setter = func(h *flow.HeaderBodyBuilder) error {
+		h.WithHeight(42).
+			WithChainID(flow.Emulator).
+			WithView(1337).
+			WithParentID(unittest.IdentifierFixture()).
+			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
+			WithParentVoterSigData(unittest.QCSigDataFixture()).
+			WithProposerID(unittest.IdentifierFixture())
 
-	bs.setter = func(header *flow.HeaderBodyBuilder) error {
-		header.WithView(1337)
 		return nil
 	}
 	bs.sign = func(_ *flow.Header) ([]byte, error) {
