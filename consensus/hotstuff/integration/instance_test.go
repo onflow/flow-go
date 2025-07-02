@@ -277,7 +277,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				View:          votes[0].View,
 				BlockID:       votes[0].BlockID,
 				SignerIndices: signerIndices,
-				SigData:       nil,
+				SigData:       unittest.RandomBytes(msig.SigLen),
 			}
 			return qc
 		},
@@ -376,6 +376,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		View:          rootBlock.View,
 		BlockID:       rootBlock.BlockID,
 		SignerIndices: signerIndices,
+		SigData:       unittest.RandomBytes(msig.SigLen),
 	}
 	certifiedRootBlock, err := model.NewCertifiedBlock(rootBlock, rootQC)
 	require.NoError(t, err)
