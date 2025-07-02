@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
+	"flag"
 	"fmt"
 	"math"
 	"strings"
@@ -52,6 +53,12 @@ import (
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+)
+
+var testWithVMTransactionExecution = flag.Bool(
+	"testWithVMTransactionExecution",
+	false,
+	"Run transactions in tests using the Cadence compiler/VM",
 )
 
 type vmTest struct {
@@ -2812,10 +2819,13 @@ func TestEntropyCallOnlyOkIfAllowed(t *testing.T) {
 				err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 				require.NoError(t, err)
 
+				ctx.VMTransactionExecutionEnabled = *testWithVMTransactionExecution
+
 				_, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
-					snapshotTree)
+					snapshotTree,
+				)
 				require.NoError(t, err)
 
 				if allowed {
