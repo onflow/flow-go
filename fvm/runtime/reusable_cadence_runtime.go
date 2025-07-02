@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/bbq"
+	"github.com/onflow/cadence/bbq/vm"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
@@ -19,16 +21,21 @@ type Environment interface {
 	RandomSourceHistory() ([]byte, error)
 }
 
-// randomSourceFunctionType is the type of the `randomSource` function.
+const randomSourceHistoryFunctionName = "randomSourceHistory"
+
+// randomSourceHistoryFunctionType is the type of the `randomSourceHistory` function.
 // This defines the signature as `func(): [UInt8]`
-var randomSourceFunctionType = &sema.FunctionType{
+var randomSourceHistoryFunctionType = &sema.FunctionType{
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
 }
 
 type ReusableCadenceRuntime struct {
 	runtime.Runtime
-	TxRuntimeEnv     runtime.Environment
-	ScriptRuntimeEnv runtime.Environment
+
+	TxRuntimeEnv       runtime.Environment
+	ScriptRuntimeEnv   runtime.Environment
+	VMTxRuntimeEnv     runtime.Environment
+	VMScriptRuntimeEnv runtime.Environment
 
 	fvmEnv Environment
 }
@@ -38,9 +45,11 @@ func NewReusableCadenceRuntime(
 	config runtime.Config,
 ) *ReusableCadenceRuntime {
 	reusable := &ReusableCadenceRuntime{
-		Runtime:          rt,
-		TxRuntimeEnv:     runtime.NewBaseInterpreterEnvironment(config),
-		ScriptRuntimeEnv: runtime.NewScriptInterpreterEnvironment(config),
+		Runtime:            rt,
+		TxRuntimeEnv:       runtime.NewBaseInterpreterEnvironment(config),
+		ScriptRuntimeEnv:   runtime.NewScriptInterpreterEnvironment(config),
+		VMTxRuntimeEnv:     runtime.NewBaseVMEnvironment(config),
+		VMScriptRuntimeEnv: runtime.NewScriptVMEnvironment(config),
 	}
 
 	reusable.declareRandomSourceHistory()
@@ -50,56 +59,67 @@ func NewReusableCadenceRuntime(
 
 func (reusable *ReusableCadenceRuntime) declareRandomSourceHistory() {
 
-	// Declare the `randomSourceHistory` function. This function is **only** used by the
-	// System transaction, to fill the `RandomBeaconHistory` contract via the heartbeat
-	// resource. This allows the `RandomBeaconHistory` contract to be a standard contract,
+	// Declare the `randomSourceHistory` function.
+	// This function is **only** used by the System transaction,
+	// to fill the `RandomBeaconHistory` contract via the heartbeat resource.
+	// This allows the `RandomBeaconHistory` contract to be a standard contract,
 	// without any special parts.
+	//
 	// Since the `randomSourceHistory` function is only used by the System transaction,
 	// it is not part of the cadence standard library, and can just be injected from here.
-	// It also doesnt need user documentation, since it is not (and should not)
+	// It also doesn't need user documentation, since it is not (and should not)
 	// be called by the user. If it is called by the user it will panic.
-	functionType := randomSourceFunctionType
 
-	blockRandomSource := stdlib.StandardLibraryValue{
-		Name: "randomSourceHistory",
-		Type: functionType,
-		Kind: common.DeclarationKindFunction,
-		Value: interpreter.NewUnmeteredStaticHostFunctionValue(
-			functionType,
-			func(invocation interpreter.Invocation) interpreter.Value {
-
-				actualArgumentCount := len(invocation.Arguments)
-				expectedArgumentCount := len(functionType.Parameters)
-
-				if actualArgumentCount != expectedArgumentCount {
-					panic(errors.NewInvalidArgumentErrorf(
-						"incorrect number of arguments: got %d, expected %d",
-						actualArgumentCount,
-						expectedArgumentCount,
-					))
-				}
-
-				var err error
-				var source []byte
-				fvmEnv := reusable.fvmEnv
-				if fvmEnv != nil {
-					source, err = fvmEnv.RandomSourceHistory()
-				} else {
-					err = errors.NewOperationNotSupportedError("randomSourceHistory")
-				}
-
-				if err != nil {
-					panic(err)
-				}
-
-				return interpreter.ByteSliceToByteArrayValue(
-					invocation.InvocationContext,
-					source)
-			},
+	reusable.TxRuntimeEnv.DeclareValue(
+		newRandomSourceHistoryFunctionValue(
+			interpreter.NewUnmeteredStaticHostFunctionValue(
+				randomSourceHistoryFunctionType,
+				func(invocation interpreter.Invocation) interpreter.Value {
+					return reusable.randomSourceHistory(invocation.InvocationContext)
+				},
+			),
 		),
+		nil,
+	)
+
+	reusable.VMTxRuntimeEnv.DeclareValue(
+		newRandomSourceHistoryFunctionValue(
+			vm.NewNativeFunctionValue(
+				randomSourceHistoryFunctionName,
+				randomSourceHistoryFunctionType,
+				func(context *vm.Context, _ []bbq.StaticType, _ ...vm.Value) vm.Value {
+					return reusable.randomSourceHistory(context)
+				},
+			),
+		),
+		nil,
+	)
+}
+
+func newRandomSourceHistoryFunctionValue(functionValue interpreter.FunctionValue) stdlib.StandardLibraryValue {
+	return stdlib.StandardLibraryValue{
+		Name:  randomSourceHistoryFunctionName,
+		Type:  randomSourceHistoryFunctionType,
+		Kind:  common.DeclarationKindFunction,
+		Value: functionValue,
+	}
+}
+
+func (reusable *ReusableCadenceRuntime) randomSourceHistory(context interpreter.InvocationContext) interpreter.Value {
+	fvmEnv := reusable.fvmEnv
+	if fvmEnv == nil {
+		panic(errors.NewOperationNotSupportedError(randomSourceHistoryFunctionName))
 	}
 
-	reusable.TxRuntimeEnv.DeclareValue(blockRandomSource, nil)
+	source, err := fvmEnv.RandomSourceHistory()
+	if err != nil {
+		panic(err)
+	}
+
+	return interpreter.ByteSliceToByteArrayValue(
+		context,
+		source,
+	)
 }
 
 func (reusable *ReusableCadenceRuntime) SetFvmEnvironment(fvmEnv Environment) {
@@ -128,10 +148,18 @@ func (reusable *ReusableCadenceRuntime) InvokeContractFunction(
 	functionName string,
 	arguments []cadence.Value,
 	argumentTypes []sema.Type,
+	useVM bool,
 ) (
 	cadence.Value,
 	error,
 ) {
+	var environment runtime.Environment
+	if useVM {
+		environment = reusable.VMTxRuntimeEnv
+	} else {
+		environment = reusable.TxRuntimeEnv
+	}
+
 	return reusable.Runtime.InvokeContractFunction(
 		contractLocation,
 		functionName,
@@ -139,7 +167,8 @@ func (reusable *ReusableCadenceRuntime) InvokeContractFunction(
 		argumentTypes,
 		runtime.Context{
 			Interface:   reusable.fvmEnv,
-			Environment: reusable.TxRuntimeEnv,
+			Environment: environment,
+			UseVM:       useVM,
 		},
 	)
 }
@@ -147,13 +176,21 @@ func (reusable *ReusableCadenceRuntime) InvokeContractFunction(
 func (reusable *ReusableCadenceRuntime) NewTransactionExecutor(
 	script runtime.Script,
 	location common.Location,
+	useVM bool,
 ) runtime.Executor {
+	var environment runtime.Environment
+	if useVM {
+		environment = reusable.VMTxRuntimeEnv
+	} else {
+		environment = reusable.TxRuntimeEnv
+	}
+
 	return reusable.Runtime.NewTransactionExecutor(
 		script,
 		runtime.Context{
 			Interface:   reusable.fvmEnv,
 			Location:    location,
-			Environment: reusable.TxRuntimeEnv,
+			Environment: environment,
 		},
 	)
 }
@@ -161,16 +198,24 @@ func (reusable *ReusableCadenceRuntime) NewTransactionExecutor(
 func (reusable *ReusableCadenceRuntime) ExecuteScript(
 	script runtime.Script,
 	location common.Location,
+	useVM bool,
 ) (
 	cadence.Value,
 	error,
 ) {
+	var environment runtime.Environment
+	if useVM {
+		environment = reusable.VMScriptRuntimeEnv
+	} else {
+		environment = reusable.ScriptRuntimeEnv
+	}
+
 	return reusable.Runtime.ExecuteScript(
 		script,
 		runtime.Context{
 			Interface:   reusable.fvmEnv,
 			Location:    location,
-			Environment: reusable.ScriptRuntimeEnv,
+			Environment: environment,
 		},
 	)
 }

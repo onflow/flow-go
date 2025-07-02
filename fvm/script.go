@@ -219,6 +219,7 @@ func (executor *scriptExecutor) executeScript() error {
 			Arguments: executor.proc.Arguments,
 		},
 		common.ScriptLocation(executor.proc.ID),
+		executor.ctx.VMScriptExecutionEnabled,
 	)
 	populateErr := executor.output.PopulateEnvironmentValues(executor.env)
 	if err != nil {
