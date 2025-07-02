@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/accounts/handler"
@@ -32,7 +34,7 @@ func NewAccounts(
 	scriptExecMode backend.IndexQueryMode,
 	scriptExecutor execution.ScriptExecutor,
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider,
-) *Accounts {
+) (*Accounts, error) {
 	var h handler.Handler
 
 	// TODO: we can instantiate these strategies outside of backend (in access_node_builder e.g.)
@@ -52,6 +54,9 @@ func NewAccounts(
 		local := handler.NewLocalHandler(log, state, scriptExecutor)
 		execNode := handler.NewExecutionNodeHandler(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
 		h = handler.NewCompareHandler(log, state, local, execNode)
+
+	default:
+		return nil, status.Errorf(codes.Internal, "unknown execution mode: %v", scriptExecMode)
 	}
 
 	return &Accounts{
@@ -59,7 +64,7 @@ func NewAccounts(
 		state:           state,
 		headers:         headers,
 		endpointHandler: h,
-	}
+	}, nil
 }
 
 // GetAccount returns the account details at the latest sealed block.

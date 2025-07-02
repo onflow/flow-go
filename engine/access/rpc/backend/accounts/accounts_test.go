@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -79,7 +80,7 @@ func (s *BackendAccountsSuite) SetupTest() {
 }
 
 func (s *BackendAccountsSuite) createHandler(mode backend.IndexQueryMode, executor *execmock.ScriptExecutor) *Accounts {
-	return NewAccounts(
+	accounts, err := NewAccounts(
 		s.log,
 		s.state,
 		s.headers,
@@ -95,6 +96,9 @@ func (s *BackendAccountsSuite) createHandler(mode backend.IndexQueryMode, execut
 			flow.IdentifierList{},
 		),
 	)
+	require.NoError(s.T(), err)
+
+	return accounts
 }
 
 // setupExecutionNodes sets up the mocks required to test against an EN backend
