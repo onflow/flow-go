@@ -33,13 +33,18 @@ func NewCompareHandler(
 	}
 }
 
-func (c *Compare) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, blockID flow.Identifier, height uint64) (*flow.Account, error) {
-	localAccount, localErr := c.localRequester.GetAccount(ctx, address)
+func (c *Compare) GetAccountAtBlockHeight(
+	ctx context.Context,
+	address flow.Address,
+	blockID flow.Identifier,
+	height uint64,
+) (*flow.Account, error) {
+	localAccount, localErr := c.localRequester.GetAccountAtBlockHeight(ctx, address, blockID, height)
 	if localErr == nil {
 		return localAccount, nil
 	}
 
-	ENAccount, ENErr := c.execNodeRequester.GetAccount(ctx, address)
+	ENAccount, ENErr := c.execNodeRequester.GetAccountAtBlockHeight(ctx, address, blockID, height)
 	// We want to compare accounts fetched from both local and execution node storages.
 	c.compareAccountResults(ENAccount, ENErr, localAccount, localErr, blockID, address)
 

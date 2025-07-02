@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/module/execution"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 
@@ -39,28 +38,6 @@ func NewLocalHandler(
 	}
 }
 
-func (l *Local) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
-	return l.GetAccountAtLatestBlock(ctx, address)
-}
-
-func (l *Local) GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error) {
-	sealed, err := l.state.Sealed().Head()
-	if err != nil {
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return nil, err
-	}
-
-	sealedBlockID := sealed.ID()
-	account, err := l.GetAccountAtBlockHeight(ctx, address, sealedBlockID, sealed.Height)
-	if err != nil {
-		l.log.Debug().Err(err).Msgf("failed to get account at blockID: %v", sealedBlockID)
-		return nil, err
-	}
-
-	return account, nil
-}
-
 func (l *Local) GetAccountAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
@@ -72,24 +49,6 @@ func (l *Local) GetAccountAtBlockHeight(
 		return nil, convertAccountError(backend.ResolveHeightError(l.state.Params(), height, err), address, height)
 	}
 	return account, nil
-}
-
-func (l *Local) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error) {
-	sealed, err := l.state.Sealed().Head()
-	if err != nil {
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return 0, err
-	}
-
-	sealedBlockID := sealed.ID()
-	balance, err := l.GetAccountBalanceAtBlockHeight(ctx, address, sealedBlockID, sealed.Height)
-	if err != nil {
-		l.log.Debug().Err(err).Msgf("failed to get account at blockID: %v", sealedBlockID)
-		return 0, err
-	}
-
-	return balance, nil
 }
 
 func (l *Local) GetAccountBalanceAtBlockHeight(
@@ -107,28 +66,6 @@ func (l *Local) GetAccountBalanceAtBlockHeight(
 	return accountBalance, nil
 }
 
-func (l *Local) GetAccountKeyAtLatestBlock(
-	ctx context.Context,
-	address flow.Address,
-	keyIndex uint32,
-) (*flow.AccountPublicKey, error) {
-	sealed, err := l.state.Sealed().Head()
-	if err != nil {
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return nil, err
-	}
-
-	sealedBlockID := sealed.ID()
-	key, err := l.GetAccountKeyAtBlockHeight(ctx, address, keyIndex, sealedBlockID, sealed.Height)
-	if err != nil {
-		l.log.Debug().Err(err).Msgf("failed to get account key at blockID: %v", sealedBlockID)
-		return nil, err
-	}
-
-	return key, nil
-}
-
 func (l *Local) GetAccountKeyAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
@@ -143,27 +80,6 @@ func (l *Local) GetAccountKeyAtBlockHeight(
 	}
 
 	return accountKey, nil
-}
-
-func (l *Local) GetAccountKeysAtLatestBlock(
-	ctx context.Context,
-	address flow.Address,
-) ([]flow.AccountPublicKey, error) {
-	sealed, err := l.state.Sealed().Head()
-	if err != nil {
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return nil, err
-	}
-
-	sealedBlockID := sealed.ID()
-	keys, err := l.GetAccountKeysAtBlockHeight(ctx, address, sealedBlockID, sealed.Height)
-	if err != nil {
-		l.log.Debug().Err(err).Msgf("failed to get account keys at blockID: %v", sealedBlockID)
-		return nil, err
-	}
-
-	return keys, nil
 }
 
 func (l *Local) GetAccountKeysAtBlockHeight(
