@@ -923,11 +923,11 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 
 	// Verify that no collector was created for block X's result:
 	// the following call will try to instantiate a collector; an error means that during repopulation no such collection was created
-	collector, err := core.collectorTree.GetOrCreateCollector(&receiptX.ExecutionResult)
+	_, err = core.collectorTree.GetOrCreateCollector(&receiptX.ExecutionResult)
 	require.Error(s.T(), err)
 
 	// Verify that the only result in the assignment collector tree is the one for block B:
-	collector, err = core.collectorTree.GetOrCreateCollector(&receiptB.ExecutionResult)
+	collector, err := core.collectorTree.GetOrCreateCollector(&receiptB.ExecutionResult)
 	require.NoError(s.T(), err)
 	require.False(s.T(), collector.Created)
 	require.Equal(s.T(), approvals.VerifyingApprovals, collector.Collector.ProcessingStatus())
