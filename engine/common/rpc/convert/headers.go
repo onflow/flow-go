@@ -79,6 +79,26 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 		}
 	}
 
+	if IsRootBlockHeader(m) {
+		rootHeader := flow.NewRootHeader(flow.UntrustedHeader{
+			HeaderBody: flow.HeaderBody{
+				ParentID:           MessageToIdentifier(m.ParentId),
+				Height:             m.Height,
+				Timestamp:          m.Timestamp.AsTime(),
+				View:               m.View,
+				ParentView:         m.ParentView,
+				ParentVoterIndices: m.ParentVoterIndices,
+				ParentVoterSigData: m.ParentVoterSigData,
+				ProposerID:         MessageToIdentifier(m.ProposerId),
+				ChainID:            *chainId,
+				LastViewTC:         lastViewTC,
+			},
+			PayloadHash: MessageToIdentifier(m.PayloadHash),
+		})
+
+		return rootHeader, nil
+	}
+
 	headerBody, err := flow.NewHeaderBody(flow.UntrustedHeaderBody{
 		ParentID:           MessageToIdentifier(m.ParentId),
 		Height:             m.Height,
@@ -103,4 +123,13 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 	}
 
 	return header, nil
+}
+
+// IsRootBlockHeader reports whether this is a root block header.
+// It returns true only if all of the fields required to build a Header are zero/nil,
+func IsRootBlockHeader(m *entities.BlockHeader) bool {
+	return MessageToIdentifier(m.ParentId) == flow.ZeroID &&
+		m.ParentVoterIndices == nil &&
+		m.ParentVoterSigData == nil &&
+		MessageToIdentifier(m.ProposerId) == flow.ZeroID
 }

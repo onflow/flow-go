@@ -138,7 +138,7 @@ func (h HeaderBody) QuorumCertificate() *QuorumCertificate {
 }
 
 // IsRootHeaderBody reports whether this is a root header.
-// It returns true only if all of the fields required to build a root Header are non-zero/nil,
+// It returns true only if all of the fields required to build a Header are non-zero/nil,
 func (h HeaderBody) IsRootHeaderBody() bool {
 	return h.ParentID != ZeroID && h.ParentVoterIndices != nil && h.ParentVoterSigData != nil && h.ProposerID != ZeroID
 }
