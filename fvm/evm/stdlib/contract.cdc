@@ -401,9 +401,9 @@ access(all) contract EVM {
         }
     }
 
-    /* 
-        Cadence-Owned Accounts (COA) 
-        A COA is a natively supported EVM smart contract wallet type 
+    /*
+        Cadence-Owned Accounts (COA)
+        A COA is a natively supported EVM smart contract wallet type
         that allows a Cadence resource to own and control an EVM address.
         This native wallet provides the primitives needed to bridge
         or control assets across Flow EVM and Cadence.
@@ -973,7 +973,7 @@ access(all) contract EVM {
         /// Sets the BridgeAccessor Capability in the BridgeRouter
         access(Bridge) fun setBridgeAccessor(_ accessor: Capability<auth(Bridge) &{BridgeAccessor}>) {
             pre {
-                accessor.check(): 
+                accessor.check():
                     "EVM.setBridgeAccessor(): Invalid BridgeAccessor Capability provided"
                 emit BridgeAccessorUpdated(
                     routerType: self.getType(),
@@ -990,9 +990,11 @@ access(all) contract EVM {
     /// Returns a reference to the BridgeAccessor designated for internal bridge requests
     access(self)
     view fun borrowBridgeAccessor(): auth(Bridge) &{BridgeAccessor} {
-        return self.account.storage.borrow<auth(Bridge) &{BridgeRouter}>(from: /storage/evmBridgeRouter)
-            ?.borrowBridgeAccessor()
-            ?? panic("EVM.borrowBridgeAccessor(): Could not borrow a reference to the EVM bridge.")
+        // TODO:
+        // return self.account.storage.borrow<auth(Bridge) &{BridgeRouter}>(from: /storage/evmBridgeRouter)
+        //     ?.borrowBridgeAccessor()
+        //     ?? panic("EVM.borrowBridgeAccessor(): Could not borrow a reference to the EVM bridge.")
+        panic("TODO")
     }
 
     /// The Heartbeat resource controls the block production.
