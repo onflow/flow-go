@@ -80,19 +80,20 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 	}
 
 	if IsRootBlockHeader(m) {
+		headerBody := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
+			ParentID:           MessageToIdentifier(m.ParentId),
+			Height:             m.Height,
+			Timestamp:          m.Timestamp.AsTime(),
+			View:               m.View,
+			ParentView:         m.ParentView,
+			ParentVoterIndices: m.ParentVoterIndices,
+			ParentVoterSigData: m.ParentVoterSigData,
+			ProposerID:         MessageToIdentifier(m.ProposerId),
+			ChainID:            *chainId,
+			LastViewTC:         lastViewTC,
+		})
 		rootHeader := flow.NewRootHeader(flow.UntrustedHeader{
-			HeaderBody: flow.HeaderBody{
-				ParentID:           MessageToIdentifier(m.ParentId),
-				Height:             m.Height,
-				Timestamp:          m.Timestamp.AsTime(),
-				View:               m.View,
-				ParentView:         m.ParentView,
-				ParentVoterIndices: m.ParentVoterIndices,
-				ParentVoterSigData: m.ParentVoterSigData,
-				ProposerID:         MessageToIdentifier(m.ProposerId),
-				ChainID:            *chainId,
-				LastViewTC:         lastViewTC,
-			},
+			HeaderBody:  *headerBody,
 			PayloadHash: MessageToIdentifier(m.PayloadHash),
 		})
 
