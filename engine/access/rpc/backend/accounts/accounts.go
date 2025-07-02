@@ -17,13 +17,10 @@ import (
 )
 
 type Accounts struct {
-	log                        zerolog.Logger
-	state                      protocol.State
-	headers                    storage.Headers
-	connFactory                connection.ConnectionFactory
-	nodeCommunicator           backend.Communicator
-	endpointHandler            handler.Handler
-	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
+	log             zerolog.Logger
+	state           protocol.State
+	headers         storage.Headers
+	endpointHandler handler.Handler
 }
 
 func NewAccounts(
@@ -58,13 +55,10 @@ func NewAccounts(
 	}
 
 	return &Accounts{
-		log:                        log,
-		state:                      state,
-		headers:                    headers,
-		connFactory:                connFactory,
-		nodeCommunicator:           nodeCommunicator,
-		endpointHandler:            h,
-		execNodeIdentitiesProvider: execNodeIdentitiesProvider,
+		log:             log,
+		state:           state,
+		headers:         headers,
+		endpointHandler: h,
 	}
 }
 
