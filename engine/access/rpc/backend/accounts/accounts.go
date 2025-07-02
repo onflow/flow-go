@@ -52,7 +52,9 @@ func NewAccounts(
 		h = handler.NewFailoverHandler(log, state, local, execNode)
 
 	case backend.IndexQueryModeCompare:
-		panic("TODO")
+		local := handler.NewLocalHandler(log, state, scriptExecutor)
+		execNode := handler.NewExecutionNodeHandler(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
+		h = handler.NewCompareHandler(log, state, local, execNode)
 	}
 
 	return &Accounts{
