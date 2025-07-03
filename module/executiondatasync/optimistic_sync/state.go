@@ -23,8 +23,8 @@ func (s State) String() string {
 		return "pending"
 	case StateWaitingPersist:
 		return "waiting_persist"
-	case StatePersisting:
-		return "persisting"
+	case StateProcessing:
+		return "processing"
 	case StateComplete:
 		return "complete"
 	case StateAbandoned:

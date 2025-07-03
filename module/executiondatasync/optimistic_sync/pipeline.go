@@ -93,6 +93,8 @@ func NewPipeline(
 		stateReceiver:        stateReceiver,
 		state:                atomic.NewInt32(int32(StatePending)),
 		isSealed:             atomic.NewBool(isSealed),
+		isAbandoned:          atomic.NewBool(false),
+		isIndexed:            atomic.NewBool(false),
 		stateChangedNotifier: engine.NewNotifier(),
 	}
 }
@@ -104,21 +106,24 @@ func NewPipeline(
 //   - context.Canceled: when the context is canceled
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (p *PipelineImpl) Run(ctx context.Context, core Core, parent PipelineStateProvider) error {
-	pipelineCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	pipelineCtx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
 
 	p.core = core
 	p.parent = parent
 
 	// try to start processing in case we are able to.
-	if err := p.onStartProcessing(ctx); err != nil {
-		return err
-	}
+	p.stateChangedNotifier.Notify()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case <-pipelineCtx.Done():
+			// if any error has happened during the detached operation we need to handle it.
+			if err := pipelineCtx.Err(); err != nil {
+				return context.Cause(pipelineCtx)
+			}
 		case <-p.stateChangedNotifier.Channel():
 			select {
 			case <-ctx.Done():
@@ -126,18 +131,17 @@ func (p *PipelineImpl) Run(ctx context.Context, core Core, parent PipelineStateP
 			default:
 			}
 
-			// if parent got abandoned no point to continue and we just go to the abandoned state and perform cleanup logic.
+			// if parent got abandoned no point to continue, and we just go to the abandoned state and perform cleanup logic.
 			if p.checkAbandoned() {
 				if err := p.transitionTo(StateAbandoned); err != nil {
-					return fmt.Errorf("failed to transition to abandoned state during initialization: %w", err)
+					return fmt.Errorf("failed to transition to abandoned state: %w", err)
 				}
-				continue
 			}
 
 			currentState := p.GetState()
 			switch currentState {
 			case StatePending:
-				if err := p.onStartProcessing(pipelineCtx); err != nil {
+				if err := p.onStartProcessing(pipelineCtx, cancel); err != nil {
 					return err
 				}
 			case StateProcessing:
@@ -159,18 +163,17 @@ func (p *PipelineImpl) Run(ctx context.Context, core Core, parent PipelineStateP
 	}
 }
 
-func (p *PipelineImpl) onStartProcessing(ctx context.Context) error {
+func (p *PipelineImpl) onStartProcessing(ctx context.Context, causeFunc context.CancelCauseFunc) error {
 	switch p.parent.GetState() {
 	case StateProcessing, StateWaitingPersist, StateComplete:
 		err := p.transitionTo(StateProcessing)
 		if err != nil {
 			return err
 		}
-		childCtx, cancel := context.WithCancelCause(ctx)
 		go func() {
-			err := p.performDownload(childCtx)
+			err := p.performDownload(ctx)
 			if err != nil {
-				cancel(err)
+				causeFunc(err)
 			}
 		}()
 	case StatePending:
@@ -335,7 +338,7 @@ func (p *PipelineImpl) validateTransition(currentState State, newState State) er
 		// 2. the pipeline's result must be sealed
 		// At that point, there are no conditions that would cause the pipeline be abandoned
 		switch currentState {
-		case StatePending, StateWaitingPersist:
+		case StatePending, StateProcessing, StateWaitingPersist:
 			return nil
 		}
 
