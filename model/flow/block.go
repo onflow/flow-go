@@ -31,6 +31,10 @@ func Genesis(chainID ChainID) *Block {
 
 // Block (currently) includes the all block header metadata and the payload content.
 //
+// Zero values are allowed only for root blocks, which must be constructed
+// using the NewRootBlock constructor. All non-root blocks must be constructed
+// using NewBlock to ensure validation of the block fields.
+//
 //structwrite:immutable - mutations allowed only within the constructor
 type Block struct {
 	// Header is a container encapsulating most of the header fields - *excluding* the payload hash
@@ -53,13 +57,15 @@ type Block struct {
 // ordering during construction.
 //
 // An instance of UntrustedBlock should be validated and converted into
-// a trusted Block using NewBlock constructor.
+// a trusted cluster Block using the NewBlock constructor (or NewRootBlock
+// for the root block).
 type UntrustedBlock Block
 
 // NewBlock creates a new block.
-// Construction Block allowed only within the constructor.
+// This constructor enforces validation rules to ensure the block is well-formed.
+// It must be used to construct all non-root blocks.
 //
-// All errors indicate a valid Block cannot be constructed from the input.
+// All errors indicate that a valid Block cannot be constructed from the input.
 func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	// validate header body
 	untrustedHeaderBody := untrusted.Header
@@ -82,7 +88,8 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 }
 
 // NewRootBlock creates a root block.
-// Construction Block allowed only within the constructor.
+// This constructor must be used **only** for constructing the root block,
+// which is the only case where zero values are allowed.
 func NewRootBlock(untrusted UntrustedBlock) *Block {
 	return &Block{
 		Header:  untrusted.Header,
