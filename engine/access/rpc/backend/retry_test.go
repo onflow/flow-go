@@ -97,8 +97,8 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	// transaction storage returns the corresponding transaction
 	suite.transactions.On("ByID", transactionBody.ID()).Return(transactionBody, nil)
 	// collection storage returns the corresponding collection
-	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(&light, nil)
-	suite.collections.On("LightByID", light.ID()).Return(&light, nil)
+	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(light, nil)
+	suite.collections.On("LightByID", light.ID()).Return(light, nil)
 	// block storage returns the corresponding block
 	suite.blocks.On("ByCollectionID", collection.ID()).Return(block, nil)
 

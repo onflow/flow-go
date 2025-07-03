@@ -564,8 +564,11 @@ func ClusterPayloadFixture(n int) *cluster.Payload {
 		tx := TransactionBodyFixture()
 		transactions[i] = &tx
 	}
-	payload := cluster.PayloadFromTransactions(flow.ZeroID, transactions...)
-	return &payload
+	payload, err := cluster.NewPayload(flow.ZeroID, transactions)
+	if err != nil {
+		panic(err)
+	}
+	return payload
 }
 
 func ClusterBlockFixture() cluster.Block {
@@ -633,9 +636,10 @@ func AddCollectionsToBlock(block *flow.Block, collections []*flow.Collection) {
 
 func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flow.CollectionGuarantee {
 	guarantee := &flow.CollectionGuarantee{
-		CollectionID:  IdentifierFixture(),
-		SignerIndices: RandomBytes(16),
-		Signature:     SignatureFixture(),
+		CollectionID:     IdentifierFixture(),
+		ReferenceBlockID: IdentifierFixture(),
+		SignerIndices:    RandomBytes(16),
+		Signature:        SignatureFixture(),
 	}
 	for _, option := range options {
 		option(guarantee)
@@ -713,7 +717,9 @@ func CompleteCollectionFixture() *entity.CompleteCollection {
 			ReferenceBlockID: FixedReferenceBlockID(),
 			SignerIndices:    SignerIndicesFixture(1),
 		},
-		Transactions: []*flow.TransactionBody{&txBody},
+		Collection: &flow.Collection{
+			Transactions: []*flow.TransactionBody{&txBody},
+		},
 	}
 }
 
@@ -725,7 +731,9 @@ func CompleteCollectionFromTransactions(txs []*flow.TransactionBody) *entity.Com
 			ReferenceBlockID: IdentifierFixture(),
 			SignerIndices:    SignerIndicesFixture(3),
 		},
-		Transactions: txs,
+		Collection: &flow.Collection{
+			Transactions: txs,
+		},
 	}
 }
 
@@ -806,12 +814,22 @@ func WithSpocks(spocks []crypto.Signature) func(*flow.ExecutionReceipt) {
 
 func ExecutionReceiptFixture(opts ...func(*flow.ExecutionReceipt)) *flow.ExecutionReceipt {
 	receipt := &flow.ExecutionReceipt{
-		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
-			ExecutorID:      IdentifierFixture(),
-			ExecutionResult: *ExecutionResultFixture(),
-			Spocks:          nil,
-		},
-		ExecutorSignature: SignatureFixture(),
+		UnsignedExecutionReceipt: *UnsignedExecutionReceiptFixture(),
+		ExecutorSignature:        SignatureFixture(),
+	}
+
+	for _, apply := range opts {
+		apply(receipt)
+	}
+
+	return receipt
+}
+
+func UnsignedExecutionReceiptFixture(opts ...func(*flow.UnsignedExecutionReceipt)) *flow.UnsignedExecutionReceipt {
+	receipt := &flow.UnsignedExecutionReceipt{
+		ExecutorID:      IdentifierFixture(),
+		ExecutionResult: *ExecutionResultFixture(),
+		Spocks:          SignaturesFixture(1),
 	}
 
 	for _, apply := range opts {
@@ -857,9 +875,14 @@ func WithPreviousResult(prevResult flow.ExecutionResult) func(*flow.ExecutionRes
 	}
 }
 
+func WithPreviousResultID(previousResultID flow.Identifier) func(*flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		result.PreviousResultID = previousResultID
+	}
+}
+
 func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	chunks := 1 // tailing chunk is always system chunk
-	var previousResultID flow.Identifier
 	chunks += len(block.Payload.Guarantees)
 	blockID := block.ID()
 
@@ -867,7 +890,7 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 		startState := result.Chunks[0].StartState // retain previous start state in case it was user-defined
 		result.BlockID = blockID
 		result.Chunks = ChunkListFixture(uint(chunks), blockID, startState)
-		result.PreviousResultID = previousResultID
+		result.PreviousResultID = IdentifierFixture()
 	}
 }
 
@@ -1589,8 +1612,9 @@ func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.HeaderBody
 	}
 
 	result := flow.ExecutionResult{
-		BlockID: block.ID(),
-		Chunks:  chunks,
+		PreviousResultID: IdentifierFixture(),
+		BlockID:          block.ID(),
+		Chunks:           chunks,
 	}
 
 	// computes chunk end state
@@ -1702,12 +1726,8 @@ func WithChunkID(chunkID flow.Identifier) func(*verification.ChunkDataPackReques
 // Use options to customize the request.
 func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest)) *verification.
 	ChunkDataPackRequest {
-
 	req := &verification.ChunkDataPackRequest{
-		Locator: chunks.Locator{
-			ResultID: IdentifierFixture(),
-			Index:    0,
-		},
+		Locator: *ChunkLocatorFixture(IdentifierFixture(), 0),
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID:   IdentifierFixture(),
 			Height:    0,
@@ -1831,7 +1851,7 @@ func EventsFixture(
 
 	events := make([]flow.Event, n)
 	for i := 0; i < n; i++ {
-		events[i] = EventFixture(types[i%len(types)], 0, uint32(i), IdentifierFixture(), 0)
+		events[i] = EventFixture(types[i%len(types)], 0, uint32(i))
 	}
 
 	return events
@@ -1840,23 +1860,6 @@ func EventsFixture(
 func EventTypeFixture(chainID flow.ChainID) flow.EventType {
 	eventType := fmt.Sprintf("A.%s.TestContract.TestEvent1", RandomAddressFixtureForChain(chainID))
 	return flow.EventType(eventType)
-}
-
-// EventFixture returns an event
-func EventFixture(
-	eType flow.EventType,
-	transactionIndex uint32,
-	eventIndex uint32,
-	txID flow.Identifier,
-	_ int,
-) flow.Event {
-	return flow.Event{
-		Type:             eType,
-		TransactionIndex: transactionIndex,
-		EventIndex:       eventIndex,
-		Payload:          []byte{},
-		TransactionID:    txID,
-	}
 }
 
 func EmulatorRootKey() (*flow.AccountPrivateKey, error) {

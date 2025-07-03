@@ -225,7 +225,7 @@ func (s *Suite) mockCollectionsForBlock(block *flow.Block) {
 	for _, g := range block.Payload.Guarantees {
 		collection := unittest.CollectionFixture(1)
 		light := collection.Light()
-		s.collections.On("LightByID", g.CollectionID).Return(&light, nil).Twice()
+		s.collections.On("LightByID", g.CollectionID).Return(light, nil).Twice()
 	}
 }
 
@@ -395,7 +395,7 @@ func (s *Suite) TestOnCollection() {
 	light := collection.Light()
 
 	// we should store the light collection and index its transactions
-	s.collections.On("StoreLightAndIndexByTransaction", &light).Return(nil).Once()
+	s.collections.On("StoreLightAndIndexByTransaction", light).Return(nil).Once()
 
 	// for each transaction in the collection, we should store it
 	needed := make(map[flow.Identifier]struct{})
@@ -428,7 +428,7 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 	light := collection.Light()
 
 	// we should store the light collection and index its transactions
-	s.collections.On("StoreLightAndIndexByTransaction", &light).Return(nil).Once()
+	s.collections.On("StoreLightAndIndexByTransaction", light).Return(nil).Once()
 	block := flow.NewBlock(flow.HeaderBody{Height: 0}, flow.Payload{Guarantees: []*flow.CollectionGuarantee{}})
 	s.blocks.On("ByID", mock.Anything).Return(block, nil)
 
@@ -474,7 +474,7 @@ func (s *Suite) TestOnCollectionDuplicate() {
 	light := collection.Light()
 
 	// we should store the light collection and index its transactions
-	s.collections.On("StoreLightAndIndexByTransaction", &light).Return(storerr.ErrAlreadyExists).Once()
+	s.collections.On("StoreLightAndIndexByTransaction", light).Return(storerr.ErrAlreadyExists).Once()
 
 	// for each transaction in the collection, we should store it
 	needed := make(map[flow.Identifier]struct{})
@@ -646,7 +646,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 		guarantees := make([]*flow.CollectionGuarantee, collPerBlk)
 		for j := 0; j < collPerBlk; j++ {
 			coll := unittest.CollectionFixture(2).Light()
-			collMap[coll.ID()] = &coll
+			collMap[coll.ID()] = coll
 			cg := unittest.CollectionGuaranteeFixture(func(cg *flow.CollectionGuarantee) {
 				cg.CollectionID = coll.ID()
 				cg.ReferenceBlockID = refBlockID
@@ -817,6 +817,6 @@ func (s *Suite) TestComponentShutdown() {
 	s.cancel()
 	unittest.AssertClosesBefore(s.T(), eng.Done(), 10*time.Millisecond)
 
-	err := eng.Process(channels.ReceiveReceipts, unittest.IdentifierFixture(), &flow.ExecutionReceipt{})
+	err := eng.Process(channels.ReceiveReceipts, unittest.IdentifierFixture(), new(flow.ExecutionReceipt))
 	s.Assert().ErrorIs(err, component.ErrComponentShutdown)
 }

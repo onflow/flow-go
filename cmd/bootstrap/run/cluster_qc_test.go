@@ -19,7 +19,7 @@ func TestGenerateClusterRootQC(t *testing.T) {
 			ParentID: flow.ZeroID,
 			View:     42,
 		},
-		cluster.EmptyPayload(flow.ZeroID),
+		*cluster.NewEmptyPayload(flow.ZeroID),
 	)
 
 	orderedParticipants := model.ToIdentityList(participants).Sort(flow.Canonical[flow.Identity]).ToSkeleton()

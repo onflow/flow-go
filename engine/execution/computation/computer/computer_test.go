@@ -130,7 +130,7 @@ func TestBlockExecutor_ExecuteBlock_VersionAwareChunk(t *testing.T) {
 
 	me := new(modulemock.Local)
 	me.On("NodeID").Return(executorID)
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -277,7 +277,8 @@ func TestBlockExecutor_ExecuteBlock_VersionAwareChunk(t *testing.T) {
 
 		// Verify ChunkDataPacks
 
-		chunkDataPacks := result.AllChunkDataPacks()
+		chunkDataPacks, err := result.AllChunkDataPacks()
+		require.NoError(t, err)
 		assert.Len(t, chunkDataPacks, 1+1) // +1 system chunk
 
 		chunkDataPack1 := chunkDataPacks[0]
@@ -316,7 +317,7 @@ func TestBlockExecutor_ExecuteBlock_VersionAwareChunk(t *testing.T) {
 		// (1+totalTransactionCount) /2 * totalTransactionCount
 		assert.LessOrEqual(t, vm.CallCount(), (1+3)/2*3)
 
-		return &result.ExecutionResult
+		return &result.ExecutionReceipt.ExecutionResult
 	}
 
 	// Versions before v1 should have nil ServiceEventCount field
@@ -357,7 +358,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	me := new(modulemock.Local)
 	me.On("NodeID").Return(executorID)
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -501,7 +502,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// Verify ChunkDataPacks
 
-		chunkDataPacks := result.AllChunkDataPacks()
+		chunkDataPacks, err := result.AllChunkDataPacks()
+		require.NoError(t, err)
 		assert.Len(t, chunkDataPacks, 1+1) // +1 system chunk
 
 		chunkDataPack1 := chunkDataPacks[0]
@@ -795,7 +797,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		expectedResults := make([]flow.TransactionResult, 0)
 		for _, c := range block.CompleteCollections {
-			for _, t := range c.Transactions {
+			for _, t := range c.Collection.Transactions {
 				txResult := flow.TransactionResult{
 					TransactionID: t.ID(),
 					ErrorMessage: fvmErrors.NewInvalidAddressErrorf(
@@ -868,7 +870,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 			transactions := []*flow.TransactionBody{}
 			for _, col := range block.Collections() {
-				transactions = append(transactions, col.Transactions...)
+				transactions = append(transactions, col.Collection.Transactions...)
 			}
 
 			// events to emit for each iteration/transaction
@@ -1117,7 +1119,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		normalTransactions := map[common.Location]struct{}{}
 		for _, col := range block.Collections() {
-			for _, txn := range col.Transactions {
+			for _, txn := range col.Collection.Transactions {
 				loc := common.TransactionLocation(txn.ID())
 				normalTransactions[loc] = struct{}{}
 			}
@@ -1557,7 +1559,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	me := new(modulemock.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -1663,8 +1665,8 @@ func generateCollection(
 	guarantee := &flow.CollectionGuarantee{CollectionID: collection.ID()}
 
 	return &entity.CompleteCollection{
-		Guarantee:    guarantee,
-		Transactions: transactions,
+		Guarantee:  guarantee,
+		Collection: &flow.Collection{Transactions: transactions},
 	}
 }
 

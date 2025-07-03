@@ -110,8 +110,8 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.CollectionID: {
-				Guarantee:    &guarantee,
-				Transactions: transactions,
+				Guarantee:  &guarantee,
+				Collection: &col,
 			},
 		},
 		StartState: unittest.StateCommitmentPointerFixture(),
@@ -119,7 +119,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -191,7 +191,7 @@ func TestComputeBlock_Uploader(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -233,7 +233,7 @@ func TestExecuteScript(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -299,7 +299,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -805,8 +805,8 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.CollectionID: {
-				Guarantee:    &guarantee,
-				Transactions: transactions,
+				Guarantee:  &guarantee,
+				Collection: &col,
 			},
 		},
 		StartState: unittest.StateCommitmentPointerFixture(),
@@ -814,7 +814,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 

@@ -126,7 +126,7 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 		},
 	}
 	testEvents := []flow.Event{
-		unittest.EventFixture(flow.EventAccountCreated, 0, 0, flow.HashToID([]byte{11, 22, 33}), 200),
+		unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.Event.WithTransactionID(flow.HashToID([]byte{11, 22, 33}))),
 	}
 	testCollectionID := flow.HashToID([]byte{0xA, 0xB, 0xC})
 	testBlock := flow.NewBlock(
@@ -210,7 +210,9 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 		Guarantee: &flow.CollectionGuarantee{
 			CollectionID: testCollectionID,
 		},
-		Transactions: []*flow.TransactionBody{testTransactionBody},
+		Collection: &flow.Collection{
+			Transactions: []*flow.TransactionBody{testTransactionBody},
+		},
 	}
 
 	expectedTestEvents := make([]*flow.Event, len(testEvents))

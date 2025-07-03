@@ -157,7 +157,16 @@ func (suite *MutatorSuite) Payload(transactions ...*flow.TransactionBody) model.
 			minRefID = refBlock.ID()
 		}
 	}
-	return model.PayloadFromTransactions(minRefID, transactions...)
+
+	// avoid a nil transaction list
+	if len(transactions) == 0 {
+		transactions = []*flow.TransactionBody{}
+	}
+
+	payload, err := model.NewPayload(minRefID, transactions)
+	suite.Assert().NoError(err)
+
+	return *payload
 }
 
 // ProposalWithParent returns a valid block proposal with the given parent and the given payload.
@@ -227,13 +236,13 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 	err := suite.db.View(func(tx *badger.Txn) error {
 
 		// should insert collection
-		var collection flow.LightCollection
-		err := operation.RetrieveCollection(suite.genesis.Payload.Collection.ID(), &collection)(tx)
+		collection := new(flow.LightCollection)
+		err := operation.RetrieveCollection(suite.genesis.Payload.Collection.ID(), collection)(tx)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
 		// should index collection
-		collection = flow.LightCollection{} // reset the collection
+		collection = new(flow.LightCollection) // reset the collection
 		err = operation.LookupCollectionPayload(suite.genesis.ID(), &collection.Transactions)(tx)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
@@ -392,7 +401,7 @@ func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
 	}
 
 	// set genesis as reference block
-	proposal := suite.ProposalWithParentAndPayload(suite.genesis, model.EmptyPayload(suite.protoGenesis.ID()))
+	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(suite.protoGenesis.ID()))
 	err := suite.state.Extend(&proposal)
 	suite.Assert().Nil(err)
 }
@@ -401,7 +410,7 @@ func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromClusterChain() {
 	// TODO skipping as this isn't implemented yet
 	unittest.SkipUnless(suite.T(), unittest.TEST_TODO, "skipping as this isn't implemented yet")
 	// set genesis from cluster chain as reference block
-	proposal := suite.ProposalWithParentAndPayload(suite.genesis, model.EmptyPayload(suite.genesis.ID()))
+	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(suite.genesis.ID()))
 	err := suite.state.Extend(&proposal)
 	suite.Assert().Error(err)
 }
@@ -417,7 +426,7 @@ func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromDifferentEpoch() {
 	nextEpochHeader, err := suite.protoState.AtHeight(heights.FinalHeight() + 1).Head()
 	require.NoError(suite.T(), err)
 
-	proposal := suite.ProposalWithParentAndPayload(suite.genesis, model.EmptyPayload(nextEpochHeader.ID()))
+	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(nextEpochHeader.ID()))
 	err = suite.state.Extend(&proposal)
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsInvalidExtensionError(err))
@@ -432,7 +441,7 @@ func (suite *MutatorSuite) TestExtend_WithUnfinalizedReferenceBlock() {
 	err := suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(unfinalized))
 	suite.Require().NoError(err)
 
-	proposal := suite.ProposalWithParentAndPayload(suite.genesis, model.EmptyPayload(unfinalized.ID()))
+	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(unfinalized.ID()))
 	err = suite.state.Extend(&proposal)
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsUnverifiableExtensionError(err))
@@ -457,7 +466,7 @@ func (suite *MutatorSuite) TestExtend_WithOrphanedReferenceBlock() {
 	suite.Require().NoError(err)
 
 	// test referencing the orphaned block
-	proposal := suite.ProposalWithParentAndPayload(suite.genesis, model.EmptyPayload(orphaned.ID()))
+	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(orphaned.ID()))
 	err = suite.state.Extend(&proposal)
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsInvalidExtensionError(err))
