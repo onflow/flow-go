@@ -183,7 +183,7 @@ func (i *InMemoryIndexer) indexCollection(collection *flow.Collection) error {
 
 	// Store the light collection
 	light := collection.Light()
-	if err := i.collections.StoreLightAndIndexByTransaction(&light); err != nil {
+	if err := i.collections.StoreLightAndIndexByTransaction(light); err != nil {
 		return fmt.Errorf("failed to store light collection and transaction index: %w", err)
 	}
 
