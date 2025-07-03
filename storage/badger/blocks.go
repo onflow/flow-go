@@ -52,14 +52,16 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Bl
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve payload: %w", err)
 		}
-		block, err := flow.NewBlock(
-			flow.UntrustedBlock{
-				Header:  header.HeaderBody,
-				Payload: *payload,
-			},
-		)
-		if err != nil {
-			return nil, fmt.Errorf("could not build block: %w", err)
+
+		// The constructor is intentionally omitted here because we cannot determine
+		// whether this is a root block or a non-root block in this context.
+		//
+		// It is safe to omit the constructor since the block has already been verified
+		// during storage.
+		//nolint:structwrite
+		block := &flow.Block{
+			Header:  header.HeaderBody,
+			Payload: *payload,
 		}
 
 		return block, nil
