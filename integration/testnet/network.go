@@ -1224,15 +1224,12 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, err
 	}
 
-	root, err := flow.NewBlock(
+	root := flow.NewRootBlock(
 		flow.UntrustedBlock{
 			Header:  rootHeader.HeaderBody,
 			Payload: unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolState.ID())),
 		},
 	)
-	if err != nil {
-		return nil, fmt.Errorf("could not build block: %w", err)
-	}
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {

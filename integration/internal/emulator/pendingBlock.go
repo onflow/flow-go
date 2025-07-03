@@ -93,19 +93,18 @@ func (b *pendingBlock) Block() *flowgo.Block {
 		}
 	}
 
-	return flowgo.NewRootBlock(
-		flowgo.UntrustedBlock{
-			Header: flowgo.HeaderBody{
-				Height:    b.height,
-				View:      b.view,
-				ParentID:  b.parentID,
-				Timestamp: b.timestamp,
-			},
-			Payload: flowgo.Payload{
-				Guarantees: guarantees,
-			},
+	//nolint:structwrite
+	return &flowgo.Block{
+		Header: flowgo.HeaderBody{
+			Height:    b.height,
+			View:      b.view,
+			ParentID:  b.parentID,
+			Timestamp: b.timestamp,
 		},
-	)
+		Payload: flowgo.Payload{
+			Guarantees: guarantees,
+		},
+	}
 }
 
 func (b *pendingBlock) Collections() []*flowgo.LightCollection {
