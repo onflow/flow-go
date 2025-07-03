@@ -462,10 +462,13 @@ func BlockHeaderFixture(opts ...func(header *flow.Header)) *flow.Header {
 	view := height + uint64(rand.Intn(1000))
 	header := BlockHeaderWithParentFixture(&flow.Header{
 		HeaderBody: flow.HeaderBody{
-			ChainID:  flow.Emulator,
-			ParentID: IdentifierFixture(),
-			Height:   height,
-			View:     view,
+			ChainID:            flow.Emulator,
+			ParentID:           IdentifierFixture(),
+			Height:             height,
+			View:               view,
+			ParentVoterIndices: SignerIndicesFixture(4),
+			ParentVoterSigData: QCSigDataFixture(),
+			ProposerID:         IdentifierFixture(),
 		},
 	})
 

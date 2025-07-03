@@ -268,6 +268,9 @@ func (bs *BuilderSuite) SetupTest() {
 
 	bs.setter = func(header *flow.Header) error {
 		header.View = 1337
+		header.ParentVoterIndices = unittest.SignerIndicesFixture(4)
+		header.ParentVoterSigData = unittest.QCSigDataFixture()
+		header.ProposerID = unittest.IdentifierFixture()
 		return nil
 	}
 	bs.sign = func(_ *flow.Header) ([]byte, error) {
