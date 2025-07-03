@@ -55,18 +55,14 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	}
 
 	// validate payload
-	untrustedPayload := untrusted.Payload
-	if untrustedPayload.ReferenceBlockID == flow.ZeroID {
-		return nil, fmt.Errorf("reference block ID must not be zero")
-	}
-	_, err := flow.NewCollection(flow.UntrustedCollection(untrustedPayload.Collection))
+	payload, err := NewPayload(UntrustedPayload(untrusted.Payload))
 	if err != nil {
-		return nil, fmt.Errorf("invalid collection: %w", err)
+		return nil, fmt.Errorf("invalid cluster payload: %w", err)
 	}
 
 	return &Block{
 		Header:  untrustedHeaderBody,
-		Payload: untrustedPayload,
+		Payload: *payload,
 	}, nil
 }
 

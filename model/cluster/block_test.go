@@ -50,10 +50,7 @@ func TestClusterBlockMalleability(t *testing.T) {
 // 7. Invalid input with zero ProposerID:
 //   - Ensures an error is returned when the Header.ProposerID is flow.ZeroID.
 //
-// 8. Invalid input with zero ReferenceBlockID in payload:
-//   - Ensures an error is returned when the Payload.ReferenceBlockID is flow.ZeroID.
-//
-// 9. Invalid input with malformed Collection in payload:
+// 8. Invalid input with malformed Collection in payload:
 //   - Ensures an error is returned when the Payload contains a Collection with invalid transaction IDs.
 func TestNewBlock(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
@@ -124,16 +121,6 @@ func TestNewBlock(t *testing.T) {
 		require.Contains(t, err.Error(), "proposer ID must not be zero")
 	})
 
-	t.Run("invalid input with zero ReferenceBlockID in payload", func(t *testing.T) {
-		block := unittest.ClusterBlockFixture()
-		block.Payload.ReferenceBlockID = flow.ZeroID
-
-		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
-		require.Error(t, err)
-		require.Nil(t, res)
-		require.Contains(t, err.Error(), "reference block ID must not be zero")
-	})
-
 	t.Run("invalid input with malformed Collection in payload", func(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 		collection := unittest.CollectionFixture(5)
@@ -143,6 +130,6 @@ func TestNewBlock(t *testing.T) {
 		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
-		require.Contains(t, err.Error(), "invalid collection")
+		require.Contains(t, err.Error(), "invalid cluster payload")
 	})
 }
