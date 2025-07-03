@@ -70,6 +70,10 @@ func (bs *BlockState) WaitForHalt(t *testing.T, requiredDurationWithoutProgress,
 	t.Logf("successfully observed progress halt for %s after %s of waiting", requiredDurationWithoutProgress, time.Since(start))
 }
 
+// Add inserts a new proposal message into BlockState.
+// It validates and tracks the proposal and updating finalized and sealed blocks.
+//
+// All errors indicate that the input message could not be converted to a valid proposal.
 func (bs *BlockState) Add(t *testing.T, msg *messages.UntrustedProposal) error {
 	bs.Lock()
 	defer bs.Unlock()

@@ -57,7 +57,7 @@ type Block struct {
 // ordering during construction.
 //
 // An instance of UntrustedBlock should be validated and converted into
-// a trusted cluster Block using the NewBlock constructor (or NewRootBlock
+// a trusted Block using the NewBlock constructor (or NewRootBlock
 // for the root block).
 type UntrustedBlock Block
 

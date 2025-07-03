@@ -25,6 +25,8 @@ func NewUntrustedProposal(internal *flow.BlockProposal) *UntrustedProposal {
 
 // DeclareTrusted converts the UntrustedProposal to a trusted internal flow.BlockProposal.
 // CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
+//
+// All errors indicate that the input message could not be converted to a valid proposal.
 func (msg *UntrustedProposal) DeclareTrusted() (*flow.BlockProposal, error) {
 	block, err := flow.NewBlock(
 		flow.UntrustedBlock{
