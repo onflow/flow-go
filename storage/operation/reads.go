@@ -77,12 +77,12 @@ func IterateKeys(r storage.Reader, startPrefix []byte, endPrefix []byte, iterFun
 		errToReturn = merr.CloseAndMergeError(it, errToReturn)
 	}()
 
+	// Initialize processing functions for iteration
+	check, create, handle := iterFunc()
+
 	for it.First(); it.Valid(); it.Next() {
 		item := it.IterItem()
 		key := item.Key()
-
-		// initialize processing functions for iteration
-		check, create, handle := iterFunc()
 
 		keyCopy := make([]byte, len(key))
 
