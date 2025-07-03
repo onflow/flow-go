@@ -917,6 +917,10 @@ func TestBuildIdentityTable(t *testing.T) {
 func TestNewEpochStateContainer(t *testing.T) {
 	unsortedIdentities := unittest.DynamicIdentityEntryListFixture(3)
 	sortedIdentities := unsortedIdentities.Sort(flow.IdentifierCanonical)
+	// ensure that unsortedIdentities is not in canonical order
+	unsortedIdentities = unsortedIdentities.Sort(func(id1, id2 flow.Identifier) int {
+		return -flow.IdentifierCanonical(id1, id2)
+	})
 
 	// 1. Valid input with all fields
 	t.Run("valid input with all fields", func(t *testing.T) {
