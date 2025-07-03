@@ -6,16 +6,10 @@ type State int32
 const (
 	// StatePending is the initial state after instantiation, before Run is called
 	StatePending State = iota
-	// StateReady is the state after Run is called, before downloading has begun
-	StateReady
 	// StateDownloading represents the state where data download is in progress
-	StateDownloading
-	// StateIndexing represents the state where data is being indexed
-	StateIndexing
+	StateProcessing
 	// StateWaitingPersist represents the state where all data is indexed, but conditions to persist are not met
 	StateWaitingPersist
-	// StatePersisting represents the state where the indexed data is being persisted to storage
-	StatePersisting
 	// StateComplete represents the state where all data is persisted to storage
 	StateComplete
 	// StateAbandoned represents the state where processing was aborted
@@ -27,12 +21,6 @@ func (s State) String() string {
 	switch s {
 	case StatePending:
 		return "pending"
-	case StateReady:
-		return "ready"
-	case StateDownloading:
-		return "downloading"
-	case StateIndexing:
-		return "indexing"
 	case StateWaitingPersist:
 		return "waiting_persist"
 	case StatePersisting:

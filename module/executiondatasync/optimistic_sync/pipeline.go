@@ -119,8 +119,8 @@ func (p *PipelineImpl) Run(ctx context.Context, core Core, parent PipelineStateP
 	p.parent = parent
 	p.cancelFn.Store(&cancel)
 
-	if err := p.transitionTo(StateReady); err != nil {
-		return fmt.Errorf("failed to transition to ready state during initialization: %w", err)
+	if err := p.processPending(); err != nil {
+		return err
 	}
 
 	notifierChan := p.stateNotifier.Channel()
@@ -235,16 +235,12 @@ func (p *PipelineImpl) processCurrentState(ctx context.Context, currentState Sta
 	}()
 
 	switch currentState {
-	case StateReady:
-		return p.processReady()
-	case StateDownloading:
+	case StatePending:
+		return p.processPending()
+	case StateProcessing:
 		return p.processDownloading(ctx)
-	case StateIndexing:
-		return p.processIndexing()
 	case StateWaitingPersist:
 		return p.processWaitingPersist()
-	case StatePersisting:
-		return p.processPersisting()
 	case StateAbandoned:
 		return p.processAbandoned()
 	case StateComplete:
@@ -254,14 +250,14 @@ func (p *PipelineImpl) processCurrentState(ctx context.Context, currentState Sta
 	}
 }
 
-// processReady handles the Ready state and transitions to StateDownloading if possible.
+// processPending handles the Ready state and transitions to StateDownloading if possible.
 //
 // No errors are expected during normal operations
-func (p *PipelineImpl) processReady() error {
+func (p *PipelineImpl) processPending() error {
 	switch p.parent.GetState() {
-	case StateDownloading, StateIndexing, StateWaitingPersist, StatePersisting, StateComplete:
-		return p.transitionTo(StateDownloading)
-	case StatePending, StateReady:
+	case StateProcessing, StateWaitingPersist, StateComplete:
+		return p.transitionTo(StateProcessing)
+	case StatePending:
 		// this pipeline should not be started before the parent, but it's possible there is a race
 		// starting the pipelines in the worker pool. pause and wait for the parent to start.
 		return nil
@@ -282,18 +278,9 @@ func (p *PipelineImpl) processDownloading(ctx context.Context) error {
 	if err := p.core.Download(ctx); err != nil {
 		return err
 	}
-
-	return p.transitionTo(StateIndexing)
-}
-
-// processIndexing handles the Indexing state and transitions to StateWaitingPersist if successful.
-//
-// No errors are expected during normal operations
-func (p *PipelineImpl) processIndexing() error {
 	if err := p.core.Index(); err != nil {
 		return err
 	}
-
 	return p.transitionTo(StateWaitingPersist)
 }
 
@@ -305,20 +292,12 @@ func (p *PipelineImpl) processIndexing() error {
 // No errors are expected during normal operations
 func (p *PipelineImpl) processWaitingPersist() error {
 	if p.isSealed.Load() && p.parent.GetState() == StateComplete {
-		return p.transitionTo(StatePersisting)
+		if err := p.core.Persist(); err != nil {
+			return err
+		}
+		return p.transitionTo(StateComplete)
 	}
 	return nil
-}
-
-// processPersisting handles the Persisting state and transitions to StateComplete if successful.
-//
-// No errors are expected during normal operations
-func (p *PipelineImpl) processPersisting() error {
-	if err := p.core.Persist(); err != nil {
-		return err
-	}
-
-	return p.transitionTo(StateComplete)
 }
 
 // processAbandoned handles the Abandoned state
@@ -347,9 +326,7 @@ func (p *PipelineImpl) transitionTo(newState State) error {
 	if hasChange {
 		// send notification for all states except ready.
 		// Ready is not needed since it's the initial state and does not impact children's state machines.
-		if newState != StateReady {
-			p.stateReceiver.OnStateUpdated(newState)
-		}
+		p.stateReceiver.OnStateUpdated(newState)
 		p.stateNotifier.Notify()
 	}
 
@@ -407,33 +384,18 @@ func (p *PipelineImpl) checkAbandoned() bool {
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (p *PipelineImpl) validateTransition(currentState State, newState State) error {
 	switch newState {
-	case StateReady:
+	case StateProcessing:
 		if currentState == StatePending {
 			return nil
 		}
 
-	case StateDownloading:
-		if currentState == StateReady {
-			return nil
-		}
-
-	case StateIndexing:
-		if currentState == StateDownloading {
-			return nil
-		}
-
 	case StateWaitingPersist:
-		if currentState == StateIndexing {
-			return nil
-		}
-
-	case StatePersisting:
-		if currentState == StateWaitingPersist {
+		if currentState == StateProcessing {
 			return nil
 		}
 
 	case StateComplete:
-		if currentState == StatePersisting {
+		if currentState == StateWaitingPersist {
 			return nil
 		}
 
@@ -443,7 +405,7 @@ func (p *PipelineImpl) validateTransition(currentState State, newState State) er
 		// 2. the pipeline's result must be sealed
 		// At that point, there are no conditions that would cause the pipeline be abandoned
 		switch currentState {
-		case StatePending, StateReady, StateDownloading, StateIndexing, StateWaitingPersist:
+		case StatePending, StateWaitingPersist:
 			return nil
 		}
 
