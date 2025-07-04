@@ -25,8 +25,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.6.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.6.1
 	github.com/onflow/flow-go v0.38.0-preview.0.0.20241021221952-af9cd6e99de1
-	github.com/onflow/flow-go-sdk v1.6.0
-	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
+	github.com/onflow/flow-go-sdk v1.3.2-0.20250704214134-bc1bf10600d2
 	github.com/onflow/flow/protobuf/go/flow v0.4.11
 	github.com/onflow/go-ethereum v1.15.10
 	github.com/prometheus/client_golang v1.20.5
