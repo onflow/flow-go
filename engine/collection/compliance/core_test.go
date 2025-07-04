@@ -198,7 +198,9 @@ func (cs *CommonSuite) SetupTest() {
 func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 	// create a proposal that directly descends from the latest finalized header
 	originID := unittest.IdentifierFixture()
-	block := unittest.ClusterBlockWithParent(cs.head.Block)
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
 	proposal := unittest.ClusterProposalFromBlock(block)
 
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
@@ -218,9 +220,15 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 
 	// create a proposal that has two ancestors in the cache
 	originID := unittest.IdentifierFixture()
-	ancestor := unittest.ClusterBlockWithParent(cs.head.Block)
-	parent := unittest.ClusterBlockWithParent(ancestor)
-	block := unittest.ClusterBlockWithParent(parent)
+	ancestor := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
+	parent := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(ancestor),
+	)
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
 	proposal := unittest.ClusterProposalFromBlock(block)
 
 	// store the data for retrieval
@@ -247,8 +255,9 @@ func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 
 	// create a proposal which is far enough ahead to be dropped
 	originID := unittest.IdentifierFixture()
-	block := unittest.ClusterBlockFixture()
-	block.Header.Height = cs.head.Block.Header.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithHeight(cs.head.Block.Header.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1),
+	)
 	proposal := unittest.ClusterProposalFromBlock(block)
 
 	err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
@@ -268,12 +277,17 @@ func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 //   - we should not attempt to process its children
 //   - we should notify VoteAggregator, for known errors
 func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
-
 	// create a proposal that has two ancestors in the cache
 	originID := unittest.IdentifierFixture()
-	ancestor := unittest.ClusterBlockWithParent(cs.head.Block)
-	parent := unittest.ClusterBlockWithParent(ancestor)
-	block := unittest.ClusterBlockWithParent(parent)
+	ancestor := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
+	parent := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(ancestor),
+	)
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
 	proposal := unittest.ClusterProposalFromBlock(block)
 	proposalMsg := messages.UntrustedClusterProposalFromInternal(proposal)
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
@@ -355,9 +369,15 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 
 	// create a proposal that has two ancestors in the cache
 	originID := unittest.IdentifierFixture()
-	ancestor := unittest.ClusterBlockWithParent(cs.head.Block)
-	parent := unittest.ClusterBlockWithParent(ancestor)
-	block := unittest.ClusterBlockWithParent(parent)
+	ancestor := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
+	parent := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(ancestor),
+	)
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
 	proposal := unittest.ClusterProposalFromBlock(block)
 	proposalMsg := messages.UntrustedClusterProposalFromInternal(proposal)
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
@@ -446,10 +466,18 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 
 	// create three children blocks
-	parent := unittest.ClusterBlockWithParent(cs.head.Block)
-	block1 := unittest.ClusterBlockWithParent(parent)
-	block2 := unittest.ClusterBlockWithParent(parent)
-	block3 := unittest.ClusterBlockWithParent(parent)
+	parent := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
+	block1 := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
+	block2 := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
+	block3 := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
 
 	proposal0 := unittest.ClusterProposalFromBlock(parent)
 	proposal1 := unittest.ClusterProposalFromBlock(block1)
@@ -501,7 +529,9 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 func (cs *CoreSuite) TestProposalBufferingOrder() {
 	// create a proposal that we will not submit until the end
 	originID := unittest.IdentifierFixture()
-	block := unittest.ClusterBlockWithParent(cs.head.Block)
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
 	missing := block
 
 	// create a chain of descendants
@@ -509,7 +539,9 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	proposalsLookup := make(map[flow.Identifier]*cluster.BlockProposal)
 	parent := missing
 	for i := 0; i < 3; i++ {
-		block := unittest.ClusterBlockWithParent(parent)
+		block := unittest.ClusterBlockFixture(
+			unittest.ClusterBlock.WithParent(parent),
+		)
 		proposal := unittest.ClusterProposalFromBlock(block)
 		proposals = append(proposals, proposal)
 		proposalsLookup[block.ID()] = proposal

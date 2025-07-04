@@ -332,9 +332,19 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 		return fmt.Errorf("could not get cluster members for broadcasting collection proposal")
 	}
 
+	block, err := cluster.NewBlock(
+		cluster.UntrustedBlock{
+			Header:  header.HeaderBody,
+			Payload: *payload,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not build cluster block: %w", err)
+	}
+
 	// create the proposal message for the collection
 	cbp := &cluster.BlockProposal{
-		Block:           cluster.NewBlock(header.HeaderBody, *payload),
+		Block:           *block,
 		ProposerSigData: proposal.ProposerSigData,
 	}
 	proposalMsg := messages.UntrustedClusterProposalFromInternal(cbp)

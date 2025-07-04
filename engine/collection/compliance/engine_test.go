@@ -163,7 +163,9 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	wg.Add(1)
 	go func() {
 		for i := 0; i < blockCount; i++ {
-			block := unittest.ClusterBlockWithParent(cs.head.Block)
+			block := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(&cs.head.Block),
+			)
 			proposal := unittest.ClusterProposalFromBlock(block)
 			hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 			cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
@@ -180,7 +182,9 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	wg.Add(1)
 	go func() {
 		// create a proposal that directly descends from the latest finalized header
-		block := unittest.ClusterBlockWithParent(cs.head.Block)
+		block := unittest.ClusterBlockFixture(
+			unittest.ClusterBlock.WithParent(&cs.head.Block),
+		)
 		proposal := unittest.ClusterProposalFromBlock(block)
 
 		hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
