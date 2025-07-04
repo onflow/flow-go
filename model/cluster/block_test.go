@@ -132,7 +132,7 @@ func TestNewBlock(t *testing.T) {
 		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
-		require.Contains(t, err.Error(), "invalid views - block view (10) ends after the parent block view (10)")
+		require.Contains(t, err.Error(), "invalid views - block view (10) is less than the parent block view (10)")
 	})
 
 	t.Run("invalid input with malformed Collection in payload", func(t *testing.T) {
