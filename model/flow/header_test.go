@@ -115,8 +115,8 @@ func TestNewHeaderBody(t *testing.T) {
 		Timestamp:          ts,
 		View:               view,
 		ParentView:         parentView,
-		ParentVoterIndices: []byte{0x01},
-		ParentVoterSigData: []byte{0x02},
+		ParentVoterIndices: unittest.SignerIndicesFixture(4),
+		ParentVoterSigData: unittest.QCSigDataFixture(),
 		ProposerID:         validID,
 		LastViewTC:         nil,
 	}
@@ -233,10 +233,10 @@ func TestHeaderBodyBuilder_PresenceChecks(t *testing.T) {
 			b.WithParentView(6)
 		}},
 		{"ParentVoterIndices", int(flow.ParentVoterIndices), func(b *flow.HeaderBodyBuilder) {
-			b.WithParentVoterIndices([]byte{0xFF})
+			b.WithParentVoterIndices(unittest.SignerIndicesFixture(4))
 		}},
 		{"ParentVoterSigData", int(flow.ParentVoterSigData), func(b *flow.HeaderBodyBuilder) {
-			b.WithParentVoterSigData([]byte{0xAA})
+			b.WithParentVoterSigData(unittest.QCSigDataFixture())
 		}},
 		{"ProposerID", int(flow.ProposerIdentifier), func(b *flow.HeaderBodyBuilder) {
 			b.WithProposerID(validID)
