@@ -40,6 +40,8 @@ var (
 //     threads to execute its internal logic.
 //
 // Nomenclature:
+//   - Within the context of the ResultsForest, we refer to a 𝒓𝒆𝒔𝒖𝒍𝒕 as 𝒔𝒆𝒂𝒍𝒆𝒅, if and only if a seal for the result
+//     exists in a finalized block.
 //   - Within the scope of the ResultsForest, the 𝙫𝙞𝙚𝙬 of a result is defined as the view of the executed block.
 //     We denote the view of a result 𝒓 as `𝒓.𝙇𝙚𝙫𝙚𝙡` (adopting the more generic terminology of the LevelledForest).
 //   - 𝘼𝙣𝙘𝙚𝙨𝙩𝙤𝙧 is a transitive binary relation between two results 𝒓₁ and 𝒓₂. We say that 𝒓₁ is an ancestor of 𝒓₂
@@ -50,11 +52,11 @@ var (
 //
 // Conceptually, the ResultsForest maintains the following three quantities:
 //  1. 𝓹 tracks the 𝙡𝙤𝙬𝙚𝙨𝙩 𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝘄𝗶𝘁𝗵𝗶𝗻 the ResultsForest. Specifically, we require that
-//     (i) a seal for the result has been included in a finalized block and
+//     (i) 𝓹 is sealed (a seal for it has been included in a finalized block) and
 //     (ii) no results with a lower view exist in the forest.
 //  2. 𝓼 is a local notion of the 𝙡𝙖𝙩𝙚𝙨𝙩 𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝘄𝗶𝘁𝗵𝗶𝗻 𝘁𝗵𝗲 𝗳𝗼𝗿𝗲𝘀𝘁. Specifically, we require all
 //     of the following attributes to hold:
-//     (i) A seal for the result has been included in a finalized block.
+//     (i) 𝓼 is sealed (a seal for it has been included in a finalized block).
 //     (ii) All parent and ancestor results exist in the forest up to and including the pruning-threshold view.
 //     Specifically, recursing the execution fork from 𝓼 backwards following the `PreviousResultID`, we
 //     eventually will reach 𝓹.
@@ -62,12 +64,10 @@ var (
 //     Note that this definition purposefully excludes results that have been sealed by the consensus nodes,
 //     but which the ResultsForest hasn't ingested yet or where some ancestor results are not yet available.
 //  3. 𝓱 is the ResultsForest's 𝙫𝙞𝙚𝙬 𝙝𝙤𝙧𝙞𝙯𝙤𝙣. No results with larger view exist in the forest.
-//  4. Γ is the 𝙡𝙤𝙬𝙚𝙨𝙩 𝙧𝙚𝙟𝙚𝙘𝙩𝙚𝙙 𝙫𝙞𝙚𝙬, which denotes the lowest view for which the ResultsForest has rejected the
-//     addition of a result. Γ's domain is the set of non-negative integers plus `nil`, i.e. Γ ∈ ℕ₀ ∪ {nil}.
-//     The ResultsForest is always initialized with Γ = nil, which means that no results have been rejected
-//     yet. If a result with view v is rejected and (a) Γ is nil then Γ is set to v, or (b) Γ is already
-//     not nil, then Γ is set to the minimum of its current value and v. The ResultsForest allows external
-//     business logic to reset Γ to nil, by calling `ResetLowestRejectedView`.
+//  4. `rejectedResults` is a boolean value that indicates whether the ResultsForest has rejected any results.
+//     During instantiation, it is initialized to false. It is set to true if and only if the ResultsForest
+//     rejects a result with view > 𝓱. The ResultsForest allows external business logic to reset
+//     `rejectedResults` back to false, by calling `ResetLowestRejectedView` (details below).
 //
 // At runtime, the ResultsForest enforces that 𝓹, 𝓼, 𝓱 always satisfy the following relationships referred
 // to collectively as 𝙞𝙣𝙫𝙖𝙧𝙞𝙖𝙣𝙩. The invariant is a necessary condition for correct protocol execution and a
@@ -79,7 +79,6 @@ var (
 //   - 𝓹.Level ≤ 𝓼.Level ≤ 𝓱
 //     with the additional constraint that 𝓹.Level < 𝓱 (required for liveness)
 //   - 𝓹, 𝓼, 𝓱, monotonically increase during the runtime of the ResultsForest
-//   - Between calls of `ResetLowestRejectedView`, Γ monotonically decreases
 //
 // Any honest protocol execution should satisfy the invariant. Hence, the invariant being violated is a
 // symptom of a severe bug in the protocol implementation or a corrupted internal state. Either way, safe
@@ -87,34 +86,57 @@ var (
 // With the following additional 𝒄𝒐𝒏𝒕𝒓𝒂𝒄𝒕, the invariant is sufficient to guarantee safety and liveness
 // of the ResultsForest (proof to be written up):
 //
-//   - The ResultsForest offers the method `ResultsForest.ResetLowestRejectedView() γ uint64`, which resets
-//     Γ to nil and returns the prior value γ before the reset. When calling `ResetLowestRejectedView`, the
-//     higher-level business logic promises that all sealed results with views ≥ γ will eventually be
-//     provided to the ResultsForest.
-//   - The higher-level business logic abides by this contract up to the smallest view for which the
-//     ResultsForest rejects a result again later. For example, after resetting Γ, if the ResultsForest
-//     rejects a result with view γ', the business logic must only deliver sealed results for all
-//     views < γ'. After a subsequent rejection of a result with view γ”, we must only deliver all sealed
-//     results with views < min(γ', γ”).
+//   - The ResultsForest offers the method `ResetLowestRejectedView() 𝒔 uint64`, which resets
+//     `rejectedResults = false` and returns the view 𝒔 := 𝓼.Level. When calling `ResetLowestRejectedView`,
+//     the higher-level business logic promises that all sealed results with views > 𝒔 will eventually be
+//     provided to the ResultsForest. Sealed results must be provided, while unsealed results may be added.
+//   - The higher-level business logic abides by this contract up to the point where the ResultsForest
+//     rejects a result again later.
 //   - When calling `ResetLowestRejectedView`, all prior contracts are annulled, and we engage again in the
-//     contract of delivering all sealed results with views ≥ γ, where γ is the value returned by
+//     contract of delivering all sealed results with views ≥ 𝒔, where 𝒔 denotes the value returned by the
+//     most recent call to `ResetLowestRejectedView`.
 //
 // Safety here means that only results marked as sealed by the protocol will be considered sealed by the ResultsForest.
 // Liveness means that every result sealed by the protocol will eventually be considered as processed by the ResultsForest.
 //
 // Important:
+//   - The ResultsForest is intended to run in an environment where the Consensus Follower ingests blocks. The
+//     Follower only accepts blocks once they are certified (i.e. a QC exists for the block). Per guarantees of
+//     the Jolteon consensus algorithm, among all blocks for some view, at most one can be certified.
 //   - The ResultsForest is designed to be 𝙚𝙫𝙚𝙣𝙩𝙪𝙖𝙡𝙡𝙮 𝙘𝙤𝙣𝙨𝙞𝙨𝙩𝙚𝙣𝙩. This means that its local values for 𝓹, 𝓼, and 𝓱
 //     may be lagging behind conceptually similar quantities in the Consensus Follower (or other components in
 //     the node). This is an intentional design choice to increase modularity, reduce requirements on other
 //     components, and allow components to progress independently. Overall, an eventually consistent design
 //     helps to keep intellectual complexity of the protocol implementation manageable while also strengthening
 //     BFT of the node implementations.
-//   - 𝓹 might be lower than
-//   - Idempotent: the ResultsForest is idempotent, i.e. adding the same result multiple times
-//   - From the protocol's perspective, sealing might grow beyond the horizon of the ResultsForest.
-//   - The ResultsForest is intended to run in an environment where the Consensus Follower ingests blocks. The
-//     Follower only accepts blocks once they are certified (i.e. a QC exists for the block). Per guarantees of
-//     the Jolteon consensus algorithm, among all blocks for some view, at most one can be certified.
+//   - 𝓹.Level essentially parameterizes the lower bound of the view window in which the ResultsForest accepts
+//     results. Other components building on top of the ResultsForest may require a shorter history. This is
+//     fine - the ResultsForest must maintain sufficient history to allow the higher-level components to work, but
+//     it may temporarily have a longer history than strictly necessary, as long as it eventually prunes it.
+//   - Similarly, 𝓼.Level is the view up to which the ResultsForest can track sealing progress. Though, the protocol
+//     might already have sealed further blocks, some of which might not have been ingested by the ResultsForest yet.
+//     This is another case, where the ResultsForest local notion lags behind the protocol's global view, which
+//     is fine as long as the forest eventually receives the result and is told that it is sealed.
+//   - The ResultsForest is an information-driven system and information is idempotent. Inputs are information about
+//     the protocol's global view rather than commands for the ResultsForest to do a certain thing. As illustration,
+//     consider a Alice walking up to a cliff. Telling Alice that "it is safe to walk up to 3m before the cliff"
+//     would be the information-driven approach. Repeatedly giving the same information is safe. Also receiving outdated
+//     information is safe - such as telling Alice that "it is safe to walk up to 5m before the cliff". Both
+//     packages of information are consistent in that they declare 5m as a safe distance to the cliff; furthermore,
+//     the first package of information provides additional insights: it is also safe to walk up to 3m to the cliff.
+//     In contrast, the command "walk 1 meter forward" would not be idempotent, because accidental repetition causes
+//     Alice to eventually fall off the cliff. The latter approach is safe only if the commander observing Alice's
+//     distance to the cliff, issuing the command, and Alice executing the command all happens within one atomic operation.
+//     Atomic state updates across different concurrent components are a major source of complexity. We reduce those
+//     complexities by designing the ResultsForest as an information-driven, eventually consistent system.
+//     Examples of Idempotent operations in the ResultsForest:
+//   - Pruning: telling the ResultsForest that all results with views smaller 70 can be pruned and later
+//     informing the forest that results with views smaller 60 can be pruned should be acceptable. The forest
+//     may respond with a dedicated sentinel informing the caller that it already has pruned up to view 70.
+//     Nevertheless, from the perspective of the ResultsForest, it should not be treated as a critical exception,
+//     because the information that all blocks up to view 60 are allowed to be pruned is a subset of the information
+//     the forest got before when being told that all blocks up to view 70 can be pruned.
+//   - Repeated addition of the same result and/or receipt should be a no-op.
 //   - <additional conditions?>
 //
 // The ResultsForest mempool supports pruning by view:
@@ -132,23 +154,29 @@ var (
 // Nevertheless, to utilize resources efficiently, the ResultsForest tries to avoid processing execution
 // forks that conflict with the finalized seal.
 //
-// Safe for concurrent access. Internally, the mempool utilizes the LevelledForrest.
-//
-// ResultsForest is a mempool holding execution results and receipts, which is aware of the tree
-// structure formed by the results. The mempool supports pruning by view (of the executed block):
-// only results descending from the latest sealed and finalized result are relevant.
-// By convention, the ResultsForest always contains the latest sealed result. Thereby, the
-// ResultsForest is able to determine whether results for a block still need to be processed or
-// can be orphaned (processing abandoned). Hence, we prune all results for blocks _below_ the
-// latest block with a finalized seal, once it has been persisted in the database.
-// All results for views at or above the pruning threshold are retained, explicitly including results
-// from execution forks or orphaned blocks even if they conflict with the finalized seal. However, such
-// orphaned forks will eventually stop growing, because either (i) a conflicting fork of blocks is
-// finalized, which means that the orphaned forks can no longer be extended by new blocks or (ii) a
-// rogue execution node pursuing its own execution fork will eventually be slashed and can no longer
-// submit new results.
-// Nevertheless, to utilize resources efficiently, the ResultsForest tries to avoid processing execution
-// forks that conflict with the finalized seal.
+// Pruning and abandoning processing of results:
+//   - For liveness, the ResultsForest must guarantee that all sealed results it knows about are
+//     eventually marked as processable.
+//   - For results that are not yet sealed, only results descending from the latest sealed result 𝓼 should
+//     ideally be processed. The ResultsForest is allowed to process results optimistically (resources
+//     permitting), accepting the possibility that some results will turn out to be orphaned later.
+//   - To utilize resources efficiently, the ResultsForest tries to avoid processing execution forks that
+//     conflict with the finalized seal. Furthermore, it attempts to cancel already ongoing processing once
+//     it concludes that a fork was abandoned. Specifically:
+//     (a) processing of execution forks that conflict with known sealed results are be abandoned (implemented)
+//     (b) processing of execution forks whose executed blocks conflict with finalized blocks can be abandoned
+//     (not yet implemented)
+//   - By convention, the ResultsForest always retains the 𝒍𝒂𝒕𝒆𝒔𝒕 𝒔𝒆𝒂𝒍𝒆𝒅 𝒂𝒏𝒅 𝒑𝒓𝒐𝒄𝒆𝒔𝒔𝒆𝒅 (denoted as 𝓹 above). Thereby,
+//     the ResultsForest is able to determine whether results for a block still need to be processed or can be
+//     orphaned (processing abandoned). Hence, we prune all results for blocks _below_ the latest block with
+//     a finalized seal, once it has been persisted in the database.
+//     All results for views at or above the pruning threshold are retained, explicitly including results
+//     from execution forks or orphaned blocks even if they conflict with the finalized seal. Nevertheless,
+//     all orphaned execution forks will eventually be dropped by the ResultsForest, as pruning progresses.
+//     The reason is that orphaned execution forks will eventually stop growing, because either
+//     (i) a conflicting fork of blocks is finalized, which means that the orphaned forks can no longer
+//     be extended by new blocks or (ii) a rogue execution node pursuing its own execution fork will
+//     eventually be slashed and can no longer submit new results.
 //
 // Safe for concurrent access. Internally, the mempool utilizes the LevelledForrest.
 type ResultsForest struct {
