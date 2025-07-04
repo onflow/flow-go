@@ -55,7 +55,7 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	}
 
 	if untrustedHeaderBody.ParentView >= untrustedHeaderBody.View {
-		return nil, fmt.Errorf("invalid views - block view (%d) is less than the parent block view (%d)", untrustedHeaderBody.View, untrustedHeaderBody.ParentView)
+		return nil, fmt.Errorf("invalid views - block parent view (%d) is greater than or equal to block view (%d)", untrustedHeaderBody.ParentView, untrustedHeaderBody.View)
 	}
 
 	// validate payload

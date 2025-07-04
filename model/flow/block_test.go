@@ -225,6 +225,6 @@ func TestNewBlock(t *testing.T) {
 		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
-		require.Contains(t, err.Error(), "invalid views - block view (10) is less than the parent block view (10)")
+		require.Contains(t, err.Error(), "invalid views - block parent view (10) is greater than or equal to block view (10)")
 	})
 }
