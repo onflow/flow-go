@@ -14,3 +14,5 @@ type Handler interface {
 }
 
 //TODO: maybe we'll need some CommonRequester type which can be 'inherited' from to reduce code duplication
+
+//TODO: considering renaming it to sth else. We already have handler.go. It might be confusing.
