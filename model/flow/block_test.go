@@ -148,6 +148,9 @@ func TestBlockMalleability(t *testing.T) {
 //
 // 8. Invalid input where ParentView is greater than or equal to View:
 //   - Ensures an error is returned when the Header.ParentView is not less than Header.View.
+//
+// 9. Invalid input with zero ProtocolStateID:
+//   - Ensures an error is returned when the Payload.ProtocolStateID is flow.ZeroID.
 func TestNewBlock(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
 		block := unittest.BlockFixture()
@@ -226,5 +229,15 @@ func TestNewBlock(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "invalid views - block parent view (10) is greater than or equal to block view (10)")
+	})
+
+	t.Run("invalid input with zero ProtocolStateID", func(t *testing.T) {
+		block := unittest.BlockFixture()
+		block.Payload.ProtocolStateID = flow.ZeroID
+
+		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "protocol state ID must not be zero")
 	})
 }

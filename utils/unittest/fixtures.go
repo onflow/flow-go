@@ -365,7 +365,7 @@ func WithExecutionResults(results ...*flow.ExecutionResult) func(*flow.Payload) 
 }
 
 func BlockWithParentFixture(parent *flow.Header) *flow.Block {
-	payload := PayloadFixture()
+	payload := PayloadFixture(WithProtocolStateID(IdentifierFixture()))
 	return BlockWithParentAndPayload(parent, payload)
 }
 

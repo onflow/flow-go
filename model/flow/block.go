@@ -85,6 +85,10 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 		return nil, fmt.Errorf("invalid views - block parent view (%d) is greater than or equal to block view (%d)", untrustedHeaderBody.ParentView, untrustedHeaderBody.View)
 	}
 
+	// validate payload
+	if untrusted.Payload.ProtocolStateID == ZeroID {
+		return nil, fmt.Errorf("protocol state ID must not be zero")
+	}
 	return &Block{
 		Header:  untrusted.Header,
 		Payload: untrusted.Payload,

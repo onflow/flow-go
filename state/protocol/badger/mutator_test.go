@@ -981,7 +981,10 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// add a second block with the receipt for block 1
 		block2 := unittest.BlockWithParentAndPayload(
 			block1.ToHeader(),
-			unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithProtocolStateID(block1.Payload.ProtocolStateID)),
+			unittest.PayloadFixture(
+				unittest.WithReceipts(receipt1),
+				unittest.WithProtocolStateID(block1.Payload.ProtocolStateID),
+			),
 		)
 
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block2))
@@ -1059,7 +1062,10 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// block 5 contains the receipt for block 2
 		block5 := unittest.BlockWithParentAndPayload(
 			block4.ToHeader(),
-			unittest.PayloadFixture(unittest.WithReceipts(receipt2), unittest.WithProtocolStateID(block4.Payload.ProtocolStateID)),
+			unittest.PayloadFixture(
+				unittest.WithReceipts(receipt2),
+				unittest.WithProtocolStateID(block4.Payload.ProtocolStateID),
+			),
 		)
 
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block5))
@@ -1069,7 +1075,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// block 6 contains the seal for block 2
 		seals = []*flow.Seal{seal2}
-		block6View := block2.Header.View + 1
+		block6View := block5.Header.View + 1
 		block6 := unittest.BlockFixture(
 			unittest.Block.WithParent(block5.ID(), block5.Header.View, block5.Header.Height),
 			unittest.Block.WithView(block6View),
