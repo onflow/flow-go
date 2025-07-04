@@ -74,7 +74,7 @@ func (f *Forks) FinalityProof() (*hotstuff.FinalityProof, bool) {
 	return f.finalityProof, f.finalityProof != nil
 }
 
-// GetBlock returns (BlockProposal, true) if the block with the specified
+// GetBlock returns (Block, true) if the block with the specified
 // id was found and (nil, false) otherwise.
 func (f *Forks) GetBlock(blockID flow.Identifier) (*model.Block, bool) {
 	blockContainer, hasBlock := f.forest.GetVertex(blockID)

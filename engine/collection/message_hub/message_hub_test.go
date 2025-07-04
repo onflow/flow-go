@@ -245,7 +245,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	s.Run("should fail with wrong proposer", func() {
 		header := block.ToHeader()
 		header.ProposerID = unittest.IdentifierFixture()
-		err := s.hub.sendOwnProposal(unittest.ProposalFromHeader(header))
+		err := s.hub.sendOwnProposal(unittest.ProposalHeaderFromHeader(header))
 		require.Error(s.T(), err, "should fail with wrong proposer")
 		header.ProposerID = s.myID
 	})
@@ -254,7 +254,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	s.Run("should fail with changed/missing parent", func() {
 		header := *block.ToHeader()
 		header.ParentID[0]++
-		err := s.hub.sendOwnProposal(unittest.ProposalFromHeader(&header))
+		err := s.hub.sendOwnProposal(unittest.ProposalHeaderFromHeader(&header))
 		require.Error(s.T(), err, "should fail with missing parent")
 		header.ParentID[0]--
 	})
@@ -263,7 +263,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	s.Run("should fail with wrong block ID", func() {
 		header := *block.ToHeader()
 		header.View++
-		err := s.hub.sendOwnProposal(unittest.ProposalFromHeader(&header))
+		err := s.hub.sendOwnProposal(unittest.ProposalHeaderFromHeader(&header))
 		require.Error(s.T(), err, "should fail with missing payload")
 		header.View--
 	})
@@ -334,7 +334,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 			unittest.ClusterBlock.WithProposerID(s.myID),
 		)
 		s.payloads.On("ByBlockID", block.ID()).Return(&block.Payload, nil)
-		proposal := unittest.ProposalFromHeader(block.ToHeader())
+		proposal := unittest.ProposalHeaderFromHeader(block.ToHeader())
 
 		// unset chain and height to make sure they are correctly reconstructed
 		hotstuffProposal := model.SignedProposalFromFlow(proposal)

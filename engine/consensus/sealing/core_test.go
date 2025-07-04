@@ -678,7 +678,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	rootSnapshot := unittest.StateSnapshotForKnownBlock(s.rootHeader, nil)
 	s.Snapshots[s.rootHeader.ID()] = rootSnapshot
 	rootSnapshot.On("SealingSegment").Return(
-		&flow.SealingSegment{Blocks: []*flow.BlockProposal{
+		&flow.SealingSegment{Blocks: []*flow.Proposal{
 			{
 				Block: *flow.NewBlock(s.rootHeader.HeaderBody, flow.Payload{}),
 				// By convention, root block has no proposer signature - implementation has to handle this edge case
@@ -838,7 +838,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	// set up sealing segment
 	finalSnapShot.On("SealingSegment").Return(
 		&flow.SealingSegment{
-			Blocks: []*flow.BlockProposal{
+			Blocks: []*flow.Proposal{
 				{
 					Block: *block,
 					// By convention, root block has no proposer signature - implementation has to handle this edge case

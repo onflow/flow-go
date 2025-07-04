@@ -30,7 +30,7 @@ type UntrustedClusterBlock cluster.Block
 // This type exists only to explicitly differentiate between trusted and untrusted instances of a cluster block proposal.
 // This differentiation is currently largely unused, but eventually untrusted models should use
 // a different type (like this one), until such time as they are fully validated.
-type UntrustedClusterProposal cluster.BlockProposal
+type UntrustedClusterProposal cluster.Proposal
 
 func NewUntrustedClusterProposal(internal cluster.Block, proposerSig []byte) *UntrustedClusterProposal {
 	return &UntrustedClusterProposal{
@@ -39,9 +39,9 @@ func NewUntrustedClusterProposal(internal cluster.Block, proposerSig []byte) *Un
 	}
 }
 
-// DeclareTrusted converts the UntrustedClusterProposal to a trusted internal cluster.BlockProposal.
+// DeclareTrusted converts the UntrustedClusterProposal to a trusted internal cluster.Proposal.
 // CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
-func (cbp *UntrustedClusterProposal) DeclareTrusted() (*cluster.BlockProposal, error) {
+func (cbp *UntrustedClusterProposal) DeclareTrusted() (*cluster.Proposal, error) {
 	block, err := cluster.NewBlock(
 		cluster.UntrustedBlock{
 			Header:  cbp.Block.Header,
@@ -56,13 +56,13 @@ func (cbp *UntrustedClusterProposal) DeclareTrusted() (*cluster.BlockProposal, e
 	if len(cbp.ProposerSigData) == 0 {
 		return nil, fmt.Errorf("proposer signature must not be empty")
 	}
-	return &cluster.BlockProposal{
+	return &cluster.Proposal{
 		Block:           *block,
 		ProposerSigData: cbp.ProposerSigData,
 	}, nil
 }
 
-func UntrustedClusterProposalFromInternal(proposal *cluster.BlockProposal) *UntrustedClusterProposal {
+func UntrustedClusterProposalFromInternal(proposal *cluster.Proposal) *UntrustedClusterProposal {
 	p := UntrustedClusterProposal(*proposal)
 	return &p
 }

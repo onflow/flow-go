@@ -104,7 +104,7 @@ func NewComplianceCore(log zerolog.Logger,
 // Caution: method might block if internally too many certified blocks are queued in the channel `certifiedRangesChan`.
 // Expected errors during normal operations:
 //   - cache.ErrDisconnectedBatch
-func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.BlockProposal) error {
+func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Proposal) error {
 	if len(batch) < 1 {
 		return nil
 	}
