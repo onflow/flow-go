@@ -128,7 +128,15 @@ func GenerateStakingKey(seed []byte) (crypto.PrivateKey, error) {
 }
 
 func GenerateStakingKeys(n int, seeds [][]byte) ([]crypto.PrivateKey, error) {
-	return GenerateKeys(crypto.BLSBLS12381, n, seeds)
+	keys := make([]crypto.PrivateKey, 0, n)
+	for i := 0; i < n; i++ {
+		key, err := GenerateStakingKey(seeds[i])
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+	return keys, nil
 }
 
 func GenerateKeys(algo crypto.SigningAlgorithm, n int, seeds [][]byte) ([]crypto.PrivateKey, error) {

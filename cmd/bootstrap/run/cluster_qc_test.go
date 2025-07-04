@@ -35,7 +35,8 @@ func createClusterParticipants(t *testing.T, n int) []model.NodeInfo {
 
 	participants := make([]model.NodeInfo, n)
 	for i, id := range ids {
-		participants[i] = model.NewPrivateNodeInfo(
+		var err error
+		participants[i], err = model.NewPrivateNodeInfo(
 			id.NodeID,
 			id.Role,
 			id.Address,
@@ -43,6 +44,7 @@ func createClusterParticipants(t *testing.T, n int) []model.NodeInfo {
 			networkKeys[i],
 			stakingKeys[i],
 		)
+		require.NoError(t, err)
 	}
 
 	return participants
