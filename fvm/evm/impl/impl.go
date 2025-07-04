@@ -5,6 +5,8 @@ import (
 	"math/big"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/bbq"
+	"github.com/onflow/cadence/bbq/vm"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/errors"
 	"github.com/onflow/cadence/interpreter"
@@ -27,7 +29,7 @@ func NewInternalEVMContractValue(
 	handler types.ContractHandler,
 	contractAddress flow.Address,
 ) *interpreter.SimpleCompositeValue {
-	location := common.NewAddressLocation(nil, common.Address(contractAddress), stdlib.ContractName)
+	location := common.NewAddressLocation(gauge, common.Address(contractAddress), stdlib.ContractName)
 
 	return interpreter.NewSimpleCompositeValue(
 		gauge,
@@ -35,25 +37,25 @@ func NewInternalEVMContractValue(
 		internalEVMContractStaticType,
 		stdlib.InternalEVMContractType.Fields,
 		map[string]interpreter.Value{
-			stdlib.InternalEVMTypeRunFunctionName:                       newInternalEVMTypeRunFunction(gauge, handler),
-			stdlib.InternalEVMTypeBatchRunFunctionName:                  newInternalEVMTypeBatchRunFunction(gauge, handler),
-			stdlib.InternalEVMTypeCreateCadenceOwnedAccountFunctionName: newInternalEVMTypeCreateCadenceOwnedAccountFunction(gauge, handler),
-			stdlib.InternalEVMTypeCallFunctionName:                      newInternalEVMTypeCallFunction(gauge, handler),
-			stdlib.InternalEVMTypeDepositFunctionName:                   newInternalEVMTypeDepositFunction(gauge, handler),
-			stdlib.InternalEVMTypeWithdrawFunctionName:                  newInternalEVMTypeWithdrawFunction(gauge, handler),
-			stdlib.InternalEVMTypeDeployFunctionName:                    newInternalEVMTypeDeployFunction(gauge, handler),
-			stdlib.InternalEVMTypeBalanceFunctionName:                   newInternalEVMTypeBalanceFunction(gauge, handler),
-			stdlib.InternalEVMTypeNonceFunctionName:                     newInternalEVMTypeNonceFunction(gauge, handler),
-			stdlib.InternalEVMTypeCodeFunctionName:                      newInternalEVMTypeCodeFunction(gauge, handler),
-			stdlib.InternalEVMTypeCodeHashFunctionName:                  newInternalEVMTypeCodeHashFunction(gauge, handler),
-			stdlib.InternalEVMTypeEncodeABIFunctionName:                 newInternalEVMTypeEncodeABIFunction(gauge, location),
-			stdlib.InternalEVMTypeDecodeABIFunctionName:                 newInternalEVMTypeDecodeABIFunction(gauge, location),
-			stdlib.InternalEVMTypeCastToAttoFLOWFunctionName:            newInternalEVMTypeCastToAttoFLOWFunction(gauge),
-			stdlib.InternalEVMTypeCastToFLOWFunctionName:                newInternalEVMTypeCastToFLOWFunction(gauge),
-			stdlib.InternalEVMTypeGetLatestBlockFunctionName:            newInternalEVMTypeGetLatestBlockFunction(gauge, handler),
-			stdlib.InternalEVMTypeDryRunFunctionName:                    newInternalEVMTypeDryRunFunction(gauge, handler),
-			stdlib.InternalEVMTypeDryCallFunctionName:                   newInternalEVMTypeDryCallFunction(gauge, handler),
-			stdlib.InternalEVMTypeCommitBlockProposalFunctionName:       newInternalEVMTypeCommitBlockProposalFunction(gauge, handler),
+			stdlib.InternalEVMTypeRunFunctionName:                       newInterpreterInternalEVMTypeRunFunction(gauge, handler),
+			stdlib.InternalEVMTypeBatchRunFunctionName:                  newInterpreterInternalEVMTypeBatchRunFunction(gauge, handler),
+			stdlib.InternalEVMTypeCreateCadenceOwnedAccountFunctionName: newInterpreterInternalEVMTypeCreateCadenceOwnedAccountFunction(gauge, handler),
+			stdlib.InternalEVMTypeCallFunctionName:                      newInterpreterInternalEVMTypeCallFunction(gauge, handler),
+			stdlib.InternalEVMTypeDepositFunctionName:                   newInterpreterInternalEVMTypeDepositFunction(gauge, handler),
+			stdlib.InternalEVMTypeWithdrawFunctionName:                  newInterpreterInternalEVMTypeWithdrawFunction(gauge, handler),
+			stdlib.InternalEVMTypeDeployFunctionName:                    newInterpreterInternalEVMTypeDeployFunction(gauge, handler),
+			stdlib.InternalEVMTypeBalanceFunctionName:                   newInterpreterInternalEVMTypeBalanceFunction(gauge, handler),
+			stdlib.InternalEVMTypeNonceFunctionName:                     newInterpreterInternalEVMTypeNonceFunction(gauge, handler),
+			stdlib.InternalEVMTypeCodeFunctionName:                      newInterpreterInternalEVMTypeCodeFunction(gauge, handler),
+			stdlib.InternalEVMTypeCodeHashFunctionName:                  newInterpreterInternalEVMTypeCodeHashFunction(gauge, handler),
+			stdlib.InternalEVMTypeEncodeABIFunctionName:                 newInterpreterInternalEVMTypeEncodeABIFunction(gauge, location),
+			stdlib.InternalEVMTypeDecodeABIFunctionName:                 newInterpreterInternalEVMTypeDecodeABIFunction(gauge, location),
+			stdlib.InternalEVMTypeCastToAttoFLOWFunctionName:            newInterpreterInternalEVMTypeCastToAttoFLOWFunction(gauge),
+			stdlib.InternalEVMTypeCastToFLOWFunctionName:                newInterpreterInternalEVMTypeCastToFLOWFunction(gauge),
+			stdlib.InternalEVMTypeGetLatestBlockFunctionName:            newInterpreterInternalEVMTypeGetLatestBlockFunction(gauge, handler),
+			stdlib.InternalEVMTypeDryRunFunctionName:                    newInterpreterInternalEVMTypeDryRunFunction(gauge, handler),
+			stdlib.InternalEVMTypeDryCallFunctionName:                   newInterpreterInternalEVMTypeDryCallFunction(gauge, handler),
+			stdlib.InternalEVMTypeCommitBlockProposalFunctionName:       newInterpreterInternalEVMTypeCommitBlockProposalFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -62,7 +64,37 @@ func NewInternalEVMContractValue(
 	)
 }
 
-func newInternalEVMTypeGetLatestBlockFunction(
+func NewInternalEVMFunctions(
+	handler types.ContractHandler,
+	contractAddress flow.Address,
+) stdlib.InternalEVMFunctions {
+	location := common.NewAddressLocation(nil, common.Address(contractAddress), stdlib.ContractName)
+
+	return stdlib.InternalEVMFunctions{
+		Run:                       newVMInternalEVMTypeRunFunction(handler),
+		BatchRun:                  newVMInternalEVMTypeBatchRunFunction(handler),
+		CreateCadenceOwnedAccount: newVMInternalEVMTypeCreateCadenceOwnedAccountFunction(handler),
+		Call:                      newVMInternalEVMTypeCallFunction(handler),
+		Deposit:                   newVMInternalEVMTypeDepositFunction(handler),
+		Withdraw:                  newVMInternalEVMTypeWithdrawFunction(handler),
+		Deploy:                    newVMInternalEVMTypeDeployFunction(handler),
+		Balance:                   newVMInternalEVMTypeBalanceFunction(handler),
+		Nonce:                     newVMInternalEVMTypeNonceFunction(handler),
+		Code:                      newVMInternalEVMTypeCodeFunction(handler),
+		CodeHash:                  newVMInternalEVMTypeCodeHashFunction(handler),
+		EncodeABI:                 newVMInternalEVMTypeEncodeABIFunction(location),
+		DecodeABI:                 newVMInternalEVMTypeDecodeABIFunction(location),
+		CastToAttoFLOW:            vmInternalEVMTypeCastToAttoFLOWFunction,
+		CastToFLOW:                vmInternalEVMTypeCastToFLOWFunction,
+		GetLatestBlock:            newVMInternalEVMTypeGetLatestBlockFunction(handler),
+		DryRun:                    newVMInternalEVMTypeDryRunFunction(handler),
+		DryCall:                   newVMInternalEVMTypeDryCallFunction(handler),
+		CommitBlockProposal:       newVMInternalEVMTypeCommitBlockProposalFunction(handler),
+	}
+
+}
+
+func newInterpreterInternalEVMTypeGetLatestBlockFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
@@ -80,6 +112,27 @@ func newInternalEVMTypeGetLatestBlockFunction(
 				gauge,
 				context,
 				locationRange,
+				latestBlock,
+			)
+		},
+	)
+}
+
+func newVMInternalEVMTypeGetLatestBlockFunction(
+	handler types.ContractHandler,
+) *vm.NativeFunctionValue {
+	return vm.NewNativeFunctionValue(
+		stdlib.InternalEVMTypeGetLatestBlockFunctionName,
+		stdlib.InternalEVMTypeGetLatestBlockFunctionType,
+		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+			latestBlock := handler.LastExecutedBlock()
+
+			return NewEVMBlockValue(
+				handler,
+				context,
+				context,
+				interpreter.EmptyLocationRange,
 				latestBlock,
 			)
 		},
@@ -356,7 +409,7 @@ func EVMBytes32ToBytesArrayValue(
 	)
 }
 
-func newInternalEVMTypeCreateCadenceOwnedAccountFunction(
+func newInterpreterInternalEVMTypeCreateCadenceOwnedAccountFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
@@ -365,21 +418,51 @@ func newInternalEVMTypeCreateCadenceOwnedAccountFunction(
 		stdlib.InternalEVMTypeCreateCadenceOwnedAccountFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
+			args := invocation.Arguments
 
-			uuid, ok := invocation.Arguments[0].(interpreter.UInt64Value)
+			uuid, ok := args[0].(interpreter.UInt64Value)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			address := handler.DeployCOA(uint64(uuid))
-
-			return EVMAddressToAddressBytesArrayValue(context, address)
+			return performDeployCOA(context, uuid, handler)
 		},
 	)
 }
 
-// newInternalEVMTypeCodeFunction returns the code of the account
-func newInternalEVMTypeCodeFunction(
+func newVMInternalEVMTypeCreateCadenceOwnedAccountFunction(
+	handler types.ContractHandler,
+) *vm.NativeFunctionValue {
+	return vm.NewNativeFunctionValue(
+		stdlib.InternalEVMTypeCreateCadenceOwnedAccountFunctionName,
+		stdlib.InternalEVMTypeCreateCadenceOwnedAccountFunctionType,
+		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+			// arg[0] is the receiver. Actual arguments starts from 1.
+			args = args[vm.TypeBoundFunctionArgumentOffset:]
+
+			uuid, ok := args[0].(interpreter.UInt64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			return performDeployCOA(context, uuid, handler)
+		},
+	)
+}
+
+func performDeployCOA(
+	context interpreter.InvocationContext,
+	uuid interpreter.UInt64Value,
+	handler types.ContractHandler,
+) interpreter.Value {
+	address := handler.DeployCOA(uint64(uuid))
+
+	return EVMAddressToAddressBytesArrayValue(context, address)
+}
+
+// newInterpreterInternalEVMTypeCodeFunction returns the code of the account
+func newInterpreterInternalEVMTypeCodeFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
@@ -389,27 +472,72 @@ func newInternalEVMTypeCodeFunction(
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
+			args := invocation.Arguments
 
-			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			addressValue, ok := args[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			address, err := AddressBytesArrayValueToEVMAddress(context, locationRange, addressValue)
-			if err != nil {
-				panic(err)
-			}
-
-			const isAuthorized = false
-			account := handler.AccountByAddress(address, isAuthorized)
-
-			return interpreter.ByteSliceToByteArrayValue(context, account.Code())
+			return performCode(
+				context,
+				addressValue,
+				locationRange,
+				handler,
+			)
 		},
 	)
 }
 
-// newInternalEVMTypeNonceFunction returns the nonce of the account
-func newInternalEVMTypeNonceFunction(
+func newVMInternalEVMTypeCodeFunction(
+	handler types.ContractHandler,
+) *vm.NativeFunctionValue {
+	return vm.NewNativeFunctionValue(
+		stdlib.InternalEVMTypeCodeFunctionName,
+		stdlib.InternalEVMTypeCodeFunctionType,
+		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+			// arg[0] is the receiver. Actual arguments starts from 1.
+			args = args[vm.TypeBoundFunctionArgumentOffset:]
+
+			addressValue, ok := args[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			return performCode(
+				context,
+				addressValue,
+				interpreter.EmptyLocationRange,
+				handler,
+			)
+		},
+	)
+}
+
+func performCode(
+	context interpreter.InvocationContext,
+	addressValue *interpreter.ArrayValue,
+	locationRange interpreter.LocationRange,
+	handler types.ContractHandler,
+) interpreter.Value {
+	address, err := AddressBytesArrayValueToEVMAddress(
+		context,
+		locationRange,
+		addressValue,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	const isAuthorized = false
+	account := handler.AccountByAddress(address, isAuthorized)
+
+	return interpreter.ByteSliceToByteArrayValue(context, account.Code())
+}
+
+// newInterpreterInternalEVMTypeNonceFunction returns the nonce of the account
+func newInterpreterInternalEVMTypeNonceFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
@@ -419,26 +547,71 @@ func newInternalEVMTypeNonceFunction(
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
+			args := invocation.Arguments
 
-			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			addressValue, ok := args[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			address, err := AddressBytesArrayValueToEVMAddress(context, locationRange, addressValue)
-			if err != nil {
-				panic(err)
-			}
-
-			const isAuthorized = false
-			account := handler.AccountByAddress(address, isAuthorized)
-
-			return interpreter.UInt64Value(account.Nonce())
+			return performNonce(
+				context,
+				addressValue,
+				locationRange,
+				handler,
+			)
 		},
 	)
 }
 
-func newInternalEVMTypeCallFunction(
+func newVMInternalEVMTypeNonceFunction(
+	handler types.ContractHandler,
+) *vm.NativeFunctionValue {
+	return vm.NewNativeFunctionValue(
+		stdlib.InternalEVMTypeNonceFunctionName,
+		stdlib.InternalEVMTypeNonceFunctionType,
+		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+			// arg[0] is the receiver. Actual arguments starts from 1.
+			args = args[vm.TypeBoundFunctionArgumentOffset:]
+
+			addressValue, ok := args[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			return performNonce(
+				context,
+				addressValue,
+				interpreter.EmptyLocationRange,
+				handler,
+			)
+		},
+	)
+}
+
+func performNonce(
+	context interpreter.InvocationContext,
+	addressValue *interpreter.ArrayValue,
+	locationRange interpreter.LocationRange,
+	handler types.ContractHandler,
+) interpreter.Value {
+	address, err := AddressBytesArrayValueToEVMAddress(
+		context,
+		locationRange,
+		addressValue,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	const isAuthorized = false
+	account := handler.AccountByAddress(address, isAuthorized)
+
+	return interpreter.UInt64Value(account.Nonce())
+}
+
+func newInterpreterInternalEVMTypeCallFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
@@ -448,30 +621,75 @@ func newInternalEVMTypeCallFunction(
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
+			args := invocation.Arguments
 
-			callArgs, err := parseCallArguments(invocation)
-			if err != nil {
-				panic(err)
-			}
-
-			// Call
-
-			const isAuthorized = true
-			account := handler.AccountByAddress(callArgs.from, isAuthorized)
-			result := account.Call(callArgs.to, callArgs.data, callArgs.gasLimit, callArgs.balance)
-
-			return NewResultValue(
-				handler,
-				gauge,
+			return performCall(
 				context,
+				args,
 				locationRange,
-				result,
+				handler,
 			)
 		},
 	)
 }
 
-func newInternalEVMTypeDryCallFunction(
+func newVMInternalEVMTypeCallFunction(
+	handler types.ContractHandler,
+) *vm.NativeFunctionValue {
+	return vm.NewNativeFunctionValue(
+		stdlib.InternalEVMTypeCallFunctionName,
+		stdlib.InternalEVMTypeCallFunctionType,
+		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+			// arg[0] is the receiver. Actual arguments starts from 1.
+			args = args[vm.TypeBoundFunctionArgumentOffset:]
+
+			return performCall(
+				context,
+				args,
+				interpreter.EmptyLocationRange,
+				handler,
+			)
+		},
+	)
+}
+
+func performCall(
+	context interpreter.InvocationContext,
+	args []interpreter.Value,
+	locationRange interpreter.LocationRange,
+	handler types.ContractHandler,
+) interpreter.Value {
+	callArgs, err := parseCallArguments(
+		context,
+		args,
+		locationRange,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	// Call
+
+	const isAuthorized = true
+	account := handler.AccountByAddress(callArgs.from, isAuthorized)
+	result := account.Call(
+		callArgs.to,
+		callArgs.data,
+		callArgs.gasLimit,
+		callArgs.balance,
+	)
+
+	return NewResultValue(
+		handler,
+		context,
+		context,
+		locationRange,
+		result,
+	)
+}
+
+func newInterpreterInternalEVMTypeDryCallFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
@@ -481,38 +699,84 @@ func newInternalEVMTypeDryCallFunction(
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
+			args := invocation.Arguments
 
-			callArgs, err := parseCallArguments(invocation)
-			if err != nil {
-				panic(err)
-			}
-			to := callArgs.to.ToCommon()
-
-			tx := gethTypes.NewTx(&gethTypes.LegacyTx{
-				Nonce:    0,
-				To:       &to,
-				Gas:      uint64(callArgs.gasLimit),
-				Data:     callArgs.data,
-				GasPrice: big.NewInt(0),
-				Value:    callArgs.balance,
-			})
-
-			txPayload, err := tx.MarshalBinary()
-			if err != nil {
-				panic(err)
-			}
-
-			// call contract function
-
-			res := handler.DryRun(txPayload, callArgs.from)
-			return NewResultValue(handler, gauge, context, locationRange, res)
+			return performDryCall(
+				context,
+				args,
+				locationRange,
+				handler,
+			)
 		},
+	)
+}
+
+func newVMInternalEVMTypeDryCallFunction(
+	handler types.ContractHandler,
+) *vm.NativeFunctionValue {
+	return vm.NewNativeFunctionValue(
+		stdlib.InternalEVMTypeDryCallFunctionName,
+		stdlib.InternalEVMTypeDryCallFunctionType,
+		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+			// arg[0] is the receiver. Actual arguments starts from 1.
+			args = args[vm.TypeBoundFunctionArgumentOffset:]
+
+			return performDryCall(
+				context,
+				args,
+				interpreter.EmptyLocationRange,
+				handler,
+			)
+		},
+	)
+}
+
+func performDryCall(
+	context interpreter.InvocationContext,
+	args []interpreter.Value,
+	locationRange interpreter.LocationRange,
+	handler types.ContractHandler,
+) interpreter.Value {
+	callArgs, err := parseCallArguments(
+		context,
+		args,
+		locationRange,
+	)
+	if err != nil {
+		panic(err)
+	}
+	to := callArgs.to.ToCommon()
+
+	tx := gethTypes.NewTx(&gethTypes.LegacyTx{
+		Nonce:    0,
+		To:       &to,
+		Gas:      uint64(callArgs.gasLimit),
+		Data:     callArgs.data,
+		GasPrice: big.NewInt(0),
+		Value:    callArgs.balance,
+	})
+
+	txPayload, err := tx.MarshalBinary()
+	if err != nil {
+		panic(err)
+	}
+
+	// call contract function
+
+	res := handler.DryRun(txPayload, callArgs.from)
+	return NewResultValue(
+		handler,
+		context,
+		context,
+		locationRange,
+		res,
 	)
 }
 
 const fungibleTokenVaultTypeBalanceFieldName = "balance"
 
-func newInternalEVMTypeDepositFunction(
+func newInterpreterInternalEVMTypeDepositFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
@@ -522,54 +786,113 @@ func newInternalEVMTypeDepositFunction(
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
+			args := invocation.Arguments
 
 			// Get from vault
 
-			fromValue, ok := invocation.Arguments[0].(*interpreter.CompositeValue)
+			fromValue, ok := args[0].(*interpreter.CompositeValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
-
-			amountValue, ok := fromValue.GetField(
-				context,
-				fungibleTokenVaultTypeBalanceFieldName,
-			).(interpreter.UFix64Value)
-			if !ok {
-				panic(errors.NewUnreachableError())
-			}
-
-			amount := types.NewBalanceFromUFix64(cadence.UFix64(amountValue.UFix64Value))
 
 			// Get to address
 
-			toAddressValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			toAddressValue, ok := args[1].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			toAddress, err := AddressBytesArrayValueToEVMAddress(context, locationRange, toAddressValue)
-			if err != nil {
-				panic(err)
-			}
-
-			// NOTE: We're intentionally not destroying the vault here,
-			// because the value of it is supposed to be "kept alive".
-			// Destroying would incorrectly be equivalent to a burn and decrease the total supply,
-			// and a withdrawal would then have to perform an actual mint of new tokens.
-
-			// Deposit
-
-			const isAuthorized = false
-			account := handler.AccountByAddress(toAddress, isAuthorized)
-			account.Deposit(types.NewFlowTokenVault(amount))
+			performDeposit(
+				context,
+				fromValue,
+				toAddressValue,
+				locationRange,
+				handler,
+			)
 
 			return interpreter.Void
 		},
 	)
 }
 
-// newInternalEVMTypeBalanceFunction returns the Flow balance of the account
-func newInternalEVMTypeBalanceFunction(
+func newVMInternalEVMTypeDepositFunction(
+	handler types.ContractHandler,
+) *vm.NativeFunctionValue {
+	return vm.NewNativeFunctionValue(
+		stdlib.InternalEVMTypeDepositFunctionName,
+		stdlib.InternalEVMTypeDepositFunctionType,
+		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+			// arg[0] is the receiver. Actual arguments starts from 1.
+			args = args[vm.TypeBoundFunctionArgumentOffset:]
+
+			// Get from vault
+
+			fromValue, ok := args[0].(*interpreter.CompositeValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			// Get to address
+
+			toAddressValue, ok := args[1].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			performDeposit(
+				context,
+				fromValue,
+				toAddressValue,
+				interpreter.EmptyLocationRange,
+				handler,
+			)
+
+			return interpreter.Void
+		},
+	)
+}
+
+func performDeposit(
+	context interpreter.InvocationContext,
+	fromValue *interpreter.CompositeValue,
+	toAddressValue *interpreter.ArrayValue,
+	locationRange interpreter.LocationRange,
+	handler types.ContractHandler,
+) {
+	amountValue, ok := fromValue.GetField(
+		context,
+		fungibleTokenVaultTypeBalanceFieldName,
+	).(interpreter.UFix64Value)
+	if !ok {
+		panic(errors.NewUnreachableError())
+	}
+
+	amount := types.NewBalanceFromUFix64(cadence.UFix64(amountValue.UFix64Value))
+
+	toAddress, err := AddressBytesArrayValueToEVMAddress(
+		context,
+		locationRange,
+		toAddressValue,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	// NOTE: We're intentionally not destroying the vault here,
+	// because the value of it is supposed to be "kept alive".
+	// Destroying would incorrectly be equivalent to a burn and decrease the total supply,
+	// and a withdrawal would then have to perform an actual mint of new tokens.
+
+	// Deposit
+
+	const isAuthorized = false
+	account := handler.AccountByAddress(toAddress, isAuthorized)
+	account.Deposit(types.NewFlowTokenVault(amount))
+}
+
+// newInterpreterInternalEVMTypeBalanceFunction returns the Flow balance of the account
+func newInterpreterInternalEVMTypeBalanceFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
@@ -579,8 +902,9 @@ func newInternalEVMTypeBalanceFunction(
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
+			args := invocation.Arguments
 
-			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			addressValue, ok := args[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
@@ -590,16 +914,72 @@ func newInternalEVMTypeBalanceFunction(
 				panic(err)
 			}
 
-			const isAuthorized = false
-			account := handler.AccountByAddress(address, isAuthorized)
-
-			return interpreter.UIntValue{BigInt: account.Balance()}
+			return performBalance(
+				context,
+				address,
+				handler,
+			)
 		},
 	)
 }
 
-// newInternalEVMTypeCodeHashFunction returns the code hash of the account
-func newInternalEVMTypeCodeHashFunction(
+func newVMInternalEVMTypeBalanceFunction(
+	handler types.ContractHandler,
+) *vm.NativeFunctionValue {
+	return vm.NewNativeFunctionValue(
+		stdlib.InternalEVMTypeBalanceFunctionName,
+		stdlib.InternalEVMTypeBalanceFunctionType,
+		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+			// arg[0] is the receiver. Actual arguments starts from 1.
+			args = args[vm.TypeBoundFunctionArgumentOffset:]
+
+			addressValue, ok := args[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			address, err := AddressBytesArrayValueToEVMAddress(
+				context,
+				interpreter.EmptyLocationRange,
+				addressValue,
+			)
+			if err != nil {
+				panic(err)
+			}
+
+			return performBalance(
+				context,
+				address,
+				handler,
+			)
+		},
+	)
+}
+
+func performBalance(
+	context interpreter.InvocationContext,
+	address types.Address,
+	handler types.ContractHandler,
+) interpreter.Value {
+	const isAuthorized = false
+	account := handler.AccountByAddress(address, isAuthorized)
+
+	balance := account.Balance()
+	memoryUsage := common.NewBigIntMemoryUsage(
+		common.BigIntByteLength(balance),
+	)
+	return interpreter.NewUIntValueFromBigInt(
+		context,
+		memoryUsage,
+		func() *big.Int {
+			return balance
+		},
+	)
+}
+
+// newInterpreterInternalEVMTypeCodeHashFunction returns the code hash of the account
+func newInterpreterInternalEVMTypeCodeHashFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
@@ -609,26 +989,68 @@ func newInternalEVMTypeCodeHashFunction(
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
+			args := invocation.Arguments
 
-			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			addressValue, ok := args[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			address, err := AddressBytesArrayValueToEVMAddress(context, locationRange, addressValue)
-			if err != nil {
-				panic(err)
-			}
-
-			const isAuthorized = false
-			account := handler.AccountByAddress(address, isAuthorized)
-
-			return interpreter.ByteSliceToByteArrayValue(context, account.CodeHash())
+			return performCodeHash(context, locationRange, addressValue, handler)
 		},
 	)
 }
 
-func newInternalEVMTypeWithdrawFunction(
+func newVMInternalEVMTypeCodeHashFunction(
+	handler types.ContractHandler,
+) *vm.NativeFunctionValue {
+	return vm.NewNativeFunctionValue(
+		stdlib.InternalEVMTypeCodeHashFunctionName,
+		stdlib.InternalEVMTypeCodeHashFunctionType,
+		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+			// arg[0] is the receiver. Actual arguments starts from 1.
+			args = args[vm.TypeBoundFunctionArgumentOffset:]
+
+			// Get address
+
+			addressValue, ok := args[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			return performCodeHash(
+				context,
+				interpreter.EmptyLocationRange,
+				addressValue,
+				handler,
+			)
+		},
+	)
+}
+
+func performCodeHash(
+	context interpreter.InvocationContext,
+	locationRange interpreter.LocationRange,
+	addressValue *interpreter.ArrayValue,
+	handler types.ContractHandler,
+) interpreter.Value {
+	address, err := AddressBytesArrayValueToEVMAddress(
+		context,
+		locationRange,
+		addressValue,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	const isAuthorized = false
+	account := handler.AccountByAddress(address, isAuthorized)
+
+	return interpreter.ByteSliceToByteArrayValue(context, account.CodeHash())
+}
+
+func newInterpreterInternalEVMTypeWithdrawFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
@@ -638,70 +1060,127 @@ func newInternalEVMTypeWithdrawFunction(
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
+			args := invocation.Arguments
 
 			// Get from address
 
-			fromAddressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			fromAddressValue, ok := args[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
-			}
-
-			fromAddress, err := AddressBytesArrayValueToEVMAddress(context, locationRange, fromAddressValue)
-			if err != nil {
-				panic(err)
 			}
 
 			// Get amount
 
-			amountValue, ok := invocation.Arguments[1].(interpreter.UIntValue)
+			amountValue, ok := args[1].(interpreter.UIntValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			amount := types.NewBalance(amountValue.BigInt)
-
-			// Withdraw
-
-			const isAuthorized = true
-			account := handler.AccountByAddress(fromAddress, isAuthorized)
-			vault := account.Withdraw(amount)
-
-			ufix, roundedOff, err := types.ConvertBalanceToUFix64(vault.Balance())
-			if err != nil {
-				panic(err)
-			}
-			if roundedOff {
-				panic(types.ErrWithdrawBalanceRounding)
-			}
-
-			// TODO: improve: maybe call actual constructor
-			return interpreter.NewCompositeValue(
+			return performWithdraw(
 				context,
+				fromAddressValue,
+				amountValue,
 				locationRange,
-				common.NewAddressLocation(gauge, handler.FlowTokenAddress(), "FlowToken"),
-				"FlowToken.Vault",
-				common.CompositeKindResource,
-				[]interpreter.CompositeField{
-					{
-						Name: "balance",
-						Value: interpreter.NewUFix64Value(gauge, func() uint64 {
-							return uint64(ufix)
-						}),
-					},
-					{
-						Name: sema.ResourceUUIDFieldName,
-						Value: interpreter.NewUInt64Value(gauge, func() uint64 {
-							return handler.GenerateResourceUUID()
-						}),
-					},
-				},
-				common.ZeroAddress,
+				handler,
 			)
 		},
 	)
 }
 
-func newInternalEVMTypeDeployFunction(
+func newVMInternalEVMTypeWithdrawFunction(
+	handler types.ContractHandler,
+) *vm.NativeFunctionValue {
+	return vm.NewNativeFunctionValue(
+		stdlib.InternalEVMTypeWithdrawFunctionName,
+		stdlib.InternalEVMTypeWithdrawFunctionType,
+		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+			// arg[0] is the receiver. Actual arguments starts from 1.
+			args = args[vm.TypeBoundFunctionArgumentOffset:]
+
+			// Get from address
+
+			fromAddressValue, ok := args[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			// Get amount
+
+			amountValue, ok := args[1].(interpreter.UIntValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			return performWithdraw(
+				context,
+				fromAddressValue,
+				amountValue,
+				interpreter.EmptyLocationRange,
+				handler,
+			)
+		},
+	)
+}
+
+func performWithdraw(
+	context interpreter.InvocationContext,
+	fromAddressValue *interpreter.ArrayValue,
+	amountValue interpreter.UIntValue,
+	locationRange interpreter.LocationRange,
+	handler types.ContractHandler,
+) interpreter.Value {
+
+	fromAddress, err := AddressBytesArrayValueToEVMAddress(
+		context,
+		locationRange,
+		fromAddressValue,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	amount := types.NewBalance(amountValue.BigInt)
+
+	// Withdraw
+
+	const isAuthorized = true
+	account := handler.AccountByAddress(fromAddress, isAuthorized)
+	vault := account.Withdraw(amount)
+
+	// TODO: improve: maybe call actual constructor
+	return interpreter.NewCompositeValue(
+		context,
+		locationRange,
+		common.NewAddressLocation(context, handler.FlowTokenAddress(), "FlowToken"),
+		"FlowToken.Vault",
+		common.CompositeKindResource,
+		[]interpreter.CompositeField{
+			{
+				Name: "balance",
+				Value: interpreter.NewUFix64Value(context, func() uint64 {
+					ufix, roundedOff, err := types.ConvertBalanceToUFix64(vault.Balance())
+					if err != nil {
+						panic(err)
+					}
+					if roundedOff {
+						panic(types.ErrWithdrawBalanceRounding)
+					}
+					return uint64(ufix)
+				}),
+			},
+			{
+				Name: sema.ResourceUUIDFieldName,
+				Value: interpreter.NewUInt64Value(context, func() uint64 {
+					return handler.GenerateResourceUUID()
+				}),
+			},
+		},
+		common.ZeroAddress,
+	)
+}
+
+func newInterpreterInternalEVMTypeDeployFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
@@ -711,117 +1190,282 @@ func newInternalEVMTypeDeployFunction(
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
+			args := invocation.Arguments
 
 			// Get from address
 
-			fromAddressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			fromAddressValue, ok := args[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
-			}
-
-			fromAddress, err := AddressBytesArrayValueToEVMAddress(context, locationRange, fromAddressValue)
-			if err != nil {
-				panic(err)
 			}
 
 			// Get code
 
-			codeValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			codeValue, ok := args[1].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
-			}
-
-			code, err := interpreter.ByteArrayValueToByteSlice(context, codeValue, locationRange)
-			if err != nil {
-				panic(err)
 			}
 
 			// Get gas limit
 
-			gasLimitValue, ok := invocation.Arguments[2].(interpreter.UInt64Value)
+			gasLimitValue, ok := args[2].(interpreter.UInt64Value)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			gasLimit := types.GasLimit(gasLimitValue)
+			// Get amount
 
-			// Get value
-
-			amountValue, ok := invocation.Arguments[3].(interpreter.UIntValue)
+			amountValue, ok := args[3].(interpreter.UIntValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			amount := types.NewBalance(amountValue.BigInt)
-
-			// Deploy
-
-			const isAuthorized = true
-			account := handler.AccountByAddress(fromAddress, isAuthorized)
-			result := account.Deploy(code, gasLimit, amount)
-
-			res := NewResultValue(handler, gauge, context, locationRange, result)
-			return res
+			return performDeploy(
+				context,
+				fromAddressValue,
+				codeValue,
+				gasLimitValue,
+				amountValue,
+				locationRange,
+				handler,
+			)
 		},
 	)
 }
 
-func newInternalEVMTypeCastToAttoFLOWFunction(
+func newVMInternalEVMTypeDeployFunction(
+	handler types.ContractHandler,
+) *vm.NativeFunctionValue {
+	return vm.NewNativeFunctionValue(
+		stdlib.InternalEVMTypeDeployFunctionName,
+		stdlib.InternalEVMTypeDeployFunctionType,
+		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+			// arg[0] is the receiver. Actual arguments starts from 1.
+			args = args[vm.TypeBoundFunctionArgumentOffset:]
+
+			// Get from address
+
+			fromAddressValue, ok := args[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			// Get code
+
+			codeValue, ok := args[1].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			// Get gas limit
+
+			gasLimitValue, ok := args[2].(interpreter.UInt64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			// Get amount
+
+			amountValue, ok := args[3].(interpreter.UIntValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			return performDeploy(
+				context,
+				fromAddressValue,
+				codeValue,
+				gasLimitValue,
+				amountValue,
+				interpreter.EmptyLocationRange,
+				handler,
+			)
+		},
+	)
+}
+
+func performDeploy(
+	context interpreter.InvocationContext,
+	fromAddressValue *interpreter.ArrayValue,
+	codeValue *interpreter.ArrayValue,
+	gasLimitValue interpreter.UInt64Value,
+	amountValue interpreter.UIntValue,
+	locationRange interpreter.LocationRange,
+	handler types.ContractHandler,
+) interpreter.Value {
+	fromAddress, err := AddressBytesArrayValueToEVMAddress(context, locationRange, fromAddressValue)
+	if err != nil {
+		panic(err)
+	}
+
+	code, err := interpreter.ByteArrayValueToByteSlice(context, codeValue, locationRange)
+	if err != nil {
+		panic(err)
+	}
+
+	gasLimit := types.GasLimit(gasLimitValue)
+
+	amount := types.NewBalance(amountValue.BigInt)
+
+	// Deploy
+
+	const isAuthorized = true
+	account := handler.AccountByAddress(fromAddress, isAuthorized)
+	result := account.Deploy(code, gasLimit, amount)
+
+	return NewResultValue(
+		handler,
+		context,
+		context,
+		locationRange,
+		result,
+	)
+}
+
+func newInterpreterInternalEVMTypeCastToAttoFLOWFunction(
 	gauge common.MemoryGauge,
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		stdlib.InternalEVMTypeCastToAttoFLOWFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			balanceValue, ok := invocation.Arguments[0].(interpreter.UFix64Value)
+			context := invocation.InvocationContext
+			args := invocation.Arguments
+
+			balanceValue, ok := args[0].(interpreter.UFix64Value)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
-			balance := types.NewBalanceFromUFix64(cadence.UFix64(balanceValue.UFix64Value))
-			return interpreter.UIntValue{BigInt: balance}
+
+			return performCastToAttoFLOW(
+				context,
+				balanceValue,
+			)
 		},
 	)
 }
 
-func newInternalEVMTypeCastToFLOWFunction(
+var vmInternalEVMTypeCastToAttoFLOWFunction = vm.NewNativeFunctionValue(
+	stdlib.InternalEVMTypeCastToAttoFLOWFunctionName,
+	stdlib.InternalEVMTypeCastToAttoFLOWFunctionType,
+	func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+		// arg[0] is the receiver. Actual arguments starts from 1.
+		args = args[vm.TypeBoundFunctionArgumentOffset:]
+
+		// Get balance
+
+		balanceValue, ok := args[0].(interpreter.UFix64Value)
+		if !ok {
+			panic(errors.NewUnreachableError())
+		}
+
+		return performCastToAttoFLOW(
+			context,
+			balanceValue,
+		)
+	},
+)
+
+func performCastToAttoFLOW(
+	context interpreter.InvocationContext,
+	balanceValue interpreter.UFix64Value,
+) interpreter.Value {
+	balance := types.NewBalanceFromUFix64(cadence.UFix64(balanceValue.UFix64Value))
+	memoryUsage := common.NewBigIntMemoryUsage(
+		common.BigIntByteLength(balance),
+	)
+	return interpreter.NewUIntValueFromBigInt(
+		context,
+		memoryUsage,
+		func() *big.Int {
+			return balance
+		},
+	)
+}
+
+func newInterpreterInternalEVMTypeCastToFLOWFunction(
 	gauge common.MemoryGauge,
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		stdlib.InternalEVMTypeCastToFLOWFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			balanceValue, ok := invocation.Arguments[0].(interpreter.UIntValue)
+			args := invocation.Arguments
+
+			balanceValue, ok := args[0].(interpreter.UIntValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
-			balance := types.NewBalance(balanceValue.BigInt)
-			// ignoring the rounding error and let user handle it
-			v, _, err := types.ConvertBalanceToUFix64(balance)
-			if err != nil {
-				panic(err)
-			}
-			return interpreter.NewUFix64Value(gauge, func() uint64 {
-				return uint64(v)
-			})
+
+			return performCastToFLOW(gauge, balanceValue)
 		},
 	)
 }
 
-func newInternalEVMTypeCommitBlockProposalFunction(
+var vmInternalEVMTypeCastToFLOWFunction = vm.NewNativeFunctionValue(
+	stdlib.InternalEVMTypeCastToFLOWFunctionName,
+	stdlib.InternalEVMTypeCastToFLOWFunctionType,
+	func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+		// arg[0] is the receiver. Actual arguments starts from 1.
+		args = args[vm.TypeBoundFunctionArgumentOffset:]
+
+		// Get balance
+
+		balanceValue, ok := args[0].(interpreter.UIntValue)
+		if !ok {
+			panic(errors.NewUnreachableError())
+		}
+
+		return performCastToFLOW(context, balanceValue)
+	},
+)
+
+func performCastToFLOW(
+	gauge common.MemoryGauge,
+	balanceValue interpreter.UIntValue,
+) interpreter.Value {
+	return interpreter.NewUFix64Value(gauge, func() uint64 {
+		balance := types.NewBalance(balanceValue.BigInt)
+		// ignoring the rounding error and let user handle it
+		v, _, err := types.ConvertBalanceToUFix64(balance)
+		if err != nil {
+			panic(err)
+		}
+		return uint64(v)
+	})
+}
+
+func newInterpreterInternalEVMTypeCommitBlockProposalFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		stdlib.InternalEVMTypeCommitBlockProposalFunctionType,
-		func(invocation interpreter.Invocation) interpreter.Value {
+		func(_ interpreter.Invocation) interpreter.Value {
 			handler.CommitBlockProposal()
 			return interpreter.Void
 		},
 	)
 }
 
-func newInternalEVMTypeRunFunction(
+func newVMInternalEVMTypeCommitBlockProposalFunction(
+	handler types.ContractHandler,
+) *vm.NativeFunctionValue {
+	return vm.NewNativeFunctionValue(
+		stdlib.InternalEVMTypeCommitBlockProposalFunctionName,
+		stdlib.InternalEVMTypeCommitBlockProposalFunctionType,
+		func(_ *vm.Context, _ []bbq.StaticType, _ ...vm.Value) vm.Value {
+			handler.CommitBlockProposal()
+			return interpreter.Void
+		},
+	)
+}
+
+func newInterpreterInternalEVMTypeRunFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
@@ -831,40 +1475,110 @@ func newInternalEVMTypeRunFunction(
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
+			args := invocation.Arguments
 
 			// Get transaction argument
 
-			transactionValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			transactionValue, ok := args[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
-			}
-
-			transaction, err := interpreter.ByteArrayValueToByteSlice(context, transactionValue, locationRange)
-			if err != nil {
-				panic(err)
 			}
 
 			// Get gas fee collector argument
 
-			gasFeeCollectorValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			gasFeeCollectorValue, ok := args[1].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			gasFeeCollector, err := interpreter.ByteArrayValueToByteSlice(context, gasFeeCollectorValue, locationRange)
-			if err != nil {
-				panic(err)
-			}
-
-			// run transaction
-			result := handler.Run(transaction, types.NewAddressFromBytes(gasFeeCollector))
-
-			return NewResultValue(handler, gauge, context, locationRange, result)
+			return performRun(
+				context,
+				transactionValue,
+				gasFeeCollectorValue,
+				locationRange,
+				handler,
+			)
 		},
 	)
 }
 
-func newInternalEVMTypeDryRunFunction(
+func newVMInternalEVMTypeRunFunction(
+	handler types.ContractHandler,
+) *vm.NativeFunctionValue {
+	return vm.NewNativeFunctionValue(
+		stdlib.InternalEVMTypeRunFunctionName,
+		stdlib.InternalEVMTypeRunFunctionType,
+		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+			// arg[0] is the receiver. Actual arguments starts from 1.
+			args = args[vm.TypeBoundFunctionArgumentOffset:]
+
+			// Get transaction argument
+
+			transactionValue, ok := args[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			// Get gas fee collector argument
+
+			gasFeeCollectorValue, ok := args[1].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			return performRun(
+				context,
+				transactionValue,
+				gasFeeCollectorValue,
+				interpreter.EmptyLocationRange,
+				handler,
+			)
+		},
+	)
+}
+
+func performRun(
+	context interpreter.InvocationContext,
+	transactionValue *interpreter.ArrayValue,
+	gasFeeCollectorValue *interpreter.ArrayValue,
+	locationRange interpreter.LocationRange,
+	handler types.ContractHandler,
+) interpreter.Value {
+	transaction, err := interpreter.ByteArrayValueToByteSlice(
+		context,
+		transactionValue,
+		locationRange,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	gasFeeCollector, err := interpreter.ByteArrayValueToByteSlice(
+		context,
+		gasFeeCollectorValue,
+		locationRange,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	// run transaction
+	result := handler.Run(
+		transaction,
+		types.NewAddressFromBytes(gasFeeCollector),
+	)
+
+	return NewResultValue(
+		handler,
+		context,
+		context,
+		locationRange,
+		result,
+	)
+}
+
+func newInterpreterInternalEVMTypeDryRunFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
@@ -874,40 +1588,99 @@ func newInternalEVMTypeDryRunFunction(
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
+			args := invocation.Arguments
 
 			// Get transaction argument
 
-			transactionValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			transactionValue, ok := args[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
-			}
-
-			transaction, err := interpreter.ByteArrayValueToByteSlice(context, transactionValue, locationRange)
-			if err != nil {
-				panic(err)
 			}
 
 			// Get from argument
 
-			fromValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			fromValue, ok := args[1].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			from, err := interpreter.ByteArrayValueToByteSlice(context, fromValue, locationRange)
-			if err != nil {
-				panic(err)
-			}
-
-			// call estimate
-
-			res := handler.DryRun(transaction, types.NewAddressFromBytes(from))
-			return NewResultValue(handler, gauge, context, locationRange, res)
+			return performDryRun(
+				context,
+				transactionValue,
+				fromValue,
+				locationRange,
+				handler,
+			)
 		},
 	)
 }
 
-func newInternalEVMTypeBatchRunFunction(
+func newVMInternalEVMTypeDryRunFunction(
+	handler types.ContractHandler,
+) *vm.NativeFunctionValue {
+	return vm.NewNativeFunctionValue(
+		stdlib.InternalEVMTypeDryRunFunctionName,
+		stdlib.InternalEVMTypeDryRunFunctionType,
+		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+			// arg[0] is the receiver. Actual arguments starts from 1.
+			args = args[vm.TypeBoundFunctionArgumentOffset:]
+
+			// Get transaction argument
+
+			transactionValue, ok := args[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			// Get from argument
+
+			fromValue, ok := args[1].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			return performDryRun(
+				context,
+				transactionValue,
+				fromValue,
+				interpreter.EmptyLocationRange,
+				handler,
+			)
+		},
+	)
+}
+
+func performDryRun(
+	context interpreter.InvocationContext,
+	transactionValue *interpreter.ArrayValue,
+	fromValue *interpreter.ArrayValue,
+	locationRange interpreter.LocationRange,
+	handler types.ContractHandler,
+) interpreter.Value {
+	transaction, err := interpreter.ByteArrayValueToByteSlice(context, transactionValue, locationRange)
+	if err != nil {
+		panic(err)
+	}
+
+	from, err := interpreter.ByteArrayValueToByteSlice(context, fromValue, locationRange)
+	if err != nil {
+		panic(err)
+	}
+
+	// call estimate
+
+	res := handler.DryRun(transaction, types.NewAddressFromBytes(from))
+	return NewResultValue(
+		handler,
+		context,
+		context,
+		locationRange,
+		res,
+	)
+}
+
+func newInterpreterInternalEVMTypeBatchRunFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
@@ -917,68 +1690,128 @@ func newInternalEVMTypeBatchRunFunction(
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
+			args := invocation.Arguments
 
 			// Get transactions batch argument
-			transactionsBatchValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			transactionsBatchValue, ok := args[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
-			}
-
-			batchCount := transactionsBatchValue.Count()
-			var transactionBatch [][]byte
-			if batchCount > 0 {
-				transactionBatch = make([][]byte, batchCount)
-				i := 0
-				transactionsBatchValue.Iterate(context, func(transactionValue interpreter.Value) (resume bool) {
-					t, err := interpreter.ByteArrayValueToByteSlice(context, transactionValue, locationRange)
-					if err != nil {
-						panic(err)
-					}
-					transactionBatch[i] = t
-					i++
-					return true
-				}, false, locationRange)
 			}
 
 			// Get gas fee collector argument
-			gasFeeCollectorValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			gasFeeCollectorValue, ok := args[1].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			gasFeeCollector, err := interpreter.ByteArrayValueToByteSlice(context, gasFeeCollectorValue, locationRange)
+			return performBatchRun(
+				context,
+				transactionsBatchValue,
+				gasFeeCollectorValue,
+				locationRange,
+				handler,
+			)
+		},
+	)
+}
+
+func newVMInternalEVMTypeBatchRunFunction(
+	handler types.ContractHandler,
+) *vm.NativeFunctionValue {
+	return vm.NewNativeFunctionValue(
+		stdlib.InternalEVMTypeBatchRunFunctionName,
+		stdlib.InternalEVMTypeBatchRunFunctionType,
+		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+			// arg[0] is the receiver. Actual arguments starts from 1.
+			args = args[vm.TypeBoundFunctionArgumentOffset:]
+
+			// Get transactions batch argument
+			transactionsBatchValue, ok := args[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			// Get gas fee collector argument
+			gasFeeCollectorValue, ok := args[1].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			return performBatchRun(
+				context,
+				transactionsBatchValue,
+				gasFeeCollectorValue,
+				interpreter.EmptyLocationRange,
+				handler,
+			)
+		},
+	)
+}
+
+func performBatchRun(
+	context interpreter.InvocationContext,
+	transactionsBatchValue *interpreter.ArrayValue,
+	gasFeeCollectorValue *interpreter.ArrayValue,
+	locationRange interpreter.LocationRange,
+	handler types.ContractHandler,
+) interpreter.Value {
+
+	batchCount := transactionsBatchValue.Count()
+	var transactionBatch [][]byte
+	if batchCount > 0 {
+		transactionBatch = make([][]byte, batchCount)
+		i := 0
+		transactionsBatchValue.Iterate(context, func(transactionValue interpreter.Value) (resume bool) {
+			t, err := interpreter.ByteArrayValueToByteSlice(context, transactionValue, locationRange)
 			if err != nil {
 				panic(err)
 			}
+			transactionBatch[i] = t
+			i++
+			return true
+		}, false, locationRange)
+	}
 
-			// Batch run
-			batchResults := handler.BatchRun(transactionBatch, types.NewAddressFromBytes(gasFeeCollector))
+	gasFeeCollector, err := interpreter.ByteArrayValueToByteSlice(
+		context,
+		gasFeeCollectorValue,
+		locationRange,
+	)
+	if err != nil {
+		panic(err)
+	}
 
-			values := newResultValues(handler, gauge, context, locationRange, batchResults)
+	// Batch run
+	batchResults := handler.BatchRun(transactionBatch, types.NewAddressFromBytes(gasFeeCollector))
 
-			loc := common.NewAddressLocation(gauge, handler.EVMContractAddress(), stdlib.ContractName)
-			evmResultType := interpreter.NewVariableSizedStaticType(
-				context,
-				interpreter.NewCompositeStaticType(
-					nil,
-					loc,
-					stdlib.EVMResultTypeQualifiedIdentifier,
-					common.NewTypeIDFromQualifiedName(
-						nil,
-						loc,
-						stdlib.EVMResultTypeQualifiedIdentifier,
-					),
-				),
-			)
+	values := newResultValues(handler, context, context, locationRange, batchResults)
 
-			return interpreter.NewArrayValue(
-				context,
-				locationRange,
-				evmResultType,
-				common.ZeroAddress,
-				values...,
-			)
-		},
+	location := common.NewAddressLocation(
+		context,
+		handler.EVMContractAddress(),
+		stdlib.ContractName,
+	)
+	evmResultType := interpreter.NewVariableSizedStaticType(
+		context,
+		interpreter.NewCompositeStaticType(
+			nil,
+			location,
+			stdlib.EVMResultTypeQualifiedIdentifier,
+			common.NewTypeIDFromQualifiedName(
+				nil,
+				location,
+				stdlib.EVMResultTypeQualifiedIdentifier,
+			),
+		),
+	)
+
+	return interpreter.NewArrayValue(
+		context,
+		locationRange,
+		evmResultType,
+		common.ZeroAddress,
+		values...,
 	)
 }
 
@@ -1192,16 +2025,17 @@ type callArguments struct {
 	balance  types.Balance
 }
 
-func parseCallArguments(invocation interpreter.Invocation) (
+func parseCallArguments(
+	context interpreter.InvocationContext,
+	args []interpreter.Value,
+	locationRange interpreter.LocationRange,
+) (
 	*callArguments,
 	error,
 ) {
-	context := invocation.InvocationContext
-	locationRange := invocation.LocationRange
-
 	// Get from address
 
-	fromAddressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+	fromAddressValue, ok := args[0].(*interpreter.ArrayValue)
 	if !ok {
 		return nil, errors.NewUnreachableError()
 	}
@@ -1213,7 +2047,7 @@ func parseCallArguments(invocation interpreter.Invocation) (
 
 	// Get to address
 
-	toAddressValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+	toAddressValue, ok := args[1].(*interpreter.ArrayValue)
 	if !ok {
 		return nil, errors.NewUnreachableError()
 	}
@@ -1225,7 +2059,7 @@ func parseCallArguments(invocation interpreter.Invocation) (
 
 	// Get data
 
-	dataValue, ok := invocation.Arguments[2].(*interpreter.ArrayValue)
+	dataValue, ok := args[2].(*interpreter.ArrayValue)
 	if !ok {
 		return nil, errors.NewUnreachableError()
 	}
@@ -1237,7 +2071,7 @@ func parseCallArguments(invocation interpreter.Invocation) (
 
 	// Get gas limit
 
-	gasLimitValue, ok := invocation.Arguments[3].(interpreter.UInt64Value)
+	gasLimitValue, ok := args[3].(interpreter.UInt64Value)
 	if !ok {
 		panic(errors.NewUnreachableError())
 	}
@@ -1246,7 +2080,7 @@ func parseCallArguments(invocation interpreter.Invocation) (
 
 	// Get balance
 
-	balanceValue, ok := invocation.Arguments[4].(interpreter.UIntValue)
+	balanceValue, ok := args[4].(interpreter.UIntValue)
 	if !ok {
 		return nil, errors.NewUnreachableError()
 	}

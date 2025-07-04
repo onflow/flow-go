@@ -56,7 +56,14 @@ func newContractType(chainID flow.ChainID) *sema.CompositeType {
 		nil,
 	)
 
-	SetupEnvironment(env, nil, evmContractAddress)
+	SetupEnvironment(
+		env,
+		// Not necessary for type checking
+		nil,
+		// Not necessary for type checking
+		InternalEVMFunctions{},
+		evmContractAddress,
+	)
 
 	program, err := env.ParseAndCheckProgram(evmCode, evmContractLocation, false)
 	if err != nil {

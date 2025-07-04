@@ -6,6 +6,8 @@ import (
 	"regexp"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/bbq/commons"
+	"github.com/onflow/cadence/bbq/vm"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
@@ -588,9 +590,32 @@ var internalEVMStandardLibraryType = stdlib.StandardLibraryType{
 	Kind: common.DeclarationKindContract,
 }
 
+type InternalEVMFunctions struct {
+	Run                       *vm.NativeFunctionValue
+	BatchRun                  *vm.NativeFunctionValue
+	CreateCadenceOwnedAccount *vm.NativeFunctionValue
+	Call                      *vm.NativeFunctionValue
+	Deposit                   *vm.NativeFunctionValue
+	Withdraw                  *vm.NativeFunctionValue
+	Deploy                    *vm.NativeFunctionValue
+	Balance                   *vm.NativeFunctionValue
+	Nonce                     *vm.NativeFunctionValue
+	Code                      *vm.NativeFunctionValue
+	CodeHash                  *vm.NativeFunctionValue
+	EncodeABI                 *vm.NativeFunctionValue
+	DecodeABI                 *vm.NativeFunctionValue
+	CastToAttoFLOW            *vm.NativeFunctionValue
+	CastToFLOW                *vm.NativeFunctionValue
+	GetLatestBlock            *vm.NativeFunctionValue
+	DryRun                    *vm.NativeFunctionValue
+	DryCall                   *vm.NativeFunctionValue
+	CommitBlockProposal       *vm.NativeFunctionValue
+}
+
 func SetupEnvironment(
 	env runtime.Environment,
 	internalEVMValue interpreter.Value,
+	internalEVMFunctions InternalEVMFunctions,
 	contractAddress flow.Address,
 ) {
 	location := common.NewAddressLocation(nil, common.Address(contractAddress), ContractName)
@@ -601,6 +626,234 @@ func SetupEnvironment(
 	)
 	env.DeclareValue(
 		newInternalEVMStandardLibraryValue(internalEVMValue),
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeRunFunctionName,
+			),
+			Type:  InternalEVMTypeRunFunctionType,
+			Value: internalEVMFunctions.Run,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeBatchRunFunctionName,
+			),
+			Type:  InternalEVMTypeBatchRunFunctionType,
+			Value: internalEVMFunctions.BatchRun,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeCreateCadenceOwnedAccountFunctionName,
+			),
+			Type:  InternalEVMTypeCreateCadenceOwnedAccountFunctionType,
+			Value: internalEVMFunctions.CreateCadenceOwnedAccount,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeCallFunctionName,
+			),
+			Type:  InternalEVMTypeCallFunctionType,
+			Value: internalEVMFunctions.Call,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeDepositFunctionName,
+			),
+			Type:  InternalEVMTypeDepositFunctionType,
+			Value: internalEVMFunctions.Deposit,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeWithdrawFunctionName,
+			),
+			Type:  InternalEVMTypeWithdrawFunctionType,
+			Value: internalEVMFunctions.Withdraw,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeDeployFunctionName,
+			),
+			Type:  InternalEVMTypeDeployFunctionType,
+			Value: internalEVMFunctions.Deploy,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeBalanceFunctionName,
+			),
+			Type:  InternalEVMTypeBalanceFunctionType,
+			Value: internalEVMFunctions.Balance,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeNonceFunctionName,
+			),
+			Type:  InternalEVMTypeNonceFunctionType,
+			Value: internalEVMFunctions.Nonce,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeCodeFunctionName,
+			),
+			Type:  InternalEVMTypeCodeFunctionType,
+			Value: internalEVMFunctions.Code,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeCodeHashFunctionName,
+			),
+			Type:  InternalEVMTypeCodeHashFunctionType,
+			Value: internalEVMFunctions.CodeHash,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeEncodeABIFunctionName,
+			),
+			Type:  InternalEVMTypeEncodeABIFunctionType,
+			Value: internalEVMFunctions.EncodeABI,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeDecodeABIFunctionName,
+			),
+			Type:  InternalEVMTypeDecodeABIFunctionType,
+			Value: internalEVMFunctions.DecodeABI,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeCastToAttoFLOWFunctionName,
+			),
+			Type:  InternalEVMTypeCastToAttoFLOWFunctionType,
+			Value: internalEVMFunctions.CastToAttoFLOW,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeCastToFLOWFunctionName,
+			),
+			Type:  InternalEVMTypeCastToFLOWFunctionType,
+			Value: internalEVMFunctions.CastToFLOW,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeGetLatestBlockFunctionName,
+			),
+			Type:  InternalEVMTypeGetLatestBlockFunctionType,
+			Value: internalEVMFunctions.GetLatestBlock,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeDryRunFunctionName,
+			),
+			Type:  InternalEVMTypeDryRunFunctionType,
+			Value: internalEVMFunctions.DryRun,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeDryCallFunctionName,
+			),
+			Type:  InternalEVMTypeDryCallFunctionType,
+			Value: internalEVMFunctions.DryCall,
+			Kind:  common.DeclarationKindFunction,
+		},
+		location,
+	)
+	env.DeclareValue(
+		stdlib.StandardLibraryValue{
+			Name: commons.QualifiedName(
+				InternalEVMContractName,
+				InternalEVMTypeCommitBlockProposalFunctionName,
+			),
+			Type:  InternalEVMTypeCommitBlockProposalFunctionType,
+			Value: internalEVMFunctions.CommitBlockProposal,
+			Kind:  common.DeclarationKindFunction,
+		},
 		location,
 	)
 }
