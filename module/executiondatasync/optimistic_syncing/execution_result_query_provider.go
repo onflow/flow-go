@@ -297,8 +297,8 @@ func getExecutorIDs(recepts flow.ExecutionReceiptList) flow.IdentifierList {
 
 // chooseExecutionNodes finds the subset of execution nodes defined in the identity table by first
 // choosing the preferred execution nodes which have executed the transaction. If no such preferred
-// execution nodes are found, then the fixed execution nodes defined in the identity table are returned.
-// If neither preferred nor fixed nodes are defined, then all execution node matching the executor IDs are returned.
+// execution nodes are found, then the required execution nodes defined in the identity table are returned.
+// If neither preferred nor required nodes are defined, then all execution node matching the executor IDs are returned.
 //
 // For example: If execution nodes in identity table are {1,2,3,4}, preferred ENs are defined as {2,3,4}
 // and the executor IDs is {1,2,3}, then {2, 3} is returned as the chosen subset of ENs.
@@ -318,9 +318,9 @@ func (e *ExecutionResultQueryProviderImpl) chooseExecutionNodes(
 		return chosenIDs.ToSkeleton(), nil
 	}
 
-	// if no preferred EN ID is found, then choose from the fixed EN IDs
+	// if no preferred EN ID is found, then choose from the required EN IDs
 	if len(requiredExecutors) > 0 {
-		// choose fixed ENs which have executed the transaction
+		// choose required ENs which have executed the transaction
 		chosenIDs := allENs.Filter(filter.And(
 			filter.HasNodeID[flow.Identity](requiredExecutors...),
 			filter.HasNodeID[flow.Identity](executorIDs...),
@@ -328,12 +328,12 @@ func (e *ExecutionResultQueryProviderImpl) chooseExecutionNodes(
 		if len(chosenIDs) > 0 {
 			return chosenIDs.ToSkeleton(), nil
 		}
-		// if no such ENs are found, then just choose all fixed ENs
+		// if no such ENs are found, then just choose all required ENs
 		chosenIDs = allENs.Filter(filter.HasNodeID[flow.Identity](requiredExecutors...))
 		return chosenIDs.ToSkeleton(), nil
 	}
 
-	// if no preferred or fixed ENs have been specified, then return all executor IDs i.e., no preference at all
+	// if no preferred or required ENs have been specified, then return all executor IDs i.e., no preference at all
 	return allENs.Filter(filter.HasNodeID[flow.Identity](executorIDs...)).ToSkeleton(), nil
 }
 
