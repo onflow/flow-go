@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -39,12 +41,25 @@ func NewUntrustedClusterProposal(internal cluster.Block, proposerSig []byte) *Un
 
 // DeclareTrusted converts the UntrustedClusterProposal to a trusted internal cluster.BlockProposal.
 // CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
-// TODO(malleability immutable, #7277): This conversion should eventually be accompanied by a full validation of the untrusted input.
-func (cbp *UntrustedClusterProposal) DeclareTrusted() *cluster.BlockProposal {
-	return &cluster.BlockProposal{
-		Block:           cluster.NewBlock(cbp.Block.Header, cbp.Block.Payload),
-		ProposerSigData: cbp.ProposerSigData,
+func (cbp *UntrustedClusterProposal) DeclareTrusted() (*cluster.BlockProposal, error) {
+	block, err := cluster.NewBlock(
+		cluster.UntrustedBlock{
+			Header:  cbp.Block.Header,
+			Payload: cbp.Block.Payload,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build cluster block: %w", err)
 	}
+
+	// validate ProposerSigData
+	if len(cbp.ProposerSigData) == 0 {
+		return nil, fmt.Errorf("proposer signature must not be empty")
+	}
+	return &cluster.BlockProposal{
+		Block:           *block,
+		ProposerSigData: cbp.ProposerSigData,
+	}, nil
 }
 
 func UntrustedClusterProposalFromInternal(proposal *cluster.BlockProposal) *UntrustedClusterProposal {

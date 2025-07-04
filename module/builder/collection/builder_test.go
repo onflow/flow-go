@@ -36,7 +36,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var noopSetter = func(*flow.Header) error { return nil }
+var noopSetter = func(header *flow.Header) error {
+	header.ParentVoterIndices = unittest.SignerIndicesFixture(4)
+	header.ParentVoterSigData = unittest.SignatureFixture()
+	header.ProposerID = unittest.IdentifierFixture()
+	return nil
+}
 var noopSigner = func(*flow.Header) ([]byte, error) { return nil, nil }
 
 type BuilderSuite struct {
@@ -65,7 +70,7 @@ type BuilderSuite struct {
 func (suite *BuilderSuite) SetupTest() {
 	var err error
 
-	suite.genesis = model.Genesis()
+	suite.genesis = unittest.ClusterBlock.Genesis()
 	suite.chainID = suite.genesis.Header.ChainID
 
 	suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
@@ -178,7 +183,7 @@ func (suite *BuilderSuite) TearDownTest() {
 	suite.Assert().NoError(err)
 }
 
-func (suite *BuilderSuite) InsertBlock(block model.Block) {
+func (suite *BuilderSuite) InsertBlock(block *model.Block) {
 	err := suite.db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
 	suite.Assert().NoError(err)
 }
@@ -206,7 +211,12 @@ func (suite *BuilderSuite) Payload(transactions ...*flow.TransactionBody) model.
 	final, err := suite.protoState.Final().Head()
 	suite.Require().NoError(err)
 
-	payload, err := model.NewPayload(final.ID(), transactions)
+	payload, err := model.NewPayload(
+		model.UntrustedPayload{
+			ReferenceBlockID: final.ID(),
+			Collection:       flow.Collection{Transactions: transactions},
+		},
+	)
 	suite.Require().NoError(err)
 
 	return *payload
@@ -243,10 +253,12 @@ func (suite *BuilderSuite) TestBuildOn_NonExistentParent() {
 }
 
 func (suite *BuilderSuite) TestBuildOn_Success() {
-
 	var expectedHeight uint64 = 42
 	setter := func(h *flow.Header) error {
 		h.Height = expectedHeight
+		h.ParentVoterIndices = unittest.SignerIndicesFixture(4)
+		h.ParentVoterSigData = unittest.SignatureFixture()
+		h.ProposerID = unittest.IdentifierFixture()
 		return nil
 	}
 
@@ -435,14 +447,18 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 	tx3 := mempoolTransactions[2] // in no block
 
 	// build first fork on top of genesis
-	block1 := unittest.ClusterBlockWithParentAndPayload(*suite.genesis, suite.Payload(tx1))
-
+	block1 := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(suite.genesis),
+		unittest.ClusterBlock.WithPayload(suite.Payload(tx1)),
+	)
 	// insert block on fork 1
 	suite.InsertBlock(block1)
 
 	// build second fork on top of genesis
-	block2 := unittest.ClusterBlockWithParentAndPayload(*suite.genesis, suite.Payload(tx2))
-
+	block2 := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(suite.genesis),
+		unittest.ClusterBlock.WithPayload(suite.Payload(tx2)),
+	)
 	// insert block on fork 2
 	suite.InsertBlock(block2)
 
@@ -474,18 +490,24 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 
 	// build a block containing tx1 on genesis
 	finalizedPayload := suite.Payload(tx1)
-	finalizedBlock := unittest.ClusterBlockWithParentAndPayload(*suite.genesis, finalizedPayload)
+	finalizedBlock := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(suite.genesis),
+		unittest.ClusterBlock.WithPayload(finalizedPayload),
+	)
 	suite.InsertBlock(finalizedBlock)
 	t.Logf("finalized: height=%d id=%s txs=%s parent_id=%s\t\n", finalizedBlock.Header.Height, finalizedBlock.ID(), finalizedPayload.Collection.Light(), finalizedBlock.Header.ParentID)
 
 	// build a block containing tx2 on the first block
 	unFinalizedPayload := suite.Payload(tx2)
-	unFinalizedBlock := unittest.ClusterBlockWithParentAndPayload(finalizedBlock, unFinalizedPayload)
+	unFinalizedBlock := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(finalizedBlock),
+		unittest.ClusterBlock.WithPayload(unFinalizedPayload),
+	)
 	suite.InsertBlock(unFinalizedBlock)
 	t.Logf("finalized: height=%d id=%s txs=%s parent_id=%s\t\n", unFinalizedBlock.Header.Height, unFinalizedBlock.ID(), unFinalizedPayload.Collection.Light(), unFinalizedBlock.Header.ParentID)
 
 	// finalize first block
-	suite.FinalizeBlock(finalizedBlock)
+	suite.FinalizeBlock(*finalizedBlock)
 
 	// build on the un-finalized block
 	header, err := suite.builder.BuildOn(unFinalizedBlock.ID(), noopSetter, noopSigner)
@@ -519,18 +541,23 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 	t.Logf("tx1: %s\ntx2: %s\ntx3: %s", tx1.ID(), tx2.ID(), tx3.ID())
 
 	// build a block containing tx1 on genesis - will be finalized
-	finalizedBlock := unittest.ClusterBlockWithParentAndPayload(*suite.genesis, suite.Payload(tx1))
-
+	finalizedBlock := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(suite.genesis),
+		unittest.ClusterBlock.WithPayload(suite.Payload(tx1)),
+	)
 	suite.InsertBlock(finalizedBlock)
 	t.Logf("finalized: id=%s\tparent_id=%s\theight=%d\n", finalizedBlock.ID(), finalizedBlock.Header.ParentID, finalizedBlock.Header.Height)
 
 	// build a block containing tx2 ALSO on genesis - will be invalidated
-	invalidatedBlock := unittest.ClusterBlockWithParentAndPayload(*suite.genesis, suite.Payload(tx2))
+	invalidatedBlock := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(suite.genesis),
+		unittest.ClusterBlock.WithPayload(suite.Payload(tx2)),
+	)
 	suite.InsertBlock(invalidatedBlock)
 	t.Logf("invalidated: id=%s\tparent_id=%s\theight=%d\n", invalidatedBlock.ID(), invalidatedBlock.Header.ParentID, invalidatedBlock.Header.Height)
 
 	// finalize first block - this indirectly invalidates the second block
-	suite.FinalizeBlock(finalizedBlock)
+	suite.FinalizeBlock(*finalizedBlock)
 
 	// build on the finalized block
 	header, err := suite.builder.BuildOn(finalizedBlock.ID(), noopSetter, noopSigner)
@@ -561,7 +588,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	refID := final.ID()
 
 	// keep track of the head of the chain
-	head := *suite.genesis
+	head := suite.genesis
 
 	// keep track of invalidated transaction IDs
 	var invalidatedTxIds []flow.Identifier
@@ -585,7 +612,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 
 		// by default, build on the head - if we are building a
 		// conflicting fork, build on the parent of the head
-		parent := head
+		parent := *head
 		if conflicting {
 			err = suite.db.View(procedure.RetrieveClusterBlock(parent.Header.ParentID, &parent))
 			assert.NoError(t, err)
@@ -594,13 +621,16 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 		}
 
 		// create a block containing the transaction
-		block := unittest.ClusterBlockWithParentAndPayload(head, suite.Payload(&tx))
+		block := unittest.ClusterBlockFixture(
+			unittest.ClusterBlock.WithParent(head),
+			unittest.ClusterBlock.WithPayload(suite.Payload(&tx)),
+		)
 		suite.InsertBlock(block)
 
 		// reset the valid head if we aren't building a conflicting fork
 		if !conflicting {
 			head = block
-			suite.FinalizeBlock(block)
+			suite.FinalizeBlock(*block)
 			assert.NoError(t, err)
 		}
 
@@ -1049,7 +1079,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 	{
 		var err error
 
-		suite.genesis = model.Genesis()
+		suite.genesis = unittest.ClusterBlock.Genesis()
 		suite.chainID = suite.genesis.Header.ChainID
 
 		suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
@@ -1093,7 +1123,9 @@ func benchmarkBuildOn(b *testing.B, size int) {
 	// create a block history to test performance against
 	final := suite.genesis
 	for i := 0; i < size; i++ {
-		block := unittest.ClusterBlockWithParent(*final)
+		block := unittest.ClusterBlockFixture(
+			unittest.ClusterBlock.WithParent(final),
+		)
 		err := suite.db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
 		require.NoError(b, err)
 
@@ -1101,7 +1133,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		if rand.Intn(100) < 80 {
 			err = suite.db.Update(procedure.FinalizeClusterBlock(block.ID()))
 			require.NoError(b, err)
-			final = &block
+			final = block
 		}
 	}
 

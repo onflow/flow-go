@@ -14,7 +14,7 @@ import (
 
 func TestClusterBlocksByHeight(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		chain := unittest.ClusterBlockChainFixture(5)
+		chain := unittest.ClusterBlockFixtures(5)
 		parent, blocks := chain[0], chain[1:]
 
 		// add parent as boundary
