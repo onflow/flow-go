@@ -1090,7 +1090,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		colFetcher = accessFetcher
 		exeNode.collectionRequester = accessFetcher
 	} else {
-		reqEng, err := requester.New(node.Logger, node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
+		reqEng, err := requester.New(node.Logger.With().Str("entity", "collection").Logger(), node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
 			channels.RequestCollections,
 			filter.Any,
 			func() flow.Entity { return &flow.Collection{} },
@@ -1298,7 +1298,7 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 		engineRegister = &underlay.NoopEngineRegister{}
 	}
 	eng, err := provider.New(
-		node.Logger,
+		node.Logger.With().Str("entity", "receipt").Logger(),
 		node.Metrics.Engine,
 		engineRegister,
 		node.Me,

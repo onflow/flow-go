@@ -745,9 +745,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				execDataCacheBackend,
 			)
 
-			r, err := edrequester.New(
-				builder.Logger,
-				metrics.NewExecutionDataRequesterCollector(),
+		r, err := edrequester.New(
+			builder.Logger.With().Str("entity", "execution_data").Logger(),
+			metrics.NewExecutionDataRequesterCollector(),
 				builder.ExecutionDataDownloader,
 				executionDataCache,
 				processedBlockHeight,
@@ -2104,9 +2104,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 
-			builder.RequestEng, err = requester.New(
-				node.Logger,
-				node.Metrics.Engine,
+		builder.RequestEng, err = requester.New(
+			node.Logger.With().Str("entity", "transaction").Logger(),
+			node.Metrics.Engine,
 				node.EngineRegistry,
 				node.Me,
 				node.State,

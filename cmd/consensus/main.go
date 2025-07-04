@@ -500,9 +500,9 @@ func main() {
 			return e, err
 		}).
 		Component("matching engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			receiptRequester, err = requester.New(
-				node.Logger,
-				node.Metrics.Engine,
+		receiptRequester, err = requester.New(
+			node.Logger.With().Str("entity", "receipt").Logger(),
+			node.Metrics.Engine,
 				node.EngineRegistry,
 				node.Me,
 				node.State,
