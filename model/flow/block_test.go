@@ -145,6 +145,9 @@ func TestBlockMalleability(t *testing.T) {
 //
 // 7. Invalid input with zero ProposerID:
 //   - Ensures an error is returned when the Header.ProposerID is flow.ZeroID.
+//
+// 8. Invalid input where ParentView is greater than or equal to View:
+//   - Ensures an error is returned when the Header.ParentView is not less than Header.View.
 func TestNewBlock(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
 		block := unittest.BlockFixture()
@@ -212,5 +215,16 @@ func TestNewBlock(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "proposer ID must not be zero")
+	})
+
+	t.Run("invalid input with ParentView is greater than or equal to View", func(t *testing.T) {
+		block := unittest.BlockFixture()
+		block.Header.ParentView = 10
+		block.Header.View = 10
+
+		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "invalid views - block view (10) ends after the parent block view (10)")
 	})
 }

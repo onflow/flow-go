@@ -118,6 +118,14 @@ func (h Header) ID() Identifier {
 	return MakeID(h)
 }
 
+// ContainsParentQC reports whether this header carries a valid parent QC.
+// It returns true only if all of the fields required to build a QC are non-zero/nil,
+// indicating that ParentQC() can be safely called without panicking.
+// Only spork root blocks or network genesis blocks do not contain a parent QC.
+func (h Header) ContainsParentQC() bool {
+	return h.ParentID != ZeroID && h.ParentVoterIndices != nil && h.ParentVoterSigData != nil && h.ProposerID != ZeroID
+}
+
 // MarshalJSON makes sure the timestamp is encoded in UTC.
 func (h Header) MarshalJSON() ([]byte, error) {
 
