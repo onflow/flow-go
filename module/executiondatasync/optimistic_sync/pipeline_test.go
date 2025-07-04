@@ -3,6 +3,7 @@ package optimistic_sync
 import (
 	"context"
 	"errors"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"testing"
 	"time"
 
@@ -28,18 +29,18 @@ func TestPipelineStateTransitions(t *testing.T) {
 
 	assert.Equal(t, StatePending, pipeline.GetState(), "Pipeline should start in Pending state")
 
-	errChan := make(chan error)
-	go func() {
-		errChan <- pipeline.Run(context.Background(), mockCore, parent)
-	}()
+	ctx, _, errChan := irrecoverable.WithSignallerAndCancel(context.Background())
+	go unittest.FailOnIrrecoverableError(t, ctx.Done(), errChan)
+	pipeline.Start(ctx)
+	unittest.RequireComponentsReadyBefore(t, time.Second, pipeline)
 
 	// Wait for pipeline to reach WaitingPersist state
-	expectedStates := []State{StateDownloading, StateIndexing, StateWaitingPersist, StatePersisting, StateComplete}
+	expectedStates := []State{StateProcessing, StateWaitingPersist, StateComplete}
 	waitForStateUpdates(t, updateChan, expectedStates...)
 	assert.Equal(t, StateComplete, pipeline.GetState(), "Pipeline should be in Complete state")
 
 	// Run should complete without error
-	waitForError(t, errChan, nil)
+	unittest.RequireComponentsDoneBefore(t, time.Second, pipeline)
 }
 
 // TestPipelineParentDependentTransitions verifies that a pipeline's transitions
@@ -53,24 +54,24 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 
 	assert.Equal(t, StatePending, pipeline.GetState(), "Pipeline should start in Pending state")
 
-	errChan := make(chan error)
-	go func() {
-		errChan <- pipeline.Run(context.Background(), mockCore, parent)
-	}()
+	ctx, _, errChan := irrecoverable.WithSignallerAndCancel(context.Background())
+	go unittest.FailOnIrrecoverableError(t, ctx.Done(), errChan)
+	pipeline.Start(ctx)
+	unittest.RequireComponentsReadyBefore(t, time.Second, pipeline)
 
 	// Initial update - parent in Ready state
-	parent.UpdateState(StateReady, pipeline)
+	parent.UpdateState(StatePending, pipeline)
 
 	// Check that pipeline remains in Ready state
 	waitNeverStateUpdate(t, updateChan)
-	assert.Equal(t, StateReady, pipeline.GetState(), "Pipeline should start in Ready state")
+	assert.Equal(t, StatePending, pipeline.GetState(), "Pipeline should start in Ready state")
 	mockCore.AssertNotCalled(t, "Download")
 
 	// Update parent to downloading
-	parent.UpdateState(StateDownloading, pipeline)
+	parent.UpdateState(StateProcessing, pipeline)
 
 	// Pipeline should now progress to WaitingPersist state and stop
-	expectedStates := []State{StateDownloading, StateIndexing, StateWaitingPersist}
+	expectedStates := []State{StateProcessing, StateWaitingPersist}
 	waitForStateUpdates(t, updateChan, expectedStates...)
 	assert.Equal(t, StateWaitingPersist, pipeline.GetState(), "Pipeline should progress to WaitingPersist state")
 	mockCore.AssertCalled(t, "Download", mock.Anything)
@@ -91,35 +92,35 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 	pipeline.SetSealed()
 
 	// Wait for pipeline to complete
-	expectedStates = []State{StatePersisting, StateComplete}
+	expectedStates = []State{StateComplete}
 	waitForStateUpdates(t, updateChan, expectedStates...)
 	assert.Equal(t, StateComplete, pipeline.GetState(), "Pipeline should reach Complete state")
 	mockCore.AssertCalled(t, "Persist")
 
 	// Run should complete without error
-	waitForError(t, errChan, nil)
+	unittest.RequireComponentsDoneBefore(t, time.Second, pipeline)
 }
 
 // TestParentAbandoned verifies that a pipeline is properly abandoned when
 // the parent pipeline is abandoned.
 func TestAbandoned(t *testing.T) {
 	t.Run("starts already abandoned", func(t *testing.T) {
-		pipeline, mockCore, updateChan, parent := createPipeline(t)
+		pipeline, mockCore, updateChan, _ := createPipeline(t)
 
 		mockCore.On("Abandon").Return(nil)
 
 		pipeline.Abandon()
 
-		errChan := make(chan error)
-		go func() {
-			errChan <- pipeline.Run(context.Background(), mockCore, parent)
-		}()
+		ctx, _, errChan := irrecoverable.WithSignallerAndCancel(context.Background())
+		go unittest.FailOnIrrecoverableError(t, ctx.Done(), errChan)
+		pipeline.Start(ctx)
+		unittest.RequireComponentsReadyBefore(t, time.Second, pipeline)
 
 		// first state must be abandoned
 		waitForStateUpdates(t, updateChan, StateAbandoned)
 
 		// Run should complete without error
-		waitForError(t, errChan, nil)
+		unittest.RequireComponentsDoneBefore(t, time.Second, pipeline)
 	})
 
 	// Test cases abandoning during different stages of processing
@@ -133,30 +134,28 @@ func TestAbandoned(t *testing.T) {
 			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
 				mockCore.On("Download", mock.Anything).Run(func(args mock.Arguments) {
 					pipeline.Abandon()
-					assert.True(t, pipeline.isAbandoned.Load())
 
 					ctx := args[0].(context.Context)
-					unittest.RequireCloseBefore(t, ctx.Done(), 50*time.Millisecond, "Abandon should cause context to be canceled")
+					unittest.RequireCloseBefore(t, ctx.Done(), 500*time.Millisecond, "Abandon should cause context to be canceled")
 				}).Return(func(ctx context.Context) error {
 					return ctx.Err()
 				})
 			},
-			expectedStates: []State{StateDownloading, StateAbandoned},
+			expectedStates: []State{StateProcessing, StateAbandoned},
 		},
 		{
 			name: "Parent abandoned during download",
 			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
 				mockCore.On("Download", mock.Anything).Run(func(args mock.Arguments) {
 					parent.UpdateState(StateAbandoned, pipeline)
-					assert.True(t, pipeline.isAbandoned.Load())
 
 					ctx := args[0].(context.Context)
-					unittest.RequireCloseBefore(t, ctx.Done(), 100*time.Millisecond, "Abandon should cause context to be canceled")
+					unittest.RequireCloseBefore(t, ctx.Done(), 500*time.Millisecond, "Abandon should cause context to be canceled")
 				}).Return(func(ctx context.Context) error {
 					return ctx.Err()
 				})
 			},
-			expectedStates: []State{StateDownloading, StateAbandoned},
+			expectedStates: []State{StateProcessing, StateAbandoned},
 		},
 		{
 			name: "Abandon during index",
@@ -165,10 +164,9 @@ func TestAbandoned(t *testing.T) {
 				mockCore.On("Download", mock.Anything).Return(nil)
 				mockCore.On("Index").Run(func(args mock.Arguments) {
 					pipeline.Abandon()
-					assert.True(t, pipeline.isAbandoned.Load())
 				}).Return(nil)
 			},
-			expectedStates: []State{StateDownloading, StateIndexing, StateWaitingPersist, StateAbandoned},
+			expectedStates: []State{StateProcessing, StateAbandoned},
 		},
 		{
 			name: "Parent abandoned during index",
@@ -177,10 +175,9 @@ func TestAbandoned(t *testing.T) {
 				mockCore.On("Download", mock.Anything).Return(nil)
 				mockCore.On("Index").Run(func(args mock.Arguments) {
 					parent.UpdateState(StateAbandoned, pipeline)
-					assert.True(t, pipeline.isAbandoned.Load())
 				}).Return(nil)
 			},
-			expectedStates: []State{StateDownloading, StateIndexing, StateWaitingPersist, StateAbandoned},
+			expectedStates: []State{StateProcessing, StateAbandoned},
 		},
 		{
 			name: "Abandon during waiting to persist",
@@ -190,11 +187,10 @@ func TestAbandoned(t *testing.T) {
 					go func() {
 						time.Sleep(100 * time.Millisecond)
 						pipeline.Abandon()
-						assert.True(t, pipeline.isAbandoned.Load())
 					}()
 				}).Return(nil)
 			},
-			expectedStates: []State{StateDownloading, StateIndexing, StateWaitingPersist, StateAbandoned},
+			expectedStates: []State{StateProcessing, StateWaitingPersist, StateAbandoned},
 		},
 		{
 			name: "Parent abandoned during waiting to persist",
@@ -204,11 +200,10 @@ func TestAbandoned(t *testing.T) {
 					go func() {
 						time.Sleep(100 * time.Millisecond)
 						parent.UpdateState(StateAbandoned, pipeline)
-						assert.True(t, pipeline.isAbandoned.Load())
 					}()
 				}).Return(nil)
 			},
-			expectedStates: []State{StateDownloading, StateIndexing, StateWaitingPersist, StateAbandoned},
+			expectedStates: []State{StateProcessing, StateWaitingPersist, StateAbandoned},
 		},
 		// Note: it does not make sense to abandon during persist, since it will only be run when:
 		// 1. the parent is already complete
@@ -223,17 +218,17 @@ func TestAbandoned(t *testing.T) {
 
 			mockCore.On("Abandon").Return(nil)
 
-			errChan := make(chan error)
-			go func() {
-				errChan <- pipeline.Run(context.Background(), mockCore, parent)
-			}()
+			ctx, _, errChan := irrecoverable.WithSignallerAndCancel(context.Background())
+			go unittest.FailOnIrrecoverableError(t, ctx.Done(), errChan)
+			pipeline.Start(ctx)
+			unittest.RequireComponentsReadyBefore(t, time.Second, pipeline)
 
 			// Send parent update to start processing
-			parent.UpdateState(StateDownloading, pipeline)
+			parent.UpdateState(StateProcessing, pipeline)
 
 			waitForStateUpdates(t, updateChan, tc.expectedStates...)
 
-			waitForError(t, errChan, nil)
+			unittest.RequireComponentsDoneBefore(t, time.Second, pipeline)
 		})
 	}
 }
@@ -261,7 +256,7 @@ func TestPipelineContextCancellation(t *testing.T) {
 				mockCore.On("Download", mock.Anything).Run(func(args mock.Arguments) {
 					cancel()
 					pipelineCtx := args[0].(context.Context)
-					unittest.RequireCloseBefore(t, pipelineCtx.Done(), 100*time.Millisecond, "Abandon should cause context to be canceled")
+					unittest.RequireCloseBefore(t, pipelineCtx.Done(), 500*time.Millisecond, "Abandon should cause context to be canceled")
 				}).Return(func(pipelineCtx context.Context) error {
 					return pipelineCtx.Err()
 				})
@@ -310,12 +305,11 @@ func TestPipelineContextCancellation(t *testing.T) {
 
 			ctx := tc.setupMock(pipeline, parent, mockCore)
 
-			errChan := make(chan error)
-			go func() {
-				errChan <- pipeline.Run(ctx, mockCore, parent)
-			}()
-
-			waitForError(t, errChan, context.Canceled)
+			irrecoverableCtx, _, errChan := irrecoverable.WithSignallerAndCancel(ctx)
+			go unittest.FailOnIrrecoverableError(t, ctx.Done(), errChan)
+			pipeline.Start(irrecoverableCtx)
+			unittest.RequireComponentsReadyBefore(t, time.Second, pipeline)
+			unittest.RequireComponentsDoneBefore(t, time.Second, pipeline)
 		})
 	}
 }
@@ -336,7 +330,7 @@ func TestPipelineErrorHandling(t *testing.T) {
 				mockCore.On("Download", mock.Anything).Return(expectedErr)
 			},
 			expectedErr:    errors.New("download error"),
-			expectedStates: []State{StateDownloading},
+			expectedStates: []State{StateProcessing},
 		},
 		{
 			name: "Index Error",
@@ -345,7 +339,7 @@ func TestPipelineErrorHandling(t *testing.T) {
 				mockCore.On("Index").Return(expectedErr)
 			},
 			expectedErr:    errors.New("index error"),
-			expectedStates: []State{StateDownloading, StateIndexing},
+			expectedStates: []State{StateProcessing},
 		},
 		{
 			name: "Persist Error",
@@ -358,7 +352,7 @@ func TestPipelineErrorHandling(t *testing.T) {
 				mockCore.On("Persist").Return(expectedErr)
 			},
 			expectedErr:    errors.New("persist error"),
-			expectedStates: []State{StateDownloading, StateIndexing, StateWaitingPersist, StatePersisting},
+			expectedStates: []State{StateProcessing, StateWaitingPersist},
 		},
 		{
 			name: "Abandon Error",
@@ -377,13 +371,12 @@ func TestPipelineErrorHandling(t *testing.T) {
 
 			tc.setupMock(pipeline, parent, mockCore, tc.expectedErr)
 
-			errChan := make(chan error)
-			go func() {
-				errChan <- pipeline.Run(context.Background(), mockCore, parent)
-			}()
+			ctx, _, errChan := irrecoverable.WithSignallerAndCancel(context.Background())
+			pipeline.Start(ctx)
+			unittest.RequireComponentsReadyBefore(t, time.Second, pipeline)
 
 			// Send parent update to trigger processing
-			parent.UpdateState(StateDownloading, pipeline)
+			parent.UpdateState(StateProcessing, pipeline)
 
 			waitForStateUpdates(t, updateChan, tc.expectedStates...)
 
@@ -403,16 +396,13 @@ func TestSetSealed(t *testing.T) {
 // TestValidateTransition verifies that the pipeline correctly validates state transitions.
 func TestValidateTransition(t *testing.T) {
 
-	allStates := []State{StatePending, StateReady, StateDownloading, StateIndexing, StateWaitingPersist, StatePersisting, StateComplete, StateAbandoned}
+	allStates := []State{StatePending, StateProcessing, StateWaitingPersist, StateComplete, StateAbandoned}
 
 	// these are all of the valid transitions from a state to another state
 	validTransitions := map[State]map[State]bool{
-		StatePending:        {StateReady: true, StateAbandoned: true},
-		StateReady:          {StateDownloading: true, StateAbandoned: true},
-		StateDownloading:    {StateIndexing: true, StateAbandoned: true},
-		StateIndexing:       {StateWaitingPersist: true, StateAbandoned: true},
-		StateWaitingPersist: {StatePersisting: true, StateAbandoned: true},
-		StatePersisting:     {StateComplete: true},
+		StatePending:        {StateProcessing: true, StateAbandoned: true},
+		StateProcessing:     {StateWaitingPersist: true, StateAbandoned: true},
+		StateWaitingPersist: {StateComplete: true, StateAbandoned: true},
 		StateComplete:       {},
 		StateAbandoned:      {},
 	}
@@ -519,7 +509,7 @@ func createPipeline(t *testing.T) (*PipelineImpl, *osmock.Core, <-chan State, *m
 	parent := NewMockStateProvider()
 	stateReceiver := NewMockStateReceiver()
 
-	pipeline := NewPipeline(zerolog.Nop(), unittest.ExecutionResultFixture(), false, stateReceiver)
+	pipeline := NewPipeline(zerolog.Nop(), unittest.ExecutionResultFixture(), false, stateReceiver, mockCore, parent)
 
 	return pipeline, mockCore, stateReceiver.updateChan, parent
 }

@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
-
+	"github.com/gammazero/workerpool"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
@@ -35,15 +36,8 @@ type PipelineStateReceiver interface {
 //
 // The state machine is designed to be run in a single goroutine. The Run method must only be called once.
 type Pipeline interface {
+	component.Component
 	PipelineStateProvider
-
-	// Run starts the pipeline processing and blocks until completion or context cancellation.
-	// CAUTION: not concurrency safe! Run must only be called once.
-	//
-	// Expected Errors:
-	//   - context.Canceled: when the context is canceled
-	//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-	Run(context.Context, Core, PipelineStateProvider) error
 
 	// SetSealed marks the pipeline's result as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.
 	SetSealed()
@@ -57,14 +51,69 @@ type Pipeline interface {
 
 var _ Pipeline = (*PipelineImpl)(nil)
 
+// worker implements a simple wrapper over worker pool which supports errors delivery via dedicated channel
+// and context based execution with cancellation.
+type worker struct {
+	ctx     context.Context
+	cancel  context.CancelFunc
+	pool    *workerpool.WorkerPool
+	errChan chan error
+}
+
+// newWorker creates a single worker.
+func newWorker() *worker {
+	ctx, cancel := context.WithCancel(context.Background())
+	return &worker{
+		ctx:     ctx,
+		cancel:  cancel,
+		pool:    workerpool.New(1),
+		errChan: make(chan error, 1),
+	}
+}
+
+// Submit submits a new task for processing, each error will be propagated in a specific channel.
+// Might block the worker if there is no one reading from the error channel and errors are happening.
+func (w *worker) Submit(task func(ctx context.Context) error) {
+	w.pool.Submit(func() {
+		err := task(w.ctx)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			w.errChan <- err
+		}
+	})
+}
+
+// ErrChan returns the channel where errors are delivered from executed jobs.
+func (w *worker) ErrChan() <-chan error {
+	return w.errChan
+}
+
+// StopWait stops the worker pool and waits for all queued tasks to
+// complete. No additional tasks may be submitted, but all pending tasks are
+// executed by workers before this function returns.
+// Any error that was delivered during execution will be delivered to the caller.
+func (w *worker) StopWait() error {
+	w.cancel()
+	w.pool.StopWait()
+
+	defer close(w.errChan)
+	select {
+	case err := <-w.errChan:
+		return err
+	default:
+		return nil
+	}
+}
+
 // PipelineImpl implements the Pipeline interface
 type PipelineImpl struct {
-	log             zerolog.Logger
-	executionResult *flow.ExecutionResult
-	stateReceiver   PipelineStateReceiver
-	stateNotifier   engine.Notifier
-	core            Core
-	parent          PipelineStateProvider
+	*component.ComponentManager
+	log                  zerolog.Logger
+	executionResult      *flow.ExecutionResult
+	stateReceiver        PipelineStateReceiver
+	stateChangedNotifier engine.Notifier
+	core                 Core
+	parent               PipelineStateProvider
+	worker               *worker
 
 	// The following fields are accessed externally. they are stored using atomics to avoid
 	// blocking the caller.
@@ -72,11 +121,7 @@ type PipelineImpl struct {
 	state       *atomic.Int32
 	isSealed    *atomic.Bool
 	isAbandoned *atomic.Bool
-
-	// cancelFn is used to cancel the pipeline's context to abort processing.
-	// it is initialized during Run, but can be called at any time via the abandon method which is
-	// called by the results forest
-	cancelFn *atomic.Pointer[context.CancelFunc]
+	isIndexed   *atomic.Bool
 }
 
 // NewPipeline creates a new processing pipeline.
@@ -86,6 +131,8 @@ func NewPipeline(
 	executionResult *flow.ExecutionResult,
 	isSealed bool,
 	stateReceiver PipelineStateReceiver,
+	core Core,
+	parent PipelineStateProvider,
 ) *PipelineImpl {
 	log = log.With().
 		Str("component", "pipeline").
@@ -93,84 +140,138 @@ func NewPipeline(
 		Str("block_id", executionResult.BlockID.String()).
 		Logger()
 
-	return &PipelineImpl{
-		log:             log,
-		executionResult: executionResult,
-		stateReceiver:   stateReceiver,
-		state:           atomic.NewInt32(int32(StatePending)),
-		isSealed:        atomic.NewBool(isSealed),
-		isAbandoned:     atomic.NewBool(false),
-		cancelFn:        atomic.NewPointer[context.CancelFunc](nil),
-		stateNotifier:   engine.NewNotifier(),
+	p := &PipelineImpl{
+		log:                  log,
+		executionResult:      executionResult,
+		stateReceiver:        stateReceiver,
+		stateChangedNotifier: engine.NewNotifier(),
+		core:                 core,
+		parent:               parent,
+		state:                atomic.NewInt32(int32(StatePending)),
+		isSealed:             atomic.NewBool(isSealed),
+		isAbandoned:          atomic.NewBool(false),
+		isIndexed:            atomic.NewBool(false),
+		worker:               newWorker(),
 	}
+
+	p.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			// run the main event loop
+			err := p.loop(ctx)
+			// after existing
+			err = errors.Join(err, p.worker.StopWait())
+			if err != nil {
+				ctx.Throw(err)
+			}
+		}).Build()
+
+	return p
 }
 
-// Run starts the pipeline processing and blocks until completion or context cancellation.
-// CAUTION: not concurrency safe! Run must only be called once.
-//
-// Expected Errors:
-//   - context.Canceled: when the context is canceled
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-func (p *PipelineImpl) Run(ctx context.Context, core Core, parent PipelineStateProvider) error {
-	pipelineCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
+func (p *PipelineImpl) loop(ctx context.Context) error {
+	// try to start processing in case we are able to.
+	p.stateChangedNotifier.Notify()
 
-	p.core = core
-	p.parent = parent
-	p.cancelFn.Store(&cancel)
-
-	if err := p.transitionTo(StateReady); err != nil {
-		return fmt.Errorf("failed to transition to ready state during initialization: %w", err)
-	}
-
-	notifierChan := p.stateNotifier.Channel()
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-
-		case <-notifierChan:
+		// any error delivered to the worker is sign of critical error and has to be reported
+		// stop any processing and return with that specific error.
+		case err := <-p.worker.ErrChan():
+			return err
+		case <-p.stateChangedNotifier.Channel():
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
 			}
 
+			// if parent got abandoned no point to continue, and we just go to the abandoned state and perform cleanup logic.
 			if p.checkAbandoned() {
-				cancel()
 				if err := p.transitionTo(StateAbandoned); err != nil {
-					return fmt.Errorf("failed to transition to abandoned state during initialization: %w", err)
+					return fmt.Errorf("failed to transition to abandoned state: %w", err)
 				}
 			}
 
-			state := p.GetState()
-			err := p.processCurrentState(pipelineCtx, state)
-			if err != nil {
-				if !errors.Is(err, context.Canceled) {
-					return fmt.Errorf("error running pipeline: %w", err)
+			currentState := p.GetState()
+			switch currentState {
+			case StatePending:
+				if err := p.onStartProcessing(); err != nil {
+					return err
 				}
-
-				// the main context was canceled. shutdown without transitioning to avoid cascading
-				// abandoned state updates since all pipelines may share the same root context
-				if ctx.Err() != nil {
-					return fmt.Errorf("running pipeline failed with context canceled: %w", err)
+			case StateProcessing:
+				if err := p.onProcessing(); err != nil {
+					return err
 				}
-
-				// the pipeline's context was canceled. transition to abandoned and process the state
-				// update before returning
-				if p.GetState() != StateAbandoned {
-					if err := p.transitionTo(StateAbandoned); err != nil {
-						return fmt.Errorf("failed to transition to abandoned state during context cancellation: %w", err)
-					}
+			case StateWaitingPersist:
+				if err := p.onPersistChanges(); err != nil {
+					return err
 				}
-				continue
-			}
-
-			if state.IsTerminal() {
+			case StateAbandoned:
+				// since core is not concurrent safe we need to ensure that it's accessed from
+				// a single goroutine.
+				p.worker.Submit(func(_ context.Context) error {
+					return p.core.Abandon()
+				})
 				return nil
+			case StateComplete:
+				return nil // terminate
+			default:
+				return fmt.Errorf("invalid pipeline state: %s", currentState)
 			}
 		}
 	}
+}
+
+func (p *PipelineImpl) onStartProcessing() error {
+	switch p.parent.GetState() {
+	case StateProcessing, StateWaitingPersist, StateComplete:
+		err := p.transitionTo(StateProcessing)
+		if err != nil {
+			return err
+		}
+		// submit for later processing since download is a 'heavy' operation which will block the event loop.
+		p.worker.Submit(p.performDownload)
+	case StatePending:
+		return nil
+	case StateAbandoned:
+		return p.transitionTo(StateAbandoned)
+	default:
+		// it's unexpected for the parent to be in any other state. this most likely indicates there's a bug
+		return fmt.Errorf("unexpected parent state: %s", p.parent.GetState())
+	}
+	return nil
+}
+
+func (p *PipelineImpl) onProcessing() error {
+	if p.isIndexed.Load() {
+		return p.transitionTo(StateWaitingPersist)
+	}
+	return nil
+}
+
+func (p *PipelineImpl) onPersistChanges() error {
+	if p.isSealed.Load() && p.parent.GetState() == StateComplete {
+		if err := p.core.Persist(); err != nil {
+			return err
+		}
+		return p.transitionTo(StateComplete)
+	} else {
+		return nil
+	}
+}
+
+// checkAbandoned returns true if the pipeline or its parent are abandoned.
+func (p *PipelineImpl) checkAbandoned() bool {
+	if p.isAbandoned.Load() {
+		return true
+	}
+	if p.parent.GetState() == StateAbandoned {
+		return true
+	}
+	return p.GetState() == StateAbandoned
 }
 
 // GetState returns the current state of the pipeline.
@@ -182,153 +283,38 @@ func (p *PipelineImpl) GetState() State {
 func (p *PipelineImpl) SetSealed() {
 	// Note: do not use a mutex here to avoid blocking the results forest.
 	if p.isSealed.CompareAndSwap(false, true) {
-		p.stateNotifier.Notify()
+		p.stateChangedNotifier.Notify()
 	}
 }
 
 // OnParentStateUpdated updates the pipeline's state based on the provided parent state.
 func (p *PipelineImpl) OnParentStateUpdated(parentState State) {
-	// Note: do not use a mutex here to avoid blocking the results forest.
-	if parentState == StateAbandoned {
-		p.abandon()
-	}
-
-	p.stateNotifier.Notify()
+	p.stateChangedNotifier.Notify()
 }
 
 // Abandon marks the pipeline as abandoned
 // This will cause the pipeline to eventually transition to the Abandoned state and halt processing
 func (p *PipelineImpl) Abandon() {
-	// Note: do not use a mutex here to avoid blocking the results forest.
-	p.abandon()
-	p.stateNotifier.Notify()
-}
-
-// abandon marks the pipeline as abandoned and cancels its context, which abort processing.
-// if the pipeline is already abandoned, this is a no-op.
-func (p *PipelineImpl) abandon() {
-	p.isAbandoned.Store(true)
-	p.cancel()
-}
-
-// cancel cancels the pipeline's context if it has been initialized, which abort processing.
-func (p *PipelineImpl) cancel() {
-	cancelFn := p.cancelFn.Load()
-	if cancelFn != nil {
-		cancel := *cancelFn
-		cancel()
+	if p.isAbandoned.CompareAndSwap(false, true) {
+		p.stateChangedNotifier.Notify()
 	}
 }
 
-// processCurrentState handles the current state and transitions to the next state if possible.
+// performDownload handles the Downloading state and transitions to StateIndexing if successful.
 //
 // Expected Errors:
 //   - context.Canceled: when the context is canceled
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-func (p *PipelineImpl) processCurrentState(ctx context.Context, currentState State) (err error) {
-	start := time.Now()
-	defer func() {
-		p.log.Debug().Err(err).
-			Str("state", currentState.String()).
-			Dur("duration", time.Since(start)).
-			Msg("completed processing step")
-	}()
-
-	switch currentState {
-	case StateReady:
-		return p.processReady()
-	case StateDownloading:
-		return p.processDownloading(ctx)
-	case StateIndexing:
-		return p.processIndexing()
-	case StateWaitingPersist:
-		return p.processWaitingPersist()
-	case StatePersisting:
-		return p.processPersisting()
-	case StateAbandoned:
-		return p.processAbandoned()
-	case StateComplete:
-		return nil // nothing to do
-	default:
-		return fmt.Errorf("invalid pipeline state: %s", currentState)
-	}
-}
-
-// processReady handles the Ready state and transitions to StateDownloading if possible.
-//
-// No errors are expected during normal operations
-func (p *PipelineImpl) processReady() error {
-	switch p.parent.GetState() {
-	case StateDownloading, StateIndexing, StateWaitingPersist, StatePersisting, StateComplete:
-		return p.transitionTo(StateDownloading)
-	case StatePending, StateReady:
-		// this pipeline should not be started before the parent, but it's possible there is a race
-		// starting the pipelines in the worker pool. pause and wait for the parent to start.
-		return nil
-	case StateAbandoned:
-		return p.transitionTo(StateAbandoned)
-	default:
-		// its unexpected for the parent to be in any other state. this most likely indicates there's a bug
-		return fmt.Errorf("unexpected parent state: %s", p.parent.GetState())
-	}
-}
-
-// processDownloading handles the Downloading state and transitions to StateIndexing if successful.
-//
-// Expected Errors:
-//   - context.Canceled: when the context is canceled
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-func (p *PipelineImpl) processDownloading(ctx context.Context) error {
+func (p *PipelineImpl) performDownload(ctx context.Context) error {
 	if err := p.core.Download(ctx); err != nil {
 		return err
 	}
-
-	return p.transitionTo(StateIndexing)
-}
-
-// processIndexing handles the Indexing state and transitions to StateWaitingPersist if successful.
-//
-// No errors are expected during normal operations
-func (p *PipelineImpl) processIndexing() error {
 	if err := p.core.Index(); err != nil {
 		return err
 	}
-
-	return p.transitionTo(StateWaitingPersist)
-}
-
-// processWaitingPersist handles the WaitingPersist state and transitions to StatePersisting if possible.
-// Conditions for transition:
-//  1. The result must be sealed
-//  2. The parent pipeline must be complete
-//
-// No errors are expected during normal operations
-func (p *PipelineImpl) processWaitingPersist() error {
-	if p.isSealed.Load() && p.parent.GetState() == StateComplete {
-		return p.transitionTo(StatePersisting)
+	if p.isIndexed.CompareAndSwap(false, true) {
+		p.stateChangedNotifier.Notify()
 	}
-	return nil
-}
-
-// processPersisting handles the Persisting state and transitions to StateComplete if successful.
-//
-// No errors are expected during normal operations
-func (p *PipelineImpl) processPersisting() error {
-	if err := p.core.Persist(); err != nil {
-		return err
-	}
-
-	return p.transitionTo(StateComplete)
-}
-
-// processAbandoned handles the Abandoned state
-//
-// No errors are expected during normal operations
-func (p *PipelineImpl) processAbandoned() error {
-	if err := p.core.Abandon(); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -347,10 +333,8 @@ func (p *PipelineImpl) transitionTo(newState State) error {
 	if hasChange {
 		// send notification for all states except ready.
 		// Ready is not needed since it's the initial state and does not impact children's state machines.
-		if newState != StateReady {
-			p.stateReceiver.OnStateUpdated(newState)
-		}
-		p.stateNotifier.Notify()
+		p.stateReceiver.OnStateUpdated(newState)
+		p.stateChangedNotifier.Notify()
 	}
 
 	return nil
@@ -376,7 +360,7 @@ func (p *PipelineImpl) setState(newState State) (bool, error) {
 
 	if !p.state.CompareAndSwap(int32(currentState), int32(newState)) {
 		// Note: this should never happen since state is only updated within the Run goroutine.
-		return false, fmt.Errorf("failed to transition from %s to %s: state update race", currentState, newState)
+		return false, fmt.Errorf("failed to transition from %s to %s", currentState, newState)
 	}
 
 	p.log.Debug().
@@ -387,19 +371,6 @@ func (p *PipelineImpl) setState(newState State) (bool, error) {
 	return true, nil
 }
 
-// checkAbandoned returns true if the pipeline or its parent are abandoned.
-func (p *PipelineImpl) checkAbandoned() bool {
-	if p.isAbandoned.Load() {
-		return true
-	}
-
-	if p.parent.GetState() == StateAbandoned {
-		return true
-	}
-
-	return p.GetState() == StateAbandoned
-}
-
 // validateTransition validates the transition from the current state to the new state.
 //
 // Expected Errors:
@@ -407,43 +378,25 @@ func (p *PipelineImpl) checkAbandoned() bool {
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (p *PipelineImpl) validateTransition(currentState State, newState State) error {
 	switch newState {
-	case StateReady:
+	case StateProcessing:
 		if currentState == StatePending {
 			return nil
 		}
-
-	case StateDownloading:
-		if currentState == StateReady {
-			return nil
-		}
-
-	case StateIndexing:
-		if currentState == StateDownloading {
-			return nil
-		}
-
 	case StateWaitingPersist:
-		if currentState == StateIndexing {
+		if currentState == StateProcessing {
 			return nil
 		}
-
-	case StatePersisting:
+	case StateComplete:
 		if currentState == StateWaitingPersist {
 			return nil
 		}
-
-	case StateComplete:
-		if currentState == StatePersisting {
-			return nil
-		}
-
 	case StateAbandoned:
 		// Note: it does not make sense to transition to abandoned from persisting or completed since to be in either state:
 		// 1. the parent must be completed
 		// 2. the pipeline's result must be sealed
 		// At that point, there are no conditions that would cause the pipeline be abandoned
 		switch currentState {
-		case StatePending, StateReady, StateDownloading, StateIndexing, StateWaitingPersist:
+		case StatePending, StateProcessing, StateWaitingPersist:
 			return nil
 		}
 
