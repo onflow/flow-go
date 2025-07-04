@@ -78,11 +78,15 @@ type ClusterBlockResponse struct {
 	Blocks []UntrustedClusterProposal
 }
 
-func (br *ClusterBlockResponse) BlocksInternal() []*cluster.BlockProposal {
+func (br *ClusterBlockResponse) BlocksInternal() ([]*cluster.BlockProposal, error) {
 	internal := make([]*cluster.BlockProposal, len(br.Blocks))
+	var err error
 	for i, block := range br.Blocks {
 		block := block
-		internal[i] = block.DeclareTrusted()
+		internal[i], err = block.DeclareTrusted()
+		if err != nil {
+			return nil, fmt.Errorf("could not convert to cluster block proposal: %w", err)
+		}
 	}
-	return internal
+	return internal, nil
 }

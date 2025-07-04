@@ -31,7 +31,11 @@ func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) *c
 		ParentVoterSigData: nil,
 		ProposerID:         flow.ZeroID,
 	}
-	block := cluster.NewBlock(headerBody, *rootBlockPayload)
 
-	return &block
+	return cluster.NewRootBlock(
+		cluster.UntrustedBlock{
+			Header:  headerBody,
+			Payload: *rootBlockPayload,
+		},
+	)
 }

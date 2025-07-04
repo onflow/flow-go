@@ -110,9 +110,14 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedClu
 		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
 	}()
 
+	trustedBlockProposal, err := proposalMsg.Message.DeclareTrusted()
+	if err != nil {
+		return fmt.Errorf("could not convert to cluster block proposal: %w", err)
+	}
+
 	proposal := flow.Slashable[*cluster.BlockProposal]{
 		OriginID: proposalMsg.OriginID,
-		Message:  proposalMsg.Message.DeclareTrusted(),
+		Message:  trustedBlockProposal,
 	}
 	header := proposal.Message.Block.Header
 	payload := proposal.Message.Block.Payload
@@ -174,7 +179,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedClu
 	}
 
 	// ignore proposals that were already processed
-	_, err := c.headers.ByBlockID(blockID)
+	_, err = c.headers.ByBlockID(blockID)
 	if err == nil {
 		log.Debug().Msg("skipping already processed proposal")
 		return nil

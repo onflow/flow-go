@@ -23,10 +23,25 @@ func TestEventStoreRetrieve(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		tx1ID := unittest.IdentifierFixture()
 		tx2ID := unittest.IdentifierFixture()
-		evt1_1 := unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.Event.WithTransactionID(tx1ID))
-		evt1_2 := unittest.EventFixture(flow.EventAccountCreated, 1, 1, unittest.Event.WithTransactionID(tx2ID))
+		evt1_1 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountCreated),
+			unittest.Event.WithTransactionIndex(0),
+			unittest.Event.WithEventIndex(0),
+			unittest.Event.WithTransactionID(tx1ID),
+		)
+		evt1_2 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountCreated),
+			unittest.Event.WithTransactionIndex(1),
+			unittest.Event.WithEventIndex(1),
+			unittest.Event.WithTransactionID(tx2ID),
+		)
 
-		evt2_1 := unittest.EventFixture(flow.EventAccountUpdated, 2, 2, unittest.Event.WithTransactionID(tx2ID))
+		evt2_1 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountUpdated),
+			unittest.Event.WithTransactionIndex(2),
+			unittest.Event.WithEventIndex(2),
+			unittest.Event.WithTransactionID(tx2ID),
+		)
 
 		expected := []flow.EventsList{
 			{evt1_1, evt1_2},
@@ -129,10 +144,25 @@ func TestEventStoreAndRemove(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		tx1ID := unittest.IdentifierFixture()
 		tx2ID := unittest.IdentifierFixture()
-		evt1_1 := unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.Event.WithTransactionID(tx1ID))
-		evt1_2 := unittest.EventFixture(flow.EventAccountCreated, 1, 1, unittest.Event.WithTransactionID(tx2ID))
+		evt1_1 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountCreated),
+			unittest.Event.WithTransactionIndex(0),
+			unittest.Event.WithEventIndex(0),
+			unittest.Event.WithTransactionID(tx1ID),
+		)
+		evt1_2 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountCreated),
+			unittest.Event.WithTransactionIndex(1),
+			unittest.Event.WithEventIndex(1),
+			unittest.Event.WithTransactionID(tx2ID),
+		)
 
-		evt2_1 := unittest.EventFixture(flow.EventAccountUpdated, 2, 2, unittest.Event.WithTransactionID(tx2ID))
+		evt2_1 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountUpdated),
+			unittest.Event.WithTransactionIndex(2),
+			unittest.Event.WithEventIndex(2),
+			unittest.Event.WithTransactionID(tx2ID),
+		)
 
 		expected := []flow.EventsList{
 			{evt1_1, evt1_2},

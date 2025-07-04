@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 func TestHeartbeatResponseSuite(t *testing.T) {
@@ -604,7 +603,7 @@ func TestGetRegisterValues(t *testing.T) {
 }
 
 func generateEvents(t *testing.T, n int) ([]flow.Event, []flow.Event) {
-	ccfEvents := generator.GetEventsWithEncoding(n, entities.EventEncodingVersion_CCF_V0)
+	ccfEvents := unittest.EventGenerator.GetEventsWithEncoding(n, entities.EventEncodingVersion_CCF_V0)
 	jsonEvents := make([]flow.Event, len(ccfEvents))
 	for i, e := range ccfEvents {
 		jsonEvent, err := convert.CcfEventToJsonEvent(e)

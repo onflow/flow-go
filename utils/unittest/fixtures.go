@@ -257,9 +257,9 @@ func ProposalFromBlock(block *flow.Block) *flow.BlockProposal {
 	}
 }
 
-func ClusterProposalFromBlock(block cluster.Block) *cluster.BlockProposal {
+func ClusterProposalFromBlock(block *cluster.Block) *cluster.BlockProposal {
 	return &cluster.BlockProposal{
-		Block:           block,
+		Block:           *block,
 		ProposerSigData: SignatureFixture(),
 	}
 }
@@ -551,59 +551,27 @@ func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *fl
 	}
 }
 
-func ClusterPayloadFixture(n int) *cluster.Payload {
-	transactions := make([]*flow.TransactionBody, n)
-	for i := 0; i < n; i++ {
-		tx := TransactionBodyFixture()
-		transactions[i] = &tx
+func ClusterPayloadFixture(transactionsCount int) *cluster.Payload {
+	return &cluster.Payload{
+		ReferenceBlockID: IdentifierFixture(),
+		Collection:       CollectionFixture(transactionsCount),
 	}
-	payload, err := cluster.NewPayload(flow.ZeroID, transactions)
-	if err != nil {
-		panic(err)
-	}
-	return payload
 }
 
-func ClusterBlockFixture() cluster.Block {
-	payload := ClusterPayloadFixture(3)
-	headerBody := HeaderBodyFixture()
-
-	return cluster.NewBlock(headerBody, *payload)
-}
-
-func ClusterBlockChainFixture(n int) []cluster.Block {
-	clusterBlocks := make([]cluster.Block, 0, n)
+func ClusterBlockFixtures(n int) []*cluster.Block {
+	clusterBlocks := make([]*cluster.Block, 0, n)
 
 	parent := ClusterBlockFixture()
 
 	for i := 0; i < n; i++ {
-		block := ClusterBlockWithParent(parent)
+		block := ClusterBlockFixture(
+			ClusterBlock.WithParent(parent),
+		)
 		clusterBlocks = append(clusterBlocks, block)
 		parent = block
 	}
 
 	return clusterBlocks
-}
-
-// ClusterBlockWithParent creates a new cluster consensus block that is valid
-// with respect to the given parent block.
-func ClusterBlockWithParent(parent cluster.Block) cluster.Block {
-	payload := ClusterPayloadFixture(3)
-	return ClusterBlockWithParentAndPayload(parent, *payload)
-}
-
-// ClusterBlockWithParentAndPayload creates a new cluster consensus block that is valid
-// with respect to the given parent block and with given payload.
-func ClusterBlockWithParentAndPayload(parent cluster.Block, payload cluster.Payload) cluster.Block {
-	headerBody := HeaderBodyFixture()
-	headerBody.Height = parent.Header.Height + 1
-	headerBody.View = parent.Header.View + 1
-	headerBody.ChainID = parent.Header.ChainID
-	headerBody.Timestamp = time.Now().UTC()
-	headerBody.ParentID = parent.ID()
-	headerBody.ParentView = parent.Header.View
-
-	return cluster.NewBlock(headerBody, payload)
 }
 
 func WithCollRef(refID flow.Identifier) func(*flow.CollectionGuarantee) {
@@ -1827,30 +1795,13 @@ func SeedFixtures(m int, n int) [][]byte {
 func BlockEventsFixture(
 	header *flow.Header,
 	n int,
-	types ...flow.EventType,
 ) flow.BlockEvents {
 	return flow.BlockEvents{
 		BlockID:        header.ID(),
 		BlockHeight:    header.Height,
 		BlockTimestamp: header.Timestamp,
-		Events:         EventsFixture(n, types...),
+		Events:         EventsFixture(n),
 	}
-}
-
-func EventsFixture(
-	n int,
-	types ...flow.EventType,
-) []flow.Event {
-	if len(types) == 0 {
-		types = []flow.EventType{"A.0x1.Foo.Bar", "A.0x2.Zoo.Moo", "A.0x3.Goo.Hoo"}
-	}
-
-	events := make([]flow.Event, n)
-	for i := 0; i < n; i++ {
-		events[i] = EventFixture(types[i%len(types)], 0, uint32(i))
-	}
-
-	return events
 }
 
 func EventTypeFixture(chainID flow.ChainID) flow.EventType {
@@ -3238,4 +3189,13 @@ func EpochStateContainerFixture() *flow.EpochStateContainer {
 		ActiveIdentities: DynamicIdentityEntryListFixture(5),
 		EpochExtensions:  []flow.EpochExtension{EpochExtensionFixture()},
 	}
+}
+
+func EpochSetupRandomSourceFixture() []byte {
+	source := make([]byte, flow.EpochSetupRandomSourceLength)
+	_, err := rand.Read(source)
+	if err != nil {
+		panic(err)
+	}
+	return source
 }

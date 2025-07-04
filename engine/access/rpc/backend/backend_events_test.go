@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
@@ -117,7 +116,7 @@ func (s *BackendEventsSuite) SetupTest() {
 		s.T().Logf("block %d: %s", header.Height, block.ID())
 	}
 
-	s.blockEvents = generator.GetEventsWithEncoding(10, entities.EventEncodingVersion_CCF_V0)
+	s.blockEvents = unittest.EventGenerator.GetEventsWithEncoding(10, entities.EventEncodingVersion_CCF_V0)
 	targetEvent = string(s.blockEvents[0].Type)
 
 	// events returned from the db are sorted by txID, txIndex, then eventIndex.
