@@ -50,7 +50,10 @@ func TestClusterBlockMalleability(t *testing.T) {
 // 7. Invalid input with zero ProposerID:
 //   - Ensures an error is returned when the Header.ProposerID is flow.ZeroID.
 //
-// 8. Invalid input with malformed Collection in payload:
+// 8. Invalid input where ParentView is greater than or equal to View:
+//   - Ensures an error is returned when the Header.ParentView is not less than Header.View.
+//
+// 9. Invalid input with malformed Collection in payload:
 //   - Ensures an error is returned when the Payload contains a Collection with invalid transaction IDs.
 func TestNewBlock(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
@@ -119,6 +122,17 @@ func TestNewBlock(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "proposer ID must not be zero")
+	})
+
+	t.Run("invalid input with ParentView is greater than or equal to View", func(t *testing.T) {
+		block := unittest.ClusterBlockFixture()
+		block.Header.ParentView = 10
+		block.Header.View = 10
+
+		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "invalid views - block view (10) ends after the parent block view (10)")
 	})
 
 	t.Run("invalid input with malformed Collection in payload", func(t *testing.T) {
