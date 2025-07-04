@@ -234,6 +234,9 @@ func (h Header) ID() Identifier {
 	return MakeID(h)
 }
 
+// HeaderBodyBuilder constructs a validated, immutable HeaderBody in two phases:
+// first by setting individual fields using fluent WithX methods, then by calling Build()
+// to perform centralized validation and return the final HeaderBody.
 type HeaderBodyBuilder struct {
 	u UntrustedHeaderBody
 }
