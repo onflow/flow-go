@@ -376,7 +376,7 @@ func (b *Backend) GetNetworkParameters(_ context.Context) accessmodel.NetworkPar
 	}
 }
 
-// resolveHeightError processes errors returned during height-based queries.
+// ResolveHeightError processes errors returned during height-based queries.
 // If the error is due to a block not being found, this function determines whether the queried
 // height falls outside the node's accessible range and provides context-sensitive error messages
 // based on spork and node root block heights.
@@ -388,7 +388,7 @@ func (b *Backend) GetNetworkParameters(_ context.Context) accessmodel.NetworkPar
 //
 // Expected errors during normal operation:
 // - storage.ErrNotFound - Indicates that the queried block does not exist in the local database.
-func resolveHeightError(
+func ResolveHeightError(
 	stateParams protocol.Params,
 	height uint64,
 	genericErr error,

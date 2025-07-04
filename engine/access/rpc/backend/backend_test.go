@@ -2036,9 +2036,9 @@ func (suite *Suite) defaultBackendParams() Params {
 	}
 }
 
-// TestResolveHeightError tests the resolveHeightError function for various scenarios where the block height
+// TestResolveHeightError tests the ResolveHeightError function for various scenarios where the block height
 // is below the spork root height, below the node root height, above the node root height, or when a different
-// error is provided. It validates that resolveHeightError returns an appropriate error message for each case.
+// error is provided. It validates that ResolveHeightError returns an appropriate error message for each case.
 //
 // Test cases:
 // 1) If height is below the spork root height, it suggests using a historic node.
@@ -2101,7 +2101,7 @@ func (suite *Suite) TestResolveHeightError() {
 				stateParams.On("SealedRoot").Return(sealedRootHeader, nil).Once()
 			}
 
-			err := resolveHeightError(stateParams, test.height, test.genericErr)
+			err := ResolveHeightError(stateParams, test.height, test.genericErr)
 
 			if test.expectOriginalErr {
 				suite.Assert().True(errors.Is(err, test.genericErr))
