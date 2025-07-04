@@ -3736,7 +3736,9 @@ func TestAccountCapabilitiesPublishEntitledRejection(t *testing.T) {
 				snapshotTree)
 
 			require.NoError(t, err)
-			require.ErrorAs(t, output.Err, &interpreter.EntitledCapabilityPublishingError{})
+
+			var publishingError *interpreter.EntitledCapabilityPublishingError
+			require.ErrorAs(t, output.Err, &publishingError)
 		}),
 	)
 
