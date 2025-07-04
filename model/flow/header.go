@@ -2,11 +2,13 @@ package flow
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/vmihailenco/msgpack/v4"
 
+	"github.com/onflow/flow-go/ledger/common/bitutils"
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/fingerprint"
 )
@@ -29,6 +31,8 @@ type ProposalHeader struct {
 //     of a block.
 //   - With a byzantine HeaderBody alone, an honest node cannot prove who created that faulty data structure,
 //     because HeaderBody does not include the proposer's signature.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type HeaderBody struct {
 	// ChainID is a chain-specific value to prevent replay attacks.
 	ChainID ChainID
@@ -57,6 +61,73 @@ type HeaderBody struct {
 	LastViewTC *TimeoutCertificate
 }
 
+// UntrustedHeaderBody is an untrusted input-only representation of a HeaderBody,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedHeaderBody should be validated and converted into
+// a trusted HeaderBody using NewHeaderBody constructor.
+type UntrustedHeaderBody HeaderBody
+
+// NewHeaderBody creates a new instance of HeaderBody.
+// Construction of HeaderBody is allowed only within the constructor
+//
+// All errors indicate a valid HeaderBody cannot be constructed from the input.
+func NewHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
+	if untrusted.ChainID == "" {
+		return nil, fmt.Errorf("ChainID must not be empty")
+	}
+	if untrusted.ParentID == ZeroID {
+		return nil, fmt.Errorf("ParentID must not be empty")
+	}
+	if untrusted.Timestamp.IsZero() {
+		return nil, fmt.Errorf("Timestamp must not be zero‐value")
+	}
+	if len(untrusted.ParentVoterIndices) == 0 {
+		return nil, fmt.Errorf("ParentVoterIndices must not be empty")
+	}
+	if len(untrusted.ParentVoterSigData) == 0 {
+		return nil, fmt.Errorf("ParentVoterSigData must not be empty")
+	}
+	if untrusted.ProposerID == ZeroID {
+		return nil, fmt.Errorf("ProposerID must not be empty")
+	}
+
+	return &HeaderBody{
+		ChainID:            untrusted.ChainID,
+		ParentID:           untrusted.ParentID,
+		Height:             untrusted.Height,
+		Timestamp:          untrusted.Timestamp,
+		View:               untrusted.View,
+		ParentView:         untrusted.ParentView,
+		ParentVoterIndices: untrusted.ParentVoterIndices,
+		ParentVoterSigData: untrusted.ParentVoterSigData,
+		ProposerID:         untrusted.ProposerID,
+		LastViewTC:         untrusted.LastViewTC,
+	}, nil
+}
+
+// NewRootHeaderBody creates a new instance of root HeaderBody.
+// This constructor must be used **only** for constructing the root header body,
+// which is the only case where zero values are allowed.
+func NewRootHeaderBody(untrusted UntrustedHeaderBody) *HeaderBody {
+	return &HeaderBody{
+		ChainID:            untrusted.ChainID,
+		ParentID:           untrusted.ParentID,
+		Height:             untrusted.Height,
+		Timestamp:          untrusted.Timestamp,
+		View:               untrusted.View,
+		ParentView:         untrusted.ParentView,
+		ParentVoterIndices: untrusted.ParentVoterIndices,
+		ParentVoterSigData: untrusted.ParentVoterSigData,
+		ProposerID:         untrusted.ProposerID,
+		LastViewTC:         untrusted.LastViewTC,
+	}
+}
+
 // QuorumCertificate returns quorum certificate [QC] that is incorporated in the block header body.
 // Caution: this is the QC for the parent.
 func (h HeaderBody) QuorumCertificate() *QuorumCertificate {
@@ -68,6 +139,12 @@ func (h HeaderBody) QuorumCertificate() *QuorumCertificate {
 	}
 }
 
+// IsRootHeaderBody reports whether this is a root header.
+// It returns true only if all of the fields required to build a Header are non-zero/nil,
+func (h HeaderBody) IsRootHeaderBody() bool {
+	return h.ParentID != ZeroID && h.ParentVoterIndices != nil && h.ParentVoterSigData != nil && h.ProposerID != ZeroID
+}
+
 // Header contains all meta-data for a block, as well as a hash of the block payload.
 // Headers are used when the metadata about a block is needed, but the payload is not.
 // Because [Header] includes the payload hash for the block, and the block ID is Merkle-ized
@@ -75,10 +152,54 @@ func (h HeaderBody) QuorumCertificate() *QuorumCertificate {
 // CAUTION regarding security:
 //   - With a byzantine HeaderBody alone, an honest node cannot prove who created that faulty data structure,
 //     because HeaderBody does not include the proposer's signature.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Header struct {
 	HeaderBody
 	// PayloadHash is a hash of the payload of this block.
 	PayloadHash Identifier
+}
+
+// UntrustedHeader is an untrusted input-only representation of a Header,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedHeader should be validated and converted into
+// a trusted Header using NewHeader constructor.
+type UntrustedHeader Header
+
+// NewHeader creates a new instance of Header.
+// Construction of Header is allowed only within the constructor
+//
+// All errors indicate a valid Header cannot be constructed from the input.
+func NewHeader(untrusted UntrustedHeader) (*Header, error) {
+	headerBody, err := NewHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))
+	if err != nil {
+		return nil, fmt.Errorf("invalid header body: %w", err)
+	}
+
+	if untrusted.PayloadHash == ZeroID {
+		return nil, fmt.Errorf("PayloadHash must not be empty")
+	}
+
+	return &Header{
+		HeaderBody:  *headerBody,
+		PayloadHash: untrusted.PayloadHash,
+	}, nil
+}
+
+// NewRootHeader creates a root header.
+//
+// This constructor must be used **only** for constructing the root header,
+// which is the only case where zero values are allowed.
+func NewRootHeader(untrusted UntrustedHeader) *Header {
+	return &Header{
+		HeaderBody:  untrusted.HeaderBody,
+		PayloadHash: untrusted.PayloadHash,
+	}
 }
 
 // Fingerprint defines custom encoding for the header to calculate its ID.
@@ -118,7 +239,103 @@ func (h Header) ID() Identifier {
 	return MakeID(h)
 }
 
+type HeaderBodyFields int
+
+const (
+	ChainIdentifier HeaderBodyFields = iota
+	ParentIdentifier
+	Height
+	Timestamp
+	View
+	ParentView
+	ParentVoterIndices
+	ParentVoterSigData
+	ProposerIdentifier
+	numHeaderBodyFields // always keep this last
+)
+
+// HeaderBodyBuilder constructs a validated, immutable HeaderBody in two phases:
+// first by setting individual fields using fluent WithX methods, then by calling Build()
+// to perform centralized validation and return the final HeaderBody.
+type HeaderBodyBuilder struct {
+	u       UntrustedHeaderBody
+	present []byte
+}
+
+// NewHeaderBodyBuilder helps to build a new Header.
+func NewHeaderBodyBuilder() *HeaderBodyBuilder {
+	return &HeaderBodyBuilder{
+		present: bitutils.MakeBitVector(int(numHeaderBodyFields)),
+	}
+}
+
+// Build validates and returns an immutable Header.
+func (b *HeaderBodyBuilder) Build() (*HeaderBody, error) {
+	// make sure every required field was initialized
+	for bit := 0; bit < int(numHeaderBodyFields); bit++ {
+		if bitutils.ReadBit(b.present, bit) == 0 {
+			return nil, fmt.Errorf("HeaderBodyBuilder: missing field at bit index %d", bit)
+		}
+	}
+
+	return NewHeaderBody(b.u)
+}
+
+func (h *HeaderBodyBuilder) WithChainID(id ChainID) *HeaderBodyBuilder {
+	h.u.ChainID = id
+	bitutils.WriteBit(h.present, int(ChainIdentifier), 1)
+	return h
+}
+func (h *HeaderBodyBuilder) WithParentID(pid Identifier) *HeaderBodyBuilder {
+	h.u.ParentID = pid
+	bitutils.WriteBit(h.present, int(ParentIdentifier), 1)
+	return h
+}
+func (h *HeaderBodyBuilder) WithHeight(height uint64) *HeaderBodyBuilder {
+	h.u.Height = height
+	bitutils.WriteBit(h.present, int(Height), 1)
+	return h
+}
+func (h *HeaderBodyBuilder) WithTimestamp(t time.Time) *HeaderBodyBuilder {
+	h.u.Timestamp = t
+	bitutils.WriteBit(h.present, int(Timestamp), 1)
+	return h
+}
+func (h *HeaderBodyBuilder) WithView(v uint64) *HeaderBodyBuilder {
+	h.u.View = v
+	bitutils.WriteBit(h.present, int(View), 1)
+	return h
+}
+func (h *HeaderBodyBuilder) WithParentView(pv uint64) *HeaderBodyBuilder {
+	h.u.ParentView = pv
+	bitutils.WriteBit(h.present, int(ParentView), 1)
+	return h
+}
+func (h *HeaderBodyBuilder) WithParentVoterIndices(idx []byte) *HeaderBodyBuilder {
+	h.u.ParentVoterIndices = idx
+	bitutils.WriteBit(h.present, int(ParentVoterIndices), 1)
+	return h
+}
+func (h *HeaderBodyBuilder) WithParentVoterSigData(sig []byte) *HeaderBodyBuilder {
+	h.u.ParentVoterSigData = sig
+	bitutils.WriteBit(h.present, int(ParentVoterSigData), 1)
+	return h
+}
+func (h *HeaderBodyBuilder) WithProposerID(id Identifier) *HeaderBodyBuilder {
+	h.u.ProposerID = id
+	bitutils.WriteBit(h.present, int(ProposerIdentifier), 1)
+	return h
+}
+func (h *HeaderBodyBuilder) WithLastViewTC(tc *TimeoutCertificate) *HeaderBodyBuilder {
+	h.u.LastViewTC = tc
+	return h
+}
+
 // MarshalJSON makes sure the timestamp is encoded in UTC.
+//
+// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
+//
+//nolint:structwrite
 func (h Header) MarshalJSON() ([]byte, error) {
 
 	// NOTE: this is just a sanity check to make sure that we don't get
@@ -140,6 +357,10 @@ func (h Header) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON makes sure the timestamp is decoded in UTC.
+//
+// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
+//
+//nolint:structwrite
 func (h *Header) UnmarshalJSON(data []byte) error {
 
 	// we use an alias to avoid endless recursion; the alias will not have the
@@ -158,12 +379,16 @@ func (h *Header) UnmarshalJSON(data []byte) error {
 }
 
 // MarshalCBOR makes sure the timestamp is encoded in UTC.
+//
+// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
+//
+//nolint:structwrite
 func (h Header) MarshalCBOR() ([]byte, error) {
 
 	// NOTE: this is just a sanity check to make sure that we don't get
 	// different encodings if someone forgets to use UTC timestamps
 	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
+		h.Timestamp = h.Timestamp.UTC() //nolint:structwrite
 	}
 
 	// we use an alias to avoid endless recursion; the alias will not have the
@@ -173,6 +398,10 @@ func (h Header) MarshalCBOR() ([]byte, error) {
 }
 
 // UnmarshalCBOR makes sure the timestamp is decoded in UTC.
+//
+// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
+//
+//nolint:structwrite
 func (h *Header) UnmarshalCBOR(data []byte) error {
 
 	// we use an alias to avoid endless recursion; the alias will not have the
@@ -195,6 +424,10 @@ func (h *Header) UnmarshalCBOR(data []byte) error {
 }
 
 // MarshalMsgpack makes sure the timestamp is encoded in UTC.
+//
+// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
+//
+//nolint:structwrite
 func (h Header) MarshalMsgpack() ([]byte, error) {
 
 	// NOTE: this is just a sanity check to make sure that we don't get
@@ -210,6 +443,10 @@ func (h Header) MarshalMsgpack() ([]byte, error) {
 }
 
 // UnmarshalMsgpack makes sure the timestamp is decoded in UTC.
+//
+// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
+//
+//nolint:structwrite
 func (h *Header) UnmarshalMsgpack(data []byte) error {
 
 	// we use an alias to avoid endless recursion; the alias will not have the

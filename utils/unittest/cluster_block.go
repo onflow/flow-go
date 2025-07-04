@@ -58,15 +58,15 @@ func (f *clusterBlockFactory) WithPayload(payload cluster.Payload) func(*cluster
 }
 
 func (f *clusterBlockFactory) Genesis() *cluster.Block {
-	headerBody := flow.HeaderBody{
+	headerBody := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
 		View:      0,
 		ChainID:   "cluster",
 		Timestamp: flow.GenesisTime,
 		ParentID:  flow.ZeroID,
-	}
+	})
 
 	return &cluster.Block{
-		Header:  headerBody,
+		Header:  *headerBody,
 		Payload: *cluster.NewEmptyPayload(flow.ZeroID),
 	}
 }
