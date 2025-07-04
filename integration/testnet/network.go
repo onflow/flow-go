@@ -1239,11 +1239,12 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, err
 	}
 
-	root := flow.NewBlock(
-		rootHeader.HeaderBody,
-		unittest.PayloadFixture(unittest.WithProtocolStateID(
-			rootProtocolState.ID(),
-		)))
+	root := flow.NewRootBlock(
+		flow.UntrustedBlock{
+			Header:  rootHeader.HeaderBody,
+			Payload: unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolState.ID())),
+		},
+	)
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {

@@ -981,7 +981,10 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// add a second block with the receipt for block 1
 		block2 := unittest.BlockWithParentAndPayload(
 			block1.ToHeader(),
-			unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithProtocolStateID(block1.Payload.ProtocolStateID)),
+			unittest.PayloadFixture(
+				unittest.WithReceipts(receipt1),
+				unittest.WithProtocolStateID(block1.Payload.ProtocolStateID),
+			),
 		)
 
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block2))
@@ -1059,7 +1062,10 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// block 5 contains the receipt for block 2
 		block5 := unittest.BlockWithParentAndPayload(
 			block4.ToHeader(),
-			unittest.PayloadFixture(unittest.WithReceipts(receipt2), unittest.WithProtocolStateID(block4.Payload.ProtocolStateID)),
+			unittest.PayloadFixture(
+				unittest.WithReceipts(receipt2),
+				unittest.WithProtocolStateID(block4.Payload.ProtocolStateID),
+			),
 		)
 
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block5))
@@ -1069,7 +1075,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// block 6 contains the seal for block 2
 		seals = []*flow.Seal{seal2}
-		block6View := block2.Header.View + 1
+		block6View := block5.Header.View + 1
 		block6 := unittest.BlockFixture(
 			unittest.Block.WithParent(block5.ID(), block5.Header.View, block5.Header.Height),
 			unittest.Block.WithView(block6View),
@@ -3200,7 +3206,14 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 			checksumMismatch[0] = byte(2)
 		}
 		payload.Guarantees[0].SignerIndices = checksumMismatch
-		block = flow.NewBlock(block.Header, payload)
+		block, err = flow.NewBlock(
+			flow.UntrustedBlock{
+				Header:  block.Header,
+				Payload: payload,
+			},
+		)
+		require.NoError(t, err)
+
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
 		require.ErrorIs(t, err, signature.ErrInvalidChecksum)
@@ -3213,7 +3226,13 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		wrongTailing[len(wrongTailing)-1] = byte(255)
 
 		payload.Guarantees[0].SignerIndices = wrongTailing
-		block = flow.NewBlock(block.Header, payload)
+		block, err = flow.NewBlock(
+			flow.UntrustedBlock{
+				Header:  block.Header,
+				Payload: payload,
+			},
+		)
+		require.NoError(t, err)
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 		require.Error(t, err)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
@@ -3223,7 +3242,14 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		// test imcompatible bit vector length
 		wrongbitVectorLength := validSignerIndices[0 : len(validSignerIndices)-1]
 		payload.Guarantees[0].SignerIndices = wrongbitVectorLength
-		block = flow.NewBlock(block.Header, payload)
+		block, err = flow.NewBlock(
+			flow.UntrustedBlock{
+				Header:  block.Header,
+				Payload: payload,
+			},
+		)
+		require.NoError(t, err)
+
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
 		require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength)
@@ -3234,7 +3260,14 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 
 		// test the ReferenceBlockID is not found
 		payload.Guarantees[0].ReferenceBlockID = flow.ZeroID
-		block = flow.NewBlock(block.Header, payload)
+		block, err = flow.NewBlock(
+			flow.UntrustedBlock{
+				Header:  block.Header,
+				Payload: payload,
+			},
+		)
+		require.NoError(t, err)
+
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.True(t, st.IsInvalidExtensionError(err), err)
@@ -3249,7 +3282,14 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 
 		// test the guarantee has wrong chain ID, and should return ErrClusterNotFound
 		payload.Guarantees[0].ChainID = flow.ChainID("some_bad_chain_ID")
-		block = flow.NewBlock(block.Header, payload)
+		block, err = flow.NewBlock(
+			flow.UntrustedBlock{
+				Header:  block.Header,
+				Payload: payload,
+			},
+		)
+		require.NoError(t, err)
+
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 		require.Error(t, err)
 		require.ErrorIs(t, err, realprotocol.ErrClusterNotFound)

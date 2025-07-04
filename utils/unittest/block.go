@@ -32,6 +32,12 @@ func (f *blockFactory) WithView(view uint64) func(*flow.Block) {
 	}
 }
 
+func (f *blockFactory) WithParentView(view uint64) func(*flow.Block) {
+	return func(block *flow.Block) {
+		block.Header.ParentView = view
+	}
+}
+
 func (f *blockFactory) WithHeight(height uint64) func(*flow.Block) {
 	return func(block *flow.Block) {
 		block.Header.Height = height

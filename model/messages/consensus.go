@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -17,12 +19,26 @@ func NewUntrustedProposal(internal *flow.BlockProposal) *UntrustedProposal {
 
 // DeclareTrusted converts the UntrustedProposal to a trusted internal flow.BlockProposal.
 // CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
-// TODO(malleability immutable): This conversion should eventually be accompanied by a full validation of the untrusted input.
-func (msg *UntrustedProposal) DeclareTrusted() *flow.BlockProposal {
-	return &flow.BlockProposal{
-		Block:           *flow.NewBlock(msg.Block.Header, msg.Block.Payload),
-		ProposerSigData: msg.ProposerSigData,
+//
+// All errors indicate that the input message could not be converted to a valid proposal.
+func (msg *UntrustedProposal) DeclareTrusted() (*flow.BlockProposal, error) {
+	block, err := flow.NewBlock(
+		flow.UntrustedBlock{
+			Header:  msg.Block.Header,
+			Payload: msg.Block.Payload,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build block: %w", err)
 	}
+	// validate ProposerSigData
+	if len(msg.ProposerSigData) == 0 {
+		return nil, fmt.Errorf("proposer signature must not be empty")
+	}
+	return &flow.BlockProposal{
+		Block:           *block,
+		ProposerSigData: msg.ProposerSigData,
+	}, nil
 }
 
 // BlockVote is part of the consensus protocol and represents a consensus node

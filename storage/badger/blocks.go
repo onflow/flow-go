@@ -52,7 +52,28 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Bl
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve payload: %w", err)
 		}
-		return flow.NewBlock(header.HeaderBody, *payload), nil
+
+		var block *flow.Block
+		if header.ContainsParentQC() {
+			block, err = flow.NewBlock(
+				flow.UntrustedBlock{
+					Header:  header.HeaderBody,
+					Payload: *payload,
+				},
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not build block: %w", err)
+			}
+		} else {
+			block = flow.NewRootBlock(
+				flow.UntrustedBlock{
+					Header:  header.HeaderBody,
+					Payload: *payload,
+				},
+			)
+		}
+
+		return block, nil
 	}
 }
 

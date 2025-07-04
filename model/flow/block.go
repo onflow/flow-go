@@ -21,10 +21,21 @@ func Genesis(chainID ChainID) *Block {
 	}
 
 	// combine to block
-	return NewBlock(headerBody, payload)
+	return NewRootBlock(
+		UntrustedBlock{
+			Header:  headerBody,
+			Payload: payload,
+		},
+	)
 }
 
 // Block (currently) includes the all block header metadata and the payload content.
+//
+// Zero values are allowed only for root blocks, which must be constructed
+// using the NewRootBlock constructor. All non-root blocks must be constructed
+// using NewBlock to ensure validation of the block fields.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Block struct {
 	// Header is a container encapsulating most of the header fields - *excluding* the payload hash
 	// and the proposer signature. Generally, the type [HeaderBody] should not be used on its own.
@@ -38,18 +49,59 @@ type Block struct {
 	Payload Payload
 }
 
-// NewBlock creates a new block.
+// UntrustedBlock is an untrusted input-only representation of a Block,
+// used for construction.
 //
-// Parameters:
-// - headerBody: the header fields to use for the block
-// - payload: the payload to associate with the block
-func NewBlock(
-	headerBody HeaderBody,
-	payload Payload,
-) *Block {
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedBlock should be validated and converted into
+// a trusted Block using the NewBlock constructor (or NewRootBlock
+// for the root block).
+type UntrustedBlock Block
+
+// NewBlock creates a new block.
+// This constructor enforces validation rules to ensure the block is well-formed.
+// It must be used to construct all non-root blocks.
+//
+// All errors indicate that a valid Block cannot be constructed from the input.
+func NewBlock(untrusted UntrustedBlock) (*Block, error) {
+	// validate header body
+	untrustedHeaderBody := untrusted.Header
+	if untrustedHeaderBody.ParentID == ZeroID {
+		return nil, fmt.Errorf("parent ID must not be zero")
+	}
+	if len(untrustedHeaderBody.ParentVoterIndices) == 0 {
+		return nil, fmt.Errorf("parent voter indices must not be empty")
+	}
+	if len(untrustedHeaderBody.ParentVoterSigData) == 0 {
+		return nil, fmt.Errorf("parent voter signature must not be empty")
+	}
+	if untrustedHeaderBody.ProposerID == ZeroID {
+		return nil, fmt.Errorf("proposer ID must not be zero")
+	}
+	if untrustedHeaderBody.ParentView >= untrustedHeaderBody.View {
+		return nil, fmt.Errorf("invalid views - block parent view (%d) is greater than or equal to block view (%d)", untrustedHeaderBody.ParentView, untrustedHeaderBody.View)
+	}
+
+	// validate payload
+	if untrusted.Payload.ProtocolStateID == ZeroID {
+		return nil, fmt.Errorf("protocol state ID must not be zero")
+	}
 	return &Block{
-		Header:  headerBody,
-		Payload: payload,
+		Header:  untrusted.Header,
+		Payload: untrusted.Payload,
+	}, nil
+}
+
+// NewRootBlock creates a root block.
+// This constructor must be used **only** for constructing the root block,
+// which is the only case where zero values are allowed.
+func NewRootBlock(untrusted UntrustedBlock) *Block {
+	return &Block{
+		Header:  untrusted.Header,
+		Payload: untrusted.Payload,
 	}
 }
 

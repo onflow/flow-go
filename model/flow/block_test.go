@@ -119,3 +119,125 @@ func TestBlockMalleability(t *testing.T) {
 		}),
 	)
 }
+
+// TestNewBlock verifies the behavior of the NewBlock constructor.
+// It ensures proper handling of both valid and invalid untrusted input fields.
+//
+// Test Cases:
+//
+// 1. Valid input:
+//   - Verifies that a properly populated UntrustedBlock results in a valid Block.
+//
+// 2. Invalid input with zero ParentID:
+//   - Ensures an error is returned when the Header.ParentID is flow.ZeroID.
+//
+// 3. Invalid input with nil ParentVoterIndices:
+//   - Ensures an error is returned when the Header.ParentVoterIndices is nil.
+//
+// 4. Invalid input with empty ParentVoterIndices:
+//   - Ensures an error is returned when the Header.ParentVoterIndices is an empty slice.
+//
+// 5. Invalid input with nil ParentVoterSigData:
+//   - Ensures an error is returned when the Header.ParentVoterSigData is nil.
+//
+// 6. Invalid input with empty ParentVoterSigData:
+//   - Ensures an error is returned when the Header.ParentVoterSigData is an empty slice.
+//
+// 7. Invalid input with zero ProposerID:
+//   - Ensures an error is returned when the Header.ProposerID is flow.ZeroID.
+//
+// 8. Invalid input where ParentView is greater than or equal to View:
+//   - Ensures an error is returned when the Header.ParentView is not less than Header.View.
+//
+// 9. Invalid input with zero ProtocolStateID:
+//   - Ensures an error is returned when the Payload.ProtocolStateID is flow.ZeroID.
+func TestNewBlock(t *testing.T) {
+	t.Run("valid input", func(t *testing.T) {
+		block := unittest.BlockFixture()
+
+		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	})
+
+	t.Run("invalid input with zero ParentID", func(t *testing.T) {
+		block := unittest.BlockFixture()
+		block.Header.ParentID = flow.ZeroID
+
+		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "parent ID must not be zero")
+	})
+
+	t.Run("invalid input with nil ParentVoterIndices", func(t *testing.T) {
+		block := unittest.BlockFixture()
+		block.Header.ParentVoterIndices = nil
+
+		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "parent voter indices must not be empty")
+	})
+
+	t.Run("invalid input with empty ParentVoterIndices", func(t *testing.T) {
+		block := unittest.BlockFixture()
+		block.Header.ParentVoterIndices = []byte{}
+
+		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "parent voter indices must not be empty")
+	})
+
+	t.Run("invalid input with nil ParentVoterSigData", func(t *testing.T) {
+		block := unittest.BlockFixture()
+		block.Header.ParentVoterSigData = nil
+
+		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "parent voter signature must not be empty")
+	})
+
+	t.Run("invalid input with empty ParentVoterSigData", func(t *testing.T) {
+		block := unittest.BlockFixture()
+		block.Header.ParentVoterSigData = []byte{}
+
+		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "parent voter signature must not be empty")
+	})
+
+	t.Run("invalid input with zero ProposerID", func(t *testing.T) {
+		block := unittest.BlockFixture()
+		block.Header.ProposerID = flow.ZeroID
+
+		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "proposer ID must not be zero")
+	})
+
+	t.Run("invalid input with ParentView is greater than or equal to View", func(t *testing.T) {
+		block := unittest.BlockFixture()
+		block.Header.ParentView = 10
+		block.Header.View = 10
+
+		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "invalid views - block parent view (10) is greater than or equal to block view (10)")
+	})
+
+	t.Run("invalid input with zero ProtocolStateID", func(t *testing.T) {
+		block := unittest.BlockFixture()
+		block.Payload.ProtocolStateID = flow.ZeroID
+
+		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "protocol state ID must not be zero")
+	})
+}

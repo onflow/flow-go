@@ -387,8 +387,9 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		block1 := unittest.BlockFixture()
 		proposal1 := unittest.ProposalFromBlock(block1)
 		// test block2 get by height
-		block2 := unittest.BlockFixture()
-		block2.Header.Height = 2
+		block2 := unittest.BlockFixture(
+			unittest.Block.WithHeight(2),
+		)
 		proposal2 := unittest.ProposalFromBlock(block2)
 
 		require.NoError(suite.T(), all.Blocks.Store(proposal1))
@@ -1347,7 +1348,10 @@ func (suite *Suite) createChain() (*flow.BlockProposal, *flow.Collection) {
 	}
 	block := unittest.BlockWithParentAndPayload(
 		suite.finalizedBlock,
-		unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
+		unittest.PayloadFixture(
+			unittest.WithGuarantees(guarantee),
+			unittest.WithProtocolStateID(unittest.IdentifierFixture()),
+		),
 	)
 	proposal := unittest.ProposalFromBlock(block)
 
