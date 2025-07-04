@@ -107,7 +107,12 @@ func (reader *accountKeyReader) GetAccountKey(
 		return nil, fmt.Errorf("getting account key failed: %w", err)
 	}
 
-	err := reader.meter.MeterComputation(ComputationKindGetAccountKey, 1)
+	err := reader.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindGetAccountKey,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return formatErr(err)
 	}
@@ -151,7 +156,12 @@ func (reader *accountKeyReader) AccountKeysCount(
 		return 0, fmt.Errorf("fetching account key count failed: %w", err)
 	}
 
-	err := reader.meter.MeterComputation(ComputationKindAccountKeysCount, 1)
+	err := reader.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindAccountKeysCount,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return formatErr(err)
 	}
