@@ -216,32 +216,32 @@ func NewResultsForest(
 	return rf, nil
 }
 
-// AddSealedResult adds a sealed Execution Result to the Result Forest (without any receipts),
-// in case the result is not already stored in the tree.
-// This method should only be used for inserting the sealed root right after initialization:
-// After recovering from a crash, the mempools are wiped and the sealed results will not
-// be stored in the Execution Tree anymore. Adding the result to the tree allows to create
-// a vertex in the tree without attaching any Execution Receipts to it.
+// AddSealedResult adds a SEALED Execution Result to the Result Forest (without any receipts),
+// in case the result is not already stored in the tree. If the result is already stored,
+// its status is set to sealed.
 // Execution results with a finalized seal are committed to the chain and considered final
 // irrespective of which Execution Nodes [ENs] produced them. Therefore, it is fine to not track
-// which ENs produced the result. However, for results without a finalized seal, it depends on the
-// clients how much trust they are willing to place in the results correctness - potentially
-// depending on how many ENs and/or which ENs specifically produced the result. Therefore,
-// unsealed results must be added using the  `AddReceipt` method.
+// which ENs produced the result (but we also don't preclude receipt from being added for the
+// result later).
+//
+// In contrast, for results without a finalized seal, it depends on the clients how much trust they
+// are willing to place in the results correctness - potentially depending on how many ENs and/or
+// which ENs specifically produced the result. Therefore, unsealed results must be added using
+// the `AddReceipt` method.
 //
 // Expected errors during normal operations:
 //   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-//
-// TODO: during normal operations we should never add a result without a receipt, this is only used for crash recovery
 func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	_, err := rf.getOrCreateExecutionResultContainer(result, true)
+	container, err := rf.getOrCreateContainer(result)
 	if err != nil {
 		return fmt.Errorf("failed to get container for result (%s): %w", result.ID(), err)
 	}
+
+	// This call might be the first time, where the ResultsForest learns that the result is sealed.
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	container.pipeline.SetSealed()
 	return nil
 }
 
@@ -255,11 +255,10 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt) (bool, error
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	container, err := rf.getOrCreateExecutionResultContainer(&receipt.ExecutionResult, false)
+	container, err := rf.getOrCreateContainer(&receipt.ExecutionResult)
 	if err != nil {
 		return false, fmt.Errorf("failed to get container for result (%s): %w", receipt.ExecutionResult.ID(), err)
 	}
-
 	if container == nil {
 		// noop if the result's block view is lower than the lowest view.
 		return false, nil
@@ -273,15 +272,19 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt) (bool, error
 	return added > 0, nil
 }
 
-// GetOrCreateContainer retrieves or creates the container for the given result. It is optimized for the case of
-// many concurrent reads compared to relatively few writes, and rarely repeated calls.  GetOrCreateContainer
-// is idempotent and atomit: it always returns the first container created for the given result.
+// getOrCreateContainer retrieves or creates the container for the given result within the forest.
+// It is optimized for the case of many concurrent reads compared to relatively few writes, and
+// rarely repeated calls.
+// getOrCreateContainer is idempotent and atomic: it always returns the first container created
+// for the given result.
+// getOrCreateContainer is not exported, because the returned container is not safe in an environment
+// with concurrent reads and modifications.
 //
 // Expected errors during normal operations:
 //   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-func (rf *ResultsForest) GetOrCreateContainer(result *flow.ExecutionResult, isSealed bool) (*ExecutionResultContainer, error) {
-	// First try to get existing container - this will acquire read-lock only
+func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult) (*ExecutionResultContainer, error) {
+	// First, try to get existing container - this will acquire read-lock only
 	resultID := result.ID()
 	container, found := rf.GetContainer(resultID)
 	if found {
@@ -300,7 +303,7 @@ func (rf *ResultsForest) GetOrCreateContainer(result *flow.ExecutionResult, isSe
 		return nil, fmt.Errorf("failed to get block header for result (%s): %w", resultID, err)
 	}
 
-	pipeline := rf.pipelineFactory.NewPipeline(result, isSealed)
+	pipeline := rf.pipelineFactory.NewPipeline(result)
 	container, err = NewExecutionResultContainer(result, executedBlock, pipeline)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container for result (%s): %w", resultID, err)
