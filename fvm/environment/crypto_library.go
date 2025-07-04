@@ -3,6 +3,7 @@ package environment
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/crypto"
@@ -181,7 +182,12 @@ func (lib *cryptoLibrary) Hash(
 ) {
 	defer lib.tracer.StartChildSpan(trace.FVMEnvHash).End()
 
-	err := lib.meter.MeterComputation(ComputationKindHash, 1)
+	err := lib.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindHash,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("hash failed: %w", err)
 	}
@@ -203,7 +209,12 @@ func (lib *cryptoLibrary) VerifySignature(
 ) {
 	defer lib.tracer.StartChildSpan(trace.FVMEnvVerifySignature).End()
 
-	err := lib.meter.MeterComputation(ComputationKindVerifySignature, 1)
+	err := lib.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindVerifySignature,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return false, fmt.Errorf("verify signature failed: %w", err)
 	}
@@ -227,7 +238,12 @@ func (lib *cryptoLibrary) VerifySignature(
 func (lib *cryptoLibrary) ValidatePublicKey(pk *runtime.PublicKey) error {
 	defer lib.tracer.StartChildSpan(trace.FVMEnvValidatePublicKey).End()
 
-	err := lib.meter.MeterComputation(ComputationKindValidatePublicKey, 1)
+	err := lib.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindValidatePublicKey,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("validate public key failed: %w", err)
 	}
@@ -244,7 +260,12 @@ func (lib *cryptoLibrary) BLSVerifyPOP(
 ) {
 	defer lib.tracer.StartChildSpan(trace.FVMEnvBLSVerifyPOP).End()
 
-	err := lib.meter.MeterComputation(ComputationKindBLSVerifyPOP, 1)
+	err := lib.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindBLSVerifyPOP,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return false, fmt.Errorf("BLSVerifyPOP failed: %w", err)
 	}
@@ -260,7 +281,12 @@ func (lib *cryptoLibrary) BLSAggregateSignatures(
 ) {
 	defer lib.tracer.StartChildSpan(trace.FVMEnvBLSAggregateSignatures).End()
 
-	err := lib.meter.MeterComputation(ComputationKindBLSAggregateSignatures, 1)
+	err := lib.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindBLSAggregateSignatures,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("BLSAggregateSignatures failed: %w", err)
 	}
@@ -276,7 +302,12 @@ func (lib *cryptoLibrary) BLSAggregatePublicKeys(
 ) {
 	defer lib.tracer.StartChildSpan(trace.FVMEnvBLSAggregatePublicKeys).End()
 
-	err := lib.meter.MeterComputation(ComputationKindBLSAggregatePublicKeys, 1)
+	err := lib.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindBLSAggregatePublicKeys,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("BLSAggregatePublicKeys failed: %w", err)
 	}

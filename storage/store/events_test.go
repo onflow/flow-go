@@ -23,10 +23,25 @@ func TestEventStoreRetrieve(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		tx1ID := unittest.IdentifierFixture()
 		tx2ID := unittest.IdentifierFixture()
-		evt1_1 := unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.Event.WithTransactionID(tx1ID))
-		evt1_2 := unittest.EventFixture(flow.EventAccountCreated, 1, 1, unittest.Event.WithTransactionID(tx2ID))
+		evt1_1 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountCreated),
+			unittest.Event.WithTransactionIndex(0),
+			unittest.Event.WithEventIndex(0),
+			unittest.Event.WithTransactionID(tx1ID),
+		)
+		evt1_2 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountCreated),
+			unittest.Event.WithTransactionIndex(1),
+			unittest.Event.WithEventIndex(1),
+			unittest.Event.WithTransactionID(tx2ID),
+		)
 
-		evt2_1 := unittest.EventFixture(flow.EventAccountUpdated, 2, 2, unittest.Event.WithTransactionID(tx2ID))
+		evt2_1 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountUpdated),
+			unittest.Event.WithTransactionIndex(2),
+			unittest.Event.WithEventIndex(2),
+			unittest.Event.WithTransactionID(tx2ID),
+		)
 
 		expected := []flow.EventsList{
 			{evt1_1, evt1_2},
@@ -117,5 +132,61 @@ func TestEventRetrieveWithoutStore(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, len(evts) == 0)
 
+	})
+}
+
+func TestEventStoreAndRemove(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		metrics := metrics.NewNoopCollector()
+		store := store.NewEvents(metrics, db)
+
+		// Create and store an event
+		blockID := unittest.IdentifierFixture()
+		tx1ID := unittest.IdentifierFixture()
+		tx2ID := unittest.IdentifierFixture()
+		evt1_1 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountCreated),
+			unittest.Event.WithTransactionIndex(0),
+			unittest.Event.WithEventIndex(0),
+			unittest.Event.WithTransactionID(tx1ID),
+		)
+		evt1_2 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountCreated),
+			unittest.Event.WithTransactionIndex(1),
+			unittest.Event.WithEventIndex(1),
+			unittest.Event.WithTransactionID(tx2ID),
+		)
+
+		evt2_1 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountUpdated),
+			unittest.Event.WithTransactionIndex(2),
+			unittest.Event.WithEventIndex(2),
+			unittest.Event.WithTransactionID(tx2ID),
+		)
+
+		expected := []flow.EventsList{
+			{evt1_1, evt1_2},
+			{evt2_1},
+		}
+
+		err := store.Store(blockID, expected)
+		require.NoError(t, err)
+
+		// Ensure it exists
+		event, err := store.ByBlockID(blockID)
+		require.NoError(t, err)
+		require.Len(t, event, 3)
+		require.Contains(t, event, evt1_1)
+		require.Contains(t, event, evt1_2)
+		require.Contains(t, event, evt2_1)
+
+		// Remove it
+		err = store.RemoveByBlockID(blockID)
+		require.NoError(t, err)
+
+		// Ensure it no longer exists
+		event, err = store.ByBlockID(blockID)
+		require.NoError(t, err)
+		require.Len(t, event, 0)
 	})
 }

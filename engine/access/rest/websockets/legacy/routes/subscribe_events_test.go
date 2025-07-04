@@ -15,7 +15,6 @@ import (
 	"golang.org/x/exp/slices"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -27,7 +26,6 @@ import (
 	mockstatestream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 type testType struct {
@@ -71,26 +69,23 @@ func (s *SubscribeEventsSuite) SetupTest() {
 	s.blocks = make([]*flow.Block, 0, blockCount)
 	s.blockEvents = make(map[flow.Identifier]flow.EventsList, blockCount)
 
-	// by default, events are in CCF encoding
-	eventsGenerator := generator.EventGenerator(generator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
-
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
 		parent = block.ToHeader()
 
 		result := unittest.ExecutionResultFixture()
-		blockEvents := unittest.BlockEventsFixture(block.ToHeader(), (i%len(testEventTypes))*3+1, testEventTypes...)
-
-		// update payloads with valid CCF encoded data
-		for i := range blockEvents.Events {
-			blockEvents.Events[i].Payload = eventsGenerator.New().Payload
-
-			s.T().Logf("block events %d %v => %v", block.Header.Height, block.ID(), blockEvents.Events[i].Type)
-		}
 
 		s.blocks = append(s.blocks, block)
-		s.blockEvents[block.ID()] = blockEvents.Events
+
+		var events []flow.Event
+		for j := 0; j < len(testEventTypes); j++ {
+			events = append(events, unittest.EventFixture(
+				unittest.Event.WithEventType(testEventTypes[j]),
+			))
+		}
+
+		s.blockEvents[block.ID()] = events
 
 		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Header.Height, block.ID(), result.ExecutionDataID)
 	}
@@ -162,7 +157,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 		t3 := test
 		t3.name = fmt.Sprintf("%s - non existing events", test.name)
-		t3.eventTypes = []string{fmt.Sprintf("%s_new", testEventTypes[0])}
+		t3.eventTypes = []string{fmt.Sprintf("%s_unknown", unittest.EventTypeFixture(chainID))}
 		tests = append(tests, t3)
 	}
 
