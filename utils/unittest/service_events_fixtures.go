@@ -1,18 +1,11 @@
 package unittest
 
 import (
-	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -21,21 +14,15 @@ import (
 
 // This file contains service event fixtures for testing purposes.
 
-func EpochSetupRandomSourceFixture() []byte {
-	source := make([]byte, flow.EpochSetupRandomSourceLength)
-	_, err := rand.Read(source)
-	if err != nil {
-		panic(err)
-	}
-	return source
-}
-
 // EpochSetupFixtureByChainID returns an EpochSetup service event as a Cadence event
 // representation and as a protocol model representation.
 func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 	events := systemcontracts.ServiceEventsForChain(chain)
 	randomSource := EpochSetupRandomSourceFixture()
-	event := EventFixture(events.EpochSetup.EventType(), 1, 1, Event.WithPayload(EpochSetupFixtureCCF(randomSource)))
+	event := EventFixture(
+		Event.WithEventType(events.EpochSetup.EventType()),
+		Event.WithPayload(EpochSetupFixtureCCF(randomSource)),
+	)
 
 	expected := &flow.EpochSetup{
 		Counter:            1,
@@ -125,7 +112,11 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
 	events := systemcontracts.ServiceEventsForChain(chain)
 
-	event := EventFixture(events.EpochCommit.EventType(), 1, 1, Event.WithPayload(EpochCommitFixtureCCF))
+	event := EventFixture(
+		Event.WithEventType(events.EpochCommit.EventType()),
+		Event.WithPayload(EpochCommitFixtureCCF),
+	)
+
 	expected := &flow.EpochCommit{
 		Counter: 1,
 		ClusterQCs: []flow.ClusterQCVoteData{
@@ -162,7 +153,11 @@ func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCom
 func EpochCommitV0FixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
 	events := systemcontracts.ServiceEventsForChain(chain)
 
-	event := EventFixture(events.EpochCommit.EventType(), 1, 1, Event.WithPayload(EpochCommitV0FixtureCCF))
+	event := EventFixture(
+		Event.WithEventType(events.EpochCommit.EventType()),
+		Event.WithPayload(EpochCommitV0FixtureCCF),
+	)
+
 	expected := &flow.EpochCommit{
 		Counter: 1,
 		ClusterQCs: []flow.ClusterQCVoteData{
@@ -197,7 +192,11 @@ func EpochRecoverFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochRe
 	events := systemcontracts.ServiceEventsForChain(chain)
 	randomSource := EpochSetupRandomSourceFixture()
 
-	event := EventFixture(events.EpochRecover.EventType(), 1, 1, Event.WithPayload(EpochRecoverFixtureCCF(randomSource)))
+	event := EventFixture(
+		Event.WithEventType(events.EpochRecover.EventType()),
+		Event.WithPayload(EpochRecoverFixtureCCF(randomSource)),
+	)
+
 	expected := &flow.EpochRecover{
 		EpochSetup: flow.EpochSetup{
 			Counter:            1,
@@ -314,7 +313,11 @@ func EpochRecoverFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochRe
 func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.VersionBeacon) {
 	events := systemcontracts.ServiceEventsForChain(chain)
 
-	event := EventFixture(events.VersionBeacon.EventType(), 1, 1, Event.WithPayload(VersionBeaconFixtureCCF))
+	event := EventFixture(
+		Event.WithEventType(events.VersionBeacon.EventType()),
+		Event.WithPayload(VersionBeaconFixtureCCF),
+	)
+
 	expected := &flow.VersionBeacon{
 		VersionBoundaries: []flow.VersionBoundary{
 			{
@@ -331,7 +334,11 @@ func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.Versio
 func ProtocolStateVersionUpgradeFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.ProtocolStateVersionUpgrade) {
 	events := systemcontracts.ServiceEventsForChain(chain)
 
-	event := EventFixture(events.ProtocolStateVersionUpgrade.EventType(), 1, 1, Event.WithPayload(ProtocolStateVersionUpgradeFixtureCCF))
+	event := EventFixture(
+		Event.WithEventType(events.ProtocolStateVersionUpgrade.EventType()),
+		Event.WithPayload(ProtocolStateVersionUpgradeFixtureCCF),
+	)
+
 	expected := &flow.ProtocolStateVersionUpgrade{
 		NewProtocolStateVersion: 1,
 		ActiveView:              1000,
@@ -1617,41 +1624,6 @@ var ProtocolStateVersionUpgradeFixtureCCF = func() []byte {
 	}
 	return b
 }()
-
-func VerifyCdcArguments(t *testing.T, expected []cadence.Value, actual []interface{}) {
-
-	for index, arg := range actual {
-
-		// marshal to bytes
-		bz, err := json.Marshal(arg)
-		require.NoError(t, err)
-
-		// parse cadence value
-		decoded, err := jsoncdc.Decode(nil, bz)
-		require.NoError(t, err)
-
-		assert.Equal(t, expected[index], decoded)
-	}
-}
-
-// InterfafceToCdcValues decodes jsoncdc encoded values from interface -> cadence value.
-func InterfafceToCdcValues(t *testing.T, vals []interface{}) []cadence.Value {
-	decoded := make([]cadence.Value, len(vals))
-	for index, val := range vals {
-
-		// marshal to bytes
-		bz, err := json.Marshal(val)
-		require.NoError(t, err)
-
-		// parse cadence value
-		cdcVal, err := jsoncdc.Decode(nil, bz)
-		require.NoError(t, err)
-
-		decoded[index] = cdcVal
-	}
-
-	return decoded
-}
 
 func NewFlowClusterQCClusterStructType() *cadence.StructType {
 

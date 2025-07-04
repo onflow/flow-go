@@ -52,14 +52,6 @@ func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 	f(tb)
 }
 
-func ConvertToCadence(data []byte) []cadence.Value {
-	ret := make([]cadence.Value, len(data))
-	for i, v := range data {
-		ret[i] = cadence.UInt8(v)
-	}
-	return ret
-}
-
 func fullKey(owner, key []byte) string {
 	return fmt.Sprintf("%x~%s", owner, key)
 }
