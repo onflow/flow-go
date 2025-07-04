@@ -111,7 +111,8 @@ func NewHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 }
 
 // NewRootHeaderBody creates a new instance of root HeaderBody.
-// It omits validity checks as fields may be zero/nil.
+// This constructor must be used **only** for constructing the root header body,
+// which is the only case where zero values are allowed.
 func NewRootHeaderBody(untrusted UntrustedHeaderBody) *HeaderBody {
 	return &HeaderBody{
 		ChainID:            untrusted.ChainID,
@@ -190,7 +191,10 @@ func NewHeader(untrusted UntrustedHeader) (*Header, error) {
 	}, nil
 }
 
-// NewRootHeader
+// NewRootHeader creates a root header.
+//
+// This constructor must be used **only** for constructing the root header,
+// which is the only case where zero values are allowed.
 func NewRootHeader(untrusted UntrustedHeader) *Header {
 	return &Header{
 		HeaderBody:  untrusted.HeaderBody,

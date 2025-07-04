@@ -40,6 +40,8 @@ var noopSigner = func(*flow.Header) ([]byte, error) { return nil, nil }
 var noopSetter = func(h *flow.HeaderBodyBuilder) error {
 	h.WithChainID(flow.Emulator).
 		WithParentID(unittest.IdentifierFixture()).
+		WithView(1337).
+		WithParentView(1336).
 		WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
 		WithParentVoterSigData(unittest.QCSigDataFixture()).
 		WithProposerID(unittest.IdentifierFixture())
@@ -261,6 +263,8 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 		h.WithHeight(expectedHeight).
 			WithChainID(flow.Emulator).
 			WithParentID(unittest.IdentifierFixture()).
+			WithView(1337).
+			WithParentView(1336).
 			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
 			WithParentVoterSigData(unittest.QCSigDataFixture()).
 			WithProposerID(unittest.IdentifierFixture())
@@ -472,6 +476,8 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 		h.WithHeight(42).
 			WithChainID(flow.Emulator).
 			WithParentID(unittest.IdentifierFixture()).
+			WithView(1337).
+			WithParentView(1336).
 			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
 			WithParentVoterSigData(unittest.QCSigDataFixture()).
 			WithProposerID(unittest.IdentifierFixture())
@@ -530,6 +536,8 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 		h.WithHeight(42).
 			WithChainID(flow.Emulator).
 			WithParentID(unittest.IdentifierFixture()).
+			WithView(1337).
+			WithParentView(1336).
 			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
 			WithParentVoterSigData(unittest.QCSigDataFixture()).
 			WithProposerID(unittest.IdentifierFixture())
@@ -591,6 +599,8 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 		h.WithHeight(42).
 			WithChainID(flow.Emulator).
 			WithParentID(unittest.IdentifierFixture()).
+			WithView(1337).
+			WithParentView(1336).
 			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
 			WithParentVoterSigData(unittest.QCSigDataFixture()).
 			WithProposerID(unittest.IdentifierFixture())
@@ -867,6 +877,8 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 		h.WithHeight(0).
 			WithChainID(flow.Emulator).
 			WithParentID(unittest.IdentifierFixture()).
+			WithView(1337).
+			WithParentView(1336).
 			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
 			WithParentVoterSigData(unittest.QCSigDataFixture()).
 			WithProposerID(unittest.IdentifierFixture())
@@ -924,6 +936,8 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 	setter := func(h *flow.HeaderBodyBuilder) error {
 		h.WithChainID(flow.Emulator).
 			WithParentID(parentID).
+			WithView(1337).
+			WithParentView(1336).
 			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
 			WithParentVoterSigData(unittest.QCSigDataFixture()).
 			WithProposerID(unittest.IdentifierFixture())
@@ -971,6 +985,8 @@ func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
 	setter := func(h *flow.HeaderBodyBuilder) error {
 		h.WithChainID(flow.Emulator).
 			WithParentID(parentID).
+			WithView(1337).
+			WithParentView(1336).
 			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
 			WithParentVoterSigData(unittest.QCSigDataFixture()).
 			WithProposerID(unittest.IdentifierFixture())
@@ -1019,6 +1035,8 @@ func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
 	setter := func(h *flow.HeaderBodyBuilder) error {
 		h.WithChainID(flow.Emulator).
 			WithParentID(parentID).
+			WithView(1337).
+			WithParentView(1336).
 			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
 			WithParentVoterSigData(unittest.QCSigDataFixture()).
 			WithProposerID(unittest.IdentifierFixture())
@@ -1069,6 +1087,8 @@ func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
 	setter := func(h *flow.HeaderBodyBuilder) error {
 		h.WithChainID(flow.Emulator).
 			WithParentID(parentID).
+			WithView(1337).
+			WithParentView(1336).
 			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
 			WithParentVoterSigData(unittest.QCSigDataFixture()).
 			WithProposerID(unittest.IdentifierFixture())
@@ -1119,6 +1139,8 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitDryRun() {
 	setter := func(h *flow.HeaderBodyBuilder) error {
 		h.WithChainID(flow.Emulator).
 			WithParentID(parentID).
+			WithView(1337).
+			WithParentView(1336).
 			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
 			WithParentVoterSigData(unittest.QCSigDataFixture()).
 			WithProposerID(unittest.IdentifierFixture())
