@@ -990,11 +990,9 @@ access(all) contract EVM {
     /// Returns a reference to the BridgeAccessor designated for internal bridge requests
     access(self)
     view fun borrowBridgeAccessor(): auth(Bridge) &{BridgeAccessor} {
-        // TODO:
-        // return self.account.storage.borrow<auth(Bridge) &{BridgeRouter}>(from: /storage/evmBridgeRouter)
-        //     ?.borrowBridgeAccessor()
-        //     ?? panic("EVM.borrowBridgeAccessor(): Could not borrow a reference to the EVM bridge.")
-        panic("TODO")
+        return self.account.storage.borrow<auth(Bridge) &{BridgeRouter}>(from: /storage/evmBridgeRouter)
+            ?.borrowBridgeAccessor()
+            ?? panic("EVM.borrowBridgeAccessor(): Could not borrow a reference to the EVM bridge.")
     }
 
     /// The Heartbeat resource controls the block production.
