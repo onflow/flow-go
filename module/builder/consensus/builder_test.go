@@ -269,6 +269,7 @@ func (bs *BuilderSuite) SetupTest() {
 		h.WithHeight(42).
 			WithChainID(flow.Emulator).
 			WithView(1337).
+			WithParentView(1300).
 			WithParentID(unittest.IdentifierFixture()).
 			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
 			WithParentVoterSigData(unittest.QCSigDataFixture()).
