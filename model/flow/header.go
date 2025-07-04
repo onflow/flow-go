@@ -294,6 +294,8 @@ func (h *HeaderBodyBuilder) WithLastViewTC(tc *TimeoutCertificate) *HeaderBodyBu
 
 // MarshalJSON makes sure the timestamp is encoded in UTC.
 //
+// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
+//
 //nolint:structwrite
 func (h Header) MarshalJSON() ([]byte, error) {
 
@@ -317,6 +319,8 @@ func (h Header) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON makes sure the timestamp is decoded in UTC.
 //
+// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
+//
 //nolint:structwrite
 func (h *Header) UnmarshalJSON(data []byte) error {
 
@@ -337,6 +341,8 @@ func (h *Header) UnmarshalJSON(data []byte) error {
 
 // MarshalCBOR makes sure the timestamp is encoded in UTC.
 //
+// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
+//
 //nolint:structwrite
 func (h Header) MarshalCBOR() ([]byte, error) {
 
@@ -353,6 +359,8 @@ func (h Header) MarshalCBOR() ([]byte, error) {
 }
 
 // UnmarshalCBOR makes sure the timestamp is decoded in UTC.
+//
+// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
 //
 //nolint:structwrite
 func (h *Header) UnmarshalCBOR(data []byte) error {
@@ -378,6 +386,8 @@ func (h *Header) UnmarshalCBOR(data []byte) error {
 
 // MarshalMsgpack makes sure the timestamp is encoded in UTC.
 //
+// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
+//
 //nolint:structwrite
 func (h Header) MarshalMsgpack() ([]byte, error) {
 
@@ -394,6 +404,8 @@ func (h Header) MarshalMsgpack() ([]byte, error) {
 }
 
 // UnmarshalMsgpack makes sure the timestamp is decoded in UTC.
+//
+// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
 //
 //nolint:structwrite
 func (h *Header) UnmarshalMsgpack(data []byte) error {

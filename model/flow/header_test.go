@@ -205,13 +205,13 @@ func TestNewHeaderBody(t *testing.T) {
 // Test Cases:
 //
 // 1. Valid input:
-//    - Ensures a Header is returned when HeaderBody is valid and PayloadHash is non-zero.
+//   - Ensures a Header is returned when HeaderBody is valid and PayloadHash is non-zero.
 //
 // 2. Invalid HeaderBody:
-//    - Ensures an error is returned when the embedded HeaderBody is invalid.
+//   - Ensures an error is returned when the embedded HeaderBody is invalid.
 //
 // 3. Missing PayloadHash:
-//    - Ensures an error is returned when PayloadHash is ZeroID.
+//   - Ensures an error is returned when PayloadHash is ZeroID.
 func TestNewHeader(t *testing.T) {
 	validID := unittest.IdentifierFixture()
 	ts := time.Unix(1_600_000_000, 0)
