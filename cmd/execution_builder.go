@@ -1298,7 +1298,7 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 		engineRegister = &underlay.NoopEngineRegister{}
 	}
 	eng, err := provider.New(
-		node.Logger.With().Str("engine", "receipt_provider").Logger(),
+		node.Logger,
 		node.Metrics.Engine,
 		engineRegister,
 		node.Me,
