@@ -745,9 +745,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				execDataCacheBackend,
 			)
 
-		r, err := edrequester.New(
-			builder.Logger.With().Str("entity", "execution_data").Logger(),
-			metrics.NewExecutionDataRequesterCollector(),
+			r, err := edrequester.New(
+				builder.Logger.With().Str("entity", "execution_data").Logger(),
+				metrics.NewExecutionDataRequesterCollector(),
 				builder.ExecutionDataDownloader,
 				executionDataCache,
 				processedBlockHeight,
