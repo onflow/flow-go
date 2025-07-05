@@ -78,6 +78,7 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 	s := crypto.ECDSAP256
 	payerAddress := unittest.AddressFixture()
 	authorizerAddress := flow.EmptyAddress
+	require.NotEqual(t, payerAddress, authorizerAddress)
 
 	transactionBody := flow.TransactionBody{
 		Script: []byte("some script"),

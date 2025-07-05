@@ -270,29 +270,29 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_SignatureValidation
 	cases := []struct {
 		payloadSigExtensionData  []byte
 		EnvelopeSigExtensionData []byte
-		invalidError             bool
+		shouldError              bool
 	}{
 		{
 			// happy path
 			payloadSigExtensionData:  nil,
 			EnvelopeSigExtensionData: nil,
-			invalidError:             false,
+			shouldError:              false,
 		},
 		{
 			// invalid payload transaction
 			payloadSigExtensionData:  []byte{10},
 			EnvelopeSigExtensionData: nil,
-			invalidError:             true,
+			shouldError:              true,
 		}, {
 			// invalid envelope transaction
 			payloadSigExtensionData:  nil,
 			EnvelopeSigExtensionData: []byte{10},
-			invalidError:             true,
+			shouldError:              true,
 		}, {
 			// invalid envelope and payload transactions
 			payloadSigExtensionData:  []byte{10},
 			EnvelopeSigExtensionData: []byte{10},
-			invalidError:             true,
+			shouldError:              true,
 		},
 	}
 	// test all cases
@@ -300,7 +300,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_SignatureValidation
 		transactionBody.PayloadSignatures[0].ExtensionData = c.payloadSigExtensionData
 		transactionBody.EnvelopeSignatures[0].ExtensionData = c.EnvelopeSigExtensionData
 		err = validator.Validate(context.Background(), &transactionBody)
-		if c.invalidError {
+		if c.shouldError {
 			assert.Error(s.T(), err)
 		} else {
 			assert.NoError(s.T(), err)
