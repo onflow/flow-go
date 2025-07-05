@@ -429,14 +429,14 @@ func (v *TransactionValidator) checkSignatureDuplications(tx *flow.TransactionBo
 }
 
 func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) error {
-	for _, signature := range append(tx.PayloadSignatures) {
+	for _, signature := range tx.PayloadSignatures {
 		valid, _ := signature.ValidateExtensionDataAndReconstructMessage(tx.PayloadMessage())
 		if !valid {
 			return InvalidSignatureError{Signature: signature}
 		}
 	}
 
-	for _, signature := range append(tx.EnvelopeSignatures) {
+	for _, signature := range tx.EnvelopeSignatures {
 		valid, _ := signature.ValidateExtensionDataAndReconstructMessage(tx.EnvelopeMessage())
 		if !valid {
 			return InvalidSignatureError{Signature: signature}
