@@ -293,7 +293,8 @@ func NewHeaderBodyBuilder() *HeaderBodyBuilder {
 	}
 }
 
-// Build validates and returns an immutable Header.
+// Build validates and returns an immutable Header. All required fields must be explicitly set (even if they are zero).
+// All errors indicate that a valid HeaderBody cannot be created from the current builder state.
 func (b *HeaderBodyBuilder) Build() (*HeaderBody, error) {
 	// make sure every required field was initialized
 	for bit := 0; bit < int(numHeaderBodyFields); bit++ {
