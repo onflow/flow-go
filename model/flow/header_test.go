@@ -413,7 +413,7 @@ func TestNewRootHeader(t *testing.T) {
 		assert.Nil(t, h)
 		assert.Contains(t, err.Error(), "invalid root header body")
 	})
-	
+
 	t.Run("non‐empty ParentVoterIndices", func(t *testing.T) {
 		u := flow.UntrustedHeader{
 			HeaderBody:  *rootBody,
