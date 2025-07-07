@@ -66,22 +66,22 @@ func (b Block) ID() Identifier {
 // The receiver Block must be well-formed (enforced by mutation protection on the type).
 // This function may panic if invoked on a malformed Block.
 func (b Block) ToHeader() *Header {
-	if b.Header.IsRootHeaderBody() {
-		return NewRootHeader(UntrustedHeader{
+	if b.Header.ContainsParentQC() {
+		header, err := NewHeader(UntrustedHeader{
 			HeaderBody:  b.Header,
 			PayloadHash: b.Payload.Hash(),
 		})
+		if err != nil {
+			panic(fmt.Errorf("could not build header from block: %w", err))
+		}
+
+		return header
 	}
 
-	header, err := NewHeader(UntrustedHeader{
+	return NewRootHeader(UntrustedHeader{
 		HeaderBody:  b.Header,
 		PayloadHash: b.Payload.Hash(),
 	})
-	if err != nil {
-		panic(fmt.Errorf("could not build header from block: %w", err))
-	}
-
-	return header
 }
 
 // TODO(malleability): remove MarshalMsgpack when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)

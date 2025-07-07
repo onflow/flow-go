@@ -158,13 +158,15 @@ func (h HeaderBody) QuorumCertificate() *QuorumCertificate {
 	}
 }
 
-// IsRootHeaderBody reports whether this is a root header.
-// It returns true only if all of the fields required to build a Header are zero/nil,
-func (h HeaderBody) IsRootHeaderBody() bool {
-	return h.ParentID == ZeroID &&
-		h.ParentVoterIndices == nil &&
-		h.ParentVoterSigData == nil &&
-		h.ProposerID == ZeroID
+// ContainsParentQC reports whether this header carries a valid parent QC.
+// It returns true only if all of the fields required to build a QC are non-zero/nil,
+// indicating that ParentQC() can be safely called without panicking.
+// Only spork root blocks or network genesis blocks do not contain a parent QC.
+func (h HeaderBody) ContainsParentQC() bool {
+	return h.ParentID != ZeroID &&
+		h.ParentVoterIndices != nil &&
+		h.ParentVoterSigData != nil &&
+		h.ProposerID != ZeroID
 }
 
 // Header contains all meta-data for a block, as well as a hash of the block payload.
