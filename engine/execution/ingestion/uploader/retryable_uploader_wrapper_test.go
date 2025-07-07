@@ -134,7 +134,9 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 	}
 	testCollectionID := flow.HashToID([]byte{0xA, 0xB, 0xC})
 	testBlock := flow.NewBlock(
-		flow.HeaderBody{},
+		flow.HeaderBody{
+			ChainID: flow.Emulator,
+		},
 		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{
 				{

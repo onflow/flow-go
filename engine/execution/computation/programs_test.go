@@ -93,7 +93,8 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 
 	block := flow.NewBlock(
 		flow.HeaderBody{
-			View: 26,
+			ChainID: flow.Emulator,
+			View:    26,
 		},
 		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
@@ -275,7 +276,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
 		block1 = flow.NewBlock(
 			flow.HeaderBody{
-				View: 1,
+				View:    1,
+				ChainID: flow.Emulator,
 			},
 			flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{},
@@ -499,6 +501,7 @@ func createTestBlockAndRun(
 
 	block := flow.NewBlock(
 		flow.HeaderBody{
+			ChainID:   flow.Emulator,
 			ParentID:  parentBlock.ID(),
 			View:      parentBlock.Header.Height + 1,
 			Timestamp: time.Now(),
