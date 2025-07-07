@@ -57,16 +57,19 @@ func (f *clusterBlockFactory) WithPayload(payload cluster.Payload) func(*cluster
 	}
 }
 
-func (f *clusterBlockFactory) Genesis() *cluster.Block {
-	headerBody := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
+func (f *clusterBlockFactory) Genesis() (*cluster.Block, error) {
+	headerBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
 		View:      0,
 		ChainID:   "cluster",
 		Timestamp: flow.GenesisTime,
 		ParentID:  flow.ZeroID,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	return &cluster.Block{
 		Header:  *headerBody,
 		Payload: *cluster.NewEmptyPayload(flow.ZeroID),
-	}
+	}, nil
 }

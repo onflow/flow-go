@@ -7,21 +7,24 @@ import (
 	"github.com/vmihailenco/msgpack/v4"
 )
 
-func Genesis(chainID ChainID) *Block {
+func Genesis(chainID ChainID) (*Block, error) {
 	// create the raw content for the genesis block
 	payload := Payload{}
 
 	// create the headerBody
-	headerBody := NewRootHeaderBody(UntrustedHeaderBody{
+	headerBody, err := NewRootHeaderBody(UntrustedHeaderBody{
 		ChainID:   chainID,
 		ParentID:  ZeroID,
 		Height:    0,
 		Timestamp: GenesisTime,
 		View:      0,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create root header body: %w", err)
+	}
 
 	// combine to block
-	return NewBlock(*headerBody, payload)
+	return NewBlock(*headerBody, payload), nil
 }
 
 // Block (currently) includes the all block header metadata and the payload content.

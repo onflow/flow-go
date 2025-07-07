@@ -12,7 +12,7 @@ import (
 )
 
 // constructRootHeader constructs a header for the root block.
-func constructRootHeader(rootChain string, rootParent string, rootHeight uint64, rootTimestamp string) *flow.Header {
+func constructRootHeader(rootChain string, rootParent string, rootHeight uint64, rootTimestamp string) (*flow.Header, error) {
 	chainID := parseChainID(rootChain)
 	parentID := parseParentID(rootParent)
 	height := rootHeight

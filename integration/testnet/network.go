@@ -1162,7 +1162,10 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	participants := bootstrap.ToIdentityList(stakedNodeInfos)
 
 	// generate root block
-	rootHeader := run.GenerateRootHeader(chainID, parentID, height, timestamp)
+	rootHeader, err := run.GenerateRootHeader(chainID, parentID, height, timestamp)
+	if err != nil {
+		return nil, err
+	}
 
 	// generate root blocks for each collector cluster
 	clusterRootBlocks, clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, stakedConfs)
@@ -1441,7 +1444,10 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 
 	for _, cluster := range clusters {
 		// generate root cluster block
-		block := clusterstate.CanonicalRootBlock(epochCounter, cluster)
+		block, err := clusterstate.CanonicalRootBlock(epochCounter, cluster)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to generate canonical root block: %w", err)
+		}
 
 		lookup := make(map[flow.Identifier]struct{})
 		for _, node := range cluster {

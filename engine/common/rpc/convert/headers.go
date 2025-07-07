@@ -80,7 +80,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 	}
 
 	if IsRootBlockHeader(m) {
-		headerBody := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
+		headerBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
 			ParentID:           MessageToIdentifier(m.ParentId),
 			Height:             m.Height,
 			Timestamp:          m.Timestamp.AsTime(),
@@ -92,6 +92,10 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 			ChainID:            *chainId,
 			LastViewTC:         lastViewTC,
 		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create root header body: %w", err)
+		}
+
 		rootHeader := flow.NewRootHeader(flow.UntrustedHeader{
 			HeaderBody:  *headerBody,
 			PayloadHash: MessageToIdentifier(m.PayloadHash),

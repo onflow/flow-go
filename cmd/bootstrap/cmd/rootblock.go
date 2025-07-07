@@ -221,7 +221,10 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root header")
-	header := constructRootHeader(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
+	header, err := constructRootHeader(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to construct root header")
+	}
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing intermediary bootstrapping data")

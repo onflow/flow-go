@@ -113,7 +113,26 @@ func NewHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 // NewRootHeaderBody creates a new instance of root HeaderBody.
 // This constructor must be used **only** for constructing the root header body,
 // which is the only case where zero values are allowed.
-func NewRootHeaderBody(untrusted UntrustedHeaderBody) *HeaderBody {
+func NewRootHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
+	if untrusted.ChainID == "" {
+		return nil, fmt.Errorf("ChainID of root header body must not be empty")
+	}
+
+	if untrusted.ParentID == ZeroID {
+		return nil, fmt.Errorf("ParentID of root header body must be empty")
+	}
+
+	if untrusted.ParentView != 0 {
+		return nil, fmt.Errorf("ParentView of root header body must be empty")
+	}
+
+	if len(untrusted.ParentVoterIndices) != 0 {
+		return nil, fmt.Errorf("ParentVoterIndices of root header body must be empty")
+	}
+	if len(untrusted.ParentVoterSigData) != 0 {
+		return nil, fmt.Errorf("ParentVoterSigData of root header body must be empty")
+	}
+
 	return &HeaderBody{
 		ChainID:            untrusted.ChainID,
 		ParentID:           untrusted.ParentID,
@@ -125,7 +144,7 @@ func NewRootHeaderBody(untrusted UntrustedHeaderBody) *HeaderBody {
 		ParentVoterSigData: untrusted.ParentVoterSigData,
 		ProposerID:         untrusted.ProposerID,
 		LastViewTC:         untrusted.LastViewTC,
-	}
+	}, nil
 }
 
 // QuorumCertificate returns quorum certificate [QC] that is incorporated in the block header body.
