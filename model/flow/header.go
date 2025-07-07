@@ -221,9 +221,9 @@ func NewRootHeader(untrusted UntrustedHeader) (*Header, error) {
 		return nil, fmt.Errorf("invalid root header body: %w", err)
 	}
 
-	if untrusted.PayloadHash != ZeroID {
-		return nil, fmt.Errorf("PayloadHash of the root header must be empty")
-	}
+	//if untrusted.PayloadHash != ZeroID {
+	//	return nil, fmt.Errorf("PayloadHash of the root header must be empty")
+	//}
 
 	return &Header{
 		HeaderBody:  *rootHeaderBody,
