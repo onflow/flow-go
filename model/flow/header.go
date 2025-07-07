@@ -118,7 +118,7 @@ func NewRootHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 		return nil, fmt.Errorf("ChainID of root header body must not be empty")
 	}
 
-	if untrusted.ParentID == ZeroID {
+	if untrusted.ParentID != ZeroID {
 		return nil, fmt.Errorf("ParentID of root header body must be empty")
 	}
 
