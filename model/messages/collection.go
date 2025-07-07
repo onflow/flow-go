@@ -20,12 +20,6 @@ type CollectionResponse struct {
 	Nonce      uint64 // so that we aren't deduplicated by the network layer
 }
 
-// UntrustedClusterBlock represents untrusted cluster block models received over the network.
-// This type exists only to explicitly differentiate between trusted and untrusted instances of a cluster block.
-// This differentiation is currently largely unused, but eventually untrusted models should use
-// a different type (like this one), until such time as they are fully validated.
-type UntrustedClusterBlock cluster.Block
-
 // UntrustedClusterProposal represents untrusted signed proposed block in collection node cluster consensus.
 // This type exists only to explicitly differentiate between trusted and untrusted instances of a cluster block proposal.
 // This differentiation is currently largely unused, but eventually untrusted models should use
