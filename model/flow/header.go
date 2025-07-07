@@ -215,11 +215,20 @@ func NewHeader(untrusted UntrustedHeader) (*Header, error) {
 //
 // This constructor must be used **only** for constructing the root header,
 // which is the only case where zero values are allowed.
-func NewRootHeader(untrusted UntrustedHeader) *Header {
-	return &Header{
-		HeaderBody:  untrusted.HeaderBody,
-		PayloadHash: untrusted.PayloadHash,
+func NewRootHeader(untrusted UntrustedHeader) (*Header, error) {
+	rootHeaderBody, err := NewRootHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))
+	if err != nil {
+		return nil, fmt.Errorf("invalid root header body: %w", err)
 	}
+
+	if untrusted.PayloadHash != ZeroID {
+		return nil, fmt.Errorf("PayloadHash of the root header must be empty")
+	}
+
+	return &Header{
+		HeaderBody:  *rootHeaderBody,
+		PayloadHash: untrusted.PayloadHash,
+	}, nil
 }
 
 // Fingerprint defines custom encoding for the header to calculate its ID.

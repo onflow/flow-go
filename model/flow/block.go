@@ -78,10 +78,15 @@ func (b Block) ToHeader() *Header {
 		return header
 	}
 
-	return NewRootHeader(UntrustedHeader{
+	rootHeader, err := NewRootHeader(UntrustedHeader{
 		HeaderBody:  b.Header,
 		PayloadHash: b.Payload.Hash(),
 	})
+	if err != nil {
+		panic(fmt.Errorf("could not build root header from block: %w", err))
+	}
+
+	return rootHeader
 }
 
 // TODO(malleability): remove MarshalMsgpack when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)

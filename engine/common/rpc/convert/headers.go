@@ -80,7 +80,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 	}
 
 	if IsRootBlockHeader(m) {
-		headerBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
+		rootHeaderBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
 			ParentID:           MessageToIdentifier(m.ParentId),
 			Height:             m.Height,
 			Timestamp:          m.Timestamp.AsTime(),
@@ -96,10 +96,13 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 			return nil, fmt.Errorf("failed to create root header body: %w", err)
 		}
 
-		rootHeader := flow.NewRootHeader(flow.UntrustedHeader{
-			HeaderBody:  *headerBody,
+		rootHeader, err := flow.NewRootHeader(flow.UntrustedHeader{
+			HeaderBody:  *rootHeaderBody,
 			PayloadHash: MessageToIdentifier(m.PayloadHash),
 		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create root header: %w", err)
+		}
 
 		return rootHeader, nil
 	}

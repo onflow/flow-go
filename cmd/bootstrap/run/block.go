@@ -8,7 +8,7 @@ import (
 )
 
 func GenerateRootHeader(chainID flow.ChainID, parentID flow.Identifier, height uint64, timestamp time.Time) (*flow.Header, error) {
-	headerBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
+	rootHeaderBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
 		ChainID:            chainID,
 		ParentID:           parentID,
 		Height:             height,
@@ -22,8 +22,13 @@ func GenerateRootHeader(chainID flow.ChainID, parentID flow.Identifier, height u
 		return nil, fmt.Errorf("failed to generate root header body: %w", err)
 	}
 
-	return flow.NewRootHeader(flow.UntrustedHeader{
-		HeaderBody:  *headerBody,
+	rootHeader, err := flow.NewRootHeader(flow.UntrustedHeader{
+		HeaderBody:  *rootHeaderBody,
 		PayloadHash: flow.ZeroID,
-	}), nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate root header: %w", err)
+	}
+
+	return rootHeader, nil
 }

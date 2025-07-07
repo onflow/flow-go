@@ -98,10 +98,15 @@ func (b *Block) ToHeader() *flow.Header {
 		return header
 	}
 
-	return flow.NewRootHeader(flow.UntrustedHeader{
+	rootHeader, err := flow.NewRootHeader(flow.UntrustedHeader{
 		HeaderBody:  b.Header,
 		PayloadHash: b.Payload.Hash(),
 	})
+	if err != nil {
+		panic(fmt.Errorf("could not build root header from block: %w", err))
+	}
+
+	return rootHeader
 }
 
 // BlockProposal represents a signed proposed block in collection node cluster consensus.
