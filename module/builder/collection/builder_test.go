@@ -38,7 +38,8 @@ import (
 
 var noopSigner = func(*flow.Header) ([]byte, error) { return nil, nil }
 var noopSetter = func(h *flow.HeaderBodyBuilder) error {
-	h.WithChainID(flow.Emulator).
+	h.WithHeight(42).
+		WithChainID(flow.Emulator).
 		WithParentID(unittest.IdentifierFixture()).
 		WithView(1337).
 		WithParentView(1336).
@@ -260,20 +261,8 @@ func (suite *BuilderSuite) TestBuildOn_NonExistentParent() {
 
 func (suite *BuilderSuite) TestBuildOn_Success() {
 	var expectedHeight uint64 = 42
-	setter := func(h *flow.HeaderBodyBuilder) error {
-		h.WithHeight(expectedHeight).
-			WithChainID(flow.Emulator).
-			WithParentID(unittest.IdentifierFixture()).
-			WithView(1337).
-			WithParentView(1336).
-			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
-			WithParentVoterSigData(unittest.QCSigDataFixture()).
-			WithProposerID(unittest.IdentifierFixture())
 
-		return nil
-	}
-
-	proposal, err := suite.builder.BuildOn(suite.genesis.ID(), setter, noopSigner)
+	proposal, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, noopSigner)
 	suite.Require().NoError(err)
 
 	// setter should have been run
@@ -473,21 +462,8 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 	// insert block on fork 2
 	suite.InsertBlock(block2)
 
-	setter := func(h *flow.HeaderBodyBuilder) error {
-		h.WithHeight(42).
-			WithChainID(flow.Emulator).
-			WithParentID(unittest.IdentifierFixture()).
-			WithView(1337).
-			WithParentView(1336).
-			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
-			WithParentVoterSigData(unittest.QCSigDataFixture()).
-			WithProposerID(unittest.IdentifierFixture())
-
-		return nil
-	}
-
 	// build on top of fork 1
-	header, err := suite.builder.BuildOn(block1.ID(), setter, noopSigner)
+	header, err := suite.builder.BuildOn(block1.ID(), noopSetter, noopSigner)
 	require.NoError(t, err)
 
 	// should be able to retrieve built block from storage
@@ -533,21 +509,8 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 	// finalize first block
 	suite.FinalizeBlock(*finalizedBlock)
 
-	setter := func(h *flow.HeaderBodyBuilder) error {
-		h.WithHeight(42).
-			WithChainID(flow.Emulator).
-			WithParentID(unittest.IdentifierFixture()).
-			WithView(1337).
-			WithParentView(1336).
-			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
-			WithParentVoterSigData(unittest.QCSigDataFixture()).
-			WithProposerID(unittest.IdentifierFixture())
-
-		return nil
-	}
-
 	// build on the un-finalized block
-	header, err := suite.builder.BuildOn(unFinalizedBlock.ID(), setter, noopSigner)
+	header, err := suite.builder.BuildOn(unFinalizedBlock.ID(), noopSetter, noopSigner)
 	require.NoError(t, err)
 
 	// retrieve the built block from storage
@@ -596,21 +559,8 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 	// finalize first block - this indirectly invalidates the second block
 	suite.FinalizeBlock(*finalizedBlock)
 
-	setter := func(h *flow.HeaderBodyBuilder) error {
-		h.WithHeight(42).
-			WithChainID(flow.Emulator).
-			WithParentID(unittest.IdentifierFixture()).
-			WithView(1337).
-			WithParentView(1336).
-			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
-			WithParentVoterSigData(unittest.QCSigDataFixture()).
-			WithProposerID(unittest.IdentifierFixture())
-
-		return nil
-	}
-
 	// build on the finalized block
-	header, err := suite.builder.BuildOn(finalizedBlock.ID(), setter, noopSigner)
+	header, err := suite.builder.BuildOn(finalizedBlock.ID(), noopSetter, noopSigner)
 	require.NoError(t, err)
 
 	// retrieve the built block from storage

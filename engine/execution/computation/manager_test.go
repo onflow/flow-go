@@ -99,7 +99,9 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	block := flow.NewBlock(
 		flow.HeaderBody{
-			View: 42,
+
+			ChainID: flow.Emulator,
+			View:    42,
 		},
 		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
@@ -794,7 +796,8 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 
 	block := flow.NewBlock(
 		flow.HeaderBody{
-			View: 26,
+			ChainID: flow.Emulator,
+			View:    26,
 		},
 		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
