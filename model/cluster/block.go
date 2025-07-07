@@ -97,7 +97,7 @@ func (b *Block) ToHeader() *flow.Header {
 		}
 		return header
 	}
-	
+
 	return flow.NewRootHeader(flow.UntrustedHeader{
 		HeaderBody:  b.Header,
 		PayloadHash: b.Payload.Hash(),
