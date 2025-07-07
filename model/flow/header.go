@@ -118,7 +118,7 @@ func NewRootHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 		return nil, fmt.Errorf("ChainID of root header body must not be empty")
 	}
 
-	if untrusted.ParentView == 0 {
+	if untrusted.ParentView != 0 {
 		return nil, fmt.Errorf("ParentView of root header body must be zero")
 	}
 

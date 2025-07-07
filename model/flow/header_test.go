@@ -73,6 +73,85 @@ func TestHeaderMalleability(t *testing.T) {
 	unittest.RequireEntityNonMalleable(t, header, unittest.WithFieldGenerator("HeaderBody.Timestamp", timestampGenerator))
 }
 
+// TestNewRootHeaderBody verifies the behavior of the NewRootHeaderBody constructor.
+// Test Cases:
+//
+// 1. Valid root input:
+//   - Ensures a HeaderBody is returned when only ChainID is set and root constraints hold.
+//
+// 2. Missing ChainID:
+//   - Ensures an error is returned when ChainID is empty.
+//
+// 3. Non-zero ParentView:
+//   - Ensures an error is returned when ParentView is non-zero.
+//
+// 4. Non-empty ParentVoterIndices:
+//   - Ensures an error is returned when ParentVoterIndices is non-empty.
+//
+// 5. Non-empty ParentVoterSigData:
+//   - Ensures an error is returned when ParentVoterSigData is non-empty.
+func TestNewRootHeaderBody(t *testing.T) {
+	validID := unittest.IdentifierFixture()
+	ts := time.Unix(1_600_000_000, 0)
+
+	base := flow.UntrustedHeaderBody{
+		ChainID:            "chain",
+		ParentID:           validID,
+		Height:             10,
+		Timestamp:          ts,
+		View:               0,
+		ParentView:         0,
+		ParentVoterIndices: unittest.SignerIndicesFixture(4),
+		ParentVoterSigData: unittest.QCSigDataFixture(),
+		ProposerID:         validID,
+		LastViewTC:         nil,
+	}
+
+	t.Run("valid root input", func(t *testing.T) {
+		hb, err := flow.NewRootHeaderBody(base)
+		assert.NoError(t, err)
+		assert.NotNil(t, hb)
+		assert.Equal(t, *hb, flow.HeaderBody(base))
+		assert.Nil(t, hb.LastViewTC)
+	})
+
+	t.Run("missing ChainID", func(t *testing.T) {
+		u := base
+		u.ChainID = ""
+		hb, err := flow.NewRootHeaderBody(u)
+		assert.Error(t, err)
+		assert.Nil(t, hb)
+		assert.Contains(t, err.Error(), "ChainID of root header body must not be empty")
+	})
+
+	t.Run("non-zero ParentView", func(t *testing.T) {
+		u := base
+		u.ParentView = 1
+		hb, err := flow.NewRootHeaderBody(u)
+		assert.Error(t, err)
+		assert.Nil(t, hb)
+		assert.Contains(t, err.Error(), "ParentView of root header body must be zero")
+	})
+
+	t.Run("non-empty ParentVoterIndices", func(t *testing.T) {
+		u := base
+		u.ParentVoterIndices = []byte{0xFF}
+		hb, err := flow.NewRootHeaderBody(u)
+		assert.Error(t, err)
+		assert.Nil(t, hb)
+		assert.Contains(t, err.Error(), "ParentVoterIndices of root header body must be empty")
+	})
+
+	t.Run("non-empty ParentVoterSigData", func(t *testing.T) {
+		u := base
+		u.ParentVoterSigData = []byte{0xAA}
+		hb, err := flow.NewRootHeaderBody(u)
+		assert.Error(t, err)
+		assert.Nil(t, hb)
+		assert.Contains(t, err.Error(), "ParentVoterSigData of root header body must be empty")
+	})
+}
+
 // TestNewHeaderBody verifies the behavior of the NewHeaderBody constructor.
 // Test Cases:
 //
