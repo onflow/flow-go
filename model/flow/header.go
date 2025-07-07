@@ -200,11 +200,7 @@ func NewHeader(untrusted UntrustedHeader) (*Header, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid header body: %w", err)
 	}
-
-	if untrusted.PayloadHash == ZeroID {
-		return nil, fmt.Errorf("PayloadHash must not be empty")
-	}
-
+	
 	return &Header{
 		HeaderBody:  *headerBody,
 		PayloadHash: untrusted.PayloadHash,
