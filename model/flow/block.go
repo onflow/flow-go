@@ -64,21 +64,19 @@ func (b Block) ID() Identifier {
 // This function may panic if invoked on a malformed Block.
 func (b Block) ToHeader() *Header {
 	if b.Header.IsRootHeaderBody() {
-		header, err := NewHeader(UntrustedHeader{
+		return NewRootHeader(UntrustedHeader{
 			HeaderBody:  b.Header,
 			PayloadHash: b.Payload.Hash(),
 		})
-		if err != nil {
-			panic(fmt.Errorf("could not build header from block: %w", err))
-		}
-
-		return header
 	}
 
-	header := NewRootHeader(UntrustedHeader{
+	header, err := NewHeader(UntrustedHeader{
 		HeaderBody:  b.Header,
 		PayloadHash: b.Payload.Hash(),
 	})
+	if err != nil {
+		panic(fmt.Errorf("could not build header from block: %w", err))
+	}
 
 	return header
 }
