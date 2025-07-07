@@ -60,6 +60,8 @@ func (b Block) ID() Identifier {
 
 // ToHeader converts the block into a compact [flow.Header] representation,
 // where the payload is compressed to a hash reference.
+// The receiver Block must be well-formed (enforced by mutation protection on the type).
+// This function may panic if invoked on a malformed Block.
 func (b Block) ToHeader() *Header {
 	if b.Header.IsRootHeaderBody() {
 		header, err := NewHeader(UntrustedHeader{
