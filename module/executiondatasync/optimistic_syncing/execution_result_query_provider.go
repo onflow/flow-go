@@ -119,7 +119,6 @@ func NewExecutionResultQueryProviderImpl(
 // Expected errors during normal operations:
 //   - ErrNoENsFoundForExecutionResult - returned when no execution nodes were found that produced
 //     the requested execution result and matches all operator's criteria
-//   - InsufficientExecutionReceipts - If no such execution node is found.
 //   - All other errors are potential indicators of bugs or corrupted internal state
 func (e *ExecutionResultQueryProviderImpl) ExecutionResultQuery(ctx context.Context, blockID flow.Identifier, criteria Criteria) (*Query, error) {
 	// if caller criteria does not set, the operators criteria should be used
@@ -201,7 +200,6 @@ func (e *ExecutionResultQueryProviderImpl) ExecutionResultQuery(ctx context.Cont
 // Since root blocks don't have execution receipts, it returns all execution nodes
 // from the identity table filtered by the specified criteria and nil execution result.
 // Expected errors during normal operations:
-//   - InsufficientExecutionReceipts - If no such execution node is found.
 //   - ErrNoMatchingExecutionResult - when no execution result matching the criteria was found
 //   - All other errors are potential indicators of bugs or corrupted internal state
 func (e *ExecutionResultQueryProviderImpl) handleRootBlock(criteria Criteria) (*Query, error) {
