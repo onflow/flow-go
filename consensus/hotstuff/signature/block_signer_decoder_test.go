@@ -55,10 +55,8 @@ func (s *blockSignerDecoderSuite) Test_SuccessfulDecode() {
 
 // Test_RootBlock tests decoder accepts root block with empty signer indices
 func (s *blockSignerDecoderSuite) Test_RootBlock() {
-	s.block.Header.ParentID = flow.ZeroID
 	s.block.Header.ParentVoterIndices = nil
 	s.block.Header.ParentVoterSigData = nil
-	s.block.Header.ProposerID = flow.ZeroID
 	s.block.Header.View = 0
 
 	ids, err := s.decoder.DecodeSignerIDs(s.block.ToHeader())
