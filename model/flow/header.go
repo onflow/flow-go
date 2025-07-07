@@ -161,7 +161,10 @@ func (h HeaderBody) QuorumCertificate() *QuorumCertificate {
 // IsRootHeaderBody reports whether this is a root header.
 // It returns true only if all of the fields required to build a Header are zero/nil,
 func (h HeaderBody) IsRootHeaderBody() bool {
-	return h.ParentID == ZeroID && h.ParentVoterIndices == nil && h.ParentVoterSigData == nil && h.ProposerID == ZeroID
+	return h.ParentID == ZeroID &&
+		h.ParentVoterIndices == nil &&
+		h.ParentVoterSigData == nil &&
+		h.ProposerID == ZeroID
 }
 
 // Header contains all meta-data for a block, as well as a hash of the block payload.
