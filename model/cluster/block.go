@@ -100,7 +100,7 @@ func (b *Block) ToHeader() *flow.Header {
 
 	rootHeader, err := flow.NewRootHeader(flow.UntrustedHeader{
 		HeaderBody:  b.Header,
-		PayloadHash: b.Payload.Hash(),
+		PayloadHash: flow.ZeroID,
 	})
 	if err != nil {
 		panic(fmt.Errorf("could not build root header from block: %w", err))

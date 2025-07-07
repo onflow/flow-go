@@ -80,7 +80,7 @@ func (b Block) ToHeader() *Header {
 
 	rootHeader, err := NewRootHeader(UntrustedHeader{
 		HeaderBody:  b.Header,
-		PayloadHash: b.Payload.Hash(),
+		PayloadHash: ZeroID,
 	})
 	if err != nil {
 		panic(fmt.Errorf("could not build root header from block: %w", err))

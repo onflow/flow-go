@@ -44,14 +44,16 @@ func TestBlocks(t *testing.T) {
 
 	block1 := flowgo.NewBlock(
 		flowgo.HeaderBody{
-			Height: 1,
+			ChainID: flow.Emulator,
+			Height:  1,
 		},
 		flowgo.Payload{},
 	)
 
 	block2 := flowgo.NewBlock(
 		flowgo.HeaderBody{
-			Height: 2,
+			ChainID: flow.Emulator,
+			Height:  2,
 		},
 		flowgo.Payload{},
 	)
