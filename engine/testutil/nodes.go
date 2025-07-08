@@ -289,6 +289,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	require.NoError(t, err)
 	node.Me, err = local.New(identity.Identity().IdentitySkeleton, privKeys.StakingKey)
 	require.NoError(t, err)
+	lockManager := storage.NewTestingLockManager()
 
 	pools := epochs.NewTransactionPools(
 		func(_ uint64) mempool.Transactions {
@@ -298,7 +299,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	db := badgerimpl.ToDB(node.PublicDB)
 	transactions := store.NewTransactions(node.Metrics, db)
 	collections := store.NewCollections(db, transactions)
-	clusterPayloads := storagebadger.NewClusterPayloads(node.Metrics, node.PublicDB)
+	clusterPayloads := store.NewClusterPayloads(node.Metrics, db)
 
 	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Metrics, node.Me, node.ChainID.Chain(), pools, collectioningest.DefaultConfig(),
 		ingest.NewAddressRateLimiter(rate.Limit(1), 10)) // 10 tps
@@ -326,15 +327,17 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	require.NoError(t, err)
 
 	clusterStateFactory, err := factories.NewClusterStateFactory(
-		node.PublicDB,
+		db,
+		lockManager,
 		node.Metrics,
 		node.Tracer,
 	)
 	require.NoError(t, err)
 
 	builderFactory, err := factories.NewBuilderFactory(
-		node.PublicDB,
+		db,
 		node.State,
+		lockManager,
 		node.Headers,
 		node.Tracer,
 		node.Metrics,
@@ -371,7 +374,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	hotstuffFactory, err := factories.NewHotStuffFactory(
 		node.Log,
 		node.Me,
-		badgerimpl.ToDB(node.PublicDB),
+		db,
 		node.State,
 		node.Metrics,
 		node.Metrics,

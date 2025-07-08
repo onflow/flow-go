@@ -3,12 +3,10 @@ package badger
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/procedure"
 )
 
 // Snapshot represents a snapshot of chain state anchored at a particular
@@ -25,29 +23,24 @@ func (s *Snapshot) Collection() (*flow.Collection, error) {
 	}
 
 	var collection flow.Collection
-	err := s.state.db.View(func(tx *badger.Txn) error {
+	// get the header for this snapshot
+	var header flow.Header
+	err := s.head(&header)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get snapshot header: %w", err)
+	}
 
-		// get the header for this snapshot
-		var header flow.Header
-		err := s.head(&header)(tx)
-		if err != nil {
-			return fmt.Errorf("failed to get snapshot header: %w", err)
-		}
+	// get the payload
+	var payload cluster.Payload
+	err = procedure.RetrieveClusterPayload(s.state.db.Reader(), header.ID(), &payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get snapshot payload: %w", err)
+	}
 
-		// get the payload
-		var payload cluster.Payload
-		err = procedure.RetrieveClusterPayload(header.ID(), &payload)(tx)
-		if err != nil {
-			return fmt.Errorf("failed to get snapshot payload: %w", err)
-		}
+	// set the collection
+	collection = payload.Collection
 
-		// set the collection
-		collection = payload.Collection
-
-		return nil
-	})
-
-	return &collection, err
+	return &collection, nil
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {
@@ -56,9 +49,7 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 	}
 
 	var head flow.Header
-	err := s.state.db.View(func(tx *badger.Txn) error {
-		return s.head(&head)(tx)
-	})
+	err := s.head(&head)
 	return &head, err
 }
 
@@ -70,23 +61,20 @@ func (s *Snapshot) Pending() ([]flow.Identifier, error) {
 }
 
 // head finds the header referenced by the snapshot.
-func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-
-		// get the snapshot header
-		err := operation.RetrieveHeader(s.blockID, head)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve header for block (%s): %w", s.blockID, err)
-		}
-
-		return nil
+func (s *Snapshot) head(head *flow.Header) error {
+	// get the snapshot header
+	err := operation.RetrieveHeader(s.state.db.Reader(), s.blockID, head)
+	if err != nil {
+		return fmt.Errorf("could not retrieve header for block (%s): %w", s.blockID, err)
 	}
+
+	return nil
 }
 
 func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
 
 	var pendingIDs flow.IdentifierList
-	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &pendingIDs))
+	err := procedure.LookupBlockChildren(s.state.db.Reader(), blockID, &pendingIDs)
 	if err != nil {
 		return nil, fmt.Errorf("could not get pending children: %w", err)
 	}
