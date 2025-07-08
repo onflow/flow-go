@@ -132,7 +132,7 @@ Example of proper error documentation:
 ```go
 // foo does abc.
 // Expected errors during normal operations:
-//  * ErrXFailed: if x failed
+//  - ErrXFailed: if x failed
 func foo() err {
    ...
    return fmt.Errorf("details about failure: %w", ErrXFailed)
