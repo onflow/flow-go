@@ -94,16 +94,14 @@ func (bb *BlockBuilder) Proposals() ([]*model.Proposal, error) {
 		if !ok {
 			return nil, fmt.Errorf("test fail: no qc found for qc index: %v", bv.QCIndex())
 		}
-		payloadHash := makePayloadHash(bv.View, qc, bv.BlockVersion)
 		var lastViewTC *flow.TimeoutCertificate
 		if qc.View+1 != bv.View {
 			lastViewTC = helper.MakeTC(helper.WithTCView(bv.View - 1))
 		}
 		proposal := &model.Proposal{
 			Block: &model.Block{
-				View:        bv.View,
-				QC:          qc,
-				PayloadHash: payloadHash,
+				View: bv.View,
+				QC:   qc,
 			},
 			LastViewTC: lastViewTC,
 		}
@@ -133,27 +131,13 @@ func (bb *BlockBuilder) Blocks() ([]*model.Block, error) {
 	return toBlocks(proposals), nil
 }
 
-func makePayloadHash(view uint64, qc *flow.QuorumCertificate, blockVersion int) flow.Identifier {
-	return flow.MakeID(struct {
-		View         uint64
-		QC           *flow.QuorumCertificate
-		BlockVersion uint64
-	}{
-		View:         view,
-		QC:           qc,
-		BlockVersion: uint64(blockVersion),
-	})
-}
-
 func makeBlockID(block *model.Block) flow.Identifier {
 	return flow.MakeID(struct {
-		View        uint64
-		QC          *flow.QuorumCertificate
-		PayloadHash flow.Identifier
+		View uint64
+		QC   *flow.QuorumCertificate
 	}{
-		View:        block.View,
-		QC:          block.QC,
-		PayloadHash: block.PayloadHash,
+		View: block.View,
+		QC:   block.QC,
 	})
 }
 
