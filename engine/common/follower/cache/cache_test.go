@@ -157,7 +157,7 @@ func (s *CacheSuite) TestBlockInTheMiddle() {
 	require.Len(s.T(), certifiedBlocks, 2)
 	require.Equal(s.T(), blocks[0], certifiedBlocks[0].Proposal)
 	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBlocks[len(certifiedBlocks)-1].Proposal)
-	require.Equal(s.T(), blocks[2].Block.Header.QuorumCertificate(), certifiedBlocks[1].CertifyingQC)
+	require.Equal(s.T(), blocks[2].Block.Header.ParentQC(), certifiedBlocks[1].CertifyingQC)
 }
 
 // TestAddBatch tests a scenario: B1 <- ... <- BN added in one batch.
@@ -171,7 +171,7 @@ func (s *CacheSuite) TestAddBatch() {
 	for i := 0; i < len(certifiedBatch)-1; i++ {
 		certifiedBlock := certifiedBatch[i]
 		require.Equal(s.T(), blocks[i], certifiedBlock.Proposal)
-		require.Equal(s.T(), blocks[i+1].Block.Header.QuorumCertificate(), certifiedBlock.CertifyingQC)
+		require.Equal(s.T(), blocks[i+1].Block.Header.ParentQC(), certifiedBlock.CertifyingQC)
 		require.Equal(s.T(), certifiedBlock.Proposal.Block.ID(), certifiedBlock.CertifyingQC.BlockID)
 		require.Equal(s.T(), certifiedBlock.Proposal.Block.Header.View, certifiedBlock.CertifyingQC.View)
 	}
@@ -187,7 +187,7 @@ func (s *CacheSuite) TestDuplicatedBatch() {
 	require.Len(s.T(), certifiedBatch, len(blocks)-2)
 	require.Equal(s.T(), blocks[1], certifiedBatch[0].Proposal)
 	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBatch[len(certifiedBatch)-1].Proposal)
-	require.Equal(s.T(), blocks[len(blocks)-1].Block.Header.QuorumCertificate(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
+	require.Equal(s.T(), blocks[len(blocks)-1].Block.Header.ParentQC(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
 
 	// add same batch again, this has to be rejected as redundant input
 	certifiedBatch, err = s.cache.AddBlocks(blocks[1:])
@@ -201,7 +201,7 @@ func (s *CacheSuite) TestDuplicatedBatch() {
 	require.Len(s.T(), certifiedBatch, len(blocks)-1)
 	require.Equal(s.T(), blocks[0], certifiedBatch[0].Proposal)
 	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBatch[len(certifiedBatch)-1].Proposal)
-	require.Equal(s.T(), blocks[len(blocks)-1].Block.Header.QuorumCertificate(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
+	require.Equal(s.T(), blocks[len(blocks)-1].Block.Header.ParentQC(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
 }
 
 // TestPruneUpToView tests that blocks lower than pruned height will be properly filtered out from incoming batch.
@@ -212,7 +212,7 @@ func (s *CacheSuite) TestPruneUpToView() {
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocks[1], certifiedBatch[0].Proposal)
 	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBatch[len(certifiedBatch)-1].Proposal)
-	require.Equal(s.T(), blocks[len(blocks)-1].Block.Header.QuorumCertificate(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
+	require.Equal(s.T(), blocks[len(blocks)-1].Block.Header.ParentQC(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
 }
 
 // TestConcurrentAdd simulates multiple workers adding batches of blocks out of order.

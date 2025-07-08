@@ -58,17 +58,6 @@ type HeaderBody struct {
 	LastViewTC *TimeoutCertificate
 }
 
-// QuorumCertificate returns quorum certificate [QC] that is incorporated in the block header body.
-// Caution: this is the QC for the parent.
-func (h HeaderBody) QuorumCertificate() *QuorumCertificate {
-	return &QuorumCertificate{
-		BlockID:       h.ParentID,
-		View:          h.ParentView,
-		SignerIndices: h.ParentVoterIndices,
-		SigData:       h.ParentVoterSigData,
-	}
-}
-
 // Header contains all meta-data for a block, as well as a hash of the block payload.
 // Headers are used when the metadata about a block is needed, but the payload is not.
 // Because [Header] includes the payload hash for the block, and the block ID is Merkle-ized
@@ -117,7 +106,7 @@ func (h Header) Fingerprint() []byte {
 // Callers *must* first verify that a parent QC is present (e.g. via ContainsParentQC)
 // before calling ParentQC. If no valid parent QC data exists (such as on a spork‐root
 // header), ParentQC will panic.
-func (h Header) ParentQC() *QuorumCertificate {
+func (h HeaderBody) ParentQC() *QuorumCertificate {
 	qc, err := NewQuorumCertificate(UntrustedQuorumCertificate{
 		BlockID:       h.ParentID,
 		View:          h.ParentView,
@@ -135,7 +124,7 @@ func (h Header) ParentQC() *QuorumCertificate {
 // It returns true only if all of the fields required to build a QC are non-zero/nil,
 // indicating that ParentQC() can be safely called without panicking.
 // Only spork root blocks or network genesis blocks do not contain a parent QC.
-func (h Header) ContainsParentQC() bool {
+func (h HeaderBody) ContainsParentQC() bool {
 	return h.ParentID != ZeroID && h.ParentVoterIndices != nil && h.ParentVoterSigData != nil && h.ProposerID != ZeroID
 }
 

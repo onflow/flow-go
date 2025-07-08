@@ -175,7 +175,11 @@ func (c *Cache) AddBlocks(batch []*flow.BlockProposal) (certifiedBatch []flow.Ce
 
 	certifiedBatch = make([]flow.CertifiedBlock, 0, len(batch)-1)
 	for i, proposal := range batch[:len(batch)-1] {
-		certifiedBlock, err := flow.NewCertifiedBlock(proposal, batch[i+1].Block.Header.QuorumCertificate())
+		child := batch[i+1].Block
+		if !child.Header.ContainsParentQC() {
+			return nil, fmt.Errorf("could not retrieve ParentQC from block (id=%x)", child.ID())
+		}
+		certifiedBlock, err := flow.NewCertifiedBlock(proposal, child.Header.ParentQC())
 		if err != nil {
 			return nil, fmt.Errorf("could not construct certified block: %w", err)
 		}

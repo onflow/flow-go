@@ -2027,7 +2027,7 @@ func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
 func CertifiedByChild(block *flow.Block, child *flow.Block) *flow.CertifiedBlock {
 	return &flow.CertifiedBlock{
 		Proposal:     &flow.BlockProposal{Block: *block, ProposerSigData: SignatureFixture()},
-		CertifyingQC: child.Header.QuorumCertificate(),
+		CertifyingQC: child.Header.ParentQC(),
 	}
 }
 
