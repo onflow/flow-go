@@ -13,6 +13,24 @@ type Core struct {
 	mock.Mock
 }
 
+// Abandon provides a mock function with no fields
+func (_m *Core) Abandon() error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Abandon")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Download provides a mock function with given fields: ctx
 func (_m *Core) Download(ctx context.Context) error {
 	ret := _m.Called(ctx)
@@ -31,17 +49,17 @@ func (_m *Core) Download(ctx context.Context) error {
 	return r0
 }
 
-// Index provides a mock function with given fields: ctx
-func (_m *Core) Index(ctx context.Context) error {
-	ret := _m.Called(ctx)
+// Index provides a mock function with no fields
+func (_m *Core) Index() error {
+	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Index")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -49,17 +67,17 @@ func (_m *Core) Index(ctx context.Context) error {
 	return r0
 }
 
-// Persist provides a mock function with given fields: ctx
-func (_m *Core) Persist(ctx context.Context) error {
-	ret := _m.Called(ctx)
+// Persist provides a mock function with no fields
+func (_m *Core) Persist() error {
+	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Persist")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
 	} else {
 		r0 = ret.Error(0)
 	}

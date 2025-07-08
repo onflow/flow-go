@@ -55,7 +55,12 @@ func (s *ProtocolState) EpochStateAtBlockID(blockID flow.Identifier) (protocol.E
 	if err != nil {
 		return nil, fmt.Errorf("could not query epoch protocol state at block (%x): %w", blockID, err)
 	}
-	return inmem.NewEpochProtocolStateAdapter(protocolStateEntry, s.globalParams), nil
+	return inmem.NewEpochProtocolStateAdapter(
+		inmem.UntrustedEpochProtocolStateAdapter{
+			RichEpochStateEntry: protocolStateEntry,
+			Params:              s.globalParams,
+		},
+	)
 }
 
 // KVStoreAtBlockID returns protocol state at block ID.

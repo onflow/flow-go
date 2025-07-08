@@ -297,6 +297,20 @@ func (m *MockCollections) EXPECT() *MockCollectionsMockRecorder {
 	return m.recorder
 }
 
+// BatchStoreLightAndIndexByTransaction mocks base method.
+func (m *MockCollections) BatchStoreLightAndIndexByTransaction(arg0 *flow.LightCollection, arg1 storage.ReaderBatchWriter) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchStoreLightAndIndexByTransaction", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BatchStoreLightAndIndexByTransaction indicates an expected call of BatchStoreLightAndIndexByTransaction.
+func (mr *MockCollectionsMockRecorder) BatchStoreLightAndIndexByTransaction(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStoreLightAndIndexByTransaction", reflect.TypeOf((*MockCollections)(nil).BatchStoreLightAndIndexByTransaction), arg0, arg1)
+}
+
 // ByID mocks base method.
 func (m *MockCollections) ByID(arg0 flow.Identifier) (*flow.Collection, error) {
 	m.ctrl.T.Helper()

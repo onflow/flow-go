@@ -176,17 +176,20 @@ type DB interface {
 }
 
 // Batch is an interface for a batch of writes to a storage backend.
-// The batch is pending until it is committed.
-// Useful for dynamically adding writes to the batch
+// The batch is pending until it is committed. Useful for dynamically adding writes to the batch.
 type Batch interface {
 	ReaderBatchWriter
 
 	// Commit applies the batched updates to the database.
+	// Commit may be called at most once per Batch.
+	// No errors are expected during normal operation.
 	Commit() error
 
 	// Close releases memory of the batch.
+	// Close must be called exactly once per Batch.
 	// This can be called as a defer statement immediately after creating Batch
 	// to reduce risk of unbounded memory consumption.
+	// No errors are expected during normal operation.
 	Close() error
 }
 
