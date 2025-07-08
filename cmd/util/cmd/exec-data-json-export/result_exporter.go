@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -27,9 +26,11 @@ type result struct {
 func ExportResults(blockID flow.Identifier, dbPath string, outputPath string) error {
 
 	// traverse backward from the given block (parent block) and fetch by blockHash
-	badgerdb := common.InitStorage(dbPath)
-	defer badgerdb.Close()
-	db := badgerimpl.ToDB(badgerdb)
+	db, err := common.InitStorage(dbPath)
+	if err != nil {
+		return fmt.Errorf("could not initialize storage: %w", err)
+	}
+	defer db.Close()
 
 	cacheMetrics := &metrics.NoopCollector{}
 	headers := store.NewHeaders(cacheMetrics, db)

@@ -64,7 +64,10 @@ func writeJSONTo(writer io.Writer, jsonData []byte) error {
 func ExportTransactions(dataDir string, outputDir string, startHeight uint64, endHeight uint64) error {
 
 	// init dependencies
-	db := common.InitStorage(flagDatadir)
+	db, err := common.InitStorage(flagDatadir)
+	if err != nil {
+		return fmt.Errorf("could not initialize storage: %w", err)
+	}
 	storages := common.InitStorages(db)
 	defer db.Close()
 
