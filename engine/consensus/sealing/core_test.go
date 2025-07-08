@@ -792,7 +792,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 //
 // Key aspects of this setup:
 //  1. Block S is the lowest block in `SealingSegment.Blocks` (ignoring `SealingSegment.ExtraBlocks`)
-//     This is the heighest sealed block as of block D.
+//     This is the highest sealed block as of block D.
 //     After bootstrapping, the storage API will only permit retrieving blocks whose height is larger or equal to the root block.
 //  2. Block X is an ancestor of S but not included in sealing segment (because it is before the root block)
 //  3. Block B contains execution results for:
