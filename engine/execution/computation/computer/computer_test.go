@@ -186,7 +186,7 @@ func TestBlockExecutor_ExecuteBlock_VersionAwareChunk(t *testing.T) {
 			Times(1) // 1 block
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -410,7 +410,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Times(1) // 1 block
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -544,11 +544,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		execCtx := fvm.NewContext()
 
-		vm := new(fvmmock.VM)
+		// vm := new(fvmmock.VM)
+		vm := &testVM{
+			t:                    t,
+			eventsPerTransaction: 1,
+		}
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -651,7 +655,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		comm := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -707,7 +711,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -941,7 +945,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			vm := fvm.NewVirtualMachine()
 
 			bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-			trackerStorage := mocktracker.NewMockStorage()
+			trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 			prov := provider.NewProvider(
 				zerolog.Nop(),
@@ -1053,7 +1057,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := fvm.NewVirtualMachine()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -1167,7 +1171,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := fvm.NewVirtualMachine()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -1213,7 +1217,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		bservice := requesterunit.MockBlobService(
 			blockstore.NewBlockstore(
 				dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -1544,7 +1548,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),

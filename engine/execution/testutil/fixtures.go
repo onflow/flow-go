@@ -648,9 +648,15 @@ func EntropyProviderFixture(source []byte) environment.EntropyProvider {
 	if source == nil {
 		source = unittest.SignatureFixture()
 	}
-	provider := envMock.EntropyProvider{}
-	provider.On("RandomSource").Return(source, nil)
-	return &provider
+	return &mockEntropyProvider{source: source}
+}
+
+type mockEntropyProvider struct {
+	source []byte
+}
+
+func (m *mockEntropyProvider) RandomSource() ([]byte, error) {
+	return m.source, nil
 }
 
 // ProtocolStateWithVersionFixture is the same as ProtocolStateWithSourceFixture,

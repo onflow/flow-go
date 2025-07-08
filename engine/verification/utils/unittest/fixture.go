@@ -258,12 +258,12 @@ func ExecutionResultFixture(t *testing.T,
 
 		vm := fvm.NewVirtualMachine()
 
-		blocks := new(envMock.Blocks)
+		// blocks := new(envMock.Blocks)
 
 		execCtx := fvm.NewContext(
 			fvm.WithLogger(log),
 			fvm.WithChain(chain),
-			fvm.WithBlocks(blocks),
+			// fvm.WithBlocks(blocks), // TODO: Re-enable when blocks mock is available
 		)
 
 		// create state.View
@@ -273,7 +273,7 @@ func ExecutionResultFixture(t *testing.T,
 		committer := committer.NewLedgerViewCommitter(led, trace.NewNoopTracer())
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),

@@ -1432,7 +1432,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		fvm.WithCadenceLogging(true),
 	)
 
-	blocks := new(envMock.Blocks)
+	// blocks := new(envMock.Blocks)
 
 	block1 := unittest.BlockFixture()
 	block2 := unittest.BlockWithParentFixture(block1.Header)

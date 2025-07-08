@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -154,11 +153,11 @@ func ExecuteLegacyWsRequest(req *http.Request, stateStreamApi state_stream.API, 
 	router.ServeHTTP(responseRecorder, req)
 }
 
-func AssertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend *mock.API) {
+func AssertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend access.API) {
 	AssertResponse(t, req, http.StatusOK, expectedRespBody, backend)
 }
 
-func AssertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend *mock.API) {
+func AssertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend access.API) {
 	rr := ExecuteRequest(req, backend)
 	actualResponseBody := rr.Body.String()
 	require.JSONEq(t,

@@ -184,18 +184,6 @@ packages:
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
-  github.com/onflow/flow-go/fvm:
-    config:
-      dir: "./fvm/mock"
-      outpkg: "mock"
-      filename: "{{.InterfaceName}}.go"
-    all: True
-  github.com/onflow/flow-go/fvm/environment:
-    config:
-      dir: "./fvm/environment/mock"
-      outpkg: "mock"
-      filename: "{{.InterfaceName}}.go"
-    all: True
   github.com/onflow/flow-go/ledger:
     config:
       dir: "./ledger/mock"

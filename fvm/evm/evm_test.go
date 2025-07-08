@@ -3354,10 +3354,10 @@ func RunWithNewEnvironment(
 		RunWithDeployedContract(t, GetStorageTestContract(t), backend, rootAddr, func(testContract *TestContract) {
 			RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
 
-				blocks := new(envMock.Blocks)
-				block1 := unittest.BlockFixture()
-				blocks.On("ByHeightFrom",
-					block1.Header.Height,
+				// blocks := new(envMock.Blocks)
+				// block1 := unittest.BlockFixture()
+				// blocks.On("ByHeightFrom",
+				//	block1.Header.Height,
 					block1.Header,
 				).Return(block1.Header, nil)
 

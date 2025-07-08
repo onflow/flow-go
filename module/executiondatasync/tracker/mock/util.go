@@ -7,8 +7,8 @@ import (
 	tracker "github.com/onflow/flow-go/module/executiondatasync/tracker"
 )
 
-func NewMockStorage() *Storage {
-	trackerStorage := new(Storage)
+func NewMockStorageWithDefaults() *MockStorage {
+	trackerStorage := new(MockStorage)
 	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
 		return fn(func(uint64, ...cid.Cid) error { return nil })
 	})
