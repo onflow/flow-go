@@ -54,7 +54,8 @@ func TestRegisters_HappyPath(t *testing.T) {
 	require.ErrorIs(t, err, storage.ErrNotFound)
 
 	// Extract registers
-	data := registers.Data()
+	data, err := registers.Data(height)
+	require.NoError(t, err)
 	require.Len(t, data, len(entries))
 	require.ElementsMatch(t, entries, data)
 }
