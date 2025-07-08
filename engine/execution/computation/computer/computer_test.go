@@ -1787,6 +1787,14 @@ func (testVM) GetAccount(
 	panic("not implemented")
 }
 
+func (vm *testVM) On(methodName string, arguments ...interface{}) *mock.Call {
+	return &mock.Call{}
+}
+
+func (vm *testVM) AssertExpectations(t mock.TestingT) bool {
+	return true
+}
+
 func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 	events := make([]flow.Event, eventCount)
 	for i := 0; i < eventCount; i++ {

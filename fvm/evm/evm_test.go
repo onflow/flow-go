@@ -3358,8 +3358,11 @@ func RunWithNewEnvironment(
 				// block1 := unittest.BlockFixture()
 				// blocks.On("ByHeightFrom",
 				//	block1.Header.Height,
-					block1.Header,
-				).Return(block1.Header, nil)
+				//	block1.Header,
+				// ).Return(block1.Header, nil)
+				
+				// TODO: Re-enable when blocks mock is available
+				block1 := unittest.BlockFixture()
 
 				opts := []fvm.Option{
 					fvm.WithChain(chain),
@@ -3368,7 +3371,7 @@ func RunWithNewEnvironment(
 					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 					fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
 					fvm.WithRandomSourceHistoryCallAllowed(true),
-					fvm.WithBlocks(blocks),
+					// fvm.WithBlocks(blocks), // TODO: Re-enable when blocks mock is available
 					fvm.WithCadenceLogging(true),
 				}
 				ctx := fvm.NewContext(opts...)
