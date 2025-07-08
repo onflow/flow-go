@@ -7,9 +7,9 @@ var IncorporatedResult incorporatedResultFactory
 type incorporatedResultFactory struct{}
 
 func (f *incorporatedResultFactory) Fixture(opts ...func(*flow.IncorporatedResult)) *flow.IncorporatedResult {
-	result := ExecutionResultFixture()
-	incorporatedBlockID := IdentifierFixture()
-	ir := flow.NewIncorporatedResult(incorporatedBlockID, result)
+	ir, _ := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+		IncorporatedBlockID: IdentifierFixture(),
+		Result:              ExecutionResultFixture()})
 
 	for _, apply := range opts {
 		apply(ir)

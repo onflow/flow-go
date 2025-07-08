@@ -315,13 +315,9 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	)
 	// in case of single node setup we should just forward vote to our own node
 	// for multi-node setup this method will be overridden
-	in.notifier.On("OnOwnVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		in.queue <- &model.Vote{
-			View:     args[1].(uint64),
-			BlockID:  args[0].(flow.Identifier),
-			SignerID: in.localID,
-			SigData:  args[2].([]byte),
-		}
+	in.notifier.On("OnOwnVote", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		vote := args[1].(*model.Vote)
+		in.queue <- vote
 	})
 
 	// program the finalizer module behaviour
@@ -363,7 +359,12 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	notifier.AddConsumer(in.notifier)
 
 	// initialize the finalizer
-	rootBlock := model.BlockFromFlow(cfg.Root)
+	var rootBlock *model.Block
+	if cfg.Root.ContainsParentQC() {
+		rootBlock = model.BlockFromFlow(cfg.Root)
+	} else {
+		rootBlock = model.GenesisBlockFromFlow(cfg.Root)
+	}
 
 	signerIndices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), in.participants.NodeIDs())
 	require.NoError(t, err, "could not encode signer indices")
@@ -372,6 +373,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		View:          rootBlock.View,
 		BlockID:       rootBlock.BlockID,
 		SignerIndices: signerIndices,
+		SigData:       unittest.SignatureFixture(),
 	}
 	certifiedRootBlock, err := model.NewCertifiedBlock(rootBlock, rootQC)
 	require.NoError(t, err)
@@ -425,7 +427,10 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				minRequiredWeight,
 			)
 
-			err := processor.Process(proposal.ProposerVote())
+			vote, err := proposal.ProposerVote()
+			require.NoError(t, err)
+
+			err = processor.Process(vote)
 			if err != nil {
 				t.Fatalf("invalid vote for own proposal: %v", err)
 			}

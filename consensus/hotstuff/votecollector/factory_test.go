@@ -21,7 +21,9 @@ func TestVoteProcessorFactory_CreateWithValidProposal(t *testing.T) {
 
 	proposal := helper.MakeSignedProposal()
 	mockedProcessor := &mockhotstuff.VerifyingVoteProcessor{}
-	mockedProcessor.On("Process", proposal.ProposerVote()).Return(nil).Once()
+	vote, err := proposal.ProposerVote()
+	require.NoError(t, err)
+	mockedProcessor.On("Process", vote).Return(nil).Once()
 	mockedFactory.On("Create", unittest.Logger(), proposal).Return(mockedProcessor, nil).Once()
 
 	voteProcessorFactory := &VoteProcessorFactory{
@@ -46,7 +48,9 @@ func TestVoteProcessorFactory_CreateWithInvalidVote(t *testing.T) {
 	t.Run("invalid-vote", func(t *testing.T) {
 		proposal := helper.MakeSignedProposal()
 		mockedProcessor := &mockhotstuff.VerifyingVoteProcessor{}
-		mockedProcessor.On("Process", proposal.ProposerVote()).Return(model.NewInvalidVoteErrorf(proposal.ProposerVote(), "")).Once()
+		vote, err := proposal.ProposerVote()
+		require.NoError(t, err)
+		mockedProcessor.On("Process", vote).Return(model.NewInvalidVoteErrorf(vote, "")).Once()
 		mockedFactory.On("Create", unittest.Logger(), proposal).Return(mockedProcessor, nil).Once()
 
 		voteProcessorFactory := &VoteProcessorFactory{
@@ -66,7 +70,9 @@ func TestVoteProcessorFactory_CreateWithInvalidVote(t *testing.T) {
 		proposal := helper.MakeSignedProposal()
 		mockedProcessor := &mockhotstuff.VerifyingVoteProcessor{}
 		exception := errors.New("process-exception")
-		mockedProcessor.On("Process", proposal.ProposerVote()).Return(exception).Once()
+		vote, err := proposal.ProposerVote()
+		require.NoError(t, err)
+		mockedProcessor.On("Process", vote).Return(exception).Once()
 
 		mockedFactory.On("Create", unittest.Logger(), proposal).Return(mockedProcessor, nil).Once()
 

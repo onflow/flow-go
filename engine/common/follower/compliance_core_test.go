@@ -140,7 +140,7 @@ func (s *CoreSuite) TestProcessingRangeHappyPath() {
 	for i := 1; i < len(proposals); i++ {
 		expectCertified := &flow.CertifiedBlock{
 			Proposal:     proposals[i-1],
-			CertifyingQC: proposals[i].Block.Header.QuorumCertificate(),
+			CertifyingQC: proposals[i].Block.ToHeader().ParentQC(),
 		}
 		s.state.On("ExtendCertified", mock.Anything, expectCertified).Return(nil).Once()
 		s.follower.On("AddCertifiedBlock", blockWithID(proposals[i-1].Block.ID())).Run(func(args mock.Arguments) {

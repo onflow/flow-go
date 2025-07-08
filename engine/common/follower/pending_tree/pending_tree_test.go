@@ -36,7 +36,7 @@ func (s *PendingTreeSuite) SetupTest() {
 // Having: F ← B1 ← B2 ← B3
 // Add [B1, B2, B3], expect to get [B1;QC_B1, B2;QC_B2; B3;QC_B3]
 func (s *PendingTreeSuite) TestBlocksConnectToFinalized() {
-	blocks := certifiedBlocksFixture(3, s.finalized)
+	blocks := certifiedBlocksFixture(s.T(), 3, s.finalized)
 	connectedBlocks, err := s.pendingTree.AddBlocks(blocks)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocks, connectedBlocks)
@@ -47,7 +47,7 @@ func (s *PendingTreeSuite) TestBlocksConnectToFinalized() {
 // Having: F ← B1 ← B2 ← B3
 // Add [B2, B3], expect to get []
 func (s *PendingTreeSuite) TestBlocksAreNotConnectedToFinalized() {
-	blocks := certifiedBlocksFixture(3, s.finalized)
+	blocks := certifiedBlocksFixture(s.T(), 3, s.finalized)
 	connectedBlocks, err := s.pendingTree.AddBlocks(blocks[1:])
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), connectedBlocks)
@@ -59,7 +59,7 @@ func (s *PendingTreeSuite) TestBlocksAreNotConnectedToFinalized() {
 // Add [B3, B4, B5], expect to get []
 // Add [B1, B2], expect to get [B1, B2, B3, B4, B5]
 func (s *PendingTreeSuite) TestInsertingMissingBlockToFinalized() {
-	blocks := certifiedBlocksFixture(5, s.finalized)
+	blocks := certifiedBlocksFixture(s.T(), 5, s.finalized)
 	connectedBlocks, err := s.pendingTree.AddBlocks(blocks[len(blocks)-3:])
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), connectedBlocks)
@@ -81,14 +81,14 @@ func (s *PendingTreeSuite) TestInsertingMissingBlockToFinalized() {
 // Add [B4, B5, B6, B7], expect to get []
 // Add [B1], expect to get [B1, B2, B3, B4, B5, B6, B7]
 func (s *PendingTreeSuite) TestAllConnectedForksAreCollected() {
-	longestFork := certifiedBlocksFixture(5, s.finalized)
+	longestFork := certifiedBlocksFixture(s.T(), 5, s.finalized)
 	B2 := unittest.BlockWithParentFixture(longestFork[0].Proposal.Block.ToHeader())
 	// make sure short fork doesn't have conflicting views, so we don't trigger exception
 	B2.Header.View = longestFork[len(longestFork)-1].Proposal.Block.Header.View + 1
 	B3 := unittest.BlockWithParentFixture(B2.ToHeader())
 	shortFork := []flow.CertifiedBlock{{
 		Proposal:     unittest.ProposalFromBlock(B2),
-		CertifyingQC: B3.Header.QuorumCertificate(),
+		CertifyingQC: B3.ToHeader().ParentQC(),
 	}, certifiedBlockFixture(B3)}
 
 	connectedBlocks, err := s.pendingTree.AddBlocks(shortFork)
@@ -106,7 +106,7 @@ func (s *PendingTreeSuite) TestAllConnectedForksAreCollected() {
 
 // TestAddingConnectedBlocks tests that adding blocks that were already reported as connected is no-op.
 func (s *PendingTreeSuite) TestAddingConnectedBlocks() {
-	blocks := certifiedBlocksFixture(3, s.finalized)
+	blocks := certifiedBlocksFixture(s.T(), 3, s.finalized)
 	connectedBlocks, err := s.pendingTree.AddBlocks(blocks)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocks, connectedBlocks)
@@ -141,7 +141,7 @@ func (s *PendingTreeSuite) TestByzantineThresholdExceeded() {
 // Randomly shuffle [B, C, D, E] and add it as single batch, expect [] connected blocks.
 // Insert [A], expect [A, B, C, D, E] connected blocks.
 func (s *PendingTreeSuite) TestBatchWithSkipsAndInRandomOrder() {
-	blocks := certifiedBlocksFixture(5, s.finalized)
+	blocks := certifiedBlocksFixture(s.T(), 5, s.finalized)
 
 	rand.Shuffle(len(blocks)-1, func(i, j int) {
 		blocks[i+1], blocks[j+1] = blocks[j+1], blocks[i+1]
@@ -172,14 +172,14 @@ func (s *PendingTreeSuite) TestBatchWithSkipsAndInRandomOrder() {
 // Add [B5, B6, B7], expect to get []
 // Finalize B4, expect to get [B5, B6, B7]
 func (s *PendingTreeSuite) TestResolveBlocksAfterFinalization() {
-	longestFork := certifiedBlocksFixture(5, s.finalized)
+	longestFork := certifiedBlocksFixture(s.T(), 5, s.finalized)
 	B2 := unittest.BlockWithParentFixture(longestFork[0].Proposal.Block.ToHeader())
 	// make sure short fork doesn't have conflicting views, so we don't trigger exception
 	B2.Header.View = longestFork[len(longestFork)-1].Proposal.Block.Header.View + 1
 	B3 := unittest.BlockWithParentFixture(B2.ToHeader())
 	shortFork := []flow.CertifiedBlock{{
 		Proposal:     unittest.ProposalFromBlock(B2),
-		CertifyingQC: B3.Header.QuorumCertificate(),
+		CertifyingQC: B3.ToHeader().ParentQC(),
 	}, certifiedBlockFixture(B3)}
 
 	connectedBlocks, err := s.pendingTree.AddBlocks(shortFork)
@@ -213,7 +213,7 @@ func (s *PendingTreeSuite) TestBlocksLowerThanFinalizedView() {
 // Finalize A.
 // Adding [A, B, C, D] returns [D] since A is already finalized, [B, C] are already stored and connected to the finalized state.
 func (s *PendingTreeSuite) TestAddingBlockAfterFinalization() {
-	blocks := certifiedBlocksFixture(4, s.finalized)
+	blocks := certifiedBlocksFixture(s.T(), 4, s.finalized)
 
 	connectedBlocks, err := s.pendingTree.AddBlocks(blocks[:3])
 	require.NoError(s.T(), err)
@@ -257,11 +257,11 @@ func (s *PendingTreeSuite) TestAddingBlocksWithSameHeight() {
 }
 
 // certifiedBlocksFixture builds a chain of certified blocks starting at some block.
-func certifiedBlocksFixture(count int, parent *flow.Header) []flow.CertifiedBlock {
+func certifiedBlocksFixture(t *testing.T, count int, parent *flow.Header) []flow.CertifiedBlock {
 	result := make([]flow.CertifiedBlock, 0, count)
 	blocks := unittest.ProposalChainFixtureFrom(count, parent)
 	for i := 0; i < count-1; i++ {
-		certBlock, err := flow.NewCertifiedBlock(blocks[i], blocks[i+1].Block.Header.QuorumCertificate())
+		certBlock, err := flow.NewCertifiedBlock(blocks[i], blocks[i+1].Block.ToHeader().ParentQC())
 		if err != nil {
 			// this should never happen, as we are specifically constructing a certifying QC for the input block
 			panic(fmt.Sprintf("unexpected error constructing certified block: %s", err.Error()))

@@ -3665,7 +3665,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 		},
 	)
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "panic: signature mismatch")
+	assert.ErrorContains(t, err, "EVM.decodeABIWithSignature(): Cannot decode! The signature does not match the provided data.")
 }
 
 func TestEVMAddressConstructionAndReturn(t *testing.T) {
@@ -5998,7 +5998,7 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 		message := result.(cadence.Struct).
 			SearchFieldByName("problem").(cadence.Optional).
 			Value.(cadence.String).String()
-		require.Equal(t, "\"the given signatures are not valid or provide enough weight\"", message)
+		require.Equal(t, "\"EVM.validateCOAOwnershipProof(): Cannot validate COA ownership for Cadence account 0x0000000000000001. The given signatures are not valid or provide enough weight.\"", message)
 	})
 }
 

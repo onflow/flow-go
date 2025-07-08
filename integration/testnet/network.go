@@ -1275,7 +1275,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithRootBlock(root.ToHeader()),
 		fvm.WithEpochConfig(epochConfig),
-		fvm.WithIdentities(participants),
+		fvm.WithNodes(stakedNodeInfos),
 	)
 	if err != nil {
 		return nil, err
