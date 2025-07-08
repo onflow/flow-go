@@ -253,11 +253,11 @@ func (p *Pipeline) processCurrentState(ctx context.Context) (bool, error) {
 	case StateDownloading:
 		return p.processDownloading(ctx)
 	case StateIndexing:
-		return p.processIndexing(ctx)
+		return p.processIndexing()
 	case StateWaitingPersist:
 		return p.processWaitingPersist(), nil
 	case StatePersisting:
-		return p.processPersisting(ctx)
+		return p.processPersisting()
 	case StateComplete, StateCanceled:
 		// Terminal states
 		return false, nil
@@ -327,10 +327,10 @@ func (p *Pipeline) processDownloading(ctx context.Context) (bool, error) {
 // It executes the index function and transitions to StateWaitingPersist if possible.
 // Returns true to continue processing, false if a terminal state was reached.
 // Returns an error if the index step fails.
-func (p *Pipeline) processIndexing(ctx context.Context) (bool, error) {
+func (p *Pipeline) processIndexing() (bool, error) {
 	p.logger.Debug().Msg("starting index step")
 
-	if err := p.core.Index(ctx); err != nil {
+	if err := p.core.Index(); err != nil {
 		p.logger.Error().
 			Err(err).
 			Msg("index step failed")
@@ -364,10 +364,10 @@ func (p *Pipeline) processWaitingPersist() bool {
 // It executes the persist function and transitions to StateComplete if successful.
 // Returns true to continue processing, false if a terminal state was reached.
 // Returns an error if the persist step fails.
-func (p *Pipeline) processPersisting(ctx context.Context) (bool, error) {
+func (p *Pipeline) processPersisting() (bool, error) {
 	p.logger.Debug().Msg("starting persist step")
 
-	if err := p.core.Persist(ctx); err != nil {
+	if err := p.core.Persist(); err != nil {
 		p.logger.Error().
 			Err(err).
 			Msg("persist step failed")

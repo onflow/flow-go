@@ -2734,7 +2734,7 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.Header.Height = block1.Header.Height
 
-		err = state.ExtendCertified(context.Background(), block1, block2.Header.QuorumCertificate())
+		err = state.ExtendCertified(context.Background(), block1, block2.Header.ParentQC())
 		require.NoError(t, err)
 
 		err = state.ExtendCertified(context.Background(), block2, unittest.CertifyBlock(block2.Header))
@@ -2780,8 +2780,8 @@ func TestExtendBlockProcessable(t *testing.T) {
 		grandChild := unittest.BlockWithParentProtocolState(child)
 
 		// extend block using certifying QC, expect that BlockProcessable will be emitted once
-		consumer.On("BlockProcessable", block.Header, child.Header.QuorumCertificate()).Once()
-		err := state.ExtendCertified(context.Background(), block, child.Header.QuorumCertificate())
+		consumer.On("BlockProcessable", block.Header, child.Header.ParentQC()).Once()
+		err = state.ExtendCertified(context.Background(), block, child.Header.ParentQC())
 		require.NoError(t, err)
 
 		// extend block without certifying QC, expect that BlockProcessable won't be called
@@ -2792,7 +2792,7 @@ func TestExtendBlockProcessable(t *testing.T) {
 		// extend block using certifying QC, expect that BlockProcessable will be emitted twice.
 		// One for parent block and second for current block.
 		grandChildCertifyingQC := unittest.CertifyBlock(grandChild.Header)
-		consumer.On("BlockProcessable", child.Header, grandChild.Header.QuorumCertificate()).Once()
+		consumer.On("BlockProcessable", child.Header, grandChild.Header.ParentQC()).Once()
 		consumer.On("BlockProcessable", grandChild.Header, grandChildCertifyingQC).Once()
 		err = state.ExtendCertified(context.Background(), grandChild, grandChildCertifyingQC)
 		require.NoError(t, err)
@@ -2880,8 +2880,7 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 
 		block3 := unittest.BlockWithParentProtocolState(block2)
-
-		err := state.ExtendCertified(context.Background(), block2, block3.Header.QuorumCertificate())
+		err = state.ExtendCertified(context.Background(), block2, block3.Header.ParentQC())
 		require.NoError(t, err)
 
 		// create receipts and seals for block2 and block3
@@ -2905,10 +2904,10 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 			unittest.WithProtocolStateID(rootProtocolStateID),
 		))
 
-		err = state.ExtendCertified(context.Background(), block3, block4.Header.QuorumCertificate())
+		err = state.ExtendCertified(context.Background(), block3, block4.Header.ParentQC())
 		require.NoError(t, err)
 
-		err = state.ExtendCertified(context.Background(), block4, block5.Header.QuorumCertificate())
+		err = state.ExtendCertified(context.Background(), block4, block5.Header.ParentQC())
 		require.NoError(t, err)
 
 		err = state.ExtendCertified(context.Background(), block5, unittest.CertifyBlock(block5.Header))
@@ -3076,7 +3075,7 @@ func TestSealed(t *testing.T) {
 			unittest.WithProtocolStateID(rootProtocolStateID),
 		))
 
-		err = state.ExtendCertified(context.Background(), block1, block2.Header.QuorumCertificate())
+		err = state.ExtendCertified(context.Background(), block1, block2.Header.ParentQC())
 		require.NoError(t, err)
 		err = state.Finalize(context.Background(), block1.ID())
 		require.NoError(t, err)
@@ -3088,7 +3087,7 @@ func TestSealed(t *testing.T) {
 			ProtocolStateID: rootProtocolStateID,
 		})
 
-		err = state.ExtendCertified(context.Background(), block2, block3.Header.QuorumCertificate())
+		err = state.ExtendCertified(context.Background(), block2, block3.Header.ParentQC())
 		require.NoError(t, err)
 		err = state.Finalize(context.Background(), block2.ID())
 		require.NoError(t, err)
