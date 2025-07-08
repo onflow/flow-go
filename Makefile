@@ -77,7 +77,7 @@ unittest-main:
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
-    go install github.com/vektra/mockery/v2@v2.53.3; \
+    go install github.com/vektra/mockery/v2@v2.53.4; \
     go install github.com/golang/mock/mockgen@v1.6.0;
 
 .PHONY: install-tools
@@ -154,77 +154,15 @@ generate-fvm-env-wrappers:
 
 .PHONY: generate-mocks
 generate-mocks: install-mock-generators
-	mockery --name '(Connector|PingInfoProvider)' --dir=network/p2p --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
+	mockery
 	CGO_CFLAGS=$(CRYPTO_FLAG) mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Headers,Payloads,Collections,Commits,Events,ServiceEvents,TransactionResults
 	CGO_CFLAGS=$(CRYPTO_FLAG) mockgen -destination=network/mocknetwork/mock_network.go -package=mocknetwork github.com/onflow/flow-go/network EngineRegistry
-	mockery --name=ExecutionDataStore --dir=module/executiondatasync/execution_data --case=underscore --output="./module/executiondatasync/execution_data/mock" --outpkg="mock"
-	mockery --name=Downloader --dir=module/executiondatasync/execution_data --case=underscore --output="./module/executiondatasync/execution_data/mock" --outpkg="mock"
-	mockery --name='.*' --dir=integration/benchmark/mocksiface --case=underscore --output="integration/benchmark/mock" --outpkg="mock"
-	mockery --name '(ExecutionDataRequester|IndexReporter)' --dir=module/state_synchronization --case=underscore --output="./module/state_synchronization/mock" --outpkg="state_synchronization"
-	mockery --name 'ExecutionState' --dir=engine/execution/state --case=underscore --output="engine/execution/state/mock" --outpkg="mock"
-	mockery --name 'BlockComputer' --dir=engine/execution/computation/computer --case=underscore --output="engine/execution/computation/computer/mock" --outpkg="mock"
-	mockery --name 'ComputationManager' --dir=engine/execution/computation --case=underscore --output="engine/execution/computation/mock" --outpkg="mock"
-	mockery --name '.*' --dir=engine/execution/computation/query --case=underscore --output="engine/execution/computation/query/mock" --outpkg="mock"
-	mockery --name 'EpochComponentsFactory' --dir=engine/collection/epochmgr --case=underscore --output="engine/collection/epochmgr/mock" --outpkg="mock"
-	mockery --name '.*' --dir=engine/execution/ --case=underscore --output="engine/execution/mock" --outpkg="mock"
-	mockery --name 'Backend' --dir=engine/collection/rpc --case=underscore --output="engine/collection/rpc/mock" --outpkg="mock"
-	mockery --name 'ProviderEngine' --dir=engine/execution/provider --case=underscore --output="engine/execution/provider/mock" --outpkg="mock"
-	mockery --name '.*' --dir=state/cluster --case=underscore --output="state/cluster/mock" --outpkg="mock"
-	mockery --name '.*' --dir=module --case=underscore --output="./module/mock" --outpkg="mock"
-	mockery --name '.*' --dir=module/mempool --case=underscore --output="./module/mempool/mock" --outpkg="mempool"
-	mockery --name '.*' --dir=module/component --case=underscore --output="./module/component/mock" --outpkg="component"
-	mockery --name '.*' --dir=network --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
-	mockery --name '.*' --dir=storage --case=underscore --output="./storage/mock" --outpkg="mock"
-	mockery --name 'DeferredDBUpdate' --dir=storage/badger/transaction --case=underscore --output="storage/mock" --outpkg="mock"
-	mockery --name '.*' --dir="state/protocol" --case=underscore --output="state/protocol/mock" --outpkg="mock"
-	mockery --name '.*' --dir="state/protocol/events" --case=underscore --output="./state/protocol/events/mock" --outpkg="mock"
-	mockery --name '.*' --dir="state/protocol/protocol_state" --case=underscore --output="state/protocol/protocol_state/mock" --outpkg="mock"
-	mockery --name '.*' --dir="state/protocol/protocol_state/epochs" --case=underscore --output="state/protocol/protocol_state/epochs/mock" --outpkg="mock"
-	mockery --name '.*' --dir=engine/execution/computation/computer --case=underscore --output="./engine/execution/computation/computer/mock" --outpkg="mock"
-	mockery --name '.*' --dir=engine/execution/state --case=underscore --output="./engine/execution/state/mock" --outpkg="mock"
-	mockery --name '.*' --dir=engine/collection --case=underscore --output="./engine/collection/mock" --outpkg="mock"
-	mockery --name 'complianceCore' --dir=engine/common/follower --exported --case=underscore --output="./engine/common/follower/mock" --outpkg="mock"
-	mockery --name '.*' --dir=engine/common/follower/cache --case=underscore --output="./engine/common/follower/cache/mock" --outpkg="mock"
-	mockery --name '.*' --dir=engine/consensus --case=underscore --output="./engine/consensus/mock" --outpkg="mock"
-	mockery --name '.*' --dir=engine/consensus/approvals --case=underscore --output="./engine/consensus/approvals/mock" --outpkg="mock"
 	rm -rf ./fvm/mock
-	mockery --name '.*' --dir=fvm --case=underscore --output="./fvm/mock" --outpkg="mock"
 	rm -rf ./fvm/environment/mock
-	mockery --name '.*' --dir=fvm/environment --case=underscore --output="./fvm/environment/mock" --outpkg="mock"
-	mockery --name '.*' --dir=ledger --case=underscore --output="./ledger/mock" --outpkg="mock"
-	mockery --name 'ViolationsConsumer' --dir=network --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
-	mockery --name '.*' --dir=network/p2p/ --case=underscore --output="./network/p2p/mock" --outpkg="mockp2p"
-	mockery --name '.*' --dir=network/alsp --case=underscore --output="./network/alsp/mock" --outpkg="mockalsp"
-	mockery --name 'Vertex' --dir="./module/forest" --case=underscore --output="./module/forest/mock" --outpkg="mock"
-	mockery --name '.*' --dir="./consensus/hotstuff" --case=underscore --output="./consensus/hotstuff/mocks" --outpkg="mocks"
-	mockery --name '.*' --dir="./engine/access/wrapper" --case=underscore --output="./engine/access/mock" --outpkg="mock"
-	mockery --name 'API' --dir="./access" --case=underscore --output="./access/mock" --outpkg="mock"
-	mockery --name 'Blocks' --dir="./access/validator" --case=underscore --output="./access/validator/mock" --outpkg="mock"
-	mockery --name 'API' --dir="./engine/protocol" --case=underscore --output="./engine/protocol/mock" --outpkg="mock"
-	mockery --name '.*' --dir="./engine/access/state_stream" --case=underscore --output="./engine/access/state_stream/mock" --outpkg="mock"
-	mockery --name 'BlockTracker' --dir="./engine/access/subscription/tracker" --case=underscore --output="./engine/access/subscription/tracker/mock"  --outpkg="mock"
-	mockery --name 'ExecutionDataTracker' --dir="./engine/access/subscription/tracker" --case=underscore --output="./engine/access/subscription/tracker/mock"  --outpkg="mock"
-	mockery --name 'DataProvider' --dir="./engine/access/rest/websockets/data_providers" --case=underscore --output="./engine/access/rest/websockets/data_providers/mock"  --outpkg="mock"
-	mockery --name 'DataProviderFactory' --dir="./engine/access/rest/websockets/data_providers" --case=underscore --output="./engine/access/rest/websockets/data_providers/mock"  --outpkg="mock"
-	mockery --name 'LinkGenerator' --dir="./engine/access/rest/common/models" --case=underscore --output="./engine/access/rest/common/models/mock"  --outpkg="mock"
-	mockery --name 'WebsocketConnection' --dir="./engine/access/rest/websockets" --case=underscore --output="./engine/access/rest/websockets/mock"  --outpkg="mock"
-	mockery --name 'ConnectionFactory' --dir="./engine/access/rpc/connection" --case=underscore --output="./engine/access/rpc/connection/mock" --outpkg="mock"
-	mockery --name 'Communicator' --dir="./engine/access/rpc/backend" --case=underscore --output="./engine/access/rpc/backend/mock" --outpkg="mock"
-	mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"
-	mockery --name 'ExecForkActor' --structname 'ExecForkActorMock' --dir=module/mempool/consensus/mock/ --case=underscore --output="./module/mempool/consensus/mock/" --outpkg="mock"
-	mockery --name '.*' --dir=engine/verification/fetcher/ --case=underscore --output="./engine/verification/fetcher/mock" --outpkg="mockfetcher"
-	mockery --name '.*' --dir=./cmd/util/ledger/reporters --case=underscore --output="./cmd/util/ledger/reporters/mock" --outpkg="mock"
-	mockery --name 'Storage' --dir=module/executiondatasync/tracker --case=underscore --output="module/executiondatasync/tracker/mock" --outpkg="mocktracker"
-	mockery --name 'ScriptExecutor' --dir=module/execution --case=underscore --output="module/execution/mock" --outpkg="mock"
-	mockery --name 'StorageSnapshot' --dir=fvm/storage/snapshot --case=underscore --output="fvm/storage/snapshot/mock" --outpkg="mock"
-	mockery --name 'Core' --dir=module/executiondatasync/optimistic_syncing --case=underscore --output="module/executiondatasync/optimistic_syncing/mock" --outpkg="mock"
-	mockery --name 'Requester' --dir=engine/access/ingestion/tx_error_messages --case=underscore --output="engine/access/ingestion/tx_error_messages/mock" --outpkg="mock"
-	mockery --name 'ExecutionDataRequester' --dir=module/state_synchronization/requester --case=underscore --output="module/state_synchronization/requester/mock" --outpkg="mock"
 
 	#temporarily make insecure/ a non-module to allow mockery to create mocks
 	mv insecure/go.mod insecure/go2.mod
 	if [ -f go.work ]; then mv go.work go2.work; fi
-	mockery --name '.*' --dir=insecure/ --case=underscore --output="./insecure/mock"  --outpkg="mockinsecure"
 	mv insecure/go2.mod insecure/go.mod
 	if [ -f go2.work ]; then mv go2.work go.work; fi
 
