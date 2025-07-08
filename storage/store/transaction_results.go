@@ -2,7 +2,6 @@ package store
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -14,129 +13,89 @@ import (
 
 var _ storage.TransactionResults = (*TransactionResults)(nil)
 
+type TwoIdentifier [flow.IdentifierLen * 2]byte
+type IdentifierAndUint32 [flow.IdentifierLen + 4]byte
+
 type TransactionResults struct {
 	db         storage.DB
-	cache      *Cache[string, flow.TransactionResult]
-	indexCache *Cache[string, flow.TransactionResult]
-	blockCache *Cache[string, []flow.TransactionResult]
+	cache      *Cache[TwoIdentifier, flow.TransactionResult]       // Key: blockID + txID
+	indexCache *Cache[IdentifierAndUint32, flow.TransactionResult] // Key: blockID + txIndex
+	blockCache *Cache[flow.Identifier, []flow.TransactionResult]   // Key: blockID
 }
 
-func KeyFromBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) string {
-	return fmt.Sprintf("%x%x", blockID, txID)
+func KeyFromBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) TwoIdentifier {
+	var key TwoIdentifier
+	n := copy(key[:], blockID[:])
+	copy(key[n:], txID[:])
+	return key
 }
 
-func KeyFromBlockIDIndex(blockID flow.Identifier, txIndex uint32) string {
-	idData := make([]byte, 4) //uint32 fits into 4 bytes
-	binary.BigEndian.PutUint32(idData, txIndex)
-	return fmt.Sprintf("%x%x", blockID, idData)
+func KeyFromBlockIDIndex(blockID flow.Identifier, txIndex uint32) IdentifierAndUint32 {
+	var key IdentifierAndUint32
+	n := copy(key[:], blockID[:])
+	binary.BigEndian.PutUint32(key[n:], txIndex)
+	return key
 }
 
-func KeyFromBlockID(blockID flow.Identifier) string {
-	return blockID.String()
+func KeyToBlockIDTransactionID(key TwoIdentifier) (flow.Identifier, flow.Identifier) {
+	blockID := flow.Identifier(key[:flow.IdentifierLen])
+	transactionID := flow.Identifier(key[flow.IdentifierLen:])
+	return blockID, transactionID
 }
 
-func KeyToBlockIDTransactionID(key string) (flow.Identifier, flow.Identifier, error) {
-	blockIDStr := key[:64]
-	txIDStr := key[64:]
-	blockID, err := flow.HexStringToIdentifier(blockIDStr)
-	if err != nil {
-		return flow.ZeroID, flow.ZeroID, fmt.Errorf("could not get block ID: %w", err)
-	}
-
-	txID, err := flow.HexStringToIdentifier(txIDStr)
-	if err != nil {
-		return flow.ZeroID, flow.ZeroID, fmt.Errorf("could not get transaction id: %w", err)
-	}
-
-	return blockID, txID, nil
-}
-
-func KeyToBlockIDIndex(key string) (flow.Identifier, uint32, error) {
-	blockIDStr := key[:64]
-	indexStr := key[64:]
-	blockID, err := flow.HexStringToIdentifier(blockIDStr)
-	if err != nil {
-		return flow.ZeroID, 0, fmt.Errorf("could not get block ID: %w", err)
-	}
-
-	txIndexBytes, err := hex.DecodeString(indexStr)
-	if err != nil {
-		return flow.ZeroID, 0, fmt.Errorf("could not get transaction index: %w", err)
-	}
-	if len(txIndexBytes) != 4 {
-		return flow.ZeroID, 0, fmt.Errorf("could not get transaction index - invalid length: %d", len(txIndexBytes))
-	}
-
-	txIndex := binary.BigEndian.Uint32(txIndexBytes)
-
-	return blockID, txIndex, nil
-}
-
-func KeyToBlockID(key string) (flow.Identifier, error) {
-
-	blockID, err := flow.HexStringToIdentifier(key)
-	if err != nil {
-		return flow.ZeroID, fmt.Errorf("could not get block ID: %w", err)
-	}
-
-	return blockID, err
+func KeyToBlockIDIndex(key IdentifierAndUint32) (flow.Identifier, uint32) {
+	blockID := flow.Identifier(key[:flow.IdentifierLen])
+	txIndex := binary.BigEndian.Uint32(key[flow.IdentifierLen:])
+	return blockID, txIndex
 }
 
 func NewTransactionResults(collector module.CacheMetrics, db storage.DB, transactionResultsCacheSize uint) *TransactionResults {
-	retrieve := func(r storage.Reader, key string) (flow.TransactionResult, error) {
-		var txResult flow.TransactionResult
-		blockID, txID, err := KeyToBlockIDTransactionID(key)
-		if err != nil {
-			return flow.TransactionResult{}, fmt.Errorf("could not convert key: %w", err)
-		}
+	retrieve := func(r storage.Reader, key TwoIdentifier) (flow.TransactionResult, error) {
+		blockID, txID := KeyToBlockIDTransactionID(key)
 
-		err = operation.RetrieveTransactionResult(r, blockID, txID, &txResult)
+		var txResult flow.TransactionResult
+		err := operation.RetrieveTransactionResult(r, blockID, txID, &txResult)
 		if err != nil {
 			return flow.TransactionResult{}, err
 		}
 		return txResult, nil
 	}
-	retrieveIndex := func(r storage.Reader, key string) (flow.TransactionResult, error) {
-		var txResult flow.TransactionResult
-		blockID, txIndex, err := KeyToBlockIDIndex(key)
-		if err != nil {
-			return flow.TransactionResult{}, fmt.Errorf("could not convert index key: %w", err)
-		}
 
-		err = operation.RetrieveTransactionResultByIndex(r, blockID, txIndex, &txResult)
+	retrieveIndex := func(r storage.Reader, key IdentifierAndUint32) (flow.TransactionResult, error) {
+		blockID, txIndex := KeyToBlockIDIndex(key)
+
+		var txResult flow.TransactionResult
+		err := operation.RetrieveTransactionResultByIndex(r, blockID, txIndex, &txResult)
 		if err != nil {
 			return flow.TransactionResult{}, err
 		}
 		return txResult, nil
 	}
-	retrieveForBlock := func(r storage.Reader, key string) ([]flow.TransactionResult, error) {
+
+	retrieveForBlock := func(r storage.Reader, blockID flow.Identifier) ([]flow.TransactionResult, error) {
 		var txResults []flow.TransactionResult
-		blockID, err := KeyToBlockID(key)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert index key: %w", err)
-		}
-
-		err = operation.LookupTransactionResultsByBlockIDUsingIndex(r, blockID, &txResults)
+		err := operation.LookupTransactionResultsByBlockIDUsingIndex(r, blockID, &txResults)
 		if err != nil {
 			return nil, err
 		}
 		return txResults, nil
 	}
+
 	return &TransactionResults{
 		db: db,
 		cache: newCache(collector, metrics.ResourceTransactionResults,
-			withLimit[string, flow.TransactionResult](transactionResultsCacheSize),
-			withStore(noopStore[string, flow.TransactionResult]),
+			withLimit[TwoIdentifier, flow.TransactionResult](transactionResultsCacheSize),
+			withStore(noopStore[TwoIdentifier, flow.TransactionResult]),
 			withRetrieve(retrieve),
 		),
 		indexCache: newCache(collector, metrics.ResourceTransactionResultIndices,
-			withLimit[string, flow.TransactionResult](transactionResultsCacheSize),
-			withStore(noopStore[string, flow.TransactionResult]),
+			withLimit[IdentifierAndUint32, flow.TransactionResult](transactionResultsCacheSize),
+			withStore(noopStore[IdentifierAndUint32, flow.TransactionResult]),
 			withRetrieve(retrieveIndex),
 		),
 		blockCache: newCache(collector, metrics.ResourceTransactionResultIndices,
-			withLimit[string, []flow.TransactionResult](transactionResultsCacheSize),
-			withStore(noopStore[string, []flow.TransactionResult]),
+			withLimit[flow.Identifier, []flow.TransactionResult](transactionResultsCacheSize),
+			withStore(noopStore[flow.Identifier, []flow.TransactionResult]),
 			withRetrieve(retrieveForBlock),
 		),
 	}
@@ -170,8 +129,7 @@ func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionRes
 			tr.indexCache.Insert(keyIndex, result)
 		}
 
-		key := KeyFromBlockID(blockID)
-		tr.blockCache.Insert(key, transactionResults)
+		tr.blockCache.Insert(blockID, transactionResults)
 	})
 	return nil
 }
@@ -198,8 +156,7 @@ func (tr *TransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier,
 
 // ByBlockID gets all transaction results for a block, ordered by transaction index
 func (tr *TransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.TransactionResult, error) {
-	key := KeyFromBlockID(blockID)
-	transactionResults, err := tr.blockCache.Get(tr.db.Reader(), key)
+	transactionResults, err := tr.blockCache.Get(tr.db.Reader(), blockID)
 	if err != nil {
 		return nil, err
 	}
@@ -209,11 +166,37 @@ func (tr *TransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.Transac
 // RemoveByBlockID removes transaction results by block ID
 func (tr *TransactionResults) RemoveByBlockID(blockID flow.Identifier) error {
 	return tr.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.RemoveTransactionResultsByBlockID(rw.GlobalReader(), rw.Writer(), blockID)
+		return tr.BatchRemoveByBlockID(blockID, rw)
 	})
 }
 
 // BatchRemoveByBlockID batch removes transaction results by block ID
 func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.ReaderBatchWriter) error {
+	// TODO: Remove records from tr.cache by prefix (blockID) and optimize removal.
+	//
+	// Currently, tr.cache can be out of sync with underlying database
+	// when transaction results are removed by this functions.
+	//
+	// Even though cache.RemoveFunc() is maybe fast enough for
+	// a 1000-item cache, using 10K-item cache size and pruning
+	// multiple blocks in one batch can slow down commit phase
+	// unless we optimize for that use case.
+	//
+	// To unblock PR onflow/flow-go#7324 which has several fixes,
+	// remove-by-prefix optimization will be tracked in separate issue/PR.
+	//
+	// Code fix (below) and test are commented out (not deleted) because
+	// we can use the code as a quick stop-gap fix if needed, and
+	// we can reuse the test even if a new (faster) approach is implemented.
+	/*
+		storage.OnCommitSucceed(batch, func() {
+			keyPrefix := KeyFromBlockID(blockID)
+
+			tr.cache.RemoveFunc(func(key string) bool {
+				return strings.HasPrefix(key, keyPrefix)
+			})
+		})
+	*/
+
 	return operation.BatchRemoveTransactionResultsByBlockID(blockID, batch)
 }

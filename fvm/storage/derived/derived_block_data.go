@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/common"
-	"github.com/onflow/cadence/interpreter"
+	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -36,7 +36,7 @@ type DerivedTransactionPreparer interface {
 }
 
 type Program struct {
-	*interpreter.Program
+	*runtime.Program
 
 	Dependencies ProgramDependencies
 }

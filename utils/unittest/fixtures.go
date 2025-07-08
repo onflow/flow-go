@@ -53,8 +53,7 @@ import (
 )
 
 const (
-	DefaultSeedFixtureLength = 64
-	DefaultAddress           = "localhost:0"
+	DefaultAddress = "localhost:0"
 )
 
 // returns a deterministic math/rand PRG that can be used for deterministic randomness in tests only.
@@ -257,9 +256,9 @@ func ProposalFromBlock(block *flow.Block) *flow.BlockProposal {
 	}
 }
 
-func ClusterProposalFromBlock(block cluster.Block) *cluster.BlockProposal {
+func ClusterProposalFromBlock(block *cluster.Block) *cluster.BlockProposal {
 	return &cluster.BlockProposal{
-		Block:           block,
+		Block:           *block,
 		ProposerSigData: SignatureFixture(),
 	}
 }
@@ -559,59 +558,27 @@ func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *fl
 	}
 }
 
-func ClusterPayloadFixture(n int) *cluster.Payload {
-	transactions := make([]*flow.TransactionBody, n)
-	for i := 0; i < n; i++ {
-		tx := TransactionBodyFixture()
-		transactions[i] = &tx
+func ClusterPayloadFixture(transactionsCount int) *cluster.Payload {
+	return &cluster.Payload{
+		ReferenceBlockID: IdentifierFixture(),
+		Collection:       CollectionFixture(transactionsCount),
 	}
-	payload, err := cluster.NewPayload(flow.ZeroID, transactions)
-	if err != nil {
-		panic(err)
-	}
-	return payload
 }
 
-func ClusterBlockFixture() cluster.Block {
-	payload := ClusterPayloadFixture(3)
-	headerBody := HeaderBodyFixture()
-
-	return cluster.NewBlock(headerBody, *payload)
-}
-
-func ClusterBlockChainFixture(n int) []cluster.Block {
-	clusterBlocks := make([]cluster.Block, 0, n)
+func ClusterBlockFixtures(n int) []*cluster.Block {
+	clusterBlocks := make([]*cluster.Block, 0, n)
 
 	parent := ClusterBlockFixture()
 
 	for i := 0; i < n; i++ {
-		block := ClusterBlockWithParent(parent)
+		block := ClusterBlockFixture(
+			ClusterBlock.WithParent(parent),
+		)
 		clusterBlocks = append(clusterBlocks, block)
 		parent = block
 	}
 
 	return clusterBlocks
-}
-
-// ClusterBlockWithParent creates a new cluster consensus block that is valid
-// with respect to the given parent block.
-func ClusterBlockWithParent(parent cluster.Block) cluster.Block {
-	payload := ClusterPayloadFixture(3)
-	return ClusterBlockWithParentAndPayload(parent, *payload)
-}
-
-// ClusterBlockWithParentAndPayload creates a new cluster consensus block that is valid
-// with respect to the given parent block and with given payload.
-func ClusterBlockWithParentAndPayload(parent cluster.Block, payload cluster.Payload) cluster.Block {
-	headerBody := HeaderBodyFixture()
-	headerBody.Height = parent.Header.Height + 1
-	headerBody.View = parent.Header.View + 1
-	headerBody.ChainID = parent.Header.ChainID
-	headerBody.Timestamp = time.Now().UTC()
-	headerBody.ParentID = parent.ID()
-	headerBody.ParentView = parent.Header.View
-
-	return cluster.NewBlock(headerBody, payload)
 }
 
 func WithCollRef(refID flow.Identifier) func(*flow.CollectionGuarantee) {
@@ -1146,8 +1113,28 @@ func NodeConfigFixture(opts ...func(*flow.Identity)) bootstrap.NodeConfig {
 }
 
 func NodeInfoFixture(opts ...func(*flow.Identity)) bootstrap.NodeInfo {
-	opts = append(opts, WithKeys)
-	return bootstrap.NodeInfoFromIdentity(IdentityFixture(opts...))
+	nodes := NodeInfosFixture(1, opts...)
+	return nodes[0]
+}
+
+// NodeInfoFromIdentity converts an identity to a public NodeInfo
+// WARNING: the function replaces the staking key from the identity by a freshly generated one.
+func NodeInfoFromIdentity(identity *flow.Identity) bootstrap.NodeInfo {
+	stakingSK := StakingPrivKeyFixture()
+	stakingPoP, err := crypto.BLSGeneratePOP(stakingSK)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return bootstrap.NewPublicNodeInfo(
+		identity.NodeID,
+		identity.Role,
+		identity.Address,
+		identity.InitialWeight,
+		identity.NetworkPubKey,
+		stakingSK.PublicKey(),
+		stakingPoP,
+	)
 }
 
 func NodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfo {
@@ -1155,7 +1142,7 @@ func NodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfo 
 	il := IdentityListFixture(n, opts...)
 	nodeInfos := make([]bootstrap.NodeInfo, 0, n)
 	for _, identity := range il {
-		nodeInfos = append(nodeInfos, bootstrap.NodeInfoFromIdentity(identity))
+		nodeInfos = append(nodeInfos, NodeInfoFromIdentity(identity))
 	}
 	return nodeInfos
 }
@@ -1171,7 +1158,10 @@ func PrivateNodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.No
 func PrivateNodeInfosFromIdentityList(il flow.IdentityList) []bootstrap.NodeInfo {
 	nodeInfos := make([]bootstrap.NodeInfo, 0, len(il))
 	for _, identity := range il {
-		nodeInfo := bootstrap.PrivateNodeInfoFromIdentity(identity, KeyFixture(crypto.ECDSAP256), KeyFixture(crypto.BLSBLS12381))
+		nodeInfo, err := bootstrap.PrivateNodeInfoFromIdentity(identity, KeyFixture(crypto.ECDSAP256), KeyFixture(crypto.BLSBLS12381))
+		if err != nil {
+			panic(err.Error())
+		}
 		nodeInfos = append(nodeInfos, nodeInfo)
 	}
 	return nodeInfos
@@ -1809,30 +1799,13 @@ func SeedFixtures(m int, n int) [][]byte {
 func BlockEventsFixture(
 	header *flow.Header,
 	n int,
-	types ...flow.EventType,
 ) flow.BlockEvents {
 	return flow.BlockEvents{
 		BlockID:        header.ID(),
 		BlockHeight:    header.Height,
 		BlockTimestamp: header.Timestamp,
-		Events:         EventsFixture(n, types...),
+		Events:         EventsFixture(n),
 	}
-}
-
-func EventsFixture(
-	n int,
-	types ...flow.EventType,
-) []flow.Event {
-	if len(types) == 0 {
-		types = []flow.EventType{"A.0x1.Foo.Bar", "A.0x2.Zoo.Moo", "A.0x3.Goo.Hoo"}
-	}
-
-	events := make([]flow.Event, n)
-	for i := 0; i < n; i++ {
-		events[i] = EventFixture(types[i%len(types)], 0, uint32(i))
-	}
-
-	return events
 }
 
 func EventTypeFixture(chainID flow.ChainID) flow.EventType {
@@ -2167,11 +2140,10 @@ func EpochRecoverFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochRecove
 		WithClusterQCsFromAssignments(setup.Assignments),
 	)
 
-	ev := &flow.EpochRecover{
+	return &flow.EpochRecover{
 		EpochSetup:  *setup,
 		EpochCommit: *commit,
 	}
-	return ev
 }
 
 func IndexFixture() *flow.Index {
@@ -2310,7 +2282,10 @@ func BootstrapFixtureWithSetupAndCommit(
 	if err != nil {
 		panic(err)
 	}
-	rootEpochState := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
+	rootEpochState, err := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
+	if err != nil {
+		panic(err)
+	}
 	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, rootEpochState.ID())
 	if err != nil {
 		panic(err)
@@ -2478,9 +2453,9 @@ func DKGBroadcastMessageFixture() *messages.BroadcastDKGMessage {
 	}
 }
 
-// PrivateKeyFixture returns a random private key with specified signature algorithm and seed length
-func PrivateKeyFixture(algo crypto.SigningAlgorithm, seedLength int) crypto.PrivateKey {
-	sk, err := crypto.GeneratePrivateKey(algo, SeedFixture(seedLength))
+// PrivateKeyFixture returns a random private key with specified signature algorithm
+func PrivateKeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
+	sk, err := crypto.GeneratePrivateKey(algo, SeedFixture(crypto.KeyGenSeedMinLen))
 	if err != nil {
 		panic(err)
 	}
@@ -2494,8 +2469,9 @@ func PrivateKeyFixtureByIdentifier(
 	seedLength int,
 	id flow.Identifier,
 ) crypto.PrivateKey {
-	seed := append(id[:], id[:]...)
-	sk, err := crypto.GeneratePrivateKey(algo, seed[:seedLength])
+	seed := make([]byte, seedLength)
+	copy(seed, id[:])
+	sk, err := crypto.GeneratePrivateKey(algo, seed)
 	if err != nil {
 		panic(err)
 	}
@@ -2508,18 +2484,18 @@ func StakingPrivKeyByIdentifier(id flow.Identifier) crypto.PrivateKey {
 
 // NetworkingPrivKeyFixture returns random ECDSAP256 private key
 func NetworkingPrivKeyFixture() crypto.PrivateKey {
-	return PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen)
+	return PrivateKeyFixture(crypto.ECDSAP256)
 }
 
 // StakingPrivKeyFixture returns a random BLS12381 private keyf
 func StakingPrivKeyFixture() crypto.PrivateKey {
-	return PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLen)
+	return PrivateKeyFixture(crypto.BLSBLS12381)
 }
 
 func NodeMachineAccountInfoFixture() bootstrap.NodeMachineAccountInfo {
 	return bootstrap.NodeMachineAccountInfo{
 		Address:           RandomAddressFixture().String(),
-		EncodedPrivateKey: PrivateKeyFixture(crypto.ECDSAP256, DefaultSeedFixtureLength).Encode(),
+		EncodedPrivateKey: PrivateKeyFixture(crypto.ECDSAP256).Encode(),
 		HashAlgorithm:     bootstrap.DefaultMachineAccountHashAlgo,
 		SigningAlgorithm:  bootstrap.DefaultMachineAccountSignAlgo,
 		KeyIndex:          bootstrap.DefaultMachineAccountKeyIndex,
@@ -2923,6 +2899,8 @@ func WithValidDKG() func(*flow.RichEpochStateEntry) {
 			commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, KeyFixture(crypto.BLSBLS12381).PublicKey())
 			commit.DKGIndexMap[nodeID] = index
 		}
+		// update CommitID according to new CurrentEpochCommit object
+		entry.MinEpochStateEntry.CurrentEpoch.CommitID = entry.CurrentEpochCommit.ID()
 	}
 }
 
@@ -3211,4 +3189,13 @@ func EpochStateContainerFixture() *flow.EpochStateContainer {
 		ActiveIdentities: DynamicIdentityEntryListFixture(5),
 		EpochExtensions:  []flow.EpochExtension{EpochExtensionFixture()},
 	}
+}
+
+func EpochSetupRandomSourceFixture() []byte {
+	source := make([]byte, flow.EpochSetupRandomSourceLength)
+	_, err := rand.Read(source)
+	if err != nil {
+		panic(err)
+	}
+	return source
 }

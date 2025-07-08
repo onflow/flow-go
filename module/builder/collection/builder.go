@@ -191,8 +191,18 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not build header: %w", err)
 	}
 
+	block, err := cluster.NewBlock(
+		cluster.UntrustedBlock{
+			Header:  proposal.Header.HeaderBody,
+			Payload: *payload,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build cluster block: %w", err)
+	}
+
 	blockProposal := cluster.BlockProposal{
-		Block:           cluster.NewBlock(proposal.Header.HeaderBody, *payload),
+		Block:           *block,
 		ProposerSigData: proposal.ProposerSigData,
 	}
 
@@ -485,9 +495,19 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 	}
 
 	// build the payload from the transactions
-	payload, err := cluster.NewPayload(minRefID, transactions)
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: transactions})
 	if err != nil {
-		return nil, fmt.Errorf("could not build a payload from the transactions: %w", err)
+		return nil, fmt.Errorf("could not build the collection from the transactions: %w", err)
+	}
+
+	payload, err := cluster.NewPayload(
+		cluster.UntrustedPayload{
+			ReferenceBlockID: minRefID,
+			Collection:       *collection,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build a payload: %w", err)
 	}
 	return payload, nil
 }

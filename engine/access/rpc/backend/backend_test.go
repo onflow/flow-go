@@ -49,7 +49,6 @@ import (
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
@@ -2011,7 +2010,7 @@ func (suite *Suite) setupConnectionFactory() connection.ConnectionFactory {
 }
 
 func generateEncodedEvents(t *testing.T, n int) ([]flow.Event, []flow.Event) {
-	ccfEvents := generator.GetEventsWithEncoding(n, entities.EventEncodingVersion_CCF_V0)
+	ccfEvents := unittest.EventGenerator.GetEventsWithEncoding(n, entities.EventEncodingVersion_CCF_V0)
 	jsonEvents := make([]flow.Event, n)
 	for i, e := range ccfEvents {
 		jsonEvent, err := convert.CcfEventToJsonEvent(e)
