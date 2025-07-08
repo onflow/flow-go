@@ -137,7 +137,7 @@ func writerSSTableWorker(ctx context.Context, workerIndex int, db *pebble.DB, ss
 	}
 }
 func createSSTableWriter(filePath string) (*sstable.Writer, error) {
-	f, err := vfs.Default.Create(filePath, vfs.DiskWriteRegular)
+	f, err := vfs.Default.Create(filePath, vfs.WriteCategoryUnspecified)
 	if err != nil {
 		return nil, err
 	}
