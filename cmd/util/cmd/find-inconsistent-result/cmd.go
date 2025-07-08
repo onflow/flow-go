@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
@@ -12,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/module/block_iterator/latest"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 )
 
 var NoMissmatchFoundError = errors.New("No missmatch found")
@@ -68,7 +66,7 @@ func findFirstMismatch(datadir string, startHeight, endHeight uint64) error {
 	}
 
 	if endHeight == 0 {
-		endHeight, err = latest.LatestSealedAndExecutedHeight(state, badgerimpl.ToDB(db))
+		endHeight, err = latest.LatestSealedAndExecutedHeight(state, db)
 		if err != nil {
 			return fmt.Errorf("could not find last executed and sealed height: %v", err)
 		}
@@ -94,8 +92,11 @@ func findFirstMismatch(datadir string, startHeight, endHeight uint64) error {
 }
 
 func createStorages(dir string) (
-	storage.Headers, storage.ExecutionResults, storage.Seals, protocol.State, *badger.DB, error) {
-	db := common.InitStorage(dir)
+	storage.Headers, storage.ExecutionResults, storage.Seals, protocol.State, storage.DB, error) {
+	db, err := common.InitStorage(dir)
+	if err != nil {
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not initialize storage: %v", err)
+	}
 
 	storages := common.InitStorages(db)
 	state, err := common.InitProtocolState(db, storages)

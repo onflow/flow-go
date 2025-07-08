@@ -42,7 +42,7 @@ var commitsCmd = &cobra.Command{
 				return fmt.Errorf("could not get commit for block id: %v: %w", blockID, err)
 			}
 
-			log.Info().Msgf("commit: %x", commit)
+			log.Info().Msgf("commit: %v", commit)
 			return nil
 		})
 

@@ -18,11 +18,12 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/model/bootstrap"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
-	"github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
@@ -139,7 +140,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	// create flow.IdentityList representation of participant set
-	participants := model.ToIdentityList(stakingNodes).Sort(flow.Canonical[flow.Identity])
+	participants := bootstrap.Sort(stakingNodes, flow.Canonical[flow.Identity])
 
 	log.Info().Msg("reading root block data")
 	block := readRootBlock()
@@ -202,13 +203,13 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	// validate the generated root snapshot is valid
 	verifyResultID := true
-	err = badger.IsValidRootSnapshot(snapshot, verifyResultID)
+	err = datastore.IsValidRootSnapshot(snapshot, verifyResultID)
 	if err != nil {
 		log.Fatal().Err(err).Msg("the generated root snapshot is invalid")
 	}
 
 	// validate the generated root snapshot QCs
-	err = badger.IsValidRootSnapshotQCs(snapshot)
+	err = datastore.IsValidRootSnapshotQCs(snapshot)
 	if err != nil {
 		log.Fatal().Err(err).Msg("root snapshot contains invalid QCs")
 	}
@@ -246,13 +247,13 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("saved result and seal are matching")
 
-	err = badger.IsValidRootSnapshot(rootSnapshot, verifyResultID)
+	err = datastore.IsValidRootSnapshot(rootSnapshot, verifyResultID)
 	if err != nil {
 		log.Fatal().Err(err).Msg("saved snapshot is invalid")
 	}
 
 	// validate the generated root snapshot QCs
-	err = badger.IsValidRootSnapshotQCs(snapshot)
+	err = datastore.IsValidRootSnapshotQCs(snapshot)
 	if err != nil {
 		log.Fatal().Err(err).Msg("root snapshot contains invalid QCs")
 	}
@@ -408,7 +409,7 @@ func readIntermediaryBootstrappingData() *IntermediaryBootstrappingData {
 func generateEmptyExecutionState(
 	rootBlock *flow.Header,
 	epochConfig epochs.EpochConfig,
-	identities flow.IdentityList,
+	nodes []bootstrap.NodeInfo,
 ) (commit flow.StateCommitment) {
 
 	log.Info().Msg("generating empty execution state")
@@ -433,7 +434,7 @@ func generateEmptyExecutionState(
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithEpochConfig(epochConfig),
-		fvm.WithIdentities(identities),
+		fvm.WithNodes(nodes),
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate execution state")

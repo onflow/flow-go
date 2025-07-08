@@ -107,10 +107,38 @@ func InitBadgerStorage(flags DBFlags) (*badger.DB, error) {
 		return nil, fmt.Errorf("only badger db is supported, got: %s", datadir.UseDB)
 	}
 
-	return InitStorage(datadir.DBDir), nil
+	return InitBadgerDBStorage(datadir.DBDir), nil
 }
 
-func InitStorage(datadir string) *badger.DB {
+func InitStorage(datadir string) (storage.DB, error) {
+	ok, err := IsBadgerFolder(datadir)
+	if err != nil {
+		return nil, err
+	}
+
+	if ok {
+		log.Info().Msgf("using badger db at %s", datadir)
+		return badgerimpl.ToDB(InitBadgerDBStorage(datadir)), nil
+	}
+
+	ok, err = IsPebbleFolder(datadir)
+	if err != nil {
+		return nil, err
+	}
+
+	if ok {
+		db, err := pebblestorage.ShouldOpenDefaultPebbleDB(log.Logger, datadir)
+		if err != nil {
+			return nil, fmt.Errorf("could not open pebble db at %s: %w", datadir, err)
+		}
+		log.Info().Msgf("using pebble db at %s", datadir)
+		return pebbleimpl.ToDB(db), nil
+	}
+
+	return nil, fmt.Errorf("could not determine storage type (not badger, nor pebble) for directory %s", datadir)
+}
+
+func InitBadgerDBStorage(datadir string) *badger.DB {
 	return InitStorageWithTruncate(datadir, false)
 }
 
@@ -139,7 +167,25 @@ func InitStorageWithTruncate(datadir string, truncate bool) *badger.DB {
 	return db
 }
 
-func InitStorages(db *badger.DB) *storage.All {
+func IsBadgerFolder(dataDir string) (bool, error) {
+	return storagebadger.IsBadgerFolder(dataDir)
+}
+
+func IsPebbleFolder(dataDir string) (bool, error) {
+	err := pebblestorage.IsPebbleInitialized(dataDir)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func InitStorages(db storage.DB) *store.All {
+	metrics := &metrics.NoopCollector{}
+	return store.InitAll(metrics, db)
+}
+
+func InitBadgerStorages(db *badger.DB) *storage.All {
 	metrics := &metrics.NoopCollector{}
 
 	return storagebadger.InitAll(metrics, db)
@@ -185,7 +231,7 @@ func WithStorage(flags DBFlags, f func(storage.DB) error) error {
 	}
 
 	if usedDir.UseDB == UsedDBBadger {
-		db := InitStorage(usedDir.DBDir)
+		db := InitBadgerDBStorage(usedDir.DBDir)
 		defer db.Close()
 
 		return f(badgerimpl.ToDB(db))
@@ -202,7 +248,7 @@ func InitBadgerAndPebble(dirs TwoDBDirs) (bdb *badger.DB, pdb *pebble.DB, err er
 		return nil, nil, err
 	}
 
-	bdb = InitStorage(dirs.BadgerDir)
+	bdb = InitBadgerDBStorage(dirs.BadgerDir)
 
 	return bdb, pdb, nil
 }

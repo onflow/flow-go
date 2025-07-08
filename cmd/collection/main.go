@@ -219,10 +219,7 @@ func main() {
 		}).
 		AdminCommand("read-range-cluster-blocks", func(conf *cmd.NodeConfig) commands.AdminCommand {
 			clusterPayloads := badger.NewClusterPayloads(&metrics.NoopCollector{}, conf.DB)
-			headers, ok := conf.Storage.Headers.(*badger.Headers)
-			if !ok {
-				panic("fail to initialize admin tool, conf.Storage.Headers can not be casted as badger headers")
-			}
+			headers := badger.NewHeaders(&metrics.NoopCollector{}, conf.DB)
 			return storageCommands.NewReadRangeClusterBlocksCommand(conf.DB, headers, clusterPayloads)
 		}).
 		Module("follower distributor", func(node *cmd.NodeConfig) error {
@@ -328,7 +325,7 @@ func main() {
 		Component("follower core", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// create a finalizer for updating the protocol
 			// state when the follower detects newly finalized blocks
-			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
+			finalizer := confinalizer.NewFinalizer(node.ProtocolDB.Reader(), node.Storage.Headers, followerState, node.Tracer)
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
@@ -460,7 +457,7 @@ func main() {
 			collectionRequestQueue := queue.NewHeroStore(maxCollectionRequestCacheSize, node.Logger, collectionRequestMetrics)
 
 			return provider.New(
-				node.Logger.With().Str("engine", "collection_provider").Logger(),
+				node.Logger.With().Str("entity", "collection").Logger(),
 				node.Metrics.Engine,
 				node.EngineRegistry,
 				node.Me,

@@ -3,6 +3,8 @@ package storage
 import (
 	"io"
 	"sync"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Iterator is an interface for iterating over key-value pairs in a storage backend.
@@ -62,6 +64,7 @@ type IteratorOption struct {
 	BadgerIterateKeyOnly bool // default false
 }
 
+// TODO: convert into a var
 func DefaultIteratorOptions() IteratorOption {
 	return IteratorOption{
 		// only needed for badger. ignored by pebble
@@ -170,6 +173,9 @@ type DB interface {
 
 	// NewBatch create a new batch for writing.
 	NewBatch() Batch
+
+	// Close closes the database and releases all resources.
+	Close() error
 }
 
 // Batch is an interface for a batch of writes to a storage backend.
@@ -249,3 +255,5 @@ func PrefixUpperBound(prefix []byte) []byte {
 	}
 	return nil // no upper-bound
 }
+
+type BlockIndexingBatchWrite func(blockID flow.Identifier, rw ReaderBatchWriter) error

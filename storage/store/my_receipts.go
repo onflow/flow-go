@@ -22,6 +22,7 @@ type MyExecutionReceipts struct {
 	cache           *Cache[flow.Identifier, *flow.ExecutionReceipt]
 	// preventing dirty reads when checking if a different my receipt has been
 	// indexed for the same block
+	// TODO(7355): lockctx
 	indexingMyReceipt *sync.Mutex
 }
 
@@ -39,6 +40,7 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db storage.DB, receip
 		// the lock would not cause any deadlock, if
 		// 1) there is no other lock in the batch operation.
 		// 2) or there is other lock in the batch operation, but the locks are acquired and released in the same order.
+		// TODO(7355): lockctx
 		rw.Lock(indexingMyReceipt)
 
 		// assemble DB operations to store receipt (no execution)

@@ -32,3 +32,13 @@ func (b *multiDBStore) WithReaderBatchWriter(fn func(storage.ReaderBatchWriter) 
 func (b *multiDBStore) NewBatch() storage.Batch {
 	return b.rwStore.NewBatch()
 }
+
+func (b *multiDBStore) Close() error {
+	if err := b.rwStore.Close(); err != nil {
+		return err
+	}
+	if err := b.r.Close(); err != nil {
+		return err
+	}
+	return nil
+}

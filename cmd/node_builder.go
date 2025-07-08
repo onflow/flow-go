@@ -6,6 +6,7 @@ import (
 
 	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/onflow/crypto"
 	"github.com/prometheus/client_golang/prometheus"
@@ -211,6 +212,7 @@ type NodeConfig struct {
 	ProtocolDB        storage.DB
 	SecretsDB         *badger.DB
 	Storage           Storage
+	StorageLockMgr    lockctx.Manager
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
 	Resolver          madns.BasicResolver
