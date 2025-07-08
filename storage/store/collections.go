@@ -15,6 +15,7 @@ import (
 type Collections struct {
 	db           storage.DB
 	transactions *Transactions
+	// TODO(7355): lockctx
 	indexingByTx *sync.Mutex
 }
 
@@ -180,6 +181,7 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 	//   is used in the code base to index collection by transaction.
 
 	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		// TODO(7355): lockctx
 		rw.Lock(c.indexingByTx)
 		return c.batchStoreLightAndIndexByTransaction(collection, rw)
 	})

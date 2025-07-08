@@ -95,6 +95,7 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 }
 
 func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
+	// TODO(7355): lockctx
 	rw.Lock(s.storing)
 
 	_, err := s.ByID(stateID)
@@ -125,6 +126,7 @@ func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.
 // Expected errors during normal operations:
 //   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
 func (s *ProtocolKVStore) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
+	// TODO(7355): lockctx
 	rw.Lock(s.indexing)
 
 	_, err := s.byBlockIdCache.Get(s.db.Reader(), blockID)

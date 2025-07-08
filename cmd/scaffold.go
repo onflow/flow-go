@@ -1232,6 +1232,13 @@ func (fnb *FlowNodeBuilder) initSecretsDB() error {
 	return nil
 }
 
+// initStorageLockManager initializes the lock manager used by the storage layer.
+// This manager must be a process-wide singleton.
+func (fnb *FlowNodeBuilder) initStorageLockManager() error {
+	fnb.StorageLockMgr = storage.MakeSingletonLockManager()
+	return nil
+}
+
 func (fnb *FlowNodeBuilder) initStorage() error {
 
 	// in order to void long iterations with big keys when initializing with an
@@ -1366,6 +1373,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 		state, err := badgerState.OpenState(
 			fnb.Metrics.Compliance,
 			fnb.ProtocolDB,
+			fnb.StorageLockMgr,
 			fnb.Storage.Headers,
 			fnb.Storage.Seals,
 			fnb.Storage.Results,
@@ -1415,6 +1423,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 		fnb.State, err = badgerState.Bootstrap(
 			fnb.Metrics.Compliance,
 			fnb.ProtocolDB,
+			fnb.StorageLockMgr,
 			fnb.Storage.Headers,
 			fnb.Storage.Seals,
 			fnb.Storage.Results,
@@ -2145,6 +2154,10 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	}
 
 	if err := fnb.initLogger(); err != nil {
+		return err
+	}
+
+	if err := fnb.initStorageLockManager(); err != nil {
 		return err
 	}
 
