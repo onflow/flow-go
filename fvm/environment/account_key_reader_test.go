@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/tracing"
 )
 
