@@ -130,6 +130,8 @@ func (m *mockProgressInitializer) Initialize(defaultIndex uint64) (storage.Consu
 	return m.progress, nil
 }
 
+var _ storage.ConsumerProgress = (*mockProgress)(nil)
+
 type mockProgress struct {
 	index     *atomic.Uint64
 	doneIndex *atomic.Uint64

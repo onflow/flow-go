@@ -1,6 +1,7 @@
 package unsynchronized
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -151,4 +152,10 @@ func (c *Collections) LightCollections() []flow.LightCollection {
 		out = append(out, *coll)
 	}
 	return out
+}
+
+// BatchStoreLightAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch operation.
+// This method is not implemented and will always return an error.
+func (c *Collections) BatchStoreLightAndIndexByTransaction(_ *flow.LightCollection, _ storage.ReaderBatchWriter) error {
+	return fmt.Errorf("not implemented")
 }
