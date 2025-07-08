@@ -90,8 +90,8 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
 
-	suite.collClient = new(accessmock.AccessAPIClient)
-	suite.execClient = new(accessmock.ExecutionAPIClient)
+	suite.collClient = accessmock.NewAccessAPIClient(suite.T())
+	suite.execClient = accessmock.NewExecutionAPIClient(suite.T())
 
 	suite.request = new(module.Requester)
 	suite.request.On("EntityByID", mock.Anything, mock.Anything)

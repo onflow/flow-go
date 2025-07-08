@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/counters"
-	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -62,7 +61,6 @@ type Suite struct {
 	seals        *storage.Seals
 
 	conduit        *mocknetwork.Conduit
-	downloader     *downloadermock.Downloader
 	sealedBlock    *flow.Header
 	finalizedBlock *flow.Header
 	log            zerolog.Logger

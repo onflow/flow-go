@@ -157,8 +157,9 @@ generate-mocks: install-mock-generators
 	mockery
 	CGO_CFLAGS=$(CRYPTO_FLAG) mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Headers,Payloads,Collections,Commits,Events,ServiceEvents,TransactionResults
 	CGO_CFLAGS=$(CRYPTO_FLAG) mockgen -destination=network/mocknetwork/mock_network.go -package=mocknetwork github.com/onflow/flow-go/network EngineRegistry
-	rm -rf ./fvm/mock
-	rm -rf ./fvm/environment/mock
+	# Keep FVM mocks - they are needed by tests
+	# rm -rf ./fvm/mock
+	# rm -rf ./fvm/environment/mock
 
 	#temporarily make insecure/ a non-module to allow mockery to create mocks
 	mv insecure/go.mod insecure/go2.mod

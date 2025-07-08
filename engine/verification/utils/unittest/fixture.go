@@ -258,7 +258,7 @@ func ExecutionResultFixture(t *testing.T,
 
 		vm := fvm.NewVirtualMachine()
 
-		// blocks := new(envMock.Blocks)
+		// blocks := new(envMock.Blocks) // TODO: Re-enable when envMock is available
 
 		execCtx := fvm.NewContext(
 			fvm.WithLogger(log),

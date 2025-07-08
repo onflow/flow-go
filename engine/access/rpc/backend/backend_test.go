@@ -119,15 +119,15 @@ func (suite *Suite) SetupTest() {
 	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.results = new(storagemock.ExecutionResults)
 	suite.txErrorMessages = storagemock.NewTransactionResultErrorMessages(suite.T())
-	suite.colClient = new(accessmock.AccessAPIClient)
-	suite.execClient = new(accessmock.ExecutionAPIClient)
+	suite.colClient = accessmock.NewAccessAPIClient(suite.T())
+	suite.execClient = accessmock.NewExecutionAPIClient(suite.T())
 	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
 	suite.events = storagemock.NewEvents(suite.T())
 	suite.chainID = flow.Testnet
-	suite.historicalAccessClient = new(accessmock.AccessAPIClient)
+	suite.historicalAccessClient = accessmock.NewAccessAPIClient(suite.T())
 	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
 
-	suite.communicator = new(backendmock.Communicator)
+	suite.communicator = backendmock.NewCommunicator(suite.T())
 
 	var err error
 	suite.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())

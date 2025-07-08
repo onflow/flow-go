@@ -346,6 +346,18 @@ packages:
       filename: "{{.InterfaceName}}.go"
     interfaces:
       StorageSnapshot:
+  github.com/onflow/flow-go/fvm:
+    config:
+      dir: "./fvm/mock"
+      outpkg: "mock"
+      filename: "{{.InterfaceName}}.go"
+    all: True
+  github.com/onflow/flow-go/fvm/environment:
+    config:
+      dir: "./fvm/environment/mock"
+      outpkg: "mock"
+      filename: "{{.InterfaceName}}.go"
+    all: True
   github.com/onflow/flow-go/module/executiondatasync/optimistic_syncing:
     config:
       dir: "./module/executiondatasync/optimistic_syncing/mock"
