@@ -3,7 +3,7 @@ with-expecter: True
 packages:
   github.com/onflow/flow-go/network/p2p:
     config:
-      dir: "network/p2p"
+      dir: "./network/mocknetwork"
       outpkg: "mocknetwork"
       filename: "{{.InterfaceName}}.go"
     interfaces:
@@ -11,7 +11,7 @@ packages:
       PingInfoProvider:
   github.com/onflow/flow-go/module/executiondatasync/execution_data:
     config:
-      dir: "module/executiondatasync/execution_data"
+      dir: "./module/executiondatasync/execution_data/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
@@ -19,13 +19,13 @@ packages:
       Downloader:
   github.com/onflow/flow-go/integration/benchmark/mocksiface:
     config:
-      dir: "integration/benchmark/mocksiface"
+      dir: "./integration/benchmark/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/module/state_synchronization:
     config:
-      dir: "module/state_synchronization"
+      dir: "./module/state_synchronization/mock"
       outpkg: "state_synchronization"
       filename: "{{.InterfaceName}}.go"
     interfaces:
@@ -33,134 +33,134 @@ packages:
       IndexReporter:
   github.com/onflow/flow-go/engine/execution/state:
     config:
-      dir: "engine/execution/state"
+      dir: "./engine/execution/state/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       ExecutionState:
   github.com/onflow/flow-go/engine/execution/computation/computer:
     config:
-      dir: "engine/execution/computation/computer"
+      dir: "./engine/execution/computation/computer/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       BlockComputer:
   github.com/onflow/flow-go/engine/execution/computation:
     config:
-      dir: "engine/execution/computation"
+      dir: "./engine/execution/computation/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       ComputationManager:
   github.com/onflow/flow-go/engine/execution/computation/query:
     config:
-      dir: "engine/execution/computation/query"
+      dir: "./engine/execution/computation/query/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/engine/collection/epochmgr:
     config:
-      dir: "engine/collection/epochmgr"
+      dir: "./engine/collection/epochmgr/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       EpochComponentsFactory:
   github.com/onflow/flow-go/engine/execution:
     config:
-      dir: "engine/execution/"
+      dir: "./engine/execution/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/engine/collection/rpc:
     config:
-      dir: "engine/collection/rpc"
+      dir: "./engine/collection/rpc/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       Backend:
   github.com/onflow/flow-go/engine/execution/provider:
     config:
-      dir: "engine/execution/provider"
+      dir: "./engine/execution/provider/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       ProviderEngine:
   github.com/onflow/flow-go/state/cluster:
     config:
-      dir: "state/cluster"
+      dir: "./state/cluster/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/module:
     config:
-      dir: "module"
+      dir: "./module/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/module/mempool:
     config:
-      dir: "module/mempool"
+      dir: "./module/mempool/mock"
       outpkg: "mempool"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/module/component:
     config:
-      dir: "module/component"
+      dir: "./module/component/mock"
       outpkg: "component"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/network:
     config:
-      dir: "network"
+      dir: "./network/mocknetwork"
       outpkg: "mocknetwork"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/storage:
     config:
-      dir: "storage"
+      dir: "./storage/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/storage/badger/transaction:
     config:
-      dir: "storage/badger/transaction"
+      dir: "./storage/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       DeferredDBUpdate:
   github.com/onflow/flow-go/state/protocol:
     config:
-      dir: "state/protocol"
+      dir: "./state/protocol/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/state/protocol/events:
     config:
-      dir: "state/protocol/events"
+      dir: "./state/protocol/events/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/state/protocol/protocol_state:
     config:
-      dir: "state/protocol/protocol_state"
+      dir: "./state/protocol/protocol_state/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/state/protocol/protocol_state/epochs:
     config:
-      dir: "state/protocol/protocol_state/epochs"
+      dir: "./state/protocol/protocol_state/epochs/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/engine/collection:
     config:
-      dir: "engine/collection"
+      dir: "./engine/collection/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/engine/common/follower:
     config:
-      dir: "engine/common/follower"
+      dir: "./engine/common/follower/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
       exported: true
@@ -168,108 +168,108 @@ packages:
       complianceCore:
   github.com/onflow/flow-go/engine/common/follower/cache:
     config:
-      dir: "engine/common/follower/cache"
+      dir: "./engine/common/follower/cache/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/engine/consensus:
     config:
-      dir: "engine/consensus"
+      dir: "./engine/consensus/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/engine/consensus/approvals:
     config:
-      dir: "engine/consensus/approvals"
+      dir: "./engine/consensus/approvals/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/fvm:
     config:
-      dir: "fvm"
+      dir: "./fvm/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/fvm/environment:
     config:
-      dir: "fvm/environment"
+      dir: "./fvm/environment/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/ledger:
     config:
-      dir: "ledger"
+      dir: "./ledger/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/network/violations:
     config:
-      dir: "network"
+      dir: "./network/mocknetwork"
       outpkg: "mocknetwork"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       ViolationsConsumer:
   github.com/onflow/flow-go/network/p2p/all:
     config:
-      dir: "network/p2p/"
+      dir: "./network/p2p/mock"
       outpkg: "mockp2p"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/network/alsp:
     config:
-      dir: "network/alsp"
+      dir: "./network/alsp/mock"
       outpkg: "mockalsp"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/module/forest:
     config:
-      dir: "./module/forest"
+      dir: "./module/forest/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       Vertex:
   github.com/onflow/flow-go/consensus/hotstuff:
     config:
-      dir: "./consensus/hotstuff"
+      dir: "./consensus/hotstuff/mocks"
       outpkg: "mocks"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/engine/access/wrapper:
     config:
-      dir: "./engine/access/wrapper"
+      dir: "./engine/access/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/access:
     config:
-      dir: "./access"
+      dir: "./access/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       API:
   github.com/onflow/flow-go/access/validator:
     config:
-      dir: "./access/validator"
+      dir: "./access/validator/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       Blocks:
   github.com/onflow/flow-go/engine/protocol:
     config:
-      dir: "./engine/protocol"
+      dir: "./engine/protocol/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       API:
   github.com/onflow/flow-go/engine/access/state_stream:
     config:
-      dir: "./engine/access/state_stream"
+      dir: "./engine/access/state_stream/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/engine/access/subscription/tracker:
     config:
-      dir: "./engine/access/subscription/tracker"
+      dir: "./engine/access/subscription/tracker/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
@@ -277,7 +277,7 @@ packages:
       ExecutionDataTracker:
   github.com/onflow/flow-go/engine/access/rest/websockets/data_providers:
     config:
-      dir: "./engine/access/rest/websockets/data_providers"
+      dir: "./engine/access/rest/websockets/data_providers/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
@@ -285,41 +285,41 @@ packages:
       DataProviderFactory:
   github.com/onflow/flow-go/engine/access/rest/common/models:
     config:
-      dir: "./engine/access/rest/common/models"
+      dir: "./engine/access/rest/common/models/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       LinkGenerator:
   github.com/onflow/flow-go/engine/access/rest/websockets:
     config:
-      dir: "./engine/access/rest/websockets"
+      dir: "./engine/access/rest/websockets/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       WebsocketConnection:
   github.com/onflow/flow-go/engine/access/rpc/connection:
     config:
-      dir: "./engine/access/rpc/connection"
+      dir: "./engine/access/rpc/connection/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       ConnectionFactory:
   github.com/onflow/flow-go/engine/access/rpc/backend:
     config:
-      dir: "./engine/access/rpc/backend"
+      dir: "./engine/access/rpc/backend/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       Communicator:
   github.com/onflow/flow-go/model/fingerprint:
     config:
-      dir: "model/fingerprint"
+      dir: "./model/fingerprint/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/module/mempool/consensus/mock:
     config:
-      dir: "module/mempool/consensus/mock/"
+      dir: "./module/mempool/consensus/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
       structname: "ExecForkActorMock"
@@ -327,61 +327,61 @@ packages:
       ExecForkActor:
   github.com/onflow/flow-go/engine/verification/fetcher:
     config:
-      dir: "engine/verification/fetcher/"
+      dir: "./engine/verification/fetcher/mock"
       outpkg: "mockfetcher"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/cmd/util/ledger/reporters:
     config:
-      dir: "./cmd/util/ledger/reporters"
+      dir: "./cmd/util/ledger/reporters/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     all: True
   github.com/onflow/flow-go/module/executiondatasync/tracker:
     config:
-      dir: "module/executiondatasync/tracker"
+      dir: "./module/executiondatasync/tracker/mock"
       outpkg: "mocktracker"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       Storage:
   github.com/onflow/flow-go/module/execution:
     config:
-      dir: "module/execution"
+      dir: "./module/execution/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       ScriptExecutor:
   github.com/onflow/flow-go/fvm/storage/snapshot:
     config:
-      dir: "fvm/storage/snapshot"
+      dir: "./fvm/storage/snapshot/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       StorageSnapshot:
   github.com/onflow/flow-go/module/executiondatasync/optimistic_syncing:
     config:
-      dir: "module/executiondatasync/optimistic_syncing"
+      dir: "./module/executiondatasync/optimistic_syncing/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       Core:
   github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages:
     config:
-      dir: "engine/access/ingestion/tx_error_messages"
+      dir: "./engine/access/ingestion/tx_error_messages/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       Requester:
   github.com/onflow/flow-go/module/state_synchronization/requester:
     config:
-      dir: "module/state_synchronization/requester"
+      dir: "./module/state_synchronization/requester/mock"
       outpkg: "mock"
       filename: "{{.InterfaceName}}.go"
     interfaces:
       ExecutionDataRequester:
   github.com/onflow/flow-go/insecure:
     config:
-      dir: "insecure/"
+      dir: "./insecure/mock"
       outpkg: "mockinsecure"
       filename: "{{.InterfaceName}}.go"
     all: True
