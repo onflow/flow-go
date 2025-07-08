@@ -293,31 +293,31 @@ func TestHeaderBodyBuilder_PresenceChecks(t *testing.T) {
 		bit  int
 		fn   func(*flow.HeaderBodyBuilder)
 	}{
-		{"ChainID", int(flow.ChainIdentifier), func(b *flow.HeaderBodyBuilder) {
+		{"ChainID", 0, func(b *flow.HeaderBodyBuilder) {
 			b.WithChainID("chain")
 		}},
-		{"ParentID", int(flow.ParentIdentifier), func(b *flow.HeaderBodyBuilder) {
+		{"ParentID", 1, func(b *flow.HeaderBodyBuilder) {
 			b.WithParentID(validID)
 		}},
-		{"Height", int(flow.Height), func(b *flow.HeaderBodyBuilder) {
+		{"Height", 2, func(b *flow.HeaderBodyBuilder) {
 			b.WithHeight(42)
 		}},
-		{"Timestamp", int(flow.Timestamp), func(b *flow.HeaderBodyBuilder) {
+		{"Timestamp", 3, func(b *flow.HeaderBodyBuilder) {
 			b.WithTimestamp(ts)
 		}},
-		{"View", int(flow.View), func(b *flow.HeaderBodyBuilder) {
+		{"View", 4, func(b *flow.HeaderBodyBuilder) {
 			b.WithView(7)
 		}},
-		{"ParentView", int(flow.ParentView), func(b *flow.HeaderBodyBuilder) {
+		{"ParentView", 5, func(b *flow.HeaderBodyBuilder) {
 			b.WithParentView(6)
 		}},
-		{"ParentVoterIndices", int(flow.ParentVoterIndices), func(b *flow.HeaderBodyBuilder) {
+		{"ParentVoterIndices", 6, func(b *flow.HeaderBodyBuilder) {
 			b.WithParentVoterIndices(unittest.SignerIndicesFixture(4))
 		}},
-		{"ParentVoterSigData", int(flow.ParentVoterSigData), func(b *flow.HeaderBodyBuilder) {
+		{"ParentVoterSigData", 7, func(b *flow.HeaderBodyBuilder) {
 			b.WithParentVoterSigData(unittest.QCSigDataFixture())
 		}},
-		{"ProposerID", int(flow.ProposerIdentifier), func(b *flow.HeaderBodyBuilder) {
+		{"ProposerID", 8, func(b *flow.HeaderBodyBuilder) {
 			b.WithProposerID(validID)
 		}},
 	}
@@ -412,6 +412,17 @@ func TestNewRootHeader(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, h)
 		assert.Contains(t, err.Error(), "invalid root header body")
+	})
+
+	t.Run("empty PayloadHash", func(t *testing.T) {
+		u := flow.UntrustedHeader{
+			HeaderBody:  *rootBody,
+			PayloadHash: flow.ZeroID,
+		}
+		h, err := flow.NewRootHeader(u)
+		assert.Error(t, err)
+		assert.Nil(t, h)
+		assert.Contains(t, err.Error(), "PayloadHash")
 	})
 
 	t.Run("non‐empty ParentVoterIndices", func(t *testing.T) {

@@ -221,6 +221,10 @@ func NewRootHeader(untrusted UntrustedHeader) (*Header, error) {
 		return nil, fmt.Errorf("invalid root header body: %w", err)
 	}
 
+	if untrusted.PayloadHash == ZeroID {
+		return nil, fmt.Errorf("PayloadHash must not be empty")
+	}
+
 	return &Header{
 		HeaderBody:  *rootHeaderBody,
 		PayloadHash: untrusted.PayloadHash,
@@ -264,18 +268,20 @@ func (h Header) ID() Identifier {
 	return MakeID(h)
 }
 
-type HeaderBodyFields int
+// headerBodyFieldBitIndex enumerates required fields in HeaderBody so that HeaderBodyBuilder
+// can enforce that all required fields are explicitly set (including to zero values) prior to building.
+type headerBodyFieldBitIndex int
 
 const (
-	ChainIdentifier HeaderBodyFields = iota
-	ParentIdentifier
-	Height
-	Timestamp
-	View
-	ParentView
-	ParentVoterIndices
-	ParentVoterSigData
-	ProposerIdentifier
+	chainIDFieldBitIndex headerBodyFieldBitIndex = iota
+	parentIDFieldBitIndex
+	heightFieldBitIndex
+	timestampFieldBitIndex
+	viewFieldBitIndex
+	parentViewFieldBitIndex
+	parentVoterIndicesFieldBitIndex
+	parentVoterSigDataFieldBitIndex
+	proposerIDFieldBitIndex
 	numHeaderBodyFields // always keep this last
 )
 
@@ -309,47 +315,47 @@ func (b *HeaderBodyBuilder) Build() (*HeaderBody, error) {
 
 func (h *HeaderBodyBuilder) WithChainID(id ChainID) *HeaderBodyBuilder {
 	h.u.ChainID = id
-	bitutils.WriteBit(h.present, int(ChainIdentifier), 1)
+	bitutils.WriteBit(h.present, int(chainIDFieldBitIndex), 1)
 	return h
 }
 func (h *HeaderBodyBuilder) WithParentID(pid Identifier) *HeaderBodyBuilder {
 	h.u.ParentID = pid
-	bitutils.WriteBit(h.present, int(ParentIdentifier), 1)
+	bitutils.WriteBit(h.present, int(parentIDFieldBitIndex), 1)
 	return h
 }
 func (h *HeaderBodyBuilder) WithHeight(height uint64) *HeaderBodyBuilder {
 	h.u.Height = height
-	bitutils.WriteBit(h.present, int(Height), 1)
+	bitutils.WriteBit(h.present, int(heightFieldBitIndex), 1)
 	return h
 }
 func (h *HeaderBodyBuilder) WithTimestamp(t time.Time) *HeaderBodyBuilder {
 	h.u.Timestamp = t
-	bitutils.WriteBit(h.present, int(Timestamp), 1)
+	bitutils.WriteBit(h.present, int(timestampFieldBitIndex), 1)
 	return h
 }
 func (h *HeaderBodyBuilder) WithView(v uint64) *HeaderBodyBuilder {
 	h.u.View = v
-	bitutils.WriteBit(h.present, int(View), 1)
+	bitutils.WriteBit(h.present, int(viewFieldBitIndex), 1)
 	return h
 }
 func (h *HeaderBodyBuilder) WithParentView(pv uint64) *HeaderBodyBuilder {
 	h.u.ParentView = pv
-	bitutils.WriteBit(h.present, int(ParentView), 1)
+	bitutils.WriteBit(h.present, int(parentViewFieldBitIndex), 1)
 	return h
 }
 func (h *HeaderBodyBuilder) WithParentVoterIndices(idx []byte) *HeaderBodyBuilder {
 	h.u.ParentVoterIndices = idx
-	bitutils.WriteBit(h.present, int(ParentVoterIndices), 1)
+	bitutils.WriteBit(h.present, int(parentVoterIndicesFieldBitIndex), 1)
 	return h
 }
 func (h *HeaderBodyBuilder) WithParentVoterSigData(sig []byte) *HeaderBodyBuilder {
 	h.u.ParentVoterSigData = sig
-	bitutils.WriteBit(h.present, int(ParentVoterSigData), 1)
+	bitutils.WriteBit(h.present, int(parentVoterSigDataFieldBitIndex), 1)
 	return h
 }
 func (h *HeaderBodyBuilder) WithProposerID(id Identifier) *HeaderBodyBuilder {
 	h.u.ProposerID = id
-	bitutils.WriteBit(h.present, int(ProposerIdentifier), 1)
+	bitutils.WriteBit(h.present, int(proposerIDFieldBitIndex), 1)
 	return h
 }
 func (h *HeaderBodyBuilder) WithLastViewTC(tc *TimeoutCertificate) *HeaderBodyBuilder {
