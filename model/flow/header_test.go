@@ -356,18 +356,18 @@ func TestHeaderBodyBuilder_PresenceChecks(t *testing.T) {
 //
 // Test Cases:
 //
-// 1. Valid root input:
-//   - Ensures a Header is returned when the embedded HeaderBody is a valid root body
+// 1. Valid genesis input:
+//   - Ensures a Header is returned when the embedded HeaderBody is a valid genesis body
 //     and PayloadHash is ZeroID.
 //
-// 2. Invalid root body:
+// 2. Invalid genesis body:
 //   - Ensures an error is returned when the embedded HeaderBody is invalid.
 //
 // 3. Non‐empty PayloadHash:
 //   - Ensures an error is returned when PayloadHash is non‐zero.
 //
 // 4. Non‐empty ParentVoterIndices:
-//   - Ensures an error is returned when the root header’s ParentVoterIndices is non‐empty.
+//   - Ensures an error is returned when the genesis header’s ParentVoterIndices is non‐empty.
 func TestNewGenesisHeader(t *testing.T) {
 	ts := time.Unix(1_600_000_000, 0)
 	validID := unittest.IdentifierFixture()

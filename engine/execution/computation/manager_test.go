@@ -99,7 +99,6 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	block := flow.NewBlock(
 		flow.HeaderBody{
-
 			ChainID: flow.Emulator,
 			View:    42,
 		},

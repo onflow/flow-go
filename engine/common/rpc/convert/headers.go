@@ -134,7 +134,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 }
 
 // IsRootBlockHeader reports whether this is a root block header.
-// It returns true only if all of the fields required to build a Header are zero/nil,
+// It returns true only if all of the fields required to build a Header are zero/nil.
 func IsRootBlockHeader(m *entities.BlockHeader) bool {
 	return MessageToIdentifier(m.ParentId) == flow.ZeroID &&
 		m.ParentVoterIndices == nil &&

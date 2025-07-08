@@ -340,7 +340,6 @@ func (b *bootstrapExecutor) Execute() error {
 		if err != nil {
 			return err
 		}
-
 		b.rootBlock = rootblock.ToHeader()
 	}
 
