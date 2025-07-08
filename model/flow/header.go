@@ -213,7 +213,7 @@ func NewHeader(untrusted UntrustedHeader) (*Header, error) {
 
 // NewGenesisHeader creates a genesis header.
 //
-// This constructor must be used **only** for constructing the root header,
+// This constructor must be used **only** for constructing the genesis header,
 // which is the only case where zero values are allowed.
 func NewGenesisHeader(untrusted UntrustedHeader) (*Header, error) {
 	rootHeaderBody, err := NewRootHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))
