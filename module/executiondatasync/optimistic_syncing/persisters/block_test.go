@@ -46,8 +46,8 @@ func (p *PersisterSuite) SetupTest() {
 	t := p.T()
 
 	block := unittest.BlockFixture()
-	p.header = block.Header
-	p.executionResult = unittest.ExecutionResultFixture(unittest.WithBlock(&block))
+	p.header = block.ToHeader()
+	p.executionResult = unittest.ExecutionResultFixture(unittest.WithBlock(block))
 
 	p.inMemoryRegisters = unsynchronized.NewRegisters(p.header.Height)
 	p.inMemoryEvents = unsynchronized.NewEvents()
@@ -102,7 +102,7 @@ func (p *PersisterSuite) populateInMemoryStorages() {
 	for i := 0; i < 2; i++ {
 		collection := unittest.CollectionFixture(2)
 		light := collection.Light()
-		err := p.inMemoryCollections.StoreLightAndIndexByTransaction(&light)
+		err := p.inMemoryCollections.StoreLightAndIndexByTransaction(light)
 		p.Require().NoError(err)
 
 		for _, tx := range collection.Transactions {

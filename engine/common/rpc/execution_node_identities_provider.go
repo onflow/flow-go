@@ -172,12 +172,12 @@ func (e *ExecutionNodeIdentitiesProvider) ExecutionNodesForResultID(
 			return nil, fmt.Errorf("failed to retrieve execution receipts for block ID %v: %w", blockID, err)
 		}
 
-		executionReceiptMetaList := make(flow.ExecutionReceiptMetaList, 0, len(allReceipts))
+		executionReceiptStubList := make(flow.ExecutionReceiptStubList, 0, len(allReceipts))
 		for _, r := range allReceipts {
-			executionReceiptMetaList = append(executionReceiptMetaList, r.Meta())
+			executionReceiptStubList = append(executionReceiptStubList, r.Stub())
 		}
 
-		receiptsByResultID := executionReceiptMetaList.GroupByResultID()
+		receiptsByResultID := executionReceiptStubList.GroupByResultID()
 		targetReceipts := receiptsByResultID.GetGroup(resultID)
 
 		if len(targetReceipts) == 0 {

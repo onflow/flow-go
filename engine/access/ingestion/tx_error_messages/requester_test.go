@@ -39,7 +39,7 @@ type RequesterSuite struct {
 	execClient  *accessmock.ExecutionAPIClient
 	connFactory *connectionmock.ConnectionFactory
 
-	rootBlock      flow.Block
+	rootBlock      *flow.Block
 	finalizedBlock *flow.Header
 }
 
@@ -58,7 +58,7 @@ func (s *RequesterSuite) SetupTest() {
 
 	s.rootBlock = unittest.BlockFixture()
 	s.rootBlock.Header.Height = 0
-	s.finalizedBlock = unittest.BlockWithParentFixture(s.rootBlock.Header).Header
+	s.finalizedBlock = unittest.BlockWithParentFixture(s.rootBlock.ToHeader()).ToHeader()
 
 	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.Header, nil)
 	s.proto.state.On("Params").Return(s.proto.params)
