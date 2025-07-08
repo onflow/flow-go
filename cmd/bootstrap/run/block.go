@@ -22,7 +22,7 @@ func GenerateRootHeader(chainID flow.ChainID, parentID flow.Identifier, height u
 		return nil, fmt.Errorf("failed to generate root header body: %w", err)
 	}
 
-	rootHeader, err := flow.NewRootHeader(flow.UntrustedHeader{
+	rootHeader, err := flow.NewGenesisHeader(flow.UntrustedHeader{
 		HeaderBody:  *rootHeaderBody,
 		PayloadHash: flow.ZeroID,
 	})
