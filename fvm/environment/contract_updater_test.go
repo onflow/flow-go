@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
-	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -296,7 +295,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 }
 
 func TestContract_DeterministicErrorOnCommit(t *testing.T) {
-	mockAccounts := &envMock.Accounts{}
+	mockAccounts := &environment.MockAccounts{}
 
 	mockAccounts.On("ContractExists", mock.Anything, mock.Anything).
 		Return(false, nil)
