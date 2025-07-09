@@ -238,7 +238,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		block := unittest.BlockWithGuaranteesFixture(
 			unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
 		)
-		block.Header.Height = uint64(i)
+		block.Header.Height = uint64(i + 1) // avoiding edge case of height = 0 (genesis block)
 		suite.blocks.On("ByID", block.ID()).Return(block, nil)
 		suite.blocks.On("ByHeight", block.Header.Height).Return(block, nil)
 		testBlocks[i] = block
@@ -412,7 +412,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		invalidHeight := uint64(len(testBlocks))
+		invalidHeight := uint64(len(testBlocks) * 2)
 		var reqHeights = []uint64{invalidHeight}
 		suite.blocks.On("ByHeight", invalidHeight).Return(nil, storage.ErrNotFound).Once()
 
