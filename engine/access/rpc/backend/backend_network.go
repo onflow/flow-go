@@ -47,7 +47,7 @@ func (b *backendNetwork) GetLatestProtocolStateSnapshot(ctx context.Context) ([]
 // GetProtocolStateSnapshotByBlockID returns serializable Snapshot for a block, by blockID.
 // The requested block must be finalized, otherwise an error is returned.
 //
-// Expected errors during normal operation:
+// Dedicated sentinel errors providing details to clients about failed requests:
 //   - access.DataNotFoundError - No block with the given ID was found
 //   - access.InvalidRequestError - Block ID is for an orphaned block and will never have a valid snapshot
 //   - access.PreconditionFailedError - A block was found, but it is not finalized and is above the finalized height.
