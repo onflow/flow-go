@@ -274,7 +274,7 @@ func TestNewHeaderBody(t *testing.T) {
 
 	t.Run("ParentView ≥ View", func(t *testing.T) {
 		u := base
-		u.ParentView = view // equal to View
+		u.ParentView = view
 		hb, err := flow.NewHeaderBody(u)
 		assert.Error(t, err)
 		assert.Nil(t, hb)

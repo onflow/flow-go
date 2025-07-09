@@ -721,17 +721,23 @@ func TestSealingSegment(t *testing.T) {
 	// where DefaultTransactionExpiry = 600
 	t.Run("test extra blocks contain exactly DefaultTransactionExpiry number of blocks below the sealed block", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
-			root := unittest.BlockWithParentAndPayload(
-				head,
-				unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+			root := unittest.BlockFixture(
+				unittest.Block.WithParent(head.ID(), head.View, head.Height),
+				unittest.Block.WithView(head.Height+1), // set view so we are still in the same epoch
+				unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID))),
 			)
 			buildFinalizedBlock(t, state, root)
 
 			blocks := make([]*flow.Block, 0, flow.DefaultTransactionExpiry+3)
 			parent := root
 			for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
-				next := unittest.BlockWithParentProtocolState(parent)
-				next.Header.View = next.Header.Height + 1 // set view so we are still in the same epoch
+				next := unittest.BlockFixture(
+					unittest.Block.WithParent(parent.ID(), parent.Header.View, parent.Header.Height),
+					unittest.Block.WithView(parent.Header.Height+1), // set view so we are still in the same epoch
+					unittest.Block.WithPayload(unittest.PayloadFixture(
+						unittest.WithProtocolStateID(parent.Payload.ProtocolStateID)),
+					),
+				)
 				buildFinalizedBlock(t, state, next)
 				blocks = append(blocks, next)
 				parent = next

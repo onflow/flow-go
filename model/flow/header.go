@@ -297,23 +297,6 @@ func (h Header) ID() Identifier {
 	return MakeID(h)
 }
 
-// headerBodyFieldBitIndex enumerates required fields in HeaderBody so that HeaderBodyBuilder
-// can enforce that all required fields are explicitly set (including to zero values) prior to building.
-type headerBodyFieldBitIndex int
-
-const (
-	chainIDFieldBitIndex headerBodyFieldBitIndex = iota
-	parentIDFieldBitIndex
-	heightFieldBitIndex
-	timestampFieldBitIndex
-	viewFieldBitIndex
-	parentViewFieldBitIndex
-	parentVoterIndicesFieldBitIndex
-	parentVoterSigDataFieldBitIndex
-	proposerIDFieldBitIndex
-	numHeaderBodyFields // always keep this last
-)
-
 // HeaderBodyBuilder constructs a validated, immutable HeaderBody in two phases:
 // first by setting individual fields using fluent WithX methods, then by calling Build()
 // to perform centralized validation and return the final HeaderBody.
@@ -393,8 +376,6 @@ func (h *HeaderBodyBuilder) WithLastViewTC(tc *TimeoutCertificate) *HeaderBodyBu
 }
 
 // MarshalJSON makes sure the timestamp is encoded in UTC.
-//
-// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
 //
 //nolint:structwrite
 func (h Header) MarshalJSON() ([]byte, error) {
