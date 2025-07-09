@@ -312,7 +312,7 @@ func rangeToCertifiedBlocks(certifiedRange []*flow.Block, certifyingQC *flow.Quo
 	for i, block := range certifiedRange {
 		var qc *flow.QuorumCertificate
 		if i < lastIndex {
-			qc = certifiedRange[i+1].Header.QuorumCertificate()
+			qc = certifiedRange[i+1].Header.ParentQC()
 		} else {
 			qc = certifyingQC
 		}
