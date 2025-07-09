@@ -15,7 +15,7 @@ import (
 	mockprot "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
-	mockstor "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -24,18 +24,6 @@ func LogCleanup(list *[]flow.Identifier) func(flow.Identifier) error {
 		*list = append(*list, blockID)
 		return nil
 	}
-}
-
-func TestNewFinalizer(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		headers := &mockstor.Headers{}
-		state := &mockprot.FollowerState{}
-		tracer := trace.NewNoopTracer()
-		fin := NewFinalizer(db, headers, state, tracer)
-		assert.Equal(t, fin.db, db)
-		assert.Equal(t, fin.headers, headers)
-		assert.Equal(t, fin.state, state)
-	})
 }
 
 // TestMakeFinalValidChain checks whether calling `MakeFinal` with the ID of a valid
@@ -97,11 +85,11 @@ func TestMakeFinalValidChain(t *testing.T) {
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
-			db:      db,
-			headers: storage.NewHeaders(metrics, db),
-			state:   state,
-			tracer:  trace.NewNoopTracer(),
-			cleanup: LogCleanup(&list),
+			dbReader: badgerimpl.ToDB(db).Reader(),
+			headers:  storage.NewHeaders(metrics, db),
+			state:    state,
+			tracer:   trace.NewNoopTracer(),
+			cleanup:  LogCleanup(&list),
 		}
 		err = fin.MakeFinal(lastID)
 		require.NoError(t, err)
@@ -153,11 +141,11 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
-			db:      db,
-			headers: storage.NewHeaders(metrics, db),
-			state:   state,
-			tracer:  trace.NewNoopTracer(),
-			cleanup: LogCleanup(&list),
+			dbReader: badgerimpl.ToDB(db).Reader(),
+			headers:  storage.NewHeaders(metrics, db),
+			state:    state,
+			tracer:   trace.NewNoopTracer(),
+			cleanup:  LogCleanup(&list),
 		}
 		err = fin.MakeFinal(pending.ID())
 		require.Error(t, err)
@@ -201,11 +189,11 @@ func TestMakeFinalDuplicate(t *testing.T) {
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
-			db:      db,
-			headers: storage.NewHeaders(metrics, db),
-			state:   state,
-			tracer:  trace.NewNoopTracer(),
-			cleanup: LogCleanup(&list),
+			dbReader: badgerimpl.ToDB(db).Reader(),
+			headers:  storage.NewHeaders(metrics, db),
+			state:    state,
+			tracer:   trace.NewNoopTracer(),
+			cleanup:  LogCleanup(&list),
 		}
 		err = fin.MakeFinal(final.ID())
 		require.NoError(t, err)
