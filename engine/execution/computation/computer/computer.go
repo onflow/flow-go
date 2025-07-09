@@ -280,8 +280,9 @@ func (e *blockComputer) queueSystemTransaction(
 ) {
 	allTxs := append(executeCallbackTxs, systemTxn)
 	// add execute callback transactions to the system collection info along to existing process transaction
-	systemCollectionInfo.CompleteCollection.Transactions = append(systemCollectionInfo.CompleteCollection.Transactions, allTxs...)
-	systemLogger = systemLogger.With().Uint32("num_txs", uint32(len(allTxs))).Logger()
+	systemTxs := systemCollectionInfo.CompleteCollection.Transactions
+	systemCollectionInfo.CompleteCollection.Transactions = append(systemTxs, allTxs...)
+	systemLogger = systemLogger.With().Uint32("num_txs", uint32(len(systemTxs))).Logger()
 
 	for i, txBody := range allTxs {
 		last := i == len(allTxs)-1
