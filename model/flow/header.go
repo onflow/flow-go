@@ -98,7 +98,7 @@ func NewHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 	if untrusted.View == 0 {
 		return nil, fmt.Errorf("View must be > 0 for non-root header")
 	}
-	if untrusted.ParentView >= untrusted.View {
+	if untrusted.ParentView > untrusted.View {
 		return nil, fmt.Errorf(
 			"ParentView (%d) must be less than View (%d)", untrusted.ParentView, untrusted.View,
 		)
