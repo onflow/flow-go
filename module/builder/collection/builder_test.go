@@ -824,7 +824,7 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 	// since we have no rate limiting we should fill all collections and in 10 blocks
 	parentID := suite.genesis.ID()
 	setter := func(h *flow.HeaderBodyBuilder) error {
-		h.WithHeight(0).
+		h.WithHeight(1).
 			WithChainID(flow.Emulator).
 			WithParentID(unittest.IdentifierFixture()).
 			WithView(1337).
