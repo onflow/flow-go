@@ -55,9 +55,15 @@ func SetupEnvironment(
 		evmContractAddress,
 	)
 
+	internalEVMFunctions := impl.NewInternalEVMFunctions(
+		contractHandler,
+		evmContractAddress,
+	)
+
 	stdlib.SetupEnvironment(
 		runtimeEnv,
 		internalEVMContractValue,
+		internalEVMFunctions,
 		evmContractAddress,
 	)
 

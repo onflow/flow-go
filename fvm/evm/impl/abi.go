@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/onflow/cadence/bbq"
+	"github.com/onflow/cadence/bbq/vm"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/errors"
 	"github.com/onflow/cadence/interpreter"
@@ -212,7 +214,7 @@ func reportABIEncodingComputation(
 	)
 }
 
-func newInternalEVMTypeEncodeABIFunction(
+func newInterpreterInternalEVMTypeEncodeABIFunction(
 	gauge common.MemoryGauge,
 	location common.AddressLocation,
 ) *interpreter.HostFunctionValue {
@@ -225,71 +227,117 @@ func newInternalEVMTypeEncodeABIFunction(
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
+			args := invocation.Arguments
 
 			// Get `values` argument
 
-			valuesArray, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			valuesArray, ok := args[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			reportABIEncodingComputation(
+			return performEncodeABI(
 				context,
 				locationRange,
 				valuesArray,
 				evmSpecialTypeIDs,
-				func(intensity uint64) {
-					common.UseComputation(
-						context,
-						common.ComputationUsage{
-							Kind:      environment.ComputationKindEVMEncodeABI,
-							Intensity: intensity,
-						},
-					)
-				},
 			)
-
-			size := valuesArray.Count()
-
-			values := make([]any, 0, size)
-			arguments := make(gethABI.Arguments, 0, size)
-
-			valuesArray.Iterate(
-				context,
-				func(element interpreter.Value) (resume bool) {
-					value, ty, err := encodeABI(
-						context,
-						locationRange,
-						element,
-						element.StaticType(context),
-						evmSpecialTypeIDs,
-					)
-					if err != nil {
-						panic(err)
-					}
-
-					values = append(values, value)
-					arguments = append(arguments, gethABI.Argument{Type: ty})
-
-					// continue iteration
-					return true
-				},
-				false,
-				locationRange,
-			)
-
-			encodedValues, err := arguments.Pack(values...)
-			if err != nil {
-				panic(
-					abiEncodingError{
-						Message: err.Error(),
-					},
-				)
-			}
-
-			return interpreter.ByteSliceToByteArrayValue(context, encodedValues)
 		},
 	)
+}
+
+func newVMInternalEVMTypeEncodeABIFunction(
+	location common.AddressLocation,
+) *vm.NativeFunctionValue {
+
+	evmSpecialTypeIDs := NewEVMSpecialTypeIDs(nil, location)
+
+	return vm.NewNativeFunctionValue(
+		stdlib.InternalEVMTypeEncodeABIFunctionName,
+		stdlib.InternalEVMTypeEncodeABIFunctionType,
+		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+			// arg[0] is the receiver. Actual arguments starts from 1.
+			args = args[vm.TypeBoundFunctionArgumentOffset:]
+
+			// Get `values` argument
+
+			valuesArray, ok := args[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			return performEncodeABI(
+				context,
+				interpreter.EmptyLocationRange,
+				valuesArray,
+				evmSpecialTypeIDs,
+			)
+		},
+	)
+}
+
+func performEncodeABI(
+	context interpreter.InvocationContext,
+	locationRange interpreter.LocationRange,
+	valuesArray *interpreter.ArrayValue,
+	evmSpecialTypeIDs evmSpecialTypeIDs,
+) interpreter.Value {
+	reportABIEncodingComputation(
+		context,
+		locationRange,
+		valuesArray,
+		evmSpecialTypeIDs,
+		func(intensity uint64) {
+			common.UseComputation(
+				context,
+				common.ComputationUsage{
+					Kind:      environment.ComputationKindEVMEncodeABI,
+					Intensity: intensity,
+				},
+			)
+		},
+	)
+
+	size := valuesArray.Count()
+
+	values := make([]any, 0, size)
+	arguments := make(gethABI.Arguments, 0, size)
+
+	valuesArray.Iterate(
+		context,
+		func(element interpreter.Value) (resume bool) {
+			value, ty, err := encodeABI(
+				context,
+				locationRange,
+				element,
+				element.StaticType(context),
+				evmSpecialTypeIDs,
+			)
+			if err != nil {
+				panic(err)
+			}
+
+			values = append(values, value)
+			arguments = append(arguments, gethABI.Argument{Type: ty})
+
+			// continue iteration
+			return true
+		},
+		false,
+		locationRange,
+	)
+
+	encodedValues, err := arguments.Pack(values...)
+	if err != nil {
+		panic(
+			abiEncodingError{
+				Message: err.Error(),
+			},
+		)
+	}
+
+	return interpreter.ByteSliceToByteArrayValue(context, encodedValues)
 }
 
 var gethTypeString = gethABI.Type{T: gethABI.StringTy}
@@ -710,7 +758,8 @@ func encodeABI(
 		Type: value.StaticType(context),
 	}
 }
-func newInternalEVMTypeDecodeABIFunction(
+
+func newInterpreterInternalEVMTypeDecodeABIFunction(
 	gauge common.MemoryGauge,
 	location common.AddressLocation,
 ) *interpreter.HostFunctionValue {
@@ -722,123 +771,182 @@ func newInternalEVMTypeDecodeABIFunction(
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
 			locationRange := invocation.LocationRange
+			args := invocation.Arguments
 
 			// Get `types` argument
 
-			typesArray, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			typesArray, ok := args[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
 			// Get `data` argument
 
-			dataValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			dataValue, ok := args[1].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			common.UseComputation(
+			return performDecodeABI(
 				context,
-				common.ComputationUsage{
-					Kind:      environment.ComputationKindEVMDecodeABI,
-					Intensity: uint64(dataValue.Count()),
+				dataValue,
+				typesArray,
+				locationRange,
+				evmSpecialTypeIDs,
+				location,
+			)
+		},
+	)
+}
+
+func newVMInternalEVMTypeDecodeABIFunction(
+	location common.AddressLocation,
+) *vm.NativeFunctionValue {
+
+	evmSpecialTypeIDs := NewEVMSpecialTypeIDs(nil, location)
+
+	return vm.NewNativeFunctionValue(
+		stdlib.InternalEVMTypeEncodeABIFunctionName,
+		stdlib.InternalEVMTypeEncodeABIFunctionType,
+		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+
+			// arg[0] is the receiver. Actual arguments starts from 1.
+			args = args[vm.TypeBoundFunctionArgumentOffset:]
+
+			// Get `types` argument
+
+			typesArray, ok := args[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			// Get `data` argument
+
+			dataValue, ok := args[1].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			return performDecodeABI(
+				context,
+				dataValue,
+				typesArray,
+				interpreter.EmptyLocationRange,
+				evmSpecialTypeIDs,
+				location,
+			)
+		},
+	)
+}
+
+func performDecodeABI(
+	context interpreter.InvocationContext,
+	dataValue *interpreter.ArrayValue,
+	typesArray *interpreter.ArrayValue,
+	locationRange interpreter.LocationRange,
+	evmSpecialTypeIDs evmSpecialTypeIDs,
+	location common.AddressLocation,
+) interpreter.Value {
+	common.UseComputation(
+		context,
+		common.ComputationUsage{
+			Kind:      environment.ComputationKindEVMDecodeABI,
+			Intensity: uint64(dataValue.Count()),
+		},
+	)
+
+	data, err := interpreter.ByteArrayValueToByteSlice(context, dataValue, locationRange)
+	if err != nil {
+		panic(err)
+	}
+
+	var arguments gethABI.Arguments
+	typesArray.Iterate(
+		context,
+		func(element interpreter.Value) (resume bool) {
+			typeValue, ok := element.(interpreter.TypeValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			staticType := typeValue.Type
+
+			gethABITy, ok := gethABIType(staticType, evmSpecialTypeIDs)
+			if !ok {
+				panic(abiDecodingError{
+					Type: staticType,
+				})
+			}
+
+			arguments = append(
+				arguments,
+				gethABI.Argument{
+					Type: gethABITy,
 				},
 			)
 
-			data, err := interpreter.ByteArrayValueToByteSlice(context, dataValue, locationRange)
+			// continue iteration
+			return true
+		},
+		false,
+		locationRange,
+	)
+
+	decodedValues, err := arguments.Unpack(data)
+	if err != nil {
+		panic(abiDecodingError{})
+	}
+
+	var index int
+	values := make([]interpreter.Value, 0, len(decodedValues))
+
+	typesArray.Iterate(
+		context,
+		func(element interpreter.Value) (resume bool) {
+			typeValue, ok := element.(interpreter.TypeValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			staticType := typeValue.Type
+
+			value, err := decodeABI(
+				context,
+				locationRange,
+				decodedValues[index],
+				staticType,
+				location,
+				evmSpecialTypeIDs,
+			)
 			if err != nil {
 				panic(err)
 			}
 
-			var arguments gethABI.Arguments
-			typesArray.Iterate(
-				context,
-				func(element interpreter.Value) (resume bool) {
-					typeValue, ok := element.(interpreter.TypeValue)
-					if !ok {
-						panic(errors.NewUnreachableError())
-					}
+			index++
 
-					staticType := typeValue.Type
+			values = append(values, value)
 
-					gethABITy, ok := gethABIType(staticType, evmSpecialTypeIDs)
-					if !ok {
-						panic(abiDecodingError{
-							Type: staticType,
-						})
-					}
-
-					arguments = append(
-						arguments,
-						gethABI.Argument{
-							Type: gethABITy,
-						},
-					)
-
-					// continue iteration
-					return true
-				},
-				false,
-				locationRange,
-			)
-
-			decodedValues, err := arguments.Unpack(data)
-			if err != nil {
-				panic(abiDecodingError{})
-			}
-
-			var index int
-			values := make([]interpreter.Value, 0, len(decodedValues))
-
-			typesArray.Iterate(
-				context,
-				func(element interpreter.Value) (resume bool) {
-					typeValue, ok := element.(interpreter.TypeValue)
-					if !ok {
-						panic(errors.NewUnreachableError())
-					}
-
-					staticType := typeValue.Type
-
-					value, err := decodeABI(
-						context,
-						locationRange,
-						decodedValues[index],
-						staticType,
-						location,
-						evmSpecialTypeIDs,
-					)
-					if err != nil {
-						panic(err)
-					}
-
-					index++
-
-					values = append(values, value)
-
-					// continue iteration
-					return true
-				},
-				false,
-				locationRange,
-			)
-
-			arrayType := interpreter.NewVariableSizedStaticType(
-				context,
-				interpreter.NewPrimitiveStaticType(
-					context,
-					interpreter.PrimitiveStaticTypeAnyStruct,
-				),
-			)
-
-			return interpreter.NewArrayValue(
-				context,
-				locationRange,
-				arrayType,
-				common.ZeroAddress,
-				values...,
-			)
+			// continue iteration
+			return true
 		},
+		false,
+		locationRange,
+	)
+
+	arrayType := interpreter.NewVariableSizedStaticType(
+		context,
+		interpreter.NewPrimitiveStaticType(
+			context,
+			interpreter.PrimitiveStaticTypeAnyStruct,
+		),
+	)
+
+	return interpreter.NewArrayValue(
+		context,
+		locationRange,
+		arrayType,
+		common.ZeroAddress,
+		values...,
 	)
 }
 
