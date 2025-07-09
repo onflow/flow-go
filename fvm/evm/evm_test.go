@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
-	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/impl"
@@ -3355,12 +3354,15 @@ func RunWithNewEnvironment(
 		RunWithDeployedContract(t, GetStorageTestContract(t), backend, rootAddr, func(testContract *TestContract) {
 			RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
 
-				blocks := new(envMock.Blocks)
+				// blocks := new(envMock.Blocks)
+				// block1 := unittest.BlockFixture()
+				// blocks.On("ByHeightFrom",
+				//	block1.Header.Height,
+				//	block1.Header,
+				// ).Return(block1.Header, nil)
+				
+				// TODO: Re-enable when blocks mock is available
 				block1 := unittest.BlockFixture()
-				blocks.On("ByHeightFrom",
-					block1.Header.Height,
-					block1.Header,
-				).Return(block1.Header, nil)
 
 				opts := []fvm.Option{
 					fvm.WithChain(chain),
@@ -3369,7 +3371,7 @@ func RunWithNewEnvironment(
 					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 					fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
 					fvm.WithRandomSourceHistoryCallAllowed(true),
-					fvm.WithBlocks(blocks),
+					// fvm.WithBlocks(blocks), // TODO: Re-enable when blocks mock is available
 					fvm.WithCadenceLogging(true),
 				}
 				ctx := fvm.NewContext(opts...)

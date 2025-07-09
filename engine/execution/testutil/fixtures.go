@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
-	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -649,9 +648,15 @@ func EntropyProviderFixture(source []byte) environment.EntropyProvider {
 	if source == nil {
 		source = unittest.SignatureFixture()
 	}
-	provider := envMock.EntropyProvider{}
-	provider.On("RandomSource").Return(source, nil)
-	return &provider
+	return &mockEntropyProvider{source: source}
+}
+
+type mockEntropyProvider struct {
+	source []byte
+}
+
+func (m *mockEntropyProvider) RandomSource() ([]byte, error) {
+	return m.source, nil
 }
 
 // ProtocolStateWithVersionFixture is the same as ProtocolStateWithSourceFixture,

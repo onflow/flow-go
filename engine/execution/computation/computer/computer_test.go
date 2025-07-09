@@ -32,7 +32,6 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
@@ -187,7 +186,7 @@ func TestBlockExecutor_ExecuteBlock_VersionAwareChunk(t *testing.T) {
 			Times(1) // 1 block
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -411,7 +410,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Times(1) // 1 block
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -545,11 +544,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		execCtx := fvm.NewContext()
 
-		vm := new(fvmmock.VM)
+		// vm := new(fvmmock.VM)
+		vm := &testVM{
+			t:                    t,
+			eventsPerTransaction: 1,
+		}
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -652,7 +655,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		comm := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -708,7 +711,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -942,7 +945,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			vm := fvm.NewVirtualMachine()
 
 			bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-			trackerStorage := mocktracker.NewMockStorage()
+			trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 			prov := provider.NewProvider(
 				zerolog.Nop(),
@@ -1054,7 +1057,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := fvm.NewVirtualMachine()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -1168,7 +1171,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := fvm.NewVirtualMachine()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -1214,7 +1217,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		bservice := requesterunit.MockBlobService(
 			blockstore.NewBlockstore(
 				dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -1545,7 +1548,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -1782,6 +1785,14 @@ func (testVM) GetAccount(
 	error,
 ) {
 	panic("not implemented")
+}
+
+func (vm *testVM) On(methodName string, arguments ...interface{}) *mock.Call {
+	return &mock.Call{}
+}
+
+func (vm *testVM) AssertExpectations(t mock.TestingT) bool {
+	return true
 }
 
 func generateEvents(eventCount int, txIndex uint32) []flow.Event {

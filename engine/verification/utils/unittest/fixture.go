@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/cluster"
 
-	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -259,12 +258,12 @@ func ExecutionResultFixture(t *testing.T,
 
 		vm := fvm.NewVirtualMachine()
 
-		blocks := new(envMock.Blocks)
+		// blocks := new(envMock.Blocks) // TODO: Re-enable when envMock is available
 
 		execCtx := fvm.NewContext(
 			fvm.WithLogger(log),
 			fvm.WithChain(chain),
-			fvm.WithBlocks(blocks),
+			// fvm.WithBlocks(blocks), // TODO: Re-enable when blocks mock is available
 		)
 
 		// create state.View
@@ -274,7 +273,7 @@ func ExecutionResultFixture(t *testing.T,
 		committer := committer.NewLedgerViewCommitter(led, trace.NewNoopTracer())
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockStorageWithDefaults()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),

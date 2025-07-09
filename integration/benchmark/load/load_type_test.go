@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
-	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/integration/benchmark/account"
@@ -129,7 +128,7 @@ func testLoad(log zerolog.Logger, l load.Load) func(t *testing.T) {
 func bootstrapVM(t *testing.T, chain flow.Chain) (*fvm.VirtualMachine, fvm.Context, snapshot.SnapshotTree) {
 	source := testutil.EntropyProviderFixture(nil)
 
-	blocks := new(envMock.Blocks)
+	blocks := &environment.NoopBlocks{}
 	block1 := unittest.BlockFixture()
 	blocks.On("ByHeightFrom",
 		block1.Header.Height,

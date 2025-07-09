@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
-	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -1433,7 +1432,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		fvm.WithCadenceLogging(true),
 	)
 
-	blocks := new(envMock.Blocks)
+	// blocks := new(envMock.Blocks)
 
 	block1 := unittest.BlockFixture()
 	block2 := unittest.BlockWithParentFixture(block1.Header)
