@@ -80,20 +80,31 @@ func NewHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 	if untrusted.ChainID == "" {
 		return nil, fmt.Errorf("ChainID must not be empty")
 	}
-	if untrusted.ParentID == ZeroID {
-		return nil, fmt.Errorf("ParentID must not be empty")
+
+	// This constructor is only for non-root headers, so require a parent QC:
+	// ParentID, ParentVoterIndices, ParentVoterSigData, ProposerID must all be set.
+	// We bundle them in one spot to avoid repeating the same four if-statements.
+	hb := HeaderBody(untrusted) // cheap conversion so we can call ContainsParentQC
+	if !hb.ContainsParentQC() {
+		return nil, fmt.Errorf(
+			"missing parent QC: ParentID, ParentVoterIndices, ParentVoterSigData and ProposerID are all required",
+		)
+	}
+
+	// 3) Now that we know it’s “normal” (has a QC), enforce block semantics:
+	if untrusted.Height == 0 {
+		return nil, fmt.Errorf("Height must be > 0 for non-root header")
+	}
+	if untrusted.View == 0 {
+		return nil, fmt.Errorf("View must be > 0 for non-root header")
+	}
+	if untrusted.ParentView >= untrusted.View {
+		return nil, fmt.Errorf(
+			"ParentView (%d) must be less than View (%d)", untrusted.ParentView, untrusted.View,
+		)
 	}
 	if untrusted.Timestamp.IsZero() {
-		return nil, fmt.Errorf("Timestamp must not be zero‐value")
-	}
-	if len(untrusted.ParentVoterIndices) == 0 {
-		return nil, fmt.Errorf("ParentVoterIndices must not be empty")
-	}
-	if len(untrusted.ParentVoterSigData) == 0 {
-		return nil, fmt.Errorf("ParentVoterSigData must not be empty")
-	}
-	if untrusted.ProposerID == ZeroID {
-		return nil, fmt.Errorf("ProposerID must not be empty")
+		return nil, fmt.Errorf("Timestamp must not be zero-value")
 	}
 
 	return &HeaderBody{
