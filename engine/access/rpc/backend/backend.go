@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -57,8 +56,8 @@ const DefaultConnectionPoolSize = 250
 //
 // All remaining calls are handled by the base Backend in this file.
 type Backend struct {
-	scripts.Scripts
 	backendTransactions
+	backendScripts
 	events.Events
 	backendBlockHeaders
 	backendBlockDetails
@@ -176,29 +175,24 @@ func New(params Params) (*Backend, error) {
 		return nil, fmt.Errorf("failed to create events: %w", err)
 	}
 
-	scriptsBackend, err := scripts.NewScriptsBackend(
-		params.Log,
-		params.AccessMetrics,
-		params.Headers,
-		params.State,
-		params.ConnFactory,
-		params.Communicator,
-		params.ScriptExecutor,
-		params.ScriptExecutionMode,
-		params.ExecNodeIdentitiesProvider,
-		loggedScripts,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create scripts: %w", err)
-	}
-
 	b := &Backend{
 		state:        params.State,
 		BlockTracker: params.BlockTracker,
 		// create the sub-backends
 		Accounts: *accountsBackend,
 		Events:   *eventsBackend,
-		Scripts:  *scriptsBackend,
+		backendScripts: backendScripts{
+			log:                        params.Log,
+			headers:                    params.Headers,
+			connFactory:                params.ConnFactory,
+			state:                      params.State,
+			metrics:                    params.AccessMetrics,
+			loggedScripts:              loggedScripts,
+			nodeCommunicator:           params.Communicator,
+			scriptExecutor:             params.ScriptExecutor,
+			scriptExecMode:             params.ScriptExecutionMode,
+			execNodeIdentitiesProvider: params.ExecNodeIdentitiesProvider,
+		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: params.Headers,
 			state:   params.State,
