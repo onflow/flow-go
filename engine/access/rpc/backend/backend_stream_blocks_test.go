@@ -16,6 +16,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -164,7 +165,10 @@ func (s *BackendBlocksSuite) backendParams() Params {
 			subscription.DefaultResponseLimit,
 			subscription.DefaultSendBufferSize,
 		),
-		BlockTracker: s.blockTracker,
+		BlockTracker:        s.blockTracker,
+		EventQueryMode:      query_mode.IndexQueryModeExecutionNodesOnly,
+		ScriptExecutionMode: query_mode.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:   query_mode.IndexQueryModeExecutionNodesOnly,
 	}
 }
 

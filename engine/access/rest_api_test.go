@@ -181,6 +181,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 		Communicator:         node_communicator.NewNodeCommunicator(false),
 		EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
 		ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
 	})
 	require.NoError(suite.T(), err)
 

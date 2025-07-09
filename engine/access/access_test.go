@@ -178,6 +178,7 @@ func (suite *Suite) RunTest(
 			Communicator:         node_communicator.NewNodeCommunicator(false),
 			EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
 			ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
 		})
 		require.NoError(suite.T(), err)
 
@@ -348,6 +349,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			Communicator:         node_communicator.NewNodeCommunicator(false),
 			EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
 			ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
 		})
 		require.NoError(suite.T(), err)
 

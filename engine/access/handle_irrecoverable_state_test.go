@@ -159,6 +159,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		BlockTracker:         nil,
 		EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
 		ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
 	})
 	suite.Require().NoError(err)
 

@@ -215,6 +215,7 @@ func (s *TransactionStatusSuite) backendParams() Params {
 		TxResultsIndex:      index.NewTransactionResultsIndex(s.indexReporter, s.transactionResults),
 		EventQueryMode:      query_mode.IndexQueryModeLocalOnly,
 		TxResultQueryMode:   query_mode.IndexQueryModeLocalOnly,
+		ScriptExecutionMode: query_mode.IndexQueryModeLocalOnly,
 		EventsIndex:         index.NewEventsIndex(s.indexReporter, s.events),
 		LastFullBlockHeight: s.lastFullBlockHeight,
 		ExecNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
