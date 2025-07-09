@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -387,12 +388,12 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 
 	// at this point, go through all blocks and store any results which are referenced
 	// by blocks in the segment, but not contained within any blocks in the segment
-	missingExecutionResults := make(map[Identifier]struct{})
+	missingExecutionResultMap := make(map[Identifier]struct{})
 
 	if builder.firstSeal != nil {
 		_, ok := builder.includedResults[builder.firstSeal.ResultID]
 		if !ok {
-			missingExecutionResults[builder.firstSeal.ResultID] = struct{}{}
+			missingExecutionResultMap[builder.firstSeal.ResultID] = struct{}{}
 		}
 	}
 
@@ -402,19 +403,28 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 			if included {
 				continue
 			}
-			missingExecutionResults[receipt.ResultID] = struct{}{}
+			missingExecutionResultMap[receipt.ResultID] = struct{}{}
 		}
 		for _, seal := range block.Payload.Seals {
 			_, included := builder.includedResults[seal.ResultID]
 			if included {
 				continue
 			}
-			missingExecutionResults[seal.ResultID] = struct{}{}
+			missingExecutionResultMap[seal.ResultID] = struct{}{}
 		}
 	}
 
+	// sort execution results to canonical order for consistent serialization
+	missingExecutionResults := make([]Identifier, 0, len(missingExecutionResultMap))
+	for resultID := range missingExecutionResultMap {
+		missingExecutionResults = append(missingExecutionResults, resultID)
+	}
+	slices.SortFunc(missingExecutionResults, func(a, b Identifier) int {
+		return bytes.Compare(a[:], b[:])
+	})
+
 	// retrieve and store all missing execution results
-	for resultID := range missingExecutionResults {
+	for _, resultID := range missingExecutionResults {
 		result, err := builder.resultLookup(resultID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve missing result (id=%x): %w", resultID, err)
