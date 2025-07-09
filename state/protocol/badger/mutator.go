@@ -220,7 +220,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.Cer
 // Expected errors during normal operations:
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 //   - state.InvalidExtensionError if the candidate block is invalid
-func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.BlockProposal) error {
+func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.Proposal) error {
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
 	defer span.End()
 	candidate := &candidateProposal.Block
@@ -303,7 +303,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.B
 // `FollowerState.Extend` (consensus follower), then `certifyingQC` must be not nil which proves payload validity.
 //
 // No errors are expected during normal operation.
-func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.BlockProposal, certifyingQC *flow.QuorumCertificate, deferredDbOps *transaction.DeferredDbOps) error {
+func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Proposal, certifyingQC *flow.QuorumCertificate, deferredDbOps *transaction.DeferredDbOps) error {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckHeader)
 	defer span.End()
 	blockID := candidate.Block.ID()

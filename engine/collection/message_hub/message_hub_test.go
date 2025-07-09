@@ -74,8 +74,7 @@ func (s *MessageHubSuite) SetupTest() {
 	)
 	s.myID = s.cluster[0].NodeID
 	s.clusterID = "cluster-id"
-	block := unittest.ClusterBlockFixture()
-	s.head = &block
+	s.head = unittest.ClusterBlockFixture()
 
 	s.payloads = storage.NewClusterPayloads(s.T())
 	s.me = module.NewLocal(s.T())
@@ -186,7 +185,7 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 	var channel channels.Channel
 	originID := unittest.IdentifierFixture()
 	s.Run("to-compliance-engine", func() {
-		blockProposalMsg := messages.NewUntrustedClusterProposal(unittest.ClusterBlockFixture(), unittest.SignatureFixture())
+		blockProposalMsg := messages.NewUntrustedClusterProposal(*unittest.ClusterBlockFixture(), unittest.SignatureFixture())
 		expectedComplianceMsg := flow.Slashable[*messages.UntrustedClusterProposal]{
 			OriginID: originID,
 			Message:  blockProposalMsg,
@@ -230,21 +229,23 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	s.cluster = append(s.cluster, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)))
 
 	// generate a parent with height and chain ID set
-	parent := unittest.ClusterBlockFixture()
-	parent.Header.ChainID = "test"
-	parent.Header.Height = 10
+	parent := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithHeight(10),
+		unittest.ClusterBlock.WithChainID("test"),
+	)
 
 	// create a block with the parent and store the payload with correct ID
-	block := unittest.ClusterBlockWithParent(parent)
-	block.Header.ProposerID = s.myID
-
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+		unittest.ClusterBlock.WithProposerID(s.myID),
+	)
 	s.payloads.On("ByBlockID", block.ID()).Return(&block.Payload, nil)
 	s.payloads.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)
 
 	s.Run("should fail with wrong proposer", func() {
-		header := *block.ToHeader()
+		header := block.ToHeader()
 		header.ProposerID = unittest.IdentifierFixture()
-		err := s.hub.sendOwnProposal(unittest.ProposalFromHeader(&header))
+		err := s.hub.sendOwnProposal(unittest.ProposalHeaderFromHeader(header))
 		require.Error(s.T(), err, "should fail with wrong proposer")
 		header.ProposerID = s.myID
 	})
@@ -253,7 +254,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	s.Run("should fail with changed/missing parent", func() {
 		header := *block.ToHeader()
 		header.ParentID[0]++
-		err := s.hub.sendOwnProposal(unittest.ProposalFromHeader(&header))
+		err := s.hub.sendOwnProposal(unittest.ProposalHeaderFromHeader(&header))
 		require.Error(s.T(), err, "should fail with missing parent")
 		header.ParentID[0]--
 	})
@@ -262,13 +263,13 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	s.Run("should fail with wrong block ID", func() {
 		header := *block.ToHeader()
 		header.View++
-		err := s.hub.sendOwnProposal(unittest.ProposalFromHeader(&header))
+		err := s.hub.sendOwnProposal(unittest.ProposalHeaderFromHeader(&header))
 		require.Error(s.T(), err, "should fail with missing payload")
 		header.View--
 	})
 
 	s.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
-		expectedBroadcastMsg := messages.NewUntrustedClusterProposal(block, unittest.SignatureFixture())
+		expectedBroadcastMsg := messages.NewUntrustedClusterProposal(*block, unittest.SignatureFixture())
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
 		headerProposal := &flow.ProposalHeader{Header: block.ToHeader(), ProposerSigData: expectedBroadcastMsg.ProposerSigData}
@@ -328,16 +329,18 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 	s.Run("proposal", func() {
 		wg.Add(1)
 		// prepare proposal fixture
-		block := unittest.ClusterBlockWithParent(*s.head)
-		block.Header.ProposerID = s.myID
+		block := unittest.ClusterBlockFixture(
+			unittest.ClusterBlock.WithParent(s.head),
+			unittest.ClusterBlock.WithProposerID(s.myID),
+		)
 		s.payloads.On("ByBlockID", block.ID()).Return(&block.Payload, nil)
-		proposal := unittest.ProposalFromHeader(block.ToHeader())
+		proposal := unittest.ProposalHeaderFromHeader(block.ToHeader())
 
 		// unset chain and height to make sure they are correctly reconstructed
 		hotstuffProposal := model.SignedProposalFromFlow(proposal)
 		s.voteAggregator.On("AddBlock", hotstuffProposal)
 		s.hotstuff.On("SubmitProposal", hotstuffProposal)
-		expectedBroadcastMsg := messages.NewUntrustedClusterProposal(block, proposal.ProposerSigData)
+		expectedBroadcastMsg := messages.NewUntrustedClusterProposal(*block, proposal.ProposerSigData)
 		s.con.On("Publish", expectedBroadcastMsg, s.cluster[1].NodeID, s.cluster[2].NodeID).
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)

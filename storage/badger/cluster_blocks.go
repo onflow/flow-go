@@ -32,11 +32,11 @@ func NewClusterBlocks(db *badger.DB, chainID flow.ChainID, headers *Headers, pay
 	return b
 }
 
-func (b *ClusterBlocks) Store(proposal *cluster.BlockProposal) error {
+func (b *ClusterBlocks) Store(proposal *cluster.Proposal) error {
 	return operation.RetryOnConflictTx(b.db, transaction.Update, b.storeTx(proposal))
 }
 
-func (b *ClusterBlocks) storeTx(proposal *cluster.BlockProposal) func(*transaction.Tx) error {
+func (b *ClusterBlocks) storeTx(proposal *cluster.Proposal) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		blockID := proposal.Block.ID()
 		err := b.headers.storeTx(blockID, proposal.Block.ToHeader(), proposal.ProposerSigData)(tx)
@@ -51,7 +51,7 @@ func (b *ClusterBlocks) storeTx(proposal *cluster.BlockProposal) func(*transacti
 	}
 }
 
-func (b *ClusterBlocks) ProposalByID(blockID flow.Identifier) (*cluster.BlockProposal, error) {
+func (b *ClusterBlocks) ProposalByID(blockID flow.Identifier) (*cluster.Proposal, error) {
 	header, err := b.headers.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get header: %w", err)
@@ -64,14 +64,23 @@ func (b *ClusterBlocks) ProposalByID(blockID flow.Identifier) (*cluster.BlockPro
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve proposer signature: %w", err)
 	}
-	proposal := &cluster.BlockProposal{
-		Block:           cluster.NewBlock(header.HeaderBody, *payload),
+	block, err := cluster.NewBlock(
+		cluster.UntrustedBlock{
+			Header:  header.HeaderBody,
+			Payload: *payload,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build cluster block: %w", err)
+	}
+	proposal := &cluster.Proposal{
+		Block:           *block,
 		ProposerSigData: sig,
 	}
 	return proposal, nil
 }
 
-func (b *ClusterBlocks) ProposalByHeight(height uint64) (*cluster.BlockProposal, error) {
+func (b *ClusterBlocks) ProposalByHeight(height uint64) (*cluster.Proposal, error) {
 	var blockID flow.Identifier
 	err := b.db.View(operation.LookupClusterBlockHeight(b.chainID, height, &blockID))
 	if err != nil {

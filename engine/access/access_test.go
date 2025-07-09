@@ -1349,7 +1349,7 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 	})
 }
 
-func (suite *Suite) createChain() (*flow.BlockProposal, *flow.Collection) {
+func (suite *Suite) createChain() (*flow.Proposal, *flow.Collection) {
 	collection := unittest.CollectionFixture(10)
 	refBlockID := unittest.IdentifierFixture()
 	// prepare cluster committee members

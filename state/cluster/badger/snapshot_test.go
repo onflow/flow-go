@@ -27,7 +27,7 @@ type SnapshotSuite struct {
 	db    *badger.DB
 	dbdir string
 
-	genesis      model.Block
+	genesis      *model.Block
 	chainID      flow.ChainID
 	epochCounter uint64
 
@@ -40,7 +40,7 @@ type SnapshotSuite struct {
 func (suite *SnapshotSuite) SetupTest() {
 	var err error
 
-	suite.genesis = *model.Genesis()
+	suite.genesis = unittest.ClusterBlock.Genesis()
 	suite.chainID = suite.genesis.Header.ChainID
 
 	suite.dbdir = unittest.TempDir(suite.T())
@@ -72,7 +72,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	)
 	suite.Require().NoError(err)
 
-	clusterStateRoot, err := NewStateRoot(&suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
+	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Require().NoError(err)
 	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
 	suite.Require().NoError(err)
@@ -112,24 +112,32 @@ func (suite *SnapshotSuite) Payload(transactions ...*flow.TransactionBody) model
 		transactions = []*flow.TransactionBody{}
 	}
 
-	payload, err := model.NewPayload(minRefID, transactions)
+	payload, err := model.NewPayload(
+		model.UntrustedPayload{
+			ReferenceBlockID: minRefID,
+			Collection:       flow.Collection{Transactions: transactions},
+		},
+	)
 	suite.Assert().NoError(err)
 
 	return *payload
 }
 
 // ProposalWithParentAndPayload returns a valid block proposal with the given parent and payload.
-func (suite *SnapshotSuite) ProposalWithParentAndPayload(parent model.Block, payload model.Payload) model.BlockProposal {
-	block := unittest.ClusterBlockWithParentAndPayload(parent, payload)
+func (suite *SnapshotSuite) ProposalWithParentAndPayload(parent *model.Block, payload model.Payload) model.Proposal {
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+		unittest.ClusterBlock.WithPayload(payload),
+	)
 	return *unittest.ClusterProposalFromBlock(block)
 }
 
 // Proposal returns a valid cluster block proposal with genesis as parent.
-func (suite *SnapshotSuite) Proposal() model.BlockProposal {
+func (suite *SnapshotSuite) Proposal() model.Proposal {
 	return suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload())
 }
 
-func (suite *SnapshotSuite) InsertBlock(proposal model.BlockProposal) {
+func (suite *SnapshotSuite) InsertBlock(proposal model.Proposal) {
 	err := suite.db.Update(procedure.InsertClusterBlock(&proposal))
 	suite.Assert().Nil(err)
 }
@@ -143,7 +151,7 @@ func (suite *SnapshotSuite) InsertSubtree(parent model.Block, depth, fanout int)
 	}
 
 	for i := 0; i < fanout; i++ {
-		proposal := suite.ProposalWithParentAndPayload(parent, suite.Payload())
+		proposal := suite.ProposalWithParentAndPayload(&parent, suite.Payload())
 		suite.InsertBlock(proposal)
 		suite.InsertSubtree(proposal.Block, depth-1, fanout)
 	}
@@ -211,7 +219,7 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	assert.NoError(t, err)
 
 	// create a second un-finalized on top of the finalized block (height=2)
-	unFinalizedProposal2 := suite.ProposalWithParentAndPayload(finalizedProposal1.Block, suite.Payload())
+	unFinalizedProposal2 := suite.ProposalWithParentAndPayload(&finalizedProposal1.Block, suite.Payload())
 	err = suite.state.Extend(&unFinalizedProposal2)
 	assert.NoError(t, err)
 
@@ -267,7 +275,7 @@ func (suite *SnapshotSuite) TestPending_WithPendingBlocks() {
 func (suite *SnapshotSuite) TestPending_Grandchildren() {
 
 	// create 3 levels of children
-	suite.InsertSubtree(suite.genesis, 3, 3)
+	suite.InsertSubtree(*suite.genesis, 3, 3)
 
 	pending, err := suite.state.Final().Pending()
 	suite.Require().Nil(err)

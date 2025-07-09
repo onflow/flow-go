@@ -15,23 +15,23 @@ type ClusterBlocks struct {
 }
 
 // ProposalByHeight provides a mock function with given fields: height
-func (_m *ClusterBlocks) ProposalByHeight(height uint64) (*cluster.BlockProposal, error) {
+func (_m *ClusterBlocks) ProposalByHeight(height uint64) (*cluster.Proposal, error) {
 	ret := _m.Called(height)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ProposalByHeight")
 	}
 
-	var r0 *cluster.BlockProposal
+	var r0 *cluster.Proposal
 	var r1 error
-	if rf, ok := ret.Get(0).(func(uint64) (*cluster.BlockProposal, error)); ok {
+	if rf, ok := ret.Get(0).(func(uint64) (*cluster.Proposal, error)); ok {
 		return rf(height)
 	}
-	if rf, ok := ret.Get(0).(func(uint64) *cluster.BlockProposal); ok {
+	if rf, ok := ret.Get(0).(func(uint64) *cluster.Proposal); ok {
 		r0 = rf(height)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*cluster.BlockProposal)
+			r0 = ret.Get(0).(*cluster.Proposal)
 		}
 	}
 
@@ -45,23 +45,23 @@ func (_m *ClusterBlocks) ProposalByHeight(height uint64) (*cluster.BlockProposal
 }
 
 // ProposalByID provides a mock function with given fields: blockID
-func (_m *ClusterBlocks) ProposalByID(blockID flow.Identifier) (*cluster.BlockProposal, error) {
+func (_m *ClusterBlocks) ProposalByID(blockID flow.Identifier) (*cluster.Proposal, error) {
 	ret := _m.Called(blockID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ProposalByID")
 	}
 
-	var r0 *cluster.BlockProposal
+	var r0 *cluster.Proposal
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (*cluster.BlockProposal, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*cluster.Proposal, error)); ok {
 		return rf(blockID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *cluster.BlockProposal); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *cluster.Proposal); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*cluster.BlockProposal)
+			r0 = ret.Get(0).(*cluster.Proposal)
 		}
 	}
 
@@ -75,7 +75,7 @@ func (_m *ClusterBlocks) ProposalByID(blockID flow.Identifier) (*cluster.BlockPr
 }
 
 // Store provides a mock function with given fields: proposal
-func (_m *ClusterBlocks) Store(proposal *cluster.BlockProposal) error {
+func (_m *ClusterBlocks) Store(proposal *cluster.Proposal) error {
 	ret := _m.Called(proposal)
 
 	if len(ret) == 0 {
@@ -83,7 +83,7 @@ func (_m *ClusterBlocks) Store(proposal *cluster.BlockProposal) error {
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*cluster.BlockProposal) error); ok {
+	if rf, ok := ret.Get(0).(func(*cluster.Proposal) error); ok {
 		r0 = rf(proposal)
 	} else {
 		r0 = ret.Error(0)

@@ -4,28 +4,22 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// UntrustedBlock represents untrusted block received over the network (from a potentially byzantine peer).
-// This type exists only to explicitly differentiate between trusted and untrusted instances of a block.
-// This differentiation is currently largely unused. But eventually, untrusted data should be
-// represented by different types (like this one), until it is fully validated.
-type UntrustedBlock flow.Block
-
 // UntrustedProposal is part of the consensus protocol and represents the leader
 // of a consensus round pushing a new proposal to the network.
 // This differentiation is currently largely unused, but eventually untrusted models should use
 // a different type (like this one), until such time as they are fully validated
-type UntrustedProposal flow.BlockProposal
+type UntrustedProposal flow.Proposal
 
-func NewUntrustedProposal(internal *flow.BlockProposal) *UntrustedProposal {
+func NewUntrustedProposal(internal *flow.Proposal) *UntrustedProposal {
 	p := UntrustedProposal(*internal)
 	return &p
 }
 
-// DeclareTrusted converts the UntrustedProposal to a trusted internal flow.BlockProposal.
+// DeclareTrusted converts the UntrustedProposal to a trusted internal flow.Proposal.
 // CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
 // TODO(malleability immutable): This conversion should eventually be accompanied by a full validation of the untrusted input.
-func (msg *UntrustedProposal) DeclareTrusted() *flow.BlockProposal {
-	return &flow.BlockProposal{
+func (msg *UntrustedProposal) DeclareTrusted() *flow.Proposal {
+	return &flow.Proposal{
 		Block:           *flow.NewBlock(msg.Block.Header, msg.Block.Payload),
 		ProposerSigData: msg.ProposerSigData,
 	}

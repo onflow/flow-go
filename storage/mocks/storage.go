@@ -96,10 +96,10 @@ func (mr *MockBlocksMockRecorder) IndexBlockForCollectionGuarantees(arg0, arg1 i
 }
 
 // ProposalByHeight mocks base method.
-func (m *MockBlocks) ProposalByHeight(arg0 uint64) (*flow.BlockProposal, error) {
+func (m *MockBlocks) ProposalByHeight(arg0 uint64) (*flow.Proposal, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ProposalByHeight", arg0)
-	ret0, _ := ret[0].(*flow.BlockProposal)
+	ret0, _ := ret[0].(*flow.Proposal)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -111,10 +111,10 @@ func (mr *MockBlocksMockRecorder) ProposalByHeight(arg0 interface{}) *gomock.Cal
 }
 
 // ProposalByID mocks base method.
-func (m *MockBlocks) ProposalByID(arg0 flow.Identifier) (*flow.BlockProposal, error) {
+func (m *MockBlocks) ProposalByID(arg0 flow.Identifier) (*flow.Proposal, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ProposalByID", arg0)
-	ret0, _ := ret[0].(*flow.BlockProposal)
+	ret0, _ := ret[0].(*flow.Proposal)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -126,7 +126,7 @@ func (mr *MockBlocksMockRecorder) ProposalByID(arg0 interface{}) *gomock.Call {
 }
 
 // Store mocks base method.
-func (m *MockBlocks) Store(arg0 *flow.BlockProposal) error {
+func (m *MockBlocks) Store(arg0 *flow.Proposal) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Store", arg0)
 	ret0, _ := ret[0].(error)
@@ -140,7 +140,7 @@ func (mr *MockBlocksMockRecorder) Store(arg0 interface{}) *gomock.Call {
 }
 
 // StoreTx mocks base method.
-func (m *MockBlocks) StoreTx(arg0 *flow.BlockProposal) func(*transaction.Tx) error {
+func (m *MockBlocks) StoreTx(arg0 *flow.Proposal) func(*transaction.Tx) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "StoreTx", arg0)
 	ret0, _ := ret[0].(func(*transaction.Tx) error)

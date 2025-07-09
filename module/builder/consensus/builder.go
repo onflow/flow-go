@@ -612,7 +612,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	insertableReceipts *InsertableReceipts,
 	setter func(*flow.Header) error,
 	sign func(*flow.Header) ([]byte, error),
-) (*flow.BlockProposal, error) {
+) (*flow.Proposal, error) {
 
 	parent, err := b.headers.ByBlockID(parentID)
 	if err != nil {
@@ -660,7 +660,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	if err != nil {
 		return nil, fmt.Errorf("could not sign the block: %w", err)
 	}
-	proposal := &flow.BlockProposal{
+	proposal := &flow.Proposal{
 		Block:           *block,
 		ProposerSigData: sig,
 	}

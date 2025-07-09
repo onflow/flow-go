@@ -14,7 +14,7 @@ import (
 
 // InsertClusterBlock inserts a cluster consensus block, updating all
 // associated indexes.
-func InsertClusterBlock(proposal *cluster.BlockProposal) func(*badger.Txn) error {
+func InsertClusterBlock(proposal *cluster.Proposal) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// store the block header
 		blockID := proposal.Block.ID()
@@ -62,7 +62,16 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 		}
 
 		// overwrite block
-		*block = cluster.NewBlock(header.HeaderBody, payload)
+		newBlock, err := cluster.NewBlock(
+			cluster.UntrustedBlock{
+				Header:  header.HeaderBody,
+				Payload: payload,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("could not build cluster block: %w", err)
+		}
+		*block = *newBlock
 
 		return nil
 	}
@@ -219,9 +228,18 @@ func RetrieveClusterPayload(blockID flow.Identifier, payload *cluster.Payload) f
 			colTransactions = append(colTransactions, &nextTx)
 		}
 
-		newPayload, err := cluster.NewPayload(refID, colTransactions)
+		collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: colTransactions})
 		if err != nil {
-			return fmt.Errorf("could not build the payload from the transactions: %w", err)
+			return fmt.Errorf("could not build the collection from the transactions: %w", err)
+		}
+		newPayload, err := cluster.NewPayload(
+			cluster.UntrustedPayload{
+				ReferenceBlockID: refID,
+				Collection:       *collection,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("could not build the payload: %w", err)
 		}
 
 		*payload = *newPayload

@@ -86,5 +86,5 @@ type ParticipantState interface {
 	// Expected errors during normal operations:
 	//  * state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 	//  * state.InvalidExtensionError if the candidate block is invalid
-	Extend(ctx context.Context, candidate *flow.BlockProposal) error
+	Extend(ctx context.Context, candidate *flow.Proposal) error
 }
