@@ -134,7 +134,6 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 		nil,
 	)
 
-	//var err error
 	suite.backend, err = backend.New(backend.Params{
 		State:                      suite.state,
 		ExecutionReceipts:          suite.receipts,

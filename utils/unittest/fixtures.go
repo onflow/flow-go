@@ -539,7 +539,7 @@ func HeaderBodyWithParentFixture(parent *flow.Header) flow.HeaderBody {
 		Height:             height,
 		Timestamp:          time.Now().UTC(),
 		View:               view,
-		ParentView:         parent.View + 1,
+		ParentView:         parent.View,
 		ParentVoterIndices: SignerIndicesFixture(4),
 		ParentVoterSigData: QCSigDataFixture(),
 		ProposerID:         IdentifierFixture(),
