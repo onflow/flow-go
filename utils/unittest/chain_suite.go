@@ -30,7 +30,7 @@ type BaseChainSuite struct {
 	Approvers  flow.IdentityList
 
 	// BLOCKS
-	RootBlock             flow.Block
+	RootBlock             *flow.Block
 	LatestSealedBlock     flow.Block
 	LatestFinalizedBlock  *flow.Block
 	UnfinalizedBlock      flow.Block
@@ -99,13 +99,13 @@ func (bc *BaseChainSuite) SetupChain() {
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP BLOCKS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 	// RootBlock <- LatestSealedBlock <- LatestFinalizedBlock <- UnfinalizedBlock
 	bc.RootBlock = BlockFixture()
-	bc.LatestSealedBlock = *BlockWithParentFixture(bc.RootBlock.Header)
-	latestFinalizedBlock := BlockWithParentFixture(bc.LatestSealedBlock.Header)
+	bc.LatestSealedBlock = *BlockWithParentFixture(bc.RootBlock.ToHeader())
+	latestFinalizedBlock := BlockWithParentFixture(bc.LatestSealedBlock.ToHeader())
 	bc.LatestFinalizedBlock = latestFinalizedBlock
-	bc.UnfinalizedBlock = *BlockWithParentFixture(bc.LatestFinalizedBlock.Header)
+	bc.UnfinalizedBlock = *BlockWithParentFixture(bc.LatestFinalizedBlock.ToHeader())
 
 	bc.Blocks = make(map[flow.Identifier]*flow.Block)
-	bc.Blocks[bc.RootBlock.ID()] = &bc.RootBlock
+	bc.Blocks[bc.RootBlock.ID()] = bc.RootBlock
 	bc.Blocks[bc.LatestSealedBlock.ID()] = &bc.LatestSealedBlock
 	bc.Blocks[bc.LatestFinalizedBlock.ID()] = bc.LatestFinalizedBlock
 	bc.Blocks[bc.UnfinalizedBlock.ID()] = &bc.UnfinalizedBlock
@@ -127,7 +127,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	bc.FinalSnapshot = &protocol.Snapshot{}
 	bc.FinalSnapshot.On("Head").Return(
 		func() *flow.Header {
-			return bc.LatestFinalizedBlock.Header
+			return bc.LatestFinalizedBlock.ToHeader()
 		},
 		nil,
 	)
@@ -178,7 +178,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	bc.SealedSnapshot.On("ProtocolState").Return(bc.KVStoreReader, nil)
 	bc.SealedSnapshot.On("Head").Return(
 		func() *flow.Header {
-			return bc.LatestSealedBlock.Header
+			return bc.LatestSealedBlock.ToHeader()
 		},
 		nil,
 	)
@@ -199,7 +199,7 @@ func (bc *BaseChainSuite) SetupChain() {
 			if !found {
 				return StateSnapshotForUnknownBlock()
 			}
-			snapshot := StateSnapshotForKnownBlock(block.Header, bc.Identities)
+			snapshot := StateSnapshotForKnownBlock(block.ToHeader(), bc.Identities)
 			snapshot.On("ProtocolState").Return(bc.KVStoreReader, nil)
 			return snapshot
 		},
@@ -212,7 +212,7 @@ func (bc *BaseChainSuite) SetupChain() {
 				snapshot := &protocol.Snapshot{}
 				snapshot.On("Head").Return(
 					func() *flow.Header {
-						return block.Header
+						return block.ToHeader()
 					},
 					nil,
 				)
@@ -260,7 +260,7 @@ func (bc *BaseChainSuite) SetupChain() {
 			if !found {
 				return nil
 			}
-			return block.Header
+			return block.ToHeader()
 		},
 		func(blockID flow.Identifier) error {
 			_, found := bc.Blocks[blockID]
@@ -281,7 +281,7 @@ func (bc *BaseChainSuite) SetupChain() {
 		func(blockHeight uint64) *flow.Header {
 			for _, b := range bc.Blocks {
 				if b.Header.Height == blockHeight {
-					return b.Header
+					return b.ToHeader()
 				}
 			}
 			return nil
@@ -304,17 +304,11 @@ func (bc *BaseChainSuite) SetupChain() {
 			if !found {
 				return nil
 			}
-			if block.Payload == nil {
-				return nil
-			}
 			return block.Payload.Index()
 		},
 		func(blockID flow.Identifier) error {
-			block, found := bc.Blocks[blockID]
+			_, found := bc.Blocks[blockID]
 			if !found {
-				return storerr.ErrNotFound
-			}
-			if block.Payload == nil {
 				return storerr.ErrNotFound
 			}
 			return nil
@@ -322,7 +316,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	)
 
 	bc.SealsIndex = make(map[flow.Identifier]*flow.Seal)
-	firtSeal := Seal.Fixture(Seal.WithBlock(bc.LatestSealedBlock.Header),
+	firtSeal := Seal.Fixture(Seal.WithBlock(bc.LatestSealedBlock.ToHeader()),
 		Seal.WithResult(bc.LatestExecutionResult))
 	for id, block := range bc.Blocks {
 		if id != bc.RootBlock.ID() {
@@ -337,17 +331,11 @@ func (bc *BaseChainSuite) SetupChain() {
 			if !found {
 				return nil
 			}
-			if block.Payload == nil {
-				return nil
-			}
-			return block.Payload
+			return &block.Payload
 		},
 		func(blockID flow.Identifier) error {
-			block, found := bc.Blocks[blockID]
+			_, found := bc.Blocks[blockID]
 			if !found {
-				return storerr.ErrNotFound
-			}
-			if block.Payload == nil {
 				return storerr.ErrNotFound
 			}
 			return nil
@@ -387,7 +375,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	bc.SealsPL = &mempool.IncorporatedResultSeals{}
 	bc.SealsPL.On("Size").Return(uint(0)).Maybe() // only for metrics
 	bc.SealsPL.On("Limit").Return(uint(1000)).Maybe()
-	bc.SealsPL.On("ByID", mock.Anything).Return(
+	bc.SealsPL.On("Get", mock.Anything).Return(
 		func(sealID flow.Identifier) *flow.IncorporatedResultSeal {
 			return bc.PendingSeals[sealID]
 		},
@@ -498,13 +486,17 @@ type subgraphFixture struct {
 //	blockA.ParentID == blockB.ID
 func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 	// BLOCKS: <- previousBlock <- block
-	parentBlock := BlockFixture()
-	parentBlock.SetPayload(PayloadFixture(WithGuarantees(CollectionGuaranteesFixture(12)...)))
-	block := BlockWithParentFixture(parentBlock.Header)
-	block.SetPayload(PayloadFixture(WithGuarantees(CollectionGuaranteesFixture(12)...)))
+	parentBlock := BlockFixture(
+		Block.WithPayload(PayloadFixture(
+			WithGuarantees(CollectionGuaranteesFixture(12)...))),
+	)
+	block := BlockWithParentAndPayload(
+		parentBlock.ToHeader(),
+		PayloadFixture(WithGuarantees(CollectionGuaranteesFixture(12)...)),
+	)
 
 	// RESULTS for Blocks:
-	previousResult := ExecutionResultFixture(WithBlock(&parentBlock))
+	previousResult := ExecutionResultFixture(WithBlock(parentBlock))
 	result := ExecutionResultFixture(
 		WithBlock(block),
 		WithPreviousResult(*previousResult),
@@ -532,7 +524,7 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 
 	return subgraphFixture{
 		Block:              block,
-		ParentBlock:        &parentBlock,
+		ParentBlock:        parentBlock,
 		Result:             result,
 		PreviousResult:     previousResult,
 		IncorporatedResult: incorporatedResult,

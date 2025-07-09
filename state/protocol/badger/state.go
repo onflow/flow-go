@@ -191,7 +191,7 @@ func Bootstrap(
 		metrics.SealedHeight(lastSealed.Header.Height)
 		metrics.FinalizedHeight(lastFinalized.Header.Height)
 		for _, proposal := range segment.Blocks {
-			metrics.BlockFinalized(proposal.Block)
+			metrics.BlockFinalized(&proposal.Block)
 		}
 
 		return nil
@@ -252,7 +252,15 @@ func bootstrapProtocolState(
 			}
 
 			// Store the epoch portion of the protocol state, including underlying EpochSetup/EpochCommit service events
-			dynamicEpochProtocolState := inmem.NewEpochProtocolStateAdapter(stateEntry.EpochEntry, params)
+			dynamicEpochProtocolState, err := inmem.NewEpochProtocolStateAdapter(
+				inmem.UntrustedEpochProtocolStateAdapter{
+					RichEpochStateEntry: stateEntry.EpochEntry,
+					Params:              params,
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("could not construct epoch protocol state adapter: %w", err)
+			}
 			err = bootstrapEpochForProtocolStateEntry(epochProtocolStateSnapshots, epochSetups, epochCommits, dynamicEpochProtocolState, verifyNetworkAddress)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store epoch service events for state entry (id=%x): %w", stateEntry.EpochEntry.ID(), err)
@@ -422,8 +430,8 @@ func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error 
 		if rootQC.View != highest.Header.View {
 			return fmt.Errorf("root QC's view %d does not match the highest block in sealing segment (view %d)", rootQC.View, highest.Header.View)
 		}
-		if rootQC.BlockID != highest.Header.ID() {
-			return fmt.Errorf("root QC is for block %v, which does not match the highest block %v in sealing segment", rootQC.BlockID, highest.Header.ID())
+		if rootQC.BlockID != highest.ID() {
+			return fmt.Errorf("root QC is for block %v, which does not match the highest block %v in sealing segment", rootQC.BlockID, highest.ID())
 		}
 
 		livenessData := &hotstuff.LivenessData{

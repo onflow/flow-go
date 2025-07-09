@@ -100,25 +100,26 @@ func (s *CoreSuite) TestProcessingSingleBlock() {
 	// incoming block has to be validated
 	s.validator.On("ValidateProposal", model.SignedProposalFromBlock(proposal)).Return(nil).Once()
 
-	err := s.core.OnBlockRange(s.originID, []*flow.BlockProposal{proposal})
+	err := s.core.OnBlockRange(s.originID, []*flow.Proposal{proposal})
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), s.core.pendingCache.Peek(block.ID()))
 
-	err = s.core.OnBlockRange(s.originID, []*flow.BlockProposal{proposal})
+	err = s.core.OnBlockRange(s.originID, []*flow.Proposal{proposal})
 	require.NoError(s.T(), err)
 }
 
 // TestAddFinalizedBlock tests that adding block below finalized height results in processing it, but since cache was pruned
 // to finalized view, it must be rejected by it.
 func (s *CoreSuite) TestAddFinalizedBlock() {
-	block := unittest.BlockFixture()
-	block.Header.View = s.finalizedBlock.View - 1 // block is below finalized view
-	proposal := unittest.ProposalFromBlock(&block)
+	block := unittest.BlockFixture(
+		unittest.Block.WithView(s.finalizedBlock.View - 1), // block is below finalized view
+	)
+	proposal := unittest.ProposalFromBlock(block)
 
 	// incoming block has to be validated
 	s.validator.On("ValidateProposal", model.SignedProposalFromBlock(proposal)).Return(nil).Once()
 
-	err := s.core.OnBlockRange(s.originID, []*flow.BlockProposal{proposal})
+	err := s.core.OnBlockRange(s.originID, []*flow.Proposal{proposal})
 	require.NoError(s.T(), err)
 	require.Nil(s.T(), s.core.pendingCache.Peek(block.ID()))
 }
@@ -249,10 +250,10 @@ func (s *CoreSuite) TestDetectingProposalEquivocation() {
 	s.validator.On("ValidateProposal", mock.Anything).Return(nil).Times(2)
 	s.followerConsumer.On("OnDoubleProposeDetected", mock.Anything, mock.Anything).Return().Once()
 
-	err := s.core.OnBlockRange(s.originID, []*flow.BlockProposal{proposal})
+	err := s.core.OnBlockRange(s.originID, []*flow.Proposal{proposal})
 	require.NoError(s.T(), err)
 
-	err = s.core.OnBlockRange(s.originID, []*flow.BlockProposal{otherProposal})
+	err = s.core.OnBlockRange(s.originID, []*flow.Proposal{otherProposal})
 	require.NoError(s.T(), err)
 }
 
@@ -302,7 +303,7 @@ func (s *CoreSuite) TestConcurrentAdd() {
 	wg.Add(workers)
 
 	for i := 0; i < workers; i++ {
-		go func(blocks []*flow.BlockProposal) {
+		go func(blocks []*flow.Proposal) {
 			defer wg.Done()
 			for batch := 0; batch < batchesPerWorker; batch++ {
 				err := s.core.OnBlockRange(s.originID, blocks[batch*blocksPerBatch:(batch+1)*blocksPerBatch])

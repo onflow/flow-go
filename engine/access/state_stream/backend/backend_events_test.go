@@ -216,8 +216,8 @@ func (s *BackendEventsSuite) runTestSubscribeEvents() {
 		},
 		{
 			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1,       // backfill all blocks
-			startBlockID:    s.rootBlock.Header.ID(), // start from root block
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+			startBlockID:    s.rootBlock.ID(),  // start from root block
 			startHeight:     0,
 		},
 	}
@@ -376,7 +376,7 @@ func (s *BackendEventsSuite) subscribe(
 			// add "backfill" block - blocks that are already in the database before the test starts
 			// this simulates a subscription on a past block
 			if test.highestBackfill > 0 {
-				s.highestBlockHeader = s.blocks[test.highestBackfill].Header
+				s.highestBlockHeader = s.blocks[test.highestBackfill].ToHeader()
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
@@ -384,7 +384,7 @@ func (s *BackendEventsSuite) subscribe(
 			// mock latest sealed if test case no start value provided
 			if test.startBlockID == flow.ZeroID && test.startHeight == 0 {
 				s.snapshot.On("Head").Unset()
-				s.snapshot.On("Head").Return(s.rootBlock.Header, nil).Once()
+				s.snapshot.On("Head").Return(s.rootBlock.ToHeader(), nil).Once()
 			}
 
 			sub := subscribeFn(subCtx, test.startBlockID, test.startHeight, test.filter)
@@ -396,7 +396,7 @@ func (s *BackendEventsSuite) subscribe(
 				// simulate new block received.
 				// all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.highestBlockHeader = b.Header
+					s.highestBlockHeader = b.ToHeader()
 
 					s.broadcaster.Publish()
 				}

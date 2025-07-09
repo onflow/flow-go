@@ -6,57 +6,63 @@ import (
 )
 
 func Genesis(chainID ChainID) *Block {
-
 	// create the raw content for the genesis block
 	payload := Payload{}
 
-	// create the header
-	header := Header{
-		HeaderBody: HeaderBody{
-			ChainID:   chainID,
-			ParentID:  ZeroID,
-			Height:    0,
-			Timestamp: uint64(GenesisTime.UnixMilli()),
-			View:      0,
-		},
-		PayloadHash: payload.Hash(),
+	// create the headerBody
+	headerBody := HeaderBody{
+		ChainID:   chainID,
+		ParentID:  ZeroID,
+		Height:    0,
+		Timestamp: uint64(GenesisTime.UnixMilli()),
+		View:      0,
 	}
 
 	// combine to block
-	genesis := Block{
-		Header:  &header,
-		Payload: &payload,
-	}
-
-	return &genesis
+	return NewBlock(headerBody, payload)
 }
 
-// Block (currently) includes the header, the payload hashes as well as the
-// payload contents.
+// Block (currently) includes the all block header metadata and the payload content.
 type Block struct {
-	Header  *Header
-	Payload *Payload
+	// Header is a container encapsulating most of the header fields - *excluding* the payload hash
+	// and the proposer signature. Generally, the type [HeaderBody] should not be used on its own.
+	// CAUTION regarding security:
+	//  * HeaderBody does not contain the hash of the block payload. Therefore, it is not a cryptographic digest
+	//    of the block and should not be confused with a "proper" header, which commits to the _entire_ content
+	//    of a block.
+	//  * With a byzantine HeaderBody alone, an honest node cannot prove who created that faulty data structure,
+	//    because HeaderBody does not include the proposer's signature.
+	Header  HeaderBody
+	Payload Payload
 }
 
-// SetPayload sets the payload and updates the payload hash.
-func (b *Block) SetPayload(payload Payload) {
-	b.Payload = &payload
-	b.Header.PayloadHash = b.Payload.Hash()
+// NewBlock creates a new block.
+//
+// Parameters:
+// - headerBody: the header fields to use for the block
+// - payload: the payload to associate with the block
+func NewBlock(
+	headerBody HeaderBody,
+	payload Payload,
+) *Block {
+	return &Block{
+		Header:  headerBody,
+		Payload: payload,
+	}
 }
 
-// Valid will check whether the block is valid bottom-up.
-func (b Block) Valid() bool {
-	return b.Header.PayloadHash == b.Payload.Hash()
-}
-
-// ID returns the ID of the header.
+// ID returns a collision-resistant hash of the Block struct.
 func (b Block) ID() Identifier {
-	return b.Header.ID()
+	return b.ToHeader().ID()
 }
 
-// Checksum returns the checksum of the header.
-func (b Block) Checksum() Identifier {
-	return b.Header.Checksum()
+// ToHeader converts the block into a compact [flow.Header] representation,
+// where the payload is compressed to a hash reference.
+func (b Block) ToHeader() *Header {
+	return &Header{
+		HeaderBody:  b.Header,
+		PayloadHash: b.Payload.Hash(),
+	}
 }
 
 // BlockStatus represents the status of a block.
@@ -76,14 +82,16 @@ func (s BlockStatus) String() string {
 	return [...]string{"BLOCK_UNKNOWN", "BLOCK_FINALIZED", "BLOCK_SEALED"}[s]
 }
 
-// BlockProposal is a signed proposal that includes the block payload, in addition to the required header and signature.
-type BlockProposal struct {
-	Block           *Block
+// Proposal is a signed proposal that includes the block payload, in addition to the required header and signature.
+type Proposal struct {
+	Block           Block
 	ProposerSigData []byte
 }
 
-func (b *BlockProposal) HeaderProposal() *ProposalHeader {
-	return &ProposalHeader{Header: b.Block.Header, ProposerSigData: b.ProposerSigData}
+// ProposalHeader converts the proposal into a compact [ProposalHeader] representation,
+// where the payload is compressed to a hash reference.
+func (b *Proposal) ProposalHeader() *ProposalHeader {
+	return &ProposalHeader{Header: b.Block.ToHeader(), ProposerSigData: b.ProposerSigData}
 }
 
 // CertifiedBlock holds a certified block, which is a block and a Quorum Certificate [QC] pointing
@@ -95,13 +103,13 @@ func (b *BlockProposal) HeaderProposal() *ProposalHeader {
 // proposer's signature is included in the QC and does not need to be provided individually anymore.
 // Therefore, from the protocol perspective, the canonical data structures are either a block proposal
 // (including the proposer's signature) or a certified block (including a QC for the block).
-// Though, for simplicity, we just extend the BlockProposal structure to represent a certified block,
+// Though, for simplicity, we just extend the Proposal structure to represent a certified block,
 // including proof that the proposer has signed their block twice. Thereby it is easy to convert
-// a [CertifiedBlock] into a [BlockProposal], which otherwise would not be possible because the QC only
+// a [CertifiedBlock] into a [Proposal], which otherwise would not be possible because the QC only
 // contains an aggregated signature (including the proposer's signature), which cannot be separated
 // into individual signatures.
 type CertifiedBlock struct {
-	Proposal     *BlockProposal
+	Proposal     *Proposal
 	CertifyingQC *QuorumCertificate
 }
 
@@ -109,7 +117,7 @@ type CertifiedBlock struct {
 // requirements and errors otherwise:
 //
 //	Block.View == QC.View and Block.BlockID == QC.BlockID
-func NewCertifiedBlock(proposal *BlockProposal, qc *QuorumCertificate) (CertifiedBlock, error) {
+func NewCertifiedBlock(proposal *Proposal, qc *QuorumCertificate) (CertifiedBlock, error) {
 	if proposal.Block.Header.View != qc.View {
 		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", proposal.Block.Header.View, qc.View)
 	}

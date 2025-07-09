@@ -22,14 +22,14 @@ import (
 // next developer who wants to add a new serialization format :-)
 func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 	block := unittest.BlockFixture()
-	proposal := unittest.ProposalFromBlock(&block)
+	proposal := unittest.ProposalFromBlock(block)
 	message := messages.NewUntrustedProposal(proposal)
 	encoded, err := codec.Encode(message)
 	assert.NoError(t, err)
 	decodedInterface, err := codec.Decode(encoded)
 	assert.NoError(t, err)
 	decoded := decodedInterface.(*messages.UntrustedProposal)
-	decodedBlock := decoded.Block.ToInternal()
+	decodedBlock := decoded.DeclareTrusted().Block
 	// compare LastViewTC separately, because it is a pointer field
 	if decodedBlock.Header.LastViewTC == nil {
 		assert.Equal(t, block.Header.LastViewTC, decodedBlock.Header.LastViewTC)
@@ -39,7 +39,7 @@ func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 	// compare the rest of the header
 	// manually set LastViewTC fields to be equal to pass the Header pointer comparison
 	decodedBlock.Header.LastViewTC = block.Header.LastViewTC
-	assert.Equal(t, *block.Header, *decodedBlock.Header)
+	assert.Equal(t, *block.ToHeader(), *decodedBlock.ToHeader())
 }
 
 func TestRoundTripHeaderViaCBOR(t *testing.T) {

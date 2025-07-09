@@ -122,7 +122,10 @@ func SnapshotFromBootstrapStateWithParams(
 		SporkRootBlockHeight: root.Header.Height,  // use root block height as the spork root block height
 	}
 
-	rootMinEpochState := EpochProtocolStateFromServiceEvents(setup, commit)
+	rootMinEpochState, err := EpochProtocolStateFromServiceEvents(setup, commit)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch protocol state: %w", err)
+	}
 	rootEpochStateID := rootMinEpochState.ID()
 	rootKvStore, err := kvStoreFactory(rootEpochStateID)
 	if err != nil {
@@ -137,7 +140,17 @@ func SnapshotFromBootstrapStateWithParams(
 		return nil, fmt.Errorf("could not encode kvstore: %w", err)
 	}
 
-	rootEpochState, err := flow.NewEpochStateEntry(rootMinEpochState, nil, nil, setup, commit, nil, nil)
+	rootEpochState, err := flow.NewEpochStateEntry(
+		flow.UntrustedEpochStateEntry{
+			MinEpochStateEntry:  rootMinEpochState,
+			PreviousEpochSetup:  nil,
+			PreviousEpochCommit: nil,
+			CurrentEpochSetup:   setup,
+			CurrentEpochCommit:  commit,
+			NextEpochSetup:      nil,
+			NextEpochCommit:     nil,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct root epoch state entry: %w", err)
 	}
@@ -156,14 +169,14 @@ func SnapshotFromBootstrapStateWithParams(
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
 		SealingSegment: &flow.SealingSegment{
-			Blocks:           []*flow.BlockProposal{{Block: root, ProposerSigData: nil}},
+			Blocks:           []*flow.Proposal{{Block: *root, ProposerSigData: nil}},
 			ExecutionResults: flow.ExecutionResultList{result},
 			LatestSeals:      map[flow.Identifier]flow.Identifier{root.ID(): seal.ID()},
 			ProtocolStateEntries: map[flow.Identifier]*flow.ProtocolStateEntryWrapper{
 				rootKvStore.ID(): rootProtocolStateEntryWrapper,
 			},
 			FirstSeal:   seal,
-			ExtraBlocks: make([]*flow.BlockProposal, 0),
+			ExtraBlocks: make([]*flow.Proposal, 0),
 		},
 		QuorumCertificate:   qc,
 		Params:              params,
@@ -183,7 +196,7 @@ func SnapshotFromBootstrapStateWithParams(
 //     that happened before should be reflected in the EpochSetup event. Specifically, ejected
 //     nodes should be no longer listed in the EpochSetup event.
 //     Hence, when the EpochSetup event is emitted / processed, the ejected flag is false for all epoch participants.
-func EpochProtocolStateFromServiceEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.MinEpochStateEntry {
+func EpochProtocolStateFromServiceEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) (*flow.MinEpochStateEntry, error) {
 	identities := make(flow.DynamicIdentityEntryList, 0, len(setup.Participants))
 	for _, identity := range setup.Participants {
 		identities = append(identities, &flow.DynamicIdentityEntry{
@@ -191,14 +204,24 @@ func EpochProtocolStateFromServiceEvents(setup *flow.EpochSetup, commit *flow.Ep
 			Ejected: false,
 		})
 	}
-	return &flow.MinEpochStateEntry{
-		PreviousEpoch: nil,
-		CurrentEpoch: flow.EpochStateContainer{
+	currentEpoch, err := flow.NewEpochStateContainer(
+		flow.UntrustedEpochStateContainer{
 			SetupID:          setup.ID(),
 			CommitID:         commit.ID(),
 			ActiveIdentities: identities,
+			EpochExtensions:  nil,
 		},
-		NextEpoch:              nil,
-		EpochFallbackTriggered: false,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct current epoch state: %w", err)
 	}
+
+	return flow.NewMinEpochStateEntry(
+		flow.UntrustedMinEpochStateEntry{
+			PreviousEpoch:          nil,
+			CurrentEpoch:           *currentEpoch,
+			NextEpoch:              nil,
+			EpochFallbackTriggered: false,
+		},
+	)
 }

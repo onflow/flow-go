@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -13,9 +14,9 @@ import (
 
 func TestBlockProposal(t *testing.T) {
 	block := unittest.FullBlockFixture()
-	proposal := unittest.ProposalFromBlock(&block)
+	proposal := unittest.ProposalFromBlock(block)
 	proposalMsg := messages.NewUntrustedProposal(proposal)
-	converted := proposalMsg.ToInternal()
+	converted := proposalMsg.DeclareTrusted()
 	assert.Equal(t, proposal, converted)
 }
 
@@ -23,12 +24,13 @@ func TestClusterBlockProposal(t *testing.T) {
 	block := unittest.ClusterBlockFixture()
 	proposal := unittest.ClusterProposalFromBlock(block)
 	proposalMsg := messages.UntrustedClusterProposalFromInternal(proposal)
-	converted := proposalMsg.ToInternal()
+	converted, err := proposalMsg.DeclareTrusted()
+	require.NoError(t, err)
 	assert.Equal(t, proposal, converted)
 }
 
 func TestBlockResponse(t *testing.T) {
-	expected := []*flow.BlockProposal{unittest.ProposalFixture(), unittest.ProposalFixture()}
+	expected := []*flow.Proposal{unittest.ProposalFixture(), unittest.ProposalFixture()}
 	res := messages.BlockResponse{
 		Blocks: []messages.UntrustedProposal{
 			*messages.NewUntrustedProposal(expected[0]),
@@ -42,13 +44,14 @@ func TestBlockResponse(t *testing.T) {
 func TestClusterBlockResponse(t *testing.T) {
 	b1 := unittest.ClusterBlockFixture()
 	b2 := unittest.ClusterBlockFixture()
-	expected := []*cluster.BlockProposal{unittest.ClusterProposalFromBlock(b1), unittest.ClusterProposalFromBlock(b2)}
+	expected := []*cluster.Proposal{unittest.ClusterProposalFromBlock(b1), unittest.ClusterProposalFromBlock(b2)}
 	res := messages.ClusterBlockResponse{
 		Blocks: []messages.UntrustedClusterProposal{
 			*messages.UntrustedClusterProposalFromInternal(expected[0]),
 			*messages.UntrustedClusterProposalFromInternal(expected[1]),
 		},
 	}
-	converted := res.BlocksInternal()
+	converted, err := res.BlocksInternal()
+	require.NoError(t, err)
 	assert.Equal(t, expected, converted)
 }

@@ -31,7 +31,7 @@ type TransactionStatusesProviderSuite struct {
 	api *accessmock.API
 
 	chain          flow.Chain
-	rootBlock      flow.Block
+	rootBlock      *flow.Block
 	finalizedBlock *flow.Header
 
 	factory       *DataProviderFactoryImpl
@@ -49,8 +49,9 @@ func (s *TransactionStatusesProviderSuite) SetupTest() {
 
 	s.chain = flow.Testnet.Chain()
 
-	s.rootBlock = unittest.BlockFixture()
-	s.rootBlock.Header.Height = 0
+	s.rootBlock = unittest.BlockFixture(
+		unittest.Block.WithHeight(0),
+	)
 
 	s.factory = NewDataProviderFactory(
 		s.log,
@@ -123,15 +124,12 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 	require.Equal(s.T(), expectedResponsePayload.TransactionResult.BlockId, actualResponsePayload.TransactionResult.BlockId)
 }
 
-func backendTransactionStatusesResponse(block flow.Block) []*accessmodel.TransactionResult {
-	id := unittest.IdentifierFixture()
+func backendTransactionStatusesResponse(block *flow.Block) []*accessmodel.TransactionResult {
 	cid := unittest.IdentifierFixture()
 	txr := accessmodel.TransactionResult{
-		Status:     flow.TransactionStatusSealed,
-		StatusCode: 10,
-		Events: []flow.Event{
-			unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
-		},
+		Status:       flow.TransactionStatusSealed,
+		StatusCode:   10,
+		Events:       unittest.EventsFixture(1),
 		ErrorMessage: "",
 		BlockID:      block.ID(),
 		CollectionID: cid,

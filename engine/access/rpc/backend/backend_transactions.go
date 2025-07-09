@@ -290,7 +290,7 @@ func (b *backendTransactions) GetTransactionResult(
 	var txResult *accessmodel.TransactionResult
 	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
 	if block != nil {
-		txResult, err = b.lookupTransactionResult(ctx, txID, block.Header, requiredEventEncodingVersion)
+		txResult, err = b.lookupTransactionResult(ctx, txID, block.ToHeader(), requiredEventEncodingVersion)
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
 		}
@@ -630,7 +630,7 @@ func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, bl
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	return b.lookupTransactionResult(ctx, b.systemTxID, block.Header, requiredEventEncodingVersion)
+	return b.lookupTransactionResult(ctx, b.systemTxID, block.ToHeader(), requiredEventEncodingVersion)
 }
 
 // Error returns:
@@ -731,7 +731,7 @@ func (b *backendTransactions) getHistoricalTransactionResult(
 				result.Status = entities.TransactionStatus_EXPIRED
 			}
 
-			return convert.MessageToTransactionResult(result), nil
+			return convert.MessageToTransactionResult(result)
 		}
 		// Otherwise, if not found, just continue
 		if status.Code(err) == codes.NotFound {

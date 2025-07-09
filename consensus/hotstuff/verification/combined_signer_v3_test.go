@@ -31,9 +31,10 @@ func TestCombinedSignWithBeaconKeyV3(t *testing.T) {
 	pk := beaconKey.PublicKey()
 	proposerView := uint64(20)
 
-	fblock := unittest.BlockFixture()
-	fblock.Header.View = proposerView
-	block := model.BlockFromFlow(fblock.Header)
+	fblock := unittest.BlockFixture(
+		unittest.Block.WithView(proposerView),
+	)
+	block := model.BlockFromFlow(fblock.ToHeader())
 	signerID := fblock.Header.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
@@ -90,9 +91,10 @@ func TestCombinedSignWithNoBeaconKeyV3(t *testing.T) {
 	pk := beaconKey.PublicKey()
 	proposerView := uint64(20)
 
-	fblock := unittest.BlockFixture()
-	fblock.Header.View = proposerView
-	block := model.BlockFromFlow(fblock.Header)
+	fblock := unittest.BlockFixture(
+		unittest.Block.WithView(proposerView),
+	)
+	block := model.BlockFromFlow(fblock.ToHeader())
 	signerID := fblock.Header.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
@@ -338,7 +340,7 @@ func generateAggregatedSignature(t *testing.T, n int, msg []byte, tag string) ([
 // generateSignature creates a single private BLS 12-381 key, signs the provided `message` with
 // using domain separation `tag` and return the private key and signature.
 func generateSignature(t *testing.T, message []byte, tag string) (crypto.PrivateKey, crypto.Signature) {
-	priv := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLen)
+	priv := unittest.PrivateKeyFixture(crypto.BLSBLS12381)
 	sig, err := priv.Sign(message, msig.NewBLSHasher(tag))
 	require.NoError(t, err)
 	return priv, sig

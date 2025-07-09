@@ -14,7 +14,7 @@ func CanonicalClusterID(epoch uint64, participants flow.IdentifierList) flow.Cha
 }
 
 // these globals are filled by the static initializer
-var rootBlockPayload = cluster.EmptyPayload(flow.ZeroID)
+var rootBlockPayload = cluster.NewEmptyPayload(flow.ZeroID)
 
 // CanonicalRootBlock returns the canonical root block for the given
 // cluster in the given epoch. It contains an empty collection referencing
@@ -31,7 +31,11 @@ func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) *c
 		ParentVoterSigData: nil,
 		ProposerID:         flow.ZeroID,
 	}
-	block := cluster.NewBlock(headerBody, rootBlockPayload)
 
-	return &block
+	return cluster.NewRootBlock(
+		cluster.UntrustedBlock{
+			Header:  headerBody,
+			Payload: *rootBlockPayload,
+		},
+	)
 }

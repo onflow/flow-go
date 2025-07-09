@@ -104,7 +104,7 @@ func NewComplianceCore(log zerolog.Logger,
 // Caution: method might block if internally too many certified blocks are queued in the channel `certifiedRangesChan`.
 // Expected errors during normal operations:
 //   - cache.ErrDisconnectedBatch
-func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.BlockProposal) error {
+func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Proposal) error {
 	if len(batch) < 1 {
 		return nil
 	}
@@ -267,7 +267,7 @@ func (c *ComplianceCore) processCertifiedBlocks(ctx context.Context, blocks Cert
 			return fmt.Errorf("could not extend protocol state with certified block: %w", err)
 		}
 
-		b, err := model.NewCertifiedBlock(model.BlockFromFlow(certifiedBlock.Proposal.Block.Header), certifiedBlock.CertifyingQC)
+		b, err := model.NewCertifiedBlock(model.BlockFromFlow(certifiedBlock.Proposal.Block.ToHeader()), certifiedBlock.CertifyingQC)
 		if err != nil {
 			return fmt.Errorf("failed to convert certified block %v to HotStuff type: %w", certifiedBlock.Proposal.Block.ID(), err)
 		}

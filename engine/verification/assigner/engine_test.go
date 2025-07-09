@@ -94,16 +94,18 @@ func createContainerBlock(options ...func(result *flow.ExecutionResult, assignme
 			ExecutorID:      unittest.IdentifierFixture(),
 			ExecutionResult: *result,
 		},
+		ExecutorSignature: unittest.SignatureFixture(),
 	}
 	// container block
-	header := unittest.BlockHeaderFixture()
-	block := &flow.Block{
-		Header: header,
-		Payload: &flow.Payload{
-			Receipts: []*flow.ExecutionReceiptStub{receipt.Stub()},
-			Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
-		},
-	}
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(
+			flow.Payload{
+				Receipts: []*flow.ExecutionReceiptStub{receipt.Stub()},
+				Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
+			},
+		),
+	)
+
 	return block, assignment
 }
 

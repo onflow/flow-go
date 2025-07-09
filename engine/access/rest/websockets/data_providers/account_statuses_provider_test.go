@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 // AccountStatusesProviderSuite is a test suite for testing the account statuses providers functionality.
@@ -33,7 +32,7 @@ type AccountStatusesProviderSuite struct {
 	api *ssmock.API
 
 	chain          flow.Chain
-	rootBlock      flow.Block
+	rootBlock      *flow.Block
 	finalizedBlock *flow.Header
 
 	factory *DataProviderFactoryImpl
@@ -49,8 +48,9 @@ func (s *AccountStatusesProviderSuite) SetupTest() {
 
 	s.chain = flow.Testnet.Chain()
 
-	s.rootBlock = unittest.BlockFixture()
-	s.rootBlock.Header.Height = 0
+	s.rootBlock = unittest.BlockFixture(
+		unittest.Block.WithHeight(0),
+	)
 
 	s.factory = NewDataProviderFactory(
 		s.log,
@@ -69,7 +69,7 @@ func (s *AccountStatusesProviderSuite) SetupTest() {
 // validates that events are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_HappyPath() {
-	eventGenerator := generator.EventGenerator(generator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
+	eventGenerator := unittest.NewEventGenerator(unittest.EventGenerator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
 	events := []flow.Event{
 		eventGenerator.New(),
 		eventGenerator.New(),

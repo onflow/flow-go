@@ -125,8 +125,17 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				return fmt.Errorf("could not finalize cluster block (id=%x): %w", clusterBlockID, err)
 			}
 
-			block := cluster.NewBlock(step.HeaderBody, payload)
-			f.metrics.ClusterBlockFinalized(&block)
+			block, err := cluster.NewBlock(
+				cluster.UntrustedBlock{
+					Header:  step.HeaderBody,
+					Payload: payload,
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("could not build cluster block: %w", err)
+			}
+
+			f.metrics.ClusterBlockFinalized(block)
 
 			// if the finalized collection is empty, we don't need to include it
 			// in the reference height index or submit it to consensus nodes
@@ -156,13 +165,19 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// collection.
 
 			// TODO add real signatures here (https://github.com/onflow/flow-go-internal/issues/4569)
-			f.pusher.SubmitCollectionGuarantee(&flow.CollectionGuarantee{
+			// TODO: after adding real signature here add check for signature in NewCollectionGuarantee
+			guarantee, err := flow.NewCollectionGuarantee(flow.UntrustedCollectionGuarantee{
 				CollectionID:     payload.Collection.ID(),
 				ReferenceBlockID: payload.ReferenceBlockID,
 				ChainID:          header.ChainID,
 				SignerIndices:    step.ParentVoterIndices,
 				Signature:        nil, // TODO: to remove because it's not easily verifiable by consensus nodes
 			})
+			if err != nil {
+				return fmt.Errorf("could not construct guarantee: %w", err)
+			}
+
+			f.pusher.SubmitCollectionGuarantee(guarantee)
 		}
 
 		return nil

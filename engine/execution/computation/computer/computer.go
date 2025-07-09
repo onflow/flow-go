@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
@@ -206,6 +207,17 @@ func (e *blockComputer) ExecuteBlock(
 	return results, nil
 }
 
+// queueTransactionRequests enqueues transaction processing requests for all user and
+// system transactions in the given block.
+//
+// If constructing the Collection for the system transaction fails (for example, because
+// NewCollection returned an error due to invalid input), this method returns an
+// irrecoverable exception. Such an error indicates a fatal, unexpected condition and
+// should abort block execution.
+//
+// Returns:
+//   - nil on success,
+//   - error if an irrecoverable error is received if the system transaction’s Collection cannot be constructed.
 func (e *blockComputer) queueTransactionRequests(
 	blockId flow.Identifier,
 	blockIdStr string,
@@ -214,7 +226,7 @@ func (e *blockComputer) queueTransactionRequests(
 	systemTxnBody *flow.TransactionBody,
 	requestQueue chan TransactionRequest,
 	numTxns int,
-) {
+) error {
 	txnIndex := uint32(0)
 
 	collectionCtx := fvm.NewContextFromParent(
@@ -240,14 +252,14 @@ func (e *blockComputer) queueTransactionRequests(
 			isSystemTransaction: false,
 		}
 
-		for i, txnBody := range collection.Transactions {
+		for i, txnBody := range collection.Collection.Transactions {
 			requestQueue <- newTransactionRequest(
 				collectionInfo,
 				collectionCtx,
 				collectionLogger,
 				txnIndex,
 				txnBody,
-				i == len(collection.Transactions)-1)
+				i == len(collection.Collection.Transactions)-1)
 			txnIndex += 1
 		}
 	}
@@ -265,13 +277,19 @@ func (e *blockComputer) queueTransactionRequests(
 		Int("num_collections", len(rawCollections)).
 		Int("num_txs", numTxns).
 		Logger()
+
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: []*flow.TransactionBody{systemTxnBody}})
+	if err != nil {
+		return irrecoverable.NewExceptionf("could not construct collection for system transacftion: %w", err)
+	}
+
 	systemCollectionInfo := collectionInfo{
 		blockId:         blockId,
 		blockIdStr:      blockIdStr,
 		blockHeight:     blockHeader.Height,
 		collectionIndex: len(rawCollections),
 		CompleteCollection: &entity.CompleteCollection{
-			Transactions: []*flow.TransactionBody{systemTxnBody},
+			Collection: collection,
 		},
 		isSystemTransaction: true,
 	}
@@ -283,12 +301,14 @@ func (e *blockComputer) queueTransactionRequests(
 		txnIndex,
 		systemTxnBody,
 		true)
+
+	return nil
 }
 
 func numberOfTransactionsInBlock(collections []*entity.CompleteCollection) int {
 	numTxns := 1 // there's one system transaction per block
 	for _, collection := range collections {
-		numTxns += len(collection.Transactions)
+		numTxns += len(collection.Collection.Transactions)
 	}
 
 	return numTxns
@@ -384,15 +404,18 @@ func (e *blockComputer) executeBlock(
 		derivedBlockData,
 		collector)
 
-	e.queueTransactionRequests(
+	err = e.queueTransactionRequests(
 		blockId,
 		blockIdStr,
-		block.Block.Header,
+		block.Block.ToHeader(),
 		rawCollections,
 		systemTxn,
 		requestQueue,
 		numTxns,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("could not queue transaction requests: %w", err)
+	}
 	close(requestQueue)
 
 	wg := &sync.WaitGroup{}

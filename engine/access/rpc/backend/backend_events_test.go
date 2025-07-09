@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
@@ -97,15 +96,12 @@ func (s *BackendEventsSuite) SetupTest() {
 		if i == 0 {
 			header = unittest.BlockHeaderFixture()
 		} else {
-			header = unittest.BlockHeaderWithParentFixture(s.blocks[i-1].Header)
+			header = unittest.BlockHeaderWithParentFixture(s.blocks[i-1].ToHeader())
 		}
 
 		payload := unittest.PayloadFixture()
 		header.PayloadHash = payload.Hash()
-		block := &flow.Block{
-			Header:  header,
-			Payload: &payload,
-		}
+		block := flow.NewBlock(header.HeaderBody, payload)
 		// the last block is sealed
 		if i == blockCount-1 {
 			s.sealedHead = header
@@ -117,7 +113,7 @@ func (s *BackendEventsSuite) SetupTest() {
 		s.T().Logf("block %d: %s", header.Height, block.ID())
 	}
 
-	s.blockEvents = generator.GetEventsWithEncoding(10, entities.EventEncodingVersion_CCF_V0)
+	s.blockEvents = unittest.EventGenerator.GetEventsWithEncoding(10, entities.EventEncodingVersion_CCF_V0)
 	targetEvent = string(s.blockEvents[0].Type)
 
 	// events returned from the db are sorted by txID, txIndex, then eventIndex.
@@ -150,7 +146,7 @@ func (s *BackendEventsSuite) SetupTest() {
 	s.headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) (*flow.Header, error) {
 		for _, block := range s.blocks {
 			if blockID == block.ID() {
-				return block.Header, nil
+				return block.ToHeader(), nil
 			}
 		}
 		return nil, storage.ErrNotFound
@@ -500,7 +496,7 @@ func (s *BackendEventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {
 				continue
 			}
 
-			headers.On("ByBlockID", blockID).Return(s.blocks[i].Header, nil)
+			headers.On("ByBlockID", blockID).Return(s.blocks[i].ToHeader(), nil)
 		}
 
 		response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding)
@@ -513,7 +509,7 @@ func (s *BackendEventsSuite) assertResponse(response []flow.BlockEvents, encodin
 	s.Assert().Len(response, len(s.blocks))
 	for i, block := range s.blocks {
 		s.Assert().Equal(block.Header.Height, response[i].BlockHeight)
-		s.Assert().Equal(block.Header.ID(), response[i].BlockID)
+		s.Assert().Equal(block.ID(), response[i].BlockID)
 		s.Assert().Len(response[i].Events, 1)
 
 		s.assertEncoding(&response[i].Events[0], encoding)

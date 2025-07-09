@@ -4,7 +4,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -15,7 +14,9 @@ import (
 	actormock "github.com/onflow/flow-go/module/mempool/consensus/mock"
 	poolmock "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/storage"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -245,64 +246,68 @@ func Test_ConflictingResults(t *testing.T) {
 // Test_ForkDetectionPersisted verifies that, when ExecForkSuppressor detects a fork, this information is
 // persisted in the data base
 func Test_ForkDetectionPersisted(t *testing.T) {
-	unittest.RunWithTempDir(t, func(dir string) {
-		db := unittest.BadgerDB(t, dir)
-		defer db.Close()
+	block := unittest.BlockFixture()
+	sealA := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(block))))
+	sealB := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(block))))
 
-		// initialize ExecForkSuppressor
-		wrappedMempool := &poolmock.IncorporatedResultSeals{}
-		execForkActor := &actormock.ExecForkActorMock{}
-		wrapper, _ := NewExecStateForkSuppressor(wrappedMempool, execForkActor.OnExecFork, db, zerolog.New(os.Stderr))
+	dbtest.RunFuncsWithNewDBHandle(
+		t,
 
-		// add seal
-		block := unittest.BlockFixture()
-		sealA := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))))
-		wrappedMempool.On("Add", sealA).Return(true, nil).Once()
-		_, _ = wrapper.Add(sealA)
+		// This function stores conflicting seals to the underlying database.
+		func(t *testing.T, db storage.DB) {
 
-		// add conflicting seal
-		sealB := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))))
-		wrappedMempool.On("Add", sealB).Return(true, nil).Once()
-		added, _ := wrapper.Add(sealB) // should be rejected because it is conflicting with sealA
-		require.True(t, added)
+			// initialize ExecForkSuppressor
+			wrappedMempool := &poolmock.IncorporatedResultSeals{}
+			execForkActor := &actormock.ExecForkActorMock{}
+			wrapper, _ := NewExecStateForkSuppressor(wrappedMempool, execForkActor.OnExecFork, db, zerolog.New(os.Stderr))
 
-		wrappedMempool.On("Get", sealA.IncorporatedResultID()).Return(sealA, true).Once()
-		execForkActor.On("OnExecFork", mock.Anything).Run(func(args mock.Arguments) {
-			conflictingSeals := args.Get(0).([]*flow.IncorporatedResultSeal)
-			require.ElementsMatch(t, []*flow.IncorporatedResultSeal{sealA, sealB}, conflictingSeals)
-		}).Return().Once()
-		wrappedMempool.On("Clear").Return().Once()
-		// try to query, at this point we will detect a conflicting seal
-		wrapper.Get(sealA.IncorporatedResultID())
+			// add seal
+			wrappedMempool.On("Add", sealA).Return(true, nil).Once()
+			_, _ = wrapper.Add(sealA)
 
-		wrappedMempool.AssertExpectations(t)
-		execForkActor.AssertExpectations(t)
+			// add conflicting seal
+			wrappedMempool.On("Add", sealB).Return(true, nil).Once()
+			added, _ := wrapper.Add(sealB) // should be rejected because it is conflicting with sealA
+			require.True(t, added)
 
-		// crash => re-initialization
-		db.Close()
-		db2 := unittest.BadgerDB(t, dir)
-		wrappedMempool2 := &poolmock.IncorporatedResultSeals{}
-		execForkActor2 := &actormock.ExecForkActorMock{}
-		execForkActor2.On("OnExecFork", mock.Anything).
-			Run(func(args mock.Arguments) {
+			wrappedMempool.On("Get", sealA.IncorporatedResultID()).Return(sealA, true).Once()
+			execForkActor.On("OnExecFork", mock.Anything).Run(func(args mock.Arguments) {
 				conflictingSeals := args.Get(0).([]*flow.IncorporatedResultSeal)
 				require.ElementsMatch(t, []*flow.IncorporatedResultSeal{sealA, sealB}, conflictingSeals)
 			}).Return().Once()
-		wrapper2, _ := NewExecStateForkSuppressor(wrappedMempool2, execForkActor2.OnExecFork, db2, zerolog.New(os.Stderr))
+			wrappedMempool.On("Clear").Return().Once()
+			// try to query, at this point we will detect a conflicting seal
+			wrapper.Get(sealA.IncorporatedResultID())
 
-		// add another (non-conflicting) seal to ExecForkSuppressor
-		// fail test if seal is added to wrapped mempool
-		wrappedMempool2.On("Add", mock.Anything).
-			Run(func(args mock.Arguments) { require.Fail(t, "seal was added to wrapped mempool") }).
-			Return(true, nil).Maybe()
-		added, _ = wrapper2.Add(unittest.IncorporatedResultSeal.Fixture())
-		require.False(t, added)
-		wrappedMempool2.On("Size").Return(uint(0)) // we asserted that Clear was called on wrappedMempool
-		require.Equal(t, uint(0), wrapper2.Size())
+			wrappedMempool.AssertExpectations(t)
+			execForkActor.AssertExpectations(t)
+		},
 
-		wrappedMempool2.AssertExpectations(t)
-		execForkActor2.AssertExpectations(t)
-	})
+		// This function retrieves conflicting seals from the same underlying database with a new instance of storage.DB.
+		func(t *testing.T, db storage.DB) {
+			wrappedMempool2 := &poolmock.IncorporatedResultSeals{}
+			execForkActor2 := &actormock.ExecForkActorMock{}
+			execForkActor2.On("OnExecFork", mock.Anything).
+				Run(func(args mock.Arguments) {
+					conflictingSeals := args.Get(0).([]*flow.IncorporatedResultSeal)
+					require.ElementsMatch(t, []*flow.IncorporatedResultSeal{sealA, sealB}, conflictingSeals)
+				}).Return().Once()
+			wrapper2, _ := NewExecStateForkSuppressor(wrappedMempool2, execForkActor2.OnExecFork, db, zerolog.New(os.Stderr))
+
+			// add another (non-conflicting) seal to ExecForkSuppressor
+			// fail test if seal is added to wrapped mempool
+			wrappedMempool2.On("Add", mock.Anything).
+				Run(func(mock.Arguments) { require.Fail(t, "seal was added to wrapped mempool") }).
+				Return(true, nil).Maybe()
+			added, _ := wrapper2.Add(unittest.IncorporatedResultSeal.Fixture())
+			require.False(t, added)
+			wrappedMempool2.On("Size").Return(uint(0)) // we asserted that Clear was called on wrappedMempool
+			require.Equal(t, uint(0), wrapper2.Size())
+
+			wrappedMempool2.AssertExpectations(t)
+			execForkActor2.AssertExpectations(t)
+		},
+	)
 }
 
 // Test_AddRemove_SmokeTest tests a real system of stdmap.IncorporatedResultSeals mempool
@@ -312,7 +317,7 @@ func Test_AddRemove_SmokeTest(t *testing.T) {
 	onExecFork := func([]*flow.IncorporatedResultSeal) {
 		require.Fail(t, "no call to onExecFork expected ")
 	}
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		wrappedMempool := stdmap.NewIncorporatedResultSeals(100)
 		wrapper, err := NewExecStateForkSuppressor(wrappedMempool, onExecFork, db, zerolog.New(os.Stderr))
 		require.NoError(t, err)
@@ -349,7 +354,7 @@ func Test_AddRemove_SmokeTest(t *testing.T) {
 // ExecForkSuppressor. We wrap stdmap.IncorporatedResultSeals with consensus.IncorporatedResultSeals which is wrapped with ExecForkSuppressor.
 // Test adding conflicting seals with different number of matching receipts.
 func Test_ConflictingSeal_SmokeTest(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		executingForkDetected := atomic.NewBool(false)
 		onExecFork := func([]*flow.IncorporatedResultSeal) {
 			executingForkDetected.Store(true)
@@ -366,7 +371,7 @@ func Test_ConflictingSeal_SmokeTest(t *testing.T) {
 		// two of them are non-conflicting but for same block and one is conflicting.
 
 		block := unittest.BlockFixture()
-		sealA := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))))
+		sealA := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(block))))
 		_, _ = wrapper.Add(sealA)
 
 		// different seal but for same result
@@ -390,7 +395,7 @@ func Test_ConflictingSeal_SmokeTest(t *testing.T) {
 		require.ElementsMatch(t, []*flow.IncorporatedResultSeal{sealA, sealB}, seals)
 
 		// add conflicting seal, which doesn't have any receipts yet
-		conflictingSeal := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))))
+		conflictingSeal := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(block))))
 		_, _ = wrapper.Add(conflictingSeal)
 
 		// conflicting seal doesn't have any receipts yet
@@ -419,8 +424,8 @@ func Test_ConflictingSeal_SmokeTest(t *testing.T) {
 //  2. wraps `wrappedMempool` in a ExecForkSuppressor
 //  3. ensures that initializing the wrapper did not error
 //  4. executes the `testLogic`
-func WithExecStateForkSuppressor(t testing.TB, testLogic func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock)) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+func WithExecStateForkSuppressor(t *testing.T, testLogic func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock)) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		wrappedMempool := &poolmock.IncorporatedResultSeals{}
 		execForkActor := &actormock.ExecForkActorMock{}
 		wrapper, err := NewExecStateForkSuppressor(wrappedMempool, execForkActor.OnExecFork, db, zerolog.New(os.Stderr))

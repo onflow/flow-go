@@ -19,9 +19,24 @@ func TestEvents_HappyPath(t *testing.T) {
 	transaction1 := unittest.TransactionFixture()
 	transaction2 := unittest.TransactionFixture()
 
-	event1 := unittest.EventFixture(flow.EventAccountCreated, 0, 0, transaction1.ID(), 200)
-	event2 := unittest.EventFixture(flow.EventAccountUpdated, 0, 1, transaction1.ID(), 201)
-	event3 := unittest.EventFixture(flow.EventAccountCreated, 1, 2, transaction2.ID(), 202)
+	event1 := unittest.EventFixture(
+		unittest.Event.WithEventType(flow.EventAccountCreated),
+		unittest.Event.WithTransactionIndex(0),
+		unittest.Event.WithEventIndex(0),
+		unittest.Event.WithTransactionID(transaction1.ID()),
+	)
+	event2 := unittest.EventFixture(
+		unittest.Event.WithEventType(flow.EventAccountUpdated),
+		unittest.Event.WithTransactionIndex(0),
+		unittest.Event.WithEventIndex(1),
+		unittest.Event.WithTransactionID(transaction1.ID()),
+	)
+	event3 := unittest.EventFixture(
+		unittest.Event.WithEventType(flow.EventAccountCreated),
+		unittest.Event.WithTransactionIndex(1),
+		unittest.Event.WithEventIndex(2),
+		unittest.Event.WithTransactionID(transaction2.ID()),
+	)
 
 	// Store events
 	expectedStoredEvents := flow.EventsList{event1, event2, event3}
@@ -55,4 +70,9 @@ func TestEvents_HappyPath(t *testing.T) {
 	assert.Len(t, typeEvents, 2)
 	assert.Contains(t, typeEvents, event1)
 	assert.Contains(t, typeEvents, event3)
+
+	// Extract structured data
+	events := eventsStore.Data()
+	require.Len(t, events, len(expectedStoredEvents))
+	require.ElementsMatch(t, events, expectedStoredEvents)
 }

@@ -400,10 +400,13 @@ func main() {
 			// the chain of seals
 			rawMempool := stdmap.NewIncorporatedResultSeals(sealLimit)
 			multipleReceiptsFilterMempool := consensusMempools.NewIncorporatedResultSeals(rawMempool, node.Storage.Receipts)
+
+			dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+
 			seals, err = consensusMempools.NewExecStateForkSuppressor(
 				multipleReceiptsFilterMempool,
 				consensusMempools.LogForkAndCrash(node.Logger),
-				node.DB,
+				dbStore,
 				node.Logger,
 			)
 			if err != nil {
@@ -505,7 +508,7 @@ func main() {
 				node.State,
 				channels.RequestReceiptsByBlockID,
 				filter.HasRole[flow.Identity](flow.RoleExecution),
-				func() flow.Entity { return &flow.ExecutionReceipt{} },
+				func() flow.Entity { return new(flow.ExecutionReceipt) },
 				requester.WithRetryInitial(2*time.Second),
 				requester.WithRetryMaximum(30*time.Second),
 			)
@@ -644,7 +647,7 @@ func main() {
 				node.Storage.Headers,
 				finalize,
 				notifier,
-				node.FinalizedRootBlock.Header,
+				node.FinalizedRootBlock.ToHeader(),
 				node.RootQC,
 			)
 			if err != nil {

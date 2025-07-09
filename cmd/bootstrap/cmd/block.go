@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
@@ -22,18 +23,15 @@ func constructRootHeader(rootChain string, rootParent string, rootHeight uint64,
 
 // constructRootBlock constructs a valid root block based on the given header and protocol state ID for that block.
 func constructRootBlock(rootHeader *flow.Header, protocolStateID flow.Identifier) *flow.Block {
-	block := &flow.Block{
-		Header:  rootHeader,
-		Payload: nil,
-	}
-	block.SetPayload(flow.Payload{
+	payload := flow.Payload{
 		Guarantees:      nil,
 		Seals:           nil,
 		Receipts:        nil,
 		Results:         nil,
 		ProtocolStateID: protocolStateID,
-	})
-	return block
+	}
+
+	return flow.NewBlock(rootHeader.HeaderBody, payload)
 }
 
 // constructRootEpochEvents constructs the epoch setup and commit events for the first epoch after spork.
@@ -44,20 +42,24 @@ func constructRootEpochEvents(
 	clusterQCs []*flow.QuorumCertificate,
 	dkgData dkg.ThresholdKeySet,
 	dkgIndexMap flow.DKGIndexMap,
-) (*flow.EpochSetup, *flow.EpochCommit) {
-
-	epochSetup := &flow.EpochSetup{
-		Counter:            flagEpochCounter,
-		FirstView:          firstView,
-		FinalView:          firstView + flagNumViewsInEpoch - 1,
-		DKGPhase1FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase - 1,
-		DKGPhase2FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*2 - 1,
-		DKGPhase3FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 - 1,
-		Participants:       participants.Sort(flow.Canonical[flow.Identity]).ToSkeleton(),
-		Assignments:        assignments,
-		RandomSource:       GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
-		TargetDuration:     flagEpochTimingDuration,
-		TargetEndTime:      rootEpochTargetEndTime(),
+) (*flow.EpochSetup, *flow.EpochCommit, error) {
+	epochSetup, err := flow.NewEpochSetup(
+		flow.UntrustedEpochSetup{
+			Counter:            flagEpochCounter,
+			FirstView:          firstView,
+			DKGPhase1FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase - 1,
+			DKGPhase2FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*2 - 1,
+			DKGPhase3FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 - 1,
+			FinalView:          firstView + flagNumViewsInEpoch - 1,
+			Participants:       participants.Sort(flow.Canonical[flow.Identity]).ToSkeleton(),
+			Assignments:        assignments,
+			RandomSource:       GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
+			TargetDuration:     flagEpochTimingDuration,
+			TargetEndTime:      rootEpochTargetEndTime(),
+		},
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not construct epoch setup: %w", err)
 	}
 
 	qcsWithSignerIDs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clusterQCs))
@@ -75,14 +77,20 @@ func constructRootEpochEvents(
 		})
 	}
 
-	epochCommit := &flow.EpochCommit{
-		Counter:            flagEpochCounter,
-		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
-		DKGGroupKey:        dkgData.PubGroupKey,
-		DKGParticipantKeys: dkgData.PubKeyShares,
-		DKGIndexMap:        dkgIndexMap,
+	epochCommit, err := flow.NewEpochCommit(
+		flow.UntrustedEpochCommit{
+			Counter:            flagEpochCounter,
+			ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
+			DKGGroupKey:        dkgData.PubGroupKey,
+			DKGParticipantKeys: dkgData.PubKeyShares,
+			DKGIndexMap:        dkgIndexMap,
+		},
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not construct epoch commit: %w", err)
 	}
-	return epochSetup, epochCommit
+
+	return epochSetup, epochCommit, nil
 }
 
 func parseChainID(chainID string) flow.ChainID {

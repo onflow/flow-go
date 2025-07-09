@@ -23,7 +23,7 @@ func TestFinalizedReader(t *testing.T) {
 		block := unittest.BlockFixture()
 
 		// store header
-		err := headers.Store(unittest.ProposalFromHeader(block.Header))
+		err := headers.Store(unittest.ProposalHeaderFromHeader(block.ToHeader()))
 		require.NoError(t, err)
 
 		// index the header
@@ -42,11 +42,11 @@ func TestFinalizedReader(t *testing.T) {
 		require.True(t, errors.Is(err, storage.ErrNotFound), err)
 
 		// finalize one more block
-		block2 := unittest.BlockWithParentFixture(block.Header)
-		require.NoError(t, headers.Store(unittest.ProposalFromHeader(block2.Header)))
+		block2 := unittest.BlockWithParentFixture(block.ToHeader())
+		require.NoError(t, headers.Store(unittest.ProposalHeaderFromHeader(block2.ToHeader())))
 		err = db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
 		require.NoError(t, err)
-		reader.BlockFinalized(block2.Header)
+		reader.BlockFinalized(block2.ToHeader())
 
 		// should be able to retrieve the block
 		finalized, err = reader.FinalizedBlockIDAtHeight(block2.Header.Height)
@@ -54,6 +54,6 @@ func TestFinalizedReader(t *testing.T) {
 		require.Equal(t, block2.ID(), finalized)
 
 		// should noop and no panic
-		reader.BlockProcessable(block.Header, block2.Header.QuorumCertificate())
+		reader.BlockProcessable(block.ToHeader(), block2.Header.QuorumCertificate())
 	})
 }

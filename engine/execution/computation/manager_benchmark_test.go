@@ -175,7 +175,7 @@ func benchmarkComputeBlock(
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -214,10 +214,7 @@ func benchmarkComputeBlock(
 		derivedChainData: derivedChainData,
 	}
 
-	parentBlock := &flow.Block{
-		Header:  &flow.Header{},
-		Payload: &flow.Payload{},
-	}
+	parentBlock := flow.NewBlock(flow.HeaderBody{}, flow.Payload{})
 
 	b.StopTimer()
 	b.ResetTimer()
@@ -276,25 +273,23 @@ func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colN
 		collections[c] = collection
 		guarantees[c] = guarantee
 		completeCollections[guarantee.CollectionID] = &entity.CompleteCollection{
-			Guarantee:    guarantee,
-			Transactions: transactions,
+			Guarantee:  guarantee,
+			Collection: collection,
 		}
 	}
 
-	block := flow.Block{
-		Header: &flow.Header{
-			HeaderBody: flow.HeaderBody{
-				ParentID: parentBlock.ID(),
-				View:     parentBlock.Header.Height + 1,
-			},
+	block := flow.NewBlock(
+		flow.HeaderBody{
+			ParentID: parentBlock.ID(),
+			View:     parentBlock.Header.Height + 1,
 		},
-		Payload: &flow.Payload{
+		flow.Payload{
 			Guarantees: guarantees,
 		},
-	}
+	)
 
 	return &entity.ExecutableBlock{
-		Block:               &block,
+		Block:               block,
 		CompleteCollections: completeCollections,
 		StartState:          unittest.StateCommitmentPointerFixture(),
 	}

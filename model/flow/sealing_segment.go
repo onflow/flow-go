@@ -27,7 +27,7 @@ type SealingSegment struct {
 	// (see sealing_segment.md for details):
 	//   (i) The highest sealed block as of `head` needs to be included in the sealing segment.
 	//       This is relevant if `head` does not contain any seals.
-	Blocks []*BlockProposal
+	Blocks []*Proposal
 
 	// ExtraBlocks [optional] holds ancestors of `Blocks` in ascending height order.
 	// Formally, ExtraBlocks contains at least the additional history to satisfy conditions
@@ -37,7 +37,7 @@ type SealingSegment struct {
 	//       limitHeight := max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
 	//       where blockSealedAtHead is the block sealed by `head` block.
 	// (Potentially longer history is permitted)
-	ExtraBlocks []*BlockProposal
+	ExtraBlocks []*Proposal
 
 	// ExecutionResults contain any results which are referenced by receipts
 	// or seals in the sealing segment, but not included in any segment block
@@ -84,7 +84,7 @@ type ProtocolStateEntryWrapper struct {
 // Highest is the highest block in the sealing segment and the reference block from snapshot that was
 // used to produce this sealing segment.
 func (segment *SealingSegment) Highest() *Block {
-	return segment.Blocks[len(segment.Blocks)-1].Block
+	return &segment.Blocks[len(segment.Blocks)-1].Block
 }
 
 // Finalized returns the last finalized block, which is an alias of Highest
@@ -94,11 +94,11 @@ func (segment *SealingSegment) Finalized() *Block {
 
 // Sealed returns the most recently sealed block based on head of sealing segment(highest block).
 func (segment *SealingSegment) Sealed() *Block {
-	return segment.Blocks[0].Block
+	return &segment.Blocks[0].Block
 }
 
 // AllBlocks returns all blocks within the sealing segment, including extra blocks, in ascending height order.
-func (segment *SealingSegment) AllBlocks() []*BlockProposal {
+func (segment *SealingSegment) AllBlocks() []*Proposal {
 	return append(segment.ExtraBlocks, segment.Blocks...)
 }
 
@@ -266,27 +266,27 @@ type SealingSegmentBuilder struct {
 	// keep track of resources included in payloads
 	includedResults map[Identifier]struct{}
 	// resources to include in the sealing segment
-	blocks               []*BlockProposal
+	blocks               []*Proposal
 	results              []*ExecutionResult
 	latestSeals          map[Identifier]Identifier
 	protocolStateEntries map[Identifier]*ProtocolStateEntryWrapper
 	firstSeal            *Seal
 	// extraBlocks included in sealing segment, must connect to the lowest block of segment
 	// stored in descending order for simpler population logic
-	extraBlocks []*BlockProposal
+	extraBlocks []*Proposal
 }
 
 // AddBlock appends a block to the sealing segment under construction.
 // Errors expected during normal operation:
 //   - InvalidSealingSegmentError if the added block would cause an invalid resulting segment
-func (builder *SealingSegmentBuilder) AddBlock(block *BlockProposal) error {
+func (builder *SealingSegmentBuilder) AddBlock(block *Proposal) error {
 	// sanity check: all blocks have to be added before adding extra blocks
 	if len(builder.extraBlocks) > 0 {
 		return fmt.Errorf("cannot add sealing segment block after extra block is added")
 	}
 
 	// sanity check: block should be 1 height higher than current highest
-	if !builder.isValidHeight(block.Block) {
+	if !builder.isValidHeight(&block.Block) {
 		return NewInvalidSealingSegmentError("invalid block height (%d)", block.Block.Header.Height)
 	}
 	blockID := block.Block.ID()
@@ -379,7 +379,7 @@ func (builder *SealingSegmentBuilder) addProtocolStateEntryIfUnseen(protocolStat
 // of sealing segment, this way they form a continuous chain.
 // Errors expected during normal operation:
 //   - InvalidSealingSegmentError if the added block would cause an invalid resulting segment
-func (builder *SealingSegmentBuilder) AddExtraBlock(block *BlockProposal) error {
+func (builder *SealingSegmentBuilder) AddExtraBlock(block *Proposal) error {
 	if len(builder.extraBlocks) == 0 {
 		if len(builder.blocks) == 0 {
 			return fmt.Errorf("cannot add extra blocks before adding lowest sealing segment block")
@@ -419,7 +419,7 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 
 	// SealingSegment must store extra blocks in ascending order, builder stores them in descending.
 	// Apply a sort to reverse the slice and use correct ordering.
-	slices.SortFunc(builder.extraBlocks, func(lhs, rhs *BlockProposal) int {
+	slices.SortFunc(builder.extraBlocks, func(lhs, rhs *Proposal) int {
 		return int(lhs.Block.Header.Height) - int(rhs.Block.Header.Height)
 	})
 
@@ -522,12 +522,12 @@ func (builder *SealingSegmentBuilder) highest() *Block {
 		return nil
 	}
 
-	return builder.blocks[len(builder.blocks)-1].Block
+	return &builder.blocks[len(builder.blocks)-1].Block
 }
 
 // lowest returns the lowest block in segment.
 func (builder *SealingSegmentBuilder) lowest() *Block {
-	return builder.blocks[0].Block
+	return &builder.blocks[0].Block
 }
 
 // NewSealingSegmentBuilder returns *SealingSegmentBuilder
@@ -539,8 +539,8 @@ func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBl
 		includedResults:      make(map[Identifier]struct{}),
 		latestSeals:          make(map[Identifier]Identifier),
 		protocolStateEntries: make(map[Identifier]*ProtocolStateEntryWrapper),
-		blocks:               make([]*BlockProposal, 0, 10),
-		extraBlocks:          make([]*BlockProposal, 0, DefaultTransactionExpiry),
+		blocks:               make([]*Proposal, 0, 10),
+		extraBlocks:          make([]*Proposal, 0, DefaultTransactionExpiry),
 		results:              make(ExecutionResultList, 0, 3),
 	}
 }
@@ -565,7 +565,7 @@ func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBl
 //
 // The node logic requires a valid sealing segment to bootstrap.
 // No errors are expected during normal operations.
-func findLatestSealForLowestBlock(blocks []*BlockProposal, latestSeals map[Identifier]Identifier) (*Seal, error) {
+func findLatestSealForLowestBlock(blocks []*Proposal, latestSeals map[Identifier]Identifier) (*Seal, error) {
 	lowestBlockID := blocks[0].Block.ID()
 	highestBlockID := blocks[len(blocks)-1].Block.ID()
 

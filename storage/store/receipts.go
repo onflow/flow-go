@@ -49,7 +49,11 @@ func NewExecutionReceipts(collector module.CacheMetrics, db storage.DB, results 
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve result: %w", err)
 		}
-		return flow.ExecutionReceiptFromStub(meta, *result), nil
+		executionReceipt, err := flow.ExecutionReceiptFromStub(meta, *result)
+		if err != nil {
+			return nil, fmt.Errorf("could not create execution receipt from stub: %w", err)
+		}
+		return executionReceipt, nil
 	}
 
 	return &ExecutionReceipts{

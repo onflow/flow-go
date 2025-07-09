@@ -3,6 +3,7 @@ package environment
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/common"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence"
@@ -165,7 +166,12 @@ func (emitter *eventEmitter) EventCollection() *EventCollection {
 }
 
 func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
-	err := emitter.meter.MeterComputation(ComputationKindEncodeEvent, 1)
+	err := emitter.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindEncodeEvent,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("emit event, event encoding failed: %w", err)
 	}
@@ -178,18 +184,28 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 	defer emitter.tracer.StartExtensiveTracingChildSpan(trace.FVMEnvEmitEvent).End()
 
 	payloadSize := len(payload)
-	err = emitter.meter.MeterComputation(ComputationKindEmitEvent, uint(payloadSize))
+	err = emitter.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindEmitEvent,
+			Intensity: uint64(payloadSize),
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("emit event failed: %w", err)
 	}
 
 	eventType := flow.EventType(event.EventType.ID())
-	flowEvent := flow.Event{
-		Type:             eventType,
-		TransactionID:    emitter.txID,
-		TransactionIndex: emitter.txIndex,
-		EventIndex:       emitter.eventCollection.TotalEventCounter(),
-		Payload:          payload,
+	flowEvent, err := flow.NewEvent(
+		flow.UntrustedEvent{
+			Type:             eventType,
+			TransactionID:    emitter.txID,
+			TransactionIndex: emitter.txIndex,
+			EventIndex:       emitter.eventCollection.TotalEventCounter(),
+			Payload:          payload,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not construct event: %w", err)
 	}
 
 	// TODO: to set limit to maximum when it is service account and get rid of this flag
@@ -202,7 +218,7 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 	if isServiceEvent {
 		eventEmitError := emitter.eventCollection.AppendServiceEvent(
 			emitter.chain,
-			flowEvent,
+			*flowEvent,
 			uint64(payloadSize))
 
 		// skip limit if payer is service account
@@ -217,7 +233,7 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 	}
 
 	// Regardless of whether it is a service event, add to eventCollection
-	eventEmitError := emitter.eventCollection.AppendEvent(flowEvent, uint64(payloadSize))
+	eventEmitError := emitter.eventCollection.AppendEvent(*flowEvent, uint64(payloadSize))
 	// skip limit if payer is service account
 	if !isServiceAccount {
 		return eventEmitError
@@ -288,7 +304,6 @@ func (collection *EventCollection) AppendServiceEvent(
 	collection.convertedServiceEvents = append(
 		collection.convertedServiceEvents,
 		*convertedEvent)
-	collection.eventCounter++
 	return collection.meter.MeterEmittedEvent(size)
 }
 

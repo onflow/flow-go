@@ -14,7 +14,7 @@ import (
 
 // InsertClusterBlock inserts a cluster consensus block, updating all
 // associated indexes.
-func InsertClusterBlock(proposal *cluster.BlockProposal) func(*badger.Txn) error {
+func InsertClusterBlock(proposal *cluster.Proposal) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// store the block header
 		blockID := proposal.Block.ID()
@@ -62,7 +62,16 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 		}
 
 		// overwrite block
-		*block = cluster.NewBlock(header.HeaderBody, payload)
+		newBlock, err := cluster.NewBlock(
+			cluster.UntrustedBlock{
+				Header:  header.HeaderBody,
+				Payload: payload,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("could not build cluster block: %w", err)
+		}
+		*block = *newBlock
 
 		return nil
 	}
@@ -156,7 +165,7 @@ func InsertClusterPayload(blockID flow.Identifier, payload *cluster.Payload) fun
 		// SkipDuplicates here is to ignore the error if the collection already exists
 		// This means the Insert operation is actually a Upsert operation.
 		// The upsert is ok, because the data is unique by its ID
-		err := operation.SkipDuplicates(operation.InsertCollection(&light))(tx)
+		err := operation.SkipDuplicates(operation.InsertCollection(light))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert payload collection: %w", err)
 		}
@@ -219,7 +228,21 @@ func RetrieveClusterPayload(blockID flow.Identifier, payload *cluster.Payload) f
 			colTransactions = append(colTransactions, &nextTx)
 		}
 
-		*payload = cluster.PayloadFromTransactions(refID, colTransactions...)
+		collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: colTransactions})
+		if err != nil {
+			return fmt.Errorf("could not build the collection from the transactions: %w", err)
+		}
+		newPayload, err := cluster.NewPayload(
+			cluster.UntrustedPayload{
+				ReferenceBlockID: refID,
+				Collection:       *collection,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("could not build the payload: %w", err)
+		}
+
+		*payload = *newPayload
 
 		return nil
 	}

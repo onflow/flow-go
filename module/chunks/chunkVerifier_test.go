@@ -447,13 +447,11 @@ func newLedger(t *testing.T) *completeLedger.Ledger {
 
 func blockFixture(collection *flow.Collection) *flow.Block {
 	guarantee := &flow.CollectionGuarantee{CollectionID: collection.ID()}
-	block := &flow.Block{
-		Header: unittest.BlockHeaderFixture(),
-		Payload: &flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{guarantee},
-		},
-	}
-	block.Header.PayloadHash = block.Payload.Hash()
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(
+			flow.Payload{Guarantees: []*flow.CollectionGuarantee{guarantee}},
+		),
+	)
 	return block
 }
 
@@ -629,7 +627,7 @@ func (s *ChunkVerifierTestSuite) GetTestSetup(t *testing.T, script string, syste
 
 	meta := &testMetadata{
 		IsSystemChunk: system,
-		Header:        block.Header,
+		Header:        block.ToHeader(),
 		Collection:    collection,
 		TxResults:     txResults,
 		ChunkEvents:   chunkEvents,
@@ -638,7 +636,7 @@ func (s *ChunkVerifierTestSuite) GetTestSetup(t *testing.T, script string, syste
 		Update:        update,
 		Proof:         proof,
 
-		ExecDataBlockID: block.Header.ID(),
+		ExecDataBlockID: block.ID(),
 
 		ledger: s.ledger,
 	}

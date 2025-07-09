@@ -112,12 +112,13 @@ func NewCore(
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
 func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedProposal]) error {
-	proposal := flow.Slashable[*flow.BlockProposal]{
+	proposal := flow.Slashable[*flow.Proposal]{
 		OriginID: proposalMsg.OriginID,
-		Message:  proposalMsg.Message.ToInternal(),
+		Message:  proposalMsg.Message.DeclareTrusted(),
 	}
-	header := proposal.Message.Block.Header
-	blockID := header.ID()
+	block := proposal.Message.Block
+	header := block.ToHeader()
+	blockID := block.ID()
 	finalHeight := c.finalizedHeight.Value()
 	finalView := c.finalizedView.Value()
 
@@ -247,9 +248,10 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedPro
 // processed as well.
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
-func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*flow.BlockProposal]) error {
-	header := proposal.Message.Block.Header
-	blockID := header.ID()
+func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*flow.Proposal]) error {
+	block := proposal.Message.Block
+	header := block.ToHeader()
+	blockID := block.ID()
 
 	log := c.log.With().
 		Str("block_id", blockID.String()).
@@ -315,14 +317,15 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*flow.BlockPro
 //   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
 //   - model.InvalidProposalError if the block proposal is invalid
 //   - engine.UnverifiableInputError if the block proposal cannot be verified
-func (c *Core) processBlockProposal(proposal *flow.BlockProposal) error {
+func (c *Core) processBlockProposal(proposal *flow.Proposal) error {
 	startTime := time.Now()
 	defer func() {
 		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
 	}()
 
-	header := proposal.Block.Header
-	blockID := header.ID()
+	block := proposal.Block
+	header := block.ToHeader()
+	blockID := block.ID()
 
 	span, ctx := c.tracer.StartBlockSpan(context.Background(), blockID, trace.ConCompProcessBlockProposal)
 	span.SetAttributes(

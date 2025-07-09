@@ -54,7 +54,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
-	"github.com/onflow/flow-go/engine/execution/migration"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	exepruner "github.com/onflow/flow-go/engine/execution/pruner"
 	"github.com/onflow/flow-go/engine/execution/rpc"
@@ -93,13 +92,11 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/dbops"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
-	"github.com/onflow/flow-go/storage/store/chained"
 )
 
 const (
@@ -224,7 +221,6 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
 		Module("bootstrap", exeNode.LoadBootstrapper).
 		Module("register store", exeNode.LoadRegisterStore).
-		Module("migrate last executed block", exeNode.MigrateLastSealedExecutedResultToPebble).
 		AdminCommand("get-transactions", func(conf *NodeConfig) commands.AdminCommand {
 			return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, exeNode.collections)
 		}).
@@ -347,24 +343,10 @@ func (exeNode *ExecutionNode) LoadExecutionStorage(
 	exeNode.receipts = store.NewExecutionReceipts(node.Metrics.Cache, db, exeNode.results, storage.DefaultCacheSize)
 	exeNode.myReceipts = store.NewMyExecutionReceipts(node.Metrics.Cache, db, exeNode.receipts)
 	exeNode.txResults = store.NewTransactionResults(node.Metrics.Cache, db, exeNode.exeConf.transactionResultsCacheSize)
-
-	if dbops.IsBadgerBased(node.DBOps) {
-		// if data are stored in badger, we can use the same storage for all data
-		exeNode.eventsReader = exeNode.events
-		exeNode.commitsReader = exeNode.commits
-		exeNode.resultsReader = exeNode.results
-		exeNode.txResultsReader = exeNode.txResults
-	} else if dbops.IsPebbleBatch(node.DBOps) {
-		// when data are stored in pebble, we need to use chained storage to query data from
-		// both pebble and badger
-		// note the pebble storage is the first argument, and badger storage is the second, so
-		// the data will be queried from pebble first, then badger
-		badgerDB := badgerimpl.ToDB(node.DB)
-		exeNode.eventsReader = chained.NewEvents(exeNode.events, store.NewEvents(node.Metrics.Cache, badgerDB))
-		exeNode.commitsReader = chained.NewCommits(exeNode.commits, store.NewCommits(node.Metrics.Cache, badgerDB))
-		exeNode.resultsReader = chained.NewExecutionResults(exeNode.results, store.NewExecutionResults(node.Metrics.Cache, badgerDB))
-		exeNode.txResultsReader = chained.NewTransactionResults(exeNode.txResults, store.NewTransactionResults(node.Metrics.Cache, badgerDB, exeNode.exeConf.transactionResultsCacheSize))
-	}
+	exeNode.eventsReader = exeNode.events
+	exeNode.commitsReader = exeNode.commits
+	exeNode.resultsReader = exeNode.results
+	exeNode.txResultsReader = exeNode.txResults
 	return nil
 }
 
@@ -756,16 +738,6 @@ func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
 	return nil
 }
 
-func (exeNode *ExecutionNode) MigrateLastSealedExecutedResultToPebble(node *NodeConfig) error {
-	// Migrate the last sealed executed
-	err := migration.MigrateLastSealedExecutedResultToPebble(node.Logger, node.DB, node.PebbleDB, node.State, node.RootSeal)
-	if err != nil {
-		return fmt.Errorf("could not migrate last sealed executed result to pebble: %w", err)
-	}
-
-	return nil
-}
-
 func (exeNode *ExecutionNode) LoadExecutionState(
 	node *NodeConfig,
 ) (
@@ -1125,7 +1097,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		reqEng, err := requester.New(node.Logger, node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
 			channels.RequestCollections,
 			filter.Any,
-			func() flow.Entity { return &flow.Collection{} },
+			func() flow.Entity { return new(flow.Collection) },
 			// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
 			requester.WithBatchInterval(exeNode.exeConf.requestInterval),
 			// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
@@ -1236,7 +1208,7 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 		node.Storage.Headers,
 		final,
 		exeNode.followerDistributor,
-		node.FinalizedRootBlock.Header,
+		node.FinalizedRootBlock.ToHeader(),
 		node.RootQC,
 		finalized,
 		pending,

@@ -256,7 +256,7 @@ func createRootQC(t *testing.T, root *flow.Block, participantData *run.Participa
 // createRootBlockData creates genesis block with first epoch and real data node identities.
 // This function requires all participants to pass DKG process.
 func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
-	root := unittest.GenesisFixture()
+	rootHeader := unittest.GenesisFixture().Header
 	consensusParticipants := participantData.Identities()
 
 	// add other roles to create a complete identity list
@@ -273,8 +273,8 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	setup := unittest.EpochSetupFixture(
 		unittest.WithParticipants(participants.ToSkeleton()),
 		unittest.SetupWithCounter(counter),
-		unittest.WithFirstView(root.Header.View),
-		unittest.WithFinalView(root.Header.View+1000),
+		unittest.WithFirstView(rootHeader.View),
+		unittest.WithFinalView(rootHeader.View+1000),
 	)
 	commit := unittest.EpochCommitFixture(
 		unittest.CommitWithCounter(counter),
@@ -285,13 +285,14 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 			commit.DKGIndexMap = dkgIndexMap
 		},
 	)
-
-	epochProtocolStateID := inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID()
-	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
+	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
+	require.NoError(t, err)
+	epochProtocolStateID := minEpochStateEntry.ID()
+	safetyParams, err := protocol.DefaultEpochSafetyParams(rootHeader.ChainID)
 	require.NoError(t, err)
 	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochProtocolStateID)
 	require.NoError(t, err)
-	root.SetPayload(flow.Payload{ProtocolStateID: rootProtocolState.ID()})
+	root := flow.NewBlock(rootHeader, flow.Payload{ProtocolStateID: rootProtocolState.ID()})
 	result := unittest.BootstrapExecutionResultFixture(root, unittest.GenesisStateCommitment)
 	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
 
@@ -300,13 +301,13 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	return root, result, seal
 }
 
-func createPrivateNodeIdentities(n int) []bootstrap.NodeInfo {
+func createPrivateNodeIdentities(t *testing.T, n int) []bootstrap.NodeInfo {
 	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
 	infos := make([]bootstrap.NodeInfo, 0, n)
 	for _, node := range consensus {
 		networkPrivKey := unittest.NetworkingPrivKeyFixture()
 		stakingPrivKey := unittest.StakingPrivKeyFixture()
-		nodeInfo := bootstrap.NewPrivateNodeInfo(
+		nodeInfo, err := bootstrap.NewPrivateNodeInfo(
 			node.NodeID,
 			node.Role,
 			node.Address,
@@ -314,6 +315,7 @@ func createPrivateNodeIdentities(n int) []bootstrap.NodeInfo {
 			networkPrivKey,
 			stakingPrivKey,
 		)
+		require.NoError(t, err)
 		infos = append(infos, nodeInfo)
 	}
 	return infos
@@ -321,7 +323,7 @@ func createPrivateNodeIdentities(n int) []bootstrap.NodeInfo {
 
 func createConsensusIdentities(t *testing.T, n int) *run.ParticipantData {
 	// create n consensus node participants
-	consensus := createPrivateNodeIdentities(n)
+	consensus := createPrivateNodeIdentities(t, n)
 	return completeConsensusIdentities(t, consensus)
 }
 

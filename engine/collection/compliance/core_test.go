@@ -39,12 +39,12 @@ type CoreSuite struct {
 type CommonSuite struct {
 	suite.Suite
 
-	head *cluster.BlockProposal
+	head *cluster.Proposal
 	// storage data
 	headerDB map[flow.Identifier]*flow.Header
 
-	pendingDB  map[flow.Identifier]flow.Slashable[*cluster.BlockProposal]
-	childrenDB map[flow.Identifier][]flow.Slashable[*cluster.BlockProposal]
+	pendingDB  map[flow.Identifier]flow.Slashable[*cluster.Proposal]
+	childrenDB map[flow.Identifier][]flow.Slashable[*cluster.Proposal]
 
 	// mocked dependencies
 	state                     *clusterstate.MutableState
@@ -69,8 +69,8 @@ func (cs *CommonSuite) SetupTest() {
 
 	// initialize the storage data
 	cs.headerDB = make(map[flow.Identifier]*flow.Header)
-	cs.pendingDB = make(map[flow.Identifier]flow.Slashable[*cluster.BlockProposal])
-	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[*cluster.BlockProposal])
+	cs.pendingDB = make(map[flow.Identifier]flow.Slashable[*cluster.Proposal])
+	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[*cluster.Proposal])
 
 	// store the head header and payload
 	cs.headerDB[block.ID()] = cs.head.Block.ToHeader()
@@ -127,7 +127,7 @@ func (cs *CommonSuite) SetupTest() {
 	cs.pending = &module.PendingClusterBlockBuffer{}
 	cs.pending.On("Add", mock.Anything, mock.Anything).Return(true)
 	cs.pending.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) flow.Slashable[*cluster.BlockProposal] {
+		func(blockID flow.Identifier) flow.Slashable[*cluster.Proposal] {
 			return cs.pendingDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -136,7 +136,7 @@ func (cs *CommonSuite) SetupTest() {
 		},
 	)
 	cs.pending.On("ByParentID", mock.Anything).Return(
-		func(blockID flow.Identifier) []flow.Slashable[*cluster.BlockProposal] {
+		func(blockID flow.Identifier) []flow.Slashable[*cluster.Proposal] {
 			return cs.childrenDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -198,7 +198,9 @@ func (cs *CommonSuite) SetupTest() {
 func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 	// create a proposal that directly descends from the latest finalized header
 	originID := unittest.IdentifierFixture()
-	block := unittest.ClusterBlockWithParent(cs.head.Block)
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
 	proposal := unittest.ClusterProposalFromBlock(block)
 
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
@@ -218,9 +220,15 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 
 	// create a proposal that has two ancestors in the cache
 	originID := unittest.IdentifierFixture()
-	ancestor := unittest.ClusterBlockWithParent(cs.head.Block)
-	parent := unittest.ClusterBlockWithParent(ancestor)
-	block := unittest.ClusterBlockWithParent(parent)
+	ancestor := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
+	parent := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(ancestor),
+	)
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
 	proposal := unittest.ClusterProposalFromBlock(block)
 
 	// store the data for retrieval
@@ -247,8 +255,9 @@ func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 
 	// create a proposal which is far enough ahead to be dropped
 	originID := unittest.IdentifierFixture()
-	block := unittest.ClusterBlockFixture()
-	block.Header.Height = cs.head.Block.Header.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithHeight(cs.head.Block.Header.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1),
+	)
 	proposal := unittest.ClusterProposalFromBlock(block)
 
 	err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
@@ -268,12 +277,17 @@ func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 //   - we should not attempt to process its children
 //   - we should notify VoteAggregator, for known errors
 func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
-
 	// create a proposal that has two ancestors in the cache
 	originID := unittest.IdentifierFixture()
-	ancestor := unittest.ClusterBlockWithParent(cs.head.Block)
-	parent := unittest.ClusterBlockWithParent(ancestor)
-	block := unittest.ClusterBlockWithParent(parent)
+	ancestor := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
+	parent := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(ancestor),
+	)
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
 	proposal := unittest.ClusterProposalFromBlock(block)
 	proposalMsg := messages.UntrustedClusterProposalFromInternal(proposal)
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
@@ -355,9 +369,15 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 
 	// create a proposal that has two ancestors in the cache
 	originID := unittest.IdentifierFixture()
-	ancestor := unittest.ClusterBlockWithParent(cs.head.Block)
-	parent := unittest.ClusterBlockWithParent(ancestor)
-	block := unittest.ClusterBlockWithParent(parent)
+	ancestor := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
+	parent := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(ancestor),
+	)
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
 	proposal := unittest.ClusterProposalFromBlock(block)
 	proposalMsg := messages.UntrustedClusterProposalFromInternal(proposal)
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
@@ -446,18 +466,26 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 
 	// create three children blocks
-	parent := unittest.ClusterBlockWithParent(cs.head.Block)
-	block1 := unittest.ClusterBlockWithParent(parent)
-	block2 := unittest.ClusterBlockWithParent(parent)
-	block3 := unittest.ClusterBlockWithParent(parent)
+	parent := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
+	block1 := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
+	block2 := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
+	block3 := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
 
 	proposal0 := unittest.ClusterProposalFromBlock(parent)
 	proposal1 := unittest.ClusterProposalFromBlock(block1)
 	proposal2 := unittest.ClusterProposalFromBlock(block2)
 	proposal3 := unittest.ClusterProposalFromBlock(block3)
 
-	pendingFromProposal := func(block *cluster.BlockProposal) flow.Slashable[*cluster.BlockProposal] {
-		return flow.Slashable[*cluster.BlockProposal]{
+	pendingFromProposal := func(block *cluster.Proposal) flow.Slashable[*cluster.Proposal] {
+		return flow.Slashable[*cluster.Proposal]{
 			OriginID: block.Block.Header.ProposerID,
 			Message:  block,
 		}
@@ -477,7 +505,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending2)
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
-	for _, prop := range []*cluster.BlockProposal{proposal0, proposal1, proposal2, proposal3} {
+	for _, prop := range []*cluster.Proposal{proposal0, proposal1, proposal2, proposal3} {
 		hotstuffProposal := model.SignedProposalFromClusterBlock(prop)
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
@@ -485,7 +513,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	}
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(flow.Slashable[*cluster.BlockProposal]{
+	err := cs.core.processBlockAndDescendants(flow.Slashable[*cluster.Proposal]{
 		OriginID: unittest.IdentifierFixture(),
 		Message:  proposal0,
 	})
@@ -501,15 +529,19 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 func (cs *CoreSuite) TestProposalBufferingOrder() {
 	// create a proposal that we will not submit until the end
 	originID := unittest.IdentifierFixture()
-	block := unittest.ClusterBlockWithParent(cs.head.Block)
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
 	missing := block
 
 	// create a chain of descendants
-	var proposals []*cluster.BlockProposal
-	proposalsLookup := make(map[flow.Identifier]*cluster.BlockProposal)
+	var proposals []*cluster.Proposal
+	proposalsLookup := make(map[flow.Identifier]*cluster.Proposal)
 	parent := missing
 	for i := 0; i < 3; i++ {
-		block := unittest.ClusterBlockWithParent(parent)
+		block := unittest.ClusterBlockFixture(
+			unittest.ClusterBlock.WithParent(parent),
+		)
 		proposal := unittest.ClusterProposalFromBlock(block)
 		proposals = append(proposals, proposal)
 		proposalsLookup[block.ID()] = proposal

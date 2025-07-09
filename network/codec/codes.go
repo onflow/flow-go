@@ -182,7 +182,8 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 
 	// collections, guarantees & transactions
 	case CodeCollectionGuarantee:
-		return &flow.CollectionGuarantee{}, what(&flow.CollectionGuarantee{}), nil
+		var guarantee flow.CollectionGuarantee
+		return &guarantee, what(&guarantee), nil
 	case CodeTransactionBody:
 		return &flow.TransactionBody{}, what(&flow.TransactionBody{}), nil
 	case CodeTransaction:
@@ -190,7 +191,7 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 
 	// core messages for execution & verification
 	case CodeExecutionReceipt:
-		return &flow.ExecutionReceipt{}, what(&flow.ExecutionReceipt{}), nil
+		return new(flow.ExecutionReceipt), what(new(flow.ExecutionReceipt)), nil
 	case CodeResultApproval:
 		return &flow.ResultApproval{}, what(&flow.ResultApproval{}), nil
 

@@ -455,7 +455,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 			node.Storage.Headers,
 			final,
 			builder.FollowerDistributor,
-			node.FinalizedRootBlock.Header,
+			node.FinalizedRootBlock.ToHeader(),
 			node.RootQC,
 			builder.Finalized,
 			builder.Pending,
@@ -2123,7 +2123,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.State,
 				channels.RequestCollections,
 				filter.HasRole[flow.Identity](flow.RoleCollection),
-				func() flow.Entity { return &flow.Collection{} },
+				func() flow.Entity { return new(flow.Collection) },
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)

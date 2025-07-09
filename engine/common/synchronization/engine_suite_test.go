@@ -36,8 +36,8 @@ type SyncSuite struct {
 	myID         flow.Identifier
 	participants flow.IdentityList
 	head         *flow.Header
-	heights      map[uint64]*flow.BlockProposal
-	blockIDs     map[flow.Identifier]*flow.BlockProposal
+	heights      map[uint64]*flow.Proposal
+	blockIDs     map[flow.Identifier]*flow.Proposal
 	net          *mocknetwork.Network
 	con          *mocknetwork.Conduit
 	me           *module.Local
@@ -64,8 +64,8 @@ func (ss *SyncSuite) SetupTest() {
 	ss.head = header
 
 	// create maps to enable block returns
-	ss.heights = make(map[uint64]*flow.BlockProposal)
-	ss.blockIDs = make(map[flow.Identifier]*flow.BlockProposal)
+	ss.heights = make(map[uint64]*flow.Proposal)
+	ss.blockIDs = make(map[flow.Identifier]*flow.Proposal)
 
 	// set up the network module mock
 	ss.net = &mocknetwork.Network{}
@@ -122,7 +122,7 @@ func (ss *SyncSuite) SetupTest() {
 	// set up blocks storage mock
 	ss.blocks = &storage.Blocks{}
 	ss.blocks.On("ProposalByHeight", mock.Anything).Return(
-		func(height uint64) (*flow.BlockProposal, error) {
+		func(height uint64) (*flow.Proposal, error) {
 			block, enabled := ss.heights[height]
 			if !enabled {
 				return nil, storerr.ErrNotFound
@@ -130,7 +130,7 @@ func (ss *SyncSuite) SetupTest() {
 			return block, nil
 		})
 	ss.blocks.On("ProposalByID", mock.Anything).Return(
-		func(blockID flow.Identifier) (*flow.BlockProposal, error) {
+		func(blockID flow.Identifier) (*flow.Proposal, error) {
 			block, enabled := ss.blockIDs[blockID]
 			if !enabled {
 				return nil, storerr.ErrNotFound

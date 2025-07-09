@@ -61,8 +61,3 @@ var _ Entity = (*ResultApproval)(nil)
 func (ra ResultApproval) ID() Identifier {
 	return MakeID(ra)
 }
-
-// Checksum generates checksum using the result approval full content
-func (ra ResultApproval) Checksum() Identifier {
-	return MakeID(ra)
-}

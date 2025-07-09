@@ -32,7 +32,7 @@ func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
 		return nil, err
 	}
 
-	blockHeader, err := BlockHeaderToMessage(h.Header, signerIDs)
+	blockHeader, err := BlockHeaderToMessage(h.ToHeader(), signerIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -78,10 +78,7 @@ func MessageToBlock(m *entities.Block) (*flow.Block, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert block header: %w", err)
 	}
-	return &flow.Block{
-		Header:  header,
-		Payload: payload,
-	}, nil
+	return flow.NewBlock(header.HeaderBody, *payload), nil
 }
 
 // BlockSealToMessage converts a flow.Seal to a protobuf BlockSeal message.
@@ -136,12 +133,18 @@ func MessagesToBlockSeals(m []*entities.BlockSeal) ([]*flow.Seal, error) {
 
 // PayloadFromMessage converts a protobuf Block message to a flow.Payload.
 func PayloadFromMessage(m *entities.Block) (*flow.Payload, error) {
-	cgs := MessagesToCollectionGuarantees(m.CollectionGuarantees)
+	cgs, err := MessagesToCollectionGuarantees(m.CollectionGuarantees)
+	if err != nil {
+		return nil, err
+	}
 	seals, err := MessagesToBlockSeals(m.BlockSeals)
 	if err != nil {
 		return nil, err
 	}
-	receipts := MessagesToExecutionResultMetaList(m.ExecutionReceiptMetaList)
+	receipts, err := MessagesToExecutionResultMetaList(m.ExecutionReceiptMetaList)
+	if err != nil {
+		return nil, err
+	}
 	results, err := MessagesToExecutionResults(m.ExecutionResultList)
 	if err != nil {
 		return nil, err

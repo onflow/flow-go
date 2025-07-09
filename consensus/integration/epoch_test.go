@@ -98,7 +98,7 @@ func TestStaticEpochTransition(t *testing.T) {
 func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 	// must finalize 8 blocks, we specify the epoch transition after 4 views
 	stopper := NewStopper(8, 0)
-	privateNodeInfos := createPrivateNodeIdentities(4)
+	privateNodeInfos := createPrivateNodeIdentities(t, 4)
 	firstEpochConsensusParticipants := completeConsensusIdentities(t, privateNodeInfos[:3])
 	rootSnapshot := createRootSnapshot(t, firstEpochConsensusParticipants)
 	consensusParticipants := NewConsensusParticipants(firstEpochConsensusParticipants)
@@ -257,11 +257,16 @@ func withNextEpoch(
 
 	// Construct the new epoch protocol state entry
 	epochStateEntry, err := flow.NewEpochStateEntry(
-		minEpochStateEntry,
-		rootProtocolState.EpochEntry.PreviousEpochSetup,
-		rootProtocolState.EpochEntry.PreviousEpochCommit,
-		currEpochSetup, currEpochCommit,
-		nextEpochSetup, nextEpochCommit)
+		flow.UntrustedEpochStateEntry{
+			MinEpochStateEntry:  minEpochStateEntry,
+			PreviousEpochSetup:  rootProtocolState.EpochEntry.PreviousEpochSetup,
+			PreviousEpochCommit: rootProtocolState.EpochEntry.PreviousEpochCommit,
+			CurrentEpochSetup:   currEpochSetup,
+			CurrentEpochCommit:  currEpochCommit,
+			NextEpochSetup:      nextEpochSetup,
+			NextEpochCommit:     nextEpochCommit,
+		},
+	)
 	require.NoError(t, err)
 	// Re-construct epoch protocol state with modified events (constructs ActiveIdentity fields)
 	epochRichProtocolState, err := flow.NewRichEpochStateEntry(epochStateEntry)
@@ -289,11 +294,8 @@ func withNextEpoch(
 	}
 
 	// Since we modified the root protocol state, we need to update the root block's ProtocolStateID field.
-	// rootBlock is a pointer, so mutations apply to Snapshot
+	encodableSnapshot.SealingSegment.Blocks[0].Block.Payload.ProtocolStateID = rootKVStore.ID()
 	rootBlock := encodableSnapshot.SealingSegment.Blocks[0].Block
-	rootBlockPayload := rootBlock.Payload
-	rootBlockPayload.ProtocolStateID = rootKVStore.ID()
-	rootBlock.SetPayload(*rootBlockPayload)
 	// Since we changed the root block, we need to update the QC, root result, and root seal.
 	// rootResult and rootSeal are pointers, so mutations apply to Snapshot
 	rootResult.BlockID = rootBlock.ID()
@@ -302,7 +304,7 @@ func withNextEpoch(
 	encodableSnapshot.SealingSegment.LatestSeals = map[flow.Identifier]flow.Identifier{
 		rootBlock.ID(): rootSeal.ID(),
 	}
-	encodableSnapshot.QuorumCertificate = createQC(rootBlock)
+	encodableSnapshot.QuorumCertificate = createQC(&rootBlock)
 
 	participantsCache.Update(nextEpochSetup.Counter, nextEpochParticipantData)
 

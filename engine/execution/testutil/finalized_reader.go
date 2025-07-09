@@ -27,7 +27,7 @@ func NewMockFinalizedReader(initHeight uint64, count int) (*MockFinalizedReader,
 
 	blockByHeight := make(map[uint64]*flow.Block, len(blocks)+1)
 	for _, b := range blocks {
-		headerByHeight[b.Header.Height] = b.Header
+		headerByHeight[b.Header.Height] = b.ToHeader()
 		blockByHeight[b.Header.Height] = b
 	}
 

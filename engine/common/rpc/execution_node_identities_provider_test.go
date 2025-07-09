@@ -57,15 +57,14 @@ func (suite *ENIdentitiesProviderSuite) TestExecutionNodesForBlockID() {
 	allExecutionNodes := unittest.IdentityListFixture(totalReceipts, unittest.WithRole(flow.RoleExecution))
 
 	// one execution result for all receipts for this block
-	executionResult := unittest.ExecutionResultFixture()
+	executionResult := *unittest.ExecutionResultFixture()
 
 	// generate execution receipts
 	receipts := make(flow.ExecutionReceiptList, totalReceipts)
 	for j := 0; j < totalReceipts; j++ {
-		r := unittest.ReceiptForBlockFixture(&block)
+		r := unittest.ReceiptForBlockFixture(block)
 		r.ExecutorID = allExecutionNodes[j].NodeID
-		er := *executionResult
-		r.ExecutionResult = er
+		r.ExecutionResult = executionResult
 		receipts[j] = r
 	}
 

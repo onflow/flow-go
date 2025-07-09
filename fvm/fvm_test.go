@@ -2862,7 +2862,7 @@ func TestEVM(t *testing.T) {
 		fvm.WithChain(flow.Emulator.Chain()),
 		fvm.WithEVMEnabled(true),
 		fvm.WithBlocks(blocks),
-		fvm.WithBlockHeader(block1.Header),
+		fvm.WithBlockHeader(block1.ToHeader()),
 		fvm.WithCadenceLogging(true),
 	}
 
@@ -3125,7 +3125,7 @@ func TestVMBridge(t *testing.T) {
 		fvm.WithChain(flow.Emulator.Chain()),
 		fvm.WithEVMEnabled(true),
 		fvm.WithBlocks(blocks),
-		fvm.WithBlockHeader(block1.Header),
+		fvm.WithBlockHeader(block1.ToHeader()),
 		fvm.WithCadenceLogging(true),
 		fvm.WithContractDeploymentRestricted(false),
 	}
@@ -3736,7 +3736,9 @@ func TestAccountCapabilitiesPublishEntitledRejection(t *testing.T) {
 				snapshotTree)
 
 			require.NoError(t, err)
-			require.ErrorAs(t, output.Err, &interpreter.EntitledCapabilityPublishingError{})
+
+			var publishingError *interpreter.EntitledCapabilityPublishingError
+			require.ErrorAs(t, output.Err, &publishingError)
 		}),
 	)
 

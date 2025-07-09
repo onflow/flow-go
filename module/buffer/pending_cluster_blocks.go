@@ -14,55 +14,68 @@ func NewPendingClusterBlocks() *PendingClusterBlocks {
 	return b
 }
 
-func (b *PendingClusterBlocks) Add(block flow.Slashable[*cluster.BlockProposal]) bool {
+func (b *PendingClusterBlocks) Add(block flow.Slashable[*cluster.Proposal]) bool {
 	return b.backend.add(flow.Slashable[*flow.ProposalHeader]{
 		OriginID: flow.Identifier{},
 		Message:  &flow.ProposalHeader{Header: block.Message.Block.ToHeader(), ProposerSigData: block.Message.ProposerSigData},
 	}, block.Message.Block.Payload)
 }
 
-func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cluster.BlockProposal], bool) {
+func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cluster.Proposal], bool) {
 	item, ok := b.backend.byID(blockID)
 	if !ok {
-		return flow.Slashable[*cluster.BlockProposal]{}, false
+		return flow.Slashable[*cluster.Proposal]{}, false
+	}
+	block, err := cluster.NewBlock(
+		cluster.UntrustedBlock{
+			Header:  item.header.Message.Header.HeaderBody,
+			Payload: item.payload.(cluster.Payload),
+		},
+	)
+	if err != nil {
+		return flow.Slashable[*cluster.Proposal]{}, false
 	}
 
-	block := flow.Slashable[*cluster.BlockProposal]{
+	proposal := flow.Slashable[*cluster.Proposal]{
 		OriginID: item.header.OriginID,
-		Message: &cluster.BlockProposal{
-			Block: cluster.NewBlock(
-				item.header.Message.Header.HeaderBody,
-				item.payload.(cluster.Payload),
-			),
+		Message: &cluster.Proposal{
+			Block:           *block,
 			ProposerSigData: item.header.Message.ProposerSigData,
 		},
 	}
 
-	return block, true
+	return proposal, true
 }
 
-func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.BlockProposal], bool) {
+func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.Proposal], bool) {
 	items, ok := b.backend.byParentID(parentID)
 	if !ok {
 		return nil, false
 	}
 
-	blocks := make([]flow.Slashable[*cluster.BlockProposal], 0, len(items))
+	proposals := make([]flow.Slashable[*cluster.Proposal], 0, len(items))
 	for _, item := range items {
-		block := flow.Slashable[*cluster.BlockProposal]{
+		block, err := cluster.NewBlock(
+			cluster.UntrustedBlock{
+				Header:  item.header.Message.Header.HeaderBody,
+				Payload: item.payload.(cluster.Payload),
+			},
+		)
+		if err != nil {
+			return nil, false
+		}
+
+		proposal := flow.Slashable[*cluster.Proposal]{
 			OriginID: item.header.OriginID,
-			Message: &cluster.BlockProposal{
-				Block: cluster.NewBlock(
-					item.header.Message.Header.HeaderBody,
-					item.payload.(cluster.Payload),
-				),
+			Message: &cluster.Proposal{
+				Block:           *block,
 				ProposerSigData: item.header.Message.ProposerSigData,
 			},
 		}
-		blocks = append(blocks, block)
+		proposals = append(proposals, proposal)
 	}
 
-	return blocks, true
+	return proposals, true
 }
 
 func (b *PendingClusterBlocks) DropForParent(parentID flow.Identifier) {

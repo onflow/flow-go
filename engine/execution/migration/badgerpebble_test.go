@@ -85,7 +85,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 			nil,
 			genesis,
 			&unittest.GenesisStateCommitment)
-		header := executableBlock.Block.Header
+		header := executableBlock.Block.ToHeader()
 
 		computationResult := testutil.ComputationResultFixture(t)
 		computationResult.ExecutableBlock = executableBlock
@@ -96,9 +96,9 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 			nil,
 			header,
 			&commit)
-		newheader := newexecutableBlock.Block.Header
+		newheader := newexecutableBlock.Block.ToHeader()
 
-		err = headers.Store(unittest.ProposalFromHeader(header))
+		err = headers.Store(unittest.ProposalHeaderFromHeader(header))
 		require.NoError(t, err)
 
 		// save execution results
@@ -187,7 +187,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		)
 		require.NotNil(t, es)
 
-		err = headers.Store(unittest.ProposalFromHeader(newheader))
+		err = headers.Store(unittest.ProposalHeaderFromHeader(newheader))
 		require.NoError(t, err)
 
 		newcomputationResult := testutil.ComputationResultFixture(t)

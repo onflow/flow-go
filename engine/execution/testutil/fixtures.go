@@ -588,8 +588,14 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 	blockExecResult := execution.NewPopulatedBlockExecutionResult(executableBlock)
 	blockExecResult.CollectionExecutionResultAt(0).AppendTransactionResults(
 		flow.EventsList{
-			unittest.EventFixture("what", 0, 0, unittest.IdentifierFixture(), 2),
-			unittest.EventFixture("ever", 0, 1, unittest.IdentifierFixture(), 22),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(0),
+				unittest.Event.WithEventIndex(0),
+			),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(0),
+				unittest.Event.WithEventIndex(1),
+			),
 		},
 		nil,
 		nil,
@@ -602,10 +608,22 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 	)
 	blockExecResult.CollectionExecutionResultAt(1).AppendTransactionResults(
 		flow.EventsList{
-			unittest.EventFixture("what", 2, 0, unittest.IdentifierFixture(), 2),
-			unittest.EventFixture("ever", 2, 1, unittest.IdentifierFixture(), 22),
-			unittest.EventFixture("ever", 2, 2, unittest.IdentifierFixture(), 2),
-			unittest.EventFixture("ever", 2, 3, unittest.IdentifierFixture(), 22),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(2),
+				unittest.Event.WithEventIndex(0),
+			),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(2),
+				unittest.Event.WithEventIndex(1),
+			),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(2),
+				unittest.Event.WithEventIndex(2),
+			),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(2),
+				unittest.Event.WithEventIndex(3),
+			),
 		},
 		nil,
 		nil,
@@ -616,6 +634,21 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 			MemoryUsed:      22,
 		},
 	)
+	executionReceipt := &flow.ExecutionReceipt{
+		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
+			ExecutorID: unittest.IdentifierFixture(),
+			ExecutionResult: flow.ExecutionResult{
+				Chunks: flow.ChunkList{
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
+				},
+			},
+			Spocks: unittest.SignaturesFixture(1),
+		},
+		ExecutorSignature: unittest.SignatureFixture(),
+	}
 
 	return &execution.ComputationResult{
 		BlockExecutionResult: blockExecResult,
@@ -629,18 +662,7 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 				},
 			},
 		},
-		ExecutionReceipt: &flow.ExecutionReceipt{
-			UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
-				ExecutionResult: flow.ExecutionResult{
-					Chunks: flow.ChunkList{
-						{EndState: unittest.StateCommitmentFixture()},
-						{EndState: unittest.StateCommitmentFixture()},
-						{EndState: unittest.StateCommitmentFixture()},
-						{EndState: unittest.StateCommitmentFixture()},
-					},
-				},
-			},
-		},
+		ExecutionReceipt: executionReceipt,
 	}
 }
 

@@ -70,10 +70,10 @@ func SignedProposalFromFlow(p *flow.ProposalHeader) *SignedProposal {
 }
 
 // TODO(malleability, #7311) clean up conversion functions and/or proposal types here
-func SignedProposalFromBlock(p *flow.BlockProposal) *SignedProposal {
+func SignedProposalFromBlock(p *flow.Proposal) *SignedProposal {
 	proposal := SignedProposal{
 		Proposal: Proposal{
-			Block:      BlockFromFlow(p.Block.Header),
+			Block:      BlockFromFlow(p.Block.ToHeader()),
 			LastViewTC: p.Block.Header.LastViewTC,
 		},
 		SigData: p.ProposerSigData,
@@ -81,7 +81,7 @@ func SignedProposalFromBlock(p *flow.BlockProposal) *SignedProposal {
 	return &proposal
 }
 
-func SignedProposalFromClusterBlock(p *cluster.BlockProposal) *SignedProposal {
+func SignedProposalFromClusterBlock(p *cluster.Proposal) *SignedProposal {
 	proposal := SignedProposal{
 		Proposal: Proposal{
 			Block:      BlockFromFlow(p.Block.ToHeader()),

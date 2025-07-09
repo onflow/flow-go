@@ -20,7 +20,7 @@ type EncodableSnapshot struct {
 // in the sealing segment with the greatest Height.
 // The EncodableSnapshot receiver must be correctly formed.
 func (snap EncodableSnapshot) Head() *flow.Header {
-	return snap.SealingSegment.Highest().Header
+	return snap.SealingSegment.Highest().ToHeader()
 }
 
 // LatestSeal returns the latest seal of the Snapshot. This is the seal
