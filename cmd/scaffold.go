@@ -283,6 +283,18 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"disable-fees",
 		false,
 		"Disables calling the transaction fee deduction. This is only for testing purposes. To disable fees on a network it is better to set the fee price to 0.0 .")
+
+	fnb.flags.BoolVar(&fnb.VMScriptExecutionEnabled,
+		"vm-script-execution-enabled",
+		false,
+		"Enables execution of scripts with the Cadence compiler/VM instead of the Cadence interpreter",
+	)
+
+	fnb.flags.BoolVar(&fnb.VMTransactionExecutionEnabled,
+		"vm-transaction-execution-enabled",
+		false,
+		"Enables execution of transactions with the Cadence compiler/VM instead of the Cadence interpreter",
+	)
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -1598,6 +1610,8 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fnb.RootChainID,
 		fnb.Storage.Headers,
 		fnb.BaseConfig.TransactionFeesDisabled,
+		fnb.BaseConfig.VMScriptExecutionEnabled,
+		fnb.BaseConfig.VMTransactionExecutionEnabled,
 	)
 }
 
