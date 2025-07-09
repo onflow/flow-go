@@ -16,6 +16,7 @@ func TestGenerateClusterRootQC(t *testing.T) {
 
 	clusterBlock := &cluster.Block{
 		Header: flow.HeaderBody{
+			ChainID:  flow.Emulator,
 			ParentID: flow.ZeroID,
 			View:     42,
 		},

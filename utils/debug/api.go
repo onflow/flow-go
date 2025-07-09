@@ -26,6 +26,7 @@ func GetExecutionAPIBlockHeader(
 		return nil, err
 	}
 
+	//nolint:structwrite
 	return &flow.Header{
 		HeaderBody: flow.HeaderBody{
 			ChainID:   flow.ChainID(resp.Block.ChainId),
@@ -53,6 +54,7 @@ func GetAccessAPIBlockHeader(
 		return nil, err
 	}
 
+	//nolint:structwrite
 	return &flow.Header{
 		HeaderBody: flow.HeaderBody{
 			ChainID:   flow.ChainID(resp.Block.ChainId),

@@ -1162,7 +1162,10 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	participants := bootstrap.ToIdentityList(stakedNodeInfos)
 
 	// generate root block
-	rootHeader := run.GenerateRootHeader(chainID, parentID, height, timestamp)
+	rootHeader, err := run.GenerateRootHeader(chainID, parentID, height, timestamp)
+	if err != nil {
+		return nil, err
+	}
 
 	// generate root blocks for each collector cluster
 	clusterRootBlocks, clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, stakedConfs)
@@ -1239,12 +1242,15 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, err
 	}
 
-	root := flow.NewRootBlock(
+	root, err := flow.NewRootBlock(
 		flow.UntrustedBlock{
 			Header:  rootHeader.HeaderBody,
 			Payload: unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolState.ID())),
 		},
 	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct root block: %w", err)
+	}
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {
@@ -1442,7 +1448,10 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 
 	for _, cluster := range clusters {
 		// generate root cluster block
-		block := clusterstate.CanonicalRootBlock(epochCounter, cluster)
+		block, err := clusterstate.CanonicalRootBlock(epochCounter, cluster)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to generate canonical root block: %w", err)
+		}
 
 		lookup := make(map[flow.Identifier]struct{})
 		for _, node := range cluster {

@@ -65,12 +65,15 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Bl
 				return nil, fmt.Errorf("could not build block: %w", err)
 			}
 		} else {
-			block = flow.NewRootBlock(
+			block, err = flow.NewRootBlock(
 				flow.UntrustedBlock{
 					Header:  header.HeaderBody,
 					Payload: *payload,
 				},
 			)
+			if err != nil {
+				return nil, fmt.Errorf("could not construct root block: %w", err)
+			}
 		}
 
 		return block, nil

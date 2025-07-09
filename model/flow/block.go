@@ -7,26 +7,36 @@ import (
 	"github.com/vmihailenco/msgpack/v4"
 )
 
-func Genesis(chainID ChainID) *Block {
+func Genesis(chainID ChainID) (*Block, error) {
 	// create the raw content for the genesis block
 	payload := Payload{}
 
 	// create the headerBody
-	headerBody := HeaderBody{
-		ChainID:   chainID,
-		ParentID:  ZeroID,
-		Height:    0,
-		Timestamp: GenesisTime,
-		View:      0,
+	headerBody, err := NewRootHeaderBody(
+		UntrustedHeaderBody{
+			ChainID:   chainID,
+			ParentID:  ZeroID,
+			Height:    0,
+			Timestamp: GenesisTime,
+			View:      0,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create root header body: %w", err)
 	}
 
 	// combine to block
-	return NewRootBlock(
+	block, err := NewRootBlock(
 		UntrustedBlock{
-			Header:  headerBody,
+			Header:  *headerBody,
 			Payload: payload,
 		},
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create root block: %w", err)
+	}
+
+	return block, nil
 }
 
 // Block (currently) includes the all block header metadata and the payload content.
@@ -68,29 +78,18 @@ type UntrustedBlock Block
 // All errors indicate that a valid Block cannot be constructed from the input.
 func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	// validate header body
-	untrustedHeaderBody := untrusted.Header
-	if untrustedHeaderBody.ParentID == ZeroID {
-		return nil, fmt.Errorf("parent ID must not be zero")
-	}
-	if len(untrustedHeaderBody.ParentVoterIndices) == 0 {
-		return nil, fmt.Errorf("parent voter indices must not be empty")
-	}
-	if len(untrustedHeaderBody.ParentVoterSigData) == 0 {
-		return nil, fmt.Errorf("parent voter signature must not be empty")
-	}
-	if untrustedHeaderBody.ProposerID == ZeroID {
-		return nil, fmt.Errorf("proposer ID must not be zero")
-	}
-	if untrustedHeaderBody.ParentView >= untrustedHeaderBody.View {
-		return nil, fmt.Errorf("invalid views - block parent view (%d) is greater than or equal to block view (%d)", untrustedHeaderBody.ParentView, untrustedHeaderBody.View)
+	headerBody, err := NewHeaderBody(UntrustedHeaderBody(untrusted.Header))
+	if err != nil {
+		return nil, fmt.Errorf("invalid header body: %w", err)
 	}
 
 	// validate payload
 	if untrusted.Payload.ProtocolStateID == ZeroID {
 		return nil, fmt.Errorf("protocol state ID must not be zero")
 	}
+
 	return &Block{
-		Header:  untrusted.Header,
+		Header:  *headerBody,
 		Payload: untrusted.Payload,
 	}, nil
 }
@@ -98,11 +97,16 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 // NewRootBlock creates a root block.
 // This constructor must be used **only** for constructing the root block,
 // which is the only case where zero values are allowed.
-func NewRootBlock(untrusted UntrustedBlock) *Block {
-	return &Block{
-		Header:  untrusted.Header,
-		Payload: untrusted.Payload,
+func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
+	rootHeaderBody, err := NewRootHeaderBody(UntrustedHeaderBody(untrusted.Header))
+	if err != nil {
+		return nil, fmt.Errorf("invalid root header body: %w", err)
 	}
+
+	return &Block{
+		Header:  *rootHeaderBody,
+		Payload: untrusted.Payload,
+	}, nil
 }
 
 // ID returns a collision-resistant hash of the Block struct.
@@ -112,17 +116,36 @@ func (b Block) ID() Identifier {
 
 // ToHeader converts the block into a compact [flow.Header] representation,
 // where the payload is compressed to a hash reference.
+// The receiver Block must be well-formed (enforced by mutation protection on the type).
+// This function may panic if invoked on a malformed Block.
 func (b Block) ToHeader() *Header {
-	return &Header{
+	if b.Header.ContainsParentQC() {
+		header, err := NewHeader(UntrustedHeader{
+			HeaderBody:  b.Header,
+			PayloadHash: b.Payload.Hash(),
+		})
+		if err != nil {
+			panic(fmt.Errorf("could not build header from block: %w", err))
+		}
+
+		return header
+	}
+
+	rootHeader, err := NewRootHeader(UntrustedHeader{
 		HeaderBody:  b.Header,
 		PayloadHash: b.Payload.Hash(),
+	})
+	if err != nil {
+		panic(fmt.Errorf("could not build root header from block: %w", err))
 	}
+
+	return rootHeader
 }
 
 // TODO(malleability): remove MarshalMsgpack when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
 func (b Block) MarshalMsgpack() ([]byte, error) {
 	if b.Header.Timestamp.Location() != time.UTC {
-		b.Header.Timestamp = b.Header.Timestamp.UTC()
+		b.Header.Timestamp = b.Header.Timestamp.UTC() //nolint:structwrite
 	}
 
 	type Encodable Block
@@ -137,7 +160,7 @@ func (b *Block) UnmarshalMsgpack(data []byte) error {
 	*b = Block(decodable)
 
 	if b.Header.Timestamp.Location() != time.UTC {
-		b.Header.Timestamp = b.Header.Timestamp.UTC()
+		b.Header.Timestamp = b.Header.Timestamp.UTC() //nolint:structwrite
 	}
 
 	return err

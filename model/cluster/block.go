@@ -88,11 +88,29 @@ func (b *Block) ID() flow.Identifier {
 
 // ToHeader converts the block into a compact [flow.Header] representation,
 // where the payload is compressed to a hash reference.
+// The receiver Block must be well-formed (enforced by mutation protection on the type).
+// This function may panic if invoked on a malformed Block.
 func (b *Block) ToHeader() *flow.Header {
-	return &flow.Header{
+	if b.Header.ContainsParentQC() {
+		header, err := flow.NewHeader(flow.UntrustedHeader{
+			HeaderBody:  b.Header,
+			PayloadHash: b.Payload.Hash(),
+		})
+		if err != nil {
+			panic(fmt.Errorf("could not build header from block: %w", err))
+		}
+		return header
+	}
+
+	rootHeader, err := flow.NewRootHeader(flow.UntrustedHeader{
 		HeaderBody:  b.Header,
 		PayloadHash: b.Payload.Hash(),
+	})
+	if err != nil {
+		panic(fmt.Errorf("could not build root header from block: %w", err))
 	}
+
+	return rootHeader
 }
 
 // BlockProposal represents a signed proposed block in collection node cluster consensus.

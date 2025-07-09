@@ -79,8 +79,8 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 		}
 	}
 
-	return &flow.Header{
-		HeaderBody: flow.HeaderBody{
+	if IsRootBlockHeader(m) {
+		rootHeaderBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
 			ParentID:           MessageToIdentifier(m.ParentId),
 			Height:             m.Height,
 			Timestamp:          m.Timestamp.AsTime(),
@@ -91,7 +91,53 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 			ProposerID:         MessageToIdentifier(m.ProposerId),
 			ChainID:            *chainId,
 			LastViewTC:         lastViewTC,
-		},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create root header body: %w", err)
+		}
+
+		rootHeader, err := flow.NewRootHeader(flow.UntrustedHeader{
+			HeaderBody:  *rootHeaderBody,
+			PayloadHash: MessageToIdentifier(m.PayloadHash),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create root header: %w", err)
+		}
+
+		return rootHeader, nil
+	}
+
+	headerBody, err := flow.NewHeaderBody(flow.UntrustedHeaderBody{
+		ParentID:           MessageToIdentifier(m.ParentId),
+		Height:             m.Height,
+		Timestamp:          m.Timestamp.AsTime(),
+		View:               m.View,
+		ParentView:         m.ParentView,
+		ParentVoterIndices: m.ParentVoterIndices,
+		ParentVoterSigData: m.ParentVoterSigData,
+		ProposerID:         MessageToIdentifier(m.ProposerId),
+		ChainID:            *chainId,
+		LastViewTC:         lastViewTC,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build header body: %w", err)
+	}
+	header, err := flow.NewHeader(flow.UntrustedHeader{
+		HeaderBody:  *headerBody,
 		PayloadHash: MessageToIdentifier(m.PayloadHash),
-	}, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build header: %w", err)
+	}
+
+	return header, nil
+}
+
+// IsRootBlockHeader reports whether this is a root block header.
+// It returns true only if all of the fields required to build a Header are zero/nil.
+func IsRootBlockHeader(m *entities.BlockHeader) bool {
+	return MessageToIdentifier(m.ParentId) == flow.ZeroID &&
+		m.ParentVoterIndices == nil &&
+		m.ParentVoterSigData == nil &&
+		MessageToIdentifier(m.ProposerId) == flow.ZeroID
 }
