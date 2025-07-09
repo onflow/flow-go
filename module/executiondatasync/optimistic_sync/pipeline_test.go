@@ -3,7 +3,6 @@ package optimistic_sync
 import (
 	"context"
 	"errors"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"testing"
 	"time"
 
@@ -29,10 +28,10 @@ func TestPipelineStateTransitions(t *testing.T) {
 
 	assert.Equal(t, StatePending, pipeline.GetState(), "Pipeline should start in Pending state")
 
-	ctx, _, errChan := irrecoverable.WithSignallerAndCancel(context.Background())
-	go unittest.FailOnIrrecoverableError(t, ctx.Done(), errChan)
-	pipeline.Start(ctx)
-	unittest.RequireComponentsReadyBefore(t, time.Second, pipeline)
+	errChan := make(chan error)
+	go func() {
+		errChan <- pipeline.Run(context.Background(), mockCore, parent)
+	}()
 
 	// Wait for pipeline to reach WaitingPersist state
 	expectedStates := []State{StateProcessing, StateWaitingPersist, StateComplete}
@@ -40,7 +39,7 @@ func TestPipelineStateTransitions(t *testing.T) {
 	assert.Equal(t, StateComplete, pipeline.GetState(), "Pipeline should be in Complete state")
 
 	// Run should complete without error
-	unittest.RequireComponentsDoneBefore(t, time.Second, pipeline)
+	waitForError(t, errChan, nil)
 }
 
 // TestPipelineParentDependentTransitions verifies that a pipeline's transitions
@@ -54,10 +53,10 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 
 	assert.Equal(t, StatePending, pipeline.GetState(), "Pipeline should start in Pending state")
 
-	ctx, _, errChan := irrecoverable.WithSignallerAndCancel(context.Background())
-	go unittest.FailOnIrrecoverableError(t, ctx.Done(), errChan)
-	pipeline.Start(ctx)
-	unittest.RequireComponentsReadyBefore(t, time.Second, pipeline)
+	errChan := make(chan error)
+	go func() {
+		errChan <- pipeline.Run(context.Background(), mockCore, parent)
+	}()
 
 	// Initial update - parent in Ready state
 	parent.UpdateState(StatePending, pipeline)
@@ -98,29 +97,29 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 	mockCore.AssertCalled(t, "Persist")
 
 	// Run should complete without error
-	unittest.RequireComponentsDoneBefore(t, time.Second, pipeline)
+	waitForError(t, errChan, nil)
 }
 
 // TestParentAbandoned verifies that a pipeline is properly abandoned when
 // the parent pipeline is abandoned.
 func TestAbandoned(t *testing.T) {
 	t.Run("starts already abandoned", func(t *testing.T) {
-		pipeline, mockCore, updateChan, _ := createPipeline(t)
+		pipeline, mockCore, updateChan, parent := createPipeline(t)
 
 		mockCore.On("Abandon").Return(nil)
 
 		pipeline.Abandon()
 
-		ctx, _, errChan := irrecoverable.WithSignallerAndCancel(context.Background())
-		go unittest.FailOnIrrecoverableError(t, ctx.Done(), errChan)
-		pipeline.Start(ctx)
-		unittest.RequireComponentsReadyBefore(t, time.Second, pipeline)
+		errChan := make(chan error)
+		go func() {
+			errChan <- pipeline.Run(context.Background(), mockCore, parent)
+		}()
 
 		// first state must be abandoned
 		waitForStateUpdates(t, updateChan, StateAbandoned)
 
 		// Run should complete without error
-		unittest.RequireComponentsDoneBefore(t, time.Second, pipeline)
+		waitForError(t, errChan, nil)
 	})
 
 	// Test cases abandoning during different stages of processing
@@ -218,17 +217,17 @@ func TestAbandoned(t *testing.T) {
 
 			mockCore.On("Abandon").Return(nil)
 
-			ctx, _, errChan := irrecoverable.WithSignallerAndCancel(context.Background())
-			go unittest.FailOnIrrecoverableError(t, ctx.Done(), errChan)
-			pipeline.Start(ctx)
-			unittest.RequireComponentsReadyBefore(t, time.Second, pipeline)
+			errChan := make(chan error)
+			go func() {
+				errChan <- pipeline.Run(context.Background(), mockCore, parent)
+			}()
 
 			// Send parent update to start processing
 			parent.UpdateState(StateProcessing, pipeline)
 
 			waitForStateUpdates(t, updateChan, tc.expectedStates...)
 
-			unittest.RequireComponentsDoneBefore(t, time.Second, pipeline)
+			waitForError(t, errChan, nil)
 		})
 	}
 }
@@ -305,11 +304,12 @@ func TestPipelineContextCancellation(t *testing.T) {
 
 			ctx := tc.setupMock(pipeline, parent, mockCore)
 
-			irrecoverableCtx, _, errChan := irrecoverable.WithSignallerAndCancel(ctx)
-			go unittest.FailOnIrrecoverableError(t, ctx.Done(), errChan)
-			pipeline.Start(irrecoverableCtx)
-			unittest.RequireComponentsReadyBefore(t, time.Second, pipeline)
-			unittest.RequireComponentsDoneBefore(t, time.Second, pipeline)
+			errChan := make(chan error)
+			go func() {
+				errChan <- pipeline.Run(ctx, mockCore, parent)
+			}()
+
+			waitForError(t, errChan, context.Canceled)
 		})
 	}
 }
@@ -371,9 +371,10 @@ func TestPipelineErrorHandling(t *testing.T) {
 
 			tc.setupMock(pipeline, parent, mockCore, tc.expectedErr)
 
-			ctx, _, errChan := irrecoverable.WithSignallerAndCancel(context.Background())
-			pipeline.Start(ctx)
-			unittest.RequireComponentsReadyBefore(t, time.Second, pipeline)
+			errChan := make(chan error)
+			go func() {
+				errChan <- pipeline.Run(context.Background(), mockCore, parent)
+			}()
 
 			// Send parent update to trigger processing
 			parent.UpdateState(StateProcessing, pipeline)
@@ -509,7 +510,7 @@ func createPipeline(t *testing.T) (*PipelineImpl, *osmock.Core, <-chan State, *m
 	parent := NewMockStateProvider()
 	stateReceiver := NewMockStateReceiver()
 
-	pipeline := NewPipeline(zerolog.Nop(), unittest.ExecutionResultFixture(), false, stateReceiver, mockCore, parent)
+	pipeline := NewPipeline(zerolog.Nop(), unittest.ExecutionResultFixture(), false, stateReceiver)
 
 	return pipeline, mockCore, stateReceiver.updateChan, parent
 }

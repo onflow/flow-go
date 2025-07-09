@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/gammazero/workerpool"
-	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
@@ -36,8 +33,15 @@ type PipelineStateReceiver interface {
 //
 // The state machine is designed to be run in a single goroutine. The Run method must only be called once.
 type Pipeline interface {
-	component.Component
 	PipelineStateProvider
+
+	// Run starts the pipeline processing and blocks until completion or context cancellation.
+	// CAUTION: not concurrency safe! Run must only be called once.
+	//
+	// Expected Errors:
+	//   - context.Canceled: when the context is canceled
+	//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+	Run(context.Context, Core, PipelineStateProvider) error
 
 	// SetSealed marks the pipeline's result as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.
 	SetSealed()
@@ -51,69 +55,14 @@ type Pipeline interface {
 
 var _ Pipeline = (*PipelineImpl)(nil)
 
-// worker implements a simple wrapper over worker pool which supports errors delivery via dedicated channel
-// and context based execution with cancellation.
-type worker struct {
-	ctx     context.Context
-	cancel  context.CancelFunc
-	pool    *workerpool.WorkerPool
-	errChan chan error
-}
-
-// newWorker creates a single worker.
-func newWorker() *worker {
-	ctx, cancel := context.WithCancel(context.Background())
-	return &worker{
-		ctx:     ctx,
-		cancel:  cancel,
-		pool:    workerpool.New(1),
-		errChan: make(chan error, 1),
-	}
-}
-
-// Submit submits a new task for processing, each error will be propagated in a specific channel.
-// Might block the worker if there is no one reading from the error channel and errors are happening.
-func (w *worker) Submit(task func(ctx context.Context) error) {
-	w.pool.Submit(func() {
-		err := task(w.ctx)
-		if err != nil && !errors.Is(err, context.Canceled) {
-			w.errChan <- err
-		}
-	})
-}
-
-// ErrChan returns the channel where errors are delivered from executed jobs.
-func (w *worker) ErrChan() <-chan error {
-	return w.errChan
-}
-
-// StopWait stops the worker pool and waits for all queued tasks to
-// complete. No additional tasks may be submitted, but all pending tasks are
-// executed by workers before this function returns.
-// Any error that was delivered during execution will be delivered to the caller.
-func (w *worker) StopWait() error {
-	w.cancel()
-	w.pool.StopWait()
-
-	defer close(w.errChan)
-	select {
-	case err := <-w.errChan:
-		return err
-	default:
-		return nil
-	}
-}
-
 // PipelineImpl implements the Pipeline interface
 type PipelineImpl struct {
-	*component.ComponentManager
 	log                  zerolog.Logger
 	executionResult      *flow.ExecutionResult
 	stateReceiver        PipelineStateReceiver
 	stateChangedNotifier engine.Notifier
 	core                 Core
 	parent               PipelineStateProvider
-	worker               *worker
 
 	// The following fields are accessed externally. they are stored using atomics to avoid
 	// blocking the caller.
@@ -131,8 +80,6 @@ func NewPipeline(
 	executionResult *flow.ExecutionResult,
 	isSealed bool,
 	stateReceiver PipelineStateReceiver,
-	core Core,
-	parent PipelineStateProvider,
 ) *PipelineImpl {
 	log = log.With().
 		Str("component", "pipeline").
@@ -140,36 +87,31 @@ func NewPipeline(
 		Str("block_id", executionResult.BlockID.String()).
 		Logger()
 
-	p := &PipelineImpl{
+	return &PipelineImpl{
 		log:                  log,
 		executionResult:      executionResult,
 		stateReceiver:        stateReceiver,
-		stateChangedNotifier: engine.NewNotifier(),
-		core:                 core,
-		parent:               parent,
 		state:                atomic.NewInt32(int32(StatePending)),
 		isSealed:             atomic.NewBool(isSealed),
 		isAbandoned:          atomic.NewBool(false),
 		isIndexed:            atomic.NewBool(false),
-		worker:               newWorker(),
+		stateChangedNotifier: engine.NewNotifier(),
 	}
-
-	p.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
-			// run the main event loop
-			err := p.loop(ctx)
-			// after existing
-			err = errors.Join(err, p.worker.StopWait())
-			if err != nil {
-				ctx.Throw(err)
-			}
-		}).Build()
-
-	return p
 }
 
-func (p *PipelineImpl) loop(ctx context.Context) error {
+// Run starts the pipeline processing and blocks until completion or context cancellation.
+// CAUTION: not concurrency safe! Run must only be called once.
+//
+// Expected Errors:
+//   - context.Canceled: when the context is canceled
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+func (p *PipelineImpl) Run(ctx context.Context, core Core, parent PipelineStateProvider) error {
+	pipelineCtx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+
+	p.core = core
+	p.parent = parent
+
 	// try to start processing in case we are able to.
 	p.stateChangedNotifier.Notify()
 
@@ -177,10 +119,11 @@ func (p *PipelineImpl) loop(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		// any error delivered to the worker is sign of critical error and has to be reported
-		// stop any processing and return with that specific error.
-		case err := <-p.worker.ErrChan():
-			return err
+		case <-pipelineCtx.Done():
+			// if any error has happened during the detached operation we need to handle it.
+			if err := pipelineCtx.Err(); err != nil {
+				return context.Cause(pipelineCtx)
+			}
 		case <-p.stateChangedNotifier.Channel():
 			select {
 			case <-ctx.Done():
@@ -198,7 +141,7 @@ func (p *PipelineImpl) loop(ctx context.Context) error {
 			currentState := p.GetState()
 			switch currentState {
 			case StatePending:
-				if err := p.onStartProcessing(); err != nil {
+				if err := p.onStartProcessing(pipelineCtx, cancel); err != nil {
 					return err
 				}
 			case StateProcessing:
@@ -210,12 +153,7 @@ func (p *PipelineImpl) loop(ctx context.Context) error {
 					return err
 				}
 			case StateAbandoned:
-				// since core is not concurrent safe we need to ensure that it's accessed from
-				// a single goroutine.
-				p.worker.Submit(func(_ context.Context) error {
-					return p.core.Abandon()
-				})
-				return nil
+				return p.core.Abandon()
 			case StateComplete:
 				return nil // terminate
 			default:
@@ -225,21 +163,25 @@ func (p *PipelineImpl) loop(ctx context.Context) error {
 	}
 }
 
-func (p *PipelineImpl) onStartProcessing() error {
+func (p *PipelineImpl) onStartProcessing(ctx context.Context, causeFunc context.CancelCauseFunc) error {
 	switch p.parent.GetState() {
 	case StateProcessing, StateWaitingPersist, StateComplete:
 		err := p.transitionTo(StateProcessing)
 		if err != nil {
 			return err
 		}
-		// submit for later processing since download is a 'heavy' operation which will block the event loop.
-		p.worker.Submit(p.performDownload)
+		go func() {
+			err := p.performDownload(ctx)
+			if err != nil {
+				causeFunc(err)
+			}
+		}()
 	case StatePending:
 		return nil
 	case StateAbandoned:
 		return p.transitionTo(StateAbandoned)
 	default:
-		// it's unexpected for the parent to be in any other state. this most likely indicates there's a bug
+		// its unexpected for the parent to be in any other state. this most likely indicates there's a bug
 		return fmt.Errorf("unexpected parent state: %s", p.parent.GetState())
 	}
 	return nil
