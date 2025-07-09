@@ -35,8 +35,11 @@ func RequireErrorIs(ctx context.Context, err error, targetErrs ...error) error {
 	return irrecoverable.NewException(err)
 }
 
-// RequireAccessError returns the error if it is an Access sentinel error
-// Otherwise, it throws an irrecoverable exception
+// RequireAccessError returns the error if it is an Access sentinel error, otherwise, it throws an
+// irrecoverable exception
+//
+// This can be used for more complex endpoints that call into other methods to ensure all unexpected
+// errors are handled.
 // Note: this method will not unwrap the error. the passed error must be an instance of a sentinel
 // error.
 func RequireAccessError(ctx context.Context, err error) error {
