@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
@@ -178,6 +179,8 @@ func (suite *RestAPITestSuite) SetupTest() {
 		Log:                  suite.log,
 		SnapshotHistoryLimit: 0,
 		Communicator:         node_communicator.NewNodeCommunicator(false),
+		EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
+		ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
 	})
 	require.NoError(suite.T(), err)
 

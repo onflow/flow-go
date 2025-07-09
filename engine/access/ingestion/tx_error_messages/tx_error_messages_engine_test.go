@@ -158,6 +158,7 @@ func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContex
 		Log:                        s.log,
 		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
 		Communicator:               node_communicator.NewNodeCommunicator(false),
+		EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
 		ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 		TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
 		ChainID:                    flow.Testnet,

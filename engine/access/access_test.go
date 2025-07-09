@@ -176,6 +176,8 @@ func (suite *Suite) RunTest(
 			Log:                  suite.log,
 			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
 			Communicator:         node_communicator.NewNodeCommunicator(false),
+			EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
 		})
 		require.NoError(suite.T(), err)
 
@@ -344,6 +346,8 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			Log:                  suite.log,
 			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
 			Communicator:         node_communicator.NewNodeCommunicator(false),
+			EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
 		})
 		require.NoError(suite.T(), err)
 
@@ -674,6 +678,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
 			Communicator:               node_communicator.NewNodeCommunicator(false),
 			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
+			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		require.NoError(suite.T(), err)
@@ -869,6 +875,8 @@ func (suite *Suite) TestGetTransactionResult() {
 			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
 			Communicator:               node_communicator.NewNodeCommunicator(false),
 			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
+			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		require.NoError(suite.T(), err)
@@ -1112,6 +1120,7 @@ func (suite *Suite) TestExecuteScript() {
 			Log:                        suite.log,
 			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
 			Communicator:               node_communicator.NewNodeCommunicator(false),
+			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
 			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
