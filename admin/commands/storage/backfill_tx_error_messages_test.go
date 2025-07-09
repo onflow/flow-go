@@ -146,6 +146,7 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 		Communicator:               node_communicator.NewNodeCommunicator(false),
 		ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 		TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
+		EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
 		ChainID:                    flow.Testnet,
 		ExecNodeIdentitiesProvider: executionNodeIdentitiesProvider,
 	})
