@@ -22,7 +22,7 @@ type Local struct {
 
 var _ Retriever = (*Local)(nil)
 
-func NewLocalRetriever(index *index.EventsIndex) *Local {
+func NewLocalEventsRetriever(index *index.EventsIndex) *Local {
 	return &Local{
 		eventsIndex: index,
 	}

@@ -29,7 +29,7 @@ type ExecutionNode struct {
 
 var _ Retriever = (*ExecutionNode)(nil)
 
-func NewExecutionNodeRetriever(
+func NewENEventsRetriever(
 	log zerolog.Logger,
 	nodeProvider *rpc.ExecutionNodeIdentitiesProvider,
 	connFactory connection.ConnectionFactory,

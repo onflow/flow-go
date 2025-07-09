@@ -1,4 +1,4 @@
-package handler
+package retriever
 
 import (
 	"bytes"
@@ -15,13 +15,13 @@ type Compare struct {
 	Failover
 }
 
-var _ Handler = (*Compare)(nil)
+var _ Retriever = (*Compare)(nil)
 
-func NewCompareHandler(
+func NewCompareAccountsRetriever(
 	log zerolog.Logger,
 	state protocol.State,
-	localRequester Handler,
-	execNodeRequester Handler,
+	localRequester Retriever,
+	execNodeRequester Retriever,
 ) *Compare {
 	return &Compare{
 		Failover: Failover{

@@ -15,7 +15,7 @@ type Failover struct {
 
 var _ ScriptExecutor = (*Failover)(nil)
 
-func NewFailoverExecutor(localExecutor ScriptExecutor, execNodeExecutor ScriptExecutor) *Failover {
+func NewFailoverScriptExecutor(localExecutor ScriptExecutor, execNodeExecutor ScriptExecutor) *Failover {
 	return &Failover{
 		localExecutor:         localExecutor,
 		executionNodeExecutor: execNodeExecutor,

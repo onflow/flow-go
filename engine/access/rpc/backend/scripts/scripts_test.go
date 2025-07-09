@@ -46,7 +46,7 @@ var (
 )
 
 // Create a suite similar to GetAccount that covers each of the modes
-type BackendScriptsSuite struct {
+type ScriptsSuite struct {
 	suite.Suite
 
 	log        zerolog.Logger
@@ -71,10 +71,10 @@ type BackendScriptsSuite struct {
 }
 
 func TestBackendScriptsSuite(t *testing.T) {
-	suite.Run(t, new(BackendScriptsSuite))
+	suite.Run(t, new(ScriptsSuite))
 }
 
-func (s *BackendScriptsSuite) SetupTest() {
+func (s *ScriptsSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.state = protocol.NewState(s.T())
 	s.snapshot = protocol.NewSnapshot(s.T())
@@ -96,7 +96,7 @@ func (s *BackendScriptsSuite) SetupTest() {
 	s.failingScript = []byte("access(all) fun main() { panic(\"!!\") }")
 }
 
-func (s *BackendScriptsSuite) defaultBackend(executor execution.ScriptExecutor, mode backend.IndexQueryMode) *Scripts {
+func (s *ScriptsSuite) defaultBackend(executor execution.ScriptExecutor, mode backend.IndexQueryMode) *Scripts {
 	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](backend.DefaultLoggedScriptsCacheSize)
 	s.Require().NoError(err)
 
@@ -124,7 +124,7 @@ func (s *BackendScriptsSuite) defaultBackend(executor execution.ScriptExecutor, 
 }
 
 // setupExecutionNodes sets up the mocks required to test against an EN backend
-func (s *BackendScriptsSuite) setupExecutionNodes(block *flow.Block) {
+func (s *ScriptsSuite) setupExecutionNodes(block *flow.Block) {
 	s.params.On("FinalizedRoot").Return(s.rootHeader, nil)
 	s.state.On("Params").Return(s.params)
 	s.state.On("Final").Return(s.snapshot)
@@ -141,7 +141,7 @@ func (s *BackendScriptsSuite) setupExecutionNodes(block *flow.Block) {
 }
 
 // setupENSuccessResponse configures the execution client mock to return a successful response
-func (s *BackendScriptsSuite) setupENSuccessResponse(blockID flow.Identifier) {
+func (s *ScriptsSuite) setupENSuccessResponse(blockID flow.Identifier) {
 	expectedExecRequest := &execproto.ExecuteScriptAtBlockIDRequest{
 		BlockId:   blockID[:],
 		Script:    s.script,
@@ -155,7 +155,7 @@ func (s *BackendScriptsSuite) setupENSuccessResponse(blockID flow.Identifier) {
 }
 
 // setupENFailingResponse configures the execution client mock to return a failing response
-func (s *BackendScriptsSuite) setupENFailingResponse(blockID flow.Identifier, err error) {
+func (s *ScriptsSuite) setupENFailingResponse(blockID flow.Identifier, err error) {
 	expectedExecRequest := &execproto.ExecuteScriptAtBlockIDRequest{
 		BlockId:   blockID[:],
 		Script:    s.failingScript,
@@ -168,7 +168,7 @@ func (s *BackendScriptsSuite) setupENFailingResponse(blockID flow.Identifier, er
 
 // TestExecuteScriptOnExecutionNode_HappyPath tests that the backend successfully executes scripts
 // on execution nodes
-func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
+func (s *ScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
@@ -191,7 +191,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
 
 // TestExecuteScriptOnExecutionNode_Fails tests that the backend returns an error when the execution
 // node returns an error
-func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
+func (s *ScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
 	ctx := context.Background()
 
 	// use a status code that's not used in the API to make sure it's passed through
@@ -218,7 +218,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
 
 // TestExecuteScriptFromStorage_HappyPath tests that the backend successfully executes scripts using
 // the local storage
-func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
+func (s *ScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
@@ -242,7 +242,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
 
 // TestExecuteScriptFromStorage_Fails tests that errors received from local storage are handled
 // and converted to the appropriate status code
-func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
+func (s *ScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
@@ -294,7 +294,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 
 // TestExecuteScriptWithFailover_HappyPath tests that when an error is returned executing a script
 // from local storage, the backend will attempt to run it on an execution node
-func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
+func (s *ScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 	ctx := context.Background()
 
 	errors := []error{
@@ -333,7 +333,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 
 // TestExecuteScriptWithFailover_SkippedForCorrectCodes tests that failover is skipped for
 // FVM errors that result in InvalidArgument or Canceled errors
-func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCodes() {
+func (s *ScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCodes() {
 	ctx := context.Background()
 
 	// configure local script executor to fail
@@ -375,7 +375,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCod
 
 // TestExecuteScriptWithFailover_ReturnsENErrors tests that when an error is returned from the execution
 // node during a failover, it is returned to the caller.
-func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
+func (s *ScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 	ctx := context.Background()
 
 	// use a status code that's not used in the API to make sure it's passed through
@@ -408,7 +408,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 
 // TestExecuteScriptAtLatestBlockFromStorage_InconsistentState tests that signaler context received error when node state is
 // inconsistent
-func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_InconsistentState() {
+func (s *ScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_InconsistentState() {
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	scripts := s.defaultBackend(scriptExecutor, backend.IndexQueryModeLocalOnly)
 
@@ -428,7 +428,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_Inconsis
 	})
 }
 
-func (s *BackendScriptsSuite) testExecuteScriptAtLatestBlock(ctx context.Context, scripts *Scripts, statusCode codes.Code) {
+func (s *ScriptsSuite) testExecuteScriptAtLatestBlock(ctx context.Context, scripts *Scripts, statusCode codes.Code) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
 
@@ -444,7 +444,7 @@ func (s *BackendScriptsSuite) testExecuteScriptAtLatestBlock(ctx context.Context
 	}
 }
 
-func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(ctx context.Context, scripts *Scripts, statusCode codes.Code) {
+func (s *ScriptsSuite) testExecuteScriptAtBlockID(ctx context.Context, scripts *Scripts, statusCode codes.Code) {
 	blockID := s.block.ID()
 	s.headers.On("ByBlockID", blockID).Return(s.block.Header, nil).Once()
 
@@ -460,7 +460,7 @@ func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(ctx context.Context, sc
 	}
 }
 
-func (s *BackendScriptsSuite) testExecuteScriptAtBlockHeight(ctx context.Context, scripts *Scripts, statusCode codes.Code) {
+func (s *ScriptsSuite) testExecuteScriptAtBlockHeight(ctx context.Context, scripts *Scripts, statusCode codes.Code) {
 	height := s.block.Header.Height
 	s.headers.On("ByHeight", height).Return(s.block.Header, nil).Once()
 

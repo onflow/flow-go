@@ -23,7 +23,7 @@ type Compare struct {
 
 var _ ScriptExecutor = (*Compare)(nil)
 
-func NewCompareExecutor(
+func NewCompareScriptExecutor(
 	log zerolog.Logger,
 	metrics module.BackendScriptsMetrics,
 	scriptCache *LoggedScriptCache,

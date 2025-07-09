@@ -29,7 +29,7 @@ import (
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
-type BackendAccountsSuite struct {
+type AccountsSuite struct {
 	suite.Suite
 
 	log        zerolog.Logger
@@ -52,10 +52,10 @@ type BackendAccountsSuite struct {
 }
 
 func TestBackendAccountsSuite(t *testing.T) {
-	suite.Run(t, new(BackendAccountsSuite))
+	suite.Run(t, new(AccountsSuite))
 }
 
-func (s *BackendAccountsSuite) SetupTest() {
+func (s *AccountsSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.state = protocol.NewState(s.T())
 	s.snapshot = protocol.NewSnapshot(s.T())
@@ -79,7 +79,7 @@ func (s *BackendAccountsSuite) SetupTest() {
 	s.failingAddress = unittest.AddressFixture()
 }
 
-func (s *BackendAccountsSuite) createHandler(mode backend.IndexQueryMode, executor *execmock.ScriptExecutor) *Accounts {
+func (s *AccountsSuite) createHandler(mode backend.IndexQueryMode, executor *execmock.ScriptExecutor) *Accounts {
 	accounts, err := NewAccounts(
 		s.log,
 		s.state,
@@ -102,7 +102,7 @@ func (s *BackendAccountsSuite) createHandler(mode backend.IndexQueryMode, execut
 }
 
 // setupExecutionNodes sets up the mocks required to test against an EN backend
-func (s *BackendAccountsSuite) setupExecutionNodes(block *flow.Block) {
+func (s *AccountsSuite) setupExecutionNodes(block *flow.Block) {
 	s.params.On("FinalizedRoot").Return(s.rootHeader, nil)
 	s.state.On("Params").Return(s.params)
 	s.state.On("Final").Return(s.snapshot)
@@ -119,7 +119,7 @@ func (s *BackendAccountsSuite) setupExecutionNodes(block *flow.Block) {
 }
 
 // setupENSuccessResponse configures the execution node client to return a successful response
-func (s *BackendAccountsSuite) setupENSuccessResponse(blockID flow.Identifier) {
+func (s *AccountsSuite) setupENSuccessResponse(blockID flow.Identifier) {
 	expectedExecRequest := &execproto.GetAccountAtBlockIDRequest{
 		BlockId: blockID[:],
 		Address: s.account.Address.Bytes(),
@@ -135,7 +135,7 @@ func (s *BackendAccountsSuite) setupENSuccessResponse(blockID flow.Identifier) {
 }
 
 // setupENFailingResponse configures the execution node client to return an error
-func (s *BackendAccountsSuite) setupENFailingResponse(blockID flow.Identifier, err error) {
+func (s *AccountsSuite) setupENFailingResponse(blockID flow.Identifier, err error) {
 	failingRequest := &execproto.GetAccountAtBlockIDRequest{
 		BlockId: blockID[:],
 		Address: s.failingAddress.Bytes(),
@@ -146,7 +146,7 @@ func (s *BackendAccountsSuite) setupENFailingResponse(blockID flow.Identifier, e
 }
 
 // TestGetAccountFromExecutionNode_HappyPath tests successfully getting accounts from execution nodes
-func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode_HappyPath() {
+func (s *AccountsSuite) TestGetAccountFromExecutionNode_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
@@ -169,7 +169,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode_HappyPath() {
 }
 
 // TestGetAccountFromExecutionNode_Fails errors received from execution nodes are returned
-func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode_Fails() {
+func (s *AccountsSuite) TestGetAccountFromExecutionNode_Fails() {
 	ctx := context.Background()
 
 	// use a status code that's not used in the API to make sure it's passed through
@@ -196,7 +196,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode_Fails() {
 }
 
 // TestGetAccountFromStorage_HappyPath test successfully getting accounts from local storage
-func (s *BackendAccountsSuite) TestGetAccountFromStorage_HappyPath() {
+func (s *AccountsSuite) TestGetAccountFromStorage_HappyPath() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
@@ -220,7 +220,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromStorage_HappyPath() {
 
 // TestGetAccountFromStorage_Fails tests that errors received from local storage are handled
 // and converted to the appropriate status code
-func (s *BackendAccountsSuite) TestGetAccountFromStorage_Fails() {
+func (s *AccountsSuite) TestGetAccountFromStorage_Fails() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
@@ -269,7 +269,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromStorage_Fails() {
 
 // TestGetAccountFromFailover_HappyPath tests that when an error is returned getting an account
 // from local storage, the backend will attempt to get the account from an execution node
-func (s *BackendAccountsSuite) TestGetAccountFromFailover_HappyPath() {
+func (s *AccountsSuite) TestGetAccountFromFailover_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
@@ -301,7 +301,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover_HappyPath() {
 
 // TestGetAccountFromFailover_ReturnsENErrors tests that when an error is returned from the execution
 // node during a failover, it is returned to the caller.
-func (s *BackendAccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
+func (s *AccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 	ctx := context.Background()
 
 	// use a status code that's not used in the API to make sure it's passed through
@@ -332,7 +332,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 
 // TestGetAccountAtLatestBlock_InconsistentState tests that signaler context received error when node state is
 // inconsistent
-func (s *BackendAccountsSuite) TestGetAccountAtLatestBlockFromStorage_InconsistentState() {
+func (s *AccountsSuite) TestGetAccountAtLatestBlockFromStorage_InconsistentState() {
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	handler := s.createHandler(backend.IndexQueryModeLocalOnly, scriptExecutor)
 
@@ -352,7 +352,7 @@ func (s *BackendAccountsSuite) TestGetAccountAtLatestBlockFromStorage_Inconsiste
 }
 
 // TestGetAccountBalanceFromStorage_HappyPaths tests successfully getting accounts balance from storage
-func (s *BackendAccountsSuite) TestGetAccountBalanceFromStorage_HappyPath() {
+func (s *AccountsSuite) TestGetAccountBalanceFromStorage_HappyPath() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
@@ -372,7 +372,7 @@ func (s *BackendAccountsSuite) TestGetAccountBalanceFromStorage_HappyPath() {
 }
 
 // TestGetAccountBalanceFromExecutionNode_HappyPath tests successfully getting accounts balance from execution nodes
-func (s *BackendAccountsSuite) TestGetAccountBalanceFromExecutionNode_HappyPath() {
+func (s *AccountsSuite) TestGetAccountBalanceFromExecutionNode_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
@@ -393,7 +393,7 @@ func (s *BackendAccountsSuite) TestGetAccountBalanceFromExecutionNode_HappyPath(
 
 // TestGetAccountBalanceFromFailover_HappyPath tests that when an error is returned getting accounts balance
 // from local storage,  the backend will attempt to get the account balances from an execution node
-func (s *BackendAccountsSuite) TestGetAccountBalanceFromFailover_HappyPath() {
+func (s *AccountsSuite) TestGetAccountBalanceFromFailover_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
@@ -420,7 +420,7 @@ func (s *BackendAccountsSuite) TestGetAccountBalanceFromFailover_HappyPath() {
 
 // TestGetAccountKeysScriptExecutionEnabled_HappyPath tests successfully getting accounts keys when
 // script execution is enabled.
-func (s *BackendAccountsSuite) TestGetAccountKeysFromStorage_HappyPath() {
+func (s *AccountsSuite) TestGetAccountKeysFromStorage_HappyPath() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
@@ -443,7 +443,7 @@ func (s *BackendAccountsSuite) TestGetAccountKeysFromStorage_HappyPath() {
 
 // TestGetAccountKeyScriptExecutionEnabled_HappyPath tests successfully getting account key by key index when
 // script execution is enabled.
-func (s *BackendAccountsSuite) TestGetAccountKeyFromStorage_HappyPath() {
+func (s *AccountsSuite) TestGetAccountKeyFromStorage_HappyPath() {
 	ctx := context.Background()
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	handler := s.createHandler(backend.IndexQueryModeLocalOnly, scriptExecutor)
@@ -465,7 +465,7 @@ func (s *BackendAccountsSuite) TestGetAccountKeyFromStorage_HappyPath() {
 }
 
 // TestGetAccountKeysFromExecutionNode_HappyPath tests successfully getting accounts keys from execution nodes
-func (s *BackendAccountsSuite) TestGetAccountKeysFromExecutionNode_HappyPath() {
+func (s *AccountsSuite) TestGetAccountKeysFromExecutionNode_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
@@ -487,7 +487,7 @@ func (s *BackendAccountsSuite) TestGetAccountKeysFromExecutionNode_HappyPath() {
 }
 
 // TestGetAccountKeyFromExecutionNode_HappyPath tests successfully getting accounts key by key index from execution nodes
-func (s *BackendAccountsSuite) TestGetAccountKeyFromExecutionNode_HappyPath() {
+func (s *AccountsSuite) TestGetAccountKeyFromExecutionNode_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
@@ -511,7 +511,7 @@ func (s *BackendAccountsSuite) TestGetAccountKeyFromExecutionNode_HappyPath() {
 
 // TestGetAccountBalanceFromFailover_HappyPath tests that when an error is returned getting accounts keys
 // from local storage, the backend will attempt to get the account key from an execution node
-func (s *BackendAccountsSuite) TestGetAccountKeysFromFailover_HappyPath() {
+func (s *AccountsSuite) TestGetAccountKeysFromFailover_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
@@ -538,7 +538,7 @@ func (s *BackendAccountsSuite) TestGetAccountKeysFromFailover_HappyPath() {
 
 // TestGetAccountKeyFromFailover_HappyPath tests that when an error is returned getting account key by key index
 // from local storage, the backend will attempt to get the account key from an execution node
-func (s *BackendAccountsSuite) TestGetAccountKeyFromFailover_HappyPath() {
+func (s *AccountsSuite) TestGetAccountKeyFromFailover_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
@@ -564,7 +564,7 @@ func (s *BackendAccountsSuite) TestGetAccountKeyFromFailover_HappyPath() {
 	}
 }
 
-func (s *BackendAccountsSuite) testGetAccount(ctx context.Context, backend *Accounts, statusCode codes.Code) {
+func (s *AccountsSuite) testGetAccount(ctx context.Context, backend *Accounts, statusCode codes.Code) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
 
@@ -580,7 +580,7 @@ func (s *BackendAccountsSuite) testGetAccount(ctx context.Context, backend *Acco
 	}
 }
 
-func (s *BackendAccountsSuite) testGetAccountAtLatestBlock(ctx context.Context, handler *Accounts, statusCode codes.Code) {
+func (s *AccountsSuite) testGetAccountAtLatestBlock(ctx context.Context, handler *Accounts, statusCode codes.Code) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
 
@@ -596,7 +596,7 @@ func (s *BackendAccountsSuite) testGetAccountAtLatestBlock(ctx context.Context, 
 	}
 }
 
-func (s *BackendAccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, handler *Accounts, statusCode codes.Code) {
+func (s *AccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, handler *Accounts, statusCode codes.Code) {
 	height := s.block.Header.Height
 	s.headers.On("BlockIDByHeight", height).Return(s.block.Header.ID(), nil).Once()
 
@@ -612,7 +612,7 @@ func (s *BackendAccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, 
 	}
 }
 
-func (s *BackendAccountsSuite) testGetAccountBalanceAtLatestBlock(ctx context.Context, handler *Accounts) {
+func (s *AccountsSuite) testGetAccountBalanceAtLatestBlock(ctx context.Context, handler *Accounts) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
 
@@ -621,13 +621,13 @@ func (s *BackendAccountsSuite) testGetAccountBalanceAtLatestBlock(ctx context.Co
 	s.Require().Equal(s.account.Balance, actual)
 }
 
-func (s *BackendAccountsSuite) testGetAccountBalanceAtBlockHeight(ctx context.Context, handler *Accounts) {
+func (s *AccountsSuite) testGetAccountBalanceAtBlockHeight(ctx context.Context, handler *Accounts) {
 	actual, err := handler.GetAccountBalanceAtBlockHeight(ctx, s.account.Address, s.block.Header.Height)
 	s.Require().NoError(err)
 	s.Require().Equal(s.account.Balance, actual)
 }
 
-func (s *BackendAccountsSuite) testGetAccountKeysAtLatestBlock(ctx context.Context, handler *Accounts) {
+func (s *AccountsSuite) testGetAccountKeysAtLatestBlock(ctx context.Context, handler *Accounts) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
 
@@ -636,7 +636,7 @@ func (s *BackendAccountsSuite) testGetAccountKeysAtLatestBlock(ctx context.Conte
 	s.Require().Equal(s.account.Keys, actual)
 }
 
-func (s *BackendAccountsSuite) testGetAccountKeyAtLatestBlock(ctx context.Context, handler *Accounts, keyIndex uint32) {
+func (s *AccountsSuite) testGetAccountKeyAtLatestBlock(ctx context.Context, handler *Accounts, keyIndex uint32) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
 
@@ -646,13 +646,13 @@ func (s *BackendAccountsSuite) testGetAccountKeyAtLatestBlock(ctx context.Contex
 	s.Require().Equal(expectedKeyByIndex, actual)
 }
 
-func (s *BackendAccountsSuite) testGetAccountKeysAtBlockHeight(ctx context.Context, handler *Accounts) {
+func (s *AccountsSuite) testGetAccountKeysAtBlockHeight(ctx context.Context, handler *Accounts) {
 	actual, err := handler.GetAccountKeysAtBlockHeight(ctx, s.account.Address, s.block.Header.Height)
 	s.Require().NoError(err)
 	s.Require().Equal(s.account.Keys, actual)
 }
 
-func (s *BackendAccountsSuite) testGetAccountKeyAtBlockHeight(ctx context.Context, handler *Accounts, keyIndex uint32) {
+func (s *AccountsSuite) testGetAccountKeyAtBlockHeight(ctx context.Context, handler *Accounts, keyIndex uint32) {
 	actual, err := handler.GetAccountKeyAtBlockHeight(ctx, s.account.Address, keyIndex, s.block.Header.Height)
 	expectedKeyByIndex := findAccountKeyByIndex(s.account.Keys, keyIndex)
 	s.Require().NoError(err)

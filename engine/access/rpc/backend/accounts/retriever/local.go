@@ -1,4 +1,4 @@
-package handler
+package retriever
 
 import (
 	"context"
@@ -24,9 +24,9 @@ type Local struct {
 	scriptExecutor execution.ScriptExecutor
 }
 
-var _ Handler = (*Local)(nil)
+var _ Retriever = (*Local)(nil)
 
-func NewLocalHandler(
+func NewLocalAccountsRetriever(
 	log zerolog.Logger,
 	state protocol.State,
 	scriptExecutor execution.ScriptExecutor,

@@ -1,4 +1,4 @@
-package handler
+package retriever
 
 import (
 	"context"
@@ -27,9 +27,9 @@ type ExecutionNode struct {
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 }
 
-var _ Handler = (*ExecutionNode)(nil)
+var _ Retriever = (*ExecutionNode)(nil)
 
-func NewExecutionNodeHandler(
+func NewENAccountsRetriever(
 	log zerolog.Logger,
 	state protocol.State,
 	connFactory connection.ConnectionFactory,

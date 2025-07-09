@@ -21,6 +21,23 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+type API interface {
+	GetEventsForHeightRange(
+		ctx context.Context,
+		eventType string,
+		startHeight,
+		endHeight uint64,
+		requiredEventEncodingVersion entities.EventEncodingVersion,
+	) ([]flow.BlockEvents, error)
+
+	GetEventsForBlockIDs(
+		ctx context.Context,
+		eventType string,
+		blockIDs []flow.Identifier,
+		requiredEventEncodingVersion entities.EventEncodingVersion,
+	) ([]flow.BlockEvents, error)
+}
+
 type Events struct {
 	headers         storage.Headers
 	state           protocol.State
@@ -28,6 +45,8 @@ type Events struct {
 	maxHeightRange  uint
 	eventsRetriever retriever.Retriever
 }
+
+var _ API = (*Events)(nil)
 
 func NewEvents(
 	log zerolog.Logger,
@@ -45,15 +64,15 @@ func NewEvents(
 
 	switch queryMode {
 	case backend.IndexQueryModeLocalOnly:
-		eventsRetriever = retriever.NewLocalRetriever(eventsIndex)
+		eventsRetriever = retriever.NewLocalEventsRetriever(eventsIndex)
 
 	case backend.IndexQueryModeExecutionNodesOnly:
-		eventsRetriever = retriever.NewExecutionNodeRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
+		eventsRetriever = retriever.NewENEventsRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
 
 	case backend.IndexQueryModeFailover:
-		local := retriever.NewLocalRetriever(eventsIndex)
-		execNode := retriever.NewExecutionNodeRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
-		eventsRetriever = retriever.NewFailoverRetriever(log, local, execNode)
+		local := retriever.NewLocalEventsRetriever(eventsIndex)
+		execNode := retriever.NewENEventsRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
+		eventsRetriever = retriever.NewFailoverEventsRetriever(log, local, execNode)
 
 	default:
 		return nil, status.Errorf(codes.Internal, "unknown execution mode: %v", queryMode)

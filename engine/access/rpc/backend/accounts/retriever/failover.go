@@ -1,4 +1,4 @@
-package handler
+package retriever
 
 import (
 	"context"
@@ -12,17 +12,17 @@ import (
 type Failover struct {
 	log               zerolog.Logger
 	state             protocol.State
-	localRequester    Handler
-	execNodeRequester Handler
+	localRequester    Retriever
+	execNodeRequester Retriever
 }
 
-var _ Handler = (*Failover)(nil)
+var _ Retriever = (*Failover)(nil)
 
-func NewFailoverHandler(
+func NewFailoverAccountsRetriever(
 	log zerolog.Logger,
 	state protocol.State,
-	localRequester Handler,
-	execNodeRequester Handler,
+	localRequester Retriever,
+	execNodeRequester Retriever,
 ) *Failover {
 	return &Failover{
 		log:               zerolog.New(log).With().Str("handler", "failover").Logger(),

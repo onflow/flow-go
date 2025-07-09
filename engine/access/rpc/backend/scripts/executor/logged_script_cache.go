@@ -15,7 +15,7 @@ type LoggedScriptCache struct {
 	loggedScripts *lru.Cache[[md5.Size]byte, time.Time]
 }
 
-func NewScriptCache(log zerolog.Logger, loggedScripts *lru.Cache[[md5.Size]byte, time.Time]) *LoggedScriptCache {
+func NewLoggedScriptCache(log zerolog.Logger, loggedScripts *lru.Cache[[md5.Size]byte, time.Time]) *LoggedScriptCache {
 	return &LoggedScriptCache{
 		log:           log,
 		loggedScripts: loggedScripts,

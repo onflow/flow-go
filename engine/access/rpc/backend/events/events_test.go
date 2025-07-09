@@ -43,7 +43,7 @@ type testCase struct {
 	queryMode backend.IndexQueryMode
 }
 
-type BackendEventsSuite struct {
+type EventsSuite struct {
 	suite.Suite
 
 	log        zerolog.Logger
@@ -71,10 +71,10 @@ type BackendEventsSuite struct {
 }
 
 func TestBackendEventsSuite(t *testing.T) {
-	suite.Run(t, new(BackendEventsSuite))
+	suite.Run(t, new(EventsSuite))
 }
 
-func (s *BackendEventsSuite) SetupTest() {
+func (s *EventsSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.state = protocol.NewState(s.T())
 	s.snapshot = protocol.NewSnapshot(s.T())
@@ -177,7 +177,7 @@ func (s *BackendEventsSuite) SetupTest() {
 	}
 }
 
-func (s *BackendEventsSuite) defaultBackend(mode backend.IndexQueryMode, eventsIndex *index.EventsIndex) *Events {
+func (s *EventsSuite) defaultBackend(mode backend.IndexQueryMode, eventsIndex *index.EventsIndex) *Events {
 	e, err := NewEvents(
 		s.log,
 		s.state,
@@ -202,7 +202,7 @@ func (s *BackendEventsSuite) defaultBackend(mode backend.IndexQueryMode, eventsI
 }
 
 // setupExecutionNodes sets up the mocks required to test against an EN backend
-func (s *BackendEventsSuite) setupExecutionNodes(block *flow.Block) {
+func (s *EventsSuite) setupExecutionNodes(block *flow.Block) {
 	s.params.On("FinalizedRoot").Return(s.rootHeader, nil)
 	s.state.On("Params").Return(s.params)
 	s.state.On("Final").Return(s.snapshot)
@@ -219,7 +219,7 @@ func (s *BackendEventsSuite) setupExecutionNodes(block *flow.Block) {
 }
 
 // setupENSuccessResponse configures the execution node client to return a successful response
-func (s *BackendEventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.Block) {
+func (s *EventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.Block) {
 	s.setupExecutionNodes(blocks[len(blocks)-1])
 
 	ids := make([][]byte, len(blocks))
@@ -255,7 +255,7 @@ func (s *BackendEventsSuite) setupENSuccessResponse(eventType string, blocks []*
 }
 
 // setupENFailingResponse configures the execution node client to return an error
-func (s *BackendEventsSuite) setupENFailingResponse(eventType string, headers []*flow.Header, err error) {
+func (s *EventsSuite) setupENFailingResponse(eventType string, headers []*flow.Header, err error) {
 	ids := make([][]byte, len(headers))
 	for i, header := range headers {
 		id := header.ID()
@@ -272,7 +272,7 @@ func (s *BackendEventsSuite) setupENFailingResponse(eventType string, headers []
 
 // TestGetEvents_HappyPaths tests the happy paths for GetEventsForBlockIDs and GetEventsForHeightRange
 // across all queryModes and encodings
-func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
+func (s *EventsSuite) TestGetEvents_HappyPaths() {
 	ctx := context.Background()
 
 	startHeight := s.blocks[0].Header.Height
@@ -383,7 +383,7 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 	}
 }
 
-func (s *BackendEventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
+func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 	ctx := context.Background()
 
 	startHeight := s.blocks[0].Header.Height
@@ -469,7 +469,7 @@ func (s *BackendEventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 	})
 }
 
-func (s *BackendEventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {
+func (s *EventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {
 	ctx := context.Background()
 
 	encoding := entities.EventEncodingVersion_CCF_V0
@@ -504,7 +504,7 @@ func (s *BackendEventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {
 	})
 }
 
-func (s *BackendEventsSuite) assertResponse(response []flow.BlockEvents, encoding entities.EventEncodingVersion) {
+func (s *EventsSuite) assertResponse(response []flow.BlockEvents, encoding entities.EventEncodingVersion) {
 	s.Assert().Len(response, len(s.blocks))
 	for i, block := range s.blocks {
 		s.Assert().Equal(block.Header.Height, response[i].BlockHeight)
@@ -515,7 +515,7 @@ func (s *BackendEventsSuite) assertResponse(response []flow.BlockEvents, encodin
 	}
 }
 
-func (s *BackendEventsSuite) assertEncoding(event *flow.Event, encoding entities.EventEncodingVersion) {
+func (s *EventsSuite) assertEncoding(event *flow.Event, encoding entities.EventEncodingVersion) {
 	var err error
 	switch encoding {
 	case entities.EventEncodingVersion_CCF_V0:

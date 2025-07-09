@@ -9,7 +9,7 @@ import (
 )
 
 type ScriptExecutor interface {
-	Execute(ctx context.Context, scriptRequest *ScriptExecutionRequest) ([]byte, time.Duration, error)
+	Execute(ctx context.Context, request *ScriptExecutionRequest) ([]byte, time.Duration, error)
 }
 
 // ScriptExecutionRequest encapsulates the data needed to execute a script to make it easier

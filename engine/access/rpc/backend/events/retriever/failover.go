@@ -18,7 +18,7 @@ type Failover struct {
 
 var _ Retriever = (*Failover)(nil)
 
-func NewFailoverRetriever(log zerolog.Logger, localRetriever Retriever, execNodeRetriever Retriever) *Failover {
+func NewFailoverEventsRetriever(log zerolog.Logger, localRetriever Retriever, execNodeRetriever Retriever) *Failover {
 	return &Failover{
 		log:               zerolog.New(log).With().Str("events_retriever", "failover").Logger(),
 		localRetriever:    localRetriever,

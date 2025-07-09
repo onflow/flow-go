@@ -16,21 +16,21 @@ import (
 )
 
 type Local struct {
-	log zerolog.Logger
-	metrics        module.BackendScriptsMetrics
+	log     zerolog.Logger
+	metrics module.BackendScriptsMetrics
 
 	scriptExecutor execution.ScriptExecutor
-	scriptCache *LoggedScriptCache
+	scriptCache    *LoggedScriptCache
 }
 
 var _ ScriptExecutor = (*Local)(nil)
 
-func NewLocalExecutor(
+func NewLocalScriptExecutor(
 	log zerolog.Logger,
 	metrics module.BackendScriptsMetrics,
 	executor execution.ScriptExecutor,
 	scriptCache *LoggedScriptCache,
-	) *Local {
+) *Local {
 	return &Local{
 		log:            zerolog.New(log).With().Str("script_executor", "local").Logger(),
 		metrics:        metrics,

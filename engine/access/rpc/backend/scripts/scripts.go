@@ -22,11 +22,19 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+type API interface {
+	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error)
+	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error)
+	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error)
+}
+
 type Scripts struct {
 	headers  storage.Headers
 	state    protocol.State
 	executor executor.ScriptExecutor
 }
+
+var _ API = (*Scripts)(nil)
 
 func NewScripts(
 	log zerolog.Logger,
@@ -41,24 +49,24 @@ func NewScripts(
 	loggedScripts *lru.Cache[[md5.Size]byte, time.Time],
 ) (*Scripts, error) {
 	var exec executor.ScriptExecutor
-	cache := executor.NewScriptCache(log, loggedScripts)
+	cache := executor.NewLoggedScriptCache(log, loggedScripts)
 
 	switch scriptExecMode {
 	case backend.IndexQueryModeLocalOnly:
-		exec = executor.NewLocalExecutor(log, metrics, scriptExecutor, cache)
+		exec = executor.NewLocalScriptExecutor(log, metrics, scriptExecutor, cache)
 
 	case backend.IndexQueryModeExecutionNodesOnly:
-		exec = executor.NewExecutionNodeExecutor(log, metrics, nodeProvider, nodeCommunicator, connFactory, cache)
+		exec = executor.NewENScriptExecutor(log, metrics, nodeProvider, nodeCommunicator, connFactory, cache)
 
 	case backend.IndexQueryModeFailover:
-		local := executor.NewLocalExecutor(log, metrics, scriptExecutor, cache)
-		execNode := executor.NewExecutionNodeExecutor(log, metrics, nodeProvider, nodeCommunicator, connFactory, cache)
-		exec = executor.NewFailoverExecutor(local, execNode)
+		local := executor.NewLocalScriptExecutor(log, metrics, scriptExecutor, cache)
+		execNode := executor.NewENScriptExecutor(log, metrics, nodeProvider, nodeCommunicator, connFactory, cache)
+		exec = executor.NewFailoverScriptExecutor(local, execNode)
 
 	case backend.IndexQueryModeCompare:
-		local := executor.NewLocalExecutor(log, metrics, scriptExecutor, cache)
-		execNode := executor.NewExecutionNodeExecutor(log, metrics, nodeProvider, nodeCommunicator, connFactory, cache)
-		exec = executor.NewCompareExecutor(log, metrics, cache, local, execNode)
+		local := executor.NewLocalScriptExecutor(log, metrics, scriptExecutor, cache)
+		execNode := executor.NewENScriptExecutor(log, metrics, nodeProvider, nodeCommunicator, connFactory, cache)
+		exec = executor.NewCompareScriptExecutor(log, metrics, cache, local, execNode)
 
 	default:
 		return nil, status.Error(codes.InvalidArgument, "invalid index mode")
@@ -72,12 +80,12 @@ func NewScripts(
 }
 
 // ExecuteScriptAtLatestBlock executes provided script at the latest sealed block.
-func (b *Scripts) ExecuteScriptAtLatestBlock(
+func (s *Scripts) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	script []byte,
 	arguments [][]byte,
 ) ([]byte, error) {
-	latestHeader, err := b.state.Sealed().Head()
+	latestHeader, err := s.state.Sealed().Head()
 	if err != nil {
 		// the latest sealed header MUST be available
 		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
@@ -85,38 +93,38 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		return nil, err
 	}
 
-	res, _, err := b.executor.Execute(ctx, executor.NewScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments))
+	res, _, err := s.executor.Execute(ctx, executor.NewScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments))
 	return res, err
 }
 
 // ExecuteScriptAtBlockID executes provided script at the provided block ID.
-func (b *Scripts) ExecuteScriptAtBlockID(
+func (s *Scripts) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
 	script []byte,
 	arguments [][]byte,
 ) ([]byte, error) {
-	header, err := b.headers.ByBlockID(blockID)
+	header, err := s.headers.ByBlockID(blockID)
 	if err != nil {
 		return nil, commonrpc.ConvertStorageError(err)
 	}
 
-	res, _, err := b.executor.Execute(ctx, executor.NewScriptExecutionRequest(blockID, header.Height, script, arguments))
+	res, _, err := s.executor.Execute(ctx, executor.NewScriptExecutionRequest(blockID, header.Height, script, arguments))
 	return res, err
 }
 
 // ExecuteScriptAtBlockHeight executes provided script at the provided block height.
-func (b *Scripts) ExecuteScriptAtBlockHeight(
+func (s *Scripts) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	blockHeight uint64,
 	script []byte,
 	arguments [][]byte,
 ) ([]byte, error) {
-	header, err := b.headers.ByHeight(blockHeight)
+	header, err := s.headers.ByHeight(blockHeight)
 	if err != nil {
-		return nil, commonrpc.ConvertStorageError(backend.ResolveHeightError(b.state.Params(), blockHeight, err))
+		return nil, commonrpc.ConvertStorageError(backend.ResolveHeightError(s.state.Params(), blockHeight, err))
 	}
 
-	res, _, err := b.executor.Execute(ctx, executor.NewScriptExecutionRequest(header.ID(), blockHeight, script, arguments))
+	res, _, err := s.executor.Execute(ctx, executor.NewScriptExecutionRequest(header.ID(), blockHeight, script, arguments))
 	return res, err
 }

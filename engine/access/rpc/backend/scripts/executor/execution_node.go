@@ -34,7 +34,7 @@ type ExecutionNode struct {
 
 var _ ScriptExecutor = (*ExecutionNode)(nil)
 
-func NewExecutionNodeExecutor(
+func NewENScriptExecutor(
 	log zerolog.Logger,
 	metrics module.BackendScriptsMetrics,
 	nodeProvider *commonrpc.ExecutionNodeIdentitiesProvider,
