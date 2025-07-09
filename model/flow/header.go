@@ -84,7 +84,7 @@ func NewHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 	// This constructor is only for non-root headers, so require a parent QC:
 	// ParentID, ParentVoterIndices, ParentVoterSigData, ProposerID must all be set.
 	// We bundle them in one spot to avoid repeating the same four if-statements.
-	hb := HeaderBody(untrusted) // cheap conversion so we can call ContainsParentQC
+	hb := HeaderBody(untrusted) // conversion so we can call ContainsParentQC
 	if !hb.ContainsParentQC() {
 		return nil, fmt.Errorf(
 			"missing parent QC: ParentID, ParentVoterIndices, ParentVoterSigData and ProposerID are all required",
@@ -98,7 +98,7 @@ func NewHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 	if untrusted.View == 0 {
 		return nil, fmt.Errorf("View must be > 0 for non-root header")
 	}
-	if untrusted.ParentView > untrusted.View {
+	if untrusted.ParentView >= untrusted.View {
 		return nil, fmt.Errorf(
 			"ParentView (%d) must be less than View (%d)", untrusted.ParentView, untrusted.View,
 		)
