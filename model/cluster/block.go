@@ -67,9 +67,14 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 		return nil, fmt.Errorf("invalid root header body: %w", err)
 	}
 
+	rootPayload, err := NewRootPayload(UntrustedPayload(untrusted.Payload))
+	if err != nil {
+		return nil, fmt.Errorf("invalid root cluster payload: %w", err)
+	}
+
 	return &Block{
 		Header:  *rootHeaderBody,
-		Payload: untrusted.Payload,
+		Payload: *rootPayload,
 	}, nil
 }
 

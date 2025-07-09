@@ -1,6 +1,7 @@
 package unittest
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/onflow/flow-go/model/cluster"
@@ -68,8 +69,21 @@ func (f *clusterBlockFactory) Genesis() (*cluster.Block, error) {
 		return nil, err
 	}
 
-	return &cluster.Block{
-		Header:  *headerBody,
-		Payload: *cluster.NewEmptyPayload(flow.ZeroID),
-	}, nil
+	payload, err := cluster.NewRootPayload(
+		cluster.UntrustedPayload(*cluster.NewEmptyPayload(flow.ZeroID)),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create root cluster payload: %w", err)
+	}
+
+	block, err := cluster.NewRootBlock(
+		cluster.UntrustedBlock{
+			Header:  *headerBody,
+			Payload: *payload,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create root cluster block: %w", err)
+	}
+	return block, nil
 }

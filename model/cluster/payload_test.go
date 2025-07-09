@@ -55,3 +55,49 @@ func TestNewPayload(t *testing.T) {
 		require.Contains(t, err.Error(), "could not construct collection")
 	})
 }
+
+// TestNewRootPayload verifies the behavior of the NewRootPayload constructor.
+// It ensures proper handling of both valid and invalid untrusted input fields.
+//
+// Test Cases:
+//
+// 1. Valid input:
+//   - Verifies that a properly populated UntrustedPayload results in a valid root Payload.
+//
+// 2. Valid input with non-zero reference block ID:
+//   - Ensures an error is returned when reference block ID is non-zero.
+//
+// 3. Invalid input with non-empty collection:
+//   - Ensures an error is returned when the Collection contains transaction IDs.
+func TestNewRootPayload(t *testing.T) {
+	base := cluster.UntrustedPayload{
+		ReferenceBlockID: flow.ZeroID,
+		Collection:       *flow.NewEmptyCollection(),
+	}
+
+	t.Run("valid input", func(t *testing.T) {
+		res, err := cluster.NewRootPayload(base)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	})
+
+	t.Run("valid input with non-zero ReferenceBlockID", func(t *testing.T) {
+		payload := base
+		payload.ReferenceBlockID = unittest.IdentifierFixture()
+
+		res, err := cluster.NewRootPayload(payload)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "ReferenceBlockID must be empty")
+	})
+
+	t.Run("invalid input with collection", func(t *testing.T) {
+		payload := base
+		payload.Collection = unittest.CollectionFixture(5)
+
+		res, err := cluster.NewRootPayload(payload)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "Collection must be empty")
+	})
+}

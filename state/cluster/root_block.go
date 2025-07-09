@@ -13,9 +13,6 @@ func CanonicalClusterID(epoch uint64, participants flow.IdentifierList) flow.Cha
 	return flow.ChainID(fmt.Sprintf("cluster-%d-%s", epoch, participants.ID()))
 }
 
-// these globals are filled by the static initializer
-var rootBlockPayload = cluster.NewEmptyPayload(flow.ZeroID)
-
 // CanonicalRootBlock returns the canonical root block for the given
 // cluster in the given epoch. It contains an empty collection referencing
 func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) (*cluster.Block, error) {
@@ -33,6 +30,13 @@ func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) (*
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create root header body: %w", err)
+	}
+
+	rootBlockPayload, err := cluster.NewRootPayload(
+		cluster.UntrustedPayload(*cluster.NewEmptyPayload(flow.ZeroID)),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create root cluster payload: %w", err)
 	}
 
 	block, err := cluster.NewRootBlock(

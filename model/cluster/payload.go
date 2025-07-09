@@ -72,6 +72,25 @@ func NewPayload(untrusted UntrustedPayload) (*Payload, error) {
 	}, nil
 }
 
+// NewRootPayload creates a root payload for a root cluster block.
+//
+// This constructor must be used **only** for constructing the root payload,
+// which is the only case where zero values are allowed.
+func NewRootPayload(untrusted UntrustedPayload) (*Payload, error) {
+	if untrusted.ReferenceBlockID != flow.ZeroID {
+		return nil, fmt.Errorf("ReferenceBlockID must be empty")
+	}
+
+	if len(untrusted.Collection.Transactions) != 0 {
+		return nil, fmt.Errorf("Collection must be empty")
+	}
+
+	return &Payload{
+		Collection:       untrusted.Collection,
+		ReferenceBlockID: untrusted.ReferenceBlockID,
+	}, nil
+}
+
 // Hash returns the hash of the payload.
 func (p Payload) Hash() flow.Identifier {
 	return flow.MakeID(p)
