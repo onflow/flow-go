@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -92,6 +93,7 @@ var _ Core = (*CoreImpl)(nil)
 // CAUTION: not concurrency safe!
 type CoreImpl struct {
 	log zerolog.Logger
+	mu  sync.Mutex
 
 	workingData *workingData
 
@@ -190,6 +192,8 @@ func NewCoreImpl(
 // - context.Canceled: if the provided context was canceled before completion
 // - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (c *CoreImpl) Download(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.log.Debug().Msg("downloading execution data")
 
 	g, gCtx := errgroup.WithContext(ctx)
@@ -250,6 +254,8 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 //
 // No errors are expected during normal operations
 func (c *CoreImpl) Index() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.workingData.executionData == nil {
 		return fmt.Errorf("could not index an empty execution data")
 	}
@@ -276,6 +282,8 @@ func (c *CoreImpl) Index() error {
 //
 // No errors are expected during normal operations
 func (c *CoreImpl) Persist() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.log.Debug().Msg("persisting execution data")
 
 	if err := c.workingData.registersPersister.Persist(); err != nil {
@@ -298,8 +306,10 @@ func (c *CoreImpl) Persist() error {
 //
 // No errors are expected during normal operations
 func (c *CoreImpl) Abandon() error {
+	c.mu.Lock()
 	// Clear in-memory storage and other processing data by setting workingData references to nil for garbage collection
 	c.workingData = nil
+	c.mu.Unlock()
 
 	return nil
 }

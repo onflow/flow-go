@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
@@ -55,6 +56,57 @@ type Pipeline interface {
 
 var _ Pipeline = (*PipelineImpl)(nil)
 
+type worker struct {
+	ctx     context.Context
+	cancel  context.CancelFunc
+	pool    *workerpool.WorkerPool
+	errChan chan error
+}
+
+// newWorker creates a single worker.
+func newWorker() *worker {
+	ctx, cancel := context.WithCancel(context.Background())
+	return &worker{
+		ctx:     ctx,
+		cancel:  cancel,
+		pool:    workerpool.New(1),
+		errChan: make(chan error, 1),
+	}
+}
+
+// Submit submits a new task for processing, each error will be propagated in a specific channel.
+// Might block the worker if there is no one reading from the error channel and errors are happening.
+func (w *worker) Submit(task func(ctx context.Context) error) {
+	w.pool.Submit(func() {
+		err := task(w.ctx)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			w.errChan <- err
+		}
+	})
+}
+
+// ErrChan returns the channel where errors are delivered from executed jobs.
+func (w *worker) ErrChan() <-chan error {
+	return w.errChan
+}
+
+// StopWait stops the worker pool and waits for all queued tasks to
+// complete. No additional tasks may be submitted, but all pending tasks are
+// executed by workers before this function returns.
+// Any error that was delivered during execution will be delivered to the caller.
+func (w *worker) StopWait() error {
+	w.cancel()
+	w.pool.StopWait()
+
+	defer close(w.errChan)
+	select {
+	case err := <-w.errChan:
+		return err
+	default:
+		return nil
+	}
+}
+
 // PipelineImpl implements the Pipeline interface
 type PipelineImpl struct {
 	log                  zerolog.Logger
@@ -63,6 +115,7 @@ type PipelineImpl struct {
 	stateChangedNotifier engine.Notifier
 	core                 Core
 	parent               PipelineStateProvider
+	worker               *worker
 
 	// The following fields are accessed externally. they are stored using atomics to avoid
 	// blocking the caller.
@@ -91,6 +144,7 @@ func NewPipeline(
 		log:                  log,
 		executionResult:      executionResult,
 		stateReceiver:        stateReceiver,
+		worker:               newWorker(),
 		state:                atomic.NewInt32(int32(StatePending)),
 		isSealed:             atomic.NewBool(isSealed),
 		isAbandoned:          atomic.NewBool(false),
@@ -106,12 +160,12 @@ func NewPipeline(
 //   - context.Canceled: when the context is canceled
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (p *PipelineImpl) Run(ctx context.Context, core Core, parent PipelineStateProvider) error {
-	pipelineCtx, cancel := context.WithCancelCause(ctx)
-	defer cancel(nil)
-
 	p.core = core
 	p.parent = parent
+	return errors.Join(p.loop(ctx), p.worker.StopWait())
+}
 
+func (p *PipelineImpl) loop(ctx context.Context) error {
 	// try to start processing in case we are able to.
 	p.stateChangedNotifier.Notify()
 
@@ -119,11 +173,8 @@ func (p *PipelineImpl) Run(ctx context.Context, core Core, parent PipelineStateP
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-pipelineCtx.Done():
-			// if any error has happened during the detached operation we need to handle it.
-			if err := pipelineCtx.Err(); err != nil {
-				return context.Cause(pipelineCtx)
-			}
+		case err := <-p.worker.ErrChan():
+			return err
 		case <-p.stateChangedNotifier.Channel():
 			select {
 			case <-ctx.Done():
@@ -141,7 +192,7 @@ func (p *PipelineImpl) Run(ctx context.Context, core Core, parent PipelineStateP
 			currentState := p.GetState()
 			switch currentState {
 			case StatePending:
-				if err := p.onStartProcessing(pipelineCtx, cancel); err != nil {
+				if err := p.onStartProcessing(); err != nil {
 					return err
 				}
 			case StateProcessing:
@@ -163,25 +214,20 @@ func (p *PipelineImpl) Run(ctx context.Context, core Core, parent PipelineStateP
 	}
 }
 
-func (p *PipelineImpl) onStartProcessing(ctx context.Context, causeFunc context.CancelCauseFunc) error {
+func (p *PipelineImpl) onStartProcessing() error {
 	switch p.parent.GetState() {
 	case StateProcessing, StateWaitingPersist, StateComplete:
 		err := p.transitionTo(StateProcessing)
 		if err != nil {
 			return err
 		}
-		go func() {
-			err := p.performDownload(ctx)
-			if err != nil {
-				causeFunc(err)
-			}
-		}()
+		p.worker.Submit(p.performDownload)
 	case StatePending:
 		return nil
 	case StateAbandoned:
 		return p.transitionTo(StateAbandoned)
 	default:
-		// its unexpected for the parent to be in any other state. this most likely indicates there's a bug
+		// it's unexpected for the parent to be in any other state. this most likely indicates there's a bug
 		return fmt.Errorf("unexpected parent state: %s", p.parent.GetState())
 	}
 	return nil
