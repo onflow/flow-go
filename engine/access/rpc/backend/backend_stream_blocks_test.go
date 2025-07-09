@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -152,7 +153,7 @@ func (s *BackendBlocksSuite) backendParams() Params {
 		Blocks:               s.blocks,
 		Headers:              s.headers,
 		ChainID:              s.chainID,
-		MaxHeightRange:       DefaultMaxHeightRange,
+		MaxHeightRange:       events.DefaultMaxHeightRange,
 		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
 		AccessMetrics:        metrics.NewNoopCollector(),
 		Log:                  s.log,

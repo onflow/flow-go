@@ -37,9 +37,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-// DefaultMaxHeightRange is the default maximum size of range requests.
-const DefaultMaxHeightRange = 250
-
 var targetEvent string
 
 type testCase struct {

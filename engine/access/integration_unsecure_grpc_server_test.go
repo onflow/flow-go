@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -197,7 +198,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		MaxHeightRange:       0,
 		Log:                  suite.log,
 		SnapshotHistoryLimit: 0,
-		Communicator:         backend.NewNodeCommunicator(false),
+		Communicator:         node_communicator.NewNodeCommunicator(false),
 	})
 	require.NoError(suite.T(), err)
 

@@ -1,7 +1,7 @@
 package executor
 
 import (
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"

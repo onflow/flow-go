@@ -2,7 +2,7 @@ package executor
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"

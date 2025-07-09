@@ -23,6 +23,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// DefaultMaxHeightRange is the default maximum size of range requests.
+const DefaultMaxHeightRange = 250
+
 type API interface {
 	GetEventsForHeightRange(
 		ctx context.Context,

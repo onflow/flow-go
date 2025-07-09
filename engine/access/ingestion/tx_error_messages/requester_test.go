@@ -16,6 +16,9 @@ import (
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
@@ -87,12 +90,12 @@ func (s *RequesterSuite) TestRequest_HappyPath() {
 		State:                      s.proto.state,
 		ExecutionReceipts:          s.receipts,
 		ConnFactory:                s.connFactory,
-		MaxHeightRange:             backend.DefaultMaxHeightRange,
+		MaxHeightRange:             events.DefaultMaxHeightRange,
 		Log:                        s.log,
 		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-		Communicator:               backend.NewNodeCommunicator(false),
-		ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+		Communicator:               node_communicator.NewNodeCommunicator(false),
+		ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
 		ChainID:                    flow.Testnet,
 		ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 	})
@@ -143,12 +146,12 @@ func (s *RequesterSuite) TestRequest_ErrorCases() {
 		State:                      s.proto.state,
 		ExecutionReceipts:          s.receipts,
 		ConnFactory:                s.connFactory,
-		MaxHeightRange:             backend.DefaultMaxHeightRange,
+		MaxHeightRange:             events.DefaultMaxHeightRange,
 		Log:                        s.log,
 		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-		Communicator:               backend.NewNodeCommunicator(false),
-		ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+		Communicator:               node_communicator.NewNodeCommunicator(false),
+		ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
 		ChainID:                    flow.Testnet,
 		ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 	})

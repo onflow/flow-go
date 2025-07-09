@@ -36,7 +36,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-
 // DefaultSnapshotHistoryLimit the amount of blocks to look back in state
 // when recursively searching for a valid snapshot
 const DefaultSnapshotHistoryLimit = 500

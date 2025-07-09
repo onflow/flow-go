@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
@@ -153,7 +154,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		MaxHeightRange:       0,
 		Log:                  suite.log,
 		SnapshotHistoryLimit: 0,
-		Communicator:         backend.NewNodeCommunicator(false),
+		Communicator:         node_communicator.NewNodeCommunicator(false),
 		BlockTracker:         nil,
 	})
 	suite.Require().NoError(err)

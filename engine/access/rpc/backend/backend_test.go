@@ -25,7 +25,11 @@ import (
 
 	"github.com/onflow/flow-go/cmd/build"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
@@ -2017,13 +2021,13 @@ func (suite *Suite) defaultBackendParams() Params {
 		ExecutionResults:     suite.results,
 		ChainID:              suite.chainID,
 		CollectionRPC:        suite.colClient,
-		MaxHeightRange:       DefaultMaxHeightRange,
+		MaxHeightRange:       events.DefaultMaxHeightRange,
 		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Communicator:         NewNodeCommunicator(false),
+		Communicator:         node_communicator.NewNodeCommunicator(false),
 		AccessMetrics:        metrics.NewNoopCollector(),
 		Log:                  suite.log,
 		BlockTracker:         nil,
-		TxResultQueryMode:    IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
 		LastFullBlockHeight:  suite.lastFullBlockHeight,
 		VersionControl:       suite.versionControl,
 		ExecNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
@@ -2101,7 +2105,7 @@ func (suite *Suite) TestResolveHeightError() {
 				stateParams.On("SealedRoot").Return(sealedRootHeader, nil).Once()
 			}
 
-			err := ResolveHeightError(stateParams, test.height, test.genericErr)
+			err := common.ResolveHeightError(stateParams, test.height, test.genericErr)
 
 			if test.expectOriginalErr {
 				suite.Assert().True(errors.Is(err, test.genericErr))
