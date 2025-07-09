@@ -25,8 +25,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	access "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
-	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	communicatormock "github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -76,7 +76,7 @@ type TransactionStatusSuite struct {
 	archiveClient          *access.AccessAPIClient
 
 	connectionFactory *connectionmock.ConnectionFactory
-	communicator      *backendmock.Communicator
+	communicator      *communicatormock.Communicator
 	blockTracker      *trackermock.BlockTracker
 	reporter          *syncmock.IndexReporter
 	indexReporter     *index.Reporter
@@ -125,7 +125,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.chainID = flow.Testnet
 	s.historicalAccessClient = access.NewAccessAPIClient(s.T())
 	s.connectionFactory = connectionmock.NewConnectionFactory(s.T())
-	s.communicator = backendmock.NewCommunicator(s.T())
+	s.communicator = communicatormock.NewCommunicator(s.T())
 	s.broadcaster = engine.NewBroadcaster()
 	s.blockTracker = trackermock.NewBlockTracker(s.T())
 	s.reporter = syncmock.NewIndexReporter(s.T())

@@ -27,8 +27,8 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
-	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	communicatormock "github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
@@ -91,7 +91,7 @@ type Suite struct {
 	historicalAccessClient *accessmock.AccessAPIClient
 
 	connectionFactory *connectionmock.ConnectionFactory
-	communicator      *backendmock.Communicator
+	communicator      *communicatormock.Communicator
 
 	chainID  flow.ChainID
 	systemTx *flow.TransactionBody
@@ -131,7 +131,7 @@ func (suite *Suite) SetupTest() {
 	suite.historicalAccessClient = new(accessmock.AccessAPIClient)
 	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
 
-	suite.communicator = new(backendmock.Communicator)
+	suite.communicator = new(communicatormock.Communicator)
 
 	var err error
 	suite.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())
