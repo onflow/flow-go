@@ -390,19 +390,24 @@ func TestBootstrapNonRoot(t *testing.T) {
 	//                                     [-----------------------][--------------------------------------]
 	// ROOT <- B1 <- B2(Receipt1a,Result1) <- B3(Receipt1b) <- ... <- G1 <- G2(R[G1]) <- G3(Seal[G1])
 	t.Run("with detached execution result reference in sealing segment", func(t *testing.T) {
-		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			block1 := unittest.BlockWithParentFixture(rootBlock)
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			buildFinalizedBlock(t, state, block1)
 
 			receipt1a, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			receipt1b := unittest.ExecutionReceiptFixture(unittest.WithResult(&receipt1a.ExecutionResult))
 
 			block2 := unittest.BlockWithParentFixture(block1.Header)
-			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1a)))
+			block2.SetPayload(unittest.PayloadFixture(
+				unittest.WithReceipts(receipt1a),
+				unittest.WithProtocolStateID(rootProtocolStateID)))
 			buildFinalizedBlock(t, state, block2)
 
 			block3 := unittest.BlockWithParentFixture(block2.Header)
-			block3.SetPayload(unittest.PayloadFixture(unittest.WithReceiptsAndNoResults(receipt1b)))
+			block3.SetPayload(unittest.PayloadFixture(
+				unittest.WithReceiptsAndNoResults(receipt1b),
+				unittest.WithProtocolStateID(rootProtocolStateID)))
 			buildFinalizedBlock(t, state, block3)
 
 			receipt2, seal2 := unittest.ReceiptAndSealForBlock(block2)
@@ -412,10 +417,11 @@ func TestBootstrapNonRoot(t *testing.T) {
 			seals := []*flow.Seal{seal1, seal2, seal3}
 
 			parent := block3
-			for i := 0; i < flow.DefaultTransactionExpiry-int(block3.Header.Height); i++ {
+			for i := 0; i < flow.DefaultTransactionExpiry-1; i++ {
 				next := unittest.BlockWithParentFixture(parent.Header)
 				next.SetPayload(unittest.PayloadFixture(
 					unittest.WithReceipts(receipts[0]),
+					unittest.WithProtocolStateID(calculateExpectedStateId(t, mutableState)(next.Header, []*flow.Seal{seals[0]})),
 					unittest.WithSeals(seals[0])))
 				seals, receipts = seals[1:], receipts[1:]
 
@@ -428,7 +434,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 
 			// G1 adds all receipts from all blocks before G1
 			blockG1 := unittest.BlockWithParentFixture(parent.Header)
-			blockG1.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipts...)))
+			blockG1.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipts...), unittest.WithProtocolStateID(parent.Payload.ProtocolStateID)))
 			buildFinalizedBlock(t, state, blockG1)
 
 			receiptS1, sealS1 := unittest.ReceiptAndSealForBlock(blockG1)
@@ -437,15 +443,19 @@ func TestBootstrapNonRoot(t *testing.T) {
 			blockG2 := unittest.BlockWithParentFixture(blockG1.Header)
 			blockG2.SetPayload(unittest.PayloadFixture(
 				unittest.WithSeals(seals...),
+				unittest.WithProtocolStateID(calculateExpectedStateId(t, mutableState)(blockG2.Header, seals)),
 				unittest.WithReceipts(receiptS1)))
 			buildFinalizedBlock(t, state, blockG2)
 
 			// G3 seals G1, creating a sealing segment
 			blockG3 := unittest.BlockWithParentFixture(blockG2.Header)
-			blockG3.SetPayload(unittest.PayloadFixture(unittest.WithSeals(sealS1)))
+			blockG3.SetPayload(unittest.PayloadFixture(
+				unittest.WithSeals(sealS1),
+				unittest.WithProtocolStateID(calculateExpectedStateId(t, mutableState)(blockG3.Header, []*flow.Seal{sealS1}))))
 			buildFinalizedBlock(t, state, blockG3)
 
 			child := unittest.BlockWithParentFixture(blockG3.Header)
+			child.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(blockG3.Payload.ProtocolStateID)))
 			buildFinalizedBlock(t, state, child)
 
 			return state.AtBlockID(blockG3.ID())
@@ -454,10 +464,12 @@ func TestBootstrapNonRoot(t *testing.T) {
 		segment, err := after.SealingSegment()
 		require.NoError(t, err)
 		// To accurately test the desired edge case we require that the lowest block in ExtraBlocks is B3
-		assert.Equal(t, segment.ExtraBlocks[0].Header.Height, uint64(3))
+		assert.Equal(t, uint64(3), segment.ExtraBlocks[0].Header.Height)
 
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
+		})
+	})
 
 	// should be able to bootstrap from snapshot after entering EFM because of sealing invalid service event
 	// ROOT <- B1 <- B2(R1) <- B3(S1) <- CHILD
