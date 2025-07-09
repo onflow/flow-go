@@ -254,9 +254,6 @@ func (p *PipelineImpl) onProcessing() error {
 
 func (p *PipelineImpl) onPersistChanges() error {
 	if p.isSealed.Load() && p.parent.GetState() == StateComplete {
-		// core is not concurrently safe but since this operation happens only after successful download
-		// and cannot happen at the same time as abandon(because abandon is scheduled from the same goroutine as persist is being called)
-		// then we have a guarantee that this operation will be executed after download and before abandoning but not in between.
 		if err := p.core.Persist(); err != nil {
 			return err
 		}
