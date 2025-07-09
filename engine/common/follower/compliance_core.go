@@ -123,7 +123,7 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 		Int("range_length", len(batch)).
 		Logger()
 
-	log.Info().Msg("processing block range")
+	log.Debug().Msg("processing block range")
 
 	if c.pendingCache.Peek(hotstuffProposal.Block.BlockID) == nil {
 		log.Debug().Msg("block not found in cache, performing validation")
@@ -312,7 +312,7 @@ func rangeToCertifiedBlocks(certifiedRange []*flow.Block, certifyingQC *flow.Quo
 	for i, block := range certifiedRange {
 		var qc *flow.QuorumCertificate
 		if i < lastIndex {
-			qc = certifiedRange[i+1].Header.QuorumCertificate()
+			qc = certifiedRange[i+1].Header.ParentQC()
 		} else {
 			qc = certifyingQC
 		}

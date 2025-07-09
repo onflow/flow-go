@@ -380,7 +380,7 @@ func TestEVMEncodeABI(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -394,7 +394,7 @@ func TestEVMEncodeABI(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint(0)
+	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -416,9 +416,9 @@ func TestEVMEncodeABI(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
-			if compKind == environment.ComputationKindEVMEncodeABI {
-				computation += intensity
+		OnMeterComputation: func(usage common.ComputationUsage) error {
+			if usage.Kind == environment.ComputationKindEVMEncodeABI {
+				computation += usage.Intensity
 			}
 			return nil
 		},
@@ -479,7 +479,7 @@ func TestEVMEncodeABI(t *testing.T) {
 		encodedABI,
 		result,
 	)
-	assert.Equal(t, computation, uint(len(cdcBytes)))
+	assert.Equal(t, uint64(len(cdcBytes)), computation)
 }
 
 func TestEVMEncodeABIByteTypes(t *testing.T) {
@@ -490,12 +490,12 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint(0)
+	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -517,9 +517,9 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
-			if compKind == environment.ComputationKindEVMEncodeABI {
-				computation += intensity
+		OnMeterComputation: func(usage common.ComputationUsage) error {
+			if usage.Kind == environment.ComputationKindEVMEncodeABI {
+				computation += usage.Intensity
 			}
 			return nil
 		},
@@ -591,10 +591,10 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 			encodedABI,
 			result,
 		)
-		assert.Equal(t, computation, uint(len(cdcBytes)))
+		assert.Equal(t, uint64(len(cdcBytes)), computation)
 
 		// Reset computation
-		computation = uint(0)
+		computation = 0
 	})
 
 	t.Run("ABI encode into `bytes[]` Solidity type", func(t *testing.T) {
@@ -667,10 +667,10 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 			encodedABI,
 			result,
 		)
-		assert.Equal(t, computation, uint(len(cdcBytes)))
+		assert.Equal(t, uint64(len(cdcBytes)), computation)
 
 		// Reset computation
-		computation = uint(0)
+		computation = 0
 	})
 
 	t.Run("ABI encode into `bytes4` Solidity type", func(t *testing.T) {
@@ -721,10 +721,10 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 			encodedABI,
 			result,
 		)
-		assert.Equal(t, computation, uint(len(cdcBytes)))
+		assert.Equal(t, uint64(len(cdcBytes)), computation)
 
 		// Reset computation
-		computation = uint(0)
+		computation = 0
 	})
 
 	t.Run("ABI encode into `bytes4[]` Solidity type", func(t *testing.T) {
@@ -786,10 +786,10 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 			encodedABI,
 			result,
 		)
-		assert.Equal(t, computation, uint(len(cdcBytes)))
+		assert.Equal(t, uint64(len(cdcBytes)), computation)
 
 		// Reset computation
-		computation = uint(0)
+		computation = 0
 	})
 
 	t.Run("ABI encode into `bytes32` Solidity type", func(t *testing.T) {
@@ -846,10 +846,10 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 			encodedABI,
 			result,
 		)
-		assert.Equal(t, computation, uint(len(cdcBytes)))
+		assert.Equal(t, uint64(len(cdcBytes)), computation)
 
 		// Reset computation
-		computation = uint(0)
+		computation = 0
 	})
 
 	t.Run("ABI encode into `bytes32[]` Solidity type", func(t *testing.T) {
@@ -922,10 +922,10 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 			encodedABI,
 			result,
 		)
-		assert.Equal(t, computation, uint(len(cdcBytes)))
+		assert.Equal(t, uint64(len(cdcBytes)), computation)
 
 		// Reset computation
-		computation = uint(0)
+		computation = 0
 	})
 }
 
@@ -937,12 +937,12 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint(0)
+	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -964,9 +964,9 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
-			if compKind == environment.ComputationKindEVMDecodeABI {
-				computation += intensity
+		OnMeterComputation: func(usage common.ComputationUsage) error {
+			if usage.Kind == environment.ComputationKindEVMDecodeABI {
+				computation += usage.Intensity
 			}
 			return nil
 		},
@@ -1024,7 +1024,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		)
 
 		// Reset computation
-		computation = uint(0)
+		computation = 0
 	})
 
 	t.Run("ABI encode/decode into `bytes[]` Solidity type", func(t *testing.T) {
@@ -1067,7 +1067,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		)
 
 		// Reset computation
-		computation = uint(0)
+		computation = 0
 	})
 
 	t.Run("ABI encode/decode into `bytes4` Solidity type", func(t *testing.T) {
@@ -1109,7 +1109,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		)
 
 		// Reset computation
-		computation = uint(0)
+		computation = 0
 	})
 
 	t.Run("ABI encode/decode into `bytes4[]` Solidity type", func(t *testing.T) {
@@ -1152,7 +1152,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		)
 
 		// Reset computation
-		computation = uint(0)
+		computation = 0
 	})
 
 	t.Run("ABI encode/decode into `bytes32` Solidity type", func(t *testing.T) {
@@ -1204,7 +1204,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		)
 
 		// Reset computation
-		computation = uint(0)
+		computation = 0
 	})
 
 	t.Run("ABI encode/decode into `bytes32[]` Solidity type", func(t *testing.T) {
@@ -1257,7 +1257,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		)
 
 		// Reset computation
-		computation = uint(0)
+		computation = 0
 	})
 }
 
@@ -1272,7 +1272,7 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -1300,7 +1300,7 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint(0)
+	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -1322,9 +1322,9 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
-			if compKind == environment.ComputationKindEVMEncodeABI {
-				computation += intensity
+		OnMeterComputation: func(usage common.ComputationUsage) error {
+			if usage.Kind == environment.ComputationKindEVMEncodeABI {
+				computation += usage.Intensity
 			}
 			return nil
 		},
@@ -1362,7 +1362,7 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 	cdcBytes, ok := result.(cadence.Array)
 	require.True(t, ok)
 	// computation & len(cdcBytes.Values) is equal to 832
-	assert.Equal(t, computation, uint(len(cdcBytes.Values)))
+	assert.Equal(t, uint64(len(cdcBytes.Values)), computation)
 }
 
 func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
@@ -1376,7 +1376,7 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -1395,7 +1395,7 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint(0)
+	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -1417,9 +1417,9 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
-			if compKind == environment.ComputationKindEVMEncodeABI {
-				computation += intensity
+		OnMeterComputation: func(usage common.ComputationUsage) error {
+			if usage.Kind == environment.ComputationKindEVMEncodeABI {
+				computation += usage.Intensity
 			}
 			return nil
 		},
@@ -1457,7 +1457,7 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 	cdcBytes, ok := result.(cadence.Array)
 	require.True(t, ok)
 	// computation & len(cdcBytes.Values) is equal to 832
-	assert.Equal(t, computation, uint(len(cdcBytes.Values)))
+	assert.Equal(t, uint64(len(cdcBytes.Values)), computation)
 }
 
 func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
@@ -1471,7 +1471,7 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -1499,7 +1499,7 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint(0)
+	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -1521,9 +1521,9 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
-			if compKind == environment.ComputationKindEVMEncodeABI {
-				computation += intensity
+		OnMeterComputation: func(usage common.ComputationUsage) error {
+			if usage.Kind == environment.ComputationKindEVMEncodeABI {
+				computation += usage.Intensity
 			}
 			return nil
 		},
@@ -1561,7 +1561,7 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 	cdcBytes, ok := result.(cadence.Array)
 	require.True(t, ok)
 	// computation & len(cdcBytes.Values) is equal to 832
-	assert.Equal(t, computation, uint(len(cdcBytes.Values)))
+	assert.Equal(t, uint64(len(cdcBytes.Values)), computation)
 }
 
 func TestEVMDecodeABI(t *testing.T) {
@@ -1575,7 +1575,7 @@ func TestEVMDecodeABI(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -1597,7 +1597,7 @@ func TestEVMDecodeABI(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint(0)
+	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -1619,9 +1619,9 @@ func TestEVMDecodeABI(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
-			if compKind == environment.ComputationKindEVMDecodeABI {
-				computation += intensity
+		OnMeterComputation: func(usage common.ComputationUsage) error {
+			if usage.Kind == environment.ComputationKindEVMDecodeABI {
+				computation += usage.Intensity
 			}
 			return nil
 		},
@@ -1680,7 +1680,7 @@ func TestEVMDecodeABI(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, cadence.NewBool(true), result)
-	assert.Equal(t, computation, uint(len(cdcBytes)))
+	assert.Equal(t, uint64(len(cdcBytes)), computation)
 }
 
 func TestEVMDecodeABIComputation(t *testing.T) {
@@ -1694,7 +1694,7 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -1730,7 +1730,7 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint(0)
+	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -1752,9 +1752,9 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
-			if compKind == environment.ComputationKindEVMDecodeABI {
-				computation += intensity
+		OnMeterComputation: func(usage common.ComputationUsage) error {
+			if usage.Kind == environment.ComputationKindEVMDecodeABI {
+				computation += usage.Intensity
 			}
 			return nil
 		},
@@ -1792,7 +1792,7 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 	cdcBytes, ok := result.(cadence.Array)
 	require.True(t, ok)
 	// computation & len(cdcBytes.Values) is equal to 832
-	assert.Equal(t, computation, uint(len(cdcBytes.Values)))
+	assert.Equal(t, uint64(len(cdcBytes.Values)), computation)
 }
 
 func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
@@ -1803,7 +1803,7 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
@@ -2066,7 +2066,7 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -2347,7 +2347,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -2433,7 +2433,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -2518,7 +2518,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -2604,7 +2604,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -2690,7 +2690,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -2786,7 +2786,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -2872,7 +2872,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -2958,7 +2958,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -3044,7 +3044,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -3130,7 +3130,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -3216,7 +3216,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -3313,7 +3313,7 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -3336,7 +3336,7 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint(0)
+	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -3358,9 +3358,9 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
-			if compKind == environment.ComputationKindEVMEncodeABI {
-				computation += intensity
+		OnMeterComputation: func(usage common.ComputationUsage) error {
+			if usage.Kind == environment.ComputationKindEVMEncodeABI {
+				computation += usage.Intensity
 			}
 			return nil
 		},
@@ -3423,7 +3423,7 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 		result,
 	)
 	// The method ID is a byte array of length 4
-	assert.Equal(t, computation+4, uint(len(cdcBytes)))
+	assert.Equal(t, uint64(len(cdcBytes)), computation+4)
 }
 
 func TestEVMDecodeABIWithSignature(t *testing.T) {
@@ -3437,7 +3437,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -3469,7 +3469,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint(0)
+	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -3491,9 +3491,9 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
-			if compKind == environment.ComputationKindEVMDecodeABI {
-				computation += intensity
+		OnMeterComputation: func(usage common.ComputationUsage) error {
+			if usage.Kind == environment.ComputationKindEVMDecodeABI {
+				computation += usage.Intensity
 			}
 			return nil
 		},
@@ -3554,7 +3554,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 
 	assert.Equal(t, cadence.NewBool(true), result)
 	// The method ID is a byte array of length 4
-	assert.Equal(t, computation+4, uint(len(cdcBytes)))
+	assert.Equal(t, uint64(len(cdcBytes)), computation+4)
 }
 
 func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
@@ -3568,7 +3568,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -3665,7 +3665,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 		},
 	)
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "panic: signature mismatch")
+	assert.ErrorContains(t, err, "EVM.decodeABIWithSignature(): Cannot decode! The signature does not match the provided data.")
 }
 
 func TestEVMAddressConstructionAndReturn(t *testing.T) {
@@ -3679,7 +3679,7 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -3781,7 +3781,7 @@ func TestEVMAddressSerializationAndDeserialization(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	addressFromBytesScript := []byte(`
       import EVM from 0x1
@@ -3958,7 +3958,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -4085,7 +4085,7 @@ func TestEVMRun(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -4214,7 +4214,7 @@ func TestEVMDryRun(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
@@ -4329,7 +4329,7 @@ func TestEVMDryCall(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
@@ -4461,7 +4461,7 @@ func TestEVMBatchRun(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -4555,7 +4555,7 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -4706,7 +4706,7 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -4835,7 +4835,7 @@ func TestCadenceOwnedAccountDryCall(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -4957,7 +4957,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -5071,7 +5071,7 @@ func TestCOADeposit(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -5233,7 +5233,7 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -5395,7 +5395,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1
@@ -5488,7 +5488,7 @@ func RunEVMScript(
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
@@ -5706,16 +5706,24 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 	t.Parallel()
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
+	type onGetAccountKeyFunc func(
+		addr runtime.Address,
+		index uint32,
+	) (*cadenceStdlib.AccountKey, error)
+
+	type onVerifySignatureFunc func(
+		signature []byte,
+		tag string,
+		sd,
+		publicKey []byte,
+		signatureAlgorithm runtime.SignatureAlgorithm,
+		hashAlgorithm runtime.HashAlgorithm,
+	) (bool, error)
+
 	validate := func(
 		proof *types.COAOwnershipProofInContext,
-		onGetAccountKey func(addr runtime.Address, index uint32) (*cadenceStdlib.AccountKey, error),
-		onVerifySignature func(
-			signature []byte,
-			tag string,
-			sd,
-			publicKey []byte,
-			signatureAlgorithm runtime.SignatureAlgorithm,
-			hashAlgorithm runtime.HashAlgorithm) (bool, error),
+		onGetAccountKey onGetAccountKeyFunc,
+		onVerifySignature onVerifySignatureFunc,
 	) (cadence.Value, error) {
 		handler := &testContractHandler{
 			deployCOA: func(_ uint64) types.Address {
@@ -5725,7 +5733,7 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+		rt := runtime.NewRuntime(runtime.Config{})
 
 		accountCodes := map[common.Location][]byte{}
 		var events []cadence.Event
@@ -5990,7 +5998,7 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 		message := result.(cadence.Struct).
 			SearchFieldByName("problem").(cadence.Optional).
 			Value.(cadence.String).String()
-		require.Equal(t, "\"the given signatures are not valid or provide enough weight\"", message)
+		require.Equal(t, "\"EVM.validateCOAOwnershipProof(): Cannot validate COA ownership for Cadence account 0x0000000000000001. The given signatures are not valid or provide enough weight.\"", message)
 	})
 }
 
@@ -6003,7 +6011,7 @@ func TestInternalEVMAccess(t *testing.T) {
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
       import EVM from 0x1

@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 )
 
-func ReadTrie(dir string, targetHash flow.StateCommitment) ([]*ledger.Payload, error) {
+func ReadTrie(dir string, targetHash flow.StateCommitment) (*mtrie.MTrie, error) {
 	log.Info().Msg("init WAL")
 
 	diskWal, err := wal.NewDiskWAL(
@@ -93,6 +93,14 @@ func ReadTrie(dir string, targetHash flow.StateCommitment) ([]*ledger.Payload, e
 		return nil, fmt.Errorf("cannot get trie at the given state commitment: %w", err)
 	}
 
+	return trie, nil
+}
+
+func ReadTrieForPayloads(dir string, targetHash flow.StateCommitment) ([]*ledger.Payload, error) {
+	trie, err := ReadTrie(dir, targetHash)
+	if err != nil {
+		return nil, err
+	}
 	return trie.AllPayloads(), nil
 }
 

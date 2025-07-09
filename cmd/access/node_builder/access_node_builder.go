@@ -13,8 +13,6 @@ import (
 
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
-	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/onflow/crypto"
@@ -348,6 +346,8 @@ type FlowAccessNodeBuilder struct {
 	events                         storage.Events
 	lightTransactionResults        storage.LightTransactionResults
 	transactionResultErrorMessages storage.TransactionResultErrorMessages
+	transactions                   storage.Transactions
+	collections                    storage.Collections
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -556,7 +556,6 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 }
 
 func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccessNodeBuilder {
-	var ds datastore.Batching
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgressInitializer
 	var processedNotifications storage.ConsumerProgressInitializer
@@ -564,7 +563,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
 	var executionDataStoreCache *execdatacache.ExecutionDataCache
-	var executionDataDBMode execution_data.ExecutionDataDBMode
 
 	// setup dependency chain to ensure indexer starts after the requester
 	requesterDependable := module.NewProxiedReadyDoneAware()
@@ -576,39 +574,26 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
 		}).
+		Module("transactions and collections storage", func(node *cmd.NodeConfig) error {
+
+			dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+
+			transactions := store.NewTransactions(node.Metrics.Cache, dbStore)
+			collections := store.NewCollections(dbStore, transactions)
+			builder.transactions = transactions
+			builder.collections = collections
+
+			return nil
+		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
-			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
-			err := os.MkdirAll(datastoreDir, 0700)
+			var err error
+			builder.ExecutionDatastoreManager, err = edstorage.CreateDatastoreManager(
+				node.Logger, builder.executionDataDir, builder.executionDataDBMode)
 			if err != nil {
-				return err
+				return fmt.Errorf("could not create execution data datastore manager: %w", err)
 			}
 
-			executionDataDBMode, err = execution_data.ParseExecutionDataDBMode(builder.executionDataDBMode)
-			if err != nil {
-				return fmt.Errorf("could not parse execution data DB mode: %w", err)
-			}
-
-			if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
-				builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(
-					node.Logger.With().Str("pebbledb", "endata").Logger(),
-					datastoreDir, nil)
-				if err != nil {
-					return fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
-				}
-			} else {
-				builder.ExecutionDatastoreManager, err = edstorage.NewBadgerDatastoreManager(datastoreDir, &badgerds.DefaultOptions)
-				if err != nil {
-					return fmt.Errorf("could not create BadgerDatastoreManager for execution data: %w", err)
-				}
-			}
-			ds = builder.ExecutionDatastoreManager.Datastore()
-
-			builder.ShutdownFunc(func() error {
-				if err := builder.ExecutionDatastoreManager.Close(); err != nil {
-					return fmt.Errorf("could not close execution data datastore: %w", err)
-				}
-				return nil
-			})
+			builder.ShutdownFunc(builder.ExecutionDatastoreManager.Close)
 
 			return nil
 		}).
@@ -633,7 +618,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return nil
 		}).
 		Module("execution datastore", func(node *cmd.NodeConfig) error {
-			builder.ExecutionDataBlobstore = blobs.NewBlobstore(ds)
+			builder.ExecutionDataBlobstore = blobs.NewBlobstore(builder.ExecutionDatastoreManager.Datastore())
 			builder.ExecutionDataStore = execution_data.NewExecutionDataStore(builder.ExecutionDataBlobstore, execution_data.DefaultSerializer)
 			return nil
 		}).
@@ -676,7 +661,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 
 			var err error
-			bs, err = node.EngineRegistry.RegisterBlobService(channels.ExecutionDataService, ds, opts...)
+			bs, err = node.EngineRegistry.RegisterBlobService(channels.ExecutionDataService, builder.ExecutionDatastoreManager.Datastore(), opts...)
 			if err != nil {
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
@@ -837,7 +822,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			net := builder.AccessNodeConfig.PublicNetworkConfig.Network
 
 			var err error
-			builder.PublicBlobService, err = net.RegisterBlobService(channels.PublicExecutionDataService, ds, opts...)
+			builder.PublicBlobService, err = net.RegisterBlobService(channels.PublicExecutionDataService, builder.ExecutionDatastoreManager.Datastore(), opts...)
 			if err != nil {
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
@@ -863,7 +848,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return nil
 			}).
 			Module("transaction results storage", func(node *cmd.NodeConfig) error {
-				builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
+				dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+				builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, dbStore, bstorage.DefaultCacheSize)
 				return nil
 			}).
 			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -954,16 +940,16 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				indexerCore, err := indexer.New(
 					builder.Logger,
 					metrics.NewExecutionStateIndexerCollector(),
-					builder.ProtocolDB,
-					builder.Storage.RegisterIndex,
-					builder.Storage.Headers,
-					builder.events,
-					builder.Storage.Collections,
-					builder.Storage.Transactions,
-					builder.lightTransactionResults,
+					notNil(builder.ProtocolDB),
+					notNil(builder.Storage.RegisterIndex),
+					notNil(builder.Storage.Headers),
+					notNil(builder.events),
+					notNil(builder.collections),
+					notNil(builder.transactions),
+					notNil(builder.lightTransactionResults),
 					builder.RootChainID.Chain(),
 					indexerDerivedChainData,
-					builder.collectionExecutedMetric,
+					notNil(builder.collectionExecutedMetric),
 				)
 				if err != nil {
 					return nil, err
@@ -1581,11 +1567,15 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
-		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
-			return builder.NetworkUnderlay
-		})
+		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(
+			idCache,
+			node.ProtocolDB,
+			func() network.DisallowListNotificationConsumer {
+				return builder.NetworkUnderlay
+			},
+		)
 		if err != nil {
-			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
+			return fmt.Errorf("could not initialize NodeDisallowListWrapper: %w", err)
 		}
 		builder.IdentityProvider = disallowListWrapper
 
@@ -1619,7 +1609,7 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 	builder.EnqueueNetworkInit()
 
 	builder.AdminCommand("get-transactions", func(conf *cmd.NodeConfig) commands.AdminCommand {
-		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
+		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, notNil(builder.collections))
 	})
 
 	// if this is an access node that supports public followers, enqueue the public network
@@ -1783,7 +1773,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.CollectionsToMarkFinalized,
 				builder.CollectionsToMarkExecuted,
 				builder.BlocksToMarkExecuted,
-				builder.Storage.Collections,
+				builder.collections,
 				builder.Storage.Blocks,
 				builder.BlockTransactions,
 			)
@@ -1848,7 +1838,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("events storage", func(node *cmd.NodeConfig) error {
-			builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
+			dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+			builder.events = store.NewEvents(node.Metrics.Cache, dbStore)
 			return nil
 		}).
 		Module("reporter", func(node *cmd.NodeConfig) error {
@@ -1884,7 +1875,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
 			if builder.storeTxResultErrorMessages {
-				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
+				dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, dbStore, bstorage.DefaultCacheSize)
 			}
 
 			return nil
@@ -2036,17 +2028,17 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			builder.nodeBackend, err = backend.New(backend.Params{
 				State:                 node.State,
-				CollectionRPC:         builder.CollectionRPC,
-				HistoricalAccessNodes: builder.HistoricalAccessRPCs,
+				CollectionRPC:         builder.CollectionRPC, // might be nil
+				HistoricalAccessNodes: notNil(builder.HistoricalAccessRPCs),
 				Blocks:                node.Storage.Blocks,
 				Headers:               node.Storage.Headers,
-				Collections:           node.Storage.Collections,
-				Transactions:          node.Storage.Transactions,
+				Collections:           notNil(builder.collections),
+				Transactions:          notNil(builder.transactions),
 				ExecutionReceipts:     node.Storage.Receipts,
 				ExecutionResults:      node.Storage.Results,
-				TxResultErrorMessages: builder.transactionResultErrorMessages,
+				TxResultErrorMessages: builder.transactionResultErrorMessages, // might be nil
 				ChainID:               node.RootChainID,
-				AccessMetrics:         builder.AccessMetrics,
+				AccessMetrics:         notNil(builder.AccessMetrics),
 				ConnFactory:           connFactory,
 				RetryEnabled:          builder.retryEnabled,
 				MaxHeightRange:        backendConfig.MaxHeightRange,
@@ -2054,7 +2046,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
 				Communicator:          backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
 				TxResultCacheSize:     builder.TxResultCacheSize,
-				ScriptExecutor:        builder.ScriptExecutor,
+				ScriptExecutor:        notNil(builder.ScriptExecutor),
 				ScriptExecutionMode:   scriptExecMode,
 				CheckPayerBalanceMode: checkPayerBalanceMode,
 				EventQueryMode:        eventQueryMode,
@@ -2066,13 +2058,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					builder.stateStreamConf.ResponseLimit,
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
-				EventsIndex:                builder.EventsIndex,
+				EventsIndex:                notNil(builder.EventsIndex),
 				TxResultQueryMode:          txResultQueryMode,
-				TxResultsIndex:             builder.TxResultsIndex,
+				TxResultsIndex:             notNil(builder.TxResultsIndex),
 				LastFullBlockHeight:        lastFullBlockHeight,
 				IndexReporter:              indexReporter,
-				VersionControl:             builder.VersionControl,
-				ExecNodeIdentitiesProvider: builder.ExecNodeIdentitiesProvider,
+				VersionControl:             notNil(builder.VersionControl),
+				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -2083,14 +2075,14 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.State,
 				config,
 				node.RootChainID,
-				builder.AccessMetrics,
+				notNil(builder.AccessMetrics),
 				builder.rpcMetricsEnabled,
-				builder.Me,
-				builder.nodeBackend,
-				builder.nodeBackend,
-				builder.secureGrpcServer,
-				builder.unsecureGrpcServer,
-				builder.stateStreamBackend,
+				notNil(builder.Me),
+				notNil(builder.nodeBackend),
+				notNil(builder.nodeBackend),
+				notNil(builder.secureGrpcServer),
+				notNil(builder.unsecureGrpcServer),
+				notNil(builder.stateStreamBackend),
 				builder.stateStreamConf,
 				indexReporter,
 			)
@@ -2113,7 +2105,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			var err error
 
 			builder.RequestEng, err = requester.New(
-				node.Logger,
+				node.Logger.With().Str("entity", "collection").Logger(),
 				node.Metrics.Engine,
 				node.EngineRegistry,
 				node.Me,
@@ -2129,34 +2121,41 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if builder.storeTxResultErrorMessages {
 				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 					node.Logger,
-					builder.nodeBackend,
+					notNil(builder.nodeBackend),
 					builder.transactionResultErrorMessages,
-					builder.ExecNodeIdentitiesProvider,
+					notNil(builder.ExecNodeIdentitiesProvider),
 				)
 			}
+
+			collectionSyncer := ingestion.NewCollectionSyncer(
+				node.Logger,
+				notNil(builder.collectionExecutedMetric),
+				builder.RequestEng,
+				node.State,
+				node.Storage.Blocks,
+				notNil(builder.collections),
+				notNil(builder.transactions),
+				lastFullBlockHeight,
+			)
+			builder.RequestEng.WithHandle(collectionSyncer.OnCollectionDownloaded)
 
 			builder.IngestEng, err = ingestion.New(
 				node.Logger,
 				node.EngineRegistry,
 				node.State,
 				node.Me,
-				builder.RequestEng,
 				node.Storage.Blocks,
-				node.Storage.Headers,
-				node.Storage.Collections,
-				node.Storage.Transactions,
 				node.Storage.Results,
 				node.Storage.Receipts,
-				builder.collectionExecutedMetric,
 				processedFinalizedBlockHeight,
-				lastFullBlockHeight,
-				builder.TxResultErrorMessagesCore,
+				notNil(collectionSyncer),
+				notNil(builder.collectionExecutedMetric),
+				notNil(builder.TxResultErrorMessagesCore),
 			)
 			if err != nil {
 				return nil, err
 			}
 			ingestionDependable.Init(builder.IngestEng)
-			builder.RequestEng.WithHandle(builder.IngestEng.OnCollection)
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
 
 			return builder.IngestEng, nil
@@ -2389,4 +2388,16 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	}
 
 	return libp2pNode, nil
+}
+
+// notNil ensures that the input is not nil and returns it
+// the usage is to ensure the dependencies are initialized before initializing a module.
+// for instance, the IngestionEngine depends on storage.Collections, which is initialized in a
+// different function, so we need to ensure that the storage.Collections is initialized before
+// creating the IngestionEngine.
+func notNil[T any](dep T) T {
+	if any(dep) == nil {
+		panic("dependency is nil")
+	}
+	return dep
 }

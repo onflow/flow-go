@@ -198,12 +198,19 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	}
 
 	for _, locator := range locators {
-		response := verification.ChunkDataPackResponse{
-			Locator: *locator,
-			Cdp:     chunkDataPack,
+		response, err := verification.NewChunkDataPackResponse(
+			verification.UntrustedChunkDataPackResponse{
+				Locator: *locator,
+				Cdp:     chunkDataPack,
+			},
+		)
+		if err != nil {
+			// TODO: update this engine to use SignalerContext and throw an exception here
+			lg.Fatal().Err(err).Msg("could not construct chunk data pack response")
+			return
 		}
 
-		e.handler.HandleChunkDataPack(originID, &response)
+		e.handler.HandleChunkDataPack(originID, response)
 		e.metrics.OnChunkDataPackSentToFetcher()
 		lg.Info().
 			Hex("result_id", logging.ID(locator.ResultID)).

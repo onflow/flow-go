@@ -21,6 +21,14 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+const (
+	// maxIndexBlockDiff is the maximum difference between the highest indexed block height and the
+	// provided start height to allow when starting a new stream.
+	// this is used to account for small delays indexing or requests made to different ANs behind a
+	// load balancer. The diff will result in the stream waiting a few blocks before starting.
+	maxIndexBlockDiff = 30
+)
+
 // ExecutionDataTracker is an interface for tracking the highest consecutive block height for which we have received a
 // new Execution Data notification
 type ExecutionDataTracker interface {
@@ -273,8 +281,11 @@ func (e *ExecutionDataTrackerImpl) checkStartHeight(height uint64) (uint64, erro
 		return 0, status.Errorf(codes.InvalidArgument, "start height %d is lower than lowest indexed height %d", height, lowestHeight)
 	}
 
-	if height > highestHeight {
-		return 0, status.Errorf(codes.InvalidArgument, "start height %d is higher than highest indexed height %d", height, highestHeight)
+	// allow for a small difference between the highest indexed height and the provided height to
+	// account for small delays indexing or requests made to different ANs behind a load balancer.
+	// this will just result in the stream waiting a few blocks before starting.
+	if height > highestHeight+maxIndexBlockDiff {
+		return 0, status.Errorf(codes.InvalidArgument, "start height %d is higher than highest indexed height %d (maxIndexBlockDiff: %d)", height, highestHeight, maxIndexBlockDiff)
 	}
 
 	return height, nil

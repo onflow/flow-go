@@ -106,6 +106,9 @@ func (s *DynamicEpochTransitionSuite) StakeNode(ctx context.Context, env templat
 	latestBlockID, err := s.Client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
+	stakingKeyPoP, err := crypto.BLSGeneratePOP(stakingKey)
+	require.NoError(s.T(), err)
+
 	// create and register node
 	tx, err := utils.MakeCreateAndSetupNodeTx(
 		env,
@@ -118,6 +121,7 @@ func (s *DynamicEpochTransitionSuite) StakeNode(ctx context.Context, env templat
 		testnet.GetPrivateNodeInfoAddress(containerName),
 		strings.TrimPrefix(networkingKey.PublicKey().String(), "0x"),
 		strings.TrimPrefix(stakingKey.PublicKey().String(), "0x"),
+		strings.TrimPrefix(stakingKeyPoP.String(), "0x"),
 		machineAccountPubKey,
 	)
 	require.NoError(s.T(), err)
@@ -165,13 +169,13 @@ func (s *DynamicEpochTransitionSuite) generateAccountKeys(role flow.Role) (
 	machineAccountKey crypto.PrivateKey,
 	machineAccountPubKey *sdk.AccountKey,
 ) {
-	operatorAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen)
+	operatorAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256)
 	networkingKey = unittest.NetworkingPrivKeyFixture()
 	stakingKey = unittest.StakingPrivKeyFixture()
 
 	// create a machine account
 	if role == flow.RoleConsensus || role == flow.RoleCollection {
-		machineAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen)
+		machineAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256)
 
 		machineAccountPubKey = &sdk.AccountKey{
 			PublicKey: machineAccountKey.PublicKey(),
@@ -303,8 +307,9 @@ func (s *DynamicEpochTransitionSuite) NewTestContainerOnNetwork(role flow.Role, 
 	}
 
 	nodeConfig := testnet.NewNodeConfig(role, containerConfigs...)
-	testContainerConfig := testnet.NewContainerConfig(info.ContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
-	err := testContainerConfig.WriteKeyFiles(s.Net.BootstrapDir, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
+	testContainerConfig, err := testnet.NewContainerConfig(info.ContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
+	require.NoError(s.T(), err)
+	err = testContainerConfig.WriteKeyFiles(s.Net.BootstrapDir, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
 	require.NoError(s.T(), err)
 
 	//add our container to the network

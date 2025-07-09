@@ -24,12 +24,6 @@ func EnsureEventsIndexSeq(t *testing.T, events []flow.Event, chainID flow.ChainI
 	expectedEventIndex := uint32(0)
 	for _, event := range events {
 		require.Equal(t, expectedEventIndex, event.EventIndex)
-		if IsServiceEvent(event, chainID) {
-			// TODO: we will need to address the double counting issue for service events.
-			//		 https://github.com/onflow/flow-go/issues/3393
-			expectedEventIndex += 2
-		} else {
-			expectedEventIndex++
-		}
+		expectedEventIndex++
 	}
 }

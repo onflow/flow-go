@@ -81,7 +81,7 @@ func run(*cobra.Command, []string) {
 	transactions := badger.NewTransactions(metrics, bdb)
 	collections := badger.NewCollections(bdb, transactions)
 	// require the chunk data pack data must exist before returning the storage module
-	chunkDataPacksPebbleDB, err := storagepebble.MustOpenDefaultPebbleDB(
+	chunkDataPacksPebbleDB, err := storagepebble.ShouldOpenDefaultPebbleDB(
 		log.Logger.With().Str("pebbledb", "cdp").Logger(), flagChunkDataPackDir)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not open chunk data pack DB at %v", flagChunkDataPackDir)
@@ -89,8 +89,10 @@ func run(*cobra.Command, []string) {
 	chunkDataPacksDB := pebbleimpl.ToDB(chunkDataPacksPebbleDB)
 	chunkDataPacks := store.NewChunkDataPacks(metrics, chunkDataPacksDB, collections, 1000)
 	chunkBatch := chunkDataPacksDB.NewBatch()
+	defer chunkBatch.Close()
 
 	writeBatch := db.NewBatch()
+	defer writeBatch.Close()
 
 	err = removeExecutionResultsFromHeight(
 		writeBatch,

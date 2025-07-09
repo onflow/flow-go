@@ -66,7 +66,8 @@ func TestNodeConfigEncodingJSON(t *testing.T) {
 
 func TestNodeInfoPubEncodingJSON(t *testing.T) {
 	t.Run("normal node info", func(t *testing.T) {
-		conf := unittest.NodeInfoFixture().Public()
+		conf, err := unittest.NodeInfoFixture().Public()
+		require.NoError(t, err)
 		enc, err := json.Marshal(conf)
 		require.NoError(t, err)
 		var dec bootstrap.NodeInfoPub
@@ -75,7 +76,8 @@ func TestNodeInfoPubEncodingJSON(t *testing.T) {
 		assert.True(t, dec.Equals(&conf))
 	})
 	t.Run("compat: should accept old files using Stake field", func(t *testing.T) {
-		conf := unittest.NodeInfoFixture().Public()
+		conf, err := unittest.NodeInfoFixture().Public()
+		require.NoError(t, err)
 		enc, err := json.Marshal(conf)
 		require.NoError(t, err)
 		// emulate the old encoding by replacing the new field with old field name

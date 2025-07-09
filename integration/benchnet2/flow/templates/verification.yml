@@ -33,6 +33,9 @@ spec:
         role: verification
         owner: {{ $.Values.owner }}
         service: flow
+        {{- if contains "verification1-" $k }}
+        pyroscope.io/scrape: "true"
+        {{- end }}
     spec:  
       nodeSelector:
         iam.gke.io/gke-metadata-server-enabled: "true"

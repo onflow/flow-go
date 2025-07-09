@@ -17,6 +17,7 @@ import (
 	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
 	checkpoint_trie_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-trie-stats"
+	db_migration "github.com/onflow/flow-go/cmd/util/cmd/db-migration"
 	debug_script "github.com/onflow/flow-go/cmd/util/cmd/debug-script"
 	debug_tx "github.com/onflow/flow-go/cmd/util/cmd/debug-tx"
 	diff_states "github.com/onflow/flow-go/cmd/util/cmd/diff-states"
@@ -31,6 +32,8 @@ import (
 	find_inconsistent_result "github.com/onflow/flow-go/cmd/util/cmd/find-inconsistent-result"
 	find_trie_root "github.com/onflow/flow-go/cmd/util/cmd/find-trie-root"
 	generate_authorization_fixes "github.com/onflow/flow-go/cmd/util/cmd/generate-authorization-fixes"
+	"github.com/onflow/flow-go/cmd/util/cmd/leaders"
+	pebble_checkpoint "github.com/onflow/flow-go/cmd/util/cmd/pebble-checkpoint"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
@@ -106,6 +109,7 @@ func addCommands() {
 	rootCmd.AddCommand(read_badger.RootCmd)
 	rootCmd.AddCommand(read_protocol_state.RootCmd)
 	rootCmd.AddCommand(ledger_json_exporter.Cmd)
+	rootCmd.AddCommand(leaders.Cmd)
 	rootCmd.AddCommand(epochs.RootCmd)
 	rootCmd.AddCommand(edbs.RootCmd)
 	rootCmd.AddCommand(index_er.RootCmd)
@@ -130,6 +134,8 @@ func addCommands() {
 	rootCmd.AddCommand(evm_state_exporter.Cmd)
 	rootCmd.AddCommand(verify_execution_result.Cmd)
 	rootCmd.AddCommand(verify_evm_offchain_replay.Cmd)
+	rootCmd.AddCommand(pebble_checkpoint.Cmd)
+	rootCmd.AddCommand(db_migration.Cmd)
 }
 
 func initConfig() {

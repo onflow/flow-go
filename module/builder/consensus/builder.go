@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -17,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 // Builder is the builder for consensus block payloads. Upon providing a payload
@@ -25,7 +23,6 @@ import (
 type Builder struct {
 	metrics              module.MempoolMetrics
 	tracer               module.Tracer
-	db                   *badger.DB
 	state                protocol.ParticipantState
 	seals                storage.Seals
 	headers              storage.Headers
@@ -43,7 +40,6 @@ type Builder struct {
 // NewBuilder creates a new block builder.
 func NewBuilder(
 	metrics module.MempoolMetrics,
-	db *badger.DB,
 	state protocol.ParticipantState,
 	headers storage.Headers,
 	seals storage.Seals,
@@ -80,7 +76,6 @@ func NewBuilder(
 
 	b := &Builder{
 		metrics:              metrics,
-		db:                   db,
 		tracer:               tracer,
 		state:                state,
 		headers:              headers,
@@ -279,13 +274,9 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 		limit = 0
 	}
 
-	// look up the root height so we don't look too far back
-	// initially this is the genesis block height (aka 0).
-	var rootHeight uint64
-	err = b.db.View(operation.RetrieveRootHeight(&rootHeight))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root block height: %w", err)
-	}
+	// the finalized root height is the height where we bootstrapped from.
+	// we should not include guarantees that are older than the finalized root
+	rootHeight := b.state.Params().FinalizedRoot().Height
 	if limit < rootHeight {
 		limit = rootHeight
 	}
@@ -423,10 +414,13 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 
 			// re-assemble the IncorporatedResult because we need its ID to
 			// check if it is in the seal mempool.
-			incorporatedResult := flow.NewIncorporatedResult(
-				blockID,
-				result,
-			)
+			incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+				IncorporatedBlockID: blockID,
+				Result:              result,
+			})
+			if err != nil {
+				return fmt.Errorf("could not create incorporated result for block %x: %w", blockID, err)
+			}
 
 			// enforce condition (0): candidate seals are only constructed once sufficient
 			// approvals have been collected. Hence, any incorporated result for which we

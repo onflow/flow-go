@@ -24,12 +24,17 @@ func NewEvents(collector module.CacheMetrics, db storage.DB) *Events {
 		return events, err
 	}
 
+	remove := func(rw storage.ReaderBatchWriter, blockID flow.Identifier) error {
+		return operation.RemoveEventsByBlockID(rw.GlobalReader(), rw.Writer(), blockID)
+	}
+
 	return &Events{
 		db: db,
 		cache: newCache(collector, metrics.ResourceEvents,
 			withStore(noopStore[flow.Identifier, []flow.Event]),
-			withRetrieve(retrieve)),
-	}
+			withRetrieve(retrieve),
+			withRemove[flow.Identifier, []flow.Event](remove),
+		)}
 }
 
 // BatchStore stores events keyed by a blockID in provided batch
@@ -137,7 +142,7 @@ func (e *Events) ByBlockIDEventType(blockID flow.Identifier, eventType flow.Even
 // RemoveByBlockID removes events by block ID
 func (e *Events) RemoveByBlockID(blockID flow.Identifier) error {
 	return e.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.RemoveEventsByBlockID(rw.GlobalReader(), rw.Writer(), blockID)
+		return e.BatchRemoveByBlockID(blockID, rw)
 	})
 }
 
@@ -145,7 +150,7 @@ func (e *Events) RemoveByBlockID(blockID flow.Identifier) error {
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (e *Events) BatchRemoveByBlockID(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-	return operation.RemoveEventsByBlockID(rw.GlobalReader(), rw.Writer(), blockID)
+	return e.cache.RemoveTx(rw, blockID)
 }
 
 type ServiceEvents struct {
@@ -160,12 +165,17 @@ func NewServiceEvents(collector module.CacheMetrics, db storage.DB) *ServiceEven
 		return events, err
 	}
 
+	remove := func(rw storage.ReaderBatchWriter, blockID flow.Identifier) error {
+		return operation.RemoveServiceEventsByBlockID(rw.GlobalReader(), rw.Writer(), blockID)
+	}
+
 	return &ServiceEvents{
 		db: db,
 		cache: newCache(collector, metrics.ResourceEvents,
 			withStore(noopStore[flow.Identifier, []flow.Event]),
-			withRetrieve(retrieve)),
-	}
+			withRetrieve(retrieve),
+			withRemove[flow.Identifier, []flow.Event](remove),
+		)}
 }
 
 // BatchStore stores service events keyed by a blockID in provided batch
@@ -207,7 +217,5 @@ func (e *ServiceEvents) RemoveByBlockID(blockID flow.Identifier) error {
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (e *ServiceEvents) BatchRemoveByBlockID(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-	return e.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.RemoveServiceEventsByBlockID(rw.GlobalReader(), rw.Writer(), blockID)
-	})
+	return e.cache.RemoveTx(rw, blockID)
 }
