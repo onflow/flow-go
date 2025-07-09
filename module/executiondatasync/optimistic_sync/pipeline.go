@@ -118,7 +118,6 @@ type PipelineImpl struct {
 
 	// The following fields are accessed externally. they are stored using atomics to avoid
 	// blocking the caller.
-
 	state            *atomic.Int32
 	parentStateCache *atomic.Int32
 	isSealed         *atomic.Bool
@@ -163,9 +162,25 @@ func NewPipeline(
 func (p *PipelineImpl) Run(ctx context.Context, core Core, parentState State) error {
 	p.core = core
 	p.parentStateCache.Store(int32(parentState))
+	// run the main event loop by calling p.loop. any error returned from it needs to be propagated to the caller.
+	// IMPORTANT: after the main loop has exited we need to ensure that worker goroutine has also finished
+	// because we need to ensure that it can report any error that has happened during the execution of detached operation.
+	// By calling StopWait we ensure that worker has stopped which also guarantees that any error has been delivered to the
+	// error channel and returned as result of StopWait.
 	return errors.Join(p.loop(ctx), p.worker.StopWait())
 }
 
+// loop implements the main event loop for state machine. It reacts on different events and performs operations upon
+// entering or leaving some state.
+// loop will perform a blocking operation until one of next things happens, whatever happens first:
+// 1. parent context signals that it is no longer valid.
+// 2. the worker thread has received an error. It's not safe to continue execution anymore, so this error needs to be propagated
+// to the caller.
+// 3. Pipeline has successfully entered terminal state.
+// Pipeline won't and shouldn't perform any state transitions after returning from this function.
+// Expected Errors:
+//   - context.Canceled: when the context is canceled
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (p *PipelineImpl) loop(ctx context.Context) error {
 	// try to start processing in case we are able to.
 	p.stateChangedNotifier.Notify()
