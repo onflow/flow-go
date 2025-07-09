@@ -15,6 +15,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access/validator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
@@ -45,9 +47,9 @@ type backendTransactions struct {
 
 	previousAccessNodes []accessproto.AccessAPIClient
 	log                 zerolog.Logger
-	nodeCommunicator    Communicator
+	nodeCommunicator    node_communicator.Communicator
 	txResultCache       *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
-	txResultQueryMode   IndexQueryMode
+	txResultQueryMode   query_mode.IndexQueryMode
 
 	systemTxID                 flow.Identifier
 	systemTx                   *flow.TransactionBody
@@ -393,11 +395,11 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	}
 
 	switch b.txResultQueryMode {
-	case IndexQueryModeExecutionNodesOnly:
+	case query_mode.IndexQueryModeExecutionNodesOnly:
 		return b.getTransactionResultsByBlockIDFromExecutionNode(ctx, block, requiredEventEncodingVersion)
-	case IndexQueryModeLocalOnly:
+	case query_mode.IndexQueryModeLocalOnly:
 		return b.GetTransactionResultsByBlockIDFromStorage(ctx, block, requiredEventEncodingVersion)
-	case IndexQueryModeFailover:
+	case query_mode.IndexQueryModeFailover:
 		results, err := b.GetTransactionResultsByBlockIDFromStorage(ctx, block, requiredEventEncodingVersion)
 		if err == nil {
 			return results, nil
@@ -547,11 +549,11 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	}
 
 	switch b.txResultQueryMode {
-	case IndexQueryModeExecutionNodesOnly:
+	case query_mode.IndexQueryModeExecutionNodesOnly:
 		return b.getTransactionResultByIndexFromExecutionNode(ctx, block, index, requiredEventEncodingVersion)
-	case IndexQueryModeLocalOnly:
+	case query_mode.IndexQueryModeLocalOnly:
 		return b.GetTransactionResultByIndexFromStorage(ctx, block, index, requiredEventEncodingVersion)
-	case IndexQueryModeFailover:
+	case query_mode.IndexQueryModeFailover:
 		result, err := b.GetTransactionResultByIndexFromStorage(ctx, block, index, requiredEventEncodingVersion)
 		if err == nil {
 			return result, nil
@@ -659,11 +661,11 @@ func (b *backendTransactions) lookupTransactionResult(
 	var txResult *accessmodel.TransactionResult
 	var err error
 	switch b.txResultQueryMode {
-	case IndexQueryModeExecutionNodesOnly:
+	case query_mode.IndexQueryModeExecutionNodesOnly:
 		txResult, err = b.GetTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
-	case IndexQueryModeLocalOnly:
+	case query_mode.IndexQueryModeLocalOnly:
 		txResult, err = b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
-	case IndexQueryModeFailover:
+	case query_mode.IndexQueryModeFailover:
 		txResult, err = b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
 		if err != nil {
 			// If any error occurs with local storage - request transaction result from EN
