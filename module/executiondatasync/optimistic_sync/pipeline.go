@@ -42,7 +42,7 @@ type Pipeline interface {
 	// Expected Errors:
 	//   - context.Canceled: when the context is canceled
 	//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-	Run(context.Context, Core, PipelineStateProvider) error
+	Run(ctx context.Context, core Core, parentState State) error
 
 	// SetSealed marks the pipeline's result as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.
 	SetSealed()
@@ -114,16 +114,16 @@ type PipelineImpl struct {
 	stateReceiver        PipelineStateReceiver
 	stateChangedNotifier engine.Notifier
 	core                 Core
-	parent               PipelineStateProvider
 	worker               *worker
 
 	// The following fields are accessed externally. they are stored using atomics to avoid
 	// blocking the caller.
 
-	state       *atomic.Int32
-	isSealed    *atomic.Bool
-	isAbandoned *atomic.Bool
-	isIndexed   *atomic.Bool
+	state            *atomic.Int32
+	parentStateCache *atomic.Int32
+	isSealed         *atomic.Bool
+	isAbandoned      *atomic.Bool
+	isIndexed        *atomic.Bool
 }
 
 // NewPipeline creates a new processing pipeline.
@@ -146,6 +146,7 @@ func NewPipeline(
 		stateReceiver:        stateReceiver,
 		worker:               newWorker(),
 		state:                atomic.NewInt32(int32(StatePending)),
+		parentStateCache:     atomic.NewInt32(int32(StatePending)),
 		isSealed:             atomic.NewBool(isSealed),
 		isAbandoned:          atomic.NewBool(false),
 		isIndexed:            atomic.NewBool(false),
@@ -159,9 +160,9 @@ func NewPipeline(
 // Expected Errors:
 //   - context.Canceled: when the context is canceled
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-func (p *PipelineImpl) Run(ctx context.Context, core Core, parent PipelineStateProvider) error {
+func (p *PipelineImpl) Run(ctx context.Context, core Core, parentState State) error {
 	p.core = core
-	p.parent = parent
+	p.parentStateCache.Store(int32(parentState))
 	return errors.Join(p.loop(ctx), p.worker.StopWait())
 }
 
@@ -215,7 +216,7 @@ func (p *PipelineImpl) loop(ctx context.Context) error {
 }
 
 func (p *PipelineImpl) onStartProcessing() error {
-	switch p.parent.GetState() {
+	switch p.parentState() {
 	case StateProcessing, StateWaitingPersist, StateComplete:
 		err := p.transitionTo(StateProcessing)
 		if err != nil {
@@ -228,7 +229,7 @@ func (p *PipelineImpl) onStartProcessing() error {
 		return p.transitionTo(StateAbandoned)
 	default:
 		// it's unexpected for the parent to be in any other state. this most likely indicates there's a bug
-		return fmt.Errorf("unexpected parent state: %s", p.parent.GetState())
+		return fmt.Errorf("unexpected parent state: %s", p.parentState())
 	}
 	return nil
 }
@@ -241,7 +242,7 @@ func (p *PipelineImpl) onProcessing() error {
 }
 
 func (p *PipelineImpl) onPersistChanges() error {
-	if p.isSealed.Load() && p.parent.GetState() == StateComplete {
+	if p.isSealed.Load() && p.parentState() == StateComplete {
 		if err := p.core.Persist(); err != nil {
 			return err
 		}
@@ -256,7 +257,7 @@ func (p *PipelineImpl) checkAbandoned() bool {
 	if p.isAbandoned.Load() {
 		return true
 	}
-	if p.parent.GetState() == StateAbandoned {
+	if p.parentState() == StateAbandoned {
 		return true
 	}
 	return p.GetState() == StateAbandoned
@@ -265,6 +266,11 @@ func (p *PipelineImpl) checkAbandoned() bool {
 // GetState returns the current state of the pipeline.
 func (p *PipelineImpl) GetState() State {
 	return State(p.state.Load())
+}
+
+// parentState returns the last cached parent state of the pipeline.
+func (p *PipelineImpl) parentState() State {
+	return State(p.parentStateCache.Load())
 }
 
 // SetSealed marks the data as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.
@@ -277,7 +283,10 @@ func (p *PipelineImpl) SetSealed() {
 
 // OnParentStateUpdated updates the pipeline's state based on the provided parent state.
 func (p *PipelineImpl) OnParentStateUpdated(parentState State) {
-	p.stateChangedNotifier.Notify()
+	oldState := p.parentStateCache.Load()
+	if p.parentStateCache.CompareAndSwap(oldState, int32(parentState)) {
+		p.stateChangedNotifier.Notify()
+	}
 }
 
 // Abandon marks the pipeline as abandoned

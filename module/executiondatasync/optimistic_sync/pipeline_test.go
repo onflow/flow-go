@@ -30,7 +30,7 @@ func TestPipelineStateTransitions(t *testing.T) {
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- pipeline.Run(context.Background(), mockCore, parent)
+		errChan <- pipeline.Run(context.Background(), mockCore, parent.GetState())
 	}()
 
 	// Wait for pipeline to reach WaitingPersist state
@@ -55,7 +55,7 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- pipeline.Run(context.Background(), mockCore, parent)
+		errChan <- pipeline.Run(context.Background(), mockCore, parent.GetState())
 	}()
 
 	// Initial update - parent in Ready state
@@ -112,7 +112,7 @@ func TestAbandoned(t *testing.T) {
 
 		errChan := make(chan error)
 		go func() {
-			errChan <- pipeline.Run(context.Background(), mockCore, parent)
+			errChan <- pipeline.Run(context.Background(), mockCore, parent.GetState())
 		}()
 
 		// first state must be abandoned
@@ -219,7 +219,7 @@ func TestAbandoned(t *testing.T) {
 
 			errChan := make(chan error)
 			go func() {
-				errChan <- pipeline.Run(context.Background(), mockCore, parent)
+				errChan <- pipeline.Run(context.Background(), mockCore, parent.GetState())
 			}()
 
 			// Send parent update to start processing
@@ -306,7 +306,7 @@ func TestPipelineContextCancellation(t *testing.T) {
 
 			errChan := make(chan error)
 			go func() {
-				errChan <- pipeline.Run(ctx, mockCore, parent)
+				errChan <- pipeline.Run(ctx, mockCore, parent.GetState())
 			}()
 
 			waitForError(t, errChan, context.Canceled)
@@ -373,7 +373,7 @@ func TestPipelineErrorHandling(t *testing.T) {
 
 			errChan := make(chan error)
 			go func() {
-				errChan <- pipeline.Run(context.Background(), mockCore, parent)
+				errChan <- pipeline.Run(context.Background(), mockCore, parent.GetState())
 			}()
 
 			// Send parent update to trigger processing
