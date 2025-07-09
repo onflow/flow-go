@@ -296,9 +296,11 @@ func configureTransactionValidator(
 
 // Ping responds to requests when the server is up.
 //
-// No errors are expected during normal operation.
-// All errors can be considered benign. Exceptions are handled explicitly within the backend and are
-// not propagated.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 func (b *Backend) Ping(ctx context.Context) error {
 	// staticCollectionRPC is only set if a collection node address was provided at startup
 	if b.staticCollectionRPC != nil {
@@ -312,9 +314,11 @@ func (b *Backend) Ping(ctx context.Context) error {
 
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
 //
-// No errors are expected during normal operation.
-// All errors can be considered benign. Exceptions are handled explicitly within the backend and are
-// not propagated.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*accessmodel.NodeVersionInfo, error) {
 	sporkID := b.stateParams.SporkID()
 	sporkRootBlockHeight := b.stateParams.SporkRootBlockHeight()
@@ -350,11 +354,13 @@ func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*accessmodel.NodeVers
 
 // GetCollectionByID returns a light collection by its ID.
 //
-// Expected errors:
-// - access.DataNotFoundError if the collection is not found.
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
-// All errors can be considered benign. Exceptions are handled explicitly within the backend and are
-// not propagated.
+// Expected sentinel errors providing details to clients about failed requests:
+// - access.DataNotFoundError if the collection is not found.
 func (b *Backend) GetCollectionByID(ctx context.Context, colID flow.Identifier) (*flow.LightCollection, error) {
 	col, err := b.collections.LightByID(colID)
 	if err != nil {
@@ -369,11 +375,13 @@ func (b *Backend) GetCollectionByID(ctx context.Context, colID flow.Identifier) 
 
 // GetFullCollectionByID returns a full collection by its ID.
 //
-// Expected errors:
-// - access.DataNotFoundError if the collection is not found.
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
-// All errors can be considered benign. Exceptions are handled explicitly within the backend and are
-// not propagated.
+// Expected sentinel errors providing details to clients about failed requests:
+// - access.DataNotFoundError if the collection is not found.
 func (b *Backend) GetFullCollectionByID(ctx context.Context, colID flow.Identifier) (*flow.Collection, error) {
 	col, err := b.collections.ByID(colID)
 	if err != nil {
@@ -399,6 +407,7 @@ func (b *Backend) GetFullCollectionByID(ctx context.Context, colID flow.Identifi
 // - err: The original error.
 //
 // Will return the original error, possibly wrapped with additional context.
+// CAUTION: this function might return irrecoverable errors or generic fatal from the lower protocol layers
 func resolveHeightError(stateParams protocol.Params, height uint64, err error) error {
 	if !errors.Is(err, storage.ErrNotFound) {
 		return err

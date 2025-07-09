@@ -29,14 +29,16 @@ func (b *backendNetwork) GetNetworkParameters(_ context.Context) accessmodel.Net
 
 // GetLatestProtocolStateSnapshot returns the latest finalized snapshot.
 //
-// No errors are expected during normal operation.
-// All errors can be considered benign. Exceptions are handled explicitly within the backend and are
-// not propagated.
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 func (b *backendNetwork) GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, error) {
 	snapshot := b.state.Final()
 	data, err := convert.SnapshotToBytes(snapshot)
 	if err != nil {
-		return nil, access.RequireNoError(ctx, fmt.Errorf("failed to convert snapshot to bytes: %w", err))
+		err = access.RequireErrorIs(ctx, err, protocol.ErrSealingSegmentBelowRootBlock, protocol.NewUnfinalizedSealingSegmentErrorf(""))
+		return nil, fmt.Errorf("snapshots might not be possible for every block: %w", err)
 	}
 
 	return data, nil
@@ -50,10 +52,10 @@ func (b *backendNetwork) GetLatestProtocolStateSnapshot(ctx context.Context) ([]
 //   - access.InvalidRequestError - Block ID is for an orphaned block and will never have a valid snapshot
 //   - access.PreconditionFailedError - A block was found, but it is not finalized and is above the finalized height.
 //
-// All errors can be considered benign. Exceptions are handled explicitly within the backend and are
-// not propagated.
-//
-// The block may or may not be finalized in the future; the client can retry later.
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error) {
 	snapshot := b.state.AtBlockID(blockID)
 	snapshotHeadByBlockId, err := snapshot.Head()
@@ -61,7 +63,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 		// storage.ErrNotFound is specifically NOT allowed since the snapshot's reference block must exist
 		// within the snapshot. we can ignore the actual error since it is rewritten below
 		_ = access.RequireErrorIs(ctx, err, state.ErrUnknownSnapshotReference)
-		return nil, access.NewDataNotFoundError("snapshot", fmt.Errorf("failed to retrieve a valid snapshot: block not found"))
+		return nil, access.NewDataNotFoundError("snapshot", fmt.Errorf("failed to retrieve snapshot: block not found"))
 	}
 
 	// Because there is no index from block ID to finalized height, we separately look up the finalized
@@ -75,19 +77,20 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 		// The block exists, but no block has been finalized at its height. Therefore, this block
 		// may be finalized in the future, and the client can retry.
 		return nil, access.NewPreconditionFailedError(
-			fmt.Errorf("failed to retrieve snapshot for block with height %d: block not finalized and is above finalized height",
+			fmt.Errorf("failed to retrieve snapshot: block still pending finalization",
 				snapshotHeadByBlockId.Height))
 	}
 
 	if blockIDFinalizedAtHeight != blockID {
 		// A different block than what was queried has been finalized at this height.
 		// Therefore, the queried block will never be finalized.
-		return nil, access.NewInvalidRequestError(fmt.Errorf("failed to retrieve snapshot for block: block not finalized and is below finalized height"))
+		return nil, access.NewInvalidRequestError(fmt.Errorf("failed to retrieve snapshot: block orphaned"))
 	}
 
 	data, err := convert.SnapshotToBytes(snapshot)
 	if err != nil {
-		return nil, access.RequireNoError(ctx, fmt.Errorf("failed to convert snapshot to bytes: %w", err))
+		err = access.RequireErrorIs(ctx, err, protocol.ErrSealingSegmentBelowRootBlock, protocol.NewUnfinalizedSealingSegmentErrorf(""))
+		return nil, fmt.Errorf("snapshots might not be possible for every block: %w", err)
 	}
 	return data, nil
 }
@@ -95,13 +98,13 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 // GetProtocolStateSnapshotByHeight returns serializable Snapshot by block height.
 // The block must be finalized (otherwise the by-height query is ambiguous).
 //
-// Expected errors during normal operation:
+// Dedicated sentinel errors providing details to clients about failed requests:
 //   - access.DataNotFoundError - No finalized block with the given height was found.
 //
-// All errors can be considered benign. Exceptions are handled explicitly within the backend and are
-// not propagated.
-//
-// The block height may or may not be finalized in the future; the client can retry later.
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 func (b *backendNetwork) GetProtocolStateSnapshotByHeight(ctx context.Context, blockHeight uint64) ([]byte, error) {
 	snapshot := b.state.AtHeight(blockHeight)
 	_, err := snapshot.Head()
@@ -114,7 +117,8 @@ func (b *backendNetwork) GetProtocolStateSnapshotByHeight(ctx context.Context, b
 
 	data, err := convert.SnapshotToBytes(snapshot)
 	if err != nil {
-		return nil, access.RequireNoError(ctx, fmt.Errorf("failed to convert snapshot to bytes: %w", err))
+		err = access.RequireErrorIs(ctx, err, protocol.ErrSealingSegmentBelowRootBlock, protocol.NewUnfinalizedSealingSegmentErrorf(""))
+		return nil, fmt.Errorf("snapshots might not be possible for every block: %w", err)
 	}
 	return data, nil
 }

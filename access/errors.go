@@ -222,7 +222,7 @@ func NewRequestTimedOutError(err error) RequestTimedOutError {
 }
 
 func (e RequestTimedOutError) Error() string {
-	return fmt.Sprintf("request timedout: %v", e.err)
+	return fmt.Sprintf("request timed out: %v", e.err)
 }
 
 func (e RequestTimedOutError) Unwrap() error {
