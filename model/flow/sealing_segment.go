@@ -417,7 +417,7 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 	for resultID := range missingExecutionResults {
 		result, err := builder.resultLookup(resultID)
 		if err != nil {
-			return nil, fmt.Errorf("could not retrieve missing result (id=%x): %v (%w)", resultID, err, ErrSegmentResultLookup)
+			return nil, fmt.Errorf("could not retrieve missing result (id=%x): %w", resultID, err)
 		}
 		builder.addExecutionResult(result)
 	}
