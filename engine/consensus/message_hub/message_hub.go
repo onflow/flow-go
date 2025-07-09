@@ -354,7 +354,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	}
 
 	blockProposal := messages.NewUntrustedProposal(
-		&flow.BlockProposal{
+		&flow.Proposal{
 			Block:           *block,
 			ProposerSigData: proposal.ProposerSigData,
 		},

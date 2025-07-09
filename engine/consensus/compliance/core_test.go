@@ -53,8 +53,8 @@ type CommonSuite struct {
 	// storage data
 	headerDB   map[flow.Identifier]*flow.Header
 	payloadDB  map[flow.Identifier]*flow.Payload
-	pendingDB  map[flow.Identifier]flow.Slashable[*flow.BlockProposal]
-	childrenDB map[flow.Identifier][]flow.Slashable[*flow.BlockProposal]
+	pendingDB  map[flow.Identifier]flow.Slashable[*flow.Proposal]
+	childrenDB map[flow.Identifier][]flow.Slashable[*flow.Proposal]
 
 	// mocked dependencies
 	me                        *module.Local
@@ -92,8 +92,8 @@ func (cs *CommonSuite) SetupTest() {
 	// initialize the storage data
 	cs.headerDB = make(map[flow.Identifier]*flow.Header)
 	cs.payloadDB = make(map[flow.Identifier]*flow.Payload)
-	cs.pendingDB = make(map[flow.Identifier]flow.Slashable[*flow.BlockProposal])
-	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[*flow.BlockProposal])
+	cs.pendingDB = make(map[flow.Identifier]flow.Slashable[*flow.Proposal])
+	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[*flow.Proposal])
 
 	// store the head header and payload
 	cs.headerDB[block.ID()] = block.ToHeader()
@@ -209,7 +209,7 @@ func (cs *CommonSuite) SetupTest() {
 	cs.pending = &module.PendingBlockBuffer{}
 	cs.pending.On("Add", mock.Anything, mock.Anything).Return(true)
 	cs.pending.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) flow.Slashable[*flow.BlockProposal] {
+		func(blockID flow.Identifier) flow.Slashable[*flow.Proposal] {
 			return cs.pendingDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -218,7 +218,7 @@ func (cs *CommonSuite) SetupTest() {
 		},
 	)
 	cs.pending.On("ByParentID", mock.Anything).Return(
-		func(blockID flow.Identifier) []flow.Slashable[*flow.BlockProposal] {
+		func(blockID flow.Identifier) []flow.Slashable[*flow.Proposal] {
 			return cs.childrenDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -559,7 +559,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending2)
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
-	for _, prop := range []*flow.BlockProposal{proposal0, proposal1, proposal2, proposal3} {
+	for _, prop := range []*flow.Proposal{proposal0, proposal1, proposal2, proposal3} {
 		hotstuffProposal := model.SignedProposalFromBlock(prop)
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
@@ -567,7 +567,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	}
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(flow.Slashable[*flow.BlockProposal]{
+	err := cs.core.processBlockAndDescendants(flow.Slashable[*flow.Proposal]{
 		OriginID: unittest.IdentifierFixture(),
 		Message:  proposal0,
 	})
@@ -585,7 +585,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	missingProposal := unittest.ProposalFromBlock(missingBlock)
 
 	// create a chain of descendants
-	var proposals []*flow.BlockProposal
+	var proposals []*flow.Proposal
 	parent := missingProposal
 	for i := 0; i < 3; i++ {
 		descendant := unittest.BlockWithParentFixture(parent.Block.ToHeader())

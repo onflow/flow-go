@@ -116,7 +116,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedPro
 	if err != nil {
 		return fmt.Errorf("could not convert proposal: %w", err)
 	}
-	proposal := flow.Slashable[*flow.BlockProposal]{
+	proposal := flow.Slashable[*flow.Proposal]{
 		OriginID: proposalMsg.OriginID,
 		Message:  blockProposal,
 	}
@@ -252,7 +252,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedPro
 // processed as well.
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
-func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*flow.BlockProposal]) error {
+func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*flow.Proposal]) error {
 	block := proposal.Message.Block
 	header := block.ToHeader()
 	blockID := block.ID()
@@ -321,7 +321,7 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*flow.BlockPro
 //   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
 //   - model.InvalidProposalError if the block proposal is invalid
 //   - engine.UnverifiableInputError if the block proposal cannot be verified
-func (c *Core) processBlockProposal(proposal *flow.BlockProposal) error {
+func (c *Core) processBlockProposal(proposal *flow.Proposal) error {
 	startTime := time.Now()
 	defer func() {
 		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))

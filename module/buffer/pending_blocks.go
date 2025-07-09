@@ -21,17 +21,17 @@ func NewPendingBlocks() *PendingBlocks {
 	return b
 }
 
-func (b *PendingBlocks) Add(block flow.Slashable[*flow.BlockProposal]) bool {
+func (b *PendingBlocks) Add(block flow.Slashable[*flow.Proposal]) bool {
 	return b.backend.add(flow.Slashable[*flow.ProposalHeader]{
 		OriginID: block.OriginID,
 		Message:  block.Message.ProposalHeader(),
 	}, block.Message.Block.Payload)
 }
 
-func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*flow.BlockProposal], bool) {
+func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*flow.Proposal], bool) {
 	item, ok := b.backend.byID(blockID)
 	if !ok {
-		return flow.Slashable[*flow.BlockProposal]{}, false
+		return flow.Slashable[*flow.Proposal]{}, false
 	}
 
 	block, err := flow.NewBlock(
@@ -41,11 +41,11 @@ func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*flow.Bloc
 		},
 	)
 	if err != nil {
-		return flow.Slashable[*flow.BlockProposal]{}, false
+		return flow.Slashable[*flow.Proposal]{}, false
 	}
-	proposal := flow.Slashable[*flow.BlockProposal]{
+	proposal := flow.Slashable[*flow.Proposal]{
 		OriginID: item.header.OriginID,
-		Message: &flow.BlockProposal{
+		Message: &flow.Proposal{
 			Block:           *block,
 			ProposerSigData: item.header.Message.ProposerSigData,
 		},
@@ -54,13 +54,13 @@ func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*flow.Bloc
 	return proposal, true
 }
 
-func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.BlockProposal], bool) {
+func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.Proposal], bool) {
 	items, ok := b.backend.byParentID(parentID)
 	if !ok {
 		return nil, false
 	}
 
-	proposals := make([]flow.Slashable[*flow.BlockProposal], 0, len(items))
+	proposals := make([]flow.Slashable[*flow.Proposal], 0, len(items))
 	for _, item := range items {
 		block, err := flow.NewBlock(
 			flow.UntrustedBlock{
@@ -72,9 +72,9 @@ func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*
 			return nil, false
 		}
 
-		proposal := flow.Slashable[*flow.BlockProposal]{
+		proposal := flow.Slashable[*flow.Proposal]{
 			OriginID: item.header.OriginID,
-			Message: &flow.BlockProposal{
+			Message: &flow.Proposal{
 				Block:           *block,
 				ProposerSigData: item.header.Message.ProposerSigData,
 			},

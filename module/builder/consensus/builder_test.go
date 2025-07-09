@@ -282,7 +282,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	bs.state = &protocol.ParticipantState{}
 	bs.state.On("Extend", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		proposal := args.Get(1).(*flow.BlockProposal)
+		proposal := args.Get(1).(*flow.Proposal)
 		bs.Assert().Equal(bs.sentinel, proposal.Block.Header.View)
 		bs.assembled = &proposal.Block.Payload
 	}).Return(nil)

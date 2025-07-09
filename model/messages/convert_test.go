@@ -31,7 +31,7 @@ func TestClusterBlockProposal(t *testing.T) {
 }
 
 func TestBlockResponse(t *testing.T) {
-	expected := []*flow.BlockProposal{unittest.ProposalFixture(), unittest.ProposalFixture()}
+	expected := []*flow.Proposal{unittest.ProposalFixture(), unittest.ProposalFixture()}
 	res := messages.BlockResponse{
 		Blocks: []messages.UntrustedProposal{
 			*messages.NewUntrustedProposal(expected[0]),
@@ -46,7 +46,7 @@ func TestBlockResponse(t *testing.T) {
 func TestClusterBlockResponse(t *testing.T) {
 	b1 := unittest.ClusterBlockFixture()
 	b2 := unittest.ClusterBlockFixture()
-	expected := []*cluster.BlockProposal{unittest.ClusterProposalFromBlock(b1), unittest.ClusterProposalFromBlock(b2)}
+	expected := []*cluster.Proposal{unittest.ClusterProposalFromBlock(b1), unittest.ClusterProposalFromBlock(b2)}
 	res := messages.ClusterBlockResponse{
 		Blocks: []messages.UntrustedClusterProposal{
 			*messages.UntrustedClusterProposalFromInternal(expected[0]),

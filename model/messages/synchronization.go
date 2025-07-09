@@ -56,11 +56,11 @@ type BlockResponse struct {
 }
 
 // BlocksInternal converts all untrusted block proposals in the BlockResponse
-// into trusted flow.BlockProposal instances.
+// into trusted flow.Proposal instances.
 //
 // All errors indicate that the input message could not be converted to a valid proposal.
-func (br *BlockResponse) BlocksInternal() ([]*flow.BlockProposal, error) {
-	internal := make([]*flow.BlockProposal, len(br.Blocks))
+func (br *BlockResponse) BlocksInternal() ([]*flow.Proposal, error) {
+	internal := make([]*flow.Proposal, len(br.Blocks))
 	for i, block := range br.Blocks {
 		proposal, err := block.DeclareTrusted()
 		if err != nil {
@@ -78,8 +78,8 @@ type ClusterBlockResponse struct {
 	Blocks []UntrustedClusterProposal
 }
 
-func (br *ClusterBlockResponse) BlocksInternal() ([]*cluster.BlockProposal, error) {
-	internal := make([]*cluster.BlockProposal, len(br.Blocks))
+func (br *ClusterBlockResponse) BlocksInternal() ([]*cluster.Proposal, error) {
+	internal := make([]*cluster.Proposal, len(br.Blocks))
 	var err error
 	for i, block := range br.Blocks {
 		block := block

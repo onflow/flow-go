@@ -176,7 +176,7 @@ func (suite *MutatorSuite) Payload(transactions ...*flow.TransactionBody) model.
 }
 
 // ProposalWithParent returns a valid block proposal with the given parent and the given payload.
-func (suite *MutatorSuite) ProposalWithParentAndPayload(parent *model.Block, payload model.Payload) model.BlockProposal {
+func (suite *MutatorSuite) ProposalWithParentAndPayload(parent *model.Block, payload model.Payload) model.Proposal {
 	block := unittest.ClusterBlockFixture(
 		unittest.ClusterBlock.WithParent(parent),
 		unittest.ClusterBlock.WithPayload(payload),
@@ -185,7 +185,7 @@ func (suite *MutatorSuite) ProposalWithParentAndPayload(parent *model.Block, pay
 }
 
 // Proposal returns a valid cluster block proposal with genesis as parent.
-func (suite *MutatorSuite) Proposal() model.BlockProposal {
+func (suite *MutatorSuite) Proposal() model.Proposal {
 	return suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload())
 }
 
@@ -300,7 +300,7 @@ func (suite *MutatorSuite) TestExtend_InvalidChainID() {
 func (suite *MutatorSuite) TestExtend_InvalidBlockHeight() {
 	proposal := suite.Proposal()
 	// change the block height
-	proposal.Block.Header.Height = proposal.Block.Header.Height - 1
+	proposal.Block.Header.Height = 3
 
 	err := suite.state.Extend(&proposal)
 	suite.Assert().Error(err)
@@ -310,11 +310,22 @@ func (suite *MutatorSuite) TestExtend_InvalidBlockHeight() {
 // TestExtend_InvalidParentView tests if mutator rejects block with invalid ParentView. ParentView must be consistent
 // with view of block referred by ParentID.
 func (suite *MutatorSuite) TestExtend_InvalidParentView() {
-	proposal := suite.Proposal()
-	// change the block parent view
-	proposal.Block.Header.ParentView--
+	tx1 := suite.Tx()
+	tx2 := suite.Tx()
 
-	err := suite.state.Extend(&proposal)
+	proposal1 := suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload(&tx1))
+
+	err := suite.state.Extend(&proposal1)
+	suite.Assert().Nil(err)
+
+	suite.FinalizeBlock(proposal1.Block)
+	suite.Assert().Nil(err)
+
+	proposal2 := suite.ProposalWithParentAndPayload(&proposal1.Block, suite.Payload(&tx2))
+	// change the block ParentView
+	proposal2.Block.Header.ParentView--
+
+	err = suite.state.Extend(&proposal2)
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }

@@ -10,18 +10,18 @@ import (
 // of a consensus round pushing a new proposal to the network.
 // This differentiation is currently largely unused, but eventually untrusted models should use
 // a different type (like this one), until such time as they are fully validated
-type UntrustedProposal flow.BlockProposal
+type UntrustedProposal flow.Proposal
 
-func NewUntrustedProposal(internal *flow.BlockProposal) *UntrustedProposal {
+func NewUntrustedProposal(internal *flow.Proposal) *UntrustedProposal {
 	p := UntrustedProposal(*internal)
 	return &p
 }
 
-// DeclareTrusted converts the UntrustedProposal to a trusted internal flow.BlockProposal.
+// DeclareTrusted converts the UntrustedProposal to a trusted internal flow.Proposal.
 // CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
 //
 // All errors indicate that the input message could not be converted to a valid proposal.
-func (msg *UntrustedProposal) DeclareTrusted() (*flow.BlockProposal, error) {
+func (msg *UntrustedProposal) DeclareTrusted() (*flow.Proposal, error) {
 	block, err := flow.NewBlock(
 		flow.UntrustedBlock{
 			Header:  msg.Block.Header,
@@ -35,7 +35,7 @@ func (msg *UntrustedProposal) DeclareTrusted() (*flow.BlockProposal, error) {
 	if len(msg.ProposerSigData) == 0 {
 		return nil, fmt.Errorf("proposer signature must not be empty")
 	}
-	return &flow.BlockProposal{
+	return &flow.Proposal{
 		Block:           *block,
 		ProposerSigData: msg.ProposerSigData,
 	}, nil

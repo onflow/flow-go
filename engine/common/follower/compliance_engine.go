@@ -81,7 +81,7 @@ type ComplianceEngine struct {
 	blocksAvailableNotifier    engine.Notifier             // notifies that new blocks are ready to be processed
 	finalizedBlockTracker      *tracker.NewestBlockTracker // tracks the latest finalization block
 	finalizedBlockNotifier     engine.Notifier             // notifies when the latest finalized block changes
-	pendingConnectedBlocksChan chan flow.Slashable[[]*flow.BlockProposal]
+	pendingConnectedBlocksChan chan flow.Slashable[[]*flow.Proposal]
 	core                       complianceCore // performs actual processing of incoming messages.
 }
 
@@ -121,7 +121,7 @@ func NewComplianceLayer(
 		pendingProposals:           pendingBlocks,
 		syncedBlocks:               syncedBlocks,
 		blocksAvailableNotifier:    engine.NewNotifier(),
-		pendingConnectedBlocksChan: make(chan flow.Slashable[[]*flow.BlockProposal], defaultPendingConnectedBlocksChanCapacity),
+		pendingConnectedBlocksChan: make(chan flow.Slashable[[]*flow.Proposal], defaultPendingConnectedBlocksChanCapacity),
 		finalizedBlockTracker:      tracker.NewNewestBlockTracker(),
 		finalizedBlockNotifier:     engine.NewNotifier(),
 		headers:                    headers,
@@ -279,7 +279,7 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 				Uint64("height", proposal.Block.Header.Height).
 				Logger()
 			latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
-			e.submitConnectedBatch(log, latestFinalizedView, proposalMsg.OriginID, []*flow.BlockProposal{proposal})
+			e.submitConnectedBatch(log, latestFinalizedView, proposalMsg.OriginID, []*flow.Proposal{proposal})
 			e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 			continue
 		}
@@ -296,7 +296,7 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		if len(batch.Message) < 1 {
 			continue
 		}
-		blocks := make([]*flow.BlockProposal, 0, len(batch.Message))
+		blocks := make([]*flow.Proposal, 0, len(batch.Message))
 		for _, block := range batch.Message {
 			block, err := block.DeclareTrusted()
 			if err != nil {
@@ -336,7 +336,7 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 }
 
 // submitConnectedBatch checks if batch is still pending and submits it via channel for further processing by worker goroutines.
-func (e *ComplianceEngine) submitConnectedBatch(log zerolog.Logger, latestFinalizedView uint64, originID flow.Identifier, blocks []*flow.BlockProposal) {
+func (e *ComplianceEngine) submitConnectedBatch(log zerolog.Logger, latestFinalizedView uint64, originID flow.Identifier, blocks []*flow.Proposal) {
 	if len(blocks) < 1 {
 		return
 	}
@@ -358,7 +358,7 @@ func (e *ComplianceEngine) submitConnectedBatch(log zerolog.Logger, latestFinali
 	log.Debug().Msgf("submitting sub-range with views [%d, %d] for further processing", firstBlock.View, lastBlock.View)
 
 	select {
-	case e.pendingConnectedBlocksChan <- flow.Slashable[[]*flow.BlockProposal]{
+	case e.pendingConnectedBlocksChan <- flow.Slashable[[]*flow.Proposal]{
 		OriginID: originID,
 		Message:  blocks,
 	}:

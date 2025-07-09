@@ -549,6 +549,7 @@ func TestExtendMissingParent(t *testing.T) {
 		extend := unittest.BlockFixture(
 			unittest.Block.WithHeight(2),
 			unittest.Block.WithView(2),
+			unittest.Block.WithParentView(1),
 		)
 
 		err := state.Extend(context.Background(), unittest.ProposalFromBlock(extend))

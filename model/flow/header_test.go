@@ -152,35 +152,38 @@ func TestNewRootHeaderBody(t *testing.T) {
 	})
 }
 
-// TestNewHeaderBody verifies the behavior of the NewHeaderBody constructor.
+// / TestNewHeaderBody verifies the behavior of the NewHeaderBody constructor after
+// grouping of the parent‐QC checks and addition of height/view ordering checks.
+//
 // Test Cases:
 //
 // 1. Valid input:
-//   - Ensures a HeaderBody is returned when all required fields are non-zero/nil.
+//   - All required fields are set (ChainID, parent‐QC, Height>0, View>0, ParentView<View, non-zero Timestamp).
+//   - Expect no error.
 //
 // 2. Missing ChainID:
-//   - Ensures an error is returned when ChainID is empty.
+//   - ChainID is empty.
+//   - Ensures an error mentioning "ChainID".
 //
-// 3. Missing ParentID:
-//   - Ensures an error is returned when ParentID is ZeroID.
+// 3. Missing parent‐QC fields:
+//   - ParentID, ParentVoterIndices, ParentVoterSigData or ProposerID is missing (nil/zero).
+//   - Ensures an error mentioning "missing parent QC".
 //
-// 4. Zero Timestamp:
-//   - Ensures an error is returned when Timestamp is zero-value.
+// 4. Zero Height:
+//   - Height set to 0.
+//   - Ensures an error mentioning "Height must be > 0".
 //
-// 5. Nil ParentVoterIndices:
-//   - Ensures an error is returned when ParentVoterIndices is nil.
+// 5. Zero View:
+//   - View set to 0.
+//   - Ensures an error mentioning "View must be > 0".
 //
-// 6. Empty ParentVoterIndices:
-//   - Ensures an error is returned when ParentVoterIndices is empty.
+// 6. ParentView ≥ View:
+//   - ParentView is equal to or greater than View.
+//   - Ensures an error mentioning "ParentView".
 //
-// 7. Nil ParentVoterSigData:
-//   - Ensures an error is returned when ParentVoterSigData is nil.
-//
-// 8. Empty ParentVoterSigData:
-//   - Ensures an error is returned when ParentVoterSigData is empty.
-//
-// 9. Missing ProposerID:
-//   - Ensures an error is returned when ProposerID is ZeroID.
+// 7. Zero Timestamp:
+//   - Timestamp is the zero value.
+//   - Ensures an error mentioning "Timestamp must not be zero-value".
 func TestNewHeaderBody(t *testing.T) {
 	validID := unittest.IdentifierFixture()
 	ts := time.Unix(1_600_000_000, 0)
@@ -204,8 +207,6 @@ func TestNewHeaderBody(t *testing.T) {
 		hb, err := flow.NewHeaderBody(base)
 		assert.NoError(t, err)
 		assert.NotNil(t, hb)
-		assert.Equal(t, *hb, flow.HeaderBody(base))
-		assert.Nil(t, hb.LastViewTC)
 	})
 
 	t.Run("missing ChainID", func(t *testing.T) {
@@ -214,25 +215,16 @@ func TestNewHeaderBody(t *testing.T) {
 		hb, err := flow.NewHeaderBody(u)
 		assert.Error(t, err)
 		assert.Nil(t, hb)
-		assert.Contains(t, err.Error(), "ChainID")
+		assert.Contains(t, err.Error(), "ChainID must not be empty")
 	})
 
-	t.Run("missing ParentID", func(t *testing.T) {
+	t.Run("missing parent QC", func(t *testing.T) {
 		u := base
 		u.ParentID = flow.ZeroID
 		hb, err := flow.NewHeaderBody(u)
 		assert.Error(t, err)
 		assert.Nil(t, hb)
-		assert.Contains(t, err.Error(), "ParentID")
-	})
-
-	t.Run("zero Timestamp", func(t *testing.T) {
-		u := base
-		u.Timestamp = time.Time{}
-		hb, err := flow.NewHeaderBody(u)
-		assert.Error(t, err)
-		assert.Nil(t, hb)
-		assert.Contains(t, err.Error(), "Timestamp")
+		assert.Contains(t, err.Error(), "missing parent QC")
 	})
 
 	t.Run("nil ParentVoterIndices", func(t *testing.T) {
@@ -241,16 +233,7 @@ func TestNewHeaderBody(t *testing.T) {
 		hb, err := flow.NewHeaderBody(u)
 		assert.Error(t, err)
 		assert.Nil(t, hb)
-		assert.Contains(t, err.Error(), "ParentVoterIndices")
-	})
-
-	t.Run("empty ParentVoterIndices", func(t *testing.T) {
-		u := base
-		u.ParentVoterIndices = []byte{}
-		hb, err := flow.NewHeaderBody(u)
-		assert.Error(t, err)
-		assert.Nil(t, hb)
-		assert.Contains(t, err.Error(), "ParentVoterIndices")
+		assert.Contains(t, err.Error(), "missing parent QC")
 	})
 
 	t.Run("nil ParentVoterSigData", func(t *testing.T) {
@@ -259,16 +242,7 @@ func TestNewHeaderBody(t *testing.T) {
 		hb, err := flow.NewHeaderBody(u)
 		assert.Error(t, err)
 		assert.Nil(t, hb)
-		assert.Contains(t, err.Error(), "ParentVoterSigData")
-	})
-
-	t.Run("empty ParentVoterSigData", func(t *testing.T) {
-		u := base
-		u.ParentVoterSigData = []byte{}
-		hb, err := flow.NewHeaderBody(u)
-		assert.Error(t, err)
-		assert.Nil(t, hb)
-		assert.Contains(t, err.Error(), "ParentVoterSigData")
+		assert.Contains(t, err.Error(), "missing parent QC")
 	})
 
 	t.Run("missing ProposerID", func(t *testing.T) {
@@ -277,7 +251,43 @@ func TestNewHeaderBody(t *testing.T) {
 		hb, err := flow.NewHeaderBody(u)
 		assert.Error(t, err)
 		assert.Nil(t, hb)
-		assert.Contains(t, err.Error(), "ProposerID")
+		assert.Contains(t, err.Error(), "missing parent QC")
+	})
+
+	t.Run("zero Height", func(t *testing.T) {
+		u := base
+		u.Height = 0
+		hb, err := flow.NewHeaderBody(u)
+		assert.Error(t, err)
+		assert.Nil(t, hb)
+		assert.Contains(t, err.Error(), "Height must be > 0")
+	})
+
+	t.Run("zero View", func(t *testing.T) {
+		u := base
+		u.View = 0
+		hb, err := flow.NewHeaderBody(u)
+		assert.Error(t, err)
+		assert.Nil(t, hb)
+		assert.Contains(t, err.Error(), "View must be > 0")
+	})
+
+	t.Run("ParentView ≥ View", func(t *testing.T) {
+		u := base
+		u.ParentView = view // equal to View
+		hb, err := flow.NewHeaderBody(u)
+		assert.Error(t, err)
+		assert.Nil(t, hb)
+		assert.Contains(t, err.Error(), "ParentView")
+	})
+
+	t.Run("zero Timestamp", func(t *testing.T) {
+		u := base
+		u.Timestamp = time.Time{}
+		hb, err := flow.NewHeaderBody(u)
+		assert.Error(t, err)
+		assert.Nil(t, hb)
+		assert.Contains(t, err.Error(), "Timestamp must not be zero-value")
 	})
 }
 

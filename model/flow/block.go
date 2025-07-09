@@ -184,15 +184,15 @@ func (s BlockStatus) String() string {
 	return [...]string{"BLOCK_UNKNOWN", "BLOCK_FINALIZED", "BLOCK_SEALED"}[s]
 }
 
-// BlockProposal is a signed proposal that includes the block payload, in addition to the required header and signature.
-type BlockProposal struct {
+// Proposal is a signed proposal that includes the block payload, in addition to the required header and signature.
+type Proposal struct {
 	Block           Block
 	ProposerSigData []byte
 }
 
 // ProposalHeader converts the proposal into a compact [ProposalHeader] representation,
 // where the payload is compressed to a hash reference.
-func (b *BlockProposal) ProposalHeader() *ProposalHeader {
+func (b *Proposal) ProposalHeader() *ProposalHeader {
 	return &ProposalHeader{Header: b.Block.ToHeader(), ProposerSigData: b.ProposerSigData}
 }
 
@@ -205,13 +205,13 @@ func (b *BlockProposal) ProposalHeader() *ProposalHeader {
 // proposer's signature is included in the QC and does not need to be provided individually anymore.
 // Therefore, from the protocol perspective, the canonical data structures are either a block proposal
 // (including the proposer's signature) or a certified block (including a QC for the block).
-// Though, for simplicity, we just extend the BlockProposal structure to represent a certified block,
+// Though, for simplicity, we just extend the Proposal structure to represent a certified block,
 // including proof that the proposer has signed their block twice. Thereby it is easy to convert
-// a [CertifiedBlock] into a [BlockProposal], which otherwise would not be possible because the QC only
+// a [CertifiedBlock] into a [Proposal], which otherwise would not be possible because the QC only
 // contains an aggregated signature (including the proposer's signature), which cannot be separated
 // into individual signatures.
 type CertifiedBlock struct {
-	Proposal     *BlockProposal
+	Proposal     *Proposal
 	CertifyingQC *QuorumCertificate
 }
 
@@ -219,7 +219,7 @@ type CertifiedBlock struct {
 // requirements and errors otherwise:
 //
 //	Block.View == QC.View and Block.BlockID == QC.BlockID
-func NewCertifiedBlock(proposal *BlockProposal, qc *QuorumCertificate) (CertifiedBlock, error) {
+func NewCertifiedBlock(proposal *Proposal, qc *QuorumCertificate) (CertifiedBlock, error) {
 	if proposal.Block.Header.View != qc.View {
 		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", proposal.Block.Header.View, qc.View)
 	}
