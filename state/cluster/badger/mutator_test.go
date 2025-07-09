@@ -176,7 +176,7 @@ func (suite *MutatorSuite) Payload(transactions ...*flow.TransactionBody) model.
 }
 
 // ProposalWithParent returns a valid block proposal with the given parent and the given payload.
-func (suite *MutatorSuite) ProposalWithParentAndPayload(parent *model.Block, payload model.Payload) model.BlockProposal {
+func (suite *MutatorSuite) ProposalWithParentAndPayload(parent *model.Block, payload model.Payload) model.Proposal {
 	block := unittest.ClusterBlockFixture(
 		unittest.ClusterBlock.WithParent(parent),
 		unittest.ClusterBlock.WithPayload(payload),
@@ -185,7 +185,7 @@ func (suite *MutatorSuite) ProposalWithParentAndPayload(parent *model.Block, pay
 }
 
 // Proposal returns a valid cluster block proposal with genesis as parent.
-func (suite *MutatorSuite) Proposal() model.BlockProposal {
+func (suite *MutatorSuite) Proposal() model.Proposal {
 	return suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload())
 }
 

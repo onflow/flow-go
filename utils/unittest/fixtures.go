@@ -229,8 +229,8 @@ func BlockFixtures(number int) []*flow.Block {
 	return blocks
 }
 
-func ProposalFixtures(number int) []*flow.BlockProposal {
-	proposals := make([]*flow.BlockProposal, 0, number)
+func ProposalFixtures(number int) []*flow.Proposal {
+	proposals := make([]*flow.Proposal, 0, number)
 	for range number {
 		proposal := ProposalFixture()
 		proposals = append(proposals, proposal)
@@ -238,26 +238,26 @@ func ProposalFixtures(number int) []*flow.BlockProposal {
 	return proposals
 }
 
-func ProposalFixture() *flow.BlockProposal {
+func ProposalFixture() *flow.Proposal {
 	return ProposalFromBlock(BlockFixture())
 }
 
-func ProposalFromHeader(header *flow.Header) *flow.ProposalHeader {
+func ProposalHeaderFromHeader(header *flow.Header) *flow.ProposalHeader {
 	return &flow.ProposalHeader{
 		Header:          header,
 		ProposerSigData: SignatureFixture(),
 	}
 }
 
-func ProposalFromBlock(block *flow.Block) *flow.BlockProposal {
-	return &flow.BlockProposal{
+func ProposalFromBlock(block *flow.Block) *flow.Proposal {
+	return &flow.Proposal{
 		Block:           *block,
 		ProposerSigData: SignatureFixture(),
 	}
 }
 
-func ClusterProposalFromBlock(block *cluster.Block) *cluster.BlockProposal {
-	return &cluster.BlockProposal{
+func ClusterProposalFromBlock(block *cluster.Block) *cluster.Proposal {
+	return &cluster.Proposal{
 		Block:           *block,
 		ProposerSigData: SignatureFixture(),
 	}
@@ -1967,14 +1967,14 @@ func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
 
 func CertifiedByChild(block *flow.Block, child *flow.Block) *flow.CertifiedBlock {
 	return &flow.CertifiedBlock{
-		Proposal:     &flow.BlockProposal{Block: *block, ProposerSigData: SignatureFixture()},
+		Proposal:     &flow.Proposal{Block: *block, ProposerSigData: SignatureFixture()},
 		CertifyingQC: child.Header.QuorumCertificate(),
 	}
 }
 
 func NewCertifiedBlock(block *flow.Block) *flow.CertifiedBlock {
 	return &flow.CertifiedBlock{
-		Proposal: &flow.BlockProposal{
+		Proposal: &flow.Proposal{
 			Block:           *block,
 			ProposerSigData: SignatureFixture(),
 		},
@@ -2381,9 +2381,9 @@ func ChainFixtureFrom(count int, parent *flow.Header) []*flow.Block {
 	return blocks
 }
 
-// ProposalChainFixtureFrom creates a chain of blocks and wraps each one in a BlockProposal.
-func ProposalChainFixtureFrom(count int, parent *flow.Header) []*flow.BlockProposal {
-	proposals := make([]*flow.BlockProposal, 0, count)
+// ProposalChainFixtureFrom creates a chain of blocks and wraps each one in a Proposal.
+func ProposalChainFixtureFrom(count int, parent *flow.Header) []*flow.Proposal {
+	proposals := make([]*flow.Proposal, 0, count)
 	for _, block := range ChainFixtureFrom(count, parent) {
 		proposals = append(proposals, ProposalFromBlock(block))
 	}

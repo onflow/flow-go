@@ -109,8 +109,8 @@ func (b *Block) ToHeader() *flow.Header {
 	return rootHeader
 }
 
-// BlockProposal represents a signed proposed block in collection node cluster consensus.
-type BlockProposal struct {
+// Proposal represents a signed proposed block in collection node cluster consensus.
+type Proposal struct {
 	Block           Block
 	ProposerSigData []byte
 }

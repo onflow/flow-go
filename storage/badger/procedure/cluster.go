@@ -14,7 +14,7 @@ import (
 
 // InsertClusterBlock inserts a cluster consensus block, updating all
 // associated indexes.
-func InsertClusterBlock(proposal *cluster.BlockProposal) func(*badger.Txn) error {
+func InsertClusterBlock(proposal *cluster.Proposal) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// store the block header
 		blockID := proposal.Block.ID()

@@ -169,14 +169,14 @@ func SnapshotFromBootstrapStateWithParams(
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
 		SealingSegment: &flow.SealingSegment{
-			Blocks:           []*flow.BlockProposal{{Block: *root, ProposerSigData: nil}},
+			Blocks:           []*flow.Proposal{{Block: *root, ProposerSigData: nil}},
 			ExecutionResults: flow.ExecutionResultList{result},
 			LatestSeals:      map[flow.Identifier]flow.Identifier{root.ID(): seal.ID()},
 			ProtocolStateEntries: map[flow.Identifier]*flow.ProtocolStateEntryWrapper{
 				rootKvStore.ID(): rootProtocolStateEntryWrapper,
 			},
 			FirstSeal:   seal,
-			ExtraBlocks: make([]*flow.BlockProposal, 0),
+			ExtraBlocks: make([]*flow.Proposal, 0),
 		},
 		QuorumCertificate:   qc,
 		Params:              params,

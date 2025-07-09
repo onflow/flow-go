@@ -21,22 +21,22 @@ func NewPendingBlocks() *PendingBlocks {
 	return b
 }
 
-func (b *PendingBlocks) Add(block flow.Slashable[*flow.BlockProposal]) bool {
+func (b *PendingBlocks) Add(block flow.Slashable[*flow.Proposal]) bool {
 	return b.backend.add(flow.Slashable[*flow.ProposalHeader]{
 		OriginID: block.OriginID,
 		Message:  block.Message.ProposalHeader(),
 	}, block.Message.Block.Payload)
 }
 
-func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*flow.BlockProposal], bool) {
+func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*flow.Proposal], bool) {
 	item, ok := b.backend.byID(blockID)
 	if !ok {
-		return flow.Slashable[*flow.BlockProposal]{}, false
+		return flow.Slashable[*flow.Proposal]{}, false
 	}
 
-	block := flow.Slashable[*flow.BlockProposal]{
+	block := flow.Slashable[*flow.Proposal]{
 		OriginID: item.header.OriginID,
-		Message: &flow.BlockProposal{
+		Message: &flow.Proposal{
 			Block:           *flow.NewBlock(item.header.Message.Header.HeaderBody, item.payload.(flow.Payload)),
 			ProposerSigData: item.header.Message.ProposerSigData,
 		},
@@ -45,17 +45,17 @@ func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*flow.Bloc
 	return block, true
 }
 
-func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.BlockProposal], bool) {
+func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.Proposal], bool) {
 	items, ok := b.backend.byParentID(parentID)
 	if !ok {
 		return nil, false
 	}
 
-	blocks := make([]flow.Slashable[*flow.BlockProposal], 0, len(items))
+	blocks := make([]flow.Slashable[*flow.Proposal], 0, len(items))
 	for _, item := range items {
-		block := flow.Slashable[*flow.BlockProposal]{
+		block := flow.Slashable[*flow.Proposal]{
 			OriginID: item.header.OriginID,
-			Message: &flow.BlockProposal{
+			Message: &flow.Proposal{
 				Block:           *flow.NewBlock(item.header.Message.Header.HeaderBody, item.payload.(flow.Payload)),
 				ProposerSigData: item.header.Message.ProposerSigData,
 			},

@@ -201,7 +201,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBody
 		return nil, fmt.Errorf("could not build cluster block: %w", err)
 	}
 
-	blockProposal := cluster.BlockProposal{
+	blockProposal := cluster.Proposal{
 		Block:           *block,
 		ProposerSigData: proposal.ProposerSigData,
 	}

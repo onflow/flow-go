@@ -126,7 +126,7 @@ func (suite *SnapshotSuite) Payload(transactions ...*flow.TransactionBody) model
 }
 
 // ProposalWithParentAndPayload returns a valid block proposal with the given parent and payload.
-func (suite *SnapshotSuite) ProposalWithParentAndPayload(parent *model.Block, payload model.Payload) model.BlockProposal {
+func (suite *SnapshotSuite) ProposalWithParentAndPayload(parent *model.Block, payload model.Payload) model.Proposal {
 	block := unittest.ClusterBlockFixture(
 		unittest.ClusterBlock.WithParent(parent),
 		unittest.ClusterBlock.WithPayload(payload),
@@ -135,11 +135,11 @@ func (suite *SnapshotSuite) ProposalWithParentAndPayload(parent *model.Block, pa
 }
 
 // Proposal returns a valid cluster block proposal with genesis as parent.
-func (suite *SnapshotSuite) Proposal() model.BlockProposal {
+func (suite *SnapshotSuite) Proposal() model.Proposal {
 	return suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload())
 }
 
-func (suite *SnapshotSuite) InsertBlock(proposal model.BlockProposal) {
+func (suite *SnapshotSuite) InsertBlock(proposal model.Proposal) {
 	err := suite.db.Update(procedure.InsertClusterBlock(&proposal))
 	suite.Assert().Nil(err)
 }
