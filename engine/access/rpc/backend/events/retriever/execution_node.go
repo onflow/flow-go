@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -24,7 +24,7 @@ type ExecutionNode struct {
 	log              zerolog.Logger
 	nodeProvider     *rpc.ExecutionNodeIdentitiesProvider
 	connFactory      connection.ConnectionFactory
-	nodeCommunicator backend.Communicator
+	nodeCommunicator node_communicator.Communicator
 }
 
 var _ Retriever = (*ExecutionNode)(nil)
@@ -33,7 +33,7 @@ func NewENEventsRetriever(
 	log zerolog.Logger,
 	nodeProvider *rpc.ExecutionNodeIdentitiesProvider,
 	connFactory connection.ConnectionFactory,
-	nodeCommunicator backend.Communicator,
+	nodeCommunicator node_communicator.Communicator,
 ) *ExecutionNode {
 	return &ExecutionNode{
 		log:              zerolog.New(log).With().Str("events_retriever", "execution_node").Logger(),

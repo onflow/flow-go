@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/module/execution"
@@ -46,7 +46,7 @@ func (l *Local) GetAccountAtBlockHeight(
 ) (*flow.Account, error) {
 	account, err := l.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height)
 	if err != nil {
-		return nil, convertAccountError(backend.ResolveHeightError(l.state.Params(), height, err), address, height)
+		return nil, convertAccountError(common.ResolveHeightError(l.state.Params(), height, err), address, height)
 	}
 	return account, nil
 }

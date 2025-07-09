@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
-	"errors"
 	"fmt"
 	"time"
 
@@ -14,6 +13,12 @@ import (
 	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/index"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/accounts"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -31,16 +36,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// DefaultMaxHeightRange is the default maximum size of range requests.
-const DefaultMaxHeightRange = 250
 
 // DefaultSnapshotHistoryLimit the amount of blocks to look back in state
 // when recursively searching for a valid snapshot
 const DefaultSnapshotHistoryLimit = 500
-
-// DefaultLoggedScriptsCacheSize is the default size of the lookup cache used to dedupe logs of scripts sent to ENs
-// limiting cache size to 16MB and does not affect script execution, only for keeping logs tidy
-const DefaultLoggedScriptsCacheSize = 1_000_000
 
 // DefaultConnectionPoolSize is the default size for the connection pool to collection and execution nodes
 const DefaultConnectionPoolSize = 250
@@ -58,12 +57,12 @@ const DefaultConnectionPoolSize = 250
 //
 // All remaining calls are handled by the base Backend in this file.
 type Backend struct {
-	backendScripts
+	scripts.Scripts
 	backendTransactions
-	backendEvents
+	events.Events
 	backendBlockHeaders
 	backendBlockDetails
-	backendAccounts
+	accounts.Accounts
 	backendExecutionResults
 	backendNetwork
 	backendSubscribeBlocks
@@ -98,17 +97,17 @@ type Params struct {
 	MaxHeightRange        uint
 	Log                   zerolog.Logger
 	SnapshotHistoryLimit  int
-	Communicator          Communicator
+	Communicator          node_communicator.Communicator
 	TxResultCacheSize     uint
 	ScriptExecutor        execution.ScriptExecutor
-	ScriptExecutionMode   IndexQueryMode
+	ScriptExecutionMode   query_mode.IndexQueryMode
 	CheckPayerBalanceMode validator.PayerBalanceMode
-	EventQueryMode        IndexQueryMode
+	EventQueryMode        query_mode.IndexQueryMode
 	BlockTracker          tracker.BlockTracker
 	SubscriptionHandler   *subscription.SubscriptionHandler
 
 	EventsIndex                *index.EventsIndex
-	TxResultQueryMode          IndexQueryMode
+	TxResultQueryMode          query_mode.IndexQueryMode
 	TxResultsIndex             *index.TransactionResultsIndex
 	LastFullBlockHeight        *counters.PersistentStrictMonotonicCounter
 	IndexReporter              state_synchronization.IndexReporter
@@ -125,7 +124,7 @@ func New(params Params) (*Backend, error) {
 		retry.Activate()
 	}
 
-	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](DefaultLoggedScriptsCacheSize)
+	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](common.DefaultLoggedScriptsCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize script logging cache: %w", err)
 	}
@@ -145,34 +144,60 @@ func New(params Params) (*Backend, error) {
 	}
 	systemTxID := systemTx.ID()
 
+	accountsBackend, err := accounts.NewAccountsBackend(
+		params.Log,
+		params.State,
+		params.Headers,
+		params.ConnFactory,
+		params.Communicator,
+		params.ScriptExecutionMode,
+
+		params.ScriptExecutor,
+		params.ExecNodeIdentitiesProvider,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create accounts: %w", err)
+	}
+
+	eventsBackend, err := events.NewEventsBackend(
+		params.Log,
+		params.State,
+		params.ChainID.Chain(),
+		params.MaxHeightRange,
+		params.Headers,
+		params.ConnFactory,
+		params.Communicator,
+		params.EventQueryMode,
+		params.EventsIndex,
+		params.ExecNodeIdentitiesProvider,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create events: %w", err)
+	}
+
+	scriptsBackend, err := scripts.NewScriptsBackend(
+		params.Log,
+		params.AccessMetrics,
+		params.Headers,
+		params.State,
+		params.ConnFactory,
+		params.Communicator,
+		params.ScriptExecutor,
+		params.ScriptExecutionMode,
+		params.ExecNodeIdentitiesProvider,
+		loggedScripts,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create scripts: %w", err)
+	}
+
 	b := &Backend{
 		state:        params.State,
 		BlockTracker: params.BlockTracker,
 		// create the sub-backends
-		backendScripts: backendScripts{
-			log:                        params.Log,
-			headers:                    params.Headers,
-			connFactory:                params.ConnFactory,
-			state:                      params.State,
-			metrics:                    params.AccessMetrics,
-			loggedScripts:              loggedScripts,
-			nodeCommunicator:           params.Communicator,
-			scriptExecutor:             params.ScriptExecutor,
-			scriptExecMode:             params.ScriptExecutionMode,
-			execNodeIdentitiesProvider: params.ExecNodeIdentitiesProvider,
-		},
-		backendEvents: backendEvents{
-			log:                        params.Log,
-			chain:                      params.ChainID.Chain(),
-			state:                      params.State,
-			headers:                    params.Headers,
-			connFactory:                params.ConnFactory,
-			maxHeightRange:             params.MaxHeightRange,
-			nodeCommunicator:           params.Communicator,
-			queryMode:                  params.EventQueryMode,
-			eventsIndex:                params.EventsIndex,
-			execNodeIdentitiesProvider: params.ExecNodeIdentitiesProvider,
-		},
+		Accounts: *accountsBackend,
+		Events:   *eventsBackend,
+		Scripts:  *scriptsBackend,
 		backendBlockHeaders: backendBlockHeaders{
 			headers: params.Headers,
 			state:   params.State,
@@ -180,16 +205,6 @@ func New(params Params) (*Backend, error) {
 		backendBlockDetails: backendBlockDetails{
 			blocks: params.Blocks,
 			state:  params.State,
-		},
-		backendAccounts: backendAccounts{
-			log:                        params.Log,
-			state:                      params.State,
-			headers:                    params.Headers,
-			connFactory:                params.ConnFactory,
-			nodeCommunicator:           params.Communicator,
-			scriptExecutor:             params.ScriptExecutor,
-			scriptExecMode:             params.ScriptExecutionMode,
-			execNodeIdentitiesProvider: params.ExecNodeIdentitiesProvider,
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: params.ExecutionResults,
@@ -373,46 +388,5 @@ func (b *Backend) GetFullCollectionByID(_ context.Context, colID flow.Identifier
 func (b *Backend) GetNetworkParameters(_ context.Context) accessmodel.NetworkParameters {
 	return accessmodel.NetworkParameters{
 		ChainID: b.chainID,
-	}
-}
-
-// ResolveHeightError processes errors returned during height-based queries.
-// If the error is due to a block not being found, this function determines whether the queried
-// height falls outside the node's accessible range and provides context-sensitive error messages
-// based on spork and node root block heights.
-//
-// Parameters:
-// - stateParams: Protocol parameters that contain spork root and node root block heights.
-// - height: The queried block height.
-// - genericErr: The initial error returned when the block is not found.
-//
-// Expected errors during normal operation:
-// - storage.ErrNotFound - Indicates that the queried block does not exist in the local database.
-func ResolveHeightError(
-	stateParams protocol.Params,
-	height uint64,
-	genericErr error,
-) error {
-	if !errors.Is(genericErr, storage.ErrNotFound) {
-		return genericErr
-	}
-
-	sporkRootBlockHeight := stateParams.SporkRootBlockHeight()
-	nodeRootBlockHeader := stateParams.SealedRoot().Height
-
-	if height < sporkRootBlockHeight {
-		return fmt.Errorf("block height %d is less than the spork root block height %d. Try to use a historic node: %w",
-			height,
-			sporkRootBlockHeight,
-			genericErr,
-		)
-	} else if height < nodeRootBlockHeader {
-		return fmt.Errorf("block height %d is less than the node's root block height %d. Try to use a different Access node: %w",
-			height,
-			nodeRootBlockHeader,
-			genericErr,
-		)
-	} else {
-		return genericErr
 	}
 }

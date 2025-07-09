@@ -10,7 +10,7 @@ import (
 
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
@@ -26,7 +26,7 @@ type ExecutionNode struct {
 	metrics module.BackendScriptsMetrics //TODO: move this metrics to scriptCache struct?
 
 	nodeProvider     *commonrpc.ExecutionNodeIdentitiesProvider
-	nodeCommunicator backend.Communicator
+	nodeCommunicator node_communicator.Communicator
 	connFactory      connection.ConnectionFactory
 
 	scriptCache *LoggedScriptCache
@@ -38,7 +38,7 @@ func NewENScriptExecutor(
 	log zerolog.Logger,
 	metrics module.BackendScriptsMetrics,
 	nodeProvider *commonrpc.ExecutionNodeIdentitiesProvider,
-	nodeCommunicator backend.Communicator,
+	nodeCommunicator node_communicator.Communicator,
 	connFactory connection.ConnectionFactory,
 	scriptCache *LoggedScriptCache,
 ) *ExecutionNode {

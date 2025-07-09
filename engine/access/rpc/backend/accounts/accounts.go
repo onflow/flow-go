@@ -7,8 +7,10 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/accounts/retriever"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
@@ -41,13 +43,13 @@ type Accounts struct {
 
 var _ API = (*Accounts)(nil)
 
-func NewAccounts(
+func NewAccountsBackend(
 	log zerolog.Logger,
 	state protocol.State,
 	headers storage.Headers,
 	connFactory connection.ConnectionFactory,
-	nodeCommunicator backend.Communicator,
-	scriptExecMode backend.IndexQueryMode,
+	nodeCommunicator node_communicator.Communicator,
+	scriptExecMode query_mode.IndexQueryMode,
 	scriptExecutor execution.ScriptExecutor,
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 ) (*Accounts, error) {
@@ -55,18 +57,18 @@ func NewAccounts(
 
 	// TODO: we can instantiate these strategies outside of backend (in access_node_builder e.g.)
 	switch scriptExecMode {
-	case backend.IndexQueryModeLocalOnly:
+	case query_mode.IndexQueryModeLocalOnly:
 		accountsRetriever = retriever.NewLocalAccountsRetriever(log, state, scriptExecutor)
 
-	case backend.IndexQueryModeExecutionNodesOnly:
+	case query_mode.IndexQueryModeExecutionNodesOnly:
 		accountsRetriever = retriever.NewENAccountsRetriever(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
 
-	case backend.IndexQueryModeFailover:
+	case query_mode.IndexQueryModeFailover:
 		local := retriever.NewLocalAccountsRetriever(log, state, scriptExecutor)
 		execNode := retriever.NewENAccountsRetriever(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
 		accountsRetriever = retriever.NewFailoverAccountsRetriever(log, state, local, execNode)
 
-	case backend.IndexQueryModeCompare:
+	case query_mode.IndexQueryModeCompare:
 		local := retriever.NewLocalAccountsRetriever(log, state, scriptExecutor)
 		execNode := retriever.NewENAccountsRetriever(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
 		accountsRetriever = retriever.NewCompareAccountsRetriever(log, state, local, execNode)
@@ -116,7 +118,7 @@ func (a *Accounts) GetAccountAtBlockHeight(
 ) (*flow.Account, error) {
 	blockID, err := a.headers.BlockIDByHeight(height)
 	if err != nil {
-		return nil, commonrpc.ConvertStorageError(backend.ResolveHeightError(a.state.Params(), height, err))
+		return nil, commonrpc.ConvertStorageError(common.ResolveHeightError(a.state.Params(), height, err))
 	}
 
 	account, err := a.accountsRetriever.GetAccountAtBlockHeight(ctx, address, blockID, height)
@@ -155,7 +157,7 @@ func (a *Accounts) GetAccountBalanceAtBlockHeight(
 ) (uint64, error) {
 	blockID, err := a.headers.BlockIDByHeight(height)
 	if err != nil {
-		return 0, commonrpc.ConvertStorageError(backend.ResolveHeightError(a.state.Params(), height, err))
+		return 0, commonrpc.ConvertStorageError(common.ResolveHeightError(a.state.Params(), height, err))
 	}
 
 	balance, err := a.accountsRetriever.GetAccountBalanceAtBlockHeight(ctx, address, blockID, height)
@@ -199,7 +201,7 @@ func (a *Accounts) GetAccountKeyAtBlockHeight(
 ) (*flow.AccountPublicKey, error) {
 	blockID, err := a.headers.BlockIDByHeight(height)
 	if err != nil {
-		return nil, commonrpc.ConvertStorageError(backend.ResolveHeightError(a.state.Params(), height, err))
+		return nil, commonrpc.ConvertStorageError(common.ResolveHeightError(a.state.Params(), height, err))
 	}
 
 	accountKey, err := a.accountsRetriever.GetAccountKeyAtBlockHeight(ctx, address, keyIndex, blockID, height)
@@ -241,7 +243,7 @@ func (a *Accounts) GetAccountKeysAtBlockHeight(
 ) ([]flow.AccountPublicKey, error) {
 	blockID, err := a.headers.BlockIDByHeight(height)
 	if err != nil {
-		return nil, commonrpc.ConvertStorageError(backend.ResolveHeightError(a.state.Params(), height, err))
+		return nil, commonrpc.ConvertStorageError(common.ResolveHeightError(a.state.Params(), height, err))
 	}
 
 	accountKeys, err := a.accountsRetriever.GetAccountKeysAtBlockHeight(ctx, address, blockID, height)

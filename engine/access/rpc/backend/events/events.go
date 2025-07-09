@@ -10,8 +10,10 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/index"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/events/retriever"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/events"
@@ -48,28 +50,28 @@ type Events struct {
 
 var _ API = (*Events)(nil)
 
-func NewEvents(
+func NewEventsBackend(
 	log zerolog.Logger,
 	state protocol.State,
 	chain flow.Chain,
 	maxHeightRange uint,
 	headers storage.Headers,
 	connFactory connection.ConnectionFactory,
-	nodeCommunicator backend.Communicator,
-	queryMode backend.IndexQueryMode,
+	nodeCommunicator node_communicator.Communicator,
+	queryMode query_mode.IndexQueryMode,
 	eventsIndex *index.EventsIndex,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 ) (*Events, error) {
 	var eventsRetriever retriever.Retriever
 
 	switch queryMode {
-	case backend.IndexQueryModeLocalOnly:
+	case query_mode.IndexQueryModeLocalOnly:
 		eventsRetriever = retriever.NewLocalEventsRetriever(eventsIndex)
 
-	case backend.IndexQueryModeExecutionNodesOnly:
+	case query_mode.IndexQueryModeExecutionNodesOnly:
 		eventsRetriever = retriever.NewENEventsRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
 
-	case backend.IndexQueryModeFailover:
+	case query_mode.IndexQueryModeFailover:
 		local := retriever.NewLocalEventsRetriever(eventsIndex)
 		execNode := retriever.NewENEventsRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
 		eventsRetriever = retriever.NewFailoverEventsRetriever(log, local, execNode)
@@ -146,7 +148,7 @@ func (e *Events) GetEventsForHeightRange(
 		// and avoids calculating header.ID() for each block.
 		blockID, err := e.headers.BlockIDByHeight(i)
 		if err != nil {
-			return nil, rpc.ConvertStorageError(backend.ResolveHeightError(e.state.Params(), i, err))
+			return nil, rpc.ConvertStorageError(common.ResolveHeightError(e.state.Params(), i, err))
 		}
 		header, err := e.headers.ByBlockID(blockID)
 		if err != nil {

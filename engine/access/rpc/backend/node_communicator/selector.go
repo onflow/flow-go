@@ -1,4 +1,4 @@
-package backend
+package node_communicator
 
 import (
 	"fmt"

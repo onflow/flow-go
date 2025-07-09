@@ -10,7 +10,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts/executor"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
@@ -36,15 +38,15 @@ type Scripts struct {
 
 var _ API = (*Scripts)(nil)
 
-func NewScripts(
+func NewScriptsBackend(
 	log zerolog.Logger,
 	metrics module.BackendScriptsMetrics,
 	headers storage.Headers,
 	state protocol.State,
 	connFactory connection.ConnectionFactory,
-	nodeCommunicator backend.Communicator,
+	nodeCommunicator node_communicator.Communicator,
 	scriptExecutor execution.ScriptExecutor,
-	scriptExecMode backend.IndexQueryMode,
+	scriptExecMode query_mode.IndexQueryMode,
 	nodeProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 	loggedScripts *lru.Cache[[md5.Size]byte, time.Time],
 ) (*Scripts, error) {
@@ -52,18 +54,18 @@ func NewScripts(
 	cache := executor.NewLoggedScriptCache(log, loggedScripts)
 
 	switch scriptExecMode {
-	case backend.IndexQueryModeLocalOnly:
+	case query_mode.IndexQueryModeLocalOnly:
 		exec = executor.NewLocalScriptExecutor(log, metrics, scriptExecutor, cache)
 
-	case backend.IndexQueryModeExecutionNodesOnly:
+	case query_mode.IndexQueryModeExecutionNodesOnly:
 		exec = executor.NewENScriptExecutor(log, metrics, nodeProvider, nodeCommunicator, connFactory, cache)
 
-	case backend.IndexQueryModeFailover:
+	case query_mode.IndexQueryModeFailover:
 		local := executor.NewLocalScriptExecutor(log, metrics, scriptExecutor, cache)
 		execNode := executor.NewENScriptExecutor(log, metrics, nodeProvider, nodeCommunicator, connFactory, cache)
 		exec = executor.NewFailoverScriptExecutor(local, execNode)
 
-	case backend.IndexQueryModeCompare:
+	case query_mode.IndexQueryModeCompare:
 		local := executor.NewLocalScriptExecutor(log, metrics, scriptExecutor, cache)
 		execNode := executor.NewENScriptExecutor(log, metrics, nodeProvider, nodeCommunicator, connFactory, cache)
 		exec = executor.NewCompareScriptExecutor(log, metrics, cache, local, execNode)
@@ -122,7 +124,7 @@ func (s *Scripts) ExecuteScriptAtBlockHeight(
 ) ([]byte, error) {
 	header, err := s.headers.ByHeight(blockHeight)
 	if err != nil {
-		return nil, commonrpc.ConvertStorageError(backend.ResolveHeightError(s.state.Params(), blockHeight, err))
+		return nil, commonrpc.ConvertStorageError(common.ResolveHeightError(s.state.Params(), blockHeight, err))
 	}
 
 	res, _, err := s.executor.Execute(ctx, executor.NewScriptExecutionRequest(header.ID(), blockHeight, script, arguments))

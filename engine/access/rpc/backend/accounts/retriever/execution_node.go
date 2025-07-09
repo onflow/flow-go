@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -23,7 +23,7 @@ type ExecutionNode struct {
 	log                        zerolog.Logger
 	state                      protocol.State
 	connFactory                connection.ConnectionFactory
-	nodeCommunicator           backend.Communicator
+	nodeCommunicator           node_communicator.Communicator
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 }
 
@@ -33,7 +33,7 @@ func NewENAccountsRetriever(
 	log zerolog.Logger,
 	state protocol.State,
 	connFactory connection.ConnectionFactory,
-	nodeCommunicator backend.Communicator,
+	nodeCommunicator node_communicator.Communicator,
 	execNodeIdentityProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 ) *ExecutionNode {
 	return &ExecutionNode{
