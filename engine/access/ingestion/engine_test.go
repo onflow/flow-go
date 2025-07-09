@@ -137,9 +137,9 @@ func (s *Suite) SetupTest() {
 
 	blockCount := 5
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
-	s.rootBlock = unittest.BlockFixture(
-		unittest.Block.WithHeight(0),
-	)
+	var err error
+	s.rootBlock, err = flow.Genesis(flow.Emulator)
+	require.NoError(s.T(), err)
 	parent := s.rootBlock.ToHeader()
 
 	for i := 0; i < blockCount; i++ {
@@ -169,7 +169,7 @@ func (s *Suite) SetupTest() {
 	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	s.proto.params.On("FinalizedRoot").Return(header, nil)
 
-	var err error
+	//var err error
 	s.collectionExecutedMetric, err = indexer.NewCollectionExecutedMetricImpl(
 		s.log,
 		metrics.NewNoopCollector(),

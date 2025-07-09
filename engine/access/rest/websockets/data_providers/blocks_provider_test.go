@@ -54,9 +54,9 @@ func (s *BlocksProviderSuite) SetupTest() {
 	blockCount := 5
 	s.blocks = make([]*flow.Block, 0, blockCount)
 
-	s.rootBlock = unittest.BlockFixture(
-		unittest.Block.WithHeight(0),
-	)
+	var err error
+	s.rootBlock, err = flow.Genesis(flow.Emulator)
+	s.Require().NoError(err)
 	parent := s.rootBlock.ToHeader()
 
 	for i := 0; i < blockCount; i++ {
