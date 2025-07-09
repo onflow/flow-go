@@ -20,17 +20,17 @@ var (
 	ErrDisconnectedBatch = errors.New("batch must be a sequence of connected blocks")
 )
 
-type BlocksByID map[flow.Identifier]*flow.BlockProposal
+type BlocksByID map[flow.Identifier]*flow.Proposal
 
 // batchContext contains contextual data for batch of blocks. Per convention, a batch is
 // a continuous sequence of blocks, i.e. `batch[k]` is the parent block of `batch[k+1]`.
 type batchContext struct {
-	batchParent *flow.BlockProposal // immediate parent of the first block in batch, i.e. `batch[0]`
-	batchChild  *flow.BlockProposal // immediate child of the last block in batch, i.e. `batch[len(batch)-1]`
+	batchParent *flow.Proposal // immediate parent of the first block in batch, i.e. `batch[0]`
+	batchChild  *flow.Proposal // immediate child of the last block in batch, i.e. `batch[len(batch)-1]`
 
 	// equivocatingBlocks holds the list of equivocations that the batch contained, when comparing to the
 	// cached blocks. An equivocation are two blocks for the same view that have different block IDs.
-	equivocatingBlocks [][2]*flow.BlockProposal
+	equivocatingBlocks [][2]*flow.Proposal
 
 	// redundant marks if ALL blocks in batch are already stored in cache, meaning that
 	// such input is identical to what was previously processed.
@@ -43,7 +43,7 @@ type batchContext struct {
 // Resolves certified blocks when processing incoming batches.
 // Concurrency safe.
 type Cache struct {
-	backend *herocache.Cache[*flow.BlockProposal] // cache with random ejection
+	backend *herocache.Cache[*flow.Proposal] // cache with random ejection
 	lock    sync.RWMutex
 
 	// secondary indices
@@ -56,7 +56,7 @@ type Cache struct {
 
 // Peek performs lookup of cached block by blockID.
 // Concurrency safe
-func (c *Cache) Peek(blockID flow.Identifier) *flow.BlockProposal {
+func (c *Cache) Peek(blockID flow.Identifier) *flow.Proposal {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	if block, found := c.backend.Get(blockID); found {
@@ -69,15 +69,15 @@ func (c *Cache) Peek(blockID flow.Identifier) *flow.BlockProposal {
 // NewCache creates new instance of Cache
 func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetrics, notifier hotstuff.ProposalViolationConsumer) *Cache {
 	// We consume ejection event from HeroCache to here to drop ejected blocks from our secondary indices.
-	distributor := NewDistributor[*flow.BlockProposal]()
+	distributor := NewDistributor[*flow.Proposal]()
 	cache := &Cache{
-		backend: herocache.NewCache[*flow.BlockProposal](
+		backend: herocache.NewCache[*flow.Proposal](
 			limit,
 			herocache.DefaultOversizeFactor,
 			heropool.RandomEjection,
 			log.With().Str("component", "follower.cache").Logger(),
 			collector,
-			herocache.WithTracer[*flow.BlockProposal](distributor),
+			herocache.WithTracer[*flow.Proposal](distributor),
 		),
 		byView:   make(map[uint64]BlocksByID),
 		byParent: make(map[flow.Identifier]BlocksByID),
@@ -90,7 +90,7 @@ func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetric
 // handleEjectedBlock performs cleanup of secondary indexes to prevent memory leaks.
 // WARNING: Concurrency safety of this function is guaranteed by `c.lock`. This method is only called
 // by `herocache.Cache.Add` and we perform this call while `c.lock` is in locked state.
-func (c *Cache) handleEjectedBlock(proposal *flow.BlockProposal) {
+func (c *Cache) handleEjectedBlock(proposal *flow.Proposal) {
 	blockID := proposal.Block.ID()
 
 	// remove block from the set of blocks for this view
@@ -134,7 +134,7 @@ func (c *Cache) handleEjectedBlock(proposal *flow.BlockProposal) {
 //
 // Expected errors during normal operations:
 //   - ErrDisconnectedBatch
-func (c *Cache) AddBlocks(batch []*flow.BlockProposal) (certifiedBatch []flow.CertifiedBlock, err error) {
+func (c *Cache) AddBlocks(batch []*flow.Proposal) (certifiedBatch []flow.CertifiedBlock, err error) {
 	batch = c.trimLeadingBlocksBelowPruningThreshold(batch)
 
 	if len(batch) < 1 { // empty batch is no-op
@@ -164,7 +164,7 @@ func (c *Cache) AddBlocks(batch []*flow.BlockProposal) (certifiedBatch []flow.Ce
 	// If there exists a parent for the batch's first block, then this is parent is certified
 	// by the batch. Hence, we prepend certifiedBatch by the parent.
 	if bc.batchParent != nil {
-		batch = append([]*flow.BlockProposal{bc.batchParent}, batch...)
+		batch = append([]*flow.Proposal{bc.batchParent}, batch...)
 	}
 	// If a child of the last block in the batch already exists in the cache: Then the entire batch is certified,
 	// and we append the child to the batch. Hence, after this operation the following holds: all blocks in the
@@ -262,7 +262,7 @@ func (c *Cache) removeByView(view uint64, blocks BlocksByID) {
 //   - requires pre-computed blockIDs in the same order as fullBlocks
 //
 // Any errors are symptoms of internal state corruption.
-func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.BlockProposal) (bc batchContext) {
+func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.Proposal) (bc batchContext) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -288,7 +288,7 @@ func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.B
 	for i, block := range fullBlocks {
 		equivocation, cached := c.cache(blockIDs[i], block)
 		if equivocation != nil {
-			bc.equivocatingBlocks = append(bc.equivocatingBlocks, [2]*flow.BlockProposal{equivocation, block})
+			bc.equivocatingBlocks = append(bc.equivocatingBlocks, [2]*flow.Proposal{equivocation, block})
 		}
 		if cached {
 			storedBlocks++
@@ -303,7 +303,7 @@ func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.B
 // equivocation. The first return value contains the already-cached equivocating block or `nil` otherwise.
 // Repeated calls with the same block are no-ops.
 // CAUTION: not concurrency safe: execute within Cache's lock.
-func (c *Cache) cache(blockID flow.Identifier, block *flow.BlockProposal) (equivocation *flow.BlockProposal, stored bool) {
+func (c *Cache) cache(blockID flow.Identifier, block *flow.Proposal) (equivocation *flow.Proposal, stored bool) {
 	cachedBlocksAtView, haveCachedBlocksAtView := c.byView[block.Block.Header.View]
 	// Check whether there is a block with the same view already in the cache.
 	// During happy-path operations `cachedBlocksAtView` contains usually zero blocks or exactly one block, which
@@ -348,7 +348,7 @@ func (c *Cache) cache(blockID flow.Identifier, block *flow.BlockProposal) (equiv
 // is the parent block of `batch[k+1]`. Returns a slice with IDs of the blocks in the same order
 // as batch. Returns `ErrDisconnectedBatch` if blocks are not a continuous sequence.
 // Pure function, hence concurrency safe.
-func enforceSequentialBlocks(batch []*flow.BlockProposal) ([]flow.Identifier, error) {
+func enforceSequentialBlocks(batch []*flow.Proposal) ([]flow.Identifier, error) {
 	blockIDs := make([]flow.Identifier, 0, len(batch))
 	parentID := batch[0].Block.ID()
 	blockIDs = append(blockIDs, parentID)
@@ -372,7 +372,7 @@ func enforceSequentialBlocks(batch []*flow.BlockProposal) ([]flow.Identifier, er
 //   - For this method, we do _not_ assume any specific ordering of the blocks.
 //   - We drop all blocks at the _beginning_ that we anyway would not want to cache.
 //   - The returned slice of blocks could still contain blocks with views below the cutoff.
-func (c *Cache) trimLeadingBlocksBelowPruningThreshold(batch []*flow.BlockProposal) []*flow.BlockProposal {
+func (c *Cache) trimLeadingBlocksBelowPruningThreshold(batch []*flow.Proposal) []*flow.Proposal {
 	lowestView := c.lowestView.Value()
 	for i, block := range batch {
 		if block.Block.Header.View >= lowestView {

@@ -21,7 +21,7 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		headers := badgerstorage.NewHeaders(metrics, db)
 
 		block := unittest.BlockFixture()
-		proposal := unittest.ProposalFromHeader(block.ToHeader())
+		proposal := unittest.ProposalHeaderFromHeader(block.ToHeader())
 
 		// store header
 		err := headers.Store(proposal)

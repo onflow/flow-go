@@ -98,7 +98,7 @@ func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, er
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 //   - state.UnverifiableExtensionError if the reference block is _not_ a known finalized block
 //   - state.InvalidExtensionError if the candidate block is invalid
-func (m *MutableState) Extend(proposal *cluster.BlockProposal) error {
+func (m *MutableState) Extend(proposal *cluster.Proposal) error {
 	candidate := proposal.Block
 	parentSpan, ctx := m.tracer.StartCollectionSpan(context.Background(), candidate.ID(), trace.COLClusterStateMutatorExtend)
 	defer parentSpan.End()

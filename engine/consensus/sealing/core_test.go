@@ -681,7 +681,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	rootSnapshot := unittest.StateSnapshotForKnownBlock(s.finalizedRootHeader, nil)
 	s.Snapshots[s.finalizedRootHeader.ID()] = rootSnapshot
 	rootSnapshot.On("SealingSegment").Return(
-		&flow.SealingSegment{Blocks: []*flow.BlockProposal{
+		&flow.SealingSegment{Blocks: []*flow.Proposal{
 			{
 				Block: *flow.NewBlock(s.finalizedRootHeader.HeaderBody, flow.Payload{}),
 				// By convention, root block has no proposer signature - implementation has to handle this edge case
@@ -890,7 +890,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	s.finalizedRootHeader = blockD.ToHeader() // call `s.State.Params().FinalizedRoot()` returns `s.finalizedRootHeader`
 	finalSnapshot.On("SealingSegment").Return(
 		&flow.SealingSegment{
-			Blocks: []*flow.BlockProposal{
+			Blocks: []*flow.Proposal{
 				{
 					Block:           *blockS,
 					ProposerSigData: nil, // combination of (i) and (ii): spork root block without proposer signature; but with ancestor blocks

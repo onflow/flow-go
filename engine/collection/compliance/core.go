@@ -115,7 +115,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedClu
 		return fmt.Errorf("could not convert to cluster block proposal: %w", err)
 	}
 
-	proposal := flow.Slashable[*cluster.BlockProposal]{
+	proposal := flow.Slashable[*cluster.Proposal]{
 		OriginID: proposalMsg.OriginID,
 		Message:  trustedBlockProposal,
 	}
@@ -243,7 +243,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedClu
 // its pending descendants. By induction, any child block of a
 // valid proposal is itself connected to the finalized state and can be
 // processed as well.
-func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.BlockProposal]) error {
+func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Proposal]) error {
 	header := proposal.Message.Block.Header
 	blockID := proposal.Message.Block.ID()
 	log := c.log.With().
@@ -310,7 +310,7 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Block
 //   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
 //   - model.InvalidProposalError if the block proposal is invalid
 //   - engine.UnverifiableInputError if the proposal cannot be validated
-func (c *Core) processBlockProposal(proposal *cluster.BlockProposal) error {
+func (c *Core) processBlockProposal(proposal *cluster.Proposal) error {
 	header := proposal.Block.Header
 	blockID := proposal.Block.ID()
 	payloadHash := proposal.Block.Payload.Hash()

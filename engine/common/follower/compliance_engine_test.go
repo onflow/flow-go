@@ -100,7 +100,7 @@ func (s *EngineSuite) TestProcessSyncedBlock() {
 
 	originID := unittest.IdentifierFixture()
 	done := make(chan struct{})
-	s.core.On("OnBlockRange", originID, []*flow.BlockProposal{proposal}).Return(nil).Run(func(_ mock.Arguments) {
+	s.core.On("OnBlockRange", originID, []*flow.Proposal{proposal}).Return(nil).Run(func(_ mock.Arguments) {
 		close(done)
 	}).Once()
 
@@ -118,7 +118,7 @@ func (s *EngineSuite) TestProcessGossipedBlock() {
 
 	originID := unittest.IdentifierFixture()
 	done := make(chan struct{})
-	s.core.On("OnBlockRange", originID, []*flow.BlockProposal{proposal}).Return(nil).Run(func(_ mock.Arguments) {
+	s.core.On("OnBlockRange", originID, []*flow.Proposal{proposal}).Return(nil).Run(func(_ mock.Arguments) {
 		close(done)
 	}).Once()
 
@@ -135,7 +135,7 @@ func (s *EngineSuite) TestProcessBlockFromComplianceInterface() {
 
 	originID := unittest.IdentifierFixture()
 	done := make(chan struct{})
-	s.core.On("OnBlockRange", originID, []*flow.BlockProposal{proposal}).Return(nil).Run(func(_ mock.Arguments) {
+	s.core.On("OnBlockRange", originID, []*flow.Proposal{proposal}).Return(nil).Run(func(_ mock.Arguments) {
 		close(done)
 	}).Once()
 
@@ -222,7 +222,7 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 }
 
 // flowBlockProposalsToMessage is a helper function to transform types.
-func flowBlockProposalsToMessage(proposals ...*flow.BlockProposal) []*messages.UntrustedProposal {
+func flowBlockProposalsToMessage(proposals ...*flow.Proposal) []*messages.UntrustedProposal {
 	result := make([]*messages.UntrustedProposal, 0, len(proposals))
 	for _, prop := range proposals {
 		result = append(result, messages.NewUntrustedProposal(prop))
