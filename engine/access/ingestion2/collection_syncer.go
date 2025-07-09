@@ -334,9 +334,9 @@ func (s *CollectionSyncer) requestCollections(collections []*flow.CollectionGuar
 		guarantors, err := protocol.FindGuarantors(s.state, collection)
 		if err != nil {
 			// failed to find guarantors for guarantees contained in a finalized block is fatal error
-			s.logger.Fatal().Err(err).Msgf("could not find guarantors for guarantee %v", collection.ID())
+			s.logger.Fatal().Err(err).Msgf("could not find guarantors for collection %v", collection.CollectionID)
 		}
-		s.requester.EntityByID(collection.ID(), filter.HasNodeID[flow.Identity](guarantors...))
+		s.requester.EntityByID(collection.CollectionID, filter.HasNodeID[flow.Identity](guarantors...))
 	}
 
 	if immediately {
