@@ -1,4 +1,4 @@
-package retriever
+package data_provider
 
 import (
 	"context"
@@ -9,12 +9,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type Retriever interface {
-	TransactionResults(
+type DataProvider interface {
+	TransactionResult(
 		ctx context.Context,
-		block *flow.Block,
+		header *flow.Header,
+		txID flow.Identifier,
 		encodingVersion entities.EventEncodingVersion,
-	) ([]*accessmodel.TransactionResult, error)
+	) (*accessmodel.TransactionResult, error)
 
 	TransactionResultByIndex(
 		ctx context.Context,
@@ -23,10 +24,9 @@ type Retriever interface {
 		encodingVersion entities.EventEncodingVersion,
 	) (*accessmodel.TransactionResult, error)
 
-	TransactionResultByTxID(
+	TransactionResultsByBlockID(
 		ctx context.Context,
-		header *flow.Header,
-		txID flow.Identifier,
+		block *flow.Block,
 		encodingVersion entities.EventEncodingVersion,
-	) (*accessmodel.TransactionResult, error)
+	) ([]*accessmodel.TransactionResult, error)
 }

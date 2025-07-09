@@ -1,4 +1,4 @@
-package transactions
+package data_provider
 
 import (
 	"context"
