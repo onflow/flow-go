@@ -120,7 +120,6 @@ func NewRootHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 	if untrusted.ParentView != 0 {
 		return nil, fmt.Errorf("ParentView of root header body must be zero")
 	}
-
 	if len(untrusted.ParentVoterIndices) != 0 {
 		return nil, fmt.Errorf("ParentVoterIndices of root header body must be empty")
 	}
