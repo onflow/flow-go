@@ -279,7 +279,8 @@ func (e *blockComputer) queueSystemTransaction(
 	systemLogger zerolog.Logger,
 ) {
 	allTxs := append(executeCallbackTxs, systemTxn)
-	systemCollectionInfo.CompleteCollection.Transactions = allTxs
+	// add execute callback transactions to the system collection info along to existing process transaction
+	systemCollectionInfo.CompleteCollection.Transactions = append(systemCollectionInfo.CompleteCollection.Transactions, allTxs...)
 	systemLogger = systemLogger.With().Uint32("num_txs", uint32(len(allTxs))).Logger()
 
 	for i, txBody := range allTxs {
@@ -471,13 +472,11 @@ func (e *blockComputer) executeSystemTransactions(
 		Logger()
 
 	systemCollectionInfo := collectionInfo{
-		blockId:         block.ID(),
-		blockIdStr:      block.ID().String(),
-		blockHeight:     block.Block.Header.Height,
-		collectionIndex: len(rawCollections),
-		CompleteCollection: &entity.CompleteCollection{
-			Transactions: []*flow.TransactionBody{},
-		},
+		blockId:             block.ID(),
+		blockIdStr:          block.ID().String(),
+		blockHeight:         block.Block.Header.Height,
+		collectionIndex:     len(rawCollections),
+		CompleteCollection:  &entity.CompleteCollection{},
 		isSystemTransaction: true,
 	}
 
@@ -500,8 +499,8 @@ func (e *blockComputer) executeSystemTransactions(
 		txIndex++
 	}
 
-	const systemTxCount = 1 // we always have one system transaction
-	txQueue := make(chan TransactionRequest, len(callbackTxs)+systemTxCount)
+	// queue size for callback transactions + 1 system transaction (process callback already executed)
+	txQueue := make(chan TransactionRequest, len(callbackTxs)+1)
 
 	e.queueSystemTransaction(
 		systemCtx,
@@ -553,6 +552,9 @@ func (e *blockComputer) executeProcessCallback(
 	systemLogger zerolog.Logger,
 ) ([]*flow.TransactionBody, error) {
 	processTxn := blueprints.ProcessCallbacksTransaction(e.vmCtx.Chain)
+
+	// add process callback transaction to the system collection info
+	systemCollectionInfo.CompleteCollection.Transactions = append(systemCollectionInfo.CompleteCollection.Transactions, processTxn)
 
 	request := newTransactionRequest(
 		systemCollectionInfo,
