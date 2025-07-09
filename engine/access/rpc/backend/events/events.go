@@ -10,8 +10,10 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/index"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/events/retriever"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/events"
@@ -20,6 +22,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
+
+// DefaultMaxHeightRange is the default maximum size of range requests.
+const DefaultMaxHeightRange = 250
 
 type API interface {
 	GetEventsForHeightRange(
@@ -39,51 +44,51 @@ type API interface {
 }
 
 type Events struct {
-	headers         storage.Headers
-	state           protocol.State
-	chain           flow.Chain
-	maxHeightRange  uint
-	eventsRetriever retriever.Retriever
+	headers        storage.Headers
+	state          protocol.State
+	chain          flow.Chain
+	maxHeightRange uint
+	retriever      retriever.EventRetriever
 }
 
 var _ API = (*Events)(nil)
 
-func NewEvents(
+func NewEventsBackend(
 	log zerolog.Logger,
 	state protocol.State,
 	chain flow.Chain,
 	maxHeightRange uint,
 	headers storage.Headers,
 	connFactory connection.ConnectionFactory,
-	nodeCommunicator backend.Communicator,
-	queryMode backend.IndexQueryMode,
+	nodeCommunicator node_communicator.Communicator,
+	queryMode query_mode.IndexQueryMode,
 	eventsIndex *index.EventsIndex,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 ) (*Events, error) {
-	var eventsRetriever retriever.Retriever
+	var eventRetriever retriever.EventRetriever
 
 	switch queryMode {
-	case backend.IndexQueryModeLocalOnly:
-		eventsRetriever = retriever.NewLocalEventsRetriever(eventsIndex)
+	case query_mode.IndexQueryModeLocalOnly:
+		eventRetriever = retriever.NewLocalEventRetriever(eventsIndex)
 
-	case backend.IndexQueryModeExecutionNodesOnly:
-		eventsRetriever = retriever.NewENEventsRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
+	case query_mode.IndexQueryModeExecutionNodesOnly:
+		eventRetriever = retriever.NewENEventRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
 
-	case backend.IndexQueryModeFailover:
-		local := retriever.NewLocalEventsRetriever(eventsIndex)
-		execNode := retriever.NewENEventsRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
-		eventsRetriever = retriever.NewFailoverEventsRetriever(log, local, execNode)
+	case query_mode.IndexQueryModeFailover:
+		local := retriever.NewLocalEventRetriever(eventsIndex)
+		execNode := retriever.NewENEventRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
+		eventRetriever = retriever.NewFailoverEventRetriever(log, local, execNode)
 
 	default:
 		return nil, status.Errorf(codes.Internal, "unknown execution mode: %v", queryMode)
 	}
 
 	return &Events{
-		state:           state,
-		chain:           chain,
-		maxHeightRange:  maxHeightRange,
-		headers:         headers,
-		eventsRetriever: eventsRetriever,
+		state:          state,
+		chain:          chain,
+		maxHeightRange: maxHeightRange,
+		headers:        headers,
+		retriever:      eventRetriever,
 	}, nil
 }
 
@@ -146,7 +151,7 @@ func (e *Events) GetEventsForHeightRange(
 		// and avoids calculating header.ID() for each block.
 		blockID, err := e.headers.BlockIDByHeight(i)
 		if err != nil {
-			return nil, rpc.ConvertStorageError(backend.ResolveHeightError(e.state.Params(), i, err))
+			return nil, rpc.ConvertStorageError(common.ResolveHeightError(e.state.Params(), i, err))
 		}
 		header, err := e.headers.ByBlockID(blockID)
 		if err != nil {
@@ -160,7 +165,7 @@ func (e *Events) GetEventsForHeightRange(
 		})
 	}
 
-	resp, err := e.eventsRetriever.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
+	resp, err := e.retriever.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +203,7 @@ func (e *Events) GetEventsForBlockIDs(
 		})
 	}
 
-	resp, err := e.eventsRetriever.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
+	resp, err := e.retriever.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}

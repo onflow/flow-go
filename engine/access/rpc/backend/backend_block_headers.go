@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -69,7 +70,7 @@ func (b *backendBlockHeaders) GetBlockHeaderByID(ctx context.Context, id flow.Id
 func (b *backendBlockHeaders) GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, flow.BlockStatus, error) {
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(ResolveHeightError(b.state.Params(), height, err))
+		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(common.ResolveHeightError(b.state.Params(), height, err))
 	}
 
 	stat, err := b.getBlockStatus(ctx, header)

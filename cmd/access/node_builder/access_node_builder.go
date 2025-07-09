@@ -49,6 +49,9 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -207,7 +210,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				CollectionClientTimeout:   3 * time.Second,
 				ExecutionClientTimeout:    3 * time.Second,
 				ConnectionPoolSize:        backend.DefaultConnectionPoolSize,
-				MaxHeightRange:            backend.DefaultMaxHeightRange,
+				MaxHeightRange:            events.DefaultMaxHeightRange,
 				PreferredExecutionNodeIDs: nil,
 				FixedExecutionNodeIDs:     nil,
 				CircuitBreakerConfig: rpcConnection.CircuitBreakerConfig{
@@ -216,9 +219,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 					MaxFailures:    5,
 					MaxRequests:    1,
 				},
-				ScriptExecutionMode: backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
-				EventQueryMode:      backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
-				TxResultQueryMode:   backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				ScriptExecutionMode: query_mode.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				EventQueryMode:      query_mode.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				TxResultQueryMode:   query_mode.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
 			},
 			RestConfig: rest.Config{
 				ListenAddress:  "",
@@ -1036,7 +1039,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 			broadcaster := engine.NewBroadcaster()
 
-			eventQueryMode, err := backend.ParseIndexQueryMode(builder.rpcConf.BackendConfig.EventQueryMode)
+			eventQueryMode, err := query_mode.ParseIndexQueryMode(builder.rpcConf.BackendConfig.EventQueryMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse event query mode: %w", err)
 			}
@@ -1044,7 +1047,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			// use the events index for events if enabled and the node is configured to use it for
 			// regular event queries
 			useIndex := builder.executionDataIndexingEnabled &&
-				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
+				eventQueryMode != query_mode.IndexQueryModeExecutionNodesOnly
 
 			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
 				builder.Logger,
@@ -1963,16 +1966,16 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				),
 			}
 
-			scriptExecMode, err := backend.ParseIndexQueryMode(config.BackendConfig.ScriptExecutionMode)
+			scriptExecMode, err := query_mode.ParseIndexQueryMode(config.BackendConfig.ScriptExecutionMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse script execution mode: %w", err)
 			}
 
-			eventQueryMode, err := backend.ParseIndexQueryMode(config.BackendConfig.EventQueryMode)
+			eventQueryMode, err := query_mode.ParseIndexQueryMode(config.BackendConfig.EventQueryMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse event query mode: %w", err)
 			}
-			if eventQueryMode == backend.IndexQueryModeCompare {
+			if eventQueryMode == query_mode.IndexQueryModeCompare {
 				return nil, fmt.Errorf("event query mode 'compare' is not supported")
 			}
 
@@ -1988,11 +1991,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to initialize block tracker: %w", err)
 			}
-			txResultQueryMode, err := backend.ParseIndexQueryMode(config.BackendConfig.TxResultQueryMode)
+			txResultQueryMode, err := query_mode.ParseIndexQueryMode(config.BackendConfig.TxResultQueryMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse transaction result query mode: %w", err)
 			}
-			if txResultQueryMode == backend.IndexQueryModeCompare {
+			if txResultQueryMode == query_mode.IndexQueryModeCompare {
 				return nil, fmt.Errorf("transaction result query mode 'compare' is not supported")
 			}
 
@@ -2044,7 +2047,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				MaxHeightRange:        backendConfig.MaxHeightRange,
 				Log:                   node.Logger,
 				SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
-				Communicator:          backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+				Communicator:          node_communicator.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
 				TxResultCacheSize:     builder.TxResultCacheSize,
 				ScriptExecutor:        notNil(builder.ScriptExecutor),
 				ScriptExecutionMode:   scriptExecMode,
@@ -2105,7 +2108,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			var err error
 
 			builder.RequestEng, err = requester.New(
-				node.Logger,
+				node.Logger.With().Str("entity", "collection").Logger(),
 				node.Metrics.Engine,
 				node.EngineRegistry,
 				node.Me,

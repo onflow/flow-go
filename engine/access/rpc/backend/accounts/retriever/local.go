@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/module/execution"
@@ -18,27 +18,27 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type Local struct {
+type LocalAccountRetriever struct {
 	log            zerolog.Logger
 	state          protocol.State
 	scriptExecutor execution.ScriptExecutor
 }
 
-var _ Retriever = (*Local)(nil)
+var _ AccountRetriever = (*LocalAccountRetriever)(nil)
 
-func NewLocalAccountsRetriever(
+func NewLocalAccountRetriever(
 	log zerolog.Logger,
 	state protocol.State,
 	scriptExecutor execution.ScriptExecutor,
-) *Local {
-	return &Local{
-		log:            zerolog.New(log).With().Str("handler", "local").Logger(),
+) *LocalAccountRetriever {
+	return &LocalAccountRetriever{
+		log:            log.With().Str("account_retriever", "local").Logger(),
 		state:          state,
 		scriptExecutor: scriptExecutor,
 	}
 }
 
-func (l *Local) GetAccountAtBlockHeight(
+func (l *LocalAccountRetriever) GetAccountAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	_ flow.Identifier,
@@ -46,12 +46,12 @@ func (l *Local) GetAccountAtBlockHeight(
 ) (*flow.Account, error) {
 	account, err := l.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height)
 	if err != nil {
-		return nil, convertAccountError(backend.ResolveHeightError(l.state.Params(), height, err), address, height)
+		return nil, convertAccountError(common.ResolveHeightError(l.state.Params(), height, err), address, height)
 	}
 	return account, nil
 }
 
-func (l *Local) GetAccountBalanceAtBlockHeight(
+func (l *LocalAccountRetriever) GetAccountBalanceAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
@@ -66,7 +66,7 @@ func (l *Local) GetAccountBalanceAtBlockHeight(
 	return accountBalance, nil
 }
 
-func (l *Local) GetAccountKeyAtBlockHeight(
+func (l *LocalAccountRetriever) GetAccountKeyAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	keyIndex uint32,
@@ -82,7 +82,7 @@ func (l *Local) GetAccountKeyAtBlockHeight(
 	return accountKey, nil
 }
 
-func (l *Local) GetAccountKeysAtBlockHeight(
+func (l *LocalAccountRetriever) GetAccountKeysAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	_ flow.Identifier,

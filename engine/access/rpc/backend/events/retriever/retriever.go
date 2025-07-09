@@ -9,13 +9,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type Retriever interface {
+type EventRetriever interface {
 	Events(
 		ctx context.Context,
 		blocks []BlockMetadata,
 		eventType flow.EventType,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
-	) (EventsResponse, error)
+	) (Response, error)
 }
 
 // BlockMetadata is used to capture information about requested blocks to avoid repeated blockID
@@ -26,7 +26,7 @@ type BlockMetadata struct {
 	Timestamp time.Time
 }
 
-type EventsResponse struct {
+type Response struct {
 	Events        []flow.BlockEvents
 	MissingBlocks []BlockMetadata
 }

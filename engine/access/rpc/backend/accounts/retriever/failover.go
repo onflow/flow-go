@@ -9,61 +9,56 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-type Failover struct {
+type FailoverAccountRetriever struct {
 	log               zerolog.Logger
 	state             protocol.State
-	localRequester    Retriever
-	execNodeRequester Retriever
+	localRequester    AccountRetriever
+	execNodeRequester AccountRetriever
 }
 
-var _ Retriever = (*Failover)(nil)
+var _ AccountRetriever = (*FailoverAccountRetriever)(nil)
 
-func NewFailoverAccountsRetriever(
+func NewFailoverAccountRetriever(
 	log zerolog.Logger,
 	state protocol.State,
-	localRequester Retriever,
-	execNodeRequester Retriever,
-) *Failover {
-	return &Failover{
-		log:               zerolog.New(log).With().Str("handler", "failover").Logger(),
+	localRequester AccountRetriever,
+	execNodeRequester AccountRetriever,
+) *FailoverAccountRetriever {
+	return &FailoverAccountRetriever{
+		log:               log.With().Str("account_retriever", "failover").Logger(),
 		state:             state,
 		localRequester:    localRequester,
 		execNodeRequester: execNodeRequester,
 	}
 }
 
-func (f *Failover) GetAccountAtBlockHeight(
+func (f *FailoverAccountRetriever) GetAccountAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
 	height uint64, //TODO: fix ALL places with unused arguments
 ) (*flow.Account, error) {
-	localAccount, localErr := f.localRequester.GetAccountAtBlockHeight(ctx, address, blockID, height)
+	localAccount, localErr := f.localRequester.GetAccountAtBlock(ctx, address, blockID, height)
 	if localErr == nil {
 		return localAccount, nil
 	}
 
-	ENAccount, ENErr := f.execNodeRequester.GetAccountAtBlockHeight(ctx, address, blockID, height)
-
-	//TODO: I commented this function call. Ask Peter if this is OK
-	// It is supposed to be called only in handler.Compare handler, isn't it?
-	//f.compareAccountResults(ENAccount, ENErr, localAccount, localErr, blockID, address)
-
+	ENAccount, ENErr := f.execNodeRequester.GetAccountAtBlock(ctx, address, blockID, height)
 	return ENAccount, ENErr
 }
 
-func (f *Failover) GetAccountBalanceAtBlockHeight(
+func (f *FailoverAccountRetriever) GetAccountBalanceAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
 	height uint64,
 ) (uint64, error) {
-	localBalance, localErr := f.localRequester.GetAccountBalanceAtBlockHeight(ctx, address, blockID, height)
+	localBalance, localErr := f.localRequester.GetAccountBalanceAtBlock(ctx, address, blockID, height)
 	if localErr == nil {
 		return localBalance, nil
 	}
 
-	ENBalance, ENErr := f.execNodeRequester.GetAccountBalanceAtBlockHeight(ctx, address, blockID, height)
+	ENBalance, ENErr := f.execNodeRequester.GetAccountBalanceAtBlock(ctx, address, blockID, height)
 	if ENErr != nil {
 		return 0, ENErr
 	}
@@ -71,19 +66,19 @@ func (f *Failover) GetAccountBalanceAtBlockHeight(
 	return ENBalance, nil
 }
 
-func (f *Failover) GetAccountKeyAtBlockHeight(
+func (f *FailoverAccountRetriever) GetAccountKeyAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	keyIndex uint32,
 	blockID flow.Identifier,
 	height uint64,
 ) (*flow.AccountPublicKey, error) {
-	localKey, localErr := f.localRequester.GetAccountKeyAtBlockHeight(ctx, address, keyIndex, blockID, height)
+	localKey, localErr := f.localRequester.GetAccountKeyAtBlock(ctx, address, keyIndex, blockID, height)
 	if localErr == nil {
 		return localKey, nil
 	}
 
-	ENKey, ENErr := f.execNodeRequester.GetAccountKeyAtBlockHeight(ctx, address, keyIndex, blockID, height)
+	ENKey, ENErr := f.execNodeRequester.GetAccountKeyAtBlock(ctx, address, keyIndex, blockID, height)
 	if ENErr != nil {
 		return nil, ENErr
 	}
@@ -91,18 +86,18 @@ func (f *Failover) GetAccountKeyAtBlockHeight(
 	return ENKey, nil
 }
 
-func (f *Failover) GetAccountKeysAtBlockHeight(
+func (f *FailoverAccountRetriever) GetAccountKeysAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
 	height uint64,
 ) ([]flow.AccountPublicKey, error) {
-	localKeys, localErr := f.localRequester.GetAccountKeysAtBlockHeight(ctx, address, blockID, height)
+	localKeys, localErr := f.localRequester.GetAccountKeysAtBlock(ctx, address, blockID, height)
 	if localErr == nil {
 		return localKeys, nil
 	}
 
-	ENKeys, ENErr := f.execNodeRequester.GetAccountKeysAtBlockHeight(ctx, address, blockID, height)
+	ENKeys, ENErr := f.execNodeRequester.GetAccountKeysAtBlock(ctx, address, blockID, height)
 	if ENErr != nil {
 		return nil, ENErr
 	}

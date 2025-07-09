@@ -11,6 +11,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
@@ -34,9 +37,9 @@ type backendScripts struct {
 	connFactory                connection.ConnectionFactory
 	metrics                    module.BackendScriptsMetrics
 	loggedScripts              *lru.Cache[[md5.Size]byte, time.Time]
-	nodeCommunicator           Communicator
+	nodeCommunicator           node_communicator.Communicator
 	scriptExecutor             execution.ScriptExecutor
-	scriptExecMode             IndexQueryMode
+	scriptExecMode             query_mode.IndexQueryMode
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 }
 
@@ -105,7 +108,7 @@ func (b *backendScripts) ExecuteScriptAtBlockHeight(
 ) ([]byte, error) {
 	header, err := b.headers.ByHeight(blockHeight)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(ResolveHeightError(b.state.Params(), blockHeight, err))
+		return nil, rpc.ConvertStorageError(common.ResolveHeightError(b.state.Params(), blockHeight, err))
 	}
 
 	return b.executeScript(ctx, newScriptExecutionRequest(header.ID(), blockHeight, script, arguments))
@@ -118,15 +121,15 @@ func (b *backendScripts) executeScript(
 	scriptRequest *scriptExecutionRequest,
 ) ([]byte, error) {
 	switch b.scriptExecMode {
-	case IndexQueryModeExecutionNodesOnly:
+	case query_mode.IndexQueryModeExecutionNodesOnly:
 		result, _, err := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
 		return result, err
 
-	case IndexQueryModeLocalOnly:
+	case query_mode.IndexQueryModeLocalOnly:
 		result, _, err := b.executeScriptLocally(ctx, scriptRequest)
 		return result, err
 
-	case IndexQueryModeFailover:
+	case query_mode.IndexQueryModeFailover:
 		localResult, localDuration, localErr := b.executeScriptLocally(ctx, scriptRequest)
 		if localErr == nil || isInvalidArgumentError(localErr) || status.Code(localErr) == codes.Canceled {
 			return localResult, localErr
@@ -143,7 +146,7 @@ func (b *backendScripts) executeScript(
 
 		return execResult, execErr
 
-	case IndexQueryModeCompare:
+	case query_mode.IndexQueryModeCompare:
 		execResult, execDuration, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
 		// we can only compare the results if there were either no errors or a cadence error
 		// since we cannot distinguish the EN error as caused by the block being pruned or some other reason,
