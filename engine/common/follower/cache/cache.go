@@ -166,10 +166,10 @@ func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, ce
 	// Otherwise, all blocks in the batch _except_ for the last one are certified
 	if bc.batchChild != nil {
 		certifiedBatch = batch
-		certifyingQC = bc.batchChild.Header.QuorumCertificate()
+		certifyingQC = bc.batchChild.Header.ParentQC()
 	} else {
 		certifiedBatch = batch[:batchSize-1]
-		certifyingQC = batch[batchSize-1].Header.QuorumCertificate()
+		certifyingQC = batch[batchSize-1].Header.ParentQC()
 	}
 	// caution: in the case `len(batch) == 1`, the `certifiedBatch` might be empty now (else-case)
 
