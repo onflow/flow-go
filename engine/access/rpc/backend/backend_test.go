@@ -2028,6 +2028,8 @@ func (suite *Suite) defaultBackendParams() Params {
 		Log:                  suite.log,
 		BlockTracker:         nil,
 		TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
+		EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
+		ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
 		LastFullBlockHeight:  suite.lastFullBlockHeight,
 		VersionControl:       suite.versionControl,
 		ExecNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
