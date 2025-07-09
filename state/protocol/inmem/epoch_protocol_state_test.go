@@ -21,7 +21,13 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 	entry := unittest.EpochStateFixture(unittest.WithValidDKG())
 
 	globalParams := mock.NewGlobalParams(t)
-	adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
+	adapter, err := inmem.NewEpochProtocolStateAdapter(
+		inmem.UntrustedEpochProtocolStateAdapter{
+			RichEpochStateEntry: entry,
+			Params:              globalParams,
+		},
+	)
+	require.NoError(t, err)
 
 	t.Run("clustering", func(t *testing.T) {
 		clustering, err := inmem.ClusteringFromSetupEvent(entry.CurrentEpochSetup)
@@ -69,7 +75,13 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 	})
 	t.Run("epoch-phase-staking", func(t *testing.T) {
 		entry := unittest.EpochStateFixture()
-		adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
+		adapter, err := inmem.NewEpochProtocolStateAdapter(
+			inmem.UntrustedEpochProtocolStateAdapter{
+				RichEpochStateEntry: entry,
+				Params:              globalParams,
+			},
+		)
+		require.NoError(t, err)
 		assert.Equal(t, flow.EpochPhaseStaking, adapter.EpochPhase())
 		assert.True(t, adapter.PreviousEpochExists())
 		assert.False(t, adapter.EpochFallbackTriggered())
@@ -80,14 +92,26 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 		entry.NextEpoch.CommitID = flow.ZeroID
 		entry.NextEpochCommit = nil
 
-		adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
+		adapter, err := inmem.NewEpochProtocolStateAdapter(
+			inmem.UntrustedEpochProtocolStateAdapter{
+				RichEpochStateEntry: entry,
+				Params:              globalParams,
+			},
+		)
+		require.NoError(t, err)
 		assert.Equal(t, flow.EpochPhaseSetup, adapter.EpochPhase())
 		assert.True(t, adapter.PreviousEpochExists())
 		assert.False(t, adapter.EpochFallbackTriggered())
 	})
 	t.Run("epoch-phase-commit", func(t *testing.T) {
 		entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
-		adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
+		adapter, err := inmem.NewEpochProtocolStateAdapter(
+			inmem.UntrustedEpochProtocolStateAdapter{
+				RichEpochStateEntry: entry,
+				Params:              globalParams,
+			},
+		)
+		require.NoError(t, err)
 		assert.Equal(t, flow.EpochPhaseCommitted, adapter.EpochPhase())
 		assert.True(t, adapter.PreviousEpochExists())
 		assert.False(t, adapter.EpochFallbackTriggered())
@@ -97,7 +121,13 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 			entry := unittest.EpochStateFixture(func(entry *flow.RichEpochStateEntry) {
 				entry.EpochFallbackTriggered = true
 			})
-			adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
+			adapter, err := inmem.NewEpochProtocolStateAdapter(
+				inmem.UntrustedEpochProtocolStateAdapter{
+					RichEpochStateEntry: entry,
+					Params:              globalParams,
+				},
+			)
+			require.NoError(t, err)
 			assert.True(t, adapter.EpochFallbackTriggered())
 			assert.Equal(t, flow.EpochPhaseFallback, entry.EpochPhase())
 		})
@@ -105,7 +135,13 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 			entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
 				entry.EpochFallbackTriggered = true
 			})
-			adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
+			adapter, err := inmem.NewEpochProtocolStateAdapter(
+				inmem.UntrustedEpochProtocolStateAdapter{
+					RichEpochStateEntry: entry,
+					Params:              globalParams,
+				},
+			)
+			require.NoError(t, err)
 			assert.True(t, adapter.EpochFallbackTriggered())
 			assert.Equal(t, flow.EpochPhaseCommitted, entry.EpochPhase())
 		})
@@ -116,7 +152,37 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 			entry.PreviousEpochSetup = nil
 			entry.PreviousEpochCommit = nil
 		})
-		adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
+		adapter, err := inmem.NewEpochProtocolStateAdapter(
+			inmem.UntrustedEpochProtocolStateAdapter{
+				RichEpochStateEntry: entry,
+				Params:              globalParams,
+			},
+		)
+		require.NoError(t, err)
 		assert.False(t, adapter.PreviousEpochExists())
+	})
+
+	// Invalid input with nil Params
+	t.Run("invalid - nil Params", func(t *testing.T) {
+		_, err := inmem.NewEpochProtocolStateAdapter(
+			inmem.UntrustedEpochProtocolStateAdapter{
+				RichEpochStateEntry: unittest.EpochStateFixture(),
+				Params:              nil,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "params must not be nil")
+	})
+
+	// Invalid input with nil RichEpochStateEntry
+	t.Run("invalid - nil RichEpochStateEntry", func(t *testing.T) {
+		_, err := inmem.NewEpochProtocolStateAdapter(
+			inmem.UntrustedEpochProtocolStateAdapter{
+				RichEpochStateEntry: nil,
+				Params:              globalParams,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "rich epoch state must not be nil")
 	})
 }

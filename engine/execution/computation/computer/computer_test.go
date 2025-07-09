@@ -608,7 +608,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 
 	t.Run("system chunk transaction should not fail", func(t *testing.T) {
-
 		// include all fees. System chunk should ignore them
 		contextOptions := []fvm.Option{
 			fvm.WithEVMEnabled(true),
