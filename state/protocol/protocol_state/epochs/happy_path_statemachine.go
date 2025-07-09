@@ -108,10 +108,16 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 	}
 
 	// construct data container specifying next epoch
-	nextEpoch := &flow.EpochStateContainer{
-		SetupID:          epochSetup.ID(),
-		CommitID:         flow.ZeroID,
-		ActiveIdentities: nextEpochActiveIdentities,
+	nextEpoch, err := flow.NewEpochStateContainer(
+		flow.UntrustedEpochStateContainer{
+			SetupID:          epochSetup.ID(),
+			CommitID:         flow.ZeroID,
+			ActiveIdentities: nextEpochActiveIdentities,
+			EpochExtensions:  nil,
+		},
+	)
+	if err != nil {
+		return false, fmt.Errorf("could not construct next epoch state: %w", err)
 	}
 
 	newMinEpochStateEntry, err := flow.NewMinEpochStateEntry(
@@ -181,8 +187,18 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 		u.telemetry.OnInvalidServiceEvent(epochCommit.ServiceEvent(), err)
 		return false, fmt.Errorf("invalid epoch commit event for epoch %d: %w", epochCommit.Counter, err)
 	}
-	nextEpoch := u.state.NextEpoch
-	nextEpoch.CommitID = epochCommit.ID()
+
+	nextEpoch, err := flow.NewEpochStateContainer(
+		flow.UntrustedEpochStateContainer{
+			SetupID:          u.state.NextEpoch.SetupID,
+			CommitID:         epochCommit.ID(),
+			ActiveIdentities: u.state.NextEpoch.ActiveIdentities,
+			EpochExtensions:  u.state.NextEpoch.EpochExtensions,
+		},
+	)
+	if err != nil {
+		return false, fmt.Errorf("could not construct next epoch state: %w", err)
+	}
 
 	newMinEpochStateEntry, err := flow.NewMinEpochStateEntry(
 		flow.UntrustedMinEpochStateEntry{

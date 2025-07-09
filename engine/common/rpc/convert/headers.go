@@ -66,18 +66,30 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 		if newestQC == nil {
 			return nil, fmt.Errorf("invalid structure newest QC should be present")
 		}
-		lastViewTC = &flow.TimeoutCertificate{
-			View:          m.LastViewTc.View,
-			NewestQCViews: m.LastViewTc.HighQcViews,
-			SignerIndices: m.LastViewTc.SignerIndices,
-			SigData:       m.LastViewTc.SigData,
-			NewestQC: &flow.QuorumCertificate{
-				View:          newestQC.View,
-				BlockID:       MessageToIdentifier(newestQC.BlockId),
-				SignerIndices: newestQC.SignerIndices,
-				SigData:       newestQC.SigData,
-			},
+
+		qc, err := flow.NewQuorumCertificate(flow.UntrustedQuorumCertificate{
+			View:          newestQC.View,
+			BlockID:       MessageToIdentifier(newestQC.BlockId),
+			SignerIndices: newestQC.SignerIndices,
+			SigData:       newestQC.SigData,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("could not build quorum certificate: %w", err)
 		}
+
+		tc, err := flow.NewTimeoutCertificate(
+			flow.UntrustedTimeoutCertificate{
+				View:          m.LastViewTc.View,
+				NewestQCViews: m.LastViewTc.HighQcViews,
+				NewestQC:      qc,
+				SignerIndices: m.LastViewTc.SignerIndices,
+				SigData:       m.LastViewTc.SigData,
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not construct timeout certificate: %w", err)
+		}
+		lastViewTC = tc
 	}
 
 	return &flow.Header{

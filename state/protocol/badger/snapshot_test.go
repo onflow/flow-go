@@ -236,7 +236,8 @@ func TestClusters(t *testing.T) {
 	rootProtocolState, err := kvstore.NewDefaultKVStore(
 		safetyParams.FinalizationSafetyThreshold,
 		safetyParams.EpochExtensionViewCount,
-		minEpochStateEntry.ID())
+		minEpochStateEntry.ID(),
+	)
 	require.NoError(t, err)
 	root.Payload.ProtocolStateID = rootProtocolState.ID()
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
@@ -871,11 +872,11 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 			b1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			b2 := unittest.BlockWithParentFixture(b1.Header)
 			b2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-			require.NoError(t, state.ExtendCertified(context.Background(), b1, b2.Header.QuorumCertificate()))
+			require.NoError(t, state.ExtendCertified(context.Background(), b1, b2.Header.ParentQC()))
 			require.NoError(t, state.ExtendCertified(context.Background(), b2, unittest.CertifyBlock(b2.Header))) // adding block b5 (providing required QC for b1)
 
 			// consistency check: there should be no finalized block in the protocol state at height `b1.Height`
-			_, err := state.AtHeight(b1.Header.Height).Head() // expect statepkg.ErrUnknownSnapshotReference as only finalized blocks are indexed by height
+			_, err = state.AtHeight(b1.Header.Height).Head() // expect statepkg.ErrUnknownSnapshotReference as only finalized blocks are indexed by height
 			assert.ErrorIs(t, err, statepkg.ErrUnknownSnapshotReference)
 
 			// requesting a sealing segment from block b1 should fail, as b1 is not yet finalized
@@ -890,7 +891,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 			orphaned := unittest.BlockWithParentFixture(sporkRoot)
 			orphaned.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			orphanedChild := unittest.BlockWithParentProtocolState(orphaned)
-			require.NoError(t, state.ExtendCertified(context.Background(), orphaned, orphanedChild.Header.QuorumCertificate()))
+			require.NoError(t, state.ExtendCertified(context.Background(), orphaned, orphanedChild.Header.ParentQC()))
 			require.NoError(t, state.ExtendCertified(context.Background(), orphanedChild, unittest.CertifyBlock(orphanedChild.Header)))
 			block := unittest.BlockWithParentFixture(sporkRoot)
 			block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
@@ -1046,13 +1047,13 @@ func TestLatestSealedResult(t *testing.T) {
 				unittest.WithProtocolStateID(rootProtocolStateID),
 			))
 
-			err = state.ExtendCertified(context.Background(), block1, block2.Header.QuorumCertificate())
+			err = state.ExtendCertified(context.Background(), block1, block2.Header.ParentQC())
 			require.NoError(t, err)
 
-			err = state.ExtendCertified(context.Background(), block2, block3.Header.QuorumCertificate())
+			err = state.ExtendCertified(context.Background(), block2, block3.Header.ParentQC())
 			require.NoError(t, err)
 
-			err = state.ExtendCertified(context.Background(), block3, block4.Header.QuorumCertificate())
+			err = state.ExtendCertified(context.Background(), block3, block4.Header.ParentQC())
 			require.NoError(t, err)
 
 			// B1 <- B2(R1) <- B3(S1)
@@ -1064,7 +1065,7 @@ func TestLatestSealedResult(t *testing.T) {
 				assert.Equal(t, block3.Payload.Seals[0], gotSeal)
 			})
 
-			err = state.ExtendCertified(context.Background(), block4, block5.Header.QuorumCertificate())
+			err = state.ExtendCertified(context.Background(), block4, block5.Header.ParentQC())
 			require.NoError(t, err)
 
 			// B1 <- B2(S1) <- B3(S1) <- B4(R2,R3)

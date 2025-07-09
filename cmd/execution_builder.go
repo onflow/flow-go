@@ -16,7 +16,6 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
-	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/rs/zerolog"
@@ -78,6 +77,8 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
+	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
+	execdatastorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/finalizedreader"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -168,7 +169,7 @@ type ExecutionNode struct {
 	executionDataStore     execution_data.ExecutionDataStore
 	toTriggerCheckpoint    *atomic.Bool      // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
 	stopControl            *stop.StopControl // stop the node at given block height
-	executionDataDatastore *badgerds.Datastore
+	executionDataDatastore execdatastorage.DatastoreManager
 	executionDataPruner    *pruner.Pruner
 	executionDataBlobstore blobs.Blobstore
 	executionDataTracker   tracker.Storage
@@ -417,7 +418,7 @@ func (exeNode *ExecutionNode) LoadBlobService(
 	if node.ObserverMode {
 		edsChannel = channels.PublicExecutionDataService
 	}
-	bs, err := node.EngineRegistry.RegisterBlobService(edsChannel, exeNode.executionDataDatastore, opts...)
+	bs, err := node.EngineRegistry.RegisterBlobService(edsChannel, exeNode.executionDataDatastore.Datastore(), opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register blob service: %w", err)
 	}
@@ -710,19 +711,14 @@ func (exeNode *ExecutionNode) LoadAuthorizationCheckingFunction(
 
 func (exeNode *ExecutionNode) LoadExecutionDataDatastore(
 	node *NodeConfig,
-) error {
-	datastoreDir := filepath.Join(exeNode.exeConf.executionDataDir, "blobstore")
-	err := os.MkdirAll(datastoreDir, 0700)
+) (err error) {
+	exeNode.executionDataDatastore, err = edstorage.CreateDatastoreManager(
+		node.Logger, exeNode.exeConf.executionDataDir, exeNode.exeConf.executionDataDBMode)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not create execution data datastore manager: %w", err)
 	}
-	dsOpts := &badgerds.DefaultOptions
-	ds, err := badgerds.NewDatastore(datastoreDir, dsOpts)
-	if err != nil {
-		return err
-	}
-	exeNode.executionDataDatastore = ds
-	exeNode.builder.ShutdownFunc(ds.Close)
+
+	exeNode.builder.ShutdownFunc(exeNode.executionDataDatastore.Close)
 	return nil
 }
 
@@ -733,7 +729,7 @@ func (exeNode *ExecutionNode) LoadBlobservicePeerManagerDependencies(node *NodeC
 }
 
 func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
-	exeNode.executionDataBlobstore = blobs.NewBlobstore(exeNode.executionDataDatastore)
+	exeNode.executionDataBlobstore = blobs.NewBlobstore(exeNode.executionDataDatastore.Datastore())
 	exeNode.executionDataStore = execution_data.NewExecutionDataStore(exeNode.executionDataBlobstore, execution_data.DefaultSerializer)
 	return nil
 }
@@ -1094,7 +1090,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		colFetcher = accessFetcher
 		exeNode.collectionRequester = accessFetcher
 	} else {
-		reqEng, err := requester.New(node.Logger, node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
+		reqEng, err := requester.New(node.Logger.With().Str("entity", "collection").Logger(), node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
 			channels.RequestCollections,
 			filter.Any,
 			func() flow.Entity { return &flow.Collection{} },
@@ -1302,7 +1298,7 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 		engineRegister = &underlay.NoopEngineRegister{}
 	}
 	eng, err := provider.New(
-		node.Logger.With().Str("engine", "receipt_provider").Logger(),
+		node.Logger.With().Str("entity", "receipt").Logger(),
 		node.Metrics.Engine,
 		engineRegister,
 		node.Me,
@@ -1387,6 +1383,8 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 	if err != nil {
 		return fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
 	}
+
+	node.Logger.Info().Msgf("execution database bootstrapped: %v, commit: %v", bootstrapped, commit)
 
 	// if the execution database does not exist, then we need to bootstrap the execution database.
 	if !bootstrapped {
