@@ -606,7 +606,7 @@ func TestExtendHeightTooLarge(t *testing.T) {
 
 		block := unittest.BlockWithParentAndPayload(
 			head,
-			flow.EmptyPayload(),
+			*flow.NewEmptyPayload(),
 		)
 		// set an invalid height
 		block.Header.Height = head.Height + 2
@@ -627,7 +627,7 @@ func TestExtendInconsistentParentView(t *testing.T) {
 
 		block := unittest.BlockWithParentAndPayload(
 			head,
-			flow.EmptyPayload(),
+			*flow.NewEmptyPayload(),
 		)
 		// set an invalid parent view
 		block.Header.ParentView++
@@ -681,7 +681,7 @@ func TestExtendInvalidChainID(t *testing.T) {
 
 		block := unittest.BlockWithParentAndPayload(
 			head,
-			flow.EmptyPayload(),
+			*flow.NewEmptyPayload(),
 		)
 		// use an invalid chain ID
 		block.Header.ChainID = head.ChainID + "-invalid"
@@ -2940,7 +2940,7 @@ func TestHeaderExtendHeightTooLarge(t *testing.T) {
 
 		block := unittest.BlockWithParentAndPayload(
 			head,
-			flow.EmptyPayload(),
+			*flow.NewEmptyPayload(),
 		)
 		// set an invalid height
 		block.Header.Height = head.Height + 2
@@ -3125,7 +3125,7 @@ func TestExtendCertifiedInvalidQC(t *testing.T) {
 		// create child block
 		block := unittest.BlockWithParentAndPayload(
 			head,
-			flow.EmptyPayload(),
+			*flow.NewEmptyPayload(),
 		)
 
 		t.Run("qc-invalid-view", func(t *testing.T) {

@@ -105,6 +105,7 @@ func (b *pendingBlock) Block() *flowgo.Block {
 			ParentID:  b.parentID,
 			Timestamp: b.timestamp,
 		},
+		//nolint:structwrite
 		Payload: flowgo.Payload{
 			Guarantees: guarantees,
 		},

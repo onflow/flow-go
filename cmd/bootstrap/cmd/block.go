@@ -23,18 +23,23 @@ func constructRootHeader(rootChain string, rootParent string, rootHeight uint64,
 
 // constructRootBlock constructs a valid root block based on the given header and protocol state ID for that block.
 func constructRootBlock(rootHeader *flow.Header, protocolStateID flow.Identifier) (*flow.Block, error) {
-	payload := flow.Payload{
-		Guarantees:      nil,
-		Seals:           nil,
-		Receipts:        nil,
-		Results:         nil,
-		ProtocolStateID: protocolStateID,
+	payload, err := flow.NewPayload(
+		flow.UntrustedPayload{
+			Guarantees:      nil,
+			Seals:           nil,
+			Receipts:        nil,
+			Results:         nil,
+			ProtocolStateID: protocolStateID,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create payload: %w", err)
 	}
 
 	block, err := flow.NewRootBlock(
 		flow.UntrustedBlock{
 			Header:  rootHeader.HeaderBody,
-			Payload: payload,
+			Payload: *payload,
 		},
 	)
 	if err != nil {

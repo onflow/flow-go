@@ -133,7 +133,7 @@ func TestBlockMalleability(t *testing.T) {
 // 2. Invalid input with invalid HeaderBody:
 //   - Ensures an error is returned when the HeaderBody.ParentID is flow.ZeroID.
 //
-// 3. Invalid input with zero ProtocolStateID:
+// 3. Invalid input with invalid Payload:
 //   - Ensures an error is returned when the Payload.ProtocolStateID is flow.ZeroID.
 func TestNewBlock(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
@@ -151,16 +151,63 @@ func TestNewBlock(t *testing.T) {
 		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
-		require.Contains(t, err.Error(), "invalid root header body")
+		require.Contains(t, err.Error(), "invalid header body")
 	})
 
-	t.Run("invalid input with zero ProtocolStateID", func(t *testing.T) {
+	t.Run("invalid input with invalid payload", func(t *testing.T) {
 		block := unittest.BlockFixture()
 		block.Payload.ProtocolStateID = flow.ZeroID
 
 		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
-		require.Contains(t, err.Error(), "protocol state ID must not be zero")
+		require.Contains(t, err.Error(), "invalid payload")
+	})
+}
+
+// TestNewRootBlock verifies the behavior of the NewRootBlock constructor.
+// It ensures proper handling of both valid and invalid untrusted input fields.
+//
+// Test Cases:
+//
+// 1. Valid input:
+//   - Verifies that a properly populated UntrustedBlock results in a valid root Block.
+//
+// 2. Invalid input with invalid HeaderBody:
+//   - Ensures an error is returned when the HeaderBody.ParentView is not zero.
+func TestNewRootBlock(t *testing.T) {
+	validID := unittest.IdentifierFixture()
+	ts := time.Unix(1_600_000_000, 0)
+
+	base := flow.UntrustedBlock{
+		Header: flow.HeaderBody{
+			ChainID:            flow.Emulator,
+			ParentID:           validID,
+			Height:             10,
+			Timestamp:          ts,
+			View:               0,
+			ParentView:         0,
+			ParentVoterIndices: []byte{},
+			ParentVoterSigData: []byte{},
+			ProposerID:         validID,
+			LastViewTC:         nil,
+		},
+		Payload: unittest.PayloadFixture(),
+	}
+
+	t.Run("valid input", func(t *testing.T) {
+		res, err := flow.NewRootBlock(base)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	})
+
+	t.Run("invalid input with invalid header body", func(t *testing.T) {
+		block := base
+		block.Header.ParentView = 1
+
+		res, err := flow.NewRootBlock(block)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "invalid root header body")
 	})
 }

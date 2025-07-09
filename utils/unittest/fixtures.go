@@ -294,7 +294,7 @@ func ReceiptAndSealForBlock(block *flow.Block, serviceEvents ...flow.ServiceEven
 }
 
 func PayloadFixture(options ...func(*flow.Payload)) flow.Payload {
-	payload := flow.EmptyPayload()
+	payload := *flow.NewEmptyPayload()
 	for _, option := range options {
 		option(&payload)
 	}

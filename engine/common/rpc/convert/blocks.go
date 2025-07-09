@@ -160,13 +160,20 @@ func PayloadFromMessage(m *entities.Block) (*flow.Payload, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &flow.Payload{
-		Guarantees:      cgs,
-		Seals:           seals,
-		Receipts:        receipts,
-		Results:         results,
-		ProtocolStateID: MessageToIdentifier(m.ProtocolStateId),
-	}, nil
+	payload, err := flow.NewPayload(
+		flow.UntrustedPayload{
+			Guarantees:      cgs,
+			Seals:           seals,
+			Receipts:        receipts,
+			Results:         results,
+			ProtocolStateID: MessageToIdentifier(m.ProtocolStateId),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build the payload: %w", err)
+	}
+
+	return payload, nil
 }
 
 // MessageToBlockStatus converts a protobuf BlockStatus message to a flow.BlockStatus.

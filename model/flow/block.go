@@ -9,7 +9,7 @@ import (
 
 func Genesis(chainID ChainID) (*Block, error) {
 	// create the raw content for the genesis block
-	payload := Payload{}
+	payload := NewEmptyPayload()
 
 	// create the headerBody
 	headerBody, err := NewRootHeaderBody(
@@ -29,7 +29,7 @@ func Genesis(chainID ChainID) (*Block, error) {
 	block, err := NewRootBlock(
 		UntrustedBlock{
 			Header:  *headerBody,
-			Payload: payload,
+			Payload: *payload,
 		},
 	)
 	if err != nil {
@@ -84,13 +84,14 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	}
 
 	// validate payload
-	if untrusted.Payload.ProtocolStateID == ZeroID {
-		return nil, fmt.Errorf("protocol state ID must not be zero")
+	payload, err := NewPayload(UntrustedPayload(untrusted.Payload))
+	if err != nil {
+		return nil, fmt.Errorf("invalid payload: %w", err)
 	}
 
 	return &Block{
 		Header:  *headerBody,
-		Payload: untrusted.Payload,
+		Payload: *payload,
 	}, nil
 }
 

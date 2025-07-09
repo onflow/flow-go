@@ -37,7 +37,7 @@ func TestIsSporkRootSnapshot(t *testing.T) {
 // TestOrderedSeals tests that protocol.OrderedSeals returns a list of ordered seals for a payload.
 func TestOrderedSeals(t *testing.T) {
 	t.Run("empty payload", func(t *testing.T) {
-		payload := flow.EmptyPayload()
+		payload := flow.NewEmptyPayload()
 		headers := storagemock.NewHeaders(t)
 
 		ordered, err := protocol.OrderedSeals(payload.Seals, headers)

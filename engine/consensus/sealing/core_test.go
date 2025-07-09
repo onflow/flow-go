@@ -701,8 +701,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 				unittest.WithResult(s.IncorporatedResult.Result))))
 	payloads.On("ByBlockID", s.IncorporatedBlock.ID()).Return(&incorporatedBlockPayload, nil)
 
-	emptyPayload := flow.EmptyPayload()
-	payloads.On("ByBlockID", s.Block.ID()).Return(&emptyPayload, nil)
+	emptyPayload := flow.NewEmptyPayload()
+	payloads.On("ByBlockID", s.Block.ID()).Return(emptyPayload, nil)
 
 	s.IdentitiesCache[s.IncorporatedBlock.ID()] = s.AuthorizedVerifiers
 

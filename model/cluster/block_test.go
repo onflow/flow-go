@@ -35,7 +35,7 @@ func TestClusterBlockMalleability(t *testing.T) {
 // 2. Invalid input with invalid HeaderBody:
 //   - Ensures an error is returned when the HeaderBody.ParentID is flow.ZeroID.
 //
-// 3. Invalid input with invalid Payload (malformed Collection in payload):
+// 3. Invalid input with invalid Payload:
 //   - Ensures an error is returned when the Payload contains a Collection with invalid transaction IDs.
 func TestNewBlock(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
@@ -53,7 +53,7 @@ func TestNewBlock(t *testing.T) {
 		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
-		require.Contains(t, err.Error(), "invalid root header body")
+		require.Contains(t, err.Error(), "invalid header body")
 	})
 
 	t.Run("invalid input with invalid payload", func(t *testing.T) {

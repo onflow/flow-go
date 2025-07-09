@@ -332,14 +332,17 @@ func ExecutionResultFixture(t *testing.T,
 			}
 		}
 
-		payload := flow.Payload{
-			Guarantees:      guarantees,
-			ProtocolStateID: protocolStateID,
-		}
+		payload, err := flow.NewPayload(
+			flow.UntrustedPayload{
+				Guarantees:      guarantees,
+				ProtocolStateID: protocolStateID,
+			},
+		)
+		require.NoError(t, err)
 		referenceBlock, err = flow.NewBlock(
 			flow.UntrustedBlock{
 				Header:  refBlkHeader.HeaderBody,
-				Payload: payload,
+				Payload: *payload,
 			},
 		)
 		require.NoError(t, err)

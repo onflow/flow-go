@@ -148,12 +148,17 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*fl
 			}
 			results = append(results, result)
 		}
-		payload := &flow.Payload{
-			Seals:           seals,
-			Guarantees:      guarantees,
-			Receipts:        receipts,
-			Results:         results,
-			ProtocolStateID: idx.ProtocolStateID,
+		payload, err := flow.NewPayload(
+			flow.UntrustedPayload{
+				Seals:           seals,
+				Guarantees:      guarantees,
+				Receipts:        receipts,
+				Results:         results,
+				ProtocolStateID: idx.ProtocolStateID,
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not build the payload: %w", err)
 		}
 
 		return payload, nil

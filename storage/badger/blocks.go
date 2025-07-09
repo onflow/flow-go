@@ -62,7 +62,7 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Bl
 				},
 			)
 			if err != nil {
-				return nil, fmt.Errorf("could not build block: %w", err)
+				return nil, fmt.Errorf("could not construct block: %w", err)
 			}
 		} else {
 			block, err = flow.NewRootBlock(

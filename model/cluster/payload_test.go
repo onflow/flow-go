@@ -65,7 +65,7 @@ func TestNewPayload(t *testing.T) {
 //   - Verifies that a properly populated UntrustedPayload results in a valid root Payload.
 //
 // 2. Valid input with non-zero reference block ID:
-//   - Ensures an error is returned when reference block ID is non-zero.
+//   - Ensures an error is returned when reference block ID is not flow.ZeroID.
 //
 // 3. Invalid input with non-empty collection:
 //   - Ensures an error is returned when the Collection contains transaction IDs.
