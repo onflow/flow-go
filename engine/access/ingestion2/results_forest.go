@@ -88,7 +88,7 @@ var (
 //
 //   - The ResultsForest offers the method `ResetLowestRejectedView() 𝒔 uint64`, which resets
 //     `rejectedResults = false` and returns the view 𝒔 := 𝓼.Level. When calling `ResetLowestRejectedView`,
-//     the higher-level business logic promises that all sealed results with views > 𝒔 will eventually be
+//     the higher-level business logic promises that all sealed results with views ≥ 𝒔 will eventually be
 //     provided to the ResultsForest. Sealed results must be provided, while unsealed results may be added.
 //   - The higher-level business logic abides by this contract up to the point where the ResultsForest
 //     rejects a result again later.
@@ -183,11 +183,13 @@ type ResultsForest struct {
 	forest                      forest.LevelledForest
 	headers                     storage.Headers
 	maxViewDelta                uint64
+	lowestRejectedView          uint64
 	lastSealedResultID          flow.Identifier
 	lastSealedView              uint64
 	latestPersistedSealedResult storage.LatestPersistedSealedResultReader
 	pipelineFactory             optimistic_sync.PipelineFactory
-	mu                          sync.RWMutex
+
+	mu sync.RWMutex
 }
 
 // NewResultsForest creates a new instance of ResultsForest.
@@ -213,6 +215,22 @@ func NewResultsForest(
 		latestPersistedSealedResult: latestPersistedSealedResult,
 	}
 	return rf, nil
+}
+
+// ResetLowestRejectedView resets the lowest rejected view and returns the previous value.
+// If no results have been rejected since the last call, false is returned.
+//
+// Lowest rejected view tracks the lowest view of a result that was rejected by the forest because
+// the forest's view window was exceeded. This is used by the higher-level business logic to identify
+// the view from which to start reproviding results. By reproviding sealed results starting from this
+// view, system can guarantee that all sealed results are eventually provided to the ResultsForest.
+func (rf *ResultsForest) ResetLowestRejectedView() (uint64, bool) {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	lowestRejectedView := rf.lowestRejectedView
+	rf.lowestRejectedView = 0
+	return lowestRejectedView, lowestRejectedView > 0
 }
 
 // AddSealedResult adds a SEALED Execution Result to the Result Forest (without any receipts),
@@ -332,6 +350,9 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult) (*Ex
 
 	// make sure the result's block view is within the accepted range
 	if executedBlock.View > rf.forest.LowestLevel+rf.maxViewDelta {
+		if rf.lowestRejectedView == 0 || executedBlock.View < rf.lowestRejectedView {
+			rf.lowestRejectedView = executedBlock.View
+		}
 		return nil, ErrMaxViewDeltaExceeded
 	}
 
