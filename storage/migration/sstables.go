@@ -6,10 +6,10 @@ import (
 	"os"
 	"sync"
 
-	"github.com/cockroachdb/pebble"
-	"github.com/cockroachdb/pebble/objstorage/objstorageprovider"
-	"github.com/cockroachdb/pebble/sstable"
-	"github.com/cockroachdb/pebble/vfs"
+	"github.com/cockroachdb/pebble/v2"
+	"github.com/cockroachdb/pebble/v2/objstorage/objstorageprovider"
+	"github.com/cockroachdb/pebble/v2/sstable"
+	"github.com/cockroachdb/pebble/v2/vfs"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog/log"
 
@@ -127,7 +127,7 @@ func writerSSTableWorker(ctx context.Context, workerIndex int, db *pebble.DB, ss
 				return fmt.Errorf("fail to close writer: %w", err)
 			}
 
-			err = db.Ingest([]string{filePath})
+			err = db.Ingest(ctx, []string{filePath})
 			if err != nil {
 				return fmt.Errorf("fail to ingest file %v: %w", filePath, err)
 			}
@@ -137,7 +137,7 @@ func writerSSTableWorker(ctx context.Context, workerIndex int, db *pebble.DB, ss
 	}
 }
 func createSSTableWriter(filePath string) (*sstable.Writer, error) {
-	f, err := vfs.Default.Create(filePath)
+	f, err := vfs.Default.Create(filePath, vfs.WriteCategoryUnspecified)
 	if err != nil {
 		return nil, err
 	}
