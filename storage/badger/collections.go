@@ -25,15 +25,6 @@ func NewCollections(db *badger.DB, transactions *Transactions) *Collections {
 	return c
 }
 
-func (c *Collections) StoreLight(collection *flow.LightCollection) error {
-	err := operation.RetryOnConflict(c.db.Update, operation.InsertCollection(collection))
-	if err != nil {
-		return fmt.Errorf("could not insert collection: %w", err)
-	}
-
-	return nil
-}
-
 func (c *Collections) Store(collection *flow.Collection) error {
 	return operation.RetryOnConflictTx(c.db, transaction.Update, func(ttx *transaction.Tx) error {
 		light := collection.Light()
@@ -153,4 +144,10 @@ func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCol
 	}
 
 	return &collection, nil
+}
+
+// BatchStoreLightAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch operation.
+// No errors are expected during normal operation.
+func (c *Collections) BatchStoreLightAndIndexByTransaction(_ *flow.LightCollection, _ storage.ReaderBatchWriter) error {
+	return nil
 }

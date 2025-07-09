@@ -1,7 +1,6 @@
 package dkg
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -11,7 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -50,16 +50,16 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 		DKGPhase2FinalView: 200,
 		DKGPhase3FinalView: 250,
 		FinalView:          300,
-		Participants:       s.netIDs,
-		RandomSource:       []byte("random bytes for seed"),
+		Participants:       s.netIDs.ToSkeleton(),
+		RandomSource:       unittest.EpochSetupRandomSourceFixture(),
 	}
 
 	// create the EpochSetup that will trigger the next DKG run with all the
 	// desired parameters
 	nextEpochSetup := flow.EpochSetup{
 		Counter:      currentCounter + 1,
-		Participants: s.netIDs,
-		RandomSource: []byte("random bytes for seed"),
+		Participants: s.netIDs.ToSkeleton(),
+		RandomSource: unittest.EpochSetupRandomSourceFixture(),
 		FirstView:    301,
 		FinalView:    600,
 	}
@@ -127,22 +127,7 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 
 	// the result is an array of public keys where the first item is the group
 	// public key
-	res := s.getResult()
-
-	assert.Equal(s.T(), len(s.nodes)+1, len(res))
-	pubKeys := make([]crypto.PublicKey, 0, len(res))
-	for _, r := range res {
-		pkBytes, err := hex.DecodeString(r)
-		assert.NoError(s.T(), err)
-		pk, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pkBytes)
-		assert.NoError(s.T(), err)
-		pubKeys = append(pubKeys, pk)
-	}
-
-	groupPubKeyBytes, err := hex.DecodeString(res[0])
-	assert.NoError(s.T(), err)
-	groupPubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, groupPubKeyBytes)
-	assert.NoError(s.T(), err)
+	_, groupPubKey, pubKeys := s.getParametersAndResult()
 
 	tag := "some tag"
 	hasher := msig.NewBLSHasher(tag)
@@ -151,8 +136,7 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 	signatures := []crypto.Signature{}
 	indices := []int{}
 	for i, n := range nodes {
-		// TODO: to replace with safeBeaconKeys
-		beaconKey, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
+		beaconKey, err := n.dkgState.UnsafeRetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
 		require.NoError(s.T(), err)
 
 		signature, err := beaconKey.Sign(sigData, hasher)
@@ -161,9 +145,9 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 		signatures = append(signatures, signature)
 		indices = append(indices, i)
 
-		ok, err := pubKeys[i+1].Verify(signature, sigData, hasher)
+		ok, err := pubKeys[i].Verify(signature, sigData, hasher)
 		require.NoError(s.T(), err)
-		assert.True(s.T(), ok, fmt.Sprintf("signature %d share doesn't verify under the public key share", i+1))
+		assert.True(s.T(), ok, fmt.Sprintf("signature %d share doesn't verify under the public key share", i))
 	}
 
 	// shuffle the signatures and indices before constructing the group

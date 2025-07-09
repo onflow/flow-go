@@ -3,20 +3,22 @@ package epochs
 import (
 	"encoding/hex"
 
-	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/flow-core-contracts/lib/go/contracts"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	emulator "github.com/onflow/flow-emulator/emulator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/crypto"
+	"github.com/onflow/flow-core-contracts/lib/go/contracts"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
-	"github.com/onflow/flow-go/crypto"
+
+	emulator "github.com/onflow/flow-go/integration/internal/emulator"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
@@ -28,10 +30,10 @@ import (
 type Suite struct {
 	suite.Suite
 
-	env            templates.Environment
-	blockchain     *emulator.Blockchain
-	emulatorClient *utils.EmulatorClient
-
+	env                   templates.Environment
+	blockchain            *emulator.Blockchain
+	emulatorClient        *utils.EmulatorClient
+	serviceAccountAddress sdk.Address
 	// Quorum Certificate deployed account and address
 	qcAddress    sdk.Address
 	qcAccountKey *sdk.AccountKey
@@ -43,10 +45,12 @@ func (s *Suite) SetupTest() {
 
 	// create a new instance of the emulated blockchain
 	var err error
-	s.blockchain, err = emulator.New(emulator.WithStorageLimitEnabled(false))
+	s.blockchain, err = emulator.New(
+		emulator.WithStorageLimitEnabled(false),
+	)
 	s.Require().NoError(err)
 	s.emulatorClient = utils.NewEmulatorClient(s.blockchain)
-
+	s.serviceAccountAddress = sdk.Address(s.blockchain.ServiceKey().Address)
 	// deploy epoch qc contract
 	s.deployEpochQCContract()
 }
@@ -78,10 +82,10 @@ func (s *Suite) deployEpochQCContract() {
 }
 
 // CreateClusterList creates a clustering with the nodes split evenly and returns the resulting `ClusterList`
-func (s *Suite) CreateClusterList(clusterCount, nodesPerCluster int) (flow.ClusterList, flow.IdentityList) {
+func (s *Suite) CreateClusterList(clusterCount, nodesPerCluster int) (flow.ClusterList, flow.IdentitySkeletonList) {
 
 	// create list of nodes to be used for the clustering
-	nodes := unittest.IdentityListFixture(clusterCount*nodesPerCluster, unittest.WithRole(flow.RoleCollection))
+	nodes := unittest.IdentityListFixture(clusterCount*nodesPerCluster, unittest.WithRole(flow.RoleCollection)).ToSkeleton()
 	// create cluster assignment
 	clusterAssignment := unittest.ClusterAssignment(uint(clusterCount), nodes)
 
@@ -98,17 +102,17 @@ func (s *Suite) PublishVoter() {
 	// sign and publish voter transaction
 	publishVoterTx := sdk.NewTransaction().
 		SetScript(templates.GeneratePublishVoterScript(s.env)).
-		SetGasLimit(9999).
-		SetProposalKey(s.blockchain.ServiceKey().Address,
+		SetComputeLimit(9999).
+		SetProposalKey(s.serviceAccountAddress,
 			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address).
+		SetPayer(s.serviceAccountAddress).
 		AddAuthorizer(s.qcAddress)
 
 	signer, err := s.blockchain.ServiceKey().Signer()
 	require.NoError(s.T(), err)
 
 	s.SignAndSubmit(publishVoterTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
+		[]sdk.Address{s.serviceAccountAddress, s.qcAddress},
 		[]sdkcrypto.Signer{signer, s.qcSigner})
 }
 
@@ -118,10 +122,10 @@ func (s *Suite) StartVoting(clustering flow.ClusterList, clusterCount, nodesPerC
 	// submit admin transaction to start voting
 	startVotingTx := sdk.NewTransaction().
 		SetScript(templates.GenerateStartVotingScript(s.env)).
-		SetGasLimit(9999).
-		SetProposalKey(s.blockchain.ServiceKey().Address,
+		SetComputeLimit(9999).
+		SetProposalKey(s.serviceAccountAddress,
 			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address).
+		SetPayer(s.serviceAccountAddress).
 		AddAuthorizer(s.qcAddress)
 
 	clusterIndices := make([]cadence.Value, 0, clusterCount)
@@ -142,7 +146,7 @@ func (s *Suite) StartVoting(clustering flow.ClusterList, clusterCount, nodesPerC
 			cdcNodeID, err := cadence.NewString(node.NodeID.String())
 			require.NoError(s.T(), err)
 			nodeIDs = append(nodeIDs, cdcNodeID)
-			nodeWeights = append(nodeWeights, cadence.NewUInt64(node.Weight))
+			nodeWeights = append(nodeWeights, cadence.NewUInt64(node.InitialWeight))
 		}
 
 		clusterNodeIDs[index] = cadence.NewArray(nodeIDs)
@@ -165,7 +169,7 @@ func (s *Suite) StartVoting(clustering flow.ClusterList, clusterCount, nodesPerC
 	require.NoError(s.T(), err)
 
 	s.SignAndSubmit(startVotingTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
+		[]sdk.Address{s.serviceAccountAddress, s.qcAddress},
 		[]sdkcrypto.Signer{signer, s.qcSigner})
 }
 
@@ -174,10 +178,10 @@ func (s *Suite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier,
 
 	registerVoterTx := sdk.NewTransaction().
 		SetScript(templates.GenerateCreateVoterScript(s.env)).
-		SetGasLimit(9999).
-		SetProposalKey(s.blockchain.ServiceKey().Address,
+		SetComputeLimit(9999).
+		SetProposalKey(s.serviceAccountAddress,
 			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address).
+		SetPayer(s.serviceAccountAddress).
 		AddAuthorizer(address)
 
 	err := registerVoterTx.AddArgument(cadence.NewAddress(s.qcAddress))
@@ -197,24 +201,24 @@ func (s *Suite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier,
 	require.NoError(s.T(), err)
 
 	s.SignAndSubmit(registerVoterTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address, address},
+		[]sdk.Address{s.serviceAccountAddress, address},
 		[]sdkcrypto.Signer{signer, nodeSigner})
 }
 
 func (s *Suite) StopVoting() {
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateStopVotingScript(s.env)).
-		SetGasLimit(9999).
-		SetProposalKey(s.blockchain.ServiceKey().Address,
+		SetComputeLimit(9999).
+		SetProposalKey(s.serviceAccountAddress,
 			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address).
+		SetPayer(s.serviceAccountAddress).
 		AddAuthorizer(s.qcAddress)
 
 	signer, err := s.blockchain.ServiceKey().Signer()
 	require.NoError(s.T(), err)
 
 	s.SignAndSubmit(tx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
+		[]sdk.Address{s.serviceAccountAddress, s.qcAddress},
 		[]sdkcrypto.Signer{signer, s.qcSigner})
 }
 
@@ -227,7 +231,7 @@ func (s *Suite) NodeHasVoted(nodeID flow.Identifier) bool {
 		return false
 	}
 
-	return result.Value.ToGoValue().(bool)
+	return bool(result.Value.(cadence.Bool))
 }
 
 /**

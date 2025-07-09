@@ -2,10 +2,11 @@ package approvals
 
 import (
 	"github.com/gammazero/workerpool"
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
@@ -42,8 +43,8 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 	s.Block = unittest.BlockHeaderWithParentFixture(s.ParentBlock)
 	verifiers := make(flow.IdentifierList, 0)
 	s.AuthorizedVerifiers = make(map[flow.Identifier]*flow.Identity)
-	s.ChunksAssignment = chunks.NewAssignment()
-	s.Chunks = unittest.ChunkListFixture(50, s.Block.ID())
+	assignmentBuilder := chunks.NewAssignmentBuilder()
+	s.Chunks = unittest.ChunkListFixture(50, s.Block.ID(), unittest.StateCommitmentFixture())
 	// mock public key to mock signature verifications
 	s.PublicKey = &module.PublicKey{}
 
@@ -59,8 +60,9 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 
 	// create assignment
 	for _, chunk := range s.Chunks {
-		s.ChunksAssignment.Add(chunk, verifiers)
+		require.NoError(s.T(), assignmentBuilder.Add(chunk.Index, verifiers))
 	}
+	s.ChunksAssignment = assignmentBuilder.Build()
 
 	s.VerID = verifiers[0]
 	result := unittest.ExecutionResultFixture()
@@ -70,9 +72,12 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 	s.IncorporatedBlock = unittest.BlockHeaderWithParentFixture(s.Block)
 
 	// compose incorporated result
-	s.IncorporatedResult = unittest.IncorporatedResult.Fixture(
-		unittest.IncorporatedResult.WithResult(result),
-		unittest.IncorporatedResult.WithIncorporatedBlockID(s.IncorporatedBlock.ID()))
+	incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+		IncorporatedBlockID: s.IncorporatedBlock.ID(),
+		Result:              result,
+	})
+	require.NoError(s.T(), err)
+	s.IncorporatedResult = incorporatedResult
 }
 
 // BaseAssignmentCollectorTestSuite is a base suite for testing assignment collectors, contains mocks for all
@@ -134,20 +139,22 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 			return realstorage.ErrNotFound
 		}
 	})
-	s.Headers.On("ByHeight", mock.Anything).Return(
-		func(height uint64) *flow.Header {
+	s.Headers.On("BlockIDByHeight", mock.Anything).Return(
+		func(height uint64) (flow.Identifier, error) {
 			if block, found := s.FinalizedAtHeight[height]; found {
-				return block
+				return block.ID(), nil
 			} else {
-				return nil
+				return flow.ZeroID, realstorage.ErrNotFound
 			}
 		},
-		func(height uint64) error {
-			_, found := s.FinalizedAtHeight[height]
-			if !found {
-				return realstorage.ErrNotFound
+	)
+	s.Headers.On("ByHeight", mock.Anything).Return(
+		func(height uint64) (*flow.Header, error) {
+			if block, found := s.FinalizedAtHeight[height]; found {
+				return block, nil
+			} else {
+				return nil, realstorage.ErrNotFound
 			}
-			return nil
 		},
 	)
 

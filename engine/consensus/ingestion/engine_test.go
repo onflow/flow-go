@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package ingestion
 
 import (
@@ -57,7 +55,7 @@ func (s *IngestionSuite) SetupTest() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(s.T(), ctx)
 
 	metrics := metrics.NewNoopCollector()
 	ingest, err := New(unittest.Logger(), metrics, s.net, me, s.core)

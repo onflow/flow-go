@@ -15,7 +15,7 @@ func TestInitializeWithMatchingKey(t *testing.T) {
 	nodeID := unittest.IdentityFixture()
 	nodeID.StakingPubKey = stakingPriv.PublicKey()
 
-	me, err := New(nodeID, stakingPriv)
+	me, err := New(nodeID.IdentitySkeleton, stakingPriv)
 	require.NoError(t, err)
 	require.Equal(t, nodeID.NodeID, me.NodeID())
 }
@@ -29,6 +29,6 @@ func TestInitializeWithMisMatchingKey(t *testing.T) {
 	nodeID := unittest.IdentityFixture()
 	nodeID.StakingPubKey = badPriv.PublicKey()
 
-	_, err := New(nodeID, stakingPriv)
+	_, err := New(nodeID.IdentitySkeleton, stakingPriv)
 	require.Error(t, err)
 }

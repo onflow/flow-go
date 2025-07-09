@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 const (
@@ -42,6 +43,10 @@ type Context struct {
 	tracing.TracerSpan
 
 	environment.EnvironmentParams
+
+	// AllowProgramCacheWritesInScripts determines if the program cache can be written to in scripts
+	// By default, the program cache is only updated by transactions.
+	AllowProgramCacheWritesInScripts bool
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -63,7 +68,7 @@ func newContext(ctx Context, opts ...Option) Context {
 }
 
 func defaultContext() Context {
-	return Context{
+	ctx := Context{
 		DisableMemoryAndInteractionLimits: false,
 		ComputationLimit:                  DefaultComputationLimit,
 		MemoryLimit:                       DefaultMemoryLimit,
@@ -73,6 +78,7 @@ func defaultContext() Context {
 		TransactionExecutorParams:         DefaultTransactionExecutorParams(),
 		EnvironmentParams:                 environment.DefaultEnvironmentParams(),
 	}
+	return ctx
 }
 
 // An Option sets a configuration parameter for a virtual machine context.
@@ -86,8 +92,8 @@ func WithChain(chain flow.Chain) Option {
 	}
 }
 
-// WithGasLimit sets the computation limit for a virtual machine context.
-// @depricated, please use WithComputationLimit instead.
+// Deprecated: WithGasLimit sets the computation limit for a virtual machine context.
+// Use WithComputationLimit instead.
 func WithGasLimit(limit uint64) Option {
 	return func(ctx Context) Context {
 		ctx.ComputationLimit = limit
@@ -161,30 +167,12 @@ func WithEventCollectionSizeLimit(limit uint64) Option {
 	}
 }
 
-// WithEntropyProvider sets the entropy provider of a virtual machine context.
-//
-// The VM uses the input to provide entropy to the Cadence runtime randomness functions.
-func WithEntropyProvider(source environment.EntropyProvider) Option {
-	return func(ctx Context) Context {
-		ctx.EntropyProvider = source
-		return ctx
-	}
-}
-
 // WithBlockHeader sets the block header for a virtual machine context.
 //
 // The VM uses the header to provide current block information to the Cadence runtime.
 func WithBlockHeader(header *flow.Header) Option {
 	return func(ctx Context) Context {
 		ctx.BlockHeader = header
-		return ctx
-	}
-}
-
-// WithServiceEventCollectionEnabled enables service event collection
-func WithServiceEventCollectionEnabled() Option {
-	return func(ctx Context) Context {
-		ctx.ServiceEventCollectionEnabled = true
 		return ctx
 	}
 }
@@ -372,6 +360,46 @@ func WithEventEncoder(encoder environment.EventEncoder) Option {
 func WithEVMEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.EVMEnabled = enabled
+		return ctx
+	}
+}
+
+// WithAllowProgramCacheWritesInScriptsEnabled enables caching of programs accessed by scripts
+func WithAllowProgramCacheWritesInScriptsEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.AllowProgramCacheWritesInScripts = enabled
+		return ctx
+	}
+}
+
+// WithEntropyProvider sets the entropy provider of a virtual machine context.
+//
+// The VM uses the input to provide entropy to the Cadence runtime randomness functions.
+func WithEntropyProvider(source environment.EntropyProvider) Option {
+	return func(ctx Context) Context {
+		ctx.EntropyProvider = source
+		return ctx
+	}
+}
+
+// WithExecutionVersionProvider sets the execution version provider of a virtual machine context.
+//
+// this is used to provide the execution version to the Cadence runtime.
+func WithExecutionVersionProvider(provider environment.ExecutionVersionProvider) Option {
+	return func(ctx Context) Context {
+		ctx.ExecutionVersionProvider = provider
+		return ctx
+	}
+}
+
+// WithProtocolStateSnapshot sets all the necessary components from a subset of the protocol state
+// to the virtual machine context.
+func WithProtocolStateSnapshot(snapshot protocol.SnapshotExecutionSubset) Option {
+	return func(ctx Context) Context {
+
+		ctx = WithEntropyProvider(snapshot)(ctx)
+
+		ctx = WithExecutionVersionProvider(environment.NewVersionBeaconExecutionVersionProvider(snapshot.VersionBeacon))(ctx)
 		return ctx
 	}
 }

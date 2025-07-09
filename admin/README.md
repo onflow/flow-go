@@ -95,3 +95,39 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 ```
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "stop-at-height", "data": { "height": 1111, "crash": false }}'
 ```
+
+### Trigger checkpoint creation on execution
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "trigger-checkpoint"}'
+```
+
+### Add/Remove/Get address to rate limit a payer from adding transactions to collection nodes' mempool
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "ingest-tx-rate-limit", "data": { "command": "add", "addresses": "a08d349e8037d6e5,e6765c6113547fb7" }}'
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "ingest-tx-rate-limit", "data": { "command": "remove", "addresses": "a08d349e8037d6e5,e6765c6113547fb7" }}'
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "ingest-tx-rate-limit", "data": { "command": "get" }}'
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "ingest-tx-rate-limit", "data": { "command": "get_config" }}'
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "ingest-tx-rate-limit", "data": { "command": "set_config", "limit": 1, "burst": 1 }}'
+```
+
+### To create a protocol snapshot for latest checkpoint (execution node only)
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "protocol-snapshot"}'
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "protocol-snapshot", "data": { "blocks-to-skip": 10 }}'
+```
+
+### To backfill transaction error messages
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "backfill-tx-error-messages", "data": { "start-height": 340, "end-height": 343, "execution-node-ids":["ec7b934df29248d574ae1cc33ae77f22f0fcf96a79e009224c46374d1837824e", "8cbdc8d24a28899a33140cb68d4146cd6f2f6c18c57f54c299f26351d126919e"] }}'
+```
+
+### Trigger chunk data pack pebble database checkpoint
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "create-chunk-data-packs-checkpoint" }'
+```
+
+### Trigger pebble protocol database checkpoints
+Useful for reading protocol state data from the checkpoints using the read-badger util without stopping the node process.
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "create-pebble-checkpoint" }'
+```

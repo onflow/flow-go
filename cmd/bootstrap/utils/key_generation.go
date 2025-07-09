@@ -7,16 +7,17 @@ import (
 	gohash "hash"
 	"io"
 
-	sdk "github.com/onflow/flow-go-sdk"
-
-	"github.com/onflow/flow-go/model/encodable"
-
 	"golang.org/x/crypto/hkdf"
 
+	"github.com/onflow/crypto"
+
+	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
+	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -127,7 +128,15 @@ func GenerateStakingKey(seed []byte) (crypto.PrivateKey, error) {
 }
 
 func GenerateStakingKeys(n int, seeds [][]byte) ([]crypto.PrivateKey, error) {
-	return GenerateKeys(crypto.BLSBLS12381, n, seeds)
+	keys := make([]crypto.PrivateKey, 0, n)
+	for i := 0; i < n; i++ {
+		key, err := GenerateStakingKey(seeds[i])
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+	return keys, nil
 }
 
 func GenerateKeys(algo crypto.SigningAlgorithm, n int, seeds [][]byte) ([]crypto.PrivateKey, error) {
@@ -175,7 +184,7 @@ func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeIn
 	//
 	// for the machine account key, we keep track of the address index to map
 	// the Flow address of the machine account to the key.
-	addressIndex := uint64(4)
+	addressIndex := uint64(systemcontracts.LastSystemAccountIndex)
 	for _, nodeInfo := range nodeInfos {
 
 		// retrieve private representation of the node
@@ -295,5 +304,23 @@ func WriteStakingNetworkingKeyFiles(nodeInfos []bootstrap.NodeInfo, write WriteJ
 		}
 	}
 
+	return nil
+}
+
+// WriteNodeInternalPubInfos writes the `node-internal-infos.pub.json` file.
+// In a nutshell, this file contains the Role, address and weight for all authorized nodes.
+func WriteNodeInternalPubInfos(nodeInfos []bootstrap.NodeInfo, write WriteJSONFileFunc) error {
+	configs := make([]model.NodeConfig, len(nodeInfos))
+	for i, nodeInfo := range nodeInfos {
+		configs[i] = model.NodeConfig{
+			Role:    nodeInfo.Role,
+			Address: nodeInfo.Address,
+			Weight:  nodeInfo.Weight,
+		}
+	}
+	err := write(bootstrap.PathNodeInfosPub, configs)
+	if err != nil {
+		return err
+	}
 	return nil
 }

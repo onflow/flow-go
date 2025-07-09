@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -15,6 +15,7 @@ var ValidChainIds = map[string]bool{
 	flow.Mainnet.String():           true,
 	flow.Testnet.String():           true,
 	flow.Sandboxnet.String():        true,
+	flow.Previewnet.String():        true,
 	flow.Benchnet.String():          true,
 	flow.Localnet.String():          true,
 	flow.Emulator.String():          true,

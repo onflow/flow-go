@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -50,6 +50,8 @@ type Controller struct {
 
 	once *sync.Once
 }
+
+var _ module.DKGController = (*Controller)(nil)
 
 // NewController instantiates a new Joint Feldman DKG controller.
 func NewController(

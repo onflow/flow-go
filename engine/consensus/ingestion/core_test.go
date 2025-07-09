@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package ingestion
 
 import (
@@ -46,7 +44,7 @@ type IngestionCoreSuite struct {
 	ref   *mockprotocol.Snapshot // state snapshot w.r.t. reference block
 
 	query   *mockprotocol.EpochQuery
-	epoch   *mockprotocol.Epoch
+	epoch   *mockprotocol.CommittedEpoch
 	headers *mockstorage.Headers
 	pool    *mockmempool.Guarantees
 
@@ -84,7 +82,7 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	final := &mockprotocol.Snapshot{}
 	ref := &mockprotocol.Snapshot{}
 	suite.query = &mockprotocol.EpochQuery{}
-	suite.epoch = &mockprotocol.Epoch{}
+	suite.epoch = &mockprotocol.CommittedEpoch{}
 	headers := &mockstorage.Headers{}
 	pool := &mockmempool.Guarantees{}
 	cluster := &mockprotocol.Cluster{}
@@ -108,14 +106,14 @@ func (suite *IngestionCoreSuite) SetupTest() {
 		},
 	)
 	final.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return suite.finalIdentities.Filter(selector)
 		},
 		nil,
 	)
 	ref.On("Epochs").Return(suite.query)
-	suite.query.On("Current").Return(suite.epoch)
-	cluster.On("Members").Return(suite.clusterMembers)
+	suite.query.On("Current").Return(suite.epoch, nil)
+	cluster.On("Members").Return(suite.clusterMembers.ToSkeleton())
 	suite.epoch.On("ClusterByChainID", mock.Anything).Return(
 		func(chainID flow.ChainID) protocol.Cluster {
 			if chainID == suite.clusterID {
@@ -298,12 +296,14 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeInvalidGuarantor() {
 // at this epoch boundary).
 func (suite *IngestionCoreSuite) TestOnGuaranteeEpochEnd() {
 
-	// in the finalized state the collectors has 0 weight but is not ejected
-	// this is what happens when we finalize the final block of the epoch during
+	// The finalized state contains the identity of a collector that:
+	//  * was active in the previous epoch but is leaving as of the current epoch
+	//  * wasn't ejected and has positive initial weight
+	// This happens when we finalize the final block of the epoch during
 	// which this node requested to unstake
 	colID, ok := suite.finalIdentities.ByNodeID(suite.collID)
 	suite.Require().True(ok)
-	colID.Weight = 0
+	colID.EpochParticipationStatus = flow.EpochParticipationStatusLeaving
 
 	guarantee := suite.validGuarantee()
 

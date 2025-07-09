@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package ingestion
 
 import (
@@ -157,7 +155,11 @@ func (e *Core) validateExpiry(guarantee *flow.CollectionGuarantee) error {
 func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	// get the clusters to assign the guarantee and check if the guarantor is part of it
 	snapshot := e.state.AtBlockID(guarantee.ReferenceBlockID)
-	cluster, err := snapshot.Epochs().Current().ClusterByChainID(guarantee.ChainID)
+	epoch, err := snapshot.Epochs().Current()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch: %w", err)
+	}
+	cluster, err := epoch.ClusterByChainID(guarantee.ChainID)
 	// reference block not found
 	if errors.Is(err, state.ErrUnknownSnapshotReference) {
 		return engine.NewUnverifiableInputError(
@@ -173,7 +175,7 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	}
 
 	// ensure the guarantors are from the same cluster
-	clusterMembers := cluster.Members()
+	clusterMembers := cluster.Members().ToSkeleton()
 
 	// find guarantors by signer indices
 	guarantors, err := signature.DecodeSignerIndicesToIdentities(clusterMembers, guarantee.SignerIndices)
@@ -187,7 +189,7 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 
 	// determine whether signers reach minimally required stake threshold
 	threshold := committees.WeightThresholdToBuildQC(clusterMembers.TotalWeight()) // compute required stake threshold
-	totalStake := flow.IdentityList(guarantors).TotalWeight()
+	totalStake := guarantors.TotalWeight()
 	if totalStake < threshold {
 		return engine.NewInvalidInputErrorf("collection guarantee qc signers have insufficient stake of %d (required=%d)", totalStake, threshold)
 	}

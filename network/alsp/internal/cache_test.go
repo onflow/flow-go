@@ -73,7 +73,7 @@ func TestSpamRecordCache_Adjust_Init(t *testing.T) {
 	originID2 := unittest.IdentifierFixture()
 
 	// adjusting a spam record for an origin ID that does not exist in the cache should initialize the record.
-	initializedPenalty, err := cache.Adjust(originID1, adjustFuncIncrement)
+	initializedPenalty, err := cache.AdjustWithInit(originID1, adjustFuncIncrement)
 	require.NoError(t, err, "expected no error")
 	require.Equal(t, float64(1), initializedPenalty, "expected initialized penalty to be 1")
 
@@ -86,7 +86,7 @@ func TestSpamRecordCache_Adjust_Init(t *testing.T) {
 
 	// adjusting a spam record for an origin ID that already exists in the cache should not initialize the record,
 	// but should apply the adjust function to the existing record.
-	initializedPenalty, err = cache.Adjust(originID1, adjustFuncIncrement)
+	initializedPenalty, err = cache.AdjustWithInit(originID1, adjustFuncIncrement)
 	require.NoError(t, err, "expected no error")
 	require.Equal(t, float64(2), initializedPenalty, "expected initialized penalty to be 2")
 	record1Again, ok := cache.Get(originID1)
@@ -98,7 +98,7 @@ func TestSpamRecordCache_Adjust_Init(t *testing.T) {
 
 	// adjusting a spam record for a different origin ID should initialize the record.
 	// this is to ensure that the record factory is called only once.
-	initializedPenalty, err = cache.Adjust(originID2, adjustFuncIncrement)
+	initializedPenalty, err = cache.AdjustWithInit(originID2, adjustFuncIncrement)
 	require.NoError(t, err, "expected no error")
 	require.Equal(t, float64(1), initializedPenalty, "expected initialized penalty to be 1")
 	record2, ok := cache.Get(originID2)
@@ -131,10 +131,10 @@ func TestSpamRecordCache_Adjust_Error(t *testing.T) {
 	originID2 := unittest.IdentifierFixture()
 
 	// initialize spam records for originID1 and originID2
-	penalty, err := cache.Adjust(originID1, adjustFnNoOp)
+	penalty, err := cache.AdjustWithInit(originID1, adjustFnNoOp)
 	require.NoError(t, err, "expected no error")
 	require.Equal(t, 0.0, penalty, "expected penalty to be 0")
-	penalty, err = cache.Adjust(originID2, adjustFnNoOp)
+	penalty, err = cache.AdjustWithInit(originID2, adjustFnNoOp)
 	require.NoError(t, err, "expected no error")
 	require.Equal(t, 0.0, penalty, "expected penalty to be 0")
 
@@ -143,7 +143,7 @@ func TestSpamRecordCache_Adjust_Error(t *testing.T) {
 		record.Penalty -= 10
 		return record, nil
 	}
-	penalty, err = cache.Adjust(originID1, adjustFunc)
+	penalty, err = cache.AdjustWithInit(originID1, adjustFunc)
 	require.NoError(t, err)
 	require.Equal(t, -10.0, penalty)
 
@@ -156,7 +156,7 @@ func TestSpamRecordCache_Adjust_Error(t *testing.T) {
 	adjustFuncError := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
 		return record, errors.New("adjustment error")
 	}
-	_, err = cache.Adjust(originID1, adjustFuncError)
+	_, err = cache.AdjustWithInit(originID1, adjustFuncError)
 	require.Error(t, err)
 
 	// even though the adjustFunc returned an error, the record should be intact.
@@ -189,11 +189,11 @@ func TestSpamRecordCache_Identities(t *testing.T) {
 	originID3 := unittest.IdentifierFixture()
 
 	// initialize spam records for a few origin IDs
-	_, err := cache.Adjust(originID1, adjustFnNoOp)
+	_, err := cache.AdjustWithInit(originID1, adjustFnNoOp)
 	require.NoError(t, err)
-	_, err = cache.Adjust(originID2, adjustFnNoOp)
+	_, err = cache.AdjustWithInit(originID2, adjustFnNoOp)
 	require.NoError(t, err)
-	_, err = cache.Adjust(originID3, adjustFnNoOp)
+	_, err = cache.AdjustWithInit(originID3, adjustFnNoOp)
 	require.NoError(t, err)
 
 	// check if the Identities method returns the correct set of origin IDs
@@ -235,11 +235,11 @@ func TestSpamRecordCache_Remove(t *testing.T) {
 	originID3 := unittest.IdentifierFixture()
 
 	// initialize spam records for a few origin IDs
-	_, err := cache.Adjust(originID1, adjustFnNoOp)
+	_, err := cache.AdjustWithInit(originID1, adjustFnNoOp)
 	require.NoError(t, err)
-	_, err = cache.Adjust(originID2, adjustFnNoOp)
+	_, err = cache.AdjustWithInit(originID2, adjustFnNoOp)
 	require.NoError(t, err)
-	_, err = cache.Adjust(originID3, adjustFnNoOp)
+	_, err = cache.AdjustWithInit(originID3, adjustFnNoOp)
 	require.NoError(t, err)
 
 	// remove originID1 and check if the record is removed
@@ -280,14 +280,14 @@ func TestSpamRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 	// 1. initializing a spam record multiple times
 	originID1 := unittest.IdentifierFixture()
 
-	_, err := cache.Adjust(originID1, adjustFnNoOp)
+	_, err := cache.AdjustWithInit(originID1, adjustFnNoOp)
 	require.NoError(t, err)
-	_, err = cache.Adjust(originID1, adjustFnNoOp)
+	_, err = cache.AdjustWithInit(originID1, adjustFnNoOp)
 	require.NoError(t, err)
 
 	// 2. Test adjusting a non-existent spam record
 	originID2 := unittest.IdentifierFixture()
-	initialPenalty, err := cache.Adjust(originID2, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	initialPenalty, err := cache.AdjustWithInit(originID2, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
 		record.Penalty -= 10
 		return record, nil
 	})
@@ -296,7 +296,7 @@ func TestSpamRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 
 	// 3. Test removing a spam record multiple times
 	originID3 := unittest.IdentifierFixture()
-	_, err = cache.Adjust(originID3, adjustFnNoOp)
+	_, err = cache.AdjustWithInit(originID3, adjustFnNoOp)
 	require.NoError(t, err)
 	require.True(t, cache.Remove(originID3))
 	require.False(t, cache.Remove(originID3))
@@ -328,7 +328,7 @@ func TestSpamRecordCache_ConcurrentInitialization(t *testing.T) {
 	for _, originID := range originIDs {
 		go func(id flow.Identifier) {
 			defer wg.Done()
-			penalty, err := cache.Adjust(id, adjustFnNoOp)
+			penalty, err := cache.AdjustWithInit(id, adjustFnNoOp)
 			require.NoError(t, err)
 			require.Equal(t, float64(0), penalty)
 		}(originID)
@@ -376,7 +376,7 @@ func TestSpamRecordCache_ConcurrentSameRecordAdjust(t *testing.T) {
 	for i := 0; i < concurrentAttempts; i++ {
 		go func() {
 			defer wg.Done()
-			penalty, err := cache.Adjust(originID, adjustFn)
+			penalty, err := cache.AdjustWithInit(originID, adjustFn)
 			require.NoError(t, err)
 			require.Less(t, penalty, 0.0) // penalty should be negative
 		}()
@@ -415,7 +415,7 @@ func TestSpamRecordCache_ConcurrentRemoval(t *testing.T) {
 
 	originIDs := unittest.IdentifierListFixture(10)
 	for _, originID := range originIDs {
-		penalty, err := cache.Adjust(originID, adjustFnNoOp)
+		penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
 		require.NoError(t, err)
 		require.Equal(t, float64(0), penalty)
 	}
@@ -464,7 +464,7 @@ func TestSpamRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 
 	originIDs := unittest.IdentifierListFixture(10)
 	for _, originID := range originIDs {
-		penalty, err := cache.Adjust(originID, adjustFnNoOp)
+		penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
 		require.NoError(t, err)
 		require.Equal(t, float64(0), penalty)
 	}
@@ -481,7 +481,7 @@ func TestSpamRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 		// adjust spam records concurrently
 		go func(id flow.Identifier) {
 			defer wg.Done()
-			_, err := cache.Adjust(id, adjustFunc)
+			_, err := cache.AdjustWithInit(id, adjustFunc)
 			require.NoError(t, err)
 		}(originID)
 
@@ -529,7 +529,7 @@ func TestSpamRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 	originIDsToRemove := originIDs[10:]
 
 	for _, originID := range originIDsToRemove {
-		penalty, err := cache.Adjust(originID, adjustFnNoOp)
+		penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
 		require.NoError(t, err)
 		require.Equal(t, float64(0), penalty)
 	}
@@ -542,7 +542,7 @@ func TestSpamRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 		originID := originID // capture range variable
 		go func() {
 			defer wg.Done()
-			penalty, err := cache.Adjust(originID, adjustFnNoOp)
+			penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
 			require.NoError(t, err)
 			require.Equal(t, float64(0), penalty)
 		}()
@@ -597,7 +597,7 @@ func TestSpamRecordCache_ConcurrentInitRemoveAdjust(t *testing.T) {
 	originIDsToAdjust := originIDs[20:]
 
 	for _, originID := range originIDsToRemove {
-		penalty, err := cache.Adjust(originID, adjustFnNoOp)
+		penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
 		require.NoError(t, err)
 		require.Equal(t, float64(0), penalty)
 	}
@@ -615,7 +615,7 @@ func TestSpamRecordCache_ConcurrentInitRemoveAdjust(t *testing.T) {
 		originID := originID // capture range variable
 		go func() {
 			defer wg.Done()
-			penalty, err := cache.Adjust(originID, adjustFnNoOp)
+			penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
 			require.NoError(t, err)
 			require.Equal(t, float64(0), penalty)
 		}()
@@ -633,7 +633,7 @@ func TestSpamRecordCache_ConcurrentInitRemoveAdjust(t *testing.T) {
 	for _, originID := range originIDsToAdjust {
 		go func(id flow.Identifier) {
 			defer wg.Done()
-			_, _ = cache.Adjust(id, adjustFunc)
+			_, _ = cache.AdjustWithInit(id, adjustFunc)
 		}(originID)
 	}
 
@@ -668,13 +668,13 @@ func TestSpamRecordCache_ConcurrentInitRemoveAndAdjust(t *testing.T) {
 	originIDsToAdjust := originIDs[20:]
 
 	for _, originID := range originIDsToRemove {
-		penalty, err := cache.Adjust(originID, adjustFnNoOp)
+		penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
 		require.NoError(t, err)
 		require.Equal(t, float64(0), penalty)
 	}
 
 	for _, originID := range originIDsToAdjust {
-		penalty, err := cache.Adjust(originID, adjustFnNoOp)
+		penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
 		require.NoError(t, err)
 		require.Equal(t, float64(0), penalty)
 	}
@@ -687,7 +687,7 @@ func TestSpamRecordCache_ConcurrentInitRemoveAndAdjust(t *testing.T) {
 		originID := originID
 		go func() {
 			defer wg.Done()
-			penalty, err := cache.Adjust(originID, adjustFnNoOp)
+			penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
 			require.NoError(t, err)
 			require.Equal(t, float64(0), penalty)
 		}()
@@ -707,7 +707,7 @@ func TestSpamRecordCache_ConcurrentInitRemoveAndAdjust(t *testing.T) {
 		originID := originID
 		go func() {
 			defer wg.Done()
-			_, err := cache.Adjust(originID, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+			_, err := cache.AdjustWithInit(originID, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
 				record.Penalty -= 1
 				return record, nil
 			})
@@ -763,7 +763,7 @@ func TestSpamRecordCache_ConcurrentIdentitiesAndOperations(t *testing.T) {
 	originIDsToRemove := originIDs[10:20]
 
 	for _, originID := range originIDsToRemove {
-		penalty, err := cache.Adjust(originID, adjustFnNoOp)
+		penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
 		require.NoError(t, err)
 		require.Equal(t, float64(0), penalty)
 	}
@@ -776,7 +776,7 @@ func TestSpamRecordCache_ConcurrentIdentitiesAndOperations(t *testing.T) {
 		originID := originID
 		go func() {
 			defer wg.Done()
-			penalty, err := cache.Adjust(originID, adjustFnNoOp)
+			penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
 			require.NoError(t, err)
 			require.Equal(t, float64(0), penalty)
 			retrieved, ok := cache.Get(originID)

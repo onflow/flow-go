@@ -60,9 +60,9 @@ func TestUnicastConfigCache_Adjust_Init(t *testing.T) {
 	peerID1 := unittest.PeerIdFixture(t)
 	peerID2 := unittest.PeerIdFixture(t)
 
-	// Initializing the unicast config for peerID1 through GetOrInit.
-	// unicast config for peerID1 does not exist in the cache, so it must be initialized when using GetOrInit.
-	cfg, err := cache.GetOrInit(peerID1)
+	// Initializing the unicast config for peerID1 through GetWithInit.
+	// unicast config for peerID1 does not exist in the cache, so it must be initialized when using GetWithInit.
+	cfg, err := cache.GetWithInit(peerID1)
 	require.NoError(t, err)
 	require.NotNil(t, cfg, "unicast config must not be nil")
 	require.Equal(t, unicastConfigFixture(), *cfg, "unicast config must be initialized with the default values")
@@ -70,15 +70,15 @@ func TestUnicastConfigCache_Adjust_Init(t *testing.T) {
 
 	// Initializing and adjusting the unicast config for peerID2 through Adjust.
 	// unicast config for peerID2 does not exist in the cache, so it must be initialized when using Adjust.
-	cfg, err = cache.Adjust(peerID2, adjustFuncIncrement)
+	cfg, err = cache.AdjustWithInit(peerID2, adjustFuncIncrement)
 	require.NoError(t, err)
 	// adjusting a non-existing unicast config must not initialize the config.
 	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
 	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, unicastConfigFixture().StreamCreationRetryAttemptBudget+1, "stream backoff must be 2")
 
-	// Retrieving the unicast config of peerID2 through GetOrInit.
+	// Retrieving the unicast config of peerID2 through GetWithInit.
 	// retrieve the unicast config for peerID2 and assert than it is initialized with the default values; and the adjust function is applied.
-	cfg, err = cache.GetOrInit(peerID2)
+	cfg, err = cache.GetWithInit(peerID2)
 	require.NoError(t, err, "unicast config must exist in the cache")
 	require.NotNil(t, cfg, "unicast config must not be nil")
 	// retrieving an existing unicast config must not change the cache size.
@@ -88,7 +88,7 @@ func TestUnicastConfigCache_Adjust_Init(t *testing.T) {
 
 	// Adjusting the unicast config of peerID1 through Adjust.
 	// unicast config for peerID1 already exists in the cache, so it must be adjusted when using Adjust.
-	cfg, err = cache.Adjust(peerID1, adjustFuncIncrement)
+	cfg, err = cache.AdjustWithInit(peerID1, adjustFuncIncrement)
 	require.NoError(t, err)
 	// adjusting an existing unicast config must not change the cache size.
 	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
@@ -96,7 +96,7 @@ func TestUnicastConfigCache_Adjust_Init(t *testing.T) {
 
 	// Recurring adjustment of the unicast config of peerID1 through Adjust.
 	// unicast config for peerID1 already exists in the cache, so it must be adjusted when using Adjust.
-	cfg, err = cache.Adjust(peerID1, adjustFuncIncrement)
+	cfg, err = cache.AdjustWithInit(peerID1, adjustFuncIncrement)
 	require.NoError(t, err)
 	// adjusting an existing unicast config must not change the cache size.
 	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
@@ -130,7 +130,7 @@ func TestUnicastConfigCache_Concurrent_Adjust(t *testing.T) {
 			wg.Add(1)
 			go func(peerId peer.ID) {
 				defer wg.Done()
-				_, err := cache.Adjust(peerId, func(cfg unicast.Config) (unicast.Config, error) {
+				_, err := cache.AdjustWithInit(peerId, func(cfg unicast.Config) (unicast.Config, error) {
 					cfg.StreamCreationRetryAttemptBudget++
 					return cfg, nil
 				})
@@ -151,7 +151,7 @@ func TestUnicastConfigCache_Concurrent_Adjust(t *testing.T) {
 			wg.Done()
 
 			peerID := peerIds[j]
-			cfg, err := cache.GetOrInit(peerID)
+			cfg, err := cache.GetWithInit(peerID)
 			require.NoError(t, err)
 			require.Equal(t,
 				uint64(j+1),
@@ -182,7 +182,7 @@ func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			peerId := unittest.PeerIdFixture(t)
-			updatedConfig, err := cache.Adjust(peerId, func(cfg unicast.Config) (unicast.Config, error) {
+			updatedConfig, err := cache.AdjustWithInit(peerId, func(cfg unicast.Config) (unicast.Config, error) {
 				cfg.StreamCreationRetryAttemptBudget = 2 // some random adjustment
 				cfg.ConsecutiveSuccessfulStream = 3      // some random adjustment
 				return cfg, nil
@@ -199,7 +199,7 @@ func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 		go func() {
 			wg.Done()
 			peerId := unittest.PeerIdFixture(t)
-			cfg, err := cache.GetOrInit(peerId)
+			cfg, err := cache.GetWithInit(peerId)
 			require.NoError(t, err) // concurrent retrieval must not fail.
 			require.Equal(t, unicastConfigFixture().StreamCreationRetryAttemptBudget, cfg.StreamCreationRetryAttemptBudget)
 			require.Equal(t, uint64(0), cfg.ConsecutiveSuccessfulStream)
@@ -229,7 +229,7 @@ func TestUnicastConfigCache_LRU_Eviction(t *testing.T) {
 		peerIds[i] = peerId
 	}
 	for i := 0; i < int(sizeLimit+1); i++ {
-		updatedConfig, err := cache.Adjust(peerIds[i], func(cfg unicast.Config) (unicast.Config, error) {
+		updatedConfig, err := cache.AdjustWithInit(peerIds[i], func(cfg unicast.Config) (unicast.Config, error) {
 			cfg.StreamCreationRetryAttemptBudget = 2 // some random adjustment
 			cfg.ConsecutiveSuccessfulStream = 3      // some random adjustment
 			return cfg, nil
@@ -241,7 +241,7 @@ func TestUnicastConfigCache_LRU_Eviction(t *testing.T) {
 
 	// except the first peer id, all other peer ids should stay intact in the cache.
 	for i := 1; i < int(sizeLimit+1); i++ {
-		cfg, err := cache.GetOrInit(peerIds[i])
+		cfg, err := cache.GetWithInit(peerIds[i])
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), cfg.StreamCreationRetryAttemptBudget)
 		require.Equal(t, uint64(3), cfg.ConsecutiveSuccessfulStream)
@@ -251,7 +251,7 @@ func TestUnicastConfigCache_LRU_Eviction(t *testing.T) {
 
 	// querying the first peer id should return a fresh unicast config,
 	// since it should be evicted due to LRU eviction, and the initiated with the default values.
-	cfg, err := cache.GetOrInit(peerIds[0])
+	cfg, err := cache.GetWithInit(peerIds[0])
 	require.NoError(t, err)
 	require.Equal(t, unicastConfigFixture().StreamCreationRetryAttemptBudget, cfg.StreamCreationRetryAttemptBudget)
 	require.Equal(t, uint64(0), cfg.ConsecutiveSuccessfulStream)

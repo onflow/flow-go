@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -19,15 +20,16 @@ func dynamicJoinFlagsFixture() (string, string, flow.EpochPhase, uint64) {
 }
 
 func getMockSnapshot(t *testing.T, epochCounter uint64, phase flow.EpochPhase) *protocolmock.Snapshot {
-	currentEpoch := new(protocolmock.Epoch)
+	currentEpoch := new(protocolmock.CommittedEpoch)
 	currentEpoch.On("Counter").Return(epochCounter, nil)
 
 	epochQuery := mocks.NewEpochQuery(t, epochCounter)
-	epochQuery.Add(currentEpoch)
+	epochQuery.AddCommitted(currentEpoch)
 
 	snapshot := new(protocolmock.Snapshot)
 	snapshot.On("Epochs").Return(epochQuery)
-	snapshot.On("Phase").Return(phase, nil)
+	snapshot.On("EpochPhase").Return(phase, nil)
+	snapshot.On("Head").Return(unittest.BlockHeaderFixture(), nil)
 
 	return snapshot
 }
@@ -87,7 +89,7 @@ func TestGetSnapshotAtEpochAndPhase(t *testing.T) {
 		_, _, targetPhase, targetEpoch := dynamicJoinFlagsFixture()
 
 		// get snapshot
-		actualSnapshot, err := GetSnapshotAtEpochAndPhase(
+		actualSnapshot, err := common.GetSnapshotAtEpochAndPhase(
 			context.Background(),
 			unittest.Logger(),
 			targetEpoch,
@@ -113,7 +115,7 @@ func TestGetSnapshotAtEpochAndPhase(t *testing.T) {
 		_, _, targetPhase, targetEpoch := dynamicJoinFlagsFixture()
 
 		// get snapshot
-		actualSnapshot, err := GetSnapshotAtEpochAndPhase(
+		actualSnapshot, err := common.GetSnapshotAtEpochAndPhase(
 			context.Background(),
 			unittest.Logger(),
 			targetEpoch,
@@ -143,7 +145,7 @@ func TestGetSnapshotAtEpochAndPhase(t *testing.T) {
 		_, _, targetPhase, _ := dynamicJoinFlagsFixture()
 
 		// get snapshot
-		actualSnapshot, err := GetSnapshotAtEpochAndPhase(
+		actualSnapshot, err := common.GetSnapshotAtEpochAndPhase(
 			context.Background(),
 			unittest.Logger(),
 			5,

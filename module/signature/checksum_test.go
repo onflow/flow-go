@@ -1,7 +1,6 @@
 package signature_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -50,11 +49,11 @@ func TestCheckSum(t *testing.T) {
 // is able to extract the same data as the encoder.
 func TestPrefixCheckSum(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		committeeSize := rapid.IntRange(0, 300).Draw(t, "committeeSize").(int)
+		committeeSize := rapid.IntRange(0, 300).Draw(t, "committeeSize")
 		committee := unittest.IdentifierListFixture(committeeSize)
-		data := rapid.IntRange(0, 200).Map(func(count int) []byte {
+		data := rapid.Map(rapid.IntRange(0, 200), func(count int) []byte {
 			return unittest.RandomBytes(count)
-		}).Draw(t, "data").([]byte)
+		}).Draw(t, "data")
 		extracted, err := msig.CompareAndExtract(committee, msig.PrefixCheckSum(committee, data))
 		require.NoError(t, err)
 		require.Equal(t, data, extracted)
@@ -68,13 +67,13 @@ func Test_InvalidCheckSum(t *testing.T) {
 	t.Run("checksum too short", func(t *testing.T) {
 		for i := 0; i < 4; i++ {
 			_, _, err := msig.SplitCheckSum(unittest.RandomBytes(i))
-			require.True(t, errors.Is(err, msig.ErrInvalidChecksum))
+			require.ErrorIs(t, err, msig.ErrInvalidChecksum)
 		}
 	})
 
 	t.Run("mismatching checksum", func(t *testing.T) {
 		committee := unittest.IdentifierListFixture(20)
 		_, err := msig.CompareAndExtract(committee, unittest.RandomBytes(112))
-		require.True(t, errors.Is(err, msig.ErrInvalidChecksum))
+		require.ErrorIs(t, err, msig.ErrInvalidChecksum)
 	})
 }

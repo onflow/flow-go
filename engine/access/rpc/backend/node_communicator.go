@@ -15,13 +15,13 @@ const maxFailedRequestCount = 3
 type Communicator interface {
 	CallAvailableNode(
 		//List of node identifiers to execute callback on
-		nodes flow.IdentityList,
+		nodes flow.IdentitySkeletonList,
 		//Callback function that represents an action to be performed on a node.
 		//It takes a node as input and returns an error indicating the result of the action.
-		call func(node *flow.Identity) error,
+		call func(node *flow.IdentitySkeleton) error,
 		// Callback function that determines whether an error should terminate further execution.
 		// It takes an error as input and returns a boolean value indicating whether the error should be considered terminal.
-		shouldTerminateOnError func(node *flow.Identity, err error) bool,
+		shouldTerminateOnError func(node *flow.IdentitySkeleton, err error) bool,
 	) error
 }
 
@@ -46,13 +46,13 @@ func NewNodeCommunicator(circuitBreakerEnabled bool) *NodeCommunicator {
 // If the maximum failed request count is reached, it returns the accumulated errors.
 func (b *NodeCommunicator) CallAvailableNode(
 	//List of node identifiers to execute callback on
-	nodes flow.IdentityList,
+	nodes flow.IdentitySkeletonList,
 	//Callback function that determines whether an error should terminate further execution.
 	// It takes an error as input and returns a boolean value indicating whether the error should be considered terminal.
-	call func(id *flow.Identity) error,
+	call func(id *flow.IdentitySkeleton) error,
 	// Callback function that determines whether an error should terminate further execution.
 	// It takes an error as input and returns a boolean value indicating whether the error should be considered terminal.
-	shouldTerminateOnError func(node *flow.Identity, err error) bool,
+	shouldTerminateOnError func(node *flow.IdentitySkeleton, err error) bool,
 ) error {
 	var errs *multierror.Error
 	nodeSelector, err := b.nodeSelectorFactory.SelectNodes(nodes)

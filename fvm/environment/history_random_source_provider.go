@@ -3,6 +3,8 @@ package environment
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/common"
+
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
@@ -85,13 +87,22 @@ func NewRandomSourceHistoryProvider(
 	return NewForbiddenRandomSourceHistoryProvider()
 }
 
-const randomSourceHistoryLen = 32
+// RandomSourceHistoryLength is the byte-size of the random source in the history
+// array.
+// It must be at least 16 (128 bits) to make sure it includes enough entropy
+// (assuming the randomness beacon also outputs more than 128 bits of entropy)
+const RandomSourceHistoryLength = 32
 
 func (b *historySourceProvider) RandomSourceHistory() ([]byte, error) {
 	defer b.tracer.StartExtensiveTracingChildSpan(
 		trace.FVMEnvRandomSourceHistoryProvider).End()
 
-	err := b.meter.MeterComputation(ComputationKindGetRandomSourceHistory, 1)
+	err := b.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindGetRandomSourceHistory,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("get block randomSource failed: %w", err)
 	}
@@ -104,7 +115,7 @@ func (b *historySourceProvider) RandomSourceHistory() ([]byte, error) {
 			"get random source for block randomSource failed: %w", err))
 	}
 
-	// A method that derives `randomSourceHistoryLen` bytes from `source` must:
+	// A method that derives `RandomSourceHistoryLength` bytes from `source` must:
 	//  - extract and expand the entropy in `source`
 	//  - output must be independent than the expanded bytes used for Cadence's `random` function
 	//
@@ -118,7 +129,7 @@ func (b *historySourceProvider) RandomSourceHistory() ([]byte, error) {
 		return nil, fmt.Errorf("failed to create a PRG from source: %w", err)
 	}
 
-	historySource := make([]byte, randomSourceHistoryLen)
+	historySource := make([]byte, RandomSourceHistoryLength)
 	csprg.Read(historySource)
 
 	return historySource, nil

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/model/flow"

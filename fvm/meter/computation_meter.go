@@ -3,12 +3,12 @@ package meter
 import (
 	"math"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
 )
 
-type MeteredComputationIntensities map[common.ComputationKind]uint
+type MeteredComputationIntensities map[common.ComputationKind]uint64
 
 var (
 	// DefaultComputationWeights is the default weights for computation intensities
@@ -28,6 +28,15 @@ var (
 const MeterExecutionInternalPrecisionBytes = 16
 
 type ExecutionEffortWeights map[common.ComputationKind]uint64
+
+func (weights ExecutionEffortWeights) ComputationFromIntensities(intensities MeteredComputationIntensities) uint64 {
+	var result uint64
+	for kind, weight := range weights {
+		intensity := uint64(intensities[kind])
+		result += weight * intensity
+	}
+	return result >> MeterExecutionInternalPrecisionBytes
+}
 
 type ComputationMeterParameters struct {
 	computationLimit   uint64
@@ -60,8 +69,8 @@ func (params ComputationMeterParameters) ComputationWeights() ExecutionEffortWei
 }
 
 // TotalComputationLimit returns the total computation limit
-func (params ComputationMeterParameters) TotalComputationLimit() uint {
-	return uint(params.computationLimit >> MeterExecutionInternalPrecisionBytes)
+func (params ComputationMeterParameters) TotalComputationLimit() uint64 {
+	return params.computationLimit >> MeterExecutionInternalPrecisionBytes
 }
 
 type ComputationMeter struct {
@@ -79,16 +88,16 @@ func NewComputationMeter(params ComputationMeterParameters) ComputationMeter {
 }
 
 // MeterComputation captures computation usage and returns an error if it goes beyond the limit
-func (m *ComputationMeter) MeterComputation(
-	kind common.ComputationKind,
-	intensity uint,
-) error {
+func (m *ComputationMeter) MeterComputation(usage common.ComputationUsage) error {
+	kind := usage.Kind
+	intensity := usage.Intensity
+
 	m.computationIntensities[kind] += intensity
 	w, ok := m.params.computationWeights[kind]
 	if !ok {
 		return nil
 	}
-	m.computationUsed += w * uint64(intensity)
+	m.computationUsed += w * intensity
 	if m.computationUsed > m.params.computationLimit {
 		return errors.NewComputationLimitExceededError(
 			uint64(m.params.TotalComputationLimit()))
@@ -97,18 +106,33 @@ func (m *ComputationMeter) MeterComputation(
 }
 
 // ComputationAvailable returns true if enough computation is left in the transaction for the given intensity and type
-func (m *ComputationMeter) ComputationAvailable(
-	kind common.ComputationKind,
-	intensity uint,
-) bool {
-	w, ok := m.params.computationWeights[kind]
+func (m *ComputationMeter) ComputationAvailable(usage common.ComputationUsage) bool {
+	w, ok := m.params.computationWeights[usage.Kind]
 	// if not found return has capacity
 	// given the behaviour of MeterComputation is ignoring intensities without a set weight
 	if !ok {
 		return true
 	}
-	potentialComputationUsage := m.computationUsed + w*uint64(intensity)
+
+	potentialComputationUsage := m.computationUsed + w*usage.Intensity
 	return potentialComputationUsage <= m.params.computationLimit
+}
+
+// ComputationRemaining returns the remaining computation (intensity) left in the transaction for the given type
+func (m *ComputationMeter) ComputationRemaining(kind common.ComputationKind) uint64 {
+	w, ok := m.params.computationWeights[kind]
+	// if not found return has capacity
+	// given the behaviour of MeterComputation is ignoring intensities without a set weight
+	if !ok {
+		return math.MaxUint64
+	}
+
+	remainingComputationUsage := m.params.computationLimit - m.computationUsed
+	if remainingComputationUsage <= 0 {
+		return 0
+	}
+
+	return remainingComputationUsage / w
 }
 
 // ComputationIntensities returns all the measured computational intensities

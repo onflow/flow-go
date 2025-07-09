@@ -4,12 +4,13 @@ import (
 	"testing"
 	"testing/quick"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 	testMock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/tracing"
@@ -17,11 +18,11 @@ import (
 
 func newDummyAccountKeyReader(
 	t *testing.T,
-	keyCount uint64,
+	keyCount uint32,
 ) environment.AccountKeyReader {
 	tracer := tracing.NewTracerSpan()
 	meter := mock.NewMeter(t)
-	meter.On("MeterComputation", testMock.Anything, testMock.Anything).Return(nil)
+	meter.On("MeterComputation", testMock.Anything).Return(nil)
 	accounts := &FakeAccounts{keyCount: keyCount}
 	return environment.NewAccountKeyReader(tracer, meter, accounts)
 }
@@ -89,7 +90,7 @@ func TestAccountKeyReader_get_out_of_range(t *testing.T) {
 
 	res, err := newDummyAccountKeyReader(t, 0).GetAccountKey(address, 1000)
 	// GetAccountKey should distinguish between an invalid index, and issues like failing to fetch a key from storage
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Nil(t, res)
 }
 
@@ -97,8 +98,8 @@ func TestAccountKeyReader_get_key_count(t *testing.T) {
 	t.Parallel()
 	address := bytesToAddress(1, 2, 3, 4)
 
-	identity := func(n uint64) (uint64, error) { return n, nil }
-	prop := func(n uint64) (uint64, error) {
+	identity := func(n uint32) (uint32, error) { return n, nil }
+	prop := func(n uint32) (uint32, error) {
 		return newDummyAccountKeyReader(t, n).AccountKeysCount(address)
 	}
 

@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -17,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
@@ -250,8 +250,8 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_ConcurrentCreatingQC() {
 func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	epochCounter := uint64(3)
 	epochLookup := &modulemock.EpochLookup{}
-	view := uint64(20)
-	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
+	proposerView := uint64(20)
+	epochLookup.On("EpochForView", proposerView).Return(epochCounter, nil)
 
 	// signers hold objects that are created with private key and can sign votes and proposals
 	signers := make(map[flow.Identifier]*verification.StakingSigner)
@@ -260,21 +260,19 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
-		me, err := local.New(identity, stakingPriv)
+		me, err := local.New(identity.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewStakingSigner(me)
-	})
+	}).Sort(flow.Canonical[flow.Identity])
 
 	leader := stakingSigners[0]
-
-	block := helper.MakeBlock(helper.WithBlockView(view),
-		helper.WithBlockProposer(leader.NodeID))
+	block := helper.MakeBlock(helper.WithBlockView(proposerView), helper.WithBlockProposer(leader.NodeID))
 
 	committee := &mockhotstuff.DynamicCommittee{}
-	committee.On("IdentitiesByEpoch", block.View).Return(stakingSigners, nil)
+	committee.On("IdentitiesByEpoch", block.View).Return(stakingSigners.ToSkeleton(), nil)
 	committee.On("IdentitiesByBlock", block.BlockID).Return(stakingSigners, nil)
-	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
+	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.ToSkeleton().TotalWeight()), nil)
 
 	votes := make([]*model.Vote, 0, len(stakingSigners))
 
@@ -287,8 +285,10 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	}
 
 	// create and sign proposal
-	proposal, err := signers[leader.NodeID].CreateProposal(block)
+	leaderVote, err := signers[leader.NodeID].CreateVote(block)
 	require.NoError(t, err)
+	proposal := helper.MakeSignedProposal(helper.WithProposal(
+		helper.MakeProposal(helper.WithBlock(block))), helper.WithSigData(leaderVote.SigData))
 
 	qcCreated := false
 	onQCCreated := func(qc *flow.QuorumCertificate) {

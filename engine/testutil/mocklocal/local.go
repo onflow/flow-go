@@ -1,11 +1,11 @@
 package mocklocal
 
 import (
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 )
@@ -44,8 +44,8 @@ func (m *MockLocal) MockNodeID(id flow.Identifier) {
 	m.id = id
 }
 
-func (m *MockLocal) NotMeFilter() flow.IdentityFilter {
-	return filter.Not(filter.HasNodeID(m.id))
+func (m *MockLocal) NotMeFilter() flow.IdentityFilter[flow.Identity] {
+	return filter.Not(filter.HasNodeID[flow.Identity](m.id))
 }
 
 func (m *MockLocal) SignFunc(data []byte, hasher hash.Hasher, f func(crypto.PrivateKey, []byte, hash.Hasher) (crypto.Signature,

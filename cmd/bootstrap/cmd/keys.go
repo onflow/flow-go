@@ -3,13 +3,13 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	"github.com/onflow/flow-go/model/flow/order"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -21,7 +21,11 @@ import (
 func genNetworkAndStakingKeys() []model.NodeInfo {
 
 	var nodeConfigs []model.NodeConfig
-	readJSON(flagConfig, &nodeConfigs)
+	err := common.ReadJSON(flagConfig, &nodeConfigs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read json")
+	}
+
 	nodes := len(nodeConfigs)
 	log.Info().Msgf("read %v node configurations", nodes)
 
@@ -49,10 +53,11 @@ func genNetworkAndStakingKeys() []model.NodeInfo {
 		internalNodes = append(internalNodes, nodeInfo)
 	}
 
-	return model.Sort(internalNodes, order.Canonical)
+	return model.Sort(internalNodes, flow.Canonical[flow.Identity])
 }
 
-func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto.PrivateKey) model.NodeInfo {
+func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto.PrivateKey,
+) model.NodeInfo {
 	var err error
 	nodeID, found := getNameID()
 	if !found {
@@ -63,11 +68,11 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto
 	}
 
 	log.Debug().
-		Str("networkPubKey", pubKeyToString(networkKey.PublicKey())).
-		Str("stakingPubKey", pubKeyToString(stakingKey.PublicKey())).
+		Str("networkPubKey", networkKey.PublicKey().String()).
+		Str("stakingPubKey", stakingKey.PublicKey().String()).
 		Msg("encoded public staking and network keys")
 
-	nodeInfo := model.NewPrivateNodeInfo(
+	nodeInfo, err := model.NewPrivateNodeInfo(
 		nodeID,
 		nodeConfig.Role,
 		nodeConfig.Address,
@@ -75,6 +80,9 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto
 		networkKey,
 		stakingKey,
 	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("creating node info failed")
+	}
 
 	return nodeInfo
 }

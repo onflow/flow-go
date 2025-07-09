@@ -3,7 +3,8 @@ package validation
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -54,11 +55,15 @@ func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.Aggregate
 	chunk *flow.Chunk, executionResultID flow.Identifier) error {
 	// TODO: replace implementation once proper aggregation is used for Verifiers' attestation signatures.
 
-	atst := flow.Attestation{
+	atst, err := flow.NewAttestation(flow.UntrustedAttestation{
 		BlockID:           chunk.BlockID,
 		ExecutionResultID: executionResultID,
 		ChunkIndex:        chunk.Index,
+	})
+	if err != nil {
+		return fmt.Errorf("could not build attestation: %w", err)
 	}
+
 	atstID := atst.ID()
 
 	for i, signature := range aggregatedSignatures.VerifierSignatures {
@@ -130,7 +135,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		byBlock[seal.BlockID] = seal
 	}
 	if len(payload.Seals) != len(byBlock) {
-		return nil, engine.NewInvalidInputError("multiple seals for the same block")
+		return nil, engine.NewInvalidInputErrorf("multiple seals for the same block")
 	}
 
 	// incorporatedResults collects execution results that are incorporated in unsealed
@@ -168,7 +173,14 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 			if err != nil {
 				return fmt.Errorf("internal error fetching result %v incorporated in block %v: %w", resultID, blockID, err)
 			}
-			incorporatedResults[resultID] = flow.NewIncorporatedResult(blockID, result)
+			incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+				IncorporatedBlockID: blockID,
+				Result:              result,
+			})
+			if err != nil {
+				return fmt.Errorf("could not create incorporated result: %w", err)
+			}
+			incorporatedResults[resultID] = incorporatedResult
 		}
 		return nil
 	}
@@ -290,7 +302,11 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 
 		// only Verification Nodes that were assigned to the chunk are allowed to approve it
 		for _, signerId := range chunkSigs.SignerIDs {
-			if !assignments.HasVerifier(chunk, signerId) {
+			b, err := assignments.HasVerifier(chunk.Index, signerId)
+			if err != nil {
+				return fmt.Errorf("getting verifiers for chunk %d failed: %w", chunk.Index, err)
+			}
+			if !b {
 				return engine.NewInvalidInputErrorf("invalid signer id at chunk: %d", chunk.Index)
 			}
 		}

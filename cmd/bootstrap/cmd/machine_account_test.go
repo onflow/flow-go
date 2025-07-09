@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -115,14 +116,14 @@ func TestMachineAccountInfoFileExists(t *testing.T) {
 
 		// read in info file
 		var machineAccountInfoBefore model.NodeMachineAccountInfo
-		readJSON(machineInfoFilePath, &machineAccountInfoBefore)
+		require.NoError(t, common.ReadJSON(machineInfoFilePath, &machineAccountInfoBefore))
 
 		// run again and make sure info file was not changed
 		machineAccountRun(nil, nil)
 		require.Regexp(t, regex, hook.logs.String())
 
 		var machineAccountInfoAfter model.NodeMachineAccountInfo
-		readJSON(machineInfoFilePath, &machineAccountInfoAfter)
+		require.NoError(t, common.ReadJSON(machineInfoFilePath, &machineAccountInfoAfter))
 
 		assert.Equal(t, machineAccountInfoBefore, machineAccountInfoAfter)
 	})

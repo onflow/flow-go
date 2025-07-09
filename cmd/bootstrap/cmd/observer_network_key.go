@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/onflow/crypto"
 	"github.com/spf13/cobra"
-
-	"github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 )
 
 var (
@@ -48,7 +48,7 @@ func observerNetworkKeyRun(_ *cobra.Command, _ []string) {
 	}
 
 	// if the file already exists, exit
-	keyExists, err := pathExists(flagOutputFile)
+	keyExists, err := common.PathExists(flagOutputFile)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not check if %s exists", flagOutputFile)
 	}

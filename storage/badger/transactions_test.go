@@ -1,7 +1,6 @@
 package badger_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -43,6 +42,6 @@ func TestTransactionRetrieveWithoutStore(t *testing.T) {
 
 		// attempt to get a invalid transaction
 		_, err := store.ByID(unittest.IdentifierFixture())
-		assert.True(t, errors.Is(err, storage.ErrNotFound))
+		assert.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }

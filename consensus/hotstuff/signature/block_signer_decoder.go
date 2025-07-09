@@ -44,11 +44,12 @@ func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.Identifi
 			// try asking by parent ID
 			// TODO: this assumes no identity table changes within epochs, must be changed for Dynamic Protocol State
 			//  See https://github.com/onflow/flow-go/issues/4085
-			members, err = b.IdentitiesByBlock(header.ParentID)
+			byBlockMembers, err := b.IdentitiesByBlock(header.ParentID)
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve identities for block %x with QC view %d for parent %x: %w",
 					header.ID(), header.ParentView, header.ParentID, err) // state.ErrUnknownSnapshotReference or exception
 			}
+			members = byBlockMembers.ToSkeleton()
 		} else {
 			return nil, fmt.Errorf("unexpected error retrieving identities for block %v: %w", header.ID(), err)
 		}

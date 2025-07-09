@@ -1,6 +1,8 @@
 package p2pnode
 
 import (
+	"time"
+
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -14,11 +16,11 @@ import (
 // GossipSubAdapterConfig is a wrapper around libp2p pubsub options that
 // implements the PubSubAdapterConfig interface for the Flow network.
 type GossipSubAdapterConfig struct {
-	options        []pubsub.Option
-	scoreTracer    p2p.PeerScoreTracer
-	scoreOption    p2p.ScoreOptionBuilder
-	pubsubTracer   p2p.PubSubTracer
-	inspectorSuite p2p.GossipSubInspectorSuite // currently only used to manage the lifecycle.
+	options      []pubsub.Option
+	scoreTracer  p2p.PeerScoreTracer
+	scoreOption  p2p.ScoreOptionBuilder
+	pubsubTracer p2p.PubSubTracer
+	inspector    p2p.GossipSubRPCInspector // currently only used to manage the lifecycle.
 }
 
 var _ p2p.PubSubAdapterConfig = (*GossipSubAdapterConfig)(nil)
@@ -82,9 +84,9 @@ func (g *GossipSubAdapterConfig) WithMessageIdFunction(f func([]byte) string) {
 // - suite: the inspector suite to use
 // Returns:
 // -None
-func (g *GossipSubAdapterConfig) WithInspectorSuite(suite p2p.GossipSubInspectorSuite) {
-	g.options = append(g.options, pubsub.WithAppSpecificRpcInspector(suite.InspectFunc()))
-	g.inspectorSuite = suite
+func (g *GossipSubAdapterConfig) WithRpcInspector(inspector p2p.GossipSubRPCInspector) {
+	g.options = append(g.options, pubsub.WithAppSpecificRpcInspector(inspector.Inspect))
+	g.inspector = inspector
 }
 
 // WithTracer adds a tracer option to the config.
@@ -95,6 +97,22 @@ func (g *GossipSubAdapterConfig) WithInspectorSuite(suite p2p.GossipSubInspector
 func (g *GossipSubAdapterConfig) WithTracer(tracer p2p.PubSubTracer) {
 	g.pubsubTracer = tracer
 	g.options = append(g.options, pubsub.WithRawTracer(tracer))
+}
+
+// WithPeerGater adds a peer gater option to the config.
+// Args:
+// - params: the topic delivery weights to use
+// Returns:
+// -None
+func (g *GossipSubAdapterConfig) WithPeerGater(topicDeliveryWeights map[string]float64, sourceDecay time.Duration) {
+	peerGaterParams := pubsub.NewPeerGaterParams(pubsub.DefaultPeerGaterThreshold, pubsub.DefaultPeerGaterGlobalDecay, pubsub.ScoreParameterDecay(sourceDecay)).WithTopicDeliveryWeights(topicDeliveryWeights)
+	g.options = append(g.options, pubsub.WithPeerGater(peerGaterParams))
+}
+
+// WithValidateQueueSize overrides the validation queue size from 32 to the given size.
+// CAUTION: Be careful setting this to a larger number as it will change the backpressure behavior of the system.
+func (g *GossipSubAdapterConfig) WithValidateQueueSize(size int) {
+	g.options = append(g.options, pubsub.WithValidateQueueSize(size))
 }
 
 // ScoreTracer returns the tracer for the peer score.
@@ -120,15 +138,15 @@ func (g *GossipSubAdapterConfig) ScoringComponent() component.Component {
 	return g.scoreOption
 }
 
-// InspectorSuiteComponent returns the component that manages the lifecycle of the inspector suite.
+// RpcInspectorComponent returns the component that manages the lifecycle of the inspector suite.
 // This is used to start and stop the inspector suite by the PubSubAdapter.
 // Args:
 //   - None
 //
 // Returns:
 //   - component.Component: the component that manages the lifecycle of the inspector suite.
-func (g *GossipSubAdapterConfig) InspectorSuiteComponent() component.Component {
-	return g.inspectorSuite
+func (g *GossipSubAdapterConfig) RpcInspectorComponent() component.Component {
+	return g.inspector
 }
 
 // WithScoreTracer sets the tracer for the peer score.

@@ -4,19 +4,19 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/status"
 
-	"github.com/rs/zerolog"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 // RestProxyHandler is a structure that represents the proxy algorithm for observer node.
@@ -32,7 +32,7 @@ type RestProxyHandler struct {
 // NewRestProxyHandler returns a new rest proxy handler for observer node.
 func NewRestProxyHandler(
 	api access.API,
-	identities flow.IdentityList,
+	identities flow.IdentitySkeletonList,
 	connectionFactory connection.ConnectionFactory,
 	log zerolog.Logger,
 	metrics metrics.ObserverMetrics,
@@ -155,7 +155,7 @@ func (r *RestProxyHandler) GetTransactionResult(
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 
@@ -177,7 +177,7 @@ func (r *RestProxyHandler) GetTransactionResult(
 		return nil, err
 	}
 
-	return access.MessageToTransactionResult(transactionResultResponse), nil
+	return convert.MessageToTransactionResult(transactionResultResponse), nil
 }
 
 // GetAccountAtBlockHeight returns account by account address and block height.
@@ -201,6 +201,87 @@ func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address 
 	}
 
 	return convert.MessageToAccount(accountResponse.Account)
+}
+
+// GetAccountBalanceAtBlockHeight returns account balance by account address and block height.
+func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
+	upstream, closer, err := r.FaultTolerantClient()
+	if err != nil {
+		return 0, err
+	}
+	defer closer.Close()
+
+	getAccountBalanceAtBlockHeightRequest := &accessproto.GetAccountBalanceAtBlockHeightRequest{
+		Address:     address.Bytes(),
+		BlockHeight: height,
+	}
+
+	accountBalanceResponse, err := upstream.GetAccountBalanceAtBlockHeight(ctx, getAccountBalanceAtBlockHeightRequest)
+	r.log("upstream", "GetAccountBalanceAtBlockHeight", err)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return accountBalanceResponse.GetBalance(), nil
+
+}
+
+// GetAccountKeys returns account keys by account address and block height.
+func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error) {
+	upstream, closer, err := r.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+
+	getAccountKeysAtBlockHeightRequest := &accessproto.GetAccountKeysAtBlockHeightRequest{
+		Address:     address.Bytes(),
+		BlockHeight: height,
+	}
+
+	accountKeyResponse, err := upstream.GetAccountKeysAtBlockHeight(ctx, getAccountKeysAtBlockHeightRequest)
+	r.log("upstream", "GetAccountKeysAtBlockHeight", err)
+
+	if err != nil {
+		return nil, err
+	}
+
+	accountKeys := make([]flow.AccountPublicKey, len(accountKeyResponse.GetAccountKeys()))
+	for i, key := range accountKeyResponse.GetAccountKeys() {
+		accountKey, err := convert.MessageToAccountKey(key)
+		if err != nil {
+			return nil, err
+		}
+
+		accountKeys[i] = *accountKey
+	}
+
+	return accountKeys, nil
+}
+
+// GetAccountKeyByIndex returns account key by account address, key index and block height.
+func (r *RestProxyHandler) GetAccountKeyByIndex(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error) {
+	upstream, closer, err := r.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+
+	getAccountKeyAtBlockHeightRequest := &accessproto.GetAccountKeyAtBlockHeightRequest{
+		Address:     address.Bytes(),
+		Index:       keyIndex,
+		BlockHeight: height,
+	}
+
+	accountKeyResponse, err := upstream.GetAccountKeyAtBlockHeight(ctx, getAccountKeyAtBlockHeightRequest)
+	r.log("upstream", "GetAccountKeyAtBlockHeight", err)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return convert.MessageToAccountKey(accountKeyResponse.AccountKey)
 }
 
 // ExecuteScriptAtLatestBlock executes script at latest block.

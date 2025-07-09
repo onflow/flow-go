@@ -9,8 +9,7 @@ import (
 )
 
 var (
-	flagDatadir          string
-	flagChunkDataPackDir string
+	flagDatadir string
 )
 
 var Cmd = &cobra.Command{
@@ -24,9 +23,6 @@ func init() {
 	Cmd.Flags().StringVar(&flagDatadir, "datadir", "",
 		"directory that stores the protocol state")
 	_ = Cmd.MarkFlagRequired("datadir")
-
-	Cmd.Flags().StringVar(&flagChunkDataPackDir, "chunk-data-pack-dir", "",
-		"directory that stores the chunk data pack")
 }
 
 func run(*cobra.Command, []string) {
@@ -37,11 +33,4 @@ func run(*cobra.Command, []string) {
 	defer db.Close()
 
 	log.Info().Msg("ProtocolDB Truncated")
-
-	if flagChunkDataPackDir != "" {
-		chunkdb := common.InitStorageWithTruncate(flagChunkDataPackDir, true)
-		defer chunkdb.Close()
-
-		log.Info().Msg("Chunk Data Pack database Truncated")
-	}
 }

@@ -144,14 +144,17 @@ func (o *Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *f
 		BlockID:          receipt.ExecutionResult.BlockID,
 		// replace all chunks with new ones to simulate chunk corruption
 		Chunks: flow.ChunkList{
-			unittest.ChunkFixture(receipt.ExecutionResult.BlockID, 0, unittest.WithChunkStartState(receiptStartState)),
+			unittest.ChunkFixture(receipt.ExecutionResult.BlockID, 0,
+				receiptStartState,
+				unittest.WithServiceEventCount(nil)), // TODO(mainnet27, #6773): remove this line
 		},
 		ServiceEvents:   receipt.ExecutionResult.ServiceEvents,
 		ExecutionDataID: receipt.ExecutionResult.ExecutionDataID,
 	}
 
 	if chunksNum > 1 {
-		result.Chunks = append(result.Chunks, unittest.ChunkListFixture(uint(chunksNum-1), receipt.ExecutionResult.BlockID)...)
+		result.Chunks = append(result.Chunks, unittest.ChunkListFixture(uint(chunksNum-1), receipt.ExecutionResult.BlockID, result.Chunks[0].EndState,
+			unittest.WithServiceEventCount(nil))...) // TODO(mainnet27, #6773): remove this line
 	}
 
 	return result
@@ -217,8 +220,8 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 	corruptedResult := o.corruptExecutionResult(receipt)
 
 	corruptedExecutionIds := o.allNodeIds.Filter(
-		filter.And(filter.HasRole(flow.RoleExecution),
-			filter.HasNodeID(o.corruptedNodeIds...))).NodeIDs()
+		filter.And(filter.HasRole[flow.Identity](flow.RoleExecution),
+			filter.HasNodeID[flow.Identity](o.corruptedNodeIds...))).NodeIDs()
 
 	// sends corrupted execution result to all corrupted execution nodes.
 	for _, corruptedExecutionId := range corruptedExecutionIds {
@@ -394,7 +397,7 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 		}
 
 		// sends an attestation on behalf of verification node to all consensus nodes
-		consensusIds := o.allNodeIds.Filter(filter.HasRole(flow.RoleConsensus)).NodeIDs()
+		consensusIds := o.allNodeIds.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus)).NodeIDs()
 		err = o.network.SendEgress(&insecure.EgressEvent{
 			CorruptOriginId: chunkDataPackRequestEvent.CorruptOriginId,
 			Channel:         channels.PushApprovals,

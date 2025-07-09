@@ -45,10 +45,10 @@ func runGenerateLevel3Summary(t *testing.T, testDir string) {
 	// read in expected summary level 3
 	var expectedTestSummary3 common.Level3Summary
 	expectedTestSummary3JsonBytes, err := os.ReadFile(expectedOutputTestDataPath)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotEmpty(t, expectedTestSummary3JsonBytes)
 	err = json.Unmarshal(expectedTestSummary3JsonBytes, &expectedTestSummary3)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// check all details of test summary level 2 between expected and actual
 

@@ -1,7 +1,7 @@
 package environment
 
 import (
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
@@ -66,7 +66,12 @@ func (generator *accountLocalIDGenerator) GenerateAccountID(
 		trace.FVMEnvGenerateAccountLocalID,
 	).End()
 
-	err := generator.meter.MeterComputation(ComputationKindGenerateAccountLocalID, 1)
+	err := generator.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindGenerateAccountLocalID,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return 0, err
 	}

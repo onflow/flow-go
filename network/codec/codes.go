@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package codec
 
 import (
@@ -194,7 +192,8 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 	case CodeExecutionReceipt:
 		return &flow.ExecutionReceipt{}, what(&flow.ExecutionReceipt{}), nil
 	case CodeResultApproval:
-		return &flow.ResultApproval{}, what(&flow.ResultApproval{}), nil
+		var approval flow.ResultApproval
+		return &approval, what(&approval), nil
 
 	// data exchange for execution of blocks
 	case CodeChunkDataRequest:

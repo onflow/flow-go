@@ -46,62 +46,47 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	// creates ids and twice chunks of the ids
 	ids := unittest.IdentityListFixture(size)
 	chunks := a.CreateChunks(2*size, a.T())
-	assignment := chmodels.NewAssignment()
+	assignmentBuilder := chmodels.NewAssignmentBuilder()
 
-	// assigns two chunks to each verifier node
-	// j keeps track of chunks
-	j := 0
-	for i := 0; i < size; i++ {
-		c, ok := chunks.ByIndex(uint64(j))
-		require.True(a.T(), ok, "chunk out of range requested")
-		assignment.Add(c, append(assignment.Verifiers(c), ids[i].NodeID))
-		j++
-		c, ok = chunks.ByIndex(uint64(j))
-		require.True(a.T(), ok, "chunk out of range requested")
-		assignment.Add(c, append(assignment.Verifiers(c), ids[i].NodeID))
+	// assign each chunk to exactly one verifier, in round-robin order
+	// Since there are 2x as many chunks as verifiers, each verifier will have 2 chunks
+	for j, chunk := range chunks {
+		v := ids[j%size].NodeID
+		require.NoError(a.T(), assignmentBuilder.Add(chunk.Index, flow.IdentifierList{v}))
 	}
+	assignment := assignmentBuilder.Build()
 
 	// evaluating the chunk assignment
 	// each verifier should have two certain chunks based on the assignment
-	// j keeps track of chunks
-	j = 0
 	for i := 0; i < size; i++ {
 		assignedChunks := assignment.ByNodeID(ids[i].NodeID)
 		require.Len(a.T(), assignedChunks, 2)
-		c, ok := chunks.ByIndex(uint64(j))
+		c, ok := chunks.ByIndex(uint64(i))
 		require.True(a.T(), ok, "chunk out of range requested")
 		require.Contains(a.T(), assignedChunks, c.Index)
-		j++
-		c, ok = chunks.ByIndex(uint64(j))
+		c2, ok := chunks.ByIndex(uint64(i + size))
 		require.True(a.T(), ok, "chunk out of range requested")
-		require.Contains(a.T(), assignedChunks, c.Index)
+		require.Contains(a.T(), assignedChunks, c2.Index)
 	}
 
 }
 
-// TestAssignDuplicate tests assign Add duplicate verifiers
+// TestAssignDuplicate tests that duplicate verifiers for a chunk are not allowed
+// since it would weaken the protocol's security
 func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	size := 5
-	// creates ids and twice chunks of the ids
-	var ids flow.IdentityList = unittest.IdentityListFixture(size)
-	chunks := a.CreateChunks(2, a.T())
-	assignment := chmodels.NewAssignment()
+	// creates verifier ids
+	var ids = unittest.IdentityListFixture(size)
+	assignmentBuilder := chmodels.NewAssignmentBuilder()
 
 	// assigns first chunk to non-duplicate list of verifiers
-	c, ok := chunks.ByIndex(uint64(0))
-	require.True(a.T(), ok, "chunk out of range requested")
-	assignment.Add(c, ids.NodeIDs())
-	require.Len(a.T(), assignment.Verifiers(c), size)
+	require.NoError(a.T(), assignmentBuilder.Add(0, ids.NodeIDs()))
 
 	// duplicates first verifier, hence size increases by 1
 	ids = append(ids, ids[0])
 	require.Len(a.T(), ids, size+1)
 	// assigns second chunk to a duplicate list of verifiers
-	c, ok = chunks.ByIndex(uint64(1))
-	require.True(a.T(), ok, "chunk out of range requested")
-	assignment.Add(c, ids.NodeIDs())
-	// should be size not size + 1
-	require.Len(a.T(), assignment.Verifiers(c), size)
+	require.Error(a.T(), assignmentBuilder.Add(1, ids.NodeIDs()))
 }
 
 // TestPermuteEntirely tests permuting an entire IdentityList against
@@ -280,7 +265,9 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 
 	for _, chunk := range result.Chunks {
 		// each chunk should be assigned to alpha verifiers
-		require.Equal(a.T(), p1.Verifiers(chunk).Len(), alpha)
+		verifiers, err := p1.Verifiers(chunk.Index)
+		require.NoError(a.T(), err)
+		require.Equal(a.T(), len(verifiers), alpha)
 	}
 }
 

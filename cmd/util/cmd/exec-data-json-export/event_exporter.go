@@ -12,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 type event struct {
@@ -31,9 +33,11 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) err
 	db := common.InitStorage(dbPath)
 	defer db.Close()
 
+	sdb := badgerimpl.ToDB(db)
+
 	cacheMetrics := &metrics.NoopCollector{}
 	headers := badger.NewHeaders(cacheMetrics, db)
-	events := badger.NewEvents(cacheMetrics, db)
+	events := store.NewEvents(cacheMetrics, sdb)
 	activeBlockID := blockID
 
 	outputFile := filepath.Join(outputPath, "events.jsonl")

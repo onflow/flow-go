@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
 )
@@ -55,21 +55,13 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *m
 		return nil, fmt.Errorf("could not create aggregator for staking signatures at block %v: %w", block.BlockID, err)
 	}
 
-	publicKeyShares := make([]crypto.PublicKey, 0, len(allParticipants))
 	dkg, err := f.committee.DKG(block.View)
 	if err != nil {
 		return nil, fmt.Errorf("could not get DKG info at block %v: %w", block.BlockID, err)
 	}
-	for _, participant := range allParticipants {
-		pk, err := dkg.KeyShare(participant.NodeID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get random beacon key share for %x at block %v: %w", participant.NodeID, block.BlockID, err)
-		}
-		publicKeyShares = append(publicKeyShares, pk)
-	}
 
 	threshold := msig.RandomBeaconThreshold(int(dkg.Size()))
-	randomBeaconInspector, err := signature.NewRandomBeaconInspector(dkg.GroupKey(), publicKeyShares, threshold, msg)
+	randomBeaconInspector, err := signature.NewRandomBeaconInspector(dkg.GroupKey(), dkg.KeyShares(), threshold, msg)
 	if err != nil {
 		return nil, fmt.Errorf("could not create random beacon inspector at block %v: %w", block.BlockID, err)
 	}
@@ -235,7 +227,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 
 	// checking of conditions for building QC are satisfied
 	totalWeight := p.stakingSigAggtor.TotalWeight()
-	p.log.Debug().Msgf("processed vote, total weight=(%d), required=(%d)", totalWeight, p.minRequiredWeight)
+	p.log.Debug().Msgf("processed vote with sig len %d, total weight=(%d), required=(%d)", len(vote.SigData), totalWeight, p.minRequiredWeight)
 	if totalWeight < p.minRequiredWeight {
 		return nil
 	}
@@ -316,10 +308,15 @@ func buildQCWithPackerAndSigData(
 		return nil, fmt.Errorf("could not pack the block sig data: %w", err)
 	}
 
-	return &flow.QuorumCertificate{
+	qc, err := flow.NewQuorumCertificate(flow.UntrustedQuorumCertificate{
 		View:          block.View,
 		BlockID:       block.BlockID,
 		SignerIndices: signerIndices,
 		SigData:       sigData,
-	}, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build quorum certificate: %w", err)
+	}
+
+	return qc, nil
 }

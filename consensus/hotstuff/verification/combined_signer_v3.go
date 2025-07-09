@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -52,29 +53,6 @@ func NewCombinedSignerV3(
 	return sc
 }
 
-// CreateProposal will create a proposal with a combined signature for the given block.
-func (c *CombinedSignerV3) CreateProposal(block *model.Block) (*model.Proposal, error) {
-
-	// check that the block is created by us
-	if block.ProposerID != c.staking.NodeID() {
-		return nil, fmt.Errorf("can't create proposal for someone else's block")
-	}
-
-	// create the signature data
-	sigData, err := c.genSigData(block)
-	if err != nil {
-		return nil, fmt.Errorf("signing my proposal failed: %w", err)
-	}
-
-	// create the proposal
-	proposal := &model.Proposal{
-		Block:   block,
-		SigData: sigData,
-	}
-
-	return proposal, nil
-}
-
 // CreateVote will create a vote with a combined signature for the given block.
 func (c *CombinedSignerV3) CreateVote(block *model.Block) (*model.Vote, error) {
 
@@ -84,12 +62,14 @@ func (c *CombinedSignerV3) CreateVote(block *model.Block) (*model.Vote, error) {
 		return nil, fmt.Errorf("could not create signature: %w", err)
 	}
 
-	// create the vote
-	vote := &model.Vote{
+	vote, err := model.NewVote(model.UntrustedVote{
 		View:     block.View,
 		BlockID:  block.BlockID,
 		SignerID: c.staking.NodeID(),
 		SigData:  sigData,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not create vote: %w", err)
 	}
 
 	return vote, nil
@@ -105,13 +85,20 @@ func (c *CombinedSignerV3) CreateTimeout(curView uint64, newestQC *flow.QuorumCe
 		return nil, fmt.Errorf("could not generate signature for timeout object at view %d: %w", curView, err)
 	}
 
-	timeout := &model.TimeoutObject{
-		View:       curView,
-		NewestQC:   newestQC,
-		LastViewTC: lastViewTC,
-		SignerID:   c.staking.NodeID(),
-		SigData:    sigData,
+	timeout, err := model.NewTimeoutObject(
+		model.UntrustedTimeoutObject{
+			View:        curView,
+			NewestQC:    newestQC,
+			LastViewTC:  lastViewTC,
+			SignerID:    c.staking.NodeID(),
+			SigData:     sigData,
+			TimeoutTick: 0,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct timeout object: %w", err)
 	}
+
 	return timeout, nil
 }
 

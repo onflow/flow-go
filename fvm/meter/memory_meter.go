@@ -3,7 +3,7 @@ package meter
 import (
 	"math"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
 )
@@ -29,13 +29,9 @@ var (
 		common.MemoryKindOptionalValue:                    41,
 		common.MemoryKindTypeValue:                        17,
 		common.MemoryKindPathValue:                        24,
-		common.MemoryKindPathCapabilityValue:              1,
-		common.MemoryKindIDCapabilityValue:                1,
-		common.MemoryKindPathLinkValue:                    1,
+		common.MemoryKindCapabilityValue:                  1, // TODO: update with proper weight
 		common.MemoryKindStorageCapabilityControllerValue: 32,
 		common.MemoryKindAccountCapabilityControllerValue: 32,
-		common.MemoryKindAccountLinkValue:                 1,
-		common.MemoryKindAccountReferenceValue:            1,
 		common.MemoryKindPublishedValue:                   1,
 		common.MemoryKindStorageReferenceValue:            41,
 		common.MemoryKindEphemeralReferenceValue:          41,
@@ -65,67 +61,66 @@ var (
 		common.MemoryKindConstantSizedStaticType: 25,
 		common.MemoryKindDictionaryStaticType:    33,
 		common.MemoryKindOptionalStaticType:      17,
-		common.MemoryKindRestrictedStaticType:    41,
+		common.MemoryKindIntersectionStaticType:  41,
 		common.MemoryKindReferenceStaticType:     41,
 		common.MemoryKindCapabilityStaticType:    17,
 		common.MemoryKindFunctionStaticType:      9,
 
 		// Cadence Values
 
-		common.MemoryKindCadenceVoidValue:           1,
-		common.MemoryKindCadenceOptionalValue:       17,
-		common.MemoryKindCadenceBoolValue:           8,
-		common.MemoryKindCadenceStringValue:         16,
-		common.MemoryKindCadenceCharacterValue:      16,
-		common.MemoryKindCadenceAddressValue:        8,
-		common.MemoryKindCadenceIntValue:            50,
-		common.MemoryKindCadenceNumberValue:         1,
-		common.MemoryKindCadenceArrayValueBase:      41,
-		common.MemoryKindCadenceArrayValueLength:    16,
-		common.MemoryKindCadenceDictionaryValue:     41,
-		common.MemoryKindCadenceKeyValuePair:        33,
-		common.MemoryKindCadenceStructValueBase:     33,
-		common.MemoryKindCadenceStructValueSize:     16,
-		common.MemoryKindCadenceResourceValueBase:   33,
-		common.MemoryKindCadenceResourceValueSize:   16,
-		common.MemoryKindCadenceEventValueBase:      33,
-		common.MemoryKindCadenceEventValueSize:      16,
-		common.MemoryKindCadenceContractValueBase:   33,
-		common.MemoryKindCadenceContractValueSize:   16,
-		common.MemoryKindCadenceEnumValueBase:       33,
-		common.MemoryKindCadenceEnumValueSize:       16,
-		common.MemoryKindCadencePathLinkValue:       1,
-		common.MemoryKindCadenceAccountLinkValue:    1,
-		common.MemoryKindCadencePathValue:           33,
-		common.MemoryKindCadenceTypeValue:           17,
-		common.MemoryKindCadencePathCapabilityValue: 1,
-		common.MemoryKindCadenceIDCapabilityValue:   1,
-		common.MemoryKindCadenceFunctionValue:       1,
-		common.MemoryKindCadenceAttachmentValueBase: 33,
-		common.MemoryKindCadenceAttachmentValueSize: 16,
+		common.MemoryKindCadenceVoidValue:                    1,
+		common.MemoryKindCadenceOptionalValue:                17,
+		common.MemoryKindCadenceBoolValue:                    8,
+		common.MemoryKindCadenceStringValue:                  16,
+		common.MemoryKindCadenceCharacterValue:               16,
+		common.MemoryKindCadenceAddressValue:                 8,
+		common.MemoryKindCadenceIntValue:                     50,
+		common.MemoryKindCadenceNumberValue:                  1,
+		common.MemoryKindCadenceArrayValueBase:               41,
+		common.MemoryKindCadenceArrayValueLength:             16,
+		common.MemoryKindCadenceDictionaryValue:              41,
+		common.MemoryKindCadenceKeyValuePair:                 33,
+		common.MemoryKindCadenceStructValueBase:              33,
+		common.MemoryKindCadenceStructValueSize:              16,
+		common.MemoryKindCadenceResourceValueBase:            33,
+		common.MemoryKindCadenceResourceValueSize:            16,
+		common.MemoryKindCadenceEventValueBase:               33,
+		common.MemoryKindCadenceEventValueSize:               16,
+		common.MemoryKindCadenceContractValueBase:            33,
+		common.MemoryKindCadenceContractValueSize:            16,
+		common.MemoryKindCadenceEnumValueBase:                33,
+		common.MemoryKindCadenceEnumValueSize:                16,
+		common.MemoryKindCadencePathValue:                    33,
+		common.MemoryKindCadenceTypeValue:                    17,
+		common.MemoryKindCadenceCapabilityValue:              1, // TODO: update with proper weight
+		common.MemoryKindCadenceDeprecatedPathCapabilityType: 1, // TODO: remove, deprecated. Also has a wrong name
+		common.MemoryKindCadenceFunctionValue:                1,
+		common.MemoryKindCadenceAttachmentValueBase:          33,
+		common.MemoryKindCadenceAttachmentValueSize:          16,
 
 		// Cadence Types
 
-		common.MemoryKindCadenceTypeParameter:          17,
-		common.MemoryKindCadenceOptionalType:           17,
-		common.MemoryKindCadenceVariableSizedArrayType: 17,
-		common.MemoryKindCadenceConstantSizedArrayType: 25,
-		common.MemoryKindCadenceDictionaryType:         33,
-		common.MemoryKindCadenceField:                  33,
-		common.MemoryKindCadenceParameter:              49,
-		common.MemoryKindCadenceStructType:             81,
-		common.MemoryKindCadenceResourceType:           81,
-		common.MemoryKindCadenceEventType:              81,
-		common.MemoryKindCadenceContractType:           81,
-		common.MemoryKindCadenceStructInterfaceType:    81,
-		common.MemoryKindCadenceResourceInterfaceType:  81,
-		common.MemoryKindCadenceContractInterfaceType:  81,
-		common.MemoryKindCadenceFunctionType:           41,
-		common.MemoryKindCadenceReferenceType:          25,
-		common.MemoryKindCadenceRestrictedType:         57,
-		common.MemoryKindCadenceCapabilityType:         17,
-		common.MemoryKindCadenceEnumType:               97,
-		common.MemoryKindCadenceAttachmentType:         81,
+		common.MemoryKindCadenceTypeParameter:            17,
+		common.MemoryKindCadenceOptionalType:             17,
+		common.MemoryKindCadenceVariableSizedArrayType:   17,
+		common.MemoryKindCadenceConstantSizedArrayType:   25,
+		common.MemoryKindCadenceDictionaryType:           33,
+		common.MemoryKindCadenceField:                    33,
+		common.MemoryKindCadenceParameter:                49,
+		common.MemoryKindCadenceStructType:               81,
+		common.MemoryKindCadenceResourceType:             81,
+		common.MemoryKindCadenceEventType:                81,
+		common.MemoryKindCadenceContractType:             81,
+		common.MemoryKindCadenceStructInterfaceType:      81,
+		common.MemoryKindCadenceResourceInterfaceType:    81,
+		common.MemoryKindCadenceContractInterfaceType:    81,
+		common.MemoryKindCadenceFunctionType:             41,
+		common.MemoryKindCadenceReferenceType:            25,
+		common.MemoryKindCadenceIntersectionType:         57,
+		common.MemoryKindCadenceDeprecatedRestrictedType: 57,
+		common.MemoryKindCadenceCapabilityType:           17,
+		common.MemoryKindCadenceEnumType:                 97,
+		common.MemoryKindCadenceAttachmentType:           81,
 
 		// Misc
 
@@ -161,17 +156,20 @@ var (
 		common.MemoryKindTypeAnnotation:    25,
 		common.MemoryKindDictionaryEntry:   33,
 
-		common.MemoryKindFunctionDeclaration:        49,
-		common.MemoryKindCompositeDeclaration:       65,
-		common.MemoryKindInterfaceDeclaration:       41,
-		common.MemoryKindEnumCaseDeclaration:        25,
-		common.MemoryKindFieldDeclaration:           41,
-		common.MemoryKindTransactionDeclaration:     81,
-		common.MemoryKindImportDeclaration:          41,
-		common.MemoryKindVariableDeclaration:        97,
-		common.MemoryKindSpecialFunctionDeclaration: 17,
-		common.MemoryKindPragmaDeclaration:          17,
-		common.MemoryKindAttachmentDeclaration:      70,
+		common.MemoryKindFunctionDeclaration:           49,
+		common.MemoryKindCompositeDeclaration:          65,
+		common.MemoryKindInterfaceDeclaration:          41,
+		common.MemoryKindEnumCaseDeclaration:           25,
+		common.MemoryKindFieldDeclaration:              41,
+		common.MemoryKindTransactionDeclaration:        81,
+		common.MemoryKindImportDeclaration:             41,
+		common.MemoryKindVariableDeclaration:           97,
+		common.MemoryKindSpecialFunctionDeclaration:    17,
+		common.MemoryKindPragmaDeclaration:             17,
+		common.MemoryKindAttachmentDeclaration:         70,
+		common.MemoryKindEntitlementDeclaration:        33,
+		common.MemoryKindEntitlementMappingElement:     17,
+		common.MemoryKindEntitlementMappingDeclaration: 57,
 
 		common.MemoryKindAssignmentStatement: 41,
 		common.MemoryKindBreakStatement:      1,
@@ -186,28 +184,29 @@ var (
 		common.MemoryKindWhileStatement:      25,
 		common.MemoryKindRemoveStatement:     33,
 
-		common.MemoryKindBooleanExpression:     9,
-		common.MemoryKindNilExpression:         1,
-		common.MemoryKindStringExpression:      17,
-		common.MemoryKindIntegerExpression:     33,
-		common.MemoryKindFixedPointExpression:  49,
-		common.MemoryKindArrayExpression:       25,
-		common.MemoryKindDictionaryExpression:  25,
-		common.MemoryKindIdentifierExpression:  1,
-		common.MemoryKindInvocationExpression:  49,
-		common.MemoryKindMemberExpression:      25,
-		common.MemoryKindIndexExpression:       33,
-		common.MemoryKindConditionalExpression: 49,
-		common.MemoryKindUnaryExpression:       25,
-		common.MemoryKindBinaryExpression:      41,
-		common.MemoryKindFunctionExpression:    25,
-		common.MemoryKindCastingExpression:     41,
-		common.MemoryKindCreateExpression:      9,
-		common.MemoryKindDestroyExpression:     17,
-		common.MemoryKindReferenceExpression:   33,
-		common.MemoryKindForceExpression:       17,
-		common.MemoryKindPathExpression:        1,
-		common.MemoryKindAttachExpression:      33,
+		common.MemoryKindBooleanExpression:        9,
+		common.MemoryKindNilExpression:            1,
+		common.MemoryKindStringExpression:         17,
+		common.MemoryKindStringTemplateExpression: 49,
+		common.MemoryKindIntegerExpression:        33,
+		common.MemoryKindFixedPointExpression:     49,
+		common.MemoryKindArrayExpression:          25,
+		common.MemoryKindDictionaryExpression:     25,
+		common.MemoryKindIdentifierExpression:     1,
+		common.MemoryKindInvocationExpression:     49,
+		common.MemoryKindMemberExpression:         25,
+		common.MemoryKindIndexExpression:          33,
+		common.MemoryKindConditionalExpression:    49,
+		common.MemoryKindUnaryExpression:          25,
+		common.MemoryKindBinaryExpression:         41,
+		common.MemoryKindFunctionExpression:       25,
+		common.MemoryKindCastingExpression:        41,
+		common.MemoryKindCreateExpression:         9,
+		common.MemoryKindDestroyExpression:        17,
+		common.MemoryKindReferenceExpression:      33,
+		common.MemoryKindForceExpression:          17,
+		common.MemoryKindPathExpression:           1,
+		common.MemoryKindAttachExpression:         33,
 
 		common.MemoryKindConstantSizedType: 25,
 		common.MemoryKindDictionaryType:    33,
@@ -216,7 +215,7 @@ var (
 		common.MemoryKindNominalType:       25,
 		common.MemoryKindOptionalType:      17,
 		common.MemoryKindReferenceType:     25,
-		common.MemoryKindRestrictedType:    41,
+		common.MemoryKindIntersectionType:  41,
 		common.MemoryKindVariableSizedType: 17,
 
 		common.MemoryKindPosition:          25,
@@ -226,18 +225,33 @@ var (
 		common.MemoryKindElaboration:       501,
 
 		// sema types
-		common.MemoryKindVariableSizedSemaType: 51,
-		common.MemoryKindConstantSizedSemaType: 59,
-		common.MemoryKindDictionarySemaType:    67,
-		common.MemoryKindOptionalSemaType:      17,
-		common.MemoryKindRestrictedSemaType:    75,
-		common.MemoryKindReferenceSemaType:     25,
-		common.MemoryKindCapabilitySemaType:    51,
+		common.MemoryKindVariableSizedSemaType:       51,
+		common.MemoryKindConstantSizedSemaType:       59,
+		common.MemoryKindDictionarySemaType:          67,
+		common.MemoryKindOptionalSemaType:            17,
+		common.MemoryKindIntersectionSemaType:        75,
+		common.MemoryKindReferenceSemaType:           25,
+		common.MemoryKindCapabilitySemaType:          51,
+		common.MemoryKindEntitlementSemaType:         49,
+		common.MemoryKindEntitlementMapSemaType:      73,
+		common.MemoryKindEntitlementRelationSemaType: 73,
 
 		// ordered-map
 		common.MemoryKindOrderedMap:          17,
 		common.MemoryKindOrderedMapEntryList: 50,
 		common.MemoryKindOrderedMapEntry:     64,
+
+		// Entitlement access
+		common.MemoryKindEntitlementSetStaticAccess:  17,
+		common.MemoryKindEntitlementMapStaticAccess:  17,
+		common.MemoryKindCadenceEntitlementSetAccess: 33,
+		common.MemoryKindCadenceEntitlementMapAccess: 17,
+
+		// InclusiveRange
+		common.MemoryKindInclusiveRangeStaticType:   17,
+		common.MemoryKindCadenceInclusiveRangeValue: 81,
+		common.MemoryKindCadenceInclusiveRangeType:  33,
+		common.MemoryKindInclusiveRangeSemaType:     17,
 	}
 )
 
@@ -248,7 +262,7 @@ func _() {
 }
 
 type ExecutionMemoryWeights map[common.MemoryKind]uint64
-type MeteredMemoryIntensities map[common.MemoryKind]uint
+type MeteredMemoryAmounts map[common.MemoryKind]uint64
 
 type MemoryMeterParameters struct {
 	memoryLimit   uint64
@@ -288,33 +302,36 @@ func (params MeterParameters) WithMemoryWeights(
 type MemoryMeter struct {
 	params MemoryMeterParameters
 
-	memoryIntensities MeteredMemoryIntensities
-	memoryEstimate    uint64
+	memoryAmounts  MeteredMemoryAmounts
+	memoryEstimate uint64
 }
 
-// MemoryIntensities returns all the measured memory intensities
-func (m *MemoryMeter) MemoryIntensities() MeteredMemoryIntensities {
-	return m.memoryIntensities
+// MemoryAmounts returns all the measured memory amounts
+func (m *MemoryMeter) MemoryAmounts() MeteredMemoryAmounts {
+	return m.memoryAmounts
 }
 
 // NewMemoryMeter constructs a new Meter
 func NewMemoryMeter(params MemoryMeterParameters) MemoryMeter {
 	m := MemoryMeter{
-		params:            params,
-		memoryIntensities: make(MeteredMemoryIntensities),
+		params:        params,
+		memoryAmounts: make(MeteredMemoryAmounts),
 	}
 
 	return m
 }
 
 // MeterMemory captures memory usage and returns an error if it goes beyond the limit
-func (m *MemoryMeter) MeterMemory(kind common.MemoryKind, intensity uint) error {
-	m.memoryIntensities[kind] += intensity
+func (m *MemoryMeter) MeterMemory(usage common.MemoryUsage) error {
+	kind := usage.Kind
+	amount := usage.Amount
+
+	m.memoryAmounts[kind] += amount
 	w, ok := m.params.memoryWeights[kind]
 	if !ok {
 		return nil
 	}
-	m.memoryEstimate += w * uint64(intensity)
+	m.memoryEstimate += w * amount
 	if m.memoryEstimate > m.params.memoryLimit {
 		return errors.NewMemoryLimitExceededError(m.params.TotalMemoryLimit())
 	}
@@ -330,7 +347,7 @@ func (m *MemoryMeter) TotalMemoryEstimate() uint64 {
 func (m *MemoryMeter) Merge(child MemoryMeter) {
 	m.memoryEstimate = m.memoryEstimate + child.TotalMemoryEstimate()
 
-	for key, intensity := range child.memoryIntensities {
-		m.memoryIntensities[key] += intensity
+	for key, intensity := range child.memoryAmounts {
+		m.memoryAmounts[key] += intensity
 	}
 }

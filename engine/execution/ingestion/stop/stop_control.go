@@ -148,7 +148,7 @@ func (s stopBoundary) String() string {
 // StopControlHeaders is an interface for fetching headers
 // Its jut a small subset of storage.Headers for comments see storage.Headers
 type StopControlHeaders interface {
-	ByHeight(height uint64) (*flow.Header, error)
+	BlockIDByHeight(height uint64) (flow.Identifier, error)
 }
 
 // NewStopControl creates new StopControl.
@@ -394,7 +394,7 @@ func (s *StopControl) GetStopParameters() StopParameters {
 // s.stopBoundary.StopBeforeHeight.
 //
 // It returns a boolean indicating if the block should be executed.
-func (s *StopControl) ShouldExecuteBlock(b *flow.Header) bool {
+func (s *StopControl) ShouldExecuteBlock(blockID flow.Identifier, height uint64) bool {
 	s.Lock()
 	defer s.Unlock()
 
@@ -405,15 +405,15 @@ func (s *StopControl) ShouldExecuteBlock(b *flow.Header) bool {
 
 	// Skips blocks at or above requested stopHeight
 	// doing so means we have started the stopping process
-	if b.Height < s.stopBoundary.StopBeforeHeight {
+	if height < s.stopBoundary.StopBeforeHeight {
 		return true
 	}
 
 	s.log.Info().
 		Msgf("Skipping execution of %s at height %d"+
 			" because stop has been requested %s",
-			b.ID(),
-			b.Height,
+			blockID,
+			height,
 			s.stopBoundary)
 
 	// stopBoundary is now immutable, because it started affecting execution
@@ -476,12 +476,12 @@ func (s *StopControl) blockFinalized(
 
 		// Let's find the ID of the block that should be executed last
 		// which is the parent of the block at the stopHeight
-		header, err := s.headers.ByHeight(s.stopBoundary.StopBeforeHeight - 1)
+		finalizedID, err := s.headers.BlockIDByHeight(s.stopBoundary.StopBeforeHeight - 1)
 		if err != nil {
 			handleErr(fmt.Errorf("failed to get header by height: %w", err))
 			return
 		}
-		parentID = header.ID()
+		parentID = finalizedID
 	}
 
 	s.stopBoundary.stopAfterExecuting = parentID

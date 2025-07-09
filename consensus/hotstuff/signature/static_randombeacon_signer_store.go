@@ -1,7 +1,8 @@
 package signature
 
 import (
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/module"
 )
 

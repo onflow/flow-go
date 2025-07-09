@@ -3,7 +3,7 @@
     {
       "json": {
         "test": "TestSanitySha3_256",
-        "package": "github.com/onflow/flow-go/crypto/hash",
+        "package": "github.com/onflow/crypto/hash",
         "output": [
           {"item": "=== RUN   TestSanitySha3_256\n"},
           {"item": "    hash_test.go:21: \n"},
@@ -29,7 +29,7 @@
     {
       "json": {
         "test": "TestSanitySha3_384",
-        "package": "github.com/onflow/flow-go/crypto/hash",
+        "package": "github.com/onflow/crypto/hash",
         "output": [
           {"item": "=== RUN   TestSanitySha3_384\n"},
           {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
@@ -41,7 +41,7 @@
     {
       "json": {
         "test": "TestSanitySha2_256",
-        "package": "github.com/onflow/flow-go/crypto/hash",
+        "package": "github.com/onflow/crypto/hash",
         "output": [
           {"item": "=== RUN   TestSanitySha2_256\n"},
           {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
@@ -53,7 +53,7 @@
     {
       "json": {
         "test": "TestSanitySha2_384",
-        "package": "github.com/onflow/flow-go/crypto/hash",
+        "package": "github.com/onflow/crypto/hash",
         "output": [
           {"item": "=== RUN   TestSanitySha2_384\n"},
           {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
@@ -65,7 +65,7 @@
     {
       "json": {
         "test": "TestSanityKmac128",
-        "package": "github.com/onflow/flow-go/crypto/hash",
+        "package": "github.com/onflow/crypto/hash",
         "output": [
           {"item": "=== RUN   TestSanityKmac128\n"},
           {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
@@ -77,7 +77,7 @@
     {
       "json": {
         "test": "TestHashersAPI",
-        "package": "github.com/onflow/flow-go/crypto/hash",
+        "package": "github.com/onflow/crypto/hash",
         "output": [
           {"item": "=== RUN   TestHashersAPI\n"},
           {"item": "    hash_test.go:114: math rand seed is 1632498687765218000\n"},
@@ -90,7 +90,7 @@
     {
       "json": {
         "test": "TestSha3",
-        "package": "github.com/onflow/flow-go/crypto/hash",
+        "package": "github.com/onflow/crypto/hash",
         "output": [
           {"item": "=== RUN   TestSha3\n"},
           {"item": "    hash_test.go:158: math rand seed is 1632498687765661000\n"},
@@ -103,7 +103,7 @@
     {
       "json": {
         "test": "TestSha3/SHA3_256",
-        "package": "github.com/onflow/flow-go/crypto/hash",
+        "package": "github.com/onflow/crypto/hash",
         "output": [
           {"item": "=== RUN   TestSha3/SHA3_256\n"},
           {"item": "    --- PASS: TestSha3/SHA3_256 (0.11s)\n"}
@@ -115,7 +115,7 @@
     {
       "json": {
         "test": "TestSha3/SHA3_384",
-        "package": "github.com/onflow/flow-go/crypto/hash",
+        "package": "github.com/onflow/crypto/hash",
         "output": [
           {"item": "=== RUN   TestSha3/SHA3_384\n"},
           {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}

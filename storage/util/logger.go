@@ -1,6 +1,8 @@
 package util
 
 import (
+	"github.com/cockroachdb/pebble"
+	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 )
 
@@ -9,10 +11,17 @@ type Logger struct {
 	log zerolog.Logger
 }
 
+var _ pebble.Logger = (*Logger)(nil)
+var _ badger.Logger = (*Logger)(nil)
+
 func NewLogger(logger zerolog.Logger) *Logger {
 	return &Logger{
-		log: logger.With().Str("component", "badger").Logger(),
+		log: logger,
 	}
+}
+
+func (l *Logger) Fatalf(msg string, args ...interface{}) {
+	l.log.Fatal().Msgf(msg, args...)
 }
 
 func (l *Logger) Errorf(msg string, args ...interface{}) {

@@ -28,8 +28,7 @@ import (
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/util"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	storageutil "github.com/onflow/flow-go/storage/util"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -50,7 +49,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		tracer := trace.NewNoopTracer()
 		log := unittest.Logger()
 		consumer := events.NewNoop()
-		all := storageutil.StorageLayer(t, db)
+		all := bstorage.InitAll(metrics, db)
 
 		// bootstrap root snapshot
 		state, err := pbadger.Bootstrap(
@@ -63,7 +62,8 @@ func TestFollowerHappyPath(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.Statuses,
+			all.EpochProtocolStateEntries,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -86,15 +86,9 @@ func TestFollowerHappyPath(t *testing.T) {
 		require.NoError(t, err)
 		rootQC, err := rootSnapshot.QuorumCertificate()
 		require.NoError(t, err)
-
-		// Hack EECC.
-		// Since root snapshot is created with 1000 views for first epoch, we will forcefully enter EECC to avoid errors
-		// related to epoch transitions.
-		db.NewTransaction(true)
-		err = db.Update(func(txn *badger.Txn) error {
-			return operation.SetEpochEmergencyFallbackTriggered(rootHeader.ID())(txn)
-		})
+		rootProtocolState, err := rootSnapshot.ProtocolState()
 		require.NoError(t, err)
+		rootProtocolStateID := rootProtocolState.ID()
 
 		consensusConsumer := pubsub.NewFollowerDistributor()
 		// use real consensus modules
@@ -163,6 +157,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		// ensure sequential block views - that way we can easily know which block will be finalized after the test
 		for i, block := range flowBlocks {
 			block.Header.View = block.Header.Height
+			block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			if i > 0 {
 				block.Header.ParentView = flowBlocks[i-1].Header.View
 				block.Header.ParentID = flowBlocks[i-1].Header.ID()

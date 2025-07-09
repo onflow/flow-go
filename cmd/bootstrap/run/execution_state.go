@@ -43,7 +43,7 @@ func GenerateExecutionState(
 		return flow.DummyStateCommitment, err
 	}
 
-	compactor, err := complete.NewCompactor(ledgerStorage, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	compactor, err := complete.NewCompactor(ledgerStorage, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metricsCollector)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}

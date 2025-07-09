@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
-	"errors"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -28,16 +28,16 @@ import (
 const uniqueScriptLoggingTimeWindow = 10 * time.Minute
 
 type backendScripts struct {
-	log               zerolog.Logger
-	headers           storage.Headers
-	executionReceipts storage.ExecutionReceipts
-	state             protocol.State
-	connFactory       connection.ConnectionFactory
-	metrics           module.BackendScriptsMetrics
-	loggedScripts     *lru.Cache[[md5.Size]byte, time.Time]
-	nodeCommunicator  Communicator
-	scriptExecutor    execution.ScriptExecutor
-	scriptExecMode    ScriptExecutionMode
+	log                        zerolog.Logger
+	headers                    storage.Headers
+	state                      protocol.State
+	connFactory                connection.ConnectionFactory
+	metrics                    module.BackendScriptsMetrics
+	loggedScripts              *lru.Cache[[md5.Size]byte, time.Time]
+	nodeCommunicator           Communicator
+	scriptExecutor             execution.ScriptExecutor
+	scriptExecMode             IndexQueryMode
+	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 }
 
 // scriptExecutionRequest encapsulates the data needed to execute a script to make it easier
@@ -105,7 +105,7 @@ func (b *backendScripts) ExecuteScriptAtBlockHeight(
 ) ([]byte, error) {
 	header, err := b.headers.ByHeight(blockHeight)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), blockHeight, err))
 	}
 
 	return b.executeScript(ctx, newScriptExecutionRequest(header.ID(), blockHeight, script, arguments))
@@ -118,15 +118,15 @@ func (b *backendScripts) executeScript(
 	scriptRequest *scriptExecutionRequest,
 ) ([]byte, error) {
 	switch b.scriptExecMode {
-	case ScriptExecutionModeExecutionNodesOnly:
+	case IndexQueryModeExecutionNodesOnly:
 		result, _, err := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
 		return result, err
 
-	case ScriptExecutionModeLocalOnly:
+	case IndexQueryModeLocalOnly:
 		result, _, err := b.executeScriptLocally(ctx, scriptRequest)
 		return result, err
 
-	case ScriptExecutionModeFailover:
+	case IndexQueryModeFailover:
 		localResult, localDuration, localErr := b.executeScriptLocally(ctx, scriptRequest)
 		if localErr == nil || isInvalidArgumentError(localErr) || status.Code(localErr) == codes.Canceled {
 			return localResult, localErr
@@ -135,7 +135,7 @@ func (b *backendScripts) executeScript(
 		// issues for some scripts.
 		execResult, execDuration, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
 
-		resultComparer := newScriptResultComparison(b.log, b.metrics, scriptRequest)
+		resultComparer := newScriptResultComparison(b.log, b.metrics, b.shouldLogScript, scriptRequest)
 		_ = resultComparer.compare(
 			newScriptResult(execResult, execDuration, execErr),
 			newScriptResult(localResult, localDuration, localErr),
@@ -143,7 +143,7 @@ func (b *backendScripts) executeScript(
 
 		return execResult, execErr
 
-	case ScriptExecutionModeCompare:
+	case IndexQueryModeCompare:
 		execResult, execDuration, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
 		// we can only compare the results if there were either no errors or a cadence error
 		// since we cannot distinguish the EN error as caused by the block being pruned or some other reason,
@@ -153,7 +153,7 @@ func (b *backendScripts) executeScript(
 		}
 		localResult, localDuration, localErr := b.executeScriptLocally(ctx, scriptRequest)
 
-		resultComparer := newScriptResultComparison(b.log, b.metrics, scriptRequest)
+		resultComparer := newScriptResultComparison(b.log, b.metrics, b.shouldLogScript, scriptRequest)
 		_ = resultComparer.compare(
 			newScriptResult(execResult, execDuration, execErr),
 			newScriptResult(localResult, localDuration, localErr),
@@ -192,19 +192,21 @@ func (b *backendScripts) executeScriptLocally(
 
 		switch status.Code(convertedErr) {
 		case codes.InvalidArgument, codes.Canceled, codes.DeadlineExceeded:
-			lg.Debug().Err(err).
-				Str("script", string(r.script)).
-				Msg("script failed to execute locally")
+			logEvent := lg.Debug().Err(err)
+			if b.shouldLogScript(execEndTime, r.insecureScriptHash) {
+				logEvent.Str("script", string(r.script))
+			}
+			logEvent.Msg("script failed to execute locally")
 
 		default:
-			lg.Error().Err(err).Msg("script execution failed")
+			lg.Debug().Err(err).Msg("script execution failed")
 			b.metrics.ScriptExecutionErrorLocal()
 		}
 
 		return nil, execDuration, convertedErr
 	}
 
-	if b.log.GetLevel() == zerolog.DebugLevel && b.shouldLogScript(execEndTime, r.insecureScriptHash) {
+	if b.shouldLogScript(execEndTime, r.insecureScriptHash) {
 		lg.Debug().
 			Str("script", string(r.script)).
 			Msg("Successfully executed script")
@@ -223,7 +225,7 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 	r *scriptExecutionRequest,
 ) ([]byte, time.Duration, error) {
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
-	executors, err := executionNodesForBlockID(ctx, r.blockID, b.executionReceipts, b.state, b.log)
+	executors, err := b.execNodeIdentitiesProvider.ExecutionNodesForBlockID(ctx, r.blockID)
 	if err != nil {
 		return nil, 0, status.Errorf(codes.Internal, "failed to find script executors at blockId %v: %v", r.blockID.String(), err)
 	}
@@ -234,30 +236,29 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 		Logger()
 
 	var result []byte
+	var executionTime time.Time
 	var execDuration time.Duration
 	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		executors,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			execStartTime := time.Now()
 
 			result, err = b.tryExecuteScriptOnExecutionNode(ctx, node.Address, r)
 
-			executionTime := time.Now()
+			executionTime = time.Now()
 			execDuration = executionTime.Sub(execStartTime)
 
 			if err != nil {
 				return err
 			}
 
-			if b.log.GetLevel() == zerolog.DebugLevel {
-				if b.shouldLogScript(executionTime, r.insecureScriptHash) {
-					lg.Debug().
-						Str("script_executor_addr", node.Address).
-						Str("script", string(r.script)).
-						Dur("execution_dur_ms", execDuration).
-						Msg("Successfully executed script")
-					b.loggedScripts.Add(r.insecureScriptHash, executionTime)
-				}
+			if b.shouldLogScript(executionTime, r.insecureScriptHash) {
+				lg.Debug().
+					Str("script_executor_addr", node.Address).
+					Str("script", string(r.script)).
+					Dur("execution_dur_ms", execDuration).
+					Msg("Successfully executed script")
+				b.loggedScripts.Add(r.insecureScriptHash, executionTime)
 			}
 
 			// log execution time
@@ -265,12 +266,13 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 
 			return nil
 		},
-		func(node *flow.Identity, err error) bool {
+		func(node *flow.IdentitySkeleton, err error) bool {
 			if status.Code(err) == codes.InvalidArgument {
-				lg.Debug().Err(err).
-					Str("script_executor_addr", node.Address).
-					Str("script", string(r.script)).
-					Msg("script failed to execute on the execution node")
+				logEvent := lg.Debug().Err(err).Str("script_executor_addr", node.Address)
+				if b.shouldLogScript(executionTime, r.insecureScriptHash) {
+					logEvent.Str("script", string(r.script))
+				}
+				logEvent.Msg("script failed to execute on the execution node")
 				return true
 			}
 			return false
@@ -319,6 +321,9 @@ func isInvalidArgumentError(scriptExecutionErr error) bool {
 
 // shouldLogScript checks if the script hash is unique in the time window
 func (b *backendScripts) shouldLogScript(execTime time.Time, scriptHash [md5.Size]byte) bool {
+	if b.log.GetLevel() > zerolog.DebugLevel {
+		return false
+	}
 	timestamp, seen := b.loggedScripts.Get(scriptHash)
 	if seen {
 		return execTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow
@@ -332,13 +337,14 @@ func convertScriptExecutionError(err error, height uint64) error {
 		return nil
 	}
 
+	var failure fvmerrors.CodedFailure
+	if fvmerrors.As(err, &failure) {
+		return rpc.ConvertError(err, "failed to execute script", codes.Internal)
+	}
+
+	// general FVM/ledger errors
 	var coded fvmerrors.CodedError
 	if fvmerrors.As(err, &coded) {
-		// general FVM/ledger errors
-		if coded.Code().IsFailure() {
-			return rpc.ConvertError(err, "failed to execute script", codes.Internal)
-		}
-
 		switch coded.Code() {
 		case fvmerrors.ErrCodeScriptExecutionCancelledError:
 			return status.Errorf(codes.Canceled, "script execution canceled: %v", err)
@@ -346,28 +352,17 @@ func convertScriptExecutionError(err error, height uint64) error {
 		case fvmerrors.ErrCodeScriptExecutionTimedOutError:
 			return status.Errorf(codes.DeadlineExceeded, "script execution timed out: %v", err)
 
+		case fvmerrors.ErrCodeComputationLimitExceededError:
+			return status.Errorf(codes.ResourceExhausted, "script execution computation limit exceeded: %v", err)
+
+		case fvmerrors.ErrCodeMemoryLimitExceededError:
+			return status.Errorf(codes.ResourceExhausted, "script execution memory limit exceeded: %v", err)
+
 		default:
 			// runtime errors
 			return status.Errorf(codes.InvalidArgument, "failed to execute script: %v", err)
 		}
 	}
 
-	return convertIndexError(err, height, "failed to execute script")
-}
-
-// convertIndexError converts errors related to index to a gRPC error
-func convertIndexError(err error, height uint64, defaultMsg string) error {
-	if err == nil {
-		return nil
-	}
-
-	if errors.Is(err, execution.ErrDataNotAvailable) {
-		return status.Errorf(codes.OutOfRange, "data for block height %d is not available", height)
-	}
-
-	if errors.Is(err, storage.ErrNotFound) {
-		return status.Errorf(codes.NotFound, "data not found: %v", err)
-	}
-
-	return rpc.ConvertError(err, defaultMsg, codes.Internal)
+	return rpc.ConvertIndexError(err, height, "failed to execute script")
 }

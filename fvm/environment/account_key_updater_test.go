@@ -8,59 +8,16 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/sema"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
-
-	akh := environment.NewAccountKeyUpdater(
-		tracing.NewTracerSpan(),
-		nil,
-		FakeAccounts{},
-		nil,
-		nil)
-
-	address := flow.BytesToAddress([]byte{1, 2, 3, 4})
-
-	// emulate encoded public key (which comes as a user input)
-	// containing bytes which are invalid UTF8
-
-	invalidEncodedKey := make([]byte, 64)
-	invalidUTF8 := []byte{0xc3, 0x28}
-	copy(invalidUTF8, invalidEncodedKey)
-	accountPublicKey := FakePublicKey{data: invalidEncodedKey}.toAccountPublicKey()
-
-	encodedPublicKey, err := flow.EncodeRuntimeAccountPublicKey(accountPublicKey)
-	require.NoError(t, err)
-
-	err = akh.InternalAddEncodedAccountKey(address, encodedPublicKey)
-	require.Error(t, err)
-
-	require.True(t, errors.IsValueError(err))
-
-	errorString := err.Error()
-	assert.True(t, utf8.ValidString(errorString))
-
-	// check if they can encoded and decoded using CBOR
-	marshalledBytes, err := cbor.Marshal(errorString)
-	require.NoError(t, err)
-
-	var unmarshalledString string
-
-	err = cbor.Unmarshal(marshalledBytes, &unmarshalledString)
-	require.NoError(t, err)
-
-	require.Equal(t, errorString, unmarshalledString)
-}
 
 func TestNewAccountKey_error_handling_produces_valid_utf8_and_sign_algo(t *testing.T) {
 
@@ -187,26 +144,29 @@ func (f FakePublicKey) EncodeCompressed() []byte         { return nil }
 func (f FakePublicKey) Equals(key crypto.PublicKey) bool { return false }
 
 type FakeAccounts struct {
-	keyCount uint64
+	keyCount uint32
 }
 
 var _ environment.Accounts = &FakeAccounts{}
 
 func (f FakeAccounts) Exists(address flow.Address) (bool, error)       { return true, nil }
 func (f FakeAccounts) Get(address flow.Address) (*flow.Account, error) { return &flow.Account{}, nil }
-func (f FakeAccounts) GetPublicKeyCount(_ flow.Address) (uint64, error) {
+func (f FakeAccounts) GetPublicKeyCount(_ flow.Address) (uint32, error) {
 	return f.keyCount, nil
 }
 func (f FakeAccounts) AppendPublicKey(_ flow.Address, _ flow.AccountPublicKey) error { return nil }
-func (f FakeAccounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {
+func (f FakeAccounts) GetPublicKey(address flow.Address, keyIndex uint32) (flow.AccountPublicKey, error) {
 	if keyIndex >= f.keyCount {
 		return flow.AccountPublicKey{}, errors.NewAccountPublicKeyNotFoundError(address, keyIndex)
 	}
 	return FakePublicKey{}.toAccountPublicKey(), nil
 }
 
-func (f FakeAccounts) SetPublicKey(_ flow.Address, _ uint64, _ flow.AccountPublicKey) ([]byte, error) {
+func (f FakeAccounts) SetPublicKey(_ flow.Address, _ uint32, _ flow.AccountPublicKey) ([]byte, error) {
 	return nil, nil
+}
+func (f FakeAccounts) GetPublicKeys(address flow.Address) ([]flow.AccountPublicKey, error) {
+	return make([]flow.AccountPublicKey, f.keyCount), nil
 }
 func (f FakeAccounts) GetContractNames(_ flow.Address) ([]string, error)      { return nil, nil }
 func (f FakeAccounts) GetContract(_ string, _ flow.Address) ([]byte, error)   { return nil, nil }
@@ -217,8 +177,8 @@ func (f FakeAccounts) Create(_ []flow.AccountPublicKey, _ flow.Address) error { 
 func (f FakeAccounts) GetValue(_ flow.RegisterID) (flow.RegisterValue, error) { return nil, nil }
 func (f FakeAccounts) GetStorageUsed(_ flow.Address) (uint64, error)          { return 0, nil }
 func (f FakeAccounts) SetValue(_ flow.RegisterID, _ []byte) error             { return nil }
-func (f FakeAccounts) AllocateStorageIndex(_ flow.Address) (atree.StorageIndex, error) {
-	return atree.StorageIndex{}, nil
+func (f FakeAccounts) AllocateSlabIndex(_ flow.Address) (atree.SlabIndex, error) {
+	return atree.SlabIndex{}, nil
 }
 func (f FakeAccounts) GenerateAccountLocalID(address flow.Address) (uint64, error) {
 	return 0, nil

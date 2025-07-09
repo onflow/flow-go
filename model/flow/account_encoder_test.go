@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -49,7 +49,7 @@ func TestDecodeAccountPublicKey_Legacy(t *testing.T) {
 	accountKey, err := flow.DecodeAccountPublicKey(b, 1)
 	require.NoError(t, err)
 
-	assert.Equal(t, 1, accountKey.Index)
+	assert.Equal(t, uint32(1), accountKey.Index)
 	assert.Equal(t, publicKey, accountKey.PublicKey)
 	assert.Equal(t, sigAlgo, accountKey.SignAlgo)
 	assert.Equal(t, hashAlgo, accountKey.HashAlgo)

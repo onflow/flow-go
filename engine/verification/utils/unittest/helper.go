@@ -7,17 +7,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/testutil"
 	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -33,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
+	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -46,7 +49,7 @@ type MockChunkDataProviderFunc func(*testing.T, CompleteExecutionReceiptList, fl
 // requests should come from a verification node, and should has one of the assigned chunk IDs. Otherwise, it fails the test.
 func SetupChunkDataPackProvider(t *testing.T,
 	hub *stub.Hub,
-	exeIdentity *flow.Identity,
+	exeIdentity bootstrap.NodeInfo,
 	participants flow.IdentityList,
 	chainID flow.ChainID,
 	completeERs CompleteExecutionReceiptList,
@@ -58,7 +61,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 	exeEngine := new(mocknetwork.Engine)
 
 	exeChunkDataConduit, err := exeNode.Net.Register(channels.ProvideChunks, exeEngine)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	replied := make(map[flow.Identifier]struct{})
 
@@ -75,7 +78,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 			originID, ok := args[1].(flow.Identifier)
 			require.True(t, ok)
 			// request should be dispatched by a verification node.
-			require.Contains(t, participants.Filter(filter.HasRole(flow.RoleVerification)).NodeIDs(), originID)
+			require.Contains(t, participants.Filter(filter.HasRole[flow.Identity](flow.RoleVerification)).NodeIDs(), originID)
 
 			req, ok := args[2].(*messages.ChunkDataRequest)
 			require.True(t, ok)
@@ -107,7 +110,7 @@ func RespondChunkDataPackRequestImmediately(t *testing.T,
 	res := completeERs.ChunkDataResponseOf(t, chunkID)
 
 	err := con.Unicast(res, verID)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	log.Debug().
 		Hex("origin_id", logging.ID(verID)).
@@ -129,7 +132,7 @@ func RespondChunkDataPackRequestAfterNTrials(n int) MockChunkDataProviderFunc {
 			res := completeERs.ChunkDataResponseOf(t, chunkID)
 
 			err := con.Unicast(res, verID)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			log.Debug().
 				Hex("origin_id", logging.ID(verID)).
@@ -150,7 +153,7 @@ func RespondChunkDataPackRequestAfterNTrials(n int) MockChunkDataProviderFunc {
 func SetupMockConsensusNode(t *testing.T,
 	log zerolog.Logger,
 	hub *stub.Hub,
-	conIdentity *flow.Identity,
+	conIdentity bootstrap.NodeInfo,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
 	completeERs CompleteExecutionReceiptList,
@@ -252,7 +255,7 @@ func SetupMockConsensusNode(t *testing.T,
 		}).Return(nil)
 
 	_, err := conNode.Net.Register(channels.ReceiveApprovals, conEngine)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	return &conNode, conEngine, wg
 }
@@ -263,23 +266,23 @@ func isSystemChunk(index uint64, chunkNum int) bool {
 	return int(index) == chunkNum-1
 }
 
-func CreateExecutionResult(blockID flow.Identifier, options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.ExecutionResult, *chunks.Assignment) {
+func CreateExecutionResult(blockID flow.Identifier, options ...func(result *flow.ExecutionResult, assignments *chunks.AssignmentBuilder)) (*flow.ExecutionResult, *chunks.Assignment) {
 	result := &flow.ExecutionResult{
 		BlockID: blockID,
 		Chunks:  flow.ChunkList{},
 	}
-	assignments := chunks.NewAssignment()
+	assignmentsBuilder := chunks.NewAssignmentBuilder()
 
 	for _, option := range options {
-		option(result, assignments)
+		option(result, assignmentsBuilder)
 	}
-	return result, assignments
+	return result, assignmentsBuilder.Build()
 }
 
-func WithChunks(setAssignees ...func(flow.Identifier, uint64, *chunks.Assignment) *flow.Chunk) func(*flow.ExecutionResult, *chunks.Assignment) {
-	return func(result *flow.ExecutionResult, assignment *chunks.Assignment) {
+func WithChunks(setAssignees ...func(flow.Identifier, uint64, *chunks.AssignmentBuilder) *flow.Chunk) func(*flow.ExecutionResult, *chunks.AssignmentBuilder) {
+	return func(result *flow.ExecutionResult, assignmentBuilder *chunks.AssignmentBuilder) {
 		for i, setAssignee := range setAssignees {
-			chunk := setAssignee(result.BlockID, uint64(i), assignment)
+			chunk := setAssignee(result.BlockID, uint64(i), assignmentBuilder)
 			result.Chunks.Insert(chunk)
 		}
 	}
@@ -298,11 +301,11 @@ func ChunkWithIndex(blockID flow.Identifier, index int) *flow.Chunk {
 	return chunk
 }
 
-func WithAssignee(assignee flow.Identifier) func(flow.Identifier, uint64, *chunks.Assignment) *flow.Chunk {
-	return func(blockID flow.Identifier, index uint64, assignment *chunks.Assignment) *flow.Chunk {
+func WithAssignee(t *testing.T, assignee flow.Identifier) func(flow.Identifier, uint64, *chunks.AssignmentBuilder) *flow.Chunk {
+	return func(blockID flow.Identifier, index uint64, assignmentBuilder *chunks.AssignmentBuilder) *flow.Chunk {
 		chunk := ChunkWithIndex(blockID, int(index))
 		fmt.Printf("with assignee: %v, chunk id: %v\n", index, chunk.ID())
-		assignment.Add(chunk, flow.IdentifierList{assignee})
+		require.NoError(t, assignmentBuilder.Add(chunk.Index, flow.IdentifierList{assignee}))
 		return chunk
 	}
 }
@@ -320,7 +323,8 @@ type ChunkAssignerFunc func(chunkIndex uint64, chunks int) bool
 //
 // It returns the list of chunk locator ids assigned to the input verification nodes, as well as the list of their chunk IDs.
 // All verification nodes are assigned the same chunks.
-func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
+func MockChunkAssignmentFixture(t *testing.T,
+	chunkAssigner *mock.ChunkAssigner,
 	verIds flow.IdentityList,
 	completeERs CompleteExecutionReceiptList,
 	isAssigned ChunkAssignerFunc) (flow.IdentifierList, flow.IdentifierList) {
@@ -333,7 +337,7 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 
 	for _, completeER := range completeERs {
 		for _, receipt := range completeER.Receipts {
-			a := chunks.NewAssignment()
+			a := chunks.NewAssignmentBuilder()
 
 			_, duplicate := visited[receipt.ExecutionResult.ID()]
 			if duplicate {
@@ -349,12 +353,16 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 					}.ID()
 					expectedLocatorIds = append(expectedLocatorIds, locatorID)
 					expectedChunkIds = append(expectedChunkIds, chunk.ID())
-					a.Add(chunk, verIds.NodeIDs())
+					require.NoError(t, a.Add(chunk.Index, verIds.NodeIDs()))
+				} else {
+					// the chunk has no verifiers assigned
+					require.NoError(t, a.Add(chunk.Index, flow.IdentifierList{}))
 				}
 
 			}
+			assignment := a.Build()
 
-			chunkAssigner.On("Assign", &receipt.ExecutionResult, completeER.ContainerBlock.ID()).Return(a, nil)
+			chunkAssigner.On("Assign", &receipt.ExecutionResult, completeER.ContainerBlock.ID()).Return(assignment, nil)
 			visited[receipt.ExecutionResult.ID()] = struct{}{}
 		}
 	}
@@ -478,27 +486,37 @@ func withConsumers(t *testing.T,
 	log := zerolog.Nop()
 
 	// bootstraps system with one node of each role.
-	s, verID, participants := bootstrapSystem(t, log, tracer, authorized)
-	exeID := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
-	conID := participants.Filter(filter.HasRole(flow.RoleConsensus))[0]
+	s, verID, bootstrapNodesInfo := bootstrapSystem(t, log, tracer, authorized)
+
+	participants := bootstrap.ToIdentityList(bootstrapNodesInfo)
+	exeIndex := slices.IndexFunc(bootstrapNodesInfo, func(info bootstrap.NodeInfo) bool {
+		return info.Role == flow.RoleExecution
+	})
+	conIndex := slices.IndexFunc(bootstrapNodesInfo, func(info bootstrap.NodeInfo) bool {
+		return info.Role == flow.RoleConsensus
+	})
 	// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
 	// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
 	// Container blocks only contain receipts of their preceding reference blocks. But they do not
 	// hold any guarantees.
 	root, err := s.State.Final().Head()
 	require.NoError(t, err)
+	protocolState, err := s.State.Final().ProtocolState()
+	require.NoError(t, err)
+	protocolStateID := protocolState.ID()
+
 	chainID := root.ChainID
 	ops = append(ops, WithExecutorIDs(
-		participants.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs()), func(builder *CompleteExecutionReceiptBuilder) {
+		participants.Filter(filter.HasRole[flow.Identity](flow.RoleExecution)).NodeIDs()), func(builder *CompleteExecutionReceiptBuilder) {
 		// needed for the guarantees to have the correct chainID and signer indices
-		builder.clusterCommittee = participants.Filter(filter.HasRole(flow.RoleCollection))
+		builder.clusterCommittee = participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 	})
 
 	// random sources for all blocks:
 	//  - root block (block[0]) is executed with sources[0] (included in QC of child block[1])
 	//  - block[i] is executed with sources[i] (included in QC of child block[i+1])
 	sources := unittest.RandomSourcesFixture(30)
-	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, sources, ops...)
+	completeERs := CompleteExecutionReceiptChainFixture(t, root, protocolStateID, blockCount, sources, ops...)
 	blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
 
 	// chunk assignment
@@ -506,8 +524,9 @@ func withConsumers(t *testing.T,
 	assignedChunkIDs := flow.IdentifierList{}
 	if authorized {
 		// only authorized verification node has some chunks assigned to it.
-		_, assignedChunkIDs = MockChunkAssignmentFixture(chunkAssigner,
-			flow.IdentityList{verID},
+		_, assignedChunkIDs = MockChunkAssignmentFixture(t,
+			chunkAssigner,
+			flow.IdentityList{verID.Identity()},
 			completeERs,
 			EvenChunkIndexAssigner)
 	}
@@ -527,7 +546,7 @@ func withConsumers(t *testing.T,
 	// execution node
 	exeNode, exeEngine, exeWG := SetupChunkDataPackProvider(t,
 		hub,
-		exeID,
+		bootstrapNodesInfo[exeIndex],
 		participants,
 		chainID,
 		completeERs,
@@ -538,8 +557,8 @@ func withConsumers(t *testing.T,
 	conNode, conEngine, conWG := SetupMockConsensusNode(t,
 		unittest.Logger(),
 		hub,
-		conID,
-		flow.IdentityList{verID},
+		bootstrapNodesInfo[conIndex],
+		flow.IdentityList{verID.Identity()},
 		participants,
 		completeERs,
 		chainID,
@@ -613,13 +632,21 @@ func bootstrapSystem(
 	authorized bool,
 ) (
 	*enginemock.StateFixture,
-	*flow.Identity,
-	flow.IdentityList,
+	bootstrap.NodeInfo,
+	[]bootstrap.NodeInfo,
 ) {
-	// creates identities to bootstrap system with
-	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	identities := unittest.CompleteIdentitySet(verID)
-	identities = append(identities, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))) // adds extra execution node
+	// creates bootstrapNodesInfo to bootstrap system with
+	bootstrapNodesInfo := make([]bootstrap.NodeInfo, 0)
+	var verID bootstrap.NodeInfo
+	for _, missingRole := range unittest.CompleteIdentitySet() {
+		nodeInfo := unittest.PrivateNodeInfoFixture(unittest.WithRole(missingRole.Role))
+		if nodeInfo.Role == flow.RoleVerification {
+			verID = nodeInfo
+		}
+		bootstrapNodesInfo = append(bootstrapNodesInfo, nodeInfo)
+	}
+	bootstrapNodesInfo = append(bootstrapNodesInfo, unittest.PrivateNodeInfoFixture(unittest.WithRole(flow.RoleExecution))) // adds extra execution node
+	identities := bootstrap.ToIdentityList(bootstrapNodesInfo)
 
 	collector := &metrics.NoopCollector{}
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
@@ -628,14 +655,25 @@ func bootstrapSystem(
 
 	if !authorized {
 		// creates a new verification node identity that is unauthorized for this epoch
-		verID = unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		identities = identities.Union(flow.IdentityList{verID})
+		verID = unittest.PrivateNodeInfoFixture(unittest.WithRole(flow.RoleVerification))
+		bootstrapNodesInfo = append(bootstrapNodesInfo, verID)
+		identities = append(identities, verID.Identity())
 
-		epochBuilder := unittest.NewEpochBuilder(t, stateFixture.State)
+		mutableProtocolState := protocol_state.NewMutableProtocolState(
+			log,
+			stateFixture.Storage.EpochProtocolStateEntries,
+			stateFixture.Storage.ProtocolKVStore,
+			stateFixture.State.Params(),
+			stateFixture.Storage.Headers,
+			stateFixture.Storage.Results,
+			stateFixture.Storage.Setups,
+			stateFixture.Storage.EpochCommits,
+		)
+		epochBuilder := unittest.NewEpochBuilder(t, mutableProtocolState, stateFixture.State)
 		epochBuilder.
-			UsingSetupOpts(unittest.WithParticipants(identities)).
+			UsingSetupOpts(unittest.WithParticipants(identities.ToSkeleton())).
 			BuildEpoch()
 	}
 
-	return stateFixture, verID, identities
+	return stateFixture, verID, bootstrapNodesInfo
 }

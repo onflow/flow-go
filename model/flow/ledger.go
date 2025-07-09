@@ -58,7 +58,7 @@ func AccountStatusRegisterID(address Address) RegisterID {
 	}
 }
 
-func PublicKeyRegisterID(address Address, index uint64) RegisterID {
+func PublicKeyRegisterID(address Address, index uint32) RegisterID {
 	return RegisterID{
 		Owner: addressToOwner(address),
 		Key:   fmt.Sprintf("public_key_%d", index),
@@ -75,8 +75,27 @@ func ContractNamesRegisterID(address Address) RegisterID {
 func ContractRegisterID(address Address, contractName string) RegisterID {
 	return RegisterID{
 		Owner: addressToOwner(address),
-		Key:   CodeKeyPrefix + contractName,
+		Key:   ContractKey(contractName),
 	}
+}
+
+func ContractKey(contractName string) string {
+	return CodeKeyPrefix + contractName
+}
+
+func IsContractKey(key string) bool {
+	return strings.HasPrefix(key, CodeKeyPrefix)
+}
+
+func KeyContractName(key string) string {
+	if !IsContractKey(key) {
+		return ""
+	}
+	return key[len(CodeKeyPrefix):]
+}
+
+func IsContractNamesRegisterID(registerID RegisterID) bool {
+	return registerID.Key == ContractNamesKey
 }
 
 func CadenceRegisterID(owner []byte, key []byte) RegisterID {
@@ -86,17 +105,21 @@ func CadenceRegisterID(owner []byte, key []byte) RegisterID {
 	}
 }
 
-func NewRegisterID(owner Address, key string) RegisterID {
-	// global registers have an empty owner field
-	ownerString := ""
-
-	// all other registers have the account's address
-	if owner != EmptyAddress {
-		ownerString = addressToOwner(owner)
+// AddressToRegisterOwner converts 8-byte address to register owner.
+// If given address is ZeroAddress, register owner is "" (global register).
+func AddressToRegisterOwner(address Address) string {
+	// Global registers have address zero and an empty owner field
+	if address == EmptyAddress {
+		return ""
 	}
 
+	// All other registers have the account's address
+	return addressToOwner(address)
+}
+
+func NewRegisterID(owner Address, key string) RegisterID {
 	return RegisterID{
-		Owner: ownerString,
+		Owner: AddressToRegisterOwner(owner),
 		Key:   key,
 	}
 }
@@ -126,6 +149,8 @@ func (id RegisterID) IsInternalState() bool {
 		id.Key == AccountStatusKey
 }
 
+const SlabIndexPrefix = '$'
+
 // IsSlabIndex returns true if the key is a slab index for an account's ordered fields
 // map.
 //
@@ -133,15 +158,19 @@ func (id RegisterID) IsInternalState() bool {
 // only to cadence.  Cadence encodes this map into bytes and split the bytes
 // into slab chunks before storing the slabs into the ledger.
 func (id RegisterID) IsSlabIndex() bool {
-	return len(id.Key) == 9 && id.Key[0] == '$'
+	return IsSlabIndexKey(id.Key)
+}
+
+func IsSlabIndexKey(key string) bool {
+	return len(key) == 9 && key[0] == SlabIndexPrefix
 }
 
 // String returns formatted string representation of the RegisterID.
 func (id RegisterID) String() string {
 	formattedKey := ""
 	if id.IsSlabIndex() {
-		i := uint64(binary.BigEndian.Uint64([]byte(id.Key[1:])))
-		formattedKey = fmt.Sprintf("$%d", i)
+		i := binary.BigEndian.Uint64([]byte(id.Key[1:]))
+		formattedKey = fmt.Sprintf("%c%d", SlabIndexPrefix, i)
 	} else {
 		formattedKey = fmt.Sprintf("#%x", []byte(id.Key))
 	}
@@ -224,6 +253,9 @@ type StorageProof = []byte
 // TODO: solve the circular dependency and define StateCommitment as ledger.State
 type StateCommitment hash.Hash
 
+// EmptyStateCommitment is the zero-value state commitment.
+var EmptyStateCommitment = StateCommitment{}
+
 // DummyStateCommitment is an arbitrary value used in function failure cases,
 // although it can represent a valid state commitment.
 var DummyStateCommitment = StateCommitment(hash.DummyHash)
@@ -240,6 +272,11 @@ func ToStateCommitment(stateBytes []byte) (StateCommitment, error) {
 	}
 	copy(state[:], stateBytes)
 	return state, nil
+}
+
+func (s StateCommitment) String() string {
+	// Just use the string function of the parent type
+	return hash.Hash(s).String()
 }
 
 func (s StateCommitment) MarshalJSON() ([]byte, error) {

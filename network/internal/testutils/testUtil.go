@@ -183,7 +183,7 @@ func NetworkConfigFixture(
 
 	me := mock.NewLocal(t)
 	me.On("NodeID").Return(myId.NodeID).Maybe()
-	me.On("NotMeFilter").Return(filter.Not(filter.HasNodeID(me.NodeID()))).Maybe()
+	me.On("NotMeFilter").Return(filter.Not(filter.HasNodeID[flow.Identity](me.NodeID()))).Maybe()
 	me.On("Address").Return(myId.Address).Maybe()
 
 	defaultFlowConfig, err := config.DefaultConfig()

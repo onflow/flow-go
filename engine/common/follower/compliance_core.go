@@ -111,7 +111,7 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 
 	firstBlock := batch[0].Header
 	lastBlock := batch[len(batch)-1].Header
-	hotstuffProposal := model.ProposalFromFlow(lastBlock)
+	hotstuffProposal := model.SignedProposalFromFlow(lastBlock)
 	log := c.log.With().
 		Hex("origin_id", originID[:]).
 		Str("chain_id", lastBlock.ChainID.String()).
@@ -123,7 +123,7 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 		Int("range_length", len(batch)).
 		Logger()
 
-	log.Info().Msg("processing block range")
+	log.Debug().Msg("processing block range")
 
 	if c.pendingCache.Peek(hotstuffProposal.Block.BlockID) == nil {
 		log.Debug().Msg("block not found in cache, performing validation")
@@ -155,13 +155,17 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 				//     service event.
 				//     -> in this case we can disregard the block
 				//     Note: we could eliminate this edge case by dropping future blocks, iff their _view_
-				//           is strictly larger than `V + EpochCommitSafetyThreshold`, where `V` denotes
+				//           is strictly larger than `V + FinalizationSafetyThreshold`, where `V` denotes
 				//           the latest finalized block known to this node.
-				//  3. No blocks have been finalized for the last `EpochCommitSafetyThreshold` views. This breaks
-				//     a critical liveness assumption - see EpochCommitSafetyThreshold in protocol.Params for details.
+				//  3. No blocks have been finalized for the last `FinalizationSafetyThreshold` views. This breaks
+				//     a critical liveness assumption - see FinalizationSafetyThreshold in protocol.Params for details.
 				//     -> In this case, it is ok for the protocol to halt. Consequently, we can just disregard
 				//        the block, which will probably lead to this node eventually halting.
-				log.Err(err).Msg("unable to validate proposal with view from unknown epoch")
+				log.Err(err).Msg(
+					"Unable to validate proposal with view from unknown epoch. While there is noting wrong with the node, " +
+						"this could be a symptom of (i) the node being severely behind, (ii) there is a byzantine proposer in " +
+						"the network, or (iii) there was no finalization progress for hundreds of views. This should be " +
+						"investigated to confirm the cause is the benign scenario (i).")
 				return nil
 			}
 			return fmt.Errorf("unexpected error validating proposal: %w", err)
@@ -308,7 +312,7 @@ func rangeToCertifiedBlocks(certifiedRange []*flow.Block, certifyingQC *flow.Quo
 	for i, block := range certifiedRange {
 		var qc *flow.QuorumCertificate
 		if i < lastIndex {
-			qc = certifiedRange[i+1].Header.QuorumCertificate()
+			qc = certifiedRange[i+1].Header.ParentQC()
 		} else {
 			qc = certifyingQC
 		}

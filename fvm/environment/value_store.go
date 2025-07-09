@@ -1,9 +1,11 @@
 package environment
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/onflow/atree"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -20,7 +22,7 @@ type ValueStore interface {
 
 	ValueExists(owner []byte, key []byte) (bool, error)
 
-	AllocateStorageIndex(owner []byte) (atree.StorageIndex, error)
+	AllocateSlabIndex(owner []byte) (atree.SlabIndex, error)
 }
 
 type ParseRestrictedValueStore struct {
@@ -82,16 +84,16 @@ func (store ParseRestrictedValueStore) ValueExists(
 		key)
 }
 
-func (store ParseRestrictedValueStore) AllocateStorageIndex(
+func (store ParseRestrictedValueStore) AllocateSlabIndex(
 	owner []byte,
 ) (
-	atree.StorageIndex,
+	atree.SlabIndex,
 	error,
 ) {
 	return parseRestrict1Arg1Ret(
 		store.txnState,
-		trace.FVMEnvAllocateStorageIndex,
-		store.impl.AllocateStorageIndex,
+		trace.FVMEnvAllocateSlabIndex,
+		store.impl.AllocateSlabIndex,
 		owner)
 }
 
@@ -133,14 +135,18 @@ func (store *valueStore) GetValue(
 		return nil, fmt.Errorf("get value failed: %w", err)
 	}
 
-	err = store.meter.MeterComputation(ComputationKindGetValue, uint(len(v)))
+	err = store.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindGetValue,
+			Intensity: uint64(len(v)),
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("get value failed: %w", err)
 	}
 	return v, nil
 }
 
-// TODO disable SetValue for scripts, right now the view changes are discarded
 func (store *valueStore) SetValue(
 	owner []byte,
 	keyBytes []byte,
@@ -153,9 +159,21 @@ func (store *valueStore) SetValue(
 		return errors.NewInvalidInternalStateAccessError(id, "modify")
 	}
 
-	err := store.meter.MeterComputation(
-		ComputationKindSetValue,
-		uint(len(value)))
+	oldValue, err := store.accounts.GetValue(id)
+	if err != nil {
+		return fmt.Errorf("get value failed: %w", err)
+	}
+	// no-op write
+	if bytes.Equal(oldValue, value) {
+		return nil
+	}
+
+	err = store.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindSetValue,
+			Intensity: uint64(len(value)),
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("set value failed: %w", err)
 	}
@@ -176,7 +194,12 @@ func (store *valueStore) ValueExists(
 ) {
 	defer store.tracer.StartChildSpan(trace.FVMEnvValueExists).End()
 
-	err = store.meter.MeterComputation(ComputationKindValueExists, 1)
+	err = store.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindValueExists,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return false, fmt.Errorf("check value existence failed: %w", err)
 	}
@@ -189,26 +212,31 @@ func (store *valueStore) ValueExists(
 	return len(v) > 0, nil
 }
 
-// AllocateStorageIndex allocates new storage index under the owner accounts
+// AllocateSlabIndex allocates new storage index under the owner accounts
 // to store a new register.
-func (store *valueStore) AllocateStorageIndex(
+func (store *valueStore) AllocateSlabIndex(
 	owner []byte,
 ) (
-	atree.StorageIndex,
+	atree.SlabIndex,
 	error,
 ) {
-	defer store.tracer.StartChildSpan(trace.FVMEnvAllocateStorageIndex).End()
+	defer store.tracer.StartChildSpan(trace.FVMEnvAllocateSlabIndex).End()
 
-	err := store.meter.MeterComputation(ComputationKindAllocateStorageIndex, 1)
+	err := store.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindAllocateSlabIndex,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf(
+		return atree.SlabIndex{}, fmt.Errorf(
 			"allocate storage index failed: %w",
 			err)
 	}
 
-	v, err := store.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
+	v, err := store.accounts.AllocateSlabIndex(flow.BytesToAddress(owner))
 	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf(
+		return atree.SlabIndex{}, fmt.Errorf(
 			"storage address allocation failed: %w",
 			err)
 	}

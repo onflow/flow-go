@@ -34,11 +34,7 @@ type DisallowListCache struct {
 func NewDisallowListCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *DisallowListCache {
 	backData := herocache.NewCache(sizeLimit,
 		herocache.DefaultOversizeFactor,
-		// this cache is supposed to keep the disallow-list causes for the authorized (staked) nodes. Since the number of such nodes is
-		// expected to be small, we do not eject any records from the cache. The cache size must be large enough to hold all
-		// the spam records of the authorized nodes. Also, this cache is keeping at most one record per peer id, so the
-		// size of the cache must be at least the number of authorized nodes.
-		heropool.NoEjection,
+		heropool.LRUEjection,
 		logger.With().Str("mempool", "disallow-list-records").Logger(),
 		collector)
 
@@ -72,20 +68,6 @@ func (d *DisallowListCache) IsDisallowListed(peerID peer.ID) ([]network.Disallow
 	return causes, true
 }
 
-// init initializes the disallow-list cache entity for the peerID.
-// Args:
-// - peerID: the peerID of the peer to be disallow-listed.
-// Returns:
-//   - bool: true if the entity is successfully added to the cache.
-//     false if the entity already exists in the cache.
-func (d *DisallowListCache) init(peerID peer.ID) bool {
-	return d.c.Add(&disallowListCacheEntity{
-		peerID: peerID,
-		causes: make(map[network.DisallowListedCause]struct{}),
-		id:     makeId(peerID),
-	})
-}
-
 // DisallowFor disallow-lists a peer for a cause.
 // Args:
 // - peerID: the peerID of the peer to be disallow-listed.
@@ -94,51 +76,26 @@ func (d *DisallowListCache) init(peerID peer.ID) bool {
 // - []network.DisallowListedCause: the list of causes for which the peer is disallow-listed.
 // - error: if the operation fails, error is irrecoverable.
 func (d *DisallowListCache) DisallowFor(peerID peer.ID, cause network.DisallowListedCause) ([]network.DisallowListedCause, error) {
-	// first, we try to optimistically add the peer to the disallow list.
-	causes, err := d.disallowListFor(peerID, cause)
-	switch {
-	case err == nil:
-		return causes, nil
-	case err == ErrDisallowCacheEntityNotFound:
-		// if the entity not exist, we initialize it and try again.
-		// Note: there is an edge case where the entity is initialized by another goroutine between the two calls.
-		// In this case, the init function is invoked twice, but it is not a problem because the underlying
-		// cache is thread-safe. Hence, we do not need to synchronize the two calls. In such cases, one of the
-		// two calls returns false, and the other call returns true. We do not care which call returns false, hence,
-		// we ignore the return value of the init function.
-		_ = d.init(peerID)
-		causes, err = d.disallowListFor(peerID, cause)
-		if err != nil {
-			// any error after the init is irrecoverable.
-			return nil, fmt.Errorf("failed to disallow list peer %s for cause %s: %w", peerID, cause, err)
+	entityId := makeId(peerID)
+	initLogic := func() flow.Entity {
+		return &disallowListCacheEntity{
+			peerID:   peerID,
+			causes:   make(map[network.DisallowListedCause]struct{}),
+			entityId: entityId,
 		}
-		return causes, nil
-	default:
-		return nil, fmt.Errorf("failed to disallow list peer %s for cause %s: %w", peerID, cause, err)
 	}
-}
-
-// disallowListFor is a helper function for disallowing a peer for a cause.
-// It adds the cause to the disallow list cache entity for the peerID and returns the updated list of causes for the peer.
-// Args:
-// - peerID: the peerID of the peer to be disallow-listed.
-// - cause: the cause for disallow-listing the peer.
-// Returns:
-// - the updated list of causes for the peer.
-// - error if the entity for the peerID is not found in the cache it returns ErrDisallowCacheEntityNotFound, which is a benign error.
-func (d *DisallowListCache) disallowListFor(peerID peer.ID, cause network.DisallowListedCause) ([]network.DisallowListedCause, error) {
-	adjustedEntity, adjusted := d.c.Adjust(makeId(peerID), func(entity flow.Entity) flow.Entity {
+	adjustLogic := func(entity flow.Entity) flow.Entity {
 		dEntity := mustBeDisallowListEntity(entity)
 		dEntity.causes[cause] = struct{}{}
 		return dEntity
-	})
-
+	}
+	adjustedEntity, adjusted := d.c.AdjustWithInit(entityId, adjustLogic, initLogic)
 	if !adjusted {
-		// if the entity is not found in the cache, we return a benign error.
-		return nil, ErrDisallowCacheEntityNotFound
+		return nil, fmt.Errorf("failed to disallow list peer %s for cause %s", peerID, cause)
 	}
 
 	dEntity := mustBeDisallowListEntity(adjustedEntity)
+	// returning a deep copy of causes (to avoid being mutated externally).
 	updatedCauses := make([]network.DisallowListedCause, 0, len(dEntity.causes))
 	for c := range dEntity.causes {
 		updatedCauses = append(updatedCauses, c)

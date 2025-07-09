@@ -1,7 +1,8 @@
 package hotstuff
 
 import (
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -174,5 +175,5 @@ type Packer interface {
 	// It returns:
 	//  - (sigData, nil) if successfully unpacked the signature data
 	//  - (nil, model.InvalidFormatError) if failed to unpack the signature data
-	Unpack(signerIdentities flow.IdentityList, sigData []byte) (*BlockSignatureData, error)
+	Unpack(signerIdentities flow.IdentitySkeletonList, sigData []byte) (*BlockSignatureData, error)
 }

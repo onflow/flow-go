@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 )
 
 func isHexString(enc []byte) error {
@@ -253,7 +253,25 @@ func TestEncodableRandomBeaconPrivKeyMsgPack(t *testing.T) {
 func generateRandomSeed(t *testing.T) []byte {
 	seed := make([]byte, 48)
 	n, err := rand.Read(seed)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, n, 48)
 	return seed
+}
+
+func TestEncodableStakingKeyPoP(t *testing.T) {
+	sig := crypto.Signature(make([]byte, crypto.SignatureLenBLSBLS12381))
+	_, err := rand.Read(sig)
+	require.NoError(t, err)
+	pop := StakingKeyPoP{sig}
+
+	enc, err := json.Marshal(pop)
+	require.NoError(t, err)
+	require.NotEmpty(t, enc)
+	require.NoError(t, isHexString(enc))
+
+	var dec StakingKeyPoP
+	err = json.Unmarshal(enc, &dec)
+	require.NoError(t, err)
+
+	require.Equal(t, sig, dec.Signature, "encoded/decoded signature equality check failed")
 }

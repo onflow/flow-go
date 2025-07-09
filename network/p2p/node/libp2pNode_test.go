@@ -24,6 +24,7 @@ import (
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
+	"github.com/onflow/flow-go/utils/concurrentmap"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -54,7 +55,7 @@ func TestMultiAddress(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		ip, port, _, err := p2putils.NetworkingInfo(*tc.identity)
+		ip, port, _, err := p2putils.NetworkingInfo(tc.identity.IdentitySkeleton)
 		require.NoError(t, err)
 
 		actualAddress := utils.MultiAddressStr(ip, port)
@@ -88,12 +89,12 @@ func TestGetPeerInfo(t *testing.T) {
 		identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("1.1.1.1:0"))
 
 		// translates node-i address into info
-		info, err := utils.PeerAddressInfo(*identity)
+		info, err := utils.PeerAddressInfo(identity.IdentitySkeleton)
 		require.NoError(t, err)
 
 		// repeats the translation for node-i
 		for j := 0; j < 10; j++ {
-			rinfo, err := utils.PeerAddressInfo(*identity)
+			rinfo, err := utils.PeerAddressInfo(identity.IdentitySkeleton)
 			require.NoError(t, err)
 			assert.Equal(t, rinfo.String(), info.String(), "inconsistent id generated")
 		}
@@ -113,7 +114,7 @@ func TestAddPeers(t *testing.T) {
 
 	// add the remaining nodes to the first node as its set of peers
 	for _, identity := range identities[1:] {
-		peerInfo, err := utils.PeerAddressInfo(*identity)
+		peerInfo, err := utils.PeerAddressInfo(identity.IdentitySkeleton)
 		require.NoError(t, err)
 		require.NoError(t, nodes[0].ConnectToPeer(ctx, peerInfo))
 	}
@@ -158,7 +159,7 @@ func TestConnGater(t *testing.T) {
 	sporkID := unittest.IdentifierFixture()
 	idProvider := mockmodule.NewIdentityProvider(t)
 
-	node1Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
+	node1Peers := concurrentmap.New[peer.ID, struct{}]()
 	node1, identity1 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 		if !node1Peers.Has(pid) {
 			return fmt.Errorf("peer id not found: %s", p2plogging.PeerId(pid))
@@ -170,10 +171,10 @@ func TestConnGater(t *testing.T) {
 	p2ptest.StartNode(t, signalerCtx, node1)
 	defer p2ptest.StopNode(t, node1, cancel)
 
-	node1Info, err := utils.PeerAddressInfo(identity1)
+	node1Info, err := utils.PeerAddressInfo(identity1.IdentitySkeleton)
 	assert.NoError(t, err)
 
-	node2Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
+	node2Peers := concurrentmap.New[peer.ID, struct{}]()
 	node2, identity2 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 		if !node2Peers.Has(pid) {
 			return fmt.Errorf("id not found: %s", p2plogging.PeerId(pid))
@@ -187,7 +188,7 @@ func TestConnGater(t *testing.T) {
 	p2ptest.StartNode(t, signalerCtx, node2)
 	defer p2ptest.StopNode(t, node2, cancel)
 
-	node2Info, err := utils.PeerAddressInfo(identity2)
+	node2Info, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	assert.NoError(t, err)
 
 	node1.Host().Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.PermanentAddrTTL)
@@ -264,21 +265,12 @@ func TestCreateStream_SinglePairwiseConnection(t *testing.T) {
 	p2ptest.StartNodes(t, signalerCtx, nodes)
 	defer p2ptest.StopNodes(t, nodes, cancel)
 
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-	done := make(chan struct{})
 	numOfStreamsPerNode := 100 // create large number of streamChan per node per connection to ensure the resource manager does not cause starvation of resources
 	expectedTotalNumOfStreams := 600
 
 	// create a number of streamChan concurrently between each node
 	streamChan := make(chan network.Stream, expectedTotalNumOfStreams)
-
-	go createConcurrentStreams(t, ctxWithTimeout, nodes, ids, numOfStreamsPerNode, streamChan, done)
-	unittest.RequireCloseBefore(t, done, 5*time.Second, "could not create streamChan on time")
-	require.Len(t,
-		streamChan,
-		expectedTotalNumOfStreams,
-		fmt.Sprintf("expected %d total number of streamChan created got %d", expectedTotalNumOfStreams, len(streamChan)))
+	createConcurrentStreams(t, ctx, nodes, ids, numOfStreamsPerNode, streamChan, expectedTotalNumOfStreams)
 
 	// ensure only a single connection exists between all nodes
 	ensureSinglePairwiseConnection(t, nodes)
@@ -286,8 +278,18 @@ func TestCreateStream_SinglePairwiseConnection(t *testing.T) {
 }
 
 // createStreams will attempt to create n number of streams concurrently between each combination of node pairs.
-func createConcurrentStreams(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, ids flow.IdentityList, n int, streams chan network.Stream, done chan struct{}) {
-	defer close(done)
+func createConcurrentStreams(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, ids flow.IdentityList, n int, streams chan network.Stream, expectedTotalNumOfStreams int) {
+	ctx, cancel := context.WithCancel(ctx)
+	// cancel called below to shutdown all streams
+
+	streamHandler := func(stream network.Stream) error {
+		streams <- stream
+
+		// wait for the done signal to close the stream
+		<-ctx.Done()
+		return nil
+	}
+
 	var wg sync.WaitGroup
 	for _, this := range nodes {
 		for i, other := range nodes {
@@ -295,7 +297,7 @@ func createConcurrentStreams(t *testing.T, ctx context.Context, nodes []p2p.LibP
 				continue
 			}
 
-			pInfo, err := utils.PeerAddressInfo(*ids[i])
+			pInfo, err := utils.PeerAddressInfo(ids[i].IdentitySkeleton)
 			require.NoError(t, err)
 			this.Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 
@@ -303,13 +305,7 @@ func createConcurrentStreams(t *testing.T, ctx context.Context, nodes []p2p.LibP
 				wg.Add(1)
 				go func(sender p2p.LibP2PNode) {
 					defer wg.Done()
-					err := sender.OpenAndWriteOnStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
-						streams <- stream
-
-						// wait for the done signal to close the stream
-						<-ctx.Done()
-						return nil
-					})
+					err := sender.OpenAndWriteOnStream(ctx, pInfo.ID, t.Name(), streamHandler)
 					require.NoError(t, err)
 				}(this)
 			}
@@ -318,7 +314,21 @@ func createConcurrentStreams(t *testing.T, ctx context.Context, nodes []p2p.LibP
 		// in 2 connections 1 created by each node, this happens because we are calling CreateStream concurrently.
 		time.Sleep(500 * time.Millisecond)
 	}
-	unittest.RequireReturnsBefore(t, wg.Wait, 3*time.Second, "could not create streams on time")
+
+	// pause until all streams are created
+	require.Eventually(t, func() bool {
+		return len(streams) >= expectedTotalNumOfStreams
+	}, 3*time.Second, 10*time.Millisecond, "could not create streams on time")
+
+	require.Len(t,
+		streams,
+		expectedTotalNumOfStreams,
+		fmt.Sprintf("expected %d total number of streamChan created got %d", expectedTotalNumOfStreams, len(streams)))
+
+	// cancel the context to trigger streams to shutdown
+	cancel()
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not shutdown streams on time")
 }
 
 // ensureSinglePairwiseConnection ensure each node in the list has exactly one connection to every other node in the list.

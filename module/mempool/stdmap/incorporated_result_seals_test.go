@@ -18,14 +18,14 @@ type icrSealsMachine struct {
 	state []*flow.IncorporatedResultSeal // model of the icrSeals
 }
 
-// Init is an action for initializing a icrSeals instance.
-func (m *icrSealsMachine) Init(t *rapid.T) {
+// init is an action for initializing a icrSeals instance.
+func (m *icrSealsMachine) init(t *rapid.T) {
 	m.icrs = NewIncorporatedResultSeals(1000)
 }
 
 // Add is a conditional action which adds an item to the icrSeals.
 func (m *icrSealsMachine) Add(t *rapid.T) {
-	i := rapid.Uint64().Draw(t, "i").(uint64)
+	i := rapid.Uint64().Draw(t, "i")
 
 	seal := unittest.IncorporatedResultSeal.Fixture(func(s *flow.IncorporatedResultSeal) {
 		s.Header.Height = i
@@ -49,7 +49,7 @@ func (m *icrSealsMachine) Add(t *rapid.T) {
 
 // Prune is a Conditional action that removes elements of height strictly lower than its argument
 func (m *icrSealsMachine) PruneUpToHeight(t *rapid.T) {
-	h := rapid.Uint64().Draw(t, "h").(uint64)
+	h := rapid.Uint64().Draw(t, "h")
 	err := m.icrs.PruneUpToHeight(h)
 	if h >= m.icrs.lowestHeight {
 		require.NoError(t, err)
@@ -72,7 +72,7 @@ func (m *icrSealsMachine) Get(t *rapid.T) {
 	if n == 0 {
 		return
 	}
-	i := rapid.IntRange(0, n-1).Draw(t, "i").(int)
+	i := rapid.IntRange(0, n-1).Draw(t, "i")
 
 	s := m.state[i]
 	actual, ok := m.icrs.ByID(s.ID())
@@ -89,7 +89,7 @@ func (m *icrSealsMachine) GetUnknown(t *rapid.T) {
 	if n == 0 {
 		return
 	}
-	i := rapid.IntRange(0, n-1).Draw(t, "i").(int)
+	i := rapid.IntRange(0, n-1).Draw(t, "i")
 	seal := unittest.IncorporatedResultSeal.Fixture(func(s *flow.IncorporatedResultSeal) {
 		s.Header.Height = uint64(i)
 	})
@@ -117,7 +117,7 @@ func (m *icrSealsMachine) Remove(t *rapid.T) {
 	if n == 0 {
 		return
 	}
-	i := rapid.IntRange(0, n-1).Draw(t, "i").(int)
+	i := rapid.IntRange(0, n-1).Draw(t, "i")
 
 	s := m.state[i]
 	ok := m.icrs.Remove(s.ID())
@@ -137,7 +137,7 @@ func (m *icrSealsMachine) RemoveUnknown(t *rapid.T) {
 	if n == 0 {
 		return
 	}
-	i := rapid.IntRange(0, n-1).Draw(t, "i").(int)
+	i := rapid.IntRange(0, n-1).Draw(t, "i")
 	seal := unittest.IncorporatedResultSeal.Fixture(func(s *flow.IncorporatedResultSeal) {
 		s.Header.Height = uint64(i)
 	})
@@ -168,7 +168,11 @@ func (m *icrSealsMachine) Check(t *rapid.T) {
 
 // Run the icrSeals state machine and test it against its model
 func TestIcrs(t *testing.T) {
-	rapid.Check(t, rapid.Run(&icrSealsMachine{}))
+	rapid.Check(t, func(t *rapid.T) {
+		sm := new(icrSealsMachine)
+		sm.init(t)
+		t.Repeat(rapid.StateMachineActions(sm))
+	})
 }
 
 func TestIncorporatedResultSeals(t *testing.T) {

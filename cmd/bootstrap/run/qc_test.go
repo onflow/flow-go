@@ -4,12 +4,11 @@ import (
 	"crypto/rand"
 	"testing"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -45,7 +44,7 @@ func TestGenerateRootQCWithSomeInvalidVotes(t *testing.T) {
 }
 
 func createSignerData(t *testing.T, n int) *ParticipantData {
-	identities := unittest.IdentityListFixture(n).Sort(order.Canonical)
+	identities := unittest.IdentityListFixture(n).Sort(flow.Canonical[flow.Identity])
 
 	networkingKeys := unittest.NetworkingKeys(n)
 	stakingKeys := unittest.StakingKeys(n)
@@ -70,14 +69,15 @@ func createSignerData(t *testing.T, n int) *ParticipantData {
 		participantLookup[identity.NodeID] = lookupParticipant
 
 		// add to participant list
-		nodeInfo := bootstrap.NewPrivateNodeInfo(
+		nodeInfo, err := bootstrap.NewPrivateNodeInfo(
 			identity.NodeID,
 			identity.Role,
 			identity.Address,
-			identity.Weight,
+			identity.InitialWeight,
 			networkingKeys[i],
 			stakingKeys[i],
 		)
+		require.NoError(t, err)
 		participants[i] = Participant{
 			NodeInfo:            nodeInfo,
 			RandomBeaconPrivKey: randomBSKs[i],
@@ -86,8 +86,8 @@ func createSignerData(t *testing.T, n int) *ParticipantData {
 
 	participantData := &ParticipantData{
 		Participants: participants,
-		Lookup:       participantLookup,
-		GroupKey:     groupKey,
+		DKGCommittee: participantLookup,
+		DKGGroupKey:  groupKey,
 	}
 
 	return participantData

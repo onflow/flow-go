@@ -272,7 +272,7 @@ func messageToTrustedTransaction(
 		if err != nil {
 			return *t, fmt.Errorf("could not convert proposer address: %w", err)
 		}
-		t.SetProposalKey(proposalAddress, uint64(proposalKey.GetKeyId()), proposalKey.GetSequenceNumber())
+		t.SetProposalKey(proposalAddress, proposalKey.GetKeyId(), proposalKey.GetSequenceNumber())
 	}
 
 	payer := m.GetPayer()
@@ -297,7 +297,7 @@ func messageToTrustedTransaction(
 		if err != nil {
 			return *t, fmt.Errorf("could not convert payload signature address: %w", err)
 		}
-		t.AddPayloadSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
+		t.AddPayloadSignature(addr, sig.GetKeyId(), sig.GetSignature())
 	}
 
 	for _, sig := range m.GetEnvelopeSignatures() {
@@ -305,13 +305,13 @@ func messageToTrustedTransaction(
 		if err != nil {
 			return *t, fmt.Errorf("could not convert envelope signature address: %w", err)
 		}
-		t.AddEnvelopeSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
+		t.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature())
 	}
 
 	t.SetScript(m.GetScript())
 	t.SetArguments(m.GetArguments())
 	t.SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId()))
-	t.SetGasLimit(m.GetGasLimit())
+	t.SetComputeLimit(m.GetGasLimit())
 
 	return *t, nil
 }

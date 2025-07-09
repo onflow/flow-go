@@ -1,4 +1,4 @@
-# To re-generate the the protobuf go code, install tools first:
+# To re-generate the protobuf go code, install tools first:
 # ```
 # cd flow-go
 # make install-tools

@@ -7,37 +7,47 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func DeployFungibleTokenContractTransaction(fungibleToken flow.Address) *flow.TransactionBody {
-	contract := contracts.FungibleToken()
+func DeployFungibleTokenContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBody {
 	contractName := "FungibleToken"
 	return DeployContractTransaction(
 		fungibleToken,
 		contract,
-		contractName)
+		contractName,
+	)
 }
 
-func DeployNonFungibleTokenContractTransaction(nonFungibleToken flow.Address) *flow.TransactionBody {
-	contract := contracts.NonFungibleToken()
+func DeployNonFungibleTokenContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBody {
 	contractName := "NonFungibleToken"
 	return DeployContractTransaction(
 		nonFungibleToken,
 		contract,
-		contractName)
+		contractName,
+	)
 }
 
-func DeployMetadataViewsContractTransaction(fungibleToken, nonFungibleToken flow.Address) *flow.TransactionBody {
-	contract := contracts.MetadataViews(fungibleToken.HexWithPrefix(), nonFungibleToken.HexWithPrefix())
+func DeployMetadataViewsContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBody {
 	contractName := "MetadataViews"
 	return DeployContractTransaction(
 		nonFungibleToken,
 		contract,
-		contractName)
+		contractName,
+	)
+}
+
+func DeployCrossVMMetadataViewsContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+	contractName := "CrossVMMetadataViews"
+	return DeployContractTransaction(
+		nonFungibleToken,
+		contract,
+		contractName,
+	)
 }
 
 func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.TransactionBody {
@@ -46,16 +56,38 @@ func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.
 	return DeployContractTransaction(
 		nonFungibleToken,
 		contract,
-		contractName)
+		contractName,
+	)
 }
 
-func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungibleToken flow.Address) *flow.TransactionBody {
-	contract := contracts.FungibleTokenMetadataViews(fungibleToken.Hex(), nonFungibleToken.Hex())
+func DeployBurnerContractTransaction(fungibleToken flow.Address) *flow.TransactionBody {
+	contract := contracts.Burner()
+	contractName := "Burner"
+	return DeployContractTransaction(
+		fungibleToken,
+		contract,
+		contractName,
+	)
+}
+
+func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+
 	contractName := "FungibleTokenMetadataViews"
 	return DeployContractTransaction(
 		fungibleToken,
 		contract,
-		contractName)
+		contractName,
+	)
+}
+
+func DeployFungibleTokenSwitchboardContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+
+	contractName := "FungibleTokenSwitchboard"
+	return DeployContractTransaction(
+		fungibleToken,
+		contract,
+		contractName,
+	)
 }
 
 //go:embed scripts/deployFlowTokenTransactionTemplate.cdc
@@ -67,8 +99,7 @@ var createFlowTokenMinterTransactionTemplate string
 //go:embed scripts/mintFlowTokenTransactionTemplate.cdc
 var mintFlowTokenTransactionTemplate string
 
-func DeployFlowTokenContractTransaction(service, fungibleToken, metadataViews, flowToken flow.Address) *flow.TransactionBody {
-	contract := contracts.FlowToken(fungibleToken.HexWithPrefix(), metadataViews.HexWithPrefix(), metadataViews.HexWithPrefix())
+func DeployFlowTokenContractTransaction(service, flowToken flow.Address, contract []byte) *flow.TransactionBody {
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(deployFlowTokenTransactionTemplate)).
@@ -109,4 +140,20 @@ func MintFlowTokenTransaction(
 		).
 		AddArgument(initialSupplyArg).
 		AddAuthorizer(service)
+}
+
+func TransferFlowTokenTransaction(
+	env templates.Environment,
+	from, to flow.Address,
+	amount string,
+) *flow.TransactionBody {
+	cadenceAmount, _ := cadence.NewUFix64(amount)
+	txScript := templates.GenerateTransferGenericVaultWithAddressScript(env)
+	return flow.NewTransactionBody().
+		SetScript(txScript).
+		AddArgument(jsoncdc.MustEncode(cadenceAmount)).
+		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(to))).
+		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(flow.HexToAddress(env.FlowTokenAddress)))).
+		AddArgument(jsoncdc.MustEncode(cadence.String("FlowToken"))).
+		AddAuthorizer(from)
 }

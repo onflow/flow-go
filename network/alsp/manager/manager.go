@@ -300,7 +300,7 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 
 	for _, id := range allIds {
 		m.logger.Trace().Hex("identifier", logging.ID(id)).Msg("onHeartbeat - looping through spam records")
-		penalty, err := m.cache.Adjust(id, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+		penalty, err := m.cache.AdjustWithInit(id, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
 			if record.Penalty > 0 {
 				// sanity check; this should never happen.
 				return record, fmt.Errorf("illegal state: spam record %x has positive penalty %f", id, record.Penalty)
@@ -423,7 +423,7 @@ func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.Repo
 	// a spam record for the peer first and then applies the penalty. In other words, Adjust uses an optimistic update by
 	// first assuming that the spam record exists and then initializing it if it does not exist. In this way, we avoid
 	// acquiring the lock twice per misbehavior report, reducing the contention on the lock and improving the performance.
-	updatedPenalty, err := m.cache.Adjust(report.OriginId, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	updatedPenalty, err := m.cache.AdjustWithInit(report.OriginId, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
 		if report.Penalty > 0 {
 			// this should never happen, unless there is a bug in the misbehavior report handling logic.
 			// we should crash the node in this case to prevent further misbehavior reports from being lost and fix the bug.

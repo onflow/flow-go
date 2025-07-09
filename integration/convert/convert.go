@@ -23,14 +23,14 @@ func ToSDKTransactionSignature(sig flow.TransactionSignature) sdk.TransactionSig
 		Address:     sdk.Address(sig.Address),
 		SignerIndex: sig.SignerIndex,
 		Signature:   sig.Signature,
-		KeyIndex:    int(sig.KeyIndex),
+		KeyIndex:    sig.KeyIndex,
 	}
 }
 
 func ToSDKProposalKey(key flow.ProposalKey) sdk.ProposalKey {
 	return sdk.ProposalKey{
 		Address:        sdk.Address(key.Address),
-		KeyIndex:       int(key.KeyIndex),
+		KeyIndex:       key.KeyIndex,
 		SequenceNumber: key.SequenceNumber,
 	}
 }

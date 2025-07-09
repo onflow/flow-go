@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
@@ -22,8 +22,10 @@ func Test_accountLocalIDGenerator_GenerateAccountID(t *testing.T) {
 		meter := envMock.NewMeter(t)
 		meter.On(
 			"MeterComputation",
-			common.ComputationKind(environment.ComputationKindGenerateAccountLocalID),
-			uint(1),
+			common.ComputationUsage{
+				Kind:      environment.ComputationKindGenerateAccountLocalID,
+				Intensity: 1,
+			},
 		).Return(nil)
 
 		accounts := envMock.NewAccounts(t)
@@ -46,8 +48,10 @@ func Test_accountLocalIDGenerator_GenerateAccountID(t *testing.T) {
 		meter := envMock.NewMeter(t)
 		meter.On(
 			"MeterComputation",
-			common.ComputationKind(environment.ComputationKindGenerateAccountLocalID),
-			uint(1),
+			common.ComputationUsage{
+				Kind:      environment.ComputationKindGenerateAccountLocalID,
+				Intensity: 1,
+			},
 		).Return(expectedErr)
 
 		accounts := envMock.NewAccounts(t)
@@ -67,8 +71,10 @@ func Test_accountLocalIDGenerator_GenerateAccountID(t *testing.T) {
 		meter := envMock.NewMeter(t)
 		meter.On(
 			"MeterComputation",
-			common.ComputationKind(environment.ComputationKindGenerateAccountLocalID),
-			uint(1),
+			common.ComputationUsage{
+				Kind:      environment.ComputationKindGenerateAccountLocalID,
+				Intensity: 1,
+			},
 		).Return(nil)
 
 		accounts := envMock.NewAccounts(t)

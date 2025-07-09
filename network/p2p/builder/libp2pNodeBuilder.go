@@ -8,19 +8,22 @@ import (
 
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	routinghelpers "github.com/libp2p/go-libp2p-routing-helpers"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/core/transport"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
+	fcrypto "github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 
-	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -61,16 +64,17 @@ type LibP2PNodeBuilder struct {
 	metricsConfig    *p2pbuilderconfig.MetricsConfig
 	basicResolver    madns.BasicResolver
 
-	resourceManager      network.ResourceManager
-	resourceManagerCfg   *p2pconfig.ResourceManagerConfig
-	connManager          connmgr.ConnManager
-	connGater            p2p.ConnectionGater
-	routingFactory       func(context.Context, host.Host) (routing.Routing, error)
-	peerManagerConfig    *p2pbuilderconfig.PeerManagerConfig
-	createNode           p2p.NodeConstructor
-	disallowListCacheCfg *p2p.DisallowListCacheConfig
-	unicastConfig        *p2pbuilderconfig.UnicastConfig
-	networkingType       flownet.NetworkingType // whether the node is running in private (staked) or public (unstaked) network
+	resourceManager       network.ResourceManager
+	resourceManagerCfg    *p2pconfig.ResourceManagerConfig
+	connManager           connmgr.ConnManager
+	connGater             p2p.ConnectionGater
+	routingFactory        func(context.Context, host.Host) (routing.Routing, error)
+	peerManagerConfig     *p2pbuilderconfig.PeerManagerConfig
+	createNode            p2p.NodeConstructor
+	disallowListCacheCfg  *p2p.DisallowListCacheConfig
+	unicastConfig         *p2pbuilderconfig.UnicastConfig
+	networkingType        flownet.NetworkingType // whether the node is running in private (staked) or public (unstaked) network
+	protocolPeerCacheList []protocol.ID
 }
 
 func NewNodeBuilder(
@@ -146,7 +150,27 @@ func (builder *LibP2PNodeBuilder) SetRoutingSystem(f func(context.Context, host.
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf p2p.GossipSubFactoryFunc, cf p2p.GossipSubAdapterConfigFunc) p2p.NodeBuilder {
+// OverrideDefaultValidateQueueSize sets the validate queue size to use for the libp2p pubsub system.
+// CAUTION: Be careful setting this to a larger number as it will change the backpressure behavior of the system.
+func (builder *LibP2PNodeBuilder) OverrideDefaultValidateQueueSize(size int) p2p.NodeBuilder {
+	builder.gossipSubBuilder.OverrideDefaultValidateQueueSize(size)
+	return builder
+}
+
+// SetProtocolPeerCacheList sets the protocols to track in the protocol peer cache.
+func (builder *LibP2PNodeBuilder) SetProtocolPeerCacheList(protocols ...protocol.ID) p2p.NodeBuilder {
+	builder.protocolPeerCacheList = protocols
+	return builder
+}
+
+// OverrideGossipSubFactory overrides the default gossipsub factory for the GossipSub protocol.
+// The purpose of override is to allow the node to provide a custom gossipsub factory for sake of testing or experimentation.
+// Note: it is not recommended to override the default gossipsub factory in production unless you know what you are doing.
+// Args:
+// - factory: custom gossipsub factory
+// Returns:
+// - NodeBuilder: the node builder
+func (builder *LibP2PNodeBuilder) OverrideGossipSubFactory(gf p2p.GossipSubFactoryFunc, cf p2p.GossipSubAdapterConfigFunc) p2p.NodeBuilder {
 	builder.gossipSubBuilder.SetGossipSubFactory(gf)
 	builder.gossipSubBuilder.SetGossipSubConfigFunc(cf)
 	return builder
@@ -180,8 +204,15 @@ func (builder *LibP2PNodeBuilder) OverrideNodeConstructor(f p2p.NodeConstructor)
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) OverrideDefaultRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspectorSuiteFactoryFunc) p2p.NodeBuilder {
-	builder.gossipSubBuilder.OverrideDefaultRpcInspectorSuiteFactory(factory)
+// OverrideDefaultRpcInspectorFactory overrides the default rpc inspector factory for the GossipSub protocol.
+// The purpose of override is to allow the node to provide a custom rpc inspector factory for sake of testing or experimentation.
+// Note: it is not recommended to override the default rpc inspector factory in production unless you know what you are doing.
+// Args:
+// - factory: custom rpc inspector factory
+// Returns:
+// - NodeBuilder: the node builder
+func (builder *LibP2PNodeBuilder) OverrideDefaultRpcInspectorFactory(factory p2p.GossipSubRpcInspectorFactoryFunc) p2p.NodeBuilder {
+	builder.gossipSubBuilder.OverrideDefaultRpcInspectorFactory(factory)
 	return builder
 }
 
@@ -196,7 +227,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			return nil, fmt.Errorf("could not create resolver: %w", err)
 		}
 
-		opts = append(opts, libp2p.MultiaddrResolver(resolver))
+		opts = append(opts, libp2p.MultiaddrResolver(swarm.ResolverFromMaDNS{Resolver: resolver}))
 	}
 
 	if builder.resourceManager != nil {
@@ -215,7 +246,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		}
 
 		opts = append(opts, libp2p.ResourceManager(mgr))
-		builder.logger.Info().Msg("default libp2p resource manager is enabled with metrics")
+		builder.logger.Info().Msgf("default libp2p resource manager is enabled with metrics, pubkey: %s", builder.networkKey.PublicKey())
 	}
 
 	if builder.connManager != nil {
@@ -261,10 +292,11 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		Parameters: &p2p.NodeParameters{
 			EnableProtectedStreams: builder.unicastConfig.EnableStreamProtection,
 		},
-		Logger:               builder.logger,
-		Host:                 h,
-		PeerManager:          peerManager,
-		DisallowListCacheCfg: builder.disallowListCacheCfg,
+		Logger:                builder.logger,
+		Host:                  h,
+		PeerManager:           peerManager,
+		DisallowListCacheCfg:  builder.disallowListCacheCfg,
+		ProtocolPeerCacheList: builder.protocolPeerCacheList,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not create libp2p node: %w", err)
@@ -378,7 +410,7 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 	// as the 1-k discovery process and the 1-1 messaging both sometimes attempt to open connection to the same target
 	// As of now there is no requirement of client sockets to be a well-known port, so disabling port reuse all together.
 	t := libp2p.Transport(func(u transport.Upgrader) (*tcp.TcpTransport, error) {
-		return tcp.NewTCPTransport(u, nil, tcp.DisableReuseport())
+		return tcp.NewTCPTransport(u, nil, nil, tcp.DisableReuseport())
 	})
 
 	// gather all the options for the libp2p node
@@ -437,7 +469,9 @@ func DefaultNodeBuilder(
 		idProvider,
 		rCfg, peerManagerCfg,
 		disallowListCacheCfg,
-		uniCfg).
+		uniCfg)
+
+	builder.
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater)
@@ -449,13 +483,28 @@ func DefaultNodeBuilder(
 		}
 		builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, idProvider))
 
-		if dhtSystemActivation == DhtSystemEnabled {
-			builder.SetRoutingSystem(
-				func(ctx context.Context, host host.Host) (routing.Routing, error) {
-					return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), logger, metricsCfg.Metrics, dht.AsServer())
-				})
-		}
+		builder.configureRoutingSystem(r, dhtSystemActivation)
 	}
 
 	return builder, nil
+}
+
+func (b *LibP2PNodeBuilder) configureRoutingSystem(
+	role flow.Role,
+	dhtSystemActivation DhtSystemActivation,
+) {
+	if role != flow.RoleAccess && role != flow.RoleExecution {
+		return // routing only required for Access and Execution nodes
+	}
+
+	if dhtSystemActivation == DhtSystemEnabled {
+		b.SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
+			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(b.sporkId), b.logger, b.metricsConfig.Metrics, dht.AsServer())
+		})
+	} else {
+		// bitswap requires a content routing system. this returns a stub instead of a full DHT
+		b.SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
+			return routinghelpers.Null{}, nil
+		})
+	}
 }

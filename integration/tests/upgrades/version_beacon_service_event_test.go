@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -61,7 +62,7 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 			SetScript(setFreezePeriodScript).
 			SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 			SetProposalKey(serviceAddress,
-				0, s.AccessClient().GetSeqNumber()). // todo track sequence number
+				0, s.AccessClient().GetAndIncrementSeqNumber()). // todo track sequence number
 			AddAuthorizer(serviceAddress).
 			SetPayer(serviceAddress)
 
@@ -243,7 +244,7 @@ func (s *TestServiceEventVersionControl) getFreezePeriod(
 
 	s.Require().True(is, "version freezePeriod script returned unknown type")
 
-	return cadenceBuffer.ToGoValue().(uint64)
+	return uint64(cadenceBuffer)
 }
 
 type versionBoundary struct {
@@ -265,7 +266,7 @@ func (s *TestServiceEventVersionControl) sendSetVersionBoundaryTransaction(
 
 	latestBlockId, err := s.AccessClient().GetLatestBlockID(ctx)
 	s.Require().NoError(err)
-	seq := s.AccessClient().GetSeqNumber()
+	seq := s.AccessClient().GetAndIncrementSeqNumber()
 
 	tx := sdk.NewTransaction().
 		SetScript(versionTableChangeScript).

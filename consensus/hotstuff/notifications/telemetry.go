@@ -60,7 +60,7 @@ func (t *TelemetryConsumer) OnStart(currentView uint64) {
 	t.pathHandler.NextStep().Msg("OnStart")
 }
 
-func (t *TelemetryConsumer) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
+func (t *TelemetryConsumer) OnReceiveProposal(currentView uint64, proposal *model.SignedProposal) {
 	block := proposal.Block
 	t.pathHandler.StartNextPath(currentView)
 	step := t.pathHandler.NextStep().
@@ -169,10 +169,10 @@ func (t *TelemetryConsumer) OnTcTriggeredViewChange(oldView uint64, newView uint
 		Msg("OnTcTriggeredViewChange")
 }
 
-func (t *TelemetryConsumer) OnOwnVote(blockID flow.Identifier, view uint64, _ []byte, recipientID flow.Identifier) {
+func (t *TelemetryConsumer) OnOwnVote(vote *model.Vote, recipientID flow.Identifier) {
 	t.pathHandler.NextStep().
-		Uint64("voted_block_view", view).
-		Hex("voted_block_id", logging.ID(blockID)).
+		Uint64("voted_block_view", vote.View).
+		Hex("voted_block_id", logging.ID(vote.BlockID)).
 		Hex("recipient_id", logging.ID(recipientID)).
 		Msg("OnOwnVote")
 }

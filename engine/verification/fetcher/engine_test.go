@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
+	"github.com/onflow/flow-go/model/verification/convert"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
@@ -338,7 +339,27 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 				// we don't alter chunk data pack content
 			},
 			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
-				identity.Weight = 0
+				identity.EpochParticipationStatus = flow.EpochParticipationStatusJoining
+				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
+			},
+			msg: "participation-status-joining-origin-id",
+		},
+		{
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack) {
+				// we don't alter chunk data pack content
+			},
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+				identity.EpochParticipationStatus = flow.EpochParticipationStatusLeaving
+				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
+			},
+			msg: "participation-status-leaving-origin-id",
+		},
+		{
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack) {
+				// we don't alter chunk data pack content
+			},
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+				identity.InitialWeight = 0
 				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
 			},
 			msg: "zero-weight-origin-id",
@@ -737,10 +758,10 @@ func mockVerifierEngine(t *testing.T,
 			require.Equal(t, expected.Result.ID(), vc.Result.ID())
 			require.Equal(t, expected.Header.ID(), vc.Header.ID())
 
-			isSystemChunk := fetcher.IsSystemChunk(vc.Chunk.Index, vc.Result)
+			isSystemChunk := convert.IsSystemChunk(vc.Chunk.Index, vc.Result)
 			require.Equal(t, isSystemChunk, vc.IsSystemChunk)
 
-			endState, err := fetcher.EndStateCommitment(vc.Result, vc.Chunk.Index, isSystemChunk)
+			endState, err := convert.EndStateCommitment(vc.Result, vc.Chunk.Index, isSystemChunk)
 			require.NoError(t, err)
 
 			require.Equal(t, endState, vc.EndState)
@@ -852,16 +873,18 @@ func chunkDataPackResponseFixture(t *testing.T,
 	collection *flow.Collection,
 	result *flow.ExecutionResult) *verification.ChunkDataPackResponse {
 
-	require.Equal(t, collection != nil, !fetcher.IsSystemChunk(chunk.Index, result), "only non-system chunks must have a collection")
+	require.Equal(t, collection != nil, !convert.IsSystemChunk(chunk.Index, result), "only non-system chunks must have a collection")
 
 	return &verification.ChunkDataPackResponse{
 		Locator: chunks.Locator{
 			ResultID: result.ID(),
 			Index:    chunk.Index,
 		},
-		Cdp: unittest.ChunkDataPackFixture(chunk.ID(),
+		Cdp: unittest.ChunkDataPackFixture(
+			chunk.ID(),
 			unittest.WithStartState(chunk.StartState),
-			unittest.WithChunkDataPackCollection(collection)),
+			unittest.WithChunkDataPackCollection(collection),
+		),
 	}
 }
 
@@ -897,7 +920,7 @@ func verifiableChunkFixture(t *testing.T,
 	result *flow.ExecutionResult,
 	chunkDataPack *flow.ChunkDataPack) *verification.VerifiableChunkData {
 
-	offsetForChunk, err := fetcher.TransactionOffsetForChunk(result.Chunks, chunk.Index)
+	offsetForChunk, err := convert.TransactionOffsetForChunk(result.Chunks, chunk.Index)
 	require.NoError(t, err)
 
 	// TODO: add end state
@@ -932,11 +955,12 @@ func chunkRequestsFixture(
 //
 // Agrees and disagrees are the list of execution node identifiers that generate the same and contradicting execution result
 // with the execution result that chunks belong to, respectively.
-func chunkRequestFixture(resultID flow.Identifier,
+func chunkRequestFixture(
+	resultID flow.Identifier,
 	status *verification.ChunkStatus,
 	agrees flow.IdentityList,
-	disagrees flow.IdentityList) *verification.ChunkDataPackRequest {
-
+	disagrees flow.IdentityList,
+) *verification.ChunkDataPackRequest {
 	return &verification.ChunkDataPackRequest{
 		Locator: chunks.Locator{
 			ResultID: resultID,
@@ -980,7 +1004,7 @@ func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount in
 	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
 
 	for _, status := range statuses {
-		if fetcher.IsSystemChunk(status.ChunkIndex, result) {
+		if convert.IsSystemChunk(status.ChunkIndex, result) {
 			// system-chunk should have a nil collection
 			continue
 		}
@@ -992,7 +1016,7 @@ func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount in
 
 func TestTransactionOffsetForChunk(t *testing.T) {
 	t.Run("first chunk index always returns zero offset", func(t *testing.T) {
-		offsetForChunk, err := fetcher.TransactionOffsetForChunk([]*flow.Chunk{nil}, 0)
+		offsetForChunk, err := convert.TransactionOffsetForChunk([]*flow.Chunk{nil}, 0)
 		require.NoError(t, err)
 		assert.Equal(t, uint32(0), offsetForChunk)
 	})
@@ -1022,19 +1046,19 @@ func TestTransactionOffsetForChunk(t *testing.T) {
 			},
 		}
 
-		offsetForChunk, err := fetcher.TransactionOffsetForChunk(chunksList, 0)
+		offsetForChunk, err := convert.TransactionOffsetForChunk(chunksList, 0)
 		require.NoError(t, err)
 		assert.Equal(t, uint32(0), offsetForChunk)
 
-		offsetForChunk, err = fetcher.TransactionOffsetForChunk(chunksList, 1)
+		offsetForChunk, err = convert.TransactionOffsetForChunk(chunksList, 1)
 		require.NoError(t, err)
 		assert.Equal(t, uint32(1), offsetForChunk)
 
-		offsetForChunk, err = fetcher.TransactionOffsetForChunk(chunksList, 2)
+		offsetForChunk, err = convert.TransactionOffsetForChunk(chunksList, 2)
 		require.NoError(t, err)
 		assert.Equal(t, uint32(3), offsetForChunk)
 
-		offsetForChunk, err = fetcher.TransactionOffsetForChunk(chunksList, 3)
+		offsetForChunk, err = convert.TransactionOffsetForChunk(chunksList, 3)
 		require.NoError(t, err)
 		assert.Equal(t, uint32(6), offsetForChunk)
 	})
@@ -1043,7 +1067,7 @@ func TestTransactionOffsetForChunk(t *testing.T) {
 
 		chunksList := make([]*flow.Chunk, 2)
 
-		_, err := fetcher.TransactionOffsetForChunk(chunksList, 2)
+		_, err := convert.TransactionOffsetForChunk(chunksList, 2)
 		require.Error(t, err)
 	})
 }

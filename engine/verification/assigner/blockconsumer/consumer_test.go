@@ -18,7 +18,8 @@ import (
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -117,10 +118,11 @@ func withConsumer(
 	process func(notifier module.ProcessingNotifier, block *flow.Block),
 	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block),
 ) {
+
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		maxProcessing := uint64(workerCount)
 
-		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationBlockHeight)
+		processedHeight := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressVerificationBlockHeight)
 		collector := &metrics.NoopCollector{}
 		tracer := trace.NewNoopTracer()
 		log := unittest.Logger()
@@ -146,11 +148,21 @@ func withConsumer(
 		// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
 		// Container blocks only contain receipts of their preceding reference blocks. But they do not
 		// hold any guarantees.
-		root, err := s.State.Params().FinalizedRoot()
+		root, err := s.State.Final().Head()
 		require.NoError(t, err)
-		clusterCommittee := participants.Filter(filter.HasRole(flow.RoleCollection))
+		rootProtocolState, err := s.State.Final().ProtocolState()
+		require.NoError(t, err)
+		rootProtocolStateID := rootProtocolState.ID()
+		clusterCommittee := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 		sources := unittest.RandomSourcesFixture(110)
-		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2, sources, vertestutils.WithClusterCommittee(clusterCommittee))
+		results := vertestutils.CompleteExecutionReceiptChainFixture(
+			t,
+			root,
+			rootProtocolStateID,
+			blockCount/2,
+			sources,
+			vertestutils.WithClusterCommittee(clusterCommittee),
+		)
 		blocks := vertestutils.ExtendStateWithFinalizedBlocks(t, results, s.State)
 		// makes sure that we generated a block chain of requested length.
 		require.Len(t, blocks, blockCount)

@@ -33,14 +33,19 @@ func (g *googleBucket) NewClient(ctx context.Context) (*storage.Client, error) {
 	return client, nil
 }
 
+type GCSFile struct {
+	Name string
+	MD5  []byte
+}
+
 // GetFiles returns a list of file names within the Google bucket
-func (g *googleBucket) GetFiles(ctx context.Context, client *storage.Client, prefix, delimiter string) ([]string, error) {
+func (g *googleBucket) GetFiles(ctx context.Context, client *storage.Client, prefix, delimiter string) ([]GCSFile, error) {
 	it := client.Bucket(g.Name).Objects(ctx, &storage.Query{
 		Prefix:    prefix,
 		Delimiter: delimiter,
 	})
 
-	var files []string
+	var files []GCSFile
 	for {
 		attrs, err := it.Next()
 		if err == iterator.Done {
@@ -50,7 +55,10 @@ func (g *googleBucket) GetFiles(ctx context.Context, client *storage.Client, pre
 			return nil, err
 		}
 
-		files = append(files, attrs.Name)
+		files = append(files, GCSFile{
+			Name: attrs.Name,
+			MD5:  attrs.MD5,
+		})
 	}
 
 	return files, nil

@@ -1,6 +1,6 @@
 transaction(restricted: Bool, path: StoragePath) {
-	prepare(signer: AuthAccount) {
-		signer.load<Bool>(from: path)
-		signer.save(restricted, to: path)
+	prepare(signer: auth(Storage) &Account) {
+		signer.storage.load<Bool>(from: path)
+		signer.storage.save(restricted, to: path)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -19,16 +20,18 @@ import (
 	_ "google.golang.org/grpc/encoding/gzip" // required for gRPC compression
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/engine"
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" // required for gRPC compression
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  // required for gRPC compression
-	"github.com/onflow/flow-go/engine/common/rpc"
+
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	exeEng "github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/computation/metrics"
 	"github.com/onflow/flow-go/engine/execution/state"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -58,10 +61,11 @@ func New(
 	scriptsExecutor exeEng.ScriptExecutor,
 	headers storage.Headers,
 	state protocol.State,
-	events storage.Events,
-	exeResults storage.ExecutionResults,
-	txResults storage.TransactionResults,
-	commits storage.Commits,
+	events storage.EventsReader,
+	exeResults storage.ExecutionResultsReader,
+	txResults storage.TransactionResultsReader,
+	commits storage.CommitsReader,
+	transactionMetrics metrics.TransactionExecutionMetricsProvider,
 	chainID flow.ChainID,
 	signerIndicesDecoder hotstuff.BlockSignerDecoder,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
@@ -81,7 +85,7 @@ func New(
 
 	if len(apiRatelimits) > 0 {
 		// create a rate limit interceptor
-		rateLimitInterceptor := rpc.NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).UnaryServerInterceptor
+		rateLimitInterceptor := grpcserver.NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).UnaryServerInterceptor
 		// append the rate limit interceptor to the list of interceptors
 		interceptors = append(interceptors, rateLimitInterceptor)
 	}
@@ -105,6 +109,7 @@ func New(
 			exeResults:           exeResults,
 			transactionResults:   txResults,
 			commits:              commits,
+			transactionMetrics:   transactionMetrics,
 			log:                  log,
 			maxBlockRange:        DefaultMaxBlockRange,
 		},
@@ -161,11 +166,12 @@ type handler struct {
 	headers              storage.Headers
 	state                protocol.State
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
-	events               storage.Events
-	exeResults           storage.ExecutionResults
-	transactionResults   storage.TransactionResults
+	events               storage.EventsReader
+	exeResults           storage.ExecutionResultsReader
+	transactionResults   storage.TransactionResultsReader
 	log                  zerolog.Logger
-	commits              storage.Commits
+	commits              storage.CommitsReader
+	transactionMetrics   metrics.TransactionExecutionMetricsProvider
 	maxBlockRange        int
 }
 
@@ -197,7 +203,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockID)
 	}
 
-	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
+	value, compUsage, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
 	if err != nil {
 		// todo check the error code instead
 		// return code 3 as this passes the litmus test in our context
@@ -205,7 +211,8 @@ func (h *handler) ExecuteScriptAtBlockID(
 	}
 
 	res := &execution.ExecuteScriptAtBlockIDResponse{
-		Value: value,
+		Value:            value,
+		ComputationUsage: compUsage,
 	}
 
 	return res, nil
@@ -269,10 +276,19 @@ func (h *handler) GetEventsForBlockIDs(
 			return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", bID)
 		}
 
-		// lookup events
-		blockEvents, err := h.events.ByBlockIDEventType(bID, flow.EventType(eType))
+		// lookup all events for the block
+		blockAllEvents, err := h.getEventsByBlockID(bID)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
+		}
+
+		// filter events by type
+		eventType := flow.EventType(eType)
+		blockEvents := make([]flow.Event, 0, len(blockAllEvents))
+		for _, event := range blockAllEvents {
+			if event.Type == eventType {
+				blockEvents = append(blockEvents, event)
+			}
 		}
 
 		result, err := h.eventResult(bID, blockEvents)
@@ -280,7 +296,6 @@ func (h *handler) GetEventsForBlockIDs(
 			return nil, err
 		}
 		results[i] = result
-
 	}
 
 	return &execution.GetEventsForBlockIDsResponse{
@@ -442,14 +457,14 @@ func (h *handler) GetTransactionResultsByBlockID(
 	}
 
 	// get all events for a block
-	blockEvents, err := h.events.ByBlockID(blockID)
+	blockEvents, err := h.getEventsByBlockID(blockID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
 	}
 
 	responseTxResults := make([]*execution.GetTransactionResultResponse, len(txResults))
 
-	eventsByTxIndex := make(map[uint32][]flow.Event, len(txResults)) //we will have at most as many buckets as tx results
+	eventsByTxIndex := make(map[uint32][]flow.Event, len(txResults)) // we will have at most as many buckets as tx results
 
 	// re-partition events by tx index
 	// it's not documented but events are stored indexed by (blockID, event.TransactionID, event.TransactionIndex, event.EventIndex)
@@ -791,4 +806,83 @@ func (h *handler) blockHeaderResponse(header *flow.Header) (*execution.BlockHead
 	return &execution.BlockHeaderResponse{
 		Block: msg,
 	}, nil
+}
+
+// GetTransactionExecutionMetricsAfter gets the execution metrics for a transaction after a given block.
+func (h *handler) GetTransactionExecutionMetricsAfter(
+	_ context.Context,
+	req *execution.GetTransactionExecutionMetricsAfterRequest,
+) (*execution.GetTransactionExecutionMetricsAfterResponse, error) {
+	height := req.GetBlockHeight()
+
+	metrics, err := h.transactionMetrics.GetTransactionExecutionMetricsAfter(height)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get metrics after block height %v: %v", height, err)
+	}
+
+	response := &execution.GetTransactionExecutionMetricsAfterResponse{
+		Results: make([]*execution.GetTransactionExecutionMetricsAfterResponse_Result, 0, len(metrics)),
+	}
+
+	for blockHeight, blockMetrics := range metrics {
+		blockResponse := &execution.GetTransactionExecutionMetricsAfterResponse_Result{
+			BlockHeight:  blockHeight,
+			Transactions: make([]*execution.GetTransactionExecutionMetricsAfterResponse_Transaction, len(blockMetrics)),
+		}
+
+		for i, transactionMetrics := range blockMetrics {
+			transactionMetricsResponse := &execution.GetTransactionExecutionMetricsAfterResponse_Transaction{
+				TransactionId:          transactionMetrics.TransactionID[:],
+				ExecutionTime:          uint64(transactionMetrics.ExecutionTime.Nanoseconds()),
+				ExecutionEffortWeights: make([]*execution.GetTransactionExecutionMetricsAfterResponse_ExecutionEffortWeight, 0, len(transactionMetrics.ExecutionEffortWeights)),
+			}
+
+			for kind, weight := range transactionMetrics.ExecutionEffortWeights {
+				transactionMetricsResponse.ExecutionEffortWeights = append(
+					transactionMetricsResponse.ExecutionEffortWeights,
+					&execution.GetTransactionExecutionMetricsAfterResponse_ExecutionEffortWeight{
+						Kind:   uint64(kind),
+						Weight: uint64(weight),
+					},
+				)
+			}
+
+			blockResponse.Transactions[i] = transactionMetricsResponse
+		}
+		response.Results = append(response.Results, blockResponse)
+	}
+
+	// sort the response by block height in descending order
+	sort.Slice(response.Results, func(i, j int) bool {
+		return response.Results[i].BlockHeight > response.Results[j].BlockHeight
+	})
+
+	return response, nil
+}
+
+// additional check that when there is no event in the block, double check if the execution
+// result has no events as well, otherwise return an error.
+// we check the execution result has no event by checking if each chunk's EventCollection is
+// the default hash for empty event collection.
+func (h *handler) getEventsByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
+	blockEvents, err := h.events.ByBlockID(blockID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
+	}
+
+	if len(blockEvents) == 0 {
+		executionResult, err := h.exeResults.ByBlockID(blockID)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get execution result for block %v: %v", blockID, err)
+		}
+
+		for _, chunk := range executionResult.Chunks {
+			if chunk.EventCollection != flow.EmptyEventCollectionID &&
+				executionResult.PreviousResultID != flow.ZeroID { // skip the root blcok
+				return nil, status.Errorf(codes.Internal, "events not found for block %s, but chunk %d has events", blockID, chunk.Index)
+			}
+		}
+	}
+
+	return blockEvents, nil
 }

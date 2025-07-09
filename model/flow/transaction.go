@@ -2,10 +2,11 @@ package flow
 
 import (
 	"fmt"
-	"sort"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
+	"golang.org/x/exp/slices"
+
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
@@ -124,8 +125,8 @@ func (tb *TransactionBody) SetReferenceBlockID(blockID Identifier) *TransactionB
 	return tb
 }
 
-// SetGasLimit sets the gas limit for this transaction.
-func (tb *TransactionBody) SetGasLimit(limit uint64) *TransactionBody {
+// SetComputeLimit sets the gas limit for this transaction.
+func (tb *TransactionBody) SetComputeLimit(limit uint64) *TransactionBody {
 	tb.GasLimit = limit
 	return tb
 }
@@ -134,7 +135,7 @@ func (tb *TransactionBody) SetGasLimit(limit uint64) *TransactionBody {
 //
 // The first two arguments specify the account key to be used, and the last argument is the sequence
 // number being declared.
-func (tb *TransactionBody) SetProposalKey(address Address, keyID uint64, sequenceNum uint64) *TransactionBody {
+func (tb *TransactionBody) SetProposalKey(address Address, keyID uint32, sequenceNum uint64) *TransactionBody {
 	proposalKey := ProposalKey{
 		Address:        address,
 		KeyIndex:       keyID,
@@ -243,7 +244,7 @@ func (tb *TransactionBody) signerMap() map[Address]int {
 // This function returns an error if the signature cannot be generated.
 func (tb *TransactionBody) SignPayload(
 	address Address,
-	keyID uint64,
+	keyID uint32,
 	privateKey crypto.PrivateKey,
 	hasher hash.Hasher,
 ) error {
@@ -266,7 +267,7 @@ func (tb *TransactionBody) SignPayload(
 // This function returns an error if the signature cannot be generated.
 func (tb *TransactionBody) SignEnvelope(
 	address Address,
-	keyID uint64,
+	keyID uint32,
 	privateKey crypto.PrivateKey,
 	hasher hash.Hasher,
 ) error {
@@ -302,26 +303,26 @@ func (tb *TransactionBody) Sign(
 }
 
 // AddPayloadSignature adds a payload signature to the transaction for the given address and key ID.
-func (tb *TransactionBody) AddPayloadSignature(address Address, keyID uint64, sig []byte) *TransactionBody {
+func (tb *TransactionBody) AddPayloadSignature(address Address, keyID uint32, sig []byte) *TransactionBody {
 	s := tb.createSignature(address, keyID, sig)
 
 	tb.PayloadSignatures = append(tb.PayloadSignatures, s)
-	sort.Slice(tb.PayloadSignatures, compareSignatures(tb.PayloadSignatures))
+	slices.SortFunc(tb.PayloadSignatures, compareSignatures)
 
 	return tb
 }
 
 // AddEnvelopeSignature adds an envelope signature to the transaction for the given address and key ID.
-func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID uint64, sig []byte) *TransactionBody {
+func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID uint32, sig []byte) *TransactionBody {
 	s := tb.createSignature(address, keyID, sig)
 
 	tb.EnvelopeSignatures = append(tb.EnvelopeSignatures, s)
-	sort.Slice(tb.EnvelopeSignatures, compareSignatures(tb.EnvelopeSignatures))
+	slices.SortFunc(tb.EnvelopeSignatures, compareSignatures)
 
 	return tb
 }
 
-func (tb *TransactionBody) createSignature(address Address, keyID uint64, sig []byte) TransactionSignature {
+func (tb *TransactionBody) createSignature(address Address, keyID uint32, sig []byte) TransactionSignature {
 	signerIndex, signerExists := tb.signerMap()[address]
 	if !signerExists {
 		signerIndex = -1
@@ -351,7 +352,7 @@ func (tb *TransactionBody) payloadCanonicalForm() interface{} {
 		ReferenceBlockID          []byte
 		GasLimit                  uint64
 		ProposalKeyAddress        []byte
-		ProposalKeyID             uint64
+		ProposalKeyID             uint32
 		ProposalKeySequenceNumber uint64
 		Payer                     []byte
 		Authorizers               [][]byte
@@ -440,7 +441,7 @@ func (f TransactionField) String() string {
 // A ProposalKey is the key that specifies the proposal key and sequence number for a transaction.
 type ProposalKey struct {
 	Address        Address
-	KeyIndex       uint64
+	KeyIndex       uint32
 	SequenceNumber uint64
 }
 
@@ -455,7 +456,7 @@ func (p ProposalKey) ByteSize() int {
 type TransactionSignature struct {
 	Address     Address
 	SignerIndex int
-	KeyIndex    uint64
+	KeyIndex    uint32
 	Signature   []byte
 }
 
@@ -488,17 +489,12 @@ func (s TransactionSignature) canonicalForm() interface{} {
 	}
 }
 
-func compareSignatures(signatures []TransactionSignature) func(i, j int) bool {
-	return func(i, j int) bool {
-		sigA := signatures[i]
-		sigB := signatures[j]
-
-		if sigA.SignerIndex == sigB.SignerIndex {
-			return sigA.KeyIndex < sigB.KeyIndex
-		}
-
-		return sigA.SignerIndex < sigB.SignerIndex
+func compareSignatures(sigA, sigB TransactionSignature) int {
+	if sigA.SignerIndex == sigB.SignerIndex {
+		return int(sigA.KeyIndex) - int(sigB.KeyIndex)
 	}
+
+	return sigA.SignerIndex - sigB.SignerIndex
 }
 
 type signaturesList []TransactionSignature

@@ -3,7 +3,6 @@ package factories
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus"
@@ -32,7 +31,7 @@ type HotStuffMetricsFunc func(chainID flow.ChainID) module.HotstuffMetrics
 type HotStuffFactory struct {
 	baseLogger     zerolog.Logger
 	me             module.Local
-	db             *badger.DB
+	db             storage.DB
 	protoState     protocol.State
 	engineMetrics  module.EngineMetrics
 	mempoolMetrics module.MempoolMetrics
@@ -43,7 +42,7 @@ type HotStuffFactory struct {
 func NewHotStuffFactory(
 	log zerolog.Logger,
 	me module.Local,
-	db *badger.DB,
+	db storage.DB,
 	protoState protocol.State,
 	engineMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
@@ -65,7 +64,7 @@ func NewHotStuffFactory(
 }
 
 func (f *HotStuffFactory) CreateModules(
-	epoch protocol.Epoch,
+	epoch protocol.CommittedEpoch,
 	cluster protocol.Cluster,
 	clusterState cluster.State,
 	headers storage.Headers,
@@ -156,13 +155,18 @@ func (f *HotStuffFactory) CreateModules(
 		return nil, nil, err
 	}
 
+	persist, err := persister.New(f.db, cluster.ChainID())
+	if err != nil {
+		return nil, nil, err
+	}
+
 	return &consensus.HotstuffModules{
 		Forks:                       forks,
 		Validator:                   validator,
 		Notifier:                    notifier,
 		Committee:                   committee,
 		Signer:                      signer,
-		Persist:                     persister.New(f.db, cluster.ChainID()),
+		Persist:                     persist,
 		VoteAggregator:              voteAggregator,
 		TimeoutAggregator:           timeoutAggregator,
 		VoteCollectorDistributor:    voteAggregationDistributor.VoteCollectorDistributor,

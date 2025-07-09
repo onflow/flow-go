@@ -9,9 +9,11 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 
-	cryptoHash "github.com/onflow/flow-go/crypto/hash"
+	cryptoHash "github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Path captures storage path of a payload;
@@ -236,6 +238,14 @@ func (k encKey) DeepCopy() encKey {
 	return newK
 }
 
+const (
+	KeyPartOwner = uint16(0)
+	// Deprecated: KeyPartController was only used by the very first
+	// version of Cadence for access control, which was later retired
+	_          = uint16(1) // DO NOT REUSE
+	KeyPartKey = uint16(2)
+)
+
 // Payload is the smallest immutable storable unit in ledger
 type Payload struct {
 	// encKey is key encoded using PayloadVersion.
@@ -317,6 +327,38 @@ func (p *Payload) Key() (Key, error) {
 		return Key{}, err
 	}
 	return *k, nil
+}
+
+// EncodedKey returns payload key.
+// CAUTION: do not modify returned encoded key
+// because it shares underlying data with payload key.
+func (p *Payload) EncodedKey() []byte {
+	if p == nil {
+		return nil
+	}
+	return p.encKey
+}
+
+// Address returns:
+// - (address, nil) if the payload is for an account, the account address is returned
+// - (flow.EmptyAddress, nil) if the payload is not for an account (global register)
+// - (flow.EmptyAddress, err) if running into any exception
+// The zero address is used for global Payloads and is not an actual account
+func (p *Payload) Address() (flow.Address, error) {
+	if p == nil {
+		return flow.EmptyAddress, fmt.Errorf("failed to get payload address: payload is nil")
+	}
+	if len(p.encKey) == 0 {
+		return flow.EmptyAddress, fmt.Errorf("failed to get payload address: encoded key is empty")
+	}
+	b, found, err := decodeKeyPartValueByType(p.encKey, KeyPartOwner, true, PayloadVersion)
+	if err != nil {
+		return flow.EmptyAddress, err
+	}
+	if !found {
+		return flow.EmptyAddress, fmt.Errorf("failed to find address by type %d", KeyPartOwner)
+	}
+	return flow.BytesToAddress(b), nil
 }
 
 // Value returns payload value.

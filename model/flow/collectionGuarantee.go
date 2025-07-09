@@ -1,9 +1,7 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package flow
 
 import (
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 )
 
 // CollectionGuarantee is a signed hash for a collection, which is used

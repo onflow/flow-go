@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -15,7 +16,12 @@ func TestWorkerImmediate(t *testing.T) {
 	t.Parallel()
 	t.Run("immediate", func(t *testing.T) {
 		done := make(chan struct{})
-		w := NewWorker(0, time.Hour, func(workerID int) { close(done) })
+		w := NewWorker(
+			context.Background(),
+			0,
+			time.Hour,
+			func(workerID int) { close(done) },
+		)
 		w.Start()
 
 		unittest.AssertClosesBefore(t, done, 5*time.Second)
@@ -30,6 +36,7 @@ func TestWorker(t *testing.T) {
 		i := atomic.NewInt64(0)
 		done := make(chan struct{})
 		w := NewWorker(
+			context.Background(),
 			0,
 			time.Millisecond,
 			func(workerID int) {
@@ -49,11 +56,13 @@ func TestWorker(t *testing.T) {
 func TestWorkerStartStop(t *testing.T) {
 	t.Parallel()
 	t.Run("stop w/o start", func(t *testing.T) {
-		w := NewWorker(0, time.Second, func(workerID int) {})
+		w := NewWorker(
+			context.Background(), 0, time.Second, func(workerID int) {})
 		w.Stop()
 	})
 	t.Run("stop and start", func(t *testing.T) {
-		w := NewWorker(0, time.Second, func(workerID int) {})
+		w := NewWorker(
+			context.Background(), 0, time.Second, func(workerID int) {})
 		w.Start()
 		w.Stop()
 	})

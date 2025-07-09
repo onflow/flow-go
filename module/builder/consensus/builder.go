@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package consensus
 
 import (
@@ -7,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -19,32 +16,30 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 // Builder is the builder for consensus block payloads. Upon providing a payload
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
-	metrics    module.MempoolMetrics
-	tracer     module.Tracer
-	db         *badger.DB
-	state      protocol.ParticipantState
-	seals      storage.Seals
-	headers    storage.Headers
-	index      storage.Index
-	blocks     storage.Blocks
-	resultsDB  storage.ExecutionResults
-	receiptsDB storage.ExecutionReceipts
-	guarPool   mempool.Guarantees
-	sealPool   mempool.IncorporatedResultSeals
-	recPool    mempool.ExecutionTree
-	cfg        Config
+	metrics              module.MempoolMetrics
+	tracer               module.Tracer
+	state                protocol.ParticipantState
+	seals                storage.Seals
+	headers              storage.Headers
+	index                storage.Index
+	blocks               storage.Blocks
+	resultsDB            storage.ExecutionResults
+	receiptsDB           storage.ExecutionReceipts
+	guarPool             mempool.Guarantees
+	sealPool             mempool.IncorporatedResultSeals
+	recPool              mempool.ExecutionTree
+	mutableProtocolState protocol.MutableProtocolState
+	cfg                  Config
 }
 
 // NewBuilder creates a new block builder.
 func NewBuilder(
 	metrics module.MempoolMetrics,
-	db *badger.DB,
 	state protocol.ParticipantState,
 	headers storage.Headers,
 	seals storage.Seals,
@@ -52,6 +47,7 @@ func NewBuilder(
 	blocks storage.Blocks,
 	resultsDB storage.ExecutionResults,
 	receiptsDB storage.ExecutionReceipts,
+	mutableProtocolState protocol.MutableProtocolState,
 	guarPool mempool.Guarantees,
 	sealPool mempool.IncorporatedResultSeals,
 	recPool mempool.ExecutionTree,
@@ -79,20 +75,20 @@ func NewBuilder(
 	}
 
 	b := &Builder{
-		metrics:    metrics,
-		db:         db,
-		tracer:     tracer,
-		state:      state,
-		headers:    headers,
-		seals:      seals,
-		index:      index,
-		blocks:     blocks,
-		resultsDB:  resultsDB,
-		receiptsDB: receiptsDB,
-		guarPool:   guarPool,
-		sealPool:   sealPool,
-		recPool:    recPool,
-		cfg:        cfg,
+		metrics:              metrics,
+		tracer:               tracer,
+		state:                state,
+		headers:              headers,
+		seals:                seals,
+		index:                index,
+		blocks:               blocks,
+		resultsDB:            resultsDB,
+		receiptsDB:           receiptsDB,
+		guarPool:             guarPool,
+		sealPool:             sealPool,
+		recPool:              recPool,
+		mutableProtocolState: mutableProtocolState,
+		cfg:                  cfg,
 	}
 
 	err = b.repopulateExecutionTree()
@@ -103,10 +99,20 @@ func NewBuilder(
 	return b, nil
 }
 
-// BuildOn creates a new block header on top of the provided parent, using the
-// given view and applying the custom setter function to allow the caller to
-// make changes to the header before storing it.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
+// BuildOn generates a new payload that is valid with respect to the parent
+// being built upon, with the view being provided by the consensus algorithm.
+// The builder stores the block and validates it against the protocol state
+// before returning it. The specified parent block must exist in the protocol state.
+//
+// NOTE: Since the block is stored within Builder, HotStuff MUST propose the
+// block once BuildOn successfully returns.
+//
+// # Errors
+// This function does not produce any expected errors.
+// However, it will pass through all errors returned by `setter` and `sign`.
+// Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
+// and handle them accordingly when handling errors returned from BuildOn.
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error) {
 
 	// since we don't know the blockID when building the block we track the
 	// time indirectly and insert the span directly at the end
@@ -136,7 +142,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		insertableGuarantees,
 		insertableSeals,
 		insertableReceipts,
-		setter)
+		setter,
+		sign)
 	if err != nil {
 		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
@@ -267,13 +274,9 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 		limit = 0
 	}
 
-	// look up the root height so we don't look too far back
-	// initially this is the genesis block height (aka 0).
-	var rootHeight uint64
-	err = b.db.View(operation.RetrieveRootHeight(&rootHeight))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root block height: %w", err)
-	}
+	// the finalized root height is the height where we bootstrapped from.
+	// we should not include guarantees that are older than the finalized root
+	rootHeight := b.state.Params().FinalizedRoot().Height
 	if limit < rootHeight {
 		limit = rootHeight
 	}
@@ -411,10 +414,13 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 
 			// re-assemble the IncorporatedResult because we need its ID to
 			// check if it is in the seal mempool.
-			incorporatedResult := flow.NewIncorporatedResult(
-				blockID,
-				result,
-			)
+			incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+				IncorporatedBlockID: blockID,
+				Result:              result,
+			})
+			if err != nil {
+				return fmt.Errorf("could not create incorporated result for block %x: %w", blockID, err)
+			}
 
 			// enforce condition (0): candidate seals are only constructed once sufficient
 			// approvals have been collected. Hence, any incorporated result for which we
@@ -606,15 +612,9 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	guarantees []*flow.CollectionGuarantee,
 	seals []*flow.Seal,
 	insertableReceipts *InsertableReceipts,
-	setter func(*flow.Header) error) (*flow.Block, error) {
-
-	// build the payload so we can get the hash
-	payload := &flow.Payload{
-		Guarantees: guarantees,
-		Seals:      seals,
-		Receipts:   insertableReceipts.receipts,
-		Results:    insertableReceipts.results,
-	}
+	setter func(*flow.Header) error,
+	sign func(*flow.Header) error,
+) (*flow.Block, error) {
 
 	parent, err := b.headers.ByBlockID(parentID)
 	if err != nil {
@@ -629,18 +629,38 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		ParentID:    parentID,
 		Height:      parent.Height + 1,
 		Timestamp:   timestamp,
-		PayloadHash: payload.Hash(),
+		PayloadHash: flow.ZeroID,
 	}
 
-	// apply the custom fields setter of the consensus algorithm
+	// apply the custom fields setter of the consensus algorithm, we must do this before applying service events
+	// since we need to know the correct view of the block.
 	err = setter(header)
 	if err != nil {
 		return nil, fmt.Errorf("could not apply setter: %w", err)
 	}
 
+	// Evolve the Protocol State starting from the parent block's state. Information that may change the state is:
+	// the candidate block's view and Service Events from execution results sealed in the candidate block.
+	protocolStateID, _, err := b.mutableProtocolState.EvolveState(header.ParentID, header.View, seals)
+	if err != nil {
+		return nil, fmt.Errorf("evolving protocol state failed: %w", err)
+	}
+
 	proposal := &flow.Block{
-		Header:  header,
-		Payload: payload,
+		Header: header,
+	}
+	proposal.SetPayload(flow.Payload{
+		Guarantees:      guarantees,
+		Seals:           seals,
+		Receipts:        insertableReceipts.receipts,
+		Results:         insertableReceipts.results,
+		ProtocolStateID: protocolStateID,
+	})
+
+	// sign the proposal
+	err = sign(header)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign the proposal: %w", err)
 	}
 
 	return proposal, nil

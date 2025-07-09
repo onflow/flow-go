@@ -8,8 +8,8 @@ import (
 
 	lcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
+	"github.com/onflow/crypto"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
@@ -111,6 +111,7 @@ func DefaultClientTLSConfig(publicKey crypto.PublicKey) (*tls.Config, error) {
 	config := &tls.Config{
 		MinVersion: tls.VersionTLS13,
 		// This is not insecure here. We will verify the cert chain ourselves.
+		// nolint
 		InsecureSkipVerify: true,
 		ClientAuth:         tls.RequireAnyClientCert,
 	}
@@ -140,7 +141,7 @@ func verifyPeerCertificateFunc(expectedPublicKey crypto.PublicKey) (func(rawCert
 		for i := 0; i < len(rawCerts); i++ {
 			cert, err := x509.ParseCertificate(rawCerts[i])
 			if err != nil {
-				return newServerAuthError(err.Error())
+				return newServerAuthError("failed to parse certificate: %s", err.Error())
 			}
 			chain[i] = cert
 		}
@@ -149,7 +150,7 @@ func verifyPeerCertificateFunc(expectedPublicKey crypto.PublicKey) (func(rawCert
 		// extension, extract the remote's public key and finally verifies the signature included in the certificate
 		actualLibP2PKey, err := libp2ptls.PubKeyFromCertChain(chain)
 		if err != nil {
-			return newServerAuthError(err.Error())
+			return newServerAuthError("could not convert certificate to libp2p public key: %s", err.Error())
 		}
 
 		// verify that the public key received is the one that is expected
@@ -169,7 +170,7 @@ func verifyPeerCertificateFunc(expectedPublicKey crypto.PublicKey) (func(rawCert
 func libP2PKeyToHexString(key lcrypto.PubKey) (string, *ServerAuthError) {
 	keyRaw, err := key.Raw()
 	if err != nil {
-		return "", newServerAuthError(err.Error())
+		return "", newServerAuthError("could not convert public key to hex string: %s", err.Error())
 	}
 	return hex.EncodeToString(keyRaw), nil
 }

@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package merkle
 
 import (
@@ -21,6 +19,7 @@ import (
 // Therefore, the range of valid key length in bytes is [1, 8191] (the corresponding
 // range in bits is [8, 65528]) .
 const maxKeyLength = 8191
+
 const maxKeyLenBits = maxKeyLength * 8
 
 var EmptyTreeRootHash []byte

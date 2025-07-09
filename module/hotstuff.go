@@ -22,7 +22,7 @@ type HotStuff interface {
 	//
 	// Block proposals must be submitted in order and only if they extend a
 	// block already known to HotStuff core.
-	SubmitProposal(proposal *model.Proposal)
+	SubmitProposal(proposal *model.SignedProposal)
 }
 
 // HotStuffFollower is run by non-consensus nodes to observe the block chain

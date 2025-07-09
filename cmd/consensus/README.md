@@ -41,7 +41,7 @@ This document provides a high-level overview of the consensus node architecture.
 - **Seal**, also _Block Seal_ - an attestation of correct execution of a block in the blockchain, built by the consensus node after receiving the necessary execution receipts and result approvals.
 - **Header**, also _Block Header_ - a data structure containing the meta-data for a block, including the merkle root hash for the payload as well as the relevant consensus node signatures.
 - **Payload**, also _Block Payload_ - a list of entities included in a block, currently consisting of collection guarantees and block seals.
-- **Index**, also _Payload Index_ - a list of entitie IDs included in a block, currently consising of a list of collection guarantee IDs and block seal IDs.
+- **Index**, also _Payload Index_ - a list of entity IDs included in a block, currently consisting of a list of collection guarantee IDs and block seal IDs.
 - **Block** - the combination of a block header with a block contents, representing all of the data necessary to construct and validate the entirety of the block.
 
 
@@ -106,7 +106,7 @@ When a block proposal is received, consensus node will first try to assemble all
 
 The `synchronization` engine is responsible for reactive synchronization of consensus nodes about the protocol state.
 
-At regular interval, it will send synchronization requests (pings) to a random subset of consensus nodes, and receive synchonization responses (pongs) in return. If it detects a difference in finalized block height above a certain threshold, it will request the missing block heights.
+At regular interval, it will send synchronization requests (pings) to a random subset of consensus nodes, and receive synchronization responses (pongs) in return. If it detects a difference in finalized block height above a certain threshold, it will request the missing block heights.
 
 Additionally, the synchronization engine provides the possibility to request blocks by specific identifier. This is used by the compliance engine to actively request missing blocks that are needed for the validation of another block.
 

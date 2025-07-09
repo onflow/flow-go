@@ -32,7 +32,7 @@ func (*NoopParticipantConsumer) OnEventProcessed() {}
 
 func (*NoopParticipantConsumer) OnStart(uint64) {}
 
-func (*NoopParticipantConsumer) OnReceiveProposal(uint64, *model.Proposal) {}
+func (*NoopParticipantConsumer) OnReceiveProposal(uint64, *model.SignedProposal) {}
 
 func (*NoopParticipantConsumer) OnReceiveQc(uint64, *flow.QuorumCertificate) {}
 
@@ -85,7 +85,7 @@ type NoopCommunicatorConsumer struct{}
 
 var _ hotstuff.CommunicatorConsumer = (*NoopCommunicatorConsumer)(nil)
 
-func (*NoopCommunicatorConsumer) OnOwnVote(flow.Identifier, uint64, []byte, flow.Identifier) {}
+func (*NoopCommunicatorConsumer) OnOwnVote(*model.Vote, flow.Identifier) {}
 
 func (*NoopCommunicatorConsumer) OnOwnTimeout(*model.TimeoutObject) {}
 
@@ -116,7 +116,8 @@ func (*NoopProposalViolationConsumer) OnDoubleVotingDetected(*model.Vote, *model
 
 func (*NoopProposalViolationConsumer) OnInvalidVoteDetected(model.InvalidVoteError) {}
 
-func (*NoopProposalViolationConsumer) OnVoteForInvalidBlockDetected(*model.Vote, *model.Proposal) {}
+func (*NoopProposalViolationConsumer) OnVoteForInvalidBlockDetected(*model.Vote, *model.SignedProposal) {
+}
 
 func (*NoopProposalViolationConsumer) OnDoubleTimeoutDetected(*model.TimeoutObject, *model.TimeoutObject) {
 }

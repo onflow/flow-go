@@ -1,8 +1,10 @@
 package pusher_test
 
 import (
+	"context"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -11,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/collection/pusher"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
@@ -40,13 +42,13 @@ func (suite *Suite) SetupTest() {
 
 	// add some dummy identities so we have one of each role
 	suite.identities = unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	me := suite.identities.Filter(filter.HasRole(flow.RoleCollection))[0]
+	me := suite.identities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))[0]
 
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
-	suite.snapshot.On("Identities", mock.Anything).Return(func(filter flow.IdentityFilter) flow.IdentityList {
+	suite.snapshot.On("Identities", mock.Anything).Return(func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 		return suite.identities.Filter(filter)
-	}, func(filter flow.IdentityFilter) error {
+	}, func(filter flow.IdentityFilter[flow.Identity]) error {
 		return nil
 	})
 	suite.state.On("Final").Return(suite.snapshot)
@@ -70,8 +72,6 @@ func (suite *Suite) SetupTest() {
 		metrics,
 		metrics,
 		suite.me,
-		suite.collections,
-		suite.transactions,
 	)
 	suite.Require().Nil(err)
 }
@@ -82,18 +82,21 @@ func TestPusherEngine(t *testing.T) {
 
 // should be able to submit collection guarantees to consensus nodes
 func (suite *Suite) TestSubmitCollectionGuarantee() {
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
+	suite.engine.Start(ctx)
+	defer cancel()
+	done := make(chan struct{})
 
 	guarantee := unittest.CollectionGuaranteeFixture()
 
 	// should submit the collection to consensus nodes
-	consensus := suite.identities.Filter(filter.HasRole(flow.RoleConsensus))
-	suite.conduit.On("Publish", guarantee, consensus[0].NodeID).Return(nil)
+	consensus := suite.identities.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))
+	suite.conduit.On("Publish", guarantee, consensus[0].NodeID).
+		Run(func(_ mock.Arguments) { close(done) }).Return(nil).Once()
 
-	msg := &messages.SubmitCollectionGuarantee{
-		Guarantee: *guarantee,
-	}
-	err := suite.engine.ProcessLocal(msg)
-	suite.Require().Nil(err)
+	suite.engine.SubmitCollectionGuarantee(guarantee)
+
+	unittest.RequireCloseBefore(suite.T(), done, time.Second, "message not sent")
 
 	suite.conduit.AssertExpectations(suite.T())
 }
@@ -103,14 +106,13 @@ func (suite *Suite) TestSubmitCollectionGuaranteeNonLocal() {
 
 	guarantee := unittest.CollectionGuaranteeFixture()
 
-	// send from a non-allowed role
-	sender := suite.identities.Filter(filter.HasRole(flow.RoleVerification))[0]
+	// verify that pusher.Engine handles any (potentially byzantine) input:
+	// A byzantine peer could target the collector node's pusher engine with messages
+	// The pusher should discard those and explicitly not get tricked into broadcasting
+	// collection guarantees which a byzantine peer might try to inject into the system.
+	sender := suite.identities.Filter(filter.HasRole[flow.Identity](flow.RoleVerification))[0]
 
-	msg := &messages.SubmitCollectionGuarantee{
-		Guarantee: *guarantee,
-	}
-	err := suite.engine.Process(channels.PushGuarantees, sender.NodeID, msg)
-	suite.Require().Error(err)
-
+	err := suite.engine.Process(channels.PushGuarantees, sender.NodeID, guarantee)
+	suite.Require().NoError(err)
 	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
 }

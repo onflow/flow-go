@@ -24,6 +24,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -79,7 +80,7 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 	}
 
 	// notify backend block is available
-	s.backend.setHighestHeight(s.blocks[len(s.blocks)-1].Header.Height)
+	s.highestBlockHeader = s.blocks[len(s.blocks)-1].Header
 
 	s.Run("All events filter", func() {
 		// create empty event filter
@@ -198,8 +199,7 @@ func TestGetExecutionDataByBlockID(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ccfEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_CCF_V0)
-	jsonEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_JSON_CDC_V0)
+	ccfEvents, jsonEvents := generateEvents(t, 3)
 
 	tests := []struct {
 		eventVersion entities.EventEncodingVersion
@@ -278,7 +278,7 @@ func TestExecutionDataStream(t *testing.T) {
 		request *executiondata.SubscribeExecutionDataRequest,
 		response *ExecutionDataResponse,
 	) {
-		sub := NewSubscription(1)
+		sub := subscription.NewSubscription(1)
 
 		api.On("SubscribeExecutionData", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
 
@@ -345,8 +345,7 @@ func TestExecutionDataStream(t *testing.T) {
 		}
 	}
 
-	ccfEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_CCF_V0)
-	jsonEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_JSON_CDC_V0)
+	ccfEvents, jsonEvents := generateEvents(t, 3)
 
 	tests := []struct {
 		eventVersion entities.EventEncodingVersion
@@ -405,7 +404,7 @@ func TestEventStream(t *testing.T) {
 		request *executiondata.SubscribeEventsRequest,
 		response *EventsResponse,
 	) {
-		sub := NewSubscription(1)
+		sub := subscription.NewSubscription(1)
 
 		api.On("SubscribeEvents", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
 
@@ -472,9 +471,7 @@ func TestEventStream(t *testing.T) {
 	}
 
 	// generate events with a payload to include
-	// generators will produce identical event payloads (before encoding)
-	ccfEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_CCF_V0)
-	jsonEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_JSON_CDC_V0)
+	ccfEvents, jsonEvents := generateEvents(t, 3)
 
 	tests := []struct {
 		eventVersion entities.EventEncodingVersion
@@ -605,13 +602,24 @@ func TestGetRegisterValues(t *testing.T) {
 	})
 }
 
+func generateEvents(t *testing.T, n int) ([]flow.Event, []flow.Event) {
+	ccfEvents := generator.GetEventsWithEncoding(n, entities.EventEncodingVersion_CCF_V0)
+	jsonEvents := make([]flow.Event, len(ccfEvents))
+	for i, e := range ccfEvents {
+		jsonEvent, err := convert.CcfEventToJsonEvent(e)
+		require.NoError(t, err)
+		jsonEvents[i] = *jsonEvent
+	}
+	return ccfEvents, jsonEvents
+}
+
 func makeConfig(maxGlobalStreams uint32) Config {
 	return Config{
 		EventFilterConfig:    state_stream.DefaultEventFilterConfig,
-		ClientSendTimeout:    state_stream.DefaultSendTimeout,
-		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
+		ClientSendTimeout:    subscription.DefaultSendTimeout,
+		ClientSendBufferSize: subscription.DefaultSendBufferSize,
 		MaxGlobalStreams:     maxGlobalStreams,
-		HeartbeatInterval:    state_stream.DefaultHeartbeatInterval,
+		HeartbeatInterval:    subscription.DefaultHeartbeatInterval,
 	}
 }
 

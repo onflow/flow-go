@@ -20,16 +20,30 @@ type RegisterStore struct {
 	finalized  execution.FinalizedReader
 	log        zerolog.Logger
 	finalizing *atomic.Bool // making sure only one goroutine is finalizing at a time
+	notifier   execution.RegisterStoreNotifier
 }
 
 var _ execution.RegisterStore = (*RegisterStore)(nil)
+
+type NoopNotifier struct{}
+
+func NewNoopNotifier() *NoopNotifier { return &NoopNotifier{} }
+
+func (n *NoopNotifier) OnFinalizedAndExecutedHeightUpdated(height uint64) {}
+
+var _ execution.RegisterStoreNotifier = (*NoopNotifier)(nil)
 
 func NewRegisterStore(
 	diskStore execution.OnDiskRegisterStore,
 	wal execution.ExecutedFinalizedWAL,
 	finalized execution.FinalizedReader,
 	log zerolog.Logger,
+	notifier execution.RegisterStoreNotifier,
 ) (*RegisterStore, error) {
+	if notifier == nil {
+		return nil, fmt.Errorf("notifier is empty, use NoopNotifier if you don't need it")
+	}
+
 	// replay the executed and finalized blocks from the write ahead logs
 	// to the OnDiskRegisterStore
 	height, err := syncDiskStore(wal, diskStore, log)
@@ -55,6 +69,7 @@ func NewRegisterStore(
 		finalized:  finalized,
 		finalizing: atomic.NewBool(false),
 		log:        log.With().Str("module", "register-store").Logger(),
+		notifier:   notifier,
 	}, nil
 }
 
@@ -194,6 +209,8 @@ func (r *RegisterStore) onBlockFinalized() error {
 	if err != nil {
 		return fmt.Errorf("cannot save %v registers to disk store for height %v: %w", len(regs), next, err)
 	}
+
+	r.notifier.OnFinalizedAndExecutedHeightUpdated(next)
 
 	err = r.memStore.Prune(next, blockID)
 	if err != nil {

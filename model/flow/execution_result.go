@@ -43,7 +43,7 @@ func (er ExecutionResult) Checksum() Identifier {
 	return MakeID(er)
 }
 
-// ValidateChunksLength checks whether the number of chuncks is zero.
+// ValidateChunksLength checks whether the number of chunks is zero.
 //
 // It returns false if the number of chunks is zero (invalid).
 // By protocol definition, each ExecutionReceipt must contain at least one
@@ -54,7 +54,8 @@ func (er ExecutionResult) ValidateChunksLength() bool {
 
 // FinalStateCommitment returns the Execution Result's commitment to the final
 // execution state of the block, i.e. the last chunk's output state.
-// Error returns:
+//
+// This function is side-effect free. The only possible error it returns is of type:
 //   - ErrNoChunks: if there are no chunks (ExecutionResult is malformed)
 func (er ExecutionResult) FinalStateCommitment() (StateCommitment, error) {
 	if !er.ValidateChunksLength() {
@@ -65,13 +66,46 @@ func (er ExecutionResult) FinalStateCommitment() (StateCommitment, error) {
 
 // InitialStateCommit returns a commitment to the execution state used as input
 // for computing the block, i.e. the leading chunk's input state.
-// Error returns:
+//
+// This function is side-effect free. The only possible error it returns is of type
 //   - ErrNoChunks: if there are no chunks (ExecutionResult is malformed)
 func (er ExecutionResult) InitialStateCommit() (StateCommitment, error) {
 	if !er.ValidateChunksLength() {
 		return DummyStateCommitment, ErrNoChunks
 	}
 	return er.Chunks[0].StartState, nil
+}
+
+// SystemChunk is a system-generated chunk added to every block.
+// It is always the final chunk in an execution result.
+func (er ExecutionResult) SystemChunk() *Chunk {
+	return er.Chunks[len(er.Chunks)-1]
+}
+
+// ServiceEventsByChunk returns the list of service events emitted during the given chunk.
+func (er ExecutionResult) ServiceEventsByChunk(chunkIndex uint64) ServiceEventList {
+	serviceEventCount := er.Chunks[chunkIndex].ServiceEventCount
+	// CASE 1: Service event count is specified (non-nil)
+	if serviceEventCount != nil {
+		if *serviceEventCount == 0 {
+			return nil
+		}
+
+		startIndex := 0
+		for i := uint64(0); i < chunkIndex; i++ {
+			startIndex += int(*er.Chunks[i].ServiceEventCount)
+		}
+		return er.ServiceEvents[startIndex : startIndex+int(*serviceEventCount)]
+	}
+	// CASE 2: Service event count omitted (nil)
+	// This indicates the chunk was generated in an older data model version.
+	// In this case, all service events associated with the result are assumed
+	// to have been emitted within the system chunk (last chunk)
+	// TODO(mainnet27, #6773): remove this path https://github.com/onflow/flow-go/issues/6773
+	if chunkIndex == er.SystemChunk().Index {
+		return er.ServiceEvents
+	}
+	return nil
 }
 
 func (er ExecutionResult) MarshalJSON() ([]byte, error) {

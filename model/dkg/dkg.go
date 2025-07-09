@@ -1,12 +1,13 @@
 package dkg
 
 import (
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 )
 
-// DKGData represents all the output data from the DKG process, including private information.
-// It is used while running the DKG during bootstrapping.
-type DKGData struct {
+// ThresholdKeySet represents all the output data from the KG process needed for a threshold signature scheme that
+// is used in random beacon protocol, including private information.
+// Typically, the ThresholdKeySet is used with a trusted setup during bootstrapping.
+type ThresholdKeySet struct {
 	PrivKeyShares []crypto.PrivateKey
 	PubGroupKey   crypto.PublicKey
 	PubKeyShares  []crypto.PublicKey

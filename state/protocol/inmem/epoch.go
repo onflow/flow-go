@@ -3,161 +3,126 @@ package inmem
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/invalid"
 )
 
-// Epoch is a memory-backed implementation of protocol.Epoch.
-type Epoch struct {
-	enc EncodableEpoch
-}
-
-var _ protocol.Epoch = (*Epoch)(nil)
-
-func (e Epoch) Encodable() EncodableEpoch {
-	return e.enc
-}
-
-func (e Epoch) Counter() (uint64, error)            { return e.enc.Counter, nil }
-func (e Epoch) FirstView() (uint64, error)          { return e.enc.FirstView, nil }
-func (e Epoch) DKGPhase1FinalView() (uint64, error) { return e.enc.DKGPhase1FinalView, nil }
-func (e Epoch) DKGPhase2FinalView() (uint64, error) { return e.enc.DKGPhase2FinalView, nil }
-func (e Epoch) DKGPhase3FinalView() (uint64, error) { return e.enc.DKGPhase3FinalView, nil }
-func (e Epoch) FinalView() (uint64, error)          { return e.enc.FinalView, nil }
-func (e Epoch) InitialIdentities() (flow.IdentityList, error) {
-	return e.enc.InitialIdentities, nil
-}
-func (e Epoch) RandomSource() ([]byte, error) {
-	return e.enc.RandomSource, nil
-}
-
-func (e Epoch) Clustering() (flow.ClusterList, error) {
-	return e.enc.Clustering, nil
-}
-
-func (e Epoch) DKG() (protocol.DKG, error) {
-	if e.enc.DKG != nil {
-		return DKG{*e.enc.DKG}, nil
-	}
-	return nil, protocol.ErrNextEpochNotCommitted
-}
-
-func (e Epoch) Cluster(i uint) (protocol.Cluster, error) {
-	if e.enc.Clusters == nil {
-		return nil, protocol.ErrNextEpochNotCommitted
-	}
-
-	if i >= uint(len(e.enc.Clusters)) {
-		return nil, fmt.Errorf("no cluster with index %d: %w", i, protocol.ErrClusterNotFound)
-	}
-	return Cluster{e.enc.Clusters[i]}, nil
-}
-
-func (e Epoch) ClusterByChainID(chainID flow.ChainID) (protocol.Cluster, error) {
-	if e.enc.Clusters == nil {
-		return nil, protocol.ErrNextEpochNotCommitted
-	}
-
-	for _, cluster := range e.enc.Clusters {
-		if cluster.RootBlock.Header.ChainID == chainID {
-			return Cluster{cluster}, nil
-		}
-	}
-	chainIDs := make([]string, 0, len(e.enc.Clusters))
-	for _, cluster := range e.enc.Clusters {
-		chainIDs = append(chainIDs, string(cluster.RootBlock.Header.ChainID))
-	}
-	return nil, fmt.Errorf("no cluster with the given chain ID %v, available chainIDs %v: %w", chainID, chainIDs, protocol.ErrClusterNotFound)
-}
-
-func (e Epoch) FinalHeight() (uint64, error) {
-	if e.enc.FinalHeight != nil {
-		return *e.enc.FinalHeight, nil
-	}
-	return 0, protocol.ErrEpochTransitionNotFinalized
-}
-
-func (e Epoch) FirstHeight() (uint64, error) {
-	if e.enc.FirstHeight != nil {
-		return *e.enc.FirstHeight, nil
-	}
-	return 0, protocol.ErrEpochTransitionNotFinalized
-}
-
+// Epochs is a wrapper around [flow.RichEpochStateEntry] implementing the [protocol.EpochQuery] interface.
+// It is intended for bootstrapping nodes. For ease of transferring the bootstrapping data from node to node,
+// Epochs is backed by easily serializable data and does not have access to a proper protocol-data-base that
+// would be part of a staked node. Therefore, it can _not_ return values for the `FirstHeight()` and
+// `FinalHeight()` methods, which are part of the [protocol.CommittedEpoch] API.
+// CAUTION: use [badger.Snapshot] for protocol logic except when bootstrapping a node.
 type Epochs struct {
-	enc EncodableEpochs
+	entry flow.RichEpochStateEntry
 }
 
 var _ protocol.EpochQuery = (*Epochs)(nil)
 
-func (eq Epochs) Previous() protocol.Epoch {
-	if eq.enc.Previous != nil {
-		return Epoch{*eq.enc.Previous}
+// Previous returns the previous epoch as of this snapshot. Valid snapshots
+// must have a previous epoch for all epochs except that immediately after the root block.
+// Error returns:
+//   - [protocol.ErrNoPreviousEpoch] - if the previous epoch does not exist.
+//     This happens when the previous epoch is queried within the first epoch of a spork.
+func (eq Epochs) Previous() (protocol.CommittedEpoch, error) {
+	if eq.entry.PreviousEpoch == nil {
+		return nil, protocol.ErrNoPreviousEpoch
 	}
-	return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
-}
-func (eq Epochs) Current() protocol.Epoch {
-	return Epoch{eq.enc.Current}
-}
-func (eq Epochs) Next() protocol.Epoch {
-	if eq.enc.Next != nil {
-		return Epoch{*eq.enc.Next}
-	}
-	return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
+	return NewCommittedEpoch(eq.entry.PreviousEpochSetup, eq.entry.PreviousEpochCommit, eq.entry.PreviousEpoch.EpochExtensions), nil
 }
 
-// setupEpoch is an implementation of protocol.Epoch backed by an EpochSetup
-// service event. This is used for converting service events to inmem.Epoch.
+// Current returns the current epoch as of this snapshot. All valid snapshots have a current epoch.
+func (eq Epochs) Current() (protocol.CommittedEpoch, error) {
+	return NewCommittedEpoch(eq.entry.CurrentEpochSetup, eq.entry.CurrentEpochCommit, eq.entry.CurrentEpoch.EpochExtensions), nil
+}
+
+// NextUnsafe should only be used by components that are actively involved in advancing
+// the epoch from [flow.EpochPhaseSetup] to [flow.EpochPhaseCommitted].
+// NextUnsafe returns the tentative configuration for the next epoch as of this snapshot.
+// Valid snapshots make such configuration available during the Epoch Setup Phase, which
+// generally is the case only after an `EpochSetupPhaseStarted` notification has been emitted.
+// CAUTION: epoch transition might not happen as described by the tentative configuration!
+//
+// Error returns:
+//   - [ErrNextEpochNotSetup] in the case that this method is queried w.r.t. a snapshot
+//     within the [flow.EpochPhaseStaking] phase or when we are in Epoch Fallback Mode.
+//   - [ErrNextEpochAlreadyCommitted] if the tentative epoch is requested from
+//     a snapshot within the [flow.EpochPhaseCommitted] phase.
+//   - generic error in case of unexpected critical internal corruption or bugs
+func (eq Epochs) NextUnsafe() (protocol.TentativeEpoch, error) {
+	switch eq.entry.EpochPhase() {
+	case flow.EpochPhaseStaking, flow.EpochPhaseFallback:
+		return nil, protocol.ErrNextEpochNotSetup
+	case flow.EpochPhaseSetup:
+		return NewSetupEpoch(eq.entry.NextEpochSetup), nil
+	case flow.EpochPhaseCommitted:
+		return nil, protocol.ErrNextEpochAlreadyCommitted
+	default:
+		return nil, fmt.Errorf("unexpected epoch phase '%s' in protocol state entry", eq.entry.EpochPhase().String())
+	}
+}
+
+// NextCommitted returns the next epoch as of this snapshot, only if it has
+// been committed already - generally that is the case only after an
+// `EpochCommittedPhaseStarted` notification has been emitted.
+//
+// Error returns:
+//   - [ErrNextEpochNotCommitted] - in the case that committed epoch has been requested w.r.t a snapshot within
+//     the [flow.EpochPhaseStaking] or [flow.EpochPhaseSetup] phases.
+//   - generic error in case of unexpected critical internal corruption or bugs
+func (eq Epochs) NextCommitted() (protocol.CommittedEpoch, error) {
+	switch eq.entry.EpochPhase() {
+	case flow.EpochPhaseStaking, flow.EpochPhaseFallback, flow.EpochPhaseSetup:
+		return nil, protocol.ErrNextEpochNotCommitted
+	case flow.EpochPhaseCommitted:
+		// A protocol state snapshot is immutable and only represents the state as of the corresponding block. The
+		// flow protocol implies that future epochs cannot have extensions, because in order to add extensions to
+		// an epoch, we have to enter that epoch. Hence, `eq.entry.NextEpoch.EpochExtensions` must be empty:
+		if len(eq.entry.NextEpoch.EpochExtensions) > 0 {
+			return nil, irrecoverable.NewExceptionf("state with current epoch %d corrupted, because future epoch %d already has %d extensions",
+				eq.entry.CurrentEpochCommit.Counter, eq.entry.NextEpochSetup.Counter, len(eq.entry.NextEpoch.EpochExtensions))
+		}
+		return NewCommittedEpoch(eq.entry.NextEpochSetup, eq.entry.NextEpochCommit, eq.entry.NextEpoch.EpochExtensions), nil
+	default:
+		return nil, fmt.Errorf("unexpected unknown phase in protocol state entry")
+	}
+}
+
+// setupEpoch is an implementation of [protocol.TentativeEpoch] backed by a [flow.EpochSetup] service event.
 type setupEpoch struct {
-	// EpochSetup service event
-	setupEvent *flow.EpochSetup
+	setupEvent *flow.EpochSetup // EpochSetup service event
 }
 
-func (es *setupEpoch) Counter() (uint64, error) {
-	return es.setupEvent.Counter, nil
+var _ protocol.TentativeEpoch = (*setupEpoch)(nil)
+
+func (es *setupEpoch) Counter() uint64 {
+	return es.setupEvent.Counter
 }
 
-func (es *setupEpoch) FirstView() (uint64, error) {
-	return es.setupEvent.FirstView, nil
-}
-
-func (es *setupEpoch) DKGPhase1FinalView() (uint64, error) {
-	return es.setupEvent.DKGPhase1FinalView, nil
-}
-
-func (es *setupEpoch) DKGPhase2FinalView() (uint64, error) {
-	return es.setupEvent.DKGPhase2FinalView, nil
-}
-
-func (es *setupEpoch) DKGPhase3FinalView() (uint64, error) {
-	return es.setupEvent.DKGPhase3FinalView, nil
-}
-
-func (es *setupEpoch) FinalView() (uint64, error) {
-	return es.setupEvent.FinalView, nil
-}
-
-func (es *setupEpoch) RandomSource() ([]byte, error) {
-	return es.setupEvent.RandomSource, nil
-}
-
-func (es *setupEpoch) InitialIdentities() (flow.IdentityList, error) {
-	identities := es.setupEvent.Participants.Filter(filter.Any)
-	return identities, nil
+func (es *setupEpoch) InitialIdentities() flow.IdentitySkeletonList {
+	return es.setupEvent.Participants
 }
 
 func (es *setupEpoch) Clustering() (flow.ClusterList, error) {
 	return ClusteringFromSetupEvent(es.setupEvent)
 }
 
+// ClusteringFromSetupEvent generates a new clustering list from Epoch setup data.
+// No errors expected during normal operation.
 func ClusteringFromSetupEvent(setupEvent *flow.EpochSetup) (flow.ClusterList, error) {
-	collectorFilter := filter.HasRole(flow.RoleCollection)
+	// By convention, the Flow protocol accepts nodes with zero initial weight: those nodes are admitted into the network as spectators,
+	// but they can't actively contribute to any of the network functions. Specifically, collectors with zero weight cannot propose
+	// collections and neither would their votes count towards certifying collections. Consequently, zero-weighted collectors are not
+	// assigned to any cluster, and `factory.NewClusterList` function rejects inputs including such collectors. Instead, zero-weighted
+	// collectors should be dropped, before we call `factory.NewClusterList`.
+	collectorFilter := filter.And[flow.IdentitySkeleton](
+		filter.HasRole[flow.IdentitySkeleton](flow.RoleCollection),
+		filter.HasInitialWeight[flow.IdentitySkeleton](true))
 	clustering, err := factory.NewClusterList(setupEvent.Assignments, setupEvent.Participants.Filter(collectorFilter))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate ClusterList from collector identities: %w", err)
@@ -165,36 +130,86 @@ func ClusteringFromSetupEvent(setupEvent *flow.EpochSetup) (flow.ClusterList, er
 	return clustering, nil
 }
 
-func (es *setupEpoch) Cluster(_ uint) (protocol.Cluster, error) {
-	return nil, protocol.ErrNextEpochNotCommitted
-}
-
-func (es *setupEpoch) ClusterByChainID(_ flow.ChainID) (protocol.Cluster, error) {
-	return nil, protocol.ErrNextEpochNotCommitted
-}
-
-func (es *setupEpoch) DKG() (protocol.DKG, error) {
-	return nil, protocol.ErrNextEpochNotCommitted
-}
-
-func (es *setupEpoch) FirstHeight() (uint64, error) {
-	return 0, protocol.ErrEpochTransitionNotFinalized
-}
-
-func (es *setupEpoch) FinalHeight() (uint64, error) {
-	return 0, protocol.ErrEpochTransitionNotFinalized
-}
-
-// committedEpoch is an implementation of protocol.Epoch backed by an EpochSetup
-// and EpochCommit service event. This is used for converting service events to
-// inmem.Epoch.
+// committedEpoch is an implementation of [protocol.CommittedEpoch] backed by a [flow.EpochSetup]
+// and [flow.EpochCommit] service events.
+// Includes all epoch extensions which have been added as of the reference block.
 type committedEpoch struct {
 	setupEpoch
 	commitEvent *flow.EpochCommit
+	extensions  []flow.EpochExtension
+}
+
+var _ protocol.CommittedEpoch = (*committedEpoch)(nil)
+
+func (es *committedEpoch) FirstView() uint64 {
+	return es.setupEvent.FirstView
+}
+
+func (es *committedEpoch) DKGPhase1FinalView() uint64 {
+	return es.setupEvent.DKGPhase1FinalView
+}
+
+func (es *committedEpoch) DKGPhase2FinalView() uint64 {
+	return es.setupEvent.DKGPhase2FinalView
+}
+
+func (es *committedEpoch) DKGPhase3FinalView() uint64 {
+	return es.setupEvent.DKGPhase3FinalView
+}
+
+// FinalView returns the final view of the epoch, taking into account possible epoch extensions.
+// If there are no epoch extensions, the final view is the final view of the current epoch setup,
+// otherwise it is the final view of the last epoch extension.
+func (es *committedEpoch) FinalView() uint64 {
+	if len(es.extensions) > 0 {
+		return es.extensions[len(es.extensions)-1].FinalView
+	}
+	return es.setupEvent.FinalView
+}
+
+// TargetDuration returns the desired real-world duration for this epoch, in seconds.
+// This target is specified by the FlowEpoch smart contract in the EpochSetup event
+// and used by the Cruise Control system to moderate the block rate.
+// In case the epoch has extensions, the target duration is calculated based on the last extension, by calculating how many
+// views were added by the extension and adding the proportional time to the target duration.
+func (es *committedEpoch) TargetDuration() uint64 {
+	if len(es.extensions) == 0 {
+		return es.setupEvent.TargetDuration
+	} else {
+		viewDuration := float64(es.setupEvent.TargetDuration) / float64(es.setupEvent.FinalView-es.setupEvent.FirstView+1)
+		lastExtension := es.extensions[len(es.extensions)-1]
+		return es.setupEvent.TargetDuration + uint64(float64(lastExtension.FinalView-es.setupEvent.FinalView)*viewDuration)
+	}
+}
+
+// TargetEndTime returns the desired real-world end time for this epoch, represented as
+// Unix Time (in units of seconds). This target is specified by the FlowEpoch smart contract in
+// the EpochSetup event and used by the Cruise Control system to moderate the block rate.
+// In case the epoch has extensions, the target end time is calculated based on the last extension, by calculating how many
+// views were added by the extension and adding the proportional time to the target end time.
+func (es *committedEpoch) TargetEndTime() uint64 {
+	if len(es.extensions) == 0 {
+		return es.setupEvent.TargetEndTime
+	} else {
+		viewDuration := float64(es.setupEvent.TargetDuration) / float64(es.setupEvent.FinalView-es.setupEvent.FirstView+1)
+		lastExtension := es.extensions[len(es.extensions)-1]
+		return es.setupEvent.TargetEndTime + uint64(float64(lastExtension.FinalView-es.setupEvent.FinalView)*viewDuration)
+	}
+}
+
+func (es *committedEpoch) RandomSource() []byte {
+	return es.setupEvent.RandomSource
+}
+
+func (es *committedEpoch) FirstHeight() (uint64, error) {
+	return 0, protocol.ErrUnknownEpochBoundary
+}
+
+func (es *committedEpoch) FinalHeight() (uint64, error) {
+	return 0, protocol.ErrUnknownEpochBoundary
 }
 
 func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
-
 	epochCounter := es.setupEvent.Counter
 
 	clustering, err := es.Clustering()
@@ -220,11 +235,14 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 	}
 
 	rootBlock := cluster.CanonicalRootBlock(epochCounter, members)
-	rootQC := &flow.QuorumCertificate{
+	rootQC, err := flow.NewQuorumCertificate(flow.UntrustedQuorumCertificate{
 		View:          rootBlock.Header.View,
 		BlockID:       rootBlock.ID(),
 		SignerIndices: signerIndices,
 		SigData:       rootQCVoteData.SigData,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build root quorum certificate: %w", err)
 	}
 
 	cluster, err := ClusterFromEncodable(EncodableCluster{
@@ -256,53 +274,42 @@ func (es *committedEpoch) ClusterByChainID(chainID flow.ChainID) (protocol.Clust
 }
 
 func (es *committedEpoch) DKG() (protocol.DKG, error) {
-	// filter initial participants to valid DKG participants
-	participants := es.setupEvent.Participants.Filter(filter.IsValidDKGParticipant)
-	lookup, err := flow.ToDKGParticipantLookup(participants, es.commitEvent.DKGParticipantKeys)
-	if err != nil {
-		return nil, fmt.Errorf("could not construct dkg lookup: %w", err)
-	}
-
-	dkg, err := DKGFromEncodable(EncodableDKG{
-		GroupKey: encodable.RandomBeaconPubKey{
-			PublicKey: es.commitEvent.DKGGroupKey,
-		},
-		Participants: lookup,
-	})
-	return dkg, err
+	return NewDKG(es.setupEvent, es.commitEvent), nil
 }
 
-// startedEpoch represents an epoch (with counter N) that has started, but there is no _finalized_ transition
-// to the next epoch yet. Note that nodes can already be in views belonging to the _next_ Epoch, and it is
-// possible that there are already unfinalized blocks in that next epoch. However, without finalized blocks
-// in Epoch N+1, there is no definition of "last block" for Epoch N.
+// heightBoundedEpoch represents an epoch (with counter N) for which we know either
+// its start boundary, end boundary, or both. A boundary is included when:
+//   - it occurred after this node's lowest known block AND
+//   - it occurred before the latest finalized block (ie. the boundary is defined)
 //
-// startedEpoch has all the information of a committedEpoch, plus the epoch's first block height.
-type startedEpoch struct {
+// heightBoundedEpoch has all the information of a committedEpoch, plus one or
+// both height boundaries for the epoch.
+type heightBoundedEpoch struct {
 	committedEpoch
-	firstHeight uint64
+	firstHeight *uint64
+	finalHeight *uint64
 }
 
-func (e *startedEpoch) FirstHeight() (uint64, error) {
-	return e.firstHeight, nil
+var _ protocol.CommittedEpoch = (*heightBoundedEpoch)(nil)
+
+func (e *heightBoundedEpoch) FirstHeight() (uint64, error) {
+	if e.firstHeight != nil {
+		return *e.firstHeight, nil
+	}
+	return 0, protocol.ErrUnknownEpochBoundary
 }
 
-// endedEpoch is an epoch which has ended (ie. the previous epoch). It has all the
-// information of a startedEpoch, plus the epoch's final block height.
-type endedEpoch struct {
-	startedEpoch
-	finalHeight uint64
+func (e *heightBoundedEpoch) FinalHeight() (uint64, error) {
+	if e.finalHeight != nil {
+		return *e.finalHeight, nil
+	}
+	return 0, protocol.ErrUnknownEpochBoundary
 }
 
-func (e *endedEpoch) FinalHeight() (uint64, error) {
-	return e.finalHeight, nil
-}
-
-// NewSetupEpoch returns a memory-backed epoch implementation based on an
-// EpochSetup event. Epoch information available after the setup phase will
-// not be accessible in the resulting epoch instance.
+// NewSetupEpoch returns a memory-backed epoch implementation based on an EpochSetup event.
+// Epoch information available after the setup phase will not be accessible in the resulting epoch instance.
 // No errors are expected during normal operations.
-func NewSetupEpoch(setupEvent *flow.EpochSetup) protocol.Epoch {
+func NewSetupEpoch(setupEvent *flow.EpochSetup) protocol.TentativeEpoch {
 	return &setupEpoch{
 		setupEvent: setupEvent,
 	}
@@ -311,44 +318,63 @@ func NewSetupEpoch(setupEvent *flow.EpochSetup) protocol.Epoch {
 // NewCommittedEpoch returns a memory-backed epoch implementation based on an
 // EpochSetup and EpochCommit events.
 // No errors are expected during normal operations.
-func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) protocol.Epoch {
+func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, extensions []flow.EpochExtension) protocol.CommittedEpoch {
 	return &committedEpoch{
 		setupEpoch: setupEpoch{
 			setupEvent: setupEvent,
 		},
 		commitEvent: commitEvent,
+		extensions:  extensions,
 	}
 }
 
-// NewStartedEpoch returns a memory-backed epoch implementation based on an
-// EpochSetup and EpochCommit events, and the epoch's first block height.
+// NewEpochWithStartBoundary returns a memory-backed epoch implementation based on an
+// EpochSetup and EpochCommit events, and the epoch's first block height (start boundary).
 // No errors are expected during normal operations.
-func NewStartedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight uint64) protocol.Epoch {
-	return &startedEpoch{
+func NewEpochWithStartBoundary(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, extensions []flow.EpochExtension, firstHeight uint64) protocol.CommittedEpoch {
+	return &heightBoundedEpoch{
 		committedEpoch: committedEpoch{
 			setupEpoch: setupEpoch{
 				setupEvent: setupEvent,
 			},
 			commitEvent: commitEvent,
+			extensions:  extensions,
 		},
-		firstHeight: firstHeight,
+		firstHeight: &firstHeight,
+		finalHeight: nil,
 	}
 }
 
-// NewEndedEpoch returns a memory-backed epoch implementation based on an
-// EpochSetup and EpochCommit events, and the epoch's final block height.
+// NewEpochWithEndBoundary returns a memory-backed epoch implementation based on an
+// EpochSetup and EpochCommit events, and the epoch's final block height (end boundary).
 // No errors are expected during normal operations.
-func NewEndedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight, finalHeight uint64) protocol.Epoch {
-	return &endedEpoch{
-		startedEpoch: startedEpoch{
-			committedEpoch: committedEpoch{
-				setupEpoch: setupEpoch{
-					setupEvent: setupEvent,
-				},
-				commitEvent: commitEvent,
+func NewEpochWithEndBoundary(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, extensions []flow.EpochExtension, finalHeight uint64) protocol.CommittedEpoch {
+	return &heightBoundedEpoch{
+		committedEpoch: committedEpoch{
+			setupEpoch: setupEpoch{
+				setupEvent: setupEvent,
 			},
-			firstHeight: firstHeight,
+			commitEvent: commitEvent,
+			extensions:  extensions,
 		},
-		finalHeight: finalHeight,
+		firstHeight: nil,
+		finalHeight: &finalHeight,
+	}
+}
+
+// NewEpochWithStartAndEndBoundaries returns a memory-backed epoch implementation based on an
+// EpochSetup and EpochCommit events, and the epoch's first and final block heights (start+end boundaries).
+// No errors are expected during normal operations.
+func NewEpochWithStartAndEndBoundaries(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, extensions []flow.EpochExtension, firstHeight, finalHeight uint64) protocol.CommittedEpoch {
+	return &heightBoundedEpoch{
+		committedEpoch: committedEpoch{
+			setupEpoch: setupEpoch{
+				setupEvent: setupEvent,
+			},
+			commitEvent: commitEvent,
+			extensions:  extensions,
+		},
+		firstHeight: &firstHeight,
+		finalHeight: &finalHeight,
 	}
 }

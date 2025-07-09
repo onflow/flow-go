@@ -25,12 +25,12 @@ type VoteAggregator interface {
 	// CAUTION: we expect that the input block's validity has been confirmed prior to calling AddBlock,
 	// including the proposer's signature. Otherwise, VoteAggregator might crash or exhibit undefined
 	// behaviour.
-	AddBlock(block *model.Proposal)
+	AddBlock(block *model.SignedProposal)
 
 	// InvalidBlock notifies the VoteAggregator about an invalid proposal, so that it
 	// can process votes for the invalid block and slash the voters.
 	// No errors are expected during normal operations
-	InvalidBlock(block *model.Proposal) error
+	InvalidBlock(block *model.SignedProposal) error
 
 	// PruneUpToView deletes all votes _below_ to the given view, as well as
 	// related indices. We only retain and process whose view is equal or larger

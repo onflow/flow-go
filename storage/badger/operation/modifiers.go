@@ -21,6 +21,17 @@ func SkipDuplicates(op func(*badger.Txn) error) func(tx *badger.Txn) error {
 	}
 }
 
+func SkipDuplicatesTx(op func(*transaction.Tx) error) func(tx *transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
+		err := op(tx)
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			metrics.GetStorageCollector().SkipDuplicate()
+			return nil
+		}
+		return err
+	}
+}
+
 func SkipNonExist(op func(*badger.Txn) error) func(tx *badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		err := op(tx)

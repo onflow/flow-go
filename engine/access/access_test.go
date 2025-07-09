@@ -8,9 +8,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/google/go-cmp/cmp"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -18,34 +15,45 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/protobuf/testing/protocmp"
 
-	"github.com/onflow/flow-go/access"
+	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/cmd/build"
 	hsmock "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 type Suite struct {
@@ -71,7 +79,7 @@ type Suite struct {
 	finalizedHeaderCache module.FinalizedHeaderCache
 	backend              *backend.Backend
 	sporkID              flow.Identifier
-	protocolVersion      uint
+	protocolStateVersion uint64
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -87,7 +95,7 @@ func (suite *Suite) SetupTest() {
 	suite.finalSnapshot = new(protocol.Snapshot)
 	suite.sealedSnapshot = new(protocol.Snapshot)
 	suite.sporkID = unittest.IdentifierFixture()
-	suite.protocolVersion = uint(unittest.Uint64InRange(10, 30))
+	suite.protocolStateVersion = unittest.Uint64InRange(10, 30)
 
 	suite.rootBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	suite.sealedBlock = suite.rootBlock
@@ -110,10 +118,13 @@ func (suite *Suite) SetupTest() {
 		nil,
 	).Maybe()
 
+	pstate := protocol.NewKVStoreReader(suite.T())
+	pstate.On("GetProtocolStateVersion").Return(suite.protocolStateVersion, nil).Maybe()
+	suite.finalSnapshot.On("ProtocolState").Return(pstate, nil).Maybe()
+
 	suite.params = new(protocol.Params)
 	suite.params.On("FinalizedRoot").Return(suite.rootBlock, nil)
 	suite.params.On("SporkID").Return(suite.sporkID, nil)
-	suite.params.On("ProtocolVersion").Return(suite.protocolVersion, nil)
 	suite.params.On("SporkRootBlockHeight").Return(suite.rootBlock.Height, nil)
 	suite.params.On("SealedRoot").Return(suite.rootBlock, nil)
 	suite.state.On("Params").Return(suite.params).Maybe()
@@ -140,10 +151,11 @@ func (suite *Suite) SetupTest() {
 }
 
 func (suite *Suite) RunTest(
-	f func(handler *access.Handler, db *badger.DB, all *storage.All),
+	f func(handler *rpc.Handler, db *badger.DB, all *storage.All, en *storage.Execution),
 ) {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
+		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
+		en := util.ExecutionStorageLayer(suite.T(), db)
 
 		var err error
 		suite.backend, err = backend.New(backend.Params{
@@ -153,8 +165,8 @@ func (suite *Suite) RunTest(
 			Headers:              all.Headers,
 			Collections:          all.Collections,
 			Transactions:         all.Transactions,
-			ExecutionResults:     all.Results,
-			ExecutionReceipts:    all.Receipts,
+			ExecutionResults:     en.Results,
+			ExecutionReceipts:    en.Receipts,
 			ChainID:              suite.chainID,
 			AccessMetrics:        suite.metrics,
 			MaxHeightRange:       backend.DefaultMaxHeightRange,
@@ -164,19 +176,20 @@ func (suite *Suite) RunTest(
 		})
 		require.NoError(suite.T(), err)
 
-		handler := access.NewHandler(
+		handler := rpc.NewHandler(
 			suite.backend,
 			suite.chainID.Chain(),
 			suite.finalizedHeaderCache,
 			suite.me,
-			access.WithBlockSignerDecoder(suite.signerIndicesDecoder),
+			subscription.DefaultMaxGlobalStreams,
+			rpc.WithBlockSignerDecoder(suite.signerIndicesDecoder),
 		)
-		f(handler, db, all)
+		f(handler, db, all, en)
 	})
 }
 
 func (suite *Suite) TestSendAndGetTransaction() {
-	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.All) {
+	suite.RunTest(func(handler *rpc.Handler, _ *badger.DB, _ *storage.All, _ *storage.Execution) {
 		referenceBlock := unittest.BlockHeaderFixture()
 		transaction := unittest.TransactionFixture()
 		transaction.SetReferenceBlockID(referenceBlock.ID())
@@ -229,7 +242,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 }
 
 func (suite *Suite) TestSendExpiredTransaction() {
-	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.All) {
+	suite.RunTest(func(handler *rpc.Handler, _ *badger.DB, _ *storage.All, en *storage.Execution) {
 		referenceBlock := suite.finalizedBlock
 
 		transaction := unittest.TransactionFixture()
@@ -249,7 +262,7 @@ func (suite *Suite) TestSendExpiredTransaction() {
 			Return(referenceBlock, nil).
 			Twice()
 
-		//Advancing final state to expire ref block
+		// Advancing final state to expire ref block
 		suite.finalizedBlock = latestBlock
 
 		req := &accessproto.SendTransactionRequest{
@@ -260,10 +273,6 @@ func (suite *Suite) TestSendExpiredTransaction() {
 		suite.Require().Error(err)
 	})
 }
-
-type mockCloser struct{}
-
-func (mc *mockCloser) Close() error { return nil }
 
 // TestSendTransactionToRandomCollectionNode tests that collection nodes are chosen from the appropriate cluster when
 // forwarding transactions by sending two transactions bound for two different collection clusters.
@@ -286,14 +295,14 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create collection node cluster
 		count := 2
-		collNodes := unittest.IdentityListFixture(count, unittest.WithRole(flow.RoleCollection))
+		collNodes := unittest.IdentityListFixture(count, unittest.WithRole(flow.RoleCollection)).ToSkeleton()
 		assignments := unittest.ClusterAssignment(uint(count), collNodes)
 		clusters, err := factory.NewClusterList(assignments, collNodes)
 		suite.Require().Nil(err)
 		collNode1 := clusters[0][0]
 		collNode2 := clusters[1][0]
-		epoch := new(protocol.Epoch)
-		suite.epochQuery.On("Current").Return(epoch)
+		epoch := new(protocol.CommittedEpoch)
+		suite.epochQuery.On("Current").Return(epoch, nil)
 		epoch.On("Clustering").Return(clusters, nil)
 
 		// create two transactions bound for each of the cluster
@@ -319,24 +328,23 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create a mock connection factory
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
-		connFactory.On("GetAccessAPIClient", collNode1.Address, nil).Return(col1ApiClient, &mockCloser{}, nil)
-		connFactory.On("GetAccessAPIClient", collNode2.Address, nil).Return(col2ApiClient, &mockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode1.Address, nil).Return(col1ApiClient, &mocks.MockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode2.Address, nil).Return(col2ApiClient, &mocks.MockCloser{}, nil)
 
 		bnd, err := backend.New(backend.Params{State: suite.state,
-			Collections:              collections,
-			Transactions:             transactions,
-			ChainID:                  suite.chainID,
-			AccessMetrics:            metrics,
-			ConnFactory:              connFactory,
-			MaxHeightRange:           backend.DefaultMaxHeightRange,
-			Log:                      suite.log,
-			SnapshotHistoryLimit:     backend.DefaultSnapshotHistoryLimit,
-			Communicator:             backend.NewNodeCommunicator(false),
-			TxErrorMessagesCacheSize: 1000,
+			Collections:          collections,
+			Transactions:         transactions,
+			ChainID:              suite.chainID,
+			AccessMetrics:        metrics,
+			ConnFactory:          connFactory,
+			MaxHeightRange:       backend.DefaultMaxHeightRange,
+			Log:                  suite.log,
+			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
+			Communicator:         backend.NewNodeCommunicator(false),
 		})
 		require.NoError(suite.T(), err)
 
-		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
+		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
 
 		// Send transaction 1
 		resp, err := handler.SendTransaction(context.Background(), sendReq1)
@@ -373,7 +381,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 }
 
 func (suite *Suite) TestGetBlockByIDAndHeight() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
+	suite.RunTest(func(handler *rpc.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
 
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
@@ -509,7 +517,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 }
 
 func (suite *Suite) TestGetExecutionResultByBlockID() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
+	suite.RunTest(func(handler *rpc.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
 
 		// test block1 get by ID
 		nonexistingID := unittest.IdentifierFixture()
@@ -519,8 +527,8 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			unittest.WithExecutionResultBlockID(blockID),
 			unittest.WithServiceEvents(3))
 
-		require.NoError(suite.T(), all.Results.Store(er))
-		require.NoError(suite.T(), all.Results.Index(blockID, er.ID()))
+		require.NoError(suite.T(), en.Results.Store(er))
+		require.NoError(suite.T(), en.Results.Index(blockID, er.ID()))
 
 		assertResp := func(
 			resp *accessproto.ExecutionResultForBlockIDResponse,
@@ -592,9 +600,8 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
-		results := bstorage.NewExecutionResults(suite.metrics, db)
-		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
+		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
+		en := util.ExecutionStorageLayer(suite.T(), db)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		enNodeIDs := enIdentities.NodeIDs()
 
@@ -602,7 +609,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 		block, collection := suite.createChain()
 
 		// setup mocks
-		originID := unittest.IdentifierFixture()
 		conduit := new(mocknetwork.Conduit)
 		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
@@ -625,7 +631,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// create a mock connection factory
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mocks.MockCloser{}, nil)
 
 		// initialize storage
 		metrics := metrics.NewNoopCollector()
@@ -637,43 +643,99 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
+		blockTransactions, err := stdmap.NewIdentifierMap(100)
+		require.NoError(suite.T(), err)
 
-		bnd, err := backend.New(backend.Params{State: suite.state,
-			CollectionRPC:             suite.collClient,
-			Blocks:                    all.Blocks,
-			Headers:                   all.Headers,
-			Collections:               collections,
-			Transactions:              transactions,
-			ExecutionReceipts:         receipts,
-			ExecutionResults:          results,
-			ChainID:                   suite.chainID,
-			AccessMetrics:             suite.metrics,
-			ConnFactory:               connFactory,
-			MaxHeightRange:            backend.DefaultMaxHeightRange,
-			PreferredExecutionNodeIDs: enNodeIDs.Strings(),
-			Log:                       suite.log,
-			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-			Communicator:              backend.NewNodeCommunicator(false),
-			TxErrorMessagesCacheSize:  1000,
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+			suite.log,
+			suite.state,
+			en.Receipts,
+			enNodeIDs,
+			nil,
+		)
+
+		bnd, err := backend.New(backend.Params{
+			State:                      suite.state,
+			CollectionRPC:              suite.collClient,
+			Blocks:                     all.Blocks,
+			Headers:                    all.Headers,
+			Collections:                collections,
+			Transactions:               transactions,
+			ExecutionReceipts:          en.Receipts,
+			ExecutionResults:           en.Results,
+			ChainID:                    suite.chainID,
+			AccessMetrics:              suite.metrics,
+			ConnFactory:                connFactory,
+			MaxHeightRange:             backend.DefaultMaxHeightRange,
+			Log:                        suite.log,
+			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
+			Communicator:               backend.NewNodeCommunicator(false),
+			TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		require.NoError(suite.T(), err)
 
-		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
+		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
+
+		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetricImpl(
+			suite.log,
+			metrics,
+			collectionsToMarkFinalized,
+			collectionsToMarkExecuted,
+			blocksToMarkExecuted,
+			collections,
+			all.Blocks,
+			blockTransactions,
+		)
+		require.NoError(suite.T(), err)
+
+		progress, err := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressLastFullBlockHeight).Initialize(suite.rootBlock.Height)
+		require.NoError(suite.T(), err)
+		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(progress)
+		require.NoError(suite.T(), err)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted)
+		processedHeight := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressIngestionEngineBlockHeight)
+
+		collectionSyncer := ingestion.NewCollectionSyncer(
+			suite.log,
+			collectionExecutedMetric,
+			suite.request,
+			suite.state,
+			all.Blocks,
+			collections,
+			transactions,
+			lastFullBlockHeight,
+		)
+
+		ingestEng, err := ingestion.New(
+			suite.log,
+			suite.net,
+			suite.state,
+			suite.me,
+			all.Blocks,
+			en.Results,
+			en.Receipts,
+			processedHeight,
+			collectionSyncer,
+			collectionExecutedMetric,
+			nil,
+		)
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
 		err = all.Blocks.Store(block)
 		require.NoError(suite.T(), err)
+
+		err = db.Update(operation.IndexBlockHeight(block.Header.Height, block.ID()))
+		require.NoError(suite.T(), err)
+
 		suite.sealedBlock = block.Header
 
 		background, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		ctx, _ := irrecoverable.WithSignaler(background)
+		ctx := irrecoverable.NewMockSignalerContext(suite.T(), background)
 		ingestEng.Start(ctx)
 		<-ingestEng.Ready()
 
@@ -686,8 +748,9 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// 3. Request engine is used to request missing collection
 		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
-		// 4. Ingest engine receives the requested collection and all the execution receipts
-		ingestEng.OnCollection(originID, collection)
+		// 4. Indexer IndexCollection receives the requested collection and all the execution receipts
+		err = indexer.IndexCollection(collection, collections, transactions, suite.log, collectionExecutedMetric)
+		require.NoError(suite.T(), err)
 
 		for _, r := range executionReceipts {
 			err = ingestEng.Process(channels.ReceiveReceipts, enNodeIDs[0], r)
@@ -711,10 +774,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 // transaction ID, block ID, and collection ID.
 func (suite *Suite) TestGetTransactionResult() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
-		results := bstorage.NewExecutionResults(suite.metrics, db)
-		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
-
+		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
+		en := util.ExecutionStorageLayer(suite.T(), db)
 		originID := unittest.IdentifierFixture()
 
 		*suite.state = protocol.State{}
@@ -726,7 +787,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		blockNegativeId := blockNegative.ID()
 
 		finalSnapshot := new(protocol.Snapshot)
-		finalSnapshot.On("Head").Return(block.Header, nil)
+		finalSnapshot.On("Head").Return(suite.finalizedBlock, nil)
 
 		suite.state.On("Params").Return(suite.params)
 		suite.state.On("Final").Return(finalSnapshot)
@@ -749,6 +810,9 @@ func (suite *Suite) TestGetTransactionResult() {
 		allIdentities := append(colIdentities, enIdentities...)
 		finalSnapshot.On("Identities", mock.Anything).Return(allIdentities, nil)
 
+		suite.state.On("AtBlockID", blockNegativeId).Return(suite.sealedSnapshot)
+		suite.sealedSnapshot.On("Identities", mock.Anything).Return(allIdentities, nil)
+
 		// assume execution node returns an empty list of events
 		suite.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(&execproto.GetTransactionResultResponse{
 			Events: nil,
@@ -761,7 +825,7 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		// create a mock connection factory
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mocks.MockCloser{}, nil)
 
 		// initialize storage
 		metrics := metrics.NewNoopCollector()
@@ -775,32 +839,84 @@ func (suite *Suite) TestGetTransactionResult() {
 		require.NoError(suite.T(), err)
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
+		blockTransactions, err := stdmap.NewIdentifierMap(100)
+		require.NoError(suite.T(), err)
+
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+			suite.log,
+			suite.state,
+			en.Receipts,
+			enNodeIDs,
+			nil,
+		)
 
 		bnd, err := backend.New(backend.Params{State: suite.state,
-			CollectionRPC:             suite.collClient,
-			Blocks:                    all.Blocks,
-			Headers:                   all.Headers,
-			Collections:               collections,
-			Transactions:              transactions,
-			ExecutionReceipts:         receipts,
-			ExecutionResults:          results,
-			ChainID:                   suite.chainID,
-			AccessMetrics:             suite.metrics,
-			ConnFactory:               connFactory,
-			MaxHeightRange:            backend.DefaultMaxHeightRange,
-			PreferredExecutionNodeIDs: enNodeIDs.Strings(),
-			Log:                       suite.log,
-			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-			Communicator:              backend.NewNodeCommunicator(false),
-			TxErrorMessagesCacheSize:  1000,
+			CollectionRPC:              suite.collClient,
+			Blocks:                     all.Blocks,
+			Headers:                    all.Headers,
+			Collections:                collections,
+			Transactions:               transactions,
+			ExecutionReceipts:          en.Receipts,
+			ExecutionResults:           en.Results,
+			ChainID:                    suite.chainID,
+			AccessMetrics:              suite.metrics,
+			ConnFactory:                connFactory,
+			MaxHeightRange:             backend.DefaultMaxHeightRange,
+			Log:                        suite.log,
+			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
+			Communicator:               backend.NewNodeCommunicator(false),
+			TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		require.NoError(suite.T(), err)
 
-		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
+		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
 
-		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted)
+		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetricImpl(
+			suite.log,
+			metrics,
+			collectionsToMarkFinalized,
+			collectionsToMarkExecuted,
+			blocksToMarkExecuted,
+			collections,
+			all.Blocks,
+			blockTransactions,
+		)
+		require.NoError(suite.T(), err)
+
+		processedHeightInitializer := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressIngestionEngineBlockHeight)
+
+		lastFullBlockHeightProgress, err := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressLastFullBlockHeight).
+			Initialize(suite.rootBlock.Height)
+		require.NoError(suite.T(), err)
+
+		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeightProgress)
+		require.NoError(suite.T(), err)
+
+		collectionSyncer := ingestion.NewCollectionSyncer(
+			suite.log,
+			collectionExecutedMetric,
+			suite.request,
+			suite.state,
+			all.Blocks,
+			collections,
+			transactions,
+			lastFullBlockHeight,
+		)
+
+		ingestEng, err := ingestion.New(
+			suite.log,
+			suite.net,
+			suite.state,
+			suite.me,
+			all.Blocks,
+			en.Results,
+			en.Receipts,
+			processedHeightInitializer,
+			collectionSyncer,
+			collectionExecutedMetric,
+			nil,
+		)
 		require.NoError(suite.T(), err)
 
 		background, cancel := context.WithCancel(context.Background())
@@ -825,14 +941,19 @@ func (suite *Suite) TestGetTransactionResult() {
 			}
 			ingestEng.OnFinalizedBlock(mb)
 
-			// Ingest engine receives the requested collection and all the execution receipts
-			ingestEng.OnCollection(originID, collection)
+			// Indexer IndexCollection receives the requested collection and all the execution receipts
+			err = indexer.IndexCollection(collection, collections, transactions, suite.log, collectionExecutedMetric)
+			require.NoError(suite.T(), err)
 
 			for _, r := range executionReceipts {
 				err = ingestEng.Process(channels.ReceiveReceipts, enNodeIDs[0], r)
 				require.NoError(suite.T(), err)
 			}
 		}
+		err = db.Update(operation.IndexBlockHeight(block.Header.Height, block.ID()))
+		require.NoError(suite.T(), err)
+		finalSnapshot.On("Head").Return(block.Header, nil)
+
 		processExecutionReceipts(block, collection, enNodeIDs, originID, ingestEng)
 		processExecutionReceipts(blockNegative, collectionNegative, enNodeIDs, originID, ingestEng)
 
@@ -891,6 +1012,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			}
 			resp, err := handler.GetTransactionResult(context.Background(), getReq)
 			require.Error(suite.T(), err)
+			require.Contains(suite.T(), err.Error(), "failed to find: transaction not in block")
 			require.Nil(suite.T(), resp)
 		})
 
@@ -952,44 +1074,48 @@ func (suite *Suite) TestGetTransactionResult() {
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
-		transactions := bstorage.NewTransactions(suite.metrics, db)
-		collections := bstorage.NewCollections(db, transactions)
-		results := bstorage.NewExecutionResults(suite.metrics, db)
-		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
-
+		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
+		en := util.ExecutionStorageLayer(suite.T(), db)
 		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		suite.sealedSnapshot.On("Identities", mock.Anything).Return(identities, nil)
 		suite.finalSnapshot.On("Identities", mock.Anything).Return(identities, nil)
 
 		// create a mock connection factory
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mocks.MockCloser{}, nil)
+
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+			suite.log,
+			suite.state,
+			en.Receipts,
+			nil,
+			identities.NodeIDs(),
+		)
 
 		var err error
 		suite.backend, err = backend.New(backend.Params{
-			State:                    suite.state,
-			CollectionRPC:            suite.collClient,
-			Blocks:                   all.Blocks,
-			Headers:                  all.Headers,
-			Collections:              collections,
-			Transactions:             transactions,
-			ExecutionReceipts:        receipts,
-			ExecutionResults:         results,
-			ChainID:                  suite.chainID,
-			AccessMetrics:            suite.metrics,
-			ConnFactory:              connFactory,
-			MaxHeightRange:           backend.DefaultMaxHeightRange,
-			FixedExecutionNodeIDs:    (identities.NodeIDs()).Strings(),
-			Log:                      suite.log,
-			SnapshotHistoryLimit:     backend.DefaultSnapshotHistoryLimit,
-			Communicator:             backend.NewNodeCommunicator(false),
-			ScriptExecutionMode:      backend.ScriptExecutionModeExecutionNodesOnly,
-			TxErrorMessagesCacheSize: 1000,
+			State:                      suite.state,
+			CollectionRPC:              suite.collClient,
+			Blocks:                     all.Blocks,
+			Headers:                    all.Headers,
+			Collections:                all.Collections,
+			Transactions:               all.Transactions,
+			ExecutionReceipts:          en.Receipts,
+			ExecutionResults:           en.Results,
+			ChainID:                    suite.chainID,
+			AccessMetrics:              suite.metrics,
+			ConnFactory:                connFactory,
+			MaxHeightRange:             backend.DefaultMaxHeightRange,
+			Log:                        suite.log,
+			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
+			Communicator:               backend.NewNodeCommunicator(false),
+			ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		require.NoError(suite.T(), err)
 
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
+		handler := rpc.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
 
 		// initialize metrics related storage
 		metrics := metrics.NewNoopCollector()
@@ -999,13 +1125,58 @@ func (suite *Suite) TestExecuteScript() {
 		require.NoError(suite.T(), err)
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
+		blockTransactions, err := stdmap.NewIdentifierMap(100)
+		require.NoError(suite.T(), err)
+
+		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetricImpl(
+			suite.log,
+			metrics,
+			collectionsToMarkFinalized,
+			collectionsToMarkExecuted,
+			blocksToMarkExecuted,
+			all.Collections,
+			all.Blocks,
+			blockTransactions,
+		)
+		require.NoError(suite.T(), err)
 
 		conduit := new(mocknetwork.Conduit)
 		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
-		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted)
+
+		processedHeightInitializer := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressIngestionEngineBlockHeight)
+
+		lastFullBlockHeightInitializer := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressLastFullBlockHeight)
+		lastFullBlockHeightProgress, err := lastFullBlockHeightInitializer.Initialize(suite.rootBlock.Height)
+		require.NoError(suite.T(), err)
+
+		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeightProgress)
+		require.NoError(suite.T(), err)
+
+		collectionSyncer := ingestion.NewCollectionSyncer(
+			suite.log,
+			collectionExecutedMetric,
+			suite.request,
+			suite.state,
+			all.Blocks,
+			all.Collections,
+			all.Transactions,
+			lastFullBlockHeight,
+		)
+
+		ingestEng, err := ingestion.New(
+			suite.log,
+			suite.net,
+			suite.state,
+			suite.me,
+			all.Blocks,
+			en.Results,
+			en.Receipts,
+			processedHeightInitializer,
+			collectionSyncer,
+			collectionExecutedMetric,
+			nil,
+		)
 		require.NoError(suite.T(), err)
 
 		// create another block as a predecessor of the block created earlier
@@ -1017,13 +1188,13 @@ func (suite *Suite) TestExecuteScript() {
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
-		//update latest sealed block
+		// update latest sealed block
 		suite.sealedBlock = lastBlock.Header
 		// create execution receipts for each of the execution node and the last block
 		executionReceipts := unittest.ReceiptsForBlockFixture(lastBlock, identities.NodeIDs())
 		// notify the ingest engine about the receipts
 		for _, r := range executionReceipts {
-			err = ingestEng.ProcessLocal(r)
+			err = ingestEng.Process(channels.ReceiveReceipts, unittest.IdentifierFixture(), r)
 			require.NoError(suite.T(), err)
 		}
 
@@ -1036,7 +1207,7 @@ func (suite *Suite) TestExecuteScript() {
 		executionReceipts = unittest.ReceiptsForBlockFixture(prevBlock, identities.NodeIDs())
 		// notify the ingest engine about the receipts
 		for _, r := range executionReceipts {
-			err = ingestEng.ProcessLocal(r)
+			err = ingestEng.Process(channels.ReceiveReceipts, unittest.IdentifierFixture(), r)
 			require.NoError(suite.T(), err)
 		}
 
@@ -1125,7 +1296,7 @@ func (suite *Suite) TestExecuteScript() {
 // TestAPICallNodeVersionInfo tests the GetNodeVersionInfo query and check response returns correct node version
 // information
 func (suite *Suite) TestAPICallNodeVersionInfo() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
+	suite.RunTest(func(handler *rpc.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
 		req := &accessproto.GetNodeVersionInfoRequest{}
 		resp, err := handler.GetNodeVersionInfo(context.Background(), req)
 		require.NoError(suite.T(), err)
@@ -1133,10 +1304,11 @@ func (suite *Suite) TestAPICallNodeVersionInfo() {
 
 		respNodeVersionInfo := resp.Info
 		suite.Require().Equal(respNodeVersionInfo, &entitiesproto.NodeVersionInfo{
-			Semver:          build.Version(),
-			Commit:          build.Commit(),
-			SporkId:         suite.sporkID[:],
-			ProtocolVersion: uint64(suite.protocolVersion),
+			Semver:               build.Version(),
+			Commit:               build.Commit(),
+			SporkId:              suite.sporkID[:],
+			ProtocolVersion:      0,
+			ProtocolStateVersion: uint64(suite.protocolStateVersion),
 		})
 	})
 }
@@ -1145,7 +1317,7 @@ func (suite *Suite) TestAPICallNodeVersionInfo() {
 // field in the response matches the finalized header from cache. It also tests that the LastFinalizedBlock field is
 // updated correctly when a block with a greater height is finalized.
 func (suite *Suite) TestLastFinalizedBlockHeightResult() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
+	suite.RunTest(func(handler *rpc.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
 		block := unittest.BlockWithParentFixture(suite.finalizedBlock)
 		newFinalizedBlock := unittest.BlockWithParentFixture(block.Header)
 
@@ -1185,7 +1357,7 @@ func (suite *Suite) createChain() (*flow.Block, *flow.Collection) {
 	collection := unittest.CollectionFixture(10)
 	refBlockID := unittest.IdentifierFixture()
 	// prepare cluster committee members
-	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole(flow.RoleCollection))
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 	// guarantee signers must be cluster committee members, so that access will fetch collection from
 	// the signers that are specified by guarantee.SignerIndices
 	indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
@@ -1200,11 +1372,11 @@ func (suite *Suite) createChain() (*flow.Block, *flow.Collection) {
 	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
 
 	cluster := new(protocol.Cluster)
-	cluster.On("Members").Return(clusterCommittee, nil)
-	epoch := new(protocol.Epoch)
+	cluster.On("Members").Return(clusterCommittee.ToSkeleton(), nil)
+	epoch := new(protocol.CommittedEpoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snap := new(protocol.Snapshot)
 	snap.On("Epochs").Return(epochs).Maybe()
 	snap.On("Params").Return(suite.params).Maybe()

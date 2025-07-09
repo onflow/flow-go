@@ -8,15 +8,14 @@ import (
 	"sync"
 	"testing"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethCrypto "github.com/onflow/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
-	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -98,6 +97,10 @@ func (a *EOATestAccount) signTx(
 	return tx
 }
 
+func (a *EOATestAccount) Nonce() uint64 {
+	return a.nonce
+}
+
 func (a *EOATestAccount) SetNonce(nonce uint64) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
@@ -126,19 +129,17 @@ func FundAndGetEOATestAccount(t testing.TB, led atree.Ledger, flowEVMRootAddress
 	account := GetTestEOAAccount(t, EOATestAccount1KeyHex)
 
 	// fund account
-	db, err := database.NewDatabase(led, flowEVMRootAddress)
-	require.NoError(t, err)
-
-	e := emulator.NewEmulator(db)
-	require.NoError(t, err)
+	e := emulator.NewEmulator(led, flowEVMRootAddress)
 
 	blk, err := e.NewBlockView(types.NewDefaultBlockContext(2))
 	require.NoError(t, err)
 
 	_, err = blk.DirectCall(
 		types.NewDepositCall(
+			RandomAddress(t), // any random non-empty address works here
 			account.Address(),
 			new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)),
+			account.nonce,
 		),
 	)
 	require.NoError(t, err)

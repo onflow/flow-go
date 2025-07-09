@@ -6,11 +6,10 @@ import (
 	"sync/atomic"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
@@ -23,7 +22,6 @@ import (
 // to me to verify, and then save it to the chunks job queue for the
 // fetcher engine to process.
 type Engine struct {
-	unit                  *engine.Unit
 	log                   zerolog.Logger
 	metrics               module.VerificationMetrics
 	tracer                module.Tracer
@@ -35,7 +33,10 @@ type Engine struct {
 	blockConsumerNotifier module.ProcessingNotifier // to report a block has been processed.
 	stopAtHeight          uint64
 	stopAtBlockID         atomic.Value
+	*module.NoopReadyDoneAware
 }
+
+var _ module.ReadyDoneAware = (*Engine)(nil)
 
 func New(
 	log zerolog.Logger,
@@ -49,7 +50,6 @@ func New(
 	stopAtHeight uint64,
 ) *Engine {
 	e := &Engine{
-		unit:             engine.NewUnit(),
 		log:              log.With().Str("engine", "assigner").Logger(),
 		metrics:          metrics,
 		tracer:           tracer,
@@ -68,14 +68,6 @@ func (e *Engine) WithBlockConsumerNotifier(notifier module.ProcessingNotifier) {
 	e.blockConsumerNotifier = notifier
 }
 
-func (e *Engine) Ready() <-chan struct{} {
-	return e.unit.Ready()
-}
-
-func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
-}
-
 // resultChunkAssignment receives an execution result that appears in a finalized incorporating block.
 // In case this verification node is authorized at the reference block of this execution receipt's result,
 // chunk assignment is computed for the result, and the list of assigned chunks returned.
@@ -84,7 +76,7 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 	incorporatingBlock flow.Identifier,
 ) (flow.ChunkList, error) {
 	resultID := result.ID()
-	log := log.With().
+	log := e.log.With().
 		Hex("result_id", logging.ID(resultID)).
 		Hex("executed_block_id", logging.ID(result.BlockID)).
 		Hex("incorporating_block_id", logging.ID(incorporatingBlock)).
@@ -108,8 +100,7 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 	}
 	e.metrics.OnChunksAssignmentDoneAtAssigner(len(chunkList))
 
-	// TODO: de-escalate to debug level on stable version.
-	log.Info().
+	log.Debug().
 		Int("total_chunks", len(result.Chunks)).
 		Int("total_assigned_chunks", len(chunkList)).
 		Msg("chunk assignment done")
@@ -151,7 +142,7 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier, block
 
 	// notifies chunk queue consumer of a new chunk
 	e.newChunkListener.Check()
-	lg.Info().Msg("chunk locator successfully pushed to chunks queue")
+	lg.Debug().Msg("chunk locator successfully pushed to chunks queue")
 
 	return true, nil
 }
@@ -163,7 +154,8 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier, block
 func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	blockID := block.ID()
 
-	span, ctx := e.tracer.StartBlockSpan(e.unit.Ctx(), blockID, trace.VERProcessFinalizedBlock)
+	// We don't have any existing information and don't need cancellation, so use a background (empty) context
+	span, ctx := e.tracer.StartBlockSpan(context.Background(), blockID, trace.VERProcessFinalizedBlock)
 	defer span.End()
 
 	e.processFinalizedBlock(ctx, block)
@@ -235,7 +227,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 	}
 
 	e.metrics.OnFinalizedBlockArrivedAtAssigner(block.Header.Height)
-	lg.Info().
+	lg.Debug().
 		Uint64("total_assigned_chunks", assignedChunksCount).
 		Uint64("total_processed_chunks", processedChunksCount).
 		Msg("finished processing finalized block")
@@ -274,13 +266,8 @@ func authorizedAsVerification(state protocol.State, blockID flow.Identifier, ide
 		return false, fmt.Errorf("node has an invalid role. expected: %s, got: %s", flow.RoleVerification, identity.Role)
 	}
 
-	// checks identity has not been ejected
-	if identity.Ejected {
-		return false, nil
-	}
-
-	// checks identity has weight
-	if identity.Weight == 0 {
+	// checks identity is an active epoch participant with positive weight
+	if !filter.IsValidCurrentEpochParticipant(identity) || identity.InitialWeight == 0 {
 		return false, nil
 	}
 

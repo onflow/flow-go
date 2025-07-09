@@ -20,11 +20,32 @@ var (
 	// ErrNextEpochNotCommitted is a sentinel error returned when the next epoch
 	// has not been committed and information is queried that is only accessible
 	// in the EpochCommitted phase.
-	ErrNextEpochNotCommitted = fmt.Errorf("queried info from EpochCommit event before it was emitted")
+	ErrNextEpochNotCommitted = fmt.Errorf("next epoch has not yet been committed")
 
-	// ErrEpochTransitionNotFinalized is a sentinel returned when a query is made
-	// for a block at an epoch boundary which has not yet been finalized.
-	ErrEpochTransitionNotFinalized = fmt.Errorf("cannot query block at un-finalized epoch transition")
+	// ErrNextEpochAlreadyCommitted is a sentinel error returned when code tries
+	// to retrieve an uncommitted TentativeEpoch during the EpochCommitted phase
+	ErrNextEpochAlreadyCommitted = fmt.Errorf("retrieving tentative epoch data when epoch is already committed")
+
+	// ErrUnknownEpochBoundary is a sentinel returned when a query is made for an
+	// epoch boundary which is unknown to this node.
+	//
+	// There are 2 cases where an epoch boundary can be unknown.
+	// Consider an epoch boundary between epoch N and epoch M=N+1.
+	// Let:
+	//   - n be the final block in epoch N
+	//   - m be the first block in epoch M
+	//   - r be this node's lowest known block
+	//   - f be this node's latest finalized block
+	//
+	// CASE 1: `r.Height > n.Height`
+	// The boundary occurred before this node's lowest known block
+	// Note that this includes the case where `r == m` (we know the first block
+	// of epoch M but not the final block of epoch N).
+	//
+	// CASE 2: `f.Height < m.Height`
+	// The boundary has not been finalized yet. Note that we may have finalized
+	// n but not m.
+	ErrUnknownEpochBoundary = fmt.Errorf("unknown epoch boundary for current chain state")
 
 	// ErrSealingSegmentBelowRootBlock is a sentinel error returned for queries
 	// for a sealing segment below the root block (local history cutoff).

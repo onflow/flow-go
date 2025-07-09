@@ -247,7 +247,7 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send testutils.ConduitSendWra
 		}
 
 		// others keeps the identifier of all nodes except ith node
-		others := suite.ids.Filter(filter.Not(filter.HasNodeID(suite.ids[i].NodeID))).NodeIDs()
+		others := suite.ids.Filter(filter.Not(filter.HasNodeID[flow.Identity](suite.ids[i].NodeID))).NodeIDs()
 		require.NoError(suite.Suite.T(), send(event, engs[i].Con, others...))
 		wg.Add(count - 1)
 	}
@@ -379,7 +379,7 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send testutils.ConduitSend
 		}
 	}
 	// others keeps the identifier of all nodes except node that is sender.
-	others := suite.ids.Filter(filter.Not(filter.HasNodeID(suite.ids[0].NodeID))).NodeIDs()
+	others := suite.ids.Filter(filter.Not(filter.HasNodeID[flow.Identity](suite.ids[0].NodeID))).NodeIDs()
 
 	// generates and sends an event of custom size to the network
 	payload := testutils.NetworkPayloadFixture(suite.T(), size)
@@ -450,7 +450,7 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send testutils.ConduitSen
 
 		// others keeps the identifier of all nodes except ith node and the node that unregistered from the topic.
 		// nodes without valid topic registration for a channel will reject messages on that channel via unicast.
-		others := suite.ids.Filter(filter.Not(filter.HasNodeID(suite.ids[i].NodeID, suite.ids[unregisterIndex].NodeID))).NodeIDs()
+		others := suite.ids.Filter(filter.Not(filter.HasNodeID[flow.Identity](suite.ids[i].NodeID, suite.ids[unregisterIndex].NodeID))).NodeIDs()
 
 		if i == unregisterIndex {
 			// assert that unsubscribed engine cannot publish on that topic

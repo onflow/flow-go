@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -31,6 +31,7 @@ import (
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -53,7 +54,6 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 			stateCommitments.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			headers := storage.NewHeaders(t)
 			blocks := storage.NewBlocks(t)
-			collections := storage.NewCollections(t)
 			events := storage.NewEvents(t)
 			events.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			serviceEvents := storage.NewServiceEvents(t)
@@ -63,7 +63,6 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 			chunkDataPacks := storage.NewChunkDataPacks(t)
 			chunkDataPacks.On("Store", mock.Anything).Return(nil)
 			results := storage.NewExecutionResults(t)
-			results.On("BatchStore", mock.Anything, mock.Anything).Return(nil)
 			results.On("BatchIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			myReceipts := storage.NewMyExecutionReceipts(t)
 			myReceipts.On("BatchStoreMyReceipt", mock.Anything, mock.Anything).Return(nil)
@@ -87,8 +86,14 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 				headersDB := badgerstorage.NewHeaders(metrics, badgerDB)
 				require.NoError(t, headersDB.Store(finalizedHeaders[10]))
 
+				getLatestFinalized := func() (uint64, error) {
+					return rootHeight, nil
+				}
+
 				es := state.NewExecutionState(
-					ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, badgerDB, trace.NewNoopTracer(),
+					ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, badgerimpl.ToDB(badgerDB),
+					getLatestFinalized,
+					trace.NewNoopTracer(),
 					rs,
 					true,
 				)
@@ -114,7 +119,7 @@ func withRegisterStore(t *testing.T, fn func(
 		log := unittest.Logger()
 		var wal execution.ExecutedFinalizedWAL
 		finalized, headerByHeight, highest := testutil.NewMockFinalizedReader(10, 100)
-		rs, err := storehouse.NewRegisterStore(diskStore, wal, finalized, log)
+		rs, err := storehouse.NewRegisterStore(diskStore, wal, finalized, log, storehouse.NewNoopNotifier())
 		require.NoError(t, err)
 		fn(t, rs, diskStore, finalized, 10, highest, headerByHeight)
 	})
@@ -208,7 +213,7 @@ func makeComputationResult(
 	commit flow.StateCommitment,
 ) *execution.ComputationResult {
 
-	computationResult := execution.NewEmptyComputationResult(completeBlock)
+	computationResult := execution.NewEmptyComputationResult(completeBlock, flow.NewChunk)
 	numberOfChunks := 1
 	ceds := make([]*execution_data.ChunkExecutionData, numberOfChunks)
 	ceds[0] = unittest.ChunkExecutionDataFixture(t, 1024)

@@ -50,7 +50,7 @@ func (h *Handler) GetNetworkParameters(
 
 func (h *Handler) GetNodeVersionInfo(
 	ctx context.Context,
-	request *access.GetNodeVersionInfoRequest,
+	_ *access.GetNodeVersionInfoRequest,
 ) (*access.GetNodeVersionInfoResponse, error) {
 	nodeVersionInfo, err := h.api.GetNodeVersionInfo(ctx)
 	if err != nil {
@@ -59,10 +59,11 @@ func (h *Handler) GetNodeVersionInfo(
 
 	return &access.GetNodeVersionInfoResponse{
 		Info: &entities.NodeVersionInfo{
-			Semver:          nodeVersionInfo.Semver,
-			Commit:          nodeVersionInfo.Commit,
-			SporkId:         nodeVersionInfo.SporkId[:],
-			ProtocolVersion: nodeVersionInfo.ProtocolVersion,
+			Semver:               nodeVersionInfo.Semver,
+			Commit:               nodeVersionInfo.Commit,
+			SporkId:              nodeVersionInfo.SporkId[:],
+			ProtocolVersion:      nodeVersionInfo.ProtocolVersion,
+			ProtocolStateVersion: nodeVersionInfo.ProtocolStateVersion,
 		},
 	}, nil
 }

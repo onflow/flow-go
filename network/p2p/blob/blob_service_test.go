@@ -89,8 +89,8 @@ func TestAuthorizedRequester(t *testing.T) {
 		assert.False(t, authorizer(sn1PeerID, cid.Cid{}))
 	})
 
-	an1.Ejected = true
-	en1.Ejected = true
+	an1.EpochParticipationStatus = flow.EpochParticipationStatusEjected
+	en1.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 
 	// AN1 is on allow list (not passed) but is ejected
 	t.Run("always denies ejected AN", func(t *testing.T) {

@@ -2,16 +2,15 @@ package crypto_test
 
 import (
 	"crypto/rand"
-	"testing"
-
 	"crypto/sha256"
 	"crypto/sha512"
+	"testing"
 
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )

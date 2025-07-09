@@ -30,21 +30,21 @@ func TestFetch(t *testing.T) {
 
 	// mock depedencies
 	cluster := new(statemock.Cluster)
-	cluster.On("Members").Return(nodes)
-	epoch := new(statemock.Epoch)
+	cluster.On("Members").Return(nodes.ToSkeleton())
+	epoch := new(statemock.CommittedEpoch)
 	epoch.On("ClusterByChainID", guarantee.ChainID).Return(cluster, nil)
 	epochs := new(statemock.EpochQuery)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snapshot := new(statemock.Snapshot)
 	snapshot.On("Epochs").Return(epochs)
 	state := new(statemock.State)
 	state.On("AtBlockID", guarantee.ReferenceBlockID).Return(snapshot).Times(1)
 
 	request := new(modulemock.Requester)
-	var filter flow.IdentityFilter
-	request.On("EntityByID", guarantee.CollectionID, mock.AnythingOfType("flow.IdentityFilter")).Run(
+	var filter flow.IdentityFilter[flow.Identity]
+	request.On("EntityByID", guarantee.CollectionID, mock.Anything).Run(
 		func(args mock.Arguments) {
-			filter = args.Get(1).(flow.IdentityFilter)
+			filter = args.Get(1).(flow.IdentityFilter[flow.Identity])
 		},
 	).Return().Times(1)
 

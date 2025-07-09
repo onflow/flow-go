@@ -2,8 +2,8 @@ package environment
 
 import (
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/sema"
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -11,15 +11,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
-
-// ContractFunctionSpec specify all the information, except the function's
-// address and arguments, needed to invoke the contract function.
-type ContractFunctionSpec struct {
-	AddressFromChain func(flow.Chain) flow.Address
-	LocationName     string
-	FunctionName     string
-	ArgumentTypes    []sema.Type
-}
 
 // SystemContracts provides methods for invoking system contract functions as
 // service account.
@@ -99,7 +90,16 @@ var verifyPayersBalanceForTransactionExecutionSpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameFlowFees,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_verifyPayersBalanceForTransactionExecution,
 	ArgumentTypes: []sema.Type{
-		sema.AuthAccountType,
+		sema.NewReferenceType(
+			nil,
+			sema.NewEntitlementSetAccess(
+				[]*sema.EntitlementType{
+					sema.BorrowValueType,
+				},
+				sema.Conjunction,
+			),
+			sema.AccountType,
+		),
 		sema.UInt64Type,
 		sema.UInt64Type,
 	},
@@ -131,7 +131,16 @@ var deductTransactionFeeSpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameFlowFees,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_deductTransactionFee,
 	ArgumentTypes: []sema.Type{
-		sema.AuthAccountType,
+		sema.NewReferenceType(
+			nil,
+			sema.NewEntitlementSetAccess(
+				[]*sema.EntitlementType{
+					sema.BorrowValueType,
+				},
+				sema.Conjunction,
+			),
+			sema.AccountType,
+		),
 		sema.UInt64Type,
 		sema.UInt64Type,
 	},
@@ -160,8 +169,28 @@ var setupNewAccountSpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameServiceAccount,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_setupNewAccount,
 	ArgumentTypes: []sema.Type{
-		sema.AuthAccountType,
-		sema.AuthAccountType,
+		sema.NewReferenceType(
+			nil,
+			sema.NewEntitlementSetAccess(
+				[]*sema.EntitlementType{
+					sema.SaveValueType,
+					sema.BorrowValueType,
+					sema.CapabilitiesType,
+				},
+				sema.Conjunction,
+			),
+			sema.AccountType,
+		),
+		sema.NewReferenceType(
+			nil,
+			sema.NewEntitlementSetAccess(
+				[]*sema.EntitlementType{
+					sema.BorrowValueType,
+				},
+				sema.Conjunction,
+			),
+			sema.AccountType,
+		),
 	},
 }
 
@@ -207,7 +236,11 @@ var accountBalanceInvocationSpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameServiceAccount,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_defaultTokenBalance,
 	ArgumentTypes: []sema.Type{
-		sema.PublicAccountType,
+		sema.NewReferenceType(
+			nil,
+			sema.UnauthorizedAccess,
+			sema.AccountType,
+		),
 	},
 }
 

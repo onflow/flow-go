@@ -66,6 +66,7 @@ func (database *BlockDatabase) NewTransaction(
 	}, nil
 }
 
+// NewSnapshotReadTransaction creates a new readonly transaction.
 func (database *BlockDatabase) NewSnapshotReadTransaction(
 	parameters state.StateParameters,
 ) Transaction {
@@ -76,6 +77,17 @@ func (database *BlockDatabase) NewSnapshotReadTransaction(
 		DerivedTransactionData: database.DerivedBlockData.
 			NewSnapshotReadDerivedTransactionData(),
 	}
+}
+
+// NewCachingSnapshotReadTransaction creates a new readonly transaction that allows writing to the
+// derived transaction data table.
+func (database *BlockDatabase) NewCachingSnapshotReadTransaction(
+	parameters state.StateParameters,
+) (Transaction, error) {
+	return &transaction{
+		TransactionData:        database.BlockData.NewCachingSnapshotReadTransactionData(parameters),
+		DerivedTransactionData: database.DerivedBlockData.NewCachingSnapshotReadDerivedTransactionData(),
+	}, nil
 }
 
 func (txn *transaction) Validate() error {

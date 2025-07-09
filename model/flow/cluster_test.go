@@ -15,10 +15,10 @@ import (
 func TestClusterAssignments(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(100, unittest.WithRole(flow.RoleCollection))
-	assignments := unittest.ClusterAssignment(10, identities)
+	assignments := unittest.ClusterAssignment(10, identities.ToSkeleton())
 	assert.Len(t, assignments, 10)
 
-	clusters, err := factory.NewClusterList(assignments, identities)
+	clusters, err := factory.NewClusterList(assignments, identities.ToSkeleton())
 	require.NoError(t, err)
 	assert.Equal(t, assignments, clusters.Assignments())
 }

@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	chmodels "github.com/onflow/flow-go/model/chunks"
@@ -163,27 +163,28 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	vc *verification.VerifiableChunkData) error {
 	// log it first
-	log := e.log.With().Timestamp().
-		Hex("origin", logging.ID(originID)).
+	log := e.log.With().
 		Uint64("chunk_index", vc.Chunk.Index).
 		Hex("result_id", logging.Entity(vc.Result)).
+		Uint64("block_height", vc.Header.Height).
+		Hex("block_id", vc.Chunk.ChunkBody.BlockID[:]).
 		Logger()
 
 	log.Info().Msg("verifiable chunk received by verifier engine")
 
 	// only accept internal calls
 	if originID != e.me.NodeID() {
-		return fmt.Errorf("invalid remote origin for verify")
+		return fmt.Errorf("invalid remote origin for verify: %v", originID)
 	}
-
-	var err error
 
 	// extracts chunk ID
 	ch, ok := vc.Result.Chunks.ByIndex(vc.Chunk.Index)
 	if !ok {
 		return engine.NewInvalidInputErrorf("chunk out of range requested: %v", vc.Chunk.Index)
 	}
-	log.With().Hex("chunk_id", logging.Entity(ch)).Logger()
+	log = log.With().
+		Hex("chunk_id", logging.Entity(ch)).
+		Logger()
 
 	// execute the assigned chunk
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERVerChunkVerify)
@@ -200,58 +201,58 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 		// if any fault found with the chunk
 		switch chFault := err.(type) {
 		case *chmodels.CFMissingRegisterTouch:
-			e.log.Warn().
+			log.Warn().
 				Str("chunk_fault_type", "missing_register_touch").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			// still create approvals for this case
 		case *chmodels.CFNonMatchingFinalState:
 			// TODO raise challenge
-			e.log.Warn().
+			log.Warn().
 				Str("chunk_fault_type", "final_state_mismatch").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFInvalidVerifiableChunk:
 			// TODO raise challenge
-			e.log.Error().
+			log.Error().
 				Str("chunk_fault_type", "invalid_verifiable_chunk").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFInvalidEventsCollection:
 			// TODO raise challenge
-			e.log.Error().
+			log.Error().
 				Str("chunk_fault_type", "invalid_event_collection").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFSystemChunkIncludedCollection:
-			e.log.Error().
+			log.Error().
 				Str("chunk_fault_type", "system_chunk_includes_collection").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFExecutionDataBlockIDMismatch:
-			e.log.Error().
+			log.Error().
 				Str("chunk_fault_type", "execution_data_block_id_mismatch").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFExecutionDataChunksLengthMismatch:
-			e.log.Error().
+			log.Error().
 				Str("chunk_fault_type", "execution_data_chunks_count_mismatch").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFExecutionDataInvalidChunkCID:
-			e.log.Error().
+			log.Error().
 				Str("chunk_fault_type", "execution_data_chunk_cid_mismatch").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFInvalidExecutionDataID:
-			e.log.Error().
+			log.Error().
 				Str("chunk_fault_type", "execution_data_root_cid_mismatch").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
@@ -264,10 +265,13 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 
 	// Generate result approval
 	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERVerGenerateResultApproval)
-	attestation := &flow.Attestation{
+	attestation, err := flow.NewAttestation(flow.UntrustedAttestation{
 		BlockID:           vc.Header.ID(),
 		ExecutionResultID: vc.Result.ID(),
 		ChunkIndex:        vc.Chunk.Index,
+	})
+	if err != nil {
+		return fmt.Errorf("could not build attestation: %w", err)
 	}
 	approval, err := GenerateResultApproval(
 		e.me,
@@ -294,7 +298,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	// Extracting consensus node ids
 	// TODO state extraction should be done based on block references
 	consensusNodes, err := e.state.Final().
-		Identities(filter.HasRole(flow.RoleConsensus))
+		Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	if err != nil {
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not load consensus node IDs: %w", err)
@@ -336,11 +340,14 @@ func GenerateResultApproval(
 	}
 
 	// result approval body
-	body := flow.ResultApprovalBody{
+	body, err := flow.NewResultApprovalBody(flow.UntrustedResultApprovalBody{
 		Attestation:          *attestation,
 		ApproverID:           me.NodeID(),
 		AttestationSignature: atstSign,
 		Spock:                spock,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build result approval body: %w", err)
 	}
 
 	// generates a signature over result approval body
@@ -350,10 +357,15 @@ func GenerateResultApproval(
 		return nil, fmt.Errorf("could not sign result approval body: %w", err)
 	}
 
-	return &flow.ResultApproval{
-		Body:              body,
+	resultApproval, err := flow.NewResultApproval(flow.UntrustedResultApproval{
+		Body:              *body,
 		VerifierSignature: bodySign,
-	}, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build result approval: %w", err)
+	}
+
+	return resultApproval, nil
 }
 
 // verifiableChunkHandler acts as a wrapper around the verify method that captures its performance-related metrics

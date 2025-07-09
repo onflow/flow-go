@@ -10,11 +10,12 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/stretchr/testify/mock"
+	"github.com/onflow/cadence/stdlib"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -37,7 +38,7 @@ func CreateContractDeploymentTransaction(contractName string, contract string, a
 	encoded := hex.EncodeToString([]byte(contract))
 
 	script := []byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount, service: AuthAccount) {
+              prepare(signer: auth(AddContract) &Account, service: &Account) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex())
               }
             }`, contractName, encoded))
@@ -55,8 +56,8 @@ func UpdateContractDeploymentTransaction(contractName string, contract string, a
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount, service: AuthAccount) {
-                signer.contracts.update__experimental(name: "%s", code: "%s".decodeHex())
+              prepare(signer: auth(UpdateContract) &Account, service: &Account) {
+                signer.contracts.update(name: "%s", code: "%s".decodeHex())
               }
             }`, contractName, encoded)),
 		).
@@ -69,8 +70,8 @@ func UpdateContractUnathorizedDeploymentTransaction(contractName string, contrac
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount) {
-                signer.contracts.update__experimental(name: "%s", code: "%s".decodeHex())
+              prepare(signer: auth(UpdateContract) &Account) {
+                signer.contracts.update(name: "%s", code: "%s".decodeHex())
               }
             }`, contractName, encoded)),
 		).
@@ -80,7 +81,7 @@ func UpdateContractUnathorizedDeploymentTransaction(contractName string, contrac
 func RemoveContractDeploymentTransaction(contractName string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount, service: AuthAccount) {
+              prepare(signer: auth(RemoveContract) &Account, service: &Account) {
                 signer.contracts.remove(name: "%s")
               }
             }`, contractName)),
@@ -92,7 +93,7 @@ func RemoveContractDeploymentTransaction(contractName string, authorizer flow.Ad
 func RemoveContractUnathorizedDeploymentTransaction(contractName string, authorizer flow.Address) *flow.TransactionBody {
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount) {
+              prepare(signer: auth(RemoveContract) &Account) {
                 signer.contracts.remove(name: "%s")
               }
             }`, contractName)),
@@ -105,7 +106,7 @@ func CreateUnauthorizedContractDeploymentTransaction(contractName string, contra
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount) {
+              prepare(signer: auth(AddContract) &Account) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex())
               }
             }`, contractName, encoded)),
@@ -233,8 +234,8 @@ func CreateAccountsWithSimpleAddresses(
 
 	scriptTemplate := `
         transaction(publicKey: [UInt8]) {
-            prepare(signer: AuthAccount) {
-                let acct = AuthAccount(payer: signer)
+            prepare(signer: auth(AddKey, BorrowValue) &Account) {
+                let acct = Account(payer: signer)
                 let publicKey2 = PublicKey(
                     publicKey: publicKey,
                     signatureAlgorithm: SignatureAlgorithm.%s
@@ -289,11 +290,20 @@ func CreateAccountsWithSimpleAddresses(
 			if event.Type == flow.EventAccountCreated {
 				data, err := ccf.Decode(nil, event.Payload)
 				if err != nil {
-					return snapshotTree, nil, errors.New(
-						"error decoding events")
+					return snapshotTree, nil, errors.New("error decoding events")
 				}
-				addr = flow.ConvertAddress(
-					data.(cadence.Event).Fields[0].(cadence.Address))
+
+				event, ok := data.(cadence.Event)
+				if !ok {
+					return snapshotTree, nil, errors.New("error decoding events")
+				}
+
+				address := cadence.SearchFieldByName(
+					event,
+					stdlib.AccountEventAddressParameter.Identifier,
+				).(cadence.Address)
+
+				addr = flow.ConvertAddress(address)
 				break
 			}
 		}
@@ -341,7 +351,7 @@ func BytesToCadenceArray(l []byte) cadence.Array {
 		values[i] = cadence.NewUInt8(b)
 	}
 
-	return cadence.NewArray(values).WithType(cadence.NewVariableSizedArrayType(cadence.NewUInt8Type()))
+	return cadence.NewArray(values).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 }
 
 // CreateAccountCreationTransaction creates a transaction which will create a new account.
@@ -358,8 +368,8 @@ func CreateAccountCreationTransaction(t testing.TB, chain flow.Chain) (flow.Acco
 	// define the cadence script
 	script := fmt.Sprintf(`
         transaction(publicKey: [UInt8]) {
-            prepare(signer: AuthAccount) {
-				let acct = AuthAccount(payer: signer)
+            prepare(signer: auth(AddKey, BorrowValue) &Account) {
+				let acct = Account(payer: signer)
                 let publicKey2 = PublicKey(
                     publicKey: publicKey,
                     signatureAlgorithm: SignatureAlgorithm.%s
@@ -398,10 +408,10 @@ func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int
 	// define the cadence script
 	script := fmt.Sprintf(`
         transaction(publicKey: [UInt8]) {
-            prepare(signer: AuthAccount) {
+            prepare(signer: auth(AddKey, BorrowValue) &Account) {
                 var i = 0
                 while i < %d {
-                    let account = AuthAccount(payer: signer)
+                    let account = Account(payer: signer)
                     let publicKey2 = PublicKey(
                         publicKey: publicKey,
                         signatureAlgorithm: SignatureAlgorithm.%s
@@ -434,7 +444,7 @@ func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int
 func CreateAddAnAccountKeyMultipleTimesTransaction(t *testing.T, accountKey *flow.AccountPrivateKey, counts int) *flow.TransactionBody {
 	script := []byte(fmt.Sprintf(`
       transaction(counts: Int, key: [UInt8]) {
-        prepare(signer: AuthAccount) {
+        prepare(signer: auth(AddKey) &Account) {
           var i = 0
           while i < counts {
             i = i + 1
@@ -473,8 +483,8 @@ func CreateAddAccountKeyTransaction(t *testing.T, accountKey *flow.AccountPrivat
 
 	script := []byte(`
         transaction(key: [UInt8]) {
-          prepare(signer: AuthAccount) {
-            let acct = AuthAccount(payer: signer)
+          prepare(signer: auth(AddKey) &Account) {
+            let acct = Account(payer: signer)
             let publicKey2 = PublicKey(
               publicKey: key,
               signatureAlgorithm: SignatureAlgorithm.%s
@@ -644,17 +654,89 @@ func EntropyProviderFixture(source []byte) environment.EntropyProvider {
 	return &provider
 }
 
+// ProtocolStateWithVersionFixture is the same as ProtocolStateWithSourceFixture,
+// but it allows specifying the desired protocol version, rather than random source.
+// TODO(mainnet27, #6773): remove, because this is only temporarily needed in the execution node to produce different chunk Data Packs depending on the protocol version
+func ProtocolStateWithVersionFixture(protocolVersion uint64) protocol.SnapshotExecutionSubsetProvider {
+	kvstore := &protocolMock.KVStoreReader{}
+	kvstore.On("GetProtocolStateVersion").Return(protocolVersion)
+	snapshot := mockSnapshotSubset{
+		randomSourceFunc: func() ([]byte, error) {
+			return unittest.SignatureFixture(), nil
+		},
+		kvStoreFunc: func() (protocol.KVStoreReader, error) {
+			return kvstore, nil
+		},
+	}
+	provider := mockProtocolStateSnapshotProvider{
+		snapshotFunc: func(blockID flow.Identifier) protocol.SnapshotExecutionSubset {
+			return snapshot
+		},
+	}
+	return provider
+}
+
 // ProtocolStateWithSourceFixture returns a protocol state mock that only
 // supports AtBlockID to return a snapshot mock.
 // The snapshot mock only supports RandomSource().
 // If input is nil, a random source fixture is generated.
-func ProtocolStateWithSourceFixture(source []byte) protocol.State {
+func ProtocolStateWithSourceFixture(source []byte) protocol.SnapshotExecutionSubsetProvider {
 	if source == nil {
 		source = unittest.SignatureFixture()
 	}
-	snapshot := &protocolMock.Snapshot{}
-	snapshot.On("RandomSource").Return(source, nil)
-	state := protocolMock.State{}
-	state.On("AtBlockID", mock.Anything).Return(snapshot)
-	return &state
+	// For tests not explicitly testing version compatibility, always return latest protocol version
+	kvstore := &protocolMock.KVStoreReader{}
+	kvstore.On("GetProtocolStateVersion").Return(uint64(2))
+	snapshot := mockSnapshotSubset{
+		randomSourceFunc: func() ([]byte, error) {
+			return source, nil
+		},
+		versionBeaconFunc: func() (*flow.SealedVersionBeacon, error) {
+			return &flow.SealedVersionBeacon{VersionBeacon: unittest.VersionBeaconFixture()}, nil
+		},
+		kvStoreFunc: func() (protocol.KVStoreReader, error) {
+			return kvstore, nil
+		},
+	}
+
+	provider := mockProtocolStateSnapshotProvider{
+		snapshotFunc: func(blockID flow.Identifier) protocol.SnapshotExecutionSubset {
+			return snapshot
+		},
+	}
+	return provider
 }
+
+type mockProtocolStateSnapshotProvider struct {
+	snapshotFunc func(blockID flow.Identifier) protocol.SnapshotExecutionSubset
+}
+
+func (m mockProtocolStateSnapshotProvider) AtBlockID(blockID flow.Identifier) protocol.SnapshotExecutionSubset {
+	return m.snapshotFunc(blockID)
+}
+
+type mockSnapshotSubset struct {
+	randomSourceFunc  func() ([]byte, error)
+	versionBeaconFunc func() (*flow.SealedVersionBeacon, error)
+	kvStoreFunc       func() (protocol.KVStoreReader, error)
+}
+
+func (m mockSnapshotSubset) RandomSource() ([]byte, error) {
+	if m.randomSourceFunc == nil {
+		return nil, errors.New("random source not implemented")
+	}
+	return m.randomSourceFunc()
+}
+
+func (m mockSnapshotSubset) VersionBeacon() (*flow.SealedVersionBeacon, error) {
+	if m.versionBeaconFunc == nil {
+		return nil, errors.New("version beacon not implemented")
+	}
+	return m.versionBeaconFunc()
+}
+
+func (m mockSnapshotSubset) ProtocolState() (protocol.KVStoreReader, error) {
+	return m.kvStoreFunc()
+}
+
+var _ protocol.SnapshotExecutionSubset = (*mockSnapshotSubset)(nil)

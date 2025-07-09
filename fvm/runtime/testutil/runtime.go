@@ -2,10 +2,10 @@ package testutil
 
 import (
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/sema"
 )
 
 var _ runtime.Runtime = &TestInterpreterRuntime{}
@@ -83,10 +83,6 @@ func (t *TestInterpreterRuntime) ReadStored(address common.Address, path cadence
 		panic("ReadStored not defined")
 	}
 	return t.ReadStoredFunc(address, path, context)
-}
-
-func (t *TestInterpreterRuntime) ReadLinked(common.Address, cadence.Path, runtime.Context) (cadence.Value, error) {
-	panic("ReadLinked not defined")
 }
 
 func (*TestInterpreterRuntime) Storage(runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {

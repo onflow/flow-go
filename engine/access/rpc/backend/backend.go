@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,23 +11,25 @@ import (
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/engine/common/version"
+	"github.com/onflow/flow-go/fvm/blueprints"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
-
-// minExecutionNodesCnt is the minimum number of execution nodes expected to have sent the execution receipt for a block
-const minExecutionNodesCnt = 2
-
-// maxAttemptsForExecutionReceipt is the maximum number of attempts to find execution receipts for a given block ID
-const maxAttemptsForExecutionReceipt = 3
 
 // DefaultMaxHeightRange is the default maximum size of range requests.
 const DefaultMaxHeightRange = 250
@@ -41,9 +44,6 @@ const DefaultLoggedScriptsCacheSize = 1_000_000
 
 // DefaultConnectionPoolSize is the default size for the connection pool to collection and execution nodes
 const DefaultConnectionPoolSize = 250
-
-var preferredENIdentifiers flow.IdentifierList
-var fixedENIdentifiers flow.IdentifierList
 
 // Backend implements the Access API.
 //
@@ -66,6 +66,8 @@ type Backend struct {
 	backendAccounts
 	backendExecutionResults
 	backendNetwork
+	backendSubscribeBlocks
+	backendSubscribeTransactions
 
 	state             protocol.State
 	chainID           flow.ChainID
@@ -73,36 +75,48 @@ type Backend struct {
 	executionReceipts storage.ExecutionReceipts
 	connFactory       connection.ConnectionFactory
 
-	// cache the response to GetNodeVersionInfo since it doesn't change
-	nodeInfo *access.NodeVersionInfo
+	BlockTracker   tracker.BlockTracker
+	stateParams    protocol.Params
+	versionControl *version.VersionControl
 }
 
 type Params struct {
-	State                     protocol.State
-	CollectionRPC             accessproto.AccessAPIClient
-	HistoricalAccessNodes     []accessproto.AccessAPIClient
-	Blocks                    storage.Blocks
-	Headers                   storage.Headers
-	Collections               storage.Collections
-	Transactions              storage.Transactions
-	ExecutionReceipts         storage.ExecutionReceipts
-	ExecutionResults          storage.ExecutionResults
-	LightTransactionResults   storage.LightTransactionResults
-	ChainID                   flow.ChainID
-	AccessMetrics             module.AccessMetrics
-	ConnFactory               connection.ConnectionFactory
-	RetryEnabled              bool
-	MaxHeightRange            uint
-	PreferredExecutionNodeIDs []string
-	FixedExecutionNodeIDs     []string
-	Log                       zerolog.Logger
-	SnapshotHistoryLimit      int
-	Communicator              Communicator
-	TxResultCacheSize         uint
-	TxErrorMessagesCacheSize  uint
-	ScriptExecutor            execution.ScriptExecutor
-	ScriptExecutionMode       ScriptExecutionMode
+	State                 protocol.State
+	CollectionRPC         accessproto.AccessAPIClient
+	HistoricalAccessNodes []accessproto.AccessAPIClient
+	Blocks                storage.Blocks
+	Headers               storage.Headers
+	Collections           storage.Collections
+	Transactions          storage.Transactions
+	ExecutionReceipts     storage.ExecutionReceipts
+	ExecutionResults      storage.ExecutionResults
+	TxResultErrorMessages storage.TransactionResultErrorMessages
+	ChainID               flow.ChainID
+	AccessMetrics         module.AccessMetrics
+	ConnFactory           connection.ConnectionFactory
+	RetryEnabled          bool
+	MaxHeightRange        uint
+	Log                   zerolog.Logger
+	SnapshotHistoryLimit  int
+	Communicator          Communicator
+	TxResultCacheSize     uint
+	ScriptExecutor        execution.ScriptExecutor
+	ScriptExecutionMode   IndexQueryMode
+	CheckPayerBalanceMode validator.PayerBalanceMode
+	EventQueryMode        IndexQueryMode
+	BlockTracker          tracker.BlockTracker
+	SubscriptionHandler   *subscription.SubscriptionHandler
+
+	EventsIndex                *index.EventsIndex
+	TxResultQueryMode          IndexQueryMode
+	TxResultsIndex             *index.TransactionResultsIndex
+	LastFullBlockHeight        *counters.PersistentStrictMonotonicCounter
+	IndexReporter              state_synchronization.IndexReporter
+	VersionControl             *version.VersionControl
+	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 }
+
+var _ TransactionErrorMessage = (*Backend)(nil)
 
 // New creates backend instance
 func New(params Params) (*Backend, error) {
@@ -116,74 +130,48 @@ func New(params Params) (*Backend, error) {
 		return nil, fmt.Errorf("failed to initialize script logging cache: %w", err)
 	}
 
-	var txResCache *lru.Cache[flow.Identifier, *access.TransactionResult]
+	var txResCache *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 	if params.TxResultCacheSize > 0 {
-		txResCache, err = lru.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
+		txResCache, err = lru.New[flow.Identifier, *accessmodel.TransactionResult](int(params.TxResultCacheSize))
 		if err != nil {
 			return nil, fmt.Errorf("failed to init cache for transaction results: %w", err)
 		}
 	}
 
-	// NOTE: The transaction error message cache is currently only used by the access node and not by the observer node.
-	//       To avoid introducing unnecessary command line arguments in the observer, one case could be that the error
-	//       message cache is nil for the observer node.
-	var txErrorMessagesCache *lru.Cache[flow.Identifier, string]
-
-	if params.TxErrorMessagesCacheSize > 0 {
-		txErrorMessagesCache, err = lru.New[flow.Identifier, string](int(params.TxErrorMessagesCacheSize))
-		if err != nil {
-			return nil, fmt.Errorf("failed to init cache for transaction error messages: %w", err)
-		}
-	}
-
-	// initialize node version info
-	nodeInfo, err := getNodeVersionInfo(params.State.Params())
+	// the system tx is hardcoded and never changes during runtime
+	systemTx, err := blueprints.SystemChunkTransaction(params.ChainID.Chain())
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize node version info: %w", err)
+		return nil, fmt.Errorf("failed to create system chunk transaction: %w", err)
 	}
+	systemTxID := systemTx.ID()
 
 	b := &Backend{
-		state: params.State,
+		state:        params.State,
+		BlockTracker: params.BlockTracker,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:           params.Headers,
-			executionReceipts: params.ExecutionReceipts,
-			connFactory:       params.ConnFactory,
-			state:             params.State,
-			log:               params.Log,
-			metrics:           params.AccessMetrics,
-			loggedScripts:     loggedScripts,
-			nodeCommunicator:  params.Communicator,
-			scriptExecutor:    params.ScriptExecutor,
-			scriptExecMode:    params.ScriptExecutionMode,
-		},
-		backendTransactions: backendTransactions{
-			staticCollectionRPC:  params.CollectionRPC,
-			state:                params.State,
-			chainID:              params.ChainID,
-			collections:          params.Collections,
-			blocks:               params.Blocks,
-			transactions:         params.Transactions,
-			results:              params.LightTransactionResults,
-			executionReceipts:    params.ExecutionReceipts,
-			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
-			transactionMetrics:   params.AccessMetrics,
-			retry:                retry,
-			connFactory:          params.ConnFactory,
-			previousAccessNodes:  params.HistoricalAccessNodes,
-			log:                  params.Log,
-			nodeCommunicator:     params.Communicator,
-			txResultCache:        txResCache,
-			txErrorMessagesCache: txErrorMessagesCache,
+			log:                        params.Log,
+			headers:                    params.Headers,
+			connFactory:                params.ConnFactory,
+			state:                      params.State,
+			metrics:                    params.AccessMetrics,
+			loggedScripts:              loggedScripts,
+			nodeCommunicator:           params.Communicator,
+			scriptExecutor:             params.ScriptExecutor,
+			scriptExecMode:             params.ScriptExecutionMode,
+			execNodeIdentitiesProvider: params.ExecNodeIdentitiesProvider,
 		},
 		backendEvents: backendEvents{
-			state:             params.State,
-			headers:           params.Headers,
-			executionReceipts: params.ExecutionReceipts,
-			connFactory:       params.ConnFactory,
-			log:               params.Log,
-			maxHeightRange:    params.MaxHeightRange,
-			nodeCommunicator:  params.Communicator,
+			log:                        params.Log,
+			chain:                      params.ChainID.Chain(),
+			state:                      params.State,
+			headers:                    params.Headers,
+			connFactory:                params.ConnFactory,
+			maxHeightRange:             params.MaxHeightRange,
+			nodeCommunicator:           params.Communicator,
+			queryMode:                  params.EventQueryMode,
+			eventsIndex:                params.EventsIndex,
+			execNodeIdentitiesProvider: params.ExecNodeIdentitiesProvider,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: params.Headers,
@@ -194,14 +182,14 @@ func New(params Params) (*Backend, error) {
 			state:  params.State,
 		},
 		backendAccounts: backendAccounts{
-			state:             params.State,
-			headers:           params.Headers,
-			executionReceipts: params.ExecutionReceipts,
-			connFactory:       params.ConnFactory,
-			log:               params.Log,
-			nodeCommunicator:  params.Communicator,
-			scriptExecutor:    params.ScriptExecutor,
-			scriptExecMode:    params.ScriptExecutionMode,
+			log:                        params.Log,
+			state:                      params.State,
+			headers:                    params.Headers,
+			connFactory:                params.ConnFactory,
+			nodeCommunicator:           params.Communicator,
+			scriptExecutor:             params.ScriptExecutor,
+			scriptExecMode:             params.ScriptExecutionMode,
+			execNodeIdentitiesProvider: params.ExecNodeIdentitiesProvider,
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: params.ExecutionResults,
@@ -212,66 +200,85 @@ func New(params Params) (*Backend, error) {
 			headers:              params.Headers,
 			snapshotHistoryLimit: params.SnapshotHistoryLimit,
 		},
+		backendSubscribeBlocks: backendSubscribeBlocks{
+			log:                 params.Log,
+			state:               params.State,
+			headers:             params.Headers,
+			blocks:              params.Blocks,
+			subscriptionHandler: params.SubscriptionHandler,
+			blockTracker:        params.BlockTracker,
+		},
+
 		collections:       params.Collections,
 		executionReceipts: params.ExecutionReceipts,
 		connFactory:       params.ConnFactory,
 		chainID:           params.ChainID,
-		nodeInfo:          nodeInfo,
+		stateParams:       params.State.Params(),
+		versionControl:    params.VersionControl,
+	}
+
+	txValidator, err := configureTransactionValidator(params.State, params.ChainID, params.IndexReporter, params.AccessMetrics, params.ScriptExecutor, params.CheckPayerBalanceMode)
+	if err != nil {
+		return nil, fmt.Errorf("could not create transaction validator: %w", err)
+	}
+
+	b.backendTransactions = backendTransactions{
+		TransactionsLocalDataProvider: &TransactionsLocalDataProvider{
+			state:               params.State,
+			collections:         params.Collections,
+			blocks:              params.Blocks,
+			eventsIndex:         params.EventsIndex,
+			txResultsIndex:      params.TxResultsIndex,
+			systemTxID:          systemTxID,
+			lastFullBlockHeight: params.LastFullBlockHeight,
+		},
+		log:                        params.Log,
+		staticCollectionRPC:        params.CollectionRPC,
+		chainID:                    params.ChainID,
+		transactions:               params.Transactions,
+		txResultErrorMessages:      params.TxResultErrorMessages,
+		transactionValidator:       txValidator,
+		transactionMetrics:         params.AccessMetrics,
+		retry:                      retry,
+		connFactory:                params.ConnFactory,
+		previousAccessNodes:        params.HistoricalAccessNodes,
+		nodeCommunicator:           params.Communicator,
+		txResultCache:              txResCache,
+		txResultQueryMode:          params.TxResultQueryMode,
+		systemTx:                   systemTx,
+		systemTxID:                 systemTxID,
+		execNodeIdentitiesProvider: params.ExecNodeIdentitiesProvider,
+	}
+
+	// TODO: The TransactionErrorMessage interface should be reorganized in future, as it is implemented in backendTransactions but used in TransactionsLocalDataProvider, and its initialization is somewhat quirky.
+	b.backendTransactions.txErrorMessages = b
+
+	b.backendSubscribeTransactions = backendSubscribeTransactions{
+		backendTransactions: &b.backendTransactions,
+		log:                 params.Log,
+		subscriptionHandler: params.SubscriptionHandler,
+		blockTracker:        params.BlockTracker,
+		sendTransaction:     b.SendTransaction,
 	}
 
 	retry.SetBackend(b)
 
-	preferredENIdentifiers, err = identifierList(params.PreferredExecutionNodeIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
-	}
-
-	fixedENIdentifiers, err = identifierList(params.FixedExecutionNodeIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
-	}
-
 	return b, nil
 }
 
-// NewCache constructs cache for storing connections to other nodes.
-// No errors are expected during normal operations.
-func NewCache(
-	log zerolog.Logger,
-	metrics module.AccessMetrics,
-	connectionPoolSize int,
-) (*lru.Cache[string, *connection.CachedClient], error) {
-	cache, err := lru.NewWithEvict(connectionPoolSize, func(_ string, client *connection.CachedClient) {
-		go client.Close() // close is blocking, so run in a goroutine
-
-		log.Debug().Str("grpc_conn_evicted", client.Address).Msg("closing grpc connection evicted from pool")
-		metrics.ConnectionFromPoolEvicted()
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
-	}
-
-	return cache, nil
-}
-
-func identifierList(ids []string) (flow.IdentifierList, error) {
-	idList := make(flow.IdentifierList, len(ids))
-	for i, idStr := range ids {
-		id, err := flow.HexStringToIdentifier(idStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert node id string %s to Flow Identifier: %w", id, err)
-		}
-		idList[i] = id
-	}
-	return idList, nil
-}
-
-func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *access.TransactionValidator {
-	return access.NewTransactionValidator(
-		access.NewProtocolStateBlocks(state),
+func configureTransactionValidator(
+	state protocol.State,
+	chainID flow.ChainID,
+	indexReporter state_synchronization.IndexReporter,
+	transactionMetrics module.TransactionValidationMetrics,
+	executor execution.ScriptExecutor,
+	checkPayerBalanceMode validator.PayerBalanceMode,
+) (*validator.TransactionValidator, error) {
+	return validator.NewTransactionValidator(
+		validator.NewProtocolStateBlocks(state, indexReporter),
 		chainID.Chain(),
-		access.TransactionValidationOptions{
+		transactionMetrics,
+		validator.TransactionValidationOptions{
 			Expiry:                       flow.DefaultTransactionExpiry,
 			ExpiryBuffer:                 flow.DefaultTransactionExpiryBuffer,
 			AllowEmptyReferenceBlockID:   false,
@@ -280,13 +287,14 @@ func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *
 			MaxGasLimit:                  flow.DefaultMaxTransactionGasLimit,
 			MaxTransactionByteSize:       flow.DefaultMaxTransactionByteSize,
 			MaxCollectionByteSize:        flow.DefaultMaxCollectionByteSize,
+			CheckPayerBalanceMode:        checkPayerBalanceMode,
 		},
+		executor,
 	)
 }
 
 // Ping responds to requests when the server is up.
 func (b *Backend) Ping(ctx context.Context) error {
-
 	// staticCollectionRPC is only set if a collection node address was provided at startup
 	if b.staticCollectionRPC != nil {
 		_, err := b.staticCollectionRPC.Ping(ctx, &accessproto.PingRequest{})
@@ -299,40 +307,34 @@ func (b *Backend) Ping(ctx context.Context) error {
 }
 
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
-func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo, error) {
-	return b.nodeInfo, nil
-}
-
-// getNodeVersionInfo returns the NodeVersionInfo for the node.
-// Since these values are static while the node is running, it is safe to cache.
-func getNodeVersionInfo(stateParams protocol.Params) (*access.NodeVersionInfo, error) {
-	sporkID, err := stateParams.SporkID()
+func (b *Backend) GetNodeVersionInfo(_ context.Context) (*accessmodel.NodeVersionInfo, error) {
+	sporkID := b.stateParams.SporkID()
+	sporkRootBlockHeight := b.stateParams.SporkRootBlockHeight()
+	nodeRootBlockHeader := b.stateParams.SealedRoot()
+	protocolSnapshot, err := b.state.Final().ProtocolState()
 	if err != nil {
-		return nil, fmt.Errorf("failed to read spork ID: %v", err)
+		return nil, fmt.Errorf("could not read finalized protocol kvstore: %w", err)
 	}
 
-	protocolVersion, err := stateParams.ProtocolVersion()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read protocol version: %v", err)
+	var compatibleRange *accessmodel.CompatibleRange
+
+	// Version control feature could be disabled
+	if b.versionControl != nil {
+		compatibleRange = &accessmodel.CompatibleRange{
+			StartHeight: b.versionControl.StartHeight(),
+			EndHeight:   b.versionControl.EndHeight(),
+		}
 	}
 
-	sporkRootBlockHeight, err := stateParams.SporkRootBlockHeight()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read spork root block height: %w", err)
-	}
-
-	nodeRootBlockHeader, err := stateParams.SealedRoot()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read node root block: %w", err)
-	}
-
-	nodeInfo := &access.NodeVersionInfo{
+	nodeInfo := &accessmodel.NodeVersionInfo{
 		Semver:               build.Version(),
 		Commit:               build.Commit(),
 		SporkId:              sporkID,
-		ProtocolVersion:      uint64(protocolVersion),
+		ProtocolVersion:      0,
+		ProtocolStateVersion: protocolSnapshot.GetProtocolStateVersion(),
 		SporkRootBlockHeight: sporkRootBlockHeight,
 		NodeRootBlockHeight:  nodeRootBlockHeader.Height,
+		CompatibleRange:      compatibleRange,
 	}
 
 	return nodeInfo, nil
@@ -353,184 +355,64 @@ func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*
 	return col, nil
 }
 
-func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParameters {
-	return access.NetworkParameters{
+func (b *Backend) GetFullCollectionByID(_ context.Context, colID flow.Identifier) (*flow.Collection, error) {
+	// retrieve the collection from the collection storage
+	col, err := b.collections.ByID(colID)
+	if err != nil {
+		// Collections are retrieved asynchronously as we finalize blocks, so
+		// it is possible for a client to request a finalized block from us
+		// containing some collection, then get a not found error when requesting
+		// that collection. These clients should retry.
+		err = rpc.ConvertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
+		return nil, err
+	}
+
+	return col, nil
+}
+
+func (b *Backend) GetNetworkParameters(_ context.Context) accessmodel.NetworkParameters {
+	return accessmodel.NetworkParameters{
 		ChainID: b.chainID,
 	}
 }
 
-// executionNodesForBlockID returns upto maxNodesCnt number of randomly chosen execution node identities
-// which have executed the given block ID.
-// If no such execution node is found, an InsufficientExecutionReceipts error is returned.
-func executionNodesForBlockID(
-	ctx context.Context,
-	blockID flow.Identifier,
-	executionReceipts storage.ExecutionReceipts,
-	state protocol.State,
-	log zerolog.Logger,
-) (flow.IdentityList, error) {
-
-	var executorIDs flow.IdentifierList
-
-	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
-	// will not be present for the root block.
-	rootBlock, err := state.Params().FinalizedRoot()
-	if err != nil {
-		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
+// resolveHeightError processes errors returned during height-based queries.
+// If the error is due to a block not being found, this function determines whether the queried
+// height falls outside the node's accessible range and provides context-sensitive error messages
+// based on spork and node root block heights.
+//
+// Parameters:
+// - stateParams: Protocol parameters that contain spork root and node root block heights.
+// - height: The queried block height.
+// - genericErr: The initial error returned when the block is not found.
+//
+// Expected errors during normal operation:
+// - storage.ErrNotFound - Indicates that the queried block does not exist in the local database.
+func resolveHeightError(
+	stateParams protocol.Params,
+	height uint64,
+	genericErr error,
+) error {
+	if !errors.Is(genericErr, storage.ErrNotFound) {
+		return genericErr
 	}
 
-	if rootBlock.ID() == blockID {
-		executorIdentities, err := state.Final().Identities(filter.HasRole(flow.RoleExecution))
-		if err != nil {
-			return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
-		}
-		executorIDs = executorIdentities.NodeIDs()
+	sporkRootBlockHeight := stateParams.SporkRootBlockHeight()
+	nodeRootBlockHeader := stateParams.SealedRoot().Height
+
+	if height < sporkRootBlockHeight {
+		return fmt.Errorf("block height %d is less than the spork root block height %d. Try to use a historic node: %w",
+			height,
+			sporkRootBlockHeight,
+			genericErr,
+		)
+	} else if height < nodeRootBlockHeader {
+		return fmt.Errorf("block height %d is less than the node's root block height %d. Try to use a different Access node: %w",
+			height,
+			nodeRootBlockHeader,
+			genericErr,
+		)
 	} else {
-		// try to find atleast minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
-		for attempt := 0; attempt < maxAttemptsForExecutionReceipt; attempt++ {
-			executorIDs, err = findAllExecutionNodes(blockID, executionReceipts, log)
-			if err != nil {
-				return nil, err
-			}
-
-			if len(executorIDs) >= minExecutionNodesCnt {
-				break
-			}
-
-			// log the attempt
-			log.Debug().Int("attempt", attempt).Int("max_attempt", maxAttemptsForExecutionReceipt).
-				Int("execution_receipts_found", len(executorIDs)).
-				Str("block_id", blockID.String()).
-				Msg("insufficient execution receipts")
-
-			// if one or less execution receipts may have been received then re-query
-			// in the hope that more might have been received by now
-
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-time.After(100 * time.Millisecond << time.Duration(attempt)):
-				//retry after an exponential backoff
-			}
-		}
-
-		receiptCnt := len(executorIDs)
-		// if less than minExecutionNodesCnt execution receipts have been received so far, then return random ENs
-		if receiptCnt < minExecutionNodesCnt {
-			newExecutorIDs, err := state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
-			if err != nil {
-				return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
-			}
-			executorIDs = newExecutorIDs.NodeIDs()
-		}
+		return genericErr
 	}
-
-	// choose from the preferred or fixed execution nodes
-	subsetENs, err := chooseExecutionNodes(state, executorIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
-	}
-
-	if len(subsetENs) == 0 {
-		return nil, fmt.Errorf("no matching execution node found for block ID %v", blockID)
-	}
-
-	return subsetENs, nil
-}
-
-// findAllExecutionNodes find all the execution nodes ids from the execution receipts that have been received for the
-// given blockID
-func findAllExecutionNodes(
-	blockID flow.Identifier,
-	executionReceipts storage.ExecutionReceipts,
-	log zerolog.Logger,
-) (flow.IdentifierList, error) {
-
-	// lookup the receipt's storage with the block ID
-	allReceipts, err := executionReceipts.ByBlockID(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
-	}
-
-	executionResultMetaList := make(flow.ExecutionReceiptMetaList, 0, len(allReceipts))
-	for _, r := range allReceipts {
-		executionResultMetaList = append(executionResultMetaList, r.Meta())
-	}
-	executionResultGroupedMetaList := executionResultMetaList.GroupByResultID()
-
-	// maximum number of matching receipts found so far for any execution result id
-	maxMatchedReceiptCnt := 0
-	// execution result id key for the highest number of matching receipts in the identicalReceipts map
-	var maxMatchedReceiptResultID flow.Identifier
-
-	// find the largest list of receipts which have the same result ID
-	for resultID, executionReceiptList := range executionResultGroupedMetaList {
-		currentMatchedReceiptCnt := executionReceiptList.Size()
-		if currentMatchedReceiptCnt > maxMatchedReceiptCnt {
-			maxMatchedReceiptCnt = currentMatchedReceiptCnt
-			maxMatchedReceiptResultID = resultID
-		}
-	}
-
-	// if there are more than one execution result for the same block ID, log as error
-	if executionResultGroupedMetaList.NumberGroups() > 1 {
-		identicalReceiptsStr := fmt.Sprintf("%v", flow.GetIDs(allReceipts))
-		log.Error().
-			Str("block_id", blockID.String()).
-			Str("execution_receipts", identicalReceiptsStr).
-			Msg("execution receipt mismatch")
-	}
-
-	// pick the largest list of matching receipts
-	matchingReceiptMetaList := executionResultGroupedMetaList.GetGroup(maxMatchedReceiptResultID)
-
-	metaReceiptGroupedByExecutorID := matchingReceiptMetaList.GroupByExecutorID()
-
-	// collect all unique execution node ids from the receipts
-	var executorIDs flow.IdentifierList
-	for executorID := range metaReceiptGroupedByExecutorID {
-		executorIDs = append(executorIDs, executorID)
-	}
-
-	return executorIDs, nil
-}
-
-// chooseExecutionNodes finds the subset of execution nodes defined in the identity table by first
-// choosing the preferred execution nodes which have executed the transaction. If no such preferred
-// execution nodes are found, then the fixed execution nodes defined in the identity table are returned
-// If neither preferred nor fixed nodes are defined, then all execution node matching the executor IDs are returned.
-// e.g. If execution nodes in identity table are {1,2,3,4}, preferred ENs are defined as {2,3,4}
-// and the executor IDs is {1,2,3}, then {2, 3} is returned as the chosen subset of ENs
-func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList) (flow.IdentityList, error) {
-
-	allENs, err := state.Final().Identities(filter.HasRole(flow.RoleExecution))
-	if err != nil {
-		return nil, fmt.Errorf("failed to retreive all execution IDs: %w", err)
-	}
-
-	// first try and choose from the preferred EN IDs
-	var chosenIDs flow.IdentityList
-	if len(preferredENIdentifiers) > 0 {
-		// find the preferred execution node IDs which have executed the transaction
-		chosenIDs = allENs.Filter(filter.And(filter.HasNodeID(preferredENIdentifiers...),
-			filter.HasNodeID(executorIDs...)))
-		if len(chosenIDs) > 0 {
-			return chosenIDs, nil
-		}
-	}
-
-	// if no preferred EN ID is found, then choose from the fixed EN IDs
-	if len(fixedENIdentifiers) > 0 {
-		// choose fixed ENs which have executed the transaction
-		chosenIDs = allENs.Filter(filter.And(filter.HasNodeID(fixedENIdentifiers...), filter.HasNodeID(executorIDs...)))
-		if len(chosenIDs) > 0 {
-			return chosenIDs, nil
-		}
-		// if no such ENs are found then just choose all fixed ENs
-		chosenIDs = allENs.Filter(filter.HasNodeID(fixedENIdentifiers...))
-		return chosenIDs, nil
-	}
-
-	// If no preferred or fixed ENs have been specified, then return all executor IDs i.e. no preference at all
-	return allENs.Filter(filter.HasNodeID(executorIDs...)), nil
 }

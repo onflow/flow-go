@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	sdk "github.com/onflow/flow-go-sdk"
@@ -46,7 +47,7 @@ func (s *Suite) TestEpochQuorumCertificate() {
 	clustering, nodes := s.CreateClusterList(clusterCount, nodesPerCluster)
 
 	// mock the epoch object to return counter 0 and clustering as our clusterList
-	epoch := &protomock.Epoch{}
+	epoch := &protomock.TentativeEpoch{}
 	epoch.On("Counter").Return(epochCounter, nil)
 	epoch.On("Clustering").Return(clustering, nil)
 
@@ -93,12 +94,19 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		signature, err := stakingPrivKey.Sign(voteMessage, hasher)
 		s.Require().NoError(err)
 
-		vote := hotstuffmodel.VoteFromFlow(nodeID, blockID, view, signature)
+		vote, err := hotstuffmodel.NewVote(hotstuffmodel.UntrustedVote{
+			View:     view,
+			BlockID:  blockID,
+			SignerID: nodeID,
+			SigData:  signature,
+		})
+		require.NoError(s.T(), err)
+
 		hotSigner := &hotstuff.Signer{}
 		hotSigner.On("CreateVote", mock.Anything).Return(vote, nil)
 
 		snapshot := &protomock.Snapshot{}
-		snapshot.On("Phase").Return(flow.EpochPhaseSetup, nil)
+		snapshot.On("EpochPhase").Return(flow.EpochPhaseSetup, nil)
 
 		state := &protomock.State{}
 		state.On("CanonicalRootBlock").Return(rootBlock)

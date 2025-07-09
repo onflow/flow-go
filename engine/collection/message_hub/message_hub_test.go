@@ -70,7 +70,7 @@ func (s *MessageHubSuite) SetupTest() {
 	// initialize the paramaters
 	s.cluster = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleCollection),
-		unittest.WithWeight(1000),
+		unittest.WithInitialWeight(1000),
 	)
 	s.myID = s.cluster[0].NodeID
 	s.clusterID = "cluster-id"
@@ -88,17 +88,17 @@ func (s *MessageHubSuite) SetupTest() {
 	s.compliance = mockcollection.NewCompliance(s.T())
 
 	// set up proto state mock
-	protoEpoch := &protocol.Epoch{}
-	clusters := flow.ClusterList{s.cluster}
+	protoEpoch := &protocol.CommittedEpoch{}
+	clusters := flow.ClusterList{s.cluster.ToSkeleton()}
 	protoEpoch.On("Clustering").Return(clusters, nil)
 
 	protoQuery := &protocol.EpochQuery{}
-	protoQuery.On("Current").Return(protoEpoch)
+	protoQuery.On("Current").Return(protoEpoch, nil)
 
 	protoSnapshot := &protocol.Snapshot{}
 	protoSnapshot.On("Epochs").Return(protoQuery)
 	protoSnapshot.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return s.cluster.Filter(selector)
 		},
 		nil,
@@ -273,7 +273,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 		expectedBroadcastMsg := messages.NewClusterBlockProposal(&block)
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
-		hotstuffProposal := model.ProposalFromFlow(block.Header)
+		hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 		s.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		s.hotstuff.On("SubmitProposal", hotstuffProposal).
 			Run(func(args mock.Arguments) { close(submitted) }).
@@ -307,7 +307,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		}).Return(nil)
 
 		// submit vote
-		s.hub.OnOwnVote(vote.BlockID, vote.View, vote.SigData, recipientID)
+		s.hub.OnOwnVote(vote, recipientID)
 	})
 	s.Run("timeout", func() {
 		wg.Add(1)
@@ -334,7 +334,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		s.payloads.On("ByBlockID", proposal.Header.ID()).Return(proposal.Payload, nil)
 
 		// unset chain and height to make sure they are correctly reconstructed
-		hotstuffProposal := model.ProposalFromFlow(proposal.Header)
+		hotstuffProposal := model.SignedProposalFromFlow(proposal.Header)
 		s.voteAggregator.On("AddBlock", hotstuffProposal)
 		s.hotstuff.On("SubmitProposal", hotstuffProposal)
 		expectedBroadcastMsg := messages.NewClusterBlockProposal(&proposal)

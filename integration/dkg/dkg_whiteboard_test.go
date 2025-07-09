@@ -6,18 +6,21 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/crypto"
 
-	"github.com/onflow/flow-go/crypto"
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/testutil"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/dkg"
+	"github.com/onflow/flow-go/module/metrics"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
@@ -35,14 +38,19 @@ func createNodes(
 	hub *stub.Hub,
 	chainID flow.ChainID,
 	whiteboard *whiteboard,
-	conIdentities flow.IdentityList,
+	conIdentities []bootstrap.NodeInfo,
 	currentEpochSetup flow.EpochSetup,
 	nextEpochSetup flow.EpochSetup,
-	firstBlock *flow.Header) ([]*node, flow.IdentityList) {
+	firstBlock *flow.Header) []*node {
+
+	identities := make(flow.IdentityList, 0, len(conIdentities))
+	for _, identity := range conIdentities {
+		identities = append(identities, identity.Identity())
+	}
 
 	// We need to initialise the nodes with a list of identities that contain
 	// all roles, otherwise there would be an error initialising the first epoch
-	identities := unittest.CompleteIdentitySet(conIdentities...)
+	identities = unittest.CompleteIdentitySet(identities...)
 
 	nodes := []*node{}
 	for _, id := range conIdentities {
@@ -57,14 +65,14 @@ func createNodes(
 			firstBlock))
 	}
 
-	return nodes, conIdentities
+	return nodes
 }
 
 // createNode instantiates a node with a network hub, a whiteboard reference,
 // and a pre-set EpochSetup that will be used to trigger the next DKG run.
 func createNode(
 	t *testing.T,
-	id *flow.Identity,
+	id bootstrap.NodeInfo,
 	ids []*flow.Identity,
 	hub *stub.Hub,
 	chainID flow.ChainID,
@@ -83,30 +91,29 @@ func createNode(
 
 	// keyKeys is used to store the private key resulting from the node's
 	// participation in the DKG run
-	dkgState, err := badger.NewDKGState(core.Metrics, core.SecretsDB)
+	dkgState, err := badger.NewRecoverableRandomBeaconStateMachine(core.Metrics, core.SecretsDB, core.Me.NodeID())
 	require.NoError(t, err)
 
-	// configure the state snapthost at firstBlock to return the desired
+	// configure the state snapshot at firstBlock to return the desired
 	// Epochs
-	currentEpoch := new(protocolmock.Epoch)
-	currentEpoch.On("Counter").Return(currentSetup.Counter, nil)
-	currentEpoch.On("InitialIdentities").Return(currentSetup.Participants, nil)
-	currentEpoch.On("DKGPhase1FinalView").Return(currentSetup.DKGPhase1FinalView, nil)
-	currentEpoch.On("DKGPhase2FinalView").Return(currentSetup.DKGPhase2FinalView, nil)
-	currentEpoch.On("DKGPhase3FinalView").Return(currentSetup.DKGPhase3FinalView, nil)
-	currentEpoch.On("RandomSource").Return(nextSetup.RandomSource, nil)
+	currentEpoch := new(protocolmock.CommittedEpoch)
+	currentEpoch.On("Counter").Return(currentSetup.Counter)
+	currentEpoch.On("InitialIdentities").Return(currentSetup.Participants)
+	currentEpoch.On("DKGPhase1FinalView").Return(currentSetup.DKGPhase1FinalView)
+	currentEpoch.On("DKGPhase2FinalView").Return(currentSetup.DKGPhase2FinalView)
+	currentEpoch.On("DKGPhase3FinalView").Return(currentSetup.DKGPhase3FinalView)
+	currentEpoch.On("RandomSource").Return(nextSetup.RandomSource)
 
-	nextEpoch := new(protocolmock.Epoch)
-	nextEpoch.On("Counter").Return(nextSetup.Counter, nil)
-	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants, nil)
-	nextEpoch.On("RandomSource").Return(nextSetup.RandomSource, nil)
+	nextEpoch := new(protocolmock.TentativeEpoch)
+	nextEpoch.On("Counter").Return(nextSetup.Counter)
+	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants)
 
 	epochQuery := mocks.NewEpochQuery(t, currentSetup.Counter)
-	epochQuery.Add(currentEpoch)
-	epochQuery.Add(nextEpoch)
+	epochQuery.AddCommitted(currentEpoch)
+	epochQuery.AddTentative(nextEpoch)
 	snapshot := new(protocolmock.Snapshot)
 	snapshot.On("Epochs").Return(epochQuery)
-	snapshot.On("Phase").Return(flow.EpochPhaseStaking, nil)
+	snapshot.On("EpochPhase").Return(flow.EpochPhaseStaking, nil)
 	snapshot.On("Head").Return(firstBlock, nil)
 	state := new(protocolmock.ParticipantState)
 	state.On("AtBlockID", firstBlock.ID()).Return(snapshot)
@@ -157,13 +164,10 @@ func createNode(
 	// reactorEngine consumes the EpochSetupPhaseStarted event
 	core.ProtocolEvents.AddConsumer(reactorEngine)
 
-	safeBeaconKeys := badger.NewSafeBeaconPrivateKeys(dkgState)
-
 	node := node{
 		t:               t,
 		GenericNode:     core,
 		dkgState:        dkgState,
-		safeBeaconKeys:  safeBeaconKeys,
 		messagingEngine: messagingEngine,
 		reactorEngine:   reactorEngine,
 	}
@@ -187,7 +191,14 @@ func TestWithWhiteboard(t *testing.T) {
 
 	// we run the DKG protocol with N consensus nodes
 	N := 10
-	conIdentities := unittest.IdentityListFixture(N, unittest.WithRole(flow.RoleConsensus))
+	bootstrapNodesInfo := unittest.PrivateNodeInfosFixture(N, unittest.WithRole(flow.RoleConsensus))
+	slices.SortFunc(bootstrapNodesInfo, func(lhs, rhs bootstrap.NodeInfo) int {
+		return flow.IdentifierCanonical(lhs.NodeID, rhs.NodeID)
+	})
+	conIdentities := make(flow.IdentitySkeletonList, 0, len(bootstrapNodesInfo))
+	for _, identity := range bootstrapNodesInfo {
+		conIdentities = append(conIdentities, &identity.Identity().IdentitySkeleton)
+	}
 
 	// The EpochSetup event is received at view 100. The phase transitions are
 	// at views 150, 200, and 250. In between phase transitions, the controller
@@ -220,27 +231,28 @@ func TestWithWhiteboard(t *testing.T) {
 		DKGPhase2FinalView: 200,
 		DKGPhase3FinalView: 250,
 		FinalView:          300,
-		Participants:       conIdentities,
-		RandomSource:       []byte("random bytes for seed"),
+		Participants:       conIdentities.ToSkeleton(),
+		RandomSource:       unittest.EpochSetupRandomSourceFixture(),
 	}
 
 	// create the EpochSetup that will trigger the next DKG run with all the
 	// desired parameters
 	nextEpochSetup := flow.EpochSetup{
 		Counter:      currentCounter + 1,
-		Participants: conIdentities,
-		RandomSource: []byte("random bytes for seed"),
+		Participants: conIdentities.ToSkeleton(),
+		RandomSource: unittest.EpochSetupRandomSourceFixture(),
 	}
 
-	nodes, _ := createNodes(
+	nodes := createNodes(
 		t,
 		hub,
 		chainID,
 		whiteboard,
-		conIdentities,
+		bootstrapNodesInfo,
 		currentEpochSetup,
 		nextEpochSetup,
-		firstBlock)
+		firstBlock,
+	)
 
 	for _, node := range nodes {
 		node.Start()
@@ -283,9 +295,7 @@ func TestWithWhiteboard(t *testing.T) {
 	signatures := []crypto.Signature{}
 	indices := []int{}
 	for i, n := range nodes {
-
-		// TODO: to replace with safeBeaconKeys
-		beaconKey, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
+		beaconKey, err := n.dkgState.UnsafeRetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
 		require.NoError(t, err)
 
 		signature, err := beaconKey.Sign(sigData, hasher)

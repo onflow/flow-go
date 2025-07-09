@@ -27,6 +27,8 @@ func NewSnapshot(err error) *Snapshot {
 	return &Snapshot{fmt.Errorf("critical unexpected error querying snapshot: %w", err)}
 }
 
+var _ protocol.Snapshot = (*Snapshot)(nil)
+
 // NewSnapshotf is NewSnapshot with ergonomic error formatting.
 func NewSnapshotf(msg string, args ...interface{}) *Snapshot {
 	return NewSnapshot(fmt.Errorf(msg, args...))
@@ -40,11 +42,15 @@ func (u *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 	return nil, u.err
 }
 
-func (u *Snapshot) Phase() (flow.EpochPhase, error) {
+func (u *Snapshot) EpochPhase() (flow.EpochPhase, error) {
 	return 0, u.err
 }
 
-func (u *Snapshot) Identities(_ flow.IdentityFilter) (flow.IdentityList, error) {
+func (u *Snapshot) Epochs() protocol.EpochQuery {
+	return EpochQuery{u.err}
+}
+
+func (u *Snapshot) Identities(_ flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
 	return nil, u.err
 }
 
@@ -76,6 +82,35 @@ func (u *Snapshot) Params() protocol.GlobalParams {
 	return Params{u.err}
 }
 
+func (u *Snapshot) EpochProtocolState() (protocol.EpochProtocolState, error) {
+	return nil, u.err
+}
+
+func (u *Snapshot) ProtocolState() (protocol.KVStoreReader, error) {
+	return nil, u.err
+}
+
 func (u *Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
 	return nil, u.err
+}
+
+// EpochQuery represents the epoch information for an invalid state snapshot query.
+type EpochQuery struct {
+	err error
+}
+
+func (e EpochQuery) Current() (protocol.CommittedEpoch, error) {
+	return nil, e.err
+}
+
+func (e EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
+	return nil, e.err
+}
+
+func (e EpochQuery) NextCommitted() (protocol.CommittedEpoch, error) {
+	return nil, e.err
+}
+
+func (e EpochQuery) Previous() (protocol.CommittedEpoch, error) {
+	return nil, e.err
 }

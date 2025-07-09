@@ -39,7 +39,7 @@ type EventHandler interface {
 	// consensus participant.
 	// All inputs should be validated before feeding into this function. Assuming trusted data.
 	// No errors are expected during normal operation.
-	OnReceiveProposal(proposal *model.Proposal) error
+	OnReceiveProposal(proposal *model.SignedProposal) error
 
 	// OnLocalTimeout handles a local timeout event by creating a model.TimeoutObject and broadcasting it.
 	// No errors are expected during normal operation.

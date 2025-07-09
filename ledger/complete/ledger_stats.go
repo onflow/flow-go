@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
 type LedgerStats struct {
@@ -16,13 +17,17 @@ type LedgerStats struct {
 }
 
 func (l *Ledger) CollectStats(payloadCallBack func(payload *ledger.Payload)) (*LedgerStats, error) {
-	visitedNodes := make(map[*node.Node]uint64)
-	var interimNodeCounter, leafNodeCounter, totalNodeCounter uint64
-
 	tries, err := l.Tries()
 	if err != nil {
 		return nil, err
 	}
+
+	return CollectStats(tries, payloadCallBack)
+}
+
+func CollectStats(tries []*trie.MTrie, payloadCallBack func(payload *ledger.Payload)) (*LedgerStats, error) {
+	visitedNodes := make(map[*node.Node]uint64)
+	var interimNodeCounter, leafNodeCounter, totalNodeCounter uint64
 
 	bar := progressbar.Default(int64(len(tries)), "collecting ledger stats")
 	for _, trie := range tries {
@@ -38,7 +43,7 @@ func (l *Ledger) CollectStats(payloadCallBack func(payload *ledger.Payload)) (*L
 			visitedNodes[n] = totalNodeCounter
 			totalNodeCounter++
 		}
-		if err = bar.Add(1); err != nil {
+		if err := bar.Add(1); err != nil {
 			return nil, err
 		}
 	}

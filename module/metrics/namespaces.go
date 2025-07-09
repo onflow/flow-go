@@ -16,6 +16,7 @@ const (
 	namespaceChainsync         = "chainsync"
 	namespaceFollowerEngine    = "follower"
 	namespaceRestAPI           = "access_rest_api"
+	namespaceMachineAcct       = "machine_account"
 )
 
 // Network subsystems represent the various layers of networking.
@@ -43,6 +44,7 @@ const (
 const (
 	subsystemTransactionTiming     = "transaction_timing"
 	subsystemTransactionSubmission = "transaction_submission"
+	subsystemTransactionValidation = "transaction_validation"
 	subsystemConnectionPool        = "connection_pool"
 	subsystemHTTP                  = "http"
 )
@@ -71,6 +73,7 @@ const (
 	subsystemMTrie             = "mtrie"
 	subsystemIngestion         = "ingestion"
 	subsystemRuntime           = "runtime"
+	subsystemEVM               = "evm"
 	subsystemProvider          = "provider"
 	subsystemBlockDataUploader = "block_data_uploader"
 )

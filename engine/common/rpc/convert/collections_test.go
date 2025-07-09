@@ -57,6 +57,16 @@ func TestConvertCollection(t *testing.T) {
 			assert.Equal(t, txID[:], txID[:])
 		}
 	})
+
+	t.Run("convert full collection to message and then back to collection", func(t *testing.T) {
+		msg, err := convert.FullCollectionToMessage(&collection)
+		require.NoError(t, err)
+
+		converted, err := convert.MessageToFullCollection(msg, flow.Testnet.Chain())
+		require.NoError(t, err)
+
+		assert.Equal(t, &collection, converted)
+	})
 }
 
 // TestConvertCollectionGuarantee tests that converting a collection guarantee to and from a protobuf

@@ -2,15 +2,15 @@
 
 The `SealingSegment` is a section of the finalized chain. It is part of the data need to
 initialize a new node to join the network. Informally, the `SealingSegment` is continuous section
-of recently finalized blocks that is long enough for the new node to execute its business logic.   
+of recently finalized blocks that is long enough for the new node to execute its business logic.
 
-## History length covered by the Sealing Segment 
+## History length covered by the Sealing Segment
 
 The `SealingSegment` is created from a `protocol.Snapshot` via the method `SealingSegment`.
-Lets denote the block that the `protocol.Snapshot` refers to as `head`. Per convention, 
-`head` must be a finalized block. 
+Lets denote the block that the `protocol.Snapshot` refers to as `head`. Per convention,
+`head` must be a finalized block.
 
-### Part 1: from `head` back to the latest sealed block 
+### Part 1: from `head` back to the latest sealed block
 
 The SealingSegment is a chain segment such that the last block (greatest height)
 is this snapshot's reference block (i.e. `head`) and the first (least height) is the most
@@ -40,10 +40,10 @@ type SealingSegment struct {
    Blocks []*Block
 
    ⋮
-}	
+}
 ```
 
-**Minimality Requirement for `SealingSegment.Blocks`**: 
+**Minimality Requirement for `SealingSegment.Blocks`**:
 In example 3, note that block `B` is the highest sealed block as of `E`. Therefore, the
 lowest block in `SealingSegment.Blocks` must be `B`. Essentially, this is a minimality
 requirement for the history: it shouldn't be longer than necessary. So
@@ -68,10 +68,10 @@ ExtraBlocks []*Block
 ```
 
 **In case `head` contains multiple seals, we need _all_ the sealed blocks**, for the following reason:
-* All nodes locally maintain a copy of the protocol state. A service event may change the state of the protocol state. 
+* All nodes locally maintain a copy of the protocol state. A service event may change the state of the protocol state.
 * For Byzantine resilience, we don't want protocol-state changes to take effect immediately. Therefore, we process
   system events only after receiving a QC for the block.
-  
+
   Now let us consider the situation where a newly initialized node comes online and processes the first child of `head`.
   Lets reuse the example from above, where our head was block `E` and we are now processing the child `X`
   ```
@@ -80,14 +80,14 @@ ExtraBlocks []*Block
    ExtraBlocks              Blocks          block
   ```
   `X` carries the QC for `E`, hence the protocol-state changes in `E` take effect for `X`. Therefore, when processing `X`,
-  we go through the seals in `E` and look through the sealed execution results for service events. 
+  we go through the seals in `E` and look through the sealed execution results for service events.
 * As the service events are order-sensitive, we need to process the seals in the correct order, which is by increasing height
-  of the sealed block. The seals don't contain the block's height information, hence we need to resolve the block. 
+  of the sealed block. The seals don't contain the block's height information, hence we need to resolve the block.
 
 **Extended history to check for duplicated collection guarantees in blocks** is required by nodes that _validate_ block
 payloads (e.g. consensus nodes). Also Access Nodes require these blocks. Collections expire after `flow.DefaultTransactionExpiry` blocks.
 Hence, we desire a history of `flow.DefaultTransactionExpiry` blocks. However, there is the edge case of a recent spork (or genesis),
-where the history is simply less that `flow.DefaultTransactionExpiry`. 
+where the history is simply less that `flow.DefaultTransactionExpiry`.
 
 ### Formal definition
 
@@ -98,10 +98,11 @@ The descriptions from the previous section can be formalized as follows
 * (ii) All blocks that are sealed by `head`. This is relevant if `head` contains _multiple_ seals.
 * (iii) The sealing segment should contain the history back to (including):
   ```
-  limitHeight := max(head.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
+  limitHeight := max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
   ```
+   where blockSealedAtHead is the block sealed by `head` block.
 Note that all three conditions have to be satisfied by a sealing segment. Therefore, it must contain the longest history
-required by any of the three conditions. The 'Spork Root Block' is the cutoff. 
+required by any of the three conditions. The 'Spork Root Block' is the cutoff.
 
 Per convention, we include the blocks for (i) in the `SealingSegment.Blocks`, while the
 additional blocks for (ii) and optionally (iii) are contained in as `SealingSegment.ExtraBlocks`.
@@ -147,5 +148,5 @@ In its current state, the sealing segment has been evolving driven by different 
 and other improvements. However, an important aspect of the sealing segment is to allow newly-joining nodes to build an internal representation
 of the protocol state, in particular the identity table. There are large changes coming around when we move to the dynamic identity table.
 Therefore, we accept that the Sealing Segment currently has some technical debt and unnecessary complexity. Once we have implemented the
-dynamic identity table, we will have a much more solidified understanding of the data in the sealing segment. 
+dynamic identity table, we will have a much more solidified understanding of the data in the sealing segment.
 

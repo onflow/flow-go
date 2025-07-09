@@ -16,11 +16,15 @@ import (
 // also writes a map containing each of the nodes weights mapped by NodeID
 func WritePartnerFiles(nodeInfos []model.NodeInfo, bootDir string) (string, string, error) {
 
-	// convert to public nodeInfos and map stkes
+	// convert to public nodeInfos and create a map from nodeID to weight
 	nodePubInfos := make([]model.NodeInfoPub, len(nodeInfos))
 	weights := make(map[flow.Identifier]uint64)
 	for i, node := range nodeInfos {
-		nodePubInfos[i] = node.Public()
+		var err error
+		nodePubInfos[i], err = node.Public()
+		if err != nil {
+			return "", "", fmt.Errorf("could not read public info: %w", err)
+		}
 		weights[node.NodeID] = node.Weight
 	}
 
@@ -105,38 +109,38 @@ func GenerateNodeInfos(consensus, collection, execution, verification, access in
 
 	nodes := make([]model.NodeInfo, 0)
 
-	// CONSENSUS = 1
+	// CONSENSUS
 	consensusNodes := unittest.NodeInfosFixture(consensus,
 		unittest.WithRole(flow.RoleConsensus),
-		unittest.WithWeight(flow.DefaultInitialWeight),
+		unittest.WithInitialWeight(flow.DefaultInitialWeight),
 	)
 	nodes = append(nodes, consensusNodes...)
 
-	// COLLECTION = 1
+	// COLLECTION
 	collectionNodes := unittest.NodeInfosFixture(collection,
 		unittest.WithRole(flow.RoleCollection),
-		unittest.WithWeight(flow.DefaultInitialWeight),
+		unittest.WithInitialWeight(flow.DefaultInitialWeight),
 	)
 	nodes = append(nodes, collectionNodes...)
 
-	// EXECUTION = 1
+	// EXECUTION
 	executionNodes := unittest.NodeInfosFixture(execution,
 		unittest.WithRole(flow.RoleExecution),
-		unittest.WithWeight(flow.DefaultInitialWeight),
+		unittest.WithInitialWeight(flow.DefaultInitialWeight),
 	)
 	nodes = append(nodes, executionNodes...)
 
-	// VERIFICATION = 1
+	// VERIFICATION
 	verificationNodes := unittest.NodeInfosFixture(verification,
 		unittest.WithRole(flow.RoleVerification),
-		unittest.WithWeight(flow.DefaultInitialWeight),
+		unittest.WithInitialWeight(flow.DefaultInitialWeight),
 	)
 	nodes = append(nodes, verificationNodes...)
 
-	// ACCESS = 1
+	// ACCESS
 	accessNodes := unittest.NodeInfosFixture(access,
 		unittest.WithRole(flow.RoleAccess),
-		unittest.WithWeight(flow.DefaultInitialWeight),
+		unittest.WithInitialWeight(flow.DefaultInitialWeight),
 	)
 	nodes = append(nodes, accessNodes...)
 

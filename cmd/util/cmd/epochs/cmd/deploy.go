@@ -121,7 +121,10 @@ func deployRun(cmd *cobra.Command, args []string) {
 func getDeployEpochTransactionArguments(snapshot *inmem.Snapshot) []cadence.Value {
 
 	// current epoch
-	currentEpoch := snapshot.Epochs().Current()
+	currentEpoch, err := snapshot.Epochs().Current()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not get current epoch")
+	}
 
 	head, err := snapshot.Head()
 	if err != nil {
@@ -131,25 +134,13 @@ func getDeployEpochTransactionArguments(snapshot *inmem.Snapshot) []cadence.Valu
 	epochContractName := systemcontracts.ContractNameEpoch
 
 	// current epoch counter
-	currentEpochCounter, err := currentEpoch.Counter()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get `currentEpochCounter` from snapshot")
-	}
+	currentEpochCounter := currentEpoch.Counter()
 
 	// get final view from snapshot
-	finalView, err := currentEpoch.FinalView()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get `finalView` for current epoch from snapshot")
-	}
+	finalView := currentEpoch.FinalView()
 
-	dkgPhase1FinalView, err := currentEpoch.DKGPhase1FinalView()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get `dkgPhase1FinalView` from snapshot")
-	}
-	dkgPhase2FinalView, err := currentEpoch.DKGPhase2FinalView()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get `dkgPhase2FinalView` from snapshot")
-	}
+	dkgPhase1FinalView := currentEpoch.DKGPhase1FinalView()
+	dkgPhase2FinalView := currentEpoch.DKGPhase2FinalView()
 
 	numViewsInEpoch := (finalView + 1) - head.View
 	numViewsInDKGPhase := dkgPhase2FinalView - dkgPhase1FinalView + 1
@@ -163,10 +154,7 @@ func getDeployEpochTransactionArguments(snapshot *inmem.Snapshot) []cadence.Valu
 	numCollectorClusters := len(clustering)
 
 	// random source
-	randomSource, err := currentEpoch.RandomSource()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get `randomSource` for current epoch from snapshot")
-	}
+	randomSource := currentEpoch.RandomSource()
 
 	return convertDeployEpochTransactionArguments(
 		epochContractName,
@@ -256,14 +244,15 @@ func getDeployEpochTransactionText(snapshot *inmem.Snapshot) []byte {
 	chainID := head.ChainID
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
+	env := systemContracts.AsTemplateEnv()
+	env.FungibleTokenAddress = flagFungibleTokenAddress
+	env.FlowTokenAddress = flagFlowTokenAddress
+	env.IDTableAddress = flagIDTableAddress
+	env.FlowFeesAddress = flagFlowFeesAddress
+
 	// epoch contract name and get code for contract
 	epochContractCode := contracts.FlowEpoch(
-		flagFungibleTokenAddress,
-		flagFlowTokenAddress,
-		flagIDTableAddress,
-		systemContracts.ClusterQC.Address.Hex(),
-		systemContracts.DKG.Address.Hex(),
-		flagFlowFeesAddress,
+		env,
 	)
 
 	// convert the epoch contract code to an [UInt8] literal string that can be

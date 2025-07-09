@@ -124,7 +124,7 @@ func newSignatureEntries(
 
 	type uniqueKey struct {
 		address flow.Address
-		index   uint64
+		index   uint32
 	}
 	duplicate := make(map[uniqueKey]struct{}, numSignatures)
 

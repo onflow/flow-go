@@ -98,3 +98,7 @@ func (cm *ConnManager) TrimOpenConns(ctx context.Context) {
 func (cm *ConnManager) Close() error {
 	return cm.basicConnMgr.Close()
 }
+
+func (cm *ConnManager) CheckLimit(l connmgr.GetConnLimiter) error {
+	return cm.basicConnMgr.CheckLimit(l)
+}

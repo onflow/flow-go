@@ -40,7 +40,7 @@ func TestResolver_HappyPath(t *testing.T) {
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 	resolver.Start(ctx)
 	unittest.RequireCloseBefore(t, resolver.Ready(), 100*time.Millisecond, "could not start dns resolver on time")
 
@@ -79,7 +79,7 @@ func TestResolver_CacheExpiry(t *testing.T) {
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 	resolver.Start(ctx)
 	unittest.RequireCloseBefore(t, resolver.Ready(), 100*time.Millisecond, "could not start dns resolver on time")
 
@@ -125,7 +125,7 @@ func TestResolver_Error(t *testing.T) {
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 	resolver.Start(ctx)
 	unittest.RequireCloseBefore(t, resolver.Ready(), 100*time.Millisecond, "could not start dns resolver on time")
 
@@ -171,7 +171,7 @@ func TestResolver_Expired_Invalidated(t *testing.T) {
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 	resolver.Start(ctx)
 	unittest.RequireCloseBefore(t, resolver.Ready(), 100*time.Millisecond, "could not start dns resolver on time")
 

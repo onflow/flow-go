@@ -1,16 +1,14 @@
 package signature
 
 import (
-	"errors"
 	mrand "math/rand"
 	"sort"
 	"testing"
 	"time"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/crypto"
 )
 
 func getPRG(t *testing.T) *mrand.Rand {
@@ -368,8 +366,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 			// Aggregation should error with sentinel ErrIdentityPublicKey
 			// aggregated public key is identity
 			signers, agg, err := aggregator.Aggregate()
-			assert.Error(t, err)
-			assert.True(t, errors.Is(err, ErrIdentityPublicKey))
+			assert.ErrorIs(t, err, ErrIdentityPublicKey)
 			assert.Nil(t, agg)
 			assert.Nil(t, signers)
 		})
@@ -408,8 +405,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 
 		// Aggregation should error with sentinel ErrIdentityPublicKey
 		signers, agg, err := aggregator.Aggregate()
-		assert.Error(t, err)
-		assert.True(t, errors.Is(err, ErrIdentityPublicKey))
+		assert.ErrorIs(t, err, ErrIdentityPublicKey)
 		assert.Nil(t, agg)
 		assert.Nil(t, signers)
 	})

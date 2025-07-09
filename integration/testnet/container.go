@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -22,7 +23,6 @@ import (
 	sdkclient "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	"github.com/onflow/flow-go/crypto"
 	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/client"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -32,6 +32,8 @@ import (
 	state "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 var (
@@ -96,8 +98,9 @@ func GetPrivateNodeInfoAddress(nodeName string) string {
 	return fmt.Sprintf("%s:%d", nodeName, DefaultFlowPort)
 }
 
-func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey crypto.PrivateKey) ContainerConfig {
-	info := bootstrap.NewPrivateNodeInfo(
+func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey crypto.PrivateKey,
+) (ContainerConfig, error) {
+	info, err := bootstrap.NewPrivateNodeInfo(
 		conf.Identifier,
 		conf.Role,
 		GetPrivateNodeInfoAddress(nodeName),
@@ -105,6 +108,9 @@ func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey
 		networkKey,
 		stakingKey,
 	)
+	if err != nil {
+		return ContainerConfig{}, err
+	}
 
 	containerConf := ContainerConfig{
 		NodeInfo:            info,
@@ -117,7 +123,7 @@ func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey
 		Corrupted:           conf.Corrupted,
 	}
 
-	return containerConf
+	return containerConf, nil
 }
 
 // ImageName returns the Docker image name for the given config.
@@ -395,8 +401,11 @@ func (c *Container) OpenState() (*state.State, error) {
 	qcs := storage.NewQuorumCertificates(metrics, db, storage.DefaultCacheSize)
 	setups := storage.NewEpochSetups(metrics, db)
 	commits := storage.NewEpochCommits(metrics, db)
-	statuses := storage.NewEpochStatuses(metrics, db)
-	versionBeacons := storage.NewVersionBeacons(db)
+	protocolState := storage.NewEpochProtocolStateEntries(metrics, setups, commits, db,
+		storage.DefaultEpochProtocolStateCacheSize, storage.DefaultProtocolStateIndexCacheSize)
+	protocolKVStates := storage.NewProtocolKVStore(metrics, db,
+		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
+	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(db))
 
 	return state.OpenState(
 		metrics,
@@ -408,7 +417,8 @@ func (c *Container) OpenState() (*state.State, error) {
 		qcs,
 		setups,
 		commits,
-		statuses,
+		protocolState,
+		protocolKVStates,
 		versionBeacons,
 	)
 }
@@ -475,7 +485,12 @@ func (c *Container) SDKClient() (*sdkclient.Client, error) {
 		return nil, fmt.Errorf("container does not implement flow.access.AccessAPI")
 	}
 
-	return sdkclient.NewClient(c.Addr(GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	return sdkclient.NewClient(
+		c.Addr(GRPCPort),
+		sdkclient.WithGRPCDialOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		),
+	)
 }
 
 // GhostClient returns a ghostnode client that connects to this node.

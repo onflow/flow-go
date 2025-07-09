@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/go-units"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
@@ -30,9 +31,12 @@ import (
 
 const checkpointFilenamePrefix = "checkpoint."
 
-const MagicBytesCheckpointHeader uint16 = 0x2137
-const MagicBytesCheckpointSubtrie uint16 = 0x2136
-const MagicBytesCheckpointToptrie uint16 = 0x2135
+const (
+	MagicBytesCheckpointHeader  uint16 = 0x2137
+	MagicBytesCheckpointSubtrie uint16 = 0x2136
+	MagicBytesCheckpointToptrie uint16 = 0x2135
+	MagicBytesPayloadHeader     uint16 = 0x2138
+)
 
 const VersionV1 uint16 = 0x01
 
@@ -252,7 +256,14 @@ func (c *Checkpointer) Checkpoint(to int) (err error) {
 		return fmt.Errorf("could not create checkpoint for %v: %w", to, err)
 	}
 
-	c.wal.log.Info().Msgf("created checkpoint %d with %d tries", to, len(tries))
+	checkpointFileSize, err := ReadCheckpointFileSize(c.wal.dir, fileName)
+	if err != nil {
+		return fmt.Errorf("could not read checkpoint file size: %w", err)
+	}
+
+	c.wal.log.Info().
+		Str("checkpoint_file_size", units.BytesSize(float64(checkpointFileSize))).
+		Msgf("created checkpoint %d with %d tries", to, len(tries))
 
 	return nil
 }
@@ -1036,7 +1047,7 @@ func CopyCheckpointFile(filename string, from string, to string) (
 	[]string,
 	error,
 ) {
-	// It's possible that the trie dir does not yet exist. If not this will create the the required path
+	// It's possible that the trie dir does not yet exist. If not this will create the required path
 	err := os.MkdirAll(to, 0700)
 	if err != nil {
 		return nil, err
@@ -1071,6 +1082,38 @@ func CopyCheckpointFile(filename string, from string, to string) (
 	err = group.Wait()
 	if err != nil {
 		return nil, fmt.Errorf("fail to copy checkpoint files: %w", err)
+	}
+
+	return newPaths, nil
+}
+
+// SoftlinkCheckpointFile creates soft links of the checkpoint file including the part files from the given `from` to
+// the `to` directory
+func SoftlinkCheckpointFile(filename string, from string, to string) ([]string, error) {
+
+	// It's possible that the trie dir does not yet exist. If not this will create the required path
+	err := os.MkdirAll(to, 0700)
+	if err != nil {
+		return nil, err
+	}
+
+	// checkpoint V6 produces multiple checkpoint part files that need to be copied over
+	pattern := filePathPattern(from, filename)
+	matched, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("could not glob checkpoint file with pattern %v: %w", pattern, err)
+	}
+
+	newPaths := make([]string, len(matched))
+	for i, match := range matched {
+		_, partfile := filepath.Split(match)
+		newPath := filepath.Join(to, partfile)
+		newPaths[i] = newPath
+
+		err := os.Symlink(match, newPath)
+		if err != nil {
+			return nil, fmt.Errorf("cannot link file from %v to %v: %w", match, newPath, err)
+		}
 	}
 
 	return newPaths, nil

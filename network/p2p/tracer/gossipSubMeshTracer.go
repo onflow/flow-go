@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/tracer/internal"
 	"github.com/onflow/flow-go/utils/logging"
@@ -47,28 +48,38 @@ const (
 // Additionally, it allows users to configure the logging interval.
 type GossipSubMeshTracer struct {
 	component.Component
-
-	topicMeshMu    sync.RWMutex                    // to protect topicMeshMap
-	topicMeshMap   map[string]map[peer.ID]struct{} // map of local mesh peers by topic.
-	logger         zerolog.Logger
-	idProvider     module.IdentityProvider
-	loggerInterval time.Duration
-	metrics        module.LocalGossipSubRouterMetrics
-	rpcSentTracker *internal.RPCSentTracker
+	topicMeshMu                  sync.RWMutex                    // to protect topicMeshMap
+	topicMeshMap                 map[string]map[peer.ID]struct{} // map of local mesh peers by topic.
+	logger                       zerolog.Logger
+	idProvider                   module.IdentityProvider
+	loggerInterval               time.Duration
+	metrics                      module.LocalGossipSubRouterMetrics
+	rpcSentTracker               *internal.RPCSentTracker
+	duplicateMessageTrackerCache *internal.DuplicateMessageTrackerCache
 }
 
 var _ p2p.PubSubTracer = (*GossipSubMeshTracer)(nil)
 
+type RpcSentTrackerConfig struct {
+	CacheSize            uint32 `validate:"gt=0"`
+	WorkerQueueCacheSize uint32 `validate:"gt=0"`
+	WorkerQueueNumber    int    `validate:"gt=0"`
+}
+
+type DuplicateMessageTrackerCacheConfig struct {
+	CacheSize uint32  `validate:"gt=0"`
+	Decay     float64 `validate:"gt=0"`
+}
+
 type GossipSubMeshTracerConfig struct {
-	network.NetworkingType
-	metrics.HeroCacheMetricsFactory
-	Logger                             zerolog.Logger
-	Metrics                            module.LocalGossipSubRouterMetrics
-	IDProvider                         module.IdentityProvider
-	LoggerInterval                     time.Duration
-	RpcSentTrackerCacheSize            uint32
-	RpcSentTrackerWorkerQueueCacheSize uint32
-	RpcSentTrackerNumOfWorkers         int
+	network.NetworkingType             `validate:"required"`
+	metrics.HeroCacheMetricsFactory    `validate:"required"`
+	Logger                             zerolog.Logger                          `validate:"required"`
+	Metrics                            module.LocalGossipSubRouterMetrics      `validate:"required"`
+	IDProvider                         module.IdentityProvider                 `validate:"required"`
+	LoggerInterval                     time.Duration                           `validate:"required"`
+	DuplicateMessageTrackerCacheConfig p2pconfig.DuplicateMessageTrackerConfig `validate:"required"`
+	RpcSentTracker                     RpcSentTrackerConfig                    `validate:"required"`
 }
 
 // NewGossipSubMeshTracer creates a new *GossipSubMeshTracer.
@@ -80,11 +91,11 @@ func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTra
 	lg := config.Logger.With().Str("component", "gossipsub_topology_tracer").Logger()
 	rpcSentTracker := internal.NewRPCSentTracker(&internal.RPCSentTrackerConfig{
 		Logger:                             lg,
-		RPCSentCacheSize:                   config.RpcSentTrackerCacheSize,
+		RPCSentCacheSize:                   config.RpcSentTracker.CacheSize,
 		RPCSentCacheCollector:              metrics.GossipSubRPCSentTrackerMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
 		WorkerQueueCacheCollector:          metrics.GossipSubRPCSentTrackerQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
-		WorkerQueueCacheSize:               config.RpcSentTrackerWorkerQueueCacheSize,
-		NumOfWorkers:                       config.RpcSentTrackerNumOfWorkers,
+		WorkerQueueCacheSize:               config.RpcSentTracker.WorkerQueueCacheSize,
+		NumOfWorkers:                       config.RpcSentTracker.WorkerQueueNumber,
 		LastHighestIhavesSentResetInterval: defaultLastHighestIHaveRPCSizeResetInterval,
 	})
 	g := &GossipSubMeshTracer{
@@ -94,6 +105,13 @@ func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTra
 		logger:         lg,
 		loggerInterval: config.LoggerInterval,
 		rpcSentTracker: rpcSentTracker,
+		duplicateMessageTrackerCache: internal.NewDuplicateMessageTrackerCache(
+			config.DuplicateMessageTrackerCacheConfig.CacheSize,
+			config.DuplicateMessageTrackerCacheConfig.Decay,
+			config.DuplicateMessageTrackerCacheConfig.SkipDecayThreshold,
+			config.Logger,
+			metrics.GossipSubDuplicateMessageTrackerCacheMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
+		),
 	}
 
 	g.Component = component.NewComponentManagerBuilder().
@@ -359,10 +377,21 @@ func (t *GossipSubMeshTracer) DuplicateMessage(msg *pubsub.Message) {
 		lg = lg.With().Str("remote_peer_id", p2plogging.PeerId(from)).Logger()
 	}
 
+	count, err := t.duplicateMessageTrackerCache.DuplicateMessageReceived(msg.ReceivedFrom)
+	if err != nil {
+		t.logger.Fatal().
+			Err(err).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Msg("failed to increment gossipsub duplicate message tracker count for peer")
+		return
+	}
+
 	lg.Trace().
 		Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
 		Int("message_size", size).
+		Float64("duplicate_message_count", count).
 		Msg("received duplicate pubsub message")
+
 }
 
 // ThrottlePeer is called by GossipSub when a peer is throttled by the local node, i.e., the local node is not accepting any
@@ -448,6 +477,28 @@ func (t *GossipSubMeshTracer) WasIHaveRPCSent(messageID string) bool {
 // LastHighestIHaveRPCSize returns the last highest RPC iHave message sent.
 func (t *GossipSubMeshTracer) LastHighestIHaveRPCSize() int64 {
 	return t.rpcSentTracker.LastHighestIHaveRPCSize()
+}
+
+// DuplicateMessageCount returns the current duplicate message count for the peer.
+func (t *GossipSubMeshTracer) DuplicateMessageCount(peerID peer.ID) float64 {
+	count, found, err := t.duplicateMessageTrackerCache.GetWithInit(peerID)
+	if err != nil {
+		t.logger.Fatal().
+			Err(err).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Str("peer_id", p2plogging.PeerId(peerID)).
+			Msg("failed to get duplicate message count for peer")
+		return 0
+	}
+	if !found {
+		t.logger.Fatal().
+			Err(err).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Str("peer_id", peerID.String()).
+			Msg("failed to initialize duplicate message count for peer during get with init")
+		return 0
+	}
+	return count
 }
 
 // logLoop logs the mesh peers of the local node for each topic at a regular interval.

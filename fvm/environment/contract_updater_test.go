@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -360,7 +360,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 		// deploy contract with voucher
 		err = contractUpdater.SetContract(
 			location,
-			[]byte("pub contract TestContract {}"),
+			[]byte("access(all) contract TestContract {}"),
 			[]flow.Address{
 				flowAddress,
 			},
@@ -385,7 +385,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 		// update should work
 		err = contractUpdater.SetContract(
 			location,
-			[]byte("pub contract TestContract {}"),
+			[]byte("access(all) contract TestContract {}"),
 			[]flow.Address{
 				flowAddress,
 			},
@@ -416,7 +416,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 		// deploy contract with voucher
 		err = contractUpdater.SetContract(
 			location,
-			[]byte("pub contract TestContract {}"),
+			[]byte("access(all) contract TestContract {}"),
 			[]flow.Address{
 				flowAddress,
 			},
@@ -441,7 +441,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 		// update should work
 		err = contractUpdater.SetContract(
 			location,
-			[]byte("pub contract TestContract {}"),
+			[]byte("access(all) contract TestContract {}"),
 			[]flow.Address{
 				flowAddress,
 			},

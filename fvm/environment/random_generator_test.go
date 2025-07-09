@@ -6,9 +6,9 @@ import (
 	mrand "math/rand"
 	"testing"
 
+	"github.com/onflow/crypto/random"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/tracing"
@@ -84,5 +84,13 @@ func TestRandomGenerator(t *testing.T) {
 				require.NotEqual(t, txn, otherTxn)
 			}
 		}
+	})
+}
+
+func TestRandomSourceHistoryProvider(t *testing.T) {
+	t.Run("source length", func(t *testing.T) {
+		// Sanity check that entropy source is at least 128 bits
+		const minimumEntropy = 128 / 8
+		require.GreaterOrEqual(t, environment.RandomSourceHistoryLength, minimumEntropy)
 	})
 }

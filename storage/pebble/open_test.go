@@ -1,7 +1,7 @@
 package pebble
 
 import (
-	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,7 +13,8 @@ import (
 func TestIsBootstrapped(t *testing.T) {
 	t.Parallel()
 	unittest.RunWithTempDir(t, func(dir string) {
-		db, err := OpenRegisterPebbleDB(dir)
+		logger := unittest.Logger()
+		db, err := OpenRegisterPebbleDB(logger, dir)
 		require.NoError(t, err)
 		bootstrapped, err := IsBootstrapped(db)
 		require.NoError(t, err)
@@ -25,7 +26,8 @@ func TestIsBootstrapped(t *testing.T) {
 func TestReadHeightsFromBootstrappedDB(t *testing.T) {
 	t.Parallel()
 	unittest.RunWithTempDir(t, func(dir string) {
-		db, err := OpenRegisterPebbleDB(dir)
+		logger := unittest.Logger()
+		db, err := OpenRegisterPebbleDB(logger, dir)
 		require.NoError(t, err)
 
 		// init with first height
@@ -39,7 +41,7 @@ func TestReadHeightsFromBootstrappedDB(t *testing.T) {
 		require.NoError(t, db.Close())
 
 		// reopen the db
-		registers, db, err := NewBootstrappedRegistersWithPath(dir)
+		registers, db, err := NewBootstrappedRegistersWithPath(logger, dir)
 		require.NoError(t, err)
 
 		require.Equal(t, firstHeight, registers.FirstHeight())
@@ -52,25 +54,52 @@ func TestReadHeightsFromBootstrappedDB(t *testing.T) {
 func TestNewBootstrappedRegistersWithPath(t *testing.T) {
 	t.Parallel()
 	unittest.RunWithTempDir(t, func(dir string) {
-		_, db, err := NewBootstrappedRegistersWithPath(dir)
-		require.Error(t, err)
-		require.True(t, errors.Is(err, storage.ErrNotBootstrapped))
+		logger := unittest.Logger()
+		_, db, err := NewBootstrappedRegistersWithPath(logger, dir)
+		require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 
 		// verify the db is closed
 		require.True(t, db == nil)
 
 		// bootstrap the db
 		// init with first height
-		db2, err := OpenRegisterPebbleDB(dir)
+		db2, err := OpenRegisterPebbleDB(logger, dir)
 		require.NoError(t, err)
 		firstHeight := uint64(10)
 		require.NoError(t, initHeights(db2, firstHeight))
 
-		registers, err := NewRegisters(db2)
+		registers, err := NewRegisters(db2, PruningDisabled)
 		require.NoError(t, err)
 		require.Equal(t, firstHeight, registers.FirstHeight())
 		require.Equal(t, firstHeight, registers.LatestHeight())
 
 		require.NoError(t, db2.Close())
+	})
+}
+
+func TestShouldOpenDefaultPebbleDB(t *testing.T) {
+	t.Parallel()
+	unittest.RunWithTempDir(t, func(dir string) {
+		logger := unittest.Logger()
+		// verify error is returned when the db is not bootstrapped
+		_, err := ShouldOpenDefaultPebbleDB(logger, dir)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "not initialized")
+
+		// bootstrap the db
+		db, err := OpenDefaultPebbleDB(logger, dir)
+		require.NoError(t, err)
+		require.NoError(t, initHeights(db, uint64(10)))
+		require.NoError(t, db.Close())
+		fmt.Println(dir)
+
+		// verify no error is returned when the db is bootstrapped
+		db, err = ShouldOpenDefaultPebbleDB(logger, dir)
+		require.NoError(t, err)
+
+		h, err := latestStoredHeight(db)
+		require.NoError(t, err)
+		require.Equal(t, uint64(10), h)
+		require.NoError(t, db.Close())
 	})
 }

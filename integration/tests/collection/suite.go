@@ -142,7 +142,7 @@ func (suite *CollectorSuite) Clusters() flow.ClusterList {
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	suite.Require().True(ok)
 
-	collectors := suite.net.Identities().Filter(filter.HasRole(flow.RoleCollection))
+	collectors := suite.net.Identities().Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	clusters, err := factory.NewClusterList(setup.Assignments, collectors)
 	suite.Require().Nil(err)
 	return clusters
@@ -163,14 +163,14 @@ func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sd
 	}
 
 	err := tx.SignEnvelope(acct.addr, acct.key.Index, acct.signer)
-	require.Nil(suite.T(), err)
+	require.NoError(suite.T(), err)
 
 	suite.acct.key.SequenceNumber++
 
 	return tx
 }
 
-func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transaction {
+func (suite *CollectorSuite) TxForCluster(target flow.IdentitySkeletonList) *sdk.Transaction {
 	acct := suite.acct
 
 	tx := suite.NextTransaction()
@@ -184,7 +184,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 		suite.serviceAccountIdx++
 		tx.SetScript(append(tx.Script, '/', '/'))
 		err = tx.SignEnvelope(sdk.Address(serviceAccountAddr), acct.key.Index, acct.signer)
-		require.Nil(suite.T(), err)
+		require.NoError(suite.T(), err)
 		routed, ok := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
 		require.True(suite.T(), ok)
 		if routed.ID() == target.ID() {
@@ -331,7 +331,7 @@ func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Contai
 	node, ok := cluster.ByIndex(nodeIdx)
 	require.True(suite.T(), ok, "invalid node index")
 
-	return suite.net.ContainerByID(node.ID())
+	return suite.net.ContainerByID(node.NodeID)
 }
 
 // ClusterStateFor returns a cluster state instance for the collector node with the given ID.

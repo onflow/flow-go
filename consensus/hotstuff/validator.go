@@ -24,12 +24,12 @@ type Validator interface {
 	// During normal operations, the following error returns are expected:
 	//  * model.InvalidProposalError if the block is invalid
 	//  * model.ErrViewForUnknownEpoch if the proposal refers unknown epoch
-	ValidateProposal(proposal *model.Proposal) error
+	ValidateProposal(proposal *model.SignedProposal) error
 
 	// ValidateVote checks the validity of a vote.
 	// Returns the full entity for the voter. During normal operations,
 	// the following errors are expected:
 	//  * model.InvalidVoteError for invalid votes
 	//  * model.ErrViewForUnknownEpoch if the vote refers unknown epoch
-	ValidateVote(vote *model.Vote) (*flow.Identity, error)
+	ValidateVote(vote *model.Vote) (*flow.IdentitySkeleton, error)
 }

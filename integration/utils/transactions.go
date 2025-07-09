@@ -6,12 +6,13 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
-	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -23,8 +24,12 @@ var createAndSetupNodeTxScript string
 //go:embed templates/remove-node.cdc
 var removeNodeTxScript string
 
+//go:embed "templates/set-protocol-state-version.cdc"
+var setProtocolStateVersionScript string
+
 func LocalnetEnv() templates.Environment {
 	return templates.Environment{
+		EpochAddress:             "f8d6e0586b0a20c7",
 		IDTableAddress:           "f8d6e0586b0a20c7",
 		FungibleTokenAddress:     "ee82856bf20e2aa6",
 		FlowTokenAddress:         "0ae53cb6e3f42a79",
@@ -49,6 +54,7 @@ func MakeCreateAndSetupNodeTx(
 	networkingAddress string,
 	networkingKey string,
 	stakingKey string,
+	stakingKeyPoP string,
 	machineKey *sdk.AccountKey,
 ) (
 	*sdk.Transaction,
@@ -58,7 +64,7 @@ func MakeCreateAndSetupNodeTx(
 	script := []byte(templates.ReplaceAddresses(createAndSetupNodeTxScript, env))
 	tx := sdk.NewTransaction().
 		SetScript(script).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlockID).
 		SetProposalKey(service.Address, 0, service.Keys[0].SequenceNumber).
 		AddAuthorizer(service.Address).
@@ -131,6 +137,16 @@ func MakeCreateAndSetupNodeTx(
 		return nil, err
 	}
 
+	// 7 - staking key PoP
+	stakingKeyPoPCDC, err := cadence.NewString(stakingKeyPoP)
+	if err != nil {
+		return nil, err
+	}
+	err = tx.AddArgument(stakingKeyPoPCDC)
+	if err != nil {
+		return nil, err
+	}
+
 	if machineKey != nil {
 		// for collection/consensus nodes, register the machine account key
 		cdcMachineAcctKey, err := sdktemplates.AccountKeyToCadenceCryptoKey(machineKey)
@@ -157,14 +173,14 @@ func MakeCreateAndSetupNodeTx(
 func MakeAdminRemoveNodeTx(
 	env templates.Environment,
 	adminAccount *sdk.Account,
-	adminAccountKeyID int,
+	adminAccountKeyID uint32,
 	latestBlockID sdk.Identifier,
 	nodeID flow.Identifier,
 ) (*sdk.Transaction, error) {
 	accountKey := adminAccount.Keys[adminAccountKeyID]
 	tx := sdk.NewTransaction().
 		SetScript([]byte(templates.ReplaceAddresses(removeNodeTxScript, env))).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlockID).
 		SetProposalKey(adminAccount.Address, adminAccountKeyID, accountKey.SequenceNumber).
 		SetPayer(adminAccount.Address).
@@ -179,11 +195,43 @@ func MakeAdminRemoveNodeTx(
 	return tx, nil
 }
 
-// submitSmokeTestTransaction will submit a create account transaction to smoke test network
+// MakeSetProtocolStateVersionTx makes an admin transaction to set the protocol state version.
+// See the Cadence transaction file for detailed documentation.
+func MakeSetProtocolStateVersionTx(
+	env templates.Environment,
+	adminAccount *sdk.Account,
+	adminAccountKeyID uint32,
+	latestBlockID sdk.Identifier,
+	newProtocolVersion uint64,
+	activeViewDiff uint64,
+) (*sdk.Transaction, error) {
+	accountKey := adminAccount.Keys[adminAccountKeyID]
+
+	tx := sdk.NewTransaction().
+		SetScript([]byte(templates.ReplaceAddresses(setProtocolStateVersionScript, env))).
+		SetComputeLimit(9999).
+		SetReferenceBlockID(latestBlockID).
+		SetProposalKey(adminAccount.Address, adminAccountKeyID, accountKey.SequenceNumber).
+		SetPayer(adminAccount.Address).
+		AddAuthorizer(adminAccount.Address)
+
+	err := tx.AddArgument(cadence.NewUInt64(newProtocolVersion))
+	if err != nil {
+		return nil, err
+	}
+	err = tx.AddArgument(cadence.NewUInt64(activeViewDiff))
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, nil
+}
+
+// CreateFlowAccount will submit a create account transaction to smoke test network
 // This ensures a single transaction can be sealed by the network.
 func CreateFlowAccount(ctx context.Context, client *testnet.Client) (sdk.Address, error) {
 	fullAccountKey := sdk.NewAccountKey().
-		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen).PublicKey()).
+		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256).PublicKey()).
 		SetHashAlgo(sdkcrypto.SHA2_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
@@ -199,4 +247,31 @@ func CreateFlowAccount(ctx context.Context, client *testnet.Client) (sdk.Address
 	}
 
 	return addr, nil
+}
+
+// MakeRecoverEpochTx makes an admin transaction to recover the network when it is in EFM mode.
+func MakeRecoverEpochTx(
+	env templates.Environment,
+	adminAccount *sdk.Account,
+	adminAccountKeyID uint32,
+	latestBlockID sdk.Identifier,
+	args []cadence.Value,
+) (*sdk.Transaction, error) {
+	accountKey := adminAccount.Keys[adminAccountKeyID]
+	tx := sdk.NewTransaction().
+		SetScript(templates.GenerateRecoverEpochScript(env)).
+		SetComputeLimit(9999).
+		SetReferenceBlockID(latestBlockID).
+		SetProposalKey(adminAccount.Address, adminAccountKeyID, accountKey.SequenceNumber).
+		SetPayer(adminAccount.Address).
+		AddAuthorizer(adminAccount.Address)
+
+	for _, arg := range args {
+		err := tx.AddArgument(arg)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return tx, nil
 }

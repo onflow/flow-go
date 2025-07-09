@@ -7,8 +7,8 @@ import (
 
 	"github.com/onflow/cadence"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 )
 
 // accountPublicKeyWrapper is used for encoding and decoding.
@@ -117,7 +117,7 @@ func decodeAccountPublicKeyWrapper(b []byte) (accountPublicKeyWrapper, error) {
 	return wrapper, nil
 }
 
-func DecodeAccountPublicKey(b []byte, index uint64) (AccountPublicKey, error) {
+func DecodeAccountPublicKey(b []byte, index uint32) (AccountPublicKey, error) {
 	w, err := decodeAccountPublicKeyWrapper(b)
 	if err != nil {
 		return AccountPublicKey{}, err
@@ -132,7 +132,7 @@ func DecodeAccountPublicKey(b []byte, index uint64) (AccountPublicKey, error) {
 	}
 
 	return AccountPublicKey{
-		Index:     int(index),
+		Index:     index,
 		PublicKey: publicKey,
 		SignAlgo:  signAlgo,
 		HashAlgo:  hashAlgo,

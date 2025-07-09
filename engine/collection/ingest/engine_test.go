@@ -10,8 +10,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"golang.org/x/time/rate"
 
-	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
@@ -88,8 +89,8 @@ func (suite *Suite) SetupTest() {
 		return herocache.NewTransactions(1000, log, metrics)
 	})
 
-	assignments := unittest.ClusterAssignment(suite.N_CLUSTERS, collectors)
-	suite.clusters, err = factory.NewClusterList(assignments, collectors)
+	assignments := unittest.ClusterAssignment(suite.N_CLUSTERS, collectors.ToSkeleton())
+	suite.clusters, err = factory.NewClusterList(assignments, collectors.ToSkeleton())
 	suite.Require().NoError(err)
 
 	suite.root = unittest.GenesisFixture()
@@ -118,14 +119,14 @@ func (suite *Suite) SetupTest() {
 		})
 
 	// set up the current epoch by default, with counter=1
-	epoch := new(protocol.Epoch)
+	epoch := new(protocol.CommittedEpoch)
 	epoch.On("Counter").Return(uint64(1), nil)
 	epoch.On("Clustering").Return(suite.clusters, nil)
 	suite.epochQuery = mocks.NewEpochQuery(suite.T(), 1, epoch)
 
 	suite.conf = DefaultConfig()
 	chain := flow.Testnet.Chain()
-	suite.engine, err = New(log, net, suite.state, metrics, metrics, metrics, suite.me, chain, suite.pools, suite.conf)
+	suite.engine, err = New(log, net, suite.state, metrics, metrics, metrics, suite.me, chain, suite.pools, suite.conf, NewAddressRateLimiter(rate.Limit(1), 1))
 	suite.Require().NoError(err)
 }
 
@@ -138,7 +139,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessTransaction(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &access.IncompleteTransactionError{}))
+		suite.Assert().True(errors.As(err, &validator.IncompleteTransactionError{}))
 	})
 
 	suite.Run("gas limit exceeds the maximum allowed", func() {
@@ -149,7 +150,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessTransaction(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &access.InvalidGasLimitError{}))
+		suite.Assert().True(errors.As(err, &validator.InvalidGasLimitError{}))
 	})
 
 	suite.Run("invalid reference block ID", func() {
@@ -168,12 +169,31 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessTransaction(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &access.InvalidScriptError{}))
+		suite.Assert().True(errors.As(err, &validator.InvalidScriptError{}))
+	})
+
+	// In some cases the Cadence parser will panic rather than return an error.
+	// If this happens, we should recover from the panic and return an InvalidScriptError.
+	// See: https://github.com/onflow/cadence/issues/3428, https://github.com/dapperlabs/flow-go/issues/6964
+	suite.Run("transaction script exceeds parse token limit (Cadence parser panic should be caught)", func() {
+		const tokenLimit = 1 << 19
+		script := "{};"
+		for len(script) < tokenLimit {
+			script += script
+		}
+
+		tx := unittest.TransactionBodyFixture()
+		tx.ReferenceBlockID = suite.root.ID()
+		tx.Script = []byte("transaction { execute {" + script + "}}")
+
+		err := suite.engine.ProcessTransaction(&tx)
+		suite.Assert().Error(err)
+		suite.Assert().True(errors.As(err, &validator.InvalidScriptError{}))
 	})
 
 	suite.Run("invalid signature format", func() {
 		signer := flow.Testnet.Chain().ServiceAddress()
-		keyIndex := uint64(0)
+		keyIndex := uint32(0)
 
 		sig1 := unittest.TransactionSignatureFixture()
 		sig1.KeyIndex = keyIndex
@@ -193,7 +213,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 			err := suite.engine.ProcessTransaction(&tx)
 			suite.Assert().Error(err)
-			suite.Assert().True(errors.As(err, &access.InvalidSignatureError{}))
+			suite.Assert().True(errors.As(err, &validator.InvalidSignatureError{}))
 		})
 
 		suite.Run("invalid format of a payload signature", func() {
@@ -204,7 +224,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 			err := suite.engine.ProcessTransaction(&tx)
 			suite.Assert().Error(err)
-			suite.Assert().True(errors.As(err, &access.InvalidSignatureError{}))
+			suite.Assert().True(errors.As(err, &validator.InvalidSignatureError{}))
 		})
 
 		suite.Run("duplicated signature (envelope only)", func() {
@@ -213,7 +233,7 @@ func (suite *Suite) TestInvalidTransaction() {
 			tx.EnvelopeSignatures = []flow.TransactionSignature{sig1, sig2}
 			err := suite.engine.ProcessTransaction(&tx)
 			suite.Assert().Error(err)
-			suite.Assert().True(errors.As(err, &access.DuplicatedSignatureError{}))
+			suite.Assert().True(errors.As(err, &validator.DuplicatedSignatureError{}))
 		})
 
 		suite.Run("duplicated signature (payload only)", func() {
@@ -223,7 +243,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 			err := suite.engine.ProcessTransaction(&tx)
 			suite.Assert().Error(err)
-			suite.Assert().True(errors.As(err, &access.DuplicatedSignatureError{}))
+			suite.Assert().True(errors.As(err, &validator.DuplicatedSignatureError{}))
 		})
 
 		suite.Run("duplicated signature (cross case)", func() {
@@ -234,7 +254,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 			err := suite.engine.ProcessTransaction(&tx)
 			suite.Assert().Error(err)
-			suite.Assert().True(errors.As(err, &access.DuplicatedSignatureError{}))
+			suite.Assert().True(errors.As(err, &validator.DuplicatedSignatureError{}))
 		})
 	})
 
@@ -251,7 +271,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessTransaction(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &access.InvalidAddressError{}))
+		suite.Assert().True(errors.As(err, &validator.InvalidAddressError{}))
 	})
 
 	suite.Run("expired reference block ID", func() {
@@ -265,7 +285,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessTransaction(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &access.ExpiredTransactionError{}))
+		suite.Assert().True(errors.As(err, &validator.ExpiredTransactionError{}))
 	})
 
 }
@@ -277,7 +297,7 @@ func (suite *Suite) TestComponentShutdown() {
 
 	// start then shut down the engine
 	parentCtx, cancel := context.WithCancel(context.Background())
-	ctx, _ := irrecoverable.WithSignaler(parentCtx)
+	ctx := irrecoverable.NewMockSignalerContext(suite.T(), parentCtx)
 	suite.engine.Start(ctx)
 	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), 10*time.Millisecond)
 	cancel()
@@ -307,9 +327,9 @@ func (suite *Suite) TestRoutingLocalCluster() {
 	suite.Assert().NoError(err)
 
 	// should be added to local mempool for the current epoch
-	counter, err := suite.epochQuery.Current().Counter()
+	currentEpoch, err := suite.epochQuery.Current()
 	suite.Assert().NoError(err)
-	suite.Assert().True(suite.pools.ForEpoch(counter).Has(tx.ID()))
+	suite.Assert().True(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -337,9 +357,9 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 	suite.Assert().NoError(err)
 
 	// should not be added to local mempool
-	counter, err := suite.epochQuery.Current().Counter()
+	currentEpoch, err := suite.epochQuery.Current()
 	suite.Assert().NoError(err)
-	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
+	suite.Assert().False(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -352,7 +372,7 @@ func (suite *Suite) TestRoutingToRemoteClusterWithNoNodes() {
 	suite.Require().True(ok)
 
 	// set the next cluster to be empty
-	emptyIdentityList := flow.IdentityList{}
+	emptyIdentityList := flow.IdentitySkeletonList{}
 	nextClusterIndex := (index + 1) % suite.N_CLUSTERS
 	suite.clusters[nextClusterIndex] = emptyIdentityList
 
@@ -370,9 +390,9 @@ func (suite *Suite) TestRoutingToRemoteClusterWithNoNodes() {
 	suite.Assert().NoError(err)
 
 	// should not be added to local mempool
-	counter, err := suite.epochQuery.Current().Counter()
+	currentEpoch, err := suite.epochQuery.Current()
 	suite.Assert().NoError(err)
-	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
+	suite.Assert().False(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -384,7 +404,7 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	suite.Require().True(ok)
 
 	// another node will send us the transaction
-	sender := local.Filter(filter.Not(filter.HasNodeID(suite.me.NodeID())))[0]
+	sender := local.Filter(filter.Not(filter.HasNodeID[flow.IdentitySkeleton](suite.me.NodeID())))[0]
 
 	// get a transaction that will be routed to local cluster
 	tx := unittest.TransactionBodyFixture()
@@ -398,9 +418,9 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	suite.Assert().NoError(err)
 
 	// should be added to local mempool for current epoch
-	counter, err := suite.epochQuery.Current().Counter()
+	currentEpoch, err := suite.epochQuery.Current()
 	suite.Assert().NoError(err)
-	suite.Assert().True(suite.pools.ForEpoch(counter).Has(tx.ID()))
+	suite.Assert().True(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -426,9 +446,9 @@ func (suite *Suite) TestRoutingInvalidTransaction() {
 	_ = suite.engine.ProcessTransaction(&tx)
 
 	// should not be added to local mempool
-	counter, err := suite.epochQuery.Current().Counter()
+	currentEpoch, err := suite.epochQuery.Current()
 	suite.Assert().NoError(err)
-	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
+	suite.Assert().False(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -442,11 +462,11 @@ func (suite *Suite) TestRouting_ClusterAssignmentChanged() {
 		suite.clusters[1],
 		suite.clusters[0],
 	}
-	epoch2 := new(protocol.Epoch)
+	epoch2 := new(protocol.CommittedEpoch)
 	epoch2.On("Counter").Return(uint64(2), nil)
 	epoch2.On("Clustering").Return(epoch2Clusters, nil)
 	// update the mocks to behave as though we have transitioned to epoch 2
-	suite.epochQuery.Add(epoch2)
+	suite.epochQuery.AddCommitted(epoch2)
 	suite.epochQuery.Transition()
 
 	// get the local cluster in epoch 2
@@ -475,18 +495,18 @@ func (suite *Suite) TestRouting_ClusterAssignmentRemoved() {
 
 	// remove ourselves from the cluster assignment for epoch 2
 	withoutMe := suite.identities.
-		Filter(filter.Not(filter.HasNodeID(suite.me.NodeID()))).
-		Filter(filter.HasRole(flow.RoleCollection))
+		Filter(filter.Not(filter.HasNodeID[flow.Identity](suite.me.NodeID()))).
+		Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	epoch2Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withoutMe)
 	epoch2Clusters, err := factory.NewClusterList(epoch2Assignment, withoutMe)
 	suite.Require().NoError(err)
 
-	epoch2 := new(protocol.Epoch)
+	epoch2 := new(protocol.CommittedEpoch)
 	epoch2.On("Counter").Return(uint64(2), nil)
 	epoch2.On("InitialIdentities").Return(withoutMe, nil)
 	epoch2.On("Clustering").Return(epoch2Clusters, nil)
 	// update the mocks to behave as though we have transitioned to epoch 2
-	suite.epochQuery.Add(epoch2)
+	suite.epochQuery.AddCommitted(epoch2)
 	suite.epochQuery.Transition()
 
 	// any transaction is OK here, since we're not in any cluster
@@ -514,18 +534,18 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 
 	// remove ourselves from the cluster assignment for epoch 2
 	withoutMe := suite.identities.
-		Filter(filter.Not(filter.HasNodeID(suite.me.NodeID()))).
-		Filter(filter.HasRole(flow.RoleCollection))
+		Filter(filter.Not(filter.HasNodeID[flow.Identity](suite.me.NodeID()))).
+		Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	epoch2Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withoutMe)
 	epoch2Clusters, err := factory.NewClusterList(epoch2Assignment, withoutMe)
 	suite.Require().NoError(err)
 
-	epoch2 := new(protocol.Epoch)
+	epoch2 := new(protocol.CommittedEpoch)
 	epoch2.On("Counter").Return(uint64(2), nil)
 	epoch2.On("InitialIdentities").Return(withoutMe, nil)
 	epoch2.On("Clustering").Return(epoch2Clusters, nil)
 	// update the mocks to behave as though we have transitioned to epoch 2
-	suite.epochQuery.Add(epoch2)
+	suite.epochQuery.AddCommitted(epoch2)
 	suite.epochQuery.Transition()
 
 	// any transaction is OK here, since we're not in any cluster
@@ -544,16 +564,16 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 	// EPOCH 3:
 
 	// include ourselves in cluster assignment
-	withMe := suite.identities.Filter(filter.HasRole(flow.RoleCollection))
+	withMe := suite.identities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	epoch3Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withMe)
 	epoch3Clusters, err := factory.NewClusterList(epoch3Assignment, withMe)
 	suite.Require().NoError(err)
 
-	epoch3 := new(protocol.Epoch)
+	epoch3 := new(protocol.CommittedEpoch)
 	epoch3.On("Counter").Return(uint64(3), nil)
 	epoch3.On("Clustering").Return(epoch3Clusters, nil)
 	// transition to epoch 3
-	suite.epochQuery.Add(epoch3)
+	suite.epochQuery.AddCommitted(epoch3)
 	suite.epochQuery.Transition()
 
 	// get the local cluster in epoch 2

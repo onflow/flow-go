@@ -4,10 +4,10 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -17,7 +17,7 @@ func TestGuaranteeInsertRetrieve(t *testing.T) {
 		g := unittest.CollectionGuaranteeFixture()
 
 		err := db.Update(InsertGuarantee(g.CollectionID, g))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var retrieved flow.CollectionGuarantee
 		err = db.View(RetrieveGuarantee(g.CollectionID, &retrieved))
@@ -49,11 +49,11 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 			}
 			return nil
 		})
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var actual []flow.Identifier
 		err = db.View(LookupPayloadGuarantees(blockID, &actual))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, []flow.Identifier{collID1, collID2}, actual)
 	})
@@ -90,7 +90,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 			}
 			return nil
 		})
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// insert block 2
 		err = db.Update(func(tx *badger.Txn) error {
@@ -104,7 +104,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 			}
 			return nil
 		})
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		t.Run("should retrieve collections for block", func(t *testing.T) {
 			var actual1 []flow.Identifier

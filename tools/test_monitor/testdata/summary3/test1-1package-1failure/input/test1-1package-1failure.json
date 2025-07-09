@@ -1,8 +1,8 @@
 {
   "tests": {
-    "github.com/onflow/flow-go/crypto/hash/TestSanitySha3_256": {
+    "github.com/onflow/crypto/hash/TestSanitySha3_256": {
       "test": "TestSanitySha3_256",
-      "package": "github.com/onflow/flow-go/crypto/hash",
+      "package": "github.com/onflow/crypto/hash",
       "runs": 1,
       "passed": 0,
       "failed": 1,
@@ -14,9 +14,9 @@
         0
       ]
     },
-    "github.com/onflow/flow-go/crypto/hash/TestSanitySha3_384": {
+    "github.com/onflow/crypto/hash/TestSanitySha3_384": {
       "test": "TestSanitySha3_384",
-      "package": "github.com/onflow/flow-go/crypto/hash",
+      "package": "github.com/onflow/crypto/hash",
       "runs": 1,
       "passed": 1,
       "failed": 0,
@@ -28,9 +28,9 @@
         0
       ]
     },
-    "github.com/onflow/flow-go/crypto/hash/TestSanitySha2_256": {
+    "github.com/onflow/crypto/hash/TestSanitySha2_256": {
       "test": "TestSanitySha2_256",
-      "package": "github.com/onflow/flow-go/crypto/hash",
+      "package": "github.com/onflow/crypto/hash",
       "runs": 1,
       "passed": 1,
       "failed": 0,
@@ -42,9 +42,9 @@
         0
       ]
     },
-    "github.com/onflow/flow-go/crypto/hash/TestSanitySha2_384": {
+    "github.com/onflow/crypto/hash/TestSanitySha2_384": {
       "test": "TestSanitySha2_384",
-      "package": "github.com/onflow/flow-go/crypto/hash",
+      "package": "github.com/onflow/crypto/hash",
       "runs": 1,
       "passed": 1,
       "failed": 0,
@@ -56,9 +56,9 @@
         0
       ]
     },
-    "github.com/onflow/flow-go/crypto/hash/TestSanityKmac128": {
+    "github.com/onflow/crypto/hash/TestSanityKmac128": {
       "test": "TestSanityKmac128",
-      "package": "github.com/onflow/flow-go/crypto/hash",
+      "package": "github.com/onflow/crypto/hash",
       "runs": 1,
       "passed": 1,
       "failed": 0,
@@ -70,9 +70,9 @@
         0
       ]
     },
-    "github.com/onflow/flow-go/crypto/hash/TestHashersAPI": {
+    "github.com/onflow/crypto/hash/TestHashersAPI": {
       "test": "TestHashersAPI",
-      "package": "github.com/onflow/flow-go/crypto/hash",
+      "package": "github.com/onflow/crypto/hash",
       "runs": 1,
       "passed": 1,
       "failed": 0,
@@ -84,9 +84,9 @@
         0
       ]
     },
-    "github.com/onflow/flow-go/crypto/hash/TestSha3": {
+    "github.com/onflow/crypto/hash/TestSha3": {
       "test": "TestSha3",
-      "package": "github.com/onflow/flow-go/crypto/hash",
+      "package": "github.com/onflow/crypto/hash",
       "runs": 1,
       "passed": 1,
       "failed": 0,
@@ -98,9 +98,9 @@
         0.23
       ]
     },
-    "github.com/onflow/flow-go/crypto/hash/TestSha3/SHA3_256": {
+    "github.com/onflow/crypto/hash/TestSha3/SHA3_256": {
       "test": "TestSha3/SHA3_256",
-      "package": "github.com/onflow/flow-go/crypto/hash",
+      "package": "github.com/onflow/crypto/hash",
       "runs": 1,
       "passed": 1,
       "failed": 0,
@@ -112,9 +112,9 @@
         0.11
       ]
     },
-    "github.com/onflow/flow-go/crypto/hash/TestSha3/SHA3_384": {
+    "github.com/onflow/crypto/hash/TestSha3/SHA3_384": {
       "test": "TestSha3/SHA3_384",
-      "package": "github.com/onflow/flow-go/crypto/hash",
+      "package": "github.com/onflow/crypto/hash",
       "runs": 1,
       "passed": 1,
       "failed": 0,

@@ -23,7 +23,7 @@ func TestAppSpecificScoreCache(t *testing.T) {
 	score := 5.0
 	updateTime := time.Now()
 
-	err := cache.Add(peerID, score, updateTime)
+	err := cache.AdjustWithInit(peerID, score, updateTime)
 	require.Nil(t, err, "failed to add score to cache")
 
 	// retrieve score from cache
@@ -34,7 +34,7 @@ func TestAppSpecificScoreCache(t *testing.T) {
 
 	// test cache update
 	newScore := 10.0
-	err = cache.Add(peerID, newScore, updateTime.Add(time.Minute))
+	err = cache.AdjustWithInit(peerID, newScore, updateTime.Add(time.Minute))
 	require.Nil(t, err, "Failed to update score in cache")
 
 	// retrieve updated score
@@ -62,13 +62,13 @@ func TestAppSpecificScoreCache_Concurrent_Add_Get_Update(t *testing.T) {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		err := cache.Add(peerId1, score1, lastUpdated1)
+		err := cache.AdjustWithInit(peerId1, score1, lastUpdated1)
 		require.Nil(t, err, "failed to add score1 to cache")
 	}()
 
 	go func() {
 		defer wg.Done()
-		err := cache.Add(peerId2, score2, lastUpdated2)
+		err := cache.AdjustWithInit(peerId2, score2, lastUpdated2)
 		require.Nil(t, err, "failed to add score2 to cache")
 	}()
 
@@ -103,13 +103,13 @@ func TestAppSpecificScoreCache_Concurrent_Add_Get_Update(t *testing.T) {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		err := cache.Add(peerId1, newScore1, lastUpdated1)
+		err := cache.AdjustWithInit(peerId1, newScore1, lastUpdated1)
 		require.Nil(t, err, "failed to update score1 in cache")
 	}()
 
 	go func() {
 		defer wg.Done()
-		err := cache.Add(peerId2, newScore2, lastUpdated2)
+		err := cache.AdjustWithInit(peerId2, newScore2, lastUpdated2)
 		require.Nil(t, err, "failed to update score2 in cache")
 	}()
 
@@ -149,7 +149,7 @@ func TestAppSpecificScoreCache_Eviction(t *testing.T) {
 
 	// add scores to cache
 	for i := 0; i < len(peerIds); i++ {
-		err := cache.Add(peerIds[i], scores[i], time.Now())
+		err := cache.AdjustWithInit(peerIds[i], scores[i], time.Now())
 		require.Nil(t, err, "failed to add score to cache")
 	}
 

@@ -27,6 +27,10 @@ func InsertIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.Txn
 		if err != nil {
 			return fmt.Errorf("could not store results index: %w", err)
 		}
+		err = operation.IndexPayloadProtocolStateID(blockID, index.ProtocolStateID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store protocol state id: %w", err)
+		}
 		return nil
 	}
 }
@@ -51,14 +55,20 @@ func RetrieveIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.T
 		var resultsIDs []flow.Identifier
 		err = operation.LookupPayloadResults(blockID, &resultsIDs)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve receipts index: %w", err)
+			return fmt.Errorf("could not retrieve results index: %w", err)
+		}
+		var stateID flow.Identifier
+		err = operation.LookupPayloadProtocolStateID(blockID, &stateID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve protocol state id: %w", err)
 		}
 
 		*index = flow.Index{
-			CollectionIDs: collIDs,
-			SealIDs:       sealIDs,
-			ReceiptIDs:    receiptIDs,
-			ResultIDs:     resultsIDs,
+			CollectionIDs:   collIDs,
+			SealIDs:         sealIDs,
+			ReceiptIDs:      receiptIDs,
+			ResultIDs:       resultsIDs,
+			ProtocolStateID: stateID,
 		}
 		return nil
 	}

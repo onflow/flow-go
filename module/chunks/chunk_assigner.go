@@ -3,8 +3,9 @@ package chunks
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/crypto/random"
+	"github.com/onflow/crypto/hash"
+	"github.com/onflow/crypto/random"
+
 	chunkmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/encoding/json"
 	"github.com/onflow/flow-go/model/flow"
@@ -66,9 +67,12 @@ func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identi
 	}
 
 	// Get a list of verifiers at block that is being sealed
-	verifiers, err := p.protocolState.AtBlockID(result.BlockID).Identities(filter.And(filter.HasRole(flow.RoleVerification),
-		filter.HasWeight(true),
-		filter.Not(filter.Ejected)))
+	verifiers, err := p.protocolState.AtBlockID(result.BlockID).Identities(
+		filter.And(
+			filter.HasInitialWeight[flow.Identity](true),
+			filter.HasRole[flow.Identity](flow.RoleVerification),
+			filter.IsValidCurrentEpochParticipant,
+		))
 	if err != nil {
 		return nil, fmt.Errorf("could not get verifiers: %w", err)
 	}
@@ -114,7 +118,7 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 	}
 
 	// creates an assignment
-	assignment := chunkmodels.NewAssignment()
+	assignmentBuilder := chunkmodels.NewAssignmentBuilder()
 
 	// permutes the entire slice
 	err := rng.Shuffle(len(ids), ids.Swap)
@@ -155,9 +159,12 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 		if !ok {
 			return nil, fmt.Errorf("chunk out of range requested: %v", i)
 		}
-		assignment.Add(chunk, assignees)
+		err := assignmentBuilder.Add(chunk.Index, assignees)
+		if err != nil {
+			return nil, fmt.Errorf("adding chunk %d failed: %w", i, err)
+		}
 	}
-	return assignment, nil
+	return assignmentBuilder.Build(), nil
 }
 
 func fingerPrint(blockID flow.Identifier, resultID flow.Identifier, alpha int) (hash.Hash, error) {

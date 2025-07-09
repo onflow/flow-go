@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package operation
 
 import (
@@ -49,15 +47,15 @@ func TestCollections(t *testing.T) {
 
 			_ = db.Update(func(tx *badger.Txn) error {
 				err := InsertCollection(&expected)(tx)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				err = IndexCollectionPayload(blockID, expected.Transactions)(tx)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				return nil
 			})
 
 			var actual flow.LightCollection
 			err := db.View(LookupCollectionPayload(blockID, &actual.Transactions))
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			assert.Equal(t, expected, actual)
 		})
@@ -69,9 +67,9 @@ func TestCollections(t *testing.T) {
 
 			_ = db.Update(func(tx *badger.Txn) error {
 				err := IndexCollectionByTransaction(transactionID, expected)(tx)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				err = RetrieveCollectionID(transactionID, &actual)(tx)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				return nil
 			})
 			assert.Equal(t, expected, actual)

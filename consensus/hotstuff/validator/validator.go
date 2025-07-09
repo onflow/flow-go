@@ -201,12 +201,16 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 //   - model.ErrViewForUnknownEpoch if the proposal refers unknown epoch
 //
 // Any other error should be treated as exception
-func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
+func (v *Validator) ValidateProposal(proposal *model.SignedProposal) error {
 	qc := proposal.Block.QC
 	block := proposal.Block
 
 	// validate the proposer's vote and get his identity
-	_, err := v.ValidateVote(proposal.ProposerVote())
+	vote, err := proposal.ProposerVote()
+	if err != nil {
+		return fmt.Errorf("could not get vote from proposer vote: %w", err)
+	}
+	_, err = v.ValidateVote(vote)
 	if model.IsInvalidVoteError(err) {
 		return model.NewInvalidProposalErrorf(proposal, "invalid proposer signature: %w", err)
 	}
@@ -294,7 +298,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 //   - model.ErrViewForUnknownEpoch if the vote refers unknown epoch
 //
 // Any other error should be treated as exception
-func (v *Validator) ValidateVote(vote *model.Vote) (*flow.Identity, error) {
+func (v *Validator) ValidateVote(vote *model.Vote) (*flow.IdentitySkeleton, error) {
 	voter, err := v.committee.IdentityByEpoch(vote.View, vote.SignerID)
 	if model.IsInvalidSignerError(err) {
 		return nil, newInvalidVoteError(vote, err)

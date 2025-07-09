@@ -7,19 +7,19 @@ import (
 	"github.com/coreos/go-semver/semver"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+	"github.com/onflow/crypto"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/assignment"
-	"github.com/onflow/flow-go/model/flow/order"
 )
 
 // ServiceEvent converts a service event encoded as the generic flow.Event
 // type to a flow.ServiceEvent type for use within protocol software and protocol
 // state. This acts as the conversion from the Cadence type to the flow-go type.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
 func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, error) {
-
 	events := systemcontracts.ServiceEventsForChain(chainID)
 
 	// depending on type of service event construct Go type
@@ -28,17 +28,46 @@ func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, e
 		return convertServiceEventEpochSetup(event)
 	case events.EpochCommit.EventType():
 		return convertServiceEventEpochCommit(event)
+	case events.EpochRecover.EventType():
+		return convertServiceEventEpochRecover(event)
 	case events.VersionBeacon.EventType():
 		return convertServiceEventVersionBeacon(event)
+	case events.ProtocolStateVersionUpgrade.EventType():
+		return convertServiceEventProtocolStateVersionUpgrade(event)
 	default:
 		return nil, fmt.Errorf("invalid event type: %s", event.Type)
 	}
 }
 
+func getField[T cadence.Value](fields map[string]cadence.Value, fieldName string) (T, error) {
+	field, ok := fields[fieldName]
+	if !ok || field == nil {
+		var zero T
+		return zero, fmt.Errorf(
+			"required field not found: %s",
+			fieldName,
+		)
+	}
+
+	value, ok := field.(T)
+	if !ok {
+		var zero T
+		return zero, invalidCadenceTypeError(fieldName, field, zero)
+	}
+
+	return value, nil
+}
+
 // convertServiceEventEpochSetup converts a service event encoded as the generic
 // flow.Event type to a ServiceEvent type for an EpochSetup event
+// CONVENTION: in the returned `EpochSetup` event,
+//   - Node identities listed in `EpochSetup.Participants` are in CANONICAL ORDER
+//   - for each cluster assignment (i.e. element in `EpochSetup.Assignments`), the nodeIDs are listed in CANONICAL ORDER
+//
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
 func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error) {
-
 	// decode bytes using ccf
 	payload, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
@@ -51,180 +80,117 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 		return nil, invalidCadenceTypeError("payload", payload, cadence.Event{})
 	}
 
-	const expectedFieldCount = 9
-	if len(cdcEvent.Fields) < expectedFieldCount {
-		return nil, fmt.Errorf(
-			"insufficient fields in EpochSetup event (%d < %d)",
-			len(cdcEvent.Fields),
-			expectedFieldCount,
-		)
-	}
-
 	if cdcEvent.Type() == nil {
 		return nil, fmt.Errorf("EpochSetup event doesn't have type")
 	}
 
-	// parse EpochSetup event
+	fields := cadence.FieldsMappedByName(cdcEvent)
 
-	var counter cadence.UInt64
-	var firstView cadence.UInt64
-	var finalView cadence.UInt64
-	var randomSrcHex cadence.String
-	var dkgPhase1FinalView cadence.UInt64
-	var dkgPhase2FinalView cadence.UInt64
-	var dkgPhase3FinalView cadence.UInt64
-	var cdcClusters cadence.Array
-	var cdcParticipants cadence.Array
-	var foundFieldCount int
-
-	evt := cdcEvent.Type().(*cadence.EventType)
-
-	for i, f := range evt.Fields {
-		switch f.Identifier {
-		case "counter":
-			foundFieldCount++
-			counter, ok = cdcEvent.Fields[i].(cadence.UInt64)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"counter",
-					cdcEvent.Fields[i],
-					cadence.UInt64(0),
-				)
-			}
-
-		case "nodeInfo":
-			foundFieldCount++
-			cdcParticipants, ok = cdcEvent.Fields[i].(cadence.Array)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"participants",
-					cdcEvent.Fields[i],
-					cadence.Array{},
-				)
-			}
-
-		case "firstView":
-			foundFieldCount++
-			firstView, ok = cdcEvent.Fields[i].(cadence.UInt64)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"firstView",
-					cdcEvent.Fields[i],
-					cadence.UInt64(0),
-				)
-			}
-
-		case "finalView":
-			foundFieldCount++
-			finalView, ok = cdcEvent.Fields[i].(cadence.UInt64)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"finalView",
-					cdcEvent.Fields[i],
-					cadence.UInt64(0),
-				)
-			}
-
-		case "collectorClusters":
-			foundFieldCount++
-			cdcClusters, ok = cdcEvent.Fields[i].(cadence.Array)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"clusters",
-					cdcEvent.Fields[i],
-					cadence.Array{},
-				)
-			}
-
-		case "randomSource":
-			foundFieldCount++
-			randomSrcHex, ok = cdcEvent.Fields[i].(cadence.String)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"randomSource",
-					cdcEvent.Fields[i],
-					cadence.String(""),
-				)
-			}
-
-		case "DKGPhase1FinalView":
-			foundFieldCount++
-			dkgPhase1FinalView, ok = cdcEvent.Fields[i].(cadence.UInt64)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"dkgPhase1FinalView",
-					cdcEvent.Fields[i],
-					cadence.UInt64(0),
-				)
-			}
-
-		case "DKGPhase2FinalView":
-			foundFieldCount++
-			dkgPhase2FinalView, ok = cdcEvent.Fields[i].(cadence.UInt64)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"dkgPhase2FinalView",
-					cdcEvent.Fields[i],
-					cadence.UInt64(0),
-				)
-			}
-
-		case "DKGPhase3FinalView":
-			foundFieldCount++
-			dkgPhase3FinalView, ok = cdcEvent.Fields[i].(cadence.UInt64)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"dkgPhase3FinalView",
-					cdcEvent.Fields[i],
-					cadence.UInt64(0),
-				)
-			}
-		}
-	}
-
-	if foundFieldCount != expectedFieldCount {
+	const expectedFieldCount = 11
+	if len(fields) < expectedFieldCount {
 		return nil, fmt.Errorf(
-			"EpochSetup event required fields not found (%d != %d)",
-			foundFieldCount,
+			"insufficient fields in EpochSetup event (%d < %d)",
+			len(fields),
 			expectedFieldCount,
 		)
 	}
 
-	setup := &flow.EpochSetup{
-		Counter:            uint64(counter),
-		FirstView:          uint64(firstView),
-		FinalView:          uint64(finalView),
-		DKGPhase1FinalView: uint64(dkgPhase1FinalView),
-		DKGPhase2FinalView: uint64(dkgPhase2FinalView),
-		DKGPhase3FinalView: uint64(dkgPhase3FinalView),
+	// parse EpochSetup event
+
+	counter, err := getField[cadence.UInt64](fields, "counter")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
 	}
 
-	// Cadence's unsafeRandom().toString() produces a string of variable length.
-	// Here we pad it with enough 0s to meet the required length.
-	paddedRandomSrcHex := fmt.Sprintf(
-		"%0*s",
-		2*flow.EpochSetupRandomSourceLength,
-		string(randomSrcHex),
-	)
-	setup.RandomSource, err = hex.DecodeString(paddedRandomSrcHex)
+	cdcParticipants, err := getField[cadence.Array](fields, "nodeInfo")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	firstView, err := getField[cadence.UInt64](fields, "firstView")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	finalView, err := getField[cadence.UInt64](fields, "finalView")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	cdcClusters, err := getField[cadence.Array](fields, "collectorClusters")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	randomSrcHex, err := getField[cadence.String](fields, "randomSource")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	targetDuration, err := getField[cadence.UInt64](fields, "targetDuration") // Epoch duration [seconds]
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	targetEndTimeUnix, err := getField[cadence.UInt64](fields, "targetEndTime") // Unix time [seconds]
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	dkgPhase1FinalView, err := getField[cadence.UInt64](fields, "DKGPhase1FinalView")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	dkgPhase2FinalView, err := getField[cadence.UInt64](fields, "DKGPhase2FinalView")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	dkgPhase3FinalView, err := getField[cadence.UInt64](fields, "DKGPhase3FinalView")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	// random source from the event must be a hex string
+	// containing exactly 128 bits (equivalent to 16 bytes or 32 hex characters)
+	randomSource, err := hex.DecodeString(string(randomSrcHex))
 	if err != nil {
 		return nil, fmt.Errorf(
 			"could not decode random source hex (%v): %w",
-			paddedRandomSrcHex,
+			randomSrcHex,
 			err,
 		)
 	}
 
-	// parse cluster assignments
-	setup.Assignments, err = convertClusterAssignments(cdcClusters.Values)
+	// parse cluster assignments; returned assignments are in canonical order
+	assignments, err := convertClusterAssignments(cdcClusters.Values)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert cluster assignments: %w", err)
 	}
 
-	// parse epoch participants
-	setup.Participants, err = convertParticipants(cdcParticipants.Values)
+	// parse epoch participants; returned node identities are in canonical order
+	participants, err := convertParticipants(cdcParticipants.Values)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert participants: %w", err)
+	}
+	setup, err := flow.NewEpochSetup(
+		flow.UntrustedEpochSetup{
+			Counter:            uint64(counter),
+			FirstView:          uint64(firstView),
+			DKGPhase1FinalView: uint64(dkgPhase1FinalView),
+			DKGPhase2FinalView: uint64(dkgPhase2FinalView),
+			DKGPhase3FinalView: uint64(dkgPhase3FinalView),
+			FinalView:          uint64(finalView),
+			Participants:       participants,
+			Assignments:        assignments,
+			RandomSource:       randomSource,
+			TargetDuration:     uint64(targetDuration),
+			TargetEndTime:      uint64(targetEndTimeUnix),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch setup: %w", err)
 	}
 
 	// construct the service event
@@ -236,10 +202,10 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 	return serviceEvent, nil
 }
 
-// convertServiceEventEpochCommit converts a service event encoded as the generic
-// flow.Event type to a ServiceEvent type for an EpochCommit event
+// convertServiceEventEpochCommit is a wrapper function to support backward-compatible event parsing for [flow.EpochCommit] events.
+// It delegates to the version-specific conversion function based on the number of fields in the event.
+// TODO(EFM, #6794): Replace this function with the body of `convertServiceEventEpochCommitV1` once the network upgrade is complete.
 func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error) {
-
 	// decode bytes using ccf
 	payload, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
@@ -251,91 +217,146 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 		return nil, invalidCadenceTypeError("payload", payload, cadence.Event{})
 	}
 
-	const expectedFieldCount = 3
-	if len(cdcEvent.Fields) < expectedFieldCount {
+	if cdcEvent.Type() == nil {
+		return nil, fmt.Errorf("EpochCommit event doesn't have type")
+	}
+
+	fields := cadence.FieldsMappedByName(cdcEvent)
+
+	switch len(fields) {
+	case 3:
+		return convertServiceEventEpochCommitV0(event)
+	case 5:
+		return convertServiceEventEpochCommitV1(event)
+	default:
 		return nil, fmt.Errorf(
-			"insufficient fields in EpochCommit event (%d < %d)",
-			len(cdcEvent.Fields),
-			expectedFieldCount,
+			"invalid number of fields in EpochCommit event, expect 3 or 5, got: %d",
+			len(fields),
 		)
+	}
+}
+
+// convertServiceEventEpochCommit converts a service event encoded as the generic
+// flow.Event type to a ServiceEvent type for an EpochCommit event.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
+func convertServiceEventEpochCommitV1(event flow.Event) (*flow.ServiceEvent, error) {
+	// decode bytes using ccf
+	payload, err := ccf.Decode(nil, event.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
+	}
+
+	cdcEvent, ok := payload.(cadence.Event)
+	if !ok {
+		return nil, invalidCadenceTypeError("payload", payload, cadence.Event{})
 	}
 
 	if cdcEvent.Type() == nil {
 		return nil, fmt.Errorf("EpochCommit event doesn't have type")
 	}
 
-	// Extract EpochCommit event fields
-	var counter cadence.UInt64
-	var cdcClusterQCVotes cadence.Array
-	var cdcDKGKeys cadence.Array
-	var foundFieldCount int
+	fields := cadence.FieldsMappedByName(cdcEvent)
 
-	evt := cdcEvent.Type().(*cadence.EventType)
-
-	for i, f := range evt.Fields {
-		switch f.Identifier {
-		case "counter":
-			foundFieldCount++
-			counter, ok = cdcEvent.Fields[i].(cadence.UInt64)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"counter",
-					cdcEvent.Fields[i],
-					cadence.UInt64(0),
-				)
-			}
-
-		case "clusterQCs":
-			foundFieldCount++
-			cdcClusterQCVotes, ok = cdcEvent.Fields[i].(cadence.Array)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"clusterQCs",
-					cdcEvent.Fields[i],
-					cadence.Array{},
-				)
-			}
-
-		case "dkgPubKeys":
-			foundFieldCount++
-			cdcDKGKeys, ok = cdcEvent.Fields[i].(cadence.Array)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"dkgPubKeys",
-					cdcEvent.Fields[i],
-					cadence.Array{},
-				)
-			}
-		}
-	}
-
-	if foundFieldCount != expectedFieldCount {
+	const expectedFieldCount = 5
+	if len(fields) < expectedFieldCount {
 		return nil, fmt.Errorf(
-			"EpochCommit event required fields not found (%d != %d)",
-			foundFieldCount,
+			"insufficient fields in EpochCommit event (%d < %d)",
+			len(fields),
 			expectedFieldCount,
 		)
 	}
 
-	commit := &flow.EpochCommit{
-		Counter: uint64(counter),
+	// Extract EpochCommit event fields
+
+	counter, err := getField[cadence.UInt64](fields, "counter")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+	}
+
+	cdcClusterQCVotes, err := getField[cadence.Array](fields, "clusterQCs")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+	}
+
+	cdcDKGKeys, err := getField[cadence.Array](fields, "dkgPubKeys")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+	}
+
+	cdcDKGGroupKey, err := getField[cadence.String](fields, "dkgGroupKey")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+	}
+
+	cdcDKGIndexMap, err := getField[cadence.Dictionary](fields, "dkgIdMapping")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
 	}
 
 	// parse cluster qc votes
-	commit.ClusterQCs, err = convertClusterQCVotes(cdcClusterQCVotes.Values)
+	clusterQCs, err := convertClusterQCVotes(cdcClusterQCVotes.Values)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert cluster qc votes: %w", err)
 	}
 
-	// parse DKG group key and participants
-	// Note: this is read in the same order as `DKGClient.SubmitResult` ie. with the group public key first followed by individual keys
-	// https://github.com/onflow/flow-go/blob/feature/dkg/module/dkg/client.go#L182-L183
-	dkgGroupKey, dkgParticipantKeys, err := convertDKGKeys(cdcDKGKeys.Values)
+	// parse DKG participants
+	dKGParticipantKeys, err := convertDKGKeys(cdcDKGKeys.Values)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert DKG keys: %w", err)
+		return nil, fmt.Errorf("could not convert Random Beacon keys: %w", err)
 	}
-	commit.DKGGroupKey = dkgGroupKey
-	commit.DKGParticipantKeys = dkgParticipantKeys
+
+	// parse DKG group key
+	dKGGroupKey, err := convertDKGKey(cdcDKGGroupKey)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert Random Beacon group key: %w", err)
+	}
+
+	// parse DKG Index Map
+	//
+	// CAUTION: When the Execution or Verification Node serializes the EpochCommit to compute its ID, the DKGIndexMap
+	// is converted from a map to a slice. This is necessary because maps don't have a deterministic order. For *valid*
+	// EpochCommit events, the following convention holds (see DKGIndexMap type declaration for details):
+	//   - For the DKG committee 𝒟, its size is n = |𝒟| = len(DKGIndexMap).
+	//   - The values in DKGIndexMap must form the set {0, 1, …, n-1}, as required by the low level cryptography
+	//     module (convention simplifying the implementation).
+	// Therefore, a valid `DKGIndexMap` can always be represented as an `IdentifierList` slice `s` such that
+	// nodeID := s[i] for i ∈ {0, …, n-1} corresponds to a key value pair (nodeID, i) in DKGIndexMap. The
+	// `EpochCommit.EncodeRLP` method performs this conversion (and panics when the convention is violated).
+	//    Generally, execution should be permissive and forward all system events to the Protocol State, which then
+	// performs comprehensive validity checks and decides whether events are accepted or rejected. However, we can
+	// only compute the ID of an EpochCommit whose DKGIndexMap satisfies the convention above. Furthermore, we do
+	// not want to depend on the System Smart Contracts to _always_ emit valid DKGIndexMap - especially for Epoch
+	// Recovery, where humans provide some of the parameters in the EpochCommit event.
+	//    Therefore, we check here that DKGIndexMap satisfies the convention required by `EncodeRLP` and error
+	// otherwise. When we error here, the corresponding event will just be omitted from `ExecutionResult.ServiceEvents`.
+	// (In contrast, erroring during the ID computation will result in an irrecoverable execution halt, because the
+	// ExecutionResult has already been fully constructed, but can't be broadcast).
+	//    We will only drop service events whose DKGIndexMap is invalid. As the Protocol State will anyway discard
+	// such events, it is fine to not relay them in the first place.
+	dKGIndexMap := make(flow.DKGIndexMap, len(cdcDKGIndexMap.Pairs))
+	for _, pair := range cdcDKGIndexMap.Pairs {
+		nodeID, err := flow.HexStringToIdentifier(string(pair.Key.(cadence.String)))
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode flow.Identifer in DKGIndexMap entry from EpochRecover event: %w", err)
+		}
+		index := pair.Value.(cadence.Int).Int()
+		dKGIndexMap[nodeID] = index
+	}
+
+	commit, err := flow.NewEpochCommit(
+		flow.UntrustedEpochCommit{
+			Counter:            uint64(counter),
+			ClusterQCs:         clusterQCs,
+			DKGGroupKey:        dKGGroupKey,
+			DKGParticipantKeys: dKGParticipantKeys,
+			DKGIndexMap:        dKGIndexMap,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch commit: %w", err)
+	}
 
 	// create the service event
 	serviceEvent := &flow.ServiceEvent{
@@ -346,77 +367,411 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 	return serviceEvent, nil
 }
 
+// convertServiceEventEpochCommit converts a service event encoded as the generic
+// flow.Event type to a ServiceEvent type for an EpochCommit event.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
+// TODO(EFM, #6794): Remove this once we complete the network upgrade
+func convertServiceEventEpochCommitV0(event flow.Event) (*flow.ServiceEvent, error) {
+	// decode bytes using ccf
+	payload, err := ccf.Decode(nil, event.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
+	}
+
+	cdcEvent, ok := payload.(cadence.Event)
+	if !ok {
+		return nil, invalidCadenceTypeError("payload", payload, cadence.Event{})
+	}
+
+	if cdcEvent.Type() == nil {
+		return nil, fmt.Errorf("EpochCommit event doesn't have type")
+	}
+
+	fields := cadence.FieldsMappedByName(cdcEvent)
+
+	const expectedFieldCount = 3
+	if len(fields) < expectedFieldCount {
+		return nil, fmt.Errorf(
+			"insufficient fields in EpochCommit event (%d < %d)",
+			len(fields),
+			expectedFieldCount,
+		)
+	}
+
+	// Extract EpochCommit event fields
+
+	counter, err := getField[cadence.UInt64](fields, "counter")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+	}
+
+	cdcClusterQCVotes, err := getField[cadence.Array](fields, "clusterQCs")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+	}
+
+	cdcDKGKeys, err := getField[cadence.Array](fields, "dkgPubKeys")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+	}
+
+	// parse cluster qc votes
+	clusterQCs, err := convertClusterQCVotes(cdcClusterQCVotes.Values)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert cluster qc votes: %w", err)
+	}
+
+	// parse DKG group key and participants
+	// Note: this is read in the same order as `DKGClient.SubmitResult` ie. with the group public key first followed by individual keys
+	// https://github.com/onflow/flow-go/blob/feature/dkg/module/dkg/client.go#L182-L183
+	dKGGroupKey, err := convertDKGKey(cdcDKGKeys.Values[0])
+	if err != nil {
+		return nil, fmt.Errorf("could not convert DKG group key: %w", err)
+	}
+	dKGParticipantKeys, err := convertDKGKeys(cdcDKGKeys.Values[1:])
+	if err != nil {
+		return nil, fmt.Errorf("could not convert DKG keys: %w", err)
+	}
+
+	commit, err := flow.NewEpochCommit(
+		flow.UntrustedEpochCommit{
+			Counter:            uint64(counter),
+			ClusterQCs:         clusterQCs,
+			DKGGroupKey:        dKGGroupKey,
+			DKGParticipantKeys: dKGParticipantKeys,
+			DKGIndexMap:        nil,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch commit: %w", err)
+	}
+
+	// create the service event
+	serviceEvent := &flow.ServiceEvent{
+		Type:  flow.ServiceEventCommit,
+		Event: commit,
+	}
+
+	return serviceEvent, nil
+}
+
+// convertServiceEventEpochRecover converts a service event encoded as the generic
+// flow.Event type to a ServiceEvent type for an EpochRecover event.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
+func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, error) {
+	// decode bytes using ccf
+	payload, err := ccf.Decode(nil, event.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
+	}
+
+	// NOTE: variable names prefixed with cdc represent cadence types
+	cdcEvent, ok := payload.(cadence.Event)
+	if !ok {
+		return nil, invalidCadenceTypeError("payload", payload, cadence.Event{})
+	}
+
+	if cdcEvent.Type() == nil {
+		return nil, fmt.Errorf("EpochRecover event doesn't have type")
+	}
+
+	fields := cadence.FieldsMappedByName(cdcEvent)
+
+	const expectedFieldCount = 15
+	if len(fields) < expectedFieldCount {
+		return nil, fmt.Errorf(
+			"insufficient fields in EpochRecover event (%d < %d)",
+			len(fields),
+			expectedFieldCount,
+		)
+	}
+
+	// parse EpochRecover event
+
+	counter, err := getField[cadence.UInt64](fields, "counter")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
+	}
+
+	cdcParticipants, err := getField[cadence.Array](fields, "nodeInfo")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
+	}
+
+	firstView, err := getField[cadence.UInt64](fields, "firstView")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
+	}
+
+	finalView, err := getField[cadence.UInt64](fields, "finalView")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
+	}
+
+	cdcClusters, err := getField[cadence.Array](fields, "clusterAssignments")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
+	}
+
+	randomSrcHex, err := getField[cadence.String](fields, "randomSource")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
+	}
+
+	targetDuration, err := getField[cadence.UInt64](fields, "targetDuration") // Epoch duration [seconds]
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
+	}
+
+	targetEndTimeUnix, err := getField[cadence.UInt64](fields, "targetEndTime") // Unix time [seconds]
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
+	}
+
+	dkgPhase1FinalView, err := getField[cadence.UInt64](fields, "DKGPhase1FinalView")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
+	}
+
+	dkgPhase2FinalView, err := getField[cadence.UInt64](fields, "DKGPhase2FinalView")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
+	}
+
+	dkgPhase3FinalView, err := getField[cadence.UInt64](fields, "DKGPhase3FinalView")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
+	}
+
+	cdcClusterQCVoteData, err := getField[cadence.Array](fields, "clusterQCVoteData")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
+	}
+
+	cdcDKGKeys, err := getField[cadence.Array](fields, "dkgPubKeys")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
+	}
+
+	cdcDKGGroupKey, err := getField[cadence.String](fields, "dkgGroupKey")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
+	}
+
+	cdcDKGIndexMap, err := getField[cadence.Dictionary](fields, "dkgIdMapping")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
+	}
+
+	// random source from the event must be a hex string
+	// containing exactly 128 bits (equivalent to 16 bytes or 32 hex characters)
+	randomSource, err := hex.DecodeString(string(randomSrcHex))
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to decode random source hex (%v) from EpochRecover event: %w",
+			randomSrcHex,
+			err,
+		)
+	}
+
+	// parse cluster assignments; returned assignments are in canonical order
+	assignments, err := convertEpochRecoverCollectorClusterAssignments(cdcClusters.Values)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert cluster assignments from EpochRecover event: %w", err)
+	}
+
+	// parse epoch participants; returned node identities are in canonical order
+	participants, err := convertParticipants(cdcParticipants.Values)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert participants from EpochRecover event: %w", err)
+	}
+
+	setup, err := flow.NewEpochSetup(
+		flow.UntrustedEpochSetup{
+			Counter:            uint64(counter),
+			FirstView:          uint64(firstView),
+			DKGPhase1FinalView: uint64(dkgPhase1FinalView),
+			DKGPhase2FinalView: uint64(dkgPhase2FinalView),
+			DKGPhase3FinalView: uint64(dkgPhase3FinalView),
+			FinalView:          uint64(finalView),
+			Participants:       participants,
+			Assignments:        assignments,
+			RandomSource:       randomSource,
+			TargetDuration:     uint64(targetDuration),
+			TargetEndTime:      uint64(targetEndTimeUnix),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch setup: %w", err)
+	}
+
+	// parse cluster qc votes
+	clusterQCs, err := convertClusterQCVoteData(cdcClusterQCVoteData.Values)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode clusterQCVoteData from EpochRecover event: %w", err)
+	}
+
+	// parse DKG participants
+	dKGParticipantKeys, err := convertDKGKeys(cdcDKGKeys.Values)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode Random Beacon key shares from EpochRecover event: %w", err)
+	}
+
+	// parse DKG group key
+	dKGGroupKey, err := convertDKGKey(cdcDKGGroupKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode Random Beacon group key from EpochRecover event: %w", err)
+	}
+
+	// parse DKG Index Map
+	//
+	// CAUTION: When the Execution or Verification Node serializes the EpochCommit to compute its ID, the DKGIndexMap
+	// is converted from a map to a slice. This is necessary because maps don't have a deterministic order. For *valid*
+	// EpochCommit events, the following convention holds (see DKGIndexMap type declaration for details):
+	//   - For the DKG committee 𝒟, its size is n = |𝒟| = len(DKGIndexMap).
+	//   - The values in DKGIndexMap must form the set {0, 1, …, n-1}, as required by the low level cryptography
+	//     module (convention simplifying the implementation).
+	// Therefore, a valid `DKGIndexMap` can always be represented as an `IdentifierList` slice `s` such that
+	// nodeID := s[i] for i ∈ {0, …, n-1} corresponds to a key value pair (nodeID, i) in DKGIndexMap. The
+	// `EpochCommit.EncodeRLP` method performs this conversion (and panics when the convention is violated).
+	//    Generally, execution should be permissive and forward all system events to the Protocol State, which then
+	// performs comprehensive validity checks and decides whether events are accepted or rejected. However, we can
+	// only compute the ID of an EpochCommit whose DKGIndexMap satisfies the convention above. Furthermore, we do
+	// not want to depend on the System Smart Contracts to _always_ emit valid DKGIndexMap - especially for Epoch
+	// Recovery, where humans provide some of the parameters in the EpochCommit event.
+	//    Therefore, we check here that DKGIndexMap satisfies the convention required by `EncodeRLP` and error
+	// otherwise. When we error here, the corresponding event will just be omitted from `ExecutionResult.ServiceEvents`.
+	// (In contrast, erroring during the ID computation will result in an irrecoverable execution halt, because the
+	// ExecutionResult has already been fully constructed, but can't be broadcast).
+	//    We will only drop service events whose DKGIndexMap is invalid. As the Protocol State will anyway discard
+	// such events, it is fine to not relay them in the first place.
+	dKGIndexMap := make(flow.DKGIndexMap, len(cdcDKGIndexMap.Pairs))
+	for _, pair := range cdcDKGIndexMap.Pairs {
+		nodeID, err := flow.HexStringToIdentifier(string(pair.Key.(cadence.String)))
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode flow.Identifer in DKGIndexMap entry from EpochRecover event: %w", err)
+		}
+		index := pair.Value.(cadence.Int).Int()
+		dKGIndexMap[nodeID] = index
+	}
+
+	commit, err := flow.NewEpochCommit(
+		flow.UntrustedEpochCommit{
+			Counter:            uint64(counter),
+			ClusterQCs:         clusterQCs,
+			DKGGroupKey:        dKGGroupKey,
+			DKGParticipantKeys: dKGParticipantKeys,
+			DKGIndexMap:        dKGIndexMap,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch commit: %w", err)
+	}
+
+	// create the service event
+	epochRecover, err := flow.NewEpochRecover(
+		flow.UntrustedEpochRecover{
+			EpochSetup:  *setup,
+			EpochCommit: *commit,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch recover: %w", err)
+	}
+
+	serviceEvent := &flow.ServiceEvent{
+		Type:  flow.ServiceEventRecover,
+		Event: epochRecover,
+	}
+
+	return serviceEvent, nil
+}
+
+// convertEpochRecoverCollectorClusterAssignments converts collector cluster assignments for EpochRecover event.
+// This is a simplified version compared to the `convertClusterAssignments` function since we are dealing with
+// a list of participants that don't need to be ordered by index or node weights.
+// No errors are expected during normal operation.
+func convertEpochRecoverCollectorClusterAssignments(cdcClusters []cadence.Value) (flow.AssignmentList, error) {
+	// parse cluster assignments to Go types
+	clusterAssignments := make([]flow.IdentifierList, 0, len(cdcClusters))
+	// we are dealing with a nested array where each element is a list of node IDs,
+	// this way we represent the cluster assignments.
+	for _, value := range cdcClusters {
+		cdcCluster, ok := value.(cadence.Array)
+		if !ok {
+			return nil, invalidCadenceTypeError("collectorClusters[i]", cdcCluster, cadence.Array{})
+		}
+
+		clusterMembers := make(flow.IdentifierList, 0, len(cdcCluster.Values))
+		for _, cdcClusterParticipant := range cdcCluster.Values {
+			nodeIDString, ok := cdcClusterParticipant.(cadence.String)
+			if !ok {
+				return nil, invalidCadenceTypeError(
+					"collectorClusters[i][j]",
+					cdcClusterParticipant,
+					cadence.String(""),
+				)
+			}
+
+			nodeID, err := flow.HexStringToIdentifier(string(nodeIDString))
+			if err != nil {
+				return nil, fmt.Errorf(
+					"could not convert hex string to identifer: %w",
+					err,
+				)
+			}
+			clusterMembers = append(clusterMembers, nodeID)
+		}
+
+		// IMPORTANT: for each cluster, node IDs must be in *canonical order*
+		clusterAssignments = append(clusterAssignments, clusterMembers.Sort(flow.IdentifierCanonical))
+	}
+
+	return clusterAssignments, nil
+}
+
 // convertClusterAssignments converts the Cadence representation of cluster
 // assignments included in the EpochSetup into the protocol AssignmentList
 // representation.
+// CONVENTION: for each cluster assignment (i.e. element in `AssignmentList`), the nodeIDs are listed in CANONICAL ORDER
+// No errors are expected during normal operation.
 func convertClusterAssignments(cdcClusters []cadence.Value) (flow.AssignmentList, error) {
-
 	// ensure we don't have duplicate cluster indices
 	indices := make(map[uint]struct{})
 
 	// parse cluster assignments to Go types
-	identifierLists := make([]flow.IdentifierList, len(cdcClusters))
+	clusterAssignments := make([]flow.IdentifierList, len(cdcClusters))
 	for _, value := range cdcClusters {
-
 		cdcCluster, ok := value.(cadence.Struct)
 		if !ok {
 			return nil, invalidCadenceTypeError("cluster", cdcCluster, cadence.Struct{})
-		}
-
-		const expectedFieldCount = 2
-		if len(cdcCluster.Fields) < expectedFieldCount {
-			return nil, fmt.Errorf(
-				"insufficient fields (%d < %d)",
-				len(cdcCluster.Fields),
-				expectedFieldCount,
-			)
 		}
 
 		if cdcCluster.Type() == nil {
 			return nil, fmt.Errorf("cluster struct doesn't have type")
 		}
 
-		// Extract cluster fields
-		var clusterIndex cadence.UInt16
-		var weightsByNodeID cadence.Dictionary
-		var foundFieldCount int
+		fields := cadence.FieldsMappedByName(cdcCluster)
 
-		cdcClusterType := cdcCluster.Type().(*cadence.StructType)
-
-		for i, f := range cdcClusterType.Fields {
-			switch f.Identifier {
-			case "index":
-				foundFieldCount++
-				clusterIndex, ok = cdcCluster.Fields[i].(cadence.UInt16)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"index",
-						cdcCluster.Fields[i],
-						cadence.UInt16(0),
-					)
-				}
-
-			case "nodeWeights":
-				foundFieldCount++
-				weightsByNodeID, ok = cdcCluster.Fields[i].(cadence.Dictionary)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"nodeWeights",
-						cdcCluster.Fields[i],
-						cadence.Dictionary{},
-					)
-				}
-			}
-		}
-
-		if foundFieldCount != expectedFieldCount {
+		const expectedFieldCount = 2
+		if len(fields) < expectedFieldCount {
 			return nil, fmt.Errorf(
-				"cluster struct required fields not found (%d != %d)",
-				foundFieldCount,
+				"insufficient fields (%d < %d)",
+				len(fields),
 				expectedFieldCount,
 			)
 		}
 
+		// Extract cluster fields
+
+		clusterIndex, err := getField[cadence.UInt16](fields, "index")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode cluster struct: %w", err)
+		}
 		// ensure cluster index is valid
 		if int(clusterIndex) >= len(cdcClusters) {
 			return nil, fmt.Errorf(
@@ -430,9 +785,14 @@ func convertClusterAssignments(cdcClusters []cadence.Value) (flow.AssignmentList
 			return nil, fmt.Errorf("duplicate cdcCluster index (%d)", clusterIndex)
 		}
 
-		// read weights to retrieve node IDs of cdcCluster members
-		for _, pair := range weightsByNodeID.Pairs {
+		weightsByNodeID, err := getField[cadence.Dictionary](fields, "nodeWeights")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode cluster struct: %w", err)
+		}
 
+		// read weights to retrieve node IDs of cdcCluster members
+		clusterMembers := make(flow.IdentifierList, 0, len(weightsByNodeID.Pairs))
+		for _, pair := range weightsByNodeID.Pairs {
 			nodeIDString, ok := pair.Key.(cadence.String)
 			if !ok {
 				return nil, invalidCadenceTypeError(
@@ -448,26 +808,24 @@ func convertClusterAssignments(cdcClusters []cadence.Value) (flow.AssignmentList
 					err,
 				)
 			}
-
-			identifierLists[clusterIndex] = append(identifierLists[clusterIndex], nodeID)
+			clusterMembers = append(clusterMembers, nodeID)
 		}
+
+		// IMPORTANT: for each cluster, node IDs must be in *canonical order*
+		clusterAssignments[clusterIndex] = clusterMembers.Sort(flow.IdentifierCanonical)
 	}
 
-	// sort identifier lists in Canonical order
-	assignments := assignment.FromIdentifierLists(identifierLists)
-
-	return assignments, nil
+	return clusterAssignments, nil
 }
 
 // convertParticipants converts the network participants specified in the
 // EpochSetup event into an IdentityList.
-func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, error) {
-
-	participants := make(flow.IdentityList, 0, len(cdcParticipants))
-	var err error
+// CONVENTION: returned IdentityList is in CANONICAL ORDER
+func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentitySkeletonList, error) {
+	participants := make(flow.IdentitySkeletonList, 0, len(cdcParticipants))
 
 	for _, value := range cdcParticipants {
-
+		// checking compliance with expected format
 		cdcNodeInfoStruct, ok := value.(cadence.Struct)
 		if !ok {
 			return nil, invalidCadenceTypeError(
@@ -477,117 +835,58 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 			)
 		}
 
-		const expectedFieldCount = 14
-		if len(cdcNodeInfoStruct.Fields) < expectedFieldCount {
-			return nil, fmt.Errorf(
-				"insufficient fields (%d < %d)",
-				len(cdcNodeInfoStruct.Fields),
-				expectedFieldCount,
-			)
-		}
-
 		if cdcNodeInfoStruct.Type() == nil {
 			return nil, fmt.Errorf("nodeInfo struct doesn't have type")
 		}
 
-		cdcNodeInfoStructType := cdcNodeInfoStruct.Type().(*cadence.StructType)
+		fields := cadence.FieldsMappedByName(cdcNodeInfoStruct)
 
-		const requiredFieldCount = 6
-		var foundFieldCount int
-
-		var nodeIDHex cadence.String
-		var role cadence.UInt8
-		var address cadence.String
-		var networkKeyHex cadence.String
-		var stakingKeyHex cadence.String
-		var initialWeight cadence.UInt64
-
-		for i, f := range cdcNodeInfoStructType.Fields {
-			switch f.Identifier {
-			case "id":
-				foundFieldCount++
-				nodeIDHex, ok = cdcNodeInfoStruct.Fields[i].(cadence.String)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"nodeInfo.id",
-						cdcNodeInfoStruct.Fields[i],
-						cadence.String(""),
-					)
-				}
-
-			case "role":
-				foundFieldCount++
-				role, ok = cdcNodeInfoStruct.Fields[i].(cadence.UInt8)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"nodeInfo.role",
-						cdcNodeInfoStruct.Fields[i],
-						cadence.UInt8(0),
-					)
-				}
-
-			case "networkingAddress":
-				foundFieldCount++
-				address, ok = cdcNodeInfoStruct.Fields[i].(cadence.String)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"nodeInfo.networkingAddress",
-						cdcNodeInfoStruct.Fields[i],
-						cadence.String(""),
-					)
-				}
-
-			case "networkingKey":
-				foundFieldCount++
-				networkKeyHex, ok = cdcNodeInfoStruct.Fields[i].(cadence.String)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"nodeInfo.networkingKey",
-						cdcNodeInfoStruct.Fields[i],
-						cadence.String(""),
-					)
-				}
-
-			case "stakingKey":
-				foundFieldCount++
-				stakingKeyHex, ok = cdcNodeInfoStruct.Fields[i].(cadence.String)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"nodeInfo.stakingKey",
-						cdcNodeInfoStruct.Fields[i],
-						cadence.String(""),
-					)
-				}
-
-			case "initialWeight":
-				foundFieldCount++
-				initialWeight, ok = cdcNodeInfoStruct.Fields[i].(cadence.UInt64)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"nodeInfo.initialWeight",
-						cdcNodeInfoStruct.Fields[i],
-						cadence.UInt64(0),
-					)
-				}
-			}
-		}
-
-		if foundFieldCount != requiredFieldCount {
+		const expectedFieldCount = 14
+		if len(fields) < expectedFieldCount {
 			return nil, fmt.Errorf(
-				"NodeInfo struct required fields not found (%d != %d)",
-				foundFieldCount,
-				requiredFieldCount,
+				"insufficient fields (%d < %d)",
+				len(fields),
+				expectedFieldCount,
 			)
 		}
 
+		nodeIDHex, err := getField[cadence.String](fields, "id")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode nodeInfo struct: %w", err)
+		}
+
+		role, err := getField[cadence.UInt8](fields, "role")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode nodeInfo struct: %w", err)
+		}
 		if !flow.Role(role).Valid() {
 			return nil, fmt.Errorf("invalid role %d", role)
 		}
 
-		identity := &flow.Identity{
-			Address: string(address),
-			Weight:  uint64(initialWeight),
-			Role:    flow.Role(role),
+		address, err := getField[cadence.String](fields, "networkingAddress")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode nodeInfo struct: %w", err)
+		}
+
+		networkKeyHex, err := getField[cadence.String](fields, "networkingKey")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode nodeInfo struct: %w", err)
+		}
+
+		stakingKeyHex, err := getField[cadence.String](fields, "stakingKey")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode nodeInfo struct: %w", err)
+		}
+
+		initialWeight, err := getField[cadence.UInt64](fields, "initialWeight")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode nodeInfo struct: %w", err)
+		}
+
+		identity := &flow.IdentitySkeleton{
+			InitialWeight: uint64(initialWeight),
+			Address:       string(address),
+			Role:          flow.Role(role),
 		}
 
 		// convert nodeID string into identifier
@@ -631,8 +930,107 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 		participants = append(participants, identity)
 	}
 
-	participants = participants.Sort(order.Canonical)
+	// IMPORTANT: returned identities must be in *canonical order*
+	participants = participants.Sort(flow.Canonical[flow.IdentitySkeleton])
 	return participants, nil
+}
+
+// convertClusterQCVoteData converts cluster QC vote data from the EpochRecover event
+// to a representation suitable for inclusion in the protocol state. Votes are
+// aggregated as part of this conversion.
+// TODO(efm-recovery): update this function for new QCVoteData structure (see https://github.com/onflow/flow-go/pull/5943#discussion_r1605267444)
+func convertClusterQCVoteData(cdcClusterQCVoteData []cadence.Value) ([]flow.ClusterQCVoteData, error) {
+	qcVoteDatas := make([]flow.ClusterQCVoteData, 0, len(cdcClusterQCVoteData))
+
+	// CAUTION: Votes are not validated prior to aggregation. This means a single
+	// invalid vote submission will result in a fully invalid QC for that cluster.
+	// Votes must be validated by the ClusterQC smart contract.
+
+	for _, cdcClusterQC := range cdcClusterQCVoteData {
+		cdcClusterQCStruct, ok := cdcClusterQC.(cadence.Struct)
+		if !ok {
+			return nil, invalidCadenceTypeError(
+				"clusterQC",
+				cdcClusterQC,
+				cadence.Struct{},
+			)
+		}
+
+		if cdcClusterQCStruct.Type() == nil {
+			return nil, fmt.Errorf("clusterQCVoteData struct doesn't have type")
+		}
+
+		fields := cadence.FieldsMappedByName(cdcClusterQCStruct)
+
+		const expectedFieldCount = 2
+		if len(fields) < expectedFieldCount {
+			return nil, fmt.Errorf(
+				"insufficient fields (%d < %d)",
+				len(fields),
+				expectedFieldCount,
+			)
+		}
+
+		cdcVoterIDs, err := getField[cadence.Array](fields, "voterIDs")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode clusterQCVoteData struct: %w", err)
+		}
+
+		voterIDs := make([]flow.Identifier, 0, len(cdcVoterIDs.Values))
+		for _, cdcVoterID := range cdcVoterIDs.Values {
+			voterIDHex, ok := cdcVoterID.(cadence.String)
+			if !ok {
+				return nil, invalidCadenceTypeError(
+					"clusterQC[i].voterID",
+					cdcVoterID,
+					cadence.String(""),
+				)
+			}
+			voterID, err := flow.HexStringToIdentifier(string(voterIDHex))
+			if err != nil {
+				return nil, fmt.Errorf("could not convert voter ID from hex: %w", err)
+			}
+			voterIDs = append(voterIDs, voterID)
+		}
+
+		cdcAggSignature, err := getField[cadence.String](fields, "aggregatedSignature")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode clusterQCVoteData struct: %w", err)
+		}
+
+		aggregatedSignature, err := hex.DecodeString(string(cdcAggSignature))
+		if err != nil {
+			return nil, fmt.Errorf("could not convert raw vote from hex: %w", err)
+		}
+
+		// check that aggregated signature is not identity, because an identity signature
+		// is invalid if verified under an identity public key. This can happen in two cases:
+		//  - If the quorum has at least one honest signer, and given all staking key proofs of possession
+		//    are valid, it's extremely unlikely for the aggregated public key (and the corresponding
+		//    aggregated signature) to be identity.
+		//  - If all quorum is malicious and intentionally forge an identity aggregate. As of the previous point,
+		//    this is only possible if there is no honest collector involved in constructing the cluster QC.
+		//    Hence, the cluster would need to contain a supermajority of malicious collectors.
+		//    As we are assuming that the fraction of malicious collectors overall does not exceed 1/3  (measured
+		//    by stake), the probability for randomly assigning 2/3 or more byzantine collectors to a single cluster
+		//    vanishes (provided a sufficiently high collector count in total).
+		//
+		//  Note that at this level, all individual signatures are guaranteed to be valid
+		//  w.r.t their corresponding staking public key. It is therefore enough to check
+		//  the aggregated signature to conclude whether the aggregated public key is identity.
+		//  This check is therefore a sanity check to catch a potential issue early.
+		if crypto.IsBLSSignatureIdentity(aggregatedSignature) {
+			return nil, fmt.Errorf("cluster qc vote aggregation failed because resulting BLS signature is identity")
+		}
+
+		// set the fields on the QC vote data object
+		qcVoteDatas = append(qcVoteDatas, flow.ClusterQCVoteData{
+			SigData:  aggregatedSignature,
+			VoterIDs: voterIDs,
+		})
+	}
+
+	return qcVoteDatas, nil
 }
 
 // convertClusterQCVotes converts raw cluster QC votes from the EpochCommit event
@@ -661,71 +1059,34 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) (
 			)
 		}
 
-		const expectedFieldCount = 4
-		if len(cdcClusterQCStruct.Fields) < expectedFieldCount {
-			return nil, fmt.Errorf(
-				"insufficient fields (%d < %d)",
-				len(cdcClusterQCStruct.Fields),
-				expectedFieldCount,
-			)
-		}
-
 		if cdcClusterQCStruct.Type() == nil {
 			return nil, fmt.Errorf("clusterQC struct doesn't have type")
 		}
 
-		cdcClusterQCStructType := cdcClusterQCStruct.Type().(*cadence.StructType)
+		fields := cadence.FieldsMappedByName(cdcClusterQCStruct)
 
-		const requiredFieldCount = 3
-		var foundFieldCount int
-
-		var index cadence.UInt16
-		var cdcVoterIDs cadence.Array
-		var cdcRawVotes cadence.Array
-
-		for i, f := range cdcClusterQCStructType.Fields {
-			switch f.Identifier {
-			case "index":
-				foundFieldCount++
-				index, ok = cdcClusterQCStruct.Fields[i].(cadence.UInt16)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"ClusterQC.index",
-						cdcClusterQCStruct.Fields[i],
-						cadence.UInt16(0),
-					)
-				}
-
-			case "voteSignatures":
-				foundFieldCount++
-				cdcRawVotes, ok = cdcClusterQCStruct.Fields[i].(cadence.Array)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"clusterQC.voteSignatures",
-						cdcClusterQCStruct.Fields[i],
-						cadence.Array{},
-					)
-				}
-
-			case "voterIDs":
-				foundFieldCount++
-				cdcVoterIDs, ok = cdcClusterQCStruct.Fields[i].(cadence.Array)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"clusterQC.voterIDs",
-						cdcClusterQCStruct.Fields[i],
-						cadence.Array{},
-					)
-				}
-			}
+		const expectedFieldCount = 4
+		if len(fields) < expectedFieldCount {
+			return nil, fmt.Errorf(
+				"insufficient fields (%d < %d)",
+				len(fields),
+				expectedFieldCount,
+			)
 		}
 
-		if foundFieldCount != requiredFieldCount {
-			return nil, fmt.Errorf(
-				"clusterQC struct required fields not found (%d != %d)",
-				foundFieldCount,
-				requiredFieldCount,
-			)
+		index, err := getField[cadence.UInt16](fields, "index")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode clusterQC struct: %w", err)
+		}
+
+		cdcRawVotes, err := getField[cadence.Array](fields, "voteSignatures")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode clusterQC struct: %w", err)
+		}
+
+		cdcVoterIDs, err := getField[cadence.Array](fields, "voterIDs")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode clusterQC struct: %w", err)
 		}
 
 		if int(index) >= len(cdcClusterQCs) {
@@ -815,74 +1176,133 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) (
 	return qcVoteDatas, nil
 }
 
-// convertDKGKeys converts hex-encoded DKG public keys as received by the DKG
+// convertDKGKeys converts hex-encoded public beacon keys as received by the DKG
 // smart contract into crypto.PublicKey representations suitable for inclusion
 // in the protocol state.
-func convertDKGKeys(cdcDKGKeys []cadence.Value) (
-	groupKey crypto.PublicKey,
-	participantKeys []crypto.PublicKey,
-	err error,
-) {
-
-	hexDKGKeys := make([]string, 0, len(cdcDKGKeys))
+func convertDKGKeys(cdcDKGKeys []cadence.Value) ([]crypto.PublicKey, error) {
+	convertedKeys := make([]crypto.PublicKey, 0, len(cdcDKGKeys))
 	for _, value := range cdcDKGKeys {
-		keyHex, ok := value.(cadence.String)
-		if !ok {
-			return nil, nil, invalidCadenceTypeError("dkgKey", value, cadence.String(""))
+		pubKey, err := convertDKGKey(value)
+		if err != nil {
+			return nil, fmt.Errorf("could not decode public beacon key share: %w", err)
 		}
-		hexDKGKeys = append(hexDKGKeys, string(keyHex))
+		convertedKeys = append(convertedKeys, pubKey)
 	}
+	return convertedKeys, nil
+}
 
-	// pop first element - group public key hex string
-	groupPubKeyHex := hexDKGKeys[0]
-	hexDKGKeys = hexDKGKeys[1:]
-
-	// decode group public key
-	groupKeyBytes, err := hex.DecodeString(groupPubKeyHex)
-	if err != nil {
-		return nil, nil, fmt.Errorf(
-			"could not decode group public key into bytes: %w",
-			err,
-		)
-	}
-	groupKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, groupKeyBytes)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not decode group public key: %w", err)
+// convertDKGKey converts a single hex-encoded public beacon keys as received by the DKG
+// smart contract into crypto.PublicKey representations suitable for inclusion
+// in the protocol state.
+func convertDKGKey(cdcDKGKeys cadence.Value) (crypto.PublicKey, error) {
+	// extract string representation from Cadence Value
+	keyHex, ok := cdcDKGKeys.(cadence.String)
+	if !ok {
+		return nil, invalidCadenceTypeError("dkgKey", cdcDKGKeys, cadence.String(""))
 	}
 
 	// decode individual public keys
-	dkgParticipantKeys := make([]crypto.PublicKey, 0, len(hexDKGKeys))
-	for _, pubKeyString := range hexDKGKeys {
-
-		pubKeyBytes, err := hex.DecodeString(pubKeyString)
-		if err != nil {
-			return nil, nil, fmt.Errorf(
-				"could not decode individual public key into bytes: %w",
-				err,
-			)
-		}
-		pubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pubKeyBytes)
-		if err != nil {
-			return nil, nil, fmt.Errorf("could not decode dkg public key: %w", err)
-		}
-		dkgParticipantKeys = append(dkgParticipantKeys, pubKey)
+	pubKeyBytes, err := hex.DecodeString(string(keyHex))
+	if err != nil {
+		return nil, fmt.Errorf("converting hex to bytes failed: %w", err)
 	}
-
-	return groupKey, dkgParticipantKeys, nil
+	pubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pubKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode bytes into a public key: %w", err)
+	}
+	return pubKey, nil
 }
 
 func invalidCadenceTypeError(
 	fieldName string,
 	actualType, expectedType cadence.Value,
 ) error {
+	// NOTE: This error is reported if the Go-types are different (not if Cadence types are different).
+	// Therefore, print the Go-type instead of cadence type.
+	// Cadence type can be `nil`, since the `expectedType` is always the zero-value of the Go type.
 	return fmt.Errorf(
-		"invalid Cadence type for field %s (got=%s, expected=%s)",
+		"invalid Cadence type for field %s (got=%T, expected=%T)",
 		fieldName,
-		actualType.Type().ID(),
-		expectedType.Type().ID(),
+		actualType,
+		expectedType,
 	)
 }
 
+// convertServiceEventProtocolStateVersionUpgrade converts a Cadence instance of the VersionBeacon
+// service event to the protocol-internal representation.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
+func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.ServiceEvent, error) {
+	payload, err := ccf.Decode(nil, event.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
+	}
+
+	versionUpgrade, err := DecodeCadenceValue("ProtocolStateVersionUpgrade payload", payload,
+		func(cdcEvent cadence.Event) (*flow.ProtocolStateVersionUpgrade, error) {
+
+			if cdcEvent.Type() == nil {
+				return nil, fmt.Errorf("ProtocolStateVersionUpgrade event doesn't have type")
+			}
+
+			fields := cadence.FieldsMappedByName(cdcEvent)
+
+			const expectedFieldCount = 2
+			if len(fields) < expectedFieldCount {
+				return nil, fmt.Errorf("unexpected number of fields in ProtocolStateVersionUpgrade (%d < %d)",
+					len(fields), expectedFieldCount)
+			}
+
+			newProtocolVersionValue, err := getField[cadence.Value](fields, "newProtocolVersion")
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode VersionBeacon event: %w", err)
+			}
+
+			activeViewValue, err := getField[cadence.Value](fields, "activeView")
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode VersionBeacon event: %w", err)
+			}
+
+			newProtocolVersion, err := DecodeCadenceValue(
+				".newProtocolVersion", newProtocolVersionValue, func(cadenceVal cadence.UInt64) (uint64, error) {
+					return uint64(cadenceVal), err
+				},
+			)
+			if err != nil {
+				return nil, err
+			}
+			activeView, err := DecodeCadenceValue(
+				".activeView", activeViewValue, func(cadenceVal cadence.UInt64) (uint64, error) {
+					return uint64(cadenceVal), err
+				},
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			return &flow.ProtocolStateVersionUpgrade{
+				NewProtocolStateVersion: newProtocolVersion,
+				ActiveView:              activeView,
+			}, nil
+		})
+	if err != nil {
+		return nil, fmt.Errorf("could not decode cadence value: %w", err)
+	}
+
+	// create the service event
+	serviceEvent := &flow.ServiceEvent{
+		Type:  flow.ServiceEventProtocolStateVersionUpgrade,
+		Event: versionUpgrade,
+	}
+	return serviceEvent, nil
+}
+
+// convertServiceEventVersionBeacon converts a Cadence instance of the VersionBeacon
+// service event to the protocol-internal representation.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
 func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, error) {
 	payload, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
@@ -890,53 +1310,38 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 	}
 
 	versionBeacon, err := DecodeCadenceValue(
-		"VersionBeacon payload", payload, func(cdcEvent cadence.Event) (
-			flow.VersionBeacon,
-			error,
-		) {
-			const expectedFieldCount = 2
-			if len(cdcEvent.Fields) != expectedFieldCount {
-				return flow.VersionBeacon{}, fmt.Errorf(
-					"unexpected number of fields in VersionBeacon event (%d != %d)",
-					len(cdcEvent.Fields),
-					expectedFieldCount,
-				)
-			}
+		"VersionBeacon payload", payload, func(cdcEvent cadence.Event) (*flow.VersionBeacon, error) {
 
 			if cdcEvent.Type() == nil {
-				return flow.VersionBeacon{}, fmt.Errorf("VersionBeacon event doesn't have type")
+				return nil, fmt.Errorf("VersionBeacon event doesn't have type")
 			}
 
-			var versionBoundariesValue, sequenceValue cadence.Value
-			var foundFieldCount int
+			fields := cadence.FieldsMappedByName(cdcEvent)
 
-			evt := cdcEvent.Type().(*cadence.EventType)
-
-			for i, f := range evt.Fields {
-				switch f.Identifier {
-				case "versionBoundaries":
-					foundFieldCount++
-					versionBoundariesValue = cdcEvent.Fields[i]
-
-				case "sequence":
-					foundFieldCount++
-					sequenceValue = cdcEvent.Fields[i]
-				}
-			}
-
-			if foundFieldCount != expectedFieldCount {
-				return flow.VersionBeacon{}, fmt.Errorf(
-					"VersionBeacon event required fields not found (%d != %d)",
-					foundFieldCount,
+			const expectedFieldCount = 2
+			if len(fields) != expectedFieldCount {
+				return nil, fmt.Errorf(
+					"unexpected number of fields in VersionBeacon event (%d != %d)",
+					len(fields),
 					expectedFieldCount,
 				)
+			}
+
+			versionBoundariesValue, err := getField[cadence.Value](fields, "versionBoundaries")
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode VersionBeacon event: %w", err)
+			}
+
+			sequenceValue, err := getField[cadence.Value](fields, "sequence")
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode VersionBeacon event: %w", err)
 			}
 
 			versionBoundaries, err := DecodeCadenceValue(
 				".versionBoundaries", versionBoundariesValue, convertVersionBoundaries,
 			)
 			if err != nil {
-				return flow.VersionBeacon{}, err
+				return nil, err
 			}
 
 			sequence, err := DecodeCadenceValue(
@@ -948,10 +1353,10 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 				},
 			)
 			if err != nil {
-				return flow.VersionBeacon{}, err
+				return nil, err
 			}
 
-			return flow.VersionBeacon{
+			return &flow.VersionBeacon{
 				VersionBoundaries: versionBoundaries,
 				Sequence:          sequence,
 			}, err
@@ -969,7 +1374,7 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 	// create the service event
 	serviceEvent := &flow.ServiceEvent{
 		Type:  flow.ServiceEventVersionBeacon,
-		Event: &versionBeacon,
+		Event: versionBeacon,
 	}
 
 	return serviceEvent, nil
@@ -982,82 +1387,12 @@ func convertVersionBoundaries(array cadence.Array) (
 	boundaries := make([]flow.VersionBoundary, len(array.Values))
 
 	for i, cadenceVal := range array.Values {
-		boundary, err := DecodeCadenceValue(
-			fmt.Sprintf(".Values[%d]", i),
-			cadenceVal,
-			func(structVal cadence.Struct) (
-				flow.VersionBoundary,
-				error,
-			) {
-				const expectedFieldCount = 2
-				if len(structVal.Fields) < expectedFieldCount {
-					return flow.VersionBoundary{}, fmt.Errorf(
-						"incorrect number of fields (%d != %d)",
-						len(structVal.Fields),
-						expectedFieldCount,
-					)
-				}
-
-				if structVal.Type() == nil {
-					return flow.VersionBoundary{}, fmt.Errorf("VersionBoundary struct doesn't have type")
-				}
-
-				var blockHeightValue, versionValue cadence.Value
-				var foundFieldCount int
-
-				structValType := structVal.Type().(*cadence.StructType)
-
-				for i, f := range structValType.Fields {
-					switch f.Identifier {
-					case "blockHeight":
-						foundFieldCount++
-						blockHeightValue = structVal.Fields[i]
-
-					case "version":
-						foundFieldCount++
-						versionValue = structVal.Fields[i]
-					}
-				}
-
-				if foundFieldCount != expectedFieldCount {
-					return flow.VersionBoundary{}, fmt.Errorf(
-						"VersionBoundaries struct required fields not found (%d != %d)",
-						foundFieldCount,
-						expectedFieldCount,
-					)
-				}
-
-				height, err := DecodeCadenceValue(
-					".blockHeight",
-					blockHeightValue,
-					func(cadenceVal cadence.UInt64) (
-						uint64,
-						error,
-					) {
-						return uint64(cadenceVal), nil
-					},
-				)
-				if err != nil {
-					return flow.VersionBoundary{}, err
-				}
-
-				version, err := DecodeCadenceValue(
-					".version",
-					versionValue,
-					convertSemverVersion,
-				)
-				if err != nil {
-					return flow.VersionBoundary{}, err
-				}
-
-				return flow.VersionBoundary{
-					BlockHeight: height,
-					Version:     version,
-				}, nil
-			},
-		)
+		boundary, err := VersionBoundary(cadenceVal)
 		if err != nil {
-			return nil, err
+			return nil, decodeError{
+				location: fmt.Sprintf(".Values[%d]", i),
+				err:      err,
+			}
 		}
 		boundaries[i] = boundary
 	}
@@ -1065,54 +1400,112 @@ func convertVersionBoundaries(array cadence.Array) (
 	return boundaries, nil
 }
 
+// VersionBoundary decodes a single version boundary from the given Cadence value.
+func VersionBoundary(value cadence.Value) (
+	flow.VersionBoundary,
+	error,
+) {
+	boundary, err := DecodeCadenceValue(
+		"VersionBoundary",
+		value,
+		func(structVal cadence.Struct) (
+			flow.VersionBoundary,
+			error,
+		) {
+			if structVal.Type() == nil {
+				return flow.VersionBoundary{}, fmt.Errorf("VersionBoundary struct doesn't have type")
+			}
+
+			fields := cadence.FieldsMappedByName(structVal)
+
+			const expectedFieldCount = 2
+			if len(fields) < expectedFieldCount {
+				return flow.VersionBoundary{}, fmt.Errorf(
+					"incorrect number of fields (%d != %d)",
+					len(fields),
+					expectedFieldCount,
+				)
+			}
+
+			blockHeightValue, err := getField[cadence.Value](fields, "blockHeight")
+			if err != nil {
+				return flow.VersionBoundary{}, fmt.Errorf("failed to decode VersionBoundary struct: %w", err)
+			}
+
+			versionValue, err := getField[cadence.Value](fields, "version")
+			if err != nil {
+				return flow.VersionBoundary{}, fmt.Errorf("failed to decode VersionBoundary struct: %w", err)
+			}
+
+			height, err := DecodeCadenceValue(
+				".blockHeight",
+				blockHeightValue,
+				func(cadenceVal cadence.UInt64) (
+					uint64,
+					error,
+				) {
+					return uint64(cadenceVal), nil
+				},
+			)
+			if err != nil {
+				return flow.VersionBoundary{}, err
+			}
+
+			version, err := DecodeCadenceValue(
+				".version",
+				versionValue,
+				convertSemverVersion,
+			)
+			if err != nil {
+				return flow.VersionBoundary{}, err
+			}
+
+			return flow.VersionBoundary{
+				BlockHeight: height,
+				Version:     version,
+			}, nil
+		},
+	)
+	return boundary, err
+}
+
 func convertSemverVersion(structVal cadence.Struct) (
 	string,
 	error,
 ) {
-	const expectedFieldCount = 4
-	if len(structVal.Fields) < expectedFieldCount {
-		return "", fmt.Errorf(
-			"incorrect number of fields (%d != %d)",
-			len(structVal.Fields),
-			expectedFieldCount,
-		)
-	}
-
 	if structVal.Type() == nil {
 		return "", fmt.Errorf("Semver struct doesn't have type")
 	}
 
-	var majorValue, minorValue, patchValue, preReleaseValue cadence.Value
-	var foundFieldCount int
+	fields := cadence.FieldsMappedByName(structVal)
 
-	structValType := structVal.Type().(*cadence.StructType)
-
-	for i, f := range structValType.Fields {
-		switch f.Identifier {
-		case "major":
-			foundFieldCount++
-			majorValue = structVal.Fields[i]
-
-		case "minor":
-			foundFieldCount++
-			minorValue = structVal.Fields[i]
-
-		case "patch":
-			foundFieldCount++
-			patchValue = structVal.Fields[i]
-
-		case "preRelease":
-			foundFieldCount++
-			preReleaseValue = structVal.Fields[i]
-		}
-	}
-
-	if foundFieldCount != expectedFieldCount {
+	const expectedFieldCount = 4
+	if len(fields) < expectedFieldCount {
 		return "", fmt.Errorf(
-			"Semver struct required fields not found (%d != %d)",
-			foundFieldCount,
+			"incorrect number of fields (%d != %d)",
+			len(fields),
 			expectedFieldCount,
 		)
+	}
+
+	majorValue, err := getField[cadence.Value](fields, "major")
+	if err != nil {
+		return "", fmt.Errorf("failed to decode SemVer struct: %w", err)
+	}
+
+	minorValue, err := getField[cadence.Value](fields, "minor")
+	if err != nil {
+		return "", fmt.Errorf("failed to decode SemVer struct: %w", err)
+	}
+
+	patchValue, err := getField[cadence.Value](fields, "patch")
+	if err != nil {
+		return "", fmt.Errorf("failed to decode SemVer struct: %w", err)
+	}
+
+	preReleaseValue, err := getField[cadence.Value](fields, "preRelease")
+	if err != nil {
+		return "", fmt.Errorf("failed to decode SemVer struct: %w", err)
 	}
 
 	major, err := DecodeCadenceValue(

@@ -8,6 +8,6 @@ type Params struct {
 	state *State
 }
 
-func (p *Params) ChainID() (flow.ChainID, error) {
-	return p.state.clusterID, nil
+func (p *Params) ChainID() flow.ChainID {
+	return p.state.clusterID
 }

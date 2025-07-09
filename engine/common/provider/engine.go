@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
-	"github.com/vmihailenco/msgpack"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/provider/internal"
@@ -52,7 +52,7 @@ type Engine struct {
 	channel        channels.Channel
 	requestHandler *engine.MessageHandler
 	requestQueue   engine.MessageStore
-	selector       flow.IdentityFilter
+	selector       flow.IdentityFilter[flow.Identity]
 	retrieve       RetrieveFunc
 	// buffered channel for EntityRequest workers to pick and process.
 	requestChannel chan *internal.EntityRequest
@@ -72,13 +72,13 @@ func New(
 	requestQueue engine.MessageStore,
 	requestWorkers uint,
 	channel channels.Channel,
-	selector flow.IdentityFilter,
+	selector flow.IdentityFilter[flow.Identity],
 	retrieve RetrieveFunc) (*Engine, error) {
 
 	// make sure we don't respond to request sent by self or unauthorized nodes
 	selector = filter.And(
 		selector,
-		filter.Not(filter.HasNodeID(me.NodeID())),
+		filter.Not(filter.HasNodeID[flow.Identity](me.NodeID())),
 	)
 
 	handler := engine.NewMessageHandler(
@@ -198,7 +198,7 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 	// for the handler to make sure the requester is authorized for this resource
 	requesters, err := e.state.Final().Identities(filter.And(
 		e.selector,
-		filter.HasNodeID(request.OriginId)),
+		filter.HasNodeID[flow.Identity](request.OriginId)),
 	)
 	if err != nil {
 		return fmt.Errorf("could not get requesters: %w", err)
@@ -266,7 +266,7 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 	e.log.Info().
 		Str("origin_id", request.OriginId.String()).
 		Strs("entity_ids", flow.IdentifierList(entityIDs).Strings()).
-		Uint64("nonce", request.Nonce). // to match with the the entity request received log
+		Uint64("nonce", request.Nonce). // to match with the entity request received log
 		Msg("entity response sent")
 
 	return nil
@@ -343,8 +343,14 @@ func (e *Engine) processEntityRequestWorker(ctx irrecoverable.SignalerContext, r
 		lg.Trace().Msg("worker picked up entity request for processing")
 		err := e.onEntityRequest(request)
 		if err != nil {
-			if engine.IsInvalidInputError(err) || engine.IsNetworkTransmissionError(err) {
-				lg.Error().Err(err).Msg("worker could not process entity request")
+			if engine.IsInvalidInputError(err) {
+				// log at debug level since nodes that recently unstaked are allowed to communicate over
+				// the network, but not allowed to request entities. Even an honest node may have been
+				// behind processing blocks and inadvertently continue requesting entities after they
+				// have left the network.
+				lg.Debug().Err(err).Msg("could not process entity request: invalid request")
+			} else if engine.IsNetworkTransmissionError(err) {
+				lg.Error().Err(err).Msg("could not process entity request: transmit error")
 			} else {
 				// this is an unexpected error, we crash the node.
 				ctx.Throw(err)

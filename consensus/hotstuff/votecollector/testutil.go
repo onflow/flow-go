@@ -1,13 +1,13 @@
 package votecollector
 
 import (
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -22,12 +22,12 @@ type VoteProcessorTestSuiteBase struct {
 
 	stakingAggregator *mockhotstuff.WeightedSignatureAggregator
 	minRequiredWeight uint64
-	proposal          *model.Proposal
+	proposal          *model.SignedProposal
 }
 
 func (s *VoteProcessorTestSuiteBase) SetupTest() {
 	s.stakingAggregator = &mockhotstuff.WeightedSignatureAggregator{}
-	s.proposal = helper.MakeProposal()
+	s.proposal = helper.MakeSignedProposal()
 
 	// let's assume we have 19 nodes each with weight 100
 	s.sigWeight = 100

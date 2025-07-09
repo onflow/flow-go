@@ -1,6 +1,8 @@
 package p2pconfig
 
 import (
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -61,6 +63,9 @@ const (
 	PeerScoringEnabledKey   = "peer-scoring-enabled"
 	ScoreParamsKey          = "scoring-parameters"
 	SubscriptionProviderKey = "subscription-provider"
+	PeerGaterKey            = "peer-gater"
+	SourceDecayKey          = "source-decay"
+	TopicDeliveryWeightsKey = "topic-delivery-weights-override"
 )
 
 // GossipSubParameters is the configuration for the GossipSub pubsub implementation.
@@ -76,65 +81,42 @@ type GossipSubParameters struct {
 	PeerScoringEnabled   bool                           `mapstructure:"peer-scoring-enabled"`
 	SubscriptionProvider SubscriptionProviderParameters `mapstructure:"subscription-provider"`
 	ScoringParameters    ScoringParameters              `mapstructure:"scoring-parameters"`
+
+	// PeerGaterEnabled enables the peer gater.
+	PeerGaterEnabled bool `mapstructure:"peer-gater-enabled"`
+	// PeerGaterSourceDecay the per IP decay for all counters tracked by the peer gater for a peer.
+	PeerGaterSourceDecay time.Duration `mapstructure:"peer-gater-source-decay"`
+	// PeerGaterTopicDeliveryWeightsOverride topic delivery weights that will override the default value for the specified channel.
+	// This is a comma separated list "channel:weight, channel2:weight, channel3:weight".
+	// i.e: consensus-committee: 1.5, sync-committee: .75
+	PeerGaterTopicDeliveryWeightsOverride string `mapstructure:"peer-gater-topic-delivery-weights-override"`
 }
 
 const (
-	AppSpecificScoreRegistryKey = "app-specific-score"
-	SpamRecordCacheKey          = "spam-record-cache"
-	DecayIntervalKey            = "decay-interval"
+	DecayIntervalKey = "decay-interval"
 )
 
 // ScoringParameters are the parameters for the score option.
 // Parameters are "numerical values" that are used to compute or build components that compute the score of a peer in GossipSub system.
 type ScoringParameters struct {
-	AppSpecificScore AppSpecificScoreParameters `validate:"required" mapstructure:"app-specific-score"`
-	SpamRecordCache  SpamRecordCacheParameters  `validate:"required" mapstructure:"spam-record-cache"`
-	// DecayInterval is the interval at which the counters associated with a peer behavior in GossipSub system are decayed.
-	DecayInterval time.Duration `validate:"gt=0s" mapstructure:"decay-interval"`
+	PeerScoring               PeerScoringParameters     `validate:"required" mapstructure:"peer-scoring"`
+	ScoringRegistryParameters ScoringRegistryParameters `validate:"required" mapstructure:"scoring-registry"`
 }
 
-const (
-	ScoreUpdateWorkerNumKey        = "score-update-worker-num"
-	ScoreUpdateRequestQueueSizeKey = "score-update-request-queue-size"
-	ScoreTTLKey                    = "score-ttl"
-)
+// PeerGaterTopicDeliveryWeights returns the topic delivery weights configured on this struct as a map[string]float64 .
+// Note: When new topic delivery weights are added to the struct this func should be updated.
+func (g *GossipSubParameters) PeerGaterTopicDeliveryWeights() (map[string]float64, error) {
+	m := make(map[string]float64)
+	for _, weightConfig := range strings.Split(g.PeerGaterTopicDeliveryWeightsOverride, ",") {
+		wc := strings.Split(weightConfig, ":")
+		f, err := strconv.ParseFloat(strings.TrimSpace(wc[1]), 64)
+		if err != nil {
+			return nil, err
+		}
+		m[strings.TrimSpace(wc[0])] = f
+	}
 
-// AppSpecificScoreParameters is the parameters for the GossipSubAppSpecificScoreRegistry.
-// Parameters are "numerical values" that are used to compute or build components that compute or maintain the application specific score of peers.
-type AppSpecificScoreParameters struct {
-	// ScoreUpdateWorkerNum is the number of workers in the worker pool for handling the application specific score update of peers in a non-blocking way.
-	ScoreUpdateWorkerNum int `validate:"gt=0" mapstructure:"score-update-worker-num"`
-
-	// ScoreUpdateRequestQueueSize is the size of the worker pool for handling the application specific score update of peers in a non-blocking way.
-	ScoreUpdateRequestQueueSize uint32 `validate:"gt=0" mapstructure:"score-update-request-queue-size"`
-
-	// ScoreTTL is the time to live of the application specific score of a peer; the registry keeps a cached copy of the
-	// application specific score of a peer for this duration. When the duration expires, the application specific score
-	// of the peer is updated asynchronously. As long as the update is in progress, the cached copy of the application
-	// specific score of the peer is used even if it is expired.
-	ScoreTTL time.Duration `validate:"required" mapstructure:"score-ttl"`
-}
-
-const (
-	PenaltyDecaySlowdownThresholdKey = "penalty-decay-slowdown-threshold"
-	DecayRateReductionFactorKey      = "penalty-decay-rate-reduction-factor"
-	PenaltyDecayEvaluationPeriodKey  = "penalty-decay-evaluation-period"
-)
-
-type SpamRecordCacheParameters struct {
-	// CacheSize is size of the cache used to store the spam records of peers.
-	// The spam records are used to penalize peers that send invalid messages.
-	CacheSize uint32 `validate:"gt=0" mapstructure:"cache-size"`
-
-	// PenaltyDecaySlowdownThreshold defines the penalty level which the decay rate is reduced by `DecayRateReductionFactor` every time the penalty of a node falls below the threshold, thereby slowing down the decay process.
-	// This mechanism ensures that malicious nodes experience longer decay periods, while honest nodes benefit from quicker decay.
-	PenaltyDecaySlowdownThreshold float64 `validate:"lt=0" mapstructure:"penalty-decay-slowdown-threshold"`
-
-	// DecayRateReductionFactor defines the value by which the decay rate is decreased every time the penalty is below the PenaltyDecaySlowdownThreshold. A reduced decay rate extends the time it takes for penalties to diminish.
-	DecayRateReductionFactor float64 `validate:"gt=0,lt=1" mapstructure:"penalty-decay-rate-reduction-factor"`
-
-	// PenaltyDecayEvaluationPeriod defines the interval at which the decay for a spam record is okay to be adjusted.
-	PenaltyDecayEvaluationPeriod time.Duration `validate:"gt=0" mapstructure:"penalty-decay-evaluation-period"`
+	return m, nil
 }
 
 // SubscriptionProviderParameters keys.
@@ -157,15 +139,19 @@ type SubscriptionProviderParameters struct {
 
 // GossipSubTracerParameters keys.
 const (
-	LocalMeshLogIntervalKey         = "local-mesh-logging-interval"
-	ScoreTracerIntervalKey          = "score-tracer-interval"
-	RPCSentTrackerCacheSizeKey      = "rpc-sent-tracker-cache-size"
-	RPCSentTrackerQueueCacheSizeKey = "rpc-sent-tracker-queue-cache-size"
-	RPCSentTrackerNumOfWorkersKey   = "rpc-sent-tracker-workers"
+	LocalMeshLogIntervalKey              = "local-mesh-logging-interval"
+	ScoreTracerIntervalKey               = "score-tracer-interval"
+	RPCSentTrackerCacheSizeKey           = "rpc-sent-tracker-cache-size"
+	RPCSentTrackerQueueCacheSizeKey      = "rpc-sent-tracker-queue-cache-size"
+	RPCSentTrackerNumOfWorkersKey        = "rpc-sent-tracker-workers"
+	DuplicateMessageCacheTrackerKey      = "duplicate-message-tracker"
+	DuplicateMessageCacheTrackerSizeKey  = "cache-size"
+	DuplicateMessageCacheTrackerDecayKey = "decay"
 )
 
 // GossipSubTracerParameters is the config for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.
 type GossipSubTracerParameters struct {
+	DuplicateMessageTrackerConfig DuplicateMessageTrackerConfig `validate:"required" mapstructure:"duplicate-message-tracker"`
 	// LocalMeshLogInterval is the interval at which the local mesh is logged.
 	LocalMeshLogInterval time.Duration `validate:"gt=0s" mapstructure:"local-mesh-logging-interval"`
 	// ScoreTracerInterval is the interval at which the score tracer logs the peer scores.
@@ -176,6 +162,16 @@ type GossipSubTracerParameters struct {
 	RPCSentTrackerQueueCacheSize uint32 `validate:"gt=0" mapstructure:"rpc-sent-tracker-queue-cache-size"`
 	// RpcSentTrackerNumOfWorkers number of workers for rpc sent tracker worker pool.
 	RpcSentTrackerNumOfWorkers int `validate:"gt=0" mapstructure:"rpc-sent-tracker-workers"`
+}
+
+// DuplicateMessageTrackerConfig duplicate message cache config.
+type DuplicateMessageTrackerConfig struct {
+	// CacheSize cache size of the gossipsub duplicate message tracker.
+	CacheSize uint32 `validate:"gt=0" mapstructure:"cache-size"`
+	// Decay rate of decay for the peer duplicate message counters.
+	Decay float64 `validate:"gt=0,lt=1" mapstructure:"decay"`
+	// SkipDecayThreshold the threshold for which when the counter is below this value, the decay function will not be called
+	SkipDecayThreshold float64 `validate:"gt=0,lt=1" mapstructure:"skip-decay-threshold"`
 }
 
 // ResourceScope is the scope of the resource, e.g., system, transient, protocol, peer, peer-protocol.

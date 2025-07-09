@@ -3,7 +3,8 @@ package environment
 import (
 	"context"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -16,7 +17,7 @@ const (
 	ComputationKindVerifySignature
 	ComputationKindAddAccountKey
 	ComputationKindAddEncodedAccountKey
-	ComputationKindAllocateStorageIndex
+	ComputationKindAllocateSlabIndex
 	ComputationKindCreateAccount
 	ComputationKindEmitEvent
 	ComputationKindGenerateUUID
@@ -35,8 +36,8 @@ const (
 	ComputationKindRemoveAccountContractCode
 	ComputationKindResolveLocation
 	ComputationKindRevokeAccountKey
-	ComputationKindRevokeEncodedAccountKey
-	_
+	_ // removed, DO NOT REUSE
+	_ // removed, DO NOT REUSE
 	ComputationKindSetValue
 	ComputationKindUpdateAccountContractCode
 	ComputationKindValidatePublicKey
@@ -57,19 +58,26 @@ const (
 	ComputationKindEVMDecodeABI
 )
 
-type Meter interface {
-	MeterComputation(common.ComputationKind, uint) error
-	ComputationUsed() (uint64, error)
-	ComputationIntensities() meter.MeteredComputationIntensities
-	ComputationAvailable(common.ComputationKind, uint) bool
+// MainnetExecutionEffortWeights are the execution effort weights as they are
+// on mainnet from crescendo spork
+var MainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
+	common.ComputationKindStatement:          314,
+	common.ComputationKindLoop:               314,
+	common.ComputationKindFunctionInvocation: 314,
+	ComputationKindGetValue:                  162,
+	ComputationKindCreateAccount:             567534,
+	ComputationKindSetValue:                  153,
+	ComputationKindEVMGasUsage:               13,
+}
 
-	MeterMemory(usage common.MemoryUsage) error
-	MemoryUsed() (uint64, error)
+type Meter interface {
+	runtime.MeterInterface
+
+	ComputationIntensities() meter.MeteredComputationIntensities
+	ComputationAvailable(common.ComputationUsage) bool
 
 	MeterEmittedEvent(byteSize uint64) error
 	TotalEmittedEventBytes() uint64
-
-	InteractionUsed() (uint64, error)
 }
 
 type meterImpl struct {
@@ -82,22 +90,20 @@ func NewMeter(txnState state.NestedTransactionPreparer) Meter {
 	}
 }
 
-func (meter *meterImpl) MeterComputation(
-	kind common.ComputationKind,
-	intensity uint,
-) error {
-	return meter.txnState.MeterComputation(kind, intensity)
+func (meter *meterImpl) MeterComputation(usage common.ComputationUsage) error {
+	return meter.txnState.MeterComputation(usage)
 }
 
 func (meter *meterImpl) ComputationIntensities() meter.MeteredComputationIntensities {
 	return meter.txnState.ComputationIntensities()
 }
 
-func (meter *meterImpl) ComputationAvailable(
-	kind common.ComputationKind,
-	intensity uint,
-) bool {
-	return meter.txnState.ComputationAvailable(kind, intensity)
+func (meter *meterImpl) ComputationAvailable(usage common.ComputationUsage) bool {
+	return meter.txnState.ComputationAvailable(usage)
+}
+
+func (meter *meterImpl) ComputationRemaining(kind common.ComputationKind) uint64 {
+	return meter.txnState.ComputationRemaining(kind)
 }
 
 func (meter *meterImpl) ComputationUsed() (uint64, error) {
@@ -105,7 +111,7 @@ func (meter *meterImpl) ComputationUsed() (uint64, error) {
 }
 
 func (meter *meterImpl) MeterMemory(usage common.MemoryUsage) error {
-	return meter.txnState.MeterMemory(usage.Kind, uint(usage.Amount))
+	return meter.txnState.MeterMemory(usage)
 }
 
 func (meter *meterImpl) MemoryUsed() (uint64, error) {
@@ -142,10 +148,7 @@ func NewCancellableMeter(
 	}
 }
 
-func (meter *cancellableMeter) MeterComputation(
-	kind common.ComputationKind,
-	intensity uint,
-) error {
+func (meter *cancellableMeter) MeterComputation(usage common.ComputationUsage) error {
 	// this method is called on every unit of operation, so
 	// checking the context here is the most likely would capture
 	// timeouts or cancellation as soon as they happen, though
@@ -164,5 +167,5 @@ func (meter *cancellableMeter) MeterComputation(
 		// do nothing
 	}
 
-	return meter.meterImpl.MeterComputation(kind, intensity)
+	return meter.meterImpl.MeterComputation(usage)
 }

@@ -4,13 +4,14 @@ package bootstrap
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
+
+	"github.com/onflow/crypto"
+	"golang.org/x/exp/slices"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -25,9 +26,9 @@ const (
 )
 
 const (
-	DefaultMachineAccountSignAlgo      = sdkcrypto.ECDSA_P256
-	DefaultMachineAccountHashAlgo      = sdkcrypto.SHA3_256
-	DefaultMachineAccountKeyIndex uint = 0
+	DefaultMachineAccountSignAlgo        = sdkcrypto.ECDSA_P256
+	DefaultMachineAccountHashAlgo        = sdkcrypto.SHA3_256
+	DefaultMachineAccountKeyIndex uint32 = 0
 )
 
 // ErrMissingPrivateInfo is returned when a method is called on NodeInfo
@@ -55,7 +56,7 @@ type NodeMachineAccountInfo struct {
 	EncodedPrivateKey []byte
 
 	// KeyIndex is the index of the key in the associated machine account
-	KeyIndex uint
+	KeyIndex uint32
 
 	// SigningAlgorithm is the algorithm used by the machine account along with
 	// the above private key to create cryptographic signatures
@@ -158,6 +159,7 @@ type NodeInfoPub struct {
 	Weight        uint64
 	NetworkPubKey encodable.NetworkPubKey
 	StakingPubKey encodable.StakingPubKey
+	StakingPoP    encodable.StakingKeyPoP
 }
 
 // decodableNodeInfoPub provides backward-compatible decoding of old models
@@ -169,6 +171,7 @@ type decodableNodeInfoPub struct {
 	Weight        uint64
 	NetworkPubKey encodable.NetworkPubKey
 	StakingPubKey encodable.StakingPubKey
+	StakingPoP    encodable.StakingKeyPoP
 	// Stake previously was used in place of the Weight field.
 	// Deprecated: supported in decoding for backward-compatibility
 	Stake uint64
@@ -205,6 +208,7 @@ func (info *NodeInfoPub) UnmarshalJSON(b []byte) error {
 	info.Weight = decodable.Weight
 	info.NetworkPubKey = decodable.NetworkPubKey
 	info.StakingPubKey = decodable.StakingPubKey
+	info.StakingPoP = decodable.StakingPoP
 	return nil
 }
 
@@ -222,6 +226,16 @@ type NodePrivateKeys struct {
 // A NodeInfo instance can contain EITHER public keys OR private keys, not both.
 // This can be ensured by using only using the provided constructors and NOT
 // manually constructing an instance.
+//
+// Deprecated: There is a concern about the current usage pattern of `NodeInfo“.
+// There are no build-time enforcements of using `NodeInfo` for either the private or public usage. The struct
+// can mistakenly be used for both cases. Other than introducing a confusing design, developers can accidentally
+// confuse the private usage as a public one, for instance by writing the private info (including the private
+// keys) into a file that is publicly shared.
+// There is an ongoing attempt to replace `NodeInfo` by the explicit structures `NodeInfoPriv` and `NodeInfoPub`
+// in https://github.com/onflow/flow-go/pull/7476.
+// It is recommended to not use `NodeInfo` in new code development in order to limit the structure usage, and to
+// use `NodeInfoPriv` and `NodeInfoPub` instead.
 type NodeInfo struct {
 
 	// NodeID is the unique identifier of the node in the network
@@ -238,11 +252,17 @@ type NodeInfo struct {
 	// Weight is the weight of the node
 	Weight uint64
 
-	// key information is private
-	networkPubKey  crypto.PublicKey
+	// PRIVATE Variant:
 	networkPrivKey crypto.PrivateKey
-	stakingPubKey  crypto.PublicKey
 	stakingPrivKey crypto.PrivateKey
+
+	// By convention, `NodeInfo` must either include the public fields and exclude the private fields, or
+	// vice versa. Mixtures are not allowed. Please check function [NodeInfoType] for the precise convention.
+	//
+	// PUBLIC Variant:
+	networkPubKey crypto.PublicKey
+	stakingPubKey crypto.PublicKey
+	stakingPoP    crypto.Signature
 }
 
 func NewPublicNodeInfo(
@@ -252,6 +272,7 @@ func NewPublicNodeInfo(
 	weight uint64,
 	networkKey crypto.PublicKey,
 	stakingKey crypto.PublicKey,
+	stakingPoP crypto.Signature,
 ) NodeInfo {
 	return NodeInfo{
 		NodeID:        nodeID,
@@ -260,6 +281,7 @@ func NewPublicNodeInfo(
 		Weight:        weight,
 		networkPubKey: networkKey,
 		stakingPubKey: stakingKey,
+		stakingPoP:    stakingPoP,
 	}
 }
 
@@ -270,7 +292,12 @@ func NewPrivateNodeInfo(
 	weight uint64,
 	networkKey crypto.PrivateKey,
 	stakingKey crypto.PrivateKey,
-) NodeInfo {
+) (NodeInfo, error) {
+	pop, err := crypto.BLSGeneratePOP(stakingKey)
+	if err != nil {
+		return NodeInfo{}, fmt.Errorf("failed to generate PoP: %w", err)
+	}
+
 	return NodeInfo{
 		NodeID:         nodeID,
 		Role:           role,
@@ -280,7 +307,8 @@ func NewPrivateNodeInfo(
 		stakingPrivKey: stakingKey,
 		networkPubKey:  networkKey.PublicKey(),
 		stakingPubKey:  stakingKey.PublicKey(),
-	}
+		stakingPoP:     pop,
+	}, nil
 }
 
 // Type returns the type of the node info instance.
@@ -288,7 +316,7 @@ func (node NodeInfo) Type() NodeInfoType {
 	if node.networkPrivKey != nil && node.stakingPrivKey != nil {
 		return NodeInfoTypePrivate
 	}
-	if node.networkPubKey != nil && node.stakingPubKey != nil {
+	if node.networkPubKey != nil && node.stakingPubKey != nil && node.stakingPoP != nil {
 		return NodeInfoTypePublic
 	}
 	return NodeInfoTypeInvalid
@@ -306,6 +334,17 @@ func (node NodeInfo) StakingPubKey() crypto.PublicKey {
 		return node.stakingPubKey
 	}
 	return node.stakingPrivKey.PublicKey()
+}
+
+func (node NodeInfo) StakingPoP() (crypto.Signature, error) {
+	if node.stakingPoP != nil {
+		return node.stakingPoP, nil
+	}
+	pop, err := crypto.BLSGeneratePOP(node.stakingPrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("staking PoP generation failed: %w", err)
+	}
+	return pop, nil
 }
 
 func (node NodeInfo) PrivateKeys() (*NodePrivateKeys, error) {
@@ -333,8 +372,17 @@ func (node NodeInfo) Private() (NodeInfoPriv, error) {
 	}, nil
 }
 
-// Public returns the canonical public encodable structure
-func (node NodeInfo) Public() NodeInfoPub {
+// Public returns the canonical encodable structure holding the node's public information.
+// It derives the networking and staking public keys, as well as the Proof of Possession (PoP) of the staking private key
+// if they are not already provided in the NodeInfo.
+//
+// It errors, if there is a problem generating the staking key PoP.
+func (node NodeInfo) Public() (NodeInfoPub, error) {
+	stakingPoP, err := node.StakingPoP()
+	if err != nil {
+		return NodeInfoPub{}, fmt.Errorf("failed to generate staking PoP: %w", err)
+	}
+
 	return NodeInfoPub{
 		Role:          node.Role,
 		Address:       node.Address,
@@ -342,50 +390,53 @@ func (node NodeInfo) Public() NodeInfoPub {
 		Weight:        node.Weight,
 		NetworkPubKey: encodable.NetworkPubKey{PublicKey: node.NetworkPubKey()},
 		StakingPubKey: encodable.StakingPubKey{PublicKey: node.StakingPubKey()},
-	}
+		StakingPoP:    encodable.StakingKeyPoP{Signature: stakingPoP},
+	}, nil
 }
 
 // PartnerPublic returns the public data for a partner node.
-func (node NodeInfo) PartnerPublic() PartnerNodeInfoPub {
+func (node NodeInfo) PartnerPublic() (PartnerNodeInfoPub, error) {
+
+	stakingPoP, err := node.StakingPoP()
+	if err != nil {
+		return PartnerNodeInfoPub{}, fmt.Errorf("failed to generate staking PoP: %w", err)
+	}
 	return PartnerNodeInfoPub{
 		Role:          node.Role,
 		Address:       node.Address,
 		NodeID:        node.NodeID,
 		NetworkPubKey: encodable.NetworkPubKey{PublicKey: node.NetworkPubKey()},
 		StakingPubKey: encodable.StakingPubKey{PublicKey: node.StakingPubKey()},
-	}
+		StakingPoP:    stakingPoP,
+	}, nil
 }
 
 // Identity returns the node info as a public Flow identity.
 func (node NodeInfo) Identity() *flow.Identity {
 	identity := &flow.Identity{
-		NodeID:        node.NodeID,
-		Address:       node.Address,
-		Role:          node.Role,
-		Weight:        node.Weight,
-		StakingPubKey: node.StakingPubKey(),
-		NetworkPubKey: node.NetworkPubKey(),
+		IdentitySkeleton: flow.IdentitySkeleton{
+			NodeID:        node.NodeID,
+			Address:       node.Address,
+			Role:          node.Role,
+			InitialWeight: node.Weight,
+			StakingPubKey: node.stakingPubKey,
+			NetworkPubKey: node.networkPubKey,
+		},
+		DynamicIdentity: flow.DynamicIdentity{
+			EpochParticipationStatus: flow.EpochParticipationStatusActive,
+		},
 	}
 	return identity
 }
 
-// NodeInfoFromIdentity converts an identity to a public NodeInfo
-func NodeInfoFromIdentity(identity *flow.Identity) NodeInfo {
-	return NewPublicNodeInfo(
-		identity.NodeID,
-		identity.Role,
-		identity.Address,
-		identity.Weight,
-		identity.NetworkPubKey,
-		identity.StakingPubKey)
-}
-
-func PrivateNodeInfoFromIdentity(identity *flow.Identity, networkKey, stakingKey crypto.PrivateKey) NodeInfo {
+// PrivateNodeInfoFromIdentity builds a NodeInfo from a flow Identity.
+// WARNING: Nothing enforces that the output NodeInfo's keys are corresponding to the input Identity.
+func PrivateNodeInfoFromIdentity(identity *flow.Identity, networkKey, stakingKey crypto.PrivateKey) (NodeInfo, error) {
 	return NewPrivateNodeInfo(
 		identity.NodeID,
 		identity.Role,
 		identity.Address,
-		identity.Weight,
+		identity.InitialWeight,
 		networkKey,
 		stakingKey,
 	)
@@ -403,11 +454,13 @@ func FilterByRole(nodes []NodeInfo, role flow.Role) []NodeInfo {
 }
 
 // Sort sorts the NodeInfo list using the given ordering.
-func Sort(nodes []NodeInfo, order flow.IdentityOrder) []NodeInfo {
+//
+// The sorted list is returned and the original list is untouched.
+func Sort(nodes []NodeInfo, order flow.IdentityOrder[flow.Identity]) []NodeInfo {
 	dup := make([]NodeInfo, len(nodes))
 	copy(dup, nodes)
-	sort.Slice(dup, func(i, j int) bool {
-		return order(dup[i].Identity(), dup[j].Identity())
+	slices.SortFunc(dup, func(i, j NodeInfo) int {
+		return order(i.Identity(), j.Identity())
 	})
 	return dup
 }
@@ -420,10 +473,14 @@ func ToIdentityList(nodes []NodeInfo) flow.IdentityList {
 	return il
 }
 
-func ToPublicNodeInfoList(nodes []NodeInfo) []NodeInfoPub {
+func ToPublicNodeInfoList(nodes []NodeInfo) ([]NodeInfoPub, error) {
 	pub := make([]NodeInfoPub, 0, len(nodes))
 	for _, node := range nodes {
-		pub = append(pub, node.Public())
+		info, err := node.Public()
+		if err != nil {
+			return nil, fmt.Errorf("could not read public info: %w", err)
+		}
+		pub = append(pub, info)
 	}
-	return pub
+	return pub, nil
 }

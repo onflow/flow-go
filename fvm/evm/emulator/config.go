@@ -1,84 +1,141 @@
 package emulator
 
 import (
-	"math"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethCore "github.com/onflow/go-ethereum/core"
+	gethVM "github.com/onflow/go-ethereum/core/vm"
+	"github.com/onflow/go-ethereum/eth/tracers"
+	gethParams "github.com/onflow/go-ethereum/params"
+
+	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
 var (
-	FlowEVMTestnetChainID = big.NewInt(666)
-	FlowEVMMainnetChainID = big.NewInt(777)
-	BlockLevelGasLimit    = uint64(math.MaxUint64)
-	zero                  = uint64(0)
+	zero    = uint64(0)
+	bigZero = big.NewInt(0)
 )
 
-// Config sets the required parameters
+var (
+	PreviewnetPragueActivation = uint64(0)          // already on Prague for PreviewNet
+	TestnetPragueActivation    = uint64(1746723600) // Thu May 08 2025 17:00:00 GMT+0000 (10am PDT)
+	MainnetPragueActivation    = uint64(1747328400) // Thu May 15 2025 17:00:00 GMT+0000 (10am PDT)
+)
+
+// Config aggregates all the configuration (chain, evm, block, tx, ...)
+// needed during executing a transaction.
 type Config struct {
 	// Chain Config
-	ChainConfig *params.ChainConfig
+	ChainConfig *gethParams.ChainConfig
 	// EVM config
-	EVMConfig vm.Config
+	EVMConfig gethVM.Config
 	// block context
-	BlockContext *vm.BlockContext
+	BlockContext *gethVM.BlockContext
 	// transaction context
-	TxContext *vm.TxContext
+	TxContext *gethVM.TxContext
 	// base unit of gas for direct calls
 	DirectCallBaseGasUsage uint64
+	// captures extra precompiled calls
+	PCTracker *CallTracker
+	// BlockTxCount captures the total number of
+	// transactions included in this block so far
+	BlockTxCountSoFar uint
+	// BlockTotalGasSoFar captures the total
+	// amount of gas used so far
+	BlockTotalGasUsedSoFar uint64
 }
 
-// DefaultChainConfig is the default chain config which
-// considers majority of EVM upgrades (e.g. Shanghai update) already been applied
-// this has done through setting the height of these changes
+// ChainRules returns the chain rules
+func (c *Config) ChainRules() gethParams.Rules {
+	return c.ChainConfig.Rules(
+		c.BlockContext.BlockNumber,
+		c.BlockContext.Random != nil,
+		c.BlockContext.Time)
+}
+
+// PreviewNetChainConfig is the chain config used by the previewnet
+var PreviewNetChainConfig = MakeChainConfig(types.FlowEVMPreviewNetChainID)
+
+// PreviewNetChainConfig is the chain config used by the testnet
+var TestNetChainConfig = MakeChainConfig(types.FlowEVMTestNetChainID)
+
+// MainNetChainConfig is the chain config used by the mainnet
+var MainNetChainConfig = MakeChainConfig(types.FlowEVMMainNetChainID)
+
+// DefaultChainConfig is the chain config used by the emulator
+var DefaultChainConfig = PreviewNetChainConfig
+
+// MakeChainConfig constructs a chain config
+// it considers majority of EVM upgrades (e.g. Cancun update) are already applied
+// This has been done through setting the height of these changes
 // to zero nad setting the time for some other changes to zero
 // For the future changes of EVM, we need to update the EVM go mod version
 // and set a proper height for the specific release based on the Flow EVM heights
 // so it could gets activated at a desired time.
-var DefaultChainConfig = &params.ChainConfig{
-	ChainID: FlowEVMTestnetChainID, // default is testnet
+func MakeChainConfig(chainID *big.Int) *gethParams.ChainConfig {
+	chainConfig := &gethParams.ChainConfig{
+		ChainID: chainID,
 
-	// Fork scheduling based on block heights
-	HomesteadBlock:      big.NewInt(0),
-	DAOForkBlock:        big.NewInt(0),
-	DAOForkSupport:      false,
-	EIP150Block:         big.NewInt(0),
-	EIP155Block:         big.NewInt(0),
-	EIP158Block:         big.NewInt(0),
-	ByzantiumBlock:      big.NewInt(0), // already on Byzantium
-	ConstantinopleBlock: big.NewInt(0), // already on Constantinople
-	PetersburgBlock:     big.NewInt(0), // already on Petersburg
-	IstanbulBlock:       big.NewInt(0), // already on Istanbul
-	BerlinBlock:         big.NewInt(0), // already on Berlin
-	LondonBlock:         big.NewInt(0), // already on London
-	MuirGlacierBlock:    big.NewInt(0), // already on MuirGlacier
+		// Fork scheduling based on block heights
+		HomesteadBlock:      bigZero,
+		DAOForkBlock:        bigZero,
+		DAOForkSupport:      false,
+		EIP150Block:         bigZero,
+		EIP155Block:         bigZero,
+		EIP158Block:         bigZero,
+		ByzantiumBlock:      bigZero, // already on Byzantium
+		ConstantinopleBlock: bigZero, // already on Constantinople
+		PetersburgBlock:     bigZero, // already on Petersburg
+		IstanbulBlock:       bigZero, // already on Istanbul
+		BerlinBlock:         bigZero, // already on Berlin
+		LondonBlock:         bigZero, // already on London
+		MuirGlacierBlock:    bigZero, // already on MuirGlacier
 
-	// Fork scheduling based on timestamps
-	ShanghaiTime: &zero, // already on Shanghai
-	CancunTime:   &zero, // already on Cancun
-	PragueTime:   &zero, // already on Prague
+		// Fork scheduling based on timestamps
+		ShanghaiTime: &zero, // already on Shanghai
+		CancunTime:   &zero, // already on Cancun
+		PragueTime:   nil,   // this is conditionally set below
+		VerkleTime:   nil,   // not on Verkle
+	}
+
+	if chainID.Cmp(types.FlowEVMPreviewNetChainID) == 0 {
+		chainConfig.PragueTime = &PreviewnetPragueActivation
+	} else if chainID.Cmp(types.FlowEVMTestNetChainID) == 0 {
+		chainConfig.PragueTime = &TestnetPragueActivation
+	} else if chainID.Cmp(types.FlowEVMMainNetChainID) == 0 {
+		chainConfig.PragueTime = &MainnetPragueActivation
+	}
+
+	return chainConfig
 }
 
+// Default config supports the dynamic fee structure (EIP-1559)
+// so it accepts both legacy transactions with a fixed gas price
+// and dynamic transactions with tip and cap.
+// Yet default config keeps the base fee to zero (no automatic adjustment)
 func defaultConfig() *Config {
 	return &Config{
 		ChainConfig: DefaultChainConfig,
-		EVMConfig: vm.Config{
+		EVMConfig: gethVM.Config{
+			// Forces the EIP-1559 baseFee to 0 (needed for 0 price calls)
 			NoBaseFee: true,
 		},
-		TxContext: &vm.TxContext{},
-		BlockContext: &vm.BlockContext{
-			CanTransfer: core.CanTransfer,
-			Transfer:    core.Transfer,
-			GasLimit:    BlockLevelGasLimit, // block gas limit
-			BaseFee:     big.NewInt(0),
-			GetHash: func(n uint64) common.Hash { // default returns some random hash values
-				return common.BytesToHash(crypto.Keccak256([]byte(new(big.Int).SetUint64(n).String())))
-			},
+		TxContext: &gethVM.TxContext{
+			GasPrice:   new(big.Int),
+			BlobFeeCap: new(big.Int),
 		},
+		BlockContext: &gethVM.BlockContext{
+			CanTransfer: gethCore.CanTransfer,
+			Transfer:    gethCore.Transfer,
+			GasLimit:    types.DefaultBlockLevelGasLimit,
+			BaseFee:     types.DefaultBaseFee,
+			GetHash: func(n uint64) gethCommon.Hash {
+				return gethCommon.Hash{}
+			},
+			GetPrecompile: gethCore.GetPrecompile,
+		},
+		PCTracker: NewCallTracker(),
 	}
 }
 
@@ -93,25 +150,23 @@ func NewConfig(opts ...Option) *Config {
 
 type Option func(*Config) *Config
 
-// WithMainnetChainID sets the chain ID to flow evm testnet
-func WithTestnetChainID() Option {
+// WithChainID sets the evm chain ID
+func WithChainID(chainID *big.Int) Option {
 	return func(c *Config) *Config {
-		c.ChainConfig.ChainID = FlowEVMTestnetChainID
+		switch chainID.Uint64() {
+		case types.FlowEVMPreviewNetChainIDInUInt64:
+			c.ChainConfig = PreviewNetChainConfig
+		case types.FlowEVMTestNetChainIDInUInt64:
+			c.ChainConfig = TestNetChainConfig
+		case types.FlowEVMMainNetChainIDInUInt64:
+			c.ChainConfig = MainNetChainConfig
+		}
 		return c
 	}
-}
-
-// WithMainnetChainID sets the chain ID to flow evm mainnet
-func WithMainnetChainID() Option {
-	return func(c *Config) *Config {
-		c.ChainConfig.ChainID = FlowEVMMainnetChainID
-		return c
-	}
-
 }
 
 // WithOrigin sets the origin of the transaction (signer)
-func WithOrigin(origin common.Address) Option {
+func WithOrigin(origin gethCommon.Address) Option {
 	return func(c *Config) *Config {
 		c.TxContext.Origin = origin
 		return c
@@ -135,7 +190,7 @@ func WithGasLimit(gasLimit uint64) Option {
 }
 
 // WithCoinbase sets the coinbase of the block where the fees are collected in
-func WithCoinbase(coinbase common.Address) Option {
+func WithCoinbase(coinbase gethCommon.Address) Option {
 	return func(c *Config) *Config {
 		c.BlockContext.Coinbase = coinbase
 		return c
@@ -159,7 +214,7 @@ func WithBlockTime(time uint64) Option {
 }
 
 // WithGetBlockHashFunction sets the functionality to look up block hash by height
-func WithGetBlockHashFunction(getHash vm.GetHashFunc) Option {
+func WithGetBlockHashFunction(getHash gethVM.GetHashFunc) Option {
 	return func(c *Config) *Config {
 		c.BlockContext.GetHash = getHash
 		return c
@@ -170,6 +225,62 @@ func WithGetBlockHashFunction(getHash vm.GetHashFunc) Option {
 func WithDirectCallBaseGasUsage(gas uint64) Option {
 	return func(c *Config) *Config {
 		c.DirectCallBaseGasUsage = gas
+		return c
+	}
+}
+
+// WithExtraPrecompiledContracts appends the precompiled contract list with extra precompiled contracts
+func WithExtraPrecompiledContracts(precompiledContracts []types.PrecompiledContract) Option {
+	return func(c *Config) *Config {
+		extraPreCompMap := make(map[gethCommon.Address]gethVM.PrecompiledContract)
+		for _, pc := range precompiledContracts {
+			// wrap pcs for tracking
+			wpc := c.PCTracker.RegisterPrecompiledContract(pc)
+			extraPreCompMap[pc.Address().ToCommon()] = wpc
+		}
+		c.BlockContext.GetPrecompile = func(rules gethParams.Rules, addr gethCommon.Address) (gethVM.PrecompiledContract, bool) {
+			prec, found := extraPreCompMap[addr]
+			if found {
+				return prec, true
+			}
+			return gethCore.GetPrecompile(rules, addr)
+		}
+		return c
+	}
+}
+
+// WithRandom sets the block context random field
+func WithRandom(rand *gethCommon.Hash) Option {
+	return func(c *Config) *Config {
+		c.BlockContext.Random = rand
+		return c
+	}
+}
+
+// WithTransactionTracer sets a transaction tracer
+func WithTransactionTracer(tracer *tracers.Tracer) Option {
+	return func(c *Config) *Config {
+		if tracer != nil {
+			c.EVMConfig.Tracer = tracer.Hooks
+		}
+		return c
+	}
+}
+
+// WithBlockTxCountSoFar sets the total number of transactions
+// included in the current block so far
+func WithBlockTxCountSoFar(txCount uint) Option {
+	return func(c *Config) *Config {
+		c.BlockTxCountSoFar = txCount
+		return c
+	}
+}
+
+// WithBlockTotalGasSoFar sets the total amount of gas used
+// for this block so far
+func WithBlockTotalGasUsedSoFar(gasUsed uint64) Option {
+	return func(c *Config) *Config {
+		c.BlockTotalGasUsedSoFar = gasUsed
 		return c
 	}
 }

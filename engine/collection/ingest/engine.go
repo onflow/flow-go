@@ -9,7 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
@@ -38,7 +38,7 @@ type Engine struct {
 	pendingTransactions  engine.MessageStore
 	messageHandler       *engine.MessageHandler
 	pools                *epochs.TransactionPools
-	transactionValidator *access.TransactionValidator
+	transactionValidator *validator.TransactionValidator
 
 	config Config
 }
@@ -55,14 +55,15 @@ func New(
 	chain flow.Chain,
 	pools *epochs.TransactionPools,
 	config Config,
+	limiter *AddressRateLimiter,
 ) (*Engine, error) {
 
 	logger := log.With().Str("engine", "ingest").Logger()
 
-	transactionValidator := access.NewTransactionValidator(
-		access.NewProtocolStateBlocks(state),
+	transactionValidator := validator.NewTransactionValidatorWithLimiter(
+		validator.NewProtocolStateBlocks(state, nil),
 		chain,
-		access.TransactionValidationOptions{
+		validator.TransactionValidationOptions{
 			Expiry:                 flow.DefaultTransactionExpiry,
 			ExpiryBuffer:           config.ExpiryBuffer,
 			MaxGasLimit:            config.MaxGasLimit,
@@ -70,6 +71,8 @@ func New(
 			MaxTransactionByteSize: config.MaxTransactionByteSize,
 			MaxCollectionByteSize:  config.MaxCollectionByteSize,
 		},
+		colMetrics,
+		limiter,
 	)
 
 	// FIFO queue for transactions
@@ -246,8 +249,10 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	// using the transaction's reference block, determine which cluster we're in.
 	// if we don't know the reference block, we will fail when attempting to query the epoch.
-	refEpoch := refSnapshot.Epochs().Current()
-
+	refEpoch, err := refSnapshot.Epochs().Current()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch for reference block: %w", err)
+	}
 	localCluster, err := e.getLocalCluster(refEpoch)
 	if err != nil {
 		return fmt.Errorf("could not get local cluster: %w", err)
@@ -295,11 +300,8 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 //     a member of the reference epoch. This is an expected condition and the transaction
 //     should be discarded.
 //   - other error for any other, unexpected error condition.
-func (e *Engine) getLocalCluster(refEpoch protocol.Epoch) (flow.IdentityList, error) {
-	epochCounter, err := refEpoch.Counter()
-	if err != nil {
-		return nil, fmt.Errorf("could not get counter for reference epoch: %w", err)
-	}
+func (e *Engine) getLocalCluster(refEpoch protocol.CommittedEpoch) (flow.IdentitySkeletonList, error) {
+	epochCounter := refEpoch.Counter()
 	clusters, err := refEpoch.Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not get clusters for reference epoch: %w", err)
@@ -309,10 +311,7 @@ func (e *Engine) getLocalCluster(refEpoch protocol.Epoch) (flow.IdentityList, er
 	if !ok {
 		// if we aren't assigned to a cluster, check that we are a member of
 		// the reference epoch
-		refIdentities, err := refEpoch.InitialIdentities()
-		if err != nil {
-			return nil, fmt.Errorf("could not get initial identities for reference epoch: %w", err)
-		}
+		refIdentities := refEpoch.InitialIdentities()
 
 		if _, ok := refIdentities.ByNodeID(e.me.NodeID()); ok {
 			// CAUTION: we are a member of the epoch, but have no assigned cluster!
@@ -333,19 +332,14 @@ func (e *Engine) getLocalCluster(refEpoch protocol.Epoch) (flow.IdentityList, er
 // * other error for any other unexpected error condition.
 func (e *Engine) ingestTransaction(
 	log zerolog.Logger,
-	refEpoch protocol.Epoch,
+	refEpoch protocol.CommittedEpoch,
 	tx *flow.TransactionBody,
 	txID flow.Identifier,
 	localClusterFingerprint flow.Identifier,
 	txClusterFingerprint flow.Identifier,
 ) error {
-	epochCounter, err := refEpoch.Counter()
-	if err != nil {
-		return fmt.Errorf("could not get counter for reference epoch: %w", err)
-	}
-
 	// use the transaction pool for the epoch the reference block is part of
-	pool := e.pools.ForEpoch(epochCounter)
+	pool := e.pools.ForEpoch(refEpoch.Counter())
 
 	// short-circuit if we have already stored the transaction
 	if pool.Has(txID) {
@@ -353,8 +347,8 @@ func (e *Engine) ingestTransaction(
 		return nil
 	}
 
-	// check if the transaction is valid
-	err = e.transactionValidator.Validate(tx)
+	// we don't pass actual ctx as we don't execute any scripts inside for now
+	err := e.transactionValidator.Validate(context.Background(), tx)
 	if err != nil {
 		return engine.NewInvalidInputErrorf("invalid transaction (%x): %w", txID, err)
 	}
@@ -370,7 +364,7 @@ func (e *Engine) ingestTransaction(
 
 // propagateTransaction propagates the transaction to a number of the responsible
 // cluster's members. Any unexpected networking errors are logged.
-func (e *Engine) propagateTransaction(log zerolog.Logger, tx *flow.TransactionBody, txCluster flow.IdentityList) {
+func (e *Engine) propagateTransaction(log zerolog.Logger, tx *flow.TransactionBody, txCluster flow.IdentitySkeletonList) {
 	log.Debug().Msg("propagating transaction to cluster")
 
 	err := e.conduit.Multicast(tx, e.config.PropagationRedundancy+1, txCluster.NodeIDs()...)

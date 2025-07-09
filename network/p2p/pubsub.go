@@ -83,19 +83,20 @@ type PubSubAdapterConfig interface {
 	// WithScoreTracer sets the tracer for the underlying pubsub score implementation.
 	// This is used to expose the local scoring table of the GossipSub node to its higher level components.
 	WithScoreTracer(tracer PeerScoreTracer)
-	WithInspectorSuite(GossipSubInspectorSuite)
+	WithRpcInspector(GossipSubRPCInspector)
+	WithPeerGater(topicDeliveryWeights map[string]float64, sourceDecay time.Duration)
+	WithValidateQueueSize(int)
 }
 
-// GossipSubControlMetricsObserver funcs used to observe gossipsub related metrics.
-type GossipSubControlMetricsObserver interface {
-	ObserveRPC(peer.ID, *pubsub.RPC)
-}
-
-// GossipSubRPCInspector app specific RPC inspector used to inspect and validate incoming RPC messages before they are processed by libp2p.
+// GossipSubRPCInspector abstracts the general behavior of an app specific RPC inspector specifically
+// used to inspect and validate incoming. It is used to implement custom message validation logic. It is injected into
+// the GossipSubRouter and run on every incoming RPC message before the message is processed by libp2p. If the message
+// is invalid the RPC message will be dropped.
 // Implementations must:
 //   - be concurrency safe
 //   - be non-blocking
 type GossipSubRPCInspector interface {
+	collection.ClusterEvents
 	component.Component
 
 	// Name returns the name of the rpc inspector.
@@ -105,18 +106,6 @@ type GossipSubRPCInspector interface {
 	// on ever RPC message received before the message is processed by libp2p.
 	// If this func returns any error the RPC message will be dropped.
 	Inspect(peer.ID, *pubsub.RPC) error
-}
-
-// GossipSubMsgValidationRpcInspector abstracts the general behavior of an app specific RPC inspector specifically
-// used to inspect and validate incoming. It is used to implement custom message validation logic. It is injected into
-// the GossipSubRouter and run on every incoming RPC message before the message is processed by libp2p. If the message
-// is invalid the RPC message will be dropped.
-// Implementations must:
-//   - be concurrency safe
-//   - be non-blocking
-type GossipSubMsgValidationRpcInspector interface {
-	collection.ClusterEvents
-	GossipSubRPCInspector
 }
 
 // Topic is the abstraction of the underlying pubsub topic that is used by the Flow network.
@@ -180,6 +169,12 @@ type PubSubTracer interface {
 	component.Component
 	pubsub.RawTracer
 	RpcControlTracking
+	// DuplicateMessageCount returns the current duplicate message count for the peer.
+	// Args:
+	// - peer.ID: the peer ID.
+	// Returns:
+	// - float64: duplicate message count.
+	DuplicateMessageCount(peer.ID) float64
 	// GetLocalMeshPeers returns the list of peers in the mesh for the given topic.
 	// Args:
 	// - topic: the topic.

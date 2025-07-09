@@ -3,7 +3,7 @@ package state
 import (
 	"fmt"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -20,14 +20,15 @@ func (id NestedTransactionId) StateForTestingOnly() *ExecutionState {
 }
 
 type Meter interface {
-	MeterComputation(kind common.ComputationKind, intensity uint) error
-	ComputationAvailable(kind common.ComputationKind, intensity uint) bool
+	MeterComputation(usage common.ComputationUsage) error
+	ComputationAvailable(usage common.ComputationUsage) bool
+	ComputationRemaining(kind common.ComputationKind) uint64
 	ComputationIntensities() meter.MeteredComputationIntensities
-	TotalComputationLimit() uint
+	TotalComputationLimit() uint64
 	TotalComputationUsed() uint64
 
-	MeterMemory(kind common.MemoryKind, intensity uint) error
-	MemoryIntensities() meter.MeteredMemoryIntensities
+	MeterMemory(usage common.MemoryUsage) error
+	MemoryAmounts() meter.MeteredMemoryAmounts
 	TotalMemoryEstimate() uint64
 
 	InteractionUsed() uint64
@@ -43,6 +44,9 @@ type Meter interface {
 // common state management operations.
 type NestedTransactionPreparer interface {
 	Meter
+
+	// ExecutionParameters returns the execution parameters
+	ExecutionParameters() ExecutionParameters
 
 	// NumNestedTransactions returns the number of uncommitted nested
 	// transactions.  Note that the main transaction is not considered a
@@ -83,7 +87,7 @@ type NestedTransactionPreparer interface {
 	// the provided meter parameters. This returns error if the current nested
 	// transaction is program restricted.
 	BeginNestedTransactionWithMeterParams(
-		params meter.MeterParameters,
+		params ExecutionParameters,
 	) (
 		NestedTransactionId,
 		error,
@@ -177,9 +181,17 @@ func NewTransactionState(
 	params StateParameters,
 ) NestedTransactionPreparer {
 	startState := NewExecutionState(snapshot, params)
+	return NewTransactionStateFromExecutionState(startState)
+}
+
+// NewTransactionStateFromExecutionState constructs a new state transaction directly
+// from an execution state.
+func NewTransactionStateFromExecutionState(
+	startState *ExecutionState,
+) NestedTransactionPreparer {
 	return &transactionState{
 		nestedTransactions: []nestedTransactionStackFrame{
-			nestedTransactionStackFrame{
+			{
 				ExecutionState:   startState,
 				parseRestriction: nil,
 			},
@@ -189,6 +201,10 @@ func NewTransactionState(
 
 func (txnState *transactionState) current() nestedTransactionStackFrame {
 	return txnState.nestedTransactions[txnState.NumNestedTransactions()]
+}
+
+func (txnState *transactionState) ExecutionParameters() ExecutionParameters {
+	return txnState.current().ExecutionParameters()
 }
 
 func (txnState *transactionState) NumNestedTransactions() int {
@@ -258,7 +274,7 @@ func (txnState *transactionState) BeginNestedTransaction() (
 }
 
 func (txnState *transactionState) BeginNestedTransactionWithMeterParams(
-	params meter.MeterParameters,
+	params ExecutionParameters,
 ) (
 	NestedTransactionId,
 	error,
@@ -429,32 +445,27 @@ func (txnState *transactionState) Set(
 	return txnState.current().Set(id, value)
 }
 
-func (txnState *transactionState) MeterComputation(
-	kind common.ComputationKind,
-	intensity uint,
-) error {
-	return txnState.current().MeterComputation(kind, intensity)
+func (txnState *transactionState) MeterComputation(usage common.ComputationUsage) error {
+	return txnState.current().MeterComputation(usage)
 }
 
-func (txnState *transactionState) ComputationAvailable(
-	kind common.ComputationKind,
-	intensity uint,
-) bool {
-	return txnState.current().ComputationAvailable(kind, intensity)
+func (txnState *transactionState) ComputationAvailable(usage common.ComputationUsage) bool {
+	return txnState.current().ComputationAvailable(usage)
 }
 
-func (txnState *transactionState) MeterMemory(
-	kind common.MemoryKind,
-	intensity uint,
-) error {
-	return txnState.current().MeterMemory(kind, intensity)
+func (txnState *transactionState) ComputationRemaining(kind common.ComputationKind) uint64 {
+	return txnState.current().ComputationRemaining(kind)
+}
+
+func (txnState *transactionState) MeterMemory(usage common.MemoryUsage) error {
+	return txnState.current().MeterMemory(usage)
 }
 
 func (txnState *transactionState) ComputationIntensities() meter.MeteredComputationIntensities {
 	return txnState.current().ComputationIntensities()
 }
 
-func (txnState *transactionState) TotalComputationLimit() uint {
+func (txnState *transactionState) TotalComputationLimit() uint64 {
 	return txnState.current().TotalComputationLimit()
 }
 
@@ -462,8 +473,8 @@ func (txnState *transactionState) TotalComputationUsed() uint64 {
 	return txnState.current().TotalComputationUsed()
 }
 
-func (txnState *transactionState) MemoryIntensities() meter.MeteredMemoryIntensities {
-	return txnState.current().MemoryIntensities()
+func (txnState *transactionState) MemoryAmounts() meter.MeteredMemoryAmounts {
+	return txnState.current().MemoryAmounts()
 }
 
 func (txnState *transactionState) TotalMemoryEstimate() uint64 {

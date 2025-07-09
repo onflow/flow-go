@@ -18,9 +18,9 @@ import (
 
 	access "github.com/onflow/flow-go/engine/access/mock"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -28,15 +28,18 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 var (
 	expectedResponse = []byte("response_data")
 
 	cadenceErr    = fvmerrors.NewCodedError(fvmerrors.ErrCodeCadenceRunTimeError, "cadence error")
-	fvmFailureErr = fvmerrors.NewCodedError(fvmerrors.FailureCodeBlockFinderFailure, "fvm error")
+	fvmFailureErr = fvmerrors.NewCodedFailure(fvmerrors.FailureCodeBlockFinderFailure, "fvm error")
 	ctxCancelErr  = fvmerrors.NewCodedError(fvmerrors.ErrCodeScriptExecutionCancelledError, "context canceled error")
 	timeoutErr    = fvmerrors.NewCodedError(fvmerrors.ErrCodeScriptExecutionTimedOutError, "timeout error")
+	compLimitErr  = fvmerrors.NewCodedError(fvmerrors.ErrCodeComputationLimitExceededError, "computation limit exceeded error")
+	memLimitErr   = fvmerrors.NewCodedError(fvmerrors.ErrCodeMemoryLimitExceededError, "memory limit exceeded error")
 )
 
 // Create a suite similar to GetAccount that covers each of the modes
@@ -85,9 +88,9 @@ func (s *BackendScriptsSuite) SetupTest() {
 	block := unittest.BlockFixture()
 	s.block = &block
 
-	s.script = []byte("pub fun main() { return 1 }")
+	s.script = []byte("access(all) fun main() { return 1 }")
 	s.arguments = [][]byte{[]byte("arg1"), []byte("arg2")}
-	s.failingScript = []byte("pub fun main() { panic(\"!!\") }")
+	s.failingScript = []byte("access(all) fun main() { panic(\"!!\") }")
 }
 
 func (s *BackendScriptsSuite) defaultBackend() *backendScripts {
@@ -95,14 +98,20 @@ func (s *BackendScriptsSuite) defaultBackend() *backendScripts {
 	s.Require().NoError(err)
 
 	return &backendScripts{
-		log:               s.log,
-		metrics:           metrics.NewNoopCollector(),
-		state:             s.state,
-		headers:           s.headers,
-		executionReceipts: s.receipts,
-		loggedScripts:     loggedScripts,
-		connFactory:       s.connectionFactory,
-		nodeCommunicator:  NewNodeCommunicator(false),
+		log:              s.log,
+		metrics:          metrics.NewNoopCollector(),
+		state:            s.state,
+		headers:          s.headers,
+		loggedScripts:    loggedScripts,
+		connFactory:      s.connectionFactory,
+		nodeCommunicator: NewNodeCommunicator(false),
+		execNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
+			s.log,
+			s.state,
+			s.receipts,
+			flow.IdentifierList{},
+			flow.IdentifierList{},
+		),
 	}
 }
 
@@ -120,7 +129,7 @@ func (s *BackendScriptsSuite) setupExecutionNodes(block *flow.Block) {
 	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
 
 	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).
-		Return(s.execClient, &mockCloser{}, nil)
+		Return(s.execClient, &mocks.MockCloser{}, nil)
 }
 
 // setupENSuccessResponse configures the execution client mock to return a successful response
@@ -158,7 +167,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
 	s.setupENSuccessResponse(s.block.ID())
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeExecutionNodesOnly
+	backend.scriptExecMode = IndexQueryModeExecutionNodesOnly
 
 	s.Run("GetAccount", func() {
 		s.testExecuteScriptAtLatestBlock(ctx, backend, codes.OK)
@@ -186,7 +195,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
 	s.setupENFailingResponse(s.block.ID(), errToReturn)
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeExecutionNodesOnly
+	backend.scriptExecMode = IndexQueryModeExecutionNodesOnly
 
 	s.Run("GetAccount", func() {
 		s.testExecuteScriptAtLatestBlock(ctx, backend, statusCode)
@@ -211,7 +220,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
 		Return(expectedResponse, nil)
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeLocalOnly
+	backend.scriptExecMode = IndexQueryModeLocalOnly
 	backend.scriptExecutor = scriptExecutor
 
 	s.Run("GetAccount - happy path", func() {
@@ -235,7 +244,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeLocalOnly
+	backend.scriptExecMode = IndexQueryModeLocalOnly
 	backend.scriptExecutor = scriptExecutor
 
 	testCases := []struct {
@@ -243,7 +252,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 		statusCode codes.Code
 	}{
 		{
-			err:        execution.ErrDataNotAvailable,
+			err:        storage.ErrHeightNotIndexed,
 			statusCode: codes.OutOfRange,
 		},
 		{
@@ -288,10 +297,12 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 	ctx := context.Background()
 
 	errors := []error{
-		execution.ErrDataNotAvailable,
+		storage.ErrHeightNotIndexed,
 		storage.ErrNotFound,
 		fmt.Errorf("system error"),
 		fvmFailureErr,
+		compLimitErr,
+		memLimitErr,
 	}
 
 	s.setupExecutionNodes(s.block)
@@ -300,7 +311,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeFailover
+	backend.scriptExecMode = IndexQueryModeFailover
 	backend.scriptExecutor = scriptExecutor
 
 	for _, errToReturn := range errors {
@@ -331,7 +342,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCod
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeFailover
+	backend.scriptExecMode = IndexQueryModeFailover
 	backend.scriptExecutor = scriptExecutor
 
 	testCases := []struct {
@@ -383,10 +394,10 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 	// configure local script executor to fail
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, s.block.Header.Height).
-		Return(nil, execution.ErrDataNotAvailable)
+		Return(nil, storage.ErrHeightNotIndexed)
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeFailover
+	backend.scriptExecMode = IndexQueryModeFailover
 	backend.scriptExecutor = scriptExecutor
 
 	s.Run("ExecuteScriptAtLatestBlock", func() {
@@ -408,7 +419,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_Inconsis
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeLocalOnly
+	backend.scriptExecMode = IndexQueryModeLocalOnly
 	backend.scriptExecutor = scriptExecutor
 
 	s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - fails with %v", "inconsistent node's state"), func() {
@@ -438,7 +449,7 @@ func (s *BackendScriptsSuite) testExecuteScriptAtLatestBlock(ctx context.Context
 	} else {
 		actual, err := backend.ExecuteScriptAtLatestBlock(ctx, s.failingScript, s.arguments)
 		s.Require().Error(err)
-		s.Require().Equal(statusCode, status.Code(err))
+		s.Require().Equal(statusCode, status.Code(err), "error code mismatch: expected %d, got %d: %s", statusCode, status.Code(err), err)
 		s.Require().Nil(actual)
 	}
 }
@@ -454,7 +465,7 @@ func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(ctx context.Context, ba
 	} else {
 		actual, err := backend.ExecuteScriptAtBlockID(ctx, blockID, s.failingScript, s.arguments)
 		s.Require().Error(err)
-		s.Require().Equal(statusCode, status.Code(err))
+		s.Require().Equal(statusCode, status.Code(err), "error code mismatch: expected %d, got %d: %s", statusCode, status.Code(err), err)
 		s.Require().Nil(actual)
 	}
 }
@@ -470,7 +481,7 @@ func (s *BackendScriptsSuite) testExecuteScriptAtBlockHeight(ctx context.Context
 	} else {
 		actual, err := backend.ExecuteScriptAtBlockHeight(ctx, height, s.failingScript, s.arguments)
 		s.Require().Error(err)
-		s.Require().Equal(statusCode, status.Code(err))
+		s.Require().Equalf(statusCode, status.Code(err), "error code mismatch: expected %d, got %d: %s", statusCode, status.Code(err), err)
 		s.Require().Nil(actual)
 	}
 }

@@ -86,7 +86,7 @@ func (block *BlockData) NewTransactionData(
 		executionTime > logical.LargestNormalTransactionExecutionTime {
 
 		return nil, fmt.Errorf(
-			"invalid tranaction: execution time out of bound")
+			"invalid transaction: execution time out of bound")
 	}
 
 	txn := block.newTransactionData(
@@ -102,6 +102,15 @@ func (block *BlockData) NewTransactionData(
 	}
 
 	return txn, nil
+}
+
+func (block *BlockData) NewCachingSnapshotReadTransactionData(
+	parameters state.StateParameters,
+) *TransactionData {
+	return block.newTransactionData(
+		false,
+		logical.EndOfBlockExecutionTime,
+		parameters)
 }
 
 func (block *BlockData) NewSnapshotReadTransactionData(

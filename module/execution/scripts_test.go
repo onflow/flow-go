@@ -6,20 +6,21 @@ import (
 	"os"
 	"testing"
 
-	"github.com/onflow/flow-go/fvm/errors"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/stdlib"
 	"github.com/rs/zerolog"
-	mocks "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/execution/computation/query"
-	"github.com/onflow/flow-go/engine/execution/computation/query/mock"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
@@ -48,7 +49,7 @@ type scriptTestSuite struct {
 func (s *scriptTestSuite) TestScriptExecution() {
 	s.Run("Simple Script Execution", func() {
 		number := int64(42)
-		code := []byte(fmt.Sprintf("pub fun main(): Int { return %d; }", number))
+		code := []byte(fmt.Sprintf("access(all) fun main(): Int { return %d; }", number))
 
 		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
 		s.Require().NoError(err)
@@ -58,7 +59,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 	})
 
 	s.Run("Get Block", func() {
-		code := []byte(fmt.Sprintf(`pub fun main(): UInt64 {
+		code := []byte(fmt.Sprintf(`access(all) fun main(): UInt64 {
 			getBlock(at: %d)!
 			return getCurrentBlock().height 
 		}`, s.height))
@@ -68,12 +69,12 @@ func (s *scriptTestSuite) TestScriptExecution() {
 		val, err := jsoncdc.Decode(nil, result)
 		s.Require().NoError(err)
 		// make sure that the returned block height matches the current one set
-		s.Assert().Equal(s.height, val.(cadence.UInt64).ToGoValue())
+		s.Assert().Equal(s.height, uint64(val.(cadence.UInt64)))
 	})
 
 	s.Run("Handle not found Register", func() {
 		// use a non-existing address to trigger register get function
-		code := []byte("import Foo from 0x01; pub fun main() { }")
+		code := []byte("import Foo from 0x01; access(all) fun main() { }")
 
 		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
 		s.Assert().Error(err)
@@ -81,7 +82,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 	})
 
 	s.Run("Valid Argument", func() {
-		code := []byte("pub fun main(foo: Int): Int { return foo }")
+		code := []byte("access(all) fun main(foo: Int): Int { return foo }")
 		arg := cadence.NewInt(2)
 		encoded, err := jsoncdc.Encode(arg)
 		s.Require().NoError(err)
@@ -97,7 +98,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 	})
 
 	s.Run("Invalid Argument", func() {
-		code := []byte("pub fun main(foo: Int): Int { return foo }")
+		code := []byte("access(all) fun main(foo: Int): Int { return foo }")
 		invalid := [][]byte{[]byte("i")}
 
 		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, invalid, s.height)
@@ -128,9 +129,32 @@ func (s *scriptTestSuite) TestGetAccount() {
 	})
 }
 
+func (s *scriptTestSuite) TestGetAccountBalance() {
+	address := s.createAccount()
+	var transferAmount uint64 = 100000000
+	s.transferTokens(address, transferAmount)
+	balance, err := s.scripts.GetAccountBalance(context.Background(), address, s.height)
+	s.Require().NoError(err)
+	s.Require().Equal(transferAmount, balance)
+}
+
+func (s *scriptTestSuite) TestGetAccountKeys() {
+	address := s.createAccount()
+	publicKey := s.addAccountKey(address, accountKeyAPIVersionV2)
+
+	accountKeys, err := s.scripts.GetAccountKeys(context.Background(), address, s.height)
+	s.Require().NoError(err)
+	s.Assert().Equal(1, len(accountKeys))
+	s.Assert().Equal(publicKey.PublicKey, accountKeys[0].PublicKey)
+	s.Assert().Equal(publicKey.SignAlgo, accountKeys[0].SignAlgo)
+	s.Assert().Equal(publicKey.HashAlgo, accountKeys[0].HashAlgo)
+	s.Assert().Equal(publicKey.Weight, accountKeys[0].Weight)
+
+}
+
 func (s *scriptTestSuite) SetupTest() {
 	logger := unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
-	entropyProvider := testutil.EntropyProviderFixture(nil)
+	entropyProvider := testutil.ProtocolStateWithSourceFixture(nil)
 	blockchain := unittest.BlockchainFixture(10)
 	headers := newBlockHeadersStorage(blockchain)
 
@@ -144,32 +168,42 @@ func (s *scriptTestSuite) SetupTest() {
 	)
 	s.height = blockchain[0].Header.Height
 
-	entropyBlock := mock.NewEntropyProviderPerBlock(s.T())
-	entropyBlock.
-		On("AtBlockID", mocks.AnythingOfType("flow.Identifier")).
-		Return(entropyProvider).
-		Maybe()
-
 	s.dbDir = unittest.TempDir(s.T())
 	db := pebbleStorage.NewBootstrappedRegistersWithPathForTest(s.T(), s.dbDir, s.height, s.height)
-	pebbleRegisters, err := pebbleStorage.NewRegisters(db)
+	pebbleRegisters, err := pebbleStorage.NewRegisters(db, pebbleStorage.PruningDisabled)
 	s.Require().NoError(err)
 	s.registerIndex = pebbleRegisters
 
-	index, err := indexer.New(logger, metrics.NewNoopCollector(), nil, s.registerIndex, headers, nil, nil)
+	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
 	s.Require().NoError(err)
 
-	scripts, err := NewScripts(
+	index, err := indexer.New(
+		logger,
+		metrics.NewNoopCollector(),
+		nil,
+		s.registerIndex,
+		headers,
+		nil,
+		nil,
+		nil,
+		nil,
+		flow.Testnet.Chain(),
+		derivedChainData,
+		nil,
+	)
+	s.Require().NoError(err)
+
+	s.scripts = NewScripts(
 		logger,
 		metrics.NewNoopCollector(),
 		s.chain.ChainID(),
-		entropyBlock,
+		entropyProvider,
 		headers,
 		index.RegisterValue,
 		query.NewDefaultConfig(),
+		derivedChainData,
+		true,
 	)
-	s.Require().NoError(err)
-	s.scripts = scripts
 
 	s.bootstrap()
 }
@@ -201,8 +235,8 @@ func (s *scriptTestSuite) bootstrap() {
 func (s *scriptTestSuite) createAccount() flow.Address {
 	const createAccountTransaction = `
 		transaction {
-		  prepare(signer: AuthAccount) {
-			let account = AuthAccount(payer: signer)
+		  prepare(signer: auth(Storage, Capabilities) &Account) {
+			let account = Account(payer: signer)
 		  }
 		}`
 
@@ -236,9 +270,111 @@ func (s *scriptTestSuite) createAccount() flow.Address {
 
 	data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 	s.Require().NoError(err)
-	address := flow.ConvertAddress(data.(cadence.Event).Fields[0].(cadence.Address))
 
-	return address
+	return flow.ConvertAddress(
+		cadence.SearchFieldByName(
+			data.(cadence.Event),
+			stdlib.AccountEventAddressParameter.Identifier,
+		).(cadence.Address),
+	)
+}
+
+func (s *scriptTestSuite) transferTokens(accountAddress flow.Address, amount uint64) {
+	transferTx := transferTokensTx(s.chain).
+		AddArgument(jsoncdc.MustEncode(cadence.UFix64(amount))).
+		AddArgument(jsoncdc.MustEncode(cadence.Address(accountAddress))).
+		AddAuthorizer(s.chain.ServiceAddress())
+
+	executionSnapshot, _, err := s.vm.Run(
+		s.vmCtx,
+		fvm.Transaction(transferTx, 0),
+		s.snapshot,
+	)
+	s.Require().NoError(err)
+
+	s.height++
+	err = s.registerIndex.Store(executionSnapshot.UpdatedRegisters(), s.height)
+	s.Require().NoError(err)
+
+	s.snapshot = s.snapshot.Append(executionSnapshot)
+}
+
+type accountKeyAPIVersion string
+
+const (
+	accountKeyAPIVersionV1 accountKeyAPIVersion = "V1"
+	accountKeyAPIVersionV2 accountKeyAPIVersion = "V2"
+)
+
+func (s *scriptTestSuite) addAccountKey(
+	accountAddress flow.Address,
+	apiVersion accountKeyAPIVersion,
+) flow.AccountPublicKey {
+	const addAccountKeyTransaction = `
+transaction(key: [UInt8]) {
+  prepare(signer: auth(AddKey) &Account) {
+	let publicKey = PublicKey(
+		publicKey: key,
+		signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
+	 )
+    signer.keys.add(
+		publicKey: publicKey,
+		hashAlgorithm: HashAlgorithm.SHA3_256,
+		weight: 1000.0
+	)
+  }
+}
+`
+	privateKey, err := unittest.AccountKeyDefaultFixture()
+	s.Require().NoError(err)
+
+	publicKey, encodedCadencePublicKey := newAccountKey(s.T(), privateKey, apiVersion)
+
+	txBody := flow.NewTransactionBody().
+		SetScript([]byte(addAccountKeyTransaction)).
+		AddArgument(encodedCadencePublicKey).
+		AddAuthorizer(accountAddress)
+
+	executionSnapshot, _, err := s.vm.Run(
+		s.vmCtx,
+		fvm.Transaction(txBody, 0),
+		s.snapshot,
+	)
+	s.Require().NoError(err)
+
+	s.height++
+	err = s.registerIndex.Store(executionSnapshot.UpdatedRegisters(), s.height)
+	s.Require().NoError(err)
+
+	s.snapshot = s.snapshot.Append(executionSnapshot)
+
+	return publicKey
+}
+
+func newAccountKey(
+	tb testing.TB,
+	privateKey *flow.AccountPrivateKey,
+	apiVersion accountKeyAPIVersion,
+) (
+	publicKey flow.AccountPublicKey,
+	encodedCadencePublicKey []byte,
+) {
+	publicKey = privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
+
+	var publicKeyBytes []byte
+	if apiVersion == accountKeyAPIVersionV1 {
+		var err error
+		publicKeyBytes, err = flow.EncodeRuntimeAccountPublicKey(publicKey)
+		require.NoError(tb, err)
+	} else {
+		publicKeyBytes = publicKey.PublicKey.Encode()
+	}
+
+	cadencePublicKey := testutil.BytesToCadenceArray(publicKeyBytes)
+	encodedCadencePublicKey, err := jsoncdc.Encode(cadencePublicKey)
+	require.NoError(tb, err)
+
+	return publicKey, encodedCadencePublicKey
 }
 
 func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
@@ -248,4 +384,54 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	}
 
 	return synctest.MockBlockHeaderStorage(synctest.WithByHeight(blocksByHeight))
+}
+
+func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(
+			`
+	// This transaction is a template for a transaction that
+	// could be used by anyone to send tokens to another account
+	// that has been set up to receive tokens.
+	//
+	// The withdraw amount and the account from getAccount
+	// would be the parameters to the transaction
+
+	import FungibleToken from 0x%s
+	import FlowToken from 0x%s
+
+	transaction(amount: UFix64, to: Address) {
+
+	// The Vault resource that holds the tokens that are being transferred
+	let sentVault: @{FungibleToken.Vault}
+
+	prepare(signer: auth(BorrowValue) &Account) {
+
+	// Get a reference to the signer's stored vault
+	let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+	?? panic("Could not borrow reference to the owner's Vault!")
+
+	// Withdraw tokens from the signer's stored vault
+	self.sentVault <- vaultRef.withdraw(amount: amount)
+	}
+
+	execute {
+
+	// Get the recipient's public account object
+	let recipient = getAccount(to)
+
+	// Get a reference to the recipient's Receiver
+	let receiverRef = recipient.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+	?? panic("Could not borrow receiver reference to the recipient's Vault")
+
+	// Deposit the withdrawn tokens in the recipient's receiver
+	receiverRef.deposit(from: <-self.sentVault)
+	}
+	}`,
+			sc.FungibleToken.Address.Hex(),
+			sc.FlowToken.Address.Hex(),
+		)),
+		)
 }

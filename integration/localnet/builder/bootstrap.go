@@ -1,6 +1,7 @@
 package main
 
 import (
+	crand "crypto/rand"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -13,62 +14,65 @@ import (
 	"time"
 
 	"github.com/go-yaml/yaml"
-	"github.com/plus3it/gorecurcopy"
 
 	"github.com/onflow/flow-go/cmd/build"
-	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+
+	"github.com/onflow/flow-go/integration/testnet"
 )
 
 const (
-	BootstrapDir             = "./bootstrap"
-	ProfilerDir              = "./profiler"
-	DataDir                  = "./data"
-	TrieDir                  = "./trie"
-	DockerComposeFile        = "./docker-compose.nodes.yml"
-	DockerComposeFileVersion = "3.7"
-	PrometheusTargetsFile    = "./targets.nodes.json"
-	PortMapFile              = "./ports.nodes.json"
-	DefaultObserverRole      = "observer"
-	DefaultLogLevel          = "DEBUG"
-	DefaultGOMAXPROCS        = 8
-	DefaultMaxObservers      = 100
-	DefaultCollectionCount   = 3
-	DefaultConsensusCount    = 3
-	DefaultExecutionCount    = 1
-	DefaultVerificationCount = 1
-	DefaultAccessCount       = 1
-	DefaultObserverCount     = 0
-	DefaultNClusters         = 1
-	DefaultProfiler          = false
-	DefaultProfileUploader   = false
-	DefaultTracing           = true
-	DefaultCadenceTracing    = false
-	DefaultExtensiveTracing  = false
-	DefaultConsensusDelay    = 800 * time.Millisecond
-	DefaultCollectionDelay   = 950 * time.Millisecond
+	BootstrapDir              = "./bootstrap"
+	ProfilerDir               = "./profiler"
+	DataDir                   = "./data"
+	TrieDir                   = "./trie"
+	DockerComposeFile         = "./docker-compose.nodes.yml"
+	DockerComposeFileVersion  = "3.7"
+	PrometheusTargetsFile     = "./targets.nodes.json"
+	PortMapFile               = "./ports.nodes.json"
+	DefaultObserverRole       = "observer"
+	DefaultLogLevel           = "DEBUG"
+	DefaultGOMAXPROCS         = 8
+	DefaultMaxObservers       = 100
+	DefaultCollectionCount    = 3
+	DefaultConsensusCount     = 3
+	DefaultExecutionCount     = 1
+	DefaultVerificationCount  = 1
+	DefaultAccessCount        = 1
+	DefaultObserverCount      = 0
+	DefaultTestExecutionCount = 0
+	DefaultNClusters          = 1
+	DefaultProfiler           = false
+	DefaultProfileUploader    = false
+	DefaultTracing            = true
+	DefaultCadenceTracing     = false
+	DefaultExtensiveTracing   = false
+	DefaultConsensusDelay     = 800 * time.Millisecond
+	DefaultCollectionDelay    = 950 * time.Millisecond
 )
 
 var (
-	collectionCount        int
-	consensusCount         int
-	executionCount         int
-	verificationCount      int
-	accessCount            int
-	observerCount          int
-	nClusters              uint
-	numViewsInStakingPhase uint64
-	numViewsInDKGPhase     uint64
-	numViewsEpoch          uint64
-	profiler               bool
-	profileUploader        bool
-	tracing                bool
-	cadenceTracing         bool
-	extesiveTracing        bool
-	consensusDelay         time.Duration
-	collectionDelay        time.Duration
-	logLevel               string
+	collectionCount             int
+	consensusCount              int
+	executionCount              int
+	verificationCount           int
+	accessCount                 int
+	observerCount               int
+	testExecutionCount          int
+	nClusters                   uint
+	numViewsInStakingPhase      uint64
+	numViewsInDKGPhase          uint64
+	numViewsEpoch               uint64
+	numViewsPerSecond           uint64
+	finalizationSafetyThreshold uint64
+	profiler                    bool
+	profileUploader             bool
+	tracing                     bool
+	cadenceTracing              bool
+	extensiveTracing            bool
+	consensusDelay              time.Duration
+	collectionDelay             time.Duration
+	logLevel                    string
 
 	ports *PortAllocator
 )
@@ -80,15 +84,18 @@ func init() {
 	flag.IntVar(&verificationCount, "verification", DefaultVerificationCount, "number of verification nodes")
 	flag.IntVar(&accessCount, "access", DefaultAccessCount, "number of staked access nodes")
 	flag.IntVar(&observerCount, "observer", DefaultObserverCount, "number of observers")
+	flag.IntVar(&testExecutionCount, "test-execution", DefaultTestExecutionCount, "number of test execution")
 	flag.UintVar(&nClusters, "nclusters", DefaultNClusters, "number of collector clusters")
 	flag.Uint64Var(&numViewsEpoch, "epoch-length", 10000, "number of views in epoch")
 	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
 	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 2000, "number of views in epoch dkg phase")
+	flag.Uint64Var(&finalizationSafetyThreshold, "finalization-safety-threshold", 1000, "number of views for safety threshold T (assume: one finalization occurs within T blocks)")
+	flag.Uint64Var(&numViewsPerSecond, "target-view-rate", 1, "target number of views per second")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
 	flag.BoolVar(&profileUploader, "profile-uploader", DefaultProfileUploader, "whether to upload profiles to the cloud")
 	flag.BoolVar(&tracing, "tracing", DefaultTracing, "whether to enable low-overhead tracing in flow")
 	flag.BoolVar(&cadenceTracing, "cadence-tracing", DefaultCadenceTracing, "whether to enable the tracing in cadance")
-	flag.BoolVar(&extesiveTracing, "extensive-tracing", DefaultExtensiveTracing, "enables high-overhead tracing in fvm")
+	flag.BoolVar(&extensiveTracing, "extensive-tracing", DefaultExtensiveTracing, "enables high-overhead tracing in fvm")
 	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
 	flag.StringVar(&logLevel, "loglevel", DefaultLogLevel, "log level for all nodes")
@@ -123,11 +130,17 @@ func main() {
 	if numViewsEpoch != 0 {
 		flowNetworkOpts = append(flowNetworkOpts, testnet.WithViewsInEpoch(numViewsEpoch))
 	}
+	if numViewsPerSecond != 0 {
+		flowNetworkOpts = append(flowNetworkOpts, testnet.WithViewsPerSecond(numViewsPerSecond))
+	}
 	if numViewsInStakingPhase != 0 {
 		flowNetworkOpts = append(flowNetworkOpts, testnet.WithViewsInStakingAuction(numViewsInStakingPhase))
 	}
 	if numViewsInDKGPhase != 0 {
 		flowNetworkOpts = append(flowNetworkOpts, testnet.WithViewsInDKGPhase(numViewsInDKGPhase))
+	}
+	if finalizationSafetyThreshold != 0 {
+		flowNetworkOpts = append(flowNetworkOpts, testnet.WithFinalizationSafetyThreshold(finalizationSafetyThreshold))
 	}
 	flowNetworkConf := testnet.NewNetworkConfig("localnet", flowNodes, flowNetworkOpts...)
 	displayFlowNetworkConf(flowNetworkConf)
@@ -145,6 +158,7 @@ func main() {
 	}
 
 	dockerServices = prepareObserverServices(dockerServices, flowNodeContainerConfigs)
+	dockerServices = prepareTestExecutionService(dockerServices, flowNodeContainerConfigs)
 
 	err = writeDockerComposeConfig(dockerServices)
 	if err != nil {
@@ -338,6 +352,7 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, n int) Se
 	service.Command = append(service.Command,
 		fmt.Sprintf("--cruise-ctl-fallback-proposal-duration=%s", consensusDelay),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
+		"--cruise-ctl-max-view-duration=2s",
 		"--chunk-alpha=1",
 		"--emergency-sealing-active=false",
 		"--insecure-access-api=false",
@@ -382,20 +397,15 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		panic(err)
 	}
 
-	// we need to actually copy the execution state into the directory for bootstrapping
-	sourceDir := "./" + filepath.Join(BootstrapDir, bootstrap.DirnameExecutionState)
-	err = gorecurcopy.CopyDirectory(sourceDir, trieDir)
-	if err != nil {
-		panic(err)
-	}
-
 	service.Command = append(service.Command,
 		"--triedir=/trie",
 		fmt.Sprintf("--rpc-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
 		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
-		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
+		fmt.Sprintf("--extensive-tracing=%t", extensiveTracing),
 		"--execution-data-dir=/data/execution-data",
 		"--chunk-data-pack-dir=/data/chunk-data-pack",
+		"--pruning-config-threshold=20",
+		"--pruning-config-sleep-after-iteration=1m",
 	)
 
 	service.Volumes = append(service.Volumes,
@@ -415,7 +425,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		fmt.Sprintf("--secure-rpc-addr=%s:%s", container.ContainerName, testnet.GRPCSecurePort),
 		fmt.Sprintf("--http-addr=%s:%s", container.ContainerName, testnet.GRPCWebPort),
 		fmt.Sprintf("--rest-addr=%s:%s", container.ContainerName, testnet.RESTPort),
-		fmt.Sprintf("--state-stream-addr=%s:%s", container.ContainerName, testnet.ExecutionStatePort),
+		fmt.Sprintf("--state-stream-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
 		fmt.Sprintf("--collection-ingress-port=%s", testnet.GRPCPort),
 		"--supports-observer=true",
 		fmt.Sprintf("--public-network-address=%s:%s", container.ContainerName, testnet.PublicNetworkPort),
@@ -424,7 +434,12 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--log-tx-time-to-finalized-executed",
 		"--execution-data-sync-enabled=true",
 		"--execution-data-dir=/data/execution-data",
-		fmt.Sprintf("--state-stream-addr=%s:%s", container.ContainerName, testnet.ExecutionStatePort),
+		"--public-network-execution-data-sync-enabled=true",
+		"--execution-data-indexing-enabled=true",
+		"--execution-state-dir=/data/execution-state",
+		"--script-execution-mode=execution-nodes-only",
+		"--event-query-mode=execution-nodes-only",
+		"--tx-result-query-mode=execution-nodes-only",
 	)
 
 	service.AddExposedPorts(
@@ -432,7 +447,6 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		testnet.GRPCSecurePort,
 		testnet.GRPCWebPort,
 		testnet.RESTPort,
-		testnet.ExecutionStatePort,
 		testnet.PublicNetworkPort,
 	)
 
@@ -445,16 +459,22 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 
 	service := defaultService(observerName, DefaultObserverRole, dataDir, profilerDir, i)
 	service.Command = append(service.Command,
-		fmt.Sprintf("--bootstrap-node-addresses=%s:%s", testnet.PrimaryAN, testnet.PublicNetworkPort),
-		fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
+		fmt.Sprintf("--observer-mode-bootstrap-node-addresses=%s:%s", testnet.PrimaryAN, testnet.PublicNetworkPort),
+		fmt.Sprintf("--observer-mode-bootstrap-node-public-keys=%s", agPublicKey),
 		fmt.Sprintf("--upstream-node-addresses=%s:%s", testnet.PrimaryAN, testnet.GRPCSecurePort),
 		fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
 		fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
-		"--bind=0.0.0.0:0",
+		"--bind=0.0.0.0:3569",
 		fmt.Sprintf("--rpc-addr=%s:%s", observerName, testnet.GRPCPort),
 		fmt.Sprintf("--secure-rpc-addr=%s:%s", observerName, testnet.GRPCSecurePort),
 		fmt.Sprintf("--http-addr=%s:%s", observerName, testnet.GRPCWebPort),
 		fmt.Sprintf("--rest-addr=%s:%s", observerName, testnet.RESTPort),
+		fmt.Sprintf("--state-stream-addr=%s:%s", observerName, testnet.GRPCPort),
+		"--execution-data-dir=/data/execution-data",
+		"--execution-data-sync-enabled=true",
+		"--execution-data-indexing-enabled=true",
+		"--execution-state-dir=/data/execution-state",
+		"--event-query-mode=execution-nodes-only",
 	)
 
 	service.AddExposedPorts(
@@ -554,6 +574,18 @@ func writeDockerComposeConfig(services Services) error {
 		return err
 	}
 
+	// add networks section
+	_, err = f.WriteString(`
+networks:
+  default:
+    name: localnet_network
+    driver: bridge
+    attachable: true
+`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -639,6 +671,24 @@ func getAccessGatewayPublicKey(flowNodeContainerConfigs []testnet.ContainerConfi
 	return "", fmt.Errorf("Unable to find public key for Access Gateway expected in container '%s'", testnet.PrimaryAN)
 }
 
+func getAccessID(flowNodeContainerConfigs []testnet.ContainerConfig) (string, error) {
+	for _, container := range flowNodeContainerConfigs {
+		if container.Role == flow.RoleAccess {
+			return container.NodeID.String(), nil
+		}
+	}
+	return "", fmt.Errorf("Unable to find Access node")
+}
+
+func getExecutionNodeConfig(flowNodeContainerConfigs []testnet.ContainerConfig) (testnet.ContainerConfig, error) {
+	for _, container := range flowNodeContainerConfigs {
+		if container.Role == flow.RoleExecution {
+			return container, nil
+		}
+	}
+	return testnet.ContainerConfig{}, fmt.Errorf("Unable to find execution node")
+}
+
 func prepareObserverServices(dockerServices Services, flowNodeContainerConfigs []testnet.ContainerConfig) Services {
 	if observerCount == 0 {
 		return dockerServices
@@ -666,13 +716,67 @@ func prepareObserverServices(dockerServices Services, flowNodeContainerConfigs [
 		dockerServices[observerName] = observerService
 
 		// Generate observer private key (localnet only, not for production)
-		err := testnet.WriteObserverPrivateKey(observerName, BootstrapDir)
+		_, err := testnet.WriteObserverPrivateKey(observerName, BootstrapDir)
 		if err != nil {
 			panic(err)
 		}
 	}
+
 	fmt.Println()
 	fmt.Println("Observer services bootstrapping data generated...")
+	fmt.Printf("Access Gateway (%s) public network libp2p key: %s\n\n", testnet.PrimaryAN, agPublicKey)
+
+	return dockerServices
+}
+
+func prepareTestExecutionService(dockerServices Services, flowNodeContainerConfigs []testnet.ContainerConfig) Services {
+	if testExecutionCount == 0 {
+		return dockerServices
+	}
+
+	agPublicKey, err := getAccessGatewayPublicKey(flowNodeContainerConfigs)
+	if err != nil {
+		panic(err)
+	}
+
+	publicAccessID, err := getAccessID(flowNodeContainerConfigs)
+	if err != nil {
+		panic(err)
+	}
+
+	containerConfig, err := getExecutionNodeConfig(flowNodeContainerConfigs)
+	if err != nil {
+		panic(err)
+	}
+
+	var nodeid flow.Identifier
+	_, _ = crand.Read(nodeid[:])
+	address := "test_execution_1:2137"
+
+	observerName := fmt.Sprintf("%s_%d", "test_execution", 1)
+	// Generate observer private key (localnet only, not for production)
+	nodeinfo, err := testnet.WriteTestExecutionService(nodeid, address, observerName, BootstrapDir)
+	if err != nil {
+		panic(err)
+	}
+
+	containerConfig.NodeInfo = nodeinfo
+	containerConfig.ContainerName = observerName
+	fmt.Println("NodeID: ", containerConfig)
+
+	observerService := prepareExecutionService(containerConfig, 1, 1)
+	observerService.Command = append(observerService.Command,
+		"--observer-mode=true",
+		fmt.Sprintf("--observer-mode-bootstrap-node-addresses=%s:%s", testnet.PrimaryAN, testnet.PublicNetworkPort),
+		fmt.Sprintf("--observer-mode-bootstrap-node-public-keys=%s", agPublicKey),
+		fmt.Sprintf("--public-access-id=%s", publicAccessID),
+	)
+
+	// Add a docker container for this named Observer
+	dockerServices[observerName] = observerService
+
+	fmt.Println()
+	fmt.Println("Test execution services bootstrapping data generated...")
 	fmt.Printf("Access Gateway (%s) public network libp2p key: %s\n\n", testnet.PrimaryAN, agPublicKey)
 
 	return dockerServices

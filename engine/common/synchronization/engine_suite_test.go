@@ -113,7 +113,7 @@ func (ss *SyncSuite) SetupTest() {
 		nil,
 	)
 	ss.snapshot.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return ss.participants.Filter(selector)
 		},
 		nil,
@@ -164,8 +164,8 @@ func (ss *SyncSuite) SetupTest() {
 	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core,
 		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
-				filter.HasRole(flow.RoleConsensus),
-				filter.Not(filter.HasNodeID(ss.me.NodeID())),
+				filter.HasRole[flow.Identity](flow.RoleConsensus),
+				filter.Not(filter.HasNodeID[flow.Identity](ss.me.NodeID())),
 			),
 			idCache,
 		),

@@ -1,6 +1,10 @@
 package slices
 
-import "sort"
+import (
+	"sort"
+
+	"golang.org/x/exp/constraints"
+)
 
 // Concat concatenates multiple []byte into one []byte with efficient one-time allocation.
 func Concat(slices [][]byte) []byte {
@@ -28,13 +32,23 @@ func EnsureByteSliceSize(b []byte, length int) []byte {
 	return stateBytes
 }
 
-// MakeRange returns a slice of int from [min, max]
-func MakeRange(min, max int) []int {
-	a := make([]int, max-min+1)
+// MakeRange returns a slice of numbers [min, max).
+// The range includes min and excludes max.
+func MakeRange[T constraints.Integer](min, max T) []T {
+	a := make([]T, max-min)
 	for i := range a {
-		a[i] = min + i
+		a[i] = min + T(i)
 	}
 	return a
+}
+
+// Fill constructs a slice of type T with length n. The slice is then filled with input "val".
+func Fill[T any](val T, n int) []T {
+	arr := make([]T, n)
+	for i := 0; i < n; i++ {
+		arr[i] = val
+	}
+	return arr
 }
 
 // AreStringSlicesEqual returns true if the two string slices are equal.

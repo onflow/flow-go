@@ -5,15 +5,14 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/hash"
 )
@@ -173,7 +172,8 @@ func (executor *scriptExecutor) Execute() error {
 }
 
 func (executor *scriptExecutor) execute() error {
-	meterParams, err := getBodyMeterParameters(
+	executionParams, _, err := getExecutionParameters(
+		executor.env.Logger(),
 		executor.ctx,
 		executor.proc,
 		executor.txnState)
@@ -182,7 +182,7 @@ func (executor *scriptExecutor) execute() error {
 	}
 
 	txnId, err := executor.txnState.BeginNestedTransactionWithMeterParams(
-		meterParams)
+		executionParams)
 	if err != nil {
 		return err
 	}
@@ -200,15 +200,13 @@ func (executor *scriptExecutor) executeScript() error {
 	rt := executor.env.BorrowCadenceRuntime()
 	defer executor.env.ReturnCadenceRuntime(rt)
 
+	chainID := executor.ctx.Chain.ChainID()
+
 	if executor.ctx.EVMEnabled {
-		chain := executor.ctx.Chain
-		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 		err := evm.SetupEnvironment(
-			chain.ChainID(),
+			chainID,
 			executor.env,
 			rt.ScriptRuntimeEnv,
-			chain.ServiceAddress(),
-			sc.FlowToken.Address,
 		)
 		if err != nil {
 			return err

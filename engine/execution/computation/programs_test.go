@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/rs/zerolog"
@@ -207,6 +207,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	chain := flow.Emulator.Chain()
 	vm := fvm.NewVirtualMachine()
 	execCtx := fvm.NewContext(
+		fvm.WithEVMEnabled(true),
 		fvm.WithBlockHeader(block.Header),
 		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: &block}}),
 		fvm.WithChain(chain))
@@ -553,5 +554,8 @@ func prepareTx(t *testing.T,
 func hasValidEventValue(t *testing.T, event flow.Event, value int) {
 	data, err := ccf.Decode(nil, event.Payload)
 	require.NoError(t, err)
-	assert.Equal(t, int16(value), data.(cadence.Event).Fields[0].ToGoValue())
+	assert.Equal(t,
+		cadence.Int16(value),
+		cadence.SearchFieldByName(data.(cadence.Event), "value"),
+	)
 }

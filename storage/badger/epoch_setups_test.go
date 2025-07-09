@@ -1,7 +1,6 @@
 package badger_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -25,7 +24,7 @@ func TestEpochSetupStoreAndRetrieve(t *testing.T) {
 
 		// attempt to get a setup that doesn't exist
 		_, err := store.ByID(unittest.IdentifierFixture())
-		assert.True(t, errors.Is(err, storage.ErrNotFound))
+		assert.ErrorIs(t, err, storage.ErrNotFound)
 
 		// store a setup in db
 		expected := unittest.EpochSetupFixture()

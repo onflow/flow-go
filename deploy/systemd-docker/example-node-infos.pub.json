@@ -5,7 +5,8 @@
       "NodeID": "9bbea0644b5e91ec66b4afddef7083e896da545d530ee52b85c78afa88301556",
       "Weight": 1000,
       "NetworkPubKey": "...",
-      "StakingPubKey": "..."
+      "StakingPubKey": "...",
+      "StakingKeyPoP": "..."
     },
     {
         "Role": "consensus",
@@ -13,7 +14,8 @@
         "NodeID": "9bbea0644b5e91ec66b4afddef7083e896da545d530ee52b85c78afa88301556",
         "Weight": 1000,
         "NetworkPubKey": "...",
-        "StakingPubKey": "..."
+        "StakingPubKey": "...",
+        "StakingKeyPoP": "..."
     },
     {
         "Role": "execution",
@@ -21,7 +23,8 @@
         "NodeID": "9bbea0644b5e91ec66b4afddef7083e896da545d530ee52b85c78afa88301556",
         "Weight": 1000,
         "NetworkPubKey": "...",
-        "StakingPubKey": "..."
+        "StakingPubKey": "...",
+        "StakingKeyPoP": "..."
     },
     {
         "Role": "verification",
@@ -29,6 +32,7 @@
         "NodeID": "9bbea0644b5e91ec66b4afddef7083e896da545d530ee52b85c78afa88301556",
         "Weight": 1000,
         "NetworkPubKey": "...",
-        "StakingPubKey": "..."
+        "StakingPubKey": "...",
+        "StakingKeyPoP": "..."
     }
 ]

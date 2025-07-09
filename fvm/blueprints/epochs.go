@@ -44,6 +44,7 @@ func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig e
 				},
 			),
 		)).
+		AddArgument(jsoncdc.MustEncode(cadence.String("FlowEpoch"))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddArgument(jsoncdc.MustEncode(epochConfig.CurrentEpochCounter)).
 		AddArgument(jsoncdc.MustEncode(epochConfig.NumViewsInEpoch)).
@@ -128,12 +129,14 @@ func DeployLockedTokensTransaction(service flow.Address, contract []byte, public
 func RegisterNodeTransaction(
 	service flow.Address,
 	flowTokenAddress flow.Address,
+	fungibleTokenAddress flow.Address,
 	nodeAddress flow.Address,
-	id *flow.Identity,
+	node bootstrap.NodeInfo,
 ) *flow.TransactionBody {
 
 	env := templates.Environment{
 		FlowTokenAddress:         flowTokenAddress.HexWithPrefix(),
+		FungibleTokenAddress:     fungibleTokenAddress.HexWithPrefix(),
 		IDTableAddress:           service.HexWithPrefix(),
 		QuorumCertificateAddress: service.HexWithPrefix(),
 		DkgAddress:               service.HexWithPrefix(),
@@ -143,8 +146,8 @@ func RegisterNodeTransaction(
 	// Use NetworkingKey as the public key of the machine account.
 	// We do this for tests/localnet but normally it should be a separate key.
 	accountKey := &flowsdk.AccountKey{
-		PublicKey: id.NetworkPubKey,
-		SigAlgo:   id.NetworkPubKey.Algorithm(),
+		PublicKey: node.NetworkPubKey(),
+		SigAlgo:   node.NetworkPubKey().Algorithm(),
 		HashAlgo:  bootstrap.DefaultMachineAccountHashAlgo,
 		Weight:    1000,
 	}
@@ -165,22 +168,31 @@ func RegisterNodeTransaction(
 		panic(err)
 	}
 
-	cdcNodeID, err := cadence.NewString(id.NodeID.String())
+	cdcNodeID, err := cadence.NewString(node.NodeID.String())
 	if err != nil {
 		panic(err)
 	}
 
-	cdcAddress, err := cadence.NewString(id.Address)
+	cdcAddress, err := cadence.NewString(node.Address)
 	if err != nil {
 		panic(err)
 	}
 
-	cdcNetworkPubKey, err := cadence.NewString(id.NetworkPubKey.String()[2:])
+	cdcNetworkPubKey, err := cadence.NewString(node.NetworkPubKey().String()[2:])
 	if err != nil {
 		panic(err)
 	}
 
-	cdcStakingPubKey, err := cadence.NewString(id.StakingPubKey.String()[2:])
+	cdcStakingPubKey, err := cadence.NewString(node.StakingPubKey().String()[2:])
+	if err != nil {
+		panic(err)
+	}
+
+	pop, err := node.StakingPoP()
+	if err != nil {
+		panic(err)
+	}
+	cdcStakingKeyPoP, err := cadence.NewString(pop.String()[2:])
 	if err != nil {
 		panic(err)
 	}
@@ -189,10 +201,11 @@ func RegisterNodeTransaction(
 	return flow.NewTransactionBody().
 		SetScript(templates.GenerateEpochRegisterNodeScript(env)).
 		AddArgument(jsoncdc.MustEncode(cdcNodeID)).
-		AddArgument(jsoncdc.MustEncode(cadence.NewUInt8(uint8(id.Role)))).
+		AddArgument(jsoncdc.MustEncode(cadence.NewUInt8(uint8(node.Role)))).
 		AddArgument(jsoncdc.MustEncode(cdcAddress)).
 		AddArgument(jsoncdc.MustEncode(cdcNetworkPubKey)).
 		AddArgument(jsoncdc.MustEncode(cdcStakingPubKey)).
+		AddArgument(jsoncdc.MustEncode(cdcStakingKeyPoP)).
 		AddArgument(jsoncdc.MustEncode(cdcAmount)).
 		AddArgument(jsoncdc.MustEncode(cadencePublicKeys)).
 		AddAuthorizer(nodeAddress)

@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/convert"
@@ -20,60 +19,152 @@ func TestEventConversion(t *testing.T) {
 
 	chainID := flow.Emulator
 
-	t.Run(
-		"epoch setup", func(t *testing.T) {
+	t.Run("epoch setup", func(t *testing.T) {
 
-			fixture, expected := unittest.EpochSetupFixtureByChainID(chainID)
+		fixture, expected := unittest.EpochSetupFixtureByChainID(chainID)
 
-			// convert Cadence types to Go types
-			event, err := convert.ServiceEvent(chainID, fixture)
-			require.NoError(t, err)
-			require.NotNil(t, event)
+		// convert Cadence types to Go types
+		event, err := convert.ServiceEvent(chainID, fixture)
+		require.NoError(t, err)
+		require.NotNil(t, event)
 
-			// cast event type to epoch setup
-			actual, ok := event.Event.(*flow.EpochSetup)
-			require.True(t, ok)
+		// cast event type to epoch setup
+		actual, ok := event.Event.(*flow.EpochSetup)
+		require.True(t, ok)
 
-			assert.Equal(t, expected, actual)
+		assert.Equal(t, expected, actual)
 
-		},
+	},
 	)
 
-	t.Run(
-		"epoch commit", func(t *testing.T) {
+	t.Run("epoch setup with random source with leading zeroes", func(t *testing.T) {
 
-			fixture, expected := unittest.EpochCommitFixtureByChainID(chainID)
+		fixture, _ := unittest.EpochSetupFixtureByChainID(chainID)
+		// all zero source to cover all cases of endiannesses
+		randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
+		// update the random source in event fixture
+		fixture.Payload = unittest.EpochSetupFixtureCCF(randomSource)
 
-			// convert Cadence types to Go types
-			event, err := convert.ServiceEvent(chainID, fixture)
-			require.NoError(t, err)
-			require.NotNil(t, event)
+		// convert Cadence types to Go types
+		event, err := convert.ServiceEvent(chainID, fixture)
+		require.NoError(t, err)
+		require.NotNil(t, event)
 
-			// cast event type to epoch commit
-			actual, ok := event.Event.(*flow.EpochCommit)
-			require.True(t, ok)
-
-			assert.Equal(t, expected, actual)
-		},
+		// cast event type to epoch setup
+		_, ok := event.Event.(*flow.EpochSetup)
+		require.True(t, ok)
+	},
 	)
 
-	t.Run(
-		"version beacon", func(t *testing.T) {
+	t.Run("epoch setup with short random source", func(t *testing.T) {
 
-			fixture, expected := unittest.VersionBeaconFixtureByChainID(chainID)
+		fixture, _ := unittest.EpochSetupFixtureByChainID(chainID)
+		// update the random source in event fixture
+		randomSource := unittest.EpochSetupRandomSourceFixture()
+		fixture.Payload = unittest.EpochSetupFixtureCCF(randomSource[:flow.EpochSetupRandomSourceLength-1])
 
-			// convert Cadence types to Go types
-			event, err := convert.ServiceEvent(chainID, fixture)
-			require.NoError(t, err)
-			require.NotNil(t, event)
-
-			// cast event type to version beacon
-			actual, ok := event.Event.(*flow.VersionBeacon)
-			require.True(t, ok)
-
-			assert.Equal(t, expected, actual)
-		},
+		// convert Cadence types to Go types
+		event, err := convert.ServiceEvent(chainID, fixture)
+		require.Error(t, err)
+		require.Nil(t, event)
+	},
 	)
+
+	t.Run("epoch setup with non-hex random source", func(t *testing.T) {
+
+		fixture, _ := unittest.EpochSetupFixtureByChainID(chainID)
+		// update the random source in event fixture
+		fixture.Payload = unittest.EpochSetupCCFWithNonHexRandomSource()
+
+		// convert Cadence types to Go types
+		event, err := convert.ServiceEvent(chainID, fixture)
+		require.Error(t, err)
+		require.Nil(t, event)
+	},
+	)
+
+	t.Run("epoch commit", func(t *testing.T) {
+
+		fixture, expected := unittest.EpochCommitFixtureByChainID(chainID)
+
+		// convert Cadence types to Go types
+		event, err := convert.ServiceEvent(chainID, fixture)
+		require.NoError(t, err)
+		require.NotNil(t, event)
+
+		// cast event type to epoch commit
+		actual, ok := event.Event.(*flow.EpochCommit)
+		require.True(t, ok)
+
+		assert.Equal(t, expected, actual)
+	},
+	)
+
+	// TODO(EFM, #6794): Remove this once we complete the network upgrade, this is only to test
+	//  backward compatibility of EpochCommit service event
+	t.Run("epoch commit, backward compatibility", func(t *testing.T) {
+
+		fixture, expected := unittest.EpochCommitV0FixtureByChainID(chainID)
+
+		// convert Cadence types to Go types
+		event, err := convert.ServiceEvent(chainID, fixture)
+		require.NoError(t, err)
+		require.NotNil(t, event)
+
+		// cast event type to epoch commit
+		actual, ok := event.Event.(*flow.EpochCommit)
+		require.True(t, ok)
+
+		assert.Equal(t, expected, actual)
+	},
+	)
+
+	t.Run("epoch recover", func(t *testing.T) {
+		fixture, expected := unittest.EpochRecoverFixtureByChainID(chainID)
+
+		// convert Cadence types to Go types
+		event, err := convert.ServiceEvent(chainID, fixture)
+		require.NoError(t, err)
+		require.NotNil(t, event)
+
+		// cast event type to epoch recover
+		actual, ok := event.Event.(*flow.EpochRecover)
+		require.True(t, ok)
+
+		assert.Equal(t, expected, actual)
+	})
+
+	t.Run("version beacon", func(t *testing.T) {
+
+		fixture, expected := unittest.VersionBeaconFixtureByChainID(chainID)
+
+		// convert Cadence types to Go types
+		event, err := convert.ServiceEvent(chainID, fixture)
+		require.NoError(t, err)
+		require.NotNil(t, event)
+
+		// cast event type to version beacon
+		actual, ok := event.Event.(*flow.VersionBeacon)
+		require.True(t, ok)
+
+		assert.Equal(t, expected, actual)
+	},
+	)
+
+	t.Run("protocol state version upgrade", func(t *testing.T) {
+		fixture, expected := unittest.ProtocolStateVersionUpgradeFixtureByChainID(chainID)
+
+		// convert Cadence types to Go types
+		event, err := convert.ServiceEvent(chainID, fixture)
+		require.NoError(t, err)
+		require.NotNil(t, event)
+
+		// cast event type to version upgrade
+		actual, ok := event.Event.(*flow.ProtocolStateVersionUpgrade)
+		require.True(t, ok)
+
+		assert.Equal(t, expected, actual)
+	})
 }
 
 func TestDecodeCadenceValue(t *testing.T) {
@@ -145,24 +236,23 @@ func TestDecodeCadenceValue(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(
-			tt.name, func(t *testing.T) {
-				result, err := convert.DecodeCadenceValue(
-					tt.location,
-					tt.value,
-					tt.decodeInner,
-				)
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := convert.DecodeCadenceValue(
+				tt.location,
+				tt.value,
+				tt.decodeInner,
+			)
 
-				if tt.expectError {
-					assert.Error(t, err)
-					if tt.expectedLocation != "" {
-						assert.Contains(t, err.Error(), tt.expectedLocation)
-					}
-				} else {
-					assert.NoError(t, err)
-					assert.Equal(t, tt.expected, result)
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.expectedLocation != "" {
+					assert.Contains(t, err.Error(), tt.expectedLocation)
 				}
-			},
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		},
 		)
 	}
 }

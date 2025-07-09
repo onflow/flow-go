@@ -11,8 +11,7 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	emulator "github.com/onflow/flow-emulator/emulator"
-
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
@@ -21,7 +20,7 @@ import (
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
 
-	"github.com/onflow/flow-go/crypto"
+	emulator "github.com/onflow/flow-go/integration/internal/emulator"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/dkg"
@@ -33,13 +32,13 @@ type ClientSuite struct {
 
 	contractClient *dkg.Client
 
-	env            templates.Environment
-	blockchain     emulator.Emulator
-	emulatorClient *utils.EmulatorClient
-
-	dkgAddress    sdk.Address
-	dkgAccountKey *sdk.AccountKey
-	dkgSigner     sdkcrypto.Signer
+	env                   templates.Environment
+	blockchain            emulator.Emulator
+	emulatorClient        *utils.EmulatorClient
+	serviceAccountAddress sdk.Address
+	dkgAddress            sdk.Address
+	dkgAccountKey         *sdk.AccountKey
+	dkgSigner             sdkcrypto.Signer
 }
 
 func TestDKGClient(t *testing.T) {
@@ -49,12 +48,14 @@ func TestDKGClient(t *testing.T) {
 // Setup Test creates the blockchain client, the emulated blockchain and deploys
 // the DKG contract to the emulator
 func (s *ClientSuite) SetupTest() {
-	blockchain, err := emulator.New(emulator.WithStorageLimitEnabled(false))
+	blockchain, err := emulator.New(
+		emulator.WithStorageLimitEnabled(false),
+	)
 	require.NoError(s.T(), err)
 
 	s.blockchain = blockchain
 	s.emulatorClient = utils.NewEmulatorClient(blockchain)
-
+	s.serviceAccountAddress = sdk.Address(s.blockchain.ServiceKey().Address)
 	// deploy contract
 	s.deployDKGContract()
 
@@ -146,19 +147,9 @@ func (s *ClientSuite) TestNilDKGSubmission() {
 	// prepare DKG
 	clients := s.prepareDKG(participants)
 
-	// generate list of public keys
-	numberOfNodes := len(participants)
-	publicKeys := make([]crypto.PublicKey, 0, numberOfNodes+1)
-	for i := 0; i < numberOfNodes; i++ {
-		publicKeys = append(publicKeys, nil)
-	}
-
-	// create a nil group public key
-	var groupPublicKey crypto.PublicKey
-
 	// submit empty nil keys for each participant
 	for _, client := range clients {
-		err := client.SubmitResult(groupPublicKey, publicKeys)
+		err := client.SubmitEmptyResult()
 		require.NoError(s.T(), err)
 	}
 }
@@ -175,14 +166,16 @@ func (s *ClientSuite) TestSubmitResult() {
 	// generate list of public keys
 	numberOfNodes := len(participants)
 	publicKeys := make([]crypto.PublicKey, 0, numberOfNodes)
+	indexMap := make(flow.DKGIndexMap, numberOfNodes)
 	for i := 0; i < numberOfNodes; i++ {
 		privateKey := unittest.KeyFixture(crypto.BLSBLS12381)
 		publicKeys = append(publicKeys, privateKey.PublicKey())
+		indexMap[participants[i]] = i
 	}
 	// create a group public key
 	groupPublicKey := unittest.KeyFixture(crypto.BLSBLS12381).PublicKey()
 
-	err := clients[0].SubmitResult(groupPublicKey, publicKeys)
+	err := clients[0].SubmitParametersAndResult(indexMap, groupPublicKey, publicKeys)
 	require.NoError(s.T(), err)
 }
 
@@ -229,18 +222,18 @@ func (s *ClientSuite) setUpAdmin() {
 
 	// set up admin resource
 	setUpAdminTx := sdk.NewTransaction().
-		SetScript(templates.GeneratePublishDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
-		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
+		SetScript(templates.GeneratePublishDKGAdminScript(s.env)).
+		SetComputeLimit(9999).
+		SetProposalKey(s.serviceAccountAddress, s.blockchain.ServiceKey().Index,
 			s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address).
+		SetPayer(s.serviceAccountAddress).
 		AddAuthorizer(s.dkgAddress)
 
 	signer, err := s.blockchain.ServiceKey().Signer()
 	require.NoError(s.T(), err)
 
 	s.signAndSubmit(setUpAdminTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
+		[]sdk.Address{s.serviceAccountAddress, s.dkgAddress},
 		[]sdkcrypto.Signer{signer, s.dkgSigner},
 	)
 }
@@ -258,10 +251,10 @@ func (s *ClientSuite) startDKGWithParticipants(nodeIDs []flow.Identifier) {
 	// start DKG using admin resource
 	startDKGTx := sdk.NewTransaction().
 		SetScript(templates.GenerateStartDKGScript(s.env)).
-		SetGasLimit(9999).
-		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
+		SetComputeLimit(9999).
+		SetProposalKey(s.serviceAccountAddress, s.blockchain.ServiceKey().Index,
 			s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address).
+		SetPayer(s.serviceAccountAddress).
 		AddAuthorizer(s.dkgAddress)
 
 	err := startDKGTx.AddArgument(cadence.NewArray(valueNodeIDs))
@@ -271,7 +264,7 @@ func (s *ClientSuite) startDKGWithParticipants(nodeIDs []flow.Identifier) {
 	require.NoError(s.T(), err)
 
 	s.signAndSubmit(startDKGTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
+		[]sdk.Address{s.serviceAccountAddress, s.dkgAddress},
 		[]sdkcrypto.Signer{signer, s.dkgSigner},
 	)
 
@@ -289,10 +282,10 @@ func (s *ClientSuite) createParticipant(nodeID flow.Identifier, authoriser sdk.A
 	// create DKG partcipant
 	createParticipantTx := sdk.NewTransaction().
 		SetScript(templates.GenerateCreateDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
-		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
+		SetComputeLimit(9999).
+		SetProposalKey(s.serviceAccountAddress, s.blockchain.ServiceKey().Index,
 			s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address).
+		SetPayer(s.serviceAccountAddress).
 		AddAuthorizer(authoriser)
 
 	err := createParticipantTx.AddArgument(cadence.NewAddress(s.dkgAddress))
@@ -307,7 +300,7 @@ func (s *ClientSuite) createParticipant(nodeID flow.Identifier, authoriser sdk.A
 	require.NoError(s.T(), err)
 
 	s.signAndSubmit(createParticipantTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address, authoriser},
+		[]sdk.Address{s.serviceAccountAddress, authoriser},
 		[]sdkcrypto.Signer{s2, signer},
 	)
 

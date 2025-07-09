@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -65,6 +64,11 @@ type transactionExecutor struct {
 
 	startedTransactionBodyExecution bool
 	nestedTxnId                     state.NestedTransactionId
+
+	// the state reads needed to compute the metering parameters
+	// this is used to invalidate the metering parameters if a transaction
+	// writes to any of those registers
+	executionStateRead *snapshot.ExecutionSnapshot
 
 	cadenceRuntime  *reusableRuntime.ReusableCadenceRuntime
 	txnBodyExecutor runtime.Executor
@@ -182,32 +186,41 @@ func (executor *transactionExecutor) preprocess() error {
 // infrequently modified and are expensive to compute.  For now this includes
 // reading meter parameter overrides and parsing programs.
 func (executor *transactionExecutor) preprocessTransactionBody() error {
-	// setup evm
+	chainID := executor.ctx.Chain.ChainID()
+
+	// setup EVM
 	if executor.ctx.EVMEnabled {
-		chain := executor.ctx.Chain
-		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 		err := evm.SetupEnvironment(
-			chain.ChainID(),
+			chainID,
 			executor.env,
 			executor.cadenceRuntime.TxRuntimeEnv,
-			chain.ServiceAddress(),
-			sc.FlowToken.Address,
 		)
 		if err != nil {
 			return err
 		}
 	}
 
-	meterParams, err := getBodyMeterParameters(
+	// get meter parameters
+	executionParameters, executionStateRead, err := getExecutionParameters(
+		executor.env.Logger(),
 		executor.ctx,
 		executor.proc,
 		executor.txnState)
 	if err != nil {
-		return fmt.Errorf("error gettng meter parameters: %w", err)
+		return fmt.Errorf("error getting execution parameters: %w", err)
 	}
 
+	if len(executionStateRead.WriteSet) != 0 {
+		// this should never happen
+		// and indicates an implementation error
+		panic("getting execution parameters should not write to registers")
+	}
+
+	// we need to save the execution state read for invalidation purposes
+	executor.executionStateRead = executionStateRead
+
 	txnId, err := executor.txnState.BeginNestedTransactionWithMeterParams(
-		meterParams)
+		executionParameters)
 	if err != nil {
 		return err
 	}
@@ -242,16 +255,14 @@ func (executor *transactionExecutor) execute() error {
 }
 
 func (executor *transactionExecutor) ExecuteTransactionBody() error {
-	// setup evm
+	chainID := executor.ctx.Chain.ChainID()
+
+	// setup EVM
 	if executor.ctx.EVMEnabled {
-		chain := executor.ctx.Chain
-		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 		err := evm.SetupEnvironment(
-			chain.ChainID(),
+			chainID,
 			executor.env,
 			executor.cadenceRuntime.TxRuntimeEnv,
-			chain.ServiceAddress(),
-			sc.FlowToken.Address,
 		)
 		if err != nil {
 			return err
@@ -326,19 +337,19 @@ func (executor *transactionExecutor) logExecutionIntensities() {
 	}
 
 	computation := zerolog.Dict()
-	for s, u := range executor.txnState.ComputationIntensities() {
-		computation.Uint(strconv.FormatUint(uint64(s), 10), u)
+	for kind, intensity := range executor.txnState.ComputationIntensities() {
+		computation.Uint64(strconv.FormatUint(uint64(kind), 10), intensity)
 	}
 	memory := zerolog.Dict()
-	for s, u := range executor.txnState.MemoryIntensities() {
-		memory.Uint(strconv.FormatUint(uint64(s), 10), u)
+	for kind, amount := range executor.txnState.MemoryAmounts() {
+		memory.Uint64(strconv.FormatUint(uint64(kind), 10), amount)
 	}
 	log.Debug().
 		Uint64("ledgerInteractionUsed", executor.txnState.InteractionUsed()).
 		Uint64("computationUsed", executor.txnState.TotalComputationUsed()).
 		Uint64("memoryEstimate", executor.txnState.TotalMemoryEstimate()).
 		Dict("computationIntensities", computation).
-		Dict("memoryIntensities", memory).
+		Dict("memoryAmounts", memory).
 		Msg("transaction execution data")
 }
 
@@ -392,25 +403,22 @@ func (executor *transactionExecutor) normalExecution() (
 
 	invalidator = environment.NewDerivedDataInvalidator(
 		contractUpdates,
-		executor.ctx.Chain.ServiceAddress(),
-		bodySnapshot)
+		bodySnapshot,
+		executor.executionStateRead,
+	)
 
 	// Check if all account storage limits are ok
-	//
-	// disable the computation/memory limit checks on storage checks,
-	// so we don't error from computation/memory limits on this part.
 	//
 	// The storage limit check is performed for all accounts that were touched during the transaction.
 	// The storage capacity of an account depends on its balance and should be higher than the accounts storage used.
 	// The payer account is special cased in this check and its balance is considered max_fees lower than its
 	// actual balance, for the purpose of calculating storage capacity, because the payer will have to pay for this tx.
-	executor.txnState.RunWithAllLimitsDisabled(func() {
-		err = executor.CheckStorageLimits(
-			executor.env,
-			bodySnapshot,
-			executor.proc.Transaction.Payer,
-			maxTxFees)
-	})
+	err = executor.CheckStorageLimits(
+		executor.ctx,
+		executor.env,
+		bodySnapshot,
+		executor.proc.Transaction.Payer,
+		maxTxFees)
 
 	if err != nil {
 		return

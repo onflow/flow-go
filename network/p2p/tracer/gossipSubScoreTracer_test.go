@@ -2,7 +2,7 @@ package tracer_test
 
 import (
 	"context"
-	"os"
+	"io"
 	"testing"
 	"time"
 
@@ -62,7 +62,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 			}
 		}
 	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).Hook(hook)
+	logger := zerolog.New(io.Discard).Level(zerolog.DebugLevel).Hook(hook)
 
 	// sets some fixed scores for the nodes for sake of testing based on their roles.
 	consensusScore := float64(87)
@@ -80,7 +80,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 	cfg.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	// the libp2p node updates the subscription list as well as the app-specific score every 10 milliseconds (for testing purposes)
 	cfg.NetworkConfig.GossipSub.SubscriptionProvider.UpdateInterval = 10 * time.Millisecond
-	cfg.NetworkConfig.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond
+	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond
 	tracerNode, tracerId := p2ptest.NodeFixture(
 		t,
 		sporkId,

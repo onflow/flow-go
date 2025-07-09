@@ -3,7 +3,7 @@ package environment
 import (
 	"fmt"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -253,7 +253,12 @@ func (creator *accountCreator) CreateAccount(
 ) {
 	defer creator.tracer.StartChildSpan(trace.FVMEnvCreateAccount).End()
 
-	err := creator.meter.MeterComputation(ComputationKindCreateAccount, 1)
+	err := creator.meter.MeterComputation(
+		common.ComputationUsage{
+			Kind:      ComputationKindCreateAccount,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return common.Address{}, err
 	}

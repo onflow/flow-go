@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto/random"
+	"github.com/onflow/crypto/random"
 )
 
 func TestRandomIntegers(t *testing.T) {
@@ -222,5 +222,15 @@ func TestSamples(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, constant, fullSlice)
+	})
+}
+
+func TestRandomString(t *testing.T) {
+	t.Run("basic random string", func(t *testing.T) {
+		length := 32
+		str, err := GenerateRandomString(length)
+		require.NoError(t, err)
+		t.Logf("string: %s", str)
+		require.Equal(t, length, len(str))
 	})
 }

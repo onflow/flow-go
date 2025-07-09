@@ -16,7 +16,7 @@ import (
 // TestClusterPrefixedMessagesReceivedTracker_Inc ensures cluster prefixed received tracker increments a cluster prefixed control messages received gauge value correctly.
 func TestClusterPrefixedMessagesReceivedTracker_Inc(t *testing.T) {
 	tracker := mockTracker(t)
-	id := unittest.IdentifierFixture()
+	id := unittest.PeerIdFixture(t)
 	n := float64(5)
 	prevGuage := 0.0
 	for i := float64(1); i <= n; i++ {
@@ -34,7 +34,7 @@ func TestClusterPrefixedMessagesReceivedTracker_Inc(t *testing.T) {
 func TestClusterPrefixedMessagesReceivedTracker_IncConcurrent(t *testing.T) {
 	tracker := mockTracker(t)
 	n := float64(5)
-	id := unittest.IdentifierFixture()
+	id := unittest.PeerIdFixture(t)
 	var wg sync.WaitGroup
 	wg.Add(5)
 	for i := float64(0); i < n; i++ {
@@ -55,7 +55,7 @@ func TestClusterPrefixedMessagesReceivedTracker_IncConcurrent(t *testing.T) {
 func TestClusterPrefixedMessagesReceivedTracker_ConcurrentIncAndLoad(t *testing.T) {
 	tracker := mockTracker(t)
 	n := float64(5)
-	id := unittest.IdentifierFixture()
+	id := unittest.PeerIdFixture(t)
 	var wg sync.WaitGroup
 	wg.Add(10)
 

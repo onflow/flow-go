@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
 )
@@ -179,12 +179,17 @@ func (p *StakingVoteProcessor) buildQC() (*flow.QuorumCertificate, error) {
 		return nil, fmt.Errorf("could not encode signer indices: %w", err)
 	}
 
-	return &flow.QuorumCertificate{
+	qc, err := flow.NewQuorumCertificate(flow.UntrustedQuorumCertificate{
 		View:          p.block.View,
 		BlockID:       p.block.BlockID,
 		SignerIndices: signerIndices,
 		SigData:       aggregatedStakingSig,
-	}, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build quorum certificate: %w", err)
+	}
+
+	return qc, nil
 }
 
 func (p *StakingVoteProcessor) signerIndicesFromIdentities(signerIDs flow.IdentifierList) ([]byte, error) {

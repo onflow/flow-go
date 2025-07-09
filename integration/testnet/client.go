@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go-sdk/templates"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -39,16 +41,24 @@ type Client struct {
 // NewClientWithKey returns a new client to an Access API listening at the given
 // address, using the given account key for signing transactions.
 func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.PrivateKey, chain flow.Chain) (*Client, error) {
-
-	flowClient, err := client.NewClient(accessAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	flowClient, err := client.NewClient(
+		accessAddr,
+		client.WithGRPCDialOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create new flow client: %w", err)
 	}
 
-	acc, err := flowClient.GetAccount(context.Background(), accountAddr)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	acc, err := getAccount(ctx, flowClient, accountAddr)
 	if err != nil {
 		return nil, fmt.Errorf("could not get the account %v: %w", accountAddr, err)
 	}
+
 	accountKey := acc.Keys[0]
 
 	mySigner, err := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
@@ -77,18 +87,18 @@ func NewClient(addr string, chain flow.Chain) (*Client, error) {
 	}
 	// Uncomment for debugging keys
 
-	//json, err := key.MarshalJSON()
-	//if err != nil {
+	// json, err := key.MarshalJSON()
+	// if err != nil {
 	//	return nil, fmt.Errorf("cannot marshal key json: %w", err)
-	//}
-	//public := key.PublicKey(1000)
-	//publicJson, err := public.MarshalJSON()
-	//if err != nil {
+	// }
+	// public := key.PublicKey(1000)
+	// publicJson, err := public.MarshalJSON()
+	// if err != nil {
 	//	return nil, fmt.Errorf("cannot marshal key json: %w", err)
-	//}
+	// }
 	//
-	//fmt.Printf("New client with private key: \n%s\n", json)
-	//fmt.Printf("and public key: \n%s\n", publicJson)
+	// fmt.Printf("New client with private key: \n%s\n", json)
+	// fmt.Printf("and public key: \n%s\n", publicJson)
 
 	return NewClientWithKey(addr, sdk.Address(chain.ServiceAddress()), privateKey, chain)
 }
@@ -98,7 +108,7 @@ func (c *Client) AccountKeyPriv() sdkcrypto.PrivateKey {
 	return c.accountKeyPriv
 }
 
-func (c *Client) GetSeqNumber() uint64 {
+func (c *Client) GetAndIncrementSeqNumber() uint64 {
 	n := c.accountKey.SequenceNumber
 	c.accountKey.SequenceNumber++
 	return n
@@ -111,18 +121,37 @@ func (c *Client) Events(ctx context.Context, typ string) ([]sdk.BlockEvents, err
 // DeployContract submits a transaction to deploy a contract with the given
 // code to the root account.
 func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contract dsl.Contract) (*sdk.Transaction, error) {
-
-	code := dsl.Transaction{
+	return c.deployContract(ctx, refID, dsl.Transaction{
 		Import: dsl.Import{},
 		Content: dsl.Prepare{
-			Content: dsl.UpdateAccountCode{Code: contract.ToCadence(), Name: contract.Name},
+			Content: dsl.SetAccountCode{
+				Code: contract.ToCadence(),
+				Name: contract.Name,
+			},
 		},
-	}
+	})
+}
 
+// UpdateContract submits a transaction to deploy a contract update with the given
+// code to the root account.
+func (c *Client) UpdateContract(ctx context.Context, refID sdk.Identifier, contract dsl.Contract) (*sdk.Transaction, error) {
+	return c.deployContract(ctx, refID, dsl.Transaction{
+		Import: dsl.Import{},
+		Content: dsl.Prepare{
+			Content: dsl.SetAccountCode{
+				Code:   contract.ToCadence(),
+				Name:   contract.Name,
+				Update: true,
+			},
+		},
+	})
+}
+
+func (c *Client) deployContract(ctx context.Context, refID sdk.Identifier, code dsl.Transaction) (*sdk.Transaction, error) {
 	tx := sdk.NewTransaction().
 		SetScript([]byte(code.ToCadence())).
 		SetReferenceBlockID(refID).
-		SetProposalKey(c.SDKServiceAddress(), 0, c.GetSeqNumber()).
+		SetProposalKey(c.SDKServiceAddress(), 0, c.GetAndIncrementSeqNumber()).
 		SetPayer(c.SDKServiceAddress()).
 		AddAuthorizer(c.SDKServiceAddress())
 
@@ -194,6 +223,11 @@ func (c *Client) AccountKey() *sdk.AccountKey {
 
 func (c *Client) Account() *sdk.Account {
 	return c.account
+}
+
+// WaitForFinalized waits for the transaction to be finalized, then returns the result.
+func (c *Client) WaitForFinalized(ctx context.Context, id sdk.Identifier) (*sdk.TransactionResult, error) {
+	return c.waitForStatus(ctx, id, sdk.TransactionStatusFinalized)
 }
 
 // WaitForSealed waits for the transaction to be sealed, then returns the result.
@@ -366,9 +400,9 @@ func (c *Client) CreateAccount(
 	if err != nil {
 		return sdk.Address{}, fmt.Errorf("failed cusnctruct create account transaction %w", err)
 	}
-	tx.SetGasLimit(1000).
+	tx.SetComputeLimit(1000).
 		SetReferenceBlockID(latestBlockID).
-		SetProposalKey(payer, 0, c.GetSeqNumber()).
+		SetProposalKey(payer, 0, c.GetAndIncrementSeqNumber()).
 		SetPayer(payer)
 
 	err = c.SignAndSendTransaction(ctx, tx)
@@ -403,4 +437,28 @@ func (c *Client) GetEventsForBlockIDs(
 	}
 
 	return events, nil
+}
+
+func getAccount(ctx context.Context, client *client.Client, address sdk.Address) (*sdk.Account, error) {
+	header, err := client.GetLatestBlockHeader(ctx, true)
+	if err != nil {
+		return nil, fmt.Errorf("could not get latest block header: %w", err)
+	}
+
+	// when this is run against an Access node with indexing enabled, occasionally the indexed height
+	// lags behind the sealed height, especially after first starting up (like in a test).
+	// Retry using the same block until we get the account.
+	for {
+		acc, err := client.GetAccountAtBlockHeight(ctx, address, header.Height)
+		if err == nil {
+			return acc, nil
+		}
+
+		switch status.Code(err) {
+		case codes.OutOfRange, codes.ResourceExhausted:
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		return nil, fmt.Errorf("could not get the account %v: %w", address, err)
+	}
 }

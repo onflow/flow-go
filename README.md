@@ -54,7 +54,7 @@ The following table lists all work streams and links to their home directory and
 ## Installation
 
 - Clone this repository
-- Install [Go](https://golang.org/doc/install) (Flow supports Go 1.18 and later)
+- Install [Go](https://golang.org/doc/install) (Flow requires Go 1.23 and later)
 - Install [Docker](https://docs.docker.com/get-docker/), which is used for running a local network and integration tests
 - Make sure the [`GOPATH`](https://golang.org/cmd/go/#hdr-GOPATH_environment_variable) and `GOBIN` environment variables
   are set, and `GOBIN` is added to your path:
@@ -100,14 +100,29 @@ The recommended way to build and run Flow for local development is using Docker.
 Build a Docker image for all nodes:
 
 ```bash
-make docker-build-flow
+make docker-native-build-flow
 ```
 
 Build a Docker image for a particular node role (replace `$ROLE` with `collection`, `consensus`, etc.):
 
 ```bash
-make docker-build-$ROLE
+make docker-native-build-$ROLE
 ```
+
+#### Building a binary for the access node
+
+Build the binary for an access node that can be run directly on the machine without using Docker.
+
+```bash
+make docker-native-build-access-binary
+```
+_this builds a binary for Linux/x86_64 machine_.
+
+The make command will generate a binary called `flow_access_node`
+
+### Importing the module
+
+When importing the `github.com/onflow/flow-go` module in your Go project, testing or building your project may require setting extra Go flags because the module requires [cgo](https://pkg.go.dev/cmd/cgo). In particular, `CGO_ENABLED` must be set to `1` if `cgo` isn't enabled by default. This constraint comes from the underlying cryptography library. Refer to the [crypto repository build](https://github.com/onflow/crypto?tab=readme-ov-file#build) for more details.
 
 ### Local Network
 

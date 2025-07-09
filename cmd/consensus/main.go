@@ -1,8 +1,7 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +13,7 @@ import (
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
@@ -52,6 +52,7 @@ import (
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/epochs"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/module/mempool"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -65,8 +66,9 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
-	"github.com/onflow/flow-go/storage"
+	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/utils/io"
 )
 
@@ -91,7 +93,6 @@ func main() {
 		emergencySealing                      bool
 		dkgMessagingEngineConfig              = dkgeng.DefaultMessagingEngineConfig()
 		cruiseCtlConfig                       = cruisectl.DefaultConfig()
-		cruiseCtlTargetTransitionTimeFlag     = cruiseCtlConfig.TargetTransition.String()
 		cruiseCtlFallbackProposalDurationFlag time.Duration
 		cruiseCtlMinViewDurationFlag          time.Duration
 		cruiseCtlMaxViewDurationFlag          time.Duration
@@ -101,35 +102,35 @@ func main() {
 
 		// DKG contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClientConfigs  []*common.FlowClientConfig
+		flowClientConfigs  []*grpcclient.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 
-		err                 error
-		mutableState        protocol.ParticipantState
-		beaconPrivateKey    *encodable.RandomBeaconPrivKey
-		guarantees          mempool.Guarantees
-		receipts            mempool.ExecutionTree
-		seals               mempool.IncorporatedResultSeals
-		pendingReceipts     mempool.PendingReceipts
-		receiptRequester    *requester.Engine
-		syncCore            *chainsync.Core
-		comp                *compliance.Engine
-		hot                 module.HotStuff
-		conMetrics          module.ConsensusMetrics
-		mainMetrics         module.HotstuffMetrics
-		receiptValidator    module.ReceiptValidator
-		chunkAssigner       *chmodule.ChunkAssigner
-		followerDistributor *pubsub.FollowerDistributor
-		dkgBrokerTunnel     *dkgmodule.BrokerTunnel
-		blockTimer          protocol.BlockTimer
-		proposalDurProvider hotstuff.ProposalDurationProvider
-		committee           *committees.Consensus
-		epochLookup         *epochs.EpochLookup
-		hotstuffModules     *consensus.HotstuffModules
-		dkgState            *bstorage.DKGState
-		safeBeaconKeys      *bstorage.SafeBeaconPrivateKeys
-		getSealingConfigs   module.SealingConfigsGetter
+		err                     error
+		mutableState            protocol.ParticipantState
+		beaconPrivateKey        *encodable.RandomBeaconPrivKey
+		guarantees              mempool.Guarantees
+		receipts                mempool.ExecutionTree
+		seals                   mempool.IncorporatedResultSeals
+		pendingReceipts         mempool.PendingReceipts
+		receiptRequester        *requester.Engine
+		syncCore                *chainsync.Core
+		comp                    *compliance.Engine
+		hot                     module.HotStuff
+		conMetrics              module.ConsensusMetrics
+		machineAccountMetrics   module.MachineAccountMetrics
+		mainMetrics             module.HotstuffMetrics
+		receiptValidator        module.ReceiptValidator
+		chunkAssigner           *chmodule.ChunkAssigner
+		followerDistributor     *pubsub.FollowerDistributor
+		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
+		blockTimer              protocol.BlockTimer
+		proposalDurProvider     hotstuff.ProposalDurationProvider
+		committee               *committees.Consensus
+		epochLookup             *epochs.EpochLookup
+		hotstuffModules         *consensus.HotstuffModules
+		myBeaconKeyStateMachine *bstorage.RecoverablePrivateBeaconKeyStateMachine
+		getSealingConfigs       module.SealingConfigsGetter
 	)
 	var deprecatedFlagBlockRateDelay time.Duration
 
@@ -146,10 +147,9 @@ func main() {
 		flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
 		flags.UintVar(&maxSealPerBlock, "max-seal-per-block", 100, "the maximum number of seals to be included in a block")
 		flags.UintVar(&maxGuaranteePerBlock, "max-guarantee-per-block", 100, "the maximum number of collection guarantees to be included in a block")
-		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
+		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 1045*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
 		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor, "adjustment of timeout duration in case of time out event")
 		flags.Uint64Var(&hotstuffHappyPathMaxRoundFailures, "hotstuff-happy-path-max-round-failures", timeout.DefaultConfig.HappyPathMaxRoundFailures, "number of failed rounds before first timeout increase")
-		flags.StringVar(&cruiseCtlTargetTransitionTimeFlag, "cruise-ctl-target-epoch-transition-time", cruiseCtlTargetTransitionTimeFlag, "the target epoch switchover schedule")
 		flags.DurationVar(&cruiseCtlFallbackProposalDurationFlag, "cruise-ctl-fallback-proposal-duration", cruiseCtlConfig.FallbackProposalDelay.Load(), "the proposal duration value to use when the controller is disabled, or in epoch fallback mode. In those modes, this value has the same as the old `--block-rate-delay`")
 		flags.DurationVar(&cruiseCtlMinViewDurationFlag, "cruise-ctl-min-view-duration", cruiseCtlConfig.MinViewDuration.Load(), "the lower bound of authority for the controller, when active. This is the smallest amount of time a view is allowed to take.")
 		flags.DurationVar(&cruiseCtlMaxViewDurationFlag, "cruise-ctl-max-view-duration", cruiseCtlConfig.MaxViewDuration.Load(), "the upper bound of authority for the controller when active. This is the largest amount of time a view is allowed to take.")
@@ -174,14 +174,6 @@ func main() {
 			}
 			startupTime = t
 			nodeBuilder.Logger.Info().Time("startup_time", startupTime).Msg("got startup_time")
-		}
-		// parse target transition time string, if set
-		if cruiseCtlTargetTransitionTimeFlag != cruiseCtlConfig.TargetTransition.String() {
-			transitionTime, err := cruisectl.ParseTransition(cruiseCtlTargetTransitionTimeFlag)
-			if err != nil {
-				return fmt.Errorf("invalid epoch transition time string: %w", err)
-			}
-			cruiseCtlConfig.TargetTransition = *transitionTime
 		}
 		// convert local flag variables to atomic config variables, for dynamically updatable fields
 		if cruiseCtlEnabledFlag != cruiseCtlConfig.Enabled.Load() {
@@ -210,17 +202,34 @@ func main() {
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
 		ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange).
+		PostInit(func(nodeConfig *cmd.NodeConfig) error {
+			// TODO(EFM, #6794): This function is introduced to implement a backward-compatible upgrade from v1 to v2.
+			// Remove this once we complete the network upgrade.
+			log := nodeConfig.Logger.With().Str("postinit", "dkg_end_state_migration").Logger()
+			if err := operation.RetryOnConflict(nodeBuilder.SecretsDB.Update, operation.MigrateDKGEndStateFromV1(log)); err != nil {
+				return fmt.Errorf("could not migrate DKG end state from v1 to v2: %w", err)
+			}
+			return nil
+		}).
+		Module("machine account config", func(node *cmd.NodeConfig) error {
+			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
+			return err
+		}).
 		Module("consensus node metrics", func(node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
-		Module("dkg state", func(node *cmd.NodeConfig) error {
-			dkgState, err = bstorage.NewDKGState(node.Metrics.Cache, node.SecretsDB)
-			return err
-		}).
-		Module("beacon keys", func(node *cmd.NodeConfig) error {
-			safeBeaconKeys = bstorage.NewSafeBeaconPrivateKeys(dkgState)
+		Module("machine account metrics", func(node *cmd.NodeConfig) error {
+			machineAccountMetrics = metrics.NewMachineAccountCollector(node.MetricsRegisterer, machineAccountInfo.FlowAddress())
 			return nil
+		}).
+		Module("dkg state", func(node *cmd.NodeConfig) error {
+			myBeaconKeyStateMachine, err = bstorage.NewRecoverableRandomBeaconStateMachine(
+				node.Metrics.Cache,
+				node.SecretsDB,
+				node.NodeID,
+			)
+			return err
 		}).
 		Module("updatable sealing config", func(node *cmd.NodeConfig) error {
 			setter, err := updatable_configs.NewSealingConfigs(
@@ -323,11 +332,11 @@ func main() {
 				return fmt.Errorf("could not load beacon key file: %w", err)
 			}
 
-			rootEpoch := node.State.AtBlockID(node.FinalizedRootBlock.ID()).Epochs().Current()
-			epochCounter, err := rootEpoch.Counter()
+			rootEpoch, err := rootSnapshot.Epochs().Current()
 			if err != nil {
-				return fmt.Errorf("could not get root epoch counter: %w", err)
+				return fmt.Errorf("could not get root epoch: %w", err)
 			}
+			rootEpochCounter := rootEpoch.Counter()
 
 			// confirm the beacon key file matches the canonical public keys
 			rootDKG, err := rootEpoch.DKG()
@@ -345,17 +354,32 @@ func main() {
 					myBeaconPublicKeyShare)
 			}
 
-			// store my beacon key for the first epoch post-spork
-			err = dkgState.InsertMyBeaconPrivateKey(epochCounter, beaconPrivateKey.PrivateKey)
-			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-				return err
+			// store my beacon key for the first epoch post-spork (only if we haven't run this logic before, i.e. state machine is in initial state)
+			started, err := myBeaconKeyStateMachine.IsDKGStarted(rootEpochCounter)
+			if err != nil {
+				return fmt.Errorf("could not get DKG started flag for root epoch %d: %w", rootEpochCounter, err)
 			}
-			// mark the root DKG as successful, so it is considered safe to use the key
-			err = dkgState.SetDKGEndState(epochCounter, flow.DKGEndStateSuccess)
-			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-				return err
+			if !started {
+				// store my beacon key for the first epoch post-spork
+				epochProtocolState, err := rootSnapshot.EpochProtocolState()
+				if err != nil {
+					return fmt.Errorf("could not get epoch protocol state for root snapshot: %w", err)
+				}
+				err = myBeaconKeyStateMachine.UpsertMyBeaconPrivateKey(rootEpochCounter, beaconPrivateKey.PrivateKey, epochProtocolState.EpochCommit())
+				if err != nil {
+					return fmt.Errorf("could not upsert my beacon private key for root epoch %d: %w", rootEpochCounter, err)
+				}
 			}
 
+			return nil
+		}).
+		Module("my beacon key epoch recovery", func(node *cmd.NodeConfig) error {
+			myBeaconKeyRecovery, err := dkgmodule.NewBeaconKeyRecovery(node.Logger, node.Me, node.State, myBeaconKeyStateMachine)
+			if err != nil {
+				return fmt.Errorf("could not initialize my beacon key epoch recovery: %w", err)
+			}
+			// subscribe for protocol events to handle exiting EFM
+			node.ProtocolEvents.AddConsumer(myBeaconKeyRecovery)
 			return nil
 		}).
 		Module("collection guarantees mempool", func(node *cmd.NodeConfig) error {
@@ -376,10 +400,13 @@ func main() {
 			// the chain of seals
 			rawMempool := stdmap.NewIncorporatedResultSeals(sealLimit)
 			multipleReceiptsFilterMempool := consensusMempools.NewIncorporatedResultSeals(rawMempool, node.Storage.Receipts)
+
+			dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+
 			seals, err = consensusMempools.NewExecStateForkSuppressor(
 				multipleReceiptsFilterMempool,
 				consensusMempools.LogForkAndCrash(node.Logger),
-				node.DB,
+				dbStore,
 				node.Logger,
 			)
 			if err != nil {
@@ -404,17 +431,13 @@ func main() {
 			followerDistributor = pubsub.NewFollowerDistributor()
 			return nil
 		}).
-		Module("machine account config", func(node *cmd.NodeConfig) error {
-			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
-			return err
-		}).
 		Module("sdk client connection options", func(node *cmd.NodeConfig) error {
 			anIDS, err := common.ValidateAccessNodeIDSFlag(accessNodeIDS, node.RootChainID, node.State.Sealed())
 			if err != nil {
 				return fmt.Errorf("failed to validate flag --access-node-ids %w", err)
 			}
 
-			flowClientConfigs, err = common.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
+			flowClientConfigs, err = grpcclient.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
 			if err != nil {
 				return fmt.Errorf("failed to prepare flow client connection configs for each access node id %w", err)
 			}
@@ -423,7 +446,7 @@ func main() {
 		}).
 		Component("machine account config validator", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// @TODO use fallback logic for flowClient similar to DKG/QC contract clients
-			flowClient, err := common.FlowClient(flowClientConfigs[0])
+			flowClient, err := grpcclient.FlowClient(flowClientConfigs[0])
 			if err != nil {
 				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)
 			}
@@ -436,8 +459,9 @@ func main() {
 			validator, err := epochs.NewMachineAccountConfigValidator(
 				node.Logger,
 				flowClient,
-				flow.RoleCollection,
+				flow.RoleConsensus,
 				*machineAccountInfo,
+				machineAccountMetrics,
 				opts...,
 			)
 			return validator, err
@@ -465,6 +489,9 @@ func main() {
 				seals,
 				getSealingConfigs,
 			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize sealing engine: %w", err)
+			}
 
 			// subscribe for finalization events from hotstuff
 			followerDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
@@ -474,13 +501,13 @@ func main() {
 		}).
 		Component("matching engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			receiptRequester, err = requester.New(
-				node.Logger,
+				node.Logger.With().Str("entity", "receipt").Logger(),
 				node.Metrics.Engine,
 				node.EngineRegistry,
 				node.Me,
 				node.State,
 				channels.RequestReceiptsByBlockID,
-				filter.HasRole(flow.RoleExecution),
+				filter.HasRole[flow.Identity](flow.RoleExecution),
 				func() flow.Entity { return &flow.ExecutionReceipt{} },
 				requester.WithRetryInitial(2*time.Second),
 				requester.WithRetryMaximum(30*time.Second),
@@ -576,7 +603,7 @@ func main() {
 			// wrap Main consensus committee with metrics
 			wrappedCommittee := committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
-			beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, safeBeaconKeys)
+			beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, myBeaconKeyStateMachine)
 
 			// initialize the combined signer for hotstuff
 			var signer hotstuff.Signer
@@ -605,7 +632,10 @@ func main() {
 			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
-			persist := persister.New(node.DB, node.RootChainID)
+			persist, err := persister.New(node.ProtocolDB, node.RootChainID)
+			if err != nil {
+				return nil, err
+			}
 
 			finalizedBlock, err := node.State.Final().Head()
 			if err != nil {
@@ -689,7 +719,7 @@ func main() {
 		Component("block rate cruise control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			livenessData, err := hotstuffModules.Persist.GetLivenessData()
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("could not load liveness data: %w", err)
 			}
 			ctl, err := cruisectl.NewBlockTimeController(node.Logger, metrics.NewCruiseCtlMetrics(), cruiseCtlConfig, node.State, livenessData.CurrentView)
 			if err != nil {
@@ -720,11 +750,20 @@ func main() {
 			return ctl, nil
 		}).
 		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			mutableProtocolState := protocol_state.NewMutableProtocolState(
+				node.Logger,
+				node.Storage.EpochProtocolStateEntries,
+				node.Storage.ProtocolKVStore,
+				node.State.Params(),
+				node.Storage.Headers,
+				node.Storage.Results,
+				node.Storage.Setups,
+				node.Storage.EpochCommits,
+			)
 			// initialize the block builder
 			var build module.Builder
 			build, err = builder.NewBuilder(
 				node.Metrics.Mempool,
-				node.DB,
 				mutableState,
 				node.Storage.Headers,
 				node.Storage.Seals,
@@ -732,6 +771,7 @@ func main() {
 				node.Storage.Blocks,
 				node.Storage.Results,
 				node.Storage.Receipts,
+				mutableProtocolState,
 				guarantees,
 				seals,
 				receipts,
@@ -905,7 +945,7 @@ func main() {
 				node.Logger,
 				node.Me,
 				node.State,
-				dkgState,
+				myBeaconKeyStateMachine,
 				dkgmodule.NewControllerFactory(
 					node.Logger,
 					node.Me,
@@ -925,7 +965,7 @@ func main() {
 	if err != nil {
 		nodeBuilder.Logger.Fatal().Err(err).Send()
 	}
-	node.Run()
+	node.Run(context.Background())
 }
 
 func loadBeaconPrivateKey(dir string, myID flow.Identifier) (*encodable.RandomBeaconPrivKey, error) {
@@ -976,11 +1016,11 @@ func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap
 }
 
 // createDKGContractClients creates an array dkgContractClient that is sorted by retry fallback priority
-func createDKGContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClientOpts []*common.FlowClientConfig) ([]module.DKGContractClient, error) {
+func createDKGContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClientOpts []*grpcclient.FlowClientConfig) ([]module.DKGContractClient, error) {
 	dkgClients := make([]module.DKGContractClient, 0)
 
 	for _, opt := range flowClientOpts {
-		flowClient, err := common.FlowClient(opt)
+		flowClient, err := grpcclient.FlowClient(opt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create flow client for dkg contract client with options: %s %w", flowClientOpts, err)
 		}

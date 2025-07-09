@@ -5,49 +5,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack/v4"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-func TestHexStringToIdentifier(t *testing.T) {
-	type testcase struct {
-		hex         string
-		expectError bool
-	}
-
-	cases := []testcase{{
-		// non-hex characters
-		hex:         "123456789012345678901234567890123456789012345678901234567890123z",
-		expectError: true,
-	}, {
-		// too short
-		hex:         "1234",
-		expectError: true,
-	}, {
-		// just right
-		hex:         "1234567890123456789012345678901234567890123456789012345678901234",
-		expectError: false,
-	}}
-
-	for _, tcase := range cases {
-		id, err := flow.HexStringToIdentifier(tcase.hex)
-		if tcase.expectError {
-			assert.Error(t, err)
-			continue
-		} else {
-			assert.NoError(t, err)
-		}
-
-		assert.Equal(t, tcase.hex, id.String())
-	}
-}
 
 func TestIdentityEncodingJSON(t *testing.T) {
 
@@ -58,7 +24,7 @@ func TestIdentityEncodingJSON(t *testing.T) {
 		var dec flow.Identity
 		err = json.Unmarshal(enc, &dec)
 		require.NoError(t, err)
-		require.True(t, identity.Equals(&dec))
+		require.True(t, identity.EqualTo(&dec))
 	})
 
 	t.Run("empty address should be omitted", func(t *testing.T) {
@@ -71,19 +37,7 @@ func TestIdentityEncodingJSON(t *testing.T) {
 		var dec flow.Identity
 		err = json.Unmarshal(enc, &dec)
 		require.NoError(t, err)
-		require.True(t, identity.Equals(&dec))
-	})
-
-	t.Run("compat: should accept old files using Stake field", func(t *testing.T) {
-		identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
-		enc, err := json.Marshal(identity)
-		require.NoError(t, err)
-		// emulate the old encoding by replacing the new field with old field name
-		enc = []byte(strings.Replace(string(enc), "Weight", "Stake", 1))
-		var dec flow.Identity
-		err = json.Unmarshal(enc, &dec)
-		require.NoError(t, err)
-		require.True(t, identity.Equals(&dec))
+		require.True(t, identity.EqualTo(&dec))
 	})
 }
 
@@ -94,7 +48,7 @@ func TestIdentityEncodingMsgpack(t *testing.T) {
 	var dec flow.Identity
 	err = msgpack.Unmarshal(enc, &dec)
 	require.NoError(t, err)
-	require.True(t, identity.Equals(&dec))
+	require.True(t, identity.EqualTo(&dec))
 }
 
 func TestIdentityList_Exists(t *testing.T) {
@@ -103,7 +57,7 @@ func TestIdentityList_Exists(t *testing.T) {
 		il2 := unittest.IdentityListFixture(1)
 
 		// sort the first list
-		il1 = il1.Sort(order.Canonical)
+		il1 = il1.Sort(flow.Canonical[flow.Identity])
 
 		for i := 0; i < 10; i++ {
 			assert.True(t, il1.Exists(il1[i]))
@@ -118,7 +72,7 @@ func TestIdentityList_IdentifierExists(t *testing.T) {
 		il2 := unittest.IdentityListFixture(1)
 
 		// sort the first list
-		il1 = il1.Sort(order.Canonical)
+		il1 = il1.Sort(flow.Canonical[flow.Identity])
 
 		for i := 0; i < 10; i++ {
 			assert.True(t, il1.IdentifierExists(il1[i].NodeID))
@@ -243,12 +197,18 @@ func TestIdentity_ID(t *testing.T) {
 
 func TestIdentity_Sort(t *testing.T) {
 	il := unittest.IdentityListFixture(20)
-	random, err := il.Shuffle()
-	require.NoError(t, err)
-	assert.False(t, random.Sorted(order.Canonical))
+	// make sure the list is not sorted
+	il[0].NodeID[0], il[1].NodeID[0] = 2, 1
+	require.False(t, flow.IsCanonical(il[0], il[1]))
+	assert.False(t, flow.IsIdentityListCanonical(il))
 
-	canonical := il.Sort(order.Canonical)
-	assert.True(t, canonical.Sorted(order.Canonical))
+	canonical := il.Sort(flow.Canonical[flow.Identity])
+	assert.True(t, flow.IsIdentityListCanonical(canonical))
+
+	// check `IsIdentityListCanonical` detects order equality in a sorted list
+	il[1] = il[10] // add a duplication
+	canonical = il.Sort(flow.Canonical[flow.Identity])
+	assert.False(t, flow.IsIdentityListCanonical(canonical))
 }
 
 func TestIdentity_EqualTo(t *testing.T) {
@@ -264,56 +224,56 @@ func TestIdentity_EqualTo(t *testing.T) {
 	})
 
 	t.Run("NodeID diff", func(t *testing.T) {
-		a := &flow.Identity{NodeID: [32]byte{1, 2, 3}}
-		b := &flow.Identity{NodeID: [32]byte{2, 2, 2}}
+		a := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{NodeID: [32]byte{1, 2, 3}}}
+		b := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{NodeID: [32]byte{2, 2, 2}}}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
 	})
 
 	t.Run("Address diff", func(t *testing.T) {
-		a := &flow.Identity{Address: "b"}
-		b := &flow.Identity{Address: "c"}
+		a := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{Address: "b"}}
+		b := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{Address: "c"}}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
 	})
 
 	t.Run("Role diff", func(t *testing.T) {
-		a := &flow.Identity{Role: flow.RoleCollection}
-		b := &flow.Identity{Role: flow.RoleExecution}
+		a := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{Role: flow.RoleCollection}}
+		b := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{Role: flow.RoleExecution}}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
 	})
 
-	t.Run("Weight diff", func(t *testing.T) {
-		a := &flow.Identity{Weight: 1}
-		b := &flow.Identity{Weight: 2}
+	t.Run("Initial weight diff", func(t *testing.T) {
+		a := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{InitialWeight: 1}}
+		b := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{InitialWeight: 2}}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
 	})
 
-	t.Run("Ejected diff", func(t *testing.T) {
-		a := &flow.Identity{Ejected: true}
-		b := &flow.Identity{Ejected: false}
+	t.Run("status diff", func(t *testing.T) {
+		a := &flow.Identity{DynamicIdentity: flow.DynamicIdentity{EpochParticipationStatus: flow.EpochParticipationStatusActive}}
+		b := &flow.Identity{DynamicIdentity: flow.DynamicIdentity{EpochParticipationStatus: flow.EpochParticipationStatusLeaving}}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
 	})
 
 	t.Run("StakingPubKey diff", func(t *testing.T) {
-		a := &flow.Identity{StakingPubKey: pks[0]}
-		b := &flow.Identity{StakingPubKey: pks[1]}
+		a := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{StakingPubKey: pks[0]}}
+		b := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{StakingPubKey: pks[1]}}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
 	})
 
 	t.Run("NetworkPubKey diff", func(t *testing.T) {
-		a := &flow.Identity{NetworkPubKey: pks[0]}
-		b := &flow.Identity{NetworkPubKey: pks[1]}
+		a := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{NetworkPubKey: pks[0]}}
+		b := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{NetworkPubKey: pks[1]}}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
@@ -321,22 +281,30 @@ func TestIdentity_EqualTo(t *testing.T) {
 
 	t.Run("Same data equals", func(t *testing.T) {
 		a := &flow.Identity{
-			NodeID:        flow.Identifier{1, 2, 3},
-			Address:       "address",
-			Role:          flow.RoleCollection,
-			Weight:        23,
-			Ejected:       false,
-			StakingPubKey: pks[0],
-			NetworkPubKey: pks[1],
+			IdentitySkeleton: flow.IdentitySkeleton{
+				NodeID:        flow.Identifier{1, 2, 3},
+				Address:       "address",
+				Role:          flow.RoleCollection,
+				InitialWeight: 23,
+				StakingPubKey: pks[0],
+				NetworkPubKey: pks[1],
+			},
+			DynamicIdentity: flow.DynamicIdentity{
+				EpochParticipationStatus: flow.EpochParticipationStatusActive,
+			},
 		}
 		b := &flow.Identity{
-			NodeID:        flow.Identifier{1, 2, 3},
-			Address:       "address",
-			Role:          flow.RoleCollection,
-			Weight:        23,
-			Ejected:       false,
-			StakingPubKey: pks[0],
-			NetworkPubKey: pks[1],
+			IdentitySkeleton: flow.IdentitySkeleton{
+				NodeID:        flow.Identifier{1, 2, 3},
+				Address:       "address",
+				Role:          flow.RoleCollection,
+				InitialWeight: 23,
+				StakingPubKey: pks[0],
+				NetworkPubKey: pks[1],
+			},
+			DynamicIdentity: flow.DynamicIdentity{
+				EpochParticipationStatus: flow.EpochParticipationStatusActive,
+			},
 		}
 
 		require.True(t, a.EqualTo(b))
@@ -350,8 +318,8 @@ func TestIdentityList_EqualTo(t *testing.T) {
 		a := flow.IdentityList{}
 		b := flow.IdentityList{}
 
-		require.True(t, a.EqualTo(b))
-		require.True(t, b.EqualTo(a))
+		require.True(t, flow.IdentityListEqualTo(a, b))
+		require.True(t, flow.IdentityListEqualTo(b, a))
 	})
 
 	t.Run("different len arent equal", func(t *testing.T) {
@@ -360,8 +328,8 @@ func TestIdentityList_EqualTo(t *testing.T) {
 		a := flow.IdentityList{identityA}
 		b := flow.IdentityList{}
 
-		require.False(t, a.EqualTo(b))
-		require.False(t, b.EqualTo(a))
+		require.False(t, flow.IdentityListEqualTo(a, b))
+		require.False(t, flow.IdentityListEqualTo(b, a))
 	})
 
 	t.Run("different data means not equal", func(t *testing.T) {
@@ -371,8 +339,8 @@ func TestIdentityList_EqualTo(t *testing.T) {
 		a := flow.IdentityList{identityA}
 		b := flow.IdentityList{identityB}
 
-		require.False(t, a.EqualTo(b))
-		require.False(t, b.EqualTo(a))
+		require.False(t, flow.IdentityListEqualTo(a, b))
+		require.False(t, flow.IdentityListEqualTo(b, a))
 	})
 
 	t.Run("same data means equal", func(t *testing.T) {
@@ -381,8 +349,8 @@ func TestIdentityList_EqualTo(t *testing.T) {
 		a := flow.IdentityList{identityA, identityA}
 		b := flow.IdentityList{identityA, identityA}
 
-		require.True(t, a.EqualTo(b))
-		require.True(t, b.EqualTo(a))
+		require.True(t, flow.IdentityListEqualTo(a, b))
+		require.True(t, flow.IdentityListEqualTo(b, a))
 	})
 }
 

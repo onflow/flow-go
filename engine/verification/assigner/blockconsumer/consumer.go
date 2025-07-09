@@ -42,7 +42,7 @@ func defaultProcessedIndex(state protocol.State) (uint64, error) {
 // index for initializing the processed index in storage.
 func NewBlockConsumer(log zerolog.Logger,
 	metrics module.VerificationMetrics,
-	processedHeight storage.ConsumerProgress,
+	processedHeight storage.ConsumerProgressInitializer,
 	blocks storage.Blocks,
 	state protocol.State,
 	blockProcessor assigner.FinalizedBlockProcessor,

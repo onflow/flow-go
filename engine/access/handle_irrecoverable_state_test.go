@@ -17,12 +17,13 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/onflow/crypto"
 	restclient "github.com/onflow/flow/openapi/go-client-generated"
 
-	"github.com/onflow/flow-go/crypto"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest"
-	"github.com/onflow/flow-go/engine/access/rest/routes"
+	"github.com/onflow/flow-go/engine/access/rest/router"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -75,12 +76,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 	suite.state = protocol.NewState(suite.T())
 	suite.snapshot = protocol.NewSnapshot(suite.T())
 
-	rootHeader := unittest.BlockHeaderFixture()
 	params := protocol.NewParams(suite.T())
-	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
-	params.On("SporkRootBlockHeight").Return(rootHeader.Height, nil)
-	params.On("SealedRoot").Return(rootHeader, nil)
 
 	suite.epochQuery = protocol.NewEpochQuery(suite.T())
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
@@ -114,6 +110,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		RestConfig: rest.Config{
 			ListenAddress: unittest.DefaultAddress,
 		},
+		WebSocketConfig: websockets.NewDefaultWebsocketConfig(),
 	}
 
 	// generate a server certificate that will be served by the GRPC server
@@ -157,6 +154,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		Log:                  suite.log,
 		SnapshotHistoryLimit: 0,
 		Communicator:         backend.NewNodeCommunicator(false),
+		BlockTracker:         nil,
 	})
 	suite.Require().NoError(err)
 
@@ -175,6 +173,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		suite.unsecureGrpcServer,
 		nil,
 		stateStreamConfig,
+		nil,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
@@ -252,7 +251,7 @@ func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 // optionsForBlocksIdGetOpts returns options for the BlocksApi.BlocksIdGet function.
 func optionsForBlocksIdGetOpts() *restclient.BlocksApiBlocksIdGetOpts {
 	return &restclient.BlocksApiBlocksIdGetOpts{
-		Expand:  optional.NewInterface([]string{routes.ExpandableFieldPayload}),
+		Expand:  optional.NewInterface([]string{router.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id"}),
 	}
 }

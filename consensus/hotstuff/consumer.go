@@ -60,7 +60,7 @@ type VoteAggregationViolationConsumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal)
+	OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.SignedProposal)
 }
 
 // TimeoutAggregationViolationConsumer consumes outbound notifications about Active Pacemaker violations specifically
@@ -138,7 +138,7 @@ type ParticipantConsumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnReceiveProposal(currentView uint64, proposal *model.Proposal)
+	OnReceiveProposal(currentView uint64, proposal *model.SignedProposal)
 
 	// OnReceiveQc notifications are produced by the EventHandler when it starts processing a
 	// QuorumCertificate [QC] constructed by the node's internal vote aggregator.
@@ -307,7 +307,7 @@ type CommunicatorConsumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier)
+	OnOwnVote(vote *model.Vote, recipientID flow.Identifier)
 
 	// OnOwnTimeout notifies about intent to broadcast the given timeout object(TO) to all actors of the consensus process.
 	// Prerequisites:

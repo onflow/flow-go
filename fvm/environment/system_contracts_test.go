@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/sema"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/environment"
@@ -54,6 +54,8 @@ func TestSystemContractsInvoke(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			const chainID = flow.Mainnet
+
 			tracer := tracing.NewTracerSpan()
 			runtimePool := reusableRuntime.NewCustomReusableCadenceRuntimePool(
 				0,
@@ -70,7 +72,7 @@ func TestSystemContractsInvoke(t *testing.T) {
 				},
 			)
 			invoker := environment.NewSystemContracts(
-				flow.Mainnet.Chain(),
+				chainID.Chain(),
 				tracer,
 				environment.NewProgramLogger(
 					tracer,

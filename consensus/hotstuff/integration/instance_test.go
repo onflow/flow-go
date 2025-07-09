@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gammazero/workerpool"
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -31,7 +32,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -59,7 +59,7 @@ type Instance struct {
 	queue          chan interface{}
 	updatingBlocks sync.RWMutex
 	headers        map[flow.Identifier]*flow.Header
-	pendings       map[flow.Identifier]*model.Proposal // indexed by parent ID
+	pendings       map[flow.Identifier]*model.SignedProposal // indexed by parent ID
 
 	// mocked dependencies
 	committee *mocks.DynamicCommittee
@@ -151,7 +151,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		stop:                  cfg.StopCondition,
 
 		// instance data
-		pendings: make(map[flow.Identifier]*model.Proposal),
+		pendings: make(map[flow.Identifier]*model.SignedProposal),
 		headers:  make(map[flow.Identifier]*flow.Header),
 		queue:    make(chan interface{}, 1024),
 
@@ -170,14 +170,14 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 
 	// program the hotstuff committee state
 	in.committee.On("IdentitiesByEpoch", mock.Anything).Return(
-		func(_ uint64) flow.IdentityList {
-			return in.participants
+		func(_ uint64) flow.IdentitySkeletonList {
+			return in.participants.ToSkeleton()
 		},
 		nil,
 	)
 	for _, participant := range in.participants {
 		in.committee.On("IdentityByBlock", mock.Anything, participant.NodeID).Return(participant, nil)
-		in.committee.On("IdentityByEpoch", mock.Anything, participant.NodeID).Return(participant, nil)
+		in.committee.On("IdentityByEpoch", mock.Anything, participant.NodeID).Return(&participant.IdentitySkeleton, nil)
 	}
 	in.committee.On("Self").Return(in.localID)
 	in.committee.On("LeaderForView", mock.Anything).Return(
@@ -185,12 +185,12 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			return in.participants[int(view)%len(in.participants)].NodeID
 		}, nil,
 	)
-	in.committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(in.participants.TotalWeight()), nil)
-	in.committee.On("TimeoutThresholdForView", mock.Anything).Return(committees.WeightThresholdToTimeout(in.participants.TotalWeight()), nil)
+	in.committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(in.participants.ToSkeleton().TotalWeight()), nil)
+	in.committee.On("TimeoutThresholdForView", mock.Anything).Return(committees.WeightThresholdToTimeout(in.participants.ToSkeleton().TotalWeight()), nil)
 
 	// program the builder module behaviour
-	in.builder.On("BuildOn", mock.Anything, mock.Anything).Return(
-		func(parentID flow.Identifier, setter func(*flow.Header) error) *flow.Header {
+	in.builder.On("BuildOn", mock.Anything, mock.Anything, mock.Anything).Return(
+		func(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) *flow.Header {
 			in.updatingBlocks.Lock()
 			defer in.updatingBlocks.Unlock()
 
@@ -207,10 +207,11 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				Timestamp:   time.Now().UTC(),
 			}
 			require.NoError(t, setter(header))
+			require.NoError(t, sign(header))
 			in.headers[header.ID()] = header
 			return header
 		},
-		func(parentID flow.Identifier, setter func(*flow.Header) error) error {
+		func(parentID flow.Identifier, _ func(*flow.Header) error, _ func(*flow.Header) error) error {
 			in.updatingBlocks.RLock()
 			_, ok := in.headers[parentID]
 			in.updatingBlocks.RUnlock()
@@ -226,16 +227,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	in.persist.On("PutLivenessData", mock.Anything).Return(nil)
 
 	// program the hotstuff signer behaviour
-	in.signer.On("CreateProposal", mock.Anything).Return(
-		func(block *model.Block) *model.Proposal {
-			proposal := &model.Proposal{
-				Block:   block,
-				SigData: nil,
-			}
-			return proposal
-		},
-		nil,
-	)
 	in.signer.On("CreateVote", mock.Anything).Return(
 		func(block *model.Block) *model.Vote {
 			vote := &model.Vote{
@@ -303,7 +294,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			}
 
 			// convert into proposal immediately
-			proposal := model.ProposalFromFlow(header)
+			proposal := model.SignedProposalFromFlow(header)
 
 			// store locally and loop back to engine for processing
 			in.ProcessBlock(proposal)
@@ -317,13 +308,9 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	)
 	// in case of single node setup we should just forward vote to our own node
 	// for multi-node setup this method will be overridden
-	in.notifier.On("OnOwnVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		in.queue <- &model.Vote{
-			View:     args[1].(uint64),
-			BlockID:  args[0].(flow.Identifier),
-			SignerID: in.localID,
-			SigData:  args[2].([]byte),
-		}
+	in.notifier.On("OnOwnVote", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		vote := args[1].(*model.Vote)
+		in.queue <- vote
 	})
 
 	// program the finalizer module behaviour
@@ -364,12 +351,13 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	notifier.AddConsumer(logConsumer)
 	notifier.AddConsumer(in.notifier)
 
-	// initialize the block producer
-	in.producer, err = blockproducer.New(in.signer, in.committee, in.builder)
-	require.NoError(t, err)
-
 	// initialize the finalizer
-	rootBlock := model.BlockFromFlow(cfg.Root)
+	var rootBlock *model.Block
+	if cfg.Root.ContainsParentQC() {
+		rootBlock = model.BlockFromFlow(cfg.Root)
+	} else {
+		rootBlock = model.GenesisBlockFromFlow(cfg.Root)
+	}
 
 	signerIndices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), in.participants.NodeIDs())
 	require.NoError(t, err, "could not encode signer indices")
@@ -378,6 +366,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		View:          rootBlock.View,
 		BlockID:       rootBlock.BlockID,
 		SignerIndices: signerIndices,
+		SigData:       unittest.SignatureFixture(),
 	}
 	certifiedRootBlock, err := model.NewCertifiedBlock(rootBlock, rootQC)
 	require.NoError(t, err)
@@ -413,23 +402,32 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		in.queue <- qc
 	}
 
-	minRequiredWeight := committees.WeightThresholdToBuildQC(uint64(in.participants.Count()) * weight)
+	minRequiredWeight := committees.WeightThresholdToBuildQC(uint64(len(in.participants)) * weight)
 	voteProcessorFactory := mocks.NewVoteProcessorFactory(t)
 	voteProcessorFactory.On("Create", mock.Anything, mock.Anything).Return(
-		func(log zerolog.Logger, proposal *model.Proposal) hotstuff.VerifyingVoteProcessor {
+		func(log zerolog.Logger, proposal *model.SignedProposal) hotstuff.VerifyingVoteProcessor {
 			stakingSigAggtor := helper.MakeWeightedSignatureAggregator(weight)
 			stakingSigAggtor.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
-			rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(int(in.participants.Count())))
+			rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(len(in.participants)))
 			rbRector.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
-			return votecollector.NewCombinedVoteProcessor(
+			processor := votecollector.NewCombinedVoteProcessor(
 				log, proposal.Block,
 				stakingSigAggtor, rbRector,
 				onQCCreated,
 				packer,
 				minRequiredWeight,
 			)
+
+			vote, err := proposal.ProposerVote()
+			require.NoError(t, err)
+
+			err = processor.Process(vote)
+			if err != nil {
+				t.Fatalf("invalid vote for own proposal: %v", err)
+			}
+			return processor
 		}, nil).Maybe()
 
 	voteAggregationDistributor := pubsub.NewVoteAggregationDistributor()
@@ -458,7 +456,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			// mock signature aggregator which doesn't perform any crypto operations and just tracks total weight
 			aggregator := &mocks.TimeoutSignatureAggregator{}
 			totalWeight := atomic.NewUint64(0)
-			newestView := counters.NewMonotonousCounter(0)
+			newestView := counters.NewMonotonicCounter(0)
 			aggregator.On("View").Return(view).Maybe()
 			aggregator.On("TotalWeight").Return(func() uint64 {
 				return totalWeight.Load()
@@ -468,7 +466,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 					newestView.Set(newestQCView)
 					identity, ok := in.participants.ByNodeID(signerID)
 					require.True(t, ok)
-					return totalWeight.Add(identity.Weight)
+					return totalWeight.Add(identity.InitialWeight)
 				}, nil,
 			).Maybe()
 			aggregator.On("Aggregate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
@@ -530,6 +528,10 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	in.safetyRules, err = safetyrules.New(in.signer, in.persist, in.committee)
 	require.NoError(t, err)
 
+	// initialize the block producer
+	in.producer, err = blockproducer.New(in.safetyRules, in.committee, in.builder)
+	require.NoError(t, err)
+
 	// initialize the event handler
 	in.handler, err = eventhandler.NewEventHandler(
 		log,
@@ -551,13 +553,13 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	return &in
 }
 
-func (in *Instance) Run() error {
+func (in *Instance) Run(t *testing.T) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		cancel()
 		<-util.AllDone(in.voteAggregator, in.timeoutAggregator)
 	}()
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	in.voteAggregator.Start(signalerCtx)
 	in.timeoutAggregator.Start(signalerCtx)
 	<-util.AllReady(in.voteAggregator, in.timeoutAggregator)
@@ -600,7 +602,7 @@ func (in *Instance) Run() error {
 			}
 		case msg := <-in.queue:
 			switch m := msg.(type) {
-			case *model.Proposal:
+			case *model.SignedProposal:
 				// add block to aggregator
 				in.voteAggregator.AddBlock(m)
 				// then pass to event handler
@@ -632,7 +634,7 @@ func (in *Instance) Run() error {
 	}
 }
 
-func (in *Instance) ProcessBlock(proposal *model.Proposal) {
+func (in *Instance) ProcessBlock(proposal *model.SignedProposal) {
 	in.updatingBlocks.Lock()
 	defer in.updatingBlocks.Unlock()
 	_, parentExists := in.headers[proposal.Block.QC.BlockID]
@@ -640,7 +642,7 @@ func (in *Instance) ProcessBlock(proposal *model.Proposal) {
 	if parentExists {
 		next := proposal
 		for next != nil {
-			in.headers[next.Block.BlockID] = model.ProposalToFlow(next)
+			in.headers[next.Block.BlockID] = helper.SignedProposalToFlow(next)
 
 			in.queue <- next
 			// keep processing the pending blocks

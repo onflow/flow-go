@@ -149,3 +149,10 @@ func WithAdditionalFlag(flag string) func(config *NodeConfig) {
 func WithAdditionalFlagf(format string, a ...any) func(config *NodeConfig) {
 	return WithAdditionalFlag(fmt.Sprintf(format, a...))
 }
+
+// WithMetricsServer exposes the metrics server
+func WithMetricsServer() func(config *NodeConfig) {
+	return func(config *NodeConfig) {
+		config.EnableMetricsServer = true
+	}
+}

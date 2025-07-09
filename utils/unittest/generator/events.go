@@ -2,14 +2,19 @@ package generator
 
 import (
 	"fmt"
+	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/stdlib"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type EventGeneratorOption func(*Events)
@@ -41,24 +46,30 @@ func EventGenerator(opts ...EventGeneratorOption) *Events {
 }
 
 func (g *Events) New() flow.Event {
-	location := common.StringLocation("test")
-	identifier := fmt.Sprintf("FooEvent%d", g.count)
+	address, err := common.BytesToAddress(unittest.RandomAddressFixture().Bytes())
+	if err != nil {
+		panic(fmt.Sprintf("unexpected error while creating random address: %s", err))
+	}
+
+	location := common.NewAddressLocation(nil, address, "TestContract")
+	identifier := fmt.Sprintf("TestContract.FooEvent%d", g.count)
 	typeID := location.TypeID(nil, identifier)
 
-	testEventType := &cadence.EventType{
-		Location:            location,
-		QualifiedIdentifier: identifier,
-		Fields: []cadence.Field{
+	testEventType := cadence.NewEventType(
+		location,
+		identifier,
+		[]cadence.Field{
 			{
 				Identifier: "a",
-				Type:       cadence.IntType{},
+				Type:       cadence.IntType,
 			},
 			{
 				Identifier: "b",
-				Type:       cadence.StringType{},
+				Type:       cadence.StringType,
 			},
 		},
-	}
+		nil,
+	)
 
 	fooString, err := cadence.NewString("foo")
 	if err != nil {
@@ -106,4 +117,87 @@ func GetEventsWithEncoding(n int, version entities.EventEncodingVersion) []flow.
 		events = append(events, eventGenerator.New())
 	}
 	return events
+}
+
+// GenerateAccountCreateEvent returns a mock account creation event.
+func GenerateAccountCreateEvent(t *testing.T, address flow.Address) flow.Event {
+	cadenceEvent := cadence.NewEvent(
+		[]cadence.Value{
+			cadence.NewAddress(address),
+		}).
+		WithType(cadence.NewEventType(
+			stdlib.FlowLocation{},
+			"AccountCreated",
+			[]cadence.Field{
+				{
+					Identifier: "address",
+					Type:       cadence.AddressType,
+				},
+			},
+			nil,
+		))
+
+	payload, err := ccf.Encode(cadenceEvent)
+	require.NoError(t, err)
+
+	event := unittest.EventFixture(
+		flow.EventType(cadenceEvent.EventType.Location.TypeID(nil, cadenceEvent.EventType.QualifiedIdentifier)),
+		0,
+		0,
+		unittest.IdentifierFixture(),
+		0,
+	)
+
+	event.Payload = payload
+
+	return event
+}
+
+// GenerateAccountContractEvent returns a mock account contract event.
+func GenerateAccountContractEvent(t *testing.T, qualifiedIdentifier string, address flow.Address) flow.Event {
+	contractName, err := cadence.NewString("EventContract")
+	require.NoError(t, err)
+
+	cadenceEvent := cadence.NewEvent(
+		[]cadence.Value{
+			cadence.NewAddress(address),
+			cadence.NewArray(
+				testutils.ConvertToCadence([]byte{111, 43, 164, 202, 220, 174, 148, 17, 253, 161, 9, 124, 237, 83, 227, 75, 115, 149, 141, 83, 129, 145, 252, 68, 122, 137, 80, 155, 89, 233, 136, 213}),
+			).WithType(cadence.NewConstantSizedArrayType(32, cadence.UInt8Type)),
+			contractName,
+		}).
+		WithType(cadence.NewEventType(
+			stdlib.FlowLocation{},
+			qualifiedIdentifier,
+			[]cadence.Field{
+				{
+					Identifier: "address",
+					Type:       cadence.AddressType,
+				},
+				{
+					Identifier: "codeHash",
+					Type:       cadence.NewConstantSizedArrayType(32, cadence.UInt8Type),
+				},
+				{
+					Identifier: "contract",
+					Type:       cadence.StringType,
+				},
+			},
+			nil,
+		))
+
+	payload, err := ccf.Encode(cadenceEvent)
+	require.NoError(t, err)
+
+	event := unittest.EventFixture(
+		flow.EventType(cadenceEvent.EventType.Location.TypeID(nil, cadenceEvent.EventType.QualifiedIdentifier)),
+		0,
+		0,
+		unittest.IdentifierFixture(),
+		0,
+	)
+
+	event.Payload = payload
+
+	return event
 }

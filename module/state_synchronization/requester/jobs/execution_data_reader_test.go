@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
@@ -92,8 +91,9 @@ func (suite *ExecutionDataReaderSuite) reset() {
 	)
 
 	suite.downloader = new(exedatamock.Downloader)
+	var executionDataCacheSize uint32 = 100 // Use local value to avoid cycle dependency on subscription package
 
-	heroCache := herocache.NewBlockExecutionData(state_stream.DefaultCacheSize, unittest.Logger(), metrics.NewNoopCollector())
+	heroCache := herocache.NewBlockExecutionData(executionDataCacheSize, unittest.Logger(), metrics.NewNoopCollector())
 	cache := cache.NewExecutionDataCache(suite.downloader, suite.headers, suite.seals, suite.results, heroCache)
 
 	suite.reader = NewExecutionDataReader(

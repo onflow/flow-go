@@ -13,11 +13,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/insecure"
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -26,16 +26,20 @@ import (
 // The attacker is mocked out in this test.
 func TestHandleOutgoingEvent_AttackerRegistered(t *testing.T) {
 	codec := unittest.NetworkCodec()
-	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
+	corruptedIdentity := unittest.PrivateNodeInfoFixture(unittest.WithAddress(insecure.DefaultAddress))
 	flowNetwork := mocknetwork.NewNetwork(t)
 	ccf := mockinsecure.NewCorruptConduitFactory(t)
 	ccf.On("RegisterEgressController", mock.Anything).Return(nil)
 
+	privateKeys, err := corruptedIdentity.PrivateKeys()
+	require.NoError(t, err)
+	me, err := local.New(corruptedIdentity.Identity().IdentitySkeleton, privateKeys.StakingKey)
+	require.NoError(t, err)
 	corruptNetwork, err := NewCorruptNetwork(
 		unittest.Logger(),
 		flow.BftTestnet,
 		insecure.DefaultAddress,
-		testutil.LocalFixture(t, corruptedIdentity),
+		me,
 		codec,
 		flowNetwork,
 		ccf)

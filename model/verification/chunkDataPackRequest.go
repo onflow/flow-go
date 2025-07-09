@@ -10,9 +10,49 @@ import (
 
 // ChunkDataPackRequest is an internal data structure in fetcher engine that is passed between the engine
 // and requester module. It conveys required information for requesting a chunk data pack.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type ChunkDataPackRequest struct {
 	chunks.Locator // uniquely identifies chunk
 	ChunkDataPackRequestInfo
+}
+
+// UntrustedChunkDataPackRequest is an untrusted input-only representation of a ChunkDataPackRequest,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedChunkDataPackRequest should be validated and converted into
+// a trusted ChunkDataPackRequest using NewChunkDataPackRequest constructor.
+type UntrustedChunkDataPackRequest ChunkDataPackRequest
+
+// NewChunkDataPackRequest creates a new instance of ChunkDataPackRequest.
+// Construction ChunkDataPackRequest allowed only within the constructor.
+//
+// All errors indicate a valid ChunkDataPackRequest cannot be constructed from the input.
+func NewChunkDataPackRequest(untrusted UntrustedChunkDataPackRequest) (*ChunkDataPackRequest, error) {
+	if untrusted.Locator.EqualTo(new(chunks.Locator)) {
+		return nil, fmt.Errorf("locator is empty")
+	}
+	if untrusted.ChunkID == flow.ZeroID {
+		return nil, fmt.Errorf("chunk ID must not be zero")
+	}
+	if len(untrusted.Agrees) == 0 {
+		return nil, fmt.Errorf("agrees list must not be empty")
+	}
+	if len(untrusted.Targets) == 0 {
+		return nil, fmt.Errorf("targets list must not be empty")
+	}
+	filteredTargets := untrusted.Targets.Filter(filter.HasRole[flow.Identity](flow.RoleExecution))
+	if len(filteredTargets) < len(untrusted.Targets) {
+		return nil, fmt.Errorf("only execution nodes identities must be provided in target list: %v", untrusted.Targets)
+	}
+	return &ChunkDataPackRequest{
+		Locator:                  untrusted.Locator,
+		ChunkDataPackRequestInfo: untrusted.ChunkDataPackRequestInfo,
+	}, nil
 }
 
 type ChunkDataPackRequestInfo struct {
@@ -28,7 +68,7 @@ type ChunkDataPackRequestInfo struct {
 func (c ChunkDataPackRequestInfo) SampleTargets(count int) (flow.IdentifierList, error) {
 	// if there are enough receipts produced the same result (agrees), we sample from them.
 	if len(c.Agrees) >= count {
-		sample, err := c.Targets.Filter(filter.HasNodeID(c.Agrees...)).Sample(uint(count))
+		sample, err := c.Targets.Filter(filter.HasNodeID[flow.Identity](c.Agrees...)).Sample(uint(count))
 		if err != nil {
 			return nil, fmt.Errorf("sampling target failed: %w", err)
 		}
@@ -41,7 +81,7 @@ func (c ChunkDataPackRequestInfo) SampleTargets(count int) (flow.IdentifierList,
 	// fetch from the one produced the same result (the only agree)
 	need := uint(count - len(c.Agrees))
 
-	nonResponders, err := c.Targets.Filter(filter.Not(filter.HasNodeID(c.Disagrees...))).Sample(need)
+	nonResponders, err := c.Targets.Filter(filter.Not(filter.HasNodeID[flow.Identity](c.Disagrees...))).Sample(need)
 	if err != nil {
 		return nil, fmt.Errorf("sampling target failed: %w", err)
 	}

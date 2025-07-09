@@ -8,10 +8,12 @@ import (
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	httpmetrics "github.com/slok/go-http-metrics/metrics"
 
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 type EntriesFunc func() uint
@@ -62,41 +64,36 @@ type NetworkSecurityMetrics interface {
 // messages received by the local node from other nodes over the GossipSub protocol may be much higher than the number
 // of messages accepted by the local node, which may indicate that the local node is throttling the incoming messages.
 type GossipSubRpcInspectorMetrics interface {
-	// OnIncomingRpcAcceptedFully tracks the number of RPC messages received by the node that are fully accepted.
-	// An RPC may contain any number of control messages, i.e., IHAVE, IWANT, GRAFT, PRUNE, as well as the actual messages.
-	// A fully accepted RPC means that all the control messages are accepted and all the messages are accepted.
-	OnIncomingRpcAcceptedFully()
+	// OnIWantMessageIDsReceived tracks the number of message ids received by the node from other nodes on an RPC.
+	// Note: this function is called on each IWANT message received by the node, not on each message id received.
+	OnIWantMessageIDsReceived(msgIdCount int)
 
-	// OnIncomingRpcAcceptedOnlyForControlMessages tracks the number of RPC messages received by the node that are accepted
-	// only for the control messages, i.e., only for the included IHAVE, IWANT, GRAFT, PRUNE. However, the actual messages
-	// included in the RPC are not accepted.
-	// This happens mostly when the validation pipeline of GossipSub is throttled, and cannot accept more actual messages for
-	// validation.
-	OnIncomingRpcAcceptedOnlyForControlMessages()
+	// OnIHaveMessageIDsReceived tracks the number of message ids received by the node from other nodes on an iHave message.
+	// This function is called on each iHave message received by the node.
+	// Args:
+	// - channel: the channel on which the iHave message was received.
+	// - msgIdCount: the number of message ids received on the iHave message.
+	OnIHaveMessageIDsReceived(channel string, msgIdCount int)
 
-	// OnIncomingRpcRejected tracks the number of RPC messages received by the node that are rejected.
-	// This happens mostly when the RPC is coming from a low-scored peer based on the peer scoring module of GossipSub.
-	OnIncomingRpcRejected()
+	// OnIncomingRpcReceived tracks the number of RPC messages received by the node.
+	// Args:
+	// 	iHaveCount: the number of iHAVE messages included in the RPC.
+	// 	iWantCount: the number of iWANT messages included in the RPC.
+	// 	graftCount: the number of GRAFT messages included in the RPC.
+	// 	pruneCount: the number of PRUNE messages included in the RPC.
+	// 	msgCount: the number of publish messages included in the RPC.
+	OnIncomingRpcReceived(iHaveCount, iWantCount, graftCount, pruneCount, msgCount int)
+}
 
-	// OnIWantReceived tracks the number of IWANT messages received by the node from other nodes over an RPC message.
-	// iWant is a control message that is sent by a node to request a message that it has seen advertised in an iHAVE message.
-	OnIWantReceived(count int)
-
-	// OnIHaveReceived tracks the number of IHAVE messages received by the node from other nodes over an RPC message.
-	// iHave is a control message that is sent by a node to another node to indicate that it has a new gossiped message.
-	OnIHaveReceived(count int)
-
-	// OnGraftReceived tracks the number of GRAFT messages received by the node from other nodes over an RPC message.
-	// GRAFT is a control message of GossipSub protocol that connects two nodes over a topic directly as gossip partners.
-	OnGraftReceived(count int)
-
-	// OnPruneReceived tracks the number of PRUNE messages received by the node from other nodes over an RPC message.
-	// PRUNE is a control message of GossipSub protocol that disconnects two nodes over a topic.
-	OnPruneReceived(count int)
-
-	// OnPublishedGossipMessagesReceived tracks the number of gossip messages received by the node from other nodes over an
-	// RPC message.
-	OnPublishedGossipMessagesReceived(count int)
+// GossipSubScoringRegistryMetrics encapsulates the metrics collectors for collecting metrics related to the Gossipsub scoring registry.
+// GossipSubScoringRegistryMetrics encapsulates various metrics collectors offering insights into penalties and
+// other factors used by the scoring registry to compute the application-specific score. It focuses on tracking internal
+// aspects of the application-specific score, distinguishing itself from GossipSubScoringMetrics.
+type GossipSubScoringRegistryMetrics interface {
+	// DuplicateMessagePenalties tracks the duplicate message penalty for a node.
+	DuplicateMessagePenalties(penalty float64)
+	// DuplicateMessagesCounts tracks the duplicate message count for a node.
+	DuplicateMessagesCounts(count float64)
 }
 
 // LocalGossipSubRouterMetrics encapsulates the metrics collectors for GossipSub router of the local node.
@@ -233,6 +230,7 @@ type LibP2PMetrics interface {
 	rcmgr.MetricsReporter
 	LibP2PConnectionMetrics
 	UnicastManagerMetrics
+	GossipSubScoringRegistryMetrics
 }
 
 // GossipSubScoringMetrics encapsulates the metrics collectors for the peer scoring module of GossipSub protocol.
@@ -262,11 +260,130 @@ type GossipSubScoringMetrics interface {
 
 // GossipSubRpcValidationInspectorMetrics encapsulates the metrics collectors for the gossipsub rpc validation control message inspectors.
 type GossipSubRpcValidationInspectorMetrics interface {
+	GossipSubRpcInspectorMetrics
+
 	// AsyncProcessingStarted increments the metric tracking the number of inspect message request being processed by workers in the rpc validator worker pool.
 	AsyncProcessingStarted()
 	// AsyncProcessingFinished tracks the time spent by a rpc validation inspector worker to process an inspect message request asynchronously and decrements the metric tracking
 	// the number of inspect message requests  being processed asynchronously by the rpc validation inspector workers.
 	AsyncProcessingFinished(duration time.Duration)
+
+	// OnIHaveControlMessageIdsTruncated tracks the number of times message ids on an iHave message were truncated.
+	// Note that this function is called only when the message ids are truncated from an iHave message, not when the iHave message itself is truncated.
+	// This is different from the OnControlMessagesTruncated function which is called when a slice of control messages truncated from an RPC with all their message ids.
+	// Args:
+	//
+	//	diff: the number of actual messages truncated.
+	OnIHaveControlMessageIdsTruncated(diff int)
+
+	// OnIWantControlMessageIdsTruncated tracks the number of times message ids on an iWant message were truncated.
+	// Note that this function is called only when the message ids are truncated from an iWant message, not when the iWant message itself is truncated.
+	// This is different from the OnControlMessagesTruncated function which is called when a slice of control messages truncated from an RPC with all their message ids.
+	// Args:
+	// 	diff: the number of actual messages truncated.
+	OnIWantControlMessageIdsTruncated(diff int)
+
+	// OnControlMessagesTruncated tracks the number of times a slice of control messages is truncated from an RPC with all their included message ids.
+	// Args:
+	//
+	//	messageType: the type of the control message that was truncated
+	//	diff: the number of control messages truncated.
+	OnControlMessagesTruncated(messageType p2pmsg.ControlMessageType, diff int)
+
+	// OnIWantMessagesInspected tracks the number of duplicate and cache miss message ids received by the node on iWant messages at the end of the async inspection iWants
+	// across one RPC, regardless of the result of the inspection.
+	//
+	//	duplicateCount: the total number of duplicate message ids received by the node on the iWant messages at the end of the async inspection of the RPC.
+	//	cacheMissCount: the total number of cache miss message ids received by the node on the iWant message at the end of the async inspection of the RPC.
+	OnIWantMessagesInspected(duplicateCount int, cacheMissCount int)
+
+	// OnIWantDuplicateMessageIdsExceedThreshold tracks the number of times that async inspection of iWant messages failed due to the total number of duplicate message ids
+	// received by the node on the iWant messages of a single RPC exceeding the threshold, which results in a misbehaviour report.
+	OnIWantDuplicateMessageIdsExceedThreshold()
+
+	// OnIWantCacheMissMessageIdsExceedThreshold tracks the number of times that async inspection of iWant messages failed due to the total
+	// number of cache miss message ids received by the node on the iWant messages of a single RPC exceeding the threshold, which results in a misbehaviour report.
+	OnIWantCacheMissMessageIdsExceedThreshold()
+
+	// OnIHaveMessagesInspected is called at the end of the async inspection of iHave messages of a single RPC, regardless of the result of the inspection.
+	// It tracks the number of duplicate topic ids and duplicate message ids received by the node on the iHave messages of that single RPC at the end of the async inspection iHaves.
+	// Args:
+	//
+	//	duplicateTopicIds: the total number of duplicate topic ids received by the node on the iHave messages at the end of the async inspection of the RPC.
+	//	duplicateMessageIds: the number of duplicate message ids received by the node on the iHave messages at the end of the async inspection of the RPC.
+	//	invalidTopicIds: the number of invalid message ids received by the node on the iHave messages at the end of the async inspection of the RPC.
+	OnIHaveMessagesInspected(duplicateTopicIds int, duplicateMessageIds, invalidTopicIds int)
+
+	// OnIHaveDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of iHave messages of a single RPC failed due to the total number of duplicate topic ids
+	// received by the node on the iHave messages of that RPC exceeding the threshold, which results in a misbehaviour report.
+	OnIHaveDuplicateTopicIdsExceedThreshold()
+
+	// OnIHaveInvalidTopicIdsExceedThreshold tracks the number of times that the async inspection of iHave messages of a single RPC failed due to the total number of invalid topic ids
+	// received by the node on the iHave messages of that RPC exceeding the threshold, which results in a misbehaviour report.
+	OnIHaveInvalidTopicIdsExceedThreshold()
+
+	// OnIHaveDuplicateMessageIdsExceedThreshold tracks the number of times that the async inspection of iHave messages of a single RPC failed due to the total number of duplicate message ids
+	// received by the node on an iHave message exceeding the threshold, which results in a misbehaviour report.
+	OnIHaveDuplicateMessageIdsExceedThreshold()
+
+	// OnInvalidTopicIdDetectedForControlMessage tracks the number of times that the async inspection of a control message type on a single RPC failed due to an invalid topic id.
+	// Args:
+	// - messageType: the type of the control message that was truncated.
+	OnInvalidTopicIdDetectedForControlMessage(messageType p2pmsg.ControlMessageType)
+
+	// OnActiveClusterIDsNotSetErr tracks the number of times that the async inspection of a control message type on a single RPC failed due to active cluster ids not set inspection failure.
+	// This is not causing a misbehaviour report.
+	OnActiveClusterIDsNotSetErr()
+
+	// OnUnstakedPeerInspectionFailed tracks the number of times that the async inspection of a control message type on a single RPC failed due to unstaked peer inspection failure.
+	// This is not causing a misbehaviour report.
+	OnUnstakedPeerInspectionFailed()
+
+	// OnInvalidControlMessageNotificationSent tracks the number of times that the async inspection of a control message failed and resulted in dissemination of an invalid control message was sent.
+	OnInvalidControlMessageNotificationSent()
+
+	// OnRpcRejectedFromUnknownSender tracks the number of rpc's rejected from unstaked nodes.
+	OnRpcRejectedFromUnknownSender()
+
+	// OnPublishMessagesInspectionErrorExceedsThreshold tracks the number of times that async inspection of publish messages failed due to the number of errors.
+	OnPublishMessagesInspectionErrorExceedsThreshold()
+
+	// OnPruneDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of prune messages for an RPC failed due to the number of duplicate topic ids
+	// received by the node on prune messages of the same RPC excesses threshold, which results in a misbehaviour report.
+	OnPruneDuplicateTopicIdsExceedThreshold()
+
+	// OnPruneInvalidTopicIdsExceedThreshold tracks the number of times that the async inspection of prune messages for an RPC failed due to the number of invalid topic ids
+	// received by the node on prune messages of the same RPC excesses threshold, which results in a misbehaviour report.
+	OnPruneInvalidTopicIdsExceedThreshold()
+
+	// OnPruneMessageInspected is called at the end of the async inspection of prune messages of the RPC, regardless of the result of the inspection.
+	// Args:
+	// 	duplicateTopicIds: the number of duplicate topic ids received by the node on the prune messages of the RPC at the end of the async inspection prunes.
+	// 	invalidTopicIds: the number of invalid topic ids received by the node on the prune messages at the end of the async inspection of a single RPC.
+	OnPruneMessageInspected(duplicateTopicIds, invalidTopicIds int)
+
+	// OnGraftDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of the graft messages of a single RPC failed due to the number of duplicate topic ids
+	// received by the node on graft messages of the same RPC excesses threshold, which results in a misbehaviour report.
+	OnGraftDuplicateTopicIdsExceedThreshold()
+
+	// OnGraftInvalidTopicIdsExceedThreshold tracks the number of times that the async inspection of the graft messages of a single RPC failed due to the number of invalid topic ids
+	// received by the node on graft messages of the same RPC excesses threshold, which results in a misbehaviour report.
+	OnGraftInvalidTopicIdsExceedThreshold()
+
+	// OnGraftMessageInspected is called at the end of the async inspection of graft messages of a single RPC, regardless of the result of the inspection.
+	// Args:
+	// 	duplicateTopicIds: the number of duplicate topic ids received by the node on the graft messages at the end of the async inspection of a single RPC.
+	// 	invalidTopicIds: the number of invalid topic ids received by the node on the graft messages at the end of the async inspection of a single RPC.
+	OnGraftMessageInspected(duplicateTopicIds, invalidTopicIds int)
+
+	// OnPublishMessageInspected is called at the end of the async inspection of publish messages of a single RPC, regardless of the result of the inspection.
+	// It tracks the total number of errors detected during the async inspection of the rpc together with their individual breakdown.
+	// Args:
+	// - errCount: the number of errors that occurred during the async inspection of publish messages.
+	// - invalidTopicIdsCount: the number of times that an invalid topic id was detected during the async inspection of publish messages.
+	// - invalidSubscriptionsCount: the number of times that an invalid subscription was detected during the async inspection of publish messages.
+	// - invalidSendersCount: the number of times that an invalid sender was detected during the async inspection of publish messages.
+	OnPublishMessageInspected(totalErrCount int, invalidTopicIdsCount int, invalidSubscriptionsCount int, invalidSendersCount int)
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.
@@ -352,20 +469,37 @@ type EngineMetrics interface {
 	OutboundMessageDropped(engine string, messages string)
 }
 
+// ComplianceMetrics reports metrics about the compliance layer, which processes, finalizes,
+// and seals blocks and tracks data in the Protocol State.
 type ComplianceMetrics interface {
+	// FinalizedHeight reports the latest finalized height known to this node.
 	FinalizedHeight(height uint64)
-	CommittedEpochFinalView(view uint64)
+	// EpochTransitionHeight reports the height of the most recently finalized epoch transition.
 	EpochTransitionHeight(height uint64)
+	// SealedHeight reports the latest block that has a finalized seal known to this node.
 	SealedHeight(height uint64)
+	// BlockFinalized reports information about data contained within finalized blocks.
 	BlockFinalized(*flow.Block)
+	// BlockSealed reports information about data contained within blocks with a finalized seal.
+	// When a new block is finalized, this method is called for every seal in the finalized block,
+	// in the order the seals are listed.
+	// CAUTION: within a block, seals can be included in any permutation (not necessarily in order
+	// of increasing height).
 	BlockSealed(*flow.Block)
+	// CurrentEpochCounter reports the current epoch counter.
 	CurrentEpochCounter(counter uint64)
+	// CurrentEpochPhase reports the current epoch phase.
 	CurrentEpochPhase(phase flow.EpochPhase)
+	// CurrentEpochFinalView reports the final view of the current epoch, including epoch extensions.
 	CurrentEpochFinalView(view uint64)
-	CurrentDKGPhase1FinalView(view uint64)
-	CurrentDKGPhase2FinalView(view uint64)
-	CurrentDKGPhase3FinalView(view uint64)
-	EpochEmergencyFallbackTriggered()
+	// CurrentDKGPhaseViews reports the final view of each DKG phase for the current epoch.
+	CurrentDKGPhaseViews(phase1FinalView, phase2FinalView, phase3FinalView uint64)
+	// EpochFallbackModeTriggered reports that EFM is triggered.
+	EpochFallbackModeTriggered()
+	// EpochFallbackModeExited reports that EFM is no longer triggered.
+	EpochFallbackModeExited()
+	// ProtocolStateVersion reports the version of the latest finalized protocol state.
+	ProtocolStateVersion(version uint64)
 }
 
 type CleanerMetrics interface {
@@ -466,9 +600,16 @@ type CruiseCtlMetrics interface {
 	// ControllerOutput measures the output of the cruise control PID controller.
 	// Concretely, this is the quantity to subtract from the baseline view duration.
 	ControllerOutput(duration time.Duration)
+
+	// ProposalPublicationDelay measures the effective delay the controller imposes on publishing
+	// the node's own proposals, with all limits of authority applied.
+	// Note: Technically, our metrics capture the publication delay relative to when the publication delay was
+	// last requested. Currently, only the EventHandler requests a publication delay, exactly once per proposal.
+	ProposalPublicationDelay(duration time.Duration)
 }
 
 type CollectionMetrics interface {
+	TransactionValidationMetrics
 	// TransactionIngested is called when a new transaction is ingested by the
 	// node. It increments the total count of ingested transactions and starts
 	// a tx->col span for the transaction.
@@ -632,6 +773,8 @@ type LedgerMetrics interface {
 }
 
 type WALMetrics interface {
+	// ExecutionCheckpointSize reports the size of a checkpoint in bytes
+	ExecutionCheckpointSize(bytes uint64)
 }
 
 type RateLimitedBlockstoreMetrics interface {
@@ -699,6 +842,15 @@ type RuntimeMetrics interface {
 	RuntimeTransactionProgramsCacheHit()
 }
 
+type EVMMetrics interface {
+	// SetNumberOfDeployedCOAs sets the total number of deployed COAs
+	SetNumberOfDeployedCOAs(count uint64)
+	// EVMTransactionExecuted reports the gas used when executing an evm transaction
+	EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool)
+	// EVMBlockExecuted reports the block size, total gas used and total supply when executing an evm block
+	EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow float64)
+}
+
 type ProviderMetrics interface {
 	// ChunkDataPackRequestProcessed is executed every time a chunk data pack request is picked up for processing at execution node.
 	// It increases the request processed counter by one.
@@ -758,6 +910,7 @@ type AccessMetrics interface {
 	RestMetrics
 	GRPCConnectionPoolMetrics
 	TransactionMetrics
+	TransactionValidationMetrics
 	BackendScriptsMetrics
 
 	// UpdateExecutionReceiptMaxHeight is called whenever we store an execution receipt from a block from a newer height
@@ -774,8 +927,30 @@ type ExecutionResultStats struct {
 	EventSize                       int
 	NumberOfRegistersTouched        int
 	NumberOfBytesWrittenToRegisters int
-	NumberOfCollections             int
-	NumberOfTransactions            int
+}
+
+type BlockExecutionResultStats struct {
+	CollectionExecutionResultStats
+	NumberOfCollections int
+}
+
+type CollectionExecutionResultStats struct {
+	ExecutionResultStats
+	NumberOfTransactions int
+}
+
+type TransactionExecutionResultStats struct {
+	ExecutionResultStats
+	NumberOfTxnConflictRetries int
+	Failed                     bool
+	SystemTransaction          bool
+	ComputationIntensities     meter.MeteredComputationIntensities
+}
+
+type TransactionExecutionResultInfo struct {
+	TransactionID flow.Identifier
+	BlockID       flow.Identifier
+	BlockHeight   uint64
 }
 
 func (stats *ExecutionResultStats) Merge(other ExecutionResultStats) {
@@ -785,13 +960,23 @@ func (stats *ExecutionResultStats) Merge(other ExecutionResultStats) {
 	stats.EventSize += other.EventSize
 	stats.NumberOfRegistersTouched += other.NumberOfRegistersTouched
 	stats.NumberOfBytesWrittenToRegisters += other.NumberOfBytesWrittenToRegisters
-	stats.NumberOfCollections += other.NumberOfCollections
+}
+
+func (stats *CollectionExecutionResultStats) Add(other TransactionExecutionResultStats) {
+	stats.ExecutionResultStats.Merge(other.ExecutionResultStats)
+	stats.NumberOfTransactions += 1
+}
+
+func (stats *BlockExecutionResultStats) Add(other CollectionExecutionResultStats) {
+	stats.CollectionExecutionResultStats.Merge(other.ExecutionResultStats)
 	stats.NumberOfTransactions += other.NumberOfTransactions
+	stats.NumberOfCollections += 1
 }
 
 type ExecutionMetrics interface {
 	LedgerMetrics
 	RuntimeMetrics
+	EVMMetrics
 	ProviderMetrics
 	WALMetrics
 
@@ -809,27 +994,29 @@ type ExecutionMetrics interface {
 	// ExecutionLastExecutedBlockHeight reports last executed block height
 	ExecutionLastExecutedBlockHeight(height uint64)
 
+	// ExecutionLastFinalizedExecutedBlockHeight reports last finalized and executed block height
+	ExecutionLastFinalizedExecutedBlockHeight(height uint64)
+
+	// ExecutionLastChunkDataPackPrunedHeight reports last chunk data pack pruned height
+	ExecutionLastChunkDataPackPrunedHeight(height uint64)
+
+	// ExecutionTargetChunkDataPackPrunedHeight reports the target height for chunk data pack to be pruned
+	ExecutionTargetChunkDataPackPrunedHeight(height uint64)
+
 	// ExecutionBlockExecuted reports the total time and computation spent on executing a block
-	ExecutionBlockExecuted(dur time.Duration, stats ExecutionResultStats)
+	ExecutionBlockExecuted(dur time.Duration, stats BlockExecutionResultStats)
 
 	// ExecutionBlockExecutionEffortVectorComponent reports the unweighted effort of given ComputationKind at block level
-	ExecutionBlockExecutionEffortVectorComponent(string, uint)
+	ExecutionBlockExecutionEffortVectorComponent(string, uint64)
 
 	// ExecutionBlockCachedPrograms reports the number of cached programs at the end of a block
 	ExecutionBlockCachedPrograms(programs int)
 
 	// ExecutionCollectionExecuted reports the total time and computation spent on executing a collection
-	ExecutionCollectionExecuted(dur time.Duration, stats ExecutionResultStats)
+	ExecutionCollectionExecuted(dur time.Duration, stats CollectionExecutionResultStats)
 
 	// ExecutionTransactionExecuted reports stats on executing a single transaction
-	ExecutionTransactionExecuted(
-		dur time.Duration,
-		numTxnConflictRetries int,
-		compUsed uint64,
-		memoryUsed uint64,
-		eventCounts int,
-		eventSize int,
-		failed bool)
+	ExecutionTransactionExecuted(dur time.Duration, stats TransactionExecutionResultStats, info TransactionExecutionResultInfo)
 
 	// ExecutionChunkDataPackGenerated reports stats on chunk data pack generation
 	ExecutionChunkDataPackGenerated(proofSize, numberOfTransactions int)
@@ -839,9 +1026,6 @@ type ExecutionMetrics interface {
 
 	// ExecutionCollectionRequestSent reports when a request for a collection is sent to a collection node
 	ExecutionCollectionRequestSent()
-
-	// Unused
-	ExecutionCollectionRequestRetried()
 
 	// ExecutionSync reports when the state syncing is triggered or stopped.
 	ExecutionSync(syncing bool)
@@ -897,6 +1081,10 @@ type TransactionMetrics interface {
 	// works if the transaction was earlier added as received.
 	TransactionFinalized(txID flow.Identifier, when time.Time)
 
+	// TransactionSealed reports the time spent between the transaction being received and sealed. Reporting only
+	// works if the transaction was earlier added as received.
+	TransactionSealed(txID flow.Identifier, when time.Time)
+
 	// TransactionExecuted reports the time spent between the transaction being received and executed. Reporting only
 	// works if the transaction was earlier added as received.
 	TransactionExecuted(txID flow.Identifier, when time.Time)
@@ -906,6 +1094,15 @@ type TransactionMetrics interface {
 
 	// TransactionSubmissionFailed should be called whenever we try to submit a transaction and it fails
 	TransactionSubmissionFailed()
+}
+
+type TransactionValidationMetrics interface {
+	// TransactionValidated tracks number of successfully validated transactions
+	TransactionValidated()
+	// TransactionValidationFailed tracks number of validation failed transactions with reason
+	TransactionValidationFailed(reason string)
+	// TransactionValidationSkipped tracks number of skipped transaction validations
+	TransactionValidationSkipped()
 }
 
 type PingMetrics interface {
@@ -981,4 +1178,24 @@ type ChainSyncMetrics interface {
 type DHTMetrics interface {
 	RoutingTablePeerAdded()
 	RoutingTablePeerRemoved()
+}
+
+type CollectionExecutedMetric interface {
+	CollectionFinalized(light flow.LightCollection)
+	CollectionExecuted(light flow.LightCollection)
+	BlockFinalized(block *flow.Block)
+	ExecutionReceiptReceived(r *flow.ExecutionReceipt)
+	UpdateLastFullBlockHeight(height uint64)
+}
+
+type MachineAccountMetrics interface {
+	// AccountBalance reports the current balance of the machine account.
+	AccountBalance(bal float64)
+	// RecommendedMinBalance reports the recommended minimum balance. If the actual balance
+	// falls below this level, it must be refilled.
+	// NOTE: Operators should alert on `AccountBalance < RecommendedMinBalance`
+	RecommendedMinBalance(bal float64)
+	// IsMisconfigured reports whether a critical misconfiguration has been detected.
+	// NOTE Operators should alert on non-zero values reported here.
+	IsMisconfigured(misconfigured bool)
 }

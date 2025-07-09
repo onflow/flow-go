@@ -52,13 +52,13 @@ const blobRecordKeyLength = 1 + 8 + blobs.CidLength
 func makeBlobRecordKey(blockHeight uint64, c cid.Cid) []byte {
 	blobRecordKey := make([]byte, blobRecordKeyLength)
 	blobRecordKey[0] = prefixBlobRecord
-	binary.LittleEndian.PutUint64(blobRecordKey[1:], blockHeight)
+	binary.BigEndian.PutUint64(blobRecordKey[1:], blockHeight)
 	copy(blobRecordKey[1+8:], c.Bytes())
 	return blobRecordKey
 }
 
 func parseBlobRecordKey(key []byte) (uint64, cid.Cid, error) {
-	blockHeight := binary.LittleEndian.Uint64(key[1:])
+	blockHeight := binary.BigEndian.Uint64(key[1:])
 	c, err := cid.Cast(key[1+8:])
 	return blockHeight, c, err
 }
@@ -74,7 +74,7 @@ func makeLatestHeightKey(c cid.Cid) []byte {
 
 func makeUint64Value(v uint64) []byte {
 	value := make([]byte, 8)
-	binary.LittleEndian.PutUint64(value, v)
+	binary.BigEndian.PutUint64(value, v)
 	return value
 }
 
@@ -84,7 +84,7 @@ func getUint64Value(item *badger.Item) (uint64, error) {
 		return 0, err
 	}
 
-	return binary.LittleEndian.Uint64(value), nil
+	return binary.BigEndian.Uint64(value), nil
 }
 
 // getBatchItemCountLimit returns the maximum number of items that can be included in a single batch
@@ -189,6 +189,7 @@ func WithPruneCallback(callback PruneCallback) StorageOption {
 }
 
 func OpenStorage(dbPath string, startHeight uint64, logger zerolog.Logger, opts ...StorageOption) (*storage, error) {
+	lg := logger.With().Str("module", "tracker_storage").Logger()
 	db, err := badger.Open(badger.LSMOnlyOptions(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("could not open tracker db: %w", err)
@@ -197,16 +198,20 @@ func OpenStorage(dbPath string, startHeight uint64, logger zerolog.Logger, opts 
 	storage := &storage{
 		db:            db,
 		pruneCallback: func(c cid.Cid) error { return nil },
-		logger:        logger.With().Str("module", "tracker_storage").Logger(),
+		logger:        lg,
 	}
 
 	for _, opt := range opts {
 		opt(storage)
 	}
 
+	lg.Info().Msgf("initialize storage with start height: %d", startHeight)
+
 	if err := storage.init(startHeight); err != nil {
 		return nil, fmt.Errorf("failed to initialize storage: %w", err)
 	}
+
+	lg.Info().Msgf("storage initialized")
 
 	return storage, nil
 }
@@ -224,10 +229,12 @@ func (s *storage) init(startHeight uint64) error {
 			)
 		}
 
+		s.logger.Info().Msgf("prune from height %v up to height %d", fulfilledHeight, prunedHeight)
 		// replay pruning in case it was interrupted during previous shutdown
 		if err := s.PruneUpToHeight(prunedHeight); err != nil {
 			return fmt.Errorf("failed to replay pruning: %w", err)
 		}
+		s.logger.Info().Msgf("finished pruning")
 	} else if errors.Is(fulfilledHeightErr, badger.ErrKeyNotFound) && errors.Is(prunedHeightErr, badger.ErrKeyNotFound) {
 		// db is empty, we need to bootstrap it
 		if err := s.bootstrap(startHeight); err != nil {

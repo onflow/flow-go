@@ -16,6 +16,7 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go-sdk/templates"
+
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
@@ -148,9 +149,9 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 
 	createAccountTx.
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
-		SetProposalKey(serviceAddress, 0, accessClient.GetSeqNumber()).
+		SetProposalKey(serviceAddress, 0, accessClient.GetAndIncrementSeqNumber()).
 		SetPayer(serviceAddress).
-		SetGasLimit(9999)
+		SetComputeLimit(9999)
 
 	// Sign the transaction
 	signedTx, err := accessClient.SignTransaction(createAccountTx)
@@ -168,7 +169,7 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 	// Try to send the transaction for the second time. It should wait less than a second because the circuit breaker
 	// is configured to break after the first failure
 	err = accessClient.SendTransaction(s.ctx, signedTx)
-	//Here we catch the codes.Unknown error, as this is the one that comes from the Circuit Breaker when the state is Open.
+	// Here we catch the codes.Unknown error, as this is the one that comes from the Circuit Breaker when the state is Open.
 	assert.Equal(s.T(), codes.Unknown, status.Code(err))
 
 	// Reconnect the collection node

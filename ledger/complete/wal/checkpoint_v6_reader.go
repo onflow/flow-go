@@ -20,8 +20,19 @@ import (
 // ErrEOFNotReached for indicating end of file not reached error
 var ErrEOFNotReached = errors.New("expect to reach EOF, but actually didn't")
 
-var ReadTriesRootHash = readTriesRootHash
+func ReadTriesRootHash(logger zerolog.Logger, dir string, fileName string) (
+	[]ledger.RootHash,
+	error,
+) {
+	err := validateCheckpointFile(logger, dir, fileName)
+	if err != nil {
+		return nil, err
+	}
+	return readTriesRootHash(logger, dir, fileName)
+}
+
 var CheckpointHasRootHash = checkpointHasRootHash
+var CheckpointHasSingleRootHash = checkpointHasSingleRootHash
 
 // readCheckpointV6 reads checkpoint file from a main file and 17 file parts.
 // the main file stores:
@@ -103,6 +114,34 @@ func OpenAndReadCheckpointV6(dir string, fileName string, logger zerolog.Logger)
 	})
 
 	return triesToReturn, errToReturn
+}
+
+// ReadCheckpointFileSize returns the total size of the checkpoint file
+func ReadCheckpointFileSize(dir string, fileName string) (uint64, error) {
+	paths := allFilePaths(dir, fileName)
+	totalSize := uint64(0)
+	for _, path := range paths {
+		fileInfo, err := os.Stat(path)
+		if err != nil {
+			return 0, fmt.Errorf("could not get file info for %v: %w", path, err)
+		}
+
+		totalSize += uint64(fileInfo.Size())
+	}
+
+	return totalSize, nil
+}
+
+func allFilePaths(dir string, fileName string) []string {
+	paths := make([]string, 0, 1+subtrieCount+1)
+	paths = append(paths, filePathCheckpointHeader(dir, fileName))
+	for i := 0; i < subtrieCount; i++ {
+		subTriePath, _, _ := filePathSubTries(dir, fileName, i)
+		paths = append(paths, subTriePath)
+	}
+	topTriePath, _ := filePathTopTries(dir, fileName)
+	paths = append(paths, topTriePath)
+	return paths
 }
 
 func filePathCheckpointHeader(dir string, fileName string) string {
@@ -686,6 +725,23 @@ func checkpointHasRootHash(logger zerolog.Logger, bootstrapDir, filename string,
 	return fmt.Errorf("could not find expected root hash %v in checkpoint file which contains: %v ", expectedRootHash, roots)
 }
 
+func checkpointHasSingleRootHash(logger zerolog.Logger, bootstrapDir, filename string, expectedRootHash ledger.RootHash) error {
+	roots, err := ReadTriesRootHash(logger, bootstrapDir, filename)
+	if err != nil {
+		return fmt.Errorf("could not read checkpoint root hash: %w", err)
+	}
+
+	if len(roots) != 1 {
+		return fmt.Errorf("expected 1 root hash in checkpoint file, but got %v", len(roots))
+	}
+
+	if roots[0] != expectedRootHash {
+		return fmt.Errorf("expected root hash %v, but got %v", expectedRootHash, roots[0])
+	}
+
+	return nil
+}
+
 func readFileHeader(reader io.Reader) (uint16, uint16, error) {
 	bytes := make([]byte, encMagicSize+encVersionSize)
 	_, err := io.ReadFull(reader, bytes)
@@ -819,4 +875,59 @@ func ensureReachedEOF(reader io.Reader) error {
 	}
 
 	return fmt.Errorf("fail to check if reached EOF: %w", err)
+}
+
+func validateCheckpointFile(logger zerolog.Logger, dir, fileName string) error {
+	headerPath := filePathCheckpointHeader(dir, fileName)
+	// validate header file
+	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath, logger)
+	if err != nil {
+		return err
+	}
+
+	// validate subtrie files
+	for index, expectedSum := range subtrieChecksums {
+		filepath, _, err := filePathSubTries(dir, fileName, index)
+		if err != nil {
+			return err
+		}
+		err = withFile(logger, filepath, func(f *os.File) error {
+			_, checksum, err := readSubTriesFooter(f)
+			if err != nil {
+				return fmt.Errorf("cannot read sub trie node count: %w", err)
+			}
+
+			if checksum != expectedSum {
+				return fmt.Errorf("mismatch checksum in subtrie file. checksum from checkpoint header %v does not "+
+					"match with the checksum in subtrie file %v", checksum, expectedSum)
+			}
+			return nil
+		})
+
+		if err != nil {
+			return err
+		}
+	}
+
+	// validate top trie file
+	filepath, _ := filePathTopTries(dir, fileName)
+	err = withFile(logger, filepath, func(file *os.File) error {
+		// read subtrie Node count and validate
+		_, _, checkSum, err := readTopTriesFooter(file)
+		if err != nil {
+			return err
+		}
+
+		if topTrieChecksum != checkSum {
+			return fmt.Errorf("mismatch top trie checksum, header file has %v, toptrie file has %v",
+				topTrieChecksum, checkSum)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

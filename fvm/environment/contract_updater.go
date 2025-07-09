@@ -6,7 +6,7 @@ import (
 	"sort"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -208,7 +208,8 @@ func (impl *contractUpdaterStubsImpl) getIsContractDeploymentRestricted() (
 				"service account. Using value from context instead.")
 		return false, false
 	}
-	restricted = restrictedCadence.ToGoValue().(bool)
+	restricted = bool(restrictedCadence)
+
 	return restricted, true
 }
 
@@ -323,8 +324,11 @@ func (updater *ContractUpdaterImpl) UpdateAccountContractCode(
 		trace.FVMEnvUpdateAccountContractCode).End()
 
 	err := updater.meter.MeterComputation(
-		ComputationKindUpdateAccountContractCode,
-		1)
+		common.ComputationUsage{
+			Kind:      ComputationKindUpdateAccountContractCode,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("update account contract code failed: %w", err)
 	}
@@ -347,8 +351,11 @@ func (updater *ContractUpdaterImpl) RemoveAccountContractCode(
 		trace.FVMEnvRemoveAccountContractCode).End()
 
 	err := updater.meter.MeterComputation(
-		ComputationKindRemoveAccountContractCode,
-		1)
+		common.ComputationUsage{
+			Kind:      ComputationKindRemoveAccountContractCode,
+			Intensity: 1,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("remove account contract code failed: %w", err)
 	}

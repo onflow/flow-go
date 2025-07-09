@@ -1,6 +1,9 @@
 package execution
 
 import (
+	"fmt"
+	"math"
+
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -31,7 +34,7 @@ func (er *BlockExecutionResult) Size() int {
 }
 
 func (er *BlockExecutionResult) CollectionExecutionResultAt(colIndex int) *CollectionExecutionResult {
-	if colIndex < 0 && colIndex > len(er.collectionExecutionResults) {
+	if colIndex < 0 || colIndex > len(er.collectionExecutionResults) {
 		return nil
 	}
 	return &er.collectionExecutionResults[colIndex]
@@ -45,6 +48,18 @@ func (er *BlockExecutionResult) AllEvents() flow.EventsList {
 		}
 	}
 	return res
+}
+
+// ServiceEventCountForChunk returns the number of service events emitted in the given chunk.
+func (er *BlockExecutionResult) ServiceEventCountForChunk(chunkIndex int) uint16 {
+	serviceEventCount := len(er.collectionExecutionResults[chunkIndex].serviceEvents)
+	if serviceEventCount > math.MaxUint16 {
+		// The current protocol demands that the ServiceEventCount does not exceed 65535.
+		// For defensive programming, we explicitly enforce this limit as 65k could be produced by a bug.
+		// Execution nodes would be first to realize that this bound is violated, and crash (fail early).
+		panic(fmt.Sprintf("service event count (%d) exceeds maximum value of 65535", serviceEventCount))
+	}
+	return uint16(serviceEventCount)
 }
 
 func (er *BlockExecutionResult) AllServiceEvents() flow.EventsList {
@@ -124,10 +139,16 @@ type BlockAttestationResult struct {
 	// was the reason this is kept here, long term we don't need this data and should
 	// act based on register deltas
 	*execution_data.BlockExecutionData
+
+	// Deprecated:
+	// TODO(mainnet27, #6773): remove this field https://github.com/onflow/flow-go/issues/6773
+	//   this is only temporarily needed produce different chunk Data Packs depending on the protocol version
+	versionAwareChunkConstructor flow.ChunkConstructor
 }
 
 func NewEmptyBlockAttestationResult(
 	blockExecutionResult *BlockExecutionResult,
+	versionAwareChunkConstructor flow.ChunkConstructor,
 ) *BlockAttestationResult {
 	colSize := blockExecutionResult.Size()
 	return &BlockAttestationResult{
@@ -140,6 +161,7 @@ func NewEmptyBlockAttestationResult(
 				0,
 				colSize),
 		},
+		versionAwareChunkConstructor: versionAwareChunkConstructor,
 	}
 }
 
@@ -185,12 +207,20 @@ func (ar *BlockAttestationResult) ChunkAt(index int) *flow.Chunk {
 	execRes := ar.collectionExecutionResults[index]
 	attestRes := ar.collectionAttestationResults[index]
 
-	return flow.NewChunk(
+	if execRes.executionSnapshot == nil {
+		// This should never happen
+		// In case it does, attach additional information to the error message
+		panic(fmt.Sprintf("execution snapshot is nil. Block ID: %s, EndState: %s", ar.Block.ID(), attestRes.endStateCommit))
+	}
+
+	// TODO(mainnet27, #6773): replace with flow.NewChunk https://github.com/onflow/flow-go/issues/6773
+	return ar.versionAwareChunkConstructor(
 		ar.Block.ID(),
 		index,
 		attestRes.startStateCommit,
 		len(execRes.TransactionResults()),
 		attestRes.eventCommit,
+		ar.ServiceEventCountForChunk(index),
 		attestRes.endStateCommit,
 		execRes.executionSnapshot.TotalComputationUsed(),
 	)

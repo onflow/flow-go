@@ -38,7 +38,7 @@ func (t *IdentityProviderIDTranslator) GetFlowID(p peer.ID) (flow.Identifier, er
 }
 
 func (t *IdentityProviderIDTranslator) GetPeerID(n flow.Identifier) (peer.ID, error) {
-	ids := t.idProvider.Identities(filter.HasNodeID(n))
+	ids := t.idProvider.Identities(filter.HasNodeID[flow.Identity](n))
 	if len(ids) == 0 {
 		return "", fmt.Errorf("could not find identity with id %v", n.String())
 	}

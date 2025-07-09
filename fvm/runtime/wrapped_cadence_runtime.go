@@ -2,10 +2,10 @@ package runtime
 
 import (
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/sema"
 
 	"github.com/onflow/flow-go/fvm/errors"
 )
@@ -64,12 +64,6 @@ func (wr WrappedCadenceRuntime) ParseAndCheckProgram(source []byte, context runt
 
 func (wr WrappedCadenceRuntime) ReadStored(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
 	v, err := wr.Runtime.ReadStored(address, path, context)
-	return v, errors.HandleRuntimeError(err)
-}
-
-func (wr WrappedCadenceRuntime) ReadLinked(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
-	//nolint:staticcheck
-	v, err := wr.Runtime.ReadLinked(address, path, context)
 	return v, errors.HandleRuntimeError(err)
 }
 

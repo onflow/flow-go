@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
+	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -82,7 +83,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 		indexerCoreTest.indexer,
 		exeCache,
 		test.latestHeight,
-		progress,
+		&mockProgressInitializer{progress: progress},
 	)
 	require.NoError(t, err)
 
@@ -121,6 +122,16 @@ func (w *indexerTest) run(ctx irrecoverable.SignalerContext, reachHeight uint64,
 	unittest.RequireCloseBefore(w.t, w.worker.Done(), testTimeout, "timeout waiting for the consumer to be done")
 }
 
+type mockProgressInitializer struct {
+	progress *mockProgress
+}
+
+func (m *mockProgressInitializer) Initialize(defaultIndex uint64) (storage.ConsumerProgress, error) {
+	return m.progress, nil
+}
+
+var _ storage.ConsumerProgress = (*mockProgress)(nil)
+
 type mockProgress struct {
 	index     *atomic.Uint64
 	doneIndex *atomic.Uint64
@@ -150,6 +161,10 @@ func (w *mockProgress) SetProcessedIndex(index uint64) error {
 	return nil
 }
 
+func (w *mockProgress) BatchSetProcessedIndex(uint64, storage.ReaderBatchWriter) error {
+	return fmt.Errorf("not implemented")
+}
+
 func (w *mockProgress) InitProcessedIndex(index uint64) error {
 	w.index.Store(index)
 	return nil
@@ -169,11 +184,13 @@ func TestIndexer_Success(t *testing.T) {
 
 	test.setBlockDataByID(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
 		trie := trieUpdateFixture(t)
+		collection := unittest.CollectionFixture(0)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: ID,
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-				{TrieUpdate: trie},
-			},
+			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{{
+				Collection: &collection,
+				TrieUpdate: trie,
+			}},
 		}
 
 		// create this to capture the closure of the creation of block execution data, so we can for each returned
@@ -211,11 +228,13 @@ func TestIndexer_Failure(t *testing.T) {
 
 	test.setBlockDataByID(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
 		trie := trieUpdateFixture(t)
+		collection := unittest.CollectionFixture(0)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: ID,
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-				{TrieUpdate: trie},
-			},
+			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{{
+				Collection: &collection,
+				TrieUpdate: trie,
+			}},
 		}
 
 		// fail when trying to persist registers
