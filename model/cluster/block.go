@@ -40,22 +40,9 @@ type UntrustedBlock Block
 // All errors indicate that a valid Block cannot be constructed from the input.
 func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	// validate header body
-	untrustedHeaderBody := untrusted.Header
-	if untrustedHeaderBody.ParentID == flow.ZeroID {
-		return nil, fmt.Errorf("parent ID must not be zero")
-	}
-	if len(untrustedHeaderBody.ParentVoterIndices) == 0 {
-		return nil, fmt.Errorf("parent voter indices must not be empty")
-	}
-	if len(untrustedHeaderBody.ParentVoterSigData) == 0 {
-		return nil, fmt.Errorf("parent voter signature must not be empty")
-	}
-	if untrustedHeaderBody.ProposerID == flow.ZeroID {
-		return nil, fmt.Errorf("proposer ID must not be zero")
-	}
-
-	if untrustedHeaderBody.ParentView >= untrustedHeaderBody.View {
-		return nil, fmt.Errorf("invalid views - block parent view (%d) is greater than or equal to block view (%d)", untrustedHeaderBody.ParentView, untrustedHeaderBody.View)
+	headerBody, err := flow.NewHeaderBody(flow.UntrustedHeaderBody(untrusted.Header))
+	if err != nil {
+		return nil, fmt.Errorf("invalid header body: %w", err)
 	}
 
 	// validate payload
@@ -65,7 +52,7 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	}
 
 	return &Block{
-		Header:  untrustedHeaderBody,
+		Header:  *headerBody,
 		Payload: *payload,
 	}, nil
 }
@@ -74,11 +61,16 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 //
 // This constructor must be used **only** for constructing the root block,
 // which is the only case where zero values are allowed.
-func NewRootBlock(untrusted UntrustedBlock) *Block {
-	return &Block{
-		Header:  untrusted.Header,
-		Payload: untrusted.Payload,
+func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
+	rootHeaderBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody(untrusted.Header))
+	if err != nil {
+		return nil, fmt.Errorf("invalid root header body: %w", err)
 	}
+
+	return &Block{
+		Header:  *rootHeaderBody,
+		Payload: untrusted.Payload,
+	}, nil
 }
 
 // ID returns a collision-resistant hash of the cluster.Block struct.

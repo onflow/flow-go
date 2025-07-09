@@ -8,6 +8,8 @@ import (
 
 // Payload is the payload for blocks in collection node cluster consensus.
 // It contains only a single collection.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Payload struct {
 
 	// Collection is the collection being created.

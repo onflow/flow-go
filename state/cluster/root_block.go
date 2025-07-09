@@ -35,10 +35,15 @@ func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) (*
 		return nil, fmt.Errorf("failed to create root header body: %w", err)
 	}
 
-	return cluster.NewRootBlock(
+	block, err := cluster.NewRootBlock(
 		cluster.UntrustedBlock{
 			Header:  *rootHeaderBody,
 			Payload: *rootBlockPayload,
 		},
-	), nil
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create root cluster block: %w", err)
+	}
+
+	return block, nil
 }
