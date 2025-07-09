@@ -20,35 +20,35 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type ExecutionNode struct {
+type ENEventRetriever struct {
 	log              zerolog.Logger
 	nodeProvider     *rpc.ExecutionNodeIdentitiesProvider
 	connFactory      connection.ConnectionFactory
 	nodeCommunicator node_communicator.Communicator
 }
 
-var _ Retriever = (*ExecutionNode)(nil)
+var _ EventRetriever = (*ENEventRetriever)(nil)
 
-func NewENEventsRetriever(
+func NewENEventRetriever(
 	log zerolog.Logger,
 	nodeProvider *rpc.ExecutionNodeIdentitiesProvider,
 	connFactory connection.ConnectionFactory,
 	nodeCommunicator node_communicator.Communicator,
-) *ExecutionNode {
-	return &ExecutionNode{
-		log:              zerolog.New(log).With().Str("events_retriever", "execution_node").Logger(),
+) *ENEventRetriever {
+	return &ENEventRetriever{
+		log:              log.With().Str("events_retriever", "execution_node").Logger(),
 		nodeProvider:     nodeProvider,
 		connFactory:      connFactory,
 		nodeCommunicator: nodeCommunicator,
 	}
 }
 
-func (e *ExecutionNode) Events(
+func (e *ENEventRetriever) Events(
 	ctx context.Context,
 	blocks []BlockMetadata,
 	eventType flow.EventType,
 	encoding entities.EventEncodingVersion,
-) (EventsResponse, error) {
+) (Response, error) {
 	// create an execution API request for events at block ID
 	blockIDs := make([]flow.Identifier, len(blocks))
 	for i := range blocks {
@@ -56,7 +56,7 @@ func (e *ExecutionNode) Events(
 	}
 
 	if len(blockIDs) == 0 {
-		return EventsResponse{}, nil
+		return Response{}, nil
 	}
 
 	req := &execproto.GetEventsForBlockIDsRequest{
@@ -72,14 +72,14 @@ func (e *ExecutionNode) Events(
 		lastBlockID,
 	)
 	if err != nil {
-		return EventsResponse{}, rpc.ConvertError(err, "failed to retrieve events from execution node", codes.Internal)
+		return Response{}, rpc.ConvertError(err, "failed to retrieve events from execution node", codes.Internal)
 	}
 
 	var resp *execproto.GetEventsForBlockIDsResponse
 	var successfulNode *flow.IdentitySkeleton
 	resp, successfulNode, err = e.getEventsFromAnyExeNode(ctx, execNodes, req)
 	if err != nil {
-		return EventsResponse{}, rpc.ConvertError(err, "failed to retrieve events from execution nodes", codes.Internal)
+		return Response{}, rpc.ConvertError(err, "failed to retrieve events from execution nodes", codes.Internal)
 	}
 	e.log.Trace().
 		Str("execution_id", successfulNode.String()).
@@ -94,10 +94,10 @@ func (e *ExecutionNode) Events(
 		encoding,
 	)
 	if err != nil {
-		return EventsResponse{}, status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
+		return Response{}, status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
 	}
 
-	return EventsResponse{
+	return Response{
 		Events: results,
 	}, nil
 }
@@ -106,7 +106,7 @@ func (e *ExecutionNode) Events(
 // We attempt querying each EN in sequence. If any EN returns a valid response, then errors from
 // other ENs are logged and swallowed. If all ENs fail to return a valid response, then an
 // error aggregating all failures is returned.
-func (e *ExecutionNode) getEventsFromAnyExeNode(
+func (e *ENEventRetriever) getEventsFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetEventsForBlockIDsRequest,
@@ -144,7 +144,7 @@ func (e *ExecutionNode) getEventsFromAnyExeNode(
 	return resp, execNode, errToReturn
 }
 
-func (e *ExecutionNode) tryGetEvents(
+func (e *ENEventRetriever) tryGetEvents(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
 	req *execproto.GetEventsForBlockIDsRequest,

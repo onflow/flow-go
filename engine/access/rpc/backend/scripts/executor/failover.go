@@ -8,21 +8,21 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type Failover struct {
+type FailoverScriptExecutor struct {
 	localExecutor         ScriptExecutor
 	executionNodeExecutor ScriptExecutor
 }
 
-var _ ScriptExecutor = (*Failover)(nil)
+var _ ScriptExecutor = (*FailoverScriptExecutor)(nil)
 
-func NewFailoverScriptExecutor(localExecutor ScriptExecutor, execNodeExecutor ScriptExecutor) *Failover {
-	return &Failover{
+func NewFailoverScriptExecutor(localExecutor ScriptExecutor, execNodeExecutor ScriptExecutor) *FailoverScriptExecutor {
+	return &FailoverScriptExecutor{
 		localExecutor:         localExecutor,
 		executionNodeExecutor: execNodeExecutor,
 	}
 }
 
-func (f *Failover) Execute(ctx context.Context, request *ScriptExecutionRequest) ([]byte, time.Duration, error) {
+func (f *FailoverScriptExecutor) Execute(ctx context.Context, request *Request) ([]byte, time.Duration, error) {
 	localResult, localDuration, localErr := f.localExecutor.Execute(ctx, request)
 
 	isInvalidArgument := status.Code(localErr) == codes.InvalidArgument

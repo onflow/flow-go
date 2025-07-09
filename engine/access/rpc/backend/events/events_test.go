@@ -178,99 +178,6 @@ func (s *EventsSuite) SetupTest() {
 	}
 }
 
-func (s *EventsSuite) defaultBackend(mode query_mode.IndexQueryMode, eventsIndex *index.EventsIndex) *Events {
-	e, err := NewEventsBackend(
-		s.log,
-		s.state,
-		s.chainID.Chain(),
-		DefaultMaxHeightRange,
-		s.headers,
-		s.connectionFactory,
-		node_communicator.NewNodeCommunicator(false),
-		mode,
-		eventsIndex,
-		commonrpc.NewExecutionNodeIdentitiesProvider(
-			s.log,
-			s.state,
-			s.receipts,
-			flow.IdentifierList{},
-			flow.IdentifierList{},
-		))
-
-	require.NoError(s.T(), err)
-
-	return e
-}
-
-// setupExecutionNodes sets up the mocks required to test against an EN backend
-func (s *EventsSuite) setupExecutionNodes(block *flow.Block) {
-	s.params.On("FinalizedRoot").Return(s.rootHeader, nil)
-	s.state.On("Params").Return(s.params)
-	s.state.On("Final").Return(s.snapshot)
-	s.snapshot.On("Identities", mock.Anything).Return(s.executionNodes, nil)
-
-	// this line causes a S1021 lint error because receipts is explicitly declared. this is required
-	// to ensure the mock library handles the response type correctly
-	var receipts flow.ExecutionReceiptList //nolint:gosimple
-	receipts = unittest.ReceiptsForBlockFixture(block, s.executionNodes.NodeIDs())
-	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
-
-	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).
-		Return(s.execClient, &mocks.MockCloser{}, nil)
-}
-
-// setupENSuccessResponse configures the execution node client to return a successful response
-func (s *EventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.Block) {
-	s.setupExecutionNodes(blocks[len(blocks)-1])
-
-	ids := make([][]byte, len(blocks))
-	results := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(blocks))
-
-	events := make([]*entities.Event, 0)
-	for _, event := range s.blockEvents {
-		if string(event.Type) == eventType {
-			events = append(events, convert.EventToMessage(event))
-		}
-	}
-
-	for i, block := range blocks {
-		id := block.ID()
-		ids[i] = id[:]
-		results[i] = &execproto.GetEventsForBlockIDsResponse_Result{
-			BlockId:     id[:],
-			BlockHeight: block.Header.Height,
-			Events:      events,
-		}
-	}
-	expectedExecRequest := &execproto.GetEventsForBlockIDsRequest{
-		Type:     eventType,
-		BlockIds: ids,
-	}
-	expectedResponse := &execproto.GetEventsForBlockIDsResponse{
-		Results:              results,
-		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
-	}
-
-	s.execClient.On("GetEventsForBlockIDs", mock.Anything, expectedExecRequest).
-		Return(expectedResponse, nil)
-}
-
-// setupENFailingResponse configures the execution node client to return an error
-func (s *EventsSuite) setupENFailingResponse(eventType string, headers []*flow.Header, err error) {
-	ids := make([][]byte, len(headers))
-	for i, header := range headers {
-		id := header.ID()
-		ids[i] = id[:]
-	}
-	failingRequest := &execproto.GetEventsForBlockIDsRequest{
-		Type:     eventType,
-		BlockIds: ids,
-	}
-
-	s.execClient.On("GetEventsForBlockIDs", mock.Anything, failingRequest).
-		Return(nil, err)
-}
-
 // TestGetEvents_HappyPaths tests the happy paths for GetEventsForBlockIDs and GetEventsForHeightRange
 // across all queryModes and encodings
 func (s *EventsSuite) TestGetEvents_HappyPaths() {
@@ -289,11 +196,11 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 	s.snapshot.On("Head").Return(s.sealedHead, nil)
 
 	s.Run("GetEventsForHeightRange - end height updated", func() {
-		b := s.defaultBackend(query_mode.IndexQueryModeFailover, s.eventsIndex)
+		backend := s.defaultBackend(query_mode.IndexQueryModeFailover, s.eventsIndex)
 		endHeight := startHeight + 20 // should still return 5 responses
 		encoding := entities.EventEncodingVersion_CCF_V0
 
-		response, err := b.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
 		s.Require().NoError(err)
 
 		s.assertResponse(response, encoding)
@@ -401,10 +308,10 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 	})
 
 	s.Run("returns error for range larger than max", func() {
-		b := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
 		endHeight := startHeight + DefaultMaxHeightRange
 
-		response, err := b.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
 		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
 		s.Assert().Nil(response)
 	})
@@ -527,4 +434,97 @@ func (s *EventsSuite) assertEncoding(event *flow.Event, encoding entities.EventE
 		s.T().Errorf("unknown encoding: %s", encoding.String())
 	}
 	s.Require().NoError(err)
+}
+
+func (s *EventsSuite) defaultBackend(mode query_mode.IndexQueryMode, eventsIndex *index.EventsIndex) *Events {
+	e, err := NewEventsBackend(
+		s.log,
+		s.state,
+		s.chainID.Chain(),
+		DefaultMaxHeightRange,
+		s.headers,
+		s.connectionFactory,
+		node_communicator.NewNodeCommunicator(false),
+		mode,
+		eventsIndex,
+		commonrpc.NewExecutionNodeIdentitiesProvider(
+			s.log,
+			s.state,
+			s.receipts,
+			flow.IdentifierList{},
+			flow.IdentifierList{},
+		))
+
+	require.NoError(s.T(), err)
+
+	return e
+}
+
+// setupExecutionNodes sets up the mocks required to test against an EN backend
+func (s *EventsSuite) setupExecutionNodes(block *flow.Block) {
+	s.params.On("FinalizedRoot").Return(s.rootHeader, nil)
+	s.state.On("Params").Return(s.params)
+	s.state.On("Final").Return(s.snapshot)
+	s.snapshot.On("Identities", mock.Anything).Return(s.executionNodes, nil)
+
+	// this line causes a S1021 lint error because receipts is explicitly declared. this is required
+	// to ensure the mock library handles the response type correctly
+	var receipts flow.ExecutionReceiptList //nolint:gosimple
+	receipts = unittest.ReceiptsForBlockFixture(block, s.executionNodes.NodeIDs())
+	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
+
+	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).
+		Return(s.execClient, &mocks.MockCloser{}, nil)
+}
+
+// setupENSuccessResponse configures the execution node client to return a successful response
+func (s *EventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.Block) {
+	s.setupExecutionNodes(blocks[len(blocks)-1])
+
+	ids := make([][]byte, len(blocks))
+	results := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(blocks))
+
+	events := make([]*entities.Event, 0)
+	for _, event := range s.blockEvents {
+		if string(event.Type) == eventType {
+			events = append(events, convert.EventToMessage(event))
+		}
+	}
+
+	for i, block := range blocks {
+		id := block.ID()
+		ids[i] = id[:]
+		results[i] = &execproto.GetEventsForBlockIDsResponse_Result{
+			BlockId:     id[:],
+			BlockHeight: block.Header.Height,
+			Events:      events,
+		}
+	}
+	expectedExecRequest := &execproto.GetEventsForBlockIDsRequest{
+		Type:     eventType,
+		BlockIds: ids,
+	}
+	expectedResponse := &execproto.GetEventsForBlockIDsResponse{
+		Results:              results,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+	}
+
+	s.execClient.On("GetEventsForBlockIDs", mock.Anything, expectedExecRequest).
+		Return(expectedResponse, nil)
+}
+
+// setupENFailingResponse configures the execution node client to return an error
+func (s *EventsSuite) setupENFailingResponse(eventType string, headers []*flow.Header, err error) {
+	ids := make([][]byte, len(headers))
+	for i, header := range headers {
+		id := header.ID()
+		ids[i] = id[:]
+	}
+	failingRequest := &execproto.GetEventsForBlockIDsRequest{
+		Type:     eventType,
+		BlockIds: ids,
+	}
+
+	s.execClient.On("GetEventsForBlockIDs", mock.Anything, failingRequest).
+		Return(nil, err)
 }

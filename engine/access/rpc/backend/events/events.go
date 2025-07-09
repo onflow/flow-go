@@ -44,11 +44,11 @@ type API interface {
 }
 
 type Events struct {
-	headers         storage.Headers
-	state           protocol.State
-	chain           flow.Chain
-	maxHeightRange  uint
-	eventsRetriever retriever.Retriever
+	headers        storage.Headers
+	state          protocol.State
+	chain          flow.Chain
+	maxHeightRange uint
+	retriever      retriever.EventRetriever
 }
 
 var _ API = (*Events)(nil)
@@ -65,30 +65,30 @@ func NewEventsBackend(
 	eventsIndex *index.EventsIndex,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 ) (*Events, error) {
-	var eventsRetriever retriever.Retriever
+	var eventRetriever retriever.EventRetriever
 
 	switch queryMode {
 	case query_mode.IndexQueryModeLocalOnly:
-		eventsRetriever = retriever.NewLocalEventsRetriever(eventsIndex)
+		eventRetriever = retriever.NewLocalEventRetriever(eventsIndex)
 
 	case query_mode.IndexQueryModeExecutionNodesOnly:
-		eventsRetriever = retriever.NewENEventsRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
+		eventRetriever = retriever.NewENEventRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
 
 	case query_mode.IndexQueryModeFailover:
-		local := retriever.NewLocalEventsRetriever(eventsIndex)
-		execNode := retriever.NewENEventsRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
-		eventsRetriever = retriever.NewFailoverEventsRetriever(log, local, execNode)
+		local := retriever.NewLocalEventRetriever(eventsIndex)
+		execNode := retriever.NewENEventRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
+		eventRetriever = retriever.NewFailoverEventRetriever(log, local, execNode)
 
 	default:
 		return nil, status.Errorf(codes.Internal, "unknown execution mode: %v", queryMode)
 	}
 
 	return &Events{
-		state:           state,
-		chain:           chain,
-		maxHeightRange:  maxHeightRange,
-		headers:         headers,
-		eventsRetriever: eventsRetriever,
+		state:          state,
+		chain:          chain,
+		maxHeightRange: maxHeightRange,
+		headers:        headers,
+		retriever:      eventRetriever,
 	}, nil
 }
 
@@ -165,7 +165,7 @@ func (e *Events) GetEventsForHeightRange(
 		})
 	}
 
-	resp, err := e.eventsRetriever.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
+	resp, err := e.retriever.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +203,7 @@ func (e *Events) GetEventsForBlockIDs(
 		})
 	}
 
-	resp, err := e.eventsRetriever.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
+	resp, err := e.retriever.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}

@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type ExecutionNode struct {
+type ENAccountRetriever struct {
 	log                        zerolog.Logger
 	state                      protocol.State
 	connFactory                connection.ConnectionFactory
@@ -27,17 +27,17 @@ type ExecutionNode struct {
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 }
 
-var _ Retriever = (*ExecutionNode)(nil)
+var _ AccountRetriever = (*ENAccountRetriever)(nil)
 
-func NewENAccountsRetriever(
+func NewENAccountRetriever(
 	log zerolog.Logger,
 	state protocol.State,
 	connFactory connection.ConnectionFactory,
 	nodeCommunicator node_communicator.Communicator,
 	execNodeIdentityProvider *commonrpc.ExecutionNodeIdentitiesProvider,
-) *ExecutionNode {
-	return &ExecutionNode{
-		log:                        zerolog.New(log).With().Str("handler", "execution_node").Logger(),
+) *ENAccountRetriever {
+	return &ENAccountRetriever{
+		log:                        log.With().Str("account_retriever", "execution_node").Logger(),
 		state:                      state,
 		connFactory:                connFactory,
 		nodeCommunicator:           nodeCommunicator,
@@ -45,7 +45,7 @@ func NewENAccountsRetriever(
 	}
 }
 
-func (e *ExecutionNode) GetAccountAtBlockHeight(
+func (e *ENAccountRetriever) GetAccountAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
@@ -105,13 +105,13 @@ func (e *ExecutionNode) GetAccountAtBlockHeight(
 	return account, nil
 }
 
-func (e *ExecutionNode) GetAccountBalanceAtBlockHeight(
+func (e *ENAccountRetriever) GetAccountBalanceAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
 	height uint64,
 ) (uint64, error) {
-	account, err := e.GetAccountAtBlockHeight(ctx, address, blockID, height)
+	account, err := e.GetAccountAtBlock(ctx, address, blockID, height)
 	if err != nil {
 		return 0, err
 	}
@@ -119,14 +119,14 @@ func (e *ExecutionNode) GetAccountBalanceAtBlockHeight(
 	return account.Balance, nil
 }
 
-func (e *ExecutionNode) GetAccountKeyAtBlockHeight(
+func (e *ENAccountRetriever) GetAccountKeyAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	keyIndex uint32,
 	blockID flow.Identifier,
 	height uint64,
 ) (*flow.AccountPublicKey, error) {
-	account, err := e.GetAccountAtBlockHeight(ctx, address, blockID, height)
+	account, err := e.GetAccountAtBlock(ctx, address, blockID, height)
 	if err != nil {
 		return nil, err
 	}
@@ -140,13 +140,13 @@ func (e *ExecutionNode) GetAccountKeyAtBlockHeight(
 	return nil, status.Errorf(codes.NotFound, "failed to get account key by index: %d", keyIndex)
 }
 
-func (e *ExecutionNode) GetAccountKeysAtBlockHeight(
+func (e *ENAccountRetriever) GetAccountKeysAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
 	height uint64,
 ) ([]flow.AccountPublicKey, error) {
-	account, err := e.GetAccountAtBlockHeight(ctx, address, blockID, height)
+	account, err := e.GetAccountAtBlock(ctx, address, blockID, height)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +155,7 @@ func (e *ExecutionNode) GetAccountKeysAtBlockHeight(
 }
 
 // tryGetAccount attempts to get the account from the given execution node.
-func (e *ExecutionNode) tryGetAccount(
+func (e *ENAccountRetriever) tryGetAccount(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
 	req *execproto.GetAccountAtBlockIDRequest,

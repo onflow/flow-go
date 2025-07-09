@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-type Compare struct {
+type ComparingScriptExecutor struct {
 	log     zerolog.Logger
 	metrics module.BackendScriptsMetrics
 
@@ -21,7 +21,7 @@ type Compare struct {
 	scriptCache *LoggedScriptCache
 }
 
-var _ ScriptExecutor = (*Compare)(nil)
+var _ ScriptExecutor = (*ComparingScriptExecutor)(nil)
 
 func NewCompareScriptExecutor(
 	log zerolog.Logger,
@@ -29,9 +29,9 @@ func NewCompareScriptExecutor(
 	scriptCache *LoggedScriptCache,
 	localExecutor ScriptExecutor,
 	execNodeExecutor ScriptExecutor,
-) *Compare {
-	return &Compare{
-		log:                   zerolog.New(log).With().Str("script_executor", "compare").Logger(),
+) *ComparingScriptExecutor {
+	return &ComparingScriptExecutor{
+		log:                   log.With().Str("script_executor", "comparing").Logger(),
 		metrics:               metrics,
 		scriptCache:           scriptCache,
 		localExecutor:         localExecutor,
@@ -39,7 +39,7 @@ func NewCompareScriptExecutor(
 	}
 }
 
-func (c *Compare) Execute(ctx context.Context, request *ScriptExecutionRequest) ([]byte, time.Duration, error) {
+func (c *ComparingScriptExecutor) Execute(ctx context.Context, request *Request) ([]byte, time.Duration, error) {
 	execResult, execDuration, execErr := c.executionNodeExecutor.Execute(ctx, request)
 
 	// we can only compare the results if there were either no errors or a cadence error

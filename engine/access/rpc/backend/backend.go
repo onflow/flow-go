@@ -10,6 +10,7 @@ import (
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/index"
@@ -114,6 +115,7 @@ type Params struct {
 	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 }
 
+var _ access.API = (*Backend)(nil)
 var _ TransactionErrorMessage = (*Backend)(nil)
 
 // New creates backend instance

@@ -11,21 +11,21 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-type Compare struct {
-	Failover
+type ComparingAccountRetriever struct {
+	FailoverAccountRetriever
 }
 
-var _ Retriever = (*Compare)(nil)
+var _ AccountRetriever = (*ComparingAccountRetriever)(nil)
 
-func NewCompareAccountsRetriever(
+func NewComparingAccountRetriever(
 	log zerolog.Logger,
 	state protocol.State,
-	localRequester Retriever,
-	execNodeRequester Retriever,
-) *Compare {
-	return &Compare{
-		Failover: Failover{
-			log:               zerolog.New(log).With().Str("handler", "compare").Logger(),
+	localRequester AccountRetriever,
+	execNodeRequester AccountRetriever,
+) *ComparingAccountRetriever {
+	return &ComparingAccountRetriever{
+		FailoverAccountRetriever: FailoverAccountRetriever{
+			log:               log.With().Str("account_retriever", "comparing").Logger(),
 			state:             state,
 			localRequester:    localRequester,
 			execNodeRequester: execNodeRequester,
@@ -33,19 +33,18 @@ func NewCompareAccountsRetriever(
 	}
 }
 
-func (c *Compare) GetAccountAtBlockHeight(
+func (c *ComparingAccountRetriever) GetAccountAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
 	height uint64,
 ) (*flow.Account, error) {
-	localAccount, localErr := c.localRequester.GetAccountAtBlockHeight(ctx, address, blockID, height)
+	localAccount, localErr := c.localRequester.GetAccountAtBlock(ctx, address, blockID, height)
 	if localErr == nil {
 		return localAccount, nil
 	}
 
-	ENAccount, ENErr := c.execNodeRequester.GetAccountAtBlockHeight(ctx, address, blockID, height)
-	// We want to compare accounts fetched from both local and execution node storages.
+	ENAccount, ENErr := c.execNodeRequester.GetAccountAtBlock(ctx, address, blockID, height)
 	c.compareAccountResults(ENAccount, ENErr, localAccount, localErr, blockID, address)
 
 	return ENAccount, ENErr
@@ -53,7 +52,7 @@ func (c *Compare) GetAccountAtBlockHeight(
 
 // compareAccountResults compares the result and error returned from local and remote getAccount calls
 // and logs the results if they are different
-func (c *Compare) compareAccountResults(
+func (c *ComparingAccountRetriever) compareAccountResults(
 	execNodeResult *flow.Account,
 	execErr error,
 	localResult *flow.Account,

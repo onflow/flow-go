@@ -10,28 +10,32 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type Failover struct {
+type FailoverEventRetriever struct {
 	log               zerolog.Logger
-	localRetriever    Retriever
-	execNodeRetriever Retriever
+	localRetriever    EventRetriever
+	execNodeRetriever EventRetriever
 }
 
-var _ Retriever = (*Failover)(nil)
+var _ EventRetriever = (*FailoverEventRetriever)(nil)
 
-func NewFailoverEventsRetriever(log zerolog.Logger, localRetriever Retriever, execNodeRetriever Retriever) *Failover {
-	return &Failover{
-		log:               zerolog.New(log).With().Str("events_retriever", "failover").Logger(),
+func NewFailoverEventRetriever(
+	log zerolog.Logger,
+	localRetriever EventRetriever,
+	execNodeRetriever EventRetriever,
+) *FailoverEventRetriever {
+	return &FailoverEventRetriever{
+		log:               log.With().Str("events_retriever", "failover").Logger(),
 		localRetriever:    localRetriever,
 		execNodeRetriever: execNodeRetriever,
 	}
 }
 
-func (f *Failover) Events(
+func (f *FailoverEventRetriever) Events(
 	ctx context.Context,
 	blocks []BlockMetadata,
 	eventType flow.EventType,
 	encoding entities.EventEncodingVersion,
-) (EventsResponse, error) {
+) (Response, error) {
 	localEvents, localErr := f.localRetriever.Events(ctx, blocks, eventType, encoding)
 	if localErr != nil {
 		f.log.Debug().Err(localErr).
@@ -50,7 +54,7 @@ func (f *Failover) Events(
 
 	ENEvents, ENErr := f.execNodeRetriever.Events(ctx, localEvents.MissingBlocks, eventType, encoding)
 	if ENErr != nil {
-		return EventsResponse{}, ENErr
+		return Response{}, ENErr
 	}
 
 	// sort ascending by block height
@@ -64,7 +68,7 @@ func (f *Failover) Events(
 		return combinedEvents[i].BlockHeight < combinedEvents[j].BlockHeight
 	})
 
-	return EventsResponse{
+	return Response{
 		Events: combinedEvents,
 	}, nil
 }

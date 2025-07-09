@@ -98,76 +98,6 @@ func (s *ScriptsSuite) SetupTest() {
 	s.failingScript = []byte("access(all) fun main() { panic(\"!!\") }")
 }
 
-func (s *ScriptsSuite) defaultBackend(executor execution.ScriptExecutor, mode query_mode.IndexQueryMode) *Scripts {
-	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](common.DefaultLoggedScriptsCacheSize)
-	s.Require().NoError(err)
-
-	scripts, err := NewScriptsBackend(
-		s.log,
-		metrics.NewNoopCollector(),
-		s.headers,
-		s.state,
-		s.connectionFactory,
-		node_communicator.NewNodeCommunicator(false),
-		executor,
-		mode,
-		commonrpc.NewExecutionNodeIdentitiesProvider(
-			s.log,
-			s.state,
-			s.receipts,
-			flow.IdentifierList{},
-			flow.IdentifierList{},
-		),
-		loggedScripts,
-	)
-	require.NoError(s.T(), err)
-
-	return scripts
-}
-
-// setupExecutionNodes sets up the mocks required to test against an EN backend
-func (s *ScriptsSuite) setupExecutionNodes(block *flow.Block) {
-	s.params.On("FinalizedRoot").Return(s.rootHeader, nil)
-	s.state.On("Params").Return(s.params)
-	s.state.On("Final").Return(s.snapshot)
-	s.snapshot.On("Identities", mock.Anything).Return(s.executionNodes, nil)
-
-	// this line causes a S1021 lint error because receipts is explicitly declared. this is required
-	// to ensure the mock library handles the response type correctly
-	var receipts flow.ExecutionReceiptList //nolint:gosimple
-	receipts = unittest.ReceiptsForBlockFixture(block, s.executionNodes.NodeIDs())
-	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
-
-	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).
-		Return(s.execClient, &mocks.MockCloser{}, nil)
-}
-
-// setupENSuccessResponse configures the execution client mock to return a successful response
-func (s *ScriptsSuite) setupENSuccessResponse(blockID flow.Identifier) {
-	expectedExecRequest := &execproto.ExecuteScriptAtBlockIDRequest{
-		BlockId:   blockID[:],
-		Script:    s.script,
-		Arguments: s.arguments,
-	}
-
-	s.execClient.On("ExecuteScriptAtBlockID", mock.Anything, expectedExecRequest).
-		Return(&execproto.ExecuteScriptAtBlockIDResponse{
-			Value: expectedResponse,
-		}, nil)
-}
-
-// setupENFailingResponse configures the execution client mock to return a failing response
-func (s *ScriptsSuite) setupENFailingResponse(blockID flow.Identifier, err error) {
-	expectedExecRequest := &execproto.ExecuteScriptAtBlockIDRequest{
-		BlockId:   blockID[:],
-		Script:    s.failingScript,
-		Arguments: s.arguments,
-	}
-
-	s.execClient.On("ExecuteScriptAtBlockID", mock.Anything, expectedExecRequest).
-		Return(nil, err)
-}
-
 // TestExecuteScriptOnExecutionNode_HappyPath tests that the backend successfully executes scripts
 // on execution nodes
 func (s *ScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
@@ -176,18 +106,18 @@ func (s *ScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
 	s.setupExecutionNodes(s.block)
 	s.setupENSuccessResponse(s.block.ID())
 
-	scripts := s.defaultBackend(execmock.NewScriptExecutor(s.T()), query_mode.IndexQueryModeExecutionNodesOnly)
+	backend := s.defaultBackend(execmock.NewScriptExecutor(s.T()), query_mode.IndexQueryModeExecutionNodesOnly)
 
 	s.Run("GetAccount", func() {
-		s.testExecuteScriptAtLatestBlock(ctx, scripts, codes.OK)
+		s.testExecuteScriptAtLatestBlock(ctx, backend, codes.OK)
 	})
 
 	s.Run("ExecuteScriptAtBlockID", func() {
-		s.testExecuteScriptAtBlockID(ctx, scripts, codes.OK)
+		s.testExecuteScriptAtBlockID(ctx, backend, codes.OK)
 	})
 
 	s.Run("ExecuteScriptAtBlockHeight", func() {
-		s.testExecuteScriptAtBlockHeight(ctx, scripts, codes.OK)
+		s.testExecuteScriptAtBlockHeight(ctx, backend, codes.OK)
 	})
 }
 
@@ -203,18 +133,18 @@ func (s *ScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
 	s.setupExecutionNodes(s.block)
 	s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-	scripts := s.defaultBackend(execmock.NewScriptExecutor(s.T()), query_mode.IndexQueryModeExecutionNodesOnly)
+	backend := s.defaultBackend(execmock.NewScriptExecutor(s.T()), query_mode.IndexQueryModeExecutionNodesOnly)
 
 	s.Run("GetAccount", func() {
-		s.testExecuteScriptAtLatestBlock(ctx, scripts, statusCode)
+		s.testExecuteScriptAtLatestBlock(ctx, backend, statusCode)
 	})
 
 	s.Run("ExecuteScriptAtBlockID", func() {
-		s.testExecuteScriptAtBlockID(ctx, scripts, statusCode)
+		s.testExecuteScriptAtBlockID(ctx, backend, statusCode)
 	})
 
 	s.Run("ExecuteScriptAtBlockHeight", func() {
-		s.testExecuteScriptAtBlockHeight(ctx, scripts, statusCode)
+		s.testExecuteScriptAtBlockHeight(ctx, backend, statusCode)
 	})
 }
 
@@ -227,18 +157,18 @@ func (s *ScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
 	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Header.Height).
 		Return(expectedResponse, nil)
 
-	scripts := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeLocalOnly)
+	backend := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeLocalOnly)
 
 	s.Run("GetAccount - happy path", func() {
-		s.testExecuteScriptAtLatestBlock(ctx, scripts, codes.OK)
+		s.testExecuteScriptAtLatestBlock(ctx, backend, codes.OK)
 	})
 
 	s.Run("GetAccountAtLatestBlock - happy path", func() {
-		s.testExecuteScriptAtBlockID(ctx, scripts, codes.OK)
+		s.testExecuteScriptAtBlockID(ctx, backend, codes.OK)
 	})
 
 	s.Run("GetAccountAtBlockHeight - happy path", func() {
-		s.testExecuteScriptAtBlockHeight(ctx, scripts, codes.OK)
+		s.testExecuteScriptAtBlockHeight(ctx, backend, codes.OK)
 	})
 }
 
@@ -248,7 +178,7 @@ func (s *ScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scripts := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeLocalOnly)
+	backend := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeLocalOnly)
 
 	testCases := []struct {
 		err        error
@@ -281,15 +211,15 @@ func (s *ScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 			Return(nil, tt.err).Times(3)
 
 		s.Run(fmt.Sprintf("GetAccount - fails with %v", tt.err), func() {
-			s.testExecuteScriptAtLatestBlock(ctx, scripts, tt.statusCode)
+			s.testExecuteScriptAtLatestBlock(ctx, backend, tt.statusCode)
 		})
 
 		s.Run(fmt.Sprintf("GetAccountAtLatestBlock - fails with %v", tt.err), func() {
-			s.testExecuteScriptAtBlockID(ctx, scripts, tt.statusCode)
+			s.testExecuteScriptAtBlockID(ctx, backend, tt.statusCode)
 		})
 
 		s.Run(fmt.Sprintf("GetAccountAtBlockHeight - fails with %v", tt.err), func() {
-			s.testExecuteScriptAtBlockHeight(ctx, scripts, tt.statusCode)
+			s.testExecuteScriptAtBlockHeight(ctx, backend, tt.statusCode)
 		})
 	}
 }
@@ -312,7 +242,7 @@ func (s *ScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 	s.setupENSuccessResponse(s.block.ID())
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scripts := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeFailover)
+	backend := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeFailover)
 
 	for _, errToReturn := range errors {
 		// configure local script executor to fail
@@ -320,15 +250,15 @@ func (s *ScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 			Return(nil, errToReturn).Times(3)
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - recovers %v", errToReturn), func() {
-			s.testExecuteScriptAtLatestBlock(ctx, scripts, codes.OK)
+			s.testExecuteScriptAtLatestBlock(ctx, backend, codes.OK)
 		})
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtBlockID - recovers %v", errToReturn), func() {
-			s.testExecuteScriptAtBlockID(ctx, scripts, codes.OK)
+			s.testExecuteScriptAtBlockID(ctx, backend, codes.OK)
 		})
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtBlockHeight - recovers %v", errToReturn), func() {
-			s.testExecuteScriptAtBlockHeight(ctx, scripts, codes.OK)
+			s.testExecuteScriptAtBlockHeight(ctx, backend, codes.OK)
 		})
 	}
 }
@@ -340,7 +270,7 @@ func (s *ScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCodes() {
 
 	// configure local script executor to fail
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scripts := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeFailover)
+	backend := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeFailover)
 
 	testCases := []struct {
 		err        error
@@ -362,15 +292,15 @@ func (s *ScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCodes() {
 			Times(3)
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - %s", tt.statusCode), func() {
-			s.testExecuteScriptAtLatestBlock(ctx, scripts, tt.statusCode)
+			s.testExecuteScriptAtLatestBlock(ctx, backend, tt.statusCode)
 		})
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtBlockID - %s", tt.statusCode), func() {
-			s.testExecuteScriptAtBlockID(ctx, scripts, tt.statusCode)
+			s.testExecuteScriptAtBlockID(ctx, backend, tt.statusCode)
 		})
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtBlockHeight - %s", tt.statusCode), func() {
-			s.testExecuteScriptAtBlockHeight(ctx, scripts, tt.statusCode)
+			s.testExecuteScriptAtBlockHeight(ctx, backend, tt.statusCode)
 		})
 	}
 }
@@ -393,18 +323,18 @@ func (s *ScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, s.block.Header.Height).
 		Return(nil, storage.ErrHeightNotIndexed)
 
-	scripts := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeFailover)
+	backend := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeFailover)
 
 	s.Run("ExecuteScriptAtLatestBlock", func() {
-		s.testExecuteScriptAtLatestBlock(ctx, scripts, statusCode)
+		s.testExecuteScriptAtLatestBlock(ctx, backend, statusCode)
 	})
 
 	s.Run("ExecuteScriptAtBlockID", func() {
-		s.testExecuteScriptAtBlockID(ctx, scripts, statusCode)
+		s.testExecuteScriptAtBlockID(ctx, backend, statusCode)
 	})
 
 	s.Run("ExecuteScriptAtBlockHeight", func() {
-		s.testExecuteScriptAtBlockHeight(ctx, scripts, statusCode)
+		s.testExecuteScriptAtBlockHeight(ctx, backend, statusCode)
 	})
 }
 
@@ -412,7 +342,7 @@ func (s *ScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 // inconsistent
 func (s *ScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_InconsistentState() {
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scripts := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeLocalOnly)
+	backend := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeLocalOnly)
 
 	s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - fails with %v", "inconsistent node's state"), func() {
 		s.state.On("Sealed").Return(s.snapshot, nil)
@@ -424,7 +354,7 @@ func (s *ScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_InconsistentSta
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
 			irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), signCtxErr))
 
-		actual, err := scripts.ExecuteScriptAtLatestBlock(signalerCtx, s.script, s.arguments)
+		actual, err := backend.ExecuteScriptAtLatestBlock(signalerCtx, s.script, s.arguments)
 		s.Require().Error(err)
 		s.Require().Nil(actual)
 	})
@@ -476,4 +406,74 @@ func (s *ScriptsSuite) testExecuteScriptAtBlockHeight(ctx context.Context, scrip
 		s.Require().Equalf(statusCode, status.Code(err), "error code mismatch: expected %d, got %d: %s", statusCode, status.Code(err), err)
 		s.Require().Nil(actual)
 	}
+}
+
+func (s *ScriptsSuite) defaultBackend(executor execution.ScriptExecutor, mode query_mode.IndexQueryMode) *Scripts {
+	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](common.DefaultLoggedScriptsCacheSize)
+	s.Require().NoError(err)
+
+	backend, err := NewScriptsBackend(
+		s.log,
+		metrics.NewNoopCollector(),
+		s.headers,
+		s.state,
+		s.connectionFactory,
+		node_communicator.NewNodeCommunicator(false),
+		executor,
+		mode,
+		commonrpc.NewExecutionNodeIdentitiesProvider(
+			s.log,
+			s.state,
+			s.receipts,
+			flow.IdentifierList{},
+			flow.IdentifierList{},
+		),
+		loggedScripts,
+	)
+	require.NoError(s.T(), err)
+
+	return backend
+}
+
+// setupExecutionNodes sets up the mocks required to test against an EN backend
+func (s *ScriptsSuite) setupExecutionNodes(block *flow.Block) {
+	s.params.On("FinalizedRoot").Return(s.rootHeader, nil)
+	s.state.On("Params").Return(s.params)
+	s.state.On("Final").Return(s.snapshot)
+	s.snapshot.On("Identities", mock.Anything).Return(s.executionNodes, nil)
+
+	// this line causes a S1021 lint error because receipts is explicitly declared. this is required
+	// to ensure the mock library handles the response type correctly
+	var receipts flow.ExecutionReceiptList //nolint:gosimple
+	receipts = unittest.ReceiptsForBlockFixture(block, s.executionNodes.NodeIDs())
+	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
+
+	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).
+		Return(s.execClient, &mocks.MockCloser{}, nil)
+}
+
+// setupENSuccessResponse configures the execution client mock to return a successful response
+func (s *ScriptsSuite) setupENSuccessResponse(blockID flow.Identifier) {
+	expectedExecRequest := &execproto.ExecuteScriptAtBlockIDRequest{
+		BlockId:   blockID[:],
+		Script:    s.script,
+		Arguments: s.arguments,
+	}
+
+	s.execClient.On("ExecuteScriptAtBlockID", mock.Anything, expectedExecRequest).
+		Return(&execproto.ExecuteScriptAtBlockIDResponse{
+			Value: expectedResponse,
+		}, nil)
+}
+
+// setupENFailingResponse configures the execution client mock to return a failing response
+func (s *ScriptsSuite) setupENFailingResponse(blockID flow.Identifier, err error) {
+	expectedExecRequest := &execproto.ExecuteScriptAtBlockIDRequest{
+		BlockId:   blockID[:],
+		Script:    s.failingScript,
+		Arguments: s.arguments,
+	}
+
+	s.execClient.On("ExecuteScriptAtBlockID", mock.Anything, expectedExecRequest).
+		Return(nil, err)
 }

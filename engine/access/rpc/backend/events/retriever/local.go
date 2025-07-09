@@ -16,33 +16,33 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type Local struct {
-	eventsIndex *index.EventsIndex
+type LocalEventRetriever struct {
+	index *index.EventsIndex
 }
 
-var _ Retriever = (*Local)(nil)
+var _ EventRetriever = (*LocalEventRetriever)(nil)
 
-func NewLocalEventsRetriever(index *index.EventsIndex) *Local {
-	return &Local{
-		eventsIndex: index,
+func NewLocalEventRetriever(index *index.EventsIndex) *LocalEventRetriever {
+	return &LocalEventRetriever{
+		index: index,
 	}
 }
 
-func (l *Local) Events(
+func (l *LocalEventRetriever) Events(
 	ctx context.Context,
 	blocks []BlockMetadata,
 	eventType flow.EventType,
 	encoding entities.EventEncodingVersion,
-) (EventsResponse, error) {
+) (Response, error) {
 	missing := make([]BlockMetadata, 0)
 	resp := make([]flow.BlockEvents, 0)
 
 	for _, blockInfo := range blocks {
 		if ctx.Err() != nil {
-			return EventsResponse{}, rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
+			return Response{}, rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
 		}
 
-		events, err := l.eventsIndex.ByBlockID(blockInfo.ID, blockInfo.Height)
+		events, err := l.index.ByBlockID(blockInfo.ID, blockInfo.Height)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) ||
@@ -51,7 +51,7 @@ func (l *Local) Events(
 				continue
 			}
 			err = fmt.Errorf("failed to get events for block %s: %w", blockInfo.ID, err)
-			return EventsResponse{}, rpc.ConvertError(err, "failed to get events from storage", codes.Internal)
+			return Response{}, rpc.ConvertError(err, "failed to get events from storage", codes.Internal)
 		}
 
 		filteredEvents := make([]flow.Event, 0)
@@ -65,7 +65,7 @@ func (l *Local) Events(
 				payload, err := convert.CcfPayloadToJsonPayload(event.Payload)
 				if err != nil {
 					err = fmt.Errorf("failed to convert event payload for block %s: %w", blockInfo.ID, err)
-					return EventsResponse{}, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
+					return Response{}, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 				}
 				event.Payload = payload
 			}
@@ -81,7 +81,7 @@ func (l *Local) Events(
 		})
 	}
 
-	return EventsResponse{
+	return Response{
 		Events:        resp,
 		MissingBlocks: missing,
 	}, nil
