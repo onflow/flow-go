@@ -790,41 +790,45 @@ func TestSealingSegment(t *testing.T) {
 	t.Run("highest block seals outside segment", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 			// build a block to seal
-			block1 := unittest.BlockWithParentAndPayload(
-				head,
-				unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+			block1 := unittest.BlockFixture(
+				unittest.Block.WithParent(head.ID(), head.View, head.Height),
+				unittest.Block.WithView(head.Height+1), // set view so we are still in the same epoch
+				unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID))),
 			)
 			buildFinalizedBlock(t, state, block1)
 
 			// build a block sealing block1
 			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 
-			block2 := unittest.BlockWithParentAndPayload(
-				block1.ToHeader(),
-				unittest.PayloadFixture(
+			block2 := unittest.BlockFixture(
+				unittest.Block.WithParent(block1.ID(), block1.Header.View, block1.Header.Height),
+				unittest.Block.WithView(block1.Header.Height+1), // set view so we are still in the same epoch
+				unittest.Block.WithPayload(unittest.PayloadFixture(
 					unittest.WithReceipts(receipt1),
-					unittest.WithProtocolStateID(rootProtocolStateID),
+					unittest.WithProtocolStateID(rootProtocolStateID)),
 				),
 			)
 			buildFinalizedBlock(t, state, block2)
 
 			receipt2, seal2 := unittest.ReceiptAndSealForBlock(block2)
-			block3 := unittest.BlockWithParentAndPayload(
-				block2.ToHeader(),
-				unittest.PayloadFixture(
+			block3 := unittest.BlockFixture(
+				unittest.Block.WithParent(block2.ID(), block2.Header.View, block2.Header.Height),
+				unittest.Block.WithView(block2.Header.Height+1), // set view so we are still in the same epoch
+				unittest.Block.WithPayload(unittest.PayloadFixture(
 					unittest.WithSeals(seal1),
 					unittest.WithReceipts(receipt2),
-					unittest.WithProtocolStateID(rootProtocolStateID),
+					unittest.WithProtocolStateID(rootProtocolStateID)),
 				),
 			)
 			buildFinalizedBlock(t, state, block3)
 
 			receipt3, seal3 := unittest.ReceiptAndSealForBlock(block3)
-			block4 := unittest.BlockWithParentAndPayload(
-				block3.ToHeader(),
-				unittest.PayloadFixture(
+			block4 := unittest.BlockFixture(
+				unittest.Block.WithParent(block3.ID(), block3.Header.View, block3.Header.Height),
+				unittest.Block.WithView(block3.Header.Height+1), // set view so we are still in the same epoch
+				unittest.Block.WithPayload(unittest.PayloadFixture(
 					unittest.WithReceipts(receipt3),
-					unittest.WithProtocolStateID(rootProtocolStateID),
+					unittest.WithProtocolStateID(rootProtocolStateID)),
 				),
 			)
 			buildFinalizedBlock(t, state, block4)
@@ -832,8 +836,13 @@ func TestSealingSegment(t *testing.T) {
 			// build chain, so it's long enough to not target blocks as inside of flow.DefaultTransactionExpiry window.
 			parent := block4
 			for i := 0; i < 1.5*flow.DefaultTransactionExpiry; i++ {
-				next := unittest.BlockWithParentProtocolState(parent)
-				next.Header.View = next.Header.Height + 1 // set view so we are still in the same epoch
+				next := unittest.BlockFixture(
+					unittest.Block.WithParent(parent.ID(), parent.Header.View, parent.Header.Height),
+					unittest.Block.WithView(parent.Header.Height+1), // set view so we are still in the same epoch
+					unittest.Block.WithPayload(unittest.PayloadFixture(
+						unittest.WithProtocolStateID(parent.Payload.ProtocolStateID)),
+					),
+				)
 				buildFinalizedBlock(t, state, next)
 				parent = next
 			}
