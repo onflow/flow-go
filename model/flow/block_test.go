@@ -3,7 +3,6 @@ package flow_test
 import (
 	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -113,7 +112,6 @@ func TestBlockMalleability(t *testing.T) {
 	unittest.RequireEntityNonMalleable(
 		t,
 		unittest.FullBlockFixture(),
-		unittest.WithFieldGenerator("Header.Timestamp", func() time.Time { return time.Now().UTC() }),
 		unittest.WithFieldGenerator("Payload.Results", func() flow.ExecutionResultList {
 			return flow.ExecutionResultList{unittest.ExecutionResultFixture()}
 		}),

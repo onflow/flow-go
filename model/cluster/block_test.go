@@ -2,7 +2,6 @@ package cluster_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -17,7 +16,6 @@ func TestClusterBlockMalleability(t *testing.T) {
 	unittest.RequireEntityNonMalleable(
 		t,
 		unittest.ClusterBlockFixture(),
-		unittest.WithFieldGenerator("Header.Timestamp", func() time.Time { return time.Now().UTC() }),
 		unittest.WithFieldGenerator("Payload.Collection", func() flow.Collection {
 			return unittest.CollectionFixture(3)
 		}),

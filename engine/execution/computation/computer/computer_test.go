@@ -1622,7 +1622,7 @@ func generateBlockWithVisitor(
 
 	block := flow.NewBlock(
 		flow.HeaderBody{
-			Timestamp: flow.GenesisTime,
+			Timestamp: uint64(flow.GenesisTime.UnixMilli()),
 			Height:    42,
 			View:      42,
 		},

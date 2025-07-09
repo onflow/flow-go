@@ -92,12 +92,13 @@ func (b *pendingBlock) Block() *flowgo.Block {
 			CollectionID: collection.ID(),
 		}
 	}
+
 	return flowgo.NewBlock(
 		flowgo.HeaderBody{
 			Height:    b.height,
 			View:      b.view,
 			ParentID:  b.parentID,
-			Timestamp: b.timestamp,
+			Timestamp: uint64(b.timestamp.UnixMilli()),
 		},
 		flowgo.Payload{
 			Guarantees: guarantees,
