@@ -1162,7 +1162,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	participants := bootstrap.ToIdentityList(stakedNodeInfos)
 
 	// generate root block
-	rootHeader, err := run.GenerateRootHeader(chainID, parentID, height, timestamp)
+	rootHeaderBody, err := run.GenerateRootHeaderBody(chainID, parentID, height, timestamp)
 	if err != nil {
 		return nil, err
 	}
@@ -1195,7 +1195,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, err
 	}
 
-	dkgOffsetView := rootHeader.View + networkConf.ViewsInStakingAuction - 1
+	dkgOffsetView := rootHeaderBody.View + networkConf.ViewsInStakingAuction - 1
 
 	// target number of seconds in epoch
 	targetDuration := networkConf.ViewsInEpoch / networkConf.ViewsPerSecond
@@ -1204,11 +1204,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	epochSetup, err := flow.NewEpochSetup(
 		flow.UntrustedEpochSetup{
 			Counter:            epochCounter,
-			FirstView:          rootHeader.View,
+			FirstView:          rootHeaderBody.View,
 			DKGPhase1FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase,
 			DKGPhase2FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*2,
 			DKGPhase3FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*3,
-			FinalView:          rootHeader.View + networkConf.ViewsInEpoch - 1,
+			FinalView:          rootHeaderBody.View + networkConf.ViewsInEpoch - 1,
 			Participants:       participants.ToSkeleton(),
 			Assignments:        clusterAssignments,
 			RandomSource:       randomSource,
@@ -1241,10 +1241,9 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	if err != nil {
 		return nil, err
 	}
-
 	root, err := flow.NewRootBlock(
 		flow.UntrustedBlock{
-			Header:  rootHeader.HeaderBody,
+			Header:  *rootHeaderBody,
 			Payload: unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolState.ID())),
 		},
 	)

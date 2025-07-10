@@ -88,26 +88,26 @@ func (b *Block) ID() flow.Identifier {
 // The receiver Block must be well-formed (enforced by mutation protection on the type).
 // This function may panic if invoked on a malformed Block.
 func (b *Block) ToHeader() *flow.Header {
-	if b.Header.ContainsParentQC() {
-		header, err := flow.NewHeader(flow.UntrustedHeader{
+	if !b.Header.ContainsParentQC() {
+		rootHeader, err := flow.NewRootHeader(flow.UntrustedHeader{
 			HeaderBody:  b.Header,
 			PayloadHash: b.Payload.Hash(),
 		})
 		if err != nil {
-			panic(fmt.Errorf("could not build header from block: %w", err))
+			panic(fmt.Errorf("could not build root header from block: %w", err))
 		}
-		return header
+
+		return rootHeader
 	}
 
-	rootHeader, err := flow.NewRootHeader(flow.UntrustedHeader{
+	header, err := flow.NewHeader(flow.UntrustedHeader{
 		HeaderBody:  b.Header,
 		PayloadHash: b.Payload.Hash(),
 	})
 	if err != nil {
-		panic(fmt.Errorf("could not build root header from block: %w", err))
+		panic(fmt.Errorf("could not build header from block: %w", err))
 	}
-
-	return rootHeader
+	return header
 }
 
 // Proposal represents a signed proposed block in collection node cluster consensus.

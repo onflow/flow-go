@@ -2886,6 +2886,7 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
 		extend := unittest.BlockFixture(
 			unittest.Block.WithHeight(2),
+			unittest.Block.WithParentView(1),
 			unittest.Block.WithView(2),
 		)
 

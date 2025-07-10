@@ -84,21 +84,21 @@ func NewHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 	// This constructor is only for non-root headers, so require a parent QC:
 	// ParentID, ParentVoterIndices, ParentVoterSigData, ProposerID must all be set.
 	// We bundle them in one spot to avoid repeating the same four if-statements.
-	hb := HeaderBody(untrusted) // cheap conversion so we can call ContainsParentQC
+	hb := HeaderBody(untrusted) // conversion so we can call ContainsParentQC
 	if !hb.ContainsParentQC() {
 		return nil, fmt.Errorf(
 			"missing parent QC: ParentID, ParentVoterIndices, ParentVoterSigData and ProposerID are all required",
 		)
 	}
 
-	// 3) Now that we know it’s “normal” (has a QC), enforce block semantics:
+	// Now that we know it’s non-root (has a QC), enforce block semantics:
 	if untrusted.Height == 0 {
 		return nil, fmt.Errorf("Height must be > 0 for non-root header")
 	}
 	if untrusted.View == 0 {
 		return nil, fmt.Errorf("View must be > 0 for non-root header")
 	}
-	if untrusted.ParentView > untrusted.View {
+	if untrusted.ParentView >= untrusted.View {
 		return nil, fmt.Errorf(
 			"ParentView (%d) must be less than View (%d)", untrusted.ParentView, untrusted.View,
 		)
@@ -128,14 +128,19 @@ func NewRootHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 	if untrusted.ChainID == "" {
 		return nil, fmt.Errorf("ChainID of root header body must not be empty")
 	}
+
+	if HeaderBody(untrusted).ContainsParentQC() {
+		return nil, fmt.Errorf(
+			"root header body must not contain a parent QC (ParentID, ParentVoterIndices, ParentVoterSigData, ProposerID must all be empty)",
+		)
+	}
+
 	if untrusted.ParentView != 0 {
 		return nil, fmt.Errorf("ParentView of root header body must be zero")
 	}
-	if len(untrusted.ParentVoterIndices) != 0 {
-		return nil, fmt.Errorf("ParentVoterIndices of root header body must be empty")
-	}
-	if len(untrusted.ParentVoterSigData) != 0 {
-		return nil, fmt.Errorf("ParentVoterSigData of root header body must be empty")
+
+	if untrusted.Timestamp.IsZero() {
+		return nil, fmt.Errorf("Timestamp of root header body must not be zero")
 	}
 
 	return &HeaderBody{
@@ -220,26 +225,6 @@ func NewHeader(untrusted UntrustedHeader) (*Header, error) {
 	}, nil
 }
 
-// NewGenesisHeader creates a genesis header.
-//
-// This constructor must be used **only** for constructing the genesis header,
-// which is the only case where zero values are allowed.
-func NewGenesisHeader(untrusted UntrustedHeader) (*Header, error) {
-	rootHeaderBody, err := NewRootHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))
-	if err != nil {
-		return nil, fmt.Errorf("invalid root header body: %w", err)
-	}
-
-	if untrusted.PayloadHash != ZeroID {
-		return nil, fmt.Errorf("PayloadHash of a genesis header must be empty")
-	}
-
-	return &Header{
-		HeaderBody:  *rootHeaderBody,
-		PayloadHash: untrusted.PayloadHash,
-	}, nil
-}
-
 // NewRootHeader creates a root header.
 //
 // This constructor must be used **only** for constructing the root header,
@@ -296,23 +281,6 @@ func (h Header) Fingerprint() []byte {
 func (h Header) ID() Identifier {
 	return MakeID(h)
 }
-
-// headerBodyFieldBitIndex enumerates required fields in HeaderBody so that HeaderBodyBuilder
-// can enforce that all required fields are explicitly set (including to zero values) prior to building.
-type headerBodyFieldBitIndex int
-
-const (
-	chainIDFieldBitIndex headerBodyFieldBitIndex = iota
-	parentIDFieldBitIndex
-	heightFieldBitIndex
-	timestampFieldBitIndex
-	viewFieldBitIndex
-	parentViewFieldBitIndex
-	parentVoterIndicesFieldBitIndex
-	parentVoterSigDataFieldBitIndex
-	proposerIDFieldBitIndex
-	numHeaderBodyFields // always keep this last
-)
 
 // HeaderBodyBuilder constructs a validated, immutable HeaderBody in two phases:
 // first by setting individual fields using fluent WithX methods, then by calling Build()
@@ -393,8 +361,6 @@ func (h *HeaderBodyBuilder) WithLastViewTC(tc *TimeoutCertificate) *HeaderBodyBu
 }
 
 // MarshalJSON makes sure the timestamp is encoded in UTC.
-//
-// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
 //
 //nolint:structwrite
 func (h Header) MarshalJSON() ([]byte, error) {

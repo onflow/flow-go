@@ -220,15 +220,15 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	clusterQCs := run.ConstructRootQCsForClusters(log, clusters, internalNodes, clusterBlocks)
 	log.Info().Msg("")
 
-	log.Info().Msg("constructing root header")
-	header, err := constructRootHeader(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
+	log.Info().Msg("constructing root header body")
+	headerBody, err := constructRootHeaderBody(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to construct root header")
 	}
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing intermediary bootstrapping data")
-	epochSetup, epochCommit, err := constructRootEpochEvents(header.View, participants, assignments, clusterQCs, randomBeaconData, dkgIndexMap)
+	epochSetup, epochCommit, err := constructRootEpochEvents(headerBody.View, participants, assignments, clusterQCs, randomBeaconData, dkgIndexMap)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to construct root epoch events")
 	}
@@ -267,7 +267,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to construct root kvstore")
 	}
-	block, err := constructRootBlock(header, rootProtocolState.ID())
+	block, err := constructRootBlock(headerBody, rootProtocolState.ID())
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to construct root block")
 	}

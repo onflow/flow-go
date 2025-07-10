@@ -526,7 +526,8 @@ func HeaderBodyWithParentFixture(parent *flow.Header) flow.HeaderBody {
 			SigData:       SignatureFixture(),
 		}
 	}
-	return flow.HeaderBody{
+
+	headerBody := flow.HeaderBody{
 		ChainID:            parent.ChainID,
 		ParentID:           parent.ID(),
 		Height:             height,
@@ -538,6 +539,21 @@ func HeaderBodyWithParentFixture(parent *flow.Header) flow.HeaderBody {
 		ProposerID:         IdentifierFixture(),
 		LastViewTC:         lastViewTC,
 	}
+
+	return headerBody
+
+	//return flow.HeaderBody{
+	//	ChainID:            parent.ChainID,
+	//	ParentID:           parent.ID(),
+	//	Height:             height,
+	//	Timestamp:          time.Now().UTC(),
+	//	View:               view,
+	//	ParentView:         parent.View,
+	//	ParentVoterIndices: SignerIndicesFixture(4),
+	//	ParentVoterSigData: QCSigDataFixture(),
+	//	ProposerID:         IdentifierFixture(),
+	//	LastViewTC:         lastViewTC,
+	//}
 }
 
 func BlockHeaderWithHeight(height uint64) *flow.Header {
