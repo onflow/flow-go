@@ -183,20 +183,17 @@ func TestNewBlock(t *testing.T) {
 // 2. Invalid input with invalid HeaderBody:
 //   - Ensures an error is returned when the HeaderBody.ParentView is not zero.
 func TestNewRootBlock(t *testing.T) {
-	validID := unittest.IdentifierFixture()
-	ts := time.Unix(1_600_000_000, 0)
-
 	base := flow.UntrustedBlock{
 		Header: flow.HeaderBody{
 			ChainID:            flow.Emulator,
-			ParentID:           validID,
+			ParentID:           flow.ZeroID,
 			Height:             10,
-			Timestamp:          ts,
+			Timestamp:          time.Now(),
 			View:               0,
 			ParentView:         0,
 			ParentVoterIndices: []byte{},
 			ParentVoterSigData: []byte{},
-			ProposerID:         validID,
+			ProposerID:         flow.ZeroID,
 			LastViewTC:         nil,
 		},
 		Payload: unittest.PayloadFixture(),
