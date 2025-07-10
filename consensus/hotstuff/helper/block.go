@@ -12,12 +12,11 @@ import (
 func MakeBlock(options ...func(*model.Block)) *model.Block {
 	view := rand.Uint64()
 	block := model.Block{
-		View:        view,
-		BlockID:     unittest.IdentifierFixture(),
-		PayloadHash: unittest.IdentifierFixture(),
-		ProposerID:  unittest.IdentifierFixture(),
-		Timestamp:   time.Now().UTC(),
-		QC:          MakeQC(WithQCView(view - 1)),
+		View:       view,
+		BlockID:    unittest.IdentifierFixture(),
+		ProposerID: unittest.IdentifierFixture(),
+		Timestamp:  time.Now().UTC(),
+		QC:         MakeQC(WithQCView(view - 1)),
 	}
 	for _, option := range options {
 		option(&block)
@@ -122,7 +121,6 @@ func SignedProposalToFlow(proposal *model.SignedProposal) *flow.ProposalHeader {
 			ProposerID:         block.ProposerID,
 			LastViewTC:         proposal.LastViewTC,
 		},
-		PayloadHash: block.PayloadHash,
 	}
 
 	return &flow.ProposalHeader{

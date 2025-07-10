@@ -10,23 +10,21 @@ import (
 // Block is the HotStuff algorithm's concept of a block, which - in the bigger picture - corresponds
 // to the block header.
 type Block struct {
-	View        uint64
-	BlockID     flow.Identifier
-	ProposerID  flow.Identifier
-	QC          *flow.QuorumCertificate
-	PayloadHash flow.Identifier
-	Timestamp   time.Time
+	View       uint64
+	BlockID    flow.Identifier
+	ProposerID flow.Identifier
+	QC         *flow.QuorumCertificate
+	Timestamp  time.Time
 }
 
 // BlockFromFlow converts a flow header to a hotstuff block.
 func BlockFromFlow(header *flow.Header) *Block {
 	block := Block{
-		BlockID:     header.ID(),
-		View:        header.View,
-		QC:          header.QuorumCertificate(),
-		ProposerID:  header.ProposerID,
-		PayloadHash: header.PayloadHash,
-		Timestamp:   header.Timestamp,
+		BlockID:    header.ID(),
+		View:       header.View,
+		QC:         header.QuorumCertificate(),
+		ProposerID: header.ProposerID,
+		Timestamp:  header.Timestamp,
 	}
 
 	return &block
@@ -36,12 +34,11 @@ func BlockFromFlow(header *flow.Header) *Block {
 // block based on the given header.
 func GenesisBlockFromFlow(header *flow.Header) *Block {
 	genesis := &Block{
-		BlockID:     header.ID(),
-		View:        header.View,
-		ProposerID:  header.ProposerID,
-		QC:          nil,
-		PayloadHash: header.PayloadHash,
-		Timestamp:   header.Timestamp,
+		BlockID:    header.ID(),
+		View:       header.View,
+		ProposerID: header.ProposerID,
+		QC:         nil,
+		Timestamp:  header.Timestamp,
 	}
 	return genesis
 }

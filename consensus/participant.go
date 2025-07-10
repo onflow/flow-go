@@ -186,12 +186,11 @@ func makeCertifiedRootBlock(header *flow.Header, qc *flow.QuorumCertificate) (mo
 	// instead of having to distinguish between a genesis block without a qc
 	// and a later-finalized root block where we can retrieve the qc.
 	rootBlock := &model.Block{
-		View:        header.View,
-		BlockID:     header.ID(),
-		ProposerID:  header.ProposerID,
-		QC:          nil, // QC is omitted
-		PayloadHash: header.PayloadHash,
-		Timestamp:   header.Timestamp,
+		View:       header.View,
+		BlockID:    header.ID(),
+		ProposerID: header.ProposerID,
+		QC:         nil, // QC is omitted
+		Timestamp:  header.Timestamp,
 	}
 	return model.NewCertifiedBlock(rootBlock, qc)
 }
