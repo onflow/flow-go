@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -58,6 +59,7 @@ type StateFixture struct {
 	Storage        *storage.All
 	ProtocolEvents *events.Distributor
 	State          protocol.ParticipantState
+	LockManager    lockctx.Manager
 }
 
 // GenericNode implements a generic in-process node for tests.
@@ -72,6 +74,7 @@ type GenericNode struct {
 	Tracer             module.Tracer
 	PublicDB           *badger.DB
 	SecretsDB          *badger.DB
+	LockManager        lockctx.Manager
 	Headers            storage.Headers
 	Guarantees         storage.Guarantees
 	Seals              storage.Seals

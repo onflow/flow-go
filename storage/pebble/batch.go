@@ -6,6 +6,7 @@ import (
 	"github.com/cockroachdb/pebble"
 )
 
+// TODO: unused?
 type Batch struct {
 	writer *pebble.Batch
 
