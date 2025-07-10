@@ -1,5 +1,5 @@
-name: Promote Image to Public Registry
-description: Pull image from private registry and push to public registry
+name: Promote Image to another Registry
+description: Pull image from private registry and push to another registry
 
 inputs:
   gcp_credentials:
@@ -11,8 +11,8 @@ inputs:
   private_registry_host:
     description: 'Private Google Artifact Registry hostname'
     required: true
-  public_registry:
-    description: 'Public container registry URL'
+  promotion_registry:
+    description: 'Registry to promote images to'
     required: true
   role:
     description: 'Role to promote'
@@ -43,29 +43,29 @@ runs:
         # Convert comma-separated tags input into an array
         IFS=',' read -ra TAGS <<< "${{ inputs.tags }}"
 
-        # Loop through each tag and pull the image from the private registry, then tag it for the public registry
+        # Loop through each tag and pull the image from the private registry, then tag it for the registry to promote to 
         for TAG in "${TAGS[@]}"; do
           IMAGE_PRIVATE="${{ inputs.private_registry }}/${{ inputs.role }}:${TAG}"
-          IMAGE_PUBLIC="${{ inputs.public_registry }}/${{ inputs.role }}:${TAG}"
-          echo "Processing ${IMAGE_PRIVATE} -> ${IMAGE_PUBLIC}"
+          IMAGE_PROMOTION="${{ inputs.promotion_registry }}/${{ inputs.role }}:${TAG}"
+          echo "Processing ${IMAGE_PRIVATE} -> ${IMAGE_PROMOTION}"
           docker pull "${IMAGE_PRIVATE}"
-          docker tag "${IMAGE_PRIVATE}" "${IMAGE_PUBLIC}"
+          docker tag "${IMAGE_PRIVATE}" "${IMAGE_PROMOTION}"
         done
 
-    - name: Authenticate with Public Registry 
+    - name: Authenticate with registry to promote to
       run: |
         gcloud auth configure-docker 
       shell: bash
 
-    - name: Push Images to Public Registry
+    - name: Push Images to registry to promote to 
       shell: bash
       run: |
         # Convert comma-separated tags input into an array
         IFS=',' read -ra TAGS <<< "${{ inputs.tags }}"
-        # Loop through each tag and push the image to the public registry
+        # Loop through each tag and push the image to the promotion registry
         for TAG in "${TAGS[@]}"; do
-          IMAGE_PUBLIC="${{ inputs.public_registry }}/${{ inputs.role }}:${TAG}"
-          echo "Pushing Image ${IMAGE_PUBLIC} to Public registry"
-          docker push "${IMAGE_PUBLIC}"
+          IMAGE_PROMOTION="${{ inputs.promotion_registry }}/${{ inputs.role }}:${TAG}"
+          echo "Pushing Image ${IMAGE_PROMOTION} to Public registry"
+          docker push "${IMAGE_PROMOTION}"
         done
 
