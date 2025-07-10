@@ -63,13 +63,13 @@ func TestHeaderGetByView(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify storing the block does not index the view automatically. It would not be safe to
-		// do that, since a byzantine leader might produce multiple proposals for the same view. 
+		// do that, since a byzantine leader might produce multiple proposals for the same view.
 		_, err = headers.BlockIDByView(block.Header.View)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// Though, HotStuff guarantees that for each view at most one block is certified. Hence, we can index
 		// a block by its view _only_ once the block is certified. When a block is certified is decided by the
-		// higher-level consensus logic, which then triggers the indexing of the block by its view via a 
+		// higher-level consensus logic, which then triggers the indexing of the block by its view via a
 		// dedicated method call:
 		require.NoError(t, db.Update(operation.IndexCertifiedBlockByView(block.Header.View, block.ID())))
 
