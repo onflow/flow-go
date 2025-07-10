@@ -534,7 +534,7 @@ func HeaderBodyWithParentFixture(parent *flow.Header) flow.HeaderBody {
 		}
 	}
 
-	headerBody := flow.HeaderBody{
+	return flow.HeaderBody{
 		ChainID:            parent.ChainID,
 		ParentID:           parent.ID(),
 		Height:             height,
@@ -546,21 +546,6 @@ func HeaderBodyWithParentFixture(parent *flow.Header) flow.HeaderBody {
 		ProposerID:         IdentifierFixture(),
 		LastViewTC:         lastViewTC,
 	}
-
-	return headerBody
-
-	//return flow.HeaderBody{
-	//	ChainID:            parent.ChainID,
-	//	ParentID:           parent.ID(),
-	//	Height:             height,
-	//	Timestamp:          time.Now().UTC(),
-	//	View:               view,
-	//	ParentView:         parent.View,
-	//	ParentVoterIndices: SignerIndicesFixture(4),
-	//	ParentVoterSigData: QCSigDataFixture(),
-	//	ProposerID:         IdentifierFixture(),
-	//	LastViewTC:         lastViewTC,
-	//}
 }
 
 func BlockHeaderWithHeight(height uint64) *flow.Header {
@@ -1712,7 +1697,7 @@ func WithChunkID(chunkID flow.Identifier) func(*verification.ChunkDataPackReques
 // and height of zero.
 // Use options to customize the request.
 func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest)) *verification.
-	ChunkDataPackRequest {
+ChunkDataPackRequest {
 	req := &verification.ChunkDataPackRequest{
 		Locator: *ChunkLocatorFixture(IdentifierFixture(), 0),
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{

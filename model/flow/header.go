@@ -8,7 +8,6 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/vmihailenco/msgpack/v4"
 
-	"github.com/onflow/flow-go/ledger/common/bitutils"
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/fingerprint"
 )
@@ -280,84 +279,6 @@ func (h Header) Fingerprint() []byte {
 // within the flow system.
 func (h Header) ID() Identifier {
 	return MakeID(h)
-}
-
-// HeaderBodyBuilder constructs a validated, immutable HeaderBody in two phases:
-// first by setting individual fields using fluent WithX methods, then by calling Build()
-// to perform centralized validation and return the final HeaderBody.
-type HeaderBodyBuilder struct {
-	u       UntrustedHeaderBody
-	present []byte
-}
-
-// NewHeaderBodyBuilder helps to build a new Header.
-func NewHeaderBodyBuilder() *HeaderBodyBuilder {
-	return &HeaderBodyBuilder{
-		present: bitutils.MakeBitVector(int(numHeaderBodyFields)),
-	}
-}
-
-// Build validates and returns an immutable Header. All required fields must be explicitly set (even if they are zero).
-// All errors indicate that a valid HeaderBody cannot be created from the current builder state.
-func (b *HeaderBodyBuilder) Build() (*HeaderBody, error) {
-	// make sure every required field was initialized
-	for bit := 0; bit < int(numHeaderBodyFields); bit++ {
-		if bitutils.ReadBit(b.present, bit) == 0 {
-			return nil, fmt.Errorf("HeaderBodyBuilder: missing field at bit index %d", bit)
-		}
-	}
-
-	return NewHeaderBody(b.u)
-}
-
-func (h *HeaderBodyBuilder) WithChainID(id ChainID) *HeaderBodyBuilder {
-	h.u.ChainID = id
-	bitutils.WriteBit(h.present, int(chainIDFieldBitIndex), 1)
-	return h
-}
-func (h *HeaderBodyBuilder) WithParentID(pid Identifier) *HeaderBodyBuilder {
-	h.u.ParentID = pid
-	bitutils.WriteBit(h.present, int(parentIDFieldBitIndex), 1)
-	return h
-}
-func (h *HeaderBodyBuilder) WithHeight(height uint64) *HeaderBodyBuilder {
-	h.u.Height = height
-	bitutils.WriteBit(h.present, int(heightFieldBitIndex), 1)
-	return h
-}
-func (h *HeaderBodyBuilder) WithTimestamp(t time.Time) *HeaderBodyBuilder {
-	h.u.Timestamp = t
-	bitutils.WriteBit(h.present, int(timestampFieldBitIndex), 1)
-	return h
-}
-func (h *HeaderBodyBuilder) WithView(v uint64) *HeaderBodyBuilder {
-	h.u.View = v
-	bitutils.WriteBit(h.present, int(viewFieldBitIndex), 1)
-	return h
-}
-func (h *HeaderBodyBuilder) WithParentView(pv uint64) *HeaderBodyBuilder {
-	h.u.ParentView = pv
-	bitutils.WriteBit(h.present, int(parentViewFieldBitIndex), 1)
-	return h
-}
-func (h *HeaderBodyBuilder) WithParentVoterIndices(idx []byte) *HeaderBodyBuilder {
-	h.u.ParentVoterIndices = idx
-	bitutils.WriteBit(h.present, int(parentVoterIndicesFieldBitIndex), 1)
-	return h
-}
-func (h *HeaderBodyBuilder) WithParentVoterSigData(sig []byte) *HeaderBodyBuilder {
-	h.u.ParentVoterSigData = sig
-	bitutils.WriteBit(h.present, int(parentVoterSigDataFieldBitIndex), 1)
-	return h
-}
-func (h *HeaderBodyBuilder) WithProposerID(id Identifier) *HeaderBodyBuilder {
-	h.u.ProposerID = id
-	bitutils.WriteBit(h.present, int(proposerIDFieldBitIndex), 1)
-	return h
-}
-func (h *HeaderBodyBuilder) WithLastViewTC(tc *TimeoutCertificate) *HeaderBodyBuilder {
-	h.u.LastViewTC = tc
-	return h
 }
 
 // MarshalJSON makes sure the timestamp is encoded in UTC.
