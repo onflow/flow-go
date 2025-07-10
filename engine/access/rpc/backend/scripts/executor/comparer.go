@@ -1,9 +1,10 @@
-package backend
+package executor
 
 import (
 	"bytes"
 	"crypto/md5" //nolint:gosec
 	"encoding/base64"
+	"errors"
 	"strings"
 	"time"
 
@@ -36,7 +37,7 @@ func newScriptResult(result []byte, duration time.Duration, err error) *scriptRe
 type scriptResultComparison struct {
 	log             zerolog.Logger
 	metrics         module.BackendScriptsMetrics
-	request         *scriptExecutionRequest
+	request         *Request
 	shouldLogScript func(time.Time, [md5.Size]byte) bool
 }
 
@@ -44,7 +45,7 @@ func newScriptResultComparison(
 	log zerolog.Logger,
 	metrics module.BackendScriptsMetrics,
 	shouldLogScript func(time.Time, [md5.Size]byte) bool,
-	request *scriptExecutionRequest,
+	request *Request,
 ) *scriptResultComparison {
 	return &scriptResultComparison{
 		log:             log,
@@ -130,7 +131,7 @@ func isOutOfRangeError(err error) bool {
 }
 
 func compareErrors(execErr, localErr error) bool {
-	if execErr == localErr {
+	if errors.Is(execErr, localErr) {
 		return true
 	}
 
