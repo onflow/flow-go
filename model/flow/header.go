@@ -220,26 +220,6 @@ func NewHeader(untrusted UntrustedHeader) (*Header, error) {
 	}, nil
 }
 
-// NewGenesisHeader creates a genesis header.
-//
-// This constructor must be used **only** for constructing the genesis header,
-// which is the only case where zero values are allowed.
-func NewGenesisHeader(untrusted UntrustedHeader) (*Header, error) {
-	rootHeaderBody, err := NewRootHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))
-	if err != nil {
-		return nil, fmt.Errorf("invalid root header body: %w", err)
-	}
-
-	if untrusted.PayloadHash != ZeroID {
-		return nil, fmt.Errorf("PayloadHash of a genesis header must be empty")
-	}
-
-	return &Header{
-		HeaderBody:  *rootHeaderBody,
-		PayloadHash: untrusted.PayloadHash,
-	}, nil
-}
-
 // NewRootHeader creates a root header.
 //
 // This constructor must be used **only** for constructing the root header,
