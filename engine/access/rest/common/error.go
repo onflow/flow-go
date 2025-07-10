@@ -91,6 +91,8 @@ func ErrorToStatusError(err error) StatusError {
 		return NewRestError(http.StatusRequestTimeout, "Request canceled", err)
 	case access.IsRequestTimedOutError(err):
 		return NewRestError(http.StatusRequestTimeout, "Request deadline exceeded", err)
+	case access.IsServiceUnavailable(err):
+		return NewRestError(http.StatusServiceUnavailable, err.Error(), err)
 	default:
 		return NewRestError(http.StatusInternalServerError, err.Error(), err)
 	}

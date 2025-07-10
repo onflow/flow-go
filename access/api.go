@@ -26,6 +26,9 @@ type API interface {
 	//     after such errors.
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return
 	//     values should be discarded.
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	// - access.ServiceUnavailable if the configured static collection node does not respond to ping.
 	Ping(ctx context.Context) error
 
 	// GetNetworkParameters returns the network parameters for the current network.

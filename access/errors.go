@@ -238,3 +238,27 @@ func IsRequestTimedOutError(err error) bool {
 	var requestTimedOutError RequestTimedOutError
 	return errors.As(err, &requestTimedOutError)
 }
+
+// ServiceUnavailable indicates that a requested service is unavailable
+type ServiceUnavailable struct {
+	err error
+}
+
+func NewServiceUnavailable(err error) ServiceUnavailable {
+	return ServiceUnavailable{err: err}
+}
+
+func (e ServiceUnavailable) Error() string {
+	return fmt.Sprintf("service unavailable error: %v", e.err)
+}
+
+func (e ServiceUnavailable) Unwrap() error {
+	return e.err
+}
+
+func (e ServiceUnavailable) accessSentinel() {}
+
+func IsServiceUnavailable(err error) bool {
+	var errServiceUnavailable ServiceUnavailable
+	return errors.As(err, &errServiceUnavailable)
+}

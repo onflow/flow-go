@@ -10,7 +10,6 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/validator"
@@ -300,11 +299,14 @@ func configureTransactionValidator(
 // As documented in the [access.API], which we partially implement with this function
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
+// Expected sentinel errors providing details to clients about failed requests:
+// - access.ServiceUnavailable if the configured static collection node does not respond to ping.
 func (b *Backend) Ping(ctx context.Context) error {
 	// staticCollectionRPC is only set if a collection node address was provided at startup
 	if b.staticCollectionRPC != nil {
 		if _, err := b.staticCollectionRPC.Ping(ctx, &accessproto.PingRequest{}); err != nil {
-			return status.Errorf(status.Code(err), "could not ping collection node: %v", err)
+			return access.NewServiceUnavailable(fmt.Errorf("could not ping collection node: %w", err))
 		}
 	}
 
