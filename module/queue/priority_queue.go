@@ -25,17 +25,7 @@ type PriorityQueueItem[T any] struct {
 }
 
 // NewPriorityQueueItem creates a new PriorityQueueItem with the given message and priority.
-//
-// Parameters:
-//   - message: the actual item to store in the queue
-//   - priority: the priority value for the item (higher values dequeued first)
-//   - invertPriorityOrder: if true, inverts the priority so lower values are considered higher priority
-//
-// Returns:
-//   - *PriorityQueueItem[T]: the newly created item
-//
-// Concurrency safety:
-//   - Safe for concurrent access
+// If invertPriorityOrder is true, inverts the priority so items with lower values take precedence.
 func NewPriorityQueueItem[T any](message T, priority uint64, invertPriorityOrder bool) *PriorityQueueItem[T] {
 	if invertPriorityOrder {
 		priority = ^priority
@@ -50,12 +40,6 @@ func NewPriorityQueueItem[T any](message T, priority uint64, invertPriorityOrder
 }
 
 // Message returns the message stored in the item.
-//
-// Returns:
-//   - T: the message stored in the item
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (item *PriorityQueueItem[T]) Message() T {
 	return item.message
 }
@@ -67,29 +51,23 @@ var _ heap.Interface = (*PriorityQueue[any])(nil)
 // are dequeued first. For items with equal priority, the oldest item (by insertion time)
 // is dequeued first.
 //
-// All exported methods are NOT safe for concurrent access. Caller must implement their own synchronization.
+// CAUTION: not concurrency safe! Caller must implement their own synchronization.
 type PriorityQueue[T any] []*PriorityQueueItem[T]
 
+// NewPriorityQueue creates a new empty priority queue.
 func NewPriorityQueue[T any]() PriorityQueue[T] {
 	return PriorityQueue[T]{}
 }
 
 // Len returns the number of items in the priority queue.
-//
-// Returns:
-//   - int: the number of items in the queue
+// CAUTION: not concurrency safe!
 func (pq PriorityQueue[T]) Len() int { return len(pq) }
 
 // Less determines the ordering of items in the priority queue.
 // PriorityQueueItems with higher priority values come first. For items with equal priority,
 // the oldest item (by insertion timestamp) comes first.
 //
-// Parameters:
-//   - i: index of the first item to compare
-//   - j: index of the second item to compare
-//
-// Returns:
-//   - bool: true if item at index i should come before item at index j
+// Returns true if and only if item at index i should come before item at index j.
 func (pq PriorityQueue[T]) Less(i, j int) bool {
 	// We want Pop to give us the highest, not lowest, priority so we use greater than here.
 	if pq[i].priority > pq[j].priority {
@@ -103,10 +81,6 @@ func (pq PriorityQueue[T]) Less(i, j int) bool {
 }
 
 // Swap exchanges the items at the given indices and updates their heap indices.
-//
-// Parameters:
-//   - i: index of the first item to swap
-//   - j: index of the second item to swap
 func (pq PriorityQueue[T]) Swap(i, j int) {
 	pq[i], pq[j] = pq[j], pq[i]
 	pq[i].index = i
@@ -115,9 +89,7 @@ func (pq PriorityQueue[T]) Swap(i, j int) {
 
 // Push adds an item to the priority queue.
 // The item's index is automatically set to its position in the heap.
-//
-// Parameters:
-//   - x: the item to add to the queue (must be *PriorityQueueItem[T])
+// The item must be of type `*PriorityQueueItem[T]` or it will be ignored.
 func (pq *PriorityQueue[T]) Push(x any) {
 	n := len(*pq)
 	item, ok := x.(*PriorityQueueItem[T])
