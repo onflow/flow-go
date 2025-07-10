@@ -24,11 +24,19 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+type API interface {
+	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error)
+	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error)
+	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error)
+}
+
 type Scripts struct {
 	headers  storage.Headers
 	state    protocol.State
 	executor executor.ScriptExecutor
 }
+
+var _ API = (*Scripts)(nil)
 
 func NewScriptsBackend(
 	log zerolog.Logger,
