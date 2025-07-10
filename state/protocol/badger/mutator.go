@@ -389,7 +389,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 	}
 
 	// STEP 5:
-	qc := candidate.Header.QuorumCertificate()
+	qc := candidate.Header.ParentQC()
 	deferredDbOps.AddDbOp(func(tx *transaction.Tx) error {
 		// STEP 5a: Deciding whether the candidate's parent has already been certified or not.
 		// Here, we populate the [storage.QuorumCertificates] index: certified block ID → QC. Except for bootstrapping, this is the

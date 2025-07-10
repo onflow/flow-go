@@ -1,6 +1,7 @@
 package unsynchronized
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -51,4 +52,22 @@ func (t *Transactions) Store(tx *flow.TransactionBody) error {
 	}
 
 	return nil
+}
+
+// Data returns a copy of the internal transaction map.
+func (t *Transactions) Data() []flow.TransactionBody {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	out := make([]flow.TransactionBody, 0, len(t.store))
+	for _, tx := range t.store {
+		out = append(out, *tx)
+	}
+	return out
+}
+
+// BatchStore stores transaction within a batch operation.
+// This method is not implemented and will always return an error.
+func (t *Transactions) BatchStore(_ *flow.TransactionBody, _ storage.ReaderBatchWriter) error {
+	return fmt.Errorf("not implemented")
 }

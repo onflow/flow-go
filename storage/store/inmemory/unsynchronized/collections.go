@@ -1,6 +1,7 @@
 package unsynchronized
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -127,4 +128,34 @@ func (c *Collections) Remove(collID flow.Identifier) error {
 	}
 
 	return nil
+}
+
+// Data returns a copy of stored collections
+func (c *Collections) Data() []flow.Collection {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	out := make([]flow.Collection, 0, len(c.collections))
+	for _, coll := range c.collections {
+		out = append(out, *coll)
+	}
+	return out
+}
+
+// LightCollections returns a copy of stored light collections
+func (c *Collections) LightCollections() []flow.LightCollection {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	out := make([]flow.LightCollection, 0, len(c.lightCollections))
+	for _, coll := range c.lightCollections {
+		out = append(out, *coll)
+	}
+	return out
+}
+
+// BatchStoreLightAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch operation.
+// This method is not implemented and will always return an error.
+func (c *Collections) BatchStoreLightAndIndexByTransaction(_ *flow.LightCollection, _ storage.ReaderBatchWriter) error {
+	return fmt.Errorf("not implemented")
 }

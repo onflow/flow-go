@@ -360,10 +360,11 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	createMetrics := func(chainID flow.ChainID) module.HotstuffMetrics {
 		return metrics.NewNoopCollector()
 	}
+
 	hotstuffFactory, err := factories.NewHotStuffFactory(
 		node.Log,
 		node.Me,
-		node.PublicDB,
+		badgerimpl.ToDB(node.PublicDB),
 		node.State,
 		node.Metrics,
 		node.Metrics,
@@ -447,7 +448,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	require.NoError(t, err)
 
 	// request receipts from execution nodes
-	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, channels.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
+	receiptRequester, err := requester.New(node.Log.With().Str("entity", "receipt").Logger(), node.Metrics, node.Net, node.Me, node.State, channels.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
 	require.NoError(t, err)
 
 	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
@@ -647,7 +648,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	)
 
 	requestEngine, err := requester.New(
-		node.Log, node.Metrics, node.Net, node.Me, node.State,
+		node.Log.With().Str("entity", "collection").Logger(), node.Metrics, node.Net, node.Me, node.State,
 		channels.RequestCollections,
 		filter.HasRole[flow.Identity](flow.RoleCollection),
 		func() flow.Entity { return &flow.Collection{} },
@@ -848,12 +849,13 @@ func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.Quor
 	signerIndices, err := signature.EncodeSignersToIndices(signerIDs, signerIDs)
 	require.NoError(t, err)
 
-	rootQC := &flow.QuorumCertificate{
+	rootQC, err := flow.NewQuorumCertificate(flow.UntrustedQuorumCertificate{
 		View:          rootHead.View,
 		BlockID:       rootHead.ID(),
 		SignerIndices: signerIndices,
 		SigData:       unittest.SignatureFixture(),
-	}
+	})
+	require.NoError(t, err)
 
 	return rootHead, rootQC
 }

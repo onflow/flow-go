@@ -23,8 +23,10 @@ type Blocks interface {
 	// finalized and ambiguous blocks.
 	ByID(blockID flow.Identifier) (*flow.Block, error)
 
-	// ByHeight returns the block at the given height. It is only available
-	// for finalized blocks.
+	// ByHeight returns the block at the given height. It is only available for finalized blocks.
+	//
+	// Expected errors during normal operations:
+	// - storage.ErrNotFound if no block is found for the given height
 	ByHeight(height uint64) (*flow.Block, error)
 
 	// ByView returns the block with the given view. It is only available for certified blocks.

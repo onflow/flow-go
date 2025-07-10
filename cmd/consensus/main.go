@@ -400,10 +400,13 @@ func main() {
 			// the chain of seals
 			rawMempool := stdmap.NewIncorporatedResultSeals(sealLimit)
 			multipleReceiptsFilterMempool := consensusMempools.NewIncorporatedResultSeals(rawMempool, node.Storage.Receipts)
+
+			dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+
 			seals, err = consensusMempools.NewExecStateForkSuppressor(
 				multipleReceiptsFilterMempool,
 				consensusMempools.LogForkAndCrash(node.Logger),
-				node.DB,
+				dbStore,
 				node.Logger,
 			)
 			if err != nil {
@@ -498,7 +501,7 @@ func main() {
 		}).
 		Component("matching engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			receiptRequester, err = requester.New(
-				node.Logger,
+				node.Logger.With().Str("entity", "receipt").Logger(),
 				node.Metrics.Engine,
 				node.EngineRegistry,
 				node.Me,
@@ -629,7 +632,7 @@ func main() {
 			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
-			persist, err := persister.New(node.DB, node.RootChainID)
+			persist, err := persister.New(node.ProtocolDB, node.RootChainID)
 			if err != nil {
 				return nil, err
 			}

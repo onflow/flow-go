@@ -252,7 +252,15 @@ func bootstrapProtocolState(
 			}
 
 			// Store the epoch portion of the protocol state, including underlying EpochSetup/EpochCommit service events
-			dynamicEpochProtocolState := inmem.NewEpochProtocolStateAdapter(stateEntry.EpochEntry, params)
+			dynamicEpochProtocolState, err := inmem.NewEpochProtocolStateAdapter(
+				inmem.UntrustedEpochProtocolStateAdapter{
+					RichEpochStateEntry: stateEntry.EpochEntry,
+					Params:              params,
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("could not construct epoch protocol state adapter: %w", err)
+			}
 			err = bootstrapEpochForProtocolStateEntry(epochProtocolStateSnapshots, epochSetups, epochCommits, dynamicEpochProtocolState, verifyNetworkAddress)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store epoch service events for state entry (id=%x): %w", stateEntry.EpochEntry.ID(), err)
@@ -326,9 +334,11 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment extra block (id=%x): %w", blockID, err)
 			}
-			err = qcs.StoreTx(block.Header.QuorumCertificate())(tx)
-			if err != nil {
-				return fmt.Errorf("could not store qc for SealingSegment extra block (id=%x): %w", blockID, err)
+			if block.Header.ContainsParentQC() {
+				err = qcs.StoreTx(block.Header.ParentQC())(tx)
+				if err != nil {
+					return fmt.Errorf("could not store qc for SealingSegment extra block (id=%x): %w", blockID, err)
+				}
 			}
 		}
 
@@ -344,11 +354,12 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment block (id=%x): %w", blockID, err)
 			}
-			err = qcs.StoreTx(block.Header.QuorumCertificate())(tx)
-			if err != nil {
-				return fmt.Errorf("could not store qc for SealingSegment block (id=%x): %w", blockID, err)
+			if block.Header.ContainsParentQC() {
+				err = qcs.StoreTx(block.Header.ParentQC())(tx)
+				if err != nil {
+					return fmt.Errorf("could not store qc for SealingSegment block (id=%x): %w", blockID, err)
+				}
 			}
-
 			// index the latest seal as of this block
 			latestSealID, ok := segment.LatestSeals[blockID]
 			if !ok {

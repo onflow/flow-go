@@ -17,6 +17,12 @@ var (
 	bigZero = big.NewInt(0)
 )
 
+var (
+	PreviewnetPragueActivation = uint64(0)          // already on Prague for PreviewNet
+	TestnetPragueActivation    = uint64(1746723600) // Thu May 08 2025 17:00:00 GMT+0000 (10am PDT)
+	MainnetPragueActivation    = uint64(1747328400) // Thu May 15 2025 17:00:00 GMT+0000 (10am PDT)
+)
+
 // Config aggregates all the configuration (chain, evm, block, tx, ...)
 // needed during executing a transaction.
 type Config struct {
@@ -68,7 +74,7 @@ var DefaultChainConfig = PreviewNetChainConfig
 // and set a proper height for the specific release based on the Flow EVM heights
 // so it could gets activated at a desired time.
 func MakeChainConfig(chainID *big.Int) *gethParams.ChainConfig {
-	return &gethParams.ChainConfig{
+	chainConfig := &gethParams.ChainConfig{
 		ChainID: chainID,
 
 		// Fork scheduling based on block heights
@@ -89,9 +95,19 @@ func MakeChainConfig(chainID *big.Int) *gethParams.ChainConfig {
 		// Fork scheduling based on timestamps
 		ShanghaiTime: &zero, // already on Shanghai
 		CancunTime:   &zero, // already on Cancun
-		PragueTime:   nil,   // not on Prague
+		PragueTime:   nil,   // this is conditionally set below
 		VerkleTime:   nil,   // not on Verkle
 	}
+
+	if chainID.Cmp(types.FlowEVMPreviewNetChainID) == 0 {
+		chainConfig.PragueTime = &PreviewnetPragueActivation
+	} else if chainID.Cmp(types.FlowEVMTestNetChainID) == 0 {
+		chainConfig.PragueTime = &TestnetPragueActivation
+	} else if chainID.Cmp(types.FlowEVMMainNetChainID) == 0 {
+		chainConfig.PragueTime = &MainnetPragueActivation
+	}
+
+	return chainConfig
 }
 
 // Default config supports the dynamic fee structure (EIP-1559)

@@ -13,8 +13,6 @@ import (
 
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
-	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/onflow/crypto"
@@ -558,7 +556,6 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 }
 
 func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccessNodeBuilder {
-	var ds datastore.Batching
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgressInitializer
 	var processedNotifications storage.ConsumerProgressInitializer
@@ -566,7 +563,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
 	var executionDataStoreCache *execdatacache.ExecutionDataCache
-	var executionDataDBMode execution_data.ExecutionDataDBMode
 
 	// setup dependency chain to ensure indexer starts after the requester
 	requesterDependable := module.NewProxiedReadyDoneAware()
@@ -590,38 +586,14 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return nil
 		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
-			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
-			err := os.MkdirAll(datastoreDir, 0700)
+			var err error
+			builder.ExecutionDatastoreManager, err = edstorage.CreateDatastoreManager(
+				node.Logger, builder.executionDataDir, builder.executionDataDBMode)
 			if err != nil {
-				return err
+				return fmt.Errorf("could not create execution data datastore manager: %w", err)
 			}
 
-			executionDataDBMode, err = execution_data.ParseExecutionDataDBMode(builder.executionDataDBMode)
-			if err != nil {
-				return fmt.Errorf("could not parse execution data DB mode: %w", err)
-			}
-
-			if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
-				builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(
-					node.Logger.With().Str("pebbledb", "endata").Logger(),
-					datastoreDir, nil)
-				if err != nil {
-					return fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
-				}
-			} else {
-				builder.ExecutionDatastoreManager, err = edstorage.NewBadgerDatastoreManager(datastoreDir, &badgerds.DefaultOptions)
-				if err != nil {
-					return fmt.Errorf("could not create BadgerDatastoreManager for execution data: %w", err)
-				}
-			}
-			ds = builder.ExecutionDatastoreManager.Datastore()
-
-			builder.ShutdownFunc(func() error {
-				if err := builder.ExecutionDatastoreManager.Close(); err != nil {
-					return fmt.Errorf("could not close execution data datastore: %w", err)
-				}
-				return nil
-			})
+			builder.ShutdownFunc(builder.ExecutionDatastoreManager.Close)
 
 			return nil
 		}).
@@ -646,7 +618,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return nil
 		}).
 		Module("execution datastore", func(node *cmd.NodeConfig) error {
-			builder.ExecutionDataBlobstore = blobs.NewBlobstore(ds)
+			builder.ExecutionDataBlobstore = blobs.NewBlobstore(builder.ExecutionDatastoreManager.Datastore())
 			builder.ExecutionDataStore = execution_data.NewExecutionDataStore(builder.ExecutionDataBlobstore, execution_data.DefaultSerializer)
 			return nil
 		}).
@@ -689,7 +661,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 
 			var err error
-			bs, err = node.EngineRegistry.RegisterBlobService(channels.ExecutionDataService, ds, opts...)
+			bs, err = node.EngineRegistry.RegisterBlobService(channels.ExecutionDataService, builder.ExecutionDatastoreManager.Datastore(), opts...)
 			if err != nil {
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
@@ -850,7 +822,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			net := builder.AccessNodeConfig.PublicNetworkConfig.Network
 
 			var err error
-			builder.PublicBlobService, err = net.RegisterBlobService(channels.PublicExecutionDataService, ds, opts...)
+			builder.PublicBlobService, err = net.RegisterBlobService(channels.PublicExecutionDataService, builder.ExecutionDatastoreManager.Datastore(), opts...)
 			if err != nil {
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
@@ -2133,7 +2105,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			var err error
 
 			builder.RequestEng, err = requester.New(
-				node.Logger,
+				node.Logger.With().Str("entity", "collection").Logger(),
 				node.Metrics.Engine,
 				node.EngineRegistry,
 				node.Me,
@@ -2155,28 +2127,35 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				)
 			}
 
+			collectionSyncer := ingestion.NewCollectionSyncer(
+				node.Logger,
+				notNil(builder.collectionExecutedMetric),
+				builder.RequestEng,
+				node.State,
+				node.Storage.Blocks,
+				notNil(builder.collections),
+				notNil(builder.transactions),
+				lastFullBlockHeight,
+			)
+			builder.RequestEng.WithHandle(collectionSyncer.OnCollectionDownloaded)
+
 			builder.IngestEng, err = ingestion.New(
 				node.Logger,
 				node.EngineRegistry,
 				node.State,
 				node.Me,
-				builder.RequestEng,
 				node.Storage.Blocks,
-				node.Storage.Headers,
-				notNil(builder.collections),
-				notNil(builder.transactions),
 				node.Storage.Results,
 				node.Storage.Receipts,
-				notNil(builder.collectionExecutedMetric),
 				processedFinalizedBlockHeight,
-				lastFullBlockHeight,
+				notNil(collectionSyncer),
+				notNil(builder.collectionExecutedMetric),
 				notNil(builder.TxResultErrorMessagesCore),
 			)
 			if err != nil {
 				return nil, err
 			}
 			ingestionDependable.Init(builder.IngestEng)
-			builder.RequestEng.WithHandle(builder.IngestEng.OnCollection)
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
 
 			return builder.IngestEng, nil

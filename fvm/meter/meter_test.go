@@ -23,7 +23,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				WithComputationLimit(1).
 				WithMemoryLimit(2),
 		)
-		require.Equal(t, uint(1), m.TotalComputationLimit())
+		require.Equal(t, uint64(1), m.TotalComputationLimit())
 		require.Equal(t, uint64(2), m.TotalMemoryLimit())
 	})
 
@@ -33,7 +33,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				WithComputationLimit(math.MaxUint32).
 				WithMemoryLimit(math.MaxUint32),
 		)
-		require.Equal(t, uint(math.MaxUint32), m.TotalComputationLimit())
+		require.Equal(t, uint64(math.MaxUint32), m.TotalComputationLimit())
 		require.Equal(t, uint64(math.MaxUint32), m.TotalMemoryLimit())
 	})
 
@@ -47,28 +47,58 @@ func TestWeightedComputationMetering(t *testing.T) {
 				WithMemoryWeights(map[common.MemoryKind]uint64{0: 1}),
 		)
 
-		err := m.MeterComputation(0, 1)
+		err := m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      0,
+				Intensity: 1,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), m.TotalComputationUsed())
 
-		err = m.MeterComputation(0, 2)
+		err = m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      0,
+				Intensity: 2,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1+2), m.TotalComputationUsed())
 
-		err = m.MeterComputation(0, 8)
+		err = m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      0,
+				Intensity: 8,
+			},
+		)
 		require.Error(t, err)
 		require.True(t, errors.IsComputationLimitExceededError(err))
 		require.Equal(t, err.Error(), errors.NewComputationLimitExceededError(10).Error())
 
-		err = m.MeterMemory(0, 2)
+		err = m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   0,
+				Amount: 2,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), m.TotalMemoryEstimate())
 
-		err = m.MeterMemory(0, 3)
+		err = m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   0,
+				Amount: 3,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(2+3), m.TotalMemoryEstimate())
 
-		err = m.MeterMemory(0, 8)
+		err = m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   0,
+				Amount: 8,
+			},
+		)
 		require.Error(t, err)
 		require.True(t, errors.IsMemoryLimitExceededError(err))
 		require.Equal(t, err.Error(), errors.NewMemoryLimitExceededError(10).Error())
@@ -84,15 +114,25 @@ func TestWeightedComputationMetering(t *testing.T) {
 				WithMemoryWeights(map[common.MemoryKind]uint64{0: 17}),
 		)
 
-		err := m.MeterComputation(0, 1)
+		err := m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      0,
+				Intensity: 1,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(13), m.TotalComputationUsed())
-		require.Equal(t, uint(1), m.ComputationIntensities()[0])
+		require.Equal(t, uint64(1), m.ComputationIntensities()[0])
 
-		err = m.MeterMemory(0, 2)
+		err = m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   0,
+				Amount: 2,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(34), m.TotalMemoryEstimate())
-		require.Equal(t, uint(2), m.MemoryIntensities()[0])
+		require.Equal(t, uint64(2), m.MemoryAmounts()[0])
 	})
 
 	t.Run("meter computation with weights lower than MeterInternalPrecisionBytes", func(t *testing.T) {
@@ -104,17 +144,27 @@ func TestWeightedComputationMetering(t *testing.T) {
 				WithMemoryWeights(map[common.MemoryKind]uint64{0: 1}),
 		)
 
-		internalPrecisionMinusOne := uint((1 << meter.MeterExecutionInternalPrecisionBytes) - 1)
+		internalPrecisionMinusOne := uint64((1 << meter.MeterExecutionInternalPrecisionBytes) - 1)
 
-		err := m.MeterComputation(0, internalPrecisionMinusOne)
+		err := m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      0,
+				Intensity: internalPrecisionMinusOne,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(0), m.TotalComputationUsed())
 		require.Equal(t, internalPrecisionMinusOne, m.ComputationIntensities()[0])
 
-		err = m.MeterComputation(0, 1)
+		err = m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      0,
+				Intensity: 1,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), m.TotalComputationUsed())
-		require.Equal(t, uint(1<<meter.MeterExecutionInternalPrecisionBytes), m.ComputationIntensities()[0])
+		require.Equal(t, uint64(1<<meter.MeterExecutionInternalPrecisionBytes), m.ComputationIntensities()[0])
 	})
 
 	t.Run("check computation capacity", func(t *testing.T) {
@@ -125,18 +175,43 @@ func TestWeightedComputationMetering(t *testing.T) {
 					map[common.ComputationKind]uint64{0: 1 << meter.MeterExecutionInternalPrecisionBytes}),
 		)
 
-		hasCapacity := m.ComputationAvailable(0, 1)
+		hasCapacity := m.ComputationAvailable(
+			common.ComputationUsage{
+				Kind:      0,
+				Intensity: 1,
+			},
+		)
 		require.True(t, hasCapacity)
 
-		err := m.MeterComputation(0, 1)
+		err := m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      0,
+				Intensity: 1,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), m.TotalComputationUsed())
 
-		require.True(t, m.ComputationAvailable(0, 9))
-		require.False(t, m.ComputationAvailable(0, 10))
+		require.True(t, m.ComputationAvailable(
+			common.ComputationUsage{
+				Kind:      0,
+				Intensity: 9,
+			},
+		))
+		require.False(t, m.ComputationAvailable(
+			common.ComputationUsage{
+				Kind:      0,
+				Intensity: 10,
+			},
+		))
 
 		// test a type without a weight (default zero)
-		require.True(t, m.ComputationAvailable(1, 10))
+		require.True(t, m.ComputationAvailable(
+			common.ComputationUsage{
+				Kind:      1,
+				Intensity: 10,
+			},
+		))
 	})
 
 	t.Run("check computation remaining", func(t *testing.T) {
@@ -148,16 +223,21 @@ func TestWeightedComputationMetering(t *testing.T) {
 		)
 
 		remaining := m.ComputationRemaining(0)
-		require.Equal(t, uint(10), remaining)
+		require.Equal(t, uint64(10), remaining)
 
-		err := m.MeterComputation(0, 1)
+		err := m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      0,
+				Intensity: 1,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), m.TotalComputationUsed())
 
-		require.Equal(t, uint(9), m.ComputationRemaining(0))
+		require.Equal(t, uint64(9), m.ComputationRemaining(0))
 
 		// test a type without a weight (default zero)
-		require.Equal(t, uint(math.MaxUint), m.ComputationRemaining(1))
+		require.Equal(t, uint64(math.MaxUint64), m.ComputationRemaining(1))
 	})
 
 	t.Run("merge meters", func(t *testing.T) {
@@ -171,36 +251,61 @@ func TestWeightedComputationMetering(t *testing.T) {
 				WithMemoryWeights(map[common.MemoryKind]uint64{0: 1}),
 		)
 
-		err := m.MeterComputation(compKind, 1)
+		err := m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      compKind,
+				Intensity: 1,
+			},
+		)
 		require.NoError(t, err)
 
 		child1 := meter.NewMeter(m.MeterParameters)
-		err = child1.MeterComputation(compKind, 2)
+		err = child1.MeterComputation(
+			common.ComputationUsage{
+				Kind:      compKind,
+				Intensity: 2,
+			},
+		)
 		require.NoError(t, err)
 
 		child2 := meter.NewMeter(m.MeterParameters)
-		err = child2.MeterComputation(compKind, 3)
+		err = child2.MeterComputation(
+			common.ComputationUsage{
+				Kind:      compKind,
+				Intensity: 3,
+			},
+		)
 		require.NoError(t, err)
 
 		child3 := meter.NewMeter(m.MeterParameters)
-		err = child3.MeterComputation(compKind, 4)
+		err = child3.MeterComputation(
+			common.ComputationUsage{
+				Kind:      compKind,
+				Intensity: 4,
+			},
+		)
 		require.NoError(t, err)
 
 		m.MergeMeter(child1)
 		require.Equal(t, uint64(1+2), m.TotalComputationUsed())
-		require.Equal(t, uint(1+2), m.ComputationIntensities()[compKind])
+		require.Equal(t, uint64(1+2), m.ComputationIntensities()[compKind])
 
 		m.MergeMeter(child2)
 		require.Equal(t, uint64(1+2+3), m.TotalComputationUsed())
-		require.Equal(t, uint(1+2+3), m.ComputationIntensities()[compKind])
+		require.Equal(t, uint64(1+2+3), m.ComputationIntensities()[compKind])
 
 		// merge hits limit, but is accepted.
 		m.MergeMeter(child3)
 		require.Equal(t, uint64(1+2+3+4), m.TotalComputationUsed())
-		require.Equal(t, uint(1+2+3+4), m.ComputationIntensities()[compKind])
+		require.Equal(t, uint64(1+2+3+4), m.ComputationIntensities()[compKind])
 
 		// error after merge (hitting limit)
-		err = m.MeterComputation(compKind, 0)
+		err = m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      compKind,
+				Intensity: 0,
+			},
+		)
 		require.Error(t, err)
 		require.True(t, errors.IsComputationLimitExceededError(err))
 		require.Equal(t, err.Error(), errors.NewComputationLimitExceededError(9).Error())
@@ -215,17 +320,27 @@ func TestWeightedComputationMetering(t *testing.T) {
 				WithComputationWeights(map[common.ComputationKind]uint64{0: 1 << meter.MeterExecutionInternalPrecisionBytes}),
 		)
 
-		err := m.MeterComputation(compKind, 1)
+		err := m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      compKind,
+				Intensity: 1,
+			},
+		)
 		require.NoError(t, err)
 
 		child := meter.NewMeter(m.MeterParameters)
-		err = child.MeterComputation(compKind, 1)
+		err = child.MeterComputation(
+			common.ComputationUsage{
+				Kind:      compKind,
+				Intensity: 1,
+			},
+		)
 		require.NoError(t, err)
 
 		// hitting limit and ignoring it
 		m.MergeMeter(child)
 		require.Equal(t, uint64(1+1), m.TotalComputationUsed())
-		require.Equal(t, uint(1+1), m.ComputationIntensities()[compKind])
+		require.Equal(t, uint64(1+1), m.ComputationIntensities()[compKind])
 	})
 
 	t.Run("merge meters - large values - computation", func(t *testing.T) {
@@ -237,16 +352,31 @@ func TestWeightedComputationMetering(t *testing.T) {
 				}),
 		)
 
-		err := m.MeterComputation(0, 1)
+		err := m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      0,
+				Intensity: 1,
+			},
+		)
 		require.NoError(t, err)
 
 		child1 := meter.NewMeter(m.MeterParameters)
-		err = child1.MeterComputation(0, 1)
+		err = child1.MeterComputation(
+			common.ComputationUsage{
+				Kind:      0,
+				Intensity: 1,
+			},
+		)
 		require.NoError(t, err)
 
 		m.MergeMeter(child1)
 
-		err = m.MeterComputation(0, 0)
+		err = m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      0,
+				Intensity: 0,
+			},
+		)
 		require.True(t, errors.IsComputationLimitExceededError(err))
 	})
 
@@ -259,16 +389,31 @@ func TestWeightedComputationMetering(t *testing.T) {
 				}),
 		)
 
-		err := m.MeterMemory(0, 1)
+		err := m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   0,
+				Amount: 1,
+			},
+		)
 		require.NoError(t, err)
 
 		child1 := meter.NewMeter(m.MeterParameters)
-		err = child1.MeterMemory(0, 1)
+		err = child1.MeterMemory(
+			common.MemoryUsage{
+				Kind:   0,
+				Amount: 1,
+			},
+		)
 		require.NoError(t, err)
 
 		m.MergeMeter(child1)
 
-		err = m.MeterMemory(0, 0)
+		err = m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   0,
+				Amount: 0,
+			},
+		)
 		require.Error(t, err)
 		require.True(t, errors.IsMemoryLimitExceededError(err))
 		require.Equal(t, err.Error(), errors.NewMemoryLimitExceededError(math.MaxUint32).Error())
@@ -290,52 +435,112 @@ func TestWeightedComputationMetering(t *testing.T) {
 		}
 
 		reset()
-		err := m.MeterComputation(0, 1)
+		err := m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      0,
+				Intensity: 1,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(0), m.TotalComputationUsed())
 		reset()
-		err = m.MeterComputation(0, 1<<meter.MeterExecutionInternalPrecisionBytes)
+		err = m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      0,
+				Intensity: 1 << meter.MeterExecutionInternalPrecisionBytes,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(0), m.TotalComputationUsed())
 		reset()
-		err = m.MeterComputation(0, math.MaxUint32)
+		err = m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      0,
+				Intensity: math.MaxUint32,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(0), m.TotalComputationUsed())
 
 		reset()
-		err = m.MeterComputation(1, 1)
+		err = m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      1,
+				Intensity: 1,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(0), m.TotalComputationUsed())
 		reset()
-		err = m.MeterComputation(1, 1<<meter.MeterExecutionInternalPrecisionBytes)
+		err = m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      1,
+				Intensity: 1 << meter.MeterExecutionInternalPrecisionBytes,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), m.TotalComputationUsed())
 		reset()
-		err = m.MeterComputation(1, math.MaxUint32)
+		err = m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      1,
+				Intensity: math.MaxUint32,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1<<16-1), m.TotalComputationUsed())
 
 		reset()
-		err = m.MeterComputation(2, 1)
+		err = m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      2,
+				Intensity: 1,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), m.TotalComputationUsed())
 		reset()
-		err = m.MeterComputation(2, 1<<meter.MeterExecutionInternalPrecisionBytes)
+		err = m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      2,
+				Intensity: 1 << meter.MeterExecutionInternalPrecisionBytes,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1<<16), m.TotalComputationUsed())
 		reset()
-		err = m.MeterComputation(2, math.MaxUint32)
+		err = m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      2,
+				Intensity: math.MaxUint32,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(math.MaxUint32), m.TotalComputationUsed())
 
 		reset()
-		err = m.MeterComputation(3, 1)
+		err = m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      3,
+				Intensity: 1,
+			},
+		)
 		require.True(t, errors.IsComputationLimitExceededError(err))
 		reset()
-		err = m.MeterComputation(3, 1<<meter.MeterExecutionInternalPrecisionBytes)
+		err = m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      3,
+				Intensity: 1 << meter.MeterExecutionInternalPrecisionBytes,
+			},
+		)
 		require.True(t, errors.IsComputationLimitExceededError(err))
 		reset()
-		err = m.MeterComputation(3, math.MaxUint32)
+		err = m.MeterComputation(
+			common.ComputationUsage{
+				Kind:      3,
+				Intensity: math.MaxUint32,
+			},
+		)
 		require.True(t, errors.IsComputationLimitExceededError(err))
 	})
 
@@ -355,51 +560,111 @@ func TestWeightedComputationMetering(t *testing.T) {
 		}
 
 		reset()
-		err := m.MeterMemory(0, 1)
+		err := m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   0,
+				Amount: 1,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(0), m.TotalMemoryEstimate())
 		reset()
-		err = m.MeterMemory(0, 1)
+		err = m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   0,
+				Amount: 1,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(0), m.TotalMemoryEstimate())
 		reset()
-		err = m.MeterMemory(0, math.MaxUint32)
+		err = m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   0,
+				Amount: math.MaxUint32,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(0), m.TotalMemoryEstimate())
 
 		reset()
-		err = m.MeterMemory(1, 1)
+		err = m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   1,
+				Amount: 1,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), m.TotalMemoryEstimate())
 		reset()
-		err = m.MeterMemory(1, 1)
+		err = m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   1,
+				Amount: 1,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), m.TotalMemoryEstimate())
 		reset()
-		err = m.MeterMemory(1, math.MaxUint32)
+		err = m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   1,
+				Amount: math.MaxUint32,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(math.MaxUint32), m.TotalMemoryEstimate())
 
 		reset()
-		err = m.MeterMemory(2, 1)
+		err = m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   2,
+				Amount: 1,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), m.TotalMemoryEstimate())
 		reset()
-		err = m.MeterMemory(2, 1)
+		err = m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   2,
+				Amount: 1,
+			},
+		)
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), m.TotalMemoryEstimate())
 		reset()
-		err = m.MeterMemory(2, math.MaxUint32)
+		err = m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   2,
+				Amount: math.MaxUint32,
+			},
+		)
 		require.True(t, errors.IsMemoryLimitExceededError(err))
 
 		reset()
-		err = m.MeterMemory(3, 1)
+		err = m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   3,
+				Amount: 1,
+			},
+		)
 		require.True(t, errors.IsMemoryLimitExceededError(err))
 		reset()
-		err = m.MeterMemory(3, 1)
+		err = m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   3,
+				Amount: 1,
+			},
+		)
 		require.True(t, errors.IsMemoryLimitExceededError(err))
 		reset()
-		err = m.MeterMemory(3, math.MaxUint32)
+		err = m.MeterMemory(
+			common.MemoryUsage{
+				Kind:   3,
+				Amount: math.MaxUint32,
+			},
+		)
 		require.True(t, errors.IsMemoryLimitExceededError(err))
 	})
 }

@@ -276,6 +276,13 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"observer-mode-bootstrap-node-addresses",
 		[]string{},
 		"the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
+
+	// TransactionFeesDisabled is a temporary convenience flag for easier testing of cadence compiler changes. This option should not be used if we need to disable fees on a network.
+	// To disable fees on a network, we need to set the fee price to 0.0.
+	fnb.flags.BoolVar(&fnb.TransactionFeesDisabled,
+		"disable-fees",
+		false,
+		"Disables calling the transaction fee deduction. This is only for testing purposes. To disable fees on a network it is better to set the fee price to 0.0 .")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -285,7 +292,7 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 		var hotstuffViewFunc func() (uint64, error)
 		// Setup consensus nodes to report their HotStuff view
 		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
-			hotstuffReader, err := persister.NewReader(node.DB, node.RootChainID)
+			hotstuffReader, err := persister.NewReader(node.ProtocolDB, node.RootChainID)
 			if err != nil {
 				return nil, err
 			}
@@ -1588,7 +1595,9 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 
 func (fnb *FlowNodeBuilder) initFvmOptions() {
 	fnb.FvmOptions = initialize.InitFvmOptions(
-		fnb.RootChainID, fnb.Storage.Headers,
+		fnb.RootChainID,
+		fnb.Storage.Headers,
+		fnb.BaseConfig.TransactionFeesDisabled,
 	)
 }
 
