@@ -110,6 +110,7 @@ type blockComputer struct {
 	log                   zerolog.Logger
 	systemChunkCtx        fvm.Context
 	systemTxn             *flow.TransactionBody
+	processCallbackTxn    *flow.TransactionBody
 	committer             ViewCommitter
 	executionDataProvider provider.Provider
 	signer                module.Local
@@ -172,6 +173,8 @@ func NewBlockComputer(
 		return nil, fmt.Errorf("could not build system chunk transaction: %w", err)
 	}
 
+	processCallbackTxn := blueprints.ProcessCallbacksTransaction(vmCtx.Chain)
+
 	return &blockComputer{
 		vm:                    vm,
 		vmCtx:                 vmCtx,
@@ -180,6 +183,7 @@ func NewBlockComputer(
 		log:                   logger,
 		systemChunkCtx:        systemChunkCtx,
 		systemTxn:             systemTxn,
+		processCallbackTxn:    processCallbackTxn,
 		committer:             committer,
 		executionDataProvider: executionDataProvider,
 		signer:                signer,
@@ -552,17 +556,15 @@ func (e *blockComputer) executeProcessCallback(
 	txnIndex uint32,
 	systemLogger zerolog.Logger,
 ) ([]*flow.TransactionBody, error) {
-	processTxn := blueprints.ProcessCallbacksTransaction(e.vmCtx.Chain)
-
 	// add process callback transaction to the system collection info
-	systemCollectionInfo.CompleteCollection.Transactions = append(systemCollectionInfo.CompleteCollection.Transactions, processTxn)
+	systemCollectionInfo.CompleteCollection.Transactions = append(systemCollectionInfo.CompleteCollection.Transactions, e.processCallbackTxn)
 
 	request := newTransactionRequest(
 		systemCollectionInfo,
 		systemCtx,
 		systemLogger,
 		txnIndex,
-		processTxn,
+		e.processCallbackTxn,
 		false)
 
 	txn, err := e.executeTransactionInternal(blockSpan, database, request, 0)
