@@ -2,6 +2,7 @@ package run
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -16,9 +17,10 @@ func TestGenerateClusterRootQC(t *testing.T) {
 
 	clusterBlock := &cluster.Block{
 		Header: flow.HeaderBody{
-			ChainID:  flow.Emulator,
-			ParentID: flow.ZeroID,
-			View:     42,
+			ChainID:   flow.Emulator,
+			ParentID:  flow.ZeroID,
+			Timestamp: time.Now().UTC(),
+			View:      42,
 		},
 		Payload: *cluster.NewEmptyPayload(flow.ZeroID),
 	}

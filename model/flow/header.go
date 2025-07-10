@@ -129,13 +129,9 @@ func NewRootHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 		return nil, fmt.Errorf("ChainID of root header body must not be empty")
 	}
 
-	// reject if any parent-QC field is set
-	if untrusted.ParentID != ZeroID ||
-		len(untrusted.ParentVoterIndices) != 0 ||
-		len(untrusted.ParentVoterSigData) != 0 ||
-		untrusted.ProposerID != ZeroID {
+	if HeaderBody(untrusted).ContainsParentQC() {
 		return nil, fmt.Errorf(
-			"root header body must not contain any parent QC fields",
+			"root header body must not contain a parent QC (ParentID, ParentVoterIndices, ParentVoterSigData, ProposerID must all be empty)",
 		)
 	}
 

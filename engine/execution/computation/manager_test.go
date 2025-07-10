@@ -99,8 +99,9 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	block := flow.NewBlock(
 		flow.HeaderBody{
-			ChainID: flow.Emulator,
-			View:    42,
+			ChainID:   flow.Emulator,
+			View:      42,
+			Timestamp: time.Now(),
 		},
 		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
