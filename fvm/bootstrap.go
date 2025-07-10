@@ -453,8 +453,10 @@ func (b *bootstrapExecutor) Execute() error {
 	// deploy staking collection contract to the service account
 	b.deployStakingCollection(service, &env)
 
-	// deploy flow callback scheduler contract to the service account
-	b.deployFlowCallbackScheduler(service, &env)
+	if b.ctx.ScheduleCallbacksEnabled {
+		// deploy flow callback scheduler contract to the service account
+		b.deployFlowCallbackScheduler(service, &env)
+	}
 
 	// sets up the EVM environment
 	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken, &env)
