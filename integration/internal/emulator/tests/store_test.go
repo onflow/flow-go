@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/stretchr/testify/assert"
@@ -44,16 +45,18 @@ func TestBlocks(t *testing.T) {
 
 	block1 := &flowgo.Block{
 		Header: flowgo.HeaderBody{
-			ChainID: flow.Emulator,
-			Height:  1,
+			ChainID:   flow.Emulator,
+			Height:    1,
+			Timestamp: time.Now(),
 		},
 		Payload: flowgo.Payload{},
 	}
 
 	block2 := &flowgo.Block{
 		Header: flowgo.HeaderBody{
-			ChainID: flow.Emulator,
-			Height:  2,
+			ChainID:   flow.Emulator,
+			Height:    2,
+			Timestamp: time.Now(),
 		},
 		Payload: flowgo.Payload{},
 	}
