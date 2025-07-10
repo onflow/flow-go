@@ -11,6 +11,7 @@ import (
 )
 
 // API provides all public-facing functionality of the Flow Access API.
+//
 // CAUTION: SIMPLIFIED ERROR HANDLING
 //   - All endpoints must only return an access.accessSentinel error or nil.
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal
@@ -112,32 +113,51 @@ type API interface {
 	// GetProtocolStateSnapshotByBlockID returns serializable Snapshot for a block, by blockID.
 	// The requested block must be finalized, otherwise an error is returned.
 	//
-	// Dedicated sentinel errors providing details to clients about failed requests:
-	//   - access.DataNotFoundError - No block with the given ID was found
-	//   - access.InvalidRequestError - Block ID is for an orphaned block and will never have a valid snapshot
-	//   - access.PreconditionFailedError - A block was found, but it is not finalized and is above the finalized height.
-	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
 	//   - All errors returned are guaranteed to be benign. The node can continue normal operations
 	//     after such errors.
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return
 	//     values should be discarded.
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	//   - access.DataNotFoundError - No block with the given ID was found
+	//   - access.InvalidRequestError - Block ID is for an orphaned block and will never have a valid snapshot
+	//   - access.PreconditionFailedError - A block was found, but it is not finalized and is above the finalized height.
 	GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error)
 
 	// GetProtocolStateSnapshotByHeight returns serializable Snapshot by block height.
 	// The block must be finalized (otherwise the by-height query is ambiguous).
 	//
-	// Dedicated sentinel errors providing details to clients about failed requests:
-	//   - access.DataNotFoundError - No finalized block with the given height was found.
-	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
 	//   - All errors returned are guaranteed to be benign. The node can continue normal operations
 	//     after such errors.
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return
 	//     values should be discarded.
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	//   - access.DataNotFoundError - No finalized block with the given height was found.
 	GetProtocolStateSnapshotByHeight(ctx context.Context, blockHeight uint64) ([]byte, error)
 
+	// GetExecutionResultForBlockID gets an execution result by its block ID.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	// As documented in the [access.API], which we partially implement with this function
+	//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	//   - access.DataNotFoundError - No execution result with the given block ID was found
 	GetExecutionResultForBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionResult, error)
+
+	// GetExecutionResultByID gets an execution result by its ID.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	// As documented in the [access.API], which we partially implement with this function
+	//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	//   - access.DataNotFoundError - No execution result with the given ID was found
 	GetExecutionResultByID(ctx context.Context, id flow.Identifier) (*flow.ExecutionResult, error)
 
 	// SubscribeBlocksFromStartBlockID subscribes to the finalized or sealed blocks starting at the

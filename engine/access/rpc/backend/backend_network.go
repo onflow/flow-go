@@ -77,7 +77,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 		// The block exists, but no block has been finalized at its height. Therefore, this block
 		// may be finalized in the future, and the client can retry.
 		return nil, access.NewPreconditionFailedError(
-			fmt.Errorf("failed to retrieve snapshot: block still pending finalization",
+			fmt.Errorf("failed to retrieve snapshot: block %d still pending finalization",
 				snapshotHeadByBlockId.Height))
 	}
 

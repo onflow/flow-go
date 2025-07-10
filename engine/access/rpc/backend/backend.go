@@ -296,7 +296,6 @@ func configureTransactionValidator(
 
 // Ping responds to requests when the server is up.
 //
-//
 // CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
 // As documented in the [access.API], which we partially implement with this function
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
@@ -313,7 +312,6 @@ func (b *Backend) Ping(ctx context.Context) error {
 }
 
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
-//
 //
 // CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
 // As documented in the [access.API], which we partially implement with this function
