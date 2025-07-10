@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -74,20 +76,106 @@ func UntrustedClusterBlockFromInternal(clusterBlock *cluster.Block) UntrustedClu
 // ClusterBlockProposal is a proposal for a block in collection node cluster
 // consensus. The header contains information about consensus state and the
 // payload contains the proposed collection (may be empty).
+//
+//structwrite:immutable
 type ClusterBlockProposal struct {
-	Block UntrustedClusterBlock
+	Block *cluster.Block
 }
 
-func NewClusterBlockProposal(internal *cluster.Block) *ClusterBlockProposal {
-	return &ClusterBlockProposal{
-		Block: UntrustedClusterBlockFromInternal(internal),
+// UntrustedClusterBlockProposal is an untrusted input-only representation of a ClusterBlockProposal,
+// used for construction.
+//
+// An instance of UntrustedClusterBlockProposal should be validated and converted into
+// a trusted ClusterBlockProposal using NewClusterBlockProposal constructor.
+type UntrustedClusterBlockProposal ClusterBlockProposal
+
+// NewClusterBlockProposal creates a new instance of ClusterBlockProposal.
+//
+// Parameters:
+//   - untrusted: untrusted ClusterBlockProposal to be validated
+//
+// Returns:
+//   - *ClusterBlockProposal: the newly created instance
+//   - error: any error that occurred during creation
+//
+// Expected Errors:
+//   - TODO: add validation errors
+func NewClusterBlockProposal(untrusted UntrustedClusterBlockProposal) (*ClusterBlockProposal, error) {
+	// TODO: add validation logic
+	if untrusted.Block == nil {
+		return nil, fmt.Errorf("block must not be nil")
 	}
+	return &ClusterBlockProposal{Block: untrusted.Block}, nil
+}
+
+func NewClusterBlockProposalFromInternal(internal *cluster.Block) *ClusterBlockProposal {
+	return &ClusterBlockProposal{Block: internal}
 }
 
 // ClusterBlockVote is a vote for a proposed block in collection node cluster
 // consensus; effectively a vote for a particular collection.
+//
+//structwrite:immutable
 type ClusterBlockVote BlockVote
+
+// UntrustedClusterBlockVote is an untrusted input-only representation of a ClusterBlockVote,
+// used for construction.
+//
+// An instance of UntrustedClusterBlockVote should be validated and converted into
+// a trusted ClusterBlockVote using NewClusterBlockVote constructor.
+type UntrustedClusterBlockVote ClusterBlockVote
+
+// NewClusterBlockVote creates a new instance of ClusterBlockVote.
+//
+// Parameters:
+//   - untrusted: untrusted ClusterBlockVote to be validated
+//
+// Returns:
+//   - *ClusterBlockVote: the newly created instance
+//   - error: any error that occurred during creation
+//
+// Expected Errors:
+//   - TODO: add validation errors
+func NewClusterBlockVote(untrusted UntrustedClusterBlockVote) (*ClusterBlockVote, error) {
+	// TODO: add validation logic
+	vote, err := NewBlockVote(UntrustedBlockVote(untrusted))
+	if err != nil {
+		return nil, err
+	}
+	cv := ClusterBlockVote(*vote)
+	return &cv, nil
+}
 
 // ClusterTimeoutObject is part of the collection cluster protocol and represents a collection node
 // timing out in given round. Contains a sequential number for deduplication purposes.
+//
+//structwrite:immutable
 type ClusterTimeoutObject TimeoutObject
+
+// UntrustedClusterTimeoutObject is an untrusted input-only representation of a ClusterTimeoutObject,
+// used for construction.
+//
+// An instance of UntrustedClusterTimeoutObject should be validated and converted into
+// a trusted ClusterTimeoutObject using NewClusterTimeoutObject constructor.
+type UntrustedClusterTimeoutObject ClusterTimeoutObject
+
+// NewClusterTimeoutObject creates a new instance of ClusterTimeoutObject.
+//
+// Parameters:
+//   - untrusted: untrusted ClusterTimeoutObject to be validated
+//
+// Returns:
+//   - *ClusterTimeoutObject: the newly created instance
+//   - error: any error that occurred during creation
+//
+// Expected Errors:
+//   - TODO: add validation errors
+func NewClusterTimeoutObject(untrusted UntrustedClusterTimeoutObject) (*ClusterTimeoutObject, error) {
+	// TODO: add validation logic
+	to, err := NewTimeoutObject(UntrustedTimeoutObject(untrusted))
+	if err != nil {
+		return nil, err
+	}
+	cto := ClusterTimeoutObject(*to)
+	return &cto, nil
+}
