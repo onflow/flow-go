@@ -8,7 +8,7 @@ import (
 // ClusterBlocks provides persistent storage for collector blocks (aka collections) produced
 // by *one specific* collector cluster (identified by the ChainID).
 // For consistency, method naming is analogous to the [storage.Blocks] interface. Though,
-// at the moment, we only need to store [cluster.BlockProposal]. Therefore, methods `ByID` and
+// at the moment, we only need to store [cluster.Proposal]. Therefore, methods `ByID` and
 // `ByHeight` don't exist here (but might be added later).
 type ClusterBlocks interface {
 
@@ -17,7 +17,7 @@ type ClusterBlocks interface {
 	// Error returns:
 	//   - storage.ErrAlreadyExists if the blockID already exists in the database.
 	//   - generic error in case of unexpected failure from the database layer or encoding failure.
-	Store(proposal *cluster.BlockProposal) error
+	Store(proposal *cluster.Proposal) error
 
 	// ProposalByID returns the collection with the given ID, along with the proposer's signature on it.
 	// It is available for all incorporated collections (validated blocks that have been appended to any
@@ -27,7 +27,7 @@ type ClusterBlocks interface {
 	//   - storage.ErrNotFound if the block ID was not found
 	//   - generic error in case of unexpected failure from the database layer, or failure
 	//     to decode an existing database value
-	ProposalByID(blockID flow.Identifier) (*cluster.BlockProposal, error)
+	ProposalByID(blockID flow.Identifier) (*cluster.Proposal, error)
 
 	// ProposalByHeight returns the collection at the given height, along with the proposer's
 	// signature on it. It is only available for finalized collections.
@@ -36,5 +36,5 @@ type ClusterBlocks interface {
 	//   - storage.ErrNotFound if the block height or block ID was not found
 	//   - generic error in case of unexpected failure from the database layer, or failure
 	//     to decode an existing database value
-	ProposalByHeight(height uint64) (*cluster.BlockProposal, error)
+	ProposalByHeight(height uint64) (*cluster.Proposal, error)
 }

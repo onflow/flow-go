@@ -37,7 +37,7 @@ func (_m *MutableState) AtBlockID(blockID flow.Identifier) cluster.Snapshot {
 }
 
 // Extend provides a mock function with given fields: proposal
-func (_m *MutableState) Extend(proposal *modelcluster.BlockProposal) error {
+func (_m *MutableState) Extend(proposal *modelcluster.Proposal) error {
 	ret := _m.Called(proposal)
 
 	if len(ret) == 0 {
@@ -45,7 +45,7 @@ func (_m *MutableState) Extend(proposal *modelcluster.BlockProposal) error {
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*modelcluster.BlockProposal) error); ok {
+	if rf, ok := ret.Get(0).(func(*modelcluster.Proposal) error); ok {
 		r0 = rf(proposal)
 	} else {
 		r0 = ret.Error(0)

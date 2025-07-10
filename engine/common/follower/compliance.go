@@ -81,7 +81,7 @@ type complianceCore interface {
 	// Caution: this method is allowed to block.
 	// Expected errors during normal operations:
 	//   - cache.ErrDisconnectedBatch
-	OnBlockRange(originID flow.Identifier, connectedRange []*flow.BlockProposal) error
+	OnBlockRange(originID flow.Identifier, connectedRange []*flow.Proposal) error
 
 	// OnFinalizedBlock prunes all blocks below the finalized view from the compliance layer's Cache
 	// and PendingTree.

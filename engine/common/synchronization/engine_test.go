@@ -186,7 +186,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
-				expected := []*flow.BlockProposal{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
+				expected := []*flow.Proposal{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
 				assert.ElementsMatch(ss.T(), expected, res.BlocksInternal(), "response should contain right blocks")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
@@ -208,7 +208,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
-				expected := []*flow.BlockProposal{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
+				expected := []*flow.Proposal{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
 				assert.ElementsMatch(ss.T(), expected, res.BlocksInternal(), "response should contain right blocks")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
@@ -230,7 +230,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
-				expected := []*flow.BlockProposal{ss.heights[ref-4], ss.heights[ref-3], ss.heights[ref-2]}
+				expected := []*flow.Proposal{ss.heights[ref-4], ss.heights[ref-3], ss.heights[ref-2]}
 				assert.ElementsMatch(ss.T(), expected, res.BlocksInternal(), "response should contain right blocks")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
@@ -305,7 +305,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 	// a request for too many blocks should be clamped
 	ss.T().Run("oversized range", func(t *testing.T) {
 		// setup request for 5 blocks. response should contain the first 2 (MaxSize)
-		ss.blockIDs = make(map[flow.Identifier]*flow.BlockProposal)
+		ss.blockIDs = make(map[flow.Identifier]*flow.Proposal)
 		req.BlockIDs = make([]flow.Identifier, 5)
 		for i := 0; i < len(req.BlockIDs); i++ {
 			b := unittest.BlockFixture(
@@ -317,7 +317,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
-				assert.ElementsMatch(ss.T(), []*flow.BlockProposal{ss.blockIDs[req.BlockIDs[0]], ss.blockIDs[req.BlockIDs[1]]}, res.BlocksInternal(), "response should contain right block")
+				assert.ElementsMatch(ss.T(), []*flow.Proposal{ss.blockIDs[req.BlockIDs[0]], ss.blockIDs[req.BlockIDs[1]]}, res.BlocksInternal(), "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")

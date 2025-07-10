@@ -33,7 +33,7 @@ func (suite *BackendSuite) itemWithParent(parent *flow.Header) *item {
 	return &item{
 		header: flow.Slashable[*flow.ProposalHeader]{
 			OriginID: unittest.IdentifierFixture(),
-			Message:  unittest.ProposalFromHeader(header),
+			Message:  unittest.ProposalHeaderFromHeader(header),
 		},
 		payload: unittest.IdentifierFixture(),
 	}

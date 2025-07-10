@@ -55,8 +55,8 @@ type BlockResponse struct {
 	Blocks []UntrustedProposal
 }
 
-func (br *BlockResponse) BlocksInternal() []*flow.BlockProposal {
-	internal := make([]*flow.BlockProposal, len(br.Blocks))
+func (br *BlockResponse) BlocksInternal() []*flow.Proposal {
+	internal := make([]*flow.Proposal, len(br.Blocks))
 	for i, block := range br.Blocks {
 		block := block
 		internal[i] = block.DeclareTrusted()
@@ -71,8 +71,8 @@ type ClusterBlockResponse struct {
 	Blocks []UntrustedClusterProposal
 }
 
-func (br *ClusterBlockResponse) BlocksInternal() ([]*cluster.BlockProposal, error) {
-	internal := make([]*cluster.BlockProposal, len(br.Blocks))
+func (br *ClusterBlockResponse) BlocksInternal() ([]*cluster.Proposal, error) {
+	internal := make([]*cluster.Proposal, len(br.Blocks))
 	var err error
 	for i, block := range br.Blocks {
 		block := block
