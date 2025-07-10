@@ -1,7 +1,6 @@
 package pipeline
 
 import (
-	"context"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -25,8 +24,9 @@ type ExecutionResultQueryProviderSuite struct {
 
 	receipts *storagemock.ExecutionReceipts
 
-	rootBlock *flow.Header
-	provider  *ExecutionResultQueryProviderImpl
+	rootBlock       *flow.Header
+	rootBlockResult *flow.ExecutionResult
+	provider        *ExecutionResultQueryProviderImpl
 }
 
 func TestExecutionResultQueryProvider(t *testing.T) {
@@ -43,13 +43,18 @@ func (suite *ExecutionResultQueryProviderSuite) SetupTest() {
 	suite.receipts = storagemock.NewExecutionReceipts(t)
 
 	suite.rootBlock = unittest.BlockHeaderFixture()
+	suite.rootBlockResult = unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(suite.rootBlock.ID()))
+	// This will be used just for the root block
+	suite.snapshot.On("SealedResult").Return(suite.rootBlockResult, nil, nil).Maybe()
+	suite.state.On("SealedResult", suite.rootBlock.ID()).Return(flow.ExecutionReceiptList{}).Maybe()
 	suite.params.On("FinalizedRoot").Return(suite.rootBlock, nil)
 	suite.state.On("Params").Return(suite.params)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot).Maybe()
 
+	var err error
 	// Initialize the provider with empty preferred and required EN lists for basic tests
-	suite.provider = NewExecutionResultQueryProviderImpl(
+	suite.provider, err = NewExecutionResultQueryProviderImpl(
 		suite.log,
 		suite.state,
 		suite.receipts,
@@ -57,6 +62,7 @@ func (suite *ExecutionResultQueryProviderSuite) SetupTest() {
 		flow.IdentifierList{},
 		2,
 	)
+	suite.Require().NoError(err)
 }
 
 // setupIdentitiesMock sets up the mock for identity-related calls.
@@ -98,7 +104,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 			RequiredExecutors: requiredExecutors,
 		}
 
-		query, err := suite.provider.ExecutionResultQuery(context.Background(), block.ID(), criteria)
+		query, err := suite.provider.ExecutionResultQuery(block.ID(), criteria)
 		suite.Require().NoError(err)
 
 		suite.Assert().ElementsMatch(requiredExecutors, query.ExecutionNodes.NodeIDs())
@@ -123,7 +129,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 			ResultInFork:      executionResult.ID(),
 		}
 
-		query, err := suite.provider.ExecutionResultQuery(context.Background(), block.ID(), criteria)
+		query, err := suite.provider.ExecutionResultQuery(block.ID(), criteria)
 		suite.Require().NoError(err)
 
 		suite.Assert().Equal(criteria.ResultInFork, query.ExecutionResult.ID())
@@ -131,7 +137,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 
 	suite.Run("successful query with different block results", func() {
 		otherResult := unittest.ExecutionResultFixture()
-		// Create 3 receipts with the same result (executionResult) and 2 with different result (otherResult)
+		// Create 3 receipts with the same result (executionResult) and 2 with a different result (otherResult)
 		receipts := make(flow.ExecutionReceiptList, totalReceipts)
 		for i := 0; i < 3; i++ {
 			r := unittest.ReceiptForBlockFixture(&block)
@@ -155,7 +161,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 			RequiredExecutors: requiredExecutors,
 		}
 
-		query, err := suite.provider.ExecutionResultQuery(context.Background(), block.ID(), criteria)
+		query, err := suite.provider.ExecutionResultQuery(block.ID(), criteria)
 		suite.Require().NoError(err)
 
 		suite.Require().Equal(executionResult.ID(), query.ExecutionResult.ID())
@@ -185,7 +191,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 			RequiredExecutors: requiredExecutors,
 		}
 
-		_, err := suite.provider.ExecutionResultQuery(context.Background(), insufficientBlock.ID(), criteria)
+		_, err := suite.provider.ExecutionResultQuery(insufficientBlock.ID(), criteria)
 		suite.Require().Error(err)
 
 		suite.Assert().Contains(err.Error(), "not enough agreeing receipts")
@@ -210,7 +216,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 			RequiredExecutors: nonExistentExecutors,
 		}
 
-		_, err := suite.provider.ExecutionResultQuery(context.Background(), block.ID(), criteria)
+		_, err := suite.provider.ExecutionResultQuery(block.ID(), criteria)
 		suite.Require().Error(err)
 
 		suite.Assert().Contains(err.Error(), "no execution nodes found for execution result")
@@ -228,10 +234,10 @@ func (suite *ExecutionResultQueryProviderSuite) TestRootBlockHandling() {
 			// RequiredExecutors is empty, will use operator defaults (also empty)
 		}
 
-		query, err := suite.provider.ExecutionResultQuery(context.Background(), suite.rootBlock.ID(), criteria)
+		query, err := suite.provider.ExecutionResultQuery(suite.rootBlock.ID(), criteria)
 		suite.Require().NoError(err)
 
-		suite.Assert().Nil(query.ExecutionResult) // Root block has no execution result
+		suite.Assert().Equal(suite.rootBlockResult, query.ExecutionResult)
 		suite.Assert().ElementsMatch(query.ExecutionNodes.NodeIDs(), allExecutionNodes.NodeIDs())
 	})
 
@@ -242,58 +248,12 @@ func (suite *ExecutionResultQueryProviderSuite) TestRootBlockHandling() {
 			RequiredExecutors: requiredExecutors,
 		}
 
-		query, err := suite.provider.ExecutionResultQuery(context.Background(), suite.rootBlock.ID(), criteria)
+		query, err := suite.provider.ExecutionResultQuery(suite.rootBlock.ID(), criteria)
 		suite.Require().NoError(err)
 
-		suite.Assert().Nil(query.ExecutionResult)
+		suite.Assert().Equal(suite.rootBlockResult, query.ExecutionResult)
 		suite.Assert().ElementsMatch(query.ExecutionNodes.NodeIDs(), requiredExecutors)
 	})
-}
-
-// TestRetryLogic tests the retry mechanism for insufficient execution receipts.
-func (suite *ExecutionResultQueryProviderSuite) TestRetryLogic() {
-	block := unittest.BlockFixture()
-	allExecutionNodes := unittest.IdentityListFixture(5, unittest.WithRole(flow.RoleExecution))
-	executionResult := unittest.ExecutionResultFixture()
-
-	// Create receipts for successful scenario
-	finalReceipts := make(flow.ExecutionReceiptList, 3)
-	for i := 0; i < 3; i++ {
-		r := unittest.ReceiptForBlockFixture(&block)
-		r.ExecutorID = allExecutionNodes[i].NodeID
-		r.ExecutionResult = *executionResult
-		finalReceipts[i] = r
-	}
-
-	expectedAttempt := 2
-	currentAttempt := 0
-	suite.receipts.On("ByBlockID", block.ID()).Return(
-		func(id flow.Identifier) flow.ExecutionReceiptList {
-			switch currentAttempt {
-			case 0:
-				currentAttempt++
-				return finalReceipts[0:1] // One receipt on first attempt
-			case 1:
-				currentAttempt++
-				return finalReceipts[0:1] // One receipt on second attempt
-			default:
-				return finalReceipts // All receipts on third attempt
-			}
-		},
-		func(id flow.Identifier) error { return nil })
-
-	suite.setupIdentitiesMock(allExecutionNodes)
-
-	criteria := Criteria{
-		AgreeingExecutors: 1,
-		RequiredExecutors: allExecutionNodes[0:3].NodeIDs(), // Provide required executors that match the receipt executors
-	}
-
-	query, err := suite.provider.ExecutionResultQuery(context.Background(), block.ID(), criteria)
-	suite.Require().NoError(err)
-
-	suite.Assert().Equal(executionResult.ID(), query.ExecutionResult.ID())
-	suite.Assert().Equal(expectedAttempt, currentAttempt)
 }
 
 // TestPreferredAndRequiredExecutionNodes tests the interaction with preferred and required execution nodes.
@@ -302,7 +262,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestPreferredAndRequiredExecutio
 	allExecutionNodes := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleExecution))
 	executionResult := unittest.ExecutionResultFixture()
 
-	// Create receipts from first 4 execution nodes
+	// Create receipts from the first 4 execution nodes
 	receipts := make(flow.ExecutionReceiptList, 4)
 	for i := 0; i < 4; i++ {
 		r := unittest.ReceiptForBlockFixture(&block)
@@ -319,7 +279,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestPreferredAndRequiredExecutio
 		suite.provider.preferredENIdentifiers = allExecutionNodes[1:4].NodeIDs()
 
 		// Criteria are empty to use operator defaults
-		query, err := suite.provider.ExecutionResultQuery(context.Background(), block.ID(), Criteria{})
+		query, err := suite.provider.ExecutionResultQuery(block.ID(), Criteria{})
 		suite.Require().NoError(err)
 
 		suite.Assert().Subset(suite.provider.preferredENIdentifiers, query.ExecutionNodes.NodeIDs())
@@ -332,7 +292,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestPreferredAndRequiredExecutio
 		suite.provider.requiredENIdentifiers = allExecutionNodes[2:6].NodeIDs()
 
 		// Criteria are empty to use operator defaults
-		query, err := suite.provider.ExecutionResultQuery(context.Background(), block.ID(), Criteria{})
+		query, err := suite.provider.ExecutionResultQuery(block.ID(), Criteria{})
 		suite.Require().NoError(err)
 
 		suite.Assert().Subset(suite.provider.requiredENIdentifiers, query.ExecutionNodes.NodeIDs())

@@ -1,11 +1,11 @@
 package pipeline
 
 import (
-	"context"
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -16,8 +16,6 @@ import (
 const (
 	// minExecutionNodesCnt is the minimum number of execution nodes expected to have sent the execution receipt for a block
 	minExecutionNodesCnt = 2
-	// maxAttemptsForExecutionReceipt is the maximum number of attempts to find execution receipts for a given block ID
-	maxAttemptsForExecutionReceipt = 3
 	// maxNodesCnt is the maximum number of nodes that will be contacted to complete an API request.
 	maxNodesCnt = 3
 )
@@ -54,9 +52,9 @@ type ExecutionResultQueryProvider interface {
 	// Expected errors during normal operations:
 	//   - ErrNoENsFoundForExecutionResult - returned when no execution nodes were found that produced
 	//     the requested execution result and matches all operator's criteria.
-	//   - InsufficientExecutionReceipts - If no such execution node is found.
+	//   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 	//   - All other errors are potential indicators of bugs or corrupted internal state
-	ExecutionResultQuery(ctx context.Context, blockID flow.Identifier, criteria Criteria) (*Query, error)
+	ExecutionResultQuery(blockID flow.Identifier, criteria Criteria) (*Query, error)
 }
 
 // ErrNoENsFoundForExecutionResult is returned when no execution nodes were found that produced
@@ -77,7 +75,8 @@ type ExecutionResultQueryProviderImpl struct {
 	requiredENIdentifiers  flow.IdentifierList
 	agreeingExecutors      uint
 
-	rootBlockID flow.Identifier
+	rootBlockID     flow.Identifier
+	rootBlockResult *flow.ExecutionResult
 }
 
 // NewExecutionResultQueryProviderImpl creates and returns a new instance of
@@ -93,6 +92,8 @@ type ExecutionResultQueryProviderImpl struct {
 //   - requiredENIdentifiers: A flow.IdentifierList of required execution node identifiers that are
 //     always considered if available.
 //   - agreeingExecutors: The minimum number of receipts including the same ExecutionResult.
+//
+// No errors are expected during normal operations
 func NewExecutionResultQueryProviderImpl(
 	log zerolog.Logger,
 	state protocol.State,
@@ -100,7 +101,15 @@ func NewExecutionResultQueryProviderImpl(
 	preferredENIdentifiers flow.IdentifierList,
 	requiredENIdentifiers flow.IdentifierList,
 	agreeingExecutors uint,
-) *ExecutionResultQueryProviderImpl {
+) (*ExecutionResultQueryProviderImpl, error) {
+	// Root block ID and result should not change and could be cached.
+	rootBlock := state.Params().FinalizedRoot()
+	rootBlockID := rootBlock.ID()
+	rootBlockResult, _, err := state.AtBlockID(rootBlockID).SealedResult()
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve root block result: %w", err)
+	}
+
 	return &ExecutionResultQueryProviderImpl{
 		log:                    log.With().Str("module", "execution_result_query").Logger(),
 		executionReceipts:      executionReceipts,
@@ -108,20 +117,21 @@ func NewExecutionResultQueryProviderImpl(
 		preferredENIdentifiers: preferredENIdentifiers,
 		requiredENIdentifiers:  requiredENIdentifiers,
 		agreeingExecutors:      agreeingExecutors,
-		rootBlockID:            flow.ZeroID,
-	}
+		rootBlockID:            rootBlockID,
+		rootBlockResult:        rootBlockResult,
+	}, nil
 }
 
 // ExecutionResultQuery retrieves execution results and associated execution nodes for a given block ID
-// based on the provided criteria. It implements retry logic to handle cases where execution receipts
-// may not be immediately available and applies node selection based on preferences and requirements.
+// based on the provided criteria.
 //
 // Expected errors during normal operations:
 //   - ErrNoENsFoundForExecutionResult - returned when no execution nodes were found that produced
 //     the requested execution result and matches all operator's criteria
+//   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 //   - All other errors are potential indicators of bugs or corrupted internal state
-func (e *ExecutionResultQueryProviderImpl) ExecutionResultQuery(ctx context.Context, blockID flow.Identifier, criteria Criteria) (*Query, error) {
-	// if caller criteria does not set, the operators criteria should be used
+func (e *ExecutionResultQueryProviderImpl) ExecutionResultQuery(blockID flow.Identifier, criteria Criteria) (*Query, error) {
+	// if caller criteria are not set, the operator criteria should be used
 	if criteria.AgreeingExecutors == 0 {
 		criteria.AgreeingExecutors = e.agreeingExecutors
 	}
@@ -130,55 +140,23 @@ func (e *ExecutionResultQueryProviderImpl) ExecutionResultQuery(ctx context.Cont
 		criteria.RequiredExecutors = e.requiredENIdentifiers
 	}
 
-	// Root block ID should not change and could be cached.
-	if e.rootBlockID == flow.ZeroID {
-		rootBlock := e.state.Params().FinalizedRoot()
-		e.rootBlockID = rootBlock.ID()
-	}
-
 	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
 	// will not be present for the root block.
 	if e.rootBlockID == blockID {
 		return e.handleRootBlock(criteria)
 	}
 
-	var (
-		executorIDs flow.IdentifierList
-		execResult  *flow.ExecutionResult
-	)
-
-	// try to find at least minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
-	for attempt := 0; attempt < maxAttemptsForExecutionReceipt; attempt++ {
-		result, receipts, err := e.findResultAndReceipts(blockID, criteria)
-		if err != nil {
-			return nil, err
-		}
-
-		executorIDs = getExecutorIDs(receipts)
-		if len(executorIDs) >= minExecutionNodesCnt {
-			execResult = result
-			break
-		}
-
-		// log the attempt
-		e.log.Debug().Int("attempt", attempt).Int("max_attempt", maxAttemptsForExecutionReceipt).
-			Int("execution_receipts_found", len(executorIDs)).
-			Str("block_id", blockID.String()).
-			Msg("insufficient execution receipts")
-
-		// if one or less execution receipts may have been received then re-query
-		// in the hope that more might have been received by now
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(100 * time.Millisecond << time.Duration(attempt)):
-			// retry after an exponential backoff
-		}
+	execResult, receipts, err := e.findResultAndReceipts(blockID, criteria)
+	if err != nil {
+		return nil, err
 	}
 
-	// if less than minExecutionNodesCnt execution receipts have been received then return an error
-	if len(executorIDs) < minExecutionNodesCnt {
-		return nil, fmt.Errorf("failed to retreive minimum execution nodes for block ID %v", blockID)
+	executorIDs := getExecutorIDs(receipts)
+
+	executorsCount := len(executorIDs)
+	// if less than minExecutionNodesCnt execution receipts have been received, then return an error
+	if executorsCount < minExecutionNodesCnt {
+		return nil, backend.NewInsufficientExecutionReceipts(blockID, executorsCount)
 	}
 
 	subsetENs, err := e.chooseExecutionNodes(criteria.RequiredExecutors, executorIDs)
@@ -199,9 +177,8 @@ func (e *ExecutionResultQueryProviderImpl) ExecutionResultQuery(ctx context.Cont
 // handleRootBlock handles execution result queries for the root block.
 // Since root blocks don't have execution receipts, it returns all execution nodes
 // from the identity table filtered by the specified criteria and nil execution result.
-// Expected errors during normal operations:
-//   - ErrNoMatchingExecutionResult - when no execution result matching the criteria was found
-//   - All other errors are potential indicators of bugs or corrupted internal state
+//
+// No errors are expected during normal operations
 func (e *ExecutionResultQueryProviderImpl) handleRootBlock(criteria Criteria) (*Query, error) {
 	executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
@@ -214,12 +191,8 @@ func (e *ExecutionResultQueryProviderImpl) handleRootBlock(criteria Criteria) (*
 		return nil, fmt.Errorf("failed to choose execution nodes for root block ID %v: %w", e.rootBlockID, err)
 	}
 
-	if len(subsetENs) == 0 {
-		return nil, ErrNoENsFoundForExecutionResult
-	}
-
 	return &Query{
-		ExecutionResult: nil,
+		ExecutionResult: e.rootBlockResult,
 		ExecutionNodes:  subsetENs,
 	}, nil
 }
@@ -234,6 +207,7 @@ func (e *ExecutionResultQueryProviderImpl) findResultAndReceipts(
 	criteria Criteria,
 ) (*flow.ExecutionResult, flow.ExecutionReceiptList, error) {
 	// lookup the receipt's storage with the block ID
+	// Note: this will return an empty slice with no error if no receipts are found.
 	allReceipts, err := e.executionReceipts.ByBlockID(blockID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
@@ -285,7 +259,7 @@ func getExecutorIDs(recepts flow.ExecutionReceiptList) flow.IdentifierList {
 	receiptGroupedByExecutorID := recepts.GroupByExecutorID()
 
 	// collect all unique execution node ids from the receipts
-	executorIDs := flow.IdentifierList{}
+	executorIDs := make(flow.IdentifierList, 0, len(receiptGroupedByExecutorID))
 	for executorID := range receiptGroupedByExecutorID {
 		executorIDs = append(executorIDs, executorID)
 	}
