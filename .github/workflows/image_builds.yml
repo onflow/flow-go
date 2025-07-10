@@ -164,6 +164,7 @@ jobs:
           role: ${{ matrix.role }} 
           tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
 
+  promote-to-public-registry:
     # This job promotes container images for various roles from a private registry to a public registry.
     # It uses a matrix strategy to handle the promotion of images for different roles in parallel.
     # The environments defined for each role are used to gate the promotion process.
