@@ -309,42 +309,41 @@ func TestHeaderBodyBuilder_PresenceChecks(t *testing.T) {
 	validID := unittest.IdentifierFixture()
 	ts := time.Unix(1_600_000_000, 0)
 
-	// Define each setter, its field name, and its bit index in HeaderBodyFields.
+	// Each entry names the field and provides the setter to call.
 	setters := []struct {
-		name string
-		bit  int
-		fn   func(*flow.HeaderBodyBuilder)
+		field string
+		fn    func(*flow.HeaderBodyBuilder)
 	}{
-		{"ChainID", 0, func(b *flow.HeaderBodyBuilder) {
+		{"ChainID", func(b *flow.HeaderBodyBuilder) {
 			b.WithChainID("chain")
 		}},
-		{"ParentID", 1, func(b *flow.HeaderBodyBuilder) {
+		{"ParentID", func(b *flow.HeaderBodyBuilder) {
 			b.WithParentID(validID)
 		}},
-		{"Height", 2, func(b *flow.HeaderBodyBuilder) {
+		{"Height", func(b *flow.HeaderBodyBuilder) {
 			b.WithHeight(42)
 		}},
-		{"Timestamp", 3, func(b *flow.HeaderBodyBuilder) {
+		{"Timestamp", func(b *flow.HeaderBodyBuilder) {
 			b.WithTimestamp(ts)
 		}},
-		{"View", 4, func(b *flow.HeaderBodyBuilder) {
+		{"View", func(b *flow.HeaderBodyBuilder) {
 			b.WithView(7)
 		}},
-		{"ParentView", 5, func(b *flow.HeaderBodyBuilder) {
+		{"ParentView", func(b *flow.HeaderBodyBuilder) {
 			b.WithParentView(6)
 		}},
-		{"ParentVoterIndices", 6, func(b *flow.HeaderBodyBuilder) {
+		{"ParentVoterIndices", func(b *flow.HeaderBodyBuilder) {
 			b.WithParentVoterIndices(unittest.SignerIndicesFixture(4))
 		}},
-		{"ParentVoterSigData", 7, func(b *flow.HeaderBodyBuilder) {
+		{"ParentVoterSigData", func(b *flow.HeaderBodyBuilder) {
 			b.WithParentVoterSigData(unittest.QCSigDataFixture())
 		}},
-		{"ProposerID", 8, func(b *flow.HeaderBodyBuilder) {
+		{"ProposerID", func(b *flow.HeaderBodyBuilder) {
 			b.WithProposerID(validID)
 		}},
 	}
 
-	// 1) Valid builder: all setters called -> no error.
+	// When all setters are called, Build should succeed.
 	t.Run("all setters present", func(t *testing.T) {
 		b := flow.NewHeaderBodyBuilder()
 		for _, s := range setters {
@@ -355,13 +354,13 @@ func TestHeaderBodyBuilder_PresenceChecks(t *testing.T) {
 		assert.NotNil(t, hb)
 	})
 
-	// 2) Missing each individual setter -> error naming the correct bit index.
+	// Omitting each setter in turn should produce an error mentioning that field.
 	for _, s := range setters {
-		t.Run(fmt.Sprintf("missing %s", s.name), func(t *testing.T) {
+		t.Run(fmt.Sprintf("missing %s", s.field), func(t *testing.T) {
 			b := flow.NewHeaderBodyBuilder()
 			// call every setter except the one we're omitting
 			for _, other := range setters {
-				if other.bit == s.bit {
+				if other.field == s.field {
 					continue
 				}
 				other.fn(b)
@@ -369,7 +368,7 @@ func TestHeaderBodyBuilder_PresenceChecks(t *testing.T) {
 			hb, err := b.Build()
 			assert.Error(t, err)
 			assert.Nil(t, hb)
-			assert.Contains(t, err.Error(), fmt.Sprintf("bit index %d", s.bit))
+			assert.Contains(t, err.Error(), s.field)
 		})
 	}
 }

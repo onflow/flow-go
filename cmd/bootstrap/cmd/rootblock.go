@@ -220,7 +220,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	clusterQCs := run.ConstructRootQCsForClusters(log, clusters, internalNodes, clusterBlocks)
 	log.Info().Msg("")
 
-	log.Info().Msg("constructing root header body")
+	log.Info().Msg("constructing root header")
 	headerBody, err := constructRootHeaderBody(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to construct root header")
