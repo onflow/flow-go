@@ -91,7 +91,7 @@ func NewHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 		)
 	}
 
-	// 3) Now that we know it’s “normal” (has a QC), enforce block semantics:
+	// Now that we know it’s non-root (has a QC), enforce block semantics:
 	if untrusted.Height == 0 {
 		return nil, fmt.Errorf("Height must be > 0 for non-root header")
 	}
@@ -128,14 +128,23 @@ func NewRootHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 	if untrusted.ChainID == "" {
 		return nil, fmt.Errorf("ChainID of root header body must not be empty")
 	}
+
+	// reject if any parent-QC field is set
+	if untrusted.ParentID != ZeroID ||
+		len(untrusted.ParentVoterIndices) != 0 ||
+		len(untrusted.ParentVoterSigData) != 0 ||
+		untrusted.ProposerID != ZeroID {
+		return nil, fmt.Errorf(
+			"root header body must not contain any parent QC fields",
+		)
+	}
+
 	if untrusted.ParentView != 0 {
 		return nil, fmt.Errorf("ParentView of root header body must be zero")
 	}
-	if len(untrusted.ParentVoterIndices) != 0 {
-		return nil, fmt.Errorf("ParentVoterIndices of root header body must be empty")
-	}
-	if len(untrusted.ParentVoterSigData) != 0 {
-		return nil, fmt.Errorf("ParentVoterSigData of root header body must be empty")
+
+	if untrusted.Timestamp.IsZero() {
+		return nil, fmt.Errorf("Timestamp of root header body must not be zero")
 	}
 
 	return &HeaderBody{
