@@ -2,19 +2,19 @@ package executor
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
 type ScriptExecutor interface {
-	Execute(ctx context.Context, scriptRequest *ScriptExecutionRequest) ([]byte, time.Duration, error)
+	Execute(ctx context.Context, scriptRequest *Request) ([]byte, time.Duration, error)
 }
 
-// ScriptExecutionRequest encapsulates the data needed to execute a script to make it easier
+// Request encapsulates the data needed to execute a script to make it easier
 // to pass around between the various methods involved in script execution
-type ScriptExecutionRequest struct {
+type Request struct {
 	blockID            flow.Identifier
 	height             uint64
 	script             []byte
@@ -27,8 +27,8 @@ func NewScriptExecutionRequest(
 	height uint64,
 	script []byte,
 	arguments [][]byte,
-) *ScriptExecutionRequest {
-	return &ScriptExecutionRequest{
+) *Request {
+	return &Request{
 		blockID:   blockID,
 		height:    height,
 		script:    script,

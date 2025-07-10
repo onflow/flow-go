@@ -15,23 +15,23 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-type Local struct {
-	log zerolog.Logger
-	metrics        module.BackendScriptsMetrics
+type LocalScriptExecutor struct {
+	log     zerolog.Logger
+	metrics module.BackendScriptsMetrics
 
 	scriptExecutor execution.ScriptExecutor
-	scriptCache *LoggedScriptCache
+	scriptCache    *LoggedScriptCache
 }
 
-var _ ScriptExecutor = (*Local)(nil)
+var _ ScriptExecutor = (*LocalScriptExecutor)(nil)
 
-func NewLocalExecutor(
+func NewLocalScriptExecutor(
 	log zerolog.Logger,
 	metrics module.BackendScriptsMetrics,
 	executor execution.ScriptExecutor,
 	scriptCache *LoggedScriptCache,
-	) *Local {
-	return &Local{
+) *LocalScriptExecutor {
+	return &LocalScriptExecutor{
 		log:            zerolog.New(log).With().Str("script_executor", "local").Logger(),
 		metrics:        metrics,
 		scriptCache:    scriptCache,
@@ -39,7 +39,7 @@ func NewLocalExecutor(
 	}
 }
 
-func (l *Local) Execute(ctx context.Context, r *ScriptExecutionRequest) ([]byte, time.Duration, error) {
+func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request) ([]byte, time.Duration, error) {
 	execStartTime := time.Now()
 
 	result, err := l.scriptExecutor.ExecuteAtBlockHeight(ctx, r.script, r.arguments, r.height)

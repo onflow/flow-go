@@ -18,7 +18,9 @@ import (
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 
 	access "github.com/onflow/flow-go/engine/access/mock"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
@@ -96,17 +98,17 @@ func (s *BackendScriptsSuite) SetupTest() {
 	s.failingScript = []byte("access(all) fun main() { panic(\"!!\") }")
 }
 
-func (s *BackendScriptsSuite) defaultBackend(executor execution.ScriptExecutor, mode backend.IndexQueryMode) *Scripts {
-	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](backend.DefaultLoggedScriptsCacheSize)
+func (s *BackendScriptsSuite) defaultBackend(executor execution.ScriptExecutor, mode query_mode.IndexQueryMode) *Scripts {
+	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](common.DefaultLoggedScriptsCacheSize)
 	s.Require().NoError(err)
 
-	scripts, err := NewScripts(
+	scripts, err := NewScriptsBackend(
 		s.log,
 		metrics.NewNoopCollector(),
 		s.headers,
 		s.state,
 		s.connectionFactory,
-		backend.NewNodeCommunicator(false),
+		node_communicator.NewNodeCommunicator(false),
 		executor,
 		mode,
 		commonrpc.NewExecutionNodeIdentitiesProvider(
@@ -174,7 +176,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
 	s.setupExecutionNodes(s.block)
 	s.setupENSuccessResponse(s.block.ID())
 
-	scripts := s.defaultBackend(execmock.NewScriptExecutor(s.T()), backend.IndexQueryModeExecutionNodesOnly)
+	scripts := s.defaultBackend(execmock.NewScriptExecutor(s.T()), query_mode.IndexQueryModeExecutionNodesOnly)
 
 	s.Run("GetAccount", func() {
 		s.testExecuteScriptAtLatestBlock(ctx, scripts, codes.OK)
@@ -201,7 +203,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
 	s.setupExecutionNodes(s.block)
 	s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-	scripts := s.defaultBackend(execmock.NewScriptExecutor(s.T()), backend.IndexQueryModeExecutionNodesOnly)
+	scripts := s.defaultBackend(execmock.NewScriptExecutor(s.T()), query_mode.IndexQueryModeExecutionNodesOnly)
 
 	s.Run("GetAccount", func() {
 		s.testExecuteScriptAtLatestBlock(ctx, scripts, statusCode)
@@ -225,7 +227,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
 	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Header.Height).
 		Return(expectedResponse, nil)
 
-	scripts := s.defaultBackend(scriptExecutor, backend.IndexQueryModeLocalOnly)
+	scripts := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeLocalOnly)
 
 	s.Run("GetAccount - happy path", func() {
 		s.testExecuteScriptAtLatestBlock(ctx, scripts, codes.OK)
@@ -246,7 +248,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scripts := s.defaultBackend(scriptExecutor, backend.IndexQueryModeLocalOnly)
+	scripts := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeLocalOnly)
 
 	testCases := []struct {
 		err        error
@@ -310,7 +312,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 	s.setupENSuccessResponse(s.block.ID())
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scripts := s.defaultBackend(scriptExecutor, backend.IndexQueryModeFailover)
+	scripts := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeFailover)
 
 	for _, errToReturn := range errors {
 		// configure local script executor to fail
@@ -338,7 +340,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCod
 
 	// configure local script executor to fail
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scripts := s.defaultBackend(scriptExecutor, backend.IndexQueryModeFailover)
+	scripts := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeFailover)
 
 	testCases := []struct {
 		err        error
@@ -391,7 +393,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, s.block.Header.Height).
 		Return(nil, storage.ErrHeightNotIndexed)
 
-	scripts := s.defaultBackend(scriptExecutor, backend.IndexQueryModeFailover)
+	scripts := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeFailover)
 
 	s.Run("ExecuteScriptAtLatestBlock", func() {
 		s.testExecuteScriptAtLatestBlock(ctx, scripts, statusCode)
@@ -410,7 +412,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 // inconsistent
 func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_InconsistentState() {
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scripts := s.defaultBackend(scriptExecutor, backend.IndexQueryModeLocalOnly)
+	scripts := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeLocalOnly)
 
 	s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - fails with %v", "inconsistent node's state"), func() {
 		s.state.On("Sealed").Return(s.snapshot, nil)

@@ -10,7 +10,7 @@ import (
 
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
@@ -21,28 +21,28 @@ import (
 // uniqueScriptLoggingTimeWindow is the duration for checking the uniqueness of scripts sent for execution
 const uniqueScriptLoggingTimeWindow = 10 * time.Minute
 
-type ExecutionNode struct {
+type ENScriptExecutor struct {
 	log     zerolog.Logger
 	metrics module.BackendScriptsMetrics //TODO: move this metrics to scriptCache struct?
 
 	nodeProvider     *commonrpc.ExecutionNodeIdentitiesProvider
-	nodeCommunicator backend.Communicator
+	nodeCommunicator node_communicator.Communicator
 	connFactory      connection.ConnectionFactory
 
 	scriptCache *LoggedScriptCache
 }
 
-var _ ScriptExecutor = (*ExecutionNode)(nil)
+var _ ScriptExecutor = (*ENScriptExecutor)(nil)
 
-func NewExecutionNodeExecutor(
+func NewENScriptExecutor(
 	log zerolog.Logger,
 	metrics module.BackendScriptsMetrics,
 	nodeProvider *commonrpc.ExecutionNodeIdentitiesProvider,
-	nodeCommunicator backend.Communicator,
+	nodeCommunicator node_communicator.Communicator,
 	connFactory connection.ConnectionFactory,
 	scriptCache *LoggedScriptCache,
-) *ExecutionNode {
-	return &ExecutionNode{
+) *ENScriptExecutor {
+	return &ENScriptExecutor{
 		log:              zerolog.New(log).With().Str("script_executor", "execution_node").Logger(),
 		metrics:          metrics,
 		nodeProvider:     nodeProvider,
@@ -52,7 +52,7 @@ func NewExecutionNodeExecutor(
 	}
 }
 
-func (e *ExecutionNode) Execute(ctx context.Context, request *ScriptExecutionRequest) ([]byte, time.Duration, error) {
+func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byte, time.Duration, error) {
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
 	executors, err := e.nodeProvider.ExecutionNodesForBlockID(ctx, request.blockID)
 	if err != nil {
@@ -106,10 +106,10 @@ func (e *ExecutionNode) Execute(ctx context.Context, request *ScriptExecutionReq
 }
 
 // tryExecuteScriptOnExecutionNode attempts to execute the script on the given execution node.
-func (e *ExecutionNode) tryExecuteScriptOnExecutionNode(
+func (e *ENScriptExecutor) tryExecuteScriptOnExecutionNode(
 	ctx context.Context,
 	executorAddress string,
-	r *ScriptExecutionRequest,
+	r *Request,
 ) ([]byte, error) {
 	execRPCClient, closer, err := e.connFactory.GetExecutionAPIClient(executorAddress)
 	if err != nil {
