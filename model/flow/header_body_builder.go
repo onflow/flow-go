@@ -26,7 +26,7 @@ const (
 
 // HeaderBodyBuilder constructs a validated, immutable HeaderBody in two phases:
 // first by setting individual fields using fluent WithX methods, then by calling Build()
-// to perform centralized validation and return the final HeaderBody.
+// to perform minimal validity and sanity checks and return the final [HeaderBody].
 type HeaderBodyBuilder struct {
 	u       UntrustedHeaderBody
 	present []byte

@@ -106,18 +106,7 @@ func NewHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 		return nil, fmt.Errorf("Timestamp must not be zero-value")
 	}
 
-	return &HeaderBody{
-		ChainID:            untrusted.ChainID,
-		ParentID:           untrusted.ParentID,
-		Height:             untrusted.Height,
-		Timestamp:          untrusted.Timestamp,
-		View:               untrusted.View,
-		ParentView:         untrusted.ParentView,
-		ParentVoterIndices: untrusted.ParentVoterIndices,
-		ParentVoterSigData: untrusted.ParentVoterSigData,
-		ProposerID:         untrusted.ProposerID,
-		LastViewTC:         untrusted.LastViewTC,
-	}, nil
+	return &hb, nil
 }
 
 // NewRootHeaderBody creates a new instance of root HeaderBody.
@@ -142,18 +131,8 @@ func NewRootHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 		return nil, fmt.Errorf("Timestamp of root header body must not be zero")
 	}
 
-	return &HeaderBody{
-		ChainID:            untrusted.ChainID,
-		ParentID:           untrusted.ParentID,
-		Height:             untrusted.Height,
-		Timestamp:          untrusted.Timestamp,
-		View:               untrusted.View,
-		ParentView:         untrusted.ParentView,
-		ParentVoterIndices: untrusted.ParentVoterIndices,
-		ParentVoterSigData: untrusted.ParentVoterSigData,
-		ProposerID:         untrusted.ProposerID,
-		LastViewTC:         untrusted.LastViewTC,
-	}, nil
+	hb := HeaderBody(untrusted)
+	return &hb, nil
 }
 
 // QuorumCertificate returns quorum certificate [QC] that is incorporated in the block header body.
@@ -306,8 +285,6 @@ func (h Header) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON makes sure the timestamp is decoded in UTC.
 //
-// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
-//
 //nolint:structwrite
 func (h *Header) UnmarshalJSON(data []byte) error {
 
@@ -328,15 +305,13 @@ func (h *Header) UnmarshalJSON(data []byte) error {
 
 // MarshalCBOR makes sure the timestamp is encoded in UTC.
 //
-// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
-//
 //nolint:structwrite
 func (h Header) MarshalCBOR() ([]byte, error) {
 
 	// NOTE: this is just a sanity check to make sure that we don't get
 	// different encodings if someone forgets to use UTC timestamps
 	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC() //nolint:structwrite
+		h.Timestamp = h.Timestamp.UTC()
 	}
 
 	// we use an alias to avoid endless recursion; the alias will not have the
@@ -346,8 +321,6 @@ func (h Header) MarshalCBOR() ([]byte, error) {
 }
 
 // UnmarshalCBOR makes sure the timestamp is decoded in UTC.
-//
-// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
 //
 //nolint:structwrite
 func (h *Header) UnmarshalCBOR(data []byte) error {
@@ -373,8 +346,6 @@ func (h *Header) UnmarshalCBOR(data []byte) error {
 
 // MarshalMsgpack makes sure the timestamp is encoded in UTC.
 //
-// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
-//
 //nolint:structwrite
 func (h Header) MarshalMsgpack() ([]byte, error) {
 
@@ -391,8 +362,6 @@ func (h Header) MarshalMsgpack() ([]byte, error) {
 }
 
 // UnmarshalMsgpack makes sure the timestamp is decoded in UTC.
-//
-// TODO(malleability): remove when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
 //
 //nolint:structwrite
 func (h *Header) UnmarshalMsgpack(data []byte) error {
