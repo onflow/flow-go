@@ -24,6 +24,32 @@ const (
 	numHeaderBodyFields // always keep this last
 )
 
+// String returns the name of the field corresponding to this bit index.
+func (f headerBodyFieldBitIndex) String() string {
+	switch f {
+	case chainIDFieldBitIndex:
+		return "ChainID"
+	case parentIDFieldBitIndex:
+		return "ParentID"
+	case heightFieldBitIndex:
+		return "Height"
+	case timestampFieldBitIndex:
+		return "Timestamp"
+	case viewFieldBitIndex:
+		return "View"
+	case parentViewFieldBitIndex:
+		return "ParentView"
+	case parentVoterIndicesFieldBitIndex:
+		return "ParentVoterIndices"
+	case parentVoterSigDataFieldBitIndex:
+		return "ParentVoterSigData"
+	case proposerIDFieldBitIndex:
+		return "ProposerID"
+	default:
+		return fmt.Sprintf("UnknownField(%d)", int(f))
+	}
+}
+
 // HeaderBodyBuilder constructs a validated, immutable HeaderBody in two phases:
 // first by setting individual fields using fluent WithX methods, then by calling Build()
 // to perform minimal validity and sanity checks and return the final [HeaderBody].
@@ -45,7 +71,7 @@ func (b *HeaderBodyBuilder) Build() (*HeaderBody, error) {
 	// make sure every required field was initialized
 	for bit := 0; bit < int(numHeaderBodyFields); bit++ {
 		if bitutils.ReadBit(b.present, bit) == 0 {
-			return nil, fmt.Errorf("HeaderBodyBuilder: missing field at bit index %d", bit)
+			return nil, fmt.Errorf("HeaderBodyBuilder: missing field %s", headerBodyFieldBitIndex(bit))
 		}
 	}
 
