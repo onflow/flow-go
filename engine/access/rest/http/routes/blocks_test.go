@@ -34,7 +34,8 @@ func prepareTestVectors(t *testing.T,
 	heights []string,
 	blocks []*flow.Block,
 	executionResults []*flow.ExecutionResult,
-	blkCnt int) []testVector {
+	blkCnt int,
+) []testVector {
 
 	singleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], true, flow.BlockStatusUnknown)
 	singleSealedBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], true, flow.BlockStatusSealed)
@@ -51,7 +52,7 @@ func prepareTestVectors(t *testing.T,
 	invalidID := unittest.IdentifierFixture().String()
 	invalidHeight := fmt.Sprintf("%d", blkCnt+1)
 
-	maxIDs := flow.IdentifierList(unittest.IdentifierListFixture(request.MaxBlockRequestHeightRange + 1))
+	maxIDs := unittest.IdentifierListFixture(request.MaxBlockRequestHeightRange + 1)
 
 	testVectors := []testVector{
 		{

@@ -2,10 +2,10 @@ package backend
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -15,84 +15,98 @@ type backendBlockHeaders struct {
 	state   protocol.State
 }
 
-func (b *backendBlockHeaders) GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error) {
-	var header *flow.Header
-	var err error
-
+// GetLatestBlockHeader returns the latest block header in the chain.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+func (b *backendBlockHeaders) GetLatestBlockHeader(
+	ctx context.Context,
+	isSealed bool,
+) (*flow.Header, flow.BlockStatus, error) {
 	if isSealed {
-		// get the latest seal header from storage
-		header, err = b.state.Sealed().Head()
+		header, err := b.state.Sealed().Head()
 		if err != nil {
-			err = irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+			// sealed header must exist in the db, otherwise the node's state may be corrupt
+			err = fmt.Errorf("failed to lookup latest sealed header: %w", err)
+			return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 		}
-	} else {
-		// get the finalized header from state
-		header, err = b.state.Final().Head()
-		if err != nil {
-			err = irrecoverable.NewExceptionf("failed to lookup final header: %w", err)
-		}
+		return header, flow.BlockStatusSealed, nil
 	}
 
+	header, err := b.state.Final().Head()
 	if err != nil {
-		// node should always have the latest block
-		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
-		// we should halt processing requests, but do throw an exception which might cause a crash:
-		// - It is unsafe to process requests if we have an internally bad state.
-		// - We would like to avoid throwing an exception as a result of an Access API request by policy
-		//   because this can cause DOS potential
-		// - Since the protocol state is widely shared, we assume that in practice another component will
-		//   observe the protocol state error and throw an exception.
-		irrecoverable.Throw(ctx, err)
-		return nil, flow.BlockStatusUnknown, err
+		// finalized header must exist in the db, otherwise the node's state may be corrupt
+		err = fmt.Errorf("failed to find latest finalized header: %w", err)
+		return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 	}
-
-	stat, err := b.getBlockStatus(ctx, header)
-	if err != nil {
-		return nil, stat, err
-	}
-	return header, stat, nil
+	return header, flow.BlockStatusFinalized, nil
 }
 
-func (b *backendBlockHeaders) GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error) {
+// GetBlockHeaderByID returns the block header with the given ID.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
+// Expected errors:
+//   - access.DataNotFoundError - No header with the given ID was found
+func (b *backendBlockHeaders) GetBlockHeaderByID(
+	ctx context.Context,
+	id flow.Identifier,
+) (*flow.Header, flow.BlockStatus, error) {
 	header, err := b.headers.ByBlockID(id)
 	if err != nil {
-		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = fmt.Errorf("failed to find header by ID: %w", err)
+		return nil, flow.BlockStatusUnknown, access.NewDataNotFoundError("header", err)
 	}
 
-	stat, err := b.getBlockStatus(ctx, header)
+	stat, err := b.getBlockStatus(header)
 	if err != nil {
-		return nil, stat, err
+		return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 	}
 	return header, stat, nil
 }
 
-func (b *backendBlockHeaders) GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, flow.BlockStatus, error) {
+// GetBlockHeaderByHeight returns the block header at the given height.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
+// Expected errors:
+//   - access.DataNotFoundError - No header with the given height was found
+func (b *backendBlockHeaders) GetBlockHeaderByHeight(
+	ctx context.Context,
+	height uint64,
+) (*flow.Header, flow.BlockStatus, error) {
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), height, err))
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = resolveHeightError(b.state.Params(), height, err)
+		err = fmt.Errorf("failed to find header by height: %w", err)
+		return nil, flow.BlockStatusUnknown, access.NewDataNotFoundError("header", err)
 	}
 
-	stat, err := b.getBlockStatus(ctx, header)
+	stat, err := b.getBlockStatus(header)
 	if err != nil {
-		return nil, stat, err
+		return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 	}
 	return header, stat, nil
 }
 
+// getBlockStatus returns the status of the block
+//
 // No errors are expected during normal operations.
-func (b *backendBlockHeaders) getBlockStatus(ctx context.Context, header *flow.Header) (flow.BlockStatus, error) {
+func (b *backendBlockHeaders) getBlockStatus(header *flow.Header) (flow.BlockStatus, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
-		// we should halt processing requests, but do throw an exception which might cause a crash:
-		// - It is unsafe to process requests if we have an internally bad State.
-		// - We would like to avoid throwing an exception as a result of an Access API request by policy
-		//   because this can cause DOS potential
-		// - Since the protocol state is widely shared, we assume that in practice another component will
-		//   observe the protocol state error and throw an exception.
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return flow.BlockStatusUnknown, err
+		// sealed header must exist in the db, otherwise the node's state may be corrupt
+		return flow.BlockStatusUnknown, fmt.Errorf("failed to lookup latest sealed header: %w", err)
 	}
 
 	if header.Height > sealed.Height {

@@ -14,18 +14,14 @@ import (
 //
 // CAUTION: SIMPLIFIED ERROR HANDLING
 //   - All endpoints must only return an access.accessSentinel error or nil.
-//   - All errors returned by this API are guaranteed to be benign. The node can continue normal
-//     operations after such errors.
-//   - To prevent delivering incorrect results to clients, in case of an error, all other return
-//     values should be discarded.
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients, in case of an error, all other return values should be discarded.
 type API interface {
 	// Ping responds to requests when the server is up.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	//   - All errors returned are guaranteed to be benign. The node can continue normal operations
-	//     after such errors.
-	//   - To prevent delivering incorrect results to clients in case of an error, all other return
-	//     values should be discarded.
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
 	// - access.ServiceUnavailable if the configured static collection node does not respond to ping.
@@ -37,27 +33,69 @@ type API interface {
 	// GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	//   - All errors returned are guaranteed to be benign. The node can continue normal operations
-	//     after such errors.
-	//   - To prevent delivering incorrect results to clients in case of an error, all other return
-	//     values should be discarded.
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	GetNodeVersionInfo(ctx context.Context) (*accessmodel.NodeVersionInfo, error)
 
+	// GetLatestBlockHeader returns the latest block header in the chain.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error)
+
+	// GetBlockHeaderByHeight returns the block header at the given height.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected errors:
+	//   - access.DataNotFoundError - No header with the given height was found
 	GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, flow.BlockStatus, error)
+
+	// GetBlockHeaderByID returns the block header with the given ID.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected errors:
+	//   - access.DataNotFoundError - No header with the given ID was found
 	GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error)
 
+	// GetLatestBlock returns the latest block in the chain.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block, flow.BlockStatus, error)
+
+	// GetBlockByHeight returns the block at the given height.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected errors:
+	//   - access.DataNotFoundError - No block with the given height was found
 	GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block, flow.BlockStatus, error)
+
+	// GetBlockByID returns the block with the given ID.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected errors:
+	//   - access.DataNotFoundError - No block with the given ID was found
 	GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error)
 
 	// GetCollectionByID returns a light collection by its ID.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	//   - All errors returned are guaranteed to be benign. The node can continue normal operations
-	//     after such errors.
-	//   - To prevent delivering incorrect results to clients in case of an error, all other return
-	//     values should be discarded.
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
 	// - access.DataNotFoundError if the collection is not found.
@@ -67,10 +105,8 @@ type API interface {
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
 	// As documented in the [access.API], which we partially implement with this function
-	//   - All errors returned are guaranteed to be benign. The node can continue normal operations
-	//     after such errors.
-	//   - To prevent delivering incorrect results to clients in case of an error, all other return
-	//     values should be discarded.
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
 	// - access.DataNotFoundError if the collection is not found.
@@ -107,20 +143,16 @@ type API interface {
 	// GetLatestProtocolStateSnapshot returns the latest finalized snapshot.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	//   - All errors returned are guaranteed to be benign. The node can continue normal operations
-	//     after such errors.
-	//   - To prevent delivering incorrect results to clients in case of an error, all other return
-	//     values should be discarded.
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, error)
 
 	// GetProtocolStateSnapshotByBlockID returns serializable Snapshot for a block, by blockID.
 	// The requested block must be finalized, otherwise an error is returned.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	//   - All errors returned are guaranteed to be benign. The node can continue normal operations
-	//     after such errors.
-	//   - To prevent delivering incorrect results to clients in case of an error, all other return
-	//     values should be discarded.
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
 	//   - access.DataNotFoundError - No block with the given ID was found
@@ -132,10 +164,8 @@ type API interface {
 	// The block must be finalized (otherwise the by-height query is ambiguous).
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	//   - All errors returned are guaranteed to be benign. The node can continue normal operations
-	//     after such errors.
-	//   - To prevent delivering incorrect results to clients in case of an error, all other return
-	//     values should be discarded.
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
 	//   - access.DataNotFoundError - No finalized block with the given height was found.
@@ -144,9 +174,8 @@ type API interface {
 	// GetExecutionResultForBlockID gets an execution result by its block ID.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	// As documented in the [access.API], which we partially implement with this function
-	//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
-	//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
 	//   - access.DataNotFoundError - No execution result with the given block ID was found
@@ -155,9 +184,8 @@ type API interface {
 	// GetExecutionResultByID gets an execution result by its ID.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	// As documented in the [access.API], which we partially implement with this function
-	//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
-	//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
 	//   - access.DataNotFoundError - No execution result with the given ID was found
