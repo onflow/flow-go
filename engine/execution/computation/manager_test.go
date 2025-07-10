@@ -796,8 +796,9 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 
 	block := flow.NewBlock(
 		flow.HeaderBody{
-			ChainID: flow.Emulator,
-			View:    26,
+			ChainID:   flow.Emulator,
+			View:      26,
+			Timestamp: time.Now(),
 		},
 		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
