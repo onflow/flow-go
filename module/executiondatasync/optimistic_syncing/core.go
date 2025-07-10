@@ -149,7 +149,6 @@ func NewCoreImpl(
 		stores.NewCollectionsStore(inmemCollections, persistentCollections),
 		stores.NewTransactionsStore(inmemTransactions, persistentTransactions),
 		stores.NewTxResultErrMsgStore(inmemTxResultErrMsgs, persistentTxResultErrMsg, executionResult.BlockID),
-		stores.NewLatestSealedResultStore(latestPersistedSealedResult, executionResult.ID(), header.Height),
 	}
 
 	blockPersister := persisters.NewBlockPersister(
@@ -158,6 +157,7 @@ func NewCoreImpl(
 		executionResult,
 		header,
 		persisterStores,
+		latestPersistedSealedResult,
 	)
 
 	registerPersister := persisters.NewRegistersPersister(inmemRegisters, persistentRegisters, header.Height)

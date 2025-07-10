@@ -30,12 +30,16 @@ func NewBlockPersister(
 	executionResult *flow.ExecutionResult,
 	header *flow.Header,
 	persisterStores []stores.PersisterStore,
+	latestPersistedSealedResult storage.LatestPersistedSealedResult,
 ) *BlockPersister {
 	log = log.With().
 		Str("component", "block_persister").
 		Hex("block_id", logging.ID(executionResult.BlockID)).
 		Uint64("height", header.Height).
 		Logger()
+
+	// LatestSealedResultStore is explicitly created and added as the last element of the collection so that its persisting method is invoked last.
+	persisterStores = append(persisterStores, stores.NewLatestSealedResultStore(latestPersistedSealedResult, executionResult.ID(), header.Height))
 
 	persister := &BlockPersister{
 		log:             log,
@@ -64,6 +68,7 @@ func (p *BlockPersister) Persist() error {
 				return err
 			}
 		}
+
 		return nil
 	})
 

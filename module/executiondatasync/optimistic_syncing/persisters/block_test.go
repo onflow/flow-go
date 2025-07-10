@@ -82,8 +82,8 @@ func (p *PersisterSuite) SetupTest() {
 			stores.NewCollectionsStore(p.inMemoryCollections, p.collections),
 			stores.NewTransactionsStore(p.inMemoryTransactions, p.transactions),
 			stores.NewTxResultErrMsgStore(p.inMemoryTxResultErrMsg, p.txResultErrMsg, p.executionResult.BlockID),
-			stores.NewLatestSealedResultStore(p.latestPersistedSealedResult, p.executionResult.ID(), p.header.Height),
 		},
+		p.latestPersistedSealedResult,
 	)
 }
 
