@@ -59,7 +59,7 @@ func (bb *BlockBuilder) GenesisBlock() *model.CertifiedBlock {
 // AddVersioned adds a block with the given qcView and blockView.
 // In addition, the version identifier of the QC embedded within the block
 // is specified by `qcVersion`. The version identifier for the block itself
-// (primarily for emulating different payloads) is specified by `blockVersion`.
+// (primarily for emulating different block ID) is specified by `blockVersion`.
 // [(◄3) 4] denotes a block of view 4, with a qc for view 3
 // [(◄3) 4'] denotes a block of view 4 that is different than [(◄3) 4], with a qc for view 3
 // [(◄3) 4'] can be created by AddVersioned(3, 4, 0, 1)
@@ -105,7 +105,7 @@ func (bb *BlockBuilder) Proposals() ([]*model.Proposal, error) {
 			},
 			LastViewTC: lastViewTC,
 		}
-		proposal.Block.BlockID = makeBlockID(proposal.Block)
+		proposal.Block.BlockID = makeBlockID(proposal.Block, bv.BlockVersion)
 
 		blocks = append(blocks, proposal)
 
@@ -131,13 +131,15 @@ func (bb *BlockBuilder) Blocks() ([]*model.Block, error) {
 	return toBlocks(proposals), nil
 }
 
-func makeBlockID(block *model.Block) flow.Identifier {
+func makeBlockID(block *model.Block, blockVersion int) flow.Identifier {
 	return flow.MakeID(struct {
-		View uint64
-		QC   *flow.QuorumCertificate
+		View         uint64
+		QC           *flow.QuorumCertificate
+		BlockVersion uint64
 	}{
-		View: block.View,
-		QC:   block.QC,
+		View:         block.View,
+		QC:           block.QC,
+		BlockVersion: uint64(blockVersion),
 	})
 }
 
@@ -146,7 +148,7 @@ func makeGenesis() *model.CertifiedBlock {
 	genesis := &model.Block{
 		View: 1,
 	}
-	genesis.BlockID = makeBlockID(genesis)
+	genesis.BlockID = makeBlockID(genesis, 0)
 
 	genesisQC := &flow.QuorumCertificate{
 		View:    1,
