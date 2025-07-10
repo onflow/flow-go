@@ -192,7 +192,7 @@ jobs:
           gcp_credentials: ${{ secrets.PUBLIC_REGISTRY_PROMOTION_SECRET }}
           private_registry: ${{ vars.PRIVATE_REGISTRY }}
           private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
-          public_registry: ${{ vars.PUBLIC_REGISTRY }}
+          promotion_registry: ${{ vars.PUBLIC_REGISTRY }}
           role: ${{ matrix.role }} 
           tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
 
