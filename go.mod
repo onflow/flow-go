@@ -105,7 +105,7 @@ require (
 	github.com/ipfs/boxo v0.17.1-0.20240131173518-89bceff34bf1
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.4
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.7.1
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.7.2-0.20250709233039-527470109893
 	github.com/onflow/flow-evm-bridge v0.1.0
 	github.com/onflow/go-ethereum v1.15.10
 	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0
