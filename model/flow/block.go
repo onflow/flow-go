@@ -104,9 +104,15 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 		return nil, fmt.Errorf("invalid root header body: %w", err)
 	}
 
+	// validate payload
+	payload, err := NewPayload(UntrustedPayload(untrusted.Payload))
+	if err != nil {
+		return nil, fmt.Errorf("invalid payload: %w", err)
+	}
+
 	return &Block{
 		Header:  *rootHeaderBody,
-		Payload: untrusted.Payload,
+		Payload: *payload,
 	}, nil
 }
 
