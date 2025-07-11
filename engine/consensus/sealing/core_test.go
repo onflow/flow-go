@@ -680,10 +680,14 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 
 	rootSnapshot := unittest.StateSnapshotForKnownBlock(s.finalizedRootHeader, nil)
 	s.Snapshots[s.finalizedRootHeader.ID()] = rootSnapshot
-	block := &flow.Block{
-		Header:  s.finalizedRootHeader.HeaderBody,
-		Payload: flow.Payload{},
-	}
+	block, err := flow.NewBlock(
+		flow.UntrustedBlock{
+			Header:  s.finalizedRootHeader.HeaderBody,
+			Payload: unittest.PayloadFixture(),
+		},
+	)
+	require.NoError(s.T(), err)
+
 	rootSnapshot.On("SealingSegment").Return(
 		&flow.SealingSegment{Blocks: []*flow.Proposal{
 			{

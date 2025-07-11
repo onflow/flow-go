@@ -1348,10 +1348,7 @@ func (suite *Suite) createChain() (*flow.Proposal, *flow.Collection) {
 	}
 	block := unittest.BlockWithParentAndPayload(
 		suite.finalizedBlock,
-		unittest.PayloadFixture(
-			unittest.WithGuarantees(guarantee),
-			unittest.WithProtocolStateID(unittest.IdentifierFixture()),
-		),
+		unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
 	)
 	proposal := unittest.ProposalFromBlock(block)
 

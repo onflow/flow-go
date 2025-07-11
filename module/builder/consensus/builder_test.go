@@ -274,6 +274,7 @@ func (bs *BuilderSuite) SetupTest() {
 			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
 			WithParentVoterSigData(unittest.QCSigDataFixture()).
 			WithProposerID(unittest.IdentifierFixture())
+
 		return nil
 	}
 	bs.sign = func(_ *flow.Header) ([]byte, error) {
