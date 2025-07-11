@@ -46,45 +46,41 @@ func RemoveEventsByBlockID(r storage.Reader, w storage.Writer, blockID flow.Iden
 }
 
 // eventIterationFunc returns an in iteration function which returns all events found during traversal or iteration
-func eventIterationFunc(events *[]flow.Event) func() (CheckFunc, HandleFunc) {
-	return func() (CheckFunc, HandleFunc) {
+func eventIterationFunc(events *[]flow.Event) IterationFunc {
+	return func(unmarshal func(data []byte, v any) error) (CheckFunc, HandleFunc) {
 		check := func(key []byte) (bool, error) {
 			return true, nil
 		}
-		handle := func(unmarshal func(data []byte, entity interface{}) error) func(data []byte) error {
-			return func(data []byte) error {
-				var val flow.Event
-				err := unmarshal(data, &val)
-				if err != nil {
-					return err
-				}
-				*events = append(*events, val)
-				return nil
+		handle := func(data []byte) error {
+			var val flow.Event
+			err := unmarshal(data, &val)
+			if err != nil {
+				return err
 			}
+			*events = append(*events, val)
+			return nil
 		}
 		return check, handle
 	}
 }
 
 // eventFilterIterationFunc returns an iteration function which filters the result by the given event type in the handleFunc
-func eventFilterIterationFunc(events *[]flow.Event, eventType flow.EventType) func() (CheckFunc, HandleFunc) {
-	return func() (CheckFunc, HandleFunc) {
+func eventFilterIterationFunc(events *[]flow.Event, eventType flow.EventType) IterationFunc {
+	return func(unmarshal func(data []byte, v any) error) (CheckFunc, HandleFunc) {
 		check := func(key []byte) (bool, error) {
 			return true, nil
 		}
-		handle := func(unmarshal func(data []byte, entity interface{}) error) func(data []byte) error {
-			return func(data []byte) error {
-				var val flow.Event
-				err := unmarshal(data, &val)
-				if err != nil {
-					return err
-				}
-				// filter out all events not of type eventType
-				if val.Type == eventType {
-					*events = append(*events, val)
-				}
-				return nil
+		handle := func(data []byte) error {
+			var val flow.Event
+			err := unmarshal(data, &val)
+			if err != nil {
+				return err
 			}
+			// filter out all events not of type eventType
+			if val.Type == eventType {
+				*events = append(*events, val)
+			}
+			return nil
 		}
 		return check, handle
 	}
