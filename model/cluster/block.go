@@ -67,6 +67,10 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 		return nil, fmt.Errorf("invalid root header body: %w", err)
 	}
 
+	if rootHeaderBody.ParentID != flow.ZeroID {
+		return nil, fmt.Errorf("ParentID must be zero")
+	}
+
 	rootPayload, err := NewRootPayload(UntrustedPayload(untrusted.Payload))
 	if err != nil {
 		return nil, fmt.Errorf("invalid root cluster payload: %w", err)

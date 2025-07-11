@@ -104,6 +104,10 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 		return nil, fmt.Errorf("invalid root header body: %w", err)
 	}
 
+	if rootHeaderBody.ParentID == ZeroID {
+		return nil, fmt.Errorf("ParentID must not be zero")
+	}
+
 	// validate payload
 	payload, err := NewPayload(UntrustedPayload(untrusted.Payload))
 	if err != nil {
