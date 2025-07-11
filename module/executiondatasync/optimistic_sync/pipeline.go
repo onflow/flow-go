@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/gammazero/workerpool"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 var (
@@ -177,7 +178,8 @@ func (p *PipelineImpl) Run(ctx context.Context, core Core, parentState State) er
 	// IMPORTANT: after the main loop has exited we need to ensure that worker goroutine has also finished
 	// because we need to ensure that it can report any error that has happened during the execution of detached operation.
 	// By calling StopWait we ensure that worker has stopped which also guarantees that any error has been delivered to the
-	// error channel and returned as result of StopWait.
+	// error channel and returned as result of StopWait. Without waiting for the worker to stop, we might skip some errors
+	// since the worker didn't have a chance to report them yet, and we have already returned from the Run method.
 	return errors.Join(p.loop(ctx), p.worker.StopWait())
 }
 
