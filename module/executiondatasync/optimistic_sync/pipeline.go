@@ -120,7 +120,6 @@ func (w *worker) StopWait() error {
 // PipelineImpl implements the Pipeline interface
 type PipelineImpl struct {
 	log                  zerolog.Logger
-	executionResult      *flow.ExecutionResult
 	stateConsumer        PipelineStateConsumer
 	stateChangedNotifier engine.Notifier
 	core                 Core
@@ -151,7 +150,6 @@ func NewPipeline(
 
 	return &PipelineImpl{
 		log:                  log,
-		executionResult:      executionResult,
 		stateConsumer:        stateReceiver,
 		worker:               newWorker(),
 		state:                atomic.NewInt32(int32(StatePending)),
