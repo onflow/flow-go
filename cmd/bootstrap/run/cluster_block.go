@@ -22,7 +22,6 @@ func GenerateRootClusterBlocks(epoch uint64, clusters flow.ClusterList) []*clust
 		}
 
 		clusterBlocks[i] = rootBlock
-
 	}
 	return clusterBlocks
 }
