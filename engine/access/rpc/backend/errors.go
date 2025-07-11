@@ -13,8 +13,8 @@ type InsufficientExecutionReceipts struct {
 	receiptCount int
 }
 
-func NewInsufficientExecutionReceipts(blockID flow.Identifier, receiptCount int) *InsufficientExecutionReceipts {
-	return &InsufficientExecutionReceipts{blockID: blockID, receiptCount: receiptCount}
+func NewInsufficientExecutionReceipts(blockID flow.Identifier, receiptCount int) InsufficientExecutionReceipts {
+	return InsufficientExecutionReceipts{blockID: blockID, receiptCount: receiptCount}
 }
 
 var _ error = (*InsufficientExecutionReceipts)(nil)

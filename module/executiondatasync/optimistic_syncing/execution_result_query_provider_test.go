@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -194,7 +195,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 		_, err := suite.provider.ExecutionResultQuery(insufficientBlock.ID(), criteria)
 		suite.Require().Error(err)
 
-		suite.Assert().Contains(err.Error(), "not enough agreeing receipts")
+		suite.Assert().True(backend.IsInsufficientExecutionReceipts(err))
 	})
 
 	suite.Run("required executors not found returns error", func() {
@@ -219,7 +220,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 		_, err := suite.provider.ExecutionResultQuery(block.ID(), criteria)
 		suite.Require().Error(err)
 
-		suite.Assert().Contains(err.Error(), "no execution nodes found for execution result")
+		suite.Assert().True(backend.IsInsufficientExecutionReceipts(err))
 	})
 }
 

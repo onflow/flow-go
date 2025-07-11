@@ -2,10 +2,9 @@ package pipeline
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 
 	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -132,31 +131,17 @@ func NewExecutionResultQueryProviderImpl(
 //   - All other errors are potential indicators of bugs or corrupted internal state
 func (e *ExecutionResultQueryProviderImpl) ExecutionResultQuery(blockID flow.Identifier, criteria Criteria) (*Query, error) {
 	// if caller criteria are not set, the operator criteria should be used
-	if criteria.AgreeingExecutors == 0 {
-		criteria.AgreeingExecutors = e.agreeingExecutors
-	}
+	e.mergeCriteria(&criteria)
 
-	if len(criteria.RequiredExecutors) == 0 {
-		criteria.RequiredExecutors = e.requiredENIdentifiers
-	}
-
-	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
+	// Check if the block ID is of the root block. If it is, then don't look for execution receipts since they
 	// will not be present for the root block.
 	if e.rootBlockID == blockID {
 		return e.handleRootBlock(criteria)
 	}
 
-	execResult, receipts, err := e.findResultAndReceipts(blockID, criteria)
+	execResult, executorIDs, err := e.findResultAndExecutors(blockID, criteria)
 	if err != nil {
 		return nil, err
-	}
-
-	executorIDs := getExecutorIDs(receipts)
-
-	executorsCount := len(executorIDs)
-	// if less than minExecutionNodesCnt execution receipts have been received, then return an error
-	if executorsCount < minExecutionNodesCnt {
-		return nil, backend.NewInsufficientExecutionReceipts(blockID, executorsCount)
 	}
 
 	subsetENs, err := e.chooseExecutionNodes(criteria.RequiredExecutors, executorIDs)
@@ -172,6 +157,17 @@ func (e *ExecutionResultQueryProviderImpl) ExecutionResultQuery(blockID flow.Ide
 		ExecutionResult: execResult,
 		ExecutionNodes:  subsetENs,
 	}, nil
+}
+
+// mergeCriteria merges criteria with base overrides. Fields from 'criteria' take precedence when set.
+func (e *ExecutionResultQueryProviderImpl) mergeCriteria(criteria *Criteria) {
+	if criteria.AgreeingExecutors == 0 {
+		criteria.AgreeingExecutors = e.agreeingExecutors
+	}
+
+	if len(criteria.RequiredExecutors) == 0 {
+		criteria.RequiredExecutors = e.requiredENIdentifiers
+	}
 }
 
 // handleRootBlock handles execution result queries for the root block.
@@ -197,16 +193,18 @@ func (e *ExecutionResultQueryProviderImpl) handleRootBlock(criteria Criteria) (*
 	}, nil
 }
 
-// findResultAndReceipts retrieves execution results and receipts for a given block ID
+// findResultAndExecutors retrieves execution results and receipts for a given block ID
 // that match the specified criteria. It groups receipts by result ID and selects
 // the result with the most agreeing receipts or the specific result if specified in criteria.
 //
-// No errors are expected during normal operations
-func (e *ExecutionResultQueryProviderImpl) findResultAndReceipts(
+// Expected errors during normal operations:
+//   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+//   - All other errors are potential indicators of bugs or corrupted internal state
+func (e *ExecutionResultQueryProviderImpl) findResultAndExecutors(
 	blockID flow.Identifier,
 	criteria Criteria,
-) (*flow.ExecutionResult, flow.ExecutionReceiptList, error) {
-	// lookup the receipt's storage with the block ID
+) (*flow.ExecutionResult, flow.IdentifierList, error) {
+	// look up the receipt's storage with the block ID
 	// Note: this will return an empty slice with no error if no receipts are found.
 	allReceipts, err := e.executionReceipts.ByBlockID(blockID)
 	if err != nil {
@@ -214,43 +212,67 @@ func (e *ExecutionResultQueryProviderImpl) findResultAndReceipts(
 	}
 
 	executionReceiptsGroupedList := allReceipts.GroupByResultID()
-	if executionReceiptsGroupedList.NumberGroups() > 1 {
-		identicalReceiptsStr := fmt.Sprintf("%v", flow.GetIDs(allReceipts))
-		e.log.Error().
-			Str("block_id", blockID.String()).
-			Str("execution_receipts", identicalReceiptsStr).
-			Msg("execution receipt mismatch")
-	}
 
-	var matchedReceipts flow.ExecutionReceiptList
+	matchedExecutorsCnt := 0
+	var matchedResultID flow.Identifier
 
-	if criteria.ResultInFork != flow.ZeroID {
-		matchedReceipts = executionReceiptsGroupedList.GetGroup(criteria.ResultInFork)
-	} else {
-		// maximum number of matching receipts found so far for any execution result id
-		maxMatchedReceiptCnt := 0
-		var maxMatchedResultID flow.Identifier
-		// find the largest list of receipts which have the same result ID
-		for resultID, executionReceiptList := range executionReceiptsGroupedList {
-			currentMatchedReceiptCnt := len(executionReceiptList)
-			if currentMatchedReceiptCnt > maxMatchedReceiptCnt {
-				maxMatchedReceiptCnt = currentMatchedReceiptCnt
-				maxMatchedResultID = resultID
+	for resultID, executionReceiptList := range executionReceiptsGroupedList {
+		executorGroup := executionReceiptList.GroupByExecutorID()
+		currentMatchedExecutorsCnt := len(executorGroup)
+
+		hasEnoughExecutors := currentMatchedExecutorsCnt >= int(criteria.AgreeingExecutors)
+		if !hasEnoughExecutors {
+			continue
+		}
+
+		// In case, neither client nor operator set criteria.RequiredExecutors, this check should be skipped, that is why
+		// hasRequiredExecutor should be set to true
+		hasRequiredCriteria := len(criteria.RequiredExecutors) != 0
+		hasRequiredExecutor := !hasRequiredCriteria
+
+		for _, requiredExecutor := range criteria.RequiredExecutors {
+			if _, ok := executorGroup[requiredExecutor]; ok {
+				hasRequiredExecutor = true
+				break
+			}
+		}
+		if !hasRequiredExecutor {
+			continue
+		}
+
+		if criteria.ResultInFork != flow.ZeroID {
+			hasRequiredAncestor := resultID == criteria.ResultInFork
+			if !hasRequiredAncestor {
+				// TODO: Enhance ResultInFork check logic.
+				// If ResultInFork is provided:
+				//
+				// 1. Check if resultID equal to the ResultInFork.
+				// 2. If not, iterate all results for the block.
+				// 3. For each result, walk through its ancestry via PreviousResultID.
+				// 4. Stop when the provided result is found or a maximum depth is reached.
+				continue
 			}
 		}
 
-		// pick the largest list of matching receipts
-		matchedReceipts = executionReceiptsGroupedList.GetGroup(maxMatchedResultID)
+		if currentMatchedExecutorsCnt > matchedExecutorsCnt {
+			matchedExecutorsCnt = currentMatchedExecutorsCnt
+			matchedResultID = resultID
+		}
 	}
 
-	if len(matchedReceipts) < int(criteria.AgreeingExecutors) {
-		return nil, nil, fmt.Errorf("not enough agreeing receipts for execution result")
+	// if less than minExecutionNodesCnt execution receipts have been received, then return an error
+	if matchedExecutorsCnt < minExecutionNodesCnt {
+		return nil, nil, backend.NewInsufficientExecutionReceipts(blockID, matchedExecutorsCnt)
 	}
 
-	// as all matched recepts are for the same block they should have same ExecutionResult, that is why return first result in a list
+	matchedReceipts := executionReceiptsGroupedList.GetGroup(matchedResultID)
+
+	executorIDs := getExecutorIDs(matchedReceipts)
+
+	// as all matched recepts are for the same block, they should have the same ExecutionResult, that is why return the first result in a list
 	result := matchedReceipts[0].ExecutionResult
 
-	return &result, matchedReceipts, nil
+	return &result, executorIDs, nil
 }
 
 // getExecutorIDs extracts unique executor node IDs from a list of execution receipts.
@@ -270,10 +292,10 @@ func getExecutorIDs(recepts flow.ExecutionReceiptList) flow.IdentifierList {
 // chooseExecutionNodes finds the subset of execution nodes defined in the identity table by first
 // choosing the preferred execution nodes which have executed the transaction. If no such preferred
 // execution nodes are found, then the required execution nodes defined in the identity table are returned.
-// If neither preferred nor required nodes are defined, then all execution node matching the executor IDs are returned.
+// If neither preferred nor required nodes are defined, then all execution nodes matching the executor IDs are returned.
 //
-// For example: If execution nodes in identity table are {1,2,3,4}, preferred ENs are defined as {2,3,4}
-// and the executor IDs is {1,2,3}, then {2, 3} is returned as the chosen subset of ENs.
+// For example, if execution nodes in the identity table are {1,2,3,4}, preferred ENs are defined as {2,3,4},
+// and the executor IDs are {1,2,3}, then {2, 3} is returned as the chosen subset of ENs.
 //
 // No errors are expected during normal operations
 func (e *ExecutionResultQueryProviderImpl) chooseExecutionNodes(
@@ -310,7 +332,7 @@ func (e *ExecutionResultQueryProviderImpl) chooseExecutionNodes(
 }
 
 // chooseFromPreferredENIDs finds the subset of execution nodes if preferred execution nodes are defined.
-// If preferredENIdentifiers is set and there are less than maxNodesCnt nodes selected, then the list is padded up to
+// If preferredENIdentifiers are set and there are less than maxNodesCnt nodes selected, then the list is padded up to
 // maxNodesCnt nodes using the following order:
 // 1. Use any EN with a receipt.
 // 2. Use any preferred node not already selected.
