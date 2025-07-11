@@ -264,24 +264,27 @@ func TestTraverse(t *testing.T) {
 		actual := make([]uint64, 0, len(keyVals))
 
 		// Define the iteration logic
-		iterationFunc := func() (operation.CheckFunc, operation.CreateFunc, operation.HandleFunc) {
+		iterationFunc := func() (operation.CheckFunc, operation.HandleFunc) {
 			check := func(key []byte) (bool, error) {
 				// Skip the key {0x42, 0x56}
 				return !bytes.Equal(key, []byte{0x42, 0x56}), nil
 			}
-			var val uint64
-			create := func() interface{} {
-				return &val
+			handle := func(unmarshal func(data []byte, entity interface{}) error) func(data []byte) error {
+				return func(data []byte) error {
+					var val uint64
+					err := unmarshal(data, &val)
+					if err != nil {
+						return err
+					}
+					actual = append(actual, val)
+					return nil
+				}
 			}
-			handle := func() error {
-				actual = append(actual, val)
-				return nil
-			}
-			return check, create, handle
+			return check, handle
 		}
 
 		// Traverse the keys starting with prefix {0x42}
-		err := operation.Traverse([]byte{0x42}, iterationFunc, storage.DefaultIteratorOptions())(r)
+		err := operation.TraverseByPrefix(r, []byte{0x42}, iterationFunc, storage.DefaultIteratorOptions())
 		require.NoError(t, err, "traverse should not return an error")
 
 		// Assert that the actual values match the expected values
