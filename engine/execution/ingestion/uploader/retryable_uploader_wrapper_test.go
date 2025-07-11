@@ -246,13 +246,7 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 func createTestBadgerRetryableUploaderWrapper(asyncUploader *AsyncUploader) *BadgerRetryableUploaderWrapper {
 	mockBlocksStorage := new(storageMock.Blocks)
 	mockBlocksStorage.On("ByID", mock.Anything).
-		Return(&flow.Block{
-			Header: flow.HeaderBody{
-				ChainID:   flow.Emulator,
-				Timestamp: time.Now(),
-			},
-			Payload: flow.Payload{},
-		}, nil)
+		Return(unittest.BlockFixture(), nil)
 
 	mockCommitsStorage := new(storageMock.Commits)
 	mockCommitsStorage.On("ByBlockID", mock.Anything).Return(nil, nil)
