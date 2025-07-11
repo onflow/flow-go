@@ -126,7 +126,6 @@ func addRootBlockCmdFlags() {
 }
 
 func rootBlock(cmd *cobra.Command, args []string) {
-
 	// maintain backward compatibility with old flag name
 	if deprecatedFlagPartnerStakes != "" {
 		log.Warn().Msg("using deprecated flag --partner-stakes (use --partner-weights instead)")
