@@ -300,7 +300,7 @@ func (suite *MutatorSuite) TestExtend_InvalidChainID() {
 func (suite *MutatorSuite) TestExtend_InvalidBlockHeight() {
 	proposal := suite.Proposal()
 	// change the block height
-	proposal.Block.Header.Height = 3
+	proposal.Block.Header.Height = proposal.Block.Header.Height + 1
 
 	err := suite.state.Extend(&proposal)
 	suite.Assert().Error(err)
