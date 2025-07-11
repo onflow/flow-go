@@ -1,6 +1,7 @@
 package blueprints_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,6 +11,7 @@ import (
 	cadenceCommon "github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -132,9 +134,12 @@ func TestExecuteCallbackTransaction(t *testing.T) {
 }
 
 func createValidCallbackEvent(t *testing.T, id uint64, effort uint64) flow.Event {
-	// todo use proper location
-	contractAddress := flow.HexToAddress("0x0000000000000000")
-	location := cadenceCommon.NewAddressLocation(nil, cadenceCommon.Address(contractAddress), "CallbackScheduler")
+	const processedEventTypeTemplate = "A.%v.CallbackScheduler.CallbackProcessed"
+	env := systemcontracts.SystemContractsForChain(flow.Mainnet.Chain().ChainID()).AsTemplateEnv()
+	eventTypeString := fmt.Sprintf(processedEventTypeTemplate, env.FlowCallbackSchedulerAddress)
+	loc, err := cadenceCommon.HexToAddress(env.FlowCallbackSchedulerAddress)
+	require.NoError(t, err)
+	location := cadenceCommon.NewAddressLocation(nil, loc, "CallbackProcessed")
 
 	eventType := cadence.NewEventType(
 		location,
@@ -157,7 +162,7 @@ func createValidCallbackEvent(t *testing.T, id uint64, effort uint64) flow.Event
 	require.NoError(t, err)
 
 	return flow.Event{
-		Type:             flow.EventType("A.0x0000000000000000.CallbackScheduler.CallbackProcessed"),
+		Type:             flow.EventType(eventTypeString),
 		TransactionID:    unittest.IdentifierFixture(),
 		TransactionIndex: 0,
 		EventIndex:       0,
@@ -167,7 +172,7 @@ func createValidCallbackEvent(t *testing.T, id uint64, effort uint64) flow.Event
 
 func createInvalidTypeEvent() flow.Event {
 	return flow.Event{
-		Type:             flow.EventType("A.0x0000000000000000.SomeContract.WrongEvent"),
+		Type:             flow.EventType("A.0000000000000000.SomeContract.WrongEvent"),
 		TransactionID:    unittest.IdentifierFixture(),
 		TransactionIndex: 0,
 		EventIndex:       0,
@@ -177,7 +182,7 @@ func createInvalidTypeEvent() flow.Event {
 
 func createInvalidPayloadEvent() flow.Event {
 	return flow.Event{
-		Type:             flow.EventType("A.0x0000000000000000.CallbackScheduler.CallbackProcessed"),
+		Type:             flow.EventType("A.0000000000000000.CallbackScheduler.CallbackProcessed"),
 		TransactionID:    unittest.IdentifierFixture(),
 		TransactionIndex: 0,
 		EventIndex:       0,
