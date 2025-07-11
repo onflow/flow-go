@@ -31,6 +31,7 @@ func (msg *UntrustedProposal) DeclareTrusted() (*flow.Proposal, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not build block: %w", err)
 	}
+
 	// validate ProposerSigData
 	if len(msg.ProposerSigData) == 0 {
 		return nil, fmt.Errorf("proposer signature must not be empty")

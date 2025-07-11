@@ -243,6 +243,10 @@ func ProposalFixture() *flow.Proposal {
 	return ProposalFromBlock(BlockFixture())
 }
 
+func ClusterProposalFixture() *cluster.Proposal {
+	return ClusterProposalFromBlock(ClusterBlockFixture())
+}
+
 func ProposalHeaderFromHeader(header *flow.Header) *flow.ProposalHeader {
 	return &flow.ProposalHeader{
 		Header:          header,
