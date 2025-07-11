@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gammazero/workerpool"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
@@ -23,10 +24,13 @@ type PipelineStateProvider interface {
 	GetState() State
 }
 
-// PipelineStateReceiver is a receiver of the pipeline state updates.
-type PipelineStateReceiver interface {
-	// OnStateUpdated is called when a pipeline's state changes.
-	OnStateUpdated(State)
+// PipelineStateConsumer is a receiver of the pipeline state updates.
+// PipelineStateConsumer implementations must be
+// - NON-BLOCKING and consume the state updates without noteworthy delay
+type PipelineStateConsumer interface {
+	// OnStateUpdated is called when a pipeline's state changes to notify the receiver of the new state.
+	// This method is will be called in the same goroutine that runs the pipeline, so it must not block.
+	OnStateUpdated(newState State)
 }
 
 // Pipeline represents a processing pipelined state machine for a single ExecutionResult.
@@ -48,7 +52,7 @@ type Pipeline interface {
 	SetSealed()
 
 	// OnParentStateUpdated updates the pipeline's parent's state.
-	OnParentStateUpdated(State)
+	OnParentStateUpdated(parentState State)
 
 	// Abandon marks the pipeline as abandoned.
 	Abandon()
@@ -56,6 +60,11 @@ type Pipeline interface {
 
 var _ Pipeline = (*PipelineImpl)(nil)
 
+// worker implements a single worker goroutine that processes tasks submitted to it.
+// It supports submission of context-based tasks that return an error.
+// Each error that occurs during task execution is sent to a dedicated error channel.
+// The primary purpose of the worker is to handle tasks in a non-blocking manner, while still allowing the parent thread
+// to observe and handle errors that occur during task execution.
 type worker struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -85,14 +94,15 @@ func (w *worker) Submit(task func(ctx context.Context) error) {
 	})
 }
 
-// ErrChan returns the channel where errors are delivered from executed jobs.
+// ErrChan returns the channel where errors are delivered from executed tasks.
 func (w *worker) ErrChan() <-chan error {
 	return w.errChan
 }
 
-// StopWait stops the worker pool and waits for all queued tasks to
-// complete. No additional tasks may be submitted, but all pending tasks are
-// executed by workers before this function returns.
+// StopWait stops the worker pool and waits for all queued tasks to complete.
+// No additional tasks may be submitted, but all pending tasks are executed by workers before this function returns.
+// This function is blocking and guarantees that any error that occurred during the execution of tasks will be delivered
+// to the caller as a return value of this function.
 // Any error that was delivered during execution will be delivered to the caller.
 func (w *worker) StopWait() error {
 	w.cancel()
@@ -111,7 +121,7 @@ func (w *worker) StopWait() error {
 type PipelineImpl struct {
 	log                  zerolog.Logger
 	executionResult      *flow.ExecutionResult
-	stateReceiver        PipelineStateReceiver
+	stateConsumer        PipelineStateConsumer
 	stateChangedNotifier engine.Notifier
 	core                 Core
 	worker               *worker
@@ -131,7 +141,7 @@ func NewPipeline(
 	log zerolog.Logger,
 	executionResult *flow.ExecutionResult,
 	isSealed bool,
-	stateReceiver PipelineStateReceiver,
+	stateReceiver PipelineStateConsumer,
 ) *PipelineImpl {
 	log = log.With().
 		Str("component", "pipeline").
@@ -142,7 +152,7 @@ func NewPipeline(
 	return &PipelineImpl{
 		log:                  log,
 		executionResult:      executionResult,
-		stateReceiver:        stateReceiver,
+		stateConsumer:        stateReceiver,
 		worker:               newWorker(),
 		state:                atomic.NewInt32(int32(StatePending)),
 		parentStateCache:     atomic.NewInt32(int32(StatePending)),
@@ -160,6 +170,9 @@ func NewPipeline(
 //   - context.Canceled: when the context is canceled
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (p *PipelineImpl) Run(ctx context.Context, core Core, parentState State) error {
+	if p.core != nil {
+		return irrecoverable.NewExceptionf("pipeline has been already started, it is not designed to be run again")
+	}
 	p.core = core
 	p.parentStateCache.Store(int32(parentState))
 	// run the main event loop by calling p.loop. any error returned from it needs to be propagated to the caller.
@@ -230,6 +243,10 @@ func (p *PipelineImpl) loop(ctx context.Context) error {
 	}
 }
 
+// onStartProcessing performs the initial state transitions depending on the parent state:
+// - Pending -> Processing
+// - Pending -> Abandoned
+// No errors are expected during normal operations.
 func (p *PipelineImpl) onStartProcessing() error {
 	switch p.parentState() {
 	case StateProcessing, StateWaitingPersist, StateComplete:
@@ -249,6 +266,9 @@ func (p *PipelineImpl) onStartProcessing() error {
 	return nil
 }
 
+// onProcessing performs the state transitions when the pipeline is in the Processing state.
+// When data has been successfully indexed, we can transition to StateWaitingPersist.
+// No errors are expected during normal operations.
 func (p *PipelineImpl) onProcessing() error {
 	if p.isIndexed.Load() {
 		return p.transitionTo(StateWaitingPersist)
@@ -256,6 +276,10 @@ func (p *PipelineImpl) onProcessing() error {
 	return nil
 }
 
+// onPersistChanges performs the state transitions when the pipeline is in the WaitingPersist state.
+// When the execution result has been sealed and the parent has already transitioned to StateComplete then
+// we can persist the data and transition to StateComplete.
+// No errors are expected during normal operations.
 func (p *PipelineImpl) onPersistChanges() error {
 	if p.isSealed.Load() && p.parentState() == StateComplete {
 		if err := p.core.Persist(); err != nil {
@@ -288,7 +312,8 @@ func (p *PipelineImpl) parentState() State {
 	return State(p.parentStateCache.Load())
 }
 
-// SetSealed marks the data as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.
+// SetSealed marks the execution result as sealed.
+// This will cause the pipeline to eventually transition to the StateComplete state when the parent finishes processing.
 func (p *PipelineImpl) SetSealed() {
 	// Note: do not use a mutex here to avoid blocking the results forest.
 	if p.isSealed.CompareAndSwap(false, true) {
@@ -297,6 +322,7 @@ func (p *PipelineImpl) SetSealed() {
 }
 
 // OnParentStateUpdated updates the pipeline's state based on the provided parent state.
+// If the parent state has changed, it will notify the state consumer and trigger a state change notification.
 func (p *PipelineImpl) OnParentStateUpdated(parentState State) {
 	oldState := p.parentStateCache.Load()
 	if p.parentStateCache.CompareAndSwap(oldState, int32(parentState)) {
@@ -312,8 +338,9 @@ func (p *PipelineImpl) Abandon() {
 	}
 }
 
-// performDownload handles the Downloading state and transitions to StateIndexing if successful.
-//
+// performDownload performs the processing step of the pipeline by downloading and indexing data.
+// It uses an atomic flag to indicate whether the operation has been completed successfully which
+// informs the state machine that eventually it can transition to the next state.
 // Expected Errors:
 //   - context.Canceled: when the context is canceled
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
@@ -343,9 +370,9 @@ func (p *PipelineImpl) transitionTo(newState State) error {
 	}
 
 	if hasChange {
-		// send notification for all states except ready.
-		// Ready is not needed since it's the initial state and does not impact children's state machines.
-		p.stateReceiver.OnStateUpdated(newState)
+		// send notification for all state changes. we require that implementations of [PipelineStateConsumer]
+		// are non-blocking and consume the state updates without noteworthy delay.
+		p.stateConsumer.OnStateUpdated(newState)
 		p.stateChangedNotifier.Notify()
 	}
 
