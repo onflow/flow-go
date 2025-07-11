@@ -20,9 +20,7 @@ func GenerateRootClusterBlocks(epoch uint64, clusters flow.ClusterList) []*clust
 		if err != nil {
 			panic(fmt.Errorf("failed to get canonical root block: %w", err))
 		}
-
 		clusterBlocks[i] = rootBlock
-
 	}
 	return clusterBlocks
 }

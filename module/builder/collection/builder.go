@@ -536,7 +536,7 @@ func (b *Builder) buildHeader(
 	}
 	headerBody, err := headerBodyBuilder.Build()
 	if err != nil {
-		return nil, fmt.Errorf("could not build header body: %w", err)
+		return nil, irrecoverable.NewExceptionf("unexpected error when building header body: %w", err)
 	}
 	header, err := flow.NewHeader(flow.UntrustedHeader{
 		HeaderBody:  *headerBody,
@@ -549,7 +549,6 @@ func (b *Builder) buildHeader(
 	if err != nil {
 		return nil, fmt.Errorf("could not sign proposal: %w", err)
 	}
-
 	return &flow.ProposalHeader{
 		Header:          header,
 		ProposerSigData: sig,

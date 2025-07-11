@@ -338,7 +338,7 @@ func (b *bootstrapExecutor) Execute() error {
 	if b.rootBlock == nil {
 		rootblock, err := flow.Genesis(b.ctx.Chain.ChainID())
 		if err != nil {
-			return err
+			return fmt.Errorf("could not build genesis block: %w", err)
 		}
 		b.rootBlock = rootblock.ToHeader()
 	}

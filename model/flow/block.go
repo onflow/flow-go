@@ -138,7 +138,6 @@ func (b Block) ToHeader() *Header {
 		if err != nil {
 			panic(fmt.Errorf("could not build root header from block: %w", err))
 		}
-
 		return rootHeader
 	}
 
@@ -149,7 +148,6 @@ func (b Block) ToHeader() *Header {
 	if err != nil {
 		panic(fmt.Errorf("could not build header from block: %w", err))
 	}
-
 	return header
 }
 

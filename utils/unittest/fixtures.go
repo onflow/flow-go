@@ -531,7 +531,6 @@ func HeaderBodyWithParentFixture(parent *flow.Header) flow.HeaderBody {
 			SigData:       SignatureFixture(),
 		}
 	}
-
 	return flow.HeaderBody{
 		ChainID:            parent.ChainID,
 		ParentID:           parent.ID(),
