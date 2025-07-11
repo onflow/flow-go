@@ -235,8 +235,11 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 	testBlocks := make([]*flow.Block, parser.MaxIDsLength)
 	for i := range testBlockIDs {
 		collections := unittest.CollectionListFixture(1)
-		block := unittest.BlockWithGuaranteesFixture(
-			unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(uint64(i)),
+			unittest.Block.WithPayload(
+				unittest.PayloadFixture(unittest.WithGuarantees(unittest.CollectionGuaranteesWithCollectionIDFixture(collections)...)),
+			),
 		)
 		block.Header.Height = uint64(i + 1) // avoiding edge case of height = 0 (genesis block)
 		suite.blocks.On("ByID", block.ID()).Return(block, nil)

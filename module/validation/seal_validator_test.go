@@ -389,13 +389,17 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 	// B3's payload contains results and receipts for B0, B1, B2
 	resultB0 := unittest.ExecutionResultFixture(unittest.WithBlock(blocks[0]), unittest.WithPreviousResult(*s.LatestExecutionResult))
 	receipts := unittest.ReceiptChainFor(blocks, resultB0)
-	blocks[3] = flow.NewBlock(
-		blocks[3].Header,
-		flow.Payload{
-			Receipts: []*flow.ExecutionReceiptStub{receipts[0].Stub(), receipts[1].Stub(), receipts[2].Stub()},
-			Results:  []*flow.ExecutionResult{&receipts[0].ExecutionResult, &receipts[1].ExecutionResult, &receipts[2].ExecutionResult},
+	var err error
+	blocks[3], err = flow.NewBlock(
+		flow.UntrustedBlock{
+			Header: blocks[3].Header,
+			Payload: unittest.PayloadFixture(
+				unittest.WithReceipts(receipts[0], receipts[1], receipts[2]),
+			),
 		},
 	)
+	require.NoError(s.T(), err)
+
 	b4 := unittest.BlockWithParentFixture(blocks[3].ToHeader())
 	blocks = append(blocks, b4)
 
@@ -479,22 +483,30 @@ func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
 	receiptChain1 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[S]_1, Result[A]_1, Result[B]_1, ...]
 	receiptChain2 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[S]_2, Result[A]_2, Result[B]_2, ...]
 
+	var err error
 	for i := 1; i <= 3; i++ {
 		// set payload for blocks A, B, C
-		blocks[i] = flow.NewBlock(
-			blocks[i].Header,
-			flow.Payload{
-				Results:  []*flow.ExecutionResult{&receiptChain1[i-1].ExecutionResult, &receiptChain2[i-1].ExecutionResult},
-				Receipts: []*flow.ExecutionReceiptStub{receiptChain1[i-1].Stub(), receiptChain2[i-1].Stub()},
+		blocks[i], err = flow.NewBlock(
+			flow.UntrustedBlock{
+				Header: blocks[i].Header,
+				Payload: unittest.PayloadFixture(
+					unittest.WithReceipts(receiptChain1[i-1], receiptChain2[i-1]),
+				),
 			},
 		)
+		require.NoError(s.T(), err)
 	}
-	blocks[4] = flow.NewBlock(
-		blocks[4].Header,
-		flow.Payload{
-			Seals: []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&receiptChain1[0].ExecutionResult))},
+
+	blocks[4], err = flow.NewBlock(
+		flow.UntrustedBlock{
+			Header: blocks[4].Header,
+			Payload: unittest.PayloadFixture(
+				unittest.WithSeals(unittest.Seal.Fixture(unittest.Seal.WithResult(&receiptChain1[0].ExecutionResult))),
+			),
 		},
 	)
+	require.NoError(s.T(), err)
+
 	for i := 0; i <= 4; i++ {
 		// we need to run this several times, as in each iteration as we have _multiple_ execution chains.
 		// In each iteration, we only mange to reconnect one additional height
@@ -588,15 +600,18 @@ func (s *SealValidationSuite) TestExtendSealDuplicate() {
 	// <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- B3{S(R(B1)), S(R(B1))}
 	s.T().Run("Duplicate seal in same payload", func(t *testing.T) {
 		_, _, b3, _, sealB1 := s.generateBasicTestFork()
-		b3 = flow.NewBlock(
-			b3.Header,
-			flow.Payload{
-				Seals: []*flow.Seal{sealB1, sealB1},
+		b3, err := flow.NewBlock(
+			flow.UntrustedBlock{
+				Header: b3.Header,
+				Payload: unittest.PayloadFixture(
+					unittest.WithSeals(sealB1, sealB1),
+				),
 			},
 		)
+		require.NoError(t, err)
 
 		// we expect an error because block 3 contains duplicate seals within its payload
-		_, err := s.sealValidator.Validate(b3)
+		_, err = s.sealValidator.Validate(b3)
 		require.Error(t, err)
 		require.True(t, engine.IsInvalidInputError(err), err)
 	})
@@ -657,17 +672,20 @@ func (s *SealValidationSuite) TestExtendSeal_DifferentIncorporatedResult() {
 		unittest.WithPreviousResult(*s.LatestExecutionResult),
 	)
 	seal := unittest.Seal.Fixture(unittest.Seal.WithResult(differentResult))
-	newBlock = flow.NewBlock(
-		newBlock.Header,
-		flow.Payload{
-			Seals: []*flow.Seal{seal},
+	newBlock, err := flow.NewBlock(
+		flow.UntrustedBlock{
+			Header: newBlock.Header,
+			Payload: unittest.PayloadFixture(
+				unittest.WithSeals(seal),
+			),
 		},
 	)
+	require.NoError(s.T(), err)
 
 	// Should fail because ER0a is different than ER0b, although they
 	// reference the same block. Technically the fork does not contain an
 	// IncorporatedResult for the result referenced by the proposed seal.
-	_, err := s.sealValidator.Validate(newBlock)
+	_, err = s.sealValidator.Validate(newBlock)
 	s.Require().Error(err)
 	s.Require().True(engine.IsInvalidInputError(err), err)
 }

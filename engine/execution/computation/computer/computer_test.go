@@ -1620,16 +1620,13 @@ func generateBlockWithVisitor(
 		completeCollections[collection.Guarantee.CollectionID] = collection
 	}
 
-	block := flow.NewBlock(
-		flow.HeaderBody{
-			ChainID:   flow.Emulator,
-			Timestamp: flow.GenesisTime,
-			Height:    42,
-			View:      42,
-		},
-		flow.Payload{
-			Guarantees: guarantees,
-		},
+	block := unittest.BlockFixture(
+		unittest.Block.WithHeight(42),
+		unittest.Block.WithView(42),
+		unittest.Block.WithParentView(41),
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(guarantees...)),
+		),
 	)
 
 	return &entity.ExecutableBlock{

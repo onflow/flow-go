@@ -55,7 +55,7 @@ func (s *BlocksProviderSuite) SetupTest() {
 	s.blocks = make([]*flow.Block, 0, blockCount)
 
 	var err error
-	s.rootBlock, err = flow.Genesis(flow.Emulator)
+	s.rootBlock, err = unittest.Block.Genesis(flow.Emulator)
 	s.Require().NoError(err)
 	parent := s.rootBlock.ToHeader()
 

@@ -306,9 +306,15 @@ func (s *ReceiptValidationSuite) TestReceiptServiceEventCountMismatch() {
 //   - receipts with zero or 2 chunks are rejected
 func (s *ReceiptValidationSuite) TestReceiptForBlockWith0Collections() {
 	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
-
 	valSubgrph := s.ValidSubgraphFixture()
-	valSubgrph.Block = flow.NewBlock(valSubgrph.Block.Header, unittest.PayloadFixture())
+	block, err := flow.NewBlock(
+		flow.UntrustedBlock{
+			Header:  valSubgrph.Block.Header,
+			Payload: unittest.PayloadFixture(),
+		},
+	)
+	s.Require().NoError(err)
+	valSubgrph.Block = block
 	s.Assert().Equal(0, len(valSubgrph.Block.Payload.Guarantees)) // sanity check that no collections in block
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 

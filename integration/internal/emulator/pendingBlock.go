@@ -95,18 +95,21 @@ func (b *pendingBlock) Block() *flowgo.Block {
 			CollectionID: collection.ID(),
 		}
 	}
-	return flowgo.NewBlock(
-		flowgo.HeaderBody{
+
+	//nolint:structwrite
+	return &flowgo.Block{
+		Header: flowgo.HeaderBody{
 			ChainID:   b.chainID,
 			Height:    b.height,
 			View:      b.view,
 			ParentID:  b.parentID,
 			Timestamp: b.timestamp,
 		},
-		flowgo.Payload{
+		//nolint:structwrite
+		Payload: flowgo.Payload{
 			Guarantees: guarantees,
 		},
-	)
+	}
 }
 
 func (b *pendingBlock) Collections() []*flowgo.LightCollection {

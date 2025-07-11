@@ -50,7 +50,7 @@ func (s *TransactionStatusesProviderSuite) SetupTest() {
 	s.chain = flow.Testnet.Chain()
 
 	var err error
-	s.rootBlock, err = flow.Genesis(s.chain.ChainID())
+	s.rootBlock, err = unittest.Block.Genesis(s.chain.ChainID())
 	s.Require().NoError(err)
 
 	s.factory = NewDataProviderFactory(

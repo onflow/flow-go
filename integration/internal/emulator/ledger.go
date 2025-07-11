@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	flowgo "github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func configureLedger(
@@ -44,7 +45,7 @@ func configureLedger(
 		}
 
 		// commit the genesis block to storage
-		genesis, err := flowgo.Genesis(conf.GetChainID())
+		genesis, err := unittest.Block.Genesis(conf.GetChainID())
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to generate genesis block: %w", err)
 		}
