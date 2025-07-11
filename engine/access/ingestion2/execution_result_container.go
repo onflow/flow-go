@@ -26,12 +26,9 @@ type ExecutionResultContainer struct {
 	resultID    flow.Identifier // precomputed ID of result to avoid expensive hashing on each call
 	blockHeader *flow.Header    // header of the block which the result is for
 	pipeline    optimistic_sync.Pipeline
-<<<<<<< HEAD
 	enqueued    *atomic.Bool
-=======
 
 	mu sync.RWMutex
->>>>>>> peter/results-forest-workers
 }
 
 // NewExecutionResultContainer creates a new instance of ExecutionResultContainer. Conceptually,
