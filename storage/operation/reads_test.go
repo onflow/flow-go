@@ -264,21 +264,19 @@ func TestTraverse(t *testing.T) {
 		actual := make([]uint64, 0, len(keyVals))
 
 		// Define the iteration logic
-		iterationFunc := func() (operation.CheckFunc, operation.HandleFunc) {
+		iterationFunc := func(unmarshal func(data []byte, v any) error) (operation.CheckFunc, operation.HandleFunc) {
 			check := func(key []byte) (bool, error) {
 				// Skip the key {0x42, 0x56}
 				return !bytes.Equal(key, []byte{0x42, 0x56}), nil
 			}
-			handle := func(unmarshal func(data []byte, entity interface{}) error) func(data []byte) error {
-				return func(data []byte) error {
-					var val uint64
-					err := unmarshal(data, &val)
-					if err != nil {
-						return err
-					}
-					actual = append(actual, val)
-					return nil
+			handle := func(data []byte) error {
+				var val uint64
+				err := unmarshal(data, &val)
+				if err != nil {
+					return err
 				}
+				actual = append(actual, val)
+				return nil
 			}
 			return check, handle
 		}

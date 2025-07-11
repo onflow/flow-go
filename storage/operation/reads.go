@@ -42,7 +42,7 @@ type IterationFunc func(decoder func(data []byte, v any) error) (CheckFunc, Hand
 // In other words, error returned by the iteration functions will be propagated to the caller.
 // No errors expected during normal operations.
 func IterateKeysByPrefixRange(r storage.Reader, startPrefix []byte, endPrefix []byte, check func(key []byte) error) error {
-	return IterateKeys(r, startPrefix, endPrefix, func() (CheckFunc, HandleFunc) {
+	iterFunc := func(unmarshal func(data []byte, v any) error) (CheckFunc, HandleFunc) {
 		return func(key []byte) (bool, error) {
 			err := check(key)
 			if err != nil {
@@ -50,7 +50,8 @@ func IterateKeysByPrefixRange(r storage.Reader, startPrefix []byte, endPrefix []
 			}
 			return false, nil
 		}, nil
-	}, storage.IteratorOption{BadgerIterateKeyOnly: true})
+	}
+	return IterateKeys(r, startPrefix, endPrefix, iterFunc, storage.IteratorOption{BadgerIterateKeyOnly: true})
 }
 
 // IterateKeys will iterate over all entries in the database, where the key starts with a prefixes in
@@ -119,7 +120,7 @@ func TraverseByPrefix(r storage.Reader, prefix []byte, iterFunc IterationFunc, o
 
 // KeyOnlyIterateFunc returns an IterationFunc that only iterates over keys
 func KeyOnlyIterateFunc(fn func(key []byte) error) IterationFunc {
-	return func() (CheckFunc, HandleFunc) {
+	return func(unmarshal func(data []byte, v any) error) (CheckFunc, HandleFunc) {
 		checker := func(key []byte) (bool, error) {
 			return false, fn(key)
 		}
