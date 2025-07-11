@@ -58,7 +58,6 @@ func (bp *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertifica
 			WithParentVoterSigData(qc.SigData).
 			WithProposerID(bp.committee.Self()).
 			WithLastViewTC(lastViewTC)
-
 		return nil
 	}
 
