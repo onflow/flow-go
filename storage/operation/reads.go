@@ -32,8 +32,9 @@ type CreateFunc func() interface{}
 // pair during a badger iteration. It should be called after the key was checked
 // and the entity was decoded.
 // No errors are expected during normal operation. Any errors will halt the iteration.
-type HandleFunc func() error
-type IterationFunc func() (CheckFunc, CreateFunc, HandleFunc)
+type HandleFunc func(data []byte) error
+
+type IterationFunc func(decoder func(data []byte, v any) error) (CheckFunc, HandleFunc)
 
 // IterateKeysByPrefixRange will iterate over all entries in the database, where the key starts with a prefixes in
 // the range [startPrefix, endPrefix] (both inclusive). We require that startPrefix <= endPrefix (otherwise this
@@ -41,14 +42,14 @@ type IterationFunc func() (CheckFunc, CreateFunc, HandleFunc)
 // In other words, error returned by the iteration functions will be propagated to the caller.
 // No errors expected during normal operations.
 func IterateKeysByPrefixRange(r storage.Reader, startPrefix []byte, endPrefix []byte, check func(key []byte) error) error {
-	return IterateKeys(r, startPrefix, endPrefix, func() (CheckFunc, CreateFunc, HandleFunc) {
+	return IterateKeys(r, startPrefix, endPrefix, func() (CheckFunc, HandleFunc) {
 		return func(key []byte) (bool, error) {
 			err := check(key)
 			if err != nil {
 				return false, err
 			}
 			return false, nil
-		}, nil, nil
+		}, nil
 	}, storage.IteratorOption{BadgerIterateKeyOnly: true})
 }
 
@@ -77,12 +78,12 @@ func IterateKeys(r storage.Reader, startPrefix []byte, endPrefix []byte, iterFun
 		errToReturn = merr.CloseAndMergeError(it, errToReturn)
 	}()
 
+	// initialize processing functions for iteration
+	check, handle := iterFunc(msgpack.Unmarshal)
+
 	for it.First(); it.Valid(); it.Next() {
 		item := it.IterItem()
 		key := item.Key()
-
-		// initialize processing functions for iteration
-		check, create, handle := iterFunc()
 
 		keyCopy := make([]byte, len(key))
 
@@ -99,23 +100,7 @@ func IterateKeys(r storage.Reader, startPrefix []byte, endPrefix []byte, iterFun
 			continue
 		}
 
-		err = item.Value(func(val []byte) error {
-
-			// decode into the entity
-			entity := create()
-			err = msgpack.Unmarshal(val, entity)
-			if err != nil {
-				return irrecoverable.NewExceptionf("could not decode entity: %w", err)
-			}
-
-			// process the entity
-			err = handle()
-			if err != nil {
-				return fmt.Errorf("could not handle entity: %w", err)
-			}
-
-			return nil
-		})
+		err = item.Value(handle)
 
 		if err != nil {
 			return fmt.Errorf("could not process value: %w", err)
@@ -134,20 +119,12 @@ func TraverseByPrefix(r storage.Reader, prefix []byte, iterFunc IterationFunc, o
 
 // KeyOnlyIterateFunc returns an IterationFunc that only iterates over keys
 func KeyOnlyIterateFunc(fn func(key []byte) error) IterationFunc {
-	return func() (CheckFunc, CreateFunc, HandleFunc) {
+	return func() (CheckFunc, HandleFunc) {
 		checker := func(key []byte) (bool, error) {
 			return false, fn(key)
 		}
 
-		create := func() interface{} {
-			return nil
-		}
-
-		handle := func() error {
-			return nil
-		}
-
-		return checker, create, handle
+		return checker, nil
 	}
 }
 
