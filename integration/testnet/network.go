@@ -115,7 +115,7 @@ const (
 	DefaultFlowPort = 2137
 
 	// PrimaryAN is the container name for the primary access node to use for API requests
-	PrimaryAN = "access_1"
+	PrimaryAN = "flowlocal.access_1"
 
 	// PrimaryON is the container name for the primary observer node to use for API requests
 	PrimaryON = "observer_1"
@@ -1032,7 +1032,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	// be created before consensus node. so by the time we are creating access/consensus
 	// node, the execution has been created, and we can add the dependency here
 	if nodeConf.Role == flow.RoleAccess || nodeConf.Role == flow.RoleConsensus {
-		execution1 := net.ContainerByName("execution_1")
+		execution1 := net.ContainerByName("flowlocal.execution_1")
 		execution1.After(suiteContainer)
 	} else {
 		net.network.After(suiteContainer)
@@ -1358,7 +1358,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 	confs := make([]ContainerConfig, 0, nNodes)
 	for i, conf := range networkConf.Nodes {
 		// define the node's name <role>_<n> and address <name>:<port>
-		name := fmt.Sprintf("%s_%d", conf.Role.String(), roleCounter[conf.Role]+1)
+		name := fmt.Sprintf("flowlocal.%s_%d", conf.Role.String(), roleCounter[conf.Role]+1)
 
 		addr := fmt.Sprintf("%s:%d", name, DefaultFlowPort)
 		roleCounter[conf.Role]++
