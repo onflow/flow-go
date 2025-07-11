@@ -549,7 +549,6 @@ func (b *Builder) buildHeader(
 	if err != nil {
 		return nil, fmt.Errorf("could not sign proposal: %w", err)
 	}
-
 	return &flow.ProposalHeader{
 		Header:          header,
 		ProposerSigData: sig,
