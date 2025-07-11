@@ -73,64 +73,64 @@ func TestHeaderMalleability(t *testing.T) {
 	unittest.RequireEntityNonMalleable(t, header, unittest.WithFieldGenerator("HeaderBody.Timestamp", timestampGenerator))
 }
 
-// TestNewRootHeaderBody verifies the behavior of the NewRootHeaderBody constructor.
+// TestNewRootHeaderBody verifies that NewRootHeaderBody enforces root‐only constraints.
 //
 // Test Cases:
 //
-// 1. Valid root input with valid ParentID:
-//   - Ensures a HeaderBody is returned when only ChainID is set and no parent QC is present,
-//     ParentView is zero, and Timestamp is non-zero.
+// 1. Valid root input with non‐zero ParentID:
+//   - Ensures a HeaderBody is returned when only ChainID, Timestamp are set,
+//     ParentView is zero, and the three QC fields are empty.
 //
 // 2. Valid root input with zero ParentID:
-//   - Ensures a HeaderBody is returned when only ChainID is set and no parent QC is present,
-//     ParentView is zero, and Timestamp is non-zero.
+//   - Same as above, but ParentID==ZeroID.  Should also succeed.
 //
 // 3. Missing ChainID:
 //   - Ensures an error is returned when ChainID is empty.
 //
-// 4. Contains parent QC via ParentID:
-//   - Ensures an error is returned when ParentID is non-zero.
+// 4. Non‐empty ParentVoterIndices:
+//   - Ensures an error is returned when ParentVoterIndices is non‐empty.
 //
-// 5. Non-zero ParentView:
-//   - Ensures an error is returned when ParentView is non-zero.
+// 5. Non‐empty ParentVoterSigData:
+//   - Ensures an error is returned when ParentVoterSigData is non‐empty.
 //
-// 6. Zero Timestamp:
+// 6. Non‐zero ProposerID:
+//   - Ensures an error is returned when ProposerID is non‐zero.
+//
+// 7. Non‐zero ParentView:
+//   - Ensures an error is returned when ParentView is non‐zero.
+//
+// 8. Zero Timestamp:
 //   - Ensures an error is returned when Timestamp is the zero value.
 func TestNewRootHeaderBody(t *testing.T) {
 	validID := unittest.IdentifierFixture()
 	ts := time.Unix(1_600_000_000, 0)
 
-	// Base untrusted root header: no parent QC, valid ChainID, zero ParentView, non-zero Timestamp.
+	// Base untrusted root header: ChainID & Timestamp set, no QC fields, ParentView==0
 	base := flow.UntrustedHeaderBody{
 		ChainID:            flow.Emulator,
-		ParentID:           validID,
+		ParentID:           validID, // allowed to be non-zero
 		Height:             0,
 		Timestamp:          ts,
 		View:               0,
 		ParentView:         0,
 		ParentVoterIndices: []byte{},
 		ParentVoterSigData: []byte{},
-		ProposerID:         flow.ZeroID,
+		ProposerID:         flow.ZeroID, // must be zero
 		LastViewTC:         nil,
 	}
 
-	t.Run("valid root input with valid ParentID", func(t *testing.T) {
+	t.Run("valid root input with non-zero ParentID", func(t *testing.T) {
 		hb, err := flow.NewRootHeaderBody(base)
 		assert.NoError(t, err)
 		assert.NotNil(t, hb)
-		assert.Equal(t, flow.Emulator, hb.ChainID)
-		assert.Equal(t, ts, hb.Timestamp)
-		assert.Zero(t, hb.ParentView)
 	})
 
-	t.Run("valid root input with ParentID as ZeroID", func(t *testing.T) {
-		base.ParentID = flow.ZeroID
-		hb, err := flow.NewRootHeaderBody(base)
+	t.Run("valid root input with zero ParentID", func(t *testing.T) {
+		u := base
+		u.ParentID = flow.ZeroID
+		hb, err := flow.NewRootHeaderBody(u)
 		assert.NoError(t, err)
 		assert.NotNil(t, hb)
-		assert.Equal(t, flow.Emulator, hb.ChainID)
-		assert.Equal(t, ts, hb.Timestamp)
-		assert.Zero(t, hb.ParentView)
 	})
 
 	t.Run("missing ChainID", func(t *testing.T) {
@@ -142,21 +142,31 @@ func TestNewRootHeaderBody(t *testing.T) {
 		assert.Contains(t, err.Error(), "ChainID of root header body must not be empty")
 	})
 
-	t.Run("contains parent QC via ParentID", func(t *testing.T) {
-		badBody := flow.UntrustedHeaderBody{
-			ChainID:            flow.Emulator,
-			ParentID:           validID,
-			ParentView:         0,
-			ParentVoterIndices: unittest.QCSigDataFixture(),
-			ParentVoterSigData: unittest.SignerIndicesFixture(4),
-			ProposerID:         validID,
-			Timestamp:          time.Now(),
-		}
-
-		hb, err := flow.NewRootHeaderBody(badBody)
+	t.Run("non-empty ParentVoterIndices", func(t *testing.T) {
+		u := base
+		u.ParentVoterIndices = unittest.SignerIndicesFixture(4)
+		hb, err := flow.NewRootHeaderBody(u)
 		assert.Error(t, err)
 		assert.Nil(t, hb)
-		assert.Contains(t, err.Error(), "root header body must not contain a parent QC")
+		assert.Contains(t, err.Error(), "must not set ParentVoterIndices")
+	})
+
+	t.Run("non-empty ParentVoterSigData", func(t *testing.T) {
+		u := base
+		u.ParentVoterSigData = unittest.QCSigDataFixture()
+		hb, err := flow.NewRootHeaderBody(u)
+		assert.Error(t, err)
+		assert.Nil(t, hb)
+		assert.Contains(t, err.Error(), "must not set ParentVoterSigData")
+	})
+
+	t.Run("non-zero ProposerID", func(t *testing.T) {
+		u := base
+		u.ProposerID = validID
+		hb, err := flow.NewRootHeaderBody(u)
+		assert.Error(t, err)
+		assert.Nil(t, hb)
+		assert.Contains(t, err.Error(), "must not set ProposerID")
 	})
 
 	t.Run("non-zero ParentView", func(t *testing.T) {
@@ -392,74 +402,114 @@ func TestHeaderBodyBuilder_PresenceChecks(t *testing.T) {
 // Test Cases:
 //
 // 1. Valid root input:
-//   - Ensures a Header is returned when the embedded HeaderBody is a valid root body (ParentID is valid)
-//     and PayloadHash is ZeroID.
+//   - Embedded HeaderBody is a valid root body and PayloadHash is non-zero.
+//   - Ensures no error and returned Header has the correct fields.
 //
-// 2. Valid root input with ParentID = ZeroID:
-//   - Ensures a Header is returned when the embedded HeaderBody is a valid root body (ParentID is ZeroID)
-//     and PayloadHash is ZeroID.
+// 2. Valid root input with ParentID == ZeroID:
+//   - Same as above but ParentID is zero.  Should still succeed.
 //
 // 3. Invalid root body:
-//   - Ensures an error is returned when the embedded HeaderBody is invalid.
+//   - Embedded HeaderBody fails root-only constraints.
+//   - Ensures an error wrapping "invalid root header body".
 //
 // 4. Empty PayloadHash:
-//   - Ensures an error is returned when PayloadHash is zero.
+//   - PayloadHash is ZeroID.
+//   - Ensures an error mentioning "PayloadHash must not be empty".
 //
-// 5. Non‐empty ParentVoterIndices:
-//   - Ensures an error is returned when the root header’s ParentVoterIndices is non‐empty.
+// 5. Non-empty ParentVoterIndices:
+//   - Ensures an error is returned when ParentVoterIndices is non-empty.
+//
+// 6. Non-empty ParentVoterSigData:
+//   - Ensures an error is returned when ParentVoterSigData is non-empty.
+//
+// 7. Non-zero ProposerID:
+//   - Ensures an error is returned when ProposerID is non-zero.
+//
+// TestNewRootHeader verifies the behavior of the NewRootHeader constructor.
+//
+// Test Cases:
+//
+// 1. Valid root input:
+//   - Embedded HeaderBody is a valid root body and PayloadHash is non-zero.
+//   - Ensures no error and returned Header has the correct fields.
+//
+// 2. Valid root input with ParentID == ZeroID and PayloadHash non-zero:
+//   - Same as above but ParentID is zero.  Should still succeed.
+//
+// 3. Invalid root body:
+//   - Embedded HeaderBody fails root-only constraints (e.g. missing ChainID).
+//   - Ensures an error wrapping "invalid root header body".
+//
+// 4. Empty PayloadHash:
+//   - PayloadHash is ZeroID.
+//   - Ensures an error mentioning "PayloadHash must not be empty".
+//
+// 5. Any QC‐field violation in the embedded body:
+//   - Even if PayloadHash is non-zero, if ParentVoterIndices, ParentVoterSigData or ProposerID
+//     are non‐empty in the root body, NewRootHeader should fail at the body check.
+//   - Ensures an error wrapping "invalid root header body".
 func TestNewRootHeader(t *testing.T) {
 	ts := time.Unix(1_600_000_000, 0)
-	validHash := unittest.IdentifierFixture()
+	nonZeroHash := unittest.IdentifierFixture()
 	validID := unittest.IdentifierFixture()
 
+	//  Prepare a valid root HeaderBody once
 	rootBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
 		ChainID:            flow.Emulator,
-		ParentView:         0,
-		ParentVoterIndices: []byte{},
-		ParentVoterSigData: []byte{},
-		ParentID:           validID,
+		ParentID:           validID, // allowed
 		Height:             0,
 		Timestamp:          ts,
 		View:               0,
-		ProposerID:         flow.ZeroID,
+		ParentView:         0,
+		ParentVoterIndices: []byte{},    // must be empty
+		ParentVoterSigData: []byte{},    // must be empty
+		ProposerID:         flow.ZeroID, // must be zero
+		LastViewTC:         nil,
 	})
 	assert.NoError(t, err)
 
 	t.Run("valid root input", func(t *testing.T) {
 		u := flow.UntrustedHeader{
 			HeaderBody:  *rootBody,
-			PayloadHash: validHash,
+			PayloadHash: nonZeroHash,
 		}
 		h, err := flow.NewRootHeader(u)
 		assert.NoError(t, err)
 		assert.NotNil(t, h)
 		assert.Equal(t, *rootBody, h.HeaderBody)
-		assert.Equal(t, validHash, h.PayloadHash)
+		assert.Equal(t, nonZeroHash, h.PayloadHash)
 	})
 
-	t.Run("valid root input with ParentID as ZeroID", func(t *testing.T) {
-		rootBody.ParentID = flow.ZeroID
+	t.Run("valid root input with ParentID == ZeroID", func(t *testing.T) {
+		body := *rootBody
+		body.ParentID = flow.ZeroID
 		u := flow.UntrustedHeader{
-			HeaderBody:  *rootBody,
-			PayloadHash: validHash,
+			HeaderBody:  body,
+			PayloadHash: nonZeroHash,
 		}
 		h, err := flow.NewRootHeader(u)
 		assert.NoError(t, err)
 		assert.NotNil(t, h)
-		assert.Equal(t, *rootBody, h.HeaderBody)
-		assert.Equal(t, validHash, h.PayloadHash)
+		assert.Equal(t, flow.ZeroID, h.HeaderBody.ParentID)
+		assert.Equal(t, nonZeroHash, h.PayloadHash)
 	})
 
-	t.Run("invalid root body", func(t *testing.T) {
-		badBody := flow.UntrustedHeaderBody{
-			ChainID:            "",
+	t.Run("invalid root body (missing ChainID)", func(t *testing.T) {
+		// Build an entirely unvalidated flow.HeaderBody by casting an UntrustedHeaderBody)
+		badBody := flow.HeaderBody(flow.UntrustedHeaderBody{
+			ChainID:            "", // invalid
+			ParentID:           flow.ZeroID,
+			Height:             0,
+			Timestamp:          ts,
+			View:               0,
 			ParentView:         0,
 			ParentVoterIndices: []byte{},
 			ParentVoterSigData: []byte{},
-		}
+			ProposerID:         flow.ZeroID,
+		})
 		u := flow.UntrustedHeader{
-			HeaderBody:  flow.HeaderBody(badBody),
-			PayloadHash: flow.ZeroID,
+			HeaderBody:  badBody,
+			PayloadHash: nonZeroHash,
 		}
 		h, err := flow.NewRootHeader(u)
 		assert.Error(t, err)
@@ -475,7 +525,73 @@ func TestNewRootHeader(t *testing.T) {
 		h, err := flow.NewRootHeader(u)
 		assert.Error(t, err)
 		assert.Nil(t, h)
-		assert.Contains(t, err.Error(), "PayloadHash")
+		assert.Contains(t, err.Error(), "PayloadHash must not be empty")
+	})
+
+	t.Run("body with ParentVoterIndices set", func(t *testing.T) {
+		badBody := flow.HeaderBody(flow.UntrustedHeaderBody{
+			ChainID:            flow.Emulator,
+			ParentID:           flow.ZeroID,
+			Height:             0,
+			Timestamp:          ts,
+			View:               0,
+			ParentView:         0,
+			ParentVoterIndices: unittest.SignerIndicesFixture(3), // invalid
+			ParentVoterSigData: []byte{},
+			ProposerID:         flow.ZeroID,
+		})
+		u := flow.UntrustedHeader{
+			HeaderBody:  badBody,
+			PayloadHash: nonZeroHash,
+		}
+		h, err := flow.NewRootHeader(u)
+		assert.Error(t, err)
+		assert.Nil(t, h)
+		assert.Contains(t, err.Error(), "invalid root header body: root header body must not set ParentVoterIndices")
+	})
+
+	t.Run("body with ParentVoterSigData set", func(t *testing.T) {
+		badBody := flow.HeaderBody(flow.UntrustedHeaderBody{
+			ChainID:            flow.Emulator,
+			ParentID:           flow.ZeroID,
+			Height:             0,
+			Timestamp:          ts,
+			View:               0,
+			ParentView:         0,
+			ParentVoterIndices: []byte{},
+			ParentVoterSigData: unittest.QCSigDataFixture(), // invalid
+			ProposerID:         flow.ZeroID,
+		})
+		u := flow.UntrustedHeader{
+			HeaderBody:  badBody,
+			PayloadHash: nonZeroHash,
+		}
+		h, err := flow.NewRootHeader(u)
+		assert.Error(t, err)
+		assert.Nil(t, h)
+		assert.Contains(t, err.Error(), "invalid root header body: root header body must not set ParentVoterSigData")
+	})
+
+	t.Run("body with ProposerID set", func(t *testing.T) {
+		badBody := flow.HeaderBody(flow.UntrustedHeaderBody{
+			ChainID:            flow.Emulator,
+			ParentID:           flow.ZeroID,
+			Height:             0,
+			Timestamp:          ts,
+			View:               0,
+			ParentView:         0,
+			ParentVoterIndices: []byte{},
+			ParentVoterSigData: []byte{},
+			ProposerID:         validID, // invalid
+		})
+		u := flow.UntrustedHeader{
+			HeaderBody:  badBody,
+			PayloadHash: nonZeroHash,
+		}
+		h, err := flow.NewRootHeader(u)
+		assert.Error(t, err)
+		assert.Nil(t, h)
+		assert.Contains(t, err.Error(), "invalid root header body: root header body must not set ProposerID")
 	})
 }
 

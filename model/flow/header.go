@@ -117,10 +117,14 @@ func NewRootHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 		return nil, fmt.Errorf("ChainID of root header body must not be empty")
 	}
 
-	if HeaderBody(untrusted).ContainsParentQC() {
-		return nil, fmt.Errorf(
-			"root header body must not contain a parent QC (ParentVoterIndices, ParentVoterSigData, ProposerID must all be empty)",
-		)
+	if len(untrusted.ParentVoterIndices) != 0 {
+		return nil, fmt.Errorf("root header body must not set ParentVoterIndices")
+	}
+	if len(untrusted.ParentVoterSigData) != 0 {
+		return nil, fmt.Errorf("root header body must not set ParentVoterSigData")
+	}
+	if untrusted.ProposerID != ZeroID {
+		return nil, fmt.Errorf("root header body must not set ProposerID")
 	}
 
 	if untrusted.ParentView != 0 {
