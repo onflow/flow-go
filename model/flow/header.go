@@ -119,7 +119,7 @@ func NewRootHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 
 	if HeaderBody(untrusted).ContainsParentQC() {
 		return nil, fmt.Errorf(
-			"root header body must not contain a parent QC (ParentID, ParentVoterIndices, ParentVoterSigData, ProposerID must all be empty)",
+			"root header body must not contain a parent QC (ParentVoterIndices, ParentVoterSigData, ProposerID must all be empty)",
 		)
 	}
 

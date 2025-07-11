@@ -198,7 +198,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			if !ok {
 				return nil
 			}
-
 			headerBuilder := flow.NewHeaderBodyBuilder().
 				WithChainID("chain").
 				WithParentID(parentID).
