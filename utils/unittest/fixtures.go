@@ -294,7 +294,9 @@ func ReceiptAndSealForBlock(block *flow.Block, serviceEvents ...flow.ServiceEven
 }
 
 func PayloadFixture(options ...func(*flow.Payload)) flow.Payload {
-	payload := *flow.NewEmptyPayload()
+	payload := flow.Payload{
+		ProtocolStateID: IdentifierFixture(),
+	}
 	for _, option := range options {
 		option(&payload)
 	}
@@ -365,8 +367,7 @@ func WithExecutionResults(results ...*flow.ExecutionResult) func(*flow.Payload) 
 }
 
 func BlockWithParentFixture(parent *flow.Header) *flow.Block {
-	payload := PayloadFixture(WithProtocolStateID(IdentifierFixture()))
-	return BlockWithParentAndPayload(parent, payload)
+	return BlockWithParentAndPayload(parent, PayloadFixture())
 }
 
 // BlockWithParentAndPayload creates a new block that is valid
