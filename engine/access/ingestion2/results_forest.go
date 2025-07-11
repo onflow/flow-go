@@ -181,6 +181,7 @@ var (
 type ResultsForest struct {
 	log                         zerolog.Logger
 	forest                      forest.LevelledForest
+	manager                     *ForestManager
 	headers                     storage.Headers
 	maxViewDelta                uint64
 	lowestRejectedView          uint64
@@ -198,6 +199,7 @@ func NewResultsForest(
 	log zerolog.Logger,
 	headers storage.Headers,
 	latestPersistedSealedResult storage.LatestPersistedSealedResultReader,
+	manager *ForestManager,
 	maxViewDelta uint64,
 ) (*ResultsForest, error) {
 	resultID, sealedHeight := latestPersistedSealedResult.Latest()
@@ -209,6 +211,7 @@ func NewResultsForest(
 	rf := &ResultsForest{
 		log:                         log.With().Str("component", "results_forest").Logger(),
 		forest:                      *forest.NewLevelledForest(sealedHeader.View),
+		manager:                     manager,
 		headers:                     headers,
 		maxViewDelta:                maxViewDelta,
 		lastSealedResultID:          resultID,
@@ -284,6 +287,8 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt) (bool, error
 	if err != nil {
 		return false, fmt.Errorf("failed to add receipt to its container: %w", err)
 	}
+
+	rf.manager.OnReceiptAdded(container)
 
 	return added > 0, nil
 }
@@ -562,9 +567,8 @@ func (rf *ResultsForest) markResultSealed(container *ExecutionResultContainer) {
 
 // OnBlockStatusUpdated signals that the block status has been updated.
 // It finds all vertices for results of blocks that conflict with the finalized block and abort them.
-func (rf *ResultsForest) OnBlockStatusUpdated(finalized *flow.Header, sealed *flow.Header, parentBlockResultIDs []flow.Identifier) {
+func (rf *ResultsForest) OnBlockStatusUpdated(finalized *flow.Header, sealed *flow.Header, parentBlockResultIDs []flow.Identifier) error {
 	finalizedBlockID := finalized.ID()
-
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
@@ -580,6 +584,9 @@ func (rf *ResultsForest) OnBlockStatusUpdated(finalized *flow.Header, sealed *fl
 			return true
 		})
 	}
+
+	rf.manager.OnBlockStatusUpdated(finalized, sealed)
+	return nil
 }
 
 // abandonFork recursively abandons a container and all its descendants.
