@@ -43,20 +43,21 @@ func LookupExecutionReceipts(r storage.Reader, blockID flow.Identifier, receiptI
 }
 
 // receiptIterationFunc returns an in iteration function which returns all receipt IDs found during traversal
-func receiptIterationFunc(receiptIDs *[]flow.Identifier) func() (CheckFunc, CreateFunc, HandleFunc) {
-	check := func(key []byte) (bool, error) {
-		return true, nil
-	}
+func receiptIterationFunc(receiptIDs *[]flow.Identifier) IterationFunc {
+	return func(unmarshal func(data []byte, v any) error) (CheckFunc, HandleFunc) {
+		check := func(key []byte) (bool, error) {
+			return true, nil
+		}
 
-	var receiptID flow.Identifier
-	create := func() interface{} {
-		return &receiptID
-	}
-	handle := func() error {
-		*receiptIDs = append(*receiptIDs, receiptID)
-		return nil
-	}
-	return func() (CheckFunc, CreateFunc, HandleFunc) {
-		return check, create, handle
+		handle := func(data []byte) error {
+			var receiptID flow.Identifier
+			err := unmarshal(data, &receiptID)
+			if err != nil {
+				return err
+			}
+			*receiptIDs = append(*receiptIDs, receiptID)
+			return nil
+		}
+		return check, handle
 	}
 }
