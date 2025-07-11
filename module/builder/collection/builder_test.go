@@ -826,7 +826,7 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 	setter := func(h *flow.HeaderBodyBuilder) error {
 		h.WithHeight(1).
 			WithChainID(flow.Emulator).
-			WithParentID(unittest.IdentifierFixture()).
+			WithParentID(parentID).
 			WithView(1337).
 			WithParentView(1336).
 			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).

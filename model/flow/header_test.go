@@ -77,20 +77,24 @@ func TestHeaderMalleability(t *testing.T) {
 //
 // Test Cases:
 //
-// 1. Valid root input:
+// 1. Valid root input with valid ParentID:
 //   - Ensures a HeaderBody is returned when only ChainID is set and no parent QC is present,
 //     ParentView is zero, and Timestamp is non-zero.
 //
-// 2. Missing ChainID:
+// 2. Valid root input with zero ParentID:
+//   - Ensures a HeaderBody is returned when only ChainID is set and no parent QC is present,
+//     ParentView is zero, and Timestamp is non-zero.
+//
+// 3. Missing ChainID:
 //   - Ensures an error is returned when ChainID is empty.
 //
-// 3. Contains parent QC via ParentID:
+// 4. Contains parent QC via ParentID:
 //   - Ensures an error is returned when ParentID is non-zero.
 //
-// 4. Non-zero ParentView:
+// 5. Non-zero ParentView:
 //   - Ensures an error is returned when ParentView is non-zero.
 //
-// 5. Zero Timestamp:
+// 6. Zero Timestamp:
 //   - Ensures an error is returned when Timestamp is the zero value.
 func TestNewRootHeaderBody(t *testing.T) {
 	validID := unittest.IdentifierFixture()
@@ -99,7 +103,7 @@ func TestNewRootHeaderBody(t *testing.T) {
 	// Base untrusted root header: no parent QC, valid ChainID, zero ParentView, non-zero Timestamp.
 	base := flow.UntrustedHeaderBody{
 		ChainID:            flow.Emulator,
-		ParentID:           flow.ZeroID,
+		ParentID:           validID,
 		Height:             0,
 		Timestamp:          ts,
 		View:               0,
@@ -110,7 +114,17 @@ func TestNewRootHeaderBody(t *testing.T) {
 		LastViewTC:         nil,
 	}
 
-	t.Run("valid root input", func(t *testing.T) {
+	t.Run("valid root input with valid ParentID", func(t *testing.T) {
+		hb, err := flow.NewRootHeaderBody(base)
+		assert.NoError(t, err)
+		assert.NotNil(t, hb)
+		assert.Equal(t, flow.Emulator, hb.ChainID)
+		assert.Equal(t, ts, hb.Timestamp)
+		assert.Zero(t, hb.ParentView)
+	})
+
+	t.Run("valid root input with ParentID as ZeroID", func(t *testing.T) {
+		base.ParentID = flow.ZeroID
 		hb, err := flow.NewRootHeaderBody(base)
 		assert.NoError(t, err)
 		assert.NotNil(t, hb)
@@ -378,27 +392,32 @@ func TestHeaderBodyBuilder_PresenceChecks(t *testing.T) {
 // Test Cases:
 //
 // 1. Valid root input:
-//   - Ensures a Header is returned when the embedded HeaderBody is a valid root body
+//   - Ensures a Header is returned when the embedded HeaderBody is a valid root body (ParentID is valid)
 //     and PayloadHash is ZeroID.
 //
-// 2. Invalid root body:
+// 2. Valid root input with ParentID = ZeroID:
+//   - Ensures a Header is returned when the embedded HeaderBody is a valid root body (ParentID is ZeroID)
+//     and PayloadHash is ZeroID.
+//
+// 3. Invalid root body:
 //   - Ensures an error is returned when the embedded HeaderBody is invalid.
 //
-// 3. Empty PayloadHash:
+// 4. Empty PayloadHash:
 //   - Ensures an error is returned when PayloadHash is zero.
 //
-// 4. Non‐empty ParentVoterIndices:
+// 5. Non‐empty ParentVoterIndices:
 //   - Ensures an error is returned when the root header’s ParentVoterIndices is non‐empty.
 func TestNewRootHeader(t *testing.T) {
 	ts := time.Unix(1_600_000_000, 0)
 	validHash := unittest.IdentifierFixture()
+	validID := unittest.IdentifierFixture()
 
 	rootBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
 		ChainID:            flow.Emulator,
 		ParentView:         0,
 		ParentVoterIndices: []byte{},
 		ParentVoterSigData: []byte{},
-		ParentID:           flow.ZeroID,
+		ParentID:           validID,
 		Height:             0,
 		Timestamp:          ts,
 		View:               0,
@@ -407,6 +426,19 @@ func TestNewRootHeader(t *testing.T) {
 	assert.NoError(t, err)
 
 	t.Run("valid root input", func(t *testing.T) {
+		u := flow.UntrustedHeader{
+			HeaderBody:  *rootBody,
+			PayloadHash: validHash,
+		}
+		h, err := flow.NewRootHeader(u)
+		assert.NoError(t, err)
+		assert.NotNil(t, h)
+		assert.Equal(t, *rootBody, h.HeaderBody)
+		assert.Equal(t, validHash, h.PayloadHash)
+	})
+
+	t.Run("valid root input with ParentID as ZeroID", func(t *testing.T) {
+		rootBody.ParentID = flow.ZeroID
 		u := flow.UntrustedHeader{
 			HeaderBody:  *rootBody,
 			PayloadHash: validHash,
