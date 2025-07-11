@@ -80,7 +80,7 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	suite.blockCount = 5
 	suite.blockHeadersMap = make(map[uint64]*flow.Header, suite.blockCount)
 
-	root, err := flow.Genesis(flow.Emulator)
+	root, err := unittest.Block.Genesis(flow.Emulator)
 	require.NoError(suite.T(), err)
 	suite.nodeRootBlock = root
 	suite.blockHeadersMap[suite.nodeRootBlock.Header.Height] = suite.nodeRootBlock.ToHeader()

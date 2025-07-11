@@ -138,7 +138,7 @@ func (s *Suite) SetupTest() {
 	blockCount := 5
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
 	var err error
-	s.rootBlock, err = flow.Genesis(flow.Emulator)
+	s.rootBlock, err = unittest.Block.Genesis(flow.Emulator)
 	require.NoError(s.T(), err)
 	parent := s.rootBlock.ToHeader()
 

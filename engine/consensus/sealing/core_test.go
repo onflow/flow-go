@@ -680,7 +680,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 
 	rootSnapshot := unittest.StateSnapshotForKnownBlock(s.finalizedRootHeader, nil)
 	s.Snapshots[s.finalizedRootHeader.ID()] = rootSnapshot
-	block, err := flow.NewBlock(
+	block, err := flow.NewRootBlock(
 		flow.UntrustedBlock{
 			Header:  s.finalizedRootHeader.HeaderBody,
 			Payload: unittest.PayloadFixture(),

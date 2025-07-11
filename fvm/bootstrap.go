@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var (
@@ -336,7 +337,7 @@ func (b *bootstrapExecutor) Preprocess() error {
 
 func (b *bootstrapExecutor) Execute() error {
 	if b.rootBlock == nil {
-		rootblock, err := flow.Genesis(b.ctx.Chain.ChainID())
+		rootblock, err := unittest.Block.Genesis(b.ctx.Chain.ChainID())
 		if err != nil {
 			return fmt.Errorf("could not build genesis block: %w", err)
 		}

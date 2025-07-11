@@ -426,7 +426,7 @@ func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Bl
 }
 
 func GenesisFixture() *flow.Block {
-	genesis, err := flow.Genesis(flow.Emulator)
+	genesis, err := Block.Genesis(flow.Emulator)
 	if err != nil {
 		panic(err)
 	}
@@ -2254,7 +2254,7 @@ func BootstrapFixtureWithChainID(
 	opts ...func(*flow.Block),
 ) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
 
-	root, err := flow.Genesis(chainID)
+	root, err := Block.Genesis(chainID)
 	if err != nil {
 		panic(err)
 	}

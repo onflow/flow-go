@@ -14,7 +14,7 @@ import (
 
 func TestPayloadEncodeEmptyJSON(t *testing.T) {
 	// nil slices
-	payload := unittest.PayloadFixture()
+	payload := *flow.NewEmptyPayload()
 	payloadHash1 := payload.Hash()
 	encoded1, err := json.Marshal(payload)
 	require.NoError(t, err)
