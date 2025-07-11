@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var (
@@ -75,7 +74,7 @@ type BootstrapProcedure struct {
 }
 
 type BootstrapParams struct {
-	rootBlock *flow.Header
+	rootHeader *flow.Header
 
 	// genesis parameters
 	accountKeys        BootstrapAccountKeys
@@ -196,7 +195,7 @@ func WithEpochConfig(epochConfig epochs.EpochConfig) BootstrapProcedureOption {
 
 func WithRootBlock(rootBlock *flow.Header) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
-		bp.rootBlock = rootBlock
+		bp.rootHeader = rootBlock
 		return bp
 	}
 }
@@ -336,12 +335,34 @@ func (b *bootstrapExecutor) Preprocess() error {
 }
 
 func (b *bootstrapExecutor) Execute() error {
-	if b.rootBlock == nil {
-		rootblock, err := unittest.Block.Genesis(b.ctx.Chain.ChainID())
+	if b.rootHeader == nil {
+		// create the raw content for the genesis block
+		payload := flow.NewEmptyPayload()
+
+		// create the headerBody
+		headerBody, err := flow.NewRootHeaderBody(
+			flow.UntrustedHeaderBody{
+				ChainID:   b.ctx.Chain.ChainID(),
+				ParentID:  flow.ZeroID,
+				Height:    0,
+				Timestamp: flow.GenesisTime,
+				View:      0,
+			},
+		)
 		if err != nil {
-			return fmt.Errorf("could not build genesis block: %w", err)
+			return fmt.Errorf("failed to create root header body: %w", err)
 		}
-		b.rootBlock = rootblock.ToHeader()
+
+		header, err := flow.NewRootHeader(
+			flow.UntrustedHeader{
+				HeaderBody:  *headerBody,
+				PayloadHash: payload.Hash(),
+			})
+		if err != nil {
+			return fmt.Errorf("failed to create root header: %w", err)
+		}
+
+		b.rootHeader = header
 	}
 
 	// initialize the account addressing state
@@ -747,7 +768,7 @@ func (b *bootstrapExecutor) deployEpoch(deployTo flow.Address, env *templates.En
 	contract := contracts.FlowEpoch(*env)
 
 	context := NewContextFromParent(b.ctx,
-		WithBlockHeader(b.rootBlock),
+		WithBlockHeader(b.rootHeader),
 		WithBlocks(&environment.NoopBlockFinder{}),
 	)
 
@@ -1059,7 +1080,7 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	}
 
 	ctx := NewContextFromParent(b.ctx,
-		WithBlockHeader(b.rootBlock),
+		WithBlockHeader(b.rootHeader),
 		WithEntropyProvider(stubEntropyProvider{}),
 		WithEVMEnabled(true),
 	)
