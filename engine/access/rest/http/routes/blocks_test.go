@@ -242,7 +242,7 @@ func generateMocks(backend *mock.API, count int) ([]string, []string, []*flow.Bl
 
 	for i := 0; i < count; i++ {
 		block := unittest.BlockFixture(
-			unittest.Block.WithHeight(uint64(i)),
+			unittest.Block.WithHeight(uint64(i + 1)), // avoiding edge case of height = 0 (genesis block)
 		)
 		blocks[i] = block
 		blockIDs[i] = block.ID().String()

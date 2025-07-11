@@ -128,7 +128,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	// setup the events storage mock
 	for i := range blockIDs {
 		block := unittest.BlockFixture(
-			unittest.Block.WithHeight(uint64(i)),
+			unittest.Block.WithHeight(uint64(i + 1)), // avoiding edge case of height = 0 (genesis block)
 		)
 		id := block.ID()
 		blockIDs[i] = id[:]

@@ -25,7 +25,8 @@ func TestFinalizer(t *testing.T) {
 		// reference block on the main consensus chain
 		refBlock := unittest.ClusterBlockFixture()
 		// genesis block for the cluster chain
-		genesis := unittest.ClusterBlock.Genesis()
+		genesis, err := unittest.ClusterBlock.Genesis()
+		require.NoError(t, err)
 
 		metrics := metrics.NewNoopCollector()
 

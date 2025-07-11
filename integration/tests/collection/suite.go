@@ -345,7 +345,8 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 
 	setup, ok := suite.net.Result().ServiceEvents[0].Event.(*flow.EpochSetup)
 	suite.Require().True(ok, "could not get root seal setup")
-	rootBlock := clusterstate.CanonicalRootBlock(setup.Counter, myCluster)
+	rootBlock, err := clusterstate.CanonicalRootBlock(setup.Counter, myCluster)
+	suite.Require().NoError(err)
 	node := suite.net.ContainerByID(id)
 
 	db, err := node.DB()

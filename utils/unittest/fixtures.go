@@ -431,7 +431,10 @@ func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Bl
 }
 
 func GenesisFixture() *flow.Block {
-	genesis := flow.Genesis(flow.Emulator)
+	genesis, err := flow.Genesis(flow.Emulator)
+	if err != nil {
+		panic(err)
+	}
 	return genesis
 }
 
@@ -464,6 +467,47 @@ func HeaderBodyFixture(opts ...func(header flow.HeaderBody)) flow.HeaderBody {
 	}
 
 	return header
+}
+
+// WithRootDefaults zeroes out all parent‐QC fields and enforces root constraints.
+func WithRootDefaults() func(*flow.UntrustedHeaderBody) {
+	ts := time.Unix(1_600_000_000, 0)
+	return func(u *flow.UntrustedHeaderBody) {
+		u.ChainID = flow.Emulator // still must be non‐empty
+		u.ParentID = flow.ZeroID  // allowed to be zero
+		u.Height = 0
+		u.View = 0
+		u.Timestamp = ts // non‐zero
+		u.ParentView = 0
+		u.ParentVoterIndices = []byte{}
+		u.ParentVoterSigData = []byte{}
+		u.ProposerID = flow.ZeroID
+		u.LastViewTC = nil
+	}
+}
+
+// UntrustedHeaderBodyFixture returns an UntrustedHeaderBody
+// pre‐populated with sane defaults.  Any opts override those defaults.
+func UntrustedHeaderBodyFixture(opts ...func(*flow.UntrustedHeaderBody)) flow.UntrustedHeaderBody {
+	ts := time.Unix(1_600_000_000, 0)
+	height := 1 + uint64(rand.Uint32())
+	view := height + uint64(rand.Intn(1000))
+	u := flow.UntrustedHeaderBody{
+		ChainID:            flow.Emulator,
+		ParentID:           IdentifierFixture(),
+		Height:             height,
+		Timestamp:          ts,
+		View:               view,
+		ParentView:         1,
+		ParentVoterIndices: SignerIndicesFixture(4),
+		ParentVoterSigData: QCSigDataFixture(),
+		ProposerID:         IdentifierFixture(),
+		LastViewTC:         nil,
+	}
+	for _, opt := range opts {
+		opt(&u)
+	}
+	return u
 }
 
 func BlockHeaderFixture(opts ...func(header *flow.Header)) *flow.Header {
@@ -2250,7 +2294,10 @@ func BootstrapFixtureWithChainID(
 	opts ...func(*flow.Block),
 ) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
 
-	root := flow.Genesis(chainID)
+	root, err := flow.Genesis(chainID)
+	if err != nil {
+		panic(err)
+	}
 	for _, apply := range opts {
 		apply(root)
 	}

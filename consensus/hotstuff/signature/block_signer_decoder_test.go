@@ -57,6 +57,8 @@ func (s *blockSignerDecoderSuite) Test_SuccessfulDecode() {
 func (s *blockSignerDecoderSuite) Test_RootBlock() {
 	s.block.Header.ParentVoterIndices = nil
 	s.block.Header.ParentVoterSigData = nil
+	s.block.Header.ParentView = 0
+	s.block.Header.ProposerID = flow.ZeroID
 	s.block.Header.View = 0
 
 	ids, err := s.decoder.DecodeSignerIDs(s.block.ToHeader())

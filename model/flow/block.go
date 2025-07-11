@@ -7,21 +7,24 @@ import (
 	"github.com/vmihailenco/msgpack/v4"
 )
 
-func Genesis(chainID ChainID) *Block {
+func Genesis(chainID ChainID) (*Block, error) {
 	// create the raw content for the genesis block
 	payload := Payload{}
 
 	// create the headerBody
-	headerBody := HeaderBody{
+	headerBody, err := NewRootHeaderBody(UntrustedHeaderBody{
 		ChainID:   chainID,
 		ParentID:  ZeroID,
 		Height:    0,
 		Timestamp: GenesisTime,
 		View:      0,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create root header body: %w", err)
 	}
 
 	// combine to block
-	return NewBlock(headerBody, payload)
+	return NewBlock(*headerBody, payload), nil
 }
 
 // Block (currently) includes the all block header metadata and the payload content.
@@ -60,17 +63,34 @@ func (b Block) ID() Identifier {
 
 // ToHeader converts the block into a compact [flow.Header] representation,
 // where the payload is compressed to a hash reference.
+// The receiver Block must be well-formed (enforced by mutation protection on the type).
+// This function may panic if invoked on a malformed Block.
 func (b Block) ToHeader() *Header {
-	return &Header{
+	if !b.Header.ContainsParentQC() {
+		rootHeader, err := NewRootHeader(UntrustedHeader{
+			HeaderBody:  b.Header,
+			PayloadHash: b.Payload.Hash(),
+		})
+		if err != nil {
+			panic(fmt.Errorf("could not build root header from block: %w", err))
+		}
+		return rootHeader
+	}
+
+	header, err := NewHeader(UntrustedHeader{
 		HeaderBody:  b.Header,
 		PayloadHash: b.Payload.Hash(),
+	})
+	if err != nil {
+		panic(fmt.Errorf("could not build header from block: %w", err))
 	}
+	return header
 }
 
 // TODO(malleability): remove MarshalMsgpack when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
 func (b Block) MarshalMsgpack() ([]byte, error) {
 	if b.Header.Timestamp.Location() != time.UTC {
-		b.Header.Timestamp = b.Header.Timestamp.UTC()
+		b.Header.Timestamp = b.Header.Timestamp.UTC() //nolint:structwrite
 	}
 
 	type Encodable Block
@@ -85,7 +105,7 @@ func (b *Block) UnmarshalMsgpack(data []byte) error {
 	*b = Block(decodable)
 
 	if b.Header.Timestamp.Location() != time.UTC {
-		b.Header.Timestamp = b.Header.Timestamp.UTC()
+		b.Header.Timestamp = b.Header.Timestamp.UTC() //nolint:structwrite
 	}
 
 	return err

@@ -48,9 +48,9 @@ func (s *AccountStatusesProviderSuite) SetupTest() {
 
 	s.chain = flow.Testnet.Chain()
 
-	s.rootBlock = unittest.BlockFixture(
-		unittest.Block.WithHeight(0),
-	)
+	var err error
+	s.rootBlock, err = flow.Genesis(s.chain.ChainID())
+	require.NoError(s.T(), err)
 
 	s.factory = NewDataProviderFactory(
 		s.log,

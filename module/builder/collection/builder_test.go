@@ -36,13 +36,19 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var noopSetter = func(header *flow.Header) error {
-	header.ParentVoterIndices = unittest.SignerIndicesFixture(4)
-	header.ParentVoterSigData = unittest.SignatureFixture()
-	header.ProposerID = unittest.IdentifierFixture()
+var noopSigner = func(*flow.Header) ([]byte, error) { return nil, nil }
+var noopSetter = func(h *flow.HeaderBodyBuilder) error {
+	h.WithHeight(42).
+		WithChainID(flow.Emulator).
+		WithParentID(unittest.IdentifierFixture()).
+		WithView(1337).
+		WithParentView(1336).
+		WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
+		WithParentVoterSigData(unittest.QCSigDataFixture()).
+		WithProposerID(unittest.IdentifierFixture())
+
 	return nil
 }
-var noopSigner = func(*flow.Header) ([]byte, error) { return nil, nil }
 
 type BuilderSuite struct {
 	suite.Suite
@@ -70,7 +76,8 @@ type BuilderSuite struct {
 func (suite *BuilderSuite) SetupTest() {
 	var err error
 
-	suite.genesis = unittest.ClusterBlock.Genesis()
+	suite.genesis, err = unittest.ClusterBlock.Genesis()
+	require.NoError(suite.T(), err)
 	suite.chainID = suite.genesis.Header.ChainID
 
 	suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
@@ -254,15 +261,8 @@ func (suite *BuilderSuite) TestBuildOn_NonExistentParent() {
 
 func (suite *BuilderSuite) TestBuildOn_Success() {
 	var expectedHeight uint64 = 42
-	setter := func(h *flow.Header) error {
-		h.Height = expectedHeight
-		h.ParentVoterIndices = unittest.SignerIndicesFixture(4)
-		h.ParentVoterSigData = unittest.SignatureFixture()
-		h.ProposerID = unittest.IdentifierFixture()
-		return nil
-	}
 
-	proposal, err := suite.builder.BuildOn(suite.genesis.ID(), setter, noopSigner)
+	proposal, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, noopSigner)
 	suite.Require().NoError(err)
 
 	// setter should have been run
@@ -289,7 +289,7 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 // TestBuildOn_SetterErrorPassthrough validates that errors from the setter function are passed through to the caller.
 func (suite *BuilderSuite) TestBuildOn_SetterErrorPassthrough() {
 	sentinel := errors.New("sentinel")
-	setter := func(h *flow.Header) error {
+	setter := func(h *flow.HeaderBodyBuilder) error {
 		return sentinel
 	}
 	_, err := suite.builder.BuildOn(suite.genesis.ID(), setter, noopSigner)
@@ -823,8 +823,21 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 
 	// since we have no rate limiting we should fill all collections and in 10 blocks
 	parentID := suite.genesis.ID()
+	setter := func(h *flow.HeaderBodyBuilder) error {
+		h.WithHeight(1).
+			WithChainID(flow.Emulator).
+			WithParentID(parentID).
+			WithView(1337).
+			WithParentView(1336).
+			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
+			WithParentVoterSigData(unittest.QCSigDataFixture()).
+			WithProposerID(unittest.IdentifierFixture())
+
+		return nil
+	}
+
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, noopSetter, noopSigner)
+		header, err := suite.builder.BuildOn(parentID, setter, noopSigner)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
 
@@ -870,8 +883,19 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 
 	// since rate limiting does not apply to non-payer keys, we should fill all collections in 10 blocks
 	parentID := suite.genesis.ID()
+	setter := func(h *flow.HeaderBodyBuilder) error {
+		h.WithChainID(flow.Emulator).
+			WithParentID(parentID).
+			WithView(1337).
+			WithParentView(1336).
+			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
+			WithParentVoterSigData(unittest.QCSigDataFixture()).
+			WithProposerID(unittest.IdentifierFixture())
+
+		return nil
+	}
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, noopSetter, noopSigner)
+		header, err := suite.builder.BuildOn(parentID, setter, noopSigner)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
 
@@ -908,8 +932,19 @@ func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
 
 	// rate-limiting should be applied, resulting in half-full collections (5/10)
 	parentID := suite.genesis.ID()
+	setter := func(h *flow.HeaderBodyBuilder) error {
+		h.WithChainID(flow.Emulator).
+			WithParentID(parentID).
+			WithView(1337).
+			WithParentView(1336).
+			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
+			WithParentVoterSigData(unittest.QCSigDataFixture()).
+			WithProposerID(unittest.IdentifierFixture())
+
+		return nil
+	}
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, noopSetter, noopSigner)
+		header, err := suite.builder.BuildOn(parentID, setter, noopSigner)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
 
@@ -947,8 +982,19 @@ func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
 	// rate-limiting should be applied, resulting in every ceil(1/k) collections
 	// having one transaction and empty collections otherwise
 	parentID := suite.genesis.ID()
+	setter := func(h *flow.HeaderBodyBuilder) error {
+		h.WithChainID(flow.Emulator).
+			WithParentID(parentID).
+			WithView(1337).
+			WithParentView(1336).
+			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
+			WithParentVoterSigData(unittest.QCSigDataFixture()).
+			WithProposerID(unittest.IdentifierFixture())
+
+		return nil
+	}
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, noopSetter, noopSigner)
+		header, err := suite.builder.BuildOn(parentID, setter, noopSigner)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
 
@@ -988,8 +1034,19 @@ func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
 
 	// rate-limiting should not be applied, since the payer is marked as unlimited
 	parentID := suite.genesis.ID()
+	setter := func(h *flow.HeaderBodyBuilder) error {
+		h.WithChainID(flow.Emulator).
+			WithParentID(parentID).
+			WithView(1337).
+			WithParentView(1336).
+			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
+			WithParentVoterSigData(unittest.QCSigDataFixture()).
+			WithProposerID(unittest.IdentifierFixture())
+
+		return nil
+	}
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, noopSetter, noopSigner)
+		header, err := suite.builder.BuildOn(parentID, setter, noopSigner)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
 
@@ -1029,8 +1086,19 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitDryRun() {
 
 	// rate-limiting should not be applied, since dry-run setting is enabled
 	parentID := suite.genesis.ID()
+	setter := func(h *flow.HeaderBodyBuilder) error {
+		h.WithChainID(flow.Emulator).
+			WithParentID(parentID).
+			WithView(1337).
+			WithParentView(1336).
+			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
+			WithParentVoterSigData(unittest.QCSigDataFixture()).
+			WithProposerID(unittest.IdentifierFixture())
+
+		return nil
+	}
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, noopSetter, noopSigner)
+		header, err := suite.builder.BuildOn(parentID, setter, noopSigner)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
 
@@ -1079,7 +1147,8 @@ func benchmarkBuildOn(b *testing.B, size int) {
 	{
 		var err error
 
-		suite.genesis = unittest.ClusterBlock.Genesis()
+		suite.genesis, err = unittest.ClusterBlock.Genesis()
+		require.NoError(suite.T(), err)
 		suite.chainID = suite.genesis.Header.ChainID
 
 		suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())

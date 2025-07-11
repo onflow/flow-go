@@ -99,7 +99,7 @@ func NewBuilder(
 // However, it will pass through all errors returned by `setter` and `sign`.
 // Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
 // and handle them accordingly when handling errors returned from BuildOn.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) ([]byte, error)) (*flow.ProposalHeader, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBodyBuilder) error, sign func(*flow.Header) ([]byte, error)) (*flow.ProposalHeader, error) {
 	parentSpan, ctx := b.tracer.StartSpanFromContext(context.Background(), trace.COLBuildOn)
 	defer parentSpan.End()
 
@@ -518,27 +518,32 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 func (b *Builder) buildHeader(
 	ctx *blockBuildContext,
 	payload *cluster.Payload,
-	setter func(header *flow.Header) error,
+	setter func(header *flow.HeaderBodyBuilder) error,
 	sign func(header *flow.Header) ([]byte, error),
 ) (*flow.ProposalHeader, error) {
-
-	header := &flow.Header{
-		HeaderBody: flow.HeaderBody{
-			ChainID:   ctx.parent.ChainID,
-			ParentID:  ctx.parentID,
-			Height:    ctx.parent.Height + 1,
-			Timestamp: time.Now().UTC(),
-		},
-		PayloadHash: payload.Hash(),
-
-		// NOTE: we rely on the HotStuff-provided setter to set the other
-		// fields, which are related to signatures and HotStuff internals
-	}
+	// NOTE: we rely on the HotStuff-provided setter to set the other
+	// fields, which are related to signatures and HotStuff internals
+	headerBodyBuilder := flow.NewHeaderBodyBuilder().
+		WithChainID(ctx.parent.ChainID).
+		WithParentID(ctx.parentID).
+		WithHeight(ctx.parent.Height + 1).
+		WithTimestamp(time.Now().UTC())
 
 	// set fields specific to the consensus algorithm
-	err := setter(header)
+	err := setter(headerBodyBuilder)
 	if err != nil {
 		return nil, fmt.Errorf("could not set fields to header: %w", err)
+	}
+	headerBody, err := headerBodyBuilder.Build()
+	if err != nil {
+		return nil, irrecoverable.NewExceptionf("unexpected error when building header body: %w", err)
+	}
+	header, err := flow.NewHeader(flow.UntrustedHeader{
+		HeaderBody:  *headerBody,
+		PayloadHash: payload.Hash(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build header: %w", err)
 	}
 	sig, err := sign(header)
 	if err != nil {

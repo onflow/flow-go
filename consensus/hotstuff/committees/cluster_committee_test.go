@@ -49,7 +49,9 @@ func (suite *ClusterSuite) SetupTest() {
 	suite.members = unittest.IdentityListFixture(5, unittest.WithRole(flow.RoleCollection))
 	suite.me = suite.members[0]
 	counter := uint64(1)
-	suite.root = clusterstate.CanonicalRootBlock(counter, suite.members.ToSkeleton())
+	rootBlock, err := clusterstate.CanonicalRootBlock(counter, suite.members.ToSkeleton())
+	suite.Require().NoError(err)
+	suite.root = rootBlock
 
 	suite.cluster.On("EpochCounter").Return(counter)
 	suite.cluster.On("Index").Return(uint(1))
@@ -58,7 +60,6 @@ func (suite *ClusterSuite) SetupTest() {
 	suite.epoch.On("Counter").Return(counter, nil)
 	suite.epoch.On("RandomSource").Return(unittest.SeedFixture(prg.RandomSourceLength))
 
-	var err error
 	suite.com, err = NewClusterCommittee(
 		suite.state,
 		suite.payloads,

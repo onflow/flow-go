@@ -18,24 +18,27 @@ var rootBlockPayload = cluster.NewEmptyPayload(flow.ZeroID)
 
 // CanonicalRootBlock returns the canonical root block for the given
 // cluster in the given epoch. It contains an empty collection referencing
-func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) *cluster.Block {
+func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) (*cluster.Block, error) {
 	chainID := CanonicalClusterID(epoch, participants.NodeIDs())
-
-	headerBody := flow.HeaderBody{
+	rootHeaderBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
 		ChainID:            chainID,
 		ParentID:           flow.ZeroID,
 		Height:             0,
 		Timestamp:          flow.GenesisTime,
 		View:               0,
+		ParentView:         0,
 		ParentVoterIndices: nil,
 		ParentVoterSigData: nil,
 		ProposerID:         flow.ZeroID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create root header body: %w", err)
 	}
 
 	return cluster.NewRootBlock(
 		cluster.UntrustedBlock{
-			Header:  headerBody,
+			Header:  *rootHeaderBody,
 			Payload: *rootBlockPayload,
 		},
-	)
+	), nil
 }

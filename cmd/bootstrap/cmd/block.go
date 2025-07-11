@@ -11,18 +11,18 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 )
 
-// constructRootHeader constructs a header for the root block.
-func constructRootHeader(rootChain string, rootParent string, rootHeight uint64, rootTimestamp string) *flow.Header {
+// constructRootHeaderBody constructs a header body for the root block.
+func constructRootHeaderBody(rootChain string, rootParent string, rootHeight uint64, rootTimestamp string) (*flow.HeaderBody, error) {
 	chainID := parseChainID(rootChain)
 	parentID := parseParentID(rootParent)
 	height := rootHeight
 	timestamp := parseRootTimestamp(rootTimestamp)
 
-	return run.GenerateRootHeader(chainID, parentID, height, timestamp)
+	return run.GenerateRootHeaderBody(chainID, parentID, height, timestamp)
 }
 
 // constructRootBlock constructs a valid root block based on the given header and protocol state ID for that block.
-func constructRootBlock(rootHeader *flow.Header, protocolStateID flow.Identifier) *flow.Block {
+func constructRootBlock(rootHeaderBody *flow.HeaderBody, protocolStateID flow.Identifier) *flow.Block {
 	payload := flow.Payload{
 		Guarantees:      nil,
 		Seals:           nil,
@@ -31,7 +31,7 @@ func constructRootBlock(rootHeader *flow.Header, protocolStateID flow.Identifier
 		ProtocolStateID: protocolStateID,
 	}
 
-	return flow.NewBlock(rootHeader.HeaderBody, payload)
+	return flow.NewBlock(*rootHeaderBody, payload)
 }
 
 // constructRootEpochEvents constructs the epoch setup and commit events for the first epoch after spork.

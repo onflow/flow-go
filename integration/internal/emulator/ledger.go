@@ -44,7 +44,10 @@ func configureLedger(
 		}
 
 		// commit the genesis block to storage
-		genesis := flowgo.Genesis(conf.GetChainID())
+		genesis, err := flowgo.Genesis(conf.GetChainID())
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to generate genesis block: %w", err)
+		}
 		latestBlock = *genesis
 
 		err = store.CommitBlock(

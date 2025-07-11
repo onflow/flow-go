@@ -336,7 +336,11 @@ func (b *bootstrapExecutor) Preprocess() error {
 
 func (b *bootstrapExecutor) Execute() error {
 	if b.rootBlock == nil {
-		b.rootBlock = flow.Genesis(b.ctx.Chain.ChainID()).ToHeader()
+		rootblock, err := flow.Genesis(b.ctx.Chain.ChainID())
+		if err != nil {
+			return fmt.Errorf("could not build genesis block: %w", err)
+		}
+		b.rootBlock = rootblock.ToHeader()
 	}
 
 	// initialize the account addressing state
