@@ -283,6 +283,11 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"disable-fees",
 		false,
 		"Disables calling the transaction fee deduction. This is only for testing purposes. To disable fees on a network it is better to set the fee price to 0.0 .")
+
+	fnb.flags.DurationVar(&fnb.BaseConfig.valueLogGCWaitDuration,
+		"value-log-gc-wait-duration",
+		flow.DefaultValueLogGCWaitDuration,
+		"wait duration before we repeatedly call the badger value log GC")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -1137,7 +1142,7 @@ func (fnb *FlowNodeBuilder) initBadgerDB() error {
 	})
 
 	fnb.Component("badger log cleaner", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		return bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCWaitDuration), nil
+		return bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, fnb.BaseConfig.valueLogGCWaitDuration), nil
 	})
 
 	return nil

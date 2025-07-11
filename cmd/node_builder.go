@@ -191,6 +191,7 @@ type BaseConfig struct {
 	BitswapReprovideEnabled bool
 
 	TransactionFeesDisabled bool
+	valueLogGCWaitDuration  time.Duration
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -312,6 +313,7 @@ func DefaultBaseConfig() *BaseConfig {
 		ComplianceConfig:        compliance.DefaultConfig(),
 		DhtSystemEnabled:        true,
 		BitswapReprovideEnabled: true,
+		valueLogGCWaitDuration:  flow.DefaultValueLogGCWaitDuration,
 	}
 }
 
