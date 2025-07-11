@@ -212,7 +212,7 @@ func (p *PipelineImpl) loop(ctx context.Context) error {
 			// if parent got abandoned no point to continue, and we just go to the abandoned state and perform cleanup logic.
 			if p.checkAbandoned() {
 				if err := p.transitionTo(StateAbandoned); err != nil {
-					return fmt.Errorf("failed to transition to abandoned state: %w", err)
+					return fmt.Errorf("could not transition to abandoned state: %w", err)
 				}
 			}
 
@@ -220,18 +220,21 @@ func (p *PipelineImpl) loop(ctx context.Context) error {
 			switch currentState {
 			case StatePending:
 				if err := p.onStartProcessing(); err != nil {
-					return err
+					return fmt.Errorf("could not process pending state: %w", err)
 				}
 			case StateProcessing:
 				if err := p.onProcessing(); err != nil {
-					return err
+					return fmt.Errorf("could not process processing state: %w", err)
 				}
 			case StateWaitingPersist:
 				if err := p.onPersistChanges(); err != nil {
-					return err
+					return fmt.Errorf("could not process waiting persist state: %w", err)
 				}
 			case StateAbandoned:
-				return p.core.Abandon()
+				if err := p.core.Abandon(); err != nil {
+					return fmt.Errorf("could not process abandonded state: %w", err)
+				}
+				return nil
 			case StateComplete:
 				return nil // terminate
 			default:
@@ -281,7 +284,7 @@ func (p *PipelineImpl) onProcessing() error {
 func (p *PipelineImpl) onPersistChanges() error {
 	if p.isSealed.Load() && p.parentState() == StateComplete {
 		if err := p.core.Persist(); err != nil {
-			return err
+			return fmt.Errorf("could not persist pending changes: %w", err)
 		}
 		return p.transitionTo(StateComplete)
 	} else {
@@ -344,10 +347,10 @@ func (p *PipelineImpl) Abandon() {
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (p *PipelineImpl) performDownload(ctx context.Context) error {
 	if err := p.core.Download(ctx); err != nil {
-		return err
+		return fmt.Errorf("could not perform download: %w", err)
 	}
 	if err := p.core.Index(); err != nil {
-		return err
+		return fmt.Errorf("could not perform indexing: %w", err)
 	}
 	if p.isIndexed.CompareAndSwap(false, true) {
 		p.stateChangedNotifier.Notify()
