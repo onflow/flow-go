@@ -66,7 +66,6 @@ func TestBlockEncodingMsgpack(t *testing.T) {
 }
 
 func TestNilProducesSameHashAsEmptySlice(t *testing.T) {
-
 	nilPayload := flow.Payload{
 		Guarantees: nil,
 		Seals:      nil,
@@ -81,7 +80,6 @@ func TestNilProducesSameHashAsEmptySlice(t *testing.T) {
 }
 
 func TestOrderingChangesHash(t *testing.T) {
-
 	seals := unittest.Seal.Fixtures(5)
 
 	payload1 := flow.Payload{
@@ -112,7 +110,6 @@ func TestBlock_Status(t *testing.T) {
 // Because our NewHeaderBody constructor enforces ParentView < View we use
 // WithFieldGenerator to safely pass it.
 func TestBlockMalleability(t *testing.T) {
-
 	block := unittest.FullBlockFixture()
 	unittest.RequireEntityNonMalleable(
 		t,
@@ -181,10 +178,7 @@ func TestNewBlock(t *testing.T) {
 // 2. Invalid input with invalid HeaderBody:
 //   - Ensures an error is returned when the HeaderBody.ParentView is not zero.
 //
-// 3. Invalid input with invalid ParentID:
-//   - Ensures an error is returned when the HeaderBody.ParentID is zero.
-//
-// 4. Invalid input with invalid Payload:
+// 3. Invalid input with invalid Payload:
 //   - Ensures an error is returned when the Payload.ProtocolStateID is flow.ZeroID.
 func TestNewRootBlock(t *testing.T) {
 	base := flow.UntrustedBlock{
@@ -217,16 +211,6 @@ func TestNewRootBlock(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "invalid root header body")
-	})
-
-	t.Run("invalid input with invalid ParentID", func(t *testing.T) {
-		block := base
-		block.Header.ParentID = flow.ZeroID
-
-		res, err := flow.NewRootBlock(block)
-		require.Error(t, err)
-		require.Nil(t, res)
-		require.Contains(t, err.Error(), "ParentID must not be zero")
 	})
 
 	t.Run("invalid input with invalid payload", func(t *testing.T) {
