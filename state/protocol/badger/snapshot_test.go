@@ -227,7 +227,7 @@ func TestClusters(t *testing.T) {
 	identities := append(unittest.IdentityListFixture(4, unittest.WithAllRolesExcept(flow.RoleCollection)), collectors...)
 
 	// bootstrap the protocol state
-	rootHeader := unittest.GenesisFixture().Header
+	rootHeader := unittest.Block.Genesis(flow.Emulator).Header
 
 	counter := uint64(1)
 	setup := unittest.EpochSetupFixture(

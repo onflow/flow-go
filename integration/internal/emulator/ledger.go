@@ -45,10 +45,7 @@ func configureLedger(
 		}
 
 		// commit the genesis block to storage
-		genesis, err := unittest.Block.Genesis(conf.GetChainID())
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to generate genesis block: %w", err)
-		}
+		genesis := unittest.Block.Genesis(conf.GetChainID())
 		latestBlock = *genesis
 
 		err = store.CommitBlock(

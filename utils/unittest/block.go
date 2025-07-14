@@ -67,16 +67,16 @@ func (f *blockFactory) WithLastViewTC(lastViewTC *flow.TimeoutCertificate) func(
 	}
 }
 
-func (f *blockFactory) Genesis(chainID flow.ChainID) (*flow.Block, error) {
+func (f *blockFactory) Genesis(chainID flow.ChainID) *flow.Block {
 	// must be const, so that the pre-calculated state commitments (GenesisStateCommitmentHex and others) always stay the same for tests
 	protocolStateID, err := flow.HexStringToIdentifier(GenesisProtocolStateIDHex)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert ProtocolStateID: %w", err)
+		panic(fmt.Errorf("failed to convert ProtocolStateID: %w", err))
 	}
 
 	parentID, err := flow.HexStringToIdentifier(GenesisParentIDHex)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert ParentID: %w", err)
+		panic(fmt.Errorf("failed to convert ParentID: %w", err))
 	}
 
 	// create the raw content for the genesis block
@@ -95,7 +95,7 @@ func (f *blockFactory) Genesis(chainID flow.ChainID) (*flow.Block, error) {
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create root header body: %w", err)
+		panic(fmt.Errorf("failed to create root header body: %w", err))
 	}
 
 	// combine to block
@@ -106,7 +106,8 @@ func (f *blockFactory) Genesis(chainID flow.ChainID) (*flow.Block, error) {
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create root block: %w", err)
+		panic(fmt.Errorf("failed to create root block: %w", err))
 	}
-	return block, nil
+
+	return block
 }

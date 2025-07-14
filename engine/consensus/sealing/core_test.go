@@ -57,7 +57,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 
 	s.sealsDB = &storage.Seals{}
 
-	s.finalizedRootHeader = unittest.GenesisFixture().ToHeader()
+	s.finalizedRootHeader = unittest.Block.Genesis(flow.Emulator).ToHeader()
 	params := new(mockstate.Params)
 	s.State.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(s.ParentBlock, nil)).Maybe()
 	s.State.On("Params").Return(params)

@@ -256,7 +256,7 @@ func createRootQC(t *testing.T, root *flow.Block, participantData *run.Participa
 // createRootBlockData creates genesis block with first epoch and real data node identities.
 // This function requires all participants to pass DKG process.
 func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
-	rootHeader := unittest.GenesisFixture().Header
+	rootHeader := unittest.Block.Genesis(flow.Emulator).Header
 	consensusParticipants := participantData.Identities()
 
 	// add other roles to create a complete identity list
