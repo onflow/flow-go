@@ -222,17 +222,17 @@ func runTransaction(
 
 	log.Info().Msgf("Debugging transaction %s ...", tx.ID())
 
-	txBody := flow.NewEmptyTransactionBody().
+	txBodyBuilder := flow.NewTransactionBodyBuilder().
 		SetScript(tx.Script).
 		SetComputeLimit(flagComputeLimit).
 		SetPayer(flow.Address(tx.Payer))
 
 	for _, argument := range tx.Arguments {
-		txBody.AddArgument(argument)
+		txBodyBuilder.AddArgument(argument)
 	}
 
 	for _, authorizer := range tx.Authorizers {
-		txBody.AddAuthorizer(flow.Address(authorizer))
+		txBodyBuilder.AddAuthorizer(flow.Address(authorizer))
 	}
 
 	proposalKeySequenceNumber := tx.ProposalKey.SequenceNumber
@@ -240,11 +240,13 @@ func runTransaction(
 		proposalKeySequenceNumber = flagProposalKeySeq
 	}
 
-	txBody.SetProposalKey(
+	txBodyBuilder.SetProposalKey(
 		flow.Address(tx.ProposalKey.Address),
 		tx.ProposalKey.KeyIndex,
 		proposalKeySequenceNumber,
 	)
+
+	txBody := txBodyBuilder.Build()
 
 	resultSnapshot, txErr, processErr := debugger.RunTransaction(
 		txBody,
