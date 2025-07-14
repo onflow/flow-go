@@ -1,8 +1,9 @@
 package pipeline
 
 import (
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"testing"
+
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
