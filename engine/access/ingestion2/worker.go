@@ -16,14 +16,14 @@ import (
 type PipelineWorkerPool struct {
 	resultsForest *ResultsForest
 	coreFactory   optimistic_sync.CoreFactory
-	messageQueue  *queue.PriorityMessageQueue[*ExecutionResultContainer]
+	messageQueue  *queue.ConcurrentPriorityQueue[*ExecutionResultContainer]
 }
 
 // NewPipelineWorkerPool creates a new instance of PipelineWorkerPool.
 func NewPipelineWorkerPool(
 	resultsForest *ResultsForest,
 	coreFactory optimistic_sync.CoreFactory,
-	messageQueue *queue.PriorityMessageQueue[*ExecutionResultContainer],
+	messageQueue *queue.ConcurrentPriorityQueue[*ExecutionResultContainer],
 ) *PipelineWorkerPool {
 	return &PipelineWorkerPool{
 		resultsForest: resultsForest,
@@ -92,7 +92,8 @@ func (e *PipelineWorkerPool) executePipeline(ctx context.Context, container *Exe
 	}
 
 	core := e.coreFactory.NewCore(container.result)
-	if err := container.Pipeline().Run(ctx, core, parent.Pipeline()); err != nil {
+	parentState := parent.Pipeline().GetState()
+	if err := container.Pipeline().Run(ctx, core, parentState); err != nil {
 		return fmt.Errorf("failed to run pipeline: %w", err)
 	}
 
