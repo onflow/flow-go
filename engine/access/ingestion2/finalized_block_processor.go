@@ -16,6 +16,11 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// TODO (peter): I think this should be pulled back into the engine. Once we implement the results forest,
+// there will be logic related to finalized blocks that interacts with the results forest. there
+// will also be logic in other handlers not included here. Moving everything into the engine will
+// ensure the logic all lives in one place, making it easier to reason about.
+
 const (
 	// finalizedBlockProcessorWorkerCount defines the number of workers that
 	// concurrently process finalized blocks in the job queue.

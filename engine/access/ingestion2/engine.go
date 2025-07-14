@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/queue"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/storage"
@@ -28,6 +29,9 @@ import (
 
 // defaultQueueCapacity is a capacity for the execution receipt message queue
 const defaultQueueCapacity = 10_000
+
+// PipelineTask is a function that executes a pipeline task within the engine's worker pool.
+type PipelineTask func() error
 
 type Engine struct {
 	*component.ComponentManager
@@ -41,6 +45,8 @@ type Engine struct {
 	executionReceiptsQueue   *engine.FifoMessageStore
 	receipts                 storage.ExecutionReceipts
 	collectionExecutedMetric module.CollectionExecutedMetric
+
+	pipelineTaskQueue *queue.ConcurrentPriorityQueue[PipelineTask]
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -52,6 +58,7 @@ func New(
 	collectionSyncer *CollectionSyncer,
 	receipts storage.ExecutionReceipts,
 	collectionExecutedMetric module.CollectionExecutedMetric,
+	pipelineWorkerCount int,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -78,6 +85,7 @@ func New(
 		executionReceiptsQueue:   executionReceiptsQueue,
 		receipts:                 receipts,
 		collectionExecutedMetric: collectionExecutedMetric,
+		pipelineTaskQueue:        queue.NewConcurrentPriorityQueue[PipelineTask](true),
 	}
 
 	// register our workers which are basically consumers of different kinds of data.
@@ -86,6 +94,11 @@ func New(
 		AddWorker(e.messageHandlerLoop).
 		AddWorker(e.finalizedBlockProcessor.StartWorkerLoop).
 		AddWorker(e.collectionSyncer.StartWorkerLoop)
+
+	for range pipelineWorkerCount {
+		builder.AddWorker(e.pipelineWorkerLoop)
+	}
+
 	e.ComponentManager = builder.Build()
 
 	// engine gets execution receipts from channels.ReceiveReceipts channel
@@ -164,6 +177,9 @@ func (e *Engine) processAvailableExecutionReceipts(ctx context.Context) error {
 //
 // No errors are expected during normal operations.
 func (e *Engine) persistExecutionReceipt(receipt *flow.ExecutionReceipt) error {
+	// TODO (peter): this should first check if the block exists in the headers storage. If not, we should
+	// not persist the receipt to avoid a byzantine spamming attack.
+
 	// persist the execution receipt locally, storing will also index the receipt
 	err := e.receipts.Store(receipt)
 	if err != nil {
@@ -178,4 +194,44 @@ func (e *Engine) persistExecutionReceipt(receipt *flow.ExecutionReceipt) error {
 // Receives block finalized events from the finalization distributor and forwards them to the consumer.
 func (e *Engine) OnFinalizedBlock(_ *model.Block) {
 	e.finalizedBlockProcessor.Notify()
+}
+
+// pipelineWorkerLoop is a component.ComponentWorker that continuously processes pipeline tasks.
+func (e *Engine) pipelineWorkerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	ch := e.pipelineTaskQueue.Channel()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ch:
+			if err := e.processAllPipelineTasks(ctx); err != nil {
+				ctx.Throw(fmt.Errorf("failed to process pipeline tasks: %w", err))
+				return
+			}
+		}
+	}
+}
+
+// processAllPipelineTasks processes all pipeline tasks availablein the queue.
+// It continues processing until all tasks are processed or the context is canceled.
+//
+// No errors are expected during normal operations.
+func (e *Engine) processAllPipelineTasks(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
+		execute, ok := e.pipelineTaskQueue.Pop()
+		if !ok {
+			return nil
+		}
+		if err := execute(); err != nil {
+			return err
+		}
+	}
 }
