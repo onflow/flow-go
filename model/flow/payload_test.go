@@ -73,7 +73,7 @@ func TestPayloadEncodingMsgpack(t *testing.T) {
 //   - Verifies that a properly populated UntrustedPayload results in a valid Payload.
 //
 // 2. Valid input with zero ProtocolStateID:
-//   - Ensures that Payload an error is returned when ProtocolStateID is s flow.ZeroID.
+//   - Ensures that an error is returned when ProtocolStateID is flow.ZeroID.
 func TestNewPayload(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
 		payload := unittest.PayloadFixture(
