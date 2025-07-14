@@ -268,7 +268,7 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		msg, ok := e.pendingProposals.Pop()
 		if ok {
 			proposalMsg := msg.(flow.Slashable[*messages.UntrustedProposal])
-			proposal, err := proposalMsg.Message.DeclareTrusted()
+			proposal, err := proposalMsg.Message.DeclareStructurallyValid()
 			if err != nil {
 				return fmt.Errorf("could not convert proposal: %w", err)
 			}
@@ -298,7 +298,7 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		}
 		blocks := make([]*flow.Proposal, 0, len(batch.Message))
 		for _, block := range batch.Message {
-			block, err := block.DeclareTrusted()
+			block, err := block.DeclareStructurallyValid()
 			if err != nil {
 				return fmt.Errorf("could not convert proposal: %w", err)
 			}

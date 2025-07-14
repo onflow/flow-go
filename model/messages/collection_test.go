@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestClusterProposal_DeclareTrusted verifies the behavior of the DeclareTrusted converting for untrusted cluster.Proposal.
+// TestClusterProposal_DeclareTrusted verifies the behavior of the DeclareStructurallyValid converting for untrusted cluster.Proposal.
 // It ensures proper handling of both valid and invalid input fields.
 //
 // Test Cases:
@@ -29,7 +29,7 @@ import (
 func TestClusterProposal_DeclareTrusted(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
 		untrustedProposal := messages.UntrustedClusterProposal(*unittest.ClusterProposalFixture())
-		res, err := untrustedProposal.DeclareTrusted()
+		res, err := untrustedProposal.DeclareStructurallyValid()
 		require.NoError(t, err)
 		require.NotNil(t, res)
 	})
@@ -38,7 +38,7 @@ func TestClusterProposal_DeclareTrusted(t *testing.T) {
 		untrustedProposal := messages.UntrustedClusterProposal(*unittest.ClusterProposalFixture())
 		untrustedProposal.Block.Header.ParentID = flow.ZeroID
 
-		res, err := untrustedProposal.DeclareTrusted()
+		res, err := untrustedProposal.DeclareStructurallyValid()
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "could not build cluster block")
@@ -48,7 +48,7 @@ func TestClusterProposal_DeclareTrusted(t *testing.T) {
 		untrustedProposal := messages.UntrustedClusterProposal(*unittest.ClusterProposalFixture())
 		untrustedProposal.ProposerSigData = nil
 
-		res, err := untrustedProposal.DeclareTrusted()
+		res, err := untrustedProposal.DeclareStructurallyValid()
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "proposer signature must not be empty")
@@ -58,7 +58,7 @@ func TestClusterProposal_DeclareTrusted(t *testing.T) {
 		untrustedProposal := messages.UntrustedClusterProposal(*unittest.ClusterProposalFixture())
 		untrustedProposal.ProposerSigData = []byte{}
 
-		res, err := untrustedProposal.DeclareTrusted()
+		res, err := untrustedProposal.DeclareStructurallyValid()
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "proposer signature must not be empty")

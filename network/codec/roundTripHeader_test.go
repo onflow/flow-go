@@ -30,7 +30,7 @@ func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 	decodedInterface, err := codec.Decode(encoded)
 	assert.NoError(t, err)
 	decoded := decodedInterface.(*messages.UntrustedProposal)
-	proposalTrusted, err := decoded.DeclareTrusted()
+	proposalTrusted, err := decoded.DeclareStructurallyValid()
 	require.NoError(t, err)
 	decodedBlock := proposalTrusted.Block
 	// compare LastViewTC separately, because it is a pointer field

@@ -33,9 +33,9 @@ func NewUntrustedClusterProposal(internal cluster.Block, proposerSig []byte) *Un
 	}
 }
 
-// DeclareTrusted converts the UntrustedClusterProposal to a trusted internal cluster.Proposal.
+// DeclareStructurallyValid converts the UntrustedClusterProposal to a trusted internal cluster.Proposal.
 // CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
-func (cbp *UntrustedClusterProposal) DeclareTrusted() (*cluster.Proposal, error) {
+func (cbp *UntrustedClusterProposal) DeclareStructurallyValid() (*cluster.Proposal, error) {
 	block, err := cluster.NewBlock(
 		cluster.UntrustedBlock{
 			Header:  cbp.Block.Header,

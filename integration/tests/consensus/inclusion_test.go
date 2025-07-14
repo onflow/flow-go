@@ -151,7 +151,7 @@ func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := proposal.DeclareTrusted()
+		proposalTrusted, err := proposal.DeclareStructurallyValid()
 		require.NoError(is.T(), err)
 		block := proposalTrusted.Block
 
@@ -202,7 +202,7 @@ func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Tim
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := proposal.DeclareTrusted()
+		proposalTrusted, err := proposal.DeclareStructurallyValid()
 		require.NoError(is.T(), err)
 		block := proposalTrusted.Block
 
@@ -247,7 +247,7 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := proposal.DeclareTrusted()
+		proposalTrusted, err := proposal.DeclareStructurallyValid()
 		require.NoError(is.T(), err)
 		nextBlock := proposalTrusted.Block
 

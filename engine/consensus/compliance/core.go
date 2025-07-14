@@ -112,7 +112,7 @@ func NewCore(
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
 func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedProposal]) error {
-	blockProposal, err := proposalMsg.Message.DeclareTrusted()
+	blockProposal, err := proposalMsg.Message.DeclareStructurallyValid()
 	if err != nil {
 		return fmt.Errorf("could not convert proposal: %w", err)
 	}

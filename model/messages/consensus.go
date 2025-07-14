@@ -17,11 +17,11 @@ func NewUntrustedProposal(internal *flow.Proposal) *UntrustedProposal {
 	return &p
 }
 
-// DeclareTrusted converts the UntrustedProposal to a trusted internal flow.Proposal.
+// DeclareStructurallyValid converts the UntrustedProposal to a trusted internal flow.Proposal.
 // CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
 //
 // All errors indicate that the input message could not be converted to a valid proposal.
-func (msg *UntrustedProposal) DeclareTrusted() (*flow.Proposal, error) {
+func (msg *UntrustedProposal) DeclareStructurallyValid() (*flow.Proposal, error) {
 	block, err := flow.NewBlock(
 		flow.UntrustedBlock{
 			Header:  msg.Block.Header,

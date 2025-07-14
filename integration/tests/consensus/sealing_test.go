@@ -171,7 +171,7 @@ SearchLoop:
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := proposal.DeclareTrusted()
+		proposalTrusted, err := proposal.DeclareStructurallyValid()
 		require.NoError(ss.T(), err)
 		block := proposalTrusted.Block
 
@@ -364,7 +364,7 @@ SealingLoop:
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := proposal.DeclareTrusted()
+		proposalTrusted, err := proposal.DeclareStructurallyValid()
 		require.NoError(ss.T(), err)
 		block := proposalTrusted.Block
 

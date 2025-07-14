@@ -78,7 +78,7 @@ func (bs *BlockState) Add(t *testing.T, msg *messages.UntrustedProposal) error {
 	bs.Lock()
 	defer bs.Unlock()
 
-	proposal, err := msg.DeclareTrusted()
+	proposal, err := msg.DeclareStructurallyValid()
 	if err != nil {
 		return fmt.Errorf("could not convert proposal: %w", err)
 	}

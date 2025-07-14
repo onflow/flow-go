@@ -126,7 +126,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 		// the following switch should be similar to the one defined in the actual node that is being emulated
 		switch v := event.(type) {
 		case *messages.UntrustedProposal:
-			proposalTrusted, err := v.DeclareTrusted()
+			proposalTrusted, err := v.DeclareStructurallyValid()
 			require.NoError(t, err)
 			fmt.Printf("Received block proposal: %s from %s\n", proposalTrusted.Block.ID().String(), from.String())
 			i++

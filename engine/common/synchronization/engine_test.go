@@ -164,7 +164,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
 				expected := ss.heights[ref-1]
-				actual, err := res.Blocks[0].DeclareTrusted()
+				actual, err := res.Blocks[0].DeclareStructurallyValid()
 				require.NoError(ss.T(), err)
 				assert.Equal(ss.T(), expected, actual, "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
@@ -299,7 +299,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
-				actual, err := res.Blocks[0].DeclareTrusted()
+				actual, err := res.Blocks[0].DeclareStructurallyValid()
 				require.NoError(ss.T(), err)
 				assert.Equal(ss.T(), proposal, actual, "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
@@ -370,7 +370,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 
 	ss.comp.On("OnSyncedBlocks", mock.Anything).Run(func(args mock.Arguments) {
 		res := args.Get(0).(flow.Slashable[[]*messages.UntrustedProposal])
-		converted, err := res.Message[0].DeclareTrusted()
+		converted, err := res.Message[0].DeclareStructurallyValid()
 		require.NoError(ss.T(), err)
 		ss.Assert().Equal(processable.Block.Header, converted.Block.Header)
 		ss.Assert().Equal(processable.Block.Payload, converted.Block.Payload)
