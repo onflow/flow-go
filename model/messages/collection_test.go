@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestClusterProposal_DeclareTrusted verifies the behavior of the DeclareStructurallyValid converting for untrusted cluster.Proposal.
+// TestClusterProposal_DeclareStructurallyValid verifies the behavior of the DeclareStructurallyValid converting for untrusted cluster.Proposal.
 // It ensures proper handling of both valid and invalid input fields.
 //
 // Test Cases:
@@ -26,7 +26,7 @@ import (
 //
 // 4. Invalid input with empty ProposerSigData:
 //   - Ensures an error is returned when the ProposerSigData is an empty byte slice.
-func TestClusterProposal_DeclareTrusted(t *testing.T) {
+func TestClusterProposal_DeclareStructurallyValid(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
 		untrustedProposal := messages.UntrustedClusterProposal(*unittest.ClusterProposalFixture())
 		res, err := untrustedProposal.DeclareStructurallyValid()

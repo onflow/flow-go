@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestProposal_DeclareTrusted verifies the behavior of the DeclareStructurallyValid converting for untrusted Proposal.
+// TestProposal_DeclareStructurallyValid verifies the behavior of the DeclareStructurallyValid converting for untrusted Proposal.
 // It ensures proper handling of both valid and invalid input fields.
 //
 // Test Cases:
@@ -26,7 +26,7 @@ import (
 //
 // 4. Invalid input with empty ProposerSigData:
 //   - Ensures an error is returned when the ProposerSigData is an empty byte slice.
-func TestProposal_DeclareTrusted(t *testing.T) {
+func TestProposal_DeclareStructurallyValid(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
 		untrustedProposal := messages.UntrustedProposal(*unittest.ProposalFixture())
 		res, err := untrustedProposal.DeclareStructurallyValid()
