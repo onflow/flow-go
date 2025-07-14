@@ -1013,7 +1013,7 @@ func (b *Blockchain) systemChunkTransaction() (*flowgo.TransactionBody, error) {
 		),
 	)
 
-	tx := flowgo.NewTransactionBody().
+	tx := flowgo.NewEmptyTransactionBody().
 		SetScript([]byte(script)).
 		SetComputeLimit(flowgo.DefaultMaxTransactionGasLimit).
 		AddAuthorizer(serviceAddress).

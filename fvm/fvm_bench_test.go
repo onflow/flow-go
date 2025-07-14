@@ -103,7 +103,7 @@ func (account *TestBenchAccount) DeployContract(b *testing.B, blockExec TestBenc
 
 func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestBenchBlockExecutor, list []string) {
 	serviceAccount := blockExec.ServiceAccount(b)
-	txBody := flow.NewTransactionBody().
+	txBody := flow.NewEmptyTransactionBody().
 		SetScript([]byte(`
 		transaction(list: [String]) {
 		  prepare(acct: auth(Storage) &Account) {
@@ -324,7 +324,7 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 		sdkTX, err := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, []templates.Contract{}, flowsdk.BytesToAddress(serviceAddress.Bytes()))
 		require.NoError(tb, err)
 
-		txBody := flow.NewTransactionBody().
+		txBody := flow.NewEmptyTransactionBody().
 			SetScript(sdkTX.Script).
 			SetArguments(sdkTX.Arguments).
 			AddAuthorizer(serviceAddress).
@@ -501,7 +501,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 				tx := txStringFunc(b, benchTransactionContext)
 
 				btx := []byte(tx)
-				txBody := flow.NewTransactionBody().
+				txBody := flow.NewEmptyTransactionBody().
 					SetScript(btx).
 					AddAuthorizer(benchmarkAccount.Address).
 					SetProposalKey(benchmarkAccount.Address, 0, benchmarkAccount.RetAndIncSeqNumber()).
@@ -879,7 +879,7 @@ func BenchRunNFTBatchTransfer(b *testing.B,
 			)
 			require.NoError(b, err)
 
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript(transferTx).
 				SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
 				AddAuthorizer(accounts[1].Address).
@@ -923,7 +923,7 @@ func setupReceiver(b *testing.B, be TestBenchBlockExecutor, nftAccount, batchNFT
 
 	setupTx := []byte(fmt.Sprintf(setUpReceiverTemplate, nftAccount.Address.Hex(), batchNFTAccount.Address.Hex()))
 
-	txBody := flow.NewTransactionBody().
+	txBody := flow.NewEmptyTransactionBody().
 		SetScript(setupTx).
 		SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
 		AddAuthorizer(targetAccount.Address).
@@ -958,7 +958,7 @@ func mintNFTs(b *testing.B, be TestBenchBlockExecutor, batchNFTAccount *TestBenc
 	}`
 	mintScript := []byte(fmt.Sprintf(mintScriptTemplate, batchNFTAccount.Address.Hex(), size))
 
-	txBody := flow.NewTransactionBody().
+	txBody := flow.NewEmptyTransactionBody().
 		SetComputeLimit(999999).
 		SetScript(mintScript).
 		SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).

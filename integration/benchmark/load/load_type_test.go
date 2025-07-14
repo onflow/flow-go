@@ -188,7 +188,7 @@ var _ common.TransactionSender = (*testTransactionSender)(nil)
 
 func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult, error) {
 	txBody :=
-		flow.NewTransactionBody().
+		flow.NewEmptyTransactionBody().
 			SetScript(tx.Script).
 			SetReferenceBlockID(convert.IDFromSDK(tx.ReferenceBlockID)).
 			SetComputeLimit(tx.GasLimit).

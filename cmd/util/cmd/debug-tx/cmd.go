@@ -222,7 +222,7 @@ func runTransaction(
 
 	log.Info().Msgf("Debugging transaction %s ...", tx.ID())
 
-	txBody := flow.NewTransactionBody().
+	txBody := flow.NewEmptyTransactionBody().
 		SetScript(tx.Script).
 		SetComputeLimit(flagComputeLimit).
 		SetPayer(flow.Address(tx.Payer))

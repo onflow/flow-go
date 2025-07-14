@@ -46,7 +46,7 @@ var setExecutionMemoryLimit string
 
 func DeployTxFeesContractTransaction(flowFees, service flow.Address, contract []byte) *flow.TransactionBody {
 
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(deployTxFeesTransactionTemplate)).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddAuthorizer(flowFees).
@@ -81,7 +81,7 @@ func SetupParametersTransaction(
 		panic(fmt.Sprintf("failed to encode restrictedAccountCreationEnabled: %s", err.Error()))
 	}
 
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(templates.ReplaceAddresses(setupParametersTransactionTemplate,
 			templates.Environment{
 				StorageFeesAddress:    service.Hex(),
@@ -98,7 +98,7 @@ func SetupParametersTransaction(
 func SetupStorageForServiceAccountsTransaction(
 	service, fungibleToken, flowToken, feeContract flow.Address,
 ) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(templates.ReplaceAddresses(setupStorageForServiceAccountsTemplate,
 			templates.Environment{
 				ServiceAccountAddress: service.Hex(),
@@ -116,7 +116,7 @@ func SetupStorageForServiceAccountsTransaction(
 func SetupStorageForAccountTransaction(
 	account, service, fungibleToken, flowToken flow.Address,
 ) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(templates.ReplaceAddresses(setupStorageForAccountTemplate,
 			templates.Environment{
 				ServiceAccountAddress: service.Hex(),
@@ -149,7 +149,7 @@ func SetupFeesTransaction(
 		panic(fmt.Sprintf("failed to encode execution effort cost: %s", err.Error()))
 	}
 
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(templates.ReplaceAddresses(setupFeesTransactionTemplate,
 			templates.Environment{
 				FlowFeesAddress: flowFees.Hex(),
@@ -209,7 +209,7 @@ func setExecutionWeightsTransaction(
 		return nil, err
 	}
 
-	tx := flow.NewTransactionBody().
+	tx := flow.NewEmptyTransactionBody().
 		SetScript([]byte(setExecutionWeightsScript)).
 		AddArgument(newWeights).
 		AddArgument(storagePath).
@@ -235,7 +235,7 @@ func SetExecutionMemoryLimitTransaction(
 		return nil, err
 	}
 
-	tx := flow.NewTransactionBody().
+	tx := flow.NewEmptyTransactionBody().
 		SetScript([]byte(setExecutionMemoryLimit)).
 		AddArgument(newLimit).
 		AddArgument(storagePath).

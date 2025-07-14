@@ -15,6 +15,8 @@ import (
 )
 
 // TransactionBody includes the main contents of a transaction
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type TransactionBody struct {
 
 	// A reference to a previous block
@@ -52,8 +54,37 @@ type TransactionBody struct {
 	EnvelopeSignatures []TransactionSignature
 }
 
-// NewTransactionBody initializes and returns an empty transaction body
-func NewTransactionBody() *TransactionBody {
+// UntrustedTransactionBody is an untrusted input-only representation of a TransactionBody,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedTransactionBody should be validated and converted into
+// a trusted TransactionBody using NewEmptyTransactionBody constructor.
+type UntrustedTransactionBody TransactionBody
+
+// NewTransactionBody creates a new instance of TransactionBody.
+// Construction of TransactionBody is allowed only within the constructor
+//
+// All errors indicate a valid TransactionBody cannot be constructed from the input.
+func NewTransactionBody(untrusted UntrustedTransactionBody) *TransactionBody {
+	return &TransactionBody{
+		ReferenceBlockID:   untrusted.ReferenceBlockID,
+		Script:             untrusted.Script,
+		Arguments:          untrusted.Arguments,
+		GasLimit:           untrusted.GasLimit,
+		ProposalKey:        untrusted.ProposalKey,
+		Payer:              untrusted.Payer,
+		Authorizers:        untrusted.Authorizers,
+		PayloadSignatures:  untrusted.PayloadSignatures,
+		EnvelopeSignatures: untrusted.EnvelopeSignatures,
+	}
+}
+
+// NewEmptyTransactionBody initializes and returns an empty transaction body
+func NewEmptyTransactionBody() *TransactionBody {
 	return &TransactionBody{}
 }
 
@@ -113,31 +144,31 @@ func (tb TransactionBody) ID() Identifier {
 
 // SetScript sets the Cadence script for this transaction.
 func (tb *TransactionBody) SetScript(script []byte) *TransactionBody {
-	tb.Script = script
+	tb.Script = script //nolint:structwrite
 	return tb
 }
 
 // SetArguments sets the Cadence arguments list for this transaction.
 func (tb *TransactionBody) SetArguments(args [][]byte) *TransactionBody {
-	tb.Arguments = args
+	tb.Arguments = args //nolint:structwrite
 	return tb
 }
 
 // AddArgument adds an argument to the Cadence arguments list for this transaction.
 func (tb *TransactionBody) AddArgument(arg []byte) *TransactionBody {
-	tb.Arguments = append(tb.Arguments, arg)
+	tb.Arguments = append(tb.Arguments, arg) //nolint:structwrite
 	return tb
 }
 
 // SetReferenceBlockID sets the reference block ID for this transaction.
 func (tb *TransactionBody) SetReferenceBlockID(blockID Identifier) *TransactionBody {
-	tb.ReferenceBlockID = blockID
+	tb.ReferenceBlockID = blockID //nolint:structwrite
 	return tb
 }
 
 // SetComputeLimit sets the gas limit for this transaction.
 func (tb *TransactionBody) SetComputeLimit(limit uint64) *TransactionBody {
-	tb.GasLimit = limit
+	tb.GasLimit = limit //nolint:structwrite
 	return tb
 }
 
@@ -151,19 +182,19 @@ func (tb *TransactionBody) SetProposalKey(address Address, keyID uint32, sequenc
 		KeyIndex:       keyID,
 		SequenceNumber: sequenceNum,
 	}
-	tb.ProposalKey = proposalKey
+	tb.ProposalKey = proposalKey //nolint:structwrite
 	return tb
 }
 
 // SetPayer sets the payer account for this transaction.
 func (tb *TransactionBody) SetPayer(address Address) *TransactionBody {
-	tb.Payer = address
+	tb.Payer = address //nolint:structwrite
 	return tb
 }
 
 // AddAuthorizer adds an authorizer account to this transaction.
 func (tb *TransactionBody) AddAuthorizer(address Address) *TransactionBody {
-	tb.Authorizers = append(tb.Authorizers, address)
+	tb.Authorizers = append(tb.Authorizers, address) //nolint:structwrite
 	return tb
 }
 
@@ -316,7 +347,7 @@ func (tb *TransactionBody) Sign(
 func (tb *TransactionBody) AddPayloadSignature(address Address, keyID uint32, sig []byte) *TransactionBody {
 	s := tb.createSignature(address, keyID, sig)
 
-	tb.PayloadSignatures = append(tb.PayloadSignatures, s)
+	tb.PayloadSignatures = append(tb.PayloadSignatures, s) //nolint:structwrite
 	slices.SortFunc(tb.PayloadSignatures, compareSignatures)
 
 	return tb
@@ -326,7 +357,7 @@ func (tb *TransactionBody) AddPayloadSignature(address Address, keyID uint32, si
 func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID uint32, sig []byte) *TransactionBody {
 	s := tb.createSignature(address, keyID, sig)
 
-	tb.EnvelopeSignatures = append(tb.EnvelopeSignatures, s)
+	tb.EnvelopeSignatures = append(tb.EnvelopeSignatures, s) //nolint:structwrite
 	slices.SortFunc(tb.EnvelopeSignatures, compareSignatures)
 
 	return tb

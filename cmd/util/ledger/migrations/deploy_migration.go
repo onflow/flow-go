@@ -29,7 +29,7 @@ func NewDeploymentMigration(
       }
     `)
 
-	tx := flow.NewTransactionBody().
+	tx := flow.NewEmptyTransactionBody().
 		SetScript(script).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract.Name))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract.Code))).

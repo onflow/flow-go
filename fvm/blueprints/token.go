@@ -101,7 +101,7 @@ var mintFlowTokenTransactionTemplate string
 
 func DeployFlowTokenContractTransaction(service, flowToken flow.Address, contract []byte) *flow.TransactionBody {
 
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(deployFlowTokenTransactionTemplate)).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddAuthorizer(flowToken).
@@ -112,7 +112,7 @@ func DeployFlowTokenContractTransaction(service, flowToken flow.Address, contrac
 // token Minter resource and stores it in the service account. This Minter is
 // expected to be stored here by the epoch smart contracts.
 func CreateFlowTokenMinterTransaction(service, flowToken flow.Address) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(templates.ReplaceAddresses(
 			createFlowTokenMinterTransactionTemplate,
 			templates.Environment{
@@ -131,7 +131,7 @@ func MintFlowTokenTransaction(
 		panic(fmt.Sprintf("failed to encode initial token supply: %s", err.Error()))
 	}
 
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(templates.ReplaceAddresses(mintFlowTokenTransactionTemplate,
 			templates.Environment{
 				FlowTokenAddress:     flowToken.Hex(),
@@ -149,7 +149,7 @@ func TransferFlowTokenTransaction(
 ) *flow.TransactionBody {
 	cadenceAmount, _ := cadence.NewUFix64(amount)
 	txScript := templates.GenerateTransferGenericVaultWithAddressScript(env)
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadenceAmount)).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(to))).

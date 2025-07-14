@@ -149,7 +149,7 @@ func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 		// create an empty transaction
-		txBody := flow.NewTransactionBody().
+		txBody := flow.NewEmptyTransactionBody().
 			SetScript([]byte(`
 				transaction() {
 					prepare() {}

@@ -269,10 +269,11 @@ func messageToTrustedTransaction(
 	chain flow.Chain,
 ) (flow.TransactionBody, error) {
 	if m == nil {
-		return flow.TransactionBody{}, ErrEmptyMessage
+		var tb flow.TransactionBody
+		return tb, ErrEmptyMessage
 	}
 
-	t := flow.NewTransactionBody()
+	t := flow.NewEmptyTransactionBody()
 
 	proposalKey := m.GetProposalKey()
 	if proposalKey != nil {

@@ -577,7 +577,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 	}
 
 	transferTokensTx := func(chain flow.Chain) *flow.TransactionBody {
-		return flow.NewTransactionBody().
+		return flow.NewEmptyTransactionBody().
 			SetScript([]byte(fmt.Sprintf(`
 							// This transaction is a template for a transaction that
 							// could be used by anyone to send tokens to another account

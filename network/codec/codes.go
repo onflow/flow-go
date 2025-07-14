@@ -185,7 +185,8 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 		var guarantee flow.CollectionGuarantee
 		return &guarantee, what(&guarantee), nil
 	case CodeTransactionBody:
-		return &flow.TransactionBody{}, what(&flow.TransactionBody{}), nil
+		var transactionBody flow.TransactionBody
+		return &transactionBody, what(&transactionBody), nil
 	case CodeTransaction:
 		return &flow.Transaction{}, what(&flow.Transaction{}), nil
 

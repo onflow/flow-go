@@ -32,7 +32,7 @@ import (
 
 func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(fmt.Sprintf(
 			`
 							// This transaction is a template for a transaction that
@@ -103,7 +103,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	)
 
 	t.Run("Success", func(t *testing.T) {
-		txBody := flow.NewTransactionBody().
+		txBody := flow.NewEmptyTransactionBody().
 			SetScript([]byte(`
 	            transaction {
 	              prepare(signer: &Account) {}
@@ -123,7 +123,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	})
 
 	t.Run("Failure", func(t *testing.T) {
-		txBody := flow.NewTransactionBody().
+		txBody := flow.NewEmptyTransactionBody().
 			SetScript([]byte(`
                 transaction {
                   var x: Int
@@ -154,7 +154,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	})
 
 	t.Run("Logs", func(t *testing.T) {
-		txBody := flow.NewTransactionBody().
+		txBody := flow.NewEmptyTransactionBody().
 			SetScript([]byte(`
                 transaction {
                   execute {
@@ -178,7 +178,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	})
 
 	t.Run("Events", func(t *testing.T) {
-		txBody := flow.NewTransactionBody().
+		txBody := flow.NewEmptyTransactionBody().
 			SetScript([]byte(`
                 transaction {
                   prepare(signer: auth(BorrowValue) &Account) {
@@ -289,7 +289,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		// transaction will panic if `contracts.names` is incorrect
-		txBody = flow.NewTransactionBody().
+		txBody = flow.NewEmptyTransactionBody().
 			SetScript([]byte(`
 				transaction {
 					prepare(signer: &Account) {
@@ -829,7 +829,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(tt.script)).
 				SetArguments(tt.args)
 
@@ -911,7 +911,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(tt.script)).
 				SetComputeLimit(tt.gasLimit)
 
@@ -1021,7 +1021,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 				// deposit more flow to increase capacity
-				txBody := flow.NewTransactionBody().
+				txBody := flow.NewEmptyTransactionBody().
 					SetScript([]byte(fmt.Sprintf(
 						`
 					import FungibleToken from %s
@@ -1448,7 +1448,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	blockCtx := fvm.NewContextFromParent(ctx, fvm.WithBlocks(blocks), fvm.WithBlockHeader(block1.ToHeader()))
 
 	t.Run("works as transaction", func(t *testing.T) {
-		txBody := flow.NewTransactionBody().
+		txBody := flow.NewEmptyTransactionBody().
 			SetScript([]byte(`
                 transaction {
                     execute {
@@ -1539,7 +1539,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	})
 
 	t.Run("panics if external function panics in transaction", func(t *testing.T) {
-		tx := flow.NewTransactionBody().
+		tx := flow.NewEmptyTransactionBody().
 			SetScript([]byte(`
                 transaction {
                     execute {
@@ -1704,7 +1704,7 @@ func TestBlockContext_Random(t *testing.T) {
 	`)
 
 	getTxRandoms := func(t *testing.T) [2]uint64 {
-		txBody := flow.NewTransactionBody().SetScript(txCode)
+		txBody := flow.NewEmptyTransactionBody().SetScript(txCode)
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
@@ -1798,7 +1798,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 		fvm.WithChain(chain),
 	)
 
-	txBody := flow.NewTransactionBody().
+	txBody := flow.NewEmptyTransactionBody().
 		SetScript(createAccountScript).
 		AddAuthorizer(chain.ServiceAddress())
 

@@ -13,7 +13,7 @@ import (
 )
 
 func TestTransaction_SignatureOrdering(t *testing.T) {
-	tx := flow.NewTransactionBody()
+	tx := flow.NewEmptyTransactionBody()
 
 	proposerAddress := unittest.RandomAddressFixture()
 	proposerKeyIndex := uint32(1)

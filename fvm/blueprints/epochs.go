@@ -35,7 +35,7 @@ var deployLockedTokensTemplate string
 
 // DeployEpochTransaction returns the transaction body for the deploy epoch transaction
 func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig epochs.EpochConfig) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(
 			templates.ReplaceAddresses(
 				deployEpochTransactionTemplate,
@@ -63,7 +63,7 @@ func SetupAccountTransaction(
 	flowToken flow.Address,
 	accountAddress flow.Address,
 ) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(
 			templates.ReplaceAddresses(
 				setupAccountTemplate,
@@ -78,7 +78,7 @@ func SetupAccountTransaction(
 
 // DeployIDTableStakingTransaction returns the transaction body for the deploy id table staking transaction
 func DeployIDTableStakingTransaction(service flow.Address, contract []byte, epochTokenPayout cadence.UFix64, rewardCut cadence.UFix64) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(deployIDTableStakingTransactionTemplate)).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddArgument(jsoncdc.MustEncode(epochTokenPayout)).
@@ -99,7 +99,7 @@ func FundAccountTransaction(
 		panic(err)
 	}
 
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(templates.ReplaceAddresses(
 			fundAccountTemplate,
 			templates.Environment{
@@ -114,7 +114,7 @@ func FundAccountTransaction(
 
 // DeployLockedTokensTransaction returns the transaction body for the deploy locked tokens transaction
 func DeployLockedTokensTransaction(service flow.Address, contract []byte, publicKeys []cadence.Value) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(
 			deployLockedTokensTemplate,
 		)).
@@ -189,7 +189,7 @@ func RegisterNodeTransaction(
 	}
 
 	// register node
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript(templates.GenerateEpochRegisterNodeScript(env)).
 		AddArgument(jsoncdc.MustEncode(cdcNodeID)).
 		AddArgument(jsoncdc.MustEncode(cadence.NewUInt8(uint8(id.Role)))).
@@ -207,7 +207,7 @@ func SetStakingAllowlistTransaction(idTableStakingAddr flow.Address, allowedNode
 		IDTableAddress: idTableStakingAddr.HexWithPrefix(),
 	}
 	allowedNodesArg := SetStakingAllowlistTxArg(allowedNodeIDs)
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript(templates.GenerateSetApprovedNodesScript(env)).
 		AddArgument(jsoncdc.MustEncode(allowedNodesArg)).
 		AddAuthorizer(idTableStakingAddr)

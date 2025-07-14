@@ -121,7 +121,7 @@ func TestGenerateAuthorizationFixes(t *testing.T) {
       }
     `
 
-	deployTX := flow.NewTransactionBody().
+	deployTX := flow.NewEmptyTransactionBody().
 		SetScript([]byte(`
           transaction(code: String) {
               prepare(signer: auth(Contracts) &Account) {
@@ -141,7 +141,7 @@ func TestGenerateAuthorizationFixes(t *testing.T) {
 	err = runDeployTx(registersByAccount)
 	require.NoError(t, err)
 
-	setupTx := flow.NewTransactionBody().
+	setupTx := flow.NewEmptyTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`
               import Test from %s
 

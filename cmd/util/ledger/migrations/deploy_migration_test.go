@@ -128,7 +128,7 @@ func TestDeploy(t *testing.T) {
 	err = migration(registersByAccount)
 	require.NoError(t, err)
 
-	txBody := flow.NewTransactionBody().
+	txBody := flow.NewEmptyTransactionBody().
 		SetScript([]byte(fmt.Sprintf(
 			`
               import NewContract from %s

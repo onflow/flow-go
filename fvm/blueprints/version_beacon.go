@@ -20,7 +20,7 @@ func DeployNodeVersionBeaconTransaction(
 	service flow.Address,
 	versionFreezePeriod cadence.UInt64,
 ) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(deployNodeVersionBeaconTransactionTemplate)).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contracts.NodeVersionBeacon())))).
 		AddArgument(jsoncdc.MustEncode(versionFreezePeriod)).

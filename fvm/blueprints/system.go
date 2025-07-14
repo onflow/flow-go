@@ -37,7 +37,7 @@ func prepareSystemContractCode(chainID flow.ChainID) string {
 // SystemChunkTransaction creates and returns the transaction corresponding to the
 // system chunk for the given chain.
 func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
-	tx := flow.NewTransactionBody().
+	tx := flow.NewEmptyTransactionBody().
 		SetScript(
 			[]byte(prepareSystemContractCode(chain.ChainID())),
 		).

@@ -12,7 +12,7 @@ import (
 
 func CreateTokenTransferTransaction(chain flow.Chain, amount int, to flow.Address, signer flow.Address) *flow.TransactionBody {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`
 		import FungibleToken from 0x%s
 		import FlowToken from 0x%s

@@ -104,7 +104,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 	}
 	`, "WrappedToken", hex.EncodeToString([]byte(testContract))))
 
-	txBody := flow.NewTransactionBody().
+	txBody := flow.NewEmptyTransactionBody().
 		SetScript(deployingTestContractScript).
 		AddAuthorizer(chain.ServiceAddress())
 
@@ -137,7 +137,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 		sc.FlowServiceAccount.Address.Hex(),
 	))
 
-	txBody = flow.NewTransactionBody().
+	txBody = flow.NewEmptyTransactionBody().
 		SetScript(wrapTokenScript).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(105))).
 		AddAuthorizer(chain.ServiceAddress())

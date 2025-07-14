@@ -67,7 +67,7 @@ func RemoveCounterContractTransaction(authorizer flow.Address, chain flow.Chain)
 }
 
 func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`
 			import 0x%s
 

@@ -43,7 +43,7 @@ func CreateContractDeploymentTransaction(contractName string, contract string, a
               }
             }`, contractName, encoded))
 
-	txBody := flow.NewTransactionBody().
+	txBody := flow.NewEmptyTransactionBody().
 		SetScript(script).
 		AddAuthorizer(authorizer).
 		AddAuthorizer(chain.ServiceAddress())
@@ -54,7 +54,7 @@ func CreateContractDeploymentTransaction(contractName string, contract string, a
 func UpdateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(contract))
 
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
               prepare(signer: auth(UpdateContract) &Account, service: &Account) {
                 signer.contracts.update(name: "%s", code: "%s".decodeHex())
@@ -68,7 +68,7 @@ func UpdateContractDeploymentTransaction(contractName string, contract string, a
 func UpdateContractUnathorizedDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(contract))
 
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
               prepare(signer: auth(UpdateContract) &Account) {
                 signer.contracts.update(name: "%s", code: "%s".decodeHex())
@@ -79,7 +79,7 @@ func UpdateContractUnathorizedDeploymentTransaction(contractName string, contrac
 }
 
 func RemoveContractDeploymentTransaction(contractName string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
               prepare(signer: auth(RemoveContract) &Account, service: &Account) {
                 signer.contracts.remove(name: "%s")
@@ -91,7 +91,7 @@ func RemoveContractDeploymentTransaction(contractName string, authorizer flow.Ad
 }
 
 func RemoveContractUnathorizedDeploymentTransaction(contractName string, authorizer flow.Address) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
               prepare(signer: auth(RemoveContract) &Account) {
                 signer.contracts.remove(name: "%s")
@@ -104,7 +104,7 @@ func RemoveContractUnathorizedDeploymentTransaction(contractName string, authori
 func CreateUnauthorizedContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(contract))
 
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
               prepare(signer: auth(AddContract) &Account) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex())
@@ -265,7 +265,7 @@ func CreateAccountsWithSimpleAddresses(
 			),
 		)
 
-		txBody := flow.NewTransactionBody().
+		txBody := flow.NewEmptyTransactionBody().
 			SetScript(script).
 			AddArgument(encCadPublicKey).
 			AddAuthorizer(serviceAddress)
@@ -386,7 +386,7 @@ func CreateAccountCreationTransaction(t testing.TB, chain flow.Chain) (flow.Acco
 	)
 
 	// create the transaction to create the account
-	tx := flow.NewTransactionBody().
+	tx := flow.NewEmptyTransactionBody().
 		SetScript([]byte(script)).
 		AddArgument(encCadPublicKey).
 		AddAuthorizer(chain.ServiceAddress())
@@ -431,7 +431,7 @@ func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int
 	)
 
 	// create the transaction to create the account
-	tx := flow.NewTransactionBody().
+	tx := flow.NewEmptyTransactionBody().
 		SetScript([]byte(script)).
 		AddArgument(encCadPublicKey).
 		AddAuthorizer(chain.ServiceAddress())

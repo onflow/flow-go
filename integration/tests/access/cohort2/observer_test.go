@@ -499,7 +499,7 @@ func createTx(net *testnet.FlowNetwork) interface{} {
 	envelopeSignature.Address = flowAddr
 	envelopeSignature.KeyIndex = 2
 
-	tx := flow.NewTransactionBody().
+	tx := flow.NewEmptyTransactionBody().
 		AddAuthorizer(flowAddr).
 		SetPayer(flowAddr).
 		SetScript(unittest.NoopTxScript()).

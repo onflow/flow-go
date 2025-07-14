@@ -437,7 +437,7 @@ func TestWithServiceAccount(t *testing.T) {
 
 	snapshotTree := snapshot.NewSnapshotTree(nil)
 
-	txBody := flow.NewTransactionBody().
+	txBody := flow.NewEmptyTransactionBody().
 		SetScript([]byte(`transaction { prepare(signer: auth(BorrowValue) &Account) { Account(payer: signer) } }`)).
 		AddAuthorizer(chain.ServiceAddress())
 
@@ -512,7 +512,7 @@ func TestEventLimits(t *testing.T) {
 		ctx,
 		fvm.WithEventCollectionSizeLimit(2))
 
-	txBody := flow.NewTransactionBody().
+	txBody := flow.NewEmptyTransactionBody().
 		SetScript([]byte(fmt.Sprintf(deployingContractScriptTemplate, hex.EncodeToString([]byte(testContract))))).
 		SetPayer(chain.ServiceAddress()).
 		AddAuthorizer(chain.ServiceAddress())
@@ -526,7 +526,7 @@ func TestEventLimits(t *testing.T) {
 
 	snapshotTree = snapshotTree.Append(executionSnapshot)
 
-	txBody = flow.NewTransactionBody().
+	txBody = flow.NewEmptyTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`
 		import TestContract from 0x%s
 			transaction {
@@ -587,7 +587,7 @@ func TestHappyPathTransactionSigning(t *testing.T) {
 				chain)
 			require.NoError(t, err)
 
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(`transaction(){}`))
 
 			txBody.SetProposalKey(accounts[0], 0, 0)
@@ -1104,7 +1104,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(`
 				transaction {
                   prepare(signer: &Account) {
@@ -1165,7 +1165,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				chain)
 			require.NoError(t, err)
 
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(`
 				transaction {
                   prepare(signer: &Account) {
@@ -1204,7 +1204,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(`
 				transaction {
                   prepare(signer: &Account) {
@@ -1262,7 +1262,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			// This transaction is specially designed to use a lot of breaks
 			// as the weight for breaks is much higher than usual.
 			// putting a `while true {break}` in a loop does not use the same amount of memory.
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(`
 				transaction {
 					prepare(signer: &Account) {
@@ -1318,7 +1318,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(`
 				transaction {
                   prepare(signer: auth(BorrowValue) &Account) {
@@ -1357,7 +1357,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(`
 				transaction {
                   prepare(signer: auth(BorrowValue) &Account) {
@@ -1395,7 +1395,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(`
 				transaction {
                   prepare(signer: auth(BorrowValue) &Account) {
@@ -1443,7 +1443,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			loops := uint64(996)
 			executionEffortNeededToCheckStorage := uint64(1)
 			maxExecutionEffort := uint64(997)
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
 				transaction() {prepare(signer: &Account){var i=0;  while i < %d {i = i +1 } } execute{}}
 			`, loops))).
@@ -1469,7 +1469,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 
 			// increasing the number of loops should fail the transaction.
 			loops = loops + 1
-			txBody = flow.NewTransactionBody().
+			txBody = flow.NewEmptyTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
 				transaction() {prepare(signer: &Account){var i=0;  while i < %d {i = i +1 } } execute{}}
 			`, loops))).
@@ -1549,7 +1549,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 			// create a transaction without loops so only the looping in the storage check is counted.
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
@@ -1765,7 +1765,7 @@ func TestEnforcingComputationLimit(t *testing.T) {
 				),
 			)
 
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript(script).
 				SetComputeLimit(computationLimit)
 
@@ -1857,7 +1857,7 @@ func TestStorageCapacity(t *testing.T) {
 			// Perform test
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(fmt.Sprintf(
 					`
 					import FungibleToken from 0x%s
@@ -1968,7 +1968,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				contract := "access(all) contract Foo {}"
 
-				txBody := flow.NewTransactionBody().SetScript([]byte(fmt.Sprintf(`
+				txBody := flow.NewEmptyTransactionBody().SetScript([]byte(fmt.Sprintf(`
 					transaction {
 						prepare(signer: auth(AddContract) &Account, service: &Account) {
 							signer.contracts.add(name: "Foo", code: "%s".decodeHex())
@@ -2038,7 +2038,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				contract := "access(all) contract Foo {}"
 
-				txBody := flow.NewTransactionBody().SetScript([]byte(fmt.Sprintf(`
+				txBody := flow.NewEmptyTransactionBody().SetScript([]byte(fmt.Sprintf(`
 					transaction {
 						prepare(signer: auth(AddContract) &Account, service: &Account) {
 							signer.contracts.add(name: "Foo", code: "%s".decodeHex())
@@ -2482,7 +2482,7 @@ func TestCapabilityControllers(t *testing.T) {
 				ctx fvm.Context,
 				snapshotTree snapshot.SnapshotTree,
 			) {
-				txBody := flow.NewTransactionBody().
+				txBody := flow.NewEmptyTransactionBody().
 					SetScript([]byte(`
 						transaction {
 						  prepare(signer: auth(Capabilities) &Account) {
@@ -2605,7 +2605,7 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 				var sequenceNumber uint64 = 0
 
 				runTransaction := func(code []byte) {
-					txBody := flow.NewTransactionBody().
+					txBody := flow.NewEmptyTransactionBody().
 						SetScript(code).
 						SetPayer(chain.ServiceAddress()).
 						SetProposalKey(chain.ServiceAddress(), 0, sequenceNumber).
@@ -2743,7 +2743,7 @@ func TestEntropyCallOnlyOkIfAllowed(t *testing.T) {
 				ctx fvm.Context,
 				snapshotTree snapshot.SnapshotTree,
 			) {
-				txBody := flow.NewTransactionBody().
+				txBody := flow.NewEmptyTransactionBody().
 					SetScript([]byte(`
 						transaction {
 						  prepare() {
@@ -2797,7 +2797,7 @@ func TestEntropyCallExpectsNoParameters(t *testing.T) {
 			ctx fvm.Context,
 			snapshotTree snapshot.SnapshotTree,
 		) {
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(`
 						transaction {
 						  prepare() {
@@ -2887,7 +2887,7 @@ func TestEVM(t *testing.T) {
 
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
 						import EVM from %s
 
@@ -3027,7 +3027,7 @@ func TestEVM(t *testing.T) {
 		) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
 					import FungibleToken from %s
 					import FlowToken from %s
@@ -3490,7 +3490,7 @@ func TestVMBridge(t *testing.T) {
 			snapshotTree = snapshotTree.Append(executionSnapshot)
 
 			// Mint an NFT
-			txBody = flow.NewTransactionBody().
+			txBody = flow.NewEmptyTransactionBody().
 				SetScript([]byte(fmt.Sprintf(
 					`
 						import NonFungibleToken from 0x%s
@@ -3713,7 +3713,7 @@ func TestAccountCapabilitiesPublishEntitledRejection(t *testing.T) {
 		) {
 
 			serviceAddress := chain.ServiceAddress()
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(`
 					transaction {
                         prepare(signer: auth(Capabilities, Storage) &Account) {
@@ -3752,7 +3752,7 @@ func TestAccountCapabilitiesPublishEntitledRejection(t *testing.T) {
 		) {
 
 			serviceAddress := chain.ServiceAddress()
-			txBody := flow.NewTransactionBody().
+			txBody := flow.NewEmptyTransactionBody().
 				SetScript([]byte(`
 					transaction {
                         prepare(signer: auth(Capabilities, Storage) &Account) {

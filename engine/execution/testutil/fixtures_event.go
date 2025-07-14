@@ -33,7 +33,7 @@ func UpdateEventContractTransaction(authorizer flow.Address, chain flow.Chain, e
 }
 
 func CreateEmitEventTransaction(contractAccount, signer flow.Address) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+	return flow.NewEmptyTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`
 			import EventContract from 0x%s
 

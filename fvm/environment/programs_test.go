@@ -680,7 +680,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 
 	callC := func(snapshotTree snapshot.SnapshotTree) snapshot.SnapshotTree {
 		procCallC := fvm.Transaction(
-			flow.NewTransactionBody().SetScript(
+			flow.NewEmptyTransactionBody().SetScript(
 				[]byte(
 					`
 					import A from 0xa
@@ -789,7 +789,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 
 	callCAfterItsBroken := func(snapshotTree snapshot.SnapshotTree) snapshot.SnapshotTree {
 		procCallC := fvm.Transaction(
-			flow.NewTransactionBody().SetScript(
+			flow.NewEmptyTransactionBody().SetScript(
 				[]byte(
 					`
 					import A from 0xa
@@ -839,7 +839,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 
 func callTx(name string, address flow.Address) *flow.TransactionBody {
 
-	return flow.NewTransactionBody().SetScript(
+	return flow.NewEmptyTransactionBody().SetScript(
 		[]byte(fmt.Sprintf(`
 			import %s from %s
 			transaction {
@@ -853,7 +853,7 @@ func callTx(name string, address flow.Address) *flow.TransactionBody {
 func contractDeployTx(name, code string, address flow.Address) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(code))
 
-	return flow.NewTransactionBody().SetScript(
+	return flow.NewEmptyTransactionBody().SetScript(
 		[]byte(fmt.Sprintf(`transaction {
               prepare(signer: auth(AddContract) &Account) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex())
@@ -865,7 +865,7 @@ func contractDeployTx(name, code string, address flow.Address) *flow.Transaction
 func updateContractTx(name, code string, address flow.Address) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(code))
 
-	return flow.NewTransactionBody().SetScript([]byte(
+	return flow.NewEmptyTransactionBody().SetScript([]byte(
 		fmt.Sprintf(`transaction {
              prepare(signer: auth(UpdateContract) &Account) {
                signer.contracts.update(name: "%s", code: "%s".decodeHex())
