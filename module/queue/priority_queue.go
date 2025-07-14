@@ -45,7 +45,7 @@ var _ heap.Interface = (*PriorityQueue[any])(nil)
 // It provides a priority queue where items with larger priority values
 // are dequeued first. For items with equal priority, the oldest item (by insertion time)
 // is dequeued first.
-// CAUTION: not concurrency safe!
+// CAUTION: not concurrency safe! Caller must implement their own synchronization.
 type PriorityQueue[T any] []*PriorityQueueItem[T]
 
 // Len returns the number of items in the priority queue.
@@ -55,6 +55,7 @@ func (pq PriorityQueue[T]) Len() int { return len(pq) }
 // Less determines the ordering of items in the priority queue.
 // PriorityQueueItems with larger priority values come first. For items with equal priority,
 // the oldest item (by insertion timestamp) comes first.
+// Returns true if and only if item at index i should come before item at index j.
 // CAUTION: not concurrency safe!
 func (pq PriorityQueue[T]) Less(i, j int) bool {
 	// We want Pop to give us the highest, not lowest, priority so we use greater than here.
@@ -78,6 +79,7 @@ func (pq PriorityQueue[T]) Swap(i, j int) {
 
 // Push adds an item to the priority queue.
 // The item's index is automatically set to its position in the heap.
+// The item must be of type `*PriorityQueueItem[T]` or it will be ignored.
 // CAUTION: not concurrency safe!
 func (pq *PriorityQueue[T]) Push(x any) {
 	n := len(*pq)

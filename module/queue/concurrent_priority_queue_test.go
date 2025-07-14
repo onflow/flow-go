@@ -13,10 +13,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestNewPriorityMessageQueue tests the constructor
-func TestNewPriorityMessageQueue(t *testing.T) {
+// TestNewConcurrentPriorityQueue tests the constructor
+func TestNewConcurrentPriorityQueue(t *testing.T) {
 	t.Run("creates queue with larger values first", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](false)
+		mq := NewConcurrentPriorityQueue[string](false)
 
 		assert.NotNil(t, mq)
 		assert.NotNil(t, mq.queue)
@@ -26,7 +26,7 @@ func TestNewPriorityMessageQueue(t *testing.T) {
 	})
 
 	t.Run("creates queue with smaller values first", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](true)
+		mq := NewConcurrentPriorityQueue[string](true)
 
 		assert.NotNil(t, mq)
 		assert.NotNil(t, mq.queue)
@@ -36,16 +36,16 @@ func TestNewPriorityMessageQueue(t *testing.T) {
 	})
 }
 
-// TestPriorityMessageQueue_Len tests the Len method
-func TestPriorityMessageQueue_Len(t *testing.T) {
+// TestConcurrentPriorityQueue_Len tests the Len method
+func TestConcurrentPriorityQueue_Len(t *testing.T) {
 	t.Run("empty queue returns 0", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](false)
+		mq := NewConcurrentPriorityQueue[string](false)
 
 		assert.Equal(t, 0, mq.Len())
 	})
 
 	t.Run("queue with items returns correct length", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](false)
+		mq := NewConcurrentPriorityQueue[string](false)
 
 		mq.Push("item1", 1)
 		mq.Push("item2", 2)
@@ -55,7 +55,7 @@ func TestPriorityMessageQueue_Len(t *testing.T) {
 	})
 
 	t.Run("length decreases after pop", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](false)
+		mq := NewConcurrentPriorityQueue[string](false)
 
 		mq.Push("item1", 1)
 		mq.Push("item2", 2)
@@ -68,10 +68,10 @@ func TestPriorityMessageQueue_Len(t *testing.T) {
 	})
 }
 
-// TestPriorityMessageQueue_Push tests the Push method
-func TestPriorityMessageQueue_Push(t *testing.T) {
+// TestConcurrentPriorityQueue_Push tests the Push method
+func TestConcurrentPriorityQueue_Push(t *testing.T) {
 	t.Run("push adds items with larger values first", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](false)
+		mq := NewConcurrentPriorityQueue[string](false)
 
 		mq.Push("low", 1)
 		mq.Push("high", 10)
@@ -97,7 +97,7 @@ func TestPriorityMessageQueue_Push(t *testing.T) {
 	})
 
 	t.Run("push adds items with smaller values first", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](true)
+		mq := NewConcurrentPriorityQueue[string](true)
 
 		mq.Push("high", 10)
 		mq.Push("low", 1)
@@ -123,7 +123,7 @@ func TestPriorityMessageQueue_Push(t *testing.T) {
 	})
 
 	t.Run("push with zero priority", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](false)
+		mq := NewConcurrentPriorityQueue[string](false)
 
 		mq.Push("zero", 0)
 		mq.Push("high", 100)
@@ -139,7 +139,7 @@ func TestPriorityMessageQueue_Push(t *testing.T) {
 	})
 
 	t.Run("push with zero priority and smaller values first", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](true)
+		mq := NewConcurrentPriorityQueue[string](true)
 
 		mq.Push("high", 100)
 		mq.Push("zero", 0)
@@ -155,10 +155,10 @@ func TestPriorityMessageQueue_Push(t *testing.T) {
 	})
 }
 
-// TestPriorityMessageQueue_Pop tests the Pop method
-func TestPriorityMessageQueue_Pop(t *testing.T) {
+// TestConcurrentPriorityQueue_Pop tests the Pop method
+func TestConcurrentPriorityQueue_Pop(t *testing.T) {
 	t.Run("pop on empty queue returns false", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](false)
+		mq := NewConcurrentPriorityQueue[string](false)
 
 		item, ok := mq.Pop()
 		assert.False(t, ok)
@@ -167,7 +167,7 @@ func TestPriorityMessageQueue_Pop(t *testing.T) {
 	})
 
 	t.Run("pop returns items in priority order", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](false)
+		mq := NewConcurrentPriorityQueue[string](false)
 
 		mq.Push("item1", 1)
 		mq.Push("item3", 3)
@@ -191,7 +191,7 @@ func TestPriorityMessageQueue_Pop(t *testing.T) {
 	})
 
 	t.Run("pop with equal priorities uses timestamp ordering", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](false)
+		mq := NewConcurrentPriorityQueue[string](false)
 
 		// Add items with same priority but different timestamps
 		mq.Push("first", 5)
@@ -215,10 +215,10 @@ func TestPriorityMessageQueue_Pop(t *testing.T) {
 	})
 }
 
-// TestPriorityMessageQueue_Channel tests the Channel method
-func TestPriorityMessageQueue_Channel(t *testing.T) {
+// TestConcurrentPriorityQueue_Channel tests the Channel method
+func TestConcurrentPriorityQueue_Channel(t *testing.T) {
 	t.Run("channel receives notification on push", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](false)
+		mq := NewConcurrentPriorityQueue[string](false)
 		ch := mq.Channel()
 
 		// Push an item
@@ -234,7 +234,7 @@ func TestPriorityMessageQueue_Channel(t *testing.T) {
 	})
 
 	t.Run("channel does not block on multiple pushes", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](false)
+		mq := NewConcurrentPriorityQueue[string](false)
 		ch := mq.Channel()
 
 		// Push multiple items rapidly
@@ -255,7 +255,7 @@ func TestPriorityMessageQueue_Channel(t *testing.T) {
 	})
 
 	t.Run("channel is buffered", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](false)
+		mq := NewConcurrentPriorityQueue[string](false)
 		ch := mq.Channel()
 
 		// Push multiple items without reading from channel
@@ -276,10 +276,10 @@ func TestPriorityMessageQueue_Channel(t *testing.T) {
 	})
 }
 
-// TestPriorityMessageQueue_Concurrency tests thread safety
-func TestPriorityMessageQueue_Concurrency(t *testing.T) {
+// TestConcurrentPriorityQueue_Concurrency tests thread safety
+func TestConcurrentPriorityQueue_Concurrency(t *testing.T) {
 	t.Run("concurrent push operations", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[int](false)
+		mq := NewConcurrentPriorityQueue[int](false)
 		numGoroutines := 1000
 		var wg sync.WaitGroup
 
@@ -310,7 +310,7 @@ func TestPriorityMessageQueue_Concurrency(t *testing.T) {
 	})
 
 	t.Run("concurrent push and pop operations", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[int](false)
+		mq := NewConcurrentPriorityQueue[int](false)
 		numGoroutines := 1000
 		var wg sync.WaitGroup
 		var mu sync.Mutex
@@ -354,7 +354,7 @@ func TestPriorityMessageQueue_Concurrency(t *testing.T) {
 	})
 
 	t.Run("concurrent len operations", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[int](false)
+		mq := NewConcurrentPriorityQueue[int](false)
 		numGoroutines := 1000
 		var wg sync.WaitGroup
 
@@ -385,10 +385,10 @@ func TestPriorityMessageQueue_Concurrency(t *testing.T) {
 	})
 }
 
-// TestPriorityMessageQueue_EdgeCases tests edge cases
-func TestPriorityMessageQueue_EdgeCases(t *testing.T) {
+// TestConcurrentPriorityQueue_EdgeCases tests edge cases
+func TestConcurrentPriorityQueue_EdgeCases(t *testing.T) {
 	t.Run("max uint64 priority with larger values first", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](false)
+		mq := NewConcurrentPriorityQueue[string](false)
 
 		mq.Push("normal", 1000)
 		mq.Push("max", math.MaxUint64)
@@ -399,7 +399,7 @@ func TestPriorityMessageQueue_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("max uint64 priority with smaller values first", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](true)
+		mq := NewConcurrentPriorityQueue[string](true)
 
 		mq.Push("normal", 1000)
 		mq.Push("max", math.MaxUint64)
@@ -410,7 +410,7 @@ func TestPriorityMessageQueue_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("empty queue after popping all items", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](false)
+		mq := NewConcurrentPriorityQueue[string](false)
 
 		mq.Push("item1", 1)
 		mq.Push("item2", 2)
@@ -431,7 +431,7 @@ func TestPriorityMessageQueue_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("channel notification after queue becomes empty", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](false)
+		mq := NewConcurrentPriorityQueue[string](false)
 		ch := mq.Channel()
 
 		mq.Push("item", 1)
@@ -456,10 +456,10 @@ func TestPriorityMessageQueue_EdgeCases(t *testing.T) {
 	})
 }
 
-// TestPriorityMessageQueue_Integration tests integration scenarios
-func TestPriorityMessageQueue_Integration(t *testing.T) {
+// TestConcurrentPriorityQueue_Integration tests integration scenarios
+func TestConcurrentPriorityQueue_Integration(t *testing.T) {
 	t.Run("mixed operations with different priorities", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](false)
+		mq := NewConcurrentPriorityQueue[string](false)
 
 		// Add items with various priorities
 		mq.Push("urgent", 100)
@@ -481,7 +481,7 @@ func TestPriorityMessageQueue_Integration(t *testing.T) {
 	})
 
 	t.Run("priority inversion with mixed operations", func(t *testing.T) {
-		mq := NewPriorityMessageQueue[string](true)
+		mq := NewConcurrentPriorityQueue[string](true)
 
 		// Add items with various priorities
 		mq.Push("urgent", 100)
@@ -506,7 +506,7 @@ func TestPriorityMessageQueue_Integration(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		mq := NewPriorityMessageQueue[string](true)
+		mq := NewConcurrentPriorityQueue[string](true)
 
 		itemCount := 100
 		go func() {
