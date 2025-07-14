@@ -96,7 +96,7 @@ func (b *pendingBlock) Block() *flowgo.Block {
 		}
 	}
 
-	//nolint:structwrite
+	//nolint:structwrite - safe because Emulator is strictly used for integration tests
 	return &flowgo.Block{
 		Header: flowgo.HeaderBody{
 			ChainID:   b.chainID,
