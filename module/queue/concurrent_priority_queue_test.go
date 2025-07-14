@@ -21,7 +21,6 @@ func TestNewConcurrentPriorityQueue(t *testing.T) {
 		assert.NotNil(t, mq)
 		assert.NotNil(t, mq.queue)
 		assert.False(t, mq.smallerValuesFirst)
-		assert.NotNil(t, mq.ch)
 		assert.Equal(t, 0, mq.Len())
 	})
 
@@ -31,7 +30,6 @@ func TestNewConcurrentPriorityQueue(t *testing.T) {
 		assert.NotNil(t, mq)
 		assert.NotNil(t, mq.queue)
 		assert.True(t, mq.smallerValuesFirst)
-		assert.NotNil(t, mq.ch)
 		assert.Equal(t, 0, mq.Len())
 	})
 }
