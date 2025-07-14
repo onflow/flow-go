@@ -101,25 +101,27 @@ var mintFlowTokenTransactionTemplate string
 
 func DeployFlowTokenContractTransaction(service, flowToken flow.Address, contract []byte) *flow.TransactionBody {
 
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(deployFlowTokenTransactionTemplate)).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddAuthorizer(flowToken).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // CreateFlowTokenMinterTransaction returns a transaction which creates a Flow
 // token Minter resource and stores it in the service account. This Minter is
 // expected to be stored here by the epoch smart contracts.
 func CreateFlowTokenMinterTransaction(service, flowToken flow.Address) *flow.TransactionBody {
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(templates.ReplaceAddresses(
 			createFlowTokenMinterTransactionTemplate,
 			templates.Environment{
 				FlowTokenAddress: flowToken.Hex(),
 			})),
 		).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 func MintFlowTokenTransaction(
@@ -131,7 +133,7 @@ func MintFlowTokenTransaction(
 		panic(fmt.Sprintf("failed to encode initial token supply: %s", err.Error()))
 	}
 
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(templates.ReplaceAddresses(mintFlowTokenTransactionTemplate,
 			templates.Environment{
 				FlowTokenAddress:     flowToken.Hex(),
@@ -139,7 +141,8 @@ func MintFlowTokenTransaction(
 			})),
 		).
 		AddArgument(initialSupplyArg).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 func TransferFlowTokenTransaction(
@@ -149,11 +152,12 @@ func TransferFlowTokenTransaction(
 ) *flow.TransactionBody {
 	cadenceAmount, _ := cadence.NewUFix64(amount)
 	txScript := templates.GenerateTransferGenericVaultWithAddressScript(env)
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadenceAmount)).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(to))).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(flow.HexToAddress(env.FlowTokenAddress)))).
 		AddArgument(jsoncdc.MustEncode(cadence.String("FlowToken"))).
-		AddAuthorizer(from)
+		AddAuthorizer(from).
+		Build()
 }

@@ -62,7 +62,7 @@ type TransactionBody struct {
 // ordering during construction.
 //
 // An instance of UntrustedTransactionBody should be validated and converted into
-// a trusted TransactionBody using NewEmptyTransactionBody constructor.
+// a trusted TransactionBody using NewTransactionBody constructor.
 type UntrustedTransactionBody TransactionBody
 
 // NewTransactionBody creates a new instance of TransactionBody.

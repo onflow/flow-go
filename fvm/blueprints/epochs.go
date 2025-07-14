@@ -35,7 +35,7 @@ var deployLockedTokensTemplate string
 
 // DeployEpochTransaction returns the transaction body for the deploy epoch transaction
 func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig epochs.EpochConfig) *flow.TransactionBody {
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(
 			templates.ReplaceAddresses(
 				deployEpochTransactionTemplate,
@@ -54,7 +54,8 @@ func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig e
 		AddArgument(jsoncdc.MustEncode(epochConfig.FLOWsupplyIncreasePercentage)).
 		AddArgument(jsoncdc.MustEncode(epochConfig.RandomSource)).
 		AddArgument(epochs.EncodeClusterAssignments(epochConfig.CollectorClusters)).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // SetupAccountTransaction returns the transaction body for the setup account transaction
@@ -63,7 +64,7 @@ func SetupAccountTransaction(
 	flowToken flow.Address,
 	accountAddress flow.Address,
 ) *flow.TransactionBody {
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(
 			templates.ReplaceAddresses(
 				setupAccountTemplate,
@@ -73,17 +74,19 @@ func SetupAccountTransaction(
 				},
 			),
 		)).
-		AddAuthorizer(accountAddress)
+		AddAuthorizer(accountAddress).
+		Build()
 }
 
 // DeployIDTableStakingTransaction returns the transaction body for the deploy id table staking transaction
 func DeployIDTableStakingTransaction(service flow.Address, contract []byte, epochTokenPayout cadence.UFix64, rewardCut cadence.UFix64) *flow.TransactionBody {
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(deployIDTableStakingTransactionTemplate)).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddArgument(jsoncdc.MustEncode(epochTokenPayout)).
 		AddArgument(jsoncdc.MustEncode(rewardCut)).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // FundAccountTransaction returns the transaction body for the fund account transaction
@@ -99,7 +102,7 @@ func FundAccountTransaction(
 		panic(err)
 	}
 
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(templates.ReplaceAddresses(
 			fundAccountTemplate,
 			templates.Environment{
@@ -109,18 +112,20 @@ func FundAccountTransaction(
 		))).
 		AddArgument(jsoncdc.MustEncode(cdcAmount)).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(nodeAddress))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // DeployLockedTokensTransaction returns the transaction body for the deploy locked tokens transaction
 func DeployLockedTokensTransaction(service flow.Address, contract []byte, publicKeys []cadence.Value) *flow.TransactionBody {
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(
 			deployLockedTokensTemplate,
 		)).
 		AddArgument(jsoncdc.MustEncode(cadence.NewArray(publicKeys))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // RegisterNodeTransaction creates a new node struct object.
@@ -189,7 +194,7 @@ func RegisterNodeTransaction(
 	}
 
 	// register node
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(templates.GenerateEpochRegisterNodeScript(env)).
 		AddArgument(jsoncdc.MustEncode(cdcNodeID)).
 		AddArgument(jsoncdc.MustEncode(cadence.NewUInt8(uint8(id.Role)))).
@@ -198,7 +203,8 @@ func RegisterNodeTransaction(
 		AddArgument(jsoncdc.MustEncode(cdcStakingPubKey)).
 		AddArgument(jsoncdc.MustEncode(cdcAmount)).
 		AddArgument(jsoncdc.MustEncode(cadencePublicKeys)).
-		AddAuthorizer(nodeAddress)
+		AddAuthorizer(nodeAddress).
+		Build()
 }
 
 // SetStakingAllowlistTransaction returns transaction body for set staking allowlist transaction
@@ -207,10 +213,11 @@ func SetStakingAllowlistTransaction(idTableStakingAddr flow.Address, allowedNode
 		IDTableAddress: idTableStakingAddr.HexWithPrefix(),
 	}
 	allowedNodesArg := SetStakingAllowlistTxArg(allowedNodeIDs)
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(templates.GenerateSetApprovedNodesScript(env)).
 		AddArgument(jsoncdc.MustEncode(allowedNodesArg)).
-		AddAuthorizer(idTableStakingAddr)
+		AddAuthorizer(idTableStakingAddr).
+		Build()
 }
 
 // SetStakingAllowlistTxArg returns the transaction argument for setting the staking allow-list.

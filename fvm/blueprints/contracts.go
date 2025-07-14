@@ -64,11 +64,12 @@ func setContractAuthorizersTransaction(
 		return nil, err
 	}
 
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(setContractOperationAuthorizersTransactionTemplate)).
 		AddAuthorizer(serviceAccount).
 		AddArgument(addressesArg).
-		AddArgument(pathArg), nil
+		AddArgument(pathArg).
+		Build(), nil
 }
 
 // SetIsContractDeploymentRestrictedTransaction sets the restricted flag for contract deployment
@@ -83,18 +84,20 @@ func SetIsContractDeploymentRestrictedTransaction(serviceAccount flow.Address, r
 		return nil, err
 	}
 
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(setIsContractDeploymentRestrictedTransactionTemplate)).
 		AddAuthorizer(serviceAccount).
 		AddArgument(argRestricted).
-		AddArgument(argPath), nil
+		AddArgument(argPath).
+		Build(), nil
 }
 
 // TODO (ramtin) get rid of authorizers
 func DeployContractTransaction(address flow.Address, contract []byte, contractName string) *flow.TransactionBody {
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(DeployContractTransactionTemplate).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contractName))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract))).
-		AddAuthorizer(address)
+		AddAuthorizer(address).
+		Build()
 }

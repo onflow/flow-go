@@ -1013,12 +1013,13 @@ func (b *Blockchain) systemChunkTransaction() (*flowgo.TransactionBody, error) {
 		),
 	)
 
-	tx := flowgo.NewEmptyTransactionBody().
+	tx := flowgo.NewTransactionBodyBuilder().
 		SetScript([]byte(script)).
 		SetComputeLimit(flowgo.DefaultMaxTransactionGasLimit).
 		AddAuthorizer(serviceAddress).
 		SetPayer(serviceAddress).
-		SetReferenceBlockID(b.pendingBlock.parentID)
+		SetReferenceBlockID(b.pendingBlock.parentID).
+		Build()
 
 	return tx, nil
 }

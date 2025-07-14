@@ -19,8 +19,9 @@ var deployRandomBeaconHistoryTransactionTemplate string
 func DeployRandomBeaconHistoryTransaction(
 	service flow.Address,
 ) *flow.TransactionBody {
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(deployRandomBeaconHistoryTransactionTemplate)).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contracts.RandomBeaconHistory()))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }

@@ -13,7 +13,6 @@ import (
 )
 
 func TestTransaction_SignatureOrdering(t *testing.T) {
-	tx := flow.NewEmptyTransactionBody()
 
 	proposerAddress := unittest.RandomAddressFixture()
 	proposerKeyIndex := uint32(1)
@@ -28,14 +27,14 @@ func TestTransaction_SignatureOrdering(t *testing.T) {
 	payerKeyIndex := uint32(0)
 	payerSignature := []byte{7, 8, 9}
 
-	tx.SetProposalKey(proposerAddress, proposerKeyIndex, proposerSequenceNumber)
-	tx.AddPayloadSignature(proposerAddress, proposerKeyIndex, proposerSignature)
-
-	tx.SetPayer(payerAddress)
-	tx.AddEnvelopeSignature(payerAddress, payerKeyIndex, payerSignature)
-
-	tx.AddAuthorizer(authorizerAddress)
-	tx.AddPayloadSignature(authorizerAddress, authorizerKeyIndex, authorizerSignature)
+	tx := flow.NewTransactionBodyBuilder().
+		SetProposalKey(proposerAddress, proposerKeyIndex, proposerSequenceNumber).
+		AddPayloadSignature(proposerAddress, proposerKeyIndex, proposerSignature).
+		SetPayer(payerAddress).
+		AddEnvelopeSignature(payerAddress, payerKeyIndex, payerSignature).
+		AddAuthorizer(authorizerAddress).
+		AddPayloadSignature(authorizerAddress, authorizerKeyIndex, authorizerSignature).
+		Build()
 
 	require.Len(t, tx.PayloadSignatures, 2)
 

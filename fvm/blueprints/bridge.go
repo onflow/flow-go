@@ -53,10 +53,11 @@ func CreateCOATransaction(
 	service flow.Address,
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/evm/create_account.cdc", bridgeEnv, env)
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(0.0))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // DeployEVMContractTransaction returns the transaction body for
@@ -70,12 +71,13 @@ func DeployEVMContractTransaction(
 	deploymentValue float64,
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/evm/deploy.cdc", bridgeEnv, env)
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(bytecode))).
 		AddArgument(jsoncdc.MustEncode(cadence.UInt64(gasLimit))).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(deploymentValue))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // DeployFlowEVMBridgeUtilsContractTransaction returns the transaction body for
@@ -89,12 +91,13 @@ func DeployFlowEVMBridgeUtilsContractTransaction(
 	factoryAddress string,
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/deploy_bridge_utils.cdc", *bridgeEnv, env)
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contractName))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(factoryAddress))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // PauseBridgeTransaction returns the transaction body for the transaction
@@ -106,10 +109,11 @@ func PauseBridgeTransaction(
 	pause bool,
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/pause/update_bridge_pause_status.cdc", bridgeEnv, env)
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.Bool(pause))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // SetRegistrarTransaction returns the transaction body for the transaction to set the factory as registrar
@@ -120,10 +124,11 @@ func SetRegistrarTransaction(
 	registryAddress string,
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/evm/set_registrar.cdc", bridgeEnv, env)
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(registryAddress))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // SetDeploymentRegistryTransaction returns the transaction body for the transaction
@@ -135,10 +140,11 @@ func SetDeploymentRegistryTransaction(
 	registryAddress string,
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/evm/set_deployment_registry.cdc", bridgeEnv, env)
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(registryAddress))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // SetDelegatedDeployerTransaction returns the transaction body for the transaction
@@ -150,10 +156,11 @@ func SetDelegatedDeployerTransaction(
 	deployerAddress string,
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/evm/set_delegated_deployer.cdc", bridgeEnv, env)
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(deployerAddress))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // AddDeployerTransaction returns the transaction body for the transaction
@@ -165,11 +172,12 @@ func AddDeployerTransaction(
 	deployerTag, deployerAddress string,
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/evm/add_deployer.cdc", bridgeEnv, env)
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(deployerTag))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(deployerAddress))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // DeployFlowEVMBridgeAccessorContractTransaction returns the transaction body for the deploy FlowEVMBridgeAccessor contract transaction
@@ -181,12 +189,13 @@ func DeployFlowEVMBridgeAccessorContractTransaction(
 	contract, _ := bridge.GetCadenceContractCode("cadence/contracts/bridge/FlowEVMBridgeAccessor.cdc", bridgeEnv, env)
 	contractName := "FlowEVMBridgeAccessor"
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/deploy_bridge_accessor.cdc", bridgeEnv, env)
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contractName))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract))).
 		AddArgument(jsoncdc.MustEncode(cadence.Address(service))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // IntegrateEVMWithBridgeAccessorTransaction returns the transaction body for the transaction
@@ -197,11 +206,12 @@ func IntegrateEVMWithBridgeAccessorTransaction(
 	service flow.Address,
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/evm-integration/claim_accessor_capability_and_save_router.cdc", bridgeEnv, env)
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String("FlowEVMBridgeAccessor"))).
 		AddArgument(jsoncdc.MustEncode(cadence.Address(service))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // UpdateOnboardFeeTransaction returns the transaction body for the transaction
@@ -213,10 +223,11 @@ func UpdateOnboardFeeTransaction(
 	fee float64,
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/fee/update_onboard_fee.cdc", bridgeEnv, env)
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(fee))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // UpdateBaseFeeTransaction returns the transaction body for the transaction
@@ -228,10 +239,11 @@ func UpdateBaseFeeTransaction(
 	fee float64,
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/fee/update_base_fee.cdc", bridgeEnv, env)
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(fee))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // UpsertContractCodeChunksTransaction returns the transaction body for the transaction
@@ -250,11 +262,12 @@ func UpsertContractCodeChunksTransaction(
 		chunks[i] = cadence.String(chunk)
 	}
 
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(forTemplate))).
 		AddArgument(jsoncdc.MustEncode(cadence.NewArray(chunks))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // CreateWFLOWTokenHandlerTransaction returns the transaction body for the transaction
@@ -267,12 +280,13 @@ func CreateWFLOWTokenHandlerTransaction(
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/token-handler/create_wflow_token_handler.cdc", bridgeEnv, env)
 
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(wflowEVMAddress))).
 		SetProposalKey(service, 0, 0).
 		SetPayer(service).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // EnableWFLOWTokenHandlerTransaction returns the transaction body for the transaction
@@ -285,12 +299,13 @@ func EnableWFLOWTokenHandlerTransaction(
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/token-handler/enable_token_handler.cdc", bridgeEnv, env)
 
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(flowTokenType))).
 		SetProposalKey(service, 0, 0).
 		SetPayer(service).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // OnboardToBridgeByTypeIDTransaction returns the transaction body for the transaction
@@ -303,12 +318,13 @@ func OnboardToBridgeByTypeIDTransaction(
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/onboarding/onboard_by_type_identifier.cdc", bridgeEnv, env)
 
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(forType))).
 		SetProposalKey(service, 0, 0).
 		SetPayer(service).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // BridgeFTToEVMTransaction returns the transaction body for the transaction
@@ -322,13 +338,14 @@ func BridgeFTToEVMTransaction(
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/tokens/bridge_tokens_to_evm.cdc", bridgeEnv, env)
 	bridgeAmount, _ := cadence.NewUFix64(amount)
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(forType))).
 		AddArgument(jsoncdc.MustEncode(bridgeAmount)).
 		SetProposalKey(service, 0, 0).
 		SetPayer(service).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // BridgeFTFromEVMTransaction returns the transaction body for the transaction
@@ -342,13 +359,14 @@ func BridgeFTFromEVMTransaction(
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/tokens/bridge_tokens_from_evm.cdc", bridgeEnv, env)
 
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(forType))).
 		AddArgument(jsoncdc.MustEncode(cadence.NewUInt256(amount))).
 		SetProposalKey(service, 0, 0).
 		SetPayer(service).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // GetEscrowedTokenBalanceScript returns the script body for the script
@@ -373,13 +391,14 @@ func BridgeNFTToEVMTransaction(
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/nft/bridge_nft_to_evm.cdc", bridgeEnv, env)
 
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(forType))).
 		AddArgument(jsoncdc.MustEncode(id)).
 		SetProposalKey(service, 0, 0).
 		SetPayer(service).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // BridgeNFTFromEVMTransaction returns the transaction body for the transaction
@@ -393,13 +412,14 @@ func BridgeNFTFromEVMTransaction(
 ) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/nft/bridge_nft_from_evm.cdc", bridgeEnv, env)
 
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(forType))).
 		AddArgument(jsoncdc.MustEncode(id)).
 		SetProposalKey(service, 0, 0).
 		SetPayer(service).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // GetIsNFTInEscrowScript returns the script body for the script

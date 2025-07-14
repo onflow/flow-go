@@ -680,7 +680,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 
 	callC := func(snapshotTree snapshot.SnapshotTree) snapshot.SnapshotTree {
 		procCallC := fvm.Transaction(
-			flow.NewEmptyTransactionBody().SetScript(
+			flow.NewTransactionBodyBuilder().SetScript(
 				[]byte(
 					`
 					import A from 0xa
@@ -691,7 +691,8 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 							log(C.hello())
 						}
 					}`,
-				)),
+				)).
+				Build(),
 			derivedBlockData.NextTxIndexForTestingOnly())
 
 		executionSnapshot, output, err := vm.Run(
@@ -789,7 +790,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 
 	callCAfterItsBroken := func(snapshotTree snapshot.SnapshotTree) snapshot.SnapshotTree {
 		procCallC := fvm.Transaction(
-			flow.NewEmptyTransactionBody().SetScript(
+			flow.NewTransactionBodyBuilder().SetScript(
 				[]byte(
 					`
 					import A from 0xa
@@ -800,7 +801,8 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 							log(C.hello())
 						}
 					}`,
-				)),
+				)).
+				Build(),
 			derivedBlockData.NextTxIndexForTestingOnly())
 
 		executionSnapshot, output, err := vm.Run(
@@ -839,7 +841,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 
 func callTx(name string, address flow.Address) *flow.TransactionBody {
 
-	return flow.NewEmptyTransactionBody().SetScript(
+	return flow.NewTransactionBodyBuilder().SetScript(
 		[]byte(fmt.Sprintf(`
 			import %s from %s
 			transaction {
@@ -847,31 +849,31 @@ func callTx(name string, address flow.Address) *flow.TransactionBody {
                 log(%s.hello())
               }
             }`, name, address.HexWithPrefix(), name)),
-	)
+	).Build()
 }
 
 func contractDeployTx(name, code string, address flow.Address) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(code))
 
-	return flow.NewEmptyTransactionBody().SetScript(
+	return flow.NewTransactionBodyBuilder().SetScript(
 		[]byte(fmt.Sprintf(`transaction {
               prepare(signer: auth(AddContract) &Account) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex())
               }
             }`, name, encoded)),
-	).AddAuthorizer(address)
+	).AddAuthorizer(address).Build()
 }
 
 func updateContractTx(name, code string, address flow.Address) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(code))
 
-	return flow.NewEmptyTransactionBody().SetScript([]byte(
+	return flow.NewTransactionBodyBuilder().SetScript([]byte(
 		fmt.Sprintf(`transaction {
              prepare(signer: auth(UpdateContract) &Account) {
                signer.contracts.update(name: "%s", code: "%s".decodeHex())
              }
            }`, name, encoded)),
-	).AddAuthorizer(address)
+	).AddAuthorizer(address).Build()
 }
 
 func compareExecutionSnapshots(t *testing.T, a, b *snapshot.ExecutionSnapshot) {
