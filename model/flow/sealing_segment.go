@@ -397,7 +397,7 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 		}
 	}
 
-	for _, block := range append(builder.blocks, builder.extraBlocks...) {
+	for _, block := range append(builder.extraBlocks, builder.blocks...) {
 		for _, receipt := range block.Payload.Receipts {
 			_, included := builder.includedResults[receipt.ResultID]
 			if included {
