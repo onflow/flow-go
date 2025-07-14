@@ -131,6 +131,10 @@ func (bb *BlockBuilder) Blocks() ([]*model.Block, error) {
 	return toBlocks(proposals), nil
 }
 
+// makeBlockID creates a block identifier based on the block's view, QC, and block version.
+// This is used to identify blocks uniquely, in this specific test setup.
+// ATTENTION: this should not be confused with the block ID used in production code which is a collision-resistant hash
+// of the full block content.
 func makeBlockID(block *model.Block, blockVersion int) flow.Identifier {
 	return flow.MakeID(struct {
 		View         uint64
