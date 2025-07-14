@@ -86,27 +86,24 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 
 	col := flow.Collection{Transactions: transactions}
 
-	guarantee := flow.CollectionGuarantee{
+	guarantee := &flow.CollectionGuarantee{
 		CollectionID: col.ID(),
 		Signature:    nil,
 	}
 
-	block := &flow.Block{
-		Header: flow.HeaderBody{
-			ChainID:   flow.Emulator,
-			View:      26,
-			Timestamp: time.Now(),
-		},
-		Payload: flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{&guarantee},
-		},
-	}
+	block := unittest.BlockFixture(
+		unittest.Block.WithView(26),
+		unittest.Block.WithParentView(25),
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
+		),
+	)
 
 	executableBlock := &entity.ExecutableBlock{
 		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.CollectionID: {
-				Guarantee:  &guarantee,
+				Guarantee:  guarantee,
 				Collection: &col,
 			},
 		},
@@ -496,28 +493,25 @@ func createTestBlockAndRun(
 	*execution.ComputationResult,
 	snapshot.SnapshotTree,
 ) {
-	guarantee := flow.CollectionGuarantee{
+	guarantee := &flow.CollectionGuarantee{
 		CollectionID: col.ID(),
 		Signature:    nil,
 	}
 
-	block := &flow.Block{
-		Header: flow.HeaderBody{
-			ChainID:   flow.Emulator,
-			ParentID:  parentBlock.ID(),
-			View:      parentBlock.Header.Height + 1,
-			Timestamp: time.Now(),
-		},
-		Payload: flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{&guarantee},
-		},
-	}
+	block := unittest.BlockFixture(
+		unittest.Block.WithParent(parentBlock.ID(), parentBlock.Header.View, parentBlock.Header.Height),
+		unittest.Block.WithView(parentBlock.Header.Height+1),
+		unittest.Block.WithParentView(parentBlock.Header.Height),
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
+		),
+	)
 
 	executableBlock := &entity.ExecutableBlock{
 		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.CollectionID: {
-				Guarantee:  &guarantee,
+				Guarantee:  guarantee,
 				Collection: &col,
 			},
 		},
