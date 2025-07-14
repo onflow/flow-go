@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru/v2"
+	lru "github.com/hashicorp/golang-lru"
 	zlog "github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
@@ -109,7 +109,7 @@ func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend, entities []*un
 // this is used only as an experimental baseline, and so it's not exported for
 // production.
 type baselineLRU struct {
-	c     *lru.Cache[flow.Identifier, flow.Entity] // used to incorporate an LRU cache
+	c     *lru.Cache // used to incorporate an LRU cache
 	limit int
 
 	// atomicAdjustMutex is used to synchronize concurrent access to the
@@ -120,7 +120,7 @@ type baselineLRU struct {
 
 func newBaselineLRU(limit int) *baselineLRU {
 	var err error
-	c, err := lru.New[flow.Identifier, flow.Entity](limit)
+	c, err := lru.New(limit)
 	if err != nil {
 		panic(err)
 	}
@@ -145,7 +145,11 @@ func (b *baselineLRU) Add(entityID flow.Identifier, entity flow.Entity) bool {
 
 // Remove will remove the item with the given hash.
 func (b *baselineLRU) Remove(entityID flow.Identifier) (flow.Entity, bool) {
-	entity, ok := b.c.Get(entityID)
+	e, ok := b.c.Get(entityID)
+	if !ok {
+		return nil, false
+	}
+	entity, ok := e.(flow.Entity)
 	if !ok {
 		return nil, false
 	}
@@ -200,16 +204,20 @@ func (b *baselineLRU) GetWithInit(entityID flow.Identifier, init func() flow.Ent
 		return newE, true
 	}
 	// if the entity was found, it means that the new entity was not added to the cache.
-	return e, true
+	return e.(flow.Entity), true
 }
 
 // ByID returns the given item from the pool.
 func (b *baselineLRU) ByID(entityID flow.Identifier) (flow.Entity, bool) {
-	entity, ok := b.c.Get(entityID)
+	e, ok := b.c.Get(entityID)
 	if !ok {
 		return nil, false
 	}
 
+	entity, ok := e.(flow.Entity)
+	if !ok {
+		return nil, false
+	}
 	return entity, ok
 }
 
@@ -222,11 +230,16 @@ func (b *baselineLRU) Size() uint {
 func (b *baselineLRU) All() map[flow.Identifier]flow.Entity {
 	all := make(map[flow.Identifier]flow.Entity)
 	for _, entityID := range b.c.Keys() {
-		entity, ok := b.ByID(entityID)
+		id, ok := entityID.(flow.Identifier)
+		if !ok {
+			panic("could not assert to entity id")
+		}
+
+		entity, ok := b.ByID(id)
 		if !ok {
 			panic("could not retrieve entity from mempool")
 		}
-		all[entityID] = entity
+		all[id] = entity
 	}
 
 	return all
@@ -237,7 +250,11 @@ func (b *baselineLRU) Identifiers() flow.IdentifierList {
 	entityIds := b.c.Keys()
 	total := len(entityIds)
 	for i := 0; i < total; i++ {
-		ids[i] = entityIds[i]
+		id, ok := entityIds[i].(flow.Identifier)
+		if !ok {
+			panic("could not assert to entity id")
+		}
+		ids[i] = id
 	}
 	return ids
 }
@@ -247,7 +264,12 @@ func (b *baselineLRU) Entities() []flow.Entity {
 	entityIds := b.c.Keys()
 	total := len(entityIds)
 	for i := 0; i < total; i++ {
-		entity, ok := b.ByID(entityIds[i])
+		id, ok := entityIds[i].(flow.Identifier)
+		if !ok {
+			panic("could not assert to entity id")
+		}
+
+		entity, ok := b.ByID(id)
 		if !ok {
 			panic("could not retrieve entity from mempool")
 		}
@@ -259,7 +281,7 @@ func (b *baselineLRU) Entities() []flow.Entity {
 // Clear removes all entities from the pool.
 func (b *baselineLRU) Clear() {
 	var err error
-	b.c, err = lru.New[flow.Identifier, flow.Entity](b.limit)
+	b.c, err = lru.New(b.limit)
 	if err != nil {
 		panic(err)
 	}
