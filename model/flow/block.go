@@ -7,9 +7,9 @@ import (
 	"github.com/vmihailenco/msgpack/v4"
 )
 
-// Block (currently) includes the all block header metadata and the payload content.
+// Block includes both the block header metadata and the payload content.
 //
-// Zero values are allowed only for root blocks, which must be constructed
+// Zero values for certain HeaderBody fields are allowed only for root blocks, which must be constructed
 // using the NewRootBlock constructor. All non-root blocks must be constructed
 // using NewBlock to ensure validation of the block fields.
 //
