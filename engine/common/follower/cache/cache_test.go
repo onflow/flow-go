@@ -154,7 +154,7 @@ func (s *CacheSuite) TestBlockInTheMiddle() {
 	certifiedBlocks, certifiedQC, err = s.cache.AddBlocks(blocks[1:2])
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocks[:2], certifiedBlocks)
-	require.Equal(s.T(), blocks[2].Header.QuorumCertificate(), certifiedQC)
+	require.Equal(s.T(), blocks[2].Header.ParentQC(), certifiedQC)
 }
 
 // TestAddBatch tests a scenario: B1 <- ... <- BN added in one batch.
@@ -165,7 +165,7 @@ func (s *CacheSuite) TestAddBatch() {
 	certifiedBatch, certifyingQC, err := s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocks[:len(blocks)-1], certifiedBatch)
-	require.Equal(s.T(), blocks[len(blocks)-1].Header.QuorumCertificate(), certifyingQC)
+	require.Equal(s.T(), blocks[len(blocks)-1].Header.ParentQC(), certifyingQC)
 }
 
 // TestDuplicatedBatch checks that processing redundant inputs rejects batches where all blocks
@@ -176,7 +176,7 @@ func (s *CacheSuite) TestDuplicatedBatch() {
 	certifiedBatch, certifyingQC, err := s.cache.AddBlocks(blocks[1:])
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocks[1:len(blocks)-1], certifiedBatch)
-	require.Equal(s.T(), blocks[len(blocks)-1].Header.QuorumCertificate(), certifyingQC)
+	require.Equal(s.T(), blocks[len(blocks)-1].Header.ParentQC(), certifyingQC)
 
 	// add same batch again, this has to be rejected as redundant input
 	certifiedBatch, certifyingQC, err = s.cache.AddBlocks(blocks[1:])
@@ -189,7 +189,7 @@ func (s *CacheSuite) TestDuplicatedBatch() {
 	certifiedBatch, certifyingQC, err = s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocks[:len(blocks)-1], certifiedBatch)
-	require.Equal(s.T(), blocks[len(blocks)-1].Header.QuorumCertificate(), certifyingQC)
+	require.Equal(s.T(), blocks[len(blocks)-1].Header.ParentQC(), certifyingQC)
 }
 
 // TestPruneUpToView tests that blocks lower than pruned height will be properly filtered out from incoming batch.
@@ -199,7 +199,7 @@ func (s *CacheSuite) TestPruneUpToView() {
 	certifiedBatch, certifyingQC, err := s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocks[1:len(blocks)-1], certifiedBatch)
-	require.Equal(s.T(), blocks[len(blocks)-1].Header.QuorumCertificate(), certifyingQC)
+	require.Equal(s.T(), blocks[len(blocks)-1].Header.ParentQC(), certifyingQC)
 }
 
 // TestConcurrentAdd simulates multiple workers adding batches of blocks out of order.
