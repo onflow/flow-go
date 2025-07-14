@@ -85,7 +85,7 @@ func (tb *TransactionBodyBuilder) AddAuthorizer(authorizer Address) *Transaction
 func (tb *TransactionBodyBuilder) AddPayloadSignature(address Address, keyID uint32, sig []byte) *TransactionBodyBuilder {
 	s := tb.createSignature(address, keyID, sig)
 
-	tb.u.PayloadSignatures = append(tb.u.EnvelopeSignatures, s)
+	tb.u.PayloadSignatures = append(tb.u.PayloadSignatures, s)
 	slices.SortFunc(tb.u.PayloadSignatures, compareSignatures)
 
 	return tb

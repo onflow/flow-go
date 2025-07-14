@@ -102,7 +102,7 @@ func MessageToTransaction(
 		if err != nil {
 			return t, err
 		}
-		t.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature())
+		tb.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature())
 	}
 
 	transactionBody := tb.SetScript(m.GetScript()).
