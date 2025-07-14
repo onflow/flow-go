@@ -29,11 +29,12 @@ func NewDeploymentMigration(
       }
     `)
 
-	tx := flow.NewEmptyTransactionBody().
+	tx := flow.NewTransactionBodyBuilder().
 		SetScript(script).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract.Name))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract.Code))).
-		AddAuthorizer(authorizer)
+		AddAuthorizer(authorizer).
+		Build()
 
 	return NewTransactionBasedMigration(
 		tx,

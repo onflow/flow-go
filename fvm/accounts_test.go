@@ -55,9 +55,10 @@ func createAccount(
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
 
-	txBody := flow.NewEmptyTransactionBody().
+	txBody := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(createAccountTransaction)).
-		AddAuthorizer(chain.ServiceAddress())
+		AddAuthorizer(chain.ServiceAddress()).
+		Build()
 
 	executionSnapshot, output, err := vm.Run(
 		ctx,
@@ -111,10 +112,11 @@ func addAccountKey(
 
 	publicKeyA, cadencePublicKey := newAccountKey(t, privateKey, apiVersion)
 
-	txBody := flow.NewEmptyTransactionBody().
+	txBody := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(addAccountKeyTransaction)).
 		AddArgument(cadencePublicKey).
-		AddAuthorizer(address)
+		AddAuthorizer(address).
+		Build()
 
 	executionSnapshot, output, err := vm.Run(
 		ctx,
@@ -143,9 +145,10 @@ func addAccountCreator(
 		),
 	)
 
-	txBody := flow.NewEmptyTransactionBody().
+	txBody := flow.NewTransactionBodyBuilder().
 		SetScript(script).
-		AddAuthorizer(chain.ServiceAddress())
+		AddAuthorizer(chain.ServiceAddress()).
+		Build()
 
 	executionSnapshot, output, err := vm.Run(
 		ctx,
@@ -173,9 +176,10 @@ func removeAccountCreator(
 		),
 	)
 
-	txBody := flow.NewEmptyTransactionBody().
+	txBody := flow.NewTransactionBodyBuilder().
 		SetScript(script).
-		AddAuthorizer(chain.ServiceAddress())
+		AddAuthorizer(chain.ServiceAddress()).
+		Build()
 
 	executionSnapshot, output, err := vm.Run(
 		ctx,
@@ -363,9 +367,10 @@ func TestCreateAccount(t *testing.T) {
 					ctx,
 					snapshotTree)
 
-				txBody := flow.NewEmptyTransactionBody().
+				txBody := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(createAccountTransaction)).
-					AddAuthorizer(payer)
+					AddAuthorizer(payer).
+					Build()
 
 				executionSnapshot, output, err := vm.Run(
 					ctx,
@@ -409,9 +414,10 @@ func TestCreateAccount(t *testing.T) {
 					ctx,
 					snapshotTree)
 
-				txBody := flow.NewEmptyTransactionBody().
+				txBody := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(createMultipleAccountsTransaction)).
-					AddAuthorizer(payer)
+					AddAuthorizer(payer).
+					Build()
 
 				executionSnapshot, output, err := vm.Run(
 					ctx,
@@ -468,9 +474,9 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 					ctx,
 					snapshotTree)
 
-				txBody := flow.NewEmptyTransactionBody().
+				txBody := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(createAccountTransaction)).
-					AddAuthorizer(payer)
+					AddAuthorizer(payer).Build()
 
 				_, output, err := vm.Run(
 					ctx,
@@ -486,9 +492,10 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 		newVMTest().withContextOptions(options...).
 			withBootstrapProcedureOptions(fvm.WithRestrictedAccountCreationEnabled(true)).
 			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
-				txBody := flow.NewEmptyTransactionBody().
+				txBody := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(createAccountTransaction)).
-					AddAuthorizer(chain.ServiceAddress())
+					AddAuthorizer(chain.ServiceAddress()).
+					Build()
 
 				_, output, err := vm.Run(
 					ctx,
@@ -518,10 +525,11 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 					snapshotTree,
 					payer)
 
-				txBody := flow.NewEmptyTransactionBody().
+				txBody := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(createAccountTransaction)).
 					SetPayer(payer).
-					AddAuthorizer(payer)
+					AddAuthorizer(payer).
+					Build()
 
 				_, output, err := vm.Run(
 					ctx,
@@ -551,9 +559,10 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 					snapshotTree,
 					payer)
 
-				txBody := flow.NewEmptyTransactionBody().
+				txBody := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(createAccountTransaction)).
-					AddAuthorizer(payer)
+					AddAuthorizer(payer).
+					Build()
 
 				executionSnapshot, output, err := vm.Run(
 					ctx,
@@ -625,10 +634,11 @@ func TestAddAccountKey(t *testing.T) {
 
 					publicKeyA, cadencePublicKey := newAccountKey(t, privateKey, accountKeyAPIVersionV2)
 
-					txBody := flow.NewEmptyTransactionBody().
+					txBody := flow.NewTransactionBodyBuilder().
 						SetScript([]byte(test.source)).
 						AddArgument(cadencePublicKey).
-						AddAuthorizer(address)
+						AddAuthorizer(address).
+						Build()
 
 					executionSnapshot, output, err := vm.Run(
 						ctx,
@@ -681,10 +691,11 @@ func TestAddAccountKey(t *testing.T) {
 
 					publicKey2, publicKey2Arg := newAccountKey(t, privateKey, accountKeyAPIVersionV2)
 
-					txBody := flow.NewEmptyTransactionBody().
+					txBody := flow.NewTransactionBodyBuilder().
 						SetScript([]byte(test.source)).
 						AddArgument(publicKey2Arg).
-						AddAuthorizer(address)
+						AddAuthorizer(address).
+						Build()
 
 					executionSnapshot, output, err := vm.Run(
 						ctx,
@@ -730,10 +741,11 @@ func TestAddAccountKey(t *testing.T) {
 					invalidPublicKeyArg, err := jsoncdc.Encode(invalidPublicKey)
 					require.NoError(t, err)
 
-					txBody := flow.NewEmptyTransactionBody().
+					txBody := flow.NewTransactionBodyBuilder().
 						SetScript([]byte(test.source)).
 						AddArgument(invalidPublicKeyArg).
-						AddAuthorizer(address)
+						AddAuthorizer(address).
+						Build()
 
 					executionSnapshot, output, err := vm.Run(
 						ctx,
@@ -785,11 +797,12 @@ func TestAddAccountKey(t *testing.T) {
 					publicKey1, publicKey1Arg := newAccountKey(t, privateKey1, accountKeyAPIVersionV2)
 					publicKey2, publicKey2Arg := newAccountKey(t, privateKey2, accountKeyAPIVersionV2)
 
-					txBody := flow.NewEmptyTransactionBody().
+					txBody := flow.NewTransactionBodyBuilder().
 						SetScript([]byte(test.source)).
 						AddArgument(publicKey1Arg).
 						AddArgument(publicKey2Arg).
-						AddAuthorizer(address)
+						AddAuthorizer(address).
+						Build()
 
 					executionSnapshot, output, err := vm.Run(
 						ctx,
@@ -840,7 +853,7 @@ func TestAddAccountKey(t *testing.T) {
 
 						_, publicKeyArg := newAccountKey(t, privateKey, accountKeyAPIVersionV2)
 
-						txBody := flow.NewEmptyTransactionBody().
+						txBody := flow.NewTransactionBodyBuilder().
 							SetScript([]byte(fmt.Sprintf(
 								`
 								transaction(key: [UInt8]) {
@@ -860,7 +873,8 @@ func TestAddAccountKey(t *testing.T) {
 								hashAlgo,
 							))).
 							AddArgument(publicKeyArg).
-							AddAuthorizer(address)
+							AddAuthorizer(address).
+							Build()
 
 						executionSnapshot, output, err := vm.Run(
 							ctx,
@@ -941,10 +955,11 @@ func TestRemoveAccountKey(t *testing.T) {
 						keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
 						require.NoError(t, err)
 
-						txBody := flow.NewEmptyTransactionBody().
+						txBody := flow.NewTransactionBodyBuilder().
 							SetScript([]byte(test.source)).
 							AddArgument(keyIndexArg).
-							AddAuthorizer(address)
+							AddAuthorizer(address).
+							Build()
 
 						executionSnapshot, output, err := vm.Run(
 							ctx,
@@ -1001,10 +1016,11 @@ func TestRemoveAccountKey(t *testing.T) {
 					keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
 					require.NoError(t, err)
 
-					txBody := flow.NewEmptyTransactionBody().
+					txBody := flow.NewTransactionBodyBuilder().
 						SetScript([]byte(test.source)).
 						AddArgument(keyIndexArg).
-						AddAuthorizer(address)
+						AddAuthorizer(address).
+						Build()
 
 					executionSnapshot, output, err := vm.Run(
 						ctx,
@@ -1057,10 +1073,11 @@ func TestRemoveAccountKey(t *testing.T) {
 					keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
 					require.NoError(t, err)
 
-					txBody := flow.NewEmptyTransactionBody().
+					txBody := flow.NewTransactionBodyBuilder().
 						SetScript([]byte(test.source)).
 						AddArgument(keyIndexArg).
-						AddAuthorizer(address)
+						AddAuthorizer(address).
+						Build()
 
 					executionSnapshot, output, err := vm.Run(
 						ctx,
@@ -1120,9 +1137,10 @@ func TestRemoveAccountKey(t *testing.T) {
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, keyCount)
 
-					txBody := flow.NewEmptyTransactionBody().
+					txBody := flow.NewTransactionBodyBuilder().
 						SetScript([]byte(test.source)).
-						AddAuthorizer(address)
+						AddAuthorizer(address).
+						Build()
 
 					for i := 0; i < keyCount; i++ {
 						keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(i))
@@ -1190,10 +1208,11 @@ func TestGetAccountKey(t *testing.T) {
 					keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
 					require.NoError(t, err)
 
-					txBody := flow.NewEmptyTransactionBody().
+					txBody := flow.NewTransactionBodyBuilder().
 						SetScript([]byte(getAccountKeyTransaction)).
 						AddArgument(keyIndexArg).
-						AddAuthorizer(address)
+						AddAuthorizer(address).
+						Build()
 
 					executionSnapshot, output, err := vm.Run(
 						ctx,
@@ -1241,10 +1260,11 @@ func TestGetAccountKey(t *testing.T) {
 				keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
 				require.NoError(t, err)
 
-				txBody := flow.NewEmptyTransactionBody().
+				txBody := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(getAccountKeyTransaction)).
 					AddArgument(keyIndexArg).
-					AddAuthorizer(address)
+					AddAuthorizer(address).
+					Build()
 
 				_, output, err := vm.Run(
 					ctx,
@@ -1305,10 +1325,11 @@ func TestGetAccountKey(t *testing.T) {
 				keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
 				require.NoError(t, err)
 
-				txBody := flow.NewEmptyTransactionBody().
+				txBody := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(getAccountKeyTransaction)).
 					AddArgument(keyIndexArg).
-					AddAuthorizer(address)
+					AddAuthorizer(address).
+					Build()
 
 				_, output, err := vm.Run(
 					ctx,
@@ -1364,9 +1385,10 @@ func TestGetAccountKey(t *testing.T) {
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
-				txBody := flow.NewEmptyTransactionBody().
+				txBody := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(getMultipleAccountKeysTransaction)).
-					AddAuthorizer(address)
+					AddAuthorizer(address).
+					Build()
 
 				for i := 0; i < keyCount; i++ {
 					keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(i))

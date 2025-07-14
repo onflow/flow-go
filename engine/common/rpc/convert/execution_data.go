@@ -268,61 +268,62 @@ func messageToTrustedTransaction(
 	m *entities.Transaction,
 	chain flow.Chain,
 ) (flow.TransactionBody, error) {
+	var t flow.TransactionBody
 	if m == nil {
-		var tb flow.TransactionBody
-		return tb, ErrEmptyMessage
+		return t, ErrEmptyMessage
 	}
 
-	t := flow.NewEmptyTransactionBody()
+	tb := flow.NewTransactionBodyBuilder()
 
 	proposalKey := m.GetProposalKey()
 	if proposalKey != nil {
 		proposalAddress, err := insecureAddress(proposalKey.GetAddress())
 		if err != nil {
-			return *t, fmt.Errorf("could not convert proposer address: %w", err)
+			return t, fmt.Errorf("could not convert proposer address: %w", err)
 		}
-		t.SetProposalKey(proposalAddress, proposalKey.GetKeyId(), proposalKey.GetSequenceNumber())
+		tb.SetProposalKey(proposalAddress, proposalKey.GetKeyId(), proposalKey.GetSequenceNumber())
 	}
 
 	payer := m.GetPayer()
 	if payer != nil {
 		payerAddress, err := insecureAddress(payer)
 		if err != nil {
-			return *t, fmt.Errorf("could not convert payer address: %w", err)
+			return t, fmt.Errorf("could not convert payer address: %w", err)
 		}
-		t.SetPayer(payerAddress)
+		tb.SetPayer(payerAddress)
 	}
 
 	for _, authorizer := range m.GetAuthorizers() {
 		authorizerAddress, err := Address(authorizer, chain)
 		if err != nil {
-			return *t, fmt.Errorf("could not convert authorizer address: %w", err)
+			return t, fmt.Errorf("could not convert authorizer address: %w", err)
 		}
-		t.AddAuthorizer(authorizerAddress)
+		tb.AddAuthorizer(authorizerAddress)
 	}
 
 	for _, sig := range m.GetPayloadSignatures() {
 		addr, err := Address(sig.GetAddress(), chain)
 		if err != nil {
-			return *t, fmt.Errorf("could not convert payload signature address: %w", err)
+			return t, fmt.Errorf("could not convert payload signature address: %w", err)
 		}
-		t.AddPayloadSignature(addr, sig.GetKeyId(), sig.GetSignature())
+		tb.AddPayloadSignature(addr, sig.GetKeyId(), sig.GetSignature())
 	}
 
 	for _, sig := range m.GetEnvelopeSignatures() {
 		addr, err := Address(sig.GetAddress(), chain)
 		if err != nil {
-			return *t, fmt.Errorf("could not convert envelope signature address: %w", err)
+			return t, fmt.Errorf("could not convert envelope signature address: %w", err)
 		}
-		t.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature())
+		tb.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature())
 	}
 
-	t.SetScript(m.GetScript())
-	t.SetArguments(m.GetArguments())
-	t.SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId()))
-	t.SetComputeLimit(m.GetGasLimit())
+	transactionBody := tb.SetScript(m.GetScript()).
+		SetArguments(m.GetArguments()).
+		SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId())).
+		SetComputeLimit(m.GetGasLimit()).
+		Build()
 
-	return *t, nil
+	return *transactionBody, nil
 }
 
 func MessageToRegisterID(m *entities.RegisterID, chain flow.Chain) (flow.RegisterID, error) {

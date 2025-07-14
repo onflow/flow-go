@@ -577,7 +577,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 	}
 
 	transferTokensTx := func(chain flow.Chain) *flow.TransactionBody {
-		return flow.NewEmptyTransactionBody().
+		return flow.NewTransactionBodyBuilder().
 			SetScript([]byte(fmt.Sprintf(`
 							// This transaction is a template for a transaction that
 							// could be used by anyone to send tokens to another account
@@ -617,7 +617,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 									receiverRef.deposit(from: <-self.sentVault)
 								}
 							}`, sc.FungibleToken.Address, sc.FlowToken.Address)),
-			)
+			).Build()
 	}
 
 	runTx := func(tc testCase,

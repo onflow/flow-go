@@ -128,7 +128,7 @@ func TestDeploy(t *testing.T) {
 	err = migration(registersByAccount)
 	require.NoError(t, err)
 
-	txBody := flow.NewEmptyTransactionBody().
+	txBody := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(
 			`
               import NewContract from %s
@@ -140,7 +140,8 @@ func TestDeploy(t *testing.T) {
               }
             `,
 			targetAddress.HexWithPrefix(),
-		)))
+		))).
+		Build()
 
 	vm := fvm.NewVirtualMachine()
 

@@ -12,7 +12,7 @@ import (
 
 func CreateTokenTransferTransaction(chain flow.Chain, amount int, to flow.Address, signer flow.Address) *flow.TransactionBody {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`
 		import FungibleToken from 0x%s
 		import FlowToken from 0x%s
@@ -35,5 +35,6 @@ func CreateTokenTransferTransaction(chain flow.Chain, amount int, to flow.Addres
 		}`, sc.FungibleToken.Address.Hex(), sc.FlowToken.Address.Hex()))).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(amount))).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(to))).
-		AddAuthorizer(signer)
+		AddAuthorizer(signer).
+		Build()
 }
