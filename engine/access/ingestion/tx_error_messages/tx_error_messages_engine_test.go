@@ -89,9 +89,7 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 
 	blockCount := 5
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
-	var err error
-	s.rootBlock, err = flow.Genesis(flow.Emulator)
-	require.NoError(s.T(), err)
+	s.rootBlock = flow.Genesis(flow.Emulator)
 	parent := s.rootBlock.ToHeader()
 
 	for i := 0; i < blockCount; i++ {
