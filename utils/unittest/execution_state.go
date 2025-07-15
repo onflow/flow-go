@@ -87,10 +87,10 @@ func genesisCommitHexByChainID(chainID flow.ChainID) string {
 		return GenesisStateCommitmentHex
 	}
 	if chainID == flow.Testnet {
-		return "fedbe565ae3400c7d0af3a25b6a186febd2f3555fd21a0ef17907d0dd3aedfb5"
+		return "389f66301e315aaa37562878e13ec78fb978cc3e4b16ea5c1fd7ba9277335096"
 	}
 	if chainID == flow.Sandboxnet {
 		return "e1c08b17f9e5896f03fe28dd37ca396c19b26628161506924fbf785834646ea1"
 	}
-	return "3652569574c59a759298d6dcc7bcc510a5a1d717266f745b8dd095b9b3b9fe7e"
+	return "ef7eaedb67a9d23bb3a9bc0bd8021287b650354e1a12c92c304ea36419450f1a"
 }
