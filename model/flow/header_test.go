@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/assert"
@@ -173,7 +174,7 @@ func TestNewRootHeaderBody(t *testing.T) {
 		u := UntrustedHeaderBodyFixture(
 			WithRootDefaults(),
 			func(u *flow.UntrustedHeaderBody) {
-				u.Timestamp = time.Time{}
+				u.Timestamp = 0
 			})
 		hb, err := flow.NewRootHeaderBody(u)
 		assert.Error(t, err)
@@ -305,7 +306,7 @@ func TestNewHeaderBody(t *testing.T) {
 
 	t.Run("zero Timestamp", func(t *testing.T) {
 		u := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
-			u.Timestamp = time.Time{}
+			u.Timestamp = 0
 		})
 		hb, err := flow.NewHeaderBody(u)
 		assert.Error(t, err)
@@ -318,7 +319,7 @@ func TestNewHeaderBody(t *testing.T) {
 // returns an error when any required setter was not called (tracked via bits in `present`).
 func TestHeaderBodyBuilder_PresenceChecks(t *testing.T) {
 	validID := unittest.IdentifierFixture()
-	ts := time.Unix(1_600_000_000, 0)
+	ts := uint64(time.Unix(1_600_000_000, 0).UnixMilli())
 
 	// Each entry names the field and provides the setter to call.
 	setters := []struct {
@@ -593,7 +594,7 @@ func TestNewHeader(t *testing.T) {
 
 	t.Run("zero Timestamp", func(t *testing.T) {
 		uBody := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
-			u.Timestamp = time.Time{}
+			u.Timestamp = 0
 		})
 		u := flow.UntrustedHeader{
 			HeaderBody:  flow.HeaderBody(uBody),
@@ -678,7 +679,7 @@ func UntrustedHeaderBodyFixture(opts ...func(*flow.UntrustedHeaderBody)) flow.Un
 
 // WithRootDefaults zeroes out all parent‐QC fields and enforces root constraints.
 func WithRootDefaults() func(*flow.UntrustedHeaderBody) {
-	ts := time.Unix(1_600_000_000, 0)
+	ts := uint64(time.Unix(1_600_000_000, 0).UnixMilli())
 	return func(u *flow.UntrustedHeaderBody) {
 		u.ChainID = flow.Emulator // still must be non‐empty
 		u.ParentID = flow.ZeroID  // allowed to be zero

@@ -95,7 +95,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		flow.HeaderBody{
 			ChainID:   flow.Emulator,
 			View:      26,
-			Timestamp: time.Now(),
+			Timestamp: uint64(time.Now().UnixMilli()),
 		},
 		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
@@ -279,7 +279,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 			flow.HeaderBody{
 				View:      1,
 				ChainID:   flow.Emulator,
-				Timestamp: time.Now(),
+				Timestamp: uint64(time.Now().UnixMilli()),
 			},
 			flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{},

@@ -107,7 +107,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 	headerBody, err := flow.NewHeaderBody(flow.UntrustedHeaderBody{
 		ParentID:           MessageToIdentifier(m.ParentId),
 		Height:             m.Height,
-		Timestamp:          m.Timestamp.AsTime(),
+		Timestamp:          uint64(m.Timestamp.AsTime().UnixMilli()),
 		View:               m.View,
 		ParentView:         m.ParentView,
 		ParentVoterIndices: m.ParentVoterIndices,

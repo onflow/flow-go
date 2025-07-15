@@ -136,7 +136,7 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 	testBlock := flow.NewBlock(
 		flow.HeaderBody{
 			ChainID:   flow.Emulator,
-			Timestamp: time.Now(),
+			Timestamp: uint64(time.Now().UnixMilli()),
 		},
 		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{
@@ -249,7 +249,7 @@ func createTestBadgerRetryableUploaderWrapper(asyncUploader *AsyncUploader) *Bad
 	mockBlocksStorage := new(storageMock.Blocks)
 	mockBlocksStorage.On("ByID", mock.Anything).Return(flow.NewBlock(flow.HeaderBody{
 		ChainID:   flow.Emulator,
-		Timestamp: time.Now(),
+		Timestamp: uint64(time.Now().UnixMilli()),
 	}, flow.Payload{}), nil)
 
 	mockCommitsStorage := new(storageMock.Commits)

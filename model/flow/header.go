@@ -107,7 +107,7 @@ func NewHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 			untrusted.ParentView, untrusted.View,
 		)
 	}
-	if untrusted.Timestamp.IsZero() {
+	if untrusted.Timestamp == 0 {
 		return nil, fmt.Errorf("Timestamp must not be zero-value")
 	}
 
@@ -135,7 +135,7 @@ func NewRootHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 	if untrusted.ParentView != 0 {
 		return nil, fmt.Errorf("ParentView of root header body must be zero")
 	}
-	if untrusted.Timestamp.IsZero() {
+	if untrusted.Timestamp == 0 {
 		return nil, fmt.Errorf("Timestamp of root header body must not be zero")
 	}
 
