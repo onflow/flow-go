@@ -188,7 +188,7 @@ var _ common.TransactionSender = (*testTransactionSender)(nil)
 
 func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult, error) {
 	txBody :=
-		flow.NewEmptyTransactionBody().
+		flow.NewTransactionBodyBuilder().
 			SetScript(tx.Script).
 			SetReferenceBlockID(convert.IDFromSDK(tx.ReferenceBlockID)).
 			SetComputeLimit(tx.GasLimit).
@@ -197,7 +197,8 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 				tx.ProposalKey.KeyIndex,
 				tx.ProposalKey.SequenceNumber,
 			).
-			SetPayer(flow.BytesToAddress(tx.Payer.Bytes()))
+			SetPayer(flow.BytesToAddress(tx.Payer.Bytes())).
+			Build()
 
 	for _, auth := range tx.Authorizers {
 		txBody.AddAuthorizer(flow.BytesToAddress(auth.Bytes()))

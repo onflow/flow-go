@@ -169,9 +169,10 @@ var fuzzTransactionTypes = []transactionType{
 		// fees should be deducted no matter what.
 		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
 			// empty transaction
-			txBody := flow.NewEmptyTransactionBody().SetScript([]byte("transaction(){prepare(){};execute{panic(\"some panic\")}}"))
-			txBody.SetProposalKey(tctx.address, 0, 0)
-			txBody.SetPayer(tctx.address)
+			txBody := flow.NewTransactionBodyBuilder().SetScript([]byte("transaction(){prepare(){};execute{panic(\"some panic\")}}")).
+				SetProposalKey(tctx.address, 0, 0).
+				SetPayer(tctx.address).
+				Build()
 			return txBody
 		},
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
@@ -198,10 +199,12 @@ var fuzzTransactionTypes = []transactionType{
 	{
 		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
 			// create account
-			txBody := flow.NewEmptyTransactionBody().SetScript(createAccountScript).
-				AddAuthorizer(tctx.address)
-			txBody.SetProposalKey(tctx.address, 0, 0)
-			txBody.SetPayer(tctx.address)
+			txBody := flow.NewTransactionBodyBuilder().
+				SetScript(createAccountScript).
+				AddAuthorizer(tctx.address).
+				SetProposalKey(tctx.address, 0, 0).
+				SetPayer(tctx.address).
+				Build()
 			return txBody
 		},
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {

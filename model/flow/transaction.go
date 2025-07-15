@@ -83,11 +83,6 @@ func NewTransactionBody(untrusted UntrustedTransactionBody) *TransactionBody {
 	}
 }
 
-// NewEmptyTransactionBody initializes and returns an empty transaction body
-func NewEmptyTransactionBody() *TransactionBody {
-	return &TransactionBody{}
-}
-
 // Fingerprint returns the canonical, unique byte representation for the TransactionBody.
 // As RLP encoding logic for TransactionBody is over-ridden by EncodeRLP below, this is
 // equivalent to directly RLP encoding the TransactionBody.
@@ -140,18 +135,6 @@ func (tb TransactionBody) InclusionEffort() uint64 {
 
 func (tb TransactionBody) ID() Identifier {
 	return MakeID(tb)
-}
-
-// SetScript sets the Cadence script for this transaction.
-func (tb *TransactionBody) SetScript(script []byte) *TransactionBody {
-	tb.Script = script //nolint:structwrite
-	return tb
-}
-
-// SetArguments sets the Cadence arguments list for this transaction.
-func (tb *TransactionBody) SetArguments(args [][]byte) *TransactionBody {
-	tb.Arguments = args //nolint:structwrite
-	return tb
 }
 
 // AddArgument adds an argument to the Cadence arguments list for this transaction.

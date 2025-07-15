@@ -437,9 +437,10 @@ func TestWithServiceAccount(t *testing.T) {
 
 	snapshotTree := snapshot.NewSnapshotTree(nil)
 
-	txBody := flow.NewEmptyTransactionBody().
+	txBody := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(`transaction { prepare(signer: auth(BorrowValue) &Account) { Account(payer: signer) } }`)).
-		AddAuthorizer(chain.ServiceAddress())
+		AddAuthorizer(chain.ServiceAddress()).
+		Build()
 
 	t.Run("With service account enabled", func(t *testing.T) {
 		executionSnapshot, output, err := vm.Run(
@@ -512,10 +513,11 @@ func TestEventLimits(t *testing.T) {
 		ctx,
 		fvm.WithEventCollectionSizeLimit(2))
 
-	txBody := flow.NewEmptyTransactionBody().
+	txBody := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(deployingContractScriptTemplate, hex.EncodeToString([]byte(testContract))))).
 		SetPayer(chain.ServiceAddress()).
-		AddAuthorizer(chain.ServiceAddress())
+		AddAuthorizer(chain.ServiceAddress()).
+		Build()
 
 	executionSnapshot, output, err := vm.Run(
 		ctx,
@@ -526,7 +528,7 @@ func TestEventLimits(t *testing.T) {
 
 	snapshotTree = snapshotTree.Append(executionSnapshot)
 
-	txBody = flow.NewEmptyTransactionBody().
+	txBody = flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`
 		import TestContract from 0x%s
 			transaction {
@@ -535,7 +537,8 @@ func TestEventLimits(t *testing.T) {
 				TestContract.EmitEvent()
 			}
 		}`, chain.ServiceAddress()))).
-		AddAuthorizer(chain.ServiceAddress())
+		AddAuthorizer(chain.ServiceAddress()).
+		Build()
 
 	t.Run("With limits", func(t *testing.T) {
 		txBody.Payer = unittest.RandomAddressFixture()
@@ -587,8 +590,9 @@ func TestHappyPathTransactionSigning(t *testing.T) {
 				chain)
 			require.NoError(t, err)
 
-			txBody := flow.NewEmptyTransactionBody().
-				SetScript([]byte(`transaction(){}`))
+			txBody := flow.NewTransactionBodyBuilder().
+				SetScript([]byte(`transaction(){}`)).
+				Build()
 
 			txBody.SetProposalKey(accounts[0], 0, 0)
 			txBody.SetPayer(accounts[0])
@@ -1104,7 +1108,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 
-			txBody := flow.NewEmptyTransactionBody().
+			txBody := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(`
 				transaction {
                   prepare(signer: &Account) {
@@ -1117,7 +1121,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 			`)).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
-				SetPayer(chain.ServiceAddress())
+				SetPayer(chain.ServiceAddress()).
+				Build()
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -1165,7 +1170,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				chain)
 			require.NoError(t, err)
 
-			txBody := flow.NewEmptyTransactionBody().
+			txBody := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(`
 				transaction {
                   prepare(signer: &Account) {
@@ -1175,7 +1180,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 			`)).
 				SetProposalKey(accounts[0], 0, 0).
 				AddAuthorizer(accounts[0]).
-				SetPayer(accounts[0])
+				SetPayer(accounts[0]).
+				Build()
 
 			err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
 			require.NoError(t, err)
@@ -1204,7 +1210,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 
-			txBody := flow.NewEmptyTransactionBody().
+			txBody := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(`
 				transaction {
                   prepare(signer: &Account) {
@@ -1214,7 +1220,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 			`)).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
-				SetPayer(chain.ServiceAddress())
+				SetPayer(chain.ServiceAddress()).
+				Build()
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -1262,7 +1269,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			// This transaction is specially designed to use a lot of breaks
 			// as the weight for breaks is much higher than usual.
 			// putting a `while true {break}` in a loop does not use the same amount of memory.
-			txBody := flow.NewEmptyTransactionBody().
+			txBody := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(`
 				transaction {
 					prepare(signer: &Account) {
@@ -1288,7 +1295,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 						while true {break};while true {break};while true {break};while true {break};while true {break};
 					}
 				}
-			`))
+			`)).Build()
 
 			err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
 			require.NoError(t, err)
@@ -1318,7 +1325,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
-			txBody := flow.NewEmptyTransactionBody().
+			txBody := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(`
 				transaction {
                   prepare(signer: auth(BorrowValue) &Account) {
@@ -1328,7 +1335,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 			`)).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
-				SetPayer(chain.ServiceAddress())
+				SetPayer(chain.ServiceAddress()).
+				Build()
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -1357,7 +1365,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 
-			txBody := flow.NewEmptyTransactionBody().
+			txBody := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(`
 				transaction {
                   prepare(signer: auth(BorrowValue) &Account) {
@@ -1367,7 +1375,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 			`)).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
-				SetPayer(chain.ServiceAddress())
+				SetPayer(chain.ServiceAddress()).
+				Build()
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -1395,7 +1404,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
-			txBody := flow.NewEmptyTransactionBody().
+			txBody := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(`
 				transaction {
                   prepare(signer: auth(BorrowValue) &Account) {
@@ -1405,7 +1414,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 			`)).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
-				SetPayer(chain.ServiceAddress())
+				SetPayer(chain.ServiceAddress()).
+				Build()
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -1443,14 +1453,15 @@ func TestSettingExecutionWeights(t *testing.T) {
 			loops := uint64(996)
 			executionEffortNeededToCheckStorage := uint64(1)
 			maxExecutionEffort := uint64(997)
-			txBody := flow.NewEmptyTransactionBody().
+			txBody := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(fmt.Sprintf(`
 				transaction() {prepare(signer: &Account){var i=0;  while i < %d {i = i +1 } } execute{}}
 			`, loops))).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress()).
-				SetComputeLimit(maxExecutionEffort)
+				SetComputeLimit(maxExecutionEffort).
+				Build()
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -1469,14 +1480,15 @@ func TestSettingExecutionWeights(t *testing.T) {
 
 			// increasing the number of loops should fail the transaction.
 			loops = loops + 1
-			txBody = flow.NewEmptyTransactionBody().
+			txBody = flow.NewTransactionBodyBuilder().
 				SetScript([]byte(fmt.Sprintf(`
 				transaction() {prepare(signer: &Account){var i=0;  while i < %d {i = i +1 } } execute{}}
 			`, loops))).
 				SetProposalKey(chain.ServiceAddress(), 0, 1).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress()).
-				SetComputeLimit(maxExecutionEffort)
+				SetComputeLimit(maxExecutionEffort).
+				Build()
 
 			err = testutil.SignTransactionAsServiceAccount(txBody, 1, chain)
 			require.NoError(t, err)
@@ -1549,7 +1561,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 			// create a transaction without loops so only the looping in the storage check is counted.
-			txBody := flow.NewEmptyTransactionBody().
+			txBody := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
@@ -1601,7 +1613,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 				))).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
-				SetPayer(chain.ServiceAddress())
+				SetPayer(chain.ServiceAddress()).
+				Build()
 
 			err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -1765,9 +1778,10 @@ func TestEnforcingComputationLimit(t *testing.T) {
 				),
 			)
 
-			txBody := flow.NewEmptyTransactionBody().
+			txBody := flow.NewTransactionBodyBuilder().
 				SetScript(script).
-				SetComputeLimit(computationLimit)
+				SetComputeLimit(computationLimit).
+				Build()
 
 			if test.payerIsServAcc {
 				txBody.SetPayer(chain.ServiceAddress()).
@@ -1857,7 +1871,7 @@ func TestStorageCapacity(t *testing.T) {
 			// Perform test
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-			txBody := flow.NewEmptyTransactionBody().
+			txBody := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(fmt.Sprintf(
 					`
 					import FungibleToken from 0x%s
@@ -1886,7 +1900,8 @@ func TestStorageCapacity(t *testing.T) {
 					sc.FlowToken.Address.Hex(),
 				))).
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(target))).
-				AddAuthorizer(signer)
+				AddAuthorizer(signer).
+				Build()
 
 			_, output, err = vm.Run(
 				ctx,
@@ -1968,7 +1983,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				contract := "access(all) contract Foo {}"
 
-				txBody := flow.NewEmptyTransactionBody().SetScript([]byte(fmt.Sprintf(`
+				txBody := flow.NewTransactionBodyBuilder().SetScript([]byte(fmt.Sprintf(`
 					transaction {
 						prepare(signer: auth(AddContract) &Account, service: &Account) {
 							signer.contracts.add(name: "Foo", code: "%s".decodeHex())
@@ -1978,7 +1993,8 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 					AddAuthorizer(account).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetPayer(chain.ServiceAddress()).
-					SetProposalKey(chain.ServiceAddress(), 0, 0)
+					SetProposalKey(chain.ServiceAddress(), 0, 0).
+					Build()
 
 				_ = testutil.SignPayload(txBody, account, privateKey)
 				_ = testutil.SignEnvelope(
@@ -2038,7 +2054,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				contract := "access(all) contract Foo {}"
 
-				txBody := flow.NewEmptyTransactionBody().SetScript([]byte(fmt.Sprintf(`
+				txBody := flow.NewTransactionBodyBuilder().SetScript([]byte(fmt.Sprintf(`
 					transaction {
 						prepare(signer: auth(AddContract) &Account, service: &Account) {
 							signer.contracts.add(name: "Foo", code: "%s".decodeHex())
@@ -2048,7 +2064,8 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 					AddAuthorizer(account).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetPayer(chain.ServiceAddress()).
-					SetProposalKey(chain.ServiceAddress(), 0, 0)
+					SetProposalKey(chain.ServiceAddress(), 0, 0).
+					Build()
 
 				_ = testutil.SignPayload(txBody, account, privateKey)
 				_ = testutil.SignEnvelope(
@@ -2482,7 +2499,7 @@ func TestCapabilityControllers(t *testing.T) {
 				ctx fvm.Context,
 				snapshotTree snapshot.SnapshotTree,
 			) {
-				txBody := flow.NewEmptyTransactionBody().
+				txBody := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(`
 						transaction {
 						  prepare(signer: auth(Capabilities) &Account) {
@@ -2496,7 +2513,8 @@ func TestCapabilityControllers(t *testing.T) {
 					`)).
 					SetProposalKey(chain.ServiceAddress(), 0, 0).
 					AddAuthorizer(chain.ServiceAddress()).
-					SetPayer(chain.ServiceAddress())
+					SetPayer(chain.ServiceAddress()).
+					Build()
 
 				err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 				require.NoError(t, err)
@@ -2605,11 +2623,12 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 				var sequenceNumber uint64 = 0
 
 				runTransaction := func(code []byte) {
-					txBody := flow.NewEmptyTransactionBody().
+					txBody := flow.NewTransactionBodyBuilder().
 						SetScript(code).
 						SetPayer(chain.ServiceAddress()).
 						SetProposalKey(chain.ServiceAddress(), 0, sequenceNumber).
-						AddAuthorizer(accounts[0])
+						AddAuthorizer(accounts[0]).
+						Build()
 
 					_ = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 					_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
@@ -2743,7 +2762,7 @@ func TestEntropyCallOnlyOkIfAllowed(t *testing.T) {
 				ctx fvm.Context,
 				snapshotTree snapshot.SnapshotTree,
 			) {
-				txBody := flow.NewEmptyTransactionBody().
+				txBody := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(`
 						transaction {
 						  prepare() {
@@ -2752,7 +2771,8 @@ func TestEntropyCallOnlyOkIfAllowed(t *testing.T) {
 						}
 					`)).
 					SetProposalKey(chain.ServiceAddress(), 0, 0).
-					SetPayer(chain.ServiceAddress())
+					SetPayer(chain.ServiceAddress()).
+					Build()
 
 				err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 				require.NoError(t, err)
@@ -2797,7 +2817,7 @@ func TestEntropyCallExpectsNoParameters(t *testing.T) {
 			ctx fvm.Context,
 			snapshotTree snapshot.SnapshotTree,
 		) {
-			txBody := flow.NewEmptyTransactionBody().
+			txBody := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(`
 						transaction {
 						  prepare() {
@@ -2806,7 +2826,8 @@ func TestEntropyCallExpectsNoParameters(t *testing.T) {
 						}
 					`)).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
-				SetPayer(chain.ServiceAddress())
+				SetPayer(chain.ServiceAddress()).
+				Build()
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -2887,7 +2908,7 @@ func TestEVM(t *testing.T) {
 
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-			txBody := flow.NewEmptyTransactionBody().
+			txBody := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(fmt.Sprintf(`
 						import EVM from %s
 
@@ -2900,7 +2921,8 @@ func TestEVM(t *testing.T) {
 					`, sc.EVMContract.Address.HexWithPrefix()))).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				SetPayer(chain.ServiceAddress()).
-				AddArgument(encodedArg)
+				AddArgument(encodedArg).
+				Build()
 
 			err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -3027,7 +3049,7 @@ func TestEVM(t *testing.T) {
 		) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-			txBody := flow.NewEmptyTransactionBody().
+			txBody := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(fmt.Sprintf(`
 					import FungibleToken from %s
 					import FlowToken from %s
@@ -3058,7 +3080,8 @@ func TestEVM(t *testing.T) {
 				))).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
-				SetPayer(chain.ServiceAddress())
+				SetPayer(chain.ServiceAddress()).
+				Build()
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -3490,7 +3513,7 @@ func TestVMBridge(t *testing.T) {
 			snapshotTree = snapshotTree.Append(executionSnapshot)
 
 			// Mint an NFT
-			txBody = flow.NewEmptyTransactionBody().
+			txBody = flow.NewTransactionBodyBuilder().
 				SetScript([]byte(fmt.Sprintf(
 					`
 						import NonFungibleToken from 0x%s
@@ -3538,7 +3561,7 @@ func TestVMBridge(t *testing.T) {
 						}
 			`,
 					env.NonFungibleTokenAddress, accounts[0].String(), env.NonFungibleTokenAddress, env.FungibleTokenAddress, accounts[0].String(),
-				))).AddAuthorizer(accounts[0])
+				))).AddAuthorizer(accounts[0]).Build()
 
 			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 3)
 			require.NoError(t, err)
@@ -3713,7 +3736,7 @@ func TestAccountCapabilitiesPublishEntitledRejection(t *testing.T) {
 		) {
 
 			serviceAddress := chain.ServiceAddress()
-			txBody := flow.NewEmptyTransactionBody().
+			txBody := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(`
 					transaction {
                         prepare(signer: auth(Capabilities, Storage) &Account) {
@@ -3725,7 +3748,8 @@ func TestAccountCapabilitiesPublishEntitledRejection(t *testing.T) {
 				`)).
 				AddAuthorizer(serviceAddress).
 				SetProposalKey(serviceAddress, 0, 0).
-				SetPayer(serviceAddress)
+				SetPayer(serviceAddress).
+				Build()
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -3752,7 +3776,7 @@ func TestAccountCapabilitiesPublishEntitledRejection(t *testing.T) {
 		) {
 
 			serviceAddress := chain.ServiceAddress()
-			txBody := flow.NewEmptyTransactionBody().
+			txBody := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(`
 					transaction {
                         prepare(signer: auth(Capabilities, Storage) &Account) {
@@ -3764,7 +3788,8 @@ func TestAccountCapabilitiesPublishEntitledRejection(t *testing.T) {
 				`)).
 				AddAuthorizer(serviceAddress).
 				SetProposalKey(serviceAddress, 0, 0).
-				SetPayer(serviceAddress)
+				SetPayer(serviceAddress).
+				Build()
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
