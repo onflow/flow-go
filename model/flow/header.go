@@ -133,11 +133,9 @@ func NewRootHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 	if untrusted.ProposerID != ZeroID {
 		return nil, fmt.Errorf("root header body must not set ProposerID")
 	}
-
 	if untrusted.ParentView != 0 {
 		return nil, fmt.Errorf("ParentView of root header body must be zero")
 	}
-
 	if untrusted.Timestamp.IsZero() {
 		return nil, fmt.Errorf("Timestamp of root header body must not be zero")
 	}

@@ -53,7 +53,6 @@ func (s *BlocksProviderSuite) SetupTest() {
 
 	blockCount := 5
 	s.blocks = make([]*flow.Block, 0, blockCount)
-
 	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
 	parent := s.rootBlock.ToHeader()
 
