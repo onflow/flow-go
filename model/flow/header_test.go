@@ -685,7 +685,6 @@ func UntrustedHeaderBodyFixture(opts ...func(*flow.UntrustedHeaderBody)) flow.Un
 	for _, opt := range opts {
 		opt(&u)
 	}
-
 	return u
 }
 

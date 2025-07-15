@@ -27,12 +27,7 @@ func GetExecutionAPIBlockHeader(
 		return nil, err
 	}
 
-	header, err := rpcConvert.MessageToBlockHeader(resp.Block)
-	if err != nil {
-		return nil, err
-	}
-
-	return header, nil
+	return rpcConvert.MessageToBlockHeader(resp.Block)
 }
 
 func GetAccessAPIBlockHeader(
@@ -52,10 +47,5 @@ func GetAccessAPIBlockHeader(
 		return nil, err
 	}
 
-	header, err := rpcConvert.MessageToBlockHeader(resp.Block)
-	if err != nil {
-		return nil, err
-	}
-
-	return header, nil
+	return rpcConvert.MessageToBlockHeader(resp.Block)
 }

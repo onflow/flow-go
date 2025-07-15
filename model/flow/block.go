@@ -7,6 +7,8 @@ import (
 	"github.com/vmihailenco/msgpack/v4"
 )
 
+// Genesis creates genesis block.
+// This function must always return a structurally valid genesis block otherwise it will panic.
 func Genesis(chainID ChainID) *Block {
 	// create the raw content for the genesis block
 	payload := Payload{}
