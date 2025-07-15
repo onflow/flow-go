@@ -3,7 +3,6 @@ package routes
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
@@ -192,9 +191,12 @@ func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, fl
 	if blkProvider.id != nil {
 		blk, status, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
 		if err != nil {
-			return nil, flow.BlockStatusUnknown, common.NewNotFoundError(
-				fmt.Sprintf("error looking up block with ID %s", blkProvider.id.String()), err,
-			)
+			if access.IsDataNotFoundError(err) {
+				return nil, flow.BlockStatusUnknown, common.NewNotFoundError(
+					fmt.Sprintf("error looking up block with ID %s", blkProvider.id.String()), err,
+				)
+			}
+			return nil, flow.BlockStatusUnknown, err
 		}
 		return blk, status, nil
 	}
@@ -202,17 +204,19 @@ func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, fl
 	if blkProvider.latest {
 		blk, status, err := blkProvider.backend.GetLatestBlock(ctx, blkProvider.sealed)
 		if err != nil {
-			// cannot be a 'not found' error since final and sealed block should always be found
-			return nil, flow.BlockStatusUnknown, common.NewRestError(http.StatusInternalServerError, "block lookup failed", err)
+			return nil, flow.BlockStatusUnknown, err
 		}
 		return blk, status, nil
 	}
 
 	blk, status, err := blkProvider.backend.GetBlockByHeight(ctx, blkProvider.height)
 	if err != nil {
-		return nil, flow.BlockStatusUnknown, common.NewNotFoundError(
-			fmt.Sprintf("error looking up block at height %d", blkProvider.height), err,
-		)
+		if access.IsDataNotFoundError(err) {
+			return nil, flow.BlockStatusUnknown, common.NewNotFoundError(
+				fmt.Sprintf("error looking up block at height %d", blkProvider.height), err,
+			)
+		}
+		return nil, flow.BlockStatusUnknown, err
 	}
 	return blk, status, nil
 }

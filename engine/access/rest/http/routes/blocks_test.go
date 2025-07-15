@@ -10,15 +10,15 @@ import (
 
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/middleware"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -36,18 +36,15 @@ func prepareTestVectors(t *testing.T,
 	executionResults []*flow.ExecutionResult,
 	blkCnt int,
 ) []testVector {
+	singleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], true, flow.BlockStatusSealed)
+	multipleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks, executionResults, true, flow.BlockStatusSealed)
 
-	singleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], true, flow.BlockStatusUnknown)
-	singleSealedBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], true, flow.BlockStatusSealed)
-	multipleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks, executionResults, true, flow.BlockStatusUnknown)
-	multipleSealedBlockExpandedResponse := expectedBlockResponsesExpanded(blocks, executionResults, true, flow.BlockStatusSealed)
+	singleBlockCondensedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], false, flow.BlockStatusSealed)
+	multipleBlockCondensedResponse := expectedBlockResponsesExpanded(blocks, executionResults, false, flow.BlockStatusSealed)
 
-	singleBlockCondensedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], false, flow.BlockStatusUnknown)
-	multipleBlockCondensedResponse := expectedBlockResponsesExpanded(blocks, executionResults, false, flow.BlockStatusUnknown)
-
-	multipleBlockHeaderWithHeaderSelectedResponse := expectedBlockResponsesSelected(blocks, executionResults, flow.BlockStatusUnknown, []string{"header"})
-	multipleBlockHeaderWithHeaderAndStatusSelectedResponse := expectedBlockResponsesSelected(blocks, executionResults, flow.BlockStatusUnknown, []string{"header", "block_status"})
-	multipleBlockHeaderWithUnknownSelectedResponse := expectedBlockResponsesSelected(blocks, executionResults, flow.BlockStatusUnknown, []string{"unknown"})
+	multipleBlockHeaderWithHeaderSelectedResponse := expectedBlockResponsesSelected(blocks, executionResults, flow.BlockStatusSealed, []string{"header"})
+	multipleBlockHeaderWithHeaderAndStatusSelectedResponse := expectedBlockResponsesSelected(blocks, executionResults, flow.BlockStatusSealed, []string{"header", "block_status"})
+	multipleBlockHeaderWithUnknownSelectedResponse := expectedBlockResponsesSelected(blocks, executionResults, flow.BlockStatusSealed, []string{"unknown"})
 
 	invalidID := unittest.IdentifierFixture().String()
 	invalidHeight := fmt.Sprintf("%d", blkCnt+1)
@@ -83,19 +80,19 @@ func prepareTestVectors(t *testing.T,
 			description:      "Get single expanded block by height",
 			request:          getByHeightsExpandedURL(t, heights[:1]...),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: singleSealedBlockExpandedResponse,
+			expectedResponse: singleBlockExpandedResponse,
 		},
 		{
 			description:      "Get multiple expanded blocks by heights",
 			request:          getByHeightsExpandedURL(t, heights...),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: multipleSealedBlockExpandedResponse,
+			expectedResponse: multipleBlockExpandedResponse,
 		},
 		{
 			description:      "Get multiple expanded blocks by start and end height",
 			request:          getByStartEndHeightExpandedURL(t, heights[0], heights[len(heights)-1]),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: multipleSealedBlockExpandedResponse,
+			expectedResponse: multipleBlockExpandedResponse,
 		},
 		{
 			description:      "Get block by ID not found",
@@ -171,7 +168,7 @@ func TestAccessGetBlocks(t *testing.T) {
 
 	for _, tv := range testVectors {
 		rr := router.ExecuteRequest(tv.request, backend)
-		require.Equal(t, tv.expectedStatus, rr.Code, "failed test %s: incorrect response code", tv.description)
+		require.Equal(t, tv.expectedStatus, rr.Code, "failed test %s: incorrect response code. response: %s", tv.description, rr.Body.String())
 		actualResp := rr.Body.String()
 		require.JSONEq(t, tv.expectedResponse, actualResp, "Failed: %s: incorrect response body", tv.description)
 	}
@@ -258,8 +255,8 @@ func generateMocks(backend *mock.API, count int) ([]string, []string, []*flow.Bl
 	}
 
 	// any other call to the backend should return a not found error
-	backend.Mock.On("GetBlockByID", mocks.Anything, mocks.Anything).Return(nil, flow.BlockStatusUnknown, status.Error(codes.NotFound, "not found"))
-	backend.Mock.On("GetBlockByHeight", mocks.Anything, mocks.Anything).Return(nil, flow.BlockStatusUnknown, status.Error(codes.NotFound, "not found"))
+	backend.Mock.On("GetBlockByID", mocks.Anything, mocks.Anything).Return(nil, flow.BlockStatusUnknown, access.NewDataNotFoundError("block", storage.ErrNotFound))
+	backend.Mock.On("GetBlockByHeight", mocks.Anything, mocks.Anything).Return(nil, flow.BlockStatusUnknown, access.NewDataNotFoundError("block", storage.ErrNotFound))
 
 	return blockIDs, heights, blocks, executionResults
 }
