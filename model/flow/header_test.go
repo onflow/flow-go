@@ -104,15 +104,15 @@ func TestHeaderMalleability(t *testing.T) {
 //   - Ensures an error is returned when Timestamp is the zero value.
 func TestNewRootHeaderBody(t *testing.T) {
 	t.Run("valid root input with non-zero ParentID", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(unittest.WithRootDefaults())
+		u := UntrustedHeaderBodyFixture(WithRootDefaults())
 		hb, err := flow.NewRootHeaderBody(u)
 		assert.NoError(t, err)
 		assert.NotNil(t, hb)
 	})
 
 	t.Run("valid root input with zero ParentID", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(
-			unittest.WithRootDefaults(),
+		u := UntrustedHeaderBodyFixture(
+			WithRootDefaults(),
 			func(u *flow.UntrustedHeaderBody) {
 				u.ParentID = flow.ZeroID
 			})
@@ -122,8 +122,8 @@ func TestNewRootHeaderBody(t *testing.T) {
 	})
 
 	t.Run("missing ChainID", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(
-			unittest.WithRootDefaults(),
+		u := UntrustedHeaderBodyFixture(
+			WithRootDefaults(),
 			func(u *flow.UntrustedHeaderBody) {
 				u.ChainID = ""
 			})
@@ -134,8 +134,8 @@ func TestNewRootHeaderBody(t *testing.T) {
 	})
 
 	t.Run("non-empty ParentVoterIndices", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(
-			unittest.WithRootDefaults(),
+		u := UntrustedHeaderBodyFixture(
+			WithRootDefaults(),
 			func(u *flow.UntrustedHeaderBody) {
 				u.ParentVoterIndices = unittest.SignerIndicesFixture(4)
 			})
@@ -146,8 +146,8 @@ func TestNewRootHeaderBody(t *testing.T) {
 	})
 
 	t.Run("non-empty ParentVoterSigData", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(
-			unittest.WithRootDefaults(),
+		u := UntrustedHeaderBodyFixture(
+			WithRootDefaults(),
 			func(u *flow.UntrustedHeaderBody) {
 				u.ParentVoterSigData = unittest.QCSigDataFixture()
 			})
@@ -158,8 +158,8 @@ func TestNewRootHeaderBody(t *testing.T) {
 	})
 
 	t.Run("non-zero ProposerID", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(
-			unittest.WithRootDefaults(),
+		u := UntrustedHeaderBodyFixture(
+			WithRootDefaults(),
 			func(u *flow.UntrustedHeaderBody) {
 				u.ProposerID = unittest.IdentifierFixture()
 			})
@@ -170,8 +170,8 @@ func TestNewRootHeaderBody(t *testing.T) {
 	})
 
 	t.Run("non-zero ParentView", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(
-			unittest.WithRootDefaults(),
+		u := UntrustedHeaderBodyFixture(
+			WithRootDefaults(),
 			func(u *flow.UntrustedHeaderBody) {
 				u.ParentView = 7
 			})
@@ -182,8 +182,8 @@ func TestNewRootHeaderBody(t *testing.T) {
 	})
 
 	t.Run("zero Timestamp", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(
-			unittest.WithRootDefaults(),
+		u := UntrustedHeaderBodyFixture(
+			WithRootDefaults(),
 			func(u *flow.UntrustedHeaderBody) {
 				u.Timestamp = time.Time{}
 			})
@@ -228,14 +228,14 @@ func TestNewRootHeaderBody(t *testing.T) {
 //   - Ensures an error mentioning "Timestamp must not be zero-value".
 func TestNewHeaderBody(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture()
+		u := UntrustedHeaderBodyFixture()
 		hb, err := flow.NewHeaderBody(u)
 		assert.NoError(t, err)
 		assert.NotNil(t, hb)
 	})
 
 	t.Run("missing ChainID", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
+		u := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.ChainID = ""
 		})
 		hb, err := flow.NewHeaderBody(u)
@@ -245,7 +245,7 @@ func TestNewHeaderBody(t *testing.T) {
 	})
 
 	t.Run("missing parent QC: ParentID", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
+		u := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.ParentID = flow.ZeroID
 		})
 		hb, err := flow.NewHeaderBody(u)
@@ -255,7 +255,7 @@ func TestNewHeaderBody(t *testing.T) {
 	})
 
 	t.Run("missing parent QC: ParentVoterIndices", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
+		u := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.ParentVoterIndices = nil
 		})
 		hb, err := flow.NewHeaderBody(u)
@@ -265,7 +265,7 @@ func TestNewHeaderBody(t *testing.T) {
 	})
 
 	t.Run("missing parent QC: ParentVoterSigData", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
+		u := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.ParentVoterSigData = nil
 		})
 		hb, err := flow.NewHeaderBody(u)
@@ -275,7 +275,7 @@ func TestNewHeaderBody(t *testing.T) {
 	})
 
 	t.Run("missing parent QC: ProposerID", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
+		u := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.ProposerID = flow.ZeroID
 		})
 		hb, err := flow.NewHeaderBody(u)
@@ -285,7 +285,7 @@ func TestNewHeaderBody(t *testing.T) {
 	})
 
 	t.Run("zero Height", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
+		u := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.Height = 0
 		})
 		hb, err := flow.NewHeaderBody(u)
@@ -295,7 +295,7 @@ func TestNewHeaderBody(t *testing.T) {
 	})
 
 	t.Run("zero View", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
+		u := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.View = 0
 		})
 		hb, err := flow.NewHeaderBody(u)
@@ -305,7 +305,7 @@ func TestNewHeaderBody(t *testing.T) {
 	})
 
 	t.Run("ParentView ≥ View", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
+		u := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			// set ParentView equal to the generated View
 			u.ParentView = u.View
 		})
@@ -316,7 +316,7 @@ func TestNewHeaderBody(t *testing.T) {
 	})
 
 	t.Run("zero Timestamp", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
+		u := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.Timestamp = time.Time{}
 		})
 		hb, err := flow.NewHeaderBody(u)
@@ -428,8 +428,8 @@ func TestNewRootHeader(t *testing.T) {
 	validID := unittest.IdentifierFixture()
 
 	t.Run("valid root input", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(
-			unittest.WithRootDefaults(),
+		u := UntrustedHeaderBodyFixture(
+			WithRootDefaults(),
 		)
 		h, err := flow.NewRootHeader(flow.UntrustedHeader{
 			HeaderBody:  flow.HeaderBody(u),
@@ -441,8 +441,8 @@ func TestNewRootHeader(t *testing.T) {
 	})
 
 	t.Run("valid root input with zero ParentID", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(
-			unittest.WithRootDefaults(),
+		u := UntrustedHeaderBodyFixture(
+			WithRootDefaults(),
 			func(u *flow.UntrustedHeaderBody) {
 				u.ParentID = flow.ZeroID
 			},
@@ -456,8 +456,8 @@ func TestNewRootHeader(t *testing.T) {
 	})
 
 	t.Run("invalid root body (missing ChainID)", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(
-			unittest.WithRootDefaults(),
+		u := UntrustedHeaderBodyFixture(
+			WithRootDefaults(),
 			func(u *flow.UntrustedHeaderBody) {
 				u.ChainID = ""
 			},
@@ -472,7 +472,7 @@ func TestNewRootHeader(t *testing.T) {
 	})
 
 	t.Run("empty PayloadHash", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(unittest.WithRootDefaults())
+		u := UntrustedHeaderBodyFixture(WithRootDefaults())
 		h, err := flow.NewRootHeader(flow.UntrustedHeader{
 			HeaderBody:  flow.HeaderBody(u),
 			PayloadHash: flow.ZeroID,
@@ -483,8 +483,8 @@ func TestNewRootHeader(t *testing.T) {
 	})
 
 	t.Run("body with ParentVoterIndices set", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(
-			unittest.WithRootDefaults(),
+		u := UntrustedHeaderBodyFixture(
+			WithRootDefaults(),
 			func(u *flow.UntrustedHeaderBody) {
 				u.ParentVoterIndices = unittest.SignerIndicesFixture(3)
 			},
@@ -499,8 +499,8 @@ func TestNewRootHeader(t *testing.T) {
 	})
 
 	t.Run("body with ParentVoterSigData set", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(
-			unittest.WithRootDefaults(),
+		u := UntrustedHeaderBodyFixture(
+			WithRootDefaults(),
 			func(u *flow.UntrustedHeaderBody) {
 				u.ParentVoterSigData = unittest.QCSigDataFixture()
 			},
@@ -515,8 +515,8 @@ func TestNewRootHeader(t *testing.T) {
 	})
 
 	t.Run("body with ProposerID set", func(t *testing.T) {
-		u := unittest.UntrustedHeaderBodyFixture(
-			unittest.WithRootDefaults(),
+		u := UntrustedHeaderBodyFixture(
+			WithRootDefaults(),
 			func(u *flow.UntrustedHeaderBody) {
 				u.ProposerID = validID
 			},
@@ -563,7 +563,7 @@ func TestNewHeader(t *testing.T) {
 
 	t.Run("valid input", func(t *testing.T) {
 		// start from a fully-populated, valid untrusted header body
-		uBody := unittest.UntrustedHeaderBodyFixture()
+		uBody := UntrustedHeaderBodyFixture()
 		u := flow.UntrustedHeader{
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: validHash,
@@ -576,7 +576,7 @@ func TestNewHeader(t *testing.T) {
 	})
 
 	t.Run("empty ChainID", func(t *testing.T) {
-		uBody := unittest.UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
+		uBody := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.ChainID = ""
 		})
 		u := flow.UntrustedHeader{
@@ -590,7 +590,7 @@ func TestNewHeader(t *testing.T) {
 	})
 
 	t.Run("zero ParentID", func(t *testing.T) {
-		uBody := unittest.UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
+		uBody := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.ParentID = flow.ZeroID
 		})
 		u := flow.UntrustedHeader{
@@ -604,7 +604,7 @@ func TestNewHeader(t *testing.T) {
 	})
 
 	t.Run("zero Timestamp", func(t *testing.T) {
-		uBody := unittest.UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
+		uBody := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.Timestamp = time.Time{}
 		})
 		u := flow.UntrustedHeader{
@@ -618,7 +618,7 @@ func TestNewHeader(t *testing.T) {
 	})
 
 	t.Run("empty ParentVoterIndices", func(t *testing.T) {
-		uBody := unittest.UntrustedHeaderBodyFixture(
+		uBody := UntrustedHeaderBodyFixture(
 			func(u *flow.UntrustedHeaderBody) {
 				u.ParentVoterIndices = []byte{}
 			},
@@ -637,7 +637,7 @@ func TestNewHeader(t *testing.T) {
 	})
 
 	t.Run("empty ParentVoterSigData", func(t *testing.T) {
-		uBody := unittest.UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
+		uBody := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.ParentVoterSigData = []byte{}
 		})
 		u := flow.UntrustedHeader{
@@ -651,7 +651,7 @@ func TestNewHeader(t *testing.T) {
 	})
 
 	t.Run("zero ProposerID", func(t *testing.T) {
-		uBody := unittest.UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
+		uBody := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.ProposerID = flow.ZeroID
 		})
 		u := flow.UntrustedHeader{
@@ -666,7 +666,7 @@ func TestNewHeader(t *testing.T) {
 
 	t.Run("missing PayloadHash", func(t *testing.T) {
 		// use a valid body but an empty payload hash
-		uBody := unittest.UntrustedHeaderBodyFixture()
+		uBody := UntrustedHeaderBodyFixture()
 		u := flow.UntrustedHeader{
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: flow.ZeroID,
@@ -676,4 +676,32 @@ func TestNewHeader(t *testing.T) {
 		assert.Nil(t, h)
 		assert.Contains(t, err.Error(), "PayloadHash must not be empty")
 	})
+}
+
+// UntrustedHeaderBodyFixture returns an UntrustedHeaderBody
+// pre‐populated with sane defaults. Any opts override those defaults.
+func UntrustedHeaderBodyFixture(opts ...func(*flow.UntrustedHeaderBody)) flow.UntrustedHeaderBody {
+	u := flow.UntrustedHeaderBody(unittest.HeaderBodyFixture())
+	for _, opt := range opts {
+		opt(&u)
+	}
+
+	return u
+}
+
+// WithRootDefaults zeroes out all parent‐QC fields and enforces root constraints.
+func WithRootDefaults() func(*flow.UntrustedHeaderBody) {
+	ts := time.Unix(1_600_000_000, 0)
+	return func(u *flow.UntrustedHeaderBody) {
+		u.ChainID = flow.Emulator // still must be non‐empty
+		u.ParentID = flow.ZeroID  // allowed to be zero
+		u.Height = 0
+		u.View = 0
+		u.Timestamp = ts // non‐zero
+		u.ParentView = 0
+		u.ParentVoterIndices = []byte{}
+		u.ParentVoterSigData = []byte{}
+		u.ProposerID = flow.ZeroID
+		u.LastViewTC = nil
+	}
 }
