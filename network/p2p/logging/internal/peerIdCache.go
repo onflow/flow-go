@@ -3,7 +3,7 @@ package internal
 import (
 	"fmt"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
@@ -13,11 +13,11 @@ type PeerIdCache struct {
 	// 	to using it here.
 	// 	This PeerIdCache is used extensively across the codebase, so any minor import cycle will cause
 	// 	a lot of trouble.
-	peerCache *lru.Cache
+	peerCache *lru.Cache[peer.ID, string]
 }
 
 func NewPeerIdCache(size int) (*PeerIdCache, error) {
-	c, err := lru.New(size)
+	c, err := lru.New[peer.ID, string](size)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create peer id cache: %w", err)
 	}
@@ -32,7 +32,7 @@ func NewPeerIdCache(size int) (*PeerIdCache, error) {
 func (p *PeerIdCache) PeerIdString(pid peer.ID) string {
 	pidStr, ok := p.peerCache.Get(pid)
 	if ok {
-		return pidStr.(string)
+		return pidStr
 	}
 
 	pidStr0 := pid.String()
@@ -50,7 +50,7 @@ func (p *PeerIdCache) Size() int {
 func (p *PeerIdCache) ByPeerId(pid peer.ID) (string, bool) {
 	pidStr, ok := p.peerCache.Get(pid)
 	if ok {
-		return pidStr.(string), true
+		return pidStr, true
 	}
 	return "", false
 }
