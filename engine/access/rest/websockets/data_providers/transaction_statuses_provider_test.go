@@ -46,11 +46,8 @@ func (s *TransactionStatusesProviderSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.api = accessmock.NewAPI(s.T())
 	s.linkGenerator = mockcommonmodels.NewLinkGenerator(s.T())
-
 	s.chain = flow.Testnet.Chain()
-
 	s.rootBlock = unittest.Block.Genesis(s.chain.ChainID())
-
 	s.factory = NewDataProviderFactory(
 		s.log,
 		nil,
