@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
 
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
@@ -74,7 +73,7 @@ func TestSpam_IHave(t *testing.T) {
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return messages.NewUntrustedProposal(unittest.ProposalFixture())
+		return flow.NewUntrustedProposal(unittest.ProposalFixture())
 	})
 
 	// prepare to spam - generate iHAVE control messages

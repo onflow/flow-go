@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -16,7 +16,7 @@ func TestCodec_Decode(t *testing.T) {
 	c := cbor.NewCodec()
 	t.Run("decodes message successfully", func(t *testing.T) {
 
-		data := messages.NewUntrustedProposal(unittest.ProposalFixture())
+		data := flow.NewUntrustedProposal(unittest.ProposalFixture())
 		encoded, err := c.Encode(data)
 		require.NoError(t, err)
 
@@ -60,7 +60,7 @@ func TestCodec_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when unmarshalling fails - wrong type", func(t *testing.T) {
-		data := messages.NewUntrustedProposal(unittest.ProposalFixture())
+		data := flow.NewUntrustedProposal(unittest.ProposalFixture())
 		encoded, err := c.Encode(data)
 		require.NoError(t, err)
 
@@ -72,7 +72,7 @@ func TestCodec_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when unmarshalling fails - corrupt", func(t *testing.T) {
-		data := messages.NewUntrustedProposal(unittest.ProposalFixture())
+		data := flow.NewUntrustedProposal(unittest.ProposalFixture())
 		encoded, err := c.Encode(data)
 		require.NoError(t, err)
 

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
-	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -17,7 +17,7 @@ import (
 func TestDecoder_Decode(t *testing.T) {
 	c := cbor.NewCodec()
 
-	blockProposal := messages.NewUntrustedProposal(unittest.ProposalFixture())
+	blockProposal := flow.NewUntrustedProposal(unittest.ProposalFixture())
 
 	t.Run("decodes message successfully", func(t *testing.T) {
 		var buf bytes.Buffer

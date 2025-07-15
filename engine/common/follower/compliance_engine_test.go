@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	followermock "github.com/onflow/flow-go/engine/common/follower/mock"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -104,9 +103,9 @@ func (s *EngineSuite) TestProcessSyncedBlock() {
 		close(done)
 	}).Once()
 
-	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.UntrustedProposal]{
+	s.engine.OnSyncedBlocks(flow.Slashable[[]*flow.Proposal]{
 		OriginID: originID,
-		Message:  flowBlockProposalsToMessage(proposal),
+		Message:  []*flow.Proposal{proposal},
 	})
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
@@ -122,7 +121,7 @@ func (s *EngineSuite) TestProcessGossipedBlock() {
 		close(done)
 	}).Once()
 
-	err := s.engine.Process(channels.ReceiveBlocks, originID, messages.NewUntrustedProposal(proposal))
+	err := s.engine.Process(channels.ReceiveBlocks, originID, proposal)
 	require.NoError(s.T(), err)
 
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
@@ -139,9 +138,9 @@ func (s *EngineSuite) TestProcessBlockFromComplianceInterface() {
 		close(done)
 	}).Once()
 
-	s.engine.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
+	s.engine.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 		OriginID: originID,
-		Message:  messages.NewUntrustedProposal(proposal),
+		Message:  proposal,
 	})
 
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
@@ -169,9 +168,9 @@ func (s *EngineSuite) TestProcessBatchOfDisconnectedBlocks() {
 		wg.Done()
 	}).Return(nil).Once()
 
-	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.UntrustedProposal]{
+	s.engine.OnSyncedBlocks(flow.Slashable[[]*flow.Proposal]{
 		OriginID: originID,
-		Message:  flowBlockProposalsToMessage(blocks...),
+		Message:  blocks,
 	})
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "expect to return before timeout")
 }
@@ -207,9 +206,9 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	}).Return().Once()
 	s.engine.engMetrics = metricsMock
 
-	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.UntrustedProposal]{
+	s.engine.OnSyncedBlocks(flow.Slashable[[]*flow.Proposal]{
 		OriginID: unittest.IdentifierFixture(),
-		Message:  flowBlockProposalsToMessage(proposal),
+		Message:  []*flow.Proposal{proposal},
 	})
 	unittest.RequireCloseBefore(s.T(), done, time.Millisecond*500, "expect to close before timeout")
 	// check if message wasn't buffered in internal channel
@@ -219,13 +218,4 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	default:
 
 	}
-}
-
-// flowBlockProposalsToMessage is a helper function to transform types.
-func flowBlockProposalsToMessage(proposals ...*flow.Proposal) []*messages.UntrustedProposal {
-	result := make([]*messages.UntrustedProposal, 0, len(proposals))
-	for _, prop := range proposals {
-		result = append(result, messages.NewUntrustedProposal(prop))
-	}
-	return result
 }

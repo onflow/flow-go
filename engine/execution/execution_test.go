@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func sendBlock(exeNode *testmock.ExecutionNode, from flow.Identifier, proposal *messages.UntrustedProposal) error {
+func sendBlock(exeNode *testmock.ExecutionNode, from flow.Identifier, proposal *flow.UntrustedProposal) error {
 	return exeNode.FollowerEngine.Process(channels.ReceiveBlocks, from, proposal)
 }
 
@@ -221,12 +221,12 @@ func TestExecutionFlow(t *testing.T) {
 		Once()
 
 	// submit block from consensus node
-	err = sendBlock(&exeNode, conID.NodeID, messages.NewUntrustedProposal(unittest.ProposalFromBlock(block)))
+	err = sendBlock(&exeNode, conID.NodeID, flow.NewUntrustedProposal(unittest.ProposalFromBlock(block)))
 	require.NoError(t, err)
 
 	// submit the child block from consensus node, which trigger the parent block
 	// to be passed to BlockProcessable
-	err = sendBlock(&exeNode, conID.NodeID, messages.NewUntrustedProposal(unittest.ProposalFromBlock(child)))
+	err = sendBlock(&exeNode, conID.NodeID, flow.NewUntrustedProposal(unittest.ProposalFromBlock(child)))
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
@@ -267,7 +267,7 @@ func deployContractBlock(
 	parent *flow.Block,
 	ref *flow.Header,
 ) (
-	*flow.TransactionBody, *flow.Collection, *flow.Block, *messages.UntrustedProposal, uint64) {
+	*flow.TransactionBody, *flow.Collection, *flow.Block, *flow.UntrustedProposal, uint64) {
 	// make tx
 	tx := execTestutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
 	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
@@ -303,12 +303,12 @@ func deployContractBlock(
 	require.NoError(t, err)
 
 	// make proposal
-	proposal := messages.NewUntrustedProposal(unittest.ProposalFromBlock(block))
+	proposal := flow.NewUntrustedProposal(unittest.ProposalFromBlock(block))
 	return tx, col, block, proposal, seq + 1
 }
 
 func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Block, ref *flow.Header) (
-	*flow.TransactionBody, *flow.Collection, *flow.Block, *messages.UntrustedProposal, uint64) {
+	*flow.TransactionBody, *flow.Collection, *flow.Block, *flow.UntrustedProposal, uint64) {
 	// make tx
 	tx := execTestutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
 	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
@@ -338,13 +338,13 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 	)
 	require.NoError(t, err)
 
-	proposal := messages.NewUntrustedProposal(unittest.ProposalFromBlock(block))
+	proposal := flow.NewUntrustedProposal(unittest.ProposalFromBlock(block))
 
 	return tx, col, block, proposal, seq + 1
 }
 
 func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Block, ref *flow.Header) (
-	*flow.TransactionBody, *flow.Collection, *flow.Block, *messages.UntrustedProposal, uint64) {
+	*flow.TransactionBody, *flow.Collection, *flow.Block, *flow.UntrustedProposal, uint64) {
 	tx := execTestutil.AddToCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
 	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
 	require.NoError(t, err)
@@ -369,7 +369,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 	)
 	require.NoError(t, err)
 
-	proposal := messages.NewUntrustedProposal(unittest.ProposalFromBlock(block))
+	proposal := flow.NewUntrustedProposal(unittest.ProposalFromBlock(block))
 
 	return tx, col, block, proposal, seq + 1
 }
@@ -600,7 +600,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	proposal := messages.NewUntrustedProposal(unittest.ProposalFromBlock(block))
+	proposal := flow.NewUntrustedProposal(unittest.ProposalFromBlock(block))
 
 	child := unittest.BlockWithParentAndProposerFixture(t, block.ToHeader(), conID.NodeID)
 	child.Header.ParentVoterIndices = voterIndices
@@ -628,7 +628,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	err = sendBlock(&exeNode, exeID.NodeID, proposal)
 	require.NoError(t, err)
 
-	err = sendBlock(&exeNode, conID.NodeID, messages.NewUntrustedProposal(unittest.ProposalFromBlock(child)))
+	err = sendBlock(&exeNode, conID.NodeID, flow.NewUntrustedProposal(unittest.ProposalFromBlock(child)))
 	require.NoError(t, err)
 
 	hub.DeliverAllEventually(t, func() bool {

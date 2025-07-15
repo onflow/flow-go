@@ -471,9 +471,14 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicat
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
 	case *flow.UntrustedProposal:
-		h.compliance.OnBlockProposal(flow.Slashable[*flow.UntrustedProposal]{
+		proposal, err := flow.NewProposal(*msg)
+		if err != nil {
+			return fmt.Errorf("cannot construct proposal: %w", err)
+		}
+
+		h.compliance.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 			OriginID: originID,
-			Message:  msg,
+			Message:  proposal,
 		})
 	case *messages.BlockVote:
 		h.forwardToOwnVoteAggregator(msg, originID)

@@ -299,7 +299,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
-				actual, err := res.Blocks[0].DeclareTrusted()
+				actual, err := flow.NewProposal(res.Blocks[0])
 				require.NoError(ss.T(), err)
 				assert.Equal(ss.T(), proposal, actual, "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
@@ -355,25 +355,24 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	originID := unittest.IdentifierFixture()
 	res := &messages.BlockResponse{
 		Nonce:  nonce,
-		Blocks: []messages.UntrustedProposal{},
+		Blocks: []flow.UntrustedProposal{},
 	}
 
 	// add one block that should be processed
 	processable := unittest.ProposalFixture()
 	ss.core.On("HandleBlock", processable.Block.ToHeader()).Return(true)
-	res.Blocks = append(res.Blocks, *messages.NewUntrustedProposal(processable))
+	res.Blocks = append(res.Blocks, *flow.NewUntrustedProposal(processable))
 
 	// add one block that should not be processed
 	unprocessable := unittest.ProposalFixture()
 	ss.core.On("HandleBlock", unprocessable.Block.ToHeader()).Return(false)
-	res.Blocks = append(res.Blocks, *messages.NewUntrustedProposal(unprocessable))
+	res.Blocks = append(res.Blocks, *flow.NewUntrustedProposal(unprocessable))
 
 	ss.comp.On("OnSyncedBlocks", mock.Anything).Run(func(args mock.Arguments) {
-		res := args.Get(0).(flow.Slashable[[]*messages.UntrustedProposal])
-		converted, err := res.Message[0].DeclareTrusted()
-		require.NoError(ss.T(), err)
-		ss.Assert().Equal(processable.Block.Header, converted.Block.Header)
-		ss.Assert().Equal(processable.Block.Payload, converted.Block.Payload)
+		res := args.Get(0).(flow.Slashable[[]*flow.Proposal])
+		actual := res.Message[0]
+		ss.Assert().Equal(processable.Block.Header, actual.Block.Header)
+		ss.Assert().Equal(processable.Block.Payload, actual.Block.Payload)
 		ss.Assert().Equal(originID, res.OriginID)
 	})
 

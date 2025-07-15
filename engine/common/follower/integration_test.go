@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/compliance"
 	moduleconsensus "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -151,11 +150,11 @@ func TestFollowerHappyPath(t *testing.T) {
 		batchesPerWorker := 10
 		blocksPerBatch := 100
 		blocksPerWorker := blocksPerBatch * batchesPerWorker
-		flowBlocks := unittest.ProposalChainFixtureFrom(workers*blocksPerWorker, rootHeader)
-		require.Greaterf(t, len(flowBlocks), defaultPendingBlocksCacheCapacity, "this test assumes that we operate with more blocks than cache's upper limit")
+		pendingBlocks := unittest.ProposalChainFixtureFrom(workers*blocksPerWorker, rootHeader)
+		require.Greaterf(t, len(pendingBlocks), defaultPendingBlocksCacheCapacity, "this test assumes that we operate with more blocks than cache's upper limit")
 
 		// ensure sequential block views - that way we can easily know which block will be finalized after the test
-		for i, proposal := range flowBlocks {
+		for i, proposal := range pendingBlocks {
 			proposal.Block.Header.View = proposal.Block.Header.Height
 			proposal.Block = flow.Block{
 				Header:  proposal.Block.Header,
@@ -163,11 +162,10 @@ func TestFollowerHappyPath(t *testing.T) {
 			}
 
 			if i > 0 {
-				proposal.Block.Header.ParentView = flowBlocks[i-1].Block.Header.View
-				proposal.Block.Header.ParentID = flowBlocks[i-1].Block.ID()
+				proposal.Block.Header.ParentView = pendingBlocks[i-1].Block.Header.View
+				proposal.Block.Header.ParentID = pendingBlocks[i-1].Block.ID()
 			}
 		}
-		pendingBlocks := flowBlockProposalsToMessage(flowBlocks...)
 
 		// Regarding the block that we expect to be finalized based on 2-chain finalization rule, we consider the last few blocks in `pendingBlocks`
 		//  ... <-- X <-- Y <-- Z
@@ -185,11 +183,11 @@ func TestFollowerHappyPath(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(workers)
 		for i := 0; i < workers; i++ {
-			go func(blocks []*messages.UntrustedProposal) {
+			go func(blocks []*flow.Proposal) {
 				defer wg.Done()
 				for submittingBlocks.Load() {
 					for batch := 0; batch < batchesPerWorker; batch++ {
-						engine.OnSyncedBlocks(flow.Slashable[[]*messages.UntrustedProposal]{
+						engine.OnSyncedBlocks(flow.Slashable[[]*flow.Proposal]{
 							OriginID: originID,
 							Message:  blocks[batch*blocksPerBatch : (batch+1)*blocksPerBatch],
 						})

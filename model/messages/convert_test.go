@@ -12,15 +12,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestBlockProposal(t *testing.T) {
-	block := unittest.FullBlockFixture()
-	proposal := unittest.ProposalFromBlock(block)
-	proposalMsg := messages.NewUntrustedProposal(proposal)
-	converted, err := proposalMsg.DeclareTrusted()
-	require.NoError(t, err)
-	assert.Equal(t, proposal, converted)
-}
-
 func TestClusterBlockProposal(t *testing.T) {
 	block := unittest.ClusterBlockFixture()
 	proposal := unittest.ClusterProposalFromBlock(block)
@@ -33,9 +24,9 @@ func TestClusterBlockProposal(t *testing.T) {
 func TestBlockResponse(t *testing.T) {
 	expected := []*flow.Proposal{unittest.ProposalFixture(), unittest.ProposalFixture()}
 	res := messages.BlockResponse{
-		Blocks: []messages.UntrustedProposal{
-			*messages.NewUntrustedProposal(expected[0]),
-			*messages.NewUntrustedProposal(expected[1]),
+		Blocks: []flow.UntrustedProposal{
+			*flow.NewUntrustedProposal(expected[0]),
+			*flow.NewUntrustedProposal(expected[1]),
 		},
 	}
 	converted, err := res.BlocksInternal()

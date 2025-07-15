@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -147,11 +146,11 @@ func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*messages.UntrustedProposal)
+		proposal, ok := msg.(*flow.UntrustedProposal)
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := proposal.DeclareTrusted()
+		proposalTrusted, err := flow.NewProposal(*proposal)
 		require.NoError(is.T(), err)
 		block := proposalTrusted.Block
 
@@ -198,11 +197,11 @@ func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Tim
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*messages.UntrustedProposal)
+		proposal, ok := msg.(*flow.UntrustedProposal)
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := proposal.DeclareTrusted()
+		proposalTrusted, err := flow.NewProposal(*proposal)
 		require.NoError(is.T(), err)
 		block := proposalTrusted.Block
 
@@ -243,11 +242,11 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*messages.UntrustedProposal)
+		proposal, ok := msg.(*flow.UntrustedProposal)
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := proposal.DeclareTrusted()
+		proposalTrusted, err := flow.NewProposal(*proposal)
 		require.NoError(is.T(), err)
 		nextBlock := proposalTrusted.Block
 

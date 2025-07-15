@@ -13,7 +13,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -75,9 +74,9 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 			cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 			// execute the block submission
-			cs.engine.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
+			cs.engine.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 				OriginID: unittest.IdentifierFixture(),
-				Message:  messages.NewUntrustedProposal(proposal),
+				Message:  proposal,
 			})
 		}
 		wg.Done()
@@ -92,9 +91,9 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
-		cs.engine.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
+		cs.engine.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 			OriginID: unittest.IdentifierFixture(),
-			Message:  messages.NewUntrustedProposal(proposal),
+			Message:  proposal,
 		})
 		wg.Done()
 	}()
