@@ -185,9 +185,73 @@ func (s BlockStatus) String() string {
 }
 
 // Proposal is a signed proposal that includes the block payload, in addition to the required header and signature.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Proposal struct {
 	Block           Block
 	ProposerSigData []byte
+}
+
+// UntrustedProposal is an untrusted input-only representation of a Proposal,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedProposal should be validated and converted into
+// a trusted cluster Proposal using the NewProposal constructor.
+type UntrustedProposal Proposal
+
+// NewProposal creates a new Proposal.
+// This constructor enforces validation rules to ensure the Proposal is well-formed.
+// It must be used to construct all non-root blocks.
+//
+// All errors indicate that a valid Proposal cannot be constructed from the input.
+func NewProposal(untrusted UntrustedProposal) (*Proposal, error) {
+	block, err := NewBlock(UntrustedBlock(untrusted.Block))
+	if err != nil {
+		return nil, fmt.Errorf("invalid block: %w", err)
+	}
+	if len(untrusted.ProposerSigData) == 0 {
+		return nil, fmt.Errorf("proposer signature must not be empty")
+	}
+
+	return &Proposal{
+		Block:           *block,
+		ProposerSigData: untrusted.ProposerSigData,
+	}, nil
+}
+
+// TODO: remove
+func NewUntrustedProposal(internal *Proposal) *UntrustedProposal {
+	p := UntrustedProposal(*internal)
+	return &p
+}
+
+// DeclareTrusted converts the UntrustedProposal to a trusted internal flow.Proposal.
+// CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
+//
+// All errors indicate that the input message could not be converted to a valid proposal.
+func (msg *UntrustedProposal) DeclareTrusted() (*Proposal, error) {
+	block, err := NewBlock(
+		UntrustedBlock{
+			Header:  msg.Block.Header,
+			Payload: msg.Block.Payload,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build block: %w", err)
+	}
+	// validate ProposerSigData
+	if len(msg.ProposerSigData) == 0 {
+		return nil, fmt.Errorf("proposer signature must not be empty")
+	}
+	//nolint:structwrite
+	return &Proposal{
+		Block:           *block,
+		ProposerSigData: msg.ProposerSigData,
+	}, nil
 }
 
 // ProposalHeader converts the proposal into a compact [ProposalHeader] representation,

@@ -43,15 +43,23 @@ func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*flow.Prop
 	if err != nil {
 		return flow.Slashable[*flow.Proposal]{}, false
 	}
-	proposal := flow.Slashable[*flow.Proposal]{
-		OriginID: item.header.OriginID,
-		Message: &flow.Proposal{
+
+	proposal, err := flow.NewProposal(
+		flow.UntrustedProposal{
 			Block:           *block,
 			ProposerSigData: item.header.Message.ProposerSigData,
 		},
+	)
+	if err != nil {
+		return flow.Slashable[*flow.Proposal]{}, false
 	}
 
-	return proposal, true
+	slashableProposal := flow.Slashable[*flow.Proposal]{
+		OriginID: item.header.OriginID,
+		Message:  proposal,
+	}
+
+	return slashableProposal, true
 }
 
 func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.Proposal], bool) {
@@ -60,7 +68,7 @@ func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*
 		return nil, false
 	}
 
-	proposals := make([]flow.Slashable[*flow.Proposal], 0, len(items))
+	slashableProposals := make([]flow.Slashable[*flow.Proposal], 0, len(items))
 	for _, item := range items {
 		block, err := flow.NewBlock(
 			flow.UntrustedBlock{
@@ -72,17 +80,24 @@ func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*
 			return nil, false
 		}
 
-		proposal := flow.Slashable[*flow.Proposal]{
-			OriginID: item.header.OriginID,
-			Message: &flow.Proposal{
+		proposal, err := flow.NewProposal(
+			flow.UntrustedProposal{
 				Block:           *block,
 				ProposerSigData: item.header.Message.ProposerSigData,
 			},
+		)
+		if err != nil {
+			return nil, false
 		}
-		proposals = append(proposals, proposal)
+
+		slashableProposal := flow.Slashable[*flow.Proposal]{
+			OriginID: item.header.OriginID,
+			Message:  proposal,
+		}
+		slashableProposals = append(slashableProposals, slashableProposal)
 	}
 
-	return proposals, true
+	return slashableProposals, true
 }
 
 func (b *PendingBlocks) DropForParent(parentID flow.Identifier) {

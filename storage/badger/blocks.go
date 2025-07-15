@@ -90,7 +90,16 @@ func (b *Blocks) retrieveProposalTx(blockID flow.Identifier) func(*badger.Txn) (
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve proposer signature: %w", err)
 		}
-		return &flow.Proposal{Block: *block, ProposerSigData: sig}, nil
+		proposal, err := flow.NewProposal(
+			flow.UntrustedProposal{
+				Block:           *block,
+				ProposerSigData: sig,
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not construct proposal: %w", err)
+		}
+		return proposal, nil
 	}
 }
 

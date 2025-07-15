@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
@@ -169,7 +168,7 @@ func NewComplianceLayer(
 // OnBlockProposal queues *untrusted* proposals for further processing and notifies the Engine's
 // internal workers. This method is intended for fresh proposals received directly from leaders.
 // It can ingest synced blocks as well, but is less performant compared to method `OnSyncedBlocks`.
-func (e *ComplianceEngine) OnBlockProposal(proposal flow.Slashable[*messages.UntrustedProposal]) {
+func (e *ComplianceEngine) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
 	// queue proposal
 	if e.pendingProposals.Push(proposal) {
@@ -181,7 +180,7 @@ func (e *ComplianceEngine) OnBlockProposal(proposal flow.Slashable[*messages.Unt
 // efficient for batches of continuously connected blocks (honest nodes supply finalized blocks
 // in suitable sequences where possible). Nevertheless, the method tolerates blocks in arbitrary
 // order (less efficient), making it robust against byzantine nodes.
-func (e *ComplianceEngine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.UntrustedProposal]) {
+func (e *ComplianceEngine) OnSyncedBlocks(blocks flow.Slashable[[]*flow.Proposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlocks)
 	// The synchronization engine feeds the follower with batches of blocks. The field `Slashable.OriginID`
 	// states which node forwarded the batch to us. Each block contains its proposer and signature.
@@ -210,8 +209,8 @@ func (e *ComplianceEngine) OnFinalizedBlock(block *model.Block) {
 // notifying us about fresh proposals directly from the consensus leaders.
 func (e *ComplianceEngine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *messages.UntrustedProposal:
-		e.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
+	case *flow.Proposal:
+		e.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 			OriginID: originID,
 			Message:  msg,
 		})
@@ -267,19 +266,16 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		// Priority 1: ingest fresh proposals
 		msg, ok := e.pendingProposals.Pop()
 		if ok {
-			proposalMsg := msg.(flow.Slashable[*messages.UntrustedProposal])
-			proposal, err := proposalMsg.Message.DeclareTrusted()
-			if err != nil {
-				return fmt.Errorf("could not convert proposal: %w", err)
-			}
+			proposal := msg.(flow.Slashable[*flow.Proposal])
+			proposalMsg := proposal.Message
 			log := e.log.With().
-				Hex("origin_id", proposalMsg.OriginID[:]).
-				Str("chain_id", proposal.Block.Header.ChainID.String()).
-				Uint64("view", proposal.Block.Header.View).
-				Uint64("height", proposal.Block.Header.Height).
+				Hex("origin_id", proposal.OriginID[:]).
+				Str("chain_id", proposalMsg.Block.Header.ChainID.String()).
+				Uint64("view", proposalMsg.Block.Header.View).
+				Uint64("height", proposalMsg.Block.Header.Height).
 				Logger()
 			latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
-			e.submitConnectedBatch(log, latestFinalizedView, proposalMsg.OriginID, []*flow.Proposal{proposal})
+			e.submitConnectedBatch(log, latestFinalizedView, proposal.OriginID, []*flow.Proposal{proposalMsg})
 			e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 			continue
 		}
@@ -292,45 +288,41 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 			return nil
 		}
 
-		batch := msg.(flow.Slashable[[]*messages.UntrustedProposal])
+		batch := msg.(flow.Slashable[[]*flow.Proposal])
 		if len(batch.Message) < 1 {
 			continue
 		}
-		blocks := make([]*flow.Proposal, 0, len(batch.Message))
-		for _, block := range batch.Message {
-			block, err := block.DeclareTrusted()
-			if err != nil {
-				return fmt.Errorf("could not convert proposal: %w", err)
-			}
-			blocks = append(blocks, block)
+		proposals := make([]*flow.Proposal, 0, len(batch.Message))
+		for _, proposal := range batch.Message {
+			proposals = append(proposals, proposal)
 
 		}
 
-		firstBlock := blocks[0].Block.Header
-		lastBlock := blocks[len(blocks)-1].Block.Header
+		firstBlockHeader := proposals[0].Block.Header
+		lastBlockHeader := proposals[len(proposals)-1].Block.Header
 		log := e.log.With().
 			Hex("origin_id", batch.OriginID[:]).
-			Str("chain_id", lastBlock.ChainID.String()).
-			Uint64("first_block_height", firstBlock.Height).
-			Uint64("first_block_view", firstBlock.View).
-			Uint64("last_block_height", lastBlock.Height).
-			Uint64("last_block_view", lastBlock.View).
-			Int("range_length", len(blocks)).
+			Str("chain_id", lastBlockHeader.ChainID.String()).
+			Uint64("first_block_height", firstBlockHeader.Height).
+			Uint64("first_block_view", firstBlockHeader.View).
+			Uint64("last_block_height", lastBlockHeader.Height).
+			Uint64("last_block_view", lastBlockHeader.View).
+			Int("range_length", len(proposals)).
 			Logger()
 
 		// extract sequences of connected blocks and schedule them for further processing
 		// we assume the sender has already ordered blocks into connected ranges if possible
 		latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
-		parentID := blocks[0].Block.ID()
+		parentID := proposals[0].Block.ID()
 		indexOfLastConnected := 0
-		for i, block := range blocks {
+		for i, block := range proposals {
 			if block.Block.Header.ParentID != parentID {
-				e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, blocks[indexOfLastConnected:i])
+				e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, proposals[indexOfLastConnected:i])
 				indexOfLastConnected = i
 			}
 			parentID = block.Block.ID()
 		}
-		e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, blocks[indexOfLastConnected:])
+		e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, proposals[indexOfLastConnected:])
 		e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlocks)
 	}
 }

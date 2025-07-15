@@ -178,6 +178,27 @@ func (e *Engine) setupResponseMessageHandler() error {
 				}
 				return ok
 			},
+			Map: func(msg *engine.Message) (*engine.Message, bool) {
+				blockResponse, ok := msg.Payload.(*messages.BlockResponse)
+				if !ok {
+					// should never happen, unless there is a bug.
+					e.log.Warn().
+						Str("entity_ids", fmt.Sprintf("%v", blockResponse)).
+						Hex("origin_id", logging.ID(msg.OriginID)).
+						Msg("cannot match the payload to entity request")
+					return nil, false
+				}
+				proposals, err := blockResponse.BlocksInternal()
+				if err != nil {
+					//TODO:
+					panic(err)
+				}
+
+				return &engine.Message{
+					OriginID: msg.OriginID,
+					Payload:  proposals,
+				}, true
+			},
 			Store: e.pendingBlockResponses,
 		},
 	)
@@ -277,7 +298,7 @@ func (e *Engine) processAvailableResponses(ctx context.Context) {
 
 		msg, ok = e.pendingBlockResponses.Get()
 		if ok {
-			e.onBlockResponse(msg.OriginID, msg.Payload.(*messages.BlockResponse))
+			e.onBlockResponse(msg.OriginID, msg.Payload.([]*flow.Proposal))
 			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 			continue
 		}
@@ -296,31 +317,31 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 }
 
 // onBlockResponse processes a response containing a specifically requested block.
-func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
-	// process the blocks one by one
-	if len(res.Blocks) == 0 {
-		e.log.Debug().Msg("received empty block response")
+func (e *Engine) onBlockResponse(originID flow.Identifier, res []*flow.Proposal) {
+	// process the proposal one by one
+	if len(res) == 0 {
+		e.log.Debug().Msg("received empty proposals")
 		return
 	}
 
-	first := res.Blocks[0].Block.Header.Height
-	last := res.Blocks[len(res.Blocks)-1].Block.Header.Height
-	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received block response")
+	first := res[0].Block.Header.Height
+	last := res[len(res)-1].Block.Header.Height
+	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received proposal")
 
-	filteredBlocks := make([]*messages.UntrustedProposal, 0, len(res.Blocks))
-	for _, block := range res.Blocks {
-		header := block.Block.ToHeader()
+	filteredProposals := make([]*flow.Proposal, 0, len(res))
+	for _, proposal := range res {
+		header := proposal.Block.ToHeader()
 		if !e.core.HandleBlock(header) {
 			e.log.Debug().Uint64("height", header.Height).Msg("block handler rejected")
 			continue
 		}
-		filteredBlocks = append(filteredBlocks, &block)
+		filteredProposals = append(filteredProposals, proposal)
 	}
 
 	// forward the block to the compliance engine for validation and processing
-	e.comp.OnSyncedBlocks(flow.Slashable[[]*messages.UntrustedProposal]{
+	e.comp.OnSyncedBlocks(flow.Slashable[[]*flow.Proposal]{
 		OriginID: originID,
-		Message:  filteredBlocks,
+		Message:  filteredProposals,
 	})
 }
 
