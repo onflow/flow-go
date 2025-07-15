@@ -548,6 +548,7 @@ func TestExtendMissingParent(t *testing.T) {
 		extend := unittest.BlockFixture(
 			unittest.Block.WithHeight(2),
 			unittest.Block.WithView(2),
+			unittest.Block.WithParentView(1),
 		)
 
 		err := state.Extend(context.Background(), unittest.ProposalFromBlock(extend))
@@ -1068,7 +1069,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// block 6 contains the seal for block 2
 		seals = []*flow.Seal{seal2}
-		block6View := block2.Header.View + 1
+		block6View := block5.Header.View + 1
 		block6 := unittest.BlockFixture(
 			unittest.Block.WithParent(block5.ID(), block5.Header.View, block5.Header.Height),
 			unittest.Block.WithView(block6View),
@@ -2878,6 +2879,7 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
 		extend := unittest.BlockFixture(
 			unittest.Block.WithHeight(2),
+			unittest.Block.WithParentView(1),
 			unittest.Block.WithView(2),
 		)
 

@@ -40,6 +40,7 @@ const MaxViewIncrease = 3
 type pendingBlock struct {
 	height    uint64
 	view      uint64
+	chainID   flowgo.ChainID
 	parentID  flowgo.Identifier
 	timestamp time.Time
 	// mapping from transaction ID to transaction
@@ -60,6 +61,7 @@ type pendingBlock struct {
 func newPendingBlock(
 	prevBlock *flowgo.Block,
 	ledgerSnapshot snapshot.StorageSnapshot,
+	chainID flowgo.ChainID,
 	timestamp time.Time,
 ) *pendingBlock {
 	pb := &pendingBlock{
@@ -67,6 +69,7 @@ func newPendingBlock(
 		// the view increments by between 1 and MaxViewIncrease to match
 		// behaviour on a real network, where views are not consecutive
 		view:               prevBlock.Header.View + uint64(rand.Intn(MaxViewIncrease)+1),
+		chainID:            chainID,
 		parentID:           prevBlock.ID(),
 		timestamp:          timestamp,
 		transactions:       make(map[flowgo.Identifier]*flowgo.TransactionBody),
@@ -95,6 +98,7 @@ func (b *pendingBlock) Block() *flowgo.Block {
 
 	return flowgo.NewBlock(
 		flowgo.HeaderBody{
+			ChainID:   b.chainID,
 			Height:    b.height,
 			View:      b.view,
 			ParentID:  b.parentID,

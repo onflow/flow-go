@@ -108,10 +108,17 @@ func TestBlock_Status(t *testing.T) {
 
 // TestBlockMalleability checks that flow.Block is not malleable: any change in its data
 // should result in a different ID.
+// Because our NewHeaderBody constructor enforces ParentView < View we use
+// WithFieldGenerator to safely pass it.
 func TestBlockMalleability(t *testing.T) {
+
+	block := unittest.FullBlockFixture()
 	unittest.RequireEntityNonMalleable(
 		t,
 		unittest.FullBlockFixture(),
+		unittest.WithFieldGenerator("Header.ParentView", func() uint64 {
+			return block.Header.View - 1 // ParentView must stay below View, so set it to View-1
+		}),
 		unittest.WithFieldGenerator("Payload.Results", func() flow.ExecutionResultList {
 			return flow.ExecutionResultList{unittest.ExecutionResultFixture()}
 		}),

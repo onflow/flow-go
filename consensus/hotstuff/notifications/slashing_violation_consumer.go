@@ -34,7 +34,6 @@ func (c *SlashingViolationsConsumer) OnInvalidBlockDetected(err flow.Slashable[m
 		Hex("proposer_id", block.ProposerID[:]).
 		Uint64("block_view", block.View).
 		Hex("block_id", block.BlockID[:]).
-		Hex("block_payloadhash", block.PayloadHash[:]).
 		Time("block_timestamp", time.UnixMilli(int64(block.Timestamp)).UTC()).
 		Msgf("OnInvalidBlockDetected: %s", err.Message.Error())
 }

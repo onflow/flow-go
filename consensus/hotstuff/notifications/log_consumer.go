@@ -231,7 +231,6 @@ func (lc *LogConsumer) logBasicBlockData(loggerEvent *zerolog.Event, block *mode
 		Uint64("block_view", block.View).
 		Hex("block_id", logging.ID(block.BlockID)).
 		Hex("proposer_id", logging.ID(block.ProposerID)).
-		Hex("payload_hash", logging.ID(block.PayloadHash)).
 		Uint64("qc_view", block.QC.View).
 		Hex("qc_block_id", logging.ID(block.QC.BlockID))
 

@@ -221,11 +221,14 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root header")
-	header := constructRootHeader(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
+	headerBody, err := constructRootHeaderBody(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to construct root header")
+	}
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing intermediary bootstrapping data")
-	epochSetup, epochCommit, err := constructRootEpochEvents(header.View, participants, assignments, clusterQCs, randomBeaconData, dkgIndexMap)
+	epochSetup, epochCommit, err := constructRootEpochEvents(headerBody.View, participants, assignments, clusterQCs, randomBeaconData, dkgIndexMap)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to construct root epoch events")
 	}
@@ -264,7 +267,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to construct root kvstore")
 	}
-	block := constructRootBlock(header, rootProtocolState.ID())
+	block := constructRootBlock(headerBody, rootProtocolState.ID())
 	err = common.WriteJSON(model.PathRootBlockData, flagOutdir, block)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")

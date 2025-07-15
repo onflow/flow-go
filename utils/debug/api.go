@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
+	rpcConvert "github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -26,14 +27,7 @@ func GetExecutionAPIBlockHeader(
 		return nil, err
 	}
 
-	return &flow.Header{
-		HeaderBody: flow.HeaderBody{
-			ChainID:   flow.ChainID(resp.Block.ChainId),
-			ParentID:  flow.Identifier(resp.Block.ParentId),
-			Height:    resp.Block.Height,
-			Timestamp: uint64(resp.Block.Timestamp.AsTime().UnixMilli()),
-		},
-	}, nil
+	return rpcConvert.MessageToBlockHeader(resp.Block)
 }
 
 func GetAccessAPIBlockHeader(
@@ -53,12 +47,5 @@ func GetAccessAPIBlockHeader(
 		return nil, err
 	}
 
-	return &flow.Header{
-		HeaderBody: flow.HeaderBody{
-			ChainID:   flow.ChainID(resp.Block.ChainId),
-			ParentID:  flow.Identifier(resp.Block.ParentId),
-			Height:    resp.Block.Height,
-			Timestamp: uint64(resp.Block.Timestamp.AsTime().UnixMilli()),
-		},
-	}, nil
+	return rpcConvert.MessageToBlockHeader(resp.Block)
 }

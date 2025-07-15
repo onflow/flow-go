@@ -174,7 +174,8 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 			}
 
 			// generate root cluster block
-			rootClusterBlock := cluster.CanonicalRootBlock(commit.Counter, model.ToIdentityList(signers).ToSkeleton())
+			rootClusterBlock, err := cluster.CanonicalRootBlock(commit.Counter, model.ToIdentityList(signers).ToSkeleton())
+			require.NoError(tc.T(), err)
 			// generate cluster root qc
 			qc, err := run.GenerateClusterRootQC(signers, model.ToIdentityList(signers).ToSkeleton(), rootClusterBlock)
 			require.NoError(t, err)

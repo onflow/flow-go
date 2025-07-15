@@ -5,21 +5,26 @@ import (
 	"time"
 )
 
+// Genesis creates genesis block.
+// This function must always return a structurally valid genesis block otherwise it will panic.
 func Genesis(chainID ChainID) *Block {
 	// create the raw content for the genesis block
 	payload := Payload{}
 
 	// create the headerBody
-	headerBody := HeaderBody{
+	headerBody, err := NewRootHeaderBody(UntrustedHeaderBody{
 		ChainID:   chainID,
 		ParentID:  ZeroID,
 		Height:    0,
 		Timestamp: uint64(GenesisTime.UnixMilli()),
 		View:      0,
+	})
+	if err != nil {
+		panic(fmt.Errorf("failed to create genesis header body: %w", err))
 	}
 
 	// combine to block
-	return NewBlock(headerBody, payload)
+	return NewBlock(*headerBody, payload)
 }
 
 // Block (currently) includes the all block header metadata and the payload content.
@@ -58,11 +63,28 @@ func (b Block) ID() Identifier {
 
 // ToHeader converts the block into a compact [flow.Header] representation,
 // where the payload is compressed to a hash reference.
+// The receiver Block must be well-formed (enforced by mutation protection on the type).
+// This function may panic if invoked on a malformed Block.
 func (b Block) ToHeader() *Header {
-	return &Header{
+	if !b.Header.ContainsParentQC() {
+		rootHeader, err := NewRootHeader(UntrustedHeader{
+			HeaderBody:  b.Header,
+			PayloadHash: b.Payload.Hash(),
+		})
+		if err != nil {
+			panic(fmt.Errorf("could not build root header from block: %w", err))
+		}
+		return rootHeader
+	}
+
+	header, err := NewHeader(UntrustedHeader{
 		HeaderBody:  b.Header,
 		PayloadHash: b.Payload.Hash(),
+	})
+	if err != nil {
+		panic(fmt.Errorf("could not build header from block: %w", err))
 	}
+	return header
 }
 
 // BlockStatus represents the status of a block.
