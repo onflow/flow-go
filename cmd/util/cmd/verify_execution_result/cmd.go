@@ -91,6 +91,7 @@ func run(*cobra.Command, []string) {
 		Str("from_to", flagFromTo).
 		Uint("worker_count", flagWorkerCount).
 		Bool("stop_on_mismatch", flagStopOnMismatch).
+		Bool("fees_disabled", flagTransactionFeesDisabled).
 		Logger()
 
 	if flagFromTo != "" {

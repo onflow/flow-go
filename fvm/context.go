@@ -1,6 +1,7 @@
 package fvm
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/rs/zerolog"
@@ -317,6 +318,7 @@ func WithTransactionBodyExecutionEnabled(enabled bool) Option {
 // WithTransactionFeesEnabled enables or disables deduction of transaction fees
 func WithTransactionFeesEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
+		fmt.Println("WithTransactionFeesEnabled", enabled)
 		ctx.TransactionFeesEnabled = enabled
 		return ctx
 	}

@@ -351,6 +351,7 @@ func makeVerifier(
 	vmTransactionExecutionEnabled bool,
 ) module.ChunkVerifier {
 
+	fmt.Println("Initializing FVM virtual machine... fee diabled	", transactionFeesDisabled)
 	vm := fvm.NewVirtualMachine()
 	fvmOptions := initialize.InitFvmOptions(
 		chainID,

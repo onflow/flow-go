@@ -1,6 +1,8 @@
 package environment
 
 import (
+	"fmt"
+
 	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
@@ -25,6 +27,7 @@ type TransactionInfoParams struct {
 func DefaultTransactionInfoParams() TransactionInfoParams {
 	// NOTE: TxIndex, TxId and TxBody are populated by NewTransactionEnv rather
 	// than by Context.
+	fmt.Println("reading default transaction info params")
 	return TransactionInfoParams{
 		TransactionFeesEnabled:         false,
 		LimitAccountStorage:            false,
