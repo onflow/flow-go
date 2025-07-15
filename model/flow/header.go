@@ -2,6 +2,7 @@ package flow
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
@@ -76,14 +77,30 @@ func (h Header) Body() interface{} {
 	}
 }
 
-// QuorumCertificate returns quorum certificate that is incorporated in the block header.
-func (h Header) QuorumCertificate() *QuorumCertificate {
-	return &QuorumCertificate{
+// ParentQC returns quorum certificate that is incorporated in the block header.
+// Callers *must* first verify that a parent QC is present (e.g. via ContainsParentQC)
+// before calling ParentQC. If no valid parent QC data exists (such as on a spork‐root
+// header), ParentQC will panic.
+func (h Header) ParentQC() *QuorumCertificate {
+	qc, err := NewQuorumCertificate(UntrustedQuorumCertificate{
 		BlockID:       h.ParentID,
 		View:          h.ParentView,
 		SignerIndices: h.ParentVoterIndices,
 		SigData:       h.ParentVoterSigData,
+	})
+	if err != nil {
+		panic(fmt.Errorf("could not build parent quorum certificate: %w", err))
 	}
+
+	return qc
+}
+
+// ContainsParentQC reports whether this header carries a valid parent QC.
+// It returns true only if all of the fields required to build a QC are non-zero/nil,
+// indicating that ParentQC() can be safely called without panicking.
+// Only spork root blocks or network genesis blocks do not contain a parent QC.
+func (h Header) ContainsParentQC() bool {
+	return h.ParentID != ZeroID && h.ParentVoterIndices != nil && h.ParentVoterSigData != nil && h.ProposerID != ZeroID
 }
 
 func (h Header) Fingerprint() []byte {

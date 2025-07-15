@@ -1,9 +1,7 @@
-package indexer
+package persisters
 
 import (
 	"testing"
-
-	"github.com/onflow/flow-go/storage"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -11,6 +9,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/persisters/stores"
+	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -18,22 +18,23 @@ import (
 
 type PersisterSuite struct {
 	suite.Suite
-	persister              *BlockPersister
-	inMemoryRegisters      *unsynchronized.Registers
-	inMemoryEvents         *unsynchronized.Events
-	inMemoryCollections    *unsynchronized.Collections
-	inMemoryTransactions   *unsynchronized.Transactions
-	inMemoryResults        *unsynchronized.LightTransactionResults
-	inMemoryTxResultErrMsg *unsynchronized.TransactionResultErrorMessages
-	registers              *storagemock.RegisterIndex
-	events                 *storagemock.Events
-	collections            *storagemock.Collections
-	transactions           *storagemock.Transactions
-	results                *storagemock.LightTransactionResults
-	txResultErrMsg         *storagemock.TransactionResultErrorMessages
-	database               *storagemock.DB
-	executionResult        *flow.ExecutionResult
-	header                 *flow.Header
+	persister                   *BlockPersister
+	inMemoryRegisters           *unsynchronized.Registers
+	inMemoryEvents              *unsynchronized.Events
+	inMemoryCollections         *unsynchronized.Collections
+	inMemoryTransactions        *unsynchronized.Transactions
+	inMemoryResults             *unsynchronized.LightTransactionResults
+	inMemoryTxResultErrMsg      *unsynchronized.TransactionResultErrorMessages
+	registers                   *storagemock.RegisterIndex
+	events                      *storagemock.Events
+	collections                 *storagemock.Collections
+	transactions                *storagemock.Transactions
+	results                     *storagemock.LightTransactionResults
+	txResultErrMsg              *storagemock.TransactionResultErrorMessages
+	latestPersistedSealedResult *storagemock.LatestPersistedSealedResult
+	database                    *storagemock.DB
+	executionResult             *flow.ExecutionResult
+	header                      *flow.Header
 }
 
 func TestPersisterSuite(t *testing.T) {
@@ -61,6 +62,7 @@ func (p *PersisterSuite) SetupTest() {
 	p.transactions = storagemock.NewTransactions(t)
 	p.results = storagemock.NewLightTransactionResults(t)
 	p.txResultErrMsg = storagemock.NewTransactionResultErrorMessages(t)
+	p.latestPersistedSealedResult = storagemock.NewLatestPersistedSealedResult(t)
 
 	p.database = storagemock.NewDB(t)
 	p.database.On("WithReaderBatchWriter", mock.Anything).Return(
@@ -69,23 +71,19 @@ func (p *PersisterSuite) SetupTest() {
 		},
 	)
 
-	p.persister = NewPersister(
+	p.persister = NewBlockPersister(
 		zerolog.Nop(),
-		p.inMemoryRegisters,
-		p.inMemoryEvents,
-		p.inMemoryCollections,
-		p.inMemoryTransactions,
-		p.inMemoryResults,
-		p.inMemoryTxResultErrMsg,
-		p.registers,
-		p.events,
-		p.collections,
-		p.transactions,
-		p.results,
-		p.txResultErrMsg,
 		p.database,
 		p.executionResult,
 		p.header,
+		[]stores.PersisterStore{
+			stores.NewEventsStore(p.inMemoryEvents, p.events, p.executionResult.BlockID),
+			stores.NewResultsStore(p.inMemoryResults, p.results, p.executionResult.BlockID),
+			stores.NewCollectionsStore(p.inMemoryCollections, p.collections),
+			stores.NewTransactionsStore(p.inMemoryTransactions, p.transactions),
+			stores.NewTxResultErrMsgStore(p.inMemoryTxResultErrMsg, p.txResultErrMsg, p.executionResult.BlockID),
+			stores.NewLatestSealedResultStore(p.latestPersistedSealedResult, p.executionResult.ID(), p.header.Height),
+		},
 	)
 }
 
@@ -143,18 +141,10 @@ func (p *PersisterSuite) TestPersister_PersistWithEmptyData() {
 	err = p.inMemoryTxResultErrMsg.Store(p.executionResult.BlockID, []flow.TransactionResultErrorMessage{})
 	p.Require().NoError(err)
 
-	storedRegisters := make([]flow.RegisterEntry, 0)
-	p.registers.On("Store", mock.Anything, p.header.Height).Run(func(args mock.Arguments) {
-		sr, ok := args.Get(0).(flow.RegisterEntries)
-		p.Require().True(ok)
-		storedRegisters = sr
-	}).Return(nil).Once()
+	p.latestPersistedSealedResult.On("BatchSet", p.executionResult.ID(), p.header.Height, mock.Anything).Return(nil).Once()
 
 	err = p.persister.Persist()
 	p.Require().NoError(err)
-
-	// Verify registers were stored (even if empty)
-	p.Assert().Empty(storedRegisters)
 
 	// Verify other storages were not called since the data is empty
 	p.events.AssertNotCalled(t, "BatchStore")
@@ -167,18 +157,11 @@ func (p *PersisterSuite) TestPersister_PersistWithEmptyData() {
 func (p *PersisterSuite) TestPersister_PersistWithData() {
 	p.populateInMemoryStorages()
 
-	storedRegisters := make([]flow.RegisterEntry, 0)
 	storedEvents := make([]flow.EventsList, 0)
 	storedCollections := make([]flow.LightCollection, 0)
 	storedTransactions := make([]flow.TransactionBody, 0)
 	storedResults := make([]flow.LightTransactionResult, 0)
 	storedTxResultErrMsgs := make([]flow.TransactionResultErrorMessage, 0)
-
-	p.registers.On("Store", mock.Anything, p.header.Height).Run(func(args mock.Arguments) {
-		sr, ok := args.Get(0).(flow.RegisterEntries)
-		p.Require().True(ok)
-		storedRegisters = sr
-	}).Return(nil)
 
 	p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		se, ok := args.Get(1).([]flow.EventsList)
@@ -210,17 +193,14 @@ func (p *PersisterSuite) TestPersister_PersistWithData() {
 		storedTxResultErrMsgs = terrm
 	}).Return(nil)
 
+	p.latestPersistedSealedResult.On("BatchSet", p.executionResult.ID(), p.header.Height, mock.Anything).Return(nil).Once()
+
 	err := p.persister.Persist()
 	p.Require().NoError(err)
 
-	// Verify all mocks were called as expected
+	// Verify expected data was stored
 	p.Assert().ElementsMatch([]flow.EventsList{p.inMemoryEvents.Data()}, storedEvents)
 	p.Assert().ElementsMatch(p.inMemoryResults.Data(), storedResults)
-
-	registers, err := p.inMemoryRegisters.Data(p.header.Height)
-	p.Require().NoError(err)
-	p.Assert().ElementsMatch(registers, storedRegisters)
-
 	p.Assert().ElementsMatch(p.inMemoryCollections.LightCollections(), storedCollections)
 	p.Assert().ElementsMatch(p.inMemoryTransactions.Data(), storedTransactions)
 	p.Assert().ElementsMatch(p.inMemoryTxResultErrMsg.Data(), storedTxResultErrMsgs)
@@ -233,16 +213,8 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 		expectedError string
 	}{
 		{
-			name: "RegistersStoreError",
-			setupMocks: func() {
-				p.registers.On("Store", mock.Anything, p.header.Height).Return(assert.AnError).Once()
-			},
-			expectedError: "could not persist registers",
-		},
-		{
 			name: "EventsBatchStoreError",
 			setupMocks: func() {
-				p.registers.On("Store", mock.Anything, p.header.Height).Return(nil).Once()
 				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(assert.AnError).Once()
 			},
 			expectedError: "could not add events to batch",
@@ -250,7 +222,6 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 		{
 			name: "ResultsBatchStoreError",
 			setupMocks: func() {
-				p.registers.On("Store", mock.Anything, p.header.Height).Return(nil).Once()
 				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
 				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(assert.AnError).Once()
 			},
@@ -259,17 +230,15 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 		{
 			name: "CollectionsStoreError",
 			setupMocks: func() {
-				p.registers.On("Store", mock.Anything, p.header.Height).Return(nil).Once()
 				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
 				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
 				p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(assert.AnError).Once()
 			},
-			expectedError: "could not add collections to batch",
+			expectedError: "could not add light collections to batch",
 		},
 		{
 			name: "TransactionsStoreError",
 			setupMocks: func() {
-				p.registers.On("Store", mock.Anything, p.header.Height).Return(nil).Once()
 				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
 				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
 				numberOfCollections := len(p.inMemoryCollections.LightCollections())
@@ -281,7 +250,6 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 		{
 			name: "TxResultErrMsgStoreError",
 			setupMocks: func() {
-				p.registers.On("Store", mock.Anything, p.header.Height).Return(nil).Once()
 				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
 				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
 				numberOfCollections := len(p.inMemoryCollections.LightCollections())
@@ -291,6 +259,20 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 				p.txResultErrMsg.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(assert.AnError).Once()
 			},
 			expectedError: "could not add transaction result error messages to batch",
+		},
+		{
+			name: "LatestPersistedSealedResultStoreError",
+			setupMocks: func() {
+				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
+				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
+				numberOfCollections := len(p.inMemoryCollections.LightCollections())
+				p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil).Times(numberOfCollections)
+				numberOfTransactions := len(p.inMemoryTransactions.Data())
+				p.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil).Times(numberOfTransactions)
+				p.txResultErrMsg.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
+				p.latestPersistedSealedResult.On("BatchSet", p.executionResult.ID(), p.header.Height, mock.Anything).Return(assert.AnError).Once()
+			},
+			expectedError: "could not persist latest sealed result",
 		},
 	}
 
