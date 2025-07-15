@@ -990,10 +990,10 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			txBody = transferTokensTx(chain).
 				AddAuthorizer(chain.ServiceAddress()).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(tc.fundWith))).
-				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(address)))
-
-			txBody.SetProposalKey(chain.ServiceAddress(), 0, 1)
-			txBody.SetPayer(chain.ServiceAddress())
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(address))).
+				SetProposalKey(chain.ServiceAddress(), 0, 1).
+				SetPayer(chain.ServiceAddress()).
+				Build()
 
 			err = testutil.SignEnvelope(
 				txBody,
@@ -1018,10 +1018,10 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			txBody = transferTokensTx(chain).
 				AddAuthorizer(address).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(tc.tryToTransfer))).
-				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
-
-			txBody.SetProposalKey(address, 0, 0)
-			txBody.SetPayer(address)
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress()))).
+				SetProposalKey(address, 0, 0).
+				SetPayer(address).
+				Build()
 
 			if tc.gasLimit == 0 {
 				txBody.SetComputeLimit(fvm.DefaultComputationLimit)
@@ -1841,7 +1841,8 @@ func TestStorageCapacity(t *testing.T) {
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_000_000))).
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(signer))).
 				SetProposalKey(service, 0, 0).
-				SetPayer(service)
+				SetPayer(service).
+				Build()
 
 			executionSnapshot, output, err := vm.Run(
 				ctx,
@@ -1857,7 +1858,8 @@ func TestStorageCapacity(t *testing.T) {
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_000_000))).
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(target))).
 				SetProposalKey(service, 0, 0).
-				SetPayer(service)
+				SetPayer(service).
+				Build()
 
 			executionSnapshot, output, err = vm.Run(
 				ctx,
@@ -2386,10 +2388,10 @@ func TestInteractionLimit(t *testing.T) {
 			txBody = transferTokensTx(chain).
 				AddAuthorizer(chain.ServiceAddress()).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_000_000))).
-				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(address)))
-
-			txBody.SetProposalKey(chain.ServiceAddress(), 0, 1)
-			txBody.SetPayer(chain.ServiceAddress())
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(address))).
+				SetProposalKey(chain.ServiceAddress(), 0, 1).
+				SetPayer(chain.ServiceAddress()).
+				Build()
 
 			err = testutil.SignEnvelope(
 				txBody,
@@ -2420,10 +2422,10 @@ func TestInteractionLimit(t *testing.T) {
 				txBody := transferTokensTx(chain).
 					AddAuthorizer(address).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1))).
-					AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
-
-				txBody.SetProposalKey(address, 0, 0)
-				txBody.SetPayer(address)
+					AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress()))).
+					SetProposalKey(address, 0, 0).
+					SetPayer(address).
+					Build()
 
 				hasher, err := exeUtils.NewHasher(privateKey.HashAlgo)
 				require.NoError(t, err)

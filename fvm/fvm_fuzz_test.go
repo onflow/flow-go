@@ -98,10 +98,9 @@ var fuzzTransactionTypes = []transactionType{
 			txBody := transferTokensTx(tctx.chain).
 				AddAuthorizer(tctx.address).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(0))). // 0 value transferred
-				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(tctx.chain.ServiceAddress())))
-
-			txBody.SetProposalKey(tctx.address, 0, 0)
-			txBody.SetPayer(tctx.address)
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(tctx.chain.ServiceAddress()))).
+				SetProposalKey(tctx.address, 0, 0).
+				SetPayer(tctx.address).Build()
 			return txBody
 		},
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
@@ -135,12 +134,11 @@ var fuzzTransactionTypes = []transactionType{
 		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
 			txBody := transferTokensTx(tctx.chain).
 				AddAuthorizer(tctx.address).
-				AddArgument(jsoncdc.MustEncode(cadence.UFix64(2 * tctx.addressFunds))). // too much value transferred
-				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(tctx.chain.ServiceAddress())))
-
-			txBody.SetProposalKey(tctx.address, 0, 0)
-			txBody.SetPayer(tctx.address)
-			return txBody
+				AddArgument(jsoncdc.MustEncode(cadence.UFix64(2*tctx.addressFunds))). // too much value transferred
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(tctx.chain.ServiceAddress()))).
+				SetProposalKey(tctx.address, 0, 0).
+				SetPayer(tctx.address)
+			return txBody.Build()
 		},
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			require.Error(t, results.output.Err)
@@ -317,10 +315,10 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		txBody = transferTokensTx(chain).
 			AddAuthorizer(chain.ServiceAddress()).
 			AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_000_000_000))). // 10 FLOW
-			AddArgument(jsoncdc.MustEncode(cadence.NewAddress(address)))
-
-		txBody.SetProposalKey(chain.ServiceAddress(), 0, 1)
-		txBody.SetPayer(chain.ServiceAddress())
+			AddArgument(jsoncdc.MustEncode(cadence.NewAddress(address))).
+			SetProposalKey(chain.ServiceAddress(), 0, 1).
+			SetPayer(chain.ServiceAddress()).
+			Build()
 
 		err = testutil.SignEnvelope(
 			txBody,

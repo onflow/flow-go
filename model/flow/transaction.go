@@ -137,12 +137,6 @@ func (tb TransactionBody) ID() Identifier {
 	return MakeID(tb)
 }
 
-// AddArgument adds an argument to the Cadence arguments list for this transaction.
-func (tb *TransactionBody) AddArgument(arg []byte) *TransactionBody {
-	tb.Arguments = append(tb.Arguments, arg) //nolint:structwrite
-	return tb
-}
-
 // SetReferenceBlockID sets the reference block ID for this transaction.
 func (tb *TransactionBody) SetReferenceBlockID(blockID Identifier) *TransactionBody {
 	tb.ReferenceBlockID = blockID //nolint:structwrite
