@@ -134,7 +134,10 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 	}
 	testCollectionID := flow.HashToID([]byte{0xA, 0xB, 0xC})
 	testBlock := flow.NewBlock(
-		flow.HeaderBody{},
+		flow.HeaderBody{
+			ChainID:   flow.Emulator,
+			Timestamp: time.Now(),
+		},
 		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{
 				{
@@ -244,7 +247,10 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 // AsyncUploader instance and proper mock storage and EDS interfaces.
 func createTestBadgerRetryableUploaderWrapper(asyncUploader *AsyncUploader) *BadgerRetryableUploaderWrapper {
 	mockBlocksStorage := new(storageMock.Blocks)
-	mockBlocksStorage.On("ByID", mock.Anything).Return(flow.NewBlock(flow.HeaderBody{}, flow.Payload{}), nil)
+	mockBlocksStorage.On("ByID", mock.Anything).Return(flow.NewBlock(flow.HeaderBody{
+		ChainID:   flow.Emulator,
+		Timestamp: time.Now(),
+	}, flow.Payload{}), nil)
 
 	mockCommitsStorage := new(storageMock.Commits)
 	mockCommitsStorage.On("ByBlockID", mock.Anything).Return(nil, nil)

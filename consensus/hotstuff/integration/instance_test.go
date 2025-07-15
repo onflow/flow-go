@@ -190,7 +190,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything, mock.Anything).Return(
-		func(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) ([]byte, error)) *flow.ProposalHeader {
+		func(parentID flow.Identifier, setter func(builder *flow.HeaderBodyBuilder) error, sign func(*flow.Header) ([]byte, error)) *flow.ProposalHeader {
 			in.updatingBlocks.Lock()
 			defer in.updatingBlocks.Unlock()
 
@@ -198,17 +198,20 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			if !ok {
 				return nil
 			}
-			header := &flow.Header{
-				HeaderBody: flow.HeaderBody{
-					ChainID:    "chain",
-					ParentID:   parentID,
-					ParentView: parent.View,
-					Height:     parent.Height + 1,
-					Timestamp:  time.Now().UTC(),
-				},
+			headerBuilder := flow.NewHeaderBodyBuilder().
+				WithChainID("chain").
+				WithParentID(parentID).
+				WithParentView(parent.View).
+				WithHeight(parent.Height + 1).
+				WithTimestamp(time.Now().UTC())
+			require.NoError(t, setter(headerBuilder))
+			headerBody, err := headerBuilder.Build()
+			require.NoError(t, err)
+			header, err := flow.NewHeader(flow.UntrustedHeader{
+				HeaderBody:  *headerBody,
 				PayloadHash: unittest.IdentifierFixture(),
-			}
-			require.NoError(t, setter(header))
+			})
+			require.NoError(t, err)
 			sig, err := sign(header)
 			require.NoError(t, err)
 			proposal := &flow.ProposalHeader{
@@ -218,7 +221,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			in.headers[header.ID()] = header
 			return proposal
 		},
-		func(parentID flow.Identifier, _ func(*flow.Header) error, _ func(*flow.Header) ([]byte, error)) error {
+		func(parentID flow.Identifier, _ func(*flow.HeaderBodyBuilder) error, _ func(*flow.Header) ([]byte, error)) error {
 			in.updatingBlocks.RLock()
 			_, ok := in.headers[parentID]
 			in.updatingBlocks.RUnlock()
@@ -273,7 +276,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				View:          votes[0].View,
 				BlockID:       votes[0].BlockID,
 				SignerIndices: signerIndices,
-				SigData:       nil,
+				SigData:       unittest.RandomBytes(msig.SigLen),
 			}
 			return qc
 		},
@@ -373,7 +376,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		View:          rootBlock.View,
 		BlockID:       rootBlock.BlockID,
 		SignerIndices: signerIndices,
-		SigData:       unittest.SignatureFixture(),
+		SigData:       unittest.RandomBytes(msig.SigLen),
 	}
 	certifiedRootBlock, err := model.NewCertifiedBlock(rootBlock, rootQC)
 	require.NoError(t, err)

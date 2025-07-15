@@ -431,8 +431,7 @@ func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Bl
 }
 
 func GenesisFixture() *flow.Block {
-	genesis := flow.Genesis(flow.Emulator)
-	return genesis
+	return flow.Genesis(flow.Emulator)
 }
 
 func WithHeaderHeight(height uint64) func(header *flow.Header) {

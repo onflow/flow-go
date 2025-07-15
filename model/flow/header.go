@@ -30,6 +30,8 @@ type ProposalHeader struct {
 //     of a block.
 //   - With a byzantine HeaderBody alone, an honest node cannot prove who created that faulty data structure,
 //     because HeaderBody does not include the proposer's signature.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type HeaderBody struct {
 	// ChainID is a chain-specific value to prevent replay attacks.
 	ChainID ChainID
@@ -58,6 +60,101 @@ type HeaderBody struct {
 	LastViewTC *TimeoutCertificate
 }
 
+// UntrustedHeaderBody is an untrusted input-only representation of a HeaderBody,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedHeaderBody should be validated and converted into
+// a trusted HeaderBody using NewHeaderBody constructor.
+type UntrustedHeaderBody HeaderBody
+
+// NewHeaderBody creates a new instance of HeaderBody.
+// Construction of HeaderBody is allowed only within the constructor
+//
+// All errors indicate a valid HeaderBody cannot be constructed from the input.
+func NewHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
+	if untrusted.ChainID == "" {
+		return nil, fmt.Errorf("ChainID must not be empty")
+	}
+
+	// Require each of the four parent-QC fields explicitly, so we get
+	// precise errors instead of a generic “missing parent QC.”
+	if untrusted.ParentID == ZeroID {
+		return nil, fmt.Errorf("ParentID must not be empty")
+	}
+	if len(untrusted.ParentVoterIndices) == 0 {
+		return nil, fmt.Errorf("ParentVoterIndices must not be empty")
+	}
+	if len(untrusted.ParentVoterSigData) == 0 {
+		return nil, fmt.Errorf("ParentVoterSigData must not be empty")
+	}
+	if untrusted.ProposerID == ZeroID {
+		return nil, fmt.Errorf("ProposerID must not be empty")
+	}
+
+	// Now enforce non-root semantics:
+	if untrusted.Height == 0 {
+		return nil, fmt.Errorf("Height must be > 0 for non-root header")
+	}
+	if untrusted.View == 0 {
+		return nil, fmt.Errorf("View must be > 0 for non-root header")
+	}
+	if untrusted.ParentView >= untrusted.View {
+		return nil, fmt.Errorf(
+			"ParentView (%d) must be less than View (%d)",
+			untrusted.ParentView, untrusted.View,
+		)
+	}
+	if untrusted.Timestamp.IsZero() {
+		return nil, fmt.Errorf("Timestamp must not be zero-value")
+	}
+
+	hb := HeaderBody(untrusted)
+	return &hb, nil
+}
+
+// NewRootHeaderBody creates a new instance of root HeaderBody.
+// This constructor must be used **only** for constructing the root header body,
+// which is the only case where zero values are allowed.
+func NewRootHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
+	if untrusted.ChainID == "" {
+		return nil, fmt.Errorf("ChainID of root header body must not be empty")
+	}
+
+	if len(untrusted.ParentVoterIndices) != 0 {
+		return nil, fmt.Errorf("root header body must not set ParentVoterIndices")
+	}
+	if len(untrusted.ParentVoterSigData) != 0 {
+		return nil, fmt.Errorf("root header body must not set ParentVoterSigData")
+	}
+	if untrusted.ProposerID != ZeroID {
+		return nil, fmt.Errorf("root header body must not set ProposerID")
+	}
+	if untrusted.ParentView != 0 {
+		return nil, fmt.Errorf("ParentView of root header body must be zero")
+	}
+	if untrusted.Timestamp.IsZero() {
+		return nil, fmt.Errorf("Timestamp of root header body must not be zero")
+	}
+
+	hb := HeaderBody(untrusted)
+	return &hb, nil
+}
+
+// ContainsParentQC reports whether this header carries a valid parent QC.
+// It returns true only if all of the fields required to build a QC are non-zero/nil,
+// indicating that ParentQC() can be safely called without panicking.
+// Only spork root blocks or network genesis blocks do not contain a parent QC.
+func (h HeaderBody) ContainsParentQC() bool {
+	return h.ParentID != ZeroID &&
+		h.ParentVoterIndices != nil &&
+		h.ParentVoterSigData != nil &&
+		h.ProposerID != ZeroID
+}
+
 // Header contains all meta-data for a block, as well as a hash of the block payload.
 // Headers are used when the metadata about a block is needed, but the payload is not.
 // Because [Header] includes the payload hash for the block, and the block ID is Merkle-ized
@@ -65,10 +162,63 @@ type HeaderBody struct {
 // CAUTION regarding security:
 //   - With a byzantine HeaderBody alone, an honest node cannot prove who created that faulty data structure,
 //     because HeaderBody does not include the proposer's signature.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Header struct {
 	HeaderBody
 	// PayloadHash is a hash of the payload of this block.
 	PayloadHash Identifier
+}
+
+// UntrustedHeader is an untrusted input-only representation of a Header,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedHeader should be validated and converted into
+// a trusted Header using NewHeader constructor.
+type UntrustedHeader Header
+
+// NewHeader creates a new instance of Header.
+// Construction of Header is allowed only within the constructor
+//
+// All errors indicate a valid Header cannot be constructed from the input.
+func NewHeader(untrusted UntrustedHeader) (*Header, error) {
+	headerBody, err := NewHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))
+	if err != nil {
+		return nil, fmt.Errorf("invalid header body: %w", err)
+	}
+
+	if untrusted.PayloadHash == ZeroID {
+		return nil, fmt.Errorf("PayloadHash must not be empty")
+	}
+
+	return &Header{
+		HeaderBody:  *headerBody,
+		PayloadHash: untrusted.PayloadHash,
+	}, nil
+}
+
+// NewRootHeader creates a root header.
+//
+// This constructor must be used **only** for constructing the root header,
+// which is the only case where zero values are allowed.
+func NewRootHeader(untrusted UntrustedHeader) (*Header, error) {
+	rootHeaderBody, err := NewRootHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))
+	if err != nil {
+		return nil, fmt.Errorf("invalid root header body: %w", err)
+	}
+
+	if untrusted.PayloadHash == ZeroID {
+		return nil, fmt.Errorf("PayloadHash must not be empty")
+	}
+
+	return &Header{
+		HeaderBody:  *rootHeaderBody,
+		PayloadHash: untrusted.PayloadHash,
+	}, nil
 }
 
 // Fingerprint defines custom encoding for the header to calculate its ID.
@@ -120,14 +270,6 @@ func (h HeaderBody) ParentQC() *QuorumCertificate {
 	return qc
 }
 
-// ContainsParentQC reports whether this header carries a valid parent QC.
-// It returns true only if all of the fields required to build a QC are non-zero/nil,
-// indicating that ParentQC() can be safely called without panicking.
-// Only spork root blocks or network genesis blocks do not contain a parent QC.
-func (h HeaderBody) ContainsParentQC() bool {
-	return h.ParentID != ZeroID && h.ParentVoterIndices != nil && h.ParentVoterSigData != nil && h.ProposerID != ZeroID
-}
-
 // ID returns a unique ID to singularly identify the header and its block
 // within the flow system.
 func (h Header) ID() Identifier {
@@ -135,6 +277,8 @@ func (h Header) ID() Identifier {
 }
 
 // MarshalJSON makes sure the timestamp is encoded in UTC.
+//
+//nolint:structwrite
 func (h Header) MarshalJSON() ([]byte, error) {
 
 	// NOTE: this is just a sanity check to make sure that we don't get
@@ -156,6 +300,8 @@ func (h Header) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON makes sure the timestamp is decoded in UTC.
+//
+//nolint:structwrite
 func (h *Header) UnmarshalJSON(data []byte) error {
 
 	// we use an alias to avoid endless recursion; the alias will not have the
@@ -174,6 +320,8 @@ func (h *Header) UnmarshalJSON(data []byte) error {
 }
 
 // MarshalCBOR makes sure the timestamp is encoded in UTC.
+//
+//nolint:structwrite
 func (h Header) MarshalCBOR() ([]byte, error) {
 
 	// NOTE: this is just a sanity check to make sure that we don't get
@@ -189,6 +337,8 @@ func (h Header) MarshalCBOR() ([]byte, error) {
 }
 
 // UnmarshalCBOR makes sure the timestamp is decoded in UTC.
+//
+//nolint:structwrite
 func (h *Header) UnmarshalCBOR(data []byte) error {
 
 	// we use an alias to avoid endless recursion; the alias will not have the
@@ -211,6 +361,8 @@ func (h *Header) UnmarshalCBOR(data []byte) error {
 }
 
 // MarshalMsgpack makes sure the timestamp is encoded in UTC.
+//
+//nolint:structwrite
 func (h Header) MarshalMsgpack() ([]byte, error) {
 
 	// NOTE: this is just a sanity check to make sure that we don't get
@@ -226,6 +378,8 @@ func (h Header) MarshalMsgpack() ([]byte, error) {
 }
 
 // UnmarshalMsgpack makes sure the timestamp is decoded in UTC.
+//
+//nolint:structwrite
 func (h *Header) UnmarshalMsgpack(data []byte) error {
 
 	// we use an alias to avoid endless recursion; the alias will not have the

@@ -32,6 +32,7 @@ func TestCombinedSignWithBeaconKeyV3(t *testing.T) {
 	proposerView := uint64(20)
 
 	fblock := unittest.BlockFixture(
+		unittest.Block.WithParentView(proposerView-1),
 		unittest.Block.WithView(proposerView),
 	)
 	block := model.BlockFromFlow(fblock.ToHeader())
@@ -92,6 +93,7 @@ func TestCombinedSignWithNoBeaconKeyV3(t *testing.T) {
 	proposerView := uint64(20)
 
 	fblock := unittest.BlockFixture(
+		unittest.Block.WithParentView(proposerView-1),
 		unittest.Block.WithView(proposerView),
 	)
 	block := model.BlockFromFlow(fblock.ToHeader())

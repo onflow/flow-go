@@ -45,13 +45,8 @@ func TestNewAccountStatusesDataProvider(t *testing.T) {
 func (s *AccountStatusesProviderSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.api = ssmock.NewAPI(s.T())
-
 	s.chain = flow.Testnet.Chain()
-
-	s.rootBlock = unittest.BlockFixture(
-		unittest.Block.WithHeight(0),
-	)
-
+	s.rootBlock = flow.Genesis(s.chain.ChainID())
 	s.factory = NewDataProviderFactory(
 		s.log,
 		s.api,

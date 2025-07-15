@@ -336,7 +336,8 @@ func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 	// create a proposal which is far enough ahead to be dropped
 	originID := cs.participants[1].NodeID
 	block := unittest.BlockFixture(
-		unittest.Block.WithView(cs.head.View + compliance.DefaultConfig().SkipNewProposalsThreshold + 1),
+		unittest.Block.WithView(cs.head.View+compliance.DefaultConfig().SkipNewProposalsThreshold+1),
+		unittest.Block.WithParentView(cs.head.View+compliance.DefaultConfig().SkipNewProposalsThreshold),
 	)
 	proposal := unittest.ProposalFromBlock(block)
 

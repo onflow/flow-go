@@ -82,8 +82,8 @@ func TestOrderedSeals(t *testing.T) {
 	})
 	t.Run("unordered", func(t *testing.T) {
 		headers := storagemock.NewHeaders(t)
-
-		blocks := unittest.ChainFixtureFrom(10, flow.Genesis(flow.Localnet).ToHeader())
+		genesisBlock := flow.Genesis(flow.Localnet)
+		blocks := unittest.ChainFixtureFrom(10, genesisBlock.ToHeader())
 		orderedSeals := unittest.Seal.Fixtures(len(blocks))
 		for i, seal := range orderedSeals {
 			seal.BlockID = blocks[i].ID()

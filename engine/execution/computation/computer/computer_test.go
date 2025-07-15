@@ -1622,6 +1622,7 @@ func generateBlockWithVisitor(
 
 	block := flow.NewBlock(
 		flow.HeaderBody{
+			ChainID:   flow.Emulator,
 			Timestamp: flow.GenesisTime,
 			Height:    42,
 			View:      42,
