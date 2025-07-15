@@ -26,7 +26,7 @@ type CheckFunc func(key []byte) (bool, error)
 
 // CreateFunc returns a pointer to an initialized entity that we can potentially
 // decode the next value into during a badger DB iteration.
-type CreateFunc func() interface{}
+type CreateFunc func() any
 
 // HandleFunc is a function that starts the processing of the current key-value
 // pair during a badger iteration. It should be called after the key was checked
@@ -158,7 +158,7 @@ func KeyExists(r storage.Reader, key []byte) (exist bool, errToReturn error) {
 //   - storage.ErrNotFound if the key does not exist in the database
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value
-func RetrieveByKey(r storage.Reader, key []byte, entity interface{}) (errToReturn error) {
+func RetrieveByKey(r storage.Reader, key []byte, entity any) (errToReturn error) {
 	val, closer, err := r.Get(key)
 	if err != nil {
 		return err
@@ -179,7 +179,7 @@ func RetrieveByKey(r storage.Reader, key []byte, entity interface{}) (errToRetur
 // keys with the format prefix` + `height` (where "+" denotes concatenation of binary strings). The height
 // is encoded as Big-Endian (entries with numerically smaller height have lexicographically smaller key).
 // The function finds the *highest* key with the given prefix and height equal to or below the given height.
-func FindHighestAtOrBelowByPrefix(r storage.Reader, prefix []byte, height uint64, entity interface{}) (errToReturn error) {
+func FindHighestAtOrBelowByPrefix(r storage.Reader, prefix []byte, height uint64, entity any) (errToReturn error) {
 	if len(prefix) == 0 {
 		return fmt.Errorf("prefix must not be empty")
 	}
