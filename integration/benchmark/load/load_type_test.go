@@ -187,7 +187,7 @@ type testTransactionSender struct {
 var _ common.TransactionSender = (*testTransactionSender)(nil)
 
 func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult, error) {
-	txBody :=
+	txBodyBuilder :=
 		flow.NewTransactionBodyBuilder().
 			SetScript(tx.Script).
 			SetReferenceBlockID(convert.IDFromSDK(tx.ReferenceBlockID)).
@@ -197,29 +197,30 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 				tx.ProposalKey.KeyIndex,
 				tx.ProposalKey.SequenceNumber,
 			).
-			SetPayer(flow.BytesToAddress(tx.Payer.Bytes())).
-			Build()
+			SetPayer(flow.BytesToAddress(tx.Payer.Bytes()))
 
 	for _, auth := range tx.Authorizers {
-		txBody.AddAuthorizer(flow.BytesToAddress(auth.Bytes()))
+		txBodyBuilder.AddAuthorizer(flow.BytesToAddress(auth.Bytes()))
 	}
 	for _, arg := range tx.Arguments {
-		txBody.AddArgument(arg)
+		txBodyBuilder.AddArgument(arg)
 	}
 	for _, sig := range tx.PayloadSignatures {
-		txBody.AddPayloadSignature(
+		txBodyBuilder.AddPayloadSignature(
 			flow.BytesToAddress(sig.Address.Bytes()),
 			sig.KeyIndex,
 			sig.Signature,
 		)
 	}
 	for _, sig := range tx.EnvelopeSignatures {
-		txBody.AddEnvelopeSignature(
+		txBodyBuilder.AddEnvelopeSignature(
 			flow.BytesToAddress(sig.Address.Bytes()),
 			sig.KeyIndex,
 			sig.Signature,
 		)
 	}
+
+	txBody := txBodyBuilder.Build()
 
 	require.Equal(t.t, string(tx.PayloadMessage()), string(txBody.PayloadMessage()))
 	require.Equal(t.t, string(tx.EnvelopeMessage()), string(txBody.EnvelopeMessage()))

@@ -103,7 +103,7 @@ func (account *TestBenchAccount) DeployContract(b *testing.B, blockExec TestBenc
 
 func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestBenchBlockExecutor, list []string) {
 	serviceAccount := blockExec.ServiceAccount(b)
-	txBody := flow.NewTransactionBodyBuilder().
+	txBodyBuilder := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(`
 		transaction(list: [String]) {
 		  prepare(acct: auth(Storage) &Account) {
@@ -113,8 +113,7 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 		  execute {}
 		}
 		`)).
-		AddAuthorizer(account.Address).
-		Build()
+		AddAuthorizer(account.Address)
 
 	cadenceArrayValues := make([]cadence.Value, len(list))
 	for i, item := range list {
@@ -122,11 +121,12 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 	}
 	cadenceArray, err := jsoncdc.Encode(cadence.NewArray(cadenceArrayValues))
 	require.NoError(b, err)
-	txBody.AddArgument(cadenceArray)
+	txBodyBuilder.AddArgument(cadenceArray)
 
-	txBody.SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber())
-	txBody.SetPayer(serviceAccount.Address)
+	txBodyBuilder.SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber())
+	txBodyBuilder.SetPayer(serviceAccount.Address)
 
+	txBody := txBodyBuilder.Build()
 	if account.Address != serviceAccount.Address {
 		err = testutil.SignPayload(txBody, account.Address, account.PrivateKey)
 		require.NoError(b, err)
@@ -984,13 +984,14 @@ func mintNFTs(b *testing.B, be TestBenchBlockExecutor, batchNFTAccount *TestBenc
 func fundAccounts(b *testing.B, be TestBenchBlockExecutor, value cadence.UFix64, accounts ...flow.Address) {
 	serviceAccount := be.ServiceAccount(b)
 	for _, a := range accounts {
-		txBody := transferTokensTx(be.Chain(b))
-		txBody.SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber())
-		txBody.AddArgument(jsoncdc.MustEncode(value))
-		txBody.AddArgument(jsoncdc.MustEncode(cadence.Address(a)))
-		txBody.AddAuthorizer(serviceAccount.Address)
-		txBody.SetPayer(serviceAccount.Address)
+		txBodyBuilder := transferTokensTx(be.Chain(b))
+		txBodyBuilder.SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber())
+		txBodyBuilder.AddArgument(jsoncdc.MustEncode(value))
+		txBodyBuilder.AddArgument(jsoncdc.MustEncode(cadence.Address(a)))
+		txBodyBuilder.AddAuthorizer(serviceAccount.Address)
+		txBodyBuilder.SetPayer(serviceAccount.Address)
 
+		txBody := txBodyBuilder.Build()
 		err := testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
 		require.NoError(b, err)
 

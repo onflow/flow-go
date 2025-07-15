@@ -1139,8 +1139,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					txBody := flow.NewTransactionBodyBuilder().
 						SetScript([]byte(test.source)).
-						AddAuthorizer(address).
-						Build()
+						AddAuthorizer(address)
 
 					for i := 0; i < keyCount; i++ {
 						keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(i))
@@ -1151,7 +1150,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					executionSnapshot, output, err := vm.Run(
 						ctx,
-						fvm.Transaction(txBody, 0),
+						fvm.Transaction(txBody.Build(), 0),
 						snapshotTree)
 					require.NoError(t, err)
 					assert.NoError(t, output.Err)
@@ -1387,8 +1386,7 @@ func TestGetAccountKey(t *testing.T) {
 
 				txBody := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(getMultipleAccountKeysTransaction)).
-					AddAuthorizer(address).
-					Build()
+					AddAuthorizer(address)
 
 				for i := 0; i < keyCount; i++ {
 					keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(i))
@@ -1399,7 +1397,7 @@ func TestGetAccountKey(t *testing.T) {
 
 				_, output, err := vm.Run(
 					ctx,
-					fvm.Transaction(txBody, 0),
+					fvm.Transaction(txBody.Build(), 0),
 					snapshotTree)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
@@ -1452,7 +1450,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				txBody := transferTokensTx(chain).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
-					AddAuthorizer(chain.ServiceAddress())
+					AddAuthorizer(chain.ServiceAddress()).Build()
 
 				executionSnapshot, output, err := vm.Run(
 					ctx,
@@ -1566,7 +1564,8 @@ func TestAccountBalanceFields(t *testing.T) {
 				txBody := transferTokensTx(chain).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
-					AddAuthorizer(chain.ServiceAddress())
+					AddAuthorizer(chain.ServiceAddress()).
+					Build()
 
 				executionSnapshot, output, err := vm.Run(
 					ctx,
@@ -1639,7 +1638,8 @@ func TestAccountBalanceFields(t *testing.T) {
 				txBody := transferTokensTx(chain).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
-					AddAuthorizer(chain.ServiceAddress())
+					AddAuthorizer(chain.ServiceAddress()).
+					Build()
 
 				executionSnapshot, output, err := vm.Run(
 					ctx,
@@ -1694,7 +1694,7 @@ func TestGetStorageCapacity(t *testing.T) {
 
 				executionSnapshot, output, err := vm.Run(
 					ctx,
-					fvm.Transaction(txBody, 0),
+					fvm.Transaction(txBody.Build(), 0),
 					snapshotTree)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)

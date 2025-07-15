@@ -480,9 +480,9 @@ func CreateAddAnAccountKeyMultipleTimesTransaction(t *testing.T, accountKey *flo
 	require.NoError(t, err)
 
 	addKeysTx := &flow.TransactionBody{
-		Script: script,
+		Script:    script,
+		Arguments: [][]byte{arg1, arg2},
 	}
-	addKeysTx = addKeysTx.AddArgument(arg1).AddArgument(arg2)
 	return addKeysTx
 }
 
@@ -511,10 +511,9 @@ func CreateAddAccountKeyTransaction(t *testing.T, accountKey *flow.AccountPrivat
 	require.NoError(t, err)
 
 	addKeysTx := &flow.TransactionBody{
-		Script: script,
+		Script:    script,
+		Arguments: [][]byte{arg},
 	}
-	addKeysTx = addKeysTx.AddArgument(arg)
-
 	return addKeysTx
 }
 

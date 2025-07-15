@@ -576,7 +576,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		},
 	}
 
-	transferTokensTx := func(chain flow.Chain) *flow.TransactionBody {
+	transferTokensTx := func(chain flow.Chain) *flow.TransactionBodyBuilder {
 		return flow.NewTransactionBodyBuilder().
 			SetScript([]byte(fmt.Sprintf(`
 							// This transaction is a template for a transaction that
@@ -617,7 +617,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 									receiverRef.deposit(from: <-self.sentVault)
 								}
 							}`, sc.FungibleToken.Address, sc.FlowToken.Address)),
-			).Build()
+			)
 	}
 
 	runTx := func(tc testCase,
@@ -638,10 +638,10 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			transferTx := transferTokensTx(chain).
 				AddAuthorizer(chain.ServiceAddress()).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(tc.fundWith))).
-				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(address)))
-
-			transferTx.SetProposalKey(chain.ServiceAddress(), 0, 1)
-			transferTx.SetPayer(chain.ServiceAddress())
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(address))).
+				SetProposalKey(chain.ServiceAddress(), 0, 1).
+				SetPayer(chain.ServiceAddress()).
+				Build()
 
 			err = testutil.SignEnvelope(
 				transferTx,
@@ -655,10 +655,10 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			transferTx2 := transferTokensTx(chain).
 				AddAuthorizer(address).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(tc.tryToTransfer))).
-				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
-
-			transferTx2.SetProposalKey(address, 0, 0)
-			transferTx2.SetPayer(address)
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress()))).
+				SetProposalKey(address, 0, 0).
+				SetPayer(address).
+				Build()
 
 			err = testutil.SignEnvelope(
 				transferTx2,

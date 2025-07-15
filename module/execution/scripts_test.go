@@ -284,7 +284,7 @@ func (s *scriptTestSuite) transferTokens(accountAddress flow.Address, amount uin
 	transferTx := transferTokensTx(s.chain).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(amount))).
 		AddArgument(jsoncdc.MustEncode(cadence.Address(accountAddress))).
-		AddAuthorizer(s.chain.ServiceAddress())
+		AddAuthorizer(s.chain.ServiceAddress()).Build()
 
 	executionSnapshot, _, err := s.vm.Run(
 		s.vmCtx,
@@ -388,7 +388,7 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	return synctest.MockBlockHeaderStorage(synctest.WithByHeight(blocksByHeight))
 }
 
-func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
+func transferTokensTx(chain flow.Chain) *flow.TransactionBodyBuilder {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 	return flow.NewTransactionBodyBuilder().
@@ -435,5 +435,5 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 			sc.FungibleToken.Address.Hex(),
 			sc.FlowToken.Address.Hex(),
 		)),
-		).Build()
+		)
 }

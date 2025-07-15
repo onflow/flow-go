@@ -30,7 +30,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
+func transferTokensTx(chain flow.Chain) *flow.TransactionBodyBuilder {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(
@@ -76,7 +76,7 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 			sc.FungibleToken.Address.Hex(),
 			sc.FlowToken.Address.Hex(),
 		)),
-		).Build()
+		)
 }
 
 func filterAccountCreatedEvents(events []flow.Event) []flow.Event {
@@ -1129,7 +1129,8 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 						jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
 					AddArgument(
 						jsoncdc.MustEncode(cadence.NewAddress(accounts[0]))).
-					SetPayer(chain.ServiceAddress())
+					SetPayer(chain.ServiceAddress()).
+					Build()
 
 				err = testutil.SignEnvelope(
 					txBody,
@@ -1908,7 +1909,8 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				AddAuthorizer(accounts[0]).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1))).
 				AddArgument(jsoncdc.MustEncode(
-					cadence.NewAddress(chain.ServiceAddress())))
+					cadence.NewAddress(chain.ServiceAddress()))).
+				Build()
 
 			txBody.SetProposalKey(accounts[0], 0, 0)
 			txBody.SetPayer(accounts[0])
@@ -1974,7 +1976,8 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			txBody := transferTokensTx(chain).
 				AddAuthorizer(accounts[0]).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1))).
-				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(lastAddress)))
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(lastAddress))).
+				Build()
 
 			txBody.SetProposalKey(accounts[0], 0, 0)
 			txBody.SetPayer(accounts[0])
@@ -2029,11 +2032,9 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 					AddAuthorizer(accounts[0]).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000_0000))).
 					AddArgument(jsoncdc.MustEncode(
-						cadence.NewAddress(chain.ServiceAddress())))
-
-				// set wrong sequence number
-				txBody.SetProposalKey(accounts[0], 0, 10)
-				txBody.SetPayer(accounts[0])
+										cadence.NewAddress(chain.ServiceAddress()))).
+					SetProposalKey(accounts[0], 0, 10). // set wrong sequence number
+					SetPayer(accounts[0]).Build()
 
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
@@ -2089,10 +2090,10 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 					AddArgument(jsoncdc.MustEncode(
 						cadence.UFix64(1_0000_0000_0000))).
 					AddArgument(jsoncdc.MustEncode(
-						cadence.NewAddress(chain.ServiceAddress())))
-
-				txBody.SetProposalKey(accounts[0], 0, 0)
-				txBody.SetPayer(accounts[0])
+						cadence.NewAddress(chain.ServiceAddress()))).
+					SetProposalKey(accounts[0], 0, 0).
+					SetPayer(accounts[0]).
+					Build()
 
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
