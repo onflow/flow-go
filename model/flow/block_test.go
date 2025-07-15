@@ -14,8 +14,7 @@ import (
 )
 
 func TestGenesisEncodingJSON(t *testing.T) {
-	genesis, err := flow.Genesis(flow.Mainnet)
-	require.NoError(t, err)
+	genesis := flow.Genesis(flow.Mainnet)
 	genesisID := genesis.ID()
 	data, err := json.Marshal(genesis)
 	require.NoError(t, err)
@@ -28,8 +27,7 @@ func TestGenesisEncodingJSON(t *testing.T) {
 }
 
 func TestGenesisDecodingMsgpack(t *testing.T) {
-	genesis, err := flow.Genesis(flow.Mainnet)
-	require.NoError(t, err)
+	genesis := flow.Genesis(flow.Mainnet)
 	genesisID := genesis.ID()
 	data, err := msgpack.Marshal(genesis)
 	require.NoError(t, err)
