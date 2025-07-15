@@ -93,7 +93,7 @@ func (suite *Suite) SetupTest() {
 	suite.clusters, err = factory.NewClusterList(assignments, collectors.ToSkeleton())
 	suite.Require().NoError(err)
 
-	suite.root = unittest.GenesisFixture()
+	suite.root = unittest.Block.Genesis(flow.Emulator)
 	suite.final = suite.root
 	suite.blocks = make(map[flow.Identifier]*flow.Block)
 	suite.blocks[suite.root.ID()] = suite.root

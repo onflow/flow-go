@@ -164,7 +164,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
 				expected := ss.heights[ref-1]
-				actual, err := res.Blocks[0].DeclareTrusted()
+				actual, err := flow.NewProposal(res.Blocks[0])
 				require.NoError(ss.T(), err)
 				assert.Equal(ss.T(), expected, actual, "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")

@@ -295,7 +295,6 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		proposals := make([]*flow.Proposal, 0, len(batch.Message))
 		for _, proposal := range batch.Message {
 			proposals = append(proposals, proposal)
-
 		}
 
 		firstBlockHeader := proposals[0].Block.Header

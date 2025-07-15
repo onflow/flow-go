@@ -87,7 +87,10 @@ func TestNewBlock(t *testing.T) {
 // 2. Invalid input with invalid HeaderBody:
 //   - Ensures an error is returned when the HeaderBody.ParentView is not zero.
 //
-// 3. Invalid input with invalid Payload:
+// 3. Invalid input with invalid ParentID:
+//   - Ensures an error is returned when the HeaderBody.ParentID is not zero.
+//
+// 4. Invalid input with invalid Payload:
 //   - Ensures an error is returned when the Payload.ReferenceBlockID is flow.ZeroID.
 func TestNewRootBlock(t *testing.T) {
 	base := cluster.UntrustedBlock{
@@ -120,6 +123,16 @@ func TestNewRootBlock(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "invalid root header body")
+	})
+
+	t.Run("invalid input with invalid ParentID", func(t *testing.T) {
+		block := base
+		block.Header.ParentID = unittest.IdentifierFixture()
+
+		res, err := cluster.NewRootBlock(block)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "ParentID must be zero")
 	})
 
 	t.Run("invalid input with invalid payload", func(t *testing.T) {

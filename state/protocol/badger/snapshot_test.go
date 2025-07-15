@@ -227,7 +227,7 @@ func TestClusters(t *testing.T) {
 	identities := append(unittest.IdentityListFixture(4, unittest.WithAllRolesExcept(flow.RoleCollection)), collectors...)
 
 	// bootstrap the protocol state
-	rootHeader := unittest.GenesisFixture().Header
+	rootHeader := unittest.Block.Genesis(flow.Emulator).Header
 
 	counter := uint64(1)
 	setup := unittest.EpochSetupFixture(
@@ -726,7 +726,7 @@ func TestSealingSegment(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 			root := unittest.BlockFixture(
 				unittest.Block.WithParent(head.ID(), head.View, head.Height),
-				unittest.Block.WithView(head.Height+1), // set view so we are still in the same epoch
+				unittest.Block.WithView(head.View+1), // set view so we are still in the same epoch
 				unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID))),
 			)
 			buildFinalizedBlock(t, state, root)
@@ -736,7 +736,7 @@ func TestSealingSegment(t *testing.T) {
 			for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 				next := unittest.BlockFixture(
 					unittest.Block.WithParent(parent.ID(), parent.Header.View, parent.Header.Height),
-					unittest.Block.WithView(parent.Header.Height+1), // set view so we are still in the same epoch
+					unittest.Block.WithView(parent.Header.View+1), // set view so we are still in the same epoch
 					unittest.Block.WithPayload(unittest.PayloadFixture(
 						unittest.WithProtocolStateID(parent.Payload.ProtocolStateID)),
 					),
@@ -795,7 +795,7 @@ func TestSealingSegment(t *testing.T) {
 			// build a block to seal
 			block1 := unittest.BlockFixture(
 				unittest.Block.WithParent(head.ID(), head.View, head.Height),
-				unittest.Block.WithView(head.Height+1), // set view so we are still in the same epoch
+				unittest.Block.WithView(head.View+1), // set view so we are still in the same epoch
 				unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID))),
 			)
 			buildFinalizedBlock(t, state, block1)
@@ -805,7 +805,7 @@ func TestSealingSegment(t *testing.T) {
 
 			block2 := unittest.BlockFixture(
 				unittest.Block.WithParent(block1.ID(), block1.Header.View, block1.Header.Height),
-				unittest.Block.WithView(block1.Header.Height+1), // set view so we are still in the same epoch
+				unittest.Block.WithView(block1.Header.View+1), // set view so we are still in the same epoch
 				unittest.Block.WithPayload(unittest.PayloadFixture(
 					unittest.WithReceipts(receipt1),
 					unittest.WithProtocolStateID(rootProtocolStateID)),
@@ -816,7 +816,7 @@ func TestSealingSegment(t *testing.T) {
 			receipt2, seal2 := unittest.ReceiptAndSealForBlock(block2)
 			block3 := unittest.BlockFixture(
 				unittest.Block.WithParent(block2.ID(), block2.Header.View, block2.Header.Height),
-				unittest.Block.WithView(block2.Header.Height+1), // set view so we are still in the same epoch
+				unittest.Block.WithView(block2.Header.View+1), // set view so we are still in the same epoch
 				unittest.Block.WithPayload(unittest.PayloadFixture(
 					unittest.WithSeals(seal1),
 					unittest.WithReceipts(receipt2),
@@ -828,7 +828,7 @@ func TestSealingSegment(t *testing.T) {
 			receipt3, seal3 := unittest.ReceiptAndSealForBlock(block3)
 			block4 := unittest.BlockFixture(
 				unittest.Block.WithParent(block3.ID(), block3.Header.View, block3.Header.Height),
-				unittest.Block.WithView(block3.Header.Height+1), // set view so we are still in the same epoch
+				unittest.Block.WithView(block3.Header.View+1), // set view so we are still in the same epoch
 				unittest.Block.WithPayload(unittest.PayloadFixture(
 					unittest.WithReceipts(receipt3),
 					unittest.WithProtocolStateID(rootProtocolStateID)),
@@ -841,7 +841,7 @@ func TestSealingSegment(t *testing.T) {
 			for i := 0; i < 1.5*flow.DefaultTransactionExpiry; i++ {
 				next := unittest.BlockFixture(
 					unittest.Block.WithParent(parent.ID(), parent.Header.View, parent.Header.Height),
-					unittest.Block.WithView(parent.Header.Height+1), // set view so we are still in the same epoch
+					unittest.Block.WithView(parent.Header.View+1), // set view so we are still in the same epoch
 					unittest.Block.WithPayload(unittest.PayloadFixture(
 						unittest.WithProtocolStateID(parent.Payload.ProtocolStateID)),
 					),

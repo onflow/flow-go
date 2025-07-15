@@ -83,7 +83,7 @@ func (br *ClusterBlockResponse) BlocksInternal() ([]*cluster.Proposal, error) {
 	var err error
 	for i, block := range br.Blocks {
 		block := block
-		internal[i], err = block.DeclareTrusted()
+		internal[i], err = block.DeclareStructurallyValid()
 		if err != nil {
 			return nil, fmt.Errorf("could not convert to cluster block proposal: %w", err)
 		}

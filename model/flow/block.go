@@ -7,41 +7,9 @@ import (
 	"github.com/vmihailenco/msgpack/v4"
 )
 
-func Genesis(chainID ChainID) (*Block, error) {
-	// create the raw content for the genesis block
-	payload := NewEmptyPayload()
-
-	// create the headerBody
-	headerBody, err := NewRootHeaderBody(
-		UntrustedHeaderBody{
-			ChainID:   chainID,
-			ParentID:  ZeroID,
-			Height:    0,
-			Timestamp: GenesisTime,
-			View:      0,
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create root header body: %w", err)
-	}
-
-	// combine to block
-	block, err := NewRootBlock(
-		UntrustedBlock{
-			Header:  *headerBody,
-			Payload: *payload,
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create root block: %w", err)
-	}
-
-	return block, nil
-}
-
-// Block (currently) includes the all block header metadata and the payload content.
+// Block includes both the block header metadata and the payload content.
 //
-// Zero values are allowed only for root blocks, which must be constructed
+// Zero values for certain HeaderBody fields are allowed only for root blocks, which must be constructed
 // using the NewRootBlock constructor. All non-root blocks must be constructed
 // using NewBlock to ensure validation of the block fields.
 //
@@ -104,9 +72,15 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 		return nil, fmt.Errorf("invalid root header body: %w", err)
 	}
 
+	// validate payload
+	payload, err := NewPayload(UntrustedPayload(untrusted.Payload))
+	if err != nil {
+		return nil, fmt.Errorf("invalid payload: %w", err)
+	}
+
 	return &Block{
 		Header:  *rootHeaderBody,
-		Payload: untrusted.Payload,
+		Payload: *payload,
 	}, nil
 }
 
@@ -128,7 +102,6 @@ func (b Block) ToHeader() *Header {
 		if err != nil {
 			panic(fmt.Errorf("could not build root header from block: %w", err))
 		}
-
 		return rootHeader
 	}
 
@@ -139,7 +112,6 @@ func (b Block) ToHeader() *Header {
 	if err != nil {
 		panic(fmt.Errorf("could not build header from block: %w", err))
 	}
-
 	return header
 }
 

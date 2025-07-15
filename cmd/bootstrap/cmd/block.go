@@ -33,7 +33,7 @@ func constructRootBlock(rootHeaderBody *flow.HeaderBody, protocolStateID flow.Id
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create payload: %w", err)
+		return nil, fmt.Errorf("could not construct payload: %w", err)
 	}
 
 	block, err := flow.NewRootBlock(
@@ -43,7 +43,7 @@ func constructRootBlock(rootHeaderBody *flow.HeaderBody, protocolStateID flow.Id
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create root block: %w", err)
+		return nil, fmt.Errorf("could not construct root block: %w", err)
 	}
 
 	return block, nil

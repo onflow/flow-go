@@ -57,7 +57,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 
 	s.sealsDB = &storage.Seals{}
 
-	s.finalizedRootHeader = unittest.GenesisFixture().ToHeader()
+	s.finalizedRootHeader = unittest.Block.Genesis(flow.Emulator).ToHeader()
 	params := new(mockstate.Params)
 	s.State.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(s.ParentBlock, nil)).Maybe()
 	s.State.On("Params").Return(params)
@@ -680,10 +680,14 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 
 	rootSnapshot := unittest.StateSnapshotForKnownBlock(s.finalizedRootHeader, nil)
 	s.Snapshots[s.finalizedRootHeader.ID()] = rootSnapshot
-	block := &flow.Block{
-		Header:  s.finalizedRootHeader.HeaderBody,
-		Payload: flow.Payload{},
-	}
+	block, err := flow.NewRootBlock(
+		flow.UntrustedBlock{
+			Header:  s.finalizedRootHeader.HeaderBody,
+			Payload: unittest.PayloadFixture(),
+		},
+	)
+	require.NoError(s.T(), err)
+
 	rootSnapshot.On("SealingSegment").Return(
 		&flow.SealingSegment{Blocks: []*flow.Proposal{
 			{

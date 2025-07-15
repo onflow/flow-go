@@ -14,8 +14,7 @@ import (
 )
 
 func TestGenesisEncodingJSON(t *testing.T) {
-	genesis, err := flow.Genesis(flow.Mainnet)
-	require.NoError(t, err)
+	genesis := unittest.Block.Genesis(flow.Mainnet)
 	genesisID := genesis.ID()
 	data, err := json.Marshal(genesis)
 	require.NoError(t, err)
@@ -28,8 +27,7 @@ func TestGenesisEncodingJSON(t *testing.T) {
 }
 
 func TestGenesisDecodingMsgpack(t *testing.T) {
-	genesis, err := flow.Genesis(flow.Mainnet)
-	require.NoError(t, err)
+	genesis := unittest.Block.Genesis(flow.Mainnet)
 	genesisID := genesis.ID()
 	data, err := msgpack.Marshal(genesis)
 	require.NoError(t, err)
@@ -68,7 +66,6 @@ func TestBlockEncodingMsgpack(t *testing.T) {
 }
 
 func TestNilProducesSameHashAsEmptySlice(t *testing.T) {
-
 	nilPayload := flow.Payload{
 		Guarantees: nil,
 		Seals:      nil,
@@ -83,7 +80,6 @@ func TestNilProducesSameHashAsEmptySlice(t *testing.T) {
 }
 
 func TestOrderingChangesHash(t *testing.T) {
-
 	seals := unittest.Seal.Fixtures(5)
 
 	payload1 := flow.Payload{
@@ -114,7 +110,6 @@ func TestBlock_Status(t *testing.T) {
 // Because our NewHeaderBody constructor enforces ParentView < View we use
 // WithFieldGenerator to safely pass it.
 func TestBlockMalleability(t *testing.T) {
-
 	block := unittest.FullBlockFixture()
 	unittest.RequireEntityNonMalleable(
 		t,
@@ -182,11 +177,14 @@ func TestNewBlock(t *testing.T) {
 //
 // 2. Invalid input with invalid HeaderBody:
 //   - Ensures an error is returned when the HeaderBody.ParentView is not zero.
+//
+// 3. Invalid input with invalid Payload:
+//   - Ensures an error is returned when the Payload.ProtocolStateID is flow.ZeroID.
 func TestNewRootBlock(t *testing.T) {
 	base := flow.UntrustedBlock{
 		Header: flow.HeaderBody{
 			ChainID:            flow.Emulator,
-			ParentID:           flow.ZeroID,
+			ParentID:           unittest.IdentifierFixture(),
 			Height:             10,
 			Timestamp:          time.Now(),
 			View:               0,
@@ -213,5 +211,15 @@ func TestNewRootBlock(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "invalid root header body")
+	})
+
+	t.Run("invalid input with invalid payload", func(t *testing.T) {
+		block := base
+		block.Payload.ProtocolStateID = flow.ZeroID
+
+		res, err := flow.NewRootBlock(block)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "invalid payload")
 	})
 }

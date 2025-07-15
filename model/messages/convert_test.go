@@ -16,7 +16,7 @@ func TestClusterBlockProposal(t *testing.T) {
 	block := unittest.ClusterBlockFixture()
 	proposal := unittest.ClusterProposalFromBlock(block)
 	proposalMsg := messages.UntrustedClusterProposalFromInternal(proposal)
-	converted, err := proposalMsg.DeclareTrusted()
+	converted, err := proposalMsg.DeclareStructurallyValid()
 	require.NoError(t, err)
 	assert.Equal(t, proposal, converted)
 }

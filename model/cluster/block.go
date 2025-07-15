@@ -11,7 +11,7 @@ import (
 // Block represents a block in collection node cluster consensus. It contains
 // a standard block header with a payload containing only a single collection.
 //
-// Zero values are allowed only for root blocks, which must be constructed
+// Zero values for certain HeaderBody fields are allowed only for root blocks, which must be constructed
 // using the NewRootBlock constructor. All non-root blocks must be constructed
 // using NewBlock to ensure validation of the block fields.
 //
@@ -67,6 +67,10 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 		return nil, fmt.Errorf("invalid root header body: %w", err)
 	}
 
+	if rootHeaderBody.ParentID != flow.ZeroID {
+		return nil, fmt.Errorf("ParentID must be zero")
+	}
+
 	rootPayload, err := NewRootPayload(UntrustedPayload(untrusted.Payload))
 	if err != nil {
 		return nil, fmt.Errorf("invalid root cluster payload: %w", err)
@@ -96,7 +100,6 @@ func (b *Block) ToHeader() *flow.Header {
 		if err != nil {
 			panic(fmt.Errorf("could not build root header from block: %w", err))
 		}
-
 		return rootHeader
 	}
 

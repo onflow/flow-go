@@ -80,17 +80,22 @@ func NewHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 		return nil, fmt.Errorf("ChainID must not be empty")
 	}
 
-	// This constructor is only for non-root headers, so require a parent QC:
-	// ParentID, ParentVoterIndices, ParentVoterSigData, ProposerID must all be set.
-	// We bundle them in one spot to avoid repeating the same four if-statements.
-	hb := HeaderBody(untrusted) // conversion so we can call ContainsParentQC
-	if !hb.ContainsParentQC() {
-		return nil, fmt.Errorf(
-			"missing parent QC: ParentID, ParentVoterIndices, ParentVoterSigData and ProposerID are all required",
-		)
+	// Require each of the four parent-QC fields explicitly, so we get
+	// precise errors instead of a generic “missing parent QC.”
+	if untrusted.ParentID == ZeroID {
+		return nil, fmt.Errorf("ParentID must not be empty")
+	}
+	if len(untrusted.ParentVoterIndices) == 0 {
+		return nil, fmt.Errorf("ParentVoterIndices must not be empty")
+	}
+	if len(untrusted.ParentVoterSigData) == 0 {
+		return nil, fmt.Errorf("ParentVoterSigData must not be empty")
+	}
+	if untrusted.ProposerID == ZeroID {
+		return nil, fmt.Errorf("ProposerID must not be empty")
 	}
 
-	// Now that we know it’s non-root (has a QC), enforce block semantics:
+	// Now enforce non-root semantics:
 	if untrusted.Height == 0 {
 		return nil, fmt.Errorf("Height must be > 0 for non-root header")
 	}
@@ -99,13 +104,15 @@ func NewHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 	}
 	if untrusted.ParentView >= untrusted.View {
 		return nil, fmt.Errorf(
-			"ParentView (%d) must be less than View (%d)", untrusted.ParentView, untrusted.View,
+			"ParentView (%d) must be less than View (%d)",
+			untrusted.ParentView, untrusted.View,
 		)
 	}
 	if untrusted.Timestamp.IsZero() {
 		return nil, fmt.Errorf("Timestamp must not be zero-value")
 	}
 
+	hb := HeaderBody(untrusted)
 	return &hb, nil
 }
 
@@ -117,10 +124,14 @@ func NewRootHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 		return nil, fmt.Errorf("ChainID of root header body must not be empty")
 	}
 
-	if HeaderBody(untrusted).ContainsParentQC() {
-		return nil, fmt.Errorf(
-			"root header body must not contain a parent QC (ParentID, ParentVoterIndices, ParentVoterSigData, ProposerID must all be empty)",
-		)
+	if len(untrusted.ParentVoterIndices) != 0 {
+		return nil, fmt.Errorf("root header body must not set ParentVoterIndices")
+	}
+	if len(untrusted.ParentVoterSigData) != 0 {
+		return nil, fmt.Errorf("root header body must not set ParentVoterSigData")
+	}
+	if untrusted.ProposerID != ZeroID {
+		return nil, fmt.Errorf("root header body must not set ProposerID")
 	}
 
 	if untrusted.ParentView != 0 {

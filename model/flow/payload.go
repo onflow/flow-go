@@ -26,7 +26,7 @@ type Payload struct {
 	ProtocolStateID Identifier
 }
 
-// UntrustedPayload is an untrusted input-only representation of a cluster Payload,
+// UntrustedPayload is an untrusted input-only representation of the main consensus Payload,
 // used for construction.
 //
 // This type exists to ensure that constructor functions are invoked explicitly
@@ -34,7 +34,7 @@ type Payload struct {
 // ordering during construction.
 //
 // An instance of UntrustedPayload should be validated and converted into
-// a trusted cluster Payload using NewPayload constructor.
+// a trusted main consensus Payload using NewPayload constructor.
 type UntrustedPayload Payload
 
 // NewPayload creates a payload given a reference block ID and a
