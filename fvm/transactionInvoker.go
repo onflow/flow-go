@@ -315,6 +315,7 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 }
 
 func (executor *transactionExecutor) deductTransactionFees() (err error) {
+	fmt.Println("Deducting transaction fees disabled", !executor.env.TransactionFeesEnabled())
 	if !executor.env.TransactionFeesEnabled() {
 		return nil
 	}
