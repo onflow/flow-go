@@ -112,8 +112,8 @@ func (s *CoreSuite) TestProcessingSingleBlock() {
 // to finalized view, it must be rejected by it.
 func (s *CoreSuite) TestAddFinalizedBlock() {
 	block := unittest.BlockFixture(
-		unittest.Block.WithView(s.finalizedBlock.View-1), // block is below finalized view
-		unittest.Block.WithParentView(s.finalizedBlock.View-2),
+		unittest.Block.WithView(s.finalizedBlock.View-1),       // block is below finalized view
+		unittest.Block.WithParentView(s.finalizedBlock.View-2), // parent view must be below view
 	)
 	proposal := unittest.ProposalFromBlock(block)
 
