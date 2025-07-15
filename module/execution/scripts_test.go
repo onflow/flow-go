@@ -240,9 +240,10 @@ func (s *scriptTestSuite) createAccount() flow.Address {
 		  }
 		}`
 
-	txBody := flow.NewEmptyTransactionBody().
+	txBody := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(createAccountTransaction)).
-		AddAuthorizer(s.chain.ServiceAddress())
+		AddAuthorizer(s.chain.ServiceAddress()).
+		Build()
 
 	executionSnapshot, output, err := s.vm.Run(
 		s.vmCtx,
@@ -330,10 +331,11 @@ transaction(key: [UInt8]) {
 
 	publicKey, encodedCadencePublicKey := newAccountKey(s.T(), privateKey, apiVersion)
 
-	txBody := flow.NewEmptyTransactionBody().
+	txBody := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(addAccountKeyTransaction)).
 		AddArgument(encodedCadencePublicKey).
-		AddAuthorizer(accountAddress)
+		AddAuthorizer(accountAddress).
+		Build()
 
 	executionSnapshot, _, err := s.vm.Run(
 		s.vmCtx,
@@ -389,7 +391,7 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-	return flow.NewEmptyTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(
 			`
 	// This transaction is a template for a transaction that
@@ -433,5 +435,5 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 			sc.FungibleToken.Address.Hex(),
 			sc.FlowToken.Address.Hex(),
 		)),
-		)
+		).Build()
 }
