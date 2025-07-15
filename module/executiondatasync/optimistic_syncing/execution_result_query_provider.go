@@ -3,10 +3,9 @@ package pipeline
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
-
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
@@ -14,8 +13,6 @@ import (
 )
 
 const (
-	// minExecutionNodesCnt is the minimum number of execution nodes expected to have sent the execution receipt for a block
-	minExecutionNodesCnt = 2
 	// maxNodesCnt is the maximum number of nodes that will be contacted to complete an API request.
 	maxNodesCnt = 3
 )
@@ -214,23 +211,46 @@ func (e *ExecutionResultQueryProviderImpl) findResultAndExecutors(
 
 	executionReceiptsGroupedList := allReceipts.GroupByResultID()
 
-	matchedExecutorsCnt := 0
+	matchedExecutorsCnt := uint(0)
 	var matchedResultID flow.Identifier
 
 	for resultID, executionReceiptList := range executionReceiptsGroupedList {
 		executorGroup := executionReceiptList.GroupByExecutorID()
-		currentMatchedExecutorsCnt := len(executorGroup)
-
-		hasEnoughExecutors := currentMatchedExecutorsCnt >= int(criteria.AgreeingExecutors)
-		if !hasEnoughExecutors {
+		if !isReceptsMatchingCriteria(executorGroup, criteria) {
 			continue
 		}
 
-		// In case, neither client nor operator set criteria.RequiredExecutors, this check should be skipped, that is why
-		// hasRequiredExecutor should be set to true
-		hasRequiredCriteria := len(criteria.RequiredExecutors) != 0
-		hasRequiredExecutor := !hasRequiredCriteria
+		currentMatchedExecutorsCnt := uint(len(executorGroup))
+		if currentMatchedExecutorsCnt > matchedExecutorsCnt {
+			matchedExecutorsCnt = currentMatchedExecutorsCnt
+			matchedResultID = resultID
+		}
+	}
 
+	// if less than agreeing executors have been received, then return an error
+	if matchedExecutorsCnt < criteria.AgreeingExecutors {
+		return nil, nil, backend.NewInsufficientExecutionReceipts(blockID, int(matchedExecutorsCnt))
+	}
+
+	matchedReceipts := executionReceiptsGroupedList.GetGroup(matchedResultID)
+
+	// all matched receipts are for the ExecutionResult.
+	result := matchedReceipts[0].ExecutionResult
+	executorIDs := getExecutorIDs(matchedReceipts)
+
+	return &result, executorIDs, nil
+}
+
+// isReceptsMatchingCriteria checks if an executor group meets the specified criteria for execution receipts matching.
+func isReceptsMatchingCriteria(executorGroup flow.ExecutionReceiptGroupedList, criteria Criteria) bool {
+	currentMatchedExecutorsCnt := uint(len(executorGroup))
+
+	if currentMatchedExecutorsCnt < criteria.AgreeingExecutors {
+		return false
+	}
+
+	if len(criteria.RequiredExecutors) > 0 {
+		hasRequiredExecutor := false
 		for _, requiredExecutor := range criteria.RequiredExecutors {
 			if _, ok := executorGroup[requiredExecutor]; ok {
 				hasRequiredExecutor = true
@@ -238,42 +258,15 @@ func (e *ExecutionResultQueryProviderImpl) findResultAndExecutors(
 			}
 		}
 		if !hasRequiredExecutor {
-			continue
-		}
-
-		if criteria.ResultInFork != flow.ZeroID {
-			hasRequiredAncestor := resultID == criteria.ResultInFork
-			if !hasRequiredAncestor {
-				// TODO: Enhance ResultInFork check logic.
-				// If ResultInFork is provided:
-				//
-				// 1. Check if resultID equal to the ResultInFork.
-				// 2. If not, iterate all results for the block.
-				// 3. For each result, walk through its ancestry via PreviousResultID.
-				// 4. Stop when the provided result is found or a maximum depth is reached.
-				continue
-			}
-		}
-
-		if currentMatchedExecutorsCnt > matchedExecutorsCnt {
-			matchedExecutorsCnt = currentMatchedExecutorsCnt
-			matchedResultID = resultID
+			return false
 		}
 	}
 
-	// if less than minExecutionNodesCnt execution receipts have been received, then return an error
-	if matchedExecutorsCnt < minExecutionNodesCnt {
-		return nil, nil, backend.NewInsufficientExecutionReceipts(blockID, matchedExecutorsCnt)
-	}
+	// TODO: Implement the `ResultInFork` check here, which iteratively checks ancestors to determine if
+	// the current result's fork includes the requested result.
+	// https://github.com/onflow/flow-go/issues/7587
 
-	matchedReceipts := executionReceiptsGroupedList.GetGroup(matchedResultID)
-
-	executorIDs := getExecutorIDs(matchedReceipts)
-
-	// as all matched recepts are for the same block, they should have the same ExecutionResult, that is why return the first result in a list
-	result := matchedReceipts[0].ExecutionResult
-
-	return &result, executorIDs, nil
+	return true
 }
 
 // getExecutorIDs extracts unique executor node IDs from a list of execution receipts.
@@ -314,6 +307,9 @@ func (e *ExecutionResultQueryProviderImpl) chooseExecutionNodes(
 	}
 
 	// if no preferred EN ID is found, then choose from the required EN IDs
+	// TODO: the order here means that if the operator has configured any preferred ENs,
+	// the user's required EN check will be entirely skipped.
+	// This will be addressed in https://github.com/onflow/flow-go/issues/7588
 	if len(requiredExecutors) > 0 {
 		// choose required ENs which have executed the transaction
 		chosenIDs := allENs.Filter(filter.And(
