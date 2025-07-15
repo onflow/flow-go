@@ -7,6 +7,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	model "github.com/onflow/flow-go/model/cluster"
@@ -40,7 +41,8 @@ type SnapshotSuite struct {
 func (suite *SnapshotSuite) SetupTest() {
 	var err error
 
-	suite.genesis = unittest.ClusterBlock.Genesis()
+	suite.genesis, err = unittest.ClusterBlock.Genesis()
+	require.NoError(suite.T(), err)
 	suite.chainID = suite.genesis.Header.ChainID
 
 	suite.dbdir = unittest.TempDir(suite.T())

@@ -54,7 +54,8 @@ type MutatorSuite struct {
 func (suite *MutatorSuite) SetupTest() {
 	var err error
 
-	suite.genesis = unittest.ClusterBlock.Genesis()
+	suite.genesis, err = unittest.ClusterBlock.Genesis()
+	require.NoError(suite.T(), err)
 	suite.chainID = suite.genesis.Header.ChainID
 
 	suite.dbdir = unittest.TempDir(suite.T())
@@ -299,7 +300,7 @@ func (suite *MutatorSuite) TestExtend_InvalidChainID() {
 func (suite *MutatorSuite) TestExtend_InvalidBlockHeight() {
 	proposal := suite.Proposal()
 	// change the block height
-	proposal.Block.Header.Height = proposal.Block.Header.Height - 1
+	proposal.Block.Header.Height = proposal.Block.Header.Height + 1
 
 	err := suite.state.Extend(&proposal)
 	suite.Assert().Error(err)
@@ -309,11 +310,22 @@ func (suite *MutatorSuite) TestExtend_InvalidBlockHeight() {
 // TestExtend_InvalidParentView tests if mutator rejects block with invalid ParentView. ParentView must be consistent
 // with view of block referred by ParentID.
 func (suite *MutatorSuite) TestExtend_InvalidParentView() {
-	proposal := suite.Proposal()
-	// change the block parent view
-	proposal.Block.Header.ParentView--
+	tx1 := suite.Tx()
+	tx2 := suite.Tx()
 
-	err := suite.state.Extend(&proposal)
+	proposal1 := suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload(&tx1))
+
+	err := suite.state.Extend(&proposal1)
+	suite.Assert().Nil(err)
+
+	suite.FinalizeBlock(proposal1.Block)
+	suite.Assert().Nil(err)
+
+	proposal2 := suite.ProposalWithParentAndPayload(&proposal1.Block, suite.Payload(&tx2))
+	// change the block ParentView
+	proposal2.Block.Header.ParentView--
+
+	err = suite.state.Extend(&proposal2)
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
