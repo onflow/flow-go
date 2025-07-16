@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func DeployFungibleTokenContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+func DeployFungibleTokenContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 	contractName := "FungibleToken"
 	return DeployContractTransaction(
 		fungibleToken,
@@ -23,7 +23,7 @@ func DeployFungibleTokenContractTransaction(fungibleToken flow.Address, contract
 	)
 }
 
-func DeployNonFungibleTokenContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+func DeployNonFungibleTokenContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 	contractName := "NonFungibleToken"
 	return DeployContractTransaction(
 		nonFungibleToken,
@@ -32,7 +32,7 @@ func DeployNonFungibleTokenContractTransaction(nonFungibleToken flow.Address, co
 	)
 }
 
-func DeployMetadataViewsContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+func DeployMetadataViewsContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 	contractName := "MetadataViews"
 	return DeployContractTransaction(
 		nonFungibleToken,
@@ -41,7 +41,7 @@ func DeployMetadataViewsContractTransaction(nonFungibleToken flow.Address, contr
 	)
 }
 
-func DeployCrossVMMetadataViewsContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+func DeployCrossVMMetadataViewsContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 	contractName := "CrossVMMetadataViews"
 	return DeployContractTransaction(
 		nonFungibleToken,
@@ -50,7 +50,7 @@ func DeployCrossVMMetadataViewsContractTransaction(nonFungibleToken flow.Address
 	)
 }
 
-func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.TransactionBody {
+func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.TransactionBodyBuilder {
 	contract := contracts.ViewResolver()
 	contractName := "ViewResolver"
 	return DeployContractTransaction(
@@ -60,7 +60,7 @@ func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.
 	)
 }
 
-func DeployBurnerContractTransaction(fungibleToken flow.Address) *flow.TransactionBody {
+func DeployBurnerContractTransaction(fungibleToken flow.Address) *flow.TransactionBodyBuilder {
 	contract := contracts.Burner()
 	contractName := "Burner"
 	return DeployContractTransaction(
@@ -70,7 +70,7 @@ func DeployBurnerContractTransaction(fungibleToken flow.Address) *flow.Transacti
 	)
 }
 
-func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 
 	contractName := "FungibleTokenMetadataViews"
 	return DeployContractTransaction(
@@ -80,7 +80,7 @@ func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken flow.Addr
 	)
 }
 
-func DeployFungibleTokenSwitchboardContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+func DeployFungibleTokenSwitchboardContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 
 	contractName := "FungibleTokenSwitchboard"
 	return DeployContractTransaction(
@@ -99,20 +99,19 @@ var createFlowTokenMinterTransactionTemplate string
 //go:embed scripts/mintFlowTokenTransactionTemplate.cdc
 var mintFlowTokenTransactionTemplate string
 
-func DeployFlowTokenContractTransaction(service, flowToken flow.Address, contract []byte) *flow.TransactionBody {
+func DeployFlowTokenContractTransaction(service, flowToken flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(deployFlowTokenTransactionTemplate)).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddAuthorizer(flowToken).
-		AddAuthorizer(service).
-		Build()
+		AddAuthorizer(service)
 }
 
 // CreateFlowTokenMinterTransaction returns a transaction which creates a Flow
 // token Minter resource and stores it in the service account. This Minter is
 // expected to be stored here by the epoch smart contracts.
-func CreateFlowTokenMinterTransaction(service, flowToken flow.Address) *flow.TransactionBody {
+func CreateFlowTokenMinterTransaction(service, flowToken flow.Address) *flow.TransactionBodyBuilder {
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(templates.ReplaceAddresses(
 			createFlowTokenMinterTransactionTemplate,
@@ -120,14 +119,13 @@ func CreateFlowTokenMinterTransaction(service, flowToken flow.Address) *flow.Tra
 				FlowTokenAddress: flowToken.Hex(),
 			})),
 		).
-		AddAuthorizer(service).
-		Build()
+		AddAuthorizer(service)
 }
 
 func MintFlowTokenTransaction(
 	fungibleToken, flowToken, service flow.Address,
 	initialSupply cadence.UFix64,
-) *flow.TransactionBody {
+) *flow.TransactionBodyBuilder {
 	initialSupplyArg, err := jsoncdc.Encode(initialSupply)
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode initial token supply: %s", err.Error()))
@@ -141,15 +139,14 @@ func MintFlowTokenTransaction(
 			})),
 		).
 		AddArgument(initialSupplyArg).
-		AddAuthorizer(service).
-		Build()
+		AddAuthorizer(service)
 }
 
 func TransferFlowTokenTransaction(
 	env templates.Environment,
 	from, to flow.Address,
 	amount string,
-) *flow.TransactionBody {
+) *flow.TransactionBodyBuilder {
 	cadenceAmount, _ := cadence.NewUFix64(amount)
 	txScript := templates.GenerateTransferGenericVaultWithAddressScript(env)
 	return flow.NewTransactionBodyBuilder().
@@ -158,6 +155,5 @@ func TransferFlowTokenTransaction(
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(to))).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(flow.HexToAddress(env.FlowTokenAddress)))).
 		AddArgument(jsoncdc.MustEncode(cadence.String("FlowToken"))).
-		AddAuthorizer(from).
-		Build()
+		AddAuthorizer(from)
 }

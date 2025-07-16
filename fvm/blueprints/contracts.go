@@ -33,12 +33,12 @@ var setIsContractDeploymentRestrictedTransactionTemplate string
 var DeployContractTransactionTemplate []byte
 
 // SetContractDeploymentAuthorizersTransaction returns a transaction for updating list of authorized accounts allowed to deploy/update contracts
-func SetContractDeploymentAuthorizersTransaction(serviceAccount flow.Address, authorized []flow.Address) (*flow.TransactionBody, error) {
+func SetContractDeploymentAuthorizersTransaction(serviceAccount flow.Address, authorized []flow.Address) (*flow.TransactionBodyBuilder, error) {
 	return setContractAuthorizersTransaction(ContractDeploymentAuthorizedAddressesPath, serviceAccount, authorized)
 }
 
 // SetContractRemovalAuthorizersTransaction returns a transaction for updating list of authorized accounts allowed to remove contracts
-func SetContractRemovalAuthorizersTransaction(serviceAccount flow.Address, authorized []flow.Address) (*flow.TransactionBody, error) {
+func SetContractRemovalAuthorizersTransaction(serviceAccount flow.Address, authorized []flow.Address) (*flow.TransactionBodyBuilder, error) {
 	return setContractAuthorizersTransaction(ContractRemovalAuthorizedAddressesPath, serviceAccount, authorized)
 }
 
@@ -46,7 +46,7 @@ func setContractAuthorizersTransaction(
 	path cadence.Path,
 	serviceAccount flow.Address,
 	authorized []flow.Address,
-) (*flow.TransactionBody, error) {
+) (*flow.TransactionBodyBuilder, error) {
 	addressValues := make([]cadence.Value, 0, len(authorized))
 	for _, address := range authorized {
 		addressValues = append(
@@ -68,12 +68,11 @@ func setContractAuthorizersTransaction(
 		SetScript([]byte(setContractOperationAuthorizersTransactionTemplate)).
 		AddAuthorizer(serviceAccount).
 		AddArgument(addressesArg).
-		AddArgument(pathArg).
-		Build(), nil
+		AddArgument(pathArg), nil
 }
 
 // SetIsContractDeploymentRestrictedTransaction sets the restricted flag for contract deployment
-func SetIsContractDeploymentRestrictedTransaction(serviceAccount flow.Address, restricted bool) (*flow.TransactionBody, error) {
+func SetIsContractDeploymentRestrictedTransaction(serviceAccount flow.Address, restricted bool) (*flow.TransactionBodyBuilder, error) {
 	argRestricted, err := jsoncdc.Encode(cadence.Bool(restricted))
 	if err != nil {
 		return nil, err
@@ -88,16 +87,14 @@ func SetIsContractDeploymentRestrictedTransaction(serviceAccount flow.Address, r
 		SetScript([]byte(setIsContractDeploymentRestrictedTransactionTemplate)).
 		AddAuthorizer(serviceAccount).
 		AddArgument(argRestricted).
-		AddArgument(argPath).
-		Build(), nil
+		AddArgument(argPath), nil
 }
 
 // TODO (ramtin) get rid of authorizers
-func DeployContractTransaction(address flow.Address, contract []byte, contractName string) *flow.TransactionBody {
+func DeployContractTransaction(address flow.Address, contract []byte, contractName string) *flow.TransactionBodyBuilder {
 	return flow.NewTransactionBodyBuilder().
 		SetScript(DeployContractTransactionTemplate).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contractName))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract))).
-		AddAuthorizer(address).
-		Build()
+		AddAuthorizer(address)
 }

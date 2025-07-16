@@ -73,8 +73,9 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	prepareTx(t, tx4, account, privKey, 3, chain)
 
 	// tx5 updates the contract to version 3 but fails (no env signature of service account)
-	tx5 := testutil.UnauthorizedDeployEventContractTransaction(account, chain, 3)
-	tx5.SetProposalKey(account, 0, 4).SetPayer(account)
+	tx5 := testutil.UnauthorizedDeployEventContractTransaction(account, chain, 3).
+		SetProposalKey(account, 0, 4).
+		SetPayer(account)
 	err = testutil.SignEnvelope(tx5, account, privKey)
 	require.NoError(t, err)
 
@@ -82,7 +83,14 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	tx6 := testutil.CreateEmitEventTransaction(account, account)
 	prepareTx(t, tx6, account, privKey, 5, chain)
 
-	transactions := []*flow.TransactionBody{tx1, tx2, tx3, tx4, tx5, tx6}
+	transactions := []*flow.TransactionBody{
+		tx1.Build(),
+		tx2.Build(),
+		tx3.Build(),
+		tx4.Build(),
+		tx5.Build(),
+		tx6.Build(),
+	}
 
 	col := flow.Collection{Transactions: transactions}
 
@@ -302,7 +310,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block11tx1 := testutil.DeployEventContractTransaction(account, chain, 1)
 		prepareTx(t, block11tx1, account, privKey, 0, chain)
 
-		txs11 := []*flow.TransactionBody{block11tx1}
+		txs11 := []*flow.TransactionBody{block11tx1.Build()}
 		col11 := flow.Collection{Transactions: txs11}
 		block11, res, block11Snapshot = createTestBlockAndRun(
 			t,
@@ -327,7 +335,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block111tx2 := testutil.UpdateEventContractTransaction(account, chain, 3)
 		prepareTx(t, block111tx2, account, privKey, 2, chain)
 
-		col111 := flow.Collection{Transactions: []*flow.TransactionBody{block111tx1, block111tx2}}
+		col111 := flow.Collection{Transactions: []*flow.TransactionBody{block111tx1.Build(), block111tx2.Build()}}
 		block111, res, block111Snapshot = createTestBlockAndRun(
 			t,
 			engine,
@@ -351,7 +359,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block1111tx1 := testutil.CreateEmitEventTransaction(account, account)
 		prepareTx(t, block1111tx1, account, privKey, 3, chain)
 
-		col1111 := flow.Collection{Transactions: []*flow.TransactionBody{block1111tx1}}
+		col1111 := flow.Collection{Transactions: []*flow.TransactionBody{block1111tx1.Build()}}
 		block1111, res, _ = createTestBlockAndRun(
 			t,
 			engine,
@@ -377,7 +385,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block112tx2 := testutil.UpdateEventContractTransaction(account, chain, 4)
 		prepareTx(t, block112tx2, account, privKey, 2, chain)
 
-		col112 := flow.Collection{Transactions: []*flow.TransactionBody{block112tx1, block112tx2}}
+		col112 := flow.Collection{Transactions: []*flow.TransactionBody{block112tx1.Build(), block112tx2.Build()}}
 		block112, res, block112Snapshot = createTestBlockAndRun(
 			t,
 			engine,
@@ -401,7 +409,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block1121tx1 := testutil.CreateEmitEventTransaction(account, account)
 		prepareTx(t, block1121tx1, account, privKey, 3, chain)
 
-		col1121 := flow.Collection{Transactions: []*flow.TransactionBody{block1121tx1}}
+		col1121 := flow.Collection{Transactions: []*flow.TransactionBody{block1121tx1.Build()}}
 		block1121, res, _ = createTestBlockAndRun(
 			t,
 			engine,
@@ -423,7 +431,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block12tx1 := testutil.DeployEventContractTransaction(account, chain, 2)
 		prepareTx(t, block12tx1, account, privKey, 0, chain)
 
-		col12 := flow.Collection{Transactions: []*flow.TransactionBody{block12tx1}}
+		col12 := flow.Collection{Transactions: []*flow.TransactionBody{block12tx1.Build()}}
 		block12, res, block12Snapshot = createTestBlockAndRun(
 			t,
 			engine,
@@ -443,7 +451,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block121tx1 := testutil.CreateEmitEventTransaction(account, account)
 		prepareTx(t, block121tx1, account, privKey, 1, chain)
 
-		col121 := flow.Collection{Transactions: []*flow.TransactionBody{block121tx1}}
+		col121 := flow.Collection{Transactions: []*flow.TransactionBody{block121tx1.Build()}}
 		block121, res, block121Snapshot = createTestBlockAndRun(
 			t,
 			engine,
@@ -464,7 +472,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block1211tx1 := testutil.CreateEmitEventTransaction(account, account)
 		prepareTx(t, block1211tx1, account, privKey, 2, chain)
 
-		col1211 := flow.Collection{Transactions: []*flow.TransactionBody{block1211tx1}}
+		col1211 := flow.Collection{Transactions: []*flow.TransactionBody{block1211tx1.Build()}}
 		block1211, res, _ = createTestBlockAndRun(
 			t,
 			engine,
@@ -542,16 +550,16 @@ func createTestBlockAndRun(
 }
 
 func prepareTx(t *testing.T,
-	tx *flow.TransactionBody,
+	txBuilder *flow.TransactionBodyBuilder,
 	account flow.Address,
 	privKey flow.AccountPrivateKey,
 	seqNumber uint64,
 	chain flow.Chain) {
-	tx.SetProposalKey(account, 0, seqNumber).
+	txBuilder.SetProposalKey(account, 0, seqNumber).
 		SetPayer(chain.ServiceAddress())
-	err := testutil.SignPayload(tx, account, privKey)
+	err := testutil.SignPayload(txBuilder, account, privKey)
 	require.NoError(t, err)
-	err = testutil.SignEnvelope(tx, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+	err = testutil.SignEnvelope(txBuilder, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(t, err)
 }
 
