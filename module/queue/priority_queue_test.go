@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestPriorityQueueItem tests the PriorityQueueItem struct and its methods
@@ -162,11 +163,11 @@ func TestPriorityQueue_Push(t *testing.T) {
 
 		defer func() {
 			r := recover()
-			assert.Equal(t, "unexpected type added to priority queue: string", r)
+			require.Equal(t, "unexpected type added to priority queue: string", r)
+			assert.Equal(t, initialLen, pq.Len())
 		}()
 
 		pq.Push("not an item")
-		assert.Equal(t, initialLen, pq.Len())
 	})
 }
 
