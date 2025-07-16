@@ -40,6 +40,9 @@ issues:
       linters:
         - unused
         - structwrite
+    - path: 'consensus/hotstuff/helper/*' # disable some linters on test helper files
+      linters:
+        - structwrite
     - path: 'utils/unittest/*' # disable some linters on test files
       linters:
         - structwrite

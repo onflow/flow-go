@@ -520,6 +520,9 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 	expectedTimeout := &model.TimeoutObject{
 		View:     view,
 		NewestQC: newestQC,
+		// don't care about actual data
+		SignerID: unittest.IdentifierFixture(),
+		SigData:  unittest.SignatureFixture(),
 	}
 
 	expectedSafetyData := &hotstuff.SafetyData{

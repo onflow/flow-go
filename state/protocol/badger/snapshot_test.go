@@ -978,7 +978,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 			require.NoError(t, state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(b2))) // adding block b2 (providing required QC for b1)
 
 			// consistency check: there should be no finalized block in the protocol state at height `b1.Height`
-			_, err := state.AtHeight(b1.Header.Height).Head() // expect statepkg.ErrUnknownSnapshotReference as only finalized blocks are indexed by height
+			_, err = state.AtHeight(b1.Header.Height).Head() // expect statepkg.ErrUnknownSnapshotReference as only finalized blocks are indexed by height
 			assert.ErrorIs(t, err, statepkg.ErrUnknownSnapshotReference)
 
 			// requesting a sealing segment from block b1 should fail, as b1 is not yet finalized

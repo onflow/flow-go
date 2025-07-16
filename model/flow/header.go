@@ -144,15 +144,22 @@ func NewRootHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 	return &hb, nil
 }
 
-// QuorumCertificate returns quorum certificate [QC] that is incorporated in the block header body.
-// Caution: this is the QC for the parent.
-func (h HeaderBody) QuorumCertificate() *QuorumCertificate {
-	return &QuorumCertificate{
+// ParentQC returns quorum certificate that is incorporated in the block header.
+// Callers *must* first verify that a parent QC is present (e.g. via ContainsParentQC)
+// before calling ParentQC. If no valid parent QC data exists (such as on a spork‐root
+// header), ParentQC will panic.
+func (h HeaderBody) ParentQC() *QuorumCertificate {
+	qc, err := NewQuorumCertificate(UntrustedQuorumCertificate{
 		BlockID:       h.ParentID,
 		View:          h.ParentView,
 		SignerIndices: h.ParentVoterIndices,
 		SigData:       h.ParentVoterSigData,
+	})
+	if err != nil {
+		panic(fmt.Errorf("could not build parent quorum certificate: %w", err))
 	}
+
+	return qc
 }
 
 // ContainsParentQC reports whether this header carries a valid parent QC.

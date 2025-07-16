@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 )
 
@@ -100,6 +101,8 @@ func (c *ApprovalCollector) IncorporatedResult() *flow.IncorporatedResult {
 	return c.incorporatedResult
 }
 
+// SealResult generates and stores the seal into the mempool.
+// No errors are expected during normal operation.
 func (c *ApprovalCollector) SealResult() error {
 	// get final state of execution result
 	finalState, err := c.incorporatedResult.Result.FinalStateCommitment()
@@ -111,11 +114,16 @@ func (c *ApprovalCollector) SealResult() error {
 	// TODO: Check SPoCK proofs
 
 	// generate & store seal
-	seal := &flow.Seal{
-		BlockID:                c.incorporatedResult.Result.BlockID,
-		ResultID:               c.incorporatedResult.Result.ID(),
-		FinalState:             finalState,
-		AggregatedApprovalSigs: c.aggregatedSignatures.Collect(),
+	seal, err := flow.NewSeal(
+		flow.UntrustedSeal{
+			BlockID:                c.incorporatedResult.Result.BlockID,
+			ResultID:               c.incorporatedResult.Result.ID(),
+			FinalState:             finalState,
+			AggregatedApprovalSigs: c.aggregatedSignatures.Collect(),
+		},
+	)
+	if err != nil {
+		return irrecoverable.NewExceptionf("could not construct seal : %w", err)
 	}
 
 	// Adding a seal that already exists in the mempool is a NoOp. But to reduce log
