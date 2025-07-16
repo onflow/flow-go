@@ -14,6 +14,8 @@ type item[T any] struct {
 	payload  flow.Slashable[T]
 }
 
+// extractProposalHeader is a type constraint for the generic type which allows to extract flow.ProposalHeader
+// from the underlying type.
 type extractProposalHeader interface {
 	ProposalHeader() *flow.ProposalHeader
 }
