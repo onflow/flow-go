@@ -92,30 +92,33 @@ func TestNewBlock(t *testing.T) {
 // 4. Invalid input with invalid Payload:
 //   - Ensures an error is returned when the Payload.ReferenceBlockID is not flow.ZeroID.
 func TestNewRootBlock(t *testing.T) {
-	base := cluster.UntrustedBlock{
-		Header: flow.HeaderBody{
-			ChainID:            flow.Emulator,
-			ParentID:           flow.ZeroID,
-			Height:             10,
-			Timestamp:          time.Now(),
-			View:               0,
-			ParentView:         0,
-			ParentVoterIndices: []byte{},
-			ParentVoterSigData: []byte{},
-			ProposerID:         flow.ZeroID,
-			LastViewTC:         nil,
-		},
-		Payload: *cluster.NewEmptyPayload(flow.ZeroID),
+	// validRootBlockFixture returns a new valid root cluster.UntrustedBlock for use in tests.
+	validRootBlockFixture := func() cluster.UntrustedBlock {
+		return cluster.UntrustedBlock{
+			Header: flow.HeaderBody{
+				ChainID:            flow.Emulator,
+				ParentID:           flow.ZeroID,
+				Height:             10,
+				Timestamp:          time.Now(),
+				View:               0,
+				ParentView:         0,
+				ParentVoterIndices: []byte{},
+				ParentVoterSigData: []byte{},
+				ProposerID:         flow.ZeroID,
+				LastViewTC:         nil,
+			},
+			Payload: *cluster.NewEmptyPayload(flow.ZeroID),
+		}
 	}
 
 	t.Run("valid input", func(t *testing.T) {
-		res, err := cluster.NewRootBlock(base)
+		res, err := cluster.NewRootBlock(validRootBlockFixture())
 		require.NoError(t, err)
 		require.NotNil(t, res)
 	})
 
 	t.Run("invalid input with invalid header body", func(t *testing.T) {
-		block := base
+		block := validRootBlockFixture()
 		block.Header.ParentView = 1
 
 		res, err := cluster.NewRootBlock(block)
@@ -125,7 +128,7 @@ func TestNewRootBlock(t *testing.T) {
 	})
 
 	t.Run("invalid input with invalid ParentID", func(t *testing.T) {
-		block := base
+		block := validRootBlockFixture()
 		block.Header.ParentID = unittest.IdentifierFixture()
 
 		res, err := cluster.NewRootBlock(block)
@@ -135,7 +138,7 @@ func TestNewRootBlock(t *testing.T) {
 	})
 
 	t.Run("invalid input with invalid payload", func(t *testing.T) {
-		block := base
+		block := validRootBlockFixture()
 		block.Payload.ReferenceBlockID = unittest.IdentifierFixture()
 
 		res, err := cluster.NewRootBlock(block)

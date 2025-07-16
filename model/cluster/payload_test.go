@@ -70,19 +70,22 @@ func TestNewPayload(t *testing.T) {
 // 3. Invalid input with non-empty collection:
 //   - Ensures an error is returned when the Collection contains transaction IDs.
 func TestNewRootPayload(t *testing.T) {
-	base := cluster.UntrustedPayload{
-		ReferenceBlockID: flow.ZeroID,
-		Collection:       *flow.NewEmptyCollection(),
+	// validRootPayloadFixture returns a new valid root cluster.UntrustedPayload for use in tests.
+	validRootPayloadFixture := func() cluster.UntrustedPayload {
+		return cluster.UntrustedPayload{
+			ReferenceBlockID: flow.ZeroID,
+			Collection:       *flow.NewEmptyCollection(),
+		}
 	}
 
 	t.Run("valid input", func(t *testing.T) {
-		res, err := cluster.NewRootPayload(base)
+		res, err := cluster.NewRootPayload(validRootPayloadFixture())
 		require.NoError(t, err)
 		require.NotNil(t, res)
 	})
 
 	t.Run("valid input with non-zero ReferenceBlockID", func(t *testing.T) {
-		payload := base
+		payload := validRootPayloadFixture()
 		payload.ReferenceBlockID = unittest.IdentifierFixture()
 
 		res, err := cluster.NewRootPayload(payload)
@@ -92,7 +95,7 @@ func TestNewRootPayload(t *testing.T) {
 	})
 
 	t.Run("invalid input with collection", func(t *testing.T) {
-		payload := base
+		payload := validRootPayloadFixture()
 		payload.Collection = unittest.CollectionFixture(5)
 
 		res, err := cluster.NewRootPayload(payload)
