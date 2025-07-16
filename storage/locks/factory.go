@@ -30,7 +30,7 @@ func makeLockPolicy() lockctx.Policy {
 
 var makeLockManagerOnce sync.Once
 
-// MakeSingletonLockManager returns the lock manager used by the storage layer.
+// SingletonLockManager returns the lock manager used by the storage layer.
 // This function must be used for production builds and must be called exactly once process-wide.
 //
 // The Lock Manager is a core component enforcing atomicity of various storage operations across different
@@ -59,13 +59,13 @@ var makeLockManagerOnce sync.Once
 //     waiting for the newest value in case a write is currently ongoing, the reader will just retrieve the
 //     previous value. This aligns with our architecture of the node operating as an eventually-consistent
 //     system, which favors loose coupling and high throughput for different components within a node.
-func MakeSingletonLockManager() lockctx.Manager {
+func SingletonLockManager() lockctx.Manager {
 	var manager lockctx.Manager
 	makeLockManagerOnce.Do(func() {
 		manager = lockctx.NewManager(storage.Locks(), makeLockPolicy())
 	})
 	if manager == nil {
-		panic("critical sanity check failed: MakeSingletonLockManager invoked more than once")
+		panic("critical sanity check failed: SingletonLockManager invoked more than once")
 	}
 	return manager
 }

@@ -1240,7 +1240,7 @@ func (fnb *FlowNodeBuilder) initStorageLockManager() error {
 		return nil
 	}
 
-	fnb.StorageLockMgr = locks.MakeSingletonLockManager()
+	fnb.StorageLockMgr = locks.SingletonLockManager()
 	return nil
 }
 
