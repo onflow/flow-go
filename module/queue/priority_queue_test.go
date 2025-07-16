@@ -156,12 +156,16 @@ func TestPriorityQueue_Push(t *testing.T) {
 		assert.Equal(t, 1, item2.index)
 	})
 
-	t.Run("push ignores non-PriorityQueueItem", func(t *testing.T) {
+	t.Run("push panics on non-PriorityQueueItem", func(t *testing.T) {
 		pq := &PriorityQueue[string]{}
 		initialLen := pq.Len()
 
-		pq.Push("not an item")
+		defer func() {
+			r := recover()
+			assert.Equal(t, "unexpected type added to priority queue: string", r)
+		}()
 
+		pq.Push("not an item")
 		assert.Equal(t, initialLen, pq.Len())
 	})
 }
