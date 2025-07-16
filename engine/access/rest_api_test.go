@@ -236,7 +236,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 	for i := range testBlockIDs {
 		collections := unittest.CollectionListFixture(1)
 		block := unittest.BlockFixture(
-			unittest.Block.WithHeight(uint64(i + 1)), // avoiding edge case of height = 0 (genesis block)
+			unittest.Block.WithHeight(uint64(i+1)), // avoiding edge case of height = 0 (genesis block)
 			unittest.Block.WithPayload(
 				unittest.PayloadFixture(unittest.WithGuarantees(unittest.CollectionGuaranteesWithCollectionIDFixture(collections)...)),
 			),
