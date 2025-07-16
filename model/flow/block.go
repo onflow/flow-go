@@ -204,12 +204,6 @@ func NewProposal(untrusted UntrustedProposal) (*Proposal, error) {
 	}, nil
 }
 
-// TODO: remove
-func NewUntrustedProposal(internal *Proposal) *UntrustedProposal {
-	p := UntrustedProposal(*internal)
-	return &p
-}
-
 // ProposalHeader converts the proposal into a compact [ProposalHeader] representation,
 // where the payload is compressed to a hash reference.
 func (b *Proposal) ProposalHeader() *ProposalHeader {

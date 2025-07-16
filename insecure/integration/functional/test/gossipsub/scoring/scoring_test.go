@@ -131,7 +131,8 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 
 	// checks end-to-end message delivery works on GossipSub
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return flow.NewUntrustedProposal(unittest.ProposalFixture())
+		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+		return &untrustedProposal
 	})
 
 	// generates 3000 spam messages to send to the victim node; based on default-config.yaml, ~1400 of these messages are enough to
@@ -208,7 +209,8 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		blockTopic,
 		1,
 		func() interface{} {
-			return flow.NewUntrustedProposal(unittest.ProposalFixture())
+			untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+			return &untrustedProposal
 		})
 }
 
@@ -270,7 +272,8 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 
 	// initially both nodes should be able to publish and receive messages from each other in the topic mesh.
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return flow.NewUntrustedProposal(unittest.ProposalFixture())
+		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+		return &untrustedProposal
 	})
 
 	scoreParams := conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Protocol
@@ -317,7 +320,8 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 
 	// even though the under-performing node is penalized, it should still be able to publish and receive messages from this node in the topic mesh.
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return flow.NewUntrustedProposal(unittest.ProposalFixture())
+		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+		return &untrustedProposal
 	})
 }
 
@@ -434,7 +438,8 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 
 	// even though the under-performing node is penalized, it should still be able to publish and receive messages from this node in both topic meshes.
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return flow.NewUntrustedProposal(unittest.ProposalFixture())
+		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+		return &untrustedProposal
 	})
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, dkgTopic, 1, func() interface{} {
 		return unittest.DKGMessageFixture()
@@ -499,7 +504,8 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 
 	// initially both nodes should be able to publish and receive messages from each other in the block topic mesh.
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return flow.NewUntrustedProposal(unittest.ProposalFixture())
+		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+		return &untrustedProposal
 	})
 
 	scoreParams := conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore
@@ -526,7 +532,8 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 	// defaultTopicMeshMessageDeliveryThreshold, which prevents the replaying node to be penalized.
 	proposalList := make([]*flow.UntrustedProposal, 200)
 	for i := 0; i < len(proposalList); i++ {
-		proposalList[i] = flow.NewUntrustedProposal(unittest.ProposalFixture())
+		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+		proposalList[i] = &untrustedProposal
 	}
 	i := -1
 	p2ptest.EnsurePubsubMessageExchangeFromNode(t, ctx, replayingNode, thisNode, thisId.NodeID, blockTopic, len(proposalList), func() interface{} {
@@ -605,7 +612,8 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 
 	// even though the replaying node is penalized, it should still be able to publish and receive messages from this node in both topic meshes.
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return flow.NewUntrustedProposal(unittest.ProposalFixture())
+		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+		return &untrustedProposal
 	})
 }
 

@@ -221,12 +221,14 @@ func TestExecutionFlow(t *testing.T) {
 		Once()
 
 	// submit block from consensus node
-	err = sendBlock(&exeNode, conID.NodeID, flow.NewUntrustedProposal(unittest.ProposalFromBlock(block)))
+	untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFromBlock(block))
+	err = sendBlock(&exeNode, conID.NodeID, &untrustedProposal)
 	require.NoError(t, err)
 
 	// submit the child block from consensus node, which trigger the parent block
 	// to be passed to BlockProcessable
-	err = sendBlock(&exeNode, conID.NodeID, flow.NewUntrustedProposal(unittest.ProposalFromBlock(child)))
+	untrustedProposal = flow.UntrustedProposal(*unittest.ProposalFromBlock(child))
+	err = sendBlock(&exeNode, conID.NodeID, &untrustedProposal)
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
@@ -303,8 +305,8 @@ func deployContractBlock(
 	require.NoError(t, err)
 
 	// make proposal
-	proposal := flow.NewUntrustedProposal(unittest.ProposalFromBlock(block))
-	return tx, col, block, proposal, seq + 1
+	proposal := flow.UntrustedProposal(*unittest.ProposalFromBlock(block))
+	return tx, col, block, &proposal, seq + 1
 }
 
 func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Block, ref *flow.Header) (
@@ -338,9 +340,9 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 	)
 	require.NoError(t, err)
 
-	proposal := flow.NewUntrustedProposal(unittest.ProposalFromBlock(block))
+	proposal := flow.UntrustedProposal(*unittest.ProposalFromBlock(block))
 
-	return tx, col, block, proposal, seq + 1
+	return tx, col, block, &proposal, seq + 1
 }
 
 func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Block, ref *flow.Header) (
@@ -369,9 +371,9 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 	)
 	require.NoError(t, err)
 
-	proposal := flow.NewUntrustedProposal(unittest.ProposalFromBlock(block))
+	proposal := flow.UntrustedProposal(*unittest.ProposalFromBlock(block))
 
-	return tx, col, block, proposal, seq + 1
+	return tx, col, block, &proposal, seq + 1
 }
 
 // Test a successful tx should change the statecommitment,
@@ -600,7 +602,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	proposal := flow.NewUntrustedProposal(unittest.ProposalFromBlock(block))
+	untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFromBlock(block))
 
 	child := unittest.BlockWithParentAndProposerFixture(t, block.ToHeader(), conID.NodeID)
 	child.Header.ParentVoterIndices = voterIndices
@@ -625,10 +627,11 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 		}).
 		Return(nil)
 
-	err = sendBlock(&exeNode, exeID.NodeID, proposal)
+	err = sendBlock(&exeNode, exeID.NodeID, &untrustedProposal)
 	require.NoError(t, err)
 
-	err = sendBlock(&exeNode, conID.NodeID, flow.NewUntrustedProposal(unittest.ProposalFromBlock(child)))
+	untrustedProposal = flow.UntrustedProposal(*unittest.ProposalFromBlock(child))
+	err = sendBlock(&exeNode, conID.NodeID, &untrustedProposal)
 	require.NoError(t, err)
 
 	hub.DeliverAllEventually(t, func() bool {

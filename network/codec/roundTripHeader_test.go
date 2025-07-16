@@ -24,8 +24,8 @@ import (
 func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 	block := unittest.BlockFixture()
 	proposal := unittest.ProposalFromBlock(block)
-	message := flow.NewUntrustedProposal(proposal)
-	encoded, err := codec.Encode(message)
+	message := flow.UntrustedProposal(*proposal)
+	encoded, err := codec.Encode(&message)
 	assert.NoError(t, err)
 	decodedInterface, err := codec.Decode(encoded)
 	assert.NoError(t, err)

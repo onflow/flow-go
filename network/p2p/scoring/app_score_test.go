@@ -92,10 +92,11 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 	// checks end-to-end message delivery works
 	// each node sends a distinct message to all and checks that all nodes receive it.
 	for _, node := range nodes {
+		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
 		outgoingMessageScope, err := message.NewOutgoingScope(
 			ids.NodeIDs(),
 			channels.TopicFromChannel(channels.PushBlocks, sporkId),
-			flow.NewUntrustedProposal(unittest.ProposalFixture()),
+			&untrustedProposal,
 			unittest.NetworkCodec().Encode,
 			message.ProtocolTypePubSub)
 		require.NoError(t, err)

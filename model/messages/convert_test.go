@@ -25,8 +25,8 @@ func TestBlockResponse(t *testing.T) {
 	expected := []*flow.Proposal{unittest.ProposalFixture(), unittest.ProposalFixture()}
 	res := messages.BlockResponse{
 		Blocks: []flow.UntrustedProposal{
-			*flow.NewUntrustedProposal(expected[0]),
-			*flow.NewUntrustedProposal(expected[1]),
+			flow.UntrustedProposal(*expected[0]),
+			flow.UntrustedProposal(*expected[1]),
 		},
 	}
 	converted, err := res.BlocksInternal()

@@ -114,6 +114,7 @@ func (s *EngineSuite) TestProcessSyncedBlock() {
 func (s *EngineSuite) TestProcessGossipedBlock() {
 	block := unittest.BlockWithParentFixture(s.finalized)
 	proposal := unittest.ProposalFromBlock(block)
+	untrustedProposal := flow.UntrustedProposal(*proposal)
 
 	originID := unittest.IdentifierFixture()
 	done := make(chan struct{})
@@ -121,7 +122,7 @@ func (s *EngineSuite) TestProcessGossipedBlock() {
 		close(done)
 	}).Once()
 
-	err := s.engine.Process(channels.ReceiveBlocks, originID, proposal)
+	err := s.engine.Process(channels.ReceiveBlocks, originID, &untrustedProposal)
 	require.NoError(s.T(), err)
 
 	unittest.AssertClosesBefore(s.T(), done, time.Second)

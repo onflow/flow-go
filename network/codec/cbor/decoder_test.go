@@ -17,17 +17,17 @@ import (
 func TestDecoder_Decode(t *testing.T) {
 	c := cbor.NewCodec()
 
-	blockProposal := flow.NewUntrustedProposal(unittest.ProposalFixture())
+	blockProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
 
 	t.Run("decodes message successfully", func(t *testing.T) {
 		var buf bytes.Buffer
 
-		err := c.NewEncoder(&buf).Encode(blockProposal)
+		err := c.NewEncoder(&buf).Encode(&blockProposal)
 		require.NoError(t, err)
 
 		decoded, err := c.NewDecoder(&buf).Decode()
 		require.NoError(t, err)
-		require.Equal(t, blockProposal, decoded)
+		require.Equal(t, &blockProposal, decoded)
 	})
 
 	t.Run("returns error when data is empty", func(t *testing.T) {

@@ -422,9 +422,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 	require.NoError(u.T(), err)
 
 	// flow.UntrustedProposal is not authorized to be sent via unicast over the ConsensusCommittee channel
-	payload := flow.NewUntrustedProposal(unittest.ProposalFixture())
+	payload := flow.UntrustedProposal(*unittest.ProposalFixture())
 	// send message via unicast
-	err = senderCon.Unicast(payload, u.receiverID.NodeID)
+	err = senderCon.Unicast(&payload, u.receiverID.NodeID)
 	require.NoError(u.T(), err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens

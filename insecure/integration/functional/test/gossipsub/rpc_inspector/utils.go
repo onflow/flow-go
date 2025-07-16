@@ -28,7 +28,8 @@ func startNodesAndEnsureConnected(t *testing.T, ctx irrecoverable.SignalerContex
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkID)
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return flow.NewUntrustedProposal(unittest.ProposalFixture())
+		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+		return &untrustedProposal
 	})
 }
 

@@ -15,14 +15,13 @@ import (
 func TestCodec_Decode(t *testing.T) {
 	c := cbor.NewCodec()
 	t.Run("decodes message successfully", func(t *testing.T) {
-
-		data := flow.NewUntrustedProposal(unittest.ProposalFixture())
-		encoded, err := c.Encode(data)
+		data := flow.UntrustedProposal(*unittest.ProposalFixture())
+		encoded, err := c.Encode(&data)
 		require.NoError(t, err)
 
 		decoded, err := c.Decode(encoded)
 		require.NoError(t, err)
-		require.Equal(t, data, decoded)
+		require.Equal(t, &data, decoded)
 	})
 
 	t.Run("returns error when data is empty", func(t *testing.T) {
@@ -60,8 +59,8 @@ func TestCodec_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when unmarshalling fails - wrong type", func(t *testing.T) {
-		data := flow.NewUntrustedProposal(unittest.ProposalFixture())
-		encoded, err := c.Encode(data)
+		data := flow.UntrustedProposal(*unittest.ProposalFixture())
+		encoded, err := c.Encode(&data)
 		require.NoError(t, err)
 
 		encoded[0] = codec.CodeCollectionGuarantee.Uint8()
@@ -72,8 +71,8 @@ func TestCodec_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when unmarshalling fails - corrupt", func(t *testing.T) {
-		data := flow.NewUntrustedProposal(unittest.ProposalFixture())
-		encoded, err := c.Encode(data)
+		data := flow.UntrustedProposal(*unittest.ProposalFixture())
+		encoded, err := c.Encode(&data)
 		require.NoError(t, err)
 
 		encoded[2] = 0x20 // corrupt payload

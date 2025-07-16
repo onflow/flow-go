@@ -1051,7 +1051,8 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 	// as nodes started fresh and no spamming has happened yet, the nodes should be able to exchange messages on the topic.
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkID)
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return flow.NewUntrustedProposal(unittest.ProposalFixture())
+		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+		return &untrustedProposal
 	})
 
 	var unknownTopicSpam []pubsub_pb.ControlMessage
@@ -1104,6 +1105,7 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 		blockTopic,
 		1,
 		func() interface{} {
-			return flow.NewUntrustedProposal(unittest.ProposalFixture())
+			untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+			return &untrustedProposal
 		})
 }

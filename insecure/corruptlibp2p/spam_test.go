@@ -73,7 +73,8 @@ func TestSpam_IHave(t *testing.T) {
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return flow.NewUntrustedProposal(unittest.ProposalFixture())
+		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+		return &untrustedProposal
 	})
 
 	// prepare to spam - generate iHAVE control messages

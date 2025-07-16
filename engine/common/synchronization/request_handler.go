@@ -235,7 +235,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 		if err != nil {
 			return fmt.Errorf("could not get block for height (%d): %w", height, err)
 		}
-		blocks = append(blocks, *flow.NewUntrustedProposal(proposal))
+		blocks = append(blocks, flow.UntrustedProposal(*proposal))
 	}
 
 	// if there are no blocks to send, skip network message
@@ -307,7 +307,7 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 		if err != nil {
 			return fmt.Errorf("could not get block by ID (%s): %w", blockID, err)
 		}
-		blocks = append(blocks, *flow.NewUntrustedProposal(proposal))
+		blocks = append(blocks, flow.UntrustedProposal(*proposal))
 	}
 
 	// if there are no blocks to send, skip network message

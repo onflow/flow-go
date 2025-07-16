@@ -353,12 +353,10 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 		return fmt.Errorf("could not build block: %w", err)
 	}
 
-	blockProposal := flow.NewUntrustedProposal(
-		&flow.Proposal{
-			Block:           *block,
-			ProposerSigData: proposal.ProposerSigData,
-		},
-	)
+	blockProposal := &flow.UntrustedProposal{
+		Block:           *block,
+		ProposerSigData: proposal.ProposerSigData,
+	}
 
 	// broadcast the proposal to consensus nodes
 	err = h.con.Publish(blockProposal, consRecipients.NodeIDs()...)
