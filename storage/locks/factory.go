@@ -51,7 +51,7 @@ var makeLockManagerOnce sync.Once
 //   - The lock manager only guarantees atomicity of reads and writes for the thread holding the lock.
 //     Other threads can continue to read possibly stale values, while the lock is held by a different thread.
 //     Though, this is no different than working with any transaction-based database, where reads might
-//     operate on a prior snapshot and return stale values, while a concurrent write is ongoing. 
+//     operate on a prior snapshot and return stale values, while a concurrent write is ongoing.
 //   - Furthermore, the writer must bundle all their writes into a _single_ Write Batch for atomicity. Even
 //     when holding the lock, reading threads can still observe the writes of one batch while not observing
 //     the writes of a second batch, despite the thread writing both batches while holding the lock. It was
@@ -72,7 +72,7 @@ func MakeSingletonLockManager() lockctx.Manager {
 
 // NewTestingLockManager returns a new lock manager instance for testing purposes.
 // CAUTION: for production code, there should only ever be one lock manager per database!
-// This is only used for integration testing, where we want to emulate within the same process 
+// This is only used for integration testing, where we want to emulate within the same process
 // multiple different nodes, each with their dedicated database and lock manager.
 func NewTestingLockManager() lockctx.Manager {
 	return lockctx.NewManager(storage.Locks(), makeLockPolicy())
