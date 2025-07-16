@@ -527,7 +527,7 @@ func (b *Builder) buildHeader(
 		WithChainID(ctx.parent.ChainID).
 		WithParentID(ctx.parentID).
 		WithHeight(ctx.parent.Height + 1).
-		WithTimestamp(time.Now().UTC())
+		WithTimestamp(uint64(time.Now().UnixMilli()))
 
 	// set fields specific to the consensus algorithm
 	err := setter(headerBodyBuilder)

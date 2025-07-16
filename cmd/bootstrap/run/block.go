@@ -12,7 +12,7 @@ func GenerateRootHeaderBody(chainID flow.ChainID, parentID flow.Identifier, heig
 		ChainID:            chainID,
 		ParentID:           parentID,
 		Height:             height,
-		Timestamp:          timestamp,
+		Timestamp:          uint64(timestamp.UnixMilli()),
 		View:               0,
 		ParentVoterIndices: nil,
 		ParentVoterSigData: nil,

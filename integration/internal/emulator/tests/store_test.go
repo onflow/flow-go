@@ -47,7 +47,7 @@ func TestBlocks(t *testing.T) {
 		flowgo.HeaderBody{
 			ChainID:   flow.Emulator,
 			Height:    1,
-			Timestamp: time.Now(),
+			Timestamp: uint64(time.Now().UnixMilli()),
 		},
 		flowgo.Payload{},
 	)
@@ -56,7 +56,7 @@ func TestBlocks(t *testing.T) {
 		flowgo.HeaderBody{
 			ChainID:   flow.Emulator,
 			Height:    2,
-			Timestamp: time.Now(),
+			Timestamp: uint64(time.Now().UnixMilli()),
 		},
 		flowgo.Payload{},
 	)

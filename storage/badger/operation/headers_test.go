@@ -17,7 +17,7 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 		expected := &flow.Header{
 			HeaderBody: flow.HeaderBody{
 				View:               1337,
-				Timestamp:          time.Now().UTC(),
+				Timestamp:          uint64(time.Now().UnixMilli()),
 				ParentID:           flow.Identifier{0x11},
 				ParentVoterIndices: []byte{0x44},
 				ParentVoterSigData: []byte{0x88},

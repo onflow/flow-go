@@ -101,7 +101,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		flow.HeaderBody{
 			ChainID:   flow.Emulator,
 			View:      42,
-			Timestamp: time.Now(),
+			Timestamp: uint64(time.Now().UnixMilli()),
 		},
 		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
@@ -798,7 +798,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		flow.HeaderBody{
 			ChainID:   flow.Emulator,
 			View:      26,
-			Timestamp: time.Now(),
+			Timestamp: uint64(time.Now().UnixMilli()),
 		},
 		flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},

@@ -291,7 +291,7 @@ func (lc *LogConsumer) OnOwnProposal(proposal *flow.ProposalHeader, targetPublic
 		Hex("block_id", logging.Entity(header)).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("payload_hash", header.PayloadHash[:]).
-		Time("timestamp", header.Timestamp).
+		Time("timestamp", time.UnixMilli(int64(header.Timestamp)).UTC()).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Time("target_publication_time", targetPublicationTime).
 		Msg("publishing HotStuff block proposal")

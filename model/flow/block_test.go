@@ -3,7 +3,6 @@ package flow_test
 import (
 	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -120,7 +119,6 @@ func TestBlockMalleability(t *testing.T) {
 		unittest.WithFieldGenerator("Header.ParentView", func() uint64 {
 			return block.Header.View - 1 // ParentView must stay below View, so set it to View-1
 		}),
-		unittest.WithFieldGenerator("Header.Timestamp", func() time.Time { return time.Now().UTC() }),
 		unittest.WithFieldGenerator("Payload.Results", func() flow.ExecutionResultList {
 			return flow.ExecutionResultList{unittest.ExecutionResultFixture()}
 		}),
