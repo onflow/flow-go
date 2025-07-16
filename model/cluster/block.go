@@ -118,3 +118,9 @@ type Proposal struct {
 	Block           Block
 	ProposerSigData []byte
 }
+
+// ProposalHeader converts the proposal into a compact [ProposalHeader] representation,
+// where the payload is compressed to a hash reference.
+func (b *Proposal) ProposalHeader() *flow.ProposalHeader {
+	return &flow.ProposalHeader{Header: b.Block.ToHeader(), ProposerSigData: b.ProposerSigData}
+}

@@ -6,19 +6,16 @@ import (
 )
 
 type PendingClusterBlocks struct {
-	backend *backend
+	backend *backend[*cluster.Proposal]
 }
 
 func NewPendingClusterBlocks() *PendingClusterBlocks {
-	b := &PendingClusterBlocks{backend: newBackend()}
+	b := &PendingClusterBlocks{backend: newBackend[*cluster.Proposal]()}
 	return b
 }
 
 func (b *PendingClusterBlocks) Add(block flow.Slashable[*cluster.Proposal]) bool {
-	return b.backend.add(flow.Slashable[*flow.ProposalHeader]{
-		OriginID: flow.Identifier{},
-		Message:  &flow.ProposalHeader{Header: block.Message.Block.ToHeader(), ProposerSigData: block.Message.ProposerSigData},
-	}, block.Message.Block.Payload)
+	return b.backend.add(block)
 }
 
 func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cluster.Proposal], bool) {
@@ -26,25 +23,7 @@ func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cl
 	if !ok {
 		return flow.Slashable[*cluster.Proposal]{}, false
 	}
-	block, err := cluster.NewBlock(
-		cluster.UntrustedBlock{
-			Header:  item.header.Message.Header.HeaderBody,
-			Payload: item.payload.(cluster.Payload),
-		},
-	)
-	if err != nil {
-		return flow.Slashable[*cluster.Proposal]{}, false
-	}
-
-	proposal := flow.Slashable[*cluster.Proposal]{
-		OriginID: item.header.OriginID,
-		Message: &cluster.Proposal{
-			Block:           *block,
-			ProposerSigData: item.header.Message.ProposerSigData,
-		},
-	}
-
-	return proposal, true
+	return item.payload, true
 }
 
 func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.Proposal], bool) {
@@ -55,24 +34,7 @@ func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slas
 
 	proposals := make([]flow.Slashable[*cluster.Proposal], 0, len(items))
 	for _, item := range items {
-		block, err := cluster.NewBlock(
-			cluster.UntrustedBlock{
-				Header:  item.header.Message.Header.HeaderBody,
-				Payload: item.payload.(cluster.Payload),
-			},
-		)
-		if err != nil {
-			return nil, false
-		}
-
-		proposal := flow.Slashable[*cluster.Proposal]{
-			OriginID: item.header.OriginID,
-			Message: &cluster.Proposal{
-				Block:           *block,
-				ProposerSigData: item.header.Message.ProposerSigData,
-			},
-		}
-		proposals = append(proposals, proposal)
+		proposals = append(proposals, item.payload)
 	}
 
 	return proposals, true
