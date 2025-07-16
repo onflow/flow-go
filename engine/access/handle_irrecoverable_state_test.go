@@ -183,7 +183,7 @@ func TestIrrecoverableState(t *testing.T) {
 
 // TestGRPCInconsistentNodeState tests the behavior when gRPC encounters an inconsistent node state.
 func (suite *IrrecoverableStateTestSuite) TestGRPCInconsistentNodeState() {
-	err := fmt.Errorf("inconsistent node's state")
+	err := fmt.Errorf("inconsistent node state")
 	suite.snapshot.On("Head").Return(nil, err)
 
 	suite.startServers(suite.T(), irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err))
@@ -216,7 +216,7 @@ func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 	)
 	suite.blocks.On("ByID", blockHeader.ID()).Return(blockHeader, nil)
 
-	err := fmt.Errorf("inconsistent node's state")
+	err := fmt.Errorf("inconsistent node state")
 	suite.snapshot.On("Head").Return(nil, err)
 
 	suite.startServers(suite.T(), fmt.Errorf("failed to lookup latest sealed header: %w", err))

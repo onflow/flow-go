@@ -63,7 +63,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 		// storage.ErrNotFound is specifically NOT allowed since the snapshot's reference block must exist
 		// within the snapshot. we can ignore the actual error since it is rewritten below
 		_ = access.RequireErrorIs(ctx, err, state.ErrUnknownSnapshotReference)
-		return nil, access.NewDataNotFoundError("snapshot", fmt.Errorf("failed to retrieve snapshot: block not found"))
+		return nil, access.NewDataNotFoundError("snapshot", fmt.Errorf("failed to retrieve a valid snapshot: %w", err))
 	}
 
 	// Because there is no index from block ID to finalized height, we separately look up the finalized
@@ -112,7 +112,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByHeight(ctx context.Context, b
 		// storage.ErrNotFound is specifically NOT allowed since the snapshot's reference block must exist
 		// within the snapshot. we can ignore the actual error since it is rewritten below
 		_ = access.RequireErrorIs(ctx, err, state.ErrUnknownSnapshotReference)
-		return nil, access.NewDataNotFoundError("snapshot", fmt.Errorf("failed to retrieve a valid snapshot: block not found"))
+		return nil, access.NewDataNotFoundError("snapshot", fmt.Errorf("failed to retrieve a valid snapshot: %w", err))
 	}
 
 	data, err := convert.SnapshotToBytes(snapshot)
