@@ -187,16 +187,16 @@ func NewProposal(untrusted UntrustedProposal) (*Proposal, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid block: %w", err)
 		}
+		// we do not have ProposerSigData for genesis block
+		if len(untrusted.ProposerSigData) == 0 {
+			return nil, fmt.Errorf("proposer signature must not be empty")
+		}
 	} else {
 		block, err = NewRootBlock(UntrustedBlock(untrusted.Block))
 		if err != nil {
 			return nil, fmt.Errorf("invalid root block: %w", err)
 		}
 	}
-
-	//if len(untrusted.ProposerSigData) == 0 {
-	//	return nil, fmt.Errorf("proposer signature must not be empty")
-	//}
 
 	return &Proposal{
 		Block:           *block,
