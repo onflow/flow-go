@@ -16,7 +16,6 @@ import (
 // Because our NewHeaderBody constructor enforces ParentView < View we use
 // WithFieldGenerator to safely pass it.
 func TestClusterBlockMalleability(t *testing.T) {
-
 	clusterBlock := unittest.ClusterBlockFixture()
 	unittest.RequireEntityNonMalleable(
 		t,
@@ -91,7 +90,7 @@ func TestNewBlock(t *testing.T) {
 //   - Ensures an error is returned when the HeaderBody.ParentID is not zero.
 //
 // 4. Invalid input with invalid Payload:
-//   - Ensures an error is returned when the Payload.ReferenceBlockID is flow.ZeroID.
+//   - Ensures an error is returned when the Payload.ReferenceBlockID is not flow.ZeroID.
 func TestNewRootBlock(t *testing.T) {
 	base := cluster.UntrustedBlock{
 		Header: flow.HeaderBody{

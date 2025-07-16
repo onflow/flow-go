@@ -500,8 +500,7 @@ func createTestBlockAndRun(
 
 	block := unittest.BlockFixture(
 		unittest.Block.WithParent(parentBlock.ID(), parentBlock.Header.View, parentBlock.Header.Height),
-		unittest.Block.WithView(parentBlock.Header.Height+1),
-		unittest.Block.WithParentView(parentBlock.Header.Height),
+		unittest.Block.WithView(parentBlock.Header.View+1),
 		unittest.Block.WithPayload(
 			unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
 		),

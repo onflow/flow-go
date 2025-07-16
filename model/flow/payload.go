@@ -37,9 +37,8 @@ type Payload struct {
 // a trusted main consensus Payload using NewPayload constructor.
 type UntrustedPayload Payload
 
-// NewPayload creates a payload given a reference block ID and a
-// list of transaction hashes.
-// Construction cluster Payload allowed only within the constructor.
+// NewPayload creates a new payload.
+// Construction of Payload is allowed only within the constructor.
 //
 // All errors indicate a valid Payload cannot be constructed from the input.
 func NewPayload(untrusted UntrustedPayload) (*Payload, error) {
