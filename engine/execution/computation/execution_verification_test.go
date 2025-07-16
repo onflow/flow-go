@@ -200,7 +200,9 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		err = testutil.SignTransactionAsServiceAccount(createAccountTx, 0, chain)
 		require.NoError(t, err)
 
-		addKeyTx := testutil.CreateAddAnAccountKeyMultipleTimesTransaction(t, &accountPrivKey, 100).AddAuthorizer(accountAddress)
+		addKeyTx := testutil.CreateAddAnAccountKeyMultipleTimesTransaction(t, &accountPrivKey, 100).
+			AddAuthorizer(accountAddress).
+			Build()
 		err = testutil.SignTransaction(addKeyTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 

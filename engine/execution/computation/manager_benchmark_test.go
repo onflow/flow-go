@@ -84,7 +84,7 @@ func mustFundAccounts(
 ) snapshot.SnapshotTree {
 	var err error
 	for _, acc := range accs.accounts {
-		transferTx := testutil.CreateTokenTransferTransaction(chain, 1_000_000, acc.address, chain.ServiceAddress())
+		transferTx := testutil.CreateTokenTransferTransaction(chain, 1_000_000, acc.address, chain.ServiceAddress()).Build()
 		err = testutil.SignTransactionAsServiceAccount(transferTx, accs.seq, chain)
 		require.NoError(b, err)
 		accs.seq++
@@ -302,10 +302,11 @@ func createTokenTransferTransaction(b *testing.B, accs *testAccounts) *flow.Tran
 	src := accs.accounts[rnd]
 	dst := accs.accounts[(rnd+1)%len(accs.accounts)]
 
-	tx := testutil.CreateTokenTransferTransaction(chain, 1, dst.address, src.address)
-	tx.SetProposalKey(chain.ServiceAddress(), 0, accs.seq).
+	tx := testutil.CreateTokenTransferTransaction(chain, 1, dst.address, src.address).
+		SetProposalKey(chain.ServiceAddress(), 0, accs.seq).
 		SetComputeLimit(1000).
-		SetPayer(chain.ServiceAddress())
+		SetPayer(chain.ServiceAddress()).
+		Build()
 	accs.seq++
 
 	err = testutil.SignPayload(tx, src.address, src.privateKey)

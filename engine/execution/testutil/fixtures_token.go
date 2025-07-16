@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func CreateTokenTransferTransaction(chain flow.Chain, amount int, to flow.Address, signer flow.Address) *flow.TransactionBody {
+func CreateTokenTransferTransaction(chain flow.Chain, amount int, to flow.Address, signer flow.Address) *flow.TransactionBodyBuilder {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`
@@ -35,6 +35,5 @@ func CreateTokenTransferTransaction(chain flow.Chain, amount int, to flow.Addres
 		}`, sc.FungibleToken.Address.Hex(), sc.FlowToken.Address.Hex()))).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(amount))).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(to))).
-		AddAuthorizer(signer).
-		Build()
+		AddAuthorizer(signer)
 }

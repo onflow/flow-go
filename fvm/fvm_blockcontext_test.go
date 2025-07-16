@@ -831,15 +831,15 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			txBody := flow.NewTransactionBodyBuilder().
+			txBodyBuilder := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(tt.script)).
-				SetArguments(tt.args).
-				Build()
+				SetArguments(tt.args)
 
 			for _, authorizer := range tt.authorizers {
-				txBody.AddAuthorizer(authorizer)
+				txBodyBuilder.AddAuthorizer(authorizer)
 			}
 
+			txBody := txBodyBuilder.Build()
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 

@@ -39,7 +39,7 @@ func MessageToTransaction(m *entitiesproto.Transaction, chain flow.Chain) (flow.
 		if err != nil {
 			return t, err
 		}
-		t.SetPayer(payerAddress)
+		tb.SetPayer(payerAddress)
 	}
 
 	for _, authorizer := range m.GetAuthorizers() {

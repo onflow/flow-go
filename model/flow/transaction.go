@@ -163,12 +163,6 @@ func (tb *TransactionBody) SetPayer(address Address) *TransactionBody {
 	return tb
 }
 
-// AddAuthorizer adds an authorizer account to this transaction.
-func (tb *TransactionBody) AddAuthorizer(address Address) *TransactionBody {
-	tb.Authorizers = append(tb.Authorizers, address) //nolint:structwrite
-	return tb
-}
-
 // Transaction is the smallest unit of task.
 type Transaction struct {
 	TransactionBody
