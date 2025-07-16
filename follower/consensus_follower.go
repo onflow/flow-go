@@ -97,6 +97,9 @@ func WithComplianceConfig(config *compliance.Config) Option {
 
 func WithLockManager(lockManager lockctx.Manager) Option {
 	return func(c *Config) {
+		if c.lockManager != nil {
+			panic("lock manager already set, cannot overwrite")
+		}
 		c.lockManager = lockManager
 	}
 }
