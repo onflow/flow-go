@@ -80,6 +80,7 @@ func (pq PriorityQueue[T]) Swap(i, j int) {
 
 // Push adds an item to the priority queue.
 // The item's index is automatically set to its position in the heap.
+// The item must be of type `*PriorityQueueItem[T]` otherwise the method will panic.
 // CAUTION: not concurrency safe!
 func (pq *PriorityQueue[T]) Push(x any) {
 	n := len(*pq)
