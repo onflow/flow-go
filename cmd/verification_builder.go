@@ -168,7 +168,9 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			var ok bool
 			var err error
 
-			if dbops.IsBatchUpdate(node.DBOps) {
+			if dbops.IsBadgerTransaction(v.DBOps) {
+				return fmt.Errorf("badger transaction is not supported for chunks queue")
+			} else if dbops.IsBatchUpdate(node.DBOps) {
 				queue := store.NewChunkQueue(node.Metrics.Cache, node.ProtocolDB)
 				ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
 				if err != nil {
