@@ -21,7 +21,7 @@ func BlockFromFlow(header *flow.Header) *Block {
 	block := Block{
 		BlockID:    header.ID(),
 		View:       header.View,
-		QC:         header.QuorumCertificate(),
+		QC:         header.ParentQC(),
 		ProposerID: header.ProposerID,
 		Timestamp:  header.Timestamp,
 	}

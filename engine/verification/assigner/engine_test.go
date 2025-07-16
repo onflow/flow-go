@@ -166,7 +166,13 @@ func newBlockHappyPath(t *testing.T) {
 			vertestutils.WithAssignee(t, s.myID())))
 	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
-	chunksNum := s.mockChunkAssigner(flow.NewIncorporatedResult(containerBlock.ID(), result), assignment)
+
+	incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+		IncorporatedBlockID: containerBlock.ID(),
+		Result:              result,
+	})
+	require.NoError(t, err)
+	chunksNum := s.mockChunkAssigner(incorporatedResult, assignment)
 	require.Equal(t, chunksNum, 1) // one chunk should be assigned
 
 	// mocks processing assigned chunks
@@ -271,7 +277,12 @@ func newBlockNoChunk(t *testing.T) {
 	containerBlock, assignment := createContainerBlock()
 	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
-	chunksNum := s.mockChunkAssigner(flow.NewIncorporatedResult(containerBlock.ID(), result), assignment)
+	incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+		IncorporatedBlockID: containerBlock.ID(),
+		Result:              result,
+	})
+	require.NoError(t, err)
+	chunksNum := s.mockChunkAssigner(incorporatedResult, assignment)
 	require.Equal(t, chunksNum, 0) // no chunk should be assigned
 
 	// once assigner engine is done processing the block, it should notify the processing notifier.
@@ -311,7 +322,12 @@ func newBlockNoAssignedChunk(t *testing.T) {
 			vertestutils.WithAssignee(t, unittest.IdentifierFixture()))) // assigned to others
 	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
-	chunksNum := s.mockChunkAssigner(flow.NewIncorporatedResult(containerBlock.ID(), result), assignment)
+	incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+		IncorporatedBlockID: containerBlock.ID(),
+		Result:              result,
+	})
+	require.NoError(t, err)
+	chunksNum := s.mockChunkAssigner(incorporatedResult, assignment)
 	require.Equal(t, chunksNum, 0) // no chunk should be assigned
 
 	// once assigner engine is done processing the block, it should notify the processing notifier.
@@ -351,7 +367,12 @@ func newBlockMultipleAssignment(t *testing.T) {
 			vertestutils.WithAssignee(t, s.myID())))                    // assigned to me
 	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
-	chunksNum := s.mockChunkAssigner(flow.NewIncorporatedResult(containerBlock.ID(), result), assignment)
+	incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+		IncorporatedBlockID: containerBlock.ID(),
+		Result:              result,
+	})
+	require.NoError(t, err)
+	chunksNum := s.mockChunkAssigner(incorporatedResult, assignment)
 	require.Equal(t, chunksNum, 3) // 3 chunks should be assigned
 
 	// mocks processing assigned chunks
@@ -390,7 +411,12 @@ func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 		vertestutils.WithChunks(vertestutils.WithAssignee(t, s.myID())))
 	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
-	chunksNum := s.mockChunkAssigner(flow.NewIncorporatedResult(containerBlock.ID(), result), assignment)
+	incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+		IncorporatedBlockID: containerBlock.ID(),
+		Result:              result,
+	})
+	require.NoError(t, err)
+	chunksNum := s.mockChunkAssigner(incorporatedResult, assignment)
 	require.Equal(t, chunksNum, 1)
 
 	// mocks processing assigned chunks

@@ -64,6 +64,7 @@ func NewInMemoryIndexer(
 }
 
 // IndexTxResultErrorMessagesData index transaction result error messages
+// No errors are expected during normal operation.
 func (i *InMemoryIndexer) IndexTxResultErrorMessagesData(txResultErrMsgs []flow.TransactionResultErrorMessage) error {
 	if err := i.txResultErrMsgs.Store(i.executionResult.BlockID, txResultErrMsgs); err != nil {
 		return fmt.Errorf("could not index transaction result error messages: %w", err)
@@ -72,9 +73,7 @@ func (i *InMemoryIndexer) IndexTxResultErrorMessagesData(txResultErrMsgs []flow.
 }
 
 // IndexBlockData indexes all execution block data.
-// Expected errors:
-// - convert.UnexpectedLedgerKeyFormat if the key is not in the expected format
-// - storage.ErrHeightNotIndexed if the given height does not match the storage's block height.
+// No errors are expected during normal operation.
 func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionDataEntity) error {
 	log := i.log.With().Hex("block_id", logging.ID(data.BlockID)).Logger()
 	log.Debug().Msg("indexing block data")
@@ -133,10 +132,8 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 		return fmt.Errorf("could not index registers: %w", err)
 	}
 
-	duration := time.Since(start)
-
 	log.Debug().
-		Dur("duration_ms", duration).
+		Dur("duration_ms", time.Since(start)).
 		Int("event_count", len(events)).
 		Int("register_count", len(registers)).
 		Int("result_count", len(results)).
@@ -147,9 +144,7 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 }
 
 // indexRegisters processes register payloads and stores them in the register database.
-// Expected errors:
-// - convert.UnexpectedLedgerKeyFormat if the key is not in the expected format
-// - storage.ErrHeightNotIndexed if the given height does not match the storage's block height.
+// No errors are expected during normal operation.
 func (i *InMemoryIndexer) indexRegisters(registers map[ledger.Path]*ledger.Payload, height uint64) error {
 	regEntries := make(flow.RegisterEntries, 0, len(registers))
 

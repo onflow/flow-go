@@ -269,10 +269,10 @@ func (lc *LogConsumer) OnNewTcDiscovered(tc *flow.TimeoutCertificate) {
 		Msg("new TC discovered")
 }
 
-func (lc *LogConsumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+func (lc *LogConsumer) OnOwnVote(vote *model.Vote, recipientID flow.Identifier) {
 	lc.log.Debug().
-		Hex("block_id", blockID[:]).
-		Uint64("block_view", view).
+		Hex("block_id", vote.BlockID[:]).
+		Uint64("block_view", vote.View).
 		Hex("recipient_id", recipientID[:]).
 		Msg("publishing HotStuff vote")
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -404,6 +405,81 @@ func TestOnBlockWithMissingParentCommit(t *testing.T) {
 	require.NoError(t, err)
 	requireExecutableHas(t, executables)
 	requireQueueIsEmpty(t, q)
+}
+
+// TestNewMissingCollection verifies that NewMissingCollection constructs a valid MissingCollection
+// when given complete, non-zero fields, and returns an error if any required field is missing.
+// It covers:
+//   - valid missing collection creation
+//   - missing BlockID
+//   - zero Height
+//   - nil Guarantee
+func TestNewMissingCollection(t *testing.T) {
+	height := uint64(10)
+
+	t.Run("valid missing collection", func(t *testing.T) {
+		id := unittest.IdentifierFixture()
+		guarantee := unittest.CollectionGuaranteeFixture()
+
+		uc := UntrustedMissingCollection{
+			BlockID:   id,
+			Height:    height,
+			Guarantee: guarantee,
+		}
+
+		mc, err := NewMissingCollection(uc)
+		assert.NoError(t, err)
+		assert.NotNil(t, mc)
+		assert.Equal(t, id, mc.BlockID)
+		assert.Equal(t, height, mc.Height)
+		assert.Equal(t, guarantee, mc.Guarantee)
+	})
+
+	t.Run("missing BlockID", func(t *testing.T) {
+		guarantee := unittest.CollectionGuaranteeFixture()
+
+		uc := UntrustedMissingCollection{
+			BlockID:   flow.ZeroID,
+			Height:    height,
+			Guarantee: guarantee,
+		}
+
+		mc, err := NewMissingCollection(uc)
+		assert.Error(t, err)
+		assert.Nil(t, mc)
+		assert.Contains(t, err.Error(), "BlockID")
+	})
+
+	t.Run("zero Height", func(t *testing.T) {
+		id := unittest.IdentifierFixture()
+		guarantee := unittest.CollectionGuaranteeFixture()
+
+		uc := UntrustedMissingCollection{
+			BlockID:   id,
+			Height:    0,
+			Guarantee: guarantee,
+		}
+
+		mc, err := NewMissingCollection(uc)
+		assert.Error(t, err)
+		assert.Nil(t, mc)
+		assert.Contains(t, err.Error(), "Height")
+	})
+
+	t.Run("nil Guarantee", func(t *testing.T) {
+		id := unittest.IdentifierFixture()
+
+		uc := UntrustedMissingCollection{
+			BlockID:   id,
+			Height:    height,
+			Guarantee: nil,
+		}
+
+		mc, err := NewMissingCollection(uc)
+		assert.Error(t, err)
+		assert.Nil(t, mc)
+		assert.Contains(t, err.Error(), "CollectionGuarantee")
+	})
 }
 
 /* ==== Test utils ==== */

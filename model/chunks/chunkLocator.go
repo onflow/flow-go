@@ -45,6 +45,20 @@ func (c Locator) ID() flow.Identifier {
 	return flow.MakeID(c)
 }
 
+// EqualTo returns true if the two Locator are equivalent.
+func (c *Locator) EqualTo(other *Locator) bool {
+	// Shortcut if `t` and `other` point to the same object; covers case where both are nil.
+	if c == other {
+		return true
+	}
+	if c == nil || other == nil { // only one is nil, the other not (otherwise we would have returned above)
+		return false
+	}
+
+	return c.ResultID == other.ResultID &&
+		c.Index == other.Index
+}
+
 // LocatorMap maps keeps chunk locators based on their locator id.
 type LocatorMap map[flow.Identifier]*Locator
 
