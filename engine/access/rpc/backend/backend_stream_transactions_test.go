@@ -312,8 +312,9 @@ func (s *TransactionStatusSuite) initializeHappyCaseMockInstructions() {
 
 // createSendTransaction generate sent transaction with ref block of the current finalized block
 func (s *TransactionStatusSuite) createSendTransaction() flow.Transaction {
-	transaction := unittest.TransactionFixture()
-	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
+	transaction := unittest.TransactionFixture(func(t *flow.Transaction) {
+		t.ReferenceBlockID = s.finalizedBlock.ID()
+	})
 	s.transactions.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(&transaction.TransactionBody, nil).Maybe()
 	return transaction
 }
@@ -634,8 +635,10 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusFailedSubscriptio
 	defer cancel()
 
 	// Generate sent transaction with ref block of the current finalized block
-	transaction := unittest.TransactionFixture()
-	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
+	transaction := unittest.TransactionFixture(
+		func(t *flow.Transaction) {
+			t.ReferenceBlockID = s.finalizedBlock.ID()
+		})
 	txId := transaction.ID()
 
 	s.Run("throws irrecoverable if sealed header not available", func() {

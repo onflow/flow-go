@@ -137,12 +137,6 @@ func (tb TransactionBody) ID() Identifier {
 	return MakeID(tb)
 }
 
-// SetReferenceBlockID sets the reference block ID for this transaction.
-func (tb *TransactionBody) SetReferenceBlockID(blockID Identifier) *TransactionBody {
-	tb.ReferenceBlockID = blockID //nolint:structwrite
-	return tb
-}
-
 // SetComputeLimit sets the gas limit for this transaction.
 func (tb *TransactionBody) SetComputeLimit(limit uint64) *TransactionBody {
 	tb.GasLimit = limit //nolint:structwrite

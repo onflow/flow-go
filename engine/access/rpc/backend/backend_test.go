@@ -1168,7 +1168,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	block := unittest.BlockFixture(
 		unittest.Block.WithHeight(2),
 	)
-	transactionBody.SetReferenceBlockID(block.ID())
+	transactionBody.ReferenceBlockID = block.ID()
 
 	headBlock := unittest.BlockFixture(
 		unittest.Block.WithHeight(block.Header.Height - 1), // head is behind the current block
@@ -1280,7 +1280,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		unittest.Block.WithHeight(2),
 	)
 	refBlockID := refBlock.ID()
-	transactionBody.SetReferenceBlockID(refBlockID)
+	transactionBody.ReferenceBlockID = refBlockID
 	txID := transactionBody.ID()
 
 	headBlock := unittest.BlockFixture(
@@ -1763,7 +1763,7 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	refBlock := unittest.BlockFixture(
 		unittest.Block.WithHeight(2),
 	)
-	transactionBody.SetReferenceBlockID(refBlock.ID())
+	transactionBody.ReferenceBlockID = refBlock.ID()
 	txId := transactionBody.ID()
 
 	// transaction storage returns the corresponding transaction

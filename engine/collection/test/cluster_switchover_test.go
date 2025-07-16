@@ -384,7 +384,7 @@ func (tc *ClusterSwitchoverTestCase) SubmitTransactionToCluster(
 	// get any block within the target epoch as the transaction's reference block
 	refBlock := tc.BlockInEpoch(epochCounter)
 	tx := tc.Transaction(func(tx *flow.TransactionBody) {
-		tx.SetReferenceBlockID(refBlock.ID())
+		tx.ReferenceBlockID = refBlock.ID()
 	})
 	clusterTx := unittest.AlterTransactionForCluster(*tx, clustering, clusterMembers, nil)
 	tc.ExpectTransaction(epochCounter, clusterIndex, clusterTx.ID())
