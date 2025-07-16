@@ -348,25 +348,19 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 }
 
 func (ss *SyncSuite) TestOnBlockResponse() {
-	nonce, err := rand.Uint64()
-	require.NoError(ss.T(), err, "should generate nonce")
-
 	// generate origin and block response
 	originID := unittest.IdentifierFixture()
-	res := &messages.BlockResponse{
-		Nonce:  nonce,
-		Blocks: []flow.UntrustedProposal{},
-	}
+	var res []*flow.Proposal
 
 	// add one block that should be processed
 	processable := unittest.ProposalFixture()
 	ss.core.On("HandleBlock", processable.Block.ToHeader()).Return(true)
-	res.Blocks = append(res.Blocks, *flow.NewUntrustedProposal(processable))
+	res = append(res, processable)
 
 	// add one block that should not be processed
 	unprocessable := unittest.ProposalFixture()
 	ss.core.On("HandleBlock", unprocessable.Block.ToHeader()).Return(false)
-	res.Blocks = append(res.Blocks, *flow.NewUntrustedProposal(unprocessable))
+	res = append(res, unprocessable)
 
 	ss.comp.On("OnSyncedBlocks", mock.Anything).Run(func(args mock.Arguments) {
 		res := args.Get(0).(flow.Slashable[[]*flow.Proposal])

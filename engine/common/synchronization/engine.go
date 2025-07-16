@@ -183,15 +183,21 @@ func (e *Engine) setupResponseMessageHandler() error {
 				if !ok {
 					// should never happen, unless there is a bug.
 					e.log.Warn().
-						Str("entity_ids", fmt.Sprintf("%v", blockResponse)).
 						Hex("origin_id", logging.ID(msg.OriginID)).
+						Interface("payload", msg.Payload).
 						Msg("cannot match the payload to entity request")
 					return nil, false
 				}
 				proposals, err := blockResponse.BlocksInternal()
 				if err != nil {
-					//TODO:
-					panic(err)
+					e.log.Warn().
+						Hex("origin_id", logging.ID(msg.OriginID)).
+						Uint64("nonce", blockResponse.Nonce).
+						Int("block_count", len(blockResponse.Blocks)).
+						Err(err).
+						Msgf("cannot convert untrusted proposal to trusted proposal")
+					e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageBlockProposal)
+					return nil, false
 				}
 
 				return &engine.Message{

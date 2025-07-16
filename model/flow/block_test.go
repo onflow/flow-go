@@ -223,3 +223,57 @@ func TestNewRootBlock(t *testing.T) {
 		require.Contains(t, err.Error(), "invalid payload")
 	})
 }
+
+// TestNewProposal verifies the behavior of the NewProposal constructor.
+// It ensures proper handling of both valid and invalid input fields.
+//
+// Test Cases:
+//
+// 1. Valid input:
+//   - Verifies that a properly populated UntrustedProposal results in a valid Proposal.
+//
+// 2. Invalid input with invalid Block:
+//   - Ensures an error is returned when the Block.ParentID is flow.ZeroID.
+//
+// 3. Invalid input with nil ProposerSigData:
+//   - Ensures an error is returned when the ProposerSigData is nil.
+//
+// 4. Invalid input with empty ProposerSigData:
+//   - Ensures an error is returned when the ProposerSigData is an empty byte slice.
+func TestNewProposal(t *testing.T) {
+	t.Run("valid input", func(t *testing.T) {
+		res, err := flow.NewProposal(flow.UntrustedProposal(*unittest.ProposalFixture()))
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	})
+
+	t.Run("invalid input with invalid block", func(t *testing.T) {
+		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+		untrustedProposal.Block.Header.ParentID = flow.ZeroID
+
+		res, err := flow.NewProposal(untrustedProposal)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "invalid root block")
+	})
+
+	t.Run("invalid input with nil ProposerSigData", func(t *testing.T) {
+		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+		untrustedProposal.ProposerSigData = nil
+
+		res, err := flow.NewProposal(untrustedProposal)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "proposer signature must not be empty")
+	})
+
+	t.Run("invalid input with empty ProposerSigData", func(t *testing.T) {
+		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+		untrustedProposal.ProposerSigData = []byte{}
+
+		res, err := flow.NewProposal(untrustedProposal)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "proposer signature must not be empty")
+	})
+}

@@ -278,7 +278,7 @@ func (bs *BuilderSuite) SetupTest() {
 		return nil
 	}
 	bs.sign = func(_ *flow.Header) ([]byte, error) {
-		return nil, nil
+		return unittest.SignatureFixture(), nil
 	}
 
 	bs.state = &protocol.ParticipantState{}

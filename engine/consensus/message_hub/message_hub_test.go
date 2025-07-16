@@ -172,10 +172,11 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 	var channel channels.Channel
 	originID := unittest.IdentifierFixture()
 	s.Run("to-compliance-engine", func() {
-		blockProposalMsg := flow.NewUntrustedProposal(unittest.ProposalFixture())
-		expectedComplianceMsg := flow.Slashable[*flow.UntrustedProposal]{
+		proposal := unittest.ProposalFixture()
+		blockProposalMsg := flow.NewUntrustedProposal(proposal)
+		expectedComplianceMsg := flow.Slashable[*flow.Proposal]{
 			OriginID: originID,
-			Message:  blockProposalMsg,
+			Message:  proposal,
 		}
 		s.compliance.On("OnBlockProposal", expectedComplianceMsg).Return(nil).Once()
 		err := s.hub.Process(channel, originID, blockProposalMsg)

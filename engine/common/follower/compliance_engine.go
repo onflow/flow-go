@@ -209,10 +209,15 @@ func (e *ComplianceEngine) OnFinalizedBlock(block *model.Block) {
 // notifying us about fresh proposals directly from the consensus leaders.
 func (e *ComplianceEngine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *flow.Proposal:
+	case *flow.UntrustedProposal:
+		proposal, err := flow.NewProposal(*msg)
+		if err != nil {
+			return fmt.Errorf("cannot construct proposal: %w", err)
+		}
+
 		e.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 			OriginID: originID,
-			Message:  msg,
+			Message:  proposal,
 		})
 	default:
 		e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, message, channel)

@@ -172,22 +172,31 @@ type Proposal struct {
 // ordering during construction.
 //
 // An instance of UntrustedProposal should be validated and converted into
-// a trusted cluster Proposal using the NewProposal constructor.
+// a trusted Proposal using the NewProposal constructor.
 type UntrustedProposal Proposal
 
 // NewProposal creates a new Proposal.
 // This constructor enforces validation rules to ensure the Proposal is well-formed.
-// It must be used to construct all non-root blocks.
 //
 // All errors indicate that a valid Proposal cannot be constructed from the input.
 func NewProposal(untrusted UntrustedProposal) (*Proposal, error) {
-	block, err := NewBlock(UntrustedBlock(untrusted.Block))
-	if err != nil {
-		return nil, fmt.Errorf("invalid block: %w", err)
+	var block *Block
+	var err error
+	if untrusted.Block.Header.ContainsParentQC() {
+		block, err = NewBlock(UntrustedBlock(untrusted.Block))
+		if err != nil {
+			return nil, fmt.Errorf("invalid block: %w", err)
+		}
+	} else {
+		block, err = NewRootBlock(UntrustedBlock(untrusted.Block))
+		if err != nil {
+			return nil, fmt.Errorf("invalid root block: %w", err)
+		}
 	}
-	if len(untrusted.ProposerSigData) == 0 {
-		return nil, fmt.Errorf("proposer signature must not be empty")
-	}
+
+	//if len(untrusted.ProposerSigData) == 0 {
+	//	return nil, fmt.Errorf("proposer signature must not be empty")
+	//}
 
 	return &Proposal{
 		Block:           *block,
@@ -199,31 +208,6 @@ func NewProposal(untrusted UntrustedProposal) (*Proposal, error) {
 func NewUntrustedProposal(internal *Proposal) *UntrustedProposal {
 	p := UntrustedProposal(*internal)
 	return &p
-}
-
-// DeclareTrusted converts the UntrustedProposal to a trusted internal flow.Proposal.
-// CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
-//
-// All errors indicate that the input message could not be converted to a valid proposal.
-func (msg *UntrustedProposal) DeclareTrusted() (*Proposal, error) {
-	block, err := NewBlock(
-		UntrustedBlock{
-			Header:  msg.Block.Header,
-			Payload: msg.Block.Payload,
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("could not build block: %w", err)
-	}
-	// validate ProposerSigData
-	if len(msg.ProposerSigData) == 0 {
-		return nil, fmt.Errorf("proposer signature must not be empty")
-	}
-	//nolint:structwrite
-	return &Proposal{
-		Block:           *block,
-		ProposerSigData: msg.ProposerSigData,
-	}, nil
 }
 
 // ProposalHeader converts the proposal into a compact [ProposalHeader] representation,
