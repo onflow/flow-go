@@ -263,7 +263,7 @@ func deployContractBlock(
 ) (
 	*flow.TransactionBody, *flow.Collection, *flow.Block, *messages.UntrustedProposal, uint64) {
 	// make tx
-	tx := execTestutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
+	tx := execTestutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain).Build()
 	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
 	require.NoError(t, err)
 

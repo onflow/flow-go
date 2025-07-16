@@ -199,11 +199,11 @@ func ExecutionResultFixture(t *testing.T,
 ) (*flow.ExecutionResult, *ExecutionReceiptData) {
 
 	// setups up the first collection of block consists of three transactions
-	tx1 := testutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
+	tx1 := testutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain).Build()
 	err := testutil.SignTransactionAsServiceAccount(tx1, 0, chain)
 	require.NoError(t, err)
 
-	tx2 := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	tx2 := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress()).Build()
 	err = testutil.SignTransactionAsServiceAccount(tx2, 1, chain)
 	require.NoError(t, err)
 	tx3 := testutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
@@ -314,7 +314,7 @@ func ExecutionResultFixture(t *testing.T,
 		}
 
 		for i := 1; i < chunkCount; i++ {
-			tx := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+			tx := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress()).Build()
 			err = testutil.SignTransactionAsServiceAccount(tx, 3+uint64(i), chain)
 			require.NoError(t, err)
 

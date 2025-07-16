@@ -19,7 +19,7 @@ access(all) contract EventContract {
 
 func DeployEventContractTransaction(authorizer flow.Address, chain flow.Chain, eventValue int) *flow.TransactionBody {
 	contract := fmt.Sprintf(EventContract, eventValue)
-	return CreateContractDeploymentTransaction("EventContract", contract, authorizer, chain)
+	return CreateContractDeploymentTransaction("EventContract", contract, authorizer, chain).Build()
 }
 
 func UnauthorizedDeployEventContractTransaction(authorizer flow.Address, chain flow.Chain, eventValue int) *flow.TransactionBody {

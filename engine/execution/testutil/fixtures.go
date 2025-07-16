@@ -33,7 +33,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func CreateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+func CreateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBodyBuilder {
 
 	encoded := hex.EncodeToString([]byte(contract))
 
@@ -43,13 +43,12 @@ func CreateContractDeploymentTransaction(contractName string, contract string, a
               }
             }`, contractName, encoded))
 
-	txBody := flow.NewTransactionBodyBuilder().
+	txBodyBuilder := flow.NewTransactionBodyBuilder().
 		SetScript(script).
 		AddAuthorizer(authorizer).
-		AddAuthorizer(chain.ServiceAddress()).
-		Build()
+		AddAuthorizer(chain.ServiceAddress())
 
-	return txBody
+	return txBodyBuilder
 }
 
 func UpdateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {

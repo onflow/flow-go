@@ -1015,20 +1015,20 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 			// ==== Transfer tokens from new account ====
 
-			txBody = transferTokensTx(chain).
+			txBodyBuilder := transferTokensTx(chain).
 				AddAuthorizer(address).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(tc.tryToTransfer))).
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress()))).
 				SetProposalKey(address, 0, 0).
-				SetPayer(address).
-				Build()
+				SetPayer(address)
 
 			if tc.gasLimit == 0 {
-				txBody.SetComputeLimit(fvm.DefaultComputationLimit)
+				txBodyBuilder.SetComputeLimit(fvm.DefaultComputationLimit)
 			} else {
-				txBody.SetComputeLimit(tc.gasLimit)
+				txBodyBuilder.SetComputeLimit(tc.gasLimit)
 			}
 
+			txBody = txBodyBuilder.Build()
 			err = testutil.SignEnvelope(
 				txBody,
 				address,
@@ -1780,14 +1780,13 @@ func TestEnforcingComputationLimit(t *testing.T) {
 
 			txBody := flow.NewTransactionBodyBuilder().
 				SetScript(script).
-				SetComputeLimit(computationLimit).
-				Build()
+				SetComputeLimit(computationLimit)
 
 			if test.payerIsServAcc {
 				txBody.SetPayer(chain.ServiceAddress()).
 					SetComputeLimit(0)
 			}
-			tx := fvm.Transaction(txBody, 0)
+			tx := fvm.Transaction(txBody.Build(), 0)
 
 			_, output, err := vm.Run(ctx, tx, nil)
 			require.NoError(t, err)

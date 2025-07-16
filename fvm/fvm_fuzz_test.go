@@ -39,7 +39,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 			// create the transaction
 			txBody := tt.createTxBody(t, tctx)
 			// set the computation limit
-			txBody.SetComputeLimit(computationLimit)
+			txBody.GasLimit = computationLimit
 
 			// sign the transaction
 			err := testutil.SignEnvelope(

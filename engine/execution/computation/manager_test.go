@@ -66,10 +66,11 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		chain)
 	require.NoError(t, err)
 
-	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
-	tx1.SetProposalKey(chain.ServiceAddress(), 0, 0).
+	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain).
+		SetProposalKey(chain.ServiceAddress(), 0, 0).
 		SetComputeLimit(1000).
-		SetPayer(chain.ServiceAddress())
+		SetPayer(chain.ServiceAddress()).
+		Build()
 
 	err = testutil.SignPayload(tx1, accounts[0], privateKeys[0])
 	require.NoError(t, err)
@@ -77,10 +78,11 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	err = testutil.SignEnvelope(tx1, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(t, err)
 
-	tx2 := testutil.CreateCounterTransaction(accounts[0], accounts[1])
-	tx2.SetProposalKey(chain.ServiceAddress(), 0, 0).
+	tx2 := testutil.CreateCounterTransaction(accounts[0], accounts[1]).
+		SetProposalKey(chain.ServiceAddress(), 0, 0).
 		SetComputeLimit(1000).
-		SetPayer(chain.ServiceAddress())
+		SetPayer(chain.ServiceAddress()).
+		Build()
 
 	err = testutil.SignPayload(tx2, accounts[1], privateKeys[1])
 	require.NoError(t, err)

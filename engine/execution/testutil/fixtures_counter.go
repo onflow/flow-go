@@ -46,7 +46,7 @@ access(all) contract Container {
 }
 `
 
-func DeployCounterContractTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+func DeployCounterContractTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBodyBuilder {
 	return CreateContractDeploymentTransaction("Container", CounterContract, authorizer, chain)
 }
 
@@ -66,7 +66,7 @@ func RemoveCounterContractTransaction(authorizer flow.Address, chain flow.Chain)
 	return RemoveContractDeploymentTransaction("Container", authorizer, chain)
 }
 
-func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBody {
+func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBodyBuilder {
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`
 			import 0x%s
@@ -83,8 +83,7 @@ func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBod
 				}
 			}`, counter)),
 		).
-		AddAuthorizer(signer).
-		Build()
+		AddAuthorizer(signer)
 }
 
 // CreateCounterPanicTransaction returns a transaction that will manipulate state by writing a new counter into storage

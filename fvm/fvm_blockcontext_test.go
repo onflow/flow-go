@@ -229,10 +229,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			chain)
 		require.NoError(t, err)
 
-		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain)
-
-		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-		txBody.SetPayer(chain.ServiceAddress())
+		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain).
+			SetProposalKey(chain.ServiceAddress(), 0, 0).
+			SetPayer(chain.ServiceAddress()).
+			Build()
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -266,10 +266,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			chain)
 		require.NoError(t, err)
 
-		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain)
-
-		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-		txBody.SetPayer(chain.ServiceAddress())
+		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain).
+			SetProposalKey(chain.ServiceAddress(), 0, 0).
+			SetPayer(chain.ServiceAddress()).
+			Build()
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -309,10 +309,9 @@ func TestBlockContext_DeployContract(t *testing.T) {
 				}
 			`)).
 			AddAuthorizer(accounts[0]).
+			SetProposalKey(chain.ServiceAddress(), 0, 1).
+			SetPayer(chain.ServiceAddress()).
 			Build()
-
-		txBody.SetProposalKey(chain.ServiceAddress(), 0, 1)
-		txBody.SetPayer(chain.ServiceAddress())
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -345,12 +344,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			chain)
 		require.NoError(t, err)
 
-		txBody := testutil.DeployLocalReplayLimitedTransaction(
-			accounts[0],
-			chain)
-
-		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-		txBody.SetPayer(chain.ServiceAddress())
+		txBody := testutil.DeployLocalReplayLimitedTransaction(accounts[0], chain).
+			SetProposalKey(chain.ServiceAddress(), 0, 0).
+			SetPayer(chain.ServiceAddress()).
+			Build()
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -391,10 +388,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		txBody := testutil.DeployGlobalReplayLimitedTransaction(
 			accounts[0],
-			chain)
-
-		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-		txBody.SetPayer(chain.ServiceAddress())
+			chain).
+			SetProposalKey(chain.ServiceAddress(), 0, 0).
+			SetPayer(chain.ServiceAddress()).
+			Build()
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -550,9 +547,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			chain)
 		require.NoError(t, err)
 
-		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain)
-		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-		txBody.SetPayer(chain.ServiceAddress())
+		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain).
+			SetProposalKey(chain.ServiceAddress(), 0, 0).
+			SetPayer(chain.ServiceAddress()).
+			Build()
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -572,10 +570,9 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		snapshotTree = snapshotTree.Append(executionSnapshot)
 
-		txBody = testutil.UpdateUnauthorizedCounterContractTransaction(
-			accounts[0])
-		txBody.SetProposalKey(accounts[0], 0, 0)
-		txBody.SetPayer(accounts[0])
+		txBody = testutil.UpdateUnauthorizedCounterContractTransaction(accounts[0]).
+			SetProposalKey(accounts[0], 0, 0).
+			SetPayer(accounts[0])
 
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -603,9 +600,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			chain)
 		require.NoError(t, err)
 
-		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain)
-		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-		txBody.SetPayer(chain.ServiceAddress())
+		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain).
+			SetProposalKey(chain.ServiceAddress(), 0, 0).
+			SetPayer(chain.ServiceAddress()).
+			Build()
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -661,9 +659,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			chain)
 		require.NoError(t, err)
 
-		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain)
-		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-		txBody.SetPayer(chain.ServiceAddress())
+		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain).
+			SetProposalKey(chain.ServiceAddress(), 0, 0).
+			SetPayer(chain.ServiceAddress()).
+			Build()
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -981,10 +980,10 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 					"Container",
 					script,
 					accounts[0],
-					chain)
-
-				txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-				txBody.SetPayer(chain.ServiceAddress())
+					chain).
+					SetProposalKey(chain.ServiceAddress(), 0, 0).
+					SetPayer(chain.ServiceAddress()).
+					Build()
 
 				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
@@ -1153,10 +1152,10 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 					"Container",
 					script,
 					accounts[0],
-					chain)
-
-				txBody.SetProposalKey(chain.ServiceAddress(), 0, seqNum())
-				txBody.SetPayer(accounts[0])
+					chain).
+					SetProposalKey(chain.ServiceAddress(), 0, seqNum()).
+					SetPayer(accounts[0]).
+					Build()
 
 				err = testutil.SignPayload(
 					txBody,
@@ -1201,10 +1200,10 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 					"Container",
 					script,
 					accounts[0],
-					chain)
-
-				txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-				txBody.SetPayer(chain.ServiceAddress())
+					chain).
+					SetProposalKey(chain.ServiceAddress(), 0, 0).
+					SetPayer(chain.ServiceAddress()).
+					Build()
 
 				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
@@ -1385,10 +1384,10 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			"Test",
 			contract,
 			address,
-			chain)
-
-		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-		txBody.SetPayer(chain.ServiceAddress())
+			chain).
+			SetProposalKey(chain.ServiceAddress(), 0, 0).
+			SetPayer(chain.ServiceAddress()).
+			Build()
 
 		err = testutil.SignPayload(txBody, address, privateKeys[0])
 		require.NoError(t, err)

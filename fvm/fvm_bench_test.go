@@ -86,10 +86,10 @@ func (account *TestBenchAccount) DeployContract(b *testing.B, blockExec TestBenc
 		contractName,
 		contract,
 		account.Address,
-		blockExec.Chain(b))
-
-	txBody.SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber())
-	txBody.SetPayer(serviceAccount.Address)
+		blockExec.Chain(b)).
+		SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
+		SetPayer(serviceAccount.Address).
+		Build()
 
 	err := testutil.SignPayload(txBody, account.Address, account.PrivateKey)
 	require.NoError(b, err)
