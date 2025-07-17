@@ -1,6 +1,14 @@
 package flow
 
-import "golang.org/x/exp/slices"
+import (
+	"fmt"
+
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
+	"golang.org/x/exp/slices"
+
+	"github.com/onflow/flow-go/model/fingerprint"
+)
 
 // TransactionBodyBuilder constructs a validated, immutable TransactionBody in two phases:
 // first by setting individual fields using fluent WithX methods, then by calling Build()
@@ -101,6 +109,56 @@ func (tb *TransactionBodyBuilder) AddEnvelopeSignature(address Address, keyID ui
 	return tb
 }
 
+func (tb *TransactionBodyBuilder) PayloadMessage() []byte {
+	return fingerprint.Fingerprint(tb.payloadCanonicalForm())
+}
+
+func (tb *TransactionBodyBuilder) payloadCanonicalForm() interface{} {
+	authorizers := make([][]byte, len(tb.u.Authorizers))
+	for i, auth := range tb.u.Authorizers {
+		authorizers[i] = auth.Bytes()
+	}
+
+	return struct {
+		Script                    []byte
+		Arguments                 [][]byte
+		ReferenceBlockID          []byte
+		GasLimit                  uint64
+		ProposalKeyAddress        []byte
+		ProposalKeyID             uint32
+		ProposalKeySequenceNumber uint64
+		Payer                     []byte
+		Authorizers               [][]byte
+	}{
+		Script:                    tb.u.Script,
+		Arguments:                 tb.u.Arguments,
+		ReferenceBlockID:          tb.u.ReferenceBlockID[:],
+		GasLimit:                  tb.u.GasLimit,
+		ProposalKeyAddress:        tb.u.ProposalKey.Address.Bytes(),
+		ProposalKeyID:             tb.u.ProposalKey.KeyIndex,
+		ProposalKeySequenceNumber: tb.u.ProposalKey.SequenceNumber,
+		Payer:                     tb.u.Payer.Bytes(),
+		Authorizers:               authorizers,
+	}
+}
+
+// EnvelopeMessage returns the signable message for transaction envelope.
+//
+// This message is only signed by the payer account.
+func (tb *TransactionBodyBuilder) EnvelopeMessage() []byte {
+	return fingerprint.Fingerprint(tb.envelopeCanonicalForm())
+}
+
+func (tb *TransactionBodyBuilder) envelopeCanonicalForm() interface{} {
+	return struct {
+		Payload           interface{}
+		PayloadSignatures interface{}
+	}{
+		tb.payloadCanonicalForm(),
+		signaturesList(tb.u.PayloadSignatures).canonicalForm(),
+	}
+}
+
 func (tb *TransactionBodyBuilder) createSignature(address Address, keyID uint32, sig []byte) TransactionSignature {
 	signerIndex, signerExists := tb.signerMap()[address]
 	if !signerExists {
@@ -162,4 +220,70 @@ func (tb *TransactionBodyBuilder) signerList() []Address {
 	}
 
 	return signers
+}
+
+// SignPayload signs the transaction payload (TransactionDomainTag + payload) with the specified account key using the default transaction domain tag.
+//
+// The resulting signature is combined with the account address and key ID before
+// being added to the transaction.
+//
+// This function returns an error if the signature cannot be generated.
+func (tb *TransactionBodyBuilder) SignPayload(
+	address Address,
+	keyID uint32,
+	privateKey crypto.PrivateKey,
+	hasher hash.Hasher,
+) error {
+	sig, err := tb.Sign(tb.PayloadMessage(), privateKey, hasher)
+
+	if err != nil {
+		return fmt.Errorf("failed to sign transaction payload with given key: %w", err)
+	}
+
+	tb.AddPayloadSignature(address, keyID, sig)
+
+	return nil
+}
+
+// SignEnvelope signs the full transaction (TransactionDomainTag + payload + payload signatures) with the specified account key using the default transaction domain tag.
+//
+// The resulting signature is combined with the account address and key ID before
+// being added to the transaction.
+//
+// This function returns an error if the signature cannot be generated.
+func (tb *TransactionBodyBuilder) SignEnvelope(
+	address Address,
+	keyID uint32,
+	privateKey crypto.PrivateKey,
+	hasher hash.Hasher,
+) error {
+	sig, err := tb.Sign(tb.EnvelopeMessage(), privateKey, hasher)
+
+	if err != nil {
+		return fmt.Errorf("failed to sign transaction envelope with given key: %w", err)
+	}
+
+	tb.AddEnvelopeSignature(address, keyID, sig)
+
+	return nil
+}
+
+// Sign signs the data (transaction_tag + message) with the specified private key
+// and hasher.
+//
+// This function returns an error if:
+//   - crypto.InvalidInputsError if the private key cannot sign with the given hasher
+//   - other error if an unexpected error occurs
+func (tb *TransactionBodyBuilder) Sign(
+	message []byte,
+	privateKey crypto.PrivateKey,
+	hasher hash.Hasher,
+) ([]byte, error) {
+	message = append(TransactionDomainTag[:], message...)
+	sig, err := privateKey.Sign(message, hasher)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign message with given key: %w", err)
+	}
+
+	return sig, nil
 }

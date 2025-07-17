@@ -44,17 +44,16 @@ var setupFeesTransactionTemplate string
 //go:embed scripts/setExecutionMemoryLimit.cdc
 var setExecutionMemoryLimit string
 
-func DeployTxFeesContractTransaction(flowFees, service flow.Address, contract []byte) *flow.TransactionBody {
+func DeployTxFeesContractTransaction(flowFees, service flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(deployTxFeesTransactionTemplate)).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddAuthorizer(flowFees).
-		AddAuthorizer(service).
-		Build()
+		AddAuthorizer(service)
 }
 
-func DeployStorageFeesContractTransaction(service flow.Address, contract []byte) *flow.TransactionBody {
+func DeployStorageFeesContractTransaction(service flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 	return DeployContractTransaction(service, contract, "FlowStorageFees")
 }
 

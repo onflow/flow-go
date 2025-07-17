@@ -5,9 +5,6 @@ import (
 	"io"
 
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/onflow/crypto"
-	"github.com/onflow/crypto/hash"
-	"golang.org/x/exp/slices"
 
 	flowrlp "github.com/onflow/flow-go/model/encoding/rlp"
 
@@ -137,26 +134,6 @@ func (tb TransactionBody) ID() Identifier {
 	return MakeID(tb)
 }
 
-// SetProposalKey sets the proposal key and sequence number for this transaction.
-//
-// The first two arguments specify the account key to be used, and the last argument is the sequence
-// number being declared.
-func (tb *TransactionBody) SetProposalKey(address Address, keyID uint32, sequenceNum uint64) *TransactionBody {
-	proposalKey := ProposalKey{
-		Address:        address,
-		KeyIndex:       keyID,
-		SequenceNumber: sequenceNum,
-	}
-	tb.ProposalKey = proposalKey //nolint:structwrite
-	return tb
-}
-
-// SetPayer sets the payer account for this transaction.
-func (tb *TransactionBody) SetPayer(address Address) *TransactionBody {
-	tb.Payer = address //nolint:structwrite
-	return tb
-}
-
 // Transaction is the smallest unit of task.
 type Transaction struct {
 	TransactionBody
@@ -185,155 +162,6 @@ func (tb *TransactionBody) MissingFields() []string {
 	}
 
 	return missingFields
-}
-
-// signerList returns a list of unique accounts required to sign this transaction.
-//
-// The list is returned in the following order:
-// 1. PROPOSER
-// 2. PAYER
-// 2. AUTHORIZERS (in insertion order)
-//
-// The only exception to the above ordering is for deduplication; if the same account
-// is used in multiple signing roles, only the first occurrence is included in the list.
-func (tb *TransactionBody) signerList() []Address {
-	signers := make([]Address, 0)
-	seen := make(map[Address]struct{})
-
-	var addSigner = func(address Address) {
-		_, ok := seen[address]
-		if ok {
-			return
-		}
-
-		signers = append(signers, address)
-		seen[address] = struct{}{}
-	}
-
-	if tb.ProposalKey.Address != EmptyAddress {
-		addSigner(tb.ProposalKey.Address)
-	}
-
-	if tb.Payer != EmptyAddress {
-		addSigner(tb.Payer)
-	}
-
-	for _, authorizer := range tb.Authorizers {
-		addSigner(authorizer)
-	}
-
-	return signers
-}
-
-// signerMap returns a mapping from address to signer index.
-func (tb *TransactionBody) signerMap() map[Address]int {
-	signers := make(map[Address]int)
-
-	for i, signer := range tb.signerList() {
-		signers[signer] = i
-	}
-
-	return signers
-}
-
-// SignPayload signs the transaction payload (TransactionDomainTag + payload) with the specified account key using the default transaction domain tag.
-//
-// The resulting signature is combined with the account address and key ID before
-// being added to the transaction.
-//
-// This function returns an error if the signature cannot be generated.
-func (tb *TransactionBody) SignPayload(
-	address Address,
-	keyID uint32,
-	privateKey crypto.PrivateKey,
-	hasher hash.Hasher,
-) error {
-	sig, err := tb.Sign(tb.PayloadMessage(), privateKey, hasher)
-
-	if err != nil {
-		return fmt.Errorf("failed to sign transaction payload with given key: %w", err)
-	}
-
-	tb.AddPayloadSignature(address, keyID, sig)
-
-	return nil
-}
-
-// SignEnvelope signs the full transaction (TransactionDomainTag + payload + payload signatures) with the specified account key using the default transaction domain tag.
-//
-// The resulting signature is combined with the account address and key ID before
-// being added to the transaction.
-//
-// This function returns an error if the signature cannot be generated.
-func (tb *TransactionBody) SignEnvelope(
-	address Address,
-	keyID uint32,
-	privateKey crypto.PrivateKey,
-	hasher hash.Hasher,
-) error {
-	sig, err := tb.Sign(tb.EnvelopeMessage(), privateKey, hasher)
-
-	if err != nil {
-		return fmt.Errorf("failed to sign transaction envelope with given key: %w", err)
-	}
-
-	tb.AddEnvelopeSignature(address, keyID, sig)
-
-	return nil
-}
-
-// Sign signs the data (transaction_tag + message) with the specified private key
-// and hasher.
-//
-// This function returns an error if:
-//   - crypto.InvalidInputsError if the private key cannot sign with the given hasher
-//   - other error if an unexpected error occurs
-func (tb *TransactionBody) Sign(
-	message []byte,
-	privateKey crypto.PrivateKey,
-	hasher hash.Hasher,
-) ([]byte, error) {
-	message = append(TransactionDomainTag[:], message...)
-	sig, err := privateKey.Sign(message, hasher)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign message with given key: %w", err)
-	}
-
-	return sig, nil
-}
-
-// AddPayloadSignature adds a payload signature to the transaction for the given address and key ID.
-func (tb *TransactionBody) AddPayloadSignature(address Address, keyID uint32, sig []byte) *TransactionBody {
-	s := tb.createSignature(address, keyID, sig)
-
-	tb.PayloadSignatures = append(tb.PayloadSignatures, s) //nolint:structwrite
-	slices.SortFunc(tb.PayloadSignatures, compareSignatures)
-
-	return tb
-}
-
-// AddEnvelopeSignature adds an envelope signature to the transaction for the given address and key ID.
-func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID uint32, sig []byte) *TransactionBody {
-	s := tb.createSignature(address, keyID, sig)
-
-	tb.EnvelopeSignatures = append(tb.EnvelopeSignatures, s) //nolint:structwrite
-	slices.SortFunc(tb.EnvelopeSignatures, compareSignatures)
-
-	return tb
-}
-
-func (tb *TransactionBody) createSignature(address Address, keyID uint32, sig []byte) TransactionSignature {
-	signerIndex, signerExists := tb.signerMap()[address]
-	if !signerExists {
-		signerIndex = -1
-	}
-
-	return TransactionSignature{
-		Address:     address,
-		SignerIndex: signerIndex,
-		KeyIndex:    keyID,
-		Signature:   sig,
-	}
 }
 
 func (tb *TransactionBody) PayloadMessage() []byte {
@@ -384,10 +212,6 @@ func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
 		tb.payloadCanonicalForm(),
 		signaturesList(tb.PayloadSignatures).canonicalForm(),
 	}
-}
-
-func (tx *Transaction) PayloadMessage() []byte {
-	return fingerprint.Fingerprint(tx.TransactionBody.payloadCanonicalForm())
 }
 
 func (tx *Transaction) String() string {

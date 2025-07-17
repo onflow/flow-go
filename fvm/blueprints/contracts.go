@@ -92,11 +92,10 @@ func SetIsContractDeploymentRestrictedTransaction(serviceAccount flow.Address, r
 }
 
 // TODO (ramtin) get rid of authorizers
-func DeployContractTransaction(address flow.Address, contract []byte, contractName string) *flow.TransactionBody {
+func DeployContractTransaction(address flow.Address, contract []byte, contractName string) *flow.TransactionBodyBuilder {
 	return flow.NewTransactionBodyBuilder().
 		SetScript(DeployContractTransactionTemplate).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contractName))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract))).
-		AddAuthorizer(address).
-		Build()
+		AddAuthorizer(address)
 }

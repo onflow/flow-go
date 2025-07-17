@@ -39,7 +39,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 			// create the transaction
 			txBody := tt.createTxBody(t, tctx)
 			// set the computation limit
-			txBody.GasLimit = computationLimit
+			txBody.SetComputeLimit(computationLimit)
 
 			// sign the transaction
 			err := testutil.SignEnvelope(
@@ -60,7 +60,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 			require.NotPanics(t, func() {
 				_, output, err = vm.Run(
 					ctx,
-					fvm.Transaction(txBody, 0),
+					fvm.Transaction(txBody.Build(), 0),
 					snapshotTree)
 			}, "Transaction should never result in a panic.")
 			require.NoError(t, err, "Transaction should never result in an error.")
@@ -85,7 +85,7 @@ type transactionTypeContext struct {
 }
 
 type transactionType struct {
-	createTxBody func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody
+	createTxBody func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBodyBuilder
 	require      func(t *testing.T, tctx transactionTypeContext, results fuzzResults)
 }
 
@@ -94,13 +94,13 @@ var fuzzTransactionTypes = []transactionType{
 		// Token transfer of 0 tokens.
 		// should succeed if no limits are hit.
 		// fees should be deducted no matter what.
-		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
+		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBodyBuilder {
 			txBody := transferTokensTx(tctx.chain).
 				AddAuthorizer(tctx.address).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(0))). // 0 value transferred
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(tctx.chain.ServiceAddress()))).
 				SetProposalKey(tctx.address, 0, 0).
-				SetPayer(tctx.address).Build()
+				SetPayer(tctx.address)
 			return txBody
 		},
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
@@ -131,14 +131,14 @@ var fuzzTransactionTypes = []transactionType{
 		// Token transfer of too many tokens.
 		// Should never succeed.
 		// fees should be deducted no matter what.
-		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
+		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBodyBuilder {
 			txBody := transferTokensTx(tctx.chain).
 				AddAuthorizer(tctx.address).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(2*tctx.addressFunds))). // too much value transferred
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(tctx.chain.ServiceAddress()))).
 				SetProposalKey(tctx.address, 0, 0).
 				SetPayer(tctx.address)
-			return txBody.Build()
+			return txBody
 		},
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			require.Error(t, results.output.Err)
@@ -165,12 +165,11 @@ var fuzzTransactionTypes = []transactionType{
 		// Transaction that calls panic.
 		// Should never succeed.
 		// fees should be deducted no matter what.
-		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
+		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBodyBuilder {
 			// empty transaction
 			txBody := flow.NewTransactionBodyBuilder().SetScript([]byte("transaction(){prepare(){};execute{panic(\"some panic\")}}")).
 				SetProposalKey(tctx.address, 0, 0).
-				SetPayer(tctx.address).
-				Build()
+				SetPayer(tctx.address)
 			return txBody
 		},
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
@@ -195,14 +194,13 @@ var fuzzTransactionTypes = []transactionType{
 		},
 	},
 	{
-		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBody {
+		createTxBody: func(t *testing.T, tctx transactionTypeContext) *flow.TransactionBodyBuilder {
 			// create account
 			txBody := flow.NewTransactionBodyBuilder().
 				SetScript(createAccountScript).
 				AddAuthorizer(tctx.address).
 				SetProposalKey(tctx.address, 0, 0).
-				SetPayer(tctx.address).
-				Build()
+				SetPayer(tctx.address)
 			return txBody
 		},
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
@@ -283,13 +281,13 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		// ==== Create an account ====
 		var txBodyBuilder *flow.TransactionBodyBuilder
 		privateKey, txBodyBuilder = testutil.CreateAccountCreationTransaction(tb, chain)
-		txBody := txBodyBuilder.Build()
 
-		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+		err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
 		if err != nil {
 			return snapshotTree, err
 		}
 
+		txBody := txBodyBuilder.Build()
 		executionSnapshot, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
@@ -313,21 +311,21 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		)
 
 		// ==== Transfer tokens to new account ====
-		txBody = transferTokensTx(chain).
+		txBodyBuilder = transferTokensTx(chain).
 			AddAuthorizer(chain.ServiceAddress()).
 			AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_000_000_000))). // 10 FLOW
 			AddArgument(jsoncdc.MustEncode(cadence.NewAddress(address))).
 			SetProposalKey(chain.ServiceAddress(), 0, 1).
-			SetPayer(chain.ServiceAddress()).
-			Build()
+			SetPayer(chain.ServiceAddress())
 
 		err = testutil.SignEnvelope(
-			txBody,
+			txBodyBuilder,
 			chain.ServiceAddress(),
 			unittest.ServiceAccountPrivateKey,
 		)
 		require.NoError(tb, err)
 
+		txBody = txBodyBuilder.Build()
 		executionSnapshot, output, err = vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),

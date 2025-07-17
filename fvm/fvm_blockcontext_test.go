@@ -109,15 +109,14 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	              prepare(signer: &Account) {}
 	            }
 	        `)).
-			AddAuthorizer(unittest.AddressFixture()).
-			Build()
+			AddAuthorizer(unittest.AddressFixture())
 
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
 		_, output, err := vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			testutil.RootBootstrappedLedger(vm, ctx))
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
@@ -141,14 +140,14 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                     self.x == 2
                   }
                 }
-            `)).Build()
+            `))
 
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
 		_, output, err := vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			testutil.RootBootstrappedLedger(vm, ctx))
 		require.NoError(t, err)
 		require.Error(t, output.Err)
@@ -163,14 +162,14 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                     log("bar")
                   }
                 }
-            `)).Build()
+            `))
 
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
 		_, output, err := vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			testutil.RootBootstrappedLedger(vm, ctx))
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
@@ -187,14 +186,14 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                   }
                 }
             `)).
-			AddAuthorizer(chain.ServiceAddress()).Build()
+			AddAuthorizer(chain.ServiceAddress())
 
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
 		_, output, err := vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			testutil.RootBootstrappedLedger(vm, ctx))
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
@@ -231,8 +230,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain).
 			SetProposalKey(chain.ServiceAddress(), 0, 0).
-			SetPayer(chain.ServiceAddress()).
-			Build()
+			SetPayer(chain.ServiceAddress())
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -245,7 +243,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		_, output, err := vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
@@ -268,8 +266,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain).
 			SetProposalKey(chain.ServiceAddress(), 0, 0).
-			SetPayer(chain.ServiceAddress()).
-			Build()
+			SetPayer(chain.ServiceAddress())
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -282,7 +279,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		executionSnapshot, output, err := vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
@@ -310,8 +307,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			`)).
 			AddAuthorizer(accounts[0]).
 			SetProposalKey(chain.ServiceAddress(), 0, 1).
-			SetPayer(chain.ServiceAddress()).
-			Build()
+			SetPayer(chain.ServiceAddress())
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -324,7 +320,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		_, output, err = vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
@@ -346,8 +342,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		txBody := testutil.DeployLocalReplayLimitedTransaction(accounts[0], chain).
 			SetProposalKey(chain.ServiceAddress(), 0, 0).
-			SetPayer(chain.ServiceAddress()).
-			Build()
+			SetPayer(chain.ServiceAddress())
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -360,7 +355,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		_, output, err := vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			snapshotTree)
 		require.NoError(t, err)
 
@@ -390,8 +385,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			accounts[0],
 			chain).
 			SetProposalKey(chain.ServiceAddress(), 0, 0).
-			SetPayer(chain.ServiceAddress()).
-			Build()
+			SetPayer(chain.ServiceAddress())
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -404,7 +398,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		_, output, err := vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			snapshotTree)
 		require.NoError(t, err)
 
@@ -431,14 +425,14 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		txBody := testutil.DeployUnauthorizedCounterContractTransaction(
-			accounts[0]).Build()
+			accounts[0])
 
 		err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
 		require.NoError(t, err)
 
 		_, output, err := vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			snapshotTree)
 		require.NoError(t, err)
 
@@ -477,15 +471,14 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0]).
 			SetProposalKey(accounts[0], 0, 0).
-			SetPayer(accounts[0]).
-			Build()
+			SetPayer(accounts[0])
 
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
 		_, output, err := vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 
 			snapshotTree)
 		require.NoError(t, err)
@@ -519,15 +512,13 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0]).
 			SetProposalKey(accounts[0], 0, 0).
-			SetPayer(accounts[0]).
-			Build()
-
+			SetPayer(accounts[0])
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
 		_, output, err := vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
@@ -549,8 +540,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain).
 			SetProposalKey(chain.ServiceAddress(), 0, 0).
-			SetPayer(chain.ServiceAddress()).
-			Build()
+			SetPayer(chain.ServiceAddress())
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -563,7 +553,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		executionSnapshot, output, err := vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
@@ -572,15 +562,13 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		txBody = testutil.UpdateUnauthorizedCounterContractTransaction(accounts[0]).
 			SetProposalKey(accounts[0], 0, 0).
-			SetPayer(accounts[0]).
-			Build()
-
+			SetPayer(accounts[0])
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
 		_, output, err = vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
@@ -603,8 +591,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain).
 			SetProposalKey(chain.ServiceAddress(), 0, 0).
-			SetPayer(chain.ServiceAddress()).
-			Build()
+			SetPayer(chain.ServiceAddress())
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -617,7 +604,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		executionSnapshot, output, err := vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
@@ -626,15 +613,14 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		txBody = testutil.RemoveUnauthorizedCounterContractTransaction(accounts[0]).
 			SetProposalKey(accounts[0], 0, 0).
-			SetPayer(accounts[0]).
-			Build()
+			SetPayer(accounts[0])
 
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
 		_, output, err = vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			snapshotTree)
 		require.NoError(t, err)
 		require.Error(t, output.Err)
@@ -662,8 +648,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain).
 			SetProposalKey(chain.ServiceAddress(), 0, 0).
-			SetPayer(chain.ServiceAddress()).
-			Build()
+			SetPayer(chain.ServiceAddress())
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -676,7 +661,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		executionSnapshot, output, err := vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
@@ -685,8 +670,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		txBody = testutil.RemoveCounterContractTransaction(accounts[0], chain).
 			SetProposalKey(accounts[0], 0, 0).
-			SetPayer(chain.ServiceAddress()).
-			Build()
+			SetPayer(chain.ServiceAddress())
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -699,7 +683,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		_, output, err = vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
@@ -726,7 +710,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		authTxBody := authTxBodyBuilder.SetProposalKey(chain.ServiceAddress(), 0, 0).
-			SetPayer(chain.ServiceAddress()).Build()
+			SetPayer(chain.ServiceAddress())
 		err = testutil.SignEnvelope(
 			authTxBody,
 			chain.ServiceAddress(),
@@ -735,7 +719,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		executionSnapshot, output, err := vm.Run(
 			ctx,
-			fvm.Transaction(authTxBody, 0),
+			fvm.Transaction(authTxBody.Build(), 0),
 			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
@@ -745,15 +729,14 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		// test deploying a new contract (not authorized by service account)
 		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0]).
 			SetProposalKey(accounts[0], 0, 0).
-			SetPayer(accounts[0]).
-			Build()
+			SetPayer(accounts[0])
 
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
 		_, output, err = vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
@@ -841,9 +824,9 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 				txBodyBuilder.AddAuthorizer(authorizer)
 			}
 
-			txBody := txBodyBuilder.Build()
-			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
 			require.NoError(t, err)
+			txBody := txBodyBuilder.Build()
 
 			_, output, err := vm.Run(
 				ctx,
@@ -918,15 +901,14 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 		t.Run(tt.label, func(t *testing.T) {
 			txBody := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(tt.script)).
-				SetComputeLimit(tt.gasLimit).
-				Build()
+				SetComputeLimit(tt.gasLimit)
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
 			_, output, err := vm.Run(
 				ctx,
-				fvm.Transaction(txBody, 0),
+				fvm.Transaction(txBody.Build(), 0),
 				testutil.RootBootstrappedLedger(vm, ctx))
 			require.NoError(t, err)
 
@@ -985,8 +967,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 					accounts[0],
 					chain).
 					SetProposalKey(chain.ServiceAddress(), 0, 0).
-					SetPayer(chain.ServiceAddress()).
-					Build()
+					SetPayer(chain.ServiceAddress())
 
 				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
@@ -999,7 +980,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 
 				_, output, err := vm.Run(
 					ctx,
-					fvm.Transaction(txBody, 0),
+					fvm.Transaction(txBody.Build(), 0),
 					snapshotTree)
 				require.NoError(t, err)
 
@@ -1054,8 +1035,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 					AddAuthorizer(accounts[0]).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetProposalKey(chain.ServiceAddress(), 0, 0).
-					SetPayer(chain.ServiceAddress()).
-					Build()
+					SetPayer(chain.ServiceAddress())
 
 				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
@@ -1068,7 +1048,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 
 				_, output, err := vm.Run(
 					ctx,
-					fvm.Transaction(txBody, 0),
+					fvm.Transaction(txBody.Build(), 0),
 					snapshotTree)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
@@ -1131,8 +1111,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 						jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
 					AddArgument(
 						jsoncdc.MustEncode(cadence.NewAddress(accounts[0]))).
-					SetPayer(chain.ServiceAddress()).
-					Build()
+					SetPayer(chain.ServiceAddress())
 
 				err = testutil.SignEnvelope(
 					txBody,
@@ -1142,7 +1121,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 
 				executionSnapshot, output, err := vm.Run(
 					ctx,
-					fvm.Transaction(txBody, 0),
+					fvm.Transaction(txBody.Build(), 0),
 					snapshotTree)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
@@ -1157,8 +1136,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 					accounts[0],
 					chain).
 					SetProposalKey(chain.ServiceAddress(), 0, seqNum()).
-					SetPayer(accounts[0]).
-					Build()
+					SetPayer(accounts[0])
 
 				err = testutil.SignPayload(
 					txBody,
@@ -1171,7 +1149,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 
 				_, output, err = vm.Run(
 					ctx,
-					fvm.Transaction(txBody, 0),
+					fvm.Transaction(txBody.Build(), 0),
 					snapshotTree)
 				require.NoError(t, err)
 
@@ -1205,8 +1183,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 					accounts[0],
 					chain).
 					SetProposalKey(chain.ServiceAddress(), 0, 0).
-					SetPayer(chain.ServiceAddress()).
-					Build()
+					SetPayer(chain.ServiceAddress())
 
 				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
@@ -1219,7 +1196,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 
 				_, output, err := vm.Run(
 					ctx,
-					fvm.Transaction(txBody, 0),
+					fvm.Transaction(txBody.Build(), 0),
 					snapshotTree)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
@@ -1253,8 +1230,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 					40)
 
 				txBody := txBodyBuilder.SetProposalKey(chain.ServiceAddress(), 0, 0).
-					SetPayer(accounts[0]).
-					Build()
+					SetPayer(accounts[0])
 
 				err = testutil.SignPayload(
 					txBody,
@@ -1267,7 +1243,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 
 				_, output, err := vm.Run(
 					ctx,
-					fvm.Transaction(txBody, 0),
+					fvm.Transaction(txBody.Build(), 0),
 					snapshotTree)
 				require.NoError(t, err)
 				require.Error(t, output.Err)
@@ -1390,8 +1366,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			address,
 			chain).
 			SetProposalKey(chain.ServiceAddress(), 0, 0).
-			SetPayer(chain.ServiceAddress()).
-			Build()
+			SetPayer(chain.ServiceAddress())
 
 		err = testutil.SignPayload(txBody, address, privateKeys[0])
 		require.NoError(t, err)
@@ -1404,7 +1379,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		executionSnapshot, output, err := vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
@@ -1468,14 +1443,14 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
                         log(nextBlock)
                     }
                 }
-            `)).Build()
+            `))
 
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
 		_, output, err := vm.Run(
 			blockCtx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			testutil.RootBootstrappedLedger(vm, ctx))
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
@@ -1556,14 +1531,14 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
                         let nextBlock = getBlock(at: block.height + UInt64(2))
                     }
                 }
-            `)).Build()
+            `))
 
 		err := testutil.SignTransactionAsServiceAccount(tx, 0, chain)
 		require.NoError(t, err)
 
 		_, output, err := vm.Run(
 			blockCtx,
-			fvm.Transaction(tx, 0),
+			fvm.Transaction(tx.Build(), 0),
 			testutil.RootBootstrappedLedger(vm, ctx))
 		require.NoError(t, err)
 		require.Error(t, output.Err)
@@ -1610,11 +1585,10 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		txBodyBuilder.SetProposalKey(chain.ServiceAddress(), 0, sequenceNumber)
 		txBodyBuilder.SetPayer(chain.ServiceAddress())
 		sequenceNumber++
-		txBody := txBodyBuilder.Build()
 
 		rootHasher := hash.NewSHA2_256()
 
-		err := txBody.SignEnvelope(
+		err := txBodyBuilder.SignEnvelope(
 			chain.ServiceAddress(),
 			0,
 			unittest.ServiceAccountPrivateKey.PrivateKey,
@@ -1622,6 +1596,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		txBody := txBodyBuilder.Build()
 		// execute the transaction
 		executionSnapshot, output, err := vm.Run(
 			ctx,
@@ -1714,13 +1689,13 @@ func TestBlockContext_Random(t *testing.T) {
 	`)
 
 	getTxRandoms := func(t *testing.T) [2]uint64 {
-		txBody := flow.NewTransactionBodyBuilder().SetScript(txCode).Build()
+		txBody := flow.NewTransactionBodyBuilder().SetScript(txCode)
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
 		_, output, err := vm.Run(
 			ctx,
-			fvm.Transaction(txBody, 0),
+			fvm.Transaction(txBody.Build(), 0),
 			testutil.RootBootstrappedLedger(vm, ctx))
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
@@ -1810,15 +1785,14 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	txBody := flow.NewTransactionBodyBuilder().
 		SetScript(createAccountScript).
-		AddAuthorizer(chain.ServiceAddress()).
-		Build()
+		AddAuthorizer(chain.ServiceAddress())
 
 	err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 	require.NoError(t, err)
 
 	_, output, err := vm.Run(
 		ctx,
-		fvm.Transaction(txBody, 0),
+		fvm.Transaction(txBody.Build(), 0),
 		testutil.RootBootstrappedLedger(vm, ctx))
 	require.NoError(t, err)
 	require.NoError(t, output.Err)
@@ -1914,15 +1888,14 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1))).
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress()))).
 				SetProposalKey(accounts[0], 0, 0).
-				SetPayer(accounts[0]).
-				Build()
+				SetPayer(accounts[0])
 
 			err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 			require.NoError(t, err)
 
 			executionSnapshot, output, err := vm.Run(
 				ctx,
-				fvm.Transaction(txBody, 0),
+				fvm.Transaction(txBody.Build(), 0),
 				snapshotTree)
 			require.NoError(t, err)
 
@@ -1980,15 +1953,14 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1))).
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(lastAddress))).
 				SetProposalKey(accounts[0], 0, 0).
-				SetPayer(accounts[0]).
-				Build()
+				SetPayer(accounts[0])
 
 			err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 			require.NoError(t, err)
 
 			executionSnapshot, output, err := vm.Run(
 				ctx,
-				fvm.Transaction(txBody, 0),
+				fvm.Transaction(txBody.Build(), 0),
 				snapshotTree)
 			require.NoError(t, err)
 
@@ -2035,14 +2007,14 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 					AddArgument(jsoncdc.MustEncode(
 										cadence.NewAddress(chain.ServiceAddress()))).
 					SetProposalKey(accounts[0], 0, 10). // set wrong sequence number
-					SetPayer(accounts[0]).Build()
+					SetPayer(accounts[0])
 
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
 				_, output, err := vm.Run(
 					ctx,
-					fvm.Transaction(txBody, 0),
+					fvm.Transaction(txBody.Build(), 0),
 					snapshotTree)
 				require.NoError(t, err)
 
@@ -2093,15 +2065,14 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 					AddArgument(jsoncdc.MustEncode(
 						cadence.NewAddress(chain.ServiceAddress()))).
 					SetProposalKey(accounts[0], 0, 0).
-					SetPayer(accounts[0]).
-					Build()
+					SetPayer(accounts[0])
 
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
 				executionSnapshot, output, err := vm.Run(
 					ctx,
-					fvm.Transaction(txBody, 0),
+					fvm.Transaction(txBody.Build(), 0),
 					snapshotTree)
 				require.NoError(t, err)
 
@@ -2112,7 +2083,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				// send it again
 				_, output, err = vm.Run(
 					ctx,
-					fvm.Transaction(txBody, 0),
+					fvm.Transaction(txBody.Build(), 0),
 					snapshotTree)
 				require.NoError(t, err)
 

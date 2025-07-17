@@ -69,8 +69,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain).
 		SetProposalKey(chain.ServiceAddress(), 0, 0).
 		SetComputeLimit(1000).
-		SetPayer(chain.ServiceAddress()).
-		Build()
+		SetPayer(chain.ServiceAddress())
 
 	err = testutil.SignPayload(tx1, accounts[0], privateKeys[0])
 	require.NoError(t, err)
@@ -81,8 +80,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	tx2 := testutil.CreateCounterTransaction(accounts[0], accounts[1]).
 		SetProposalKey(chain.ServiceAddress(), 0, 0).
 		SetComputeLimit(1000).
-		SetPayer(chain.ServiceAddress()).
-		Build()
+		SetPayer(chain.ServiceAddress())
 
 	err = testutil.SignPayload(tx2, accounts[1], privateKeys[1])
 	require.NoError(t, err)
@@ -90,7 +88,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	err = testutil.SignEnvelope(tx2, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(t, err)
 
-	transactions := []*flow.TransactionBody{tx1, tx2}
+	transactions := []*flow.TransactionBody{tx1.Build(), tx2.Build()}
 
 	col := flow.Collection{Transactions: transactions}
 
@@ -777,15 +775,18 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 	privKey := privateKeys[0]
 	// tx1 deploys contract version 1
 	tx1Builder := testutil.DeployEventContractTransaction(account, chain, 1)
-	tx1 := prepareTx(t, tx1Builder, account, privKey, 0, chain)
+	prepareTx(t, tx1Builder, account, privKey, 0, chain)
+	tx1 := tx1Builder.Build()
 
 	// tx2 emits event which will fail encoding
 	tx2Builder := testutil.CreateEmitEventTransaction(account, account)
-	tx2 := prepareTx(t, tx2Builder, account, privKey, 1, chain)
+	prepareTx(t, tx2Builder, account, privKey, 1, chain)
+	tx2 := tx2Builder.Build()
 
 	// tx3 emits event that will work fine
 	tx3Builder := testutil.CreateEmitEventTransaction(account, account)
-	tx3 := prepareTx(t, tx3Builder, account, privKey, 2, chain)
+	prepareTx(t, tx3Builder, account, privKey, 2, chain)
+	tx3 := tx3Builder.Build()
 
 	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
 

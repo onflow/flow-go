@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func DeployFungibleTokenContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+func DeployFungibleTokenContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 	contractName := "FungibleToken"
 	return DeployContractTransaction(
 		fungibleToken,
@@ -23,7 +23,7 @@ func DeployFungibleTokenContractTransaction(fungibleToken flow.Address, contract
 	)
 }
 
-func DeployNonFungibleTokenContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+func DeployNonFungibleTokenContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 	contractName := "NonFungibleToken"
 	return DeployContractTransaction(
 		nonFungibleToken,
@@ -32,7 +32,7 @@ func DeployNonFungibleTokenContractTransaction(nonFungibleToken flow.Address, co
 	)
 }
 
-func DeployMetadataViewsContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+func DeployMetadataViewsContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 	contractName := "MetadataViews"
 	return DeployContractTransaction(
 		nonFungibleToken,
@@ -41,7 +41,7 @@ func DeployMetadataViewsContractTransaction(nonFungibleToken flow.Address, contr
 	)
 }
 
-func DeployCrossVMMetadataViewsContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+func DeployCrossVMMetadataViewsContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 	contractName := "CrossVMMetadataViews"
 	return DeployContractTransaction(
 		nonFungibleToken,
@@ -50,7 +50,7 @@ func DeployCrossVMMetadataViewsContractTransaction(nonFungibleToken flow.Address
 	)
 }
 
-func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.TransactionBody {
+func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.TransactionBodyBuilder {
 	contract := contracts.ViewResolver()
 	contractName := "ViewResolver"
 	return DeployContractTransaction(
@@ -60,7 +60,7 @@ func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.
 	)
 }
 
-func DeployBurnerContractTransaction(fungibleToken flow.Address) *flow.TransactionBody {
+func DeployBurnerContractTransaction(fungibleToken flow.Address) *flow.TransactionBodyBuilder {
 	contract := contracts.Burner()
 	contractName := "Burner"
 	return DeployContractTransaction(
@@ -70,7 +70,7 @@ func DeployBurnerContractTransaction(fungibleToken flow.Address) *flow.Transacti
 	)
 }
 
-func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 
 	contractName := "FungibleTokenMetadataViews"
 	return DeployContractTransaction(
@@ -80,7 +80,7 @@ func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken flow.Addr
 	)
 }
 
-func DeployFungibleTokenSwitchboardContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+func DeployFungibleTokenSwitchboardContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 
 	contractName := "FungibleTokenSwitchboard"
 	return DeployContractTransaction(
@@ -149,7 +149,7 @@ func TransferFlowTokenTransaction(
 	env templates.Environment,
 	from, to flow.Address,
 	amount string,
-) *flow.TransactionBody {
+) *flow.TransactionBodyBuilder {
 	cadenceAmount, _ := cadence.NewUFix64(amount)
 	txScript := templates.GenerateTransferGenericVaultWithAddressScript(env)
 	return flow.NewTransactionBodyBuilder().
@@ -158,6 +158,5 @@ func TransferFlowTokenTransaction(
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(to))).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(flow.HexToAddress(env.FlowTokenAddress)))).
 		AddArgument(jsoncdc.MustEncode(cadence.String("FlowToken"))).
-		AddAuthorizer(from).
-		Build()
+		AddAuthorizer(from)
 }

@@ -220,11 +220,10 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 		)
 	}
 
+	require.Equal(t.t, string(tx.PayloadMessage()), string(txBodyBuilder.PayloadMessage()))
+	require.Equal(t.t, string(tx.EnvelopeMessage()), string(txBodyBuilder.EnvelopeMessage()))
+
 	txBody := txBodyBuilder.Build()
-
-	require.Equal(t.t, string(tx.PayloadMessage()), string(txBody.PayloadMessage()))
-	require.Equal(t.t, string(tx.EnvelopeMessage()), string(txBody.EnvelopeMessage()))
-
 	proc := fvm.Transaction(txBody, 0)
 
 	t.snapshot.Lock()
