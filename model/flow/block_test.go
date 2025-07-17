@@ -344,7 +344,7 @@ func TestNewRootProposal(t *testing.T) {
 		require.NotNil(t, res)
 	})
 
-	t.Run("invalid input with invalid header body", func(t *testing.T) {
+	t.Run("invalid input with invalid block", func(t *testing.T) {
 		block := validRootBlockFixture()
 		block.Header.ParentView = 1
 
@@ -359,7 +359,7 @@ func TestNewRootProposal(t *testing.T) {
 		require.Contains(t, err.Error(), "invalid root block")
 	})
 
-	t.Run("invalid input with invalid root block", func(t *testing.T) {
+	t.Run("invalid input with non-empty proposer signature", func(t *testing.T) {
 		untrustedProposal := flow.UntrustedProposal{
 			Block:           validRootBlockFixture(),
 			ProposerSigData: unittest.SignatureFixture(),
