@@ -55,11 +55,15 @@ func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.Aggregate
 	chunk *flow.Chunk, executionResultID flow.Identifier) error {
 	// TODO: replace implementation once proper aggregation is used for Verifiers' attestation signatures.
 
-	atst := flow.Attestation{
+	atst, err := flow.NewAttestation(flow.UntrustedAttestation{
 		BlockID:           chunk.BlockID,
 		ExecutionResultID: executionResultID,
 		ChunkIndex:        chunk.Index,
+	})
+	if err != nil {
+		return fmt.Errorf("could not build attestation: %w", err)
 	}
+
 	atstID := atst.ID()
 
 	for i, signature := range aggregatedSignatures.VerifierSignatures {
@@ -169,7 +173,14 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 			if err != nil {
 				return fmt.Errorf("internal error fetching result %v incorporated in block %v: %w", resultID, blockID, err)
 			}
-			incorporatedResults[resultID] = flow.NewIncorporatedResult(blockID, result)
+			incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+				IncorporatedBlockID: blockID,
+				Result:              result,
+			})
+			if err != nil {
+				return fmt.Errorf("could not create incorporated result: %w", err)
+			}
+			incorporatedResults[resultID] = incorporatedResult
 		}
 		return nil
 	}
