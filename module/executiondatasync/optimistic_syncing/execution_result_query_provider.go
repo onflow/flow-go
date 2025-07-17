@@ -62,8 +62,6 @@ type Query struct {
 	ExecutionResult *flow.ExecutionResult
 	// ExecutionNodes is the list of execution node identities that produced the result
 	ExecutionNodes flow.IdentitySkeletonList
-	// ExecutorCount is the number of execution receipts that include this result
-	ExecutorCount int
 }
 
 // ExecutionResultQueryProvider provides execution results and execution nodes based on criteria.
@@ -138,34 +136,50 @@ func NewExecutionResultQueryProviderImpl(
 //   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 //   - All other errors are potential indicators of bugs or corrupted internal state
 func (e *ExecutionResultQueryProviderImpl) ExecutionResultQuery(blockID flow.Identifier, criteria Criteria) (*Query, error) {
-	// Check if the block ID is of the root block. If it is, then don't look for execution receipts since they
-	// will not be present for the root block.
-	if e.rootBlockID == blockID {
-		return e.handleRootBlock(criteria)
-	}
-
-	return e.findResultAndExecutors(blockID, criteria)
-}
-
-// handleRootBlock handles execution result queries for the root block.
-// Since root blocks don't have execution receipts, it returns all execution nodes
-// from the identity table filtered by the specified criteria and the root execution result.
-//
-// No errors are expected during normal operations
-func (e *ExecutionResultQueryProviderImpl) handleRootBlock(criteria Criteria) (*Query, error) {
 	executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve execution IDs for root block: %w", err)
 	}
 
-	executorIDs := executorIdentities.NodeIDs()
-	subsetENs, err := e.chooseExecutionNodes(executorIDs, criteria.RequiredExecutors)
+	// if the block ID is the root block, then use the root ExecutionResult and skip the receipt
+	// check since there will not be any.
+	if e.rootBlockID == blockID {
+		subsetENs, err := e.chooseExecutionNodes(executorIdentities, criteria.RequiredExecutors)
+		if err != nil {
+			return nil, fmt.Errorf("failed to choose execution nodes for root block ID %v: %w", e.rootBlockID, err)
+		}
+
+		return &Query{
+			ExecutionResult: e.rootBlockResult,
+			ExecutionNodes:  subsetENs,
+		}, nil
+	}
+
+	result, executorIDs, err := e.findResultAndExecutors(blockID, executorIdentities, criteria)
 	if err != nil {
-		return nil, fmt.Errorf("failed to choose execution nodes for root block ID %v: %w", e.rootBlockID, err)
+		return nil, fmt.Errorf("failed to find result and executors for block ID %v: %w", blockID, err)
+	}
+
+	executors := executorIdentities.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
+	subsetENs, err := e.chooseExecutionNodes(executors, criteria.RequiredExecutors)
+	if err != nil {
+		return nil, fmt.Errorf("failed to choose execution nodes for block ID %v: %w", blockID, err)
+	}
+
+	if len(subsetENs) == 0 {
+		// this is unexpected, and probably indicates there is a bug.
+		// There are only three ways that chooseExecutionNodes can return an empty list:
+		//   1. there are no executors for the result
+		//   2. none of the user's required executors are in the executor list
+		//   3. none of the operator's required executors are in the executor list
+		// None of these are possible since there must be at least one AgreeingExecutors. If the
+		// criteria is met, then there must be at least one acceptable executor. If this is not true,
+		// then the criteria check must fail.
+		return nil, fmt.Errorf("no execution nodes found for result %v (blockID: %v): %w", result.ID(), blockID, err)
 	}
 
 	return &Query{
-		ExecutionResult: e.rootBlockResult,
+		ExecutionResult: result,
 		ExecutionNodes:  subsetENs,
 	}, nil
 }
@@ -179,62 +193,45 @@ func (e *ExecutionResultQueryProviderImpl) handleRootBlock(criteria Criteria) (*
 //   - All other errors are potential indicators of bugs or corrupted internal state
 func (e *ExecutionResultQueryProviderImpl) findResultAndExecutors(
 	blockID flow.Identifier,
+	allENs flow.IdentityList,
 	criteria Criteria,
-) (*Query, error) {
-	// merge the user's criteria with the operator's for the ExecutionResult check. we will then use
-	// the original criteria when selecting execution nodes since the returned nodes should match the
-	// user's preferences if provided.
-	mergedCriteria := e.baseCriteria.Merge(criteria)
+) (*flow.ExecutionResult, flow.IdentifierList, error) {
+	type result struct {
+		result   *flow.ExecutionResult
+		receipts flow.ExecutionReceiptList
+	}
+
+	criteria = e.baseCriteria.Merge(criteria)
 
 	// Note: this will return an empty slice with no error if no receipts are found.
 	allReceipts, err := e.executionReceipts.ByBlockID(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
+		return nil, nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
 	}
 
 	// find all results that match the criteria and have at least one acceptable executor
-	results := make([]*Query, 0)
+	results := make([]result, 0)
 	for _, executionReceiptList := range allReceipts.GroupByResultID() {
 		executorGroup := executionReceiptList.GroupByExecutorID()
-		if !checkCriteria(executorGroup, mergedCriteria) {
-			continue
+		if checkCriteria(executorGroup, criteria) {
+			results = append(results, result{
+				result:   &executionReceiptList[0].ExecutionResult,
+				receipts: executionReceiptList,
+			})
 		}
-
-		executorIDs := getExecutorIDs(executionReceiptList)
-		subsetENs, err := e.chooseExecutionNodes(executorIDs, criteria.RequiredExecutors)
-		if err != nil {
-			return nil, fmt.Errorf("failed to choose execution nodes for block ID %v: %w", blockID, err)
-		}
-
-		if len(subsetENs) == 0 {
-			// this is unexpected, and probably indicates there is a bug.
-			// The only ways that chooseExecutionNodes can return an empty list:
-			//   1. there are no executors for the result
-			//   2. none of the user's required executors are in the executor list
-			//   3. none of the operator's required executors are in the executor list
-			// None of these are possible since there must be at least one AgreeingExecutors, so if
-			// the criteria is met, then there must be at least one acceptable executor. If this is
-			// not true, the the criteria check must fail.
-			return nil, fmt.Errorf("no execution nodes found for block ID %v: %w", blockID, err)
-		}
-
-		results = append(results, &Query{
-			ExecutionResult: &executionReceiptList[0].ExecutionResult,
-			ExecutionNodes:  subsetENs,
-			ExecutorCount:   len(executionReceiptList),
-		})
 	}
 
 	if len(results) == 0 {
-		return nil, backend.NewInsufficientExecutionReceipts(blockID, 0)
+		return nil, nil, backend.NewInsufficientExecutionReceipts(blockID, 0)
 	}
 
 	// sort results by the number of execution nodes in descending order
 	sort.Slice(results, func(i, j int) bool {
-		return results[i].ExecutorCount > results[j].ExecutorCount
+		return len(results[i].receipts) > len(results[j].receipts)
 	})
 
-	return results[0], nil
+	executorIDs := getExecutorIDs(results[0].receipts)
+	return results[0].result, executorIDs, nil
 }
 
 // checkCriteria checks if an executor group meets the specified criteria for execution receipts matching.
@@ -294,15 +291,9 @@ func getExecutorIDs(recepts flow.ExecutionReceiptList) flow.IdentifierList {
 //
 // No errors are expected during normal operations
 func (e *ExecutionResultQueryProviderImpl) chooseExecutionNodes(
-	executorIDs flow.IdentifierList,
+	executors flow.IdentityList,
 	userRequiredExecutors flow.IdentifierList,
 ) (flow.IdentitySkeletonList, error) {
-	allENs, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve all execution IDs: %w", err)
-	}
-	executors := allENs.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
-
 	var chosenIDs flow.IdentityList
 
 	// first, check if the user's criteria included any required executors.
