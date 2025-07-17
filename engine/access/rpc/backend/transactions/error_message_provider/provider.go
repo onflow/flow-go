@@ -1,4 +1,4 @@
-package data_provider
+package error_message_provider
 
 import (
 	"context"
@@ -10,10 +10,11 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/index"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -21,8 +22,8 @@ import (
 
 const DefaultFailedErrorMessage = "failed"
 
-// ErrorMessageProvider declares the lookup transaction error methods by different input parameters.
-type ErrorMessageProvider interface {
+// TxErrorMessageProvider declares the lookup transaction error methods by different input parameters.
+type TxErrorMessageProvider interface {
 	// LookupErrorMessageByTransactionID is a function type for getting transaction error message by block ID and transaction ID.
 	// Expected errors during normal operation:
 	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
@@ -42,28 +43,28 @@ type ErrorMessageProvider interface {
 	LookupErrorMessagesByBlockID(ctx context.Context, blockID flow.Identifier, height uint64) (map[flow.Identifier]string, error)
 }
 
-type ErrorMessageProviderImpl struct {
+type TxErrorMessageProviderImpl struct {
 	log zerolog.Logger
 
 	txResultErrorMessages storage.TransactionResultErrorMessages
 	txResultsIndex        *index.TransactionResultsIndex
 
 	connFactory                connection.ConnectionFactory
-	nodeCommunicator           backend.Communicator
+	nodeCommunicator           node_communicator.Communicator
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider
 }
 
-var _ ErrorMessageProvider = (*ErrorMessageProviderImpl)(nil)
+var _ TxErrorMessageProvider = (*TxErrorMessageProviderImpl)(nil)
 
-func NewErrorMessageProvider(
+func NewTxErrorMessageProvider(
 	log zerolog.Logger,
 	txResultErrorMessages storage.TransactionResultErrorMessages,
 	txResultsIndex *index.TransactionResultsIndex,
 	connFactory connection.ConnectionFactory,
-	nodeCommunicator backend.Communicator,
+	nodeCommunicator node_communicator.Communicator,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
-) *ErrorMessageProviderImpl {
-	return &ErrorMessageProviderImpl{
+) *TxErrorMessageProviderImpl {
+	return &TxErrorMessageProviderImpl{
 		log:                        log,
 		txResultErrorMessages:      txResultErrorMessages,
 		txResultsIndex:             txResultsIndex,
@@ -73,7 +74,7 @@ func NewErrorMessageProvider(
 	}
 }
 
-func (e *ErrorMessageProviderImpl) LookupErrorMessageByTransactionID(
+func (e *TxErrorMessageProviderImpl) LookupErrorMessageByTransactionID(
 	ctx context.Context,
 	blockID flow.Identifier,
 	height uint64,
@@ -91,7 +92,7 @@ func (e *ErrorMessageProviderImpl) LookupErrorMessageByTransactionID(
 		blockID,
 	)
 	if err != nil {
-		if backend.IsInsufficientExecutionReceipts(err) {
+		if common.IsInsufficientExecutionReceipts(err) {
 			return "", status.Error(codes.NotFound, err.Error())
 		}
 		return "", rpc.ConvertError(err, "failed to select execution nodes", codes.Internal)
@@ -121,7 +122,7 @@ func (e *ErrorMessageProviderImpl) LookupErrorMessageByTransactionID(
 	return resp.ErrorMessage, nil
 }
 
-func (e *ErrorMessageProviderImpl) LookupErrorMessageByIndex(
+func (e *TxErrorMessageProviderImpl) LookupErrorMessageByIndex(
 	ctx context.Context,
 	blockID flow.Identifier,
 	height uint64,
@@ -139,7 +140,7 @@ func (e *ErrorMessageProviderImpl) LookupErrorMessageByIndex(
 		blockID,
 	)
 	if err != nil {
-		if backend.IsInsufficientExecutionReceipts(err) {
+		if common.IsInsufficientExecutionReceipts(err) {
 			return "", status.Error(codes.NotFound, err.Error())
 		}
 		return "", rpc.ConvertError(err, "failed to select execution nodes", codes.Internal)
@@ -169,7 +170,7 @@ func (e *ErrorMessageProviderImpl) LookupErrorMessageByIndex(
 	return resp.ErrorMessage, nil
 }
 
-func (e *ErrorMessageProviderImpl) LookupErrorMessagesByBlockID(
+func (e *TxErrorMessageProviderImpl) LookupErrorMessagesByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
 	height uint64,
@@ -192,7 +193,7 @@ func (e *ErrorMessageProviderImpl) LookupErrorMessagesByBlockID(
 		blockID,
 	)
 	if err != nil {
-		if backend.IsInsufficientExecutionReceipts(err) {
+		if common.IsInsufficientExecutionReceipts(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, rpc.ConvertError(err, "failed to select execution nodes", codes.Internal)
@@ -231,7 +232,7 @@ func (e *ErrorMessageProviderImpl) LookupErrorMessagesByBlockID(
 //   - status.Error - GRPC call failed, some of possible codes are:
 //   - codes.NotFound - request cannot be served by EN because of absence of data.
 //   - codes.Unavailable - remote node is not unavailable.
-func (e *ErrorMessageProviderImpl) getTransactionErrorMessagesFromAnyEN(
+func (e *TxErrorMessageProviderImpl) getTransactionErrorMessagesFromAnyEN(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionErrorMessagesByBlockIDRequest,
@@ -276,7 +277,7 @@ func (e *ErrorMessageProviderImpl) getTransactionErrorMessagesFromAnyEN(
 //   - status.Error - GRPC call failed, some of possible codes are:
 //   - codes.NotFound - request cannot be served by EN because of absence of data.
 //   - codes.Unavailable - remote node is not unavailable.
-func (e *ErrorMessageProviderImpl) getTransactionErrorMessageFromAnyEN(
+func (e *TxErrorMessageProviderImpl) getTransactionErrorMessageFromAnyEN(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionErrorMessageRequest,
@@ -319,7 +320,7 @@ func (e *ErrorMessageProviderImpl) getTransactionErrorMessageFromAnyEN(
 //   - status.Error - GRPC call failed, some of possible codes are:
 //   - codes.NotFound - request cannot be served by EN because of absence of data.
 //   - codes.Unavailable - remote node is not unavailable.
-func (e *ErrorMessageProviderImpl) getTransactionErrorMessageByIndexFromAnyEN(
+func (e *TxErrorMessageProviderImpl) getTransactionErrorMessageByIndexFromAnyEN(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionErrorMessageByIndexRequest,
@@ -361,7 +362,7 @@ func (e *ErrorMessageProviderImpl) getTransactionErrorMessageByIndexFromAnyEN(
 //   - codes.Unavailable - remote node is not unavailable.
 //
 // tryGetTransactionErrorMessageFromEN performs a grpc call to the specified execution node and returns response.
-func (e *ErrorMessageProviderImpl) tryGetTransactionErrorMessageFromEN(
+func (e *TxErrorMessageProviderImpl) tryGetTransactionErrorMessageFromEN(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionErrorMessageRequest,
@@ -379,7 +380,7 @@ func (e *ErrorMessageProviderImpl) tryGetTransactionErrorMessageFromEN(
 //   - status.Error - GRPC call failed, some of possible codes are:
 //   - codes.NotFound - request cannot be served by EN because of absence of data.
 //   - codes.Unavailable - remote node is not unavailable.
-func (e *ErrorMessageProviderImpl) tryGetTransactionErrorMessageByIndexFromEN(
+func (e *TxErrorMessageProviderImpl) tryGetTransactionErrorMessageByIndexFromEN(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionErrorMessageByIndexRequest,
@@ -397,7 +398,7 @@ func (e *ErrorMessageProviderImpl) tryGetTransactionErrorMessageByIndexFromEN(
 //   - status.Error - GRPC call failed, some of possible codes are:
 //   - codes.NotFound - request cannot be served by EN because of absence of data.
 //   - codes.Unavailable - remote node is not unavailable.
-func (e *ErrorMessageProviderImpl) tryGetTransactionErrorMessagesByBlockIDFromEN(
+func (e *TxErrorMessageProviderImpl) tryGetTransactionErrorMessagesByBlockIDFromEN(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionErrorMessagesByBlockIDRequest,

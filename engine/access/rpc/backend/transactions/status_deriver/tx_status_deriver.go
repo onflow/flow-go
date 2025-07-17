@@ -1,4 +1,4 @@
-package data_provider
+package status_deriver
 
 import (
 	"github.com/onflow/flow-go/model/flow"
@@ -84,4 +84,13 @@ func (t *TxStatusDeriver) DeriveTransactionStatus(blockHeight uint64, executed b
 
 	// otherwise, this block has been executed, and sealed, so report as sealed
 	return flow.TransactionStatusSealed, nil
+}
+
+// isExpired checks whether a transaction is expired given the height of the
+// transaction's reference block and the height to compare against.
+func isExpired(refHeight, compareToHeight uint64) bool {
+	if compareToHeight <= refHeight {
+		return false
+	}
+	return compareToHeight-refHeight > flow.DefaultTransactionExpiry
 }

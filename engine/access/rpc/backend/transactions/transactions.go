@@ -15,8 +15,12 @@ import (
 
 	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/engine/access/index"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/data_provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
@@ -57,130 +61,139 @@ type Transactions struct {
 	systemTx   *flow.TransactionBody
 
 	// RPC Clients & Network
-	staticCollectionRPC accessproto.AccessAPIClient // RPC client tied to a fixed collection node
-	previousAccessNodes []accessproto.AccessAPIClient
-	nodeCommunicator    backend.Communicator
-	connFactory         connection.ConnectionFactory
-	retry               *backend.Retry
+	staticCollectionRPCClient   accessproto.AccessAPIClient // RPC client tied to a fixed collection node
+	historicalAccessNodeClients []accessproto.AccessAPIClient
+	nodeCommunicator            node_communicator.Communicator
+	connectionFactory           connection.ConnectionFactory
+	retrier                     *retrier.Retrier
 
 	// Storages
 	blocks       storage.Blocks
 	collections  storage.Collections
 	transactions storage.Transactions
 
-	//  Caching
 	txResultCache *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 
-	//  Transaction Processing
-	transactionValidator *validator.TransactionValidator
-
-	//  Indexing & Data Derivation
-	dataProvider    data_provider.DataProvider
-	txStatusDeriver *data_provider.TxStatusDeriver
+	txValidator     *validator.TransactionValidator
+	txProvider      provider.TransactionProvider
+	txStatusDeriver *status_deriver.TxStatusDeriver
 }
 
 var _ API = (*Transactions)(nil)
 
-func NewTransactions(
-	log zerolog.Logger,
-	transactionMetrics module.TransactionMetrics,
-	state protocol.State,
-	systemTxID flow.Identifier,
-	systemTx *flow.TransactionBody,
-	staticCollectionRPC accessproto.AccessAPIClient,
-	previousAccessNodes []accessproto.AccessAPIClient,
-	nodeCommunicator backend.Communicator,
-	connFactory connection.ConnectionFactory,
-	retry *backend.Retry,
-	nodeProvider *commonrpc.ExecutionNodeIdentitiesProvider,
-	blocks storage.Blocks,
-	collections storage.Collections,
-	transactions storage.Transactions,
-	txErrorMessages data_provider.ErrorMessageProvider,
-	txResultCache *lru.Cache[flow.Identifier, *accessmodel.TransactionResult],
-	txResultQueryMode backend.IndexQueryMode,
-	transactionValidator *validator.TransactionValidator,
-	txStatusDeriver *data_provider.TxStatusDeriver,
-	eventsIndex *index.EventsIndex,
-	txResultsIndex *index.TransactionResultsIndex,
-) (*Transactions, error) {
-	var dataProvider data_provider.DataProvider
+type Params struct {
+	Log                         zerolog.Logger
+	Metrics                     module.TransactionMetrics
+	State                       protocol.State
+	SystemTxID                  flow.Identifier
+	SystemTx                    *flow.TransactionBody
+	StaticCollectionRPCClient   accessproto.AccessAPIClient
+	HistoricalAccessNodeClients []accessproto.AccessAPIClient
+	NodeCommunicator            node_communicator.Communicator
+	ConnFactory                 connection.ConnectionFactory
+	EnableRetries               bool
+	NodeProvider                *commonrpc.ExecutionNodeIdentitiesProvider
+	Blocks                      storage.Blocks
+	Collections                 storage.Collections
+	Transactions                storage.Transactions
+	TxErrorMessageProvider      error_message_provider.TxErrorMessageProvider
+	TxResultCache               *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
+	TxResultQueryMode           query_mode.IndexQueryMode
+	TxValidator                 *validator.TransactionValidator
+	TxStatusDeriver             *status_deriver.TxStatusDeriver
+	EventsIndex                 *index.EventsIndex
+	TxResultsIndex              *index.TransactionResultsIndex
+}
 
-	switch txResultQueryMode {
-	case backend.IndexQueryModeLocalOnly:
-		dataProvider = data_provider.NewLocalDataProvider(
-			state,
-			collections,
-			blocks,
-			eventsIndex,
-			txResultsIndex,
-			txErrorMessages,
-			systemTxID,
-			txStatusDeriver,
+func NewTransactionsBackend(params Params) (*Transactions, error) {
+	var txProvider provider.TransactionProvider
+
+	switch params.TxResultQueryMode {
+	case query_mode.IndexQueryModeLocalOnly:
+		txProvider = provider.NewLocalTransactionProvider(
+			params.State,
+			params.Collections,
+			params.Blocks,
+			params.EventsIndex,
+			params.TxResultsIndex,
+			params.TxErrorMessageProvider,
+			params.SystemTxID,
+			params.TxStatusDeriver,
 		)
 
-	case backend.IndexQueryModeExecutionNodesOnly:
-		dataProvider = data_provider.NewExecutionNodeDataProvider(
-			log,
-			state,
-			collections,
-			connFactory,
-			nodeCommunicator,
-			nodeProvider,
-			txStatusDeriver,
-			systemTxID,
-			systemTx,
+	case query_mode.IndexQueryModeExecutionNodesOnly:
+		txProvider = provider.NewENTransactionProvider(
+			params.Log,
+			params.State,
+			params.Collections,
+			params.ConnFactory,
+			params.NodeCommunicator,
+			params.NodeProvider,
+			params.TxStatusDeriver,
+			params.SystemTxID,
+			params.SystemTx,
 		)
 
-	case backend.IndexQueryModeFailover:
-		local := data_provider.NewLocalDataProvider(
-			state,
-			collections,
-			blocks,
-			eventsIndex,
-			txResultsIndex,
-			txErrorMessages,
-			systemTxID,
-			txStatusDeriver,
+	case query_mode.IndexQueryModeFailover:
+		local := provider.NewLocalTransactionProvider(
+			params.State,
+			params.Collections,
+			params.Blocks,
+			params.EventsIndex,
+			params.TxResultsIndex,
+			params.TxErrorMessageProvider,
+			params.SystemTxID,
+			params.TxStatusDeriver,
 		)
 
-		execNode := data_provider.NewExecutionNodeDataProvider(
-			log,
-			state,
-			collections,
-			connFactory,
-			nodeCommunicator,
-			nodeProvider,
-			txStatusDeriver,
-			systemTxID,
-			systemTx,
+		execNode := provider.NewENTransactionProvider(
+			params.Log,
+			params.State,
+			params.Collections,
+			params.ConnFactory,
+			params.NodeCommunicator,
+			params.NodeProvider,
+			params.TxStatusDeriver,
+			params.SystemTxID,
+			params.SystemTx,
 		)
 
-		dataProvider = data_provider.NewFailoverDataProvider(local, execNode)
+		txProvider = provider.NewFailoverTransactionProvider(local, execNode)
 
 	default:
 		return nil, status.Error(codes.Internal, "invalid index query mode")
 	}
 
-	return &Transactions{
-		log:                  log,
-		metrics:              transactionMetrics,
-		state:                state,
-		systemTxID:           systemTxID,
-		systemTx:             systemTx,
-		staticCollectionRPC:  staticCollectionRPC,
-		previousAccessNodes:  previousAccessNodes,
-		nodeCommunicator:     nodeCommunicator,
-		connFactory:          connFactory,
-		retry:                retry,
-		blocks:               blocks,
-		collections:          collections,
-		transactions:         transactions,
-		txResultCache:        txResultCache,
-		transactionValidator: transactionValidator,
-		dataProvider:         dataProvider,
-		txStatusDeriver:      txStatusDeriver,
-	}, nil
+	txs := &Transactions{
+		log:                         params.Log,
+		metrics:                     params.Metrics,
+		state:                       params.State,
+		systemTxID:                  params.SystemTxID,
+		systemTx:                    params.SystemTx,
+		staticCollectionRPCClient:   params.StaticCollectionRPCClient,
+		historicalAccessNodeClients: params.HistoricalAccessNodeClients,
+		nodeCommunicator:            params.NodeCommunicator,
+		connectionFactory:           params.ConnFactory,
+		blocks:                      params.Blocks,
+		collections:                 params.Collections,
+		transactions:                params.Transactions,
+		txResultCache:               params.TxResultCache,
+		txValidator:                 params.TxValidator,
+		txProvider:                  txProvider,
+		txStatusDeriver:             params.TxStatusDeriver,
+	}
+
+	if params.EnableRetries {
+		txs.retrier = retrier.NewRetrier(
+			params.Log,
+			params.Blocks,
+			params.Collections,
+			txs,
+			params.TxStatusDeriver,
+		)
+	}
+
+	return txs, nil
 }
 
 // SendTransaction forwards the transaction to the collection node
@@ -190,7 +203,7 @@ func (t *Transactions) SendTransaction(
 ) error {
 	now := time.Now().UTC()
 
-	err := t.transactionValidator.Validate(ctx, tx)
+	err := t.txValidator.Validate(ctx, tx)
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "invalid transaction: %s", err.Error())
 	}
@@ -210,7 +223,7 @@ func (t *Transactions) SendTransaction(
 		return status.Errorf(codes.Internal, "failed to store transaction: %v", err)
 	}
 
-	if t.retry.IsActive() {
+	if t.retrier != nil {
 		go t.registerTransactionForRetry(tx)
 	}
 
@@ -220,8 +233,8 @@ func (t *Transactions) SendTransaction(
 // trySendTransaction tries to transaction to a collection node
 func (t *Transactions) trySendTransaction(ctx context.Context, tx *flow.TransactionBody) error {
 	// if a collection node rpc client was provided at startup, just use that
-	if t.staticCollectionRPC != nil {
-		return t.grpcTxSend(ctx, t.staticCollectionRPC, tx)
+	if t.staticCollectionRPCClient != nil {
+		return t.grpcTxSend(ctx, t.staticCollectionRPCClient, tx)
 	}
 
 	// otherwise choose all collection nodes to try
@@ -282,7 +295,7 @@ func (t *Transactions) sendTransactionToCollector(
 	tx *flow.TransactionBody,
 	collectionNodeAddr string,
 ) error {
-	collectionRPC, closer, err := t.connFactory.GetAccessAPIClient(collectionNodeAddr, nil)
+	collectionRPC, closer, err := t.connectionFactory.GetAccessAPIClient(collectionNodeAddr, nil)
 	if err != nil {
 		return fmt.Errorf("failed to connect to collection node at %s: %w", collectionNodeAddr, err)
 	}
@@ -540,7 +553,7 @@ func (t *Transactions) GetTransactionResultsByBlockID(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	return t.dataProvider.TransactionResultsByBlockID(ctx, block, requiredEventEncodingVersion)
+	return t.txProvider.TransactionResultsByBlockID(ctx, block, requiredEventEncodingVersion)
 }
 
 // GetTransactionResultByIndex returns transactions Results for an index in a block that is executed,
@@ -557,7 +570,7 @@ func (t *Transactions) GetTransactionResultByIndex(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	return t.dataProvider.TransactionResultByIndex(ctx, block, index, requiredEventEncodingVersion)
+	return t.txProvider.TransactionResultByIndex(ctx, block, index, requiredEventEncodingVersion)
 }
 
 // GetSystemTransaction returns system transaction
@@ -598,7 +611,7 @@ func (t *Transactions) lookupTransactionResult(
 	header *flow.Header,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
-	txResult, err := t.dataProvider.TransactionResult(ctx, header, txID, requiredEventEncodingVersion)
+	txResult, err := t.txProvider.TransactionResult(ctx, header, txID, requiredEventEncodingVersion)
 
 	if err != nil {
 		// if either the storage or execution node reported no results or there were not enough execution results
@@ -618,7 +631,7 @@ func (t *Transactions) getHistoricalTransaction(
 	ctx context.Context,
 	txID flow.Identifier,
 ) (*flow.TransactionBody, error) {
-	for _, historicalNode := range t.previousAccessNodes {
+	for _, historicalNode := range t.historicalAccessNodeClients {
 		txResp, err := historicalNode.GetTransaction(ctx, &accessproto.GetTransactionRequest{Id: txID[:]})
 		if err == nil {
 			tx, err := convert.MessageToTransaction(txResp.Transaction, t.state.Params().ChainID().Chain())
@@ -642,7 +655,7 @@ func (t *Transactions) getHistoricalTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
 ) (*accessmodel.TransactionResult, error) {
-	for _, historicalNode := range t.previousAccessNodes {
+	for _, historicalNode := range t.historicalAccessNodeClients {
 		result, err := historicalNode.GetTransactionResult(ctx, &accessproto.GetTransactionRequest{Id: txID[:]})
 		if err == nil {
 			// Found on a historical node. Report
@@ -675,7 +688,7 @@ func (t *Transactions) registerTransactionForRetry(tx *flow.TransactionBody) {
 		return
 	}
 
-	t.retry.RegisterTransaction(referenceBlock.Height, tx)
+	t.retrier.RegisterTransaction(referenceBlock.Height, tx)
 }
 
 // ATTENTION: might be a source of problems in future. We run this code on finalization gorotuine,
@@ -684,5 +697,5 @@ func (t *Transactions) registerTransactionForRetry(tx *flow.TransactionBody) {
 // too often for this engine. An example of similar approach - https://github.com/onflow/flow-go/blob/10b0fcbf7e2031674c00f3cdd280f27bd1b16c47/engine/common/follower/compliance_engine.go#L201..
 // No errors expected during normal operations.
 func (t *Transactions) ProcessFinalizedBlockHeight(height uint64) error {
-	return t.retry.Retry(height)
+	return t.retrier.Retry(height)
 }

@@ -1,4 +1,4 @@
-package data_provider
+package provider
 
 import (
 	"context"
@@ -10,7 +10,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -22,38 +24,38 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type ExecutionNodeDataProvider struct {
+type ENTransactionProvider struct {
 	log   zerolog.Logger
 	state protocol.State
 
 	collections storage.Collections
 
 	connFactory      connection.ConnectionFactory
-	nodeCommunicator backend.Communicator
+	nodeCommunicator node_communicator.Communicator
 	nodeProvider     *rpc.ExecutionNodeIdentitiesProvider
 
-	txStatusDeriver *TxStatusDeriver
+	txStatusDeriver *status_deriver.TxStatusDeriver
 
 	systemTxID flow.Identifier
 	systemTx   *flow.TransactionBody
 }
 
-var _ DataProvider = (*ExecutionNodeDataProvider)(nil)
+var _ TransactionProvider = (*ENTransactionProvider)(nil)
 
-func NewExecutionNodeDataProvider(
+func NewENTransactionProvider(
 	log zerolog.Logger,
 	state protocol.State,
 	collections storage.Collections,
 	connFactory connection.ConnectionFactory,
-	nodeCommunicator backend.Communicator,
+	nodeCommunicator node_communicator.Communicator,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
-	txStatusDeriver *TxStatusDeriver,
+	txStatusDeriver *status_deriver.TxStatusDeriver,
 	systemTxID flow.Identifier,
 	systemTx *flow.TransactionBody,
-) *ExecutionNodeDataProvider {
+) *ENTransactionProvider {
 
-	return &ExecutionNodeDataProvider{
-		log:              log,
+	return &ENTransactionProvider{
+		log:              log.With().Str("transaction_provider", "execution_node").Logger(),
 		state:            state,
 		collections:      collections,
 		connFactory:      connFactory,
@@ -65,7 +67,7 @@ func NewExecutionNodeDataProvider(
 	}
 }
 
-func (e *ExecutionNodeDataProvider) TransactionResult(
+func (e *ENTransactionProvider) TransactionResult(
 	ctx context.Context,
 	block *flow.Header,
 	transactionID flow.Identifier,
@@ -84,7 +86,7 @@ func (e *ExecutionNodeDataProvider) TransactionResult(
 	)
 	if err != nil {
 		// if no execution receipt were found, return a NotFound GRPC error
-		if backend.IsInsufficientExecutionReceipts(err) {
+		if common.IsInsufficientExecutionReceipts(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, err
@@ -120,7 +122,7 @@ func (e *ExecutionNodeDataProvider) TransactionResult(
 	}, nil
 }
 
-func (e *ExecutionNodeDataProvider) TransactionResultByIndex(
+func (e *ENTransactionProvider) TransactionResultByIndex(
 	ctx context.Context,
 	block *flow.Block,
 	index uint32,
@@ -138,7 +140,7 @@ func (e *ExecutionNodeDataProvider) TransactionResultByIndex(
 		blockID,
 	)
 	if err != nil {
-		if backend.IsInsufficientExecutionReceipts(err) {
+		if common.IsInsufficientExecutionReceipts(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
@@ -174,7 +176,7 @@ func (e *ExecutionNodeDataProvider) TransactionResultByIndex(
 	}, nil
 }
 
-func (e *ExecutionNodeDataProvider) TransactionResultsByBlockID(
+func (e *ENTransactionProvider) TransactionResultsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
@@ -189,7 +191,7 @@ func (e *ExecutionNodeDataProvider) TransactionResultsByBlockID(
 		blockID,
 	)
 	if err != nil {
-		if backend.IsInsufficientExecutionReceipts(err) {
+		if common.IsInsufficientExecutionReceipts(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
@@ -296,7 +298,7 @@ func (e *ExecutionNodeDataProvider) TransactionResultsByBlockID(
 	return results, nil
 }
 
-func (e *ExecutionNodeDataProvider) getTransactionResultFromAnyExeNode(
+func (e *ENTransactionProvider) getTransactionResultFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionResultRequest,
@@ -331,7 +333,7 @@ func (e *ExecutionNodeDataProvider) getTransactionResultFromAnyExeNode(
 	return resp, errToReturn
 }
 
-func (e *ExecutionNodeDataProvider) getTransactionResultsByBlockIDFromAnyExeNode(
+func (e *ENTransactionProvider) getTransactionResultsByBlockIDFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionsByBlockIDRequest,
@@ -371,7 +373,7 @@ func (e *ExecutionNodeDataProvider) getTransactionResultsByBlockIDFromAnyExeNode
 	return resp, errToReturn
 }
 
-func (e *ExecutionNodeDataProvider) getTransactionResultByIndexFromAnyExeNode(
+func (e *ENTransactionProvider) getTransactionResultByIndexFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionByIndexRequest,
@@ -409,7 +411,7 @@ func (e *ExecutionNodeDataProvider) getTransactionResultByIndexFromAnyExeNode(
 	return resp, errToReturn
 }
 
-func (e *ExecutionNodeDataProvider) tryGetTransactionResult(
+func (e *ENTransactionProvider) tryGetTransactionResult(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionResultRequest,
@@ -428,7 +430,7 @@ func (e *ExecutionNodeDataProvider) tryGetTransactionResult(
 	return resp, nil
 }
 
-func (e *ExecutionNodeDataProvider) tryGetTransactionResultsByBlockID(
+func (e *ENTransactionProvider) tryGetTransactionResultsByBlockID(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionsByBlockIDRequest,
@@ -447,7 +449,7 @@ func (e *ExecutionNodeDataProvider) tryGetTransactionResultsByBlockID(
 	return resp, nil
 }
 
-func (e *ExecutionNodeDataProvider) tryGetTransactionResultByIndex(
+func (e *ENTransactionProvider) tryGetTransactionResultByIndex(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionByIndexRequest,

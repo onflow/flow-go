@@ -1,4 +1,4 @@
-package data_provider
+package provider
 
 import (
 	"context"
@@ -11,6 +11,8 @@ import (
 	"google.golang.org/grpc/codes"
 
 	"github.com/onflow/flow-go/engine/access/index"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -24,31 +26,31 @@ import (
 // ErrTransactionNotInBlock represents an error indicating that the transaction is not found in the block.
 var ErrTransactionNotInBlock = errors.New("transaction not in block")
 
-// Local provides functionality for retrieving transaction results and error messages from local storages
-type Local struct {
+// LocalTransactionProvider provides functionality for retrieving transaction results and error messages from local storages
+type LocalTransactionProvider struct {
 	state           protocol.State
 	collections     storage.Collections
 	blocks          storage.Blocks
 	eventsIndex     *index.EventsIndex
 	txResultsIndex  *index.TransactionResultsIndex
-	txErrorMessages ErrorMessageProvider
+	txErrorMessages error_message_provider.TxErrorMessageProvider
 	systemTxID      flow.Identifier
-	txStatusDeriver *TxStatusDeriver
+	txStatusDeriver *status_deriver.TxStatusDeriver
 }
 
-var _ DataProvider = (*Local)(nil)
+var _ TransactionProvider = (*LocalTransactionProvider)(nil)
 
-func NewLocalDataProvider(
+func NewLocalTransactionProvider(
 	state protocol.State,
 	collections storage.Collections,
 	blocks storage.Blocks,
 	eventsIndex *index.EventsIndex,
 	txResultsIndex *index.TransactionResultsIndex,
-	txErrorMessages ErrorMessageProvider,
+	txErrorMessages error_message_provider.TxErrorMessageProvider,
 	systemTxID flow.Identifier,
-	txStatusDeriver *TxStatusDeriver,
-) *Local {
-	return &Local{
+	txStatusDeriver *status_deriver.TxStatusDeriver,
+) *LocalTransactionProvider {
+	return &LocalTransactionProvider{
 		state:           state,
 		collections:     collections,
 		blocks:          blocks,
@@ -60,15 +62,6 @@ func NewLocalDataProvider(
 	}
 }
 
-//func (t *Local) TransactionResult0(
-//	ctx context.Context,
-//	block *flow.Header,
-//	transactionID flow.Identifier,
-//	encodingVersion entities.EventEncodingVersion,
-//) (*accessmodel.TransactionResult, error) {
-//
-//}
-
 // TransactionResult retrieves a transaction result from storage by block ID and transaction ID.
 // Expected errors during normal operation:
 //   - codes.NotFound when result cannot be provided by storage due to the absence of data.
@@ -78,7 +71,7 @@ func NewLocalDataProvider(
 //
 // All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
 // getter or when deriving transaction status.
-func (t *Local) TransactionResult(
+func (t *LocalTransactionProvider) TransactionResult(
 	ctx context.Context,
 	block *flow.Header,
 	transactionID flow.Identifier,
@@ -151,7 +144,7 @@ func (t *Local) TransactionResult(
 //
 // All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
 // getter or when deriving transaction status.
-func (t *Local) TransactionResultByIndex(
+func (t *LocalTransactionProvider) TransactionResultByIndex(
 	ctx context.Context,
 	block *flow.Block,
 	index uint32,
@@ -225,7 +218,7 @@ func (t *Local) TransactionResultByIndex(
 //
 // All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
 // getter or when deriving transaction status.
-func (t *Local) TransactionResultsByBlockID(
+func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
@@ -309,18 +302,9 @@ func (t *Local) TransactionResultsByBlockID(
 	return results, nil
 }
 
-// isExpired checks whether a transaction is expired given the height of the
-// transaction's reference block and the height to compare against.
-func isExpired(refHeight, compareToHeight uint64) bool {
-	if compareToHeight <= refHeight {
-		return false
-	}
-	return compareToHeight-refHeight > flow.DefaultTransactionExpiry
-}
-
 // lookupCollectionIDInBlock returns the collection ID based on the transaction ID.
 // The lookup is performed in block collections.
-func (t *Local) lookupCollectionIDInBlock(
+func (t *LocalTransactionProvider) lookupCollectionIDInBlock(
 	block *flow.Block,
 	txID flow.Identifier,
 ) (flow.Identifier, error) {
@@ -341,7 +325,7 @@ func (t *Local) lookupCollectionIDInBlock(
 
 // buildTxIDToCollectionIDMapping returns a map of transaction ID to collection ID based on the provided block.
 // No errors expected during normal operations.
-func (t *Local) buildTxIDToCollectionIDMapping(block *flow.Block) (map[flow.Identifier]flow.Identifier, error) {
+func (t *LocalTransactionProvider) buildTxIDToCollectionIDMapping(block *flow.Block) (map[flow.Identifier]flow.Identifier, error) {
 	txToCollectionID := make(map[flow.Identifier]flow.Identifier)
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := t.collections.LightByID(guarantee.ID())

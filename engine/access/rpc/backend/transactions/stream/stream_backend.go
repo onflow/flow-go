@@ -1,4 +1,4 @@
-package backend
+package stream
 
 import (
 	"context"
@@ -17,6 +17,8 @@ import (
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 )
 
 // TransactionExpiryForUnknownStatus defines the number of blocks after which
@@ -26,15 +28,57 @@ const TransactionExpiryForUnknownStatus = flow.DefaultTransactionExpiry
 // sendTransaction defines a function type for sending a transaction.
 type sendTransaction func(ctx context.Context, tx *flow.TransactionBody) error
 
-// backendSubscribeTransactions manages transaction subscriptions for monitoring transaction statuses.
+type API interface {
+	SubscribeTransactionStatuses(
+		ctx context.Context,
+		txID flow.Identifier,
+		requiredEventEncodingVersion entities.EventEncodingVersion,
+	) subscription.Subscription
+
+	SendAndSubscribeTransactionStatuses(
+		ctx context.Context,
+		tx *flow.TransactionBody,
+		requiredEventEncodingVersion entities.EventEncodingVersion,
+	) subscription.Subscription
+}
+
+// TransactionStream manages transaction subscriptions for monitoring transaction statuses.
 // It provides functionalities to send transactions, subscribe to transaction status updates,
 // and handle subscription lifecycles.
-type backendSubscribeTransactions struct {
+type TransactionStream struct {
 	log                 zerolog.Logger
-	backendTransactions *backendTransactions
+	state               protocol.State
 	subscriptionHandler *subscription.SubscriptionHandler
 	blockTracker        tracker.BlockTracker
 	sendTransaction     sendTransaction
+
+	blocks       storage.Blocks
+	collections  storage.Collections
+	transactions storage.Transactions
+}
+
+var _ API = (*TransactionStream)(nil)
+
+func NewTransactionStreamBackend(
+	log zerolog.Logger,
+	state protocol.State,
+	subscriptionHandler *subscription.SubscriptionHandler,
+	blockTracker tracker.BlockTracker,
+	sendTransaction sendTransaction,
+	blocks storage.Blocks,
+	collections storage.Collections,
+	transactions storage.Transactions,
+) *TransactionStream {
+	return &TransactionStream{
+		log:                 log,
+		state:               state,
+		subscriptionHandler: subscriptionHandler,
+		blockTracker:        blockTracker,
+		sendTransaction:     sendTransaction,
+		blocks:              blocks,
+		collections:         collections,
+		transactions:        transactions,
+	}
 }
 
 // SendAndSubscribeTransactionStatuses sends a transaction and subscribes to its status updates.
@@ -49,17 +93,17 @@ type backendSubscribeTransactions struct {
 //   - requiredEventEncodingVersion: The version of event encoding required for the subscription.
 //
 // If the transaction cannot be sent, the subscription will fail and return a failed subscription.
-func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(
+func (t *TransactionStream) SendAndSubscribeTransactionStatuses(
 	ctx context.Context,
 	tx *flow.TransactionBody,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) subscription.Subscription {
-	if err := b.sendTransaction(ctx, tx); err != nil {
-		b.log.Debug().Err(err).Str("tx_id", tx.ID().String()).Msg("failed to send transaction")
+	if err := t.sendTransaction(ctx, tx); err != nil {
+		t.log.Debug().Err(err).Str("tx_id", tx.ID().String()).Msg("failed to send transaction")
 		return subscription.NewFailedSubscription(err, "failed to send transaction")
 	}
 
-	return b.createSubscription(ctx, tx.ID(), tx.ReferenceBlockID, tx.ReferenceBlockID, requiredEventEncodingVersion)
+	return t.createSubscription(ctx, tx.ID(), tx.ReferenceBlockID, tx.ReferenceBlockID, requiredEventEncodingVersion)
 }
 
 // SubscribeTransactionStatuses subscribes to status updates for a given transaction ID.
@@ -72,19 +116,19 @@ func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(
 //   - ctx: The context to manage the subscription's lifecycle, including cancellation.
 //   - txID: The unique identifier of the transaction to monitor.
 //   - requiredEventEncodingVersion: The version of event encoding required for the subscription.
-func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(
+func (t *TransactionStream) SubscribeTransactionStatuses(
 	ctx context.Context,
 	txID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) subscription.Subscription {
-	header, err := b.backendTransactions.state.Sealed().Head()
+	header, err := t.state.Sealed().Head()
 	if err != nil {
 		// throw the exception as the node must have the current sealed block in storage
 		irrecoverable.Throw(ctx, fmt.Errorf("failed to lookup sealed block: %w", err))
 		return subscription.NewFailedSubscription(err, "failed to lookup sealed block")
 	}
 
-	return b.createSubscription(ctx, txID, header.ID(), flow.ZeroID, requiredEventEncodingVersion)
+	return t.createSubscription(ctx, txID, header.ID(), flow.ZeroID, requiredEventEncodingVersion)
 }
 
 // createSubscription initializes a transaction subscription for monitoring status updates.
@@ -103,7 +147,7 @@ func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(
 //   - subscription.Subscription: A subscription for monitoring transaction status updates.
 //
 // If the start height cannot be determined or current transaction state cannot be determined, a failed subscription is returned.
-func (b *backendSubscribeTransactions) createSubscription(
+func (t *TransactionStream) createSubscription(
 	ctx context.Context,
 	txID flow.Identifier,
 	startBlockID flow.Identifier,
@@ -111,26 +155,33 @@ func (b *backendSubscribeTransactions) createSubscription(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) subscription.Subscription {
 	// Determine the height of the block to start the subscription from.
-	startHeight, err := b.blockTracker.GetStartHeightFromBlockID(startBlockID)
+	startHeight, err := t.blockTracker.GetStartHeightFromBlockID(startBlockID)
 	if err != nil {
-		b.log.Debug().Err(err).Str("block_id", startBlockID.String()).Msg("failed to get start height")
+		t.log.Debug().Err(err).Str("block_id", startBlockID.String()).Msg("failed to get start height")
 		return subscription.NewFailedSubscription(err, "failed to get start height")
 	}
 
-	txInfo := newTransactionSubscriptionMetadata(b.backendTransactions, txID, referenceBlockID, requiredEventEncodingVersion)
+	txInfo := NewTransactionMetadata(
+		t.blocks,
+		t.collections,
+		t.transactions,
+		txID,
+		referenceBlockID,
+		requiredEventEncodingVersion,
+	)
 
-	return b.subscriptionHandler.Subscribe(ctx, startHeight, b.getTransactionStatusResponse(txInfo, startHeight))
+	return t.subscriptionHandler.Subscribe(ctx, startHeight, t.getTransactionStatusResponse(txInfo, startHeight))
 }
 
 // getTransactionStatusResponse returns a callback function that produces transaction status
 // subscription responses based on new blocks.
 // The returned callback is not concurrency-safe
-func (b *backendSubscribeTransactions) getTransactionStatusResponse(
-	txInfo *transactionSubscriptionMetadata,
+func (t *TransactionStream) getTransactionStatusResponse(
+	txInfo *TransactionMetadata,
 	startHeight uint64,
 ) func(context.Context, uint64) (interface{}, error) {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
-		err := b.checkBlockReady(height)
+		err := t.checkBlockReady(height)
 		if err != nil {
 			return nil, err
 		}
@@ -175,9 +226,9 @@ func hasReachedUnknownStatusLimit(height, startHeight uint64, status flow.Transa
 // checkBlockReady checks if the given block height is valid and available based on the expected block status.
 // Expected errors during normal operation:
 // - [subscription.ErrBlockNotReady]: block for the given block height is not available.
-func (b *backendSubscribeTransactions) checkBlockReady(height uint64) error {
+func (t *TransactionStream) checkBlockReady(height uint64) error {
 	// Get the highest available finalized block height
-	highestHeight, err := b.blockTracker.GetHighestHeight(flow.BlockStatusFinalized)
+	highestHeight, err := t.blockTracker.GetHighestHeight(flow.BlockStatusFinalized)
 	if err != nil {
 		return fmt.Errorf("could not get highest height for block %d: %w", height, err)
 	}

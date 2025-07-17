@@ -1,4 +1,4 @@
-package data_provider
+package provider
 
 import (
 	"context"
@@ -9,21 +9,21 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type Failover struct {
-	localProvider    DataProvider
-	execNodeProvider DataProvider
+type FailoverTransactionProvider struct {
+	localProvider    TransactionProvider
+	execNodeProvider TransactionProvider
 }
 
-var _ DataProvider = (*Failover)(nil)
+var _ TransactionProvider = (*FailoverTransactionProvider)(nil)
 
-func NewFailoverDataProvider(local DataProvider, execNode DataProvider) *Failover {
-	return &Failover{
+func NewFailoverTransactionProvider(local TransactionProvider, execNode TransactionProvider) *FailoverTransactionProvider {
+	return &FailoverTransactionProvider{
 		localProvider:    local,
 		execNodeProvider: execNode,
 	}
 }
 
-func (f *Failover) TransactionResult(
+func (f *FailoverTransactionProvider) TransactionResult(
 	ctx context.Context,
 	header *flow.Header,
 	txID flow.Identifier,
@@ -38,7 +38,7 @@ func (f *Failover) TransactionResult(
 	return ENResult, ENErr
 }
 
-func (f *Failover) TransactionResultByIndex(
+func (f *FailoverTransactionProvider) TransactionResultByIndex(
 	ctx context.Context,
 	block *flow.Block,
 	index uint32,
@@ -53,7 +53,7 @@ func (f *Failover) TransactionResultByIndex(
 	return ENResult, ENErr
 }
 
-func (f *Failover) TransactionResultsByBlockID(
+func (f *FailoverTransactionProvider) TransactionResultsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
 	encodingVersion entities.EventEncodingVersion,
