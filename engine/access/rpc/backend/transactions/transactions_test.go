@@ -1010,6 +1010,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	block := unittest.BlockFixture()
 	blockID := block.ID()
 	_, enIDs := suite.setupReceipts(&block)
+	suite.fixedExecutionNodeIDs = enIDs.NodeIDs()
 
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.transactions.On("ByID", transactionBody.ID()).Return(transactionBody, nil)
