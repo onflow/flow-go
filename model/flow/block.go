@@ -203,6 +203,9 @@ func NewRootProposal(untrusted UntrustedProposal) (*Proposal, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid root block: %w", err)
 	}
+	if len(untrusted.ProposerSigData) != 0 {
+		return nil, fmt.Errorf("proposer signature must be empty")
+	}
 
 	return &Proposal{
 		Block:           *block,
