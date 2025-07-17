@@ -20,10 +20,6 @@ func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block 
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
 	}
 
-	// check payload integrity
-	if block.Header.PayloadHash != block.Payload.Hash() {
-		return fmt.Errorf("computed payload hash does not match header")
-	}
 
 	// store the block header
 	blockID := block.ID()
@@ -168,24 +164,19 @@ func InsertClusterPayload(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 		return fmt.Errorf("could not look up collection payload: %w", err)
 	}
 
-	// cluster payloads only contain a single collection, allow duplicates,
-	// because it is valid for two competing forks to have the same payload.
+	// Cluster payloads only contain a single collection
+	// We allow duplicates, because it is valid for two competing forks to have the same payload.
+	// Payloads are keyed by content hash, so duplicate values have the same key.
 	light := payload.Collection.Light()
-	// SkipDuplicates here is to ignore the error if the collection already exists
-	// This means the Insert operation is actually a Upsert operation.
-	// The upsert is ok, because the data is unique by its ID
 	writer := rw.Writer()
-	err = operation.UpsertCollection(writer, &light)
+	err = operation.UpsertCollection(writer, &light) // keyed by content hash so no lock needed
 	if err != nil {
 		return fmt.Errorf("could not insert payload collection: %w", err)
 	}
 
 	// insert constituent transactions
 	for _, colTx := range payload.Collection.Transactions {
-		// SkipDuplicates here is to ignore the error if the collection already exists
-		// This means the Insert operation is actually a Upsert operation.
-		// The upsert is ok, because the data is unique by its ID
-		err = operation.UpsertTransaction(writer, colTx.ID(), colTx)
+		err = operation.UpsertTransaction(writer, colTx.ID(), colTx) // keyed by content hash so no lock needed
 		if err != nil {
 			return fmt.Errorf("could not insert payload transaction: %w", err)
 		}
@@ -193,8 +184,6 @@ func InsertClusterPayload(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 
 	// index the transaction IDs within the collection
 	txIDs = payload.Collection.Light().Transactions
-	// SkipDuplicates here is to ignore the error if the collection already exists
-	// This means the Insert operation is actually a Upsert operation.
 	err = operation.IndexCollectionPayload(writer, blockID, txIDs)
 	if err != nil {
 		return fmt.Errorf("could not index collection: %w", err)

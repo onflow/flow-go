@@ -53,11 +53,6 @@ func (cp *ClusterPayloads) retrieveTx(r storage.Reader, blockID flow.Identifier)
 	return val, nil
 }
 
-func (cp *ClusterPayloads) Store(lctx lockctx.Proof, blockID flow.Identifier, payload *cluster.Payload) error {
-	return cp.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return cp.storeTx(lctx, rw, blockID, payload)
-	})
-}
 
 func (cp *ClusterPayloads) ByBlockID(blockID flow.Identifier) (*cluster.Payload, error) {
 	return cp.retrieveTx(cp.db.Reader(), blockID)

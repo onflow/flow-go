@@ -16,17 +16,17 @@ import (
 
 // IndexClusterBlockHeight UpsertByKeys a block number to block ID mapping for
 // the given cluster.
-func IndexClusterBlockHeight(lctx lockctx.Proof, w storage.Writer, clusterID flow.ChainID, number uint64, blockID flow.Identifier) error {
+func IndexClusterBlockHeight(lctx lockctx.Proof, w storage.Writer, clusterID flow.ChainID, height uint64, blockID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockFinalizeClusterBlock) {
 		return fmt.Errorf("missing lock: %v", storage.LockFinalizeClusterBlock)
 	}
 
-	return UpsertByKey(w, MakePrefix(codeFinalizedCluster, clusterID, number), blockID)
+	return UpsertByKey(w, MakePrefix(codeFinalizedCluster, clusterID, height), blockID)
 }
 
-// LookupClusterBlockHeight retrieves a block ID by number for the given cluster
-func LookupClusterBlockHeight(r storage.Reader, clusterID flow.ChainID, number uint64, blockID *flow.Identifier) error {
-	return RetrieveByKey(r, MakePrefix(codeFinalizedCluster, clusterID, number), blockID)
+// LookupClusterBlockHeight retrieves a block ID by height for the given cluster
+func LookupClusterBlockHeight(r storage.Reader, clusterID flow.ChainID, height uint64, blockID *flow.Identifier) error {
+	return RetrieveByKey(r, MakePrefix(codeFinalizedCluster, clusterID, height), blockID)
 }
 
 // UpsertByKeyClusterFinalizedHeight UpsertByKeys the finalized boundary for the given cluster.

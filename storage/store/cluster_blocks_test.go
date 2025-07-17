@@ -67,6 +67,7 @@ func TestClusterBlocksByHeight(t *testing.T) {
 	})
 }
 
+// TestClusterBlocks tests inserting and querying a chain of cluster blocks. 
 func TestClusterBlocks(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
@@ -89,20 +90,17 @@ func TestClusterBlocks(t *testing.T) {
 
 		// store a chain of blocks
 		for _, block := range blocks {
-			_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertClusterBlock)
+			_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertClusterBlock, storage.LockFinalizeClusterBlock)
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.InsertClusterBlock(lctx, rw, &block)
 			})
 			require.NoError(t, err)
-			lctx.Release()
 
-			lctx = lockManager.NewContext()
-			require.NoError(t, lctx.AcquireLock(storage.LockFinalizeClusterBlock))
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.FinalizeClusterBlock(lctx, rw, block.Header.ID())
 			})
-			lctx.Release()
 			require.NoError(t, err)
+			lctx.Release()
 		}
 
 		clusterBlocks := NewClusterBlocks(
@@ -112,11 +110,22 @@ func TestClusterBlocks(t *testing.T) {
 			NewClusterPayloads(metrics.NewNoopCollector(), db),
 		)
 
-		// check if the block can be retrieved by height
-		for _, block := range blocks {
-			retrievedBlock, err := clusterBlocks.ByHeight(block.Header.Height)
-			require.NoError(t, err)
-			require.Equal(t, block.ID(), retrievedBlock.ID())
-		}
+		t.Run("ByHeight", func(t *testing.T) {
+			// check if the block can be retrieved by height
+			for _, block := range blocks {
+				retrievedBlock, err := clusterBlocks.ByHeight(block.Header.Height)
+				require.NoError(t, err)
+				require.Equal(t, block.ID(), retrievedBlock.ID())
+			}
+		})
+		
+		t.Run("ByID", func(t *testing.T) {
+			// check if the block can be retrieved by ID
+			for _, block := range blocks {
+				retrievedBlock, err := clusterBlocks.ByID(block.ID())
+				require.NoError(t, err)
+				require.Equal(t, block.ID(), retrievedBlock.ID())
+			}
+		})
 	})
 }
