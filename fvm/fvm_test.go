@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	bridge "github.com/onflow/flow-evm-bridge"
+
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/test"
 
@@ -592,10 +593,9 @@ func TestHappyPathTransactionSigning(t *testing.T) {
 
 			txBody := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(`transaction(){}`)).
+				SetProposalKey(accounts[0], 0, 0).
+				SetPayer(accounts[0]).
 				Build()
-
-			txBody.SetProposalKey(accounts[0], 0, 0)
-			txBody.SetPayer(accounts[0])
 
 			hasher, err := exeUtils.NewHasher(privateKey.HashAlgo)
 			require.NoError(t, err)

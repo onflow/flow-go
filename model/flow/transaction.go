@@ -137,12 +137,6 @@ func (tb TransactionBody) ID() Identifier {
 	return MakeID(tb)
 }
 
-// SetComputeLimit sets the gas limit for this transaction.
-func (tb *TransactionBody) SetComputeLimit(limit uint64) *TransactionBody {
-	tb.GasLimit = limit //nolint:structwrite
-	return tb
-}
-
 // SetProposalKey sets the proposal key and sequence number for this transaction.
 //
 // The first two arguments specify the account key to be used, and the last argument is the sequence
