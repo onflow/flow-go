@@ -107,7 +107,6 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 	})
 
 	t.Run("multiple collections events", func(t *testing.T) {
-
 		deployTx := blueprints.DeployContractTransaction(chain.ServiceAddress(), []byte(""+
 			`access(all) contract Foo {
 				access(all) event FooEvent(x: Int, y: Int)
@@ -128,17 +127,18 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			}`, chain.ServiceAddress())))
 
 		// copy txs
-		emitTx2 := emitTx1
-		emitTx3 := emitTx1
+		emitTx2 := *emitTx1
+		emitTx3 := *emitTx1
 
 		err := testutil.SignTransactionAsServiceAccount(deployTx, 0, chain)
 		require.NoError(t, err)
 
 		err = testutil.SignTransactionAsServiceAccount(emitTx1, 1, chain)
 		require.NoError(t, err)
-		err = testutil.SignTransactionAsServiceAccount(emitTx2, 2, chain)
+
+		err = testutil.SignTransactionAsServiceAccount(&emitTx2, 2, chain)
 		require.NoError(t, err)
-		err = testutil.SignTransactionAsServiceAccount(emitTx3, 3, chain)
+		err = testutil.SignTransactionAsServiceAccount(&emitTx3, 3, chain)
 		require.NoError(t, err)
 
 		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
@@ -190,7 +190,6 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 	t.Run("with failed storage limit", func(t *testing.T) {
 
 		accountPrivKey, createAccountTxBuilder := testutil.CreateAccountCreationTransaction(t, chain)
-		createAccountTx := createAccountTxBuilder.Build()
 
 		// this should return the address of newly created account
 		accountAddress, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
@@ -207,6 +206,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		minimumStorage, err := cadence.NewUFix64("0.00011661")
 		require.NoError(t, err)
 
+		createAccountTx := createAccountTxBuilder.Build()
 		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
 			{
 				createAccountTx,
@@ -235,7 +235,6 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 
 	t.Run("with failed transaction fee deduction", func(t *testing.T) {
 		accountPrivKey, createAccountTxBuilder := testutil.CreateAccountCreationTransaction(t, chain)
-		createAccountTx := createAccountTxBuilder.Build()
 
 		// this should return the address of newly created account
 		accountAddress, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
@@ -269,6 +268,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 
 		require.NoError(t, err)
 
+		createAccountTx := createAccountTxBuilder.Build()
 		cr := executeBlockAndVerifyWithParameters(t, [][]*flow.TransactionBody{
 			{
 				createAccountTx,
@@ -626,7 +626,6 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		return func(t *testing.T) {
 			// ==== Create an account ====
 			privateKey, createAccountTxBuilder := testutil.CreateAccountCreationTransaction(t, chain)
-			createAccountTx := createAccountTxBuilder.Build()
 
 			// this should return the address of newly created account
 			address, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
@@ -666,6 +665,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			)
 			require.NoError(t, err)
 
+			createAccountTx := createAccountTxBuilder.Build()
 			cr := executeBlockAndVerifyWithParameters(t, [][]*flow.TransactionBody{
 				{
 					createAccountTx,
