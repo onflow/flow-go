@@ -34,7 +34,6 @@ import (
 )
 
 func CreateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBodyBuilder {
-
 	encoded := hex.EncodeToString([]byte(contract))
 
 	script := []byte(fmt.Sprintf(`transaction {
@@ -66,7 +65,7 @@ func UpdateContractDeploymentTransaction(contractName string, contract string, a
 		Build()
 }
 
-func UpdateContractUnathorizedDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBody {
+func UpdateContractUnathorizedDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBodyBuilder {
 	encoded := hex.EncodeToString([]byte(contract))
 
 	return flow.NewTransactionBodyBuilder().
@@ -76,11 +75,10 @@ func UpdateContractUnathorizedDeploymentTransaction(contractName string, contrac
               }
             }`, contractName, encoded)),
 		).
-		AddAuthorizer(authorizer).
-		Build()
+		AddAuthorizer(authorizer)
 }
 
-func RemoveContractDeploymentTransaction(contractName string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+func RemoveContractDeploymentTransaction(contractName string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBodyBuilder {
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`transaction {
               prepare(signer: auth(RemoveContract) &Account, service: &Account) {
@@ -89,11 +87,10 @@ func RemoveContractDeploymentTransaction(contractName string, authorizer flow.Ad
             }`, contractName)),
 		).
 		AddAuthorizer(authorizer).
-		AddAuthorizer(chain.ServiceAddress()).
-		Build()
+		AddAuthorizer(chain.ServiceAddress())
 }
 
-func RemoveContractUnathorizedDeploymentTransaction(contractName string, authorizer flow.Address) *flow.TransactionBody {
+func RemoveContractUnathorizedDeploymentTransaction(contractName string, authorizer flow.Address) *flow.TransactionBodyBuilder {
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`transaction {
               prepare(signer: auth(RemoveContract) &Account) {
@@ -101,11 +98,10 @@ func RemoveContractUnathorizedDeploymentTransaction(contractName string, authori
               }
             }`, contractName)),
 		).
-		AddAuthorizer(authorizer).
-		Build()
+		AddAuthorizer(authorizer)
 }
 
-func CreateUnauthorizedContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBody {
+func CreateUnauthorizedContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBodyBuilder {
 	encoded := hex.EncodeToString([]byte(contract))
 
 	return flow.NewTransactionBodyBuilder().
@@ -115,8 +111,7 @@ func CreateUnauthorizedContractDeploymentTransaction(contractName string, contra
               }
             }`, contractName, encoded)),
 		).
-		AddAuthorizer(authorizer).
-		Build()
+		AddAuthorizer(authorizer)
 }
 
 func SignPayload(
@@ -404,7 +399,7 @@ func CreateAccountCreationTransaction(t testing.TB, chain flow.Chain) (flow.Acco
 // CreateMultiAccountCreationTransaction creates a transaction which will create many (n) new account.
 //
 // This function returns a randomly generated private key and the transaction.
-func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int) (flow.AccountPrivateKey, *flow.TransactionBody) {
+func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int) (flow.AccountPrivateKey, *flow.TransactionBodyBuilder) {
 	accountKey, err := GenerateAccountPrivateKey()
 	require.NoError(t, err)
 	encPublicKey := accountKey.PublicKey(1000).PublicKey.Encode()
@@ -441,8 +436,7 @@ func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int
 	tx := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(script)).
 		AddArgument(encCadPublicKey).
-		AddAuthorizer(chain.ServiceAddress()).
-		Build()
+		AddAuthorizer(chain.ServiceAddress())
 
 	return accountKey, tx
 }

@@ -50,19 +50,19 @@ func DeployCounterContractTransaction(authorizer flow.Address, chain flow.Chain)
 	return CreateContractDeploymentTransaction("Container", CounterContract, authorizer, chain)
 }
 
-func DeployUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBody {
+func DeployUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBodyBuilder {
 	return CreateUnauthorizedContractDeploymentTransaction("Container", CounterContract, authorizer)
 }
 
-func UpdateUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBody {
+func UpdateUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBodyBuilder {
 	return UpdateContractUnathorizedDeploymentTransaction("Container", CounterContractV2, authorizer)
 }
 
-func RemoveUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBody {
+func RemoveUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBodyBuilder {
 	return RemoveContractUnathorizedDeploymentTransaction("Container", authorizer)
 }
 
-func RemoveCounterContractTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+func RemoveCounterContractTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBodyBuilder {
 	return RemoveContractDeploymentTransaction("Container", authorizer, chain)
 }
 

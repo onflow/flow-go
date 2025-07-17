@@ -431,7 +431,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		txBody := testutil.DeployUnauthorizedCounterContractTransaction(
-			accounts[0])
+			accounts[0]).Build()
 
 		err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
 		require.NoError(t, err)
@@ -475,10 +475,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			chain)
 		require.NoError(t, err)
 
-		txBody := testutil.DeployUnauthorizedCounterContractTransaction(
-			accounts[0])
-		txBody.SetProposalKey(accounts[0], 0, 0)
-		txBody.SetPayer(accounts[0])
+		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0]).
+			SetProposalKey(accounts[0], 0, 0).
+			SetPayer(accounts[0]).
+			Build()
 
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -517,10 +517,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			chain)
 		require.NoError(t, err)
 
-		txBody := testutil.DeployUnauthorizedCounterContractTransaction(
-			accounts[0])
-		txBody.SetProposalKey(accounts[0], 0, 0)
-		txBody.SetPayer(accounts[0])
+		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0]).
+			SetProposalKey(accounts[0], 0, 0).
+			SetPayer(accounts[0]).
+			Build()
 
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -572,7 +572,8 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		txBody = testutil.UpdateUnauthorizedCounterContractTransaction(accounts[0]).
 			SetProposalKey(accounts[0], 0, 0).
-			SetPayer(accounts[0])
+			SetPayer(accounts[0]).
+			Build()
 
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -623,10 +624,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		snapshotTree = snapshotTree.Append(executionSnapshot)
 
-		txBody = testutil.RemoveUnauthorizedCounterContractTransaction(
-			accounts[0])
-		txBody.SetProposalKey(accounts[0], 0, 0)
-		txBody.SetPayer(accounts[0])
+		txBody = testutil.RemoveUnauthorizedCounterContractTransaction(accounts[0]).
+			SetProposalKey(accounts[0], 0, 0).
+			SetPayer(accounts[0]).
+			Build()
 
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -682,9 +683,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		snapshotTree = snapshotTree.Append(executionSnapshot)
 
-		txBody = testutil.RemoveCounterContractTransaction(accounts[0], chain)
-		txBody.SetProposalKey(accounts[0], 0, 0)
-		txBody.SetPayer(chain.ServiceAddress())
+		txBody = testutil.RemoveCounterContractTransaction(accounts[0], chain).
+			SetProposalKey(accounts[0], 0, 0).
+			SetPayer(chain.ServiceAddress()).
+			Build()
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -718,13 +720,13 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// setup a new authorizer account
-		authTxBody, err := blueprints.SetContractDeploymentAuthorizersTransaction(
+		authTxBodyBuilder, err := blueprints.SetContractDeploymentAuthorizersTransaction(
 			chain.ServiceAddress(),
 			[]flow.Address{chain.ServiceAddress(), accounts[0]})
 		require.NoError(t, err)
 
-		authTxBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-		authTxBody.SetPayer(chain.ServiceAddress())
+		authTxBody := authTxBodyBuilder.SetProposalKey(chain.ServiceAddress(), 0, 0).
+			SetPayer(chain.ServiceAddress()).Build()
 		err = testutil.SignEnvelope(
 			authTxBody,
 			chain.ServiceAddress(),
@@ -741,9 +743,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		// test deploying a new contract (not authorized by service account)
-		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
-		txBody.SetProposalKey(accounts[0], 0, 0)
-		txBody.SetPayer(accounts[0])
+		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0]).
+			SetProposalKey(accounts[0], 0, 0).
+			SetPayer(accounts[0]).
+			Build()
 
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -1244,13 +1247,14 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 					chain)
 				require.NoError(t, err)
 
-				_, txBody := testutil.CreateMultiAccountCreationTransaction(
+				_, txBodyBuilder := testutil.CreateMultiAccountCreationTransaction(
 					t,
 					chain,
 					40)
 
-				txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-				txBody.SetPayer(accounts[0])
+				txBody := txBodyBuilder.SetProposalKey(chain.ServiceAddress(), 0, 0).
+					SetPayer(accounts[0]).
+					Build()
 
 				err = testutil.SignPayload(
 					txBody,
@@ -1907,12 +1911,10 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			txBody := transferTokensTx(chain).
 				AddAuthorizer(accounts[0]).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1))).
-				AddArgument(jsoncdc.MustEncode(
-					cadence.NewAddress(chain.ServiceAddress()))).
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress()))).
+				SetProposalKey(accounts[0], 0, 0).
+				SetPayer(accounts[0]).
 				Build()
-
-			txBody.SetProposalKey(accounts[0], 0, 0)
-			txBody.SetPayer(accounts[0])
 
 			err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 			require.NoError(t, err)
@@ -1976,10 +1978,9 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				AddAuthorizer(accounts[0]).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1))).
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(lastAddress))).
+				SetProposalKey(accounts[0], 0, 0).
+				SetPayer(accounts[0]).
 				Build()
-
-			txBody.SetProposalKey(accounts[0], 0, 0)
-			txBody.SetPayer(accounts[0])
 
 			err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 			require.NoError(t, err)

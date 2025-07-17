@@ -73,8 +73,10 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	prepareTx(t, tx4, account, privKey, 3, chain)
 
 	// tx5 updates the contract to version 3 but fails (no env signature of service account)
-	tx5 := testutil.UnauthorizedDeployEventContractTransaction(account, chain, 3)
-	tx5.SetProposalKey(account, 0, 4).SetPayer(account)
+	tx5 := testutil.UnauthorizedDeployEventContractTransaction(account, chain, 3).
+		SetProposalKey(account, 0, 4).
+		SetPayer(account).
+		Build()
 	err = testutil.SignEnvelope(tx5, account, privKey)
 	require.NoError(t, err)
 
