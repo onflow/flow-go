@@ -193,7 +193,7 @@ func InsertClusterPayload(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	}
 
 	// insert the reference block ID
-	err = operation.IndexReferenceBlockByClusterBlock(writer, blockID, payload.ReferenceBlockID)
+	err = operation.IndexReferenceBlockByClusterBlock(lctx, writer, blockID, payload.ReferenceBlockID)
 	if err != nil {
 		return fmt.Errorf("could not insert reference block ID: %w", err)
 	}

@@ -45,7 +45,10 @@ func RetrieveClusterFinalizedHeight(r storage.Reader, clusterID flow.ChainID, nu
 // IndexReferenceBlockByClusterBlock UpsertByKeys the reference block ID for the given
 // cluster block ID. While each cluster block specifies a reference block in its
 // payload, we maintain this additional lookup for performance reasons.
-func IndexReferenceBlockByClusterBlock(w storage.Writer, clusterBlockID, refID flow.Identifier) error {
+func IndexReferenceBlockByClusterBlock(lctx lockctx.Proof, w storage.Writer, clusterBlockID, refID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
+		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
+	}
 	return UpsertByKey(w, MakePrefix(codeClusterBlockToRefBlock, clusterBlockID), refID)
 }
 
