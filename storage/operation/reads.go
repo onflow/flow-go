@@ -13,20 +13,7 @@ import (
 	"github.com/onflow/flow-go/utils/merr"
 )
 
-// CheckFunc is a function that checks if the value should be read and decoded.
-// return (true, nil) to read the value and pass it to the CreateFunc and HandleFunc for decoding
-// return (false, nil) to skip reading the value
-// return (false, err) if running into any exception, the iteration should be stopped.
-// when making a CheckFunc to be used in the IterationFunc to iterate over the keys, a sentinel error
-// can be defined and checked to stop the iteration early, such as finding the first key that match
-// certain condition.
-// Note: the returned bool is to decide whether to read the value or not, rather than whether to stop
-// the iteration or not.
-type CheckFunc func(key []byte) (bool, error)
 
-// CreateFunc returns a pointer to an initialized entity that we can potentially
-// decode the next value into during a badger DB iteration.
-type CreateFunc func() any
 
 // HandleFunc is a function that starts the processing of the current key-value
 // pair during a badger iteration. It should be called after the key was checked
@@ -34,7 +21,11 @@ type CreateFunc func() any
 // No errors are expected during normal operation. Any errors will halt the iteration.
 type HandleFunc func(data []byte) error
 
-type IterationFunc func(decoder func(data []byte, v any) error) (CheckFunc, HandleFunc)
+// IterationFunc is a function that will be called on each key-value pair during the iteration.
+// The key is copied and passed to the function, so the caller can safely add it to a slice.
+// The `getValue` function can be called to retrieve the value of the current key.
+// The caller can return (true, nil) to stop the iteration early.
+type IterationFunc func(keyCopy []byte, getValue func(destVal any) error) (bail bool, err error)
 
 // IterateKeysByPrefixRange will iterate over all entries in the database, where the key starts with a prefixes in
 // the range [startPrefix, endPrefix] (both inclusive). We require that startPrefix <= endPrefix (otherwise this
@@ -42,14 +33,12 @@ type IterationFunc func(decoder func(data []byte, v any) error) (CheckFunc, Hand
 // In other words, error returned by the iteration functions will be propagated to the caller.
 // No errors expected during normal operations.
 func IterateKeysByPrefixRange(r storage.Reader, startPrefix []byte, endPrefix []byte, check func(key []byte) error) error {
-	iterFunc := func(unmarshal func(data []byte, v any) error) (CheckFunc, HandleFunc) {
-		return func(key []byte) (bool, error) {
-			err := check(key)
-			if err != nil {
-				return false, err
-			}
-			return false, nil
-		}, nil
+	iterFunc := func(key []byte, getValue func(destVal any) error) (bail bool, err error) {
+		err = check(key)
+		if err != nil {
+			return true, err
+		}
+		return false, nil
 	}
 	return IterateKeys(r, startPrefix, endPrefix, iterFunc, storage.IteratorOption{BadgerIterateKeyOnly: true})
 }
@@ -79,9 +68,6 @@ func IterateKeys(r storage.Reader, startPrefix []byte, endPrefix []byte, iterFun
 		errToReturn = merr.CloseAndMergeError(it, errToReturn)
 	}()
 
-	// initialize processing functions for iteration
-	check, handle := iterFunc(msgpack.Unmarshal)
-
 	for it.First(); it.Valid(); it.Next() {
 		item := it.IterItem()
 		key := item.Key()
@@ -93,25 +79,23 @@ func IterateKeys(r storage.Reader, startPrefix []byte, endPrefix []byte, iterFun
 		copy(keyCopy, key)
 
 		// check if we should process the item at all
-		shouldReadValue, err := check(keyCopy)
+		bail, err := iterFunc(keyCopy, func(destVal any) error {
+			return item.Value(func(val []byte) error {
+				return msgpack.Unmarshal(val, destVal)
+			})
+		})
 		if err != nil {
 			return err
 		}
-		if !shouldReadValue { // skip reading value
-			continue
-		}
-
-		err = item.Value(handle)
-
-		if err != nil {
-			return fmt.Errorf("could not process value: %w", err)
+		if bail {
+			return nil
 		}
 	}
 
 	return nil
 }
 
-// Traverse will iterate over all keys with the given prefix
+// TraverseByPrefix will iterate over all keys with the given prefix
 // error returned by the iteration functions will be propagated to the caller.
 // No other errors are expected during normal operation.
 func TraverseByPrefix(r storage.Reader, prefix []byte, iterFunc IterationFunc, opt storage.IteratorOption) error {
@@ -120,12 +104,12 @@ func TraverseByPrefix(r storage.Reader, prefix []byte, iterFunc IterationFunc, o
 
 // KeyOnlyIterateFunc returns an IterationFunc that only iterates over keys
 func KeyOnlyIterateFunc(fn func(key []byte) error) IterationFunc {
-	return func(unmarshal func(data []byte, v any) error) (CheckFunc, HandleFunc) {
-		checker := func(key []byte) (bool, error) {
-			return false, fn(key)
+	return func(key []byte, getValue func(destVal any) error) (bail bool, err error) {
+		err = fn(key)
+		if err != nil {
+			return true, err
 		}
-
-		return checker, nil
+		return false, nil
 	}
 }
 

@@ -27,25 +27,18 @@ func GetComputationResultUploadStatus(r storage.Reader, blockID flow.Identifier,
 // GetBlockIDsByStatus returns all IDs of stored ComputationResult instances.
 func GetBlockIDsByStatus(r storage.Reader, blockIDs *[]flow.Identifier,
 	targetUploadStatus bool) error {
-	iterationFunc := func(unmarshal func(data []byte, v any) error) (CheckFunc, HandleFunc) {
-		var currKey flow.Identifier
-		check := func(key []byte) (bool, error) {
-			currKey = flow.HashToID(key[1:])
-			return true, nil
+	iterationFunc := func(keyCopy []byte, getValue func(destVal any) error) (bail bool, err error) {
+		var wasUploadCompleted bool
+		err = getValue(&wasUploadCompleted)
+		if err != nil {
+			return true, err
 		}
 
-		handle := func(data []byte) error {
-			var wasUploadCompleted bool
-			err := unmarshal(data, &wasUploadCompleted)
-			if err != nil {
-				return err
-			}
-			if blockIDs != nil && wasUploadCompleted == targetUploadStatus {
-				*blockIDs = append(*blockIDs, currKey)
-			}
-			return nil
+		if blockIDs != nil && wasUploadCompleted == targetUploadStatus {
+			*blockIDs = append(*blockIDs, flow.HashToID(keyCopy[1:]))
 		}
-		return check, handle
+		return false, nil
 	}
+
 	return TraverseByPrefix(r, MakePrefix(codeComputationResults), iterationFunc, storage.DefaultIteratorOptions())
 }
