@@ -13,12 +13,6 @@ import (
 	"github.com/onflow/flow-go/utils/merr"
 )
 
-// HandleFunc is a function that starts the processing of the current key-value
-// pair during a badger iteration. It should be called after the key was checked
-// and the entity was decoded.
-// No errors are expected during normal operation. Any errors will halt the iteration.
-type HandleFunc func(data []byte) error
-
 // IterationFunc is a function that will be called on each key-value pair during the iteration.
 // The key is copied and passed to the function, so the caller can safely add it to a slice.
 // The `getValue` function can be called to retrieve the value of the current key.
