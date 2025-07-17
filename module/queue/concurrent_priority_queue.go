@@ -59,7 +59,7 @@ func (mq *ConcurrentPriorityQueue[T]) Pop() (T, bool) {
 	mq.mu.Lock()
 	defer mq.mu.Unlock()
 
-	for mq.queue.Len() == 0 {
+	if mq.queue.Len() == 0 {
 		var nilT T
 		return nilT, false
 	}
