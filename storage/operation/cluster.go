@@ -30,7 +30,10 @@ func LookupClusterBlockHeight(r storage.Reader, clusterID flow.ChainID, height u
 }
 
 // UpsertByKeyClusterFinalizedHeight UpsertByKeys the finalized boundary for the given cluster.
-func UpsertClusterFinalizedHeight(w storage.Writer, clusterID flow.ChainID, number uint64) error {
+func UpsertClusterFinalizedHeight(lctx lockctx.Proof, w storage.Writer, clusterID flow.ChainID, number uint64) error {
+	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
+		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
+	}
 	return UpsertByKey(w, MakePrefix(codeClusterHeight, clusterID), number)
 }
 

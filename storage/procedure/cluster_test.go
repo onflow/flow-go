@@ -51,7 +51,7 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		}))
 
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertClusterFinalizedHeight(rw.Writer(), block.Header.ChainID, parent.Header.Height)
+			return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), block.Header.ChainID, parent.Header.Height)
 		}))
 
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

@@ -30,7 +30,7 @@ func TestClusterBlocks(t *testing.T) {
 
 		// add parent as boundary
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertClusterFinalizedHeight(rw.Writer(), parent.Header.ChainID, parent.Header.Height)
+			return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), parent.Header.ChainID, parent.Header.Height)
 		})
 		require.NoError(t, err)
 

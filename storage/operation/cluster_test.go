@@ -91,13 +91,18 @@ func TestClusterBoundaries(t *testing.T) {
 		})
 
 		t.Run("insert/retrieve", func(t *testing.T) {
+			lockManager := storage.NewTestingLockManager()
+
+			lctx := lockManager.NewContext()
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
+
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.UpsertClusterFinalizedHeight(rw.Writer(), clusterID, 21)
+				return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), clusterID, 21)
 			})
 			assert.NoError(t, err)
 
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.UpsertClusterFinalizedHeight(rw.Writer(), clusterID, expected)
+				return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), clusterID, expected)
 			})
 			assert.NoError(t, err)
 
@@ -108,7 +113,10 @@ func TestClusterBoundaries(t *testing.T) {
 		})
 
 		t.Run("multiple chain IDs", func(t *testing.T) {
+			lockManager := storage.NewTestingLockManager()
 			for i := 0; i < 3; i++ {
+				lctx := lockManager.NewContext()
+				require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 				// use different cluster ID but same boundary
 				clusterID = flow.ChainID(fmt.Sprintf("cluster-%d", i))
 				expected = uint64(i)
@@ -118,7 +126,7 @@ func TestClusterBoundaries(t *testing.T) {
 				assert.ErrorIs(t, err, storage.ErrNotFound)
 
 				err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.UpsertClusterFinalizedHeight(rw.Writer(), clusterID, expected)
+					return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), clusterID, expected)
 				})
 
 				err = operation.RetrieveClusterFinalizedHeight(db.Reader(), clusterID, &actual)

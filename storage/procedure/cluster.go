@@ -137,7 +137,7 @@ func FinalizeClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	}
 
 	// update the finalized boundary
-	err = operation.UpsertClusterFinalizedHeight(writer, chainID, header.Height)
+	err = operation.UpsertClusterFinalizedHeight(lctx, writer, chainID, header.Height)
 	if err != nil {
 		return fmt.Errorf("could not update finalized boundary: %w", err)
 	}
