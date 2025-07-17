@@ -13,9 +13,9 @@ import (
 	"github.com/onflow/flow-go/utils/merr"
 )
 
-// IterationFunc is a function that will be called on each key-value pair during the iteration.
-// The key is copied and passed to the function, so the caller can safely add it to a slice.
-// The `getValue` function can be called to retrieve the value of the current key.
+// IterationFunc is a callback function that will be called on each key-value pair during the iteration.
+// The key is copied and passed to the function, so key can be modified or retained after iteration.
+// The `getValue` function can be called to retrieve the value of the current key and decode value into destVal object.
 // The caller can return (true, nil) to stop the iteration early.
 type IterationFunc func(keyCopy []byte, getValue func(destVal any) error) (bail bool, err error)
 
