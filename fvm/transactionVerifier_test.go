@@ -34,7 +34,7 @@ func TestTransactionVerification(t *testing.T) {
 	err = accounts.Create([]flow.AccountPublicKey{privKey2.PublicKey(1000)}, address2)
 	require.NoError(t, err)
 
-	//tx := &flow.TransactionBody{}
+	tx := &flow.TransactionBody{}
 
 	run := func(
 		body *flow.TransactionBody,
@@ -55,15 +55,10 @@ func TestTransactionVerification(t *testing.T) {
 			KeyIndex:    0,
 		}
 
-		tx := &flow.TransactionBody{
-			ProposalKey: flow.ProposalKey{
-				Address:        address1,
-				KeyIndex:       0,
-				SequenceNumber: 0,
-			},
-			Payer:             address1,
-			PayloadSignatures: []flow.TransactionSignature{sig, sig},
-		}
+		tx.SetProposalKey(address1, 0, 0)
+		tx.SetPayer(address1)
+
+		tx.PayloadSignatures = []flow.TransactionSignature{sig, sig}
 
 		ctx := fvm.NewContext(
 			fvm.WithAuthorizationChecksEnabled(true),
@@ -84,16 +79,11 @@ func TestTransactionVerification(t *testing.T) {
 			KeyIndex:    0,
 		}
 
-		tx := &flow.TransactionBody{
-			ProposalKey: flow.ProposalKey{
-				Address:        address1,
-				KeyIndex:       0,
-				SequenceNumber: 0,
-			},
-			Payer:              address1,
-			PayloadSignatures:  []flow.TransactionSignature{sig},
-			EnvelopeSignatures: []flow.TransactionSignature{sig},
-		}
+		tx.SetProposalKey(address1, 0, 0)
+		tx.SetPayer(address1)
+
+		tx.PayloadSignatures = []flow.TransactionSignature{sig}
+		tx.EnvelopeSignatures = []flow.TransactionSignature{sig}
 
 		ctx := fvm.NewContext(
 			fvm.WithAuthorizationChecksEnabled(true),
@@ -108,14 +98,8 @@ func TestTransactionVerification(t *testing.T) {
 	})
 
 	t.Run("invalid envelope signature", func(t *testing.T) {
-		tx := &flow.TransactionBody{
-			ProposalKey: flow.ProposalKey{
-				Address:        address1,
-				KeyIndex:       0,
-				SequenceNumber: 0,
-			},
-			Payer: address2,
-		}
+		tx.SetProposalKey(address1, 0, 0)
+		tx.SetPayer(address2)
 
 		// assign a valid payload signature
 		hasher1, err := crypto.NewPrefixedHashing(privKey1.HashAlgo, flow.TransactionTagString)
@@ -151,20 +135,14 @@ func TestTransactionVerification(t *testing.T) {
 	})
 
 	t.Run("invalid payload signature", func(t *testing.T) {
+		tx.SetProposalKey(address1, 0, 0)
+		tx.SetPayer(address2)
+
 		sig1 := flow.TransactionSignature{
 			Address:     address1,
 			SignerIndex: 0,
 			KeyIndex:    0,
 			// invalid signature
-		}
-
-		tx := &flow.TransactionBody{
-			ProposalKey: flow.ProposalKey{
-				Address:        address1,
-				KeyIndex:       0,
-				SequenceNumber: 0,
-			},
-			Payer: address2,
 		}
 
 		// assign a valid envelope signature
@@ -197,14 +175,8 @@ func TestTransactionVerification(t *testing.T) {
 		// TODO: this test expects a Payload error but should be updated to expect en Envelope error.
 		// The test should be updated once the FVM updates the order of validating signatures:
 		// envelope needs to be checked first and payload later.
-		tx := &flow.TransactionBody{
-			ProposalKey: flow.ProposalKey{
-				Address:        address1,
-				KeyIndex:       0,
-				SequenceNumber: 0,
-			},
-			Payer: address2,
-		}
+		tx.SetProposalKey(address1, 0, 0)
+		tx.SetPayer(address2)
 
 		sig1 := flow.TransactionSignature{
 			Address:     address1,

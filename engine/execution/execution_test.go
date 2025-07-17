@@ -263,12 +263,12 @@ func deployContractBlock(
 ) (
 	*flow.TransactionBody, *flow.Collection, *flow.Block, *messages.UntrustedProposal, uint64) {
 	// make tx
-	tx := execTestutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
+	tx := execTestutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain).Build()
 	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
 	require.NoError(t, err)
 
 	// make collection
-	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx.Build()}}
+	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 
 	signerIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
@@ -295,7 +295,7 @@ func deployContractBlock(
 
 	// make proposal
 	proposal := messages.NewUntrustedProposal(unittest.ProposalFromBlock(block))
-	return tx.Build(), col, block, proposal, seq + 1
+	return tx, col, block, proposal, seq + 1
 }
 
 func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Block, ref *flow.Header) (
@@ -306,7 +306,7 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 	require.NoError(t, err)
 
 	// make collection
-	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx.Build()}}
+	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID}.NodeIDs())
 	// make block
@@ -328,7 +328,7 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 
 	proposal := messages.NewUntrustedProposal(unittest.ProposalFromBlock(block))
 
-	return tx.Build(), col, block, proposal, seq + 1
+	return tx, col, block, proposal, seq + 1
 }
 
 func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Block, ref *flow.Header) (
@@ -342,7 +342,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 	require.NoError(t, err)
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID}.NodeIDs())
 
-	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx.Build()}}
+	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 	block := unittest.BlockWithParentAndProposerFixture(t, parent.ToHeader(), conID.NodeID) // sets field `ParentVoterIndices` such that `conID.NodeID` is the sole signer
 	block = flow.NewBlock(
 		block.Header,
@@ -356,7 +356,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 
 	proposal := messages.NewUntrustedProposal(unittest.ProposalFromBlock(block))
 
-	return tx.Build(), col, block, proposal, seq + 1
+	return tx, col, block, proposal, seq + 1
 }
 
 // Test a successful tx should change the statecommitment,

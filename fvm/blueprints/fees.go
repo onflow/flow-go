@@ -54,7 +54,7 @@ func DeployTxFeesContractTransaction(flowFees, service flow.Address, contract []
 		Build()
 }
 
-func DeployStorageFeesContractTransaction(service flow.Address, contract []byte) *flow.TransactionBodyBuilder {
+func DeployStorageFeesContractTransaction(service flow.Address, contract []byte) *flow.TransactionBody {
 	return DeployContractTransaction(service, contract, "FlowStorageFees")
 }
 

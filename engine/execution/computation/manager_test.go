@@ -69,7 +69,8 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain).
 		SetProposalKey(chain.ServiceAddress(), 0, 0).
 		SetComputeLimit(1000).
-		SetPayer(chain.ServiceAddress())
+		SetPayer(chain.ServiceAddress()).
+		Build()
 
 	err = testutil.SignPayload(tx1, accounts[0], privateKeys[0])
 	require.NoError(t, err)
@@ -80,7 +81,8 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	tx2 := testutil.CreateCounterTransaction(accounts[0], accounts[1]).
 		SetProposalKey(chain.ServiceAddress(), 0, 0).
 		SetComputeLimit(1000).
-		SetPayer(chain.ServiceAddress())
+		SetPayer(chain.ServiceAddress()).
+		Build()
 
 	err = testutil.SignPayload(tx2, accounts[1], privateKeys[1])
 	require.NoError(t, err)
@@ -88,7 +90,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	err = testutil.SignEnvelope(tx2, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(t, err)
 
-	transactions := []*flow.TransactionBody{tx1.Build(), tx2.Build()}
+	transactions := []*flow.TransactionBody{tx1, tx2}
 
 	col := flow.Collection{Transactions: transactions}
 
@@ -785,7 +787,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 	tx3 := testutil.CreateEmitEventTransaction(account, account)
 	prepareTx(t, tx3, account, privKey, 2, chain)
 
-	transactions := []*flow.TransactionBody{tx1.Build(), tx2.Build(), tx3.Build()}
+	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
 
 	col := flow.Collection{Transactions: transactions}
 

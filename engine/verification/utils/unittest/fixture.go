@@ -199,17 +199,17 @@ func ExecutionResultFixture(t *testing.T,
 ) (*flow.ExecutionResult, *ExecutionReceiptData) {
 
 	// setups up the first collection of block consists of three transactions
-	tx1 := testutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
+	tx1 := testutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain).Build()
 	err := testutil.SignTransactionAsServiceAccount(tx1, 0, chain)
 	require.NoError(t, err)
 
-	tx2 := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	tx2 := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress()).Build()
 	err = testutil.SignTransactionAsServiceAccount(tx2, 1, chain)
 	require.NoError(t, err)
 	tx3 := testutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
 	err = testutil.SignTransactionAsServiceAccount(tx3, 2, chain)
 	require.NoError(t, err)
-	transactions := []*flow.TransactionBody{tx1.Build(), tx2.Build(), tx3.Build()}
+	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
 	collection := flow.Collection{Transactions: transactions}
 	collections := []*flow.Collection{&collection}
 	clusterChainID := cluster.CanonicalClusterID(1, clusterCommittee.NodeIDs())
@@ -314,11 +314,11 @@ func ExecutionResultFixture(t *testing.T,
 		}
 
 		for i := 1; i < chunkCount; i++ {
-			tx := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+			tx := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress()).Build()
 			err = testutil.SignTransactionAsServiceAccount(tx, 3+uint64(i), chain)
 			require.NoError(t, err)
 
-			collection := flow.Collection{Transactions: []*flow.TransactionBody{tx.Build()}}
+			collection := flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 			guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollection(&collection), unittest.WithCollRef(refBlkHeader.ParentID))
 			guarantee.SignerIndices = indices
 			guarantee.ChainID = clusterChainID

@@ -137,6 +137,32 @@ func (tb TransactionBody) ID() Identifier {
 	return MakeID(tb)
 }
 
+// SetComputeLimit sets the gas limit for this transaction.
+func (tb *TransactionBody) SetComputeLimit(limit uint64) *TransactionBody {
+	tb.GasLimit = limit //nolint:structwrite
+	return tb
+}
+
+// SetProposalKey sets the proposal key and sequence number for this transaction.
+//
+// The first two arguments specify the account key to be used, and the last argument is the sequence
+// number being declared.
+func (tb *TransactionBody) SetProposalKey(address Address, keyID uint32, sequenceNum uint64) *TransactionBody {
+	proposalKey := ProposalKey{
+		Address:        address,
+		KeyIndex:       keyID,
+		SequenceNumber: sequenceNum,
+	}
+	tb.ProposalKey = proposalKey //nolint:structwrite
+	return tb
+}
+
+// SetPayer sets the payer account for this transaction.
+func (tb *TransactionBody) SetPayer(address Address) *TransactionBody {
+	tb.Payer = address //nolint:structwrite
+	return tb
+}
+
 // Transaction is the smallest unit of task.
 type Transaction struct {
 	TransactionBody

@@ -82,21 +82,22 @@ func (account *TestBenchAccount) RetAndIncSeqNumber() uint64 {
 
 func (account *TestBenchAccount) DeployContract(b *testing.B, blockExec TestBenchBlockExecutor, contractName string, contract string) {
 	serviceAccount := blockExec.ServiceAccount(b)
-	txBodyBuilder := testutil.CreateContractDeploymentTransaction(
+	txBody := testutil.CreateContractDeploymentTransaction(
 		contractName,
 		contract,
 		account.Address,
 		blockExec.Chain(b)).
 		SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
-		SetPayer(serviceAccount.Address)
+		SetPayer(serviceAccount.Address).
+		Build()
 
-	err := testutil.SignPayload(txBodyBuilder, account.Address, account.PrivateKey)
+	err := testutil.SignPayload(txBody, account.Address, account.PrivateKey)
 	require.NoError(b, err)
 
-	err = testutil.SignEnvelope(txBodyBuilder, serviceAccount.Address, serviceAccount.PrivateKey)
+	err = testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
 	require.NoError(b, err)
 
-	computationResult := blockExec.ExecuteCollections(b, [][]*flow.TransactionBody{{txBodyBuilder.Build()}})
+	computationResult := blockExec.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
 	require.Empty(b, computationResult.AllTransactionResults()[0].ErrorMessage)
 }
 
@@ -120,17 +121,18 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 	}
 	cadenceArray, err := jsoncdc.Encode(cadence.NewArray(cadenceArrayValues))
 	require.NoError(b, err)
-	txBodyBuilder.AddArgument(cadenceArray).
-		SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
-		SetPayer(serviceAccount.Address)
+	txBodyBuilder.AddArgument(cadenceArray)
+
+	txBodyBuilder.SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber())
+	txBodyBuilder.SetPayer(serviceAccount.Address)
 
 	txBody := txBodyBuilder.Build()
 	if account.Address != serviceAccount.Address {
-		err = testutil.SignPayload(txBodyBuilder, account.Address, account.PrivateKey)
+		err = testutil.SignPayload(txBody, account.Address, account.PrivateKey)
 		require.NoError(b, err)
 	}
 
-	err = testutil.SignEnvelope(txBodyBuilder, serviceAccount.Address, serviceAccount.PrivateKey)
+	err = testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
 	require.NoError(b, err)
 
 	computationResult := blockExec.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
@@ -323,17 +325,18 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 		sdkTX, err := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, []templates.Contract{}, flowsdk.BytesToAddress(serviceAddress.Bytes()))
 		require.NoError(tb, err)
 
-		txBodyBuilder := flow.NewTransactionBodyBuilder().
+		txBody := flow.NewTransactionBodyBuilder().
 			SetScript(sdkTX.Script).
 			SetArguments(sdkTX.Arguments).
 			AddAuthorizer(serviceAddress).
 			SetProposalKey(serviceAddress, 0, b.ServiceAccount(tb).RetAndIncSeqNumber()).
-			SetPayer(serviceAddress)
+			SetPayer(serviceAddress).
+			Build()
 
-		err = testutil.SignEnvelope(txBodyBuilder, b.Chain(tb).ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(txBody, b.Chain(tb).ServiceAddress(), unittest.ServiceAccountPrivateKey)
 		require.NoError(tb, err)
 
-		computationResult := b.ExecuteCollections(tb, [][]*flow.TransactionBody{{txBodyBuilder.Build()}})
+		computationResult := b.ExecuteCollections(tb, [][]*flow.TransactionBody{{txBody}})
 		require.Empty(tb, computationResult.AllTransactionResults()[0].ErrorMessage)
 
 		var addr flow.Address
@@ -500,16 +503,17 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 				tx := txStringFunc(b, benchTransactionContext)
 
 				btx := []byte(tx)
-				txBodyBuilder := flow.NewTransactionBodyBuilder().
+				txBody := flow.NewTransactionBodyBuilder().
 					SetScript(btx).
 					AddAuthorizer(benchmarkAccount.Address).
 					SetProposalKey(benchmarkAccount.Address, 0, benchmarkAccount.RetAndIncSeqNumber()).
-					SetPayer(benchmarkAccount.Address)
+					SetPayer(benchmarkAccount.Address).
+					Build()
 
-				err = testutil.SignEnvelope(txBodyBuilder, benchmarkAccount.Address, benchmarkAccount.PrivateKey)
+				err = testutil.SignEnvelope(txBody, benchmarkAccount.Address, benchmarkAccount.PrivateKey)
 				require.NoError(b, err)
 
-				transactions[j] = txBodyBuilder.Build()
+				transactions[j] = txBody
 			}
 			b.StartTimer()
 			computationResult := blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{transactions})
@@ -878,21 +882,22 @@ func BenchRunNFTBatchTransfer(b *testing.B,
 			)
 			require.NoError(b, err)
 
-			txBodyBuilder := flow.NewTransactionBodyBuilder().
+			txBody := flow.NewTransactionBodyBuilder().
 				SetScript(transferTx).
 				SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
 				AddAuthorizer(accounts[1].Address).
 				AddArgument(encodedArg).
 				AddArgument(encodedAddress).
-				SetPayer(serviceAccount.Address)
+				SetPayer(serviceAccount.Address).
+				Build()
 
-			err = testutil.SignPayload(txBodyBuilder, accounts[1].Address, accounts[1].PrivateKey)
+			err = testutil.SignPayload(txBody, accounts[1].Address, accounts[1].PrivateKey)
 			require.NoError(b, err)
 
-			err = testutil.SignEnvelope(txBodyBuilder, serviceAccount.Address, serviceAccount.PrivateKey)
+			err = testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
 			require.NoError(b, err)
 
-			transactions[j] = txBodyBuilder.Build()
+			transactions[j] = txBody
 		}
 
 		computationResult = blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{transactions})
@@ -922,19 +927,20 @@ func setupReceiver(b *testing.B, be TestBenchBlockExecutor, nftAccount, batchNFT
 
 	setupTx := []byte(fmt.Sprintf(setUpReceiverTemplate, nftAccount.Address.Hex(), batchNFTAccount.Address.Hex()))
 
-	txBodyBuilder := flow.NewTransactionBodyBuilder().
+	txBody := flow.NewTransactionBodyBuilder().
 		SetScript(setupTx).
 		SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
 		AddAuthorizer(targetAccount.Address).
-		SetPayer(serviceAccount.Address)
+		SetPayer(serviceAccount.Address).
+		Build()
 
-	err := testutil.SignPayload(txBodyBuilder, targetAccount.Address, targetAccount.PrivateKey)
+	err := testutil.SignPayload(txBody, targetAccount.Address, targetAccount.PrivateKey)
 	require.NoError(b, err)
 
-	err = testutil.SignEnvelope(txBodyBuilder, serviceAccount.Address, serviceAccount.PrivateKey)
+	err = testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
 	require.NoError(b, err)
 
-	computationResult := be.ExecuteCollections(b, [][]*flow.TransactionBody{{txBodyBuilder.Build()}})
+	computationResult := be.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
 	require.Empty(b, computationResult.AllTransactionResults()[0].ErrorMessage)
 }
 
@@ -957,20 +963,21 @@ func mintNFTs(b *testing.B, be TestBenchBlockExecutor, batchNFTAccount *TestBenc
 	}`
 	mintScript := []byte(fmt.Sprintf(mintScriptTemplate, batchNFTAccount.Address.Hex(), size))
 
-	txBodyBuilder := flow.NewTransactionBodyBuilder().
+	txBody := flow.NewTransactionBodyBuilder().
 		SetComputeLimit(999999).
 		SetScript(mintScript).
 		SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
 		AddAuthorizer(batchNFTAccount.Address).
-		SetPayer(serviceAccount.Address)
+		SetPayer(serviceAccount.Address).
+		Build()
 
-	err := testutil.SignPayload(txBodyBuilder, batchNFTAccount.Address, batchNFTAccount.PrivateKey)
+	err := testutil.SignPayload(txBody, batchNFTAccount.Address, batchNFTAccount.PrivateKey)
 	require.NoError(b, err)
 
-	err = testutil.SignEnvelope(txBodyBuilder, serviceAccount.Address, serviceAccount.PrivateKey)
+	err = testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
 	require.NoError(b, err)
 
-	computationResult := be.ExecuteCollections(b, [][]*flow.TransactionBody{{txBodyBuilder.Build()}})
+	computationResult := be.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
 	require.Empty(b, computationResult.AllTransactionResults()[0].ErrorMessage)
 }
 
@@ -984,10 +991,11 @@ func fundAccounts(b *testing.B, be TestBenchBlockExecutor, value cadence.UFix64,
 		txBodyBuilder.AddAuthorizer(serviceAccount.Address)
 		txBodyBuilder.SetPayer(serviceAccount.Address)
 
-		err := testutil.SignEnvelope(txBodyBuilder, serviceAccount.Address, serviceAccount.PrivateKey)
+		txBody := txBodyBuilder.Build()
+		err := testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
 		require.NoError(b, err)
 
-		computationResult := be.ExecuteCollections(b, [][]*flow.TransactionBody{{txBodyBuilder.Build()}})
+		computationResult := be.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
 		require.Empty(b, computationResult.AllTransactionResults()[0].ErrorMessage)
 	}
 }

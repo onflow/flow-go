@@ -17,22 +17,22 @@ access(all) contract EventContract {
 }
 `
 
-func DeployEventContractTransaction(authorizer flow.Address, chain flow.Chain, eventValue int) *flow.TransactionBodyBuilder {
+func DeployEventContractTransaction(authorizer flow.Address, chain flow.Chain, eventValue int) *flow.TransactionBody {
 	contract := fmt.Sprintf(EventContract, eventValue)
-	return CreateContractDeploymentTransaction("EventContract", contract, authorizer, chain)
+	return CreateContractDeploymentTransaction("EventContract", contract, authorizer, chain).Build()
 }
 
-func UnauthorizedDeployEventContractTransaction(authorizer flow.Address, chain flow.Chain, eventValue int) *flow.TransactionBodyBuilder {
+func UnauthorizedDeployEventContractTransaction(authorizer flow.Address, chain flow.Chain, eventValue int) *flow.TransactionBody {
 	contract := fmt.Sprintf(EventContract, eventValue)
 	return CreateUnauthorizedContractDeploymentTransaction("EventContract", contract, authorizer)
 }
 
-func UpdateEventContractTransaction(authorizer flow.Address, chain flow.Chain, eventValue int) *flow.TransactionBodyBuilder {
+func UpdateEventContractTransaction(authorizer flow.Address, chain flow.Chain, eventValue int) *flow.TransactionBody {
 	contract := fmt.Sprintf(EventContract, eventValue)
 	return UpdateContractDeploymentTransaction("EventContract", contract, authorizer, chain)
 }
 
-func CreateEmitEventTransaction(contractAccount, signer flow.Address) *flow.TransactionBodyBuilder {
+func CreateEmitEventTransaction(contractAccount, signer flow.Address) *flow.TransactionBody {
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`
 			import EventContract from 0x%s
@@ -44,5 +44,6 @@ func CreateEmitEventTransaction(contractAccount, signer flow.Address) *flow.Tran
 				}
 			}`, contractAccount)),
 		).
-		AddAuthorizer(signer)
+		AddAuthorizer(signer).
+		Build()
 }
