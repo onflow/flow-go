@@ -14,9 +14,11 @@ const (
 	// LockFinalizeBlock protects the entire block finalization process (Finalize)
 	LockFinalizeBlock = "lock_finalize_block"
 	// LockIndexResultApproval protects indexing result approvals by approval and chunk.
-	LockIndexResultApproval  = "lock_index_result_approval"
-	LockInsertClusterBlock   = "lock_insert_cluster_block"
-	LockFinalizeClusterBlock = "lock_finalize_cluster_block"
+	LockIndexResultApproval = "lock_index_result_approval"
+	// LockInsertOrFinalizeClusterBlock protects the entire cluster block insertion or finalization process.
+	// The reason they are combined is because insertion process reads some data updated by finalization process,
+	// in order to prevent dirty reads, we need to acquire the lock for both operations.
+	LockInsertOrFinalizeClusterBlock = "lock_insert_or_finalize_cluster_block"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -25,8 +27,7 @@ func Locks() []string {
 		LockInsertBlock,
 		LockFinalizeBlock,
 		LockIndexResultApproval,
-		LockInsertClusterBlock,
-		LockFinalizeClusterBlock,
+		LockInsertOrFinalizeClusterBlock,
 	}
 }
 
@@ -47,7 +48,6 @@ func Locks() []string {
 func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
 		Add(LockInsertBlock, LockFinalizeBlock).
-		Add(LockInsertClusterBlock, LockFinalizeClusterBlock).
 		Build()
 }
 

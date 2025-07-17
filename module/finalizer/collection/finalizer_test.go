@@ -70,7 +70,7 @@ func TestFinalizer(t *testing.T) {
 		insert := func(db storage.DB, lockManager lockctx.Manager, block model.Block) {
 			lctx := lockManager.NewContext()
 			defer lctx.Release()
-			require.NoError(t, lctx.AcquireLock(storage.LockInsertClusterBlock))
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.InsertClusterBlock(lctx, rw, &block)
 			})

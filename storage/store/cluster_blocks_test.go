@@ -20,7 +20,7 @@ func TestClusterBlocksByHeight(t *testing.T) {
 
 		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockFinalizeClusterBlock))
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.Header.ChainID, parent.Header.Height, parent.ID())
 		})
@@ -35,7 +35,7 @@ func TestClusterBlocksByHeight(t *testing.T) {
 
 		// store a chain of blocks
 		for _, block := range blocks {
-			_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertClusterBlock)
+			_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertOrFinalizeClusterBlock)
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.InsertClusterBlock(lctx, rw, &block)
 			})
@@ -43,7 +43,7 @@ func TestClusterBlocksByHeight(t *testing.T) {
 			lctx.Release()
 
 			lctx = lockManager.NewContext()
-			require.NoError(t, lctx.AcquireLock(storage.LockFinalizeClusterBlock))
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.FinalizeClusterBlock(lctx, rw, block.Header.ID())
 			})
@@ -67,7 +67,7 @@ func TestClusterBlocksByHeight(t *testing.T) {
 	})
 }
 
-// TestClusterBlocks tests inserting and querying a chain of cluster blocks. 
+// TestClusterBlocks tests inserting and querying a chain of cluster blocks.
 func TestClusterBlocks(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
@@ -75,7 +75,7 @@ func TestClusterBlocks(t *testing.T) {
 		parent, blocks := chain[0], chain[1:]
 
 		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockFinalizeClusterBlock))
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.Header.ChainID, parent.Header.Height, parent.ID())
 		})
@@ -90,7 +90,7 @@ func TestClusterBlocks(t *testing.T) {
 
 		// store a chain of blocks
 		for _, block := range blocks {
-			_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertClusterBlock, storage.LockFinalizeClusterBlock)
+			_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertOrFinalizeClusterBlock)
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.InsertClusterBlock(lctx, rw, &block)
 			})
@@ -118,7 +118,7 @@ func TestClusterBlocks(t *testing.T) {
 				require.Equal(t, block.ID(), retrievedBlock.ID())
 			}
 		})
-		
+
 		t.Run("ByID", func(t *testing.T) {
 			// check if the block can be retrieved by ID
 			for _, block := range blocks {

@@ -17,7 +17,7 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		block := unittest.ClusterBlockFixture()
 
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertClusterBlock)
+		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertOrFinalizeClusterBlock)
 		defer lctx.Release()
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return InsertClusterBlock(lctx, rw, &block)
@@ -40,11 +40,11 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertClusterBlock))
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return InsertClusterBlock(lctx, rw, &block)
 		}))
-		require.NoError(t, lctx.AcquireLock(storage.LockFinalizeClusterBlock))
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), block.Header.ChainID, parent.Header.Height, parent.ID())

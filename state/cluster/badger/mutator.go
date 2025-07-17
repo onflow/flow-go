@@ -138,7 +138,7 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
 	lctx := m.lockManager.NewContext()
 	defer lctx.Release()
-	err = lctx.AcquireLock(storage.LockInsertClusterBlock)
+	err = lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
 	if err != nil {
 		return fmt.Errorf("could not acquire lock for inserting cluster block: %w", err)
 	}

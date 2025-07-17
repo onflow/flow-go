@@ -33,7 +33,7 @@ func (b *ClusterBlocks) Store(block *cluster.Block) error {
 	// TODO: remove this once we have a proper lock manager
 	manager := storage.NewTestingLockManager()
 	lctx := manager.NewContext()
-	if err := lctx.AcquireLock(storage.LockInsertClusterBlock); err != nil {
+	if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
 		return fmt.Errorf("could not acquire lock: %w", err)
 	}
 	defer lctx.Release()
@@ -44,8 +44,8 @@ func (b *ClusterBlocks) Store(block *cluster.Block) error {
 }
 
 func (b *ClusterBlocks) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block *cluster.Block) error {
-	if !lctx.HoldsLock(storage.LockInsertClusterBlock) {
-		return fmt.Errorf("missing required lock: %s", storage.LockInsertClusterBlock)
+	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
 	}
 
 	err := b.headers.storeTx(rw, block.Header)

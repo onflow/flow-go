@@ -16,10 +16,9 @@ import (
 // InsertClusterBlock inserts a cluster consensus block, updating all
 // associated indexes.
 func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block *cluster.Block) error {
-	if !lctx.HoldsLock(storage.LockInsertClusterBlock) {
+	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
 	}
-
 
 	// store the block header
 	blockID := block.ID()
@@ -92,8 +91,8 @@ func RetrieveLatestFinalizedClusterHeader(r storage.Reader, chainID flow.ChainID
 
 // FinalizeClusterBlock finalizes a block in cluster consensus.
 func FinalizeClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockFinalizeClusterBlock) {
-		return fmt.Errorf("missing required lock: %s", storage.LockFinalizeClusterBlock)
+	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
 	}
 
 	r := rw.GlobalReader()
@@ -150,8 +149,8 @@ func FinalizeClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 // InsertClusterPayload inserts the payload for a cluster block. It inserts
 // both the collection and all constituent transactions, allowing duplicates.
 func InsertClusterPayload(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *cluster.Payload) error {
-	if !lctx.HoldsLock(storage.LockInsertClusterBlock) {
-		return fmt.Errorf("missing required lock: %s", storage.LockInsertClusterBlock)
+	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
 	}
 
 	var txIDs []flow.Identifier

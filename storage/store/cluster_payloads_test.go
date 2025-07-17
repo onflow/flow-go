@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
+	"github.com/onflow/flow-go/storage/procedure"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -26,7 +27,7 @@ func TestStoreRetrieveClusterPayload(t *testing.T) {
 		lctx := manager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertClusterBlock))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store1.Store(lctx, blockID, expected)
+			return procedure.InsertClusterPayload(lctx, rw, blockID, expected)
 		})
 		lctx.Release()
 		require.NoError(t, err)
@@ -40,7 +41,7 @@ func TestStoreRetrieveClusterPayload(t *testing.T) {
 		lctx = manager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertClusterBlock))
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store1.Store(lctx, blockID, expected)
+			return procedure.InsertClusterPayload(lctx, rw, blockID, expected)
 		})
 		lctx.Release()
 		require.ErrorIs(t, err, storage.ErrAlreadyExists)

@@ -27,13 +27,9 @@ type State struct {
 func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot) (*State, error) {
 	lctx := lockManager.NewContext()
 	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertClusterBlock)
+	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire lock for inserting cluster block: %w", err)
-	}
-	err = lctx.AcquireLock(storage.LockFinalizeClusterBlock)
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire lock for finalizing cluster block: %w", err)
 	}
 	isBootstrapped, err := IsBootstrapped(db, stateRoot.ClusterID())
 	if err != nil {
@@ -46,10 +42,6 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 
 	genesis := stateRoot.Block()
 	rootQC := stateRoot.QC()
-	err = lctx.AcquireLock(storage.LockFinalizeClusterBlock)
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire lock for finalizing cluster block: %w", err)
-	}
 
 	// bootstrap cluster state
 	err = state.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

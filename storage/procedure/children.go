@@ -33,7 +33,7 @@ func IndexNewBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flo
 }
 
 func InsertNewClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockInsertClusterBlock) {
+	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
 	}
 

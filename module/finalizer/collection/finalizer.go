@@ -60,7 +60,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	// Acquire a lock for finalizing cluster blocks
 	lctx := f.lockManager.NewContext()
 	defer lctx.Release()
-	if err := lctx.AcquireLock(storage.LockFinalizeClusterBlock); err != nil {
+	if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
 		return fmt.Errorf("could not acquire lock: %w", err)
 	}
 

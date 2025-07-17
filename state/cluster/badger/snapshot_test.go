@@ -135,7 +135,7 @@ func (suite *SnapshotSuite) Block() model.Block {
 func (suite *SnapshotSuite) InsertBlock(block model.Block) {
 	lctx := suite.lockManager.NewContext()
 	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertClusterBlock)
+	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
 	suite.Assert().Nil(err)
 	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return procedure.InsertClusterBlock(lctx, rw, &block)
@@ -229,7 +229,7 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		lctx := suite.lockManager.NewContext()
 		defer lctx.Release()
-		if err := lctx.AcquireLock(storage.LockFinalizeClusterBlock); err != nil {
+		if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
 			return err
 		}
 		return procedure.FinalizeClusterBlock(lctx, rw, finalizedBlock1.ID())

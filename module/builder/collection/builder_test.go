@@ -189,7 +189,7 @@ func (suite *BuilderSuite) TearDownTest() {
 func (suite *BuilderSuite) InsertBlock(block model.Block) {
 	lctx := suite.lockManager.NewContext()
 	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertClusterBlock)
+	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
 	suite.Assert().NoError(err)
 	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return procedure.InsertClusterBlock(lctx, rw, &block)
@@ -206,7 +206,7 @@ func (suite *BuilderSuite) FinalizeBlock(block model.Block) {
 		}
 		lctx := suite.lockManager.NewContext()
 		defer lctx.Release()
-		if err := lctx.AcquireLock(storage.LockFinalizeClusterBlock); err != nil {
+		if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
 			return err
 		}
 		err = procedure.FinalizeClusterBlock(lctx, rw, block.ID())
@@ -1120,7 +1120,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 	for i := 0; i < size; i++ {
 		block := unittest.ClusterBlockWithParent(final)
 		lctx := suite.lockManager.NewContext()
-		require.NoError(b, lctx.AcquireLock(storage.LockInsertClusterBlock))
+		require.NoError(b, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 
 		err := suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return procedure.InsertClusterBlock(lctx, rw, &block)
@@ -1133,7 +1133,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 			err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				lctx := suite.lockManager.NewContext()
 				defer lctx.Release()
-				if err := lctx.AcquireLock(storage.LockFinalizeClusterBlock); err != nil {
+				if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
 					return err
 				}
 				return procedure.FinalizeClusterBlock(lctx, rw, block.ID())

@@ -17,8 +17,8 @@ import (
 // IndexClusterBlockHeight UpsertByKeys a block number to block ID mapping for
 // the given cluster.
 func IndexClusterBlockHeight(lctx lockctx.Proof, w storage.Writer, clusterID flow.ChainID, height uint64, blockID flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockFinalizeClusterBlock) {
-		return fmt.Errorf("missing lock: %v", storage.LockFinalizeClusterBlock)
+	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
+		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
 	}
 
 	return UpsertByKey(w, MakePrefix(codeFinalizedCluster, clusterID, height), blockID)
@@ -57,7 +57,15 @@ func LookupReferenceBlockByClusterBlock(r storage.Reader, clusterBlockID flow.Id
 // block height. The cluster block ID is included in the key for more efficient
 // traversal. Only finalized cluster blocks should be included in this index.
 // The key looks like: <prefix 0:1><ref_height 1:9><cluster_block_id 9:41>
-func IndexClusterBlockByReferenceHeight(w storage.Writer, refHeight uint64, clusterBlockID flow.Identifier) error {
+func IndexClusterBlockByReferenceHeight(lctx lockctx.Proof, w storage.Writer, refHeight uint64, clusterBlockID flow.Identifier) error {
+	// Why is this lock necessary?
+	// A single reference height can correspond to multiple cluster blocks. While we are finalizing blocks,
+	// we may also be concurrently extending cluster blocks. This leads to simultaneous updates and reads
+	// on keys sharing the same prefix. To prevent race conditions during these concurrent reads and writes,
+	// synchronization is required when accessing these keys.
+	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
+		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
+	}
 	return UpsertByKey(w, MakePrefix(codeRefHeightToClusterBlock, refHeight, clusterBlockID), nil)
 }
 
@@ -65,7 +73,15 @@ func IndexClusterBlockByReferenceHeight(w storage.Writer, refHeight uint64, clus
 // index and returns any finalized cluster blocks which have a reference block with
 // height in the given range. This is used to avoid including duplicate transaction
 // when building or validating a new collection.
-func LookupClusterBlocksByReferenceHeightRange(r storage.Reader, start, end uint64, clusterBlockIDs *[]flow.Identifier) error {
+func LookupClusterBlocksByReferenceHeightRange(lctx lockctx.Proof, r storage.Reader, start, end uint64, clusterBlockIDs *[]flow.Identifier) error {
+	// Why is this lock necessary?
+	// A single reference height can correspond to multiple cluster blocks. While we are finalizing blocks,
+	// we may also be concurrently extending cluster blocks. This leads to simultaneous updates and reads
+	// on keys sharing the same prefix. To prevent race conditions during these concurrent reads and writes,
+	// synchronization is required when accessing these keys.
+	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
+		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
+	}
 	startPrefix := MakePrefix(codeRefHeightToClusterBlock, start)
 	endPrefix := MakePrefix(codeRefHeightToClusterBlock, end)
 	prefixLen := len(startPrefix)
