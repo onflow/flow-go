@@ -582,3 +582,117 @@ func getFolderSize(t testing.TB, dir string) int64 {
 
 	return size
 }
+
+func TestBatchValue(t *testing.T) {
+	const key = "key1"
+
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		t.Run("no data", func(t *testing.T) {
+			b := db.NewBatch()
+			defer b.Close()
+
+			callbackInvocationCount := 0
+
+			callbackFunc := func(error) {
+				callbackInvocationCount++
+
+				value := b.Value(key)
+				require.Nil(t, value)
+			}
+
+			const expectedCallbackInvocationCount = 2
+			for range expectedCallbackInvocationCount {
+				b.AddCallback(callbackFunc)
+			}
+
+			k := []byte{0x01}
+			v := []byte{0x02}
+
+			// Insert k and v into batch.
+			err := b.Writer().Set(k, v)
+			require.NoError(t, err)
+
+			// Commit batch.
+			err = b.Commit()
+			require.NoError(t, err)
+
+			require.Equal(t, expectedCallbackInvocationCount, callbackInvocationCount)
+		})
+
+		t.Run("store data multiple times", func(t *testing.T) {
+			b := db.NewBatch()
+			defer b.Close()
+
+			b.SetValue(key, []string{"value1", "value2"})
+
+			b.SetValue(key, []string{"value2", "value3"})
+
+			callbackInvocationCount := 0
+
+			callbackFunc := func(error) {
+				callbackInvocationCount++
+
+				data := b.Value(key)
+				require.Equal(t, []string{"value2", "value3"}, data.([]string))
+			}
+
+			const expectedCallbackInvocationCount = 2
+			for range expectedCallbackInvocationCount {
+				b.AddCallback(callbackFunc)
+			}
+
+			k := []byte{0x01}
+			v := []byte{0x02}
+
+			// Insert k and v into batch.
+			err := b.Writer().Set(k, v)
+			require.NoError(t, err)
+
+			// Commit batch.
+			err = b.Commit()
+			require.NoError(t, err)
+
+			require.Equal(t, expectedCallbackInvocationCount, callbackInvocationCount)
+		})
+
+		t.Run("store and remove data", func(t *testing.T) {
+			b := db.NewBatch()
+			defer b.Close()
+
+			b.SetValue(key, []string{"value1", "value2"})
+
+			callbackInvocationCount := 0
+
+			callbackFunc := func(error) {
+				callbackInvocationCount++
+
+				data := b.Value(key)
+				if callbackInvocationCount == 1 {
+					require.Equal(t, []string{"value1", "value2"}, data.([]string))
+
+					b.SetValue(key, nil)
+				} else {
+					require.Nil(t, data)
+				}
+			}
+
+			const expectedCallbackInvocationCount = 2
+			for range expectedCallbackInvocationCount {
+				b.AddCallback(callbackFunc)
+			}
+
+			k := []byte{0x01}
+			v := []byte{0x02}
+
+			// Insert k and v into batch.
+			err := b.Writer().Set(k, v)
+			require.NoError(t, err)
+
+			// Commit batch.
+			err = b.Commit()
+			require.NoError(t, err)
+
+			require.Equal(t, expectedCallbackInvocationCount, callbackInvocationCount)
+		})
+	})
+}

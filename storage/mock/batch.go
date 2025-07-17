@@ -80,6 +80,31 @@ func (_m *Batch) Lock(_a0 *sync.Mutex) {
 	_m.Called(_a0)
 }
 
+// SetValue provides a mock function with given fields: key, value
+func (_m *Batch) SetValue(key string, value interface{}) {
+	_m.Called(key, value)
+}
+
+// Value provides a mock function with given fields: key
+func (_m *Batch) Value(key string) interface{} {
+	ret := _m.Called(key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Value")
+	}
+
+	var r0 interface{}
+	if rf, ok := ret.Get(0).(func(string) interface{}); ok {
+		r0 = rf(key)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	return r0
+}
+
 // Writer provides a mock function with no fields
 func (_m *Batch) Writer() storage.Writer {
 	ret := _m.Called()

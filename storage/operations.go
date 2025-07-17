@@ -155,6 +155,14 @@ type ReaderBatchWriter interface {
 	// regardless the batch update is succeeded or failed.
 	// The error parameter is the error returned by the batch update.
 	AddCallback(func(error))
+
+	// SetValue stores the given value by the given key in this batch.
+	// Stored value can be retrieved by the same key via Value().
+	SetValue(key string, value any)
+
+	// Value returns the value associated with this batch for the given key,
+	// or nil if no value is associated with the key.
+	Value(key string) any
 }
 
 // DB is an interface for a database store that provides a reader and a writer.
