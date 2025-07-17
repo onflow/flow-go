@@ -187,7 +187,7 @@ func InsertClusterPayload(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 
 	// index the transaction IDs within the collection
 	txIDs = payload.Collection.Light().Transactions
-	err = operation.IndexCollectionPayload(writer, blockID, txIDs)
+	err = operation.IndexCollectionPayload(lctx, writer, blockID, txIDs)
 	if err != nil {
 		return fmt.Errorf("could not index collection: %w", err)
 	}
