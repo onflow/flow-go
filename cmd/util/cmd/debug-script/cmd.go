@@ -27,6 +27,7 @@ var (
 	flagChain               string
 	flagScript              string
 	flagUseExecutionDataAPI bool
+	flagUseVM               bool
 )
 
 var Cmd = &cobra.Command{
@@ -59,6 +60,8 @@ func init() {
 	_ = Cmd.MarkFlagRequired("script")
 
 	Cmd.Flags().BoolVar(&flagUseExecutionDataAPI, "use-execution-data-api", false, "use the execution data API")
+
+	Cmd.Flags().BoolVar(&flagUseVM, "use-vm", false, "use the VM for script execution (default: false)")
 }
 
 func run(*cobra.Command, []string) {
@@ -127,7 +130,7 @@ func run(*cobra.Command, []string) {
 		}
 	}
 
-	debugger := debug.NewRemoteDebugger(chain, log.Logger)
+	debugger := debug.NewRemoteDebugger(chain, log.Logger, flagUseVM, flagUseVM)
 
 	// TODO: add support for arguments
 	var arguments [][]byte

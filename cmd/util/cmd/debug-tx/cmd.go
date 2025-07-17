@@ -38,6 +38,7 @@ var (
 	flagUseExecutionDataAPI bool
 	flagDumpRegisters       bool
 	flagCollectionID        string
+	flagUseVM               bool
 )
 
 var Cmd = &cobra.Command{
@@ -72,6 +73,7 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagCollectionID, "collection-id", "", "collection ID")
 
+	Cmd.Flags().BoolVar(&flagUseVM, "use-vm", false, "use the VM for transaction execution (default: false)")
 }
 
 func run(_ *cobra.Command, args []string) {
@@ -216,7 +218,7 @@ func runTransactionID(txID flow.Identifier, flowClient *client.Client, chain flo
 
 	blockSnapshot := newBlockSnapshot(remoteSnapshot)
 
-	debugger := debug.NewRemoteDebugger(chain, log.Logger)
+	debugger := debug.NewRemoteDebugger(chain, log.Logger, flagUseVM, flagUseVM)
 
 	for _, blockTx := range txsResult {
 		blockTxID := flow.Identifier(blockTx.ID())

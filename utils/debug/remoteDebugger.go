@@ -21,6 +21,8 @@ type RemoteDebugger struct {
 func NewRemoteDebugger(
 	chain flow.Chain,
 	logger zerolog.Logger,
+	vmTransactionExecutionEnabled bool,
+	vmScriptExecutionEnabled bool,
 ) *RemoteDebugger {
 	vm := fvm.NewVirtualMachine()
 
@@ -31,6 +33,8 @@ func NewRemoteDebugger(
 		fvm.WithChain(chain),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithEVMEnabled(true),
+		fvm.WithVMTransactionExecutionEnabled(vmTransactionExecutionEnabled),
+		fvm.WithVMScriptExecutionEnabled(vmScriptExecutionEnabled),
 	)
 
 	return &RemoteDebugger{
