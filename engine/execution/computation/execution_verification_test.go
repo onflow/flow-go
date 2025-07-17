@@ -191,7 +191,8 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 
 	t.Run("with failed storage limit", func(t *testing.T) {
 
-		accountPrivKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
+		accountPrivKey, createAccountTxBuilder := testutil.CreateAccountCreationTransaction(t, chain)
+		createAccountTx := createAccountTxBuilder.Build()
 
 		// this should return the address of newly created account
 		accountAddress, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
@@ -236,7 +237,9 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 	})
 
 	t.Run("with failed transaction fee deduction", func(t *testing.T) {
-		accountPrivKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
+		accountPrivKey, createAccountTxBuilder := testutil.CreateAccountCreationTransaction(t, chain)
+		createAccountTx := createAccountTxBuilder.Build()
+
 		// this should return the address of newly created account
 		accountAddress, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
 		require.NoError(t, err)
@@ -627,7 +630,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		bootstrapOpts []fvm.BootstrapProcedureOption) func(t *testing.T) {
 		return func(t *testing.T) {
 			// ==== Create an account ====
-			privateKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
+			privateKey, createAccountTxBuilder := testutil.CreateAccountCreationTransaction(t, chain)
+			createAccountTx := createAccountTxBuilder.Build()
 
 			// this should return the address of newly created account
 			address, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)

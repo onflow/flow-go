@@ -1603,13 +1603,14 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	sequenceNumber := uint64(0)
 
 	createAccount := func() (flow.Address, crypto.PublicKey) {
-		privateKey, txBody := testutil.CreateAccountCreationTransaction(
+		privateKey, txBodyBuilder := testutil.CreateAccountCreationTransaction(
 			t,
 			chain)
 
-		txBody.SetProposalKey(chain.ServiceAddress(), 0, sequenceNumber)
-		txBody.SetPayer(chain.ServiceAddress())
+		txBodyBuilder.SetProposalKey(chain.ServiceAddress(), 0, sequenceNumber)
+		txBodyBuilder.SetPayer(chain.ServiceAddress())
 		sequenceNumber++
+		txBody := txBodyBuilder.Build()
 
 		rootHasher := hash.NewSHA2_256()
 

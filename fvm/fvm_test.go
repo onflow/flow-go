@@ -954,7 +954,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 	runTx := func(tc testCase) func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 		return func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// ==== Create an account ====
-			privateKey, txBody := testutil.CreateAccountCreationTransaction(t, chain)
+			privateKey, txBodyBuilder := testutil.CreateAccountCreationTransaction(t, chain)
+			txBody := txBodyBuilder.Build()
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -1015,7 +1016,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 			// ==== Transfer tokens from new account ====
 
-			txBodyBuilder := transferTokensTx(chain).
+			txBodyBuilder = transferTokensTx(chain).
 				AddAuthorizer(address).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(tc.tryToTransfer))).
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress()))).
@@ -2346,8 +2347,9 @@ func TestInteractionLimit(t *testing.T) {
 	).bootstrapWith(
 		func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) (snapshot.SnapshotTree, error) {
 			// ==== Create an account ====
-			var txBody *flow.TransactionBody
-			privateKey, txBody = testutil.CreateAccountCreationTransaction(t, chain)
+			var txBodyBuilder *flow.TransactionBodyBuilder
+			privateKey, txBodyBuilder = testutil.CreateAccountCreationTransaction(t, chain)
+			txBody := txBodyBuilder.Build()
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			if err != nil {

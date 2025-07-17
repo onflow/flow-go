@@ -281,8 +281,9 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		fvm.WithAccountStorageLimit(true),
 	).bootstrapWith(func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) (snapshot.SnapshotTree, error) {
 		// ==== Create an account ====
-		var txBody *flow.TransactionBody
-		privateKey, txBody = testutil.CreateAccountCreationTransaction(tb, chain)
+		var txBodyBuilder *flow.TransactionBodyBuilder
+		privateKey, txBodyBuilder = testutil.CreateAccountCreationTransaction(tb, chain)
+		txBody := txBodyBuilder.Build()
 
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		if err != nil {
