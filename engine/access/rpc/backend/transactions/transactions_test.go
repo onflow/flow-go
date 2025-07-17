@@ -110,7 +110,6 @@ func (suite *Suite) SetupTest() {
 	params.On("SporkRootBlockHeight").Return(header.Height, nil).Maybe()
 	params.On("SealedRoot").Return(header, nil).Maybe()
 
-	//suite.state = new(protocolmock.State)
 	suite.state = protocolmock.NewState(suite.T())
 	suite.state.On("Params").Return(params).Maybe()
 
@@ -148,9 +147,12 @@ func (suite *Suite) SetupTest() {
 	require.NoError(suite.T(), err)
 	suite.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(progress)
 	suite.Require().NoError(err)
+
+	suite.fixedExecutionNodeIDs = nil
+	suite.preferredExecutionNodeIDs = nil
+	suite.errMessageProvider = nil
 }
 
-// TearDownTest cleans up the db
 func (suite *Suite) TearDownTest() {
 	err := os.RemoveAll(suite.dbDir)
 	suite.Require().NoError(err)
@@ -796,6 +798,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 
 	// Set up the state and snapshot mocks
 	_, fixedENIDs := suite.setupReceipts(&block)
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
@@ -803,7 +806,6 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 
 	suite.reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
 	suite.reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
-	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
 
 	suite.connectionFactory.
 		On("GetExecutionAPIClient", mock.Anything).
@@ -888,6 +890,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 
 	// Set up the state and snapshot mocks
 	_, fixedENIDs := suite.setupReceipts(&block)
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
@@ -895,7 +898,6 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 
 	suite.reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
 	suite.reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
-	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
 
 	suite.connectionFactory.
 		On("GetExecutionAPIClient", mock.Anything).
@@ -1009,14 +1011,16 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 
 	block := unittest.BlockFixture()
 	blockID := block.ID()
-	_, enIDs := suite.setupReceipts(&block)
-	suite.fixedExecutionNodeIDs = enIDs.NodeIDs()
+
+	// setup chain state
+	_, fixedENIDs := suite.setupReceipts(&block)
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
 
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.transactions.On("ByID", transactionBody.ID()).Return(transactionBody, nil)
 	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(&light, nil)
 	suite.blocks.On("ByCollectionID", collection.ID()).Return(&block, nil)
-	suite.snapshot.On("Identities", mock.Anything).Return(enIDs, nil)
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	exeEventReq := execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
@@ -1027,7 +1031,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	}
 	suite.executionAPIClient.On("GetTransactionResult", context.Background(), &exeEventReq).
 		Return(&exeEventResp, status.Errorf(codes.NotFound, "not found")).
-		Times(len(enIDs)) // should call each EN once
+		Times(len(fixedENIDs)) // should call each EN once
 
 	suite.connectionFactory.
 		On("GetExecutionAPIClient", mock.Anything).
