@@ -28,7 +28,6 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/hashicorp/golang-lru v1.0.2
 	github.com/improbable-eng/grpc-web v0.15.0
 	github.com/ipfs/go-block-format v0.2.0
 	github.com/ipfs/go-cid v0.4.1
@@ -51,9 +50,9 @@ require (
 	github.com/onflow/cadence v1.6.4-0.20250716211848-427e09066d13
 	github.com/onflow/crypto v0.25.3
 	github.com/onflow/flow v0.3.4
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.7.1
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.7.3
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.7.1
-	github.com/onflow/flow-go-sdk v1.6.1
+	github.com/onflow/flow-go-sdk v1.6.2
 	github.com/onflow/flow/protobuf/go/flow v0.4.10
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pierrec/lz4 v2.6.1+incompatible
@@ -206,6 +205,7 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
+	github.com/hashicorp/golang-lru v1.0.2
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
 	github.com/huandu/go-clone v1.6.0 // indirect
