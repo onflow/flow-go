@@ -34,7 +34,7 @@ func GetBlockIDsByStatus(r storage.Reader, blockIDs *[]flow.Identifier,
 			return true, err
 		}
 
-		if blockIDs != nil && wasUploadCompleted == targetUploadStatus {
+		if wasUploadCompleted == targetUploadStatus {
 			*blockIDs = append(*blockIDs, flow.HashToID(keyCopy[1:]))
 		}
 		return false, nil
