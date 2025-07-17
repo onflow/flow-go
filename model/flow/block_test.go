@@ -299,8 +299,8 @@ func TestNewProposal(t *testing.T) {
 // 4. Invalid input with non-empty ProposerSigData:
 //   - Ensures an error is returned when a ProposerSigData is included, as this is not permitted for root proposals.
 func TestNewRootProposal(t *testing.T) {
-	// validRootBlockFixture returns a new valid root flow.Block for use in tests.
-	validRootBlockFixture := func() flow.Block {
+	// validRootProposalFixture returns a new valid root flow.UntrustedProposal for use in tests.
+	validRootProposalFixture := func() flow.UntrustedProposal {
 		block, err := flow.NewRootBlock(flow.UntrustedBlock{
 			Header: flow.HeaderBody{
 				ChainID:            flow.Emulator,
@@ -319,25 +319,22 @@ func TestNewRootProposal(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		return *block
+		return flow.UntrustedProposal{
+			Block:           *block,
+			ProposerSigData: nil,
+		}
 	}
 
 	t.Run("valid input with nil ProposerSigData", func(t *testing.T) {
-		untrustedProposal := flow.UntrustedProposal{
-			Block:           validRootBlockFixture(),
-			ProposerSigData: nil,
-		}
+		res, err := flow.NewRootProposal(validRootProposalFixture())
 
-		res, err := flow.NewRootProposal(untrustedProposal)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 	})
 
 	t.Run("valid input with empty ProposerSigData", func(t *testing.T) {
-		untrustedProposal := flow.UntrustedProposal{
-			Block:           validRootBlockFixture(),
-			ProposerSigData: []byte{},
-		}
+		untrustedProposal := validRootProposalFixture()
+		untrustedProposal.ProposerSigData = []byte{}
 
 		res, err := flow.NewRootProposal(untrustedProposal)
 		require.NoError(t, err)
@@ -345,13 +342,8 @@ func TestNewRootProposal(t *testing.T) {
 	})
 
 	t.Run("invalid input with invalid block", func(t *testing.T) {
-		block := validRootBlockFixture()
-		block.Header.ParentView = 1
-
-		untrustedProposal := flow.UntrustedProposal{
-			Block:           block,
-			ProposerSigData: nil,
-		}
+		untrustedProposal := validRootProposalFixture()
+		untrustedProposal.Block.Header.ParentView = 1
 
 		res, err := flow.NewRootProposal(untrustedProposal)
 		require.Error(t, err)
@@ -360,10 +352,8 @@ func TestNewRootProposal(t *testing.T) {
 	})
 
 	t.Run("invalid input with non-empty proposer signature", func(t *testing.T) {
-		untrustedProposal := flow.UntrustedProposal{
-			Block:           validRootBlockFixture(),
-			ProposerSigData: unittest.SignatureFixture(),
-		}
+		untrustedProposal := validRootProposalFixture()
+		untrustedProposal.ProposerSigData = unittest.SignatureFixture()
 
 		res, err := flow.NewRootProposal(untrustedProposal)
 		require.Error(t, err)
