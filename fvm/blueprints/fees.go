@@ -44,16 +44,16 @@ var setupFeesTransactionTemplate string
 //go:embed scripts/setExecutionMemoryLimit.cdc
 var setExecutionMemoryLimit string
 
-func DeployTxFeesContractTransaction(flowFees, service flow.Address, contract []byte) *flow.TransactionBody {
+func DeployTxFeesContractTransaction(flowFees, service flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(deployTxFeesTransactionTemplate)).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddAuthorizer(flowFees).
 		AddAuthorizer(service)
 }
 
-func DeployStorageFeesContractTransaction(service flow.Address, contract []byte) *flow.TransactionBody {
+func DeployStorageFeesContractTransaction(service flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 	return DeployContractTransaction(service, contract, "FlowStorageFees")
 }
 
@@ -81,7 +81,7 @@ func SetupParametersTransaction(
 		panic(fmt.Sprintf("failed to encode restrictedAccountCreationEnabled: %s", err.Error()))
 	}
 
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(templates.ReplaceAddresses(setupParametersTransactionTemplate,
 			templates.Environment{
 				StorageFeesAddress:    service.Hex(),
@@ -92,13 +92,14 @@ func SetupParametersTransaction(
 		AddArgument(minimumStorageReservationArg).
 		AddArgument(storagePerFlowArg).
 		AddArgument(restrictedAccountCreationEnabledArg).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 func SetupStorageForServiceAccountsTransaction(
 	service, fungibleToken, flowToken, feeContract flow.Address,
 ) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(templates.ReplaceAddresses(setupStorageForServiceAccountsTemplate,
 			templates.Environment{
 				ServiceAccountAddress: service.Hex(),
@@ -110,13 +111,14 @@ func SetupStorageForServiceAccountsTransaction(
 		AddAuthorizer(service).
 		AddAuthorizer(fungibleToken).
 		AddAuthorizer(flowToken).
-		AddAuthorizer(feeContract)
+		AddAuthorizer(feeContract).
+		Build()
 }
 
 func SetupStorageForAccountTransaction(
 	account, service, fungibleToken, flowToken flow.Address,
 ) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(templates.ReplaceAddresses(setupStorageForAccountTemplate,
 			templates.Environment{
 				ServiceAccountAddress: service.Hex(),
@@ -126,7 +128,8 @@ func SetupStorageForAccountTransaction(
 			})),
 		).
 		AddAuthorizer(account).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 func SetupFeesTransaction(
@@ -149,7 +152,7 @@ func SetupFeesTransaction(
 		panic(fmt.Sprintf("failed to encode execution effort cost: %s", err.Error()))
 	}
 
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(templates.ReplaceAddresses(setupFeesTransactionTemplate,
 			templates.Environment{
 				FlowFeesAddress: flowFees.Hex(),
@@ -158,7 +161,8 @@ func SetupFeesTransaction(
 		AddArgument(surgeFactorArg).
 		AddArgument(inclusionEffortCostArg).
 		AddArgument(executionEffortCostArg).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // SetExecutionEffortWeightsTransaction creates a transaction that sets up weights for the weighted Meter.
@@ -209,11 +213,12 @@ func setExecutionWeightsTransaction(
 		return nil, err
 	}
 
-	tx := flow.NewTransactionBody().
+	tx := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(setExecutionWeightsScript)).
 		AddArgument(newWeights).
 		AddArgument(storagePath).
-		AddAuthorizer(parametersAccount)
+		AddAuthorizer(parametersAccount).
+		Build()
 
 	return tx, nil
 }
@@ -235,11 +240,12 @@ func SetExecutionMemoryLimitTransaction(
 		return nil, err
 	}
 
-	tx := flow.NewTransactionBody().
+	tx := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(setExecutionMemoryLimit)).
 		AddArgument(newLimit).
 		AddArgument(storagePath).
-		AddAuthorizer(parametersAccount)
+		AddAuthorizer(parametersAccount).
+		Build()
 
 	return tx, nil
 }

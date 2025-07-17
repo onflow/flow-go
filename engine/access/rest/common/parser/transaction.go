@@ -100,7 +100,7 @@ func (t *Transaction) Parse(raw io.Reader, chain flow.Chain) error {
 		return fmt.Errorf("invalid gas limit: %w", err)
 	}
 
-	flowTransaction := flow.TransactionBody{
+	flowTransaction := flow.NewTransactionBody(flow.UntrustedTransactionBody{
 		ReferenceBlockID:   blockID.Flow(),
 		Script:             script,
 		Arguments:          args.Flow(),
@@ -110,11 +110,11 @@ func (t *Transaction) Parse(raw io.Reader, chain flow.Chain) error {
 		Authorizers:        auths,
 		PayloadSignatures:  payloadSigs.Flow(),
 		EnvelopeSignatures: envelopeSigs.Flow(),
-	}
+	})
 
 	// we use the gRPC method of converting the incoming transaction to a Flow transaction since
 	// it sets the signer_index appropriately.
-	entityTransaction := convert.TransactionToMessage(flowTransaction)
+	entityTransaction := convert.TransactionToMessage(*flowTransaction)
 	flowTx, err := convert.MessageToTransaction(entityTransaction, chain)
 	if err != nil {
 		return err

@@ -240,9 +240,10 @@ func (s *scriptTestSuite) createAccount() flow.Address {
 		  }
 		}`
 
-	txBody := flow.NewTransactionBody().
+	txBody := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(createAccountTransaction)).
-		AddAuthorizer(s.chain.ServiceAddress())
+		AddAuthorizer(s.chain.ServiceAddress()).
+		Build()
 
 	executionSnapshot, output, err := s.vm.Run(
 		s.vmCtx,
@@ -283,7 +284,7 @@ func (s *scriptTestSuite) transferTokens(accountAddress flow.Address, amount uin
 	transferTx := transferTokensTx(s.chain).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(amount))).
 		AddArgument(jsoncdc.MustEncode(cadence.Address(accountAddress))).
-		AddAuthorizer(s.chain.ServiceAddress())
+		AddAuthorizer(s.chain.ServiceAddress()).Build()
 
 	executionSnapshot, _, err := s.vm.Run(
 		s.vmCtx,
@@ -330,10 +331,11 @@ transaction(key: [UInt8]) {
 
 	publicKey, encodedCadencePublicKey := newAccountKey(s.T(), privateKey, apiVersion)
 
-	txBody := flow.NewTransactionBody().
+	txBody := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(addAccountKeyTransaction)).
 		AddArgument(encodedCadencePublicKey).
-		AddAuthorizer(accountAddress)
+		AddAuthorizer(accountAddress).
+		Build()
 
 	executionSnapshot, _, err := s.vm.Run(
 		s.vmCtx,
@@ -386,10 +388,10 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	return synctest.MockBlockHeaderStorage(synctest.WithByHeight(blocksByHeight))
 }
 
-func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
+func transferTokensTx(chain flow.Chain) *flow.TransactionBodyBuilder {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(
 			`
 	// This transaction is a template for a transaction that

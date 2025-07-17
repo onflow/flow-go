@@ -91,7 +91,7 @@ func mustFundAccounts(
 
 		executionSnapshot, output, err := vm.Run(
 			execCtx,
-			fvm.Transaction(transferTx, 0),
+			fvm.Transaction(transferTx.Build(), 0),
 			snapshotTree)
 		require.NoError(b, err)
 		require.NoError(b, output.Err)
@@ -280,6 +280,7 @@ func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colN
 
 	block := flow.NewBlock(
 		flow.HeaderBody{
+			ChainID:  chain.ChainID(),
 			ParentID: parentBlock.ID(),
 			View:     parentBlock.Header.Height + 1,
 		},
@@ -302,8 +303,8 @@ func createTokenTransferTransaction(b *testing.B, accs *testAccounts) *flow.Tran
 	src := accs.accounts[rnd]
 	dst := accs.accounts[(rnd+1)%len(accs.accounts)]
 
-	tx := testutil.CreateTokenTransferTransaction(chain, 1, dst.address, src.address)
-	tx.SetProposalKey(chain.ServiceAddress(), 0, accs.seq).
+	tx := testutil.CreateTokenTransferTransaction(chain, 1, dst.address, src.address).
+		SetProposalKey(chain.ServiceAddress(), 0, accs.seq).
 		SetComputeLimit(1000).
 		SetPayer(chain.ServiceAddress())
 	accs.seq++
@@ -314,5 +315,5 @@ func createTokenTransferTransaction(b *testing.B, accs *testAccounts) *flow.Tran
 	err = testutil.SignEnvelope(tx, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(b, err)
 
-	return tx
+	return tx.Build()
 }

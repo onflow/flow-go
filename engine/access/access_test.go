@@ -191,8 +191,10 @@ func (suite *Suite) RunTest(
 func (suite *Suite) TestSendAndGetTransaction() {
 	suite.RunTest(func(handler *rpc.Handler, _ *badger.DB, _ *storage.All, _ *storage.Execution) {
 		referenceBlock := unittest.BlockHeaderFixture()
-		transaction := unittest.TransactionFixture()
-		transaction.SetReferenceBlockID(referenceBlock.ID())
+		transaction := unittest.TransactionFixture(
+			func(t *flow.Transaction) {
+				t.ReferenceBlockID = referenceBlock.ID()
+			})
 
 		refSnapshot := new(protocol.Snapshot)
 
@@ -245,8 +247,10 @@ func (suite *Suite) TestSendExpiredTransaction() {
 	suite.RunTest(func(handler *rpc.Handler, _ *badger.DB, _ *storage.All, en *storage.Execution) {
 		referenceBlock := suite.finalizedBlock
 
-		transaction := unittest.TransactionFixture()
-		transaction.SetReferenceBlockID(referenceBlock.ID())
+		transaction := unittest.TransactionFixture(
+			func(t *flow.Transaction) {
+				t.ReferenceBlockID = referenceBlock.ID()
+			})
 		// create latest block that is past the expiry window
 		latestBlock := unittest.BlockHeaderFixture()
 		latestBlock.Height = referenceBlock.Height + flow.DefaultTransactionExpiry*2
@@ -281,8 +285,10 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create a transaction
 		referenceBlock := unittest.BlockHeaderFixture()
-		transaction := unittest.TransactionFixture()
-		transaction.SetReferenceBlockID(referenceBlock.ID())
+		transaction := unittest.TransactionFixture(
+			func(t *flow.Transaction) {
+				t.ReferenceBlockID = referenceBlock.ID()
+			})
 
 		// setup the state and finalSnapshot mock expectations
 		suite.state.On("AtBlockID", referenceBlock.ID()).Return(suite.finalSnapshot, nil)

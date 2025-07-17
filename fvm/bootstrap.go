@@ -502,7 +502,7 @@ func (b *bootstrapExecutor) deployFungibleToken(env *templates.Environment) flow
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployFungibleTokenContractTransaction(fungibleToken, contract),
+			blueprints.DeployFungibleTokenContractTransaction(fungibleToken, contract).Build(),
 			0),
 	)
 	env.FungibleTokenAddress = fungibleToken.String()
@@ -517,7 +517,7 @@ func (b *bootstrapExecutor) deployNonFungibleToken(deployTo flow.Address, env *t
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployNonFungibleTokenContractTransaction(deployTo, contract),
+			blueprints.DeployNonFungibleTokenContractTransaction(deployTo, contract).Build(),
 			0),
 	)
 	env.NonFungibleTokenAddress = deployTo.String()
@@ -530,7 +530,7 @@ func (b *bootstrapExecutor) deployViewResolver(deployTo flow.Address, env *templ
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployViewResolverContractTransaction(deployTo),
+			blueprints.DeployViewResolverContractTransaction(deployTo).Build(),
 			0),
 	)
 	env.ViewResolverAddress = deployTo.String()
@@ -542,7 +542,7 @@ func (b *bootstrapExecutor) deployBurner(deployTo flow.Address, env *templates.E
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployBurnerContractTransaction(deployTo),
+			blueprints.DeployBurnerContractTransaction(deployTo).Build(),
 			0),
 	)
 	env.BurnerAddress = deployTo.String()
@@ -558,7 +558,7 @@ func (b *bootstrapExecutor) deployCrypto(deployTo flow.Address, env *templates.E
 			blueprints.DeployContractTransaction(
 				deployTo,
 				contract,
-				"Crypto"),
+				"Crypto").Build(),
 			0),
 	)
 	env.CryptoAddress = deployTo.String()
@@ -572,7 +572,7 @@ func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken 
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployMetadataViewsContractTransaction(nonFungibleToken, mvContract),
+			blueprints.DeployMetadataViewsContractTransaction(nonFungibleToken, mvContract).Build(),
 			0),
 	)
 	env.MetadataViewsAddress = nonFungibleToken.String()
@@ -583,7 +583,7 @@ func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken 
 	txError, err = b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, ftmvContract),
+			blueprints.DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, ftmvContract).Build(),
 			0),
 	)
 	env.FungibleTokenMetadataViewsAddress = fungibleToken.String()
@@ -602,7 +602,7 @@ func (b *bootstrapExecutor) deployCrossVMMetadataViews(nonFungibleToken flow.Add
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployCrossVMMetadataViewsContractTransaction(nonFungibleToken, crossVMMVContract),
+			blueprints.DeployCrossVMMetadataViewsContractTransaction(nonFungibleToken, crossVMMVContract).Build(),
 			0),
 	)
 	env.CrossVMMetadataViewsAddress = nonFungibleToken.String()
@@ -616,7 +616,7 @@ func (b *bootstrapExecutor) deployFungibleTokenSwitchboard(deployTo flow.Address
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployFungibleTokenSwitchboardContractTransaction(deployTo, contract),
+			blueprints.DeployFungibleTokenSwitchboardContractTransaction(deployTo, contract).Build(),
 			0),
 	)
 	env.FungibleTokenSwitchboardAddress = deployTo.String()
@@ -656,7 +656,7 @@ func (b *bootstrapExecutor) deployFlowFees(service flow.Address, env *templates.
 				flowFees,
 				service,
 				contract,
-			),
+			).Build(),
 			0),
 	)
 	env.FlowFeesAddress = flowFees.String()
@@ -673,7 +673,7 @@ func (b *bootstrapExecutor) deployStorageFees(deployTo flow.Address, env *templa
 		Transaction(
 			blueprints.DeployStorageFeesContractTransaction(
 				deployTo,
-				contract),
+				contract).Build(),
 			0),
 	)
 	env.StorageFeesAddress = deployTo.String()
@@ -697,7 +697,7 @@ func (b *bootstrapExecutor) deployDKG(deployTo flow.Address, env *templates.Envi
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployContractTransaction(deployTo, contract, "FlowDKG"),
+			blueprints.DeployContractTransaction(deployTo, contract, "FlowDKG").Build(),
 			0,
 		),
 	)
@@ -710,7 +710,7 @@ func (b *bootstrapExecutor) deployQC(deployTo flow.Address, env *templates.Envir
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployContractTransaction(deployTo, contract, "FlowClusterQC"),
+			blueprints.DeployContractTransaction(deployTo, contract, "FlowClusterQC").Build(),
 			0,
 		),
 	)
@@ -763,7 +763,7 @@ func (b *bootstrapExecutor) deployExecutionParameters(deployTo flow.Address, env
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployContractTransaction(deployTo, contract, "FlowExecutionParameters"),
+			blueprints.DeployContractTransaction(deployTo, contract, "FlowExecutionParameters").Build(),
 			0,
 		),
 	)
@@ -782,7 +782,7 @@ func (b *bootstrapExecutor) deployServiceAccount(deployTo flow.Address, env *tem
 			blueprints.DeployContractTransaction(
 				deployTo,
 				contract,
-				"FlowServiceAccount"),
+				"FlowServiceAccount").Build(),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy service account contract: %s", txError, err)
@@ -800,7 +800,7 @@ func (b *bootstrapExecutor) deployNFTStorefrontV2(deployTo flow.Address, env *te
 			blueprints.DeployContractTransaction(
 				deployTo,
 				contract,
-				"NFTStorefrontV2"),
+				"NFTStorefrontV2").Build(),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy NFTStorefrontV2 contract: %s", txError, err)
@@ -1004,7 +1004,7 @@ func (b *bootstrapExecutor) setupEVM(serviceAddress, nonFungibleTokenAddress, fu
 		// WithEVMEnabled should only be used after we create an account for storage
 		txError, err := b.invokeMetaTransaction(
 			NewContextFromParent(b.ctx, WithEVMEnabled(true)),
-			Transaction(tx, 0),
+			Transaction(tx.Build(), 0),
 		)
 		panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
 
@@ -1086,7 +1086,7 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	}
 
 	// Create a COA in the bridge account
-	run(blueprints.CreateCOATransaction(*env, bridgeEnv, serviceAddress), "failed to create COA in Service Account: %s")
+	run(blueprints.CreateCOATransaction(*env, bridgeEnv, serviceAddress).Build(), "failed to create COA in Service Account: %s")
 
 	// Arbitrary high gas limit that can be used for all the
 	// EVM transactions to ensure none of them run out of gas
@@ -1156,7 +1156,7 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 			txError, err := b.invokeMetaTransaction(
 				ctx,
 				Transaction(
-					blueprints.DeployContractTransaction(serviceAddress, contract, name),
+					blueprints.DeployContractTransaction(serviceAddress, contract, name).Build(),
 					0),
 			)
 			panicOnMetaInvokeErrf("failed to deploy "+name+" contract: %s", txError, err)
@@ -1329,7 +1329,7 @@ func (b *bootstrapExecutor) deployStakingProxyContract(deployTo flow.Address, en
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployContractTransaction(deployTo, contract, "StakingProxy"),
+			blueprints.DeployContractTransaction(deployTo, contract, "StakingProxy").Build(),
 			0,
 		),
 	)
@@ -1401,7 +1401,7 @@ func (b *bootstrapExecutor) deployStakingCollection(
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployContractTransaction(deployTo, contract, "FlowStakingCollection"),
+			blueprints.DeployContractTransaction(deployTo, contract, "FlowStakingCollection").Build(),
 			0,
 		),
 	)
@@ -1417,7 +1417,7 @@ func (b *bootstrapExecutor) deployMigrationContract(deployTo flow.Address) {
 	)
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
-		Transaction(tx, 0),
+		Transaction(tx.Build(), 0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy Migration contract: %s", txError, err)
 }
