@@ -915,12 +915,12 @@ func TestBuildIdentityTable(t *testing.T) {
 // 5. Invalid input with unsorted ActiveIdentities:
 //   - Should return an error indicating ActiveIdentities are not sorted.
 func TestNewEpochStateContainer(t *testing.T) {
-	unsortedIdentities := unittest.DynamicIdentityEntryListFixture(3)
-	sortedIdentities := unsortedIdentities.Sort(flow.IdentifierCanonical)
-	// ensure that unsortedIdentities is not in canonical order
-	unsortedIdentities = unsortedIdentities.Sort(func(id1, id2 flow.Identifier) int {
-		return -flow.IdentifierCanonical(id1, id2)
-	})
+	identities := unittest.DynamicIdentityEntryListFixture(3)
+	sortedIdentities := identities.Sort(flow.IdentifierCanonical)
+
+	// Copy and shuffle to ensure it's unsorted
+	unsortedIdentities := sortedIdentities.Copy()
+	unsortedIdentities[0], unsortedIdentities[1] = unsortedIdentities[1], unsortedIdentities[0]
 
 	// 1. Valid input with all fields
 	t.Run("valid input with all fields", func(t *testing.T) {
@@ -960,26 +960,31 @@ func TestNewEpochStateContainer(t *testing.T) {
 			flow.UntrustedEpochStateContainer{
 				SetupID:          flow.ZeroID,
 				ActiveIdentities: sortedIdentities,
-			})
+			},
+		)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "SetupID must not be zero")
 	})
 
 	// 4. Invalid input with nil ActiveIdentities
 	t.Run("invalid - nil ActiveIdentities", func(t *testing.T) {
-		_, err := flow.NewEpochStateContainer(flow.UntrustedEpochStateContainer{
-			SetupID: unittest.IdentifierFixture(),
-		})
+		_, err := flow.NewEpochStateContainer(
+			flow.UntrustedEpochStateContainer{
+				SetupID: unittest.IdentifierFixture(),
+			},
+		)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "ActiveIdentities must not be nil")
 	})
 
 	// 5. Invalid input with unsorted ActiveIdentities
 	t.Run("invalid - unsorted ActiveIdentities", func(t *testing.T) {
-		_, err := flow.NewEpochStateContainer(flow.UntrustedEpochStateContainer{
-			SetupID:          unittest.IdentifierFixture(),
-			ActiveIdentities: unsortedIdentities,
-		})
+		_, err := flow.NewEpochStateContainer(
+			flow.UntrustedEpochStateContainer{
+				SetupID:          unittest.IdentifierFixture(),
+				ActiveIdentities: unsortedIdentities,
+			},
+		)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "ActiveIdentities are not sorted")
 	})

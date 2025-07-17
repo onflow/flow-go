@@ -265,10 +265,13 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 
 	// Generate result approval
 	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERVerGenerateResultApproval)
-	attestation := &flow.Attestation{
+	attestation, err := flow.NewAttestation(flow.UntrustedAttestation{
 		BlockID:           vc.Header.ID(),
 		ExecutionResultID: vc.Result.ID(),
 		ChunkIndex:        vc.Chunk.Index,
+	})
+	if err != nil {
+		return fmt.Errorf("could not build attestation: %w", err)
 	}
 	approval, err := GenerateResultApproval(
 		e.me,
@@ -337,11 +340,14 @@ func GenerateResultApproval(
 	}
 
 	// result approval body
-	body := flow.ResultApprovalBody{
+	body, err := flow.NewResultApprovalBody(flow.UntrustedResultApprovalBody{
 		Attestation:          *attestation,
 		ApproverID:           me.NodeID(),
 		AttestationSignature: atstSign,
 		Spock:                spock,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build result approval body: %w", err)
 	}
 
 	// generates a signature over result approval body
@@ -351,10 +357,15 @@ func GenerateResultApproval(
 		return nil, fmt.Errorf("could not sign result approval body: %w", err)
 	}
 
-	return &flow.ResultApproval{
-		Body:              body,
+	resultApproval, err := flow.NewResultApproval(flow.UntrustedResultApproval{
+		Body:              *body,
 		VerifierSignature: bodySign,
-	}, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build result approval: %w", err)
+	}
+
+	return resultApproval, nil
 }
 
 // verifiableChunkHandler acts as a wrapper around the verify method that captures its performance-related metrics

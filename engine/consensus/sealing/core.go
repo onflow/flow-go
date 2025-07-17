@@ -166,7 +166,13 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 					Msg("skipping outdated block referenced in root sealing segment")
 				continue
 			}
-			incorporatedResult := flow.NewIncorporatedResult(blockID, result)
+			incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+				IncorporatedBlockID: blockID,
+				Result:              result,
+			})
+			if err != nil {
+				return fmt.Errorf("could not create incorporated result for block (%x): %w", blockID, err)
+			}
 			err = c.ProcessIncorporatedResult(incorporatedResult)
 			if err != nil {
 				return fmt.Errorf("could not process incorporated result from block %s: %w", blockID, err)

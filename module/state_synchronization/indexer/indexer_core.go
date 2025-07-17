@@ -144,22 +144,21 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			results = append(results, chunk.TransactionResults...)
 		}
 
-		batch := c.protocolDB.NewBatch()
-		defer batch.Close()
+		err := c.protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			err := c.events.BatchStore(data.BlockID, []flow.EventsList{events}, rw)
+			if err != nil {
+				return fmt.Errorf("could not index events at height %d: %w", header.Height, err)
+			}
 
-		err := c.events.BatchStore(data.BlockID, []flow.EventsList{events}, batch)
-		if err != nil {
-			return fmt.Errorf("could not index events at height %d: %w", header.Height, err)
-		}
+			err = c.results.BatchStore(data.BlockID, results, rw)
+			if err != nil {
+				return fmt.Errorf("could not index transaction results at height %d: %w", header.Height, err)
+			}
+			return nil
+		})
 
-		err = c.results.BatchStore(data.BlockID, results, batch)
 		if err != nil {
-			return fmt.Errorf("could not index transaction results at height %d: %w", header.Height, err)
-		}
-
-		err = batch.Commit()
-		if err != nil {
-			return fmt.Errorf("batch flush error: %w", err)
+			return fmt.Errorf("could not commit block data: %w", err)
 		}
 
 		eventCount = len(events)
@@ -186,7 +185,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		indexedCount := 0
 		if len(data.ChunkExecutionDatas) > 0 {
 			for _, chunk := range data.ChunkExecutionDatas[0 : len(data.ChunkExecutionDatas)-1] {
-				err := HandleCollection(chunk.Collection, c.collections, c.transactions, c.log, c.collectionExecutedMetric)
+				err := IndexCollection(chunk.Collection, c.collections, c.transactions, c.log, c.collectionExecutedMetric)
 				if err != nil {
 					return fmt.Errorf("could not handle collection")
 				}
@@ -326,9 +325,9 @@ func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, 
 	return c.registers.Store(regEntries, height)
 }
 
-// HandleCollection handles the response of the collection request made earlier when a block was received.
+// IndexCollection handles the response of the collection request made earlier when a block was received.
 // No errors expected during normal operations.
-func HandleCollection(
+func IndexCollection(
 	collection *flow.Collection,
 	collections storage.Collections,
 	transactions storage.Transactions,
