@@ -173,7 +173,7 @@ func NewComplianceLayer(
 	return e, nil
 }
 
-// OnBlockProposal queues *untrusted* proposals for further processing and notifies the Engine's
+// OnBlockProposal queues basic structural validated proposals for further processing and notifies the Engine's
 // internal workers. This method is intended for fresh proposals received directly from leaders.
 // It can ingest synced blocks as well, but is less performant compared to method `OnSyncedBlocks`.
 func (e *ComplianceEngine) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) {
@@ -184,7 +184,7 @@ func (e *ComplianceEngine) OnBlockProposal(proposal flow.Slashable[*flow.Proposa
 	}
 }
 
-// OnSyncedBlocks is an optimized consumer for *untrusted* synced blocks. It is specifically
+// OnSyncedBlocks is an optimized consumer for basic structural validated synced blocks. It is specifically
 // efficient for batches of continuously connected blocks (honest nodes supply finalized blocks
 // in suitable sequences where possible). Nevertheless, the method tolerates blocks in arbitrary
 // order (less efficient), making it robust against byzantine nodes.

@@ -174,7 +174,7 @@ func SnapshotFromBootstrapStateWithParams(
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not construct proposal: %w", err)
+		return nil, fmt.Errorf("could not construct root proposal: %w", err)
 	}
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
