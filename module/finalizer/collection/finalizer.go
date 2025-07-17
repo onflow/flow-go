@@ -118,6 +118,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// look up the transactions included in the payload
 			step := steps[i]
 			var payload cluster.Payload
+			// This does not require a lock, as a block's payload once set never changes.
 			err = procedure.RetrieveClusterPayload(rw.GlobalReader(), clusterBlockID, &payload)
 			if err != nil {
 				return fmt.Errorf("could not retrieve payload for cluster block (id=%x): %w", clusterBlockID, err)
@@ -156,6 +157,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 			// look up the reference block height to populate index
 			var refBlock flow.Header
+			// This does not require a lock, as a block's header once set never changes.
 			err = operation.RetrieveHeader(rw.GlobalReader(), payload.ReferenceBlockID, &refBlock)
 			if err != nil {
 				return fmt.Errorf("could not retrieve reference block (id=%x): %w", payload.ReferenceBlockID, err)

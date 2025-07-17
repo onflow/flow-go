@@ -258,37 +258,34 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 		return ctx, nil
 	}
 
-	// otherwise, attempt to read them from storage
-	err = (func(r storage.Reader) error {
-		var refEpochFinalHeight uint64
-		var refEpochFinalID flow.Identifier
+	r := b.db.Reader()
 
-		err = operation.RetrieveEpochLastHeight(r, b.clusterEpoch, &refEpochFinalHeight)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				return nil
-			}
-			return fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
-		}
-		err = operation.LookupBlockHeight(r, refEpochFinalHeight, &refEpochFinalID)
-		if err != nil {
-			// if we are able to retrieve the epoch's final height, the block must be finalized
-			// therefore failing to look up its height here is an unexpected error
-			return irrecoverable.NewExceptionf("could not retrieve ID of finalized final block of operating epoch: %w", err)
-		}
+	var refEpochFinalHeight uint64
+	var refEpochFinalID flow.Identifier
 
-		// cache the values
-		b.epochFinalHeight = &refEpochFinalHeight
-		b.epochFinalID = &refEpochFinalID
-		// store the values in the build context
-		ctx.refEpochFinalID = b.epochFinalID
-		ctx.refEpochFinalHeight = b.epochFinalHeight
-
-		return nil
-	})(b.db.Reader())
+	err = operation.RetrieveEpochLastHeight(r, b.clusterEpoch, &refEpochFinalHeight)
 	if err != nil {
-		return nil, fmt.Errorf("could not get block build context: %w", err)
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
 	}
+
+	// this does not require a lock, as block ID of an height does not change
+	err = operation.LookupBlockHeight(r, refEpochFinalHeight, &refEpochFinalID)
+	if err != nil {
+		// if we are able to retrieve the epoch's final height, the block must be finalized
+		// therefore failing to look up its height here is an unexpected error
+		return nil, irrecoverable.NewExceptionf("could not retrieve ID of finalized final block of operating epoch: %w", err)
+	}
+
+	// cache the values
+	b.epochFinalHeight = &refEpochFinalHeight
+	b.epochFinalID = &refEpochFinalID
+	// store the values in the build context
+	ctx.refEpochFinalID = b.epochFinalID
+	ctx.refEpochFinalHeight = b.epochFinalHeight
+
 	return ctx, nil
 }
 

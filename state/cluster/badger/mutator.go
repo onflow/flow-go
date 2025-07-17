@@ -59,36 +59,32 @@ func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, er
 	var ctx extendContext
 	ctx.candidate = candidate
 
-	err := (func(r storage.Reader) error {
-		// get the latest finalized cluster block and latest finalized consensus height
-		ctx.finalizedClusterBlock = new(flow.Header)
-		err := procedure.RetrieveLatestFinalizedClusterHeader(r, candidate.Header.ChainID, ctx.finalizedClusterBlock)
-		if err != nil {
-			return fmt.Errorf("could not retrieve finalized cluster head: %w", err)
-		}
-		err = operation.RetrieveFinalizedHeight(r, &ctx.finalizedConsensusHeight)
-		if err != nil {
-			return fmt.Errorf("could not retrieve finalized height on consensus chain: %w", err)
-		}
-
-		err = operation.RetrieveEpochFirstHeight(r, m.State.epoch, &ctx.epochFirstHeight)
-		if err != nil {
-			return fmt.Errorf("could not get operating epoch first height: %w", err)
-		}
-		err = operation.RetrieveEpochLastHeight(r, m.State.epoch, &ctx.epochLastHeight)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				ctx.epochHasEnded = false
-				return nil
-			}
-			return fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
-		}
-		ctx.epochHasEnded = true
-		return nil
-	})(m.State.db.Reader())
+	r := m.State.db.Reader()
+	// get the latest finalized cluster block and latest finalized consensus height
+	ctx.finalizedClusterBlock = new(flow.Header)
+	err := procedure.RetrieveLatestFinalizedClusterHeader(r, candidate.Header.ChainID, ctx.finalizedClusterBlock)
 	if err != nil {
-		return extendContext{}, fmt.Errorf("could not read required state information for Extend checks: %w", err)
+		return extendContext{}, fmt.Errorf("could not retrieve finalized cluster head: %w", err)
 	}
+	err = operation.RetrieveFinalizedHeight(r, &ctx.finalizedConsensusHeight)
+	if err != nil {
+		return extendContext{}, fmt.Errorf("could not retrieve finalized height on consensus chain: %w", err)
+	}
+
+	err = operation.RetrieveEpochFirstHeight(r, m.State.epoch, &ctx.epochFirstHeight)
+	if err != nil {
+		return extendContext{}, fmt.Errorf("could not get operating epoch first height: %w", err)
+	}
+	err = operation.RetrieveEpochLastHeight(r, m.State.epoch, &ctx.epochLastHeight)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			ctx.epochHasEnded = false
+			return extendContext{}, nil
+		}
+		return extendContext{}, fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
+	}
+	ctx.epochHasEnded = true
+
 	return ctx, nil
 }
 
