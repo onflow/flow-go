@@ -96,7 +96,7 @@ func TraverseByPrefix(r storage.Reader, prefix []byte, iterFunc IterationFunc, o
 
 // KeyOnlyIterateFunc returns an IterationFunc that only iterates over keys
 func KeyOnlyIterateFunc(fn func(key []byte) error) IterationFunc {
-	return func(key []byte, getValue func(destVal any) error) (bail bool, err error) {
+	return func(key []byte, _ func(destVal any) error) (bail bool, err error) {
 		err = fn(key)
 		if err != nil {
 			return true, err
