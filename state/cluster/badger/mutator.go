@@ -55,14 +55,14 @@ type extendContext struct {
 // getExtendCtx reads all required information from the database in order to validate
 // a candidate cluster block.
 // No errors are expected during normal operation.
-func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, error) {
+func (m *MutableState) getExtendCtx(lctx lockctx.Proof, candidate *cluster.Block) (extendContext, error) {
 	var ctx extendContext
 	ctx.candidate = candidate
 
 	r := m.State.db.Reader()
 	// get the latest finalized cluster block and latest finalized consensus height
 	ctx.finalizedClusterBlock = new(flow.Header)
-	err := procedure.RetrieveLatestFinalizedClusterHeader(r, candidate.Header.ChainID, ctx.finalizedClusterBlock)
+	err := procedure.RetrieveLatestFinalizedClusterHeader(lctx, r, candidate.Header.ChainID, ctx.finalizedClusterBlock)
 	if err != nil {
 		return extendContext{}, fmt.Errorf("could not retrieve finalized cluster head: %w", err)
 	}
@@ -107,8 +107,15 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 		return fmt.Errorf("error checking header validity: %w", err)
 	}
 
+	lctx := m.lockManager.NewContext()
+	defer lctx.Release()
+	err = lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
+	if err != nil {
+		return fmt.Errorf("could not acquire lock for inserting cluster block: %w", err)
+	}
+
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendGetExtendCtx)
-	extendCtx, err := m.getExtendCtx(candidate)
+	extendCtx, err := m.getExtendCtx(lctx, candidate)
 	span.End()
 	if err != nil {
 		return fmt.Errorf("error gettting extend context data: %w", err)
@@ -136,12 +143,6 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 	}
 
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
-	lctx := m.lockManager.NewContext()
-	defer lctx.Release()
-	err = lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
-	if err != nil {
-		return fmt.Errorf("could not acquire lock for inserting cluster block: %w", err)
-	}
 
 	err = m.State.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return procedure.InsertClusterBlock(lctx, rw, candidate)
