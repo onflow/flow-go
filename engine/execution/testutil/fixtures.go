@@ -50,7 +50,7 @@ func CreateContractDeploymentTransaction(contractName string, contract string, a
 	return txBodyBuilder
 }
 
-func UpdateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+func UpdateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBodyBuilder {
 	encoded := hex.EncodeToString([]byte(contract))
 
 	return flow.NewTransactionBodyBuilder().
@@ -61,8 +61,7 @@ func UpdateContractDeploymentTransaction(contractName string, contract string, a
             }`, contractName, encoded)),
 		).
 		AddAuthorizer(authorizer).
-		AddAuthorizer(chain.ServiceAddress()).
-		Build()
+		AddAuthorizer(chain.ServiceAddress())
 }
 
 func UpdateContractUnathorizedDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBodyBuilder {
