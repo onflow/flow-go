@@ -194,7 +194,8 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 	case CodeExecutionReceipt:
 		return new(flow.ExecutionReceipt), what(new(flow.ExecutionReceipt)), nil
 	case CodeResultApproval:
-		return &flow.ResultApproval{}, what(&flow.ResultApproval{}), nil
+		var approval flow.ResultApproval
+		return &approval, what(&approval), nil
 
 	// data exchange for execution of blocks
 	case CodeChunkDataRequest:

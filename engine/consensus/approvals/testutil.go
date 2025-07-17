@@ -72,9 +72,12 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 	s.IncorporatedBlock = unittest.BlockHeaderWithParentFixture(s.Block)
 
 	// compose incorporated result
-	s.IncorporatedResult = unittest.IncorporatedResult.Fixture(
-		unittest.IncorporatedResult.WithResult(result),
-		unittest.IncorporatedResult.WithIncorporatedBlockID(s.IncorporatedBlock.ID()))
+	incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+		IncorporatedBlockID: s.IncorporatedBlock.ID(),
+		Result:              result,
+	})
+	require.NoError(s.T(), err)
+	s.IncorporatedResult = incorporatedResult
 }
 
 // BaseAssignmentCollectorTestSuite is a base suite for testing assignment collectors, contains mocks for all

@@ -49,12 +49,14 @@ func (c *StakingSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 		return nil, fmt.Errorf("could not create signature: %w", err)
 	}
 
-	// create the vote
-	vote := &model.Vote{
+	vote, err := model.NewVote(model.UntrustedVote{
 		View:     block.View,
 		BlockID:  block.BlockID,
 		SignerID: c.signerID,
 		SigData:  sigData,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not create vote: %w", err)
 	}
 
 	return vote, nil
@@ -69,13 +71,20 @@ func (c *StakingSigner) CreateTimeout(curView uint64, newestQC *flow.QuorumCerti
 		return nil, fmt.Errorf("could not generate signature for timeout object at view %d: %w", curView, err)
 	}
 
-	timeout := &model.TimeoutObject{
-		View:       curView,
-		NewestQC:   newestQC,
-		LastViewTC: lastViewTC,
-		SignerID:   c.signerID,
-		SigData:    sigData,
+	timeout, err := model.NewTimeoutObject(
+		model.UntrustedTimeoutObject{
+			View:        curView,
+			NewestQC:    newestQC,
+			LastViewTC:  lastViewTC,
+			SignerID:    c.signerID,
+			SigData:     sigData,
+			TimeoutTick: 0,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct timeout object: %w", err)
 	}
+
 	return timeout, nil
 }
 

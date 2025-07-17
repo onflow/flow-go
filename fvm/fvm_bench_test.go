@@ -471,7 +471,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 				access(all) fun empty() {
 				}
 
-				access(all) fun emit() {
+				access(all) fun emitEvent() {
 					emit SomeEvent()
 				}
 			}
@@ -610,7 +610,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	b.Run("get account and get storage used", func(b *testing.B) {
 		benchTransaction(b,
 			func(b *testing.B, context benchTransactionContext) string {
-				return templateTx(100, `getAccount(signer.address).storageUsed`)
+				return templateTx(100, `getAccount(signer.address).storage.used`)
 			},
 		)
 	})
@@ -694,7 +694,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	b.Run("emit event", func(b *testing.B) {
 		benchTransaction(b,
 			func(b *testing.B, context benchTransactionContext) string {
-				return templateTx(100, `TestContract.emit()`)
+				return templateTx(100, `TestContract.emitEvent()`)
 			},
 		)
 	})

@@ -874,9 +874,11 @@ func chunkDataPackResponseFixture(t *testing.T,
 
 	return &verification.ChunkDataPackResponse{
 		Locator: *unittest.ChunkLocatorFixture(result.ID(), chunk.Index),
-		Cdp: unittest.ChunkDataPackFixture(chunk.ID(),
+		Cdp: unittest.ChunkDataPackFixture(
+			chunk.ID(),
 			unittest.WithStartState(chunk.StartState),
-			unittest.WithChunkDataPackCollection(collection)),
+			unittest.WithChunkDataPackCollection(collection),
+		),
 	}
 }
 
@@ -947,11 +949,12 @@ func chunkRequestsFixture(
 //
 // Agrees and disagrees are the list of execution node identifiers that generate the same and contradicting execution result
 // with the execution result that chunks belong to, respectively.
-func chunkRequestFixture(resultID flow.Identifier,
+func chunkRequestFixture(
+	resultID flow.Identifier,
 	status *verification.ChunkStatus,
 	agrees flow.IdentityList,
-	disagrees flow.IdentityList) *verification.ChunkDataPackRequest {
-
+	disagrees flow.IdentityList,
+) *verification.ChunkDataPackRequest {
 	return &verification.ChunkDataPackRequest{
 		Locator: *unittest.ChunkLocatorFixture(resultID, status.ChunkIndex),
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{

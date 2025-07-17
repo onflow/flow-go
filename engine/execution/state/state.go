@@ -337,7 +337,7 @@ func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCom
 func (s *state) ChunkDataPackByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	chunkDataPack, err := s.chunkDataPacks.ByChunkID(chunkID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve stored chunk data pack: %w", err)
+		return nil, fmt.Errorf("could not retrieve chunk data pack: %w", err)
 	}
 
 	return chunkDataPack, nil
