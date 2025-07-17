@@ -191,6 +191,7 @@ func (reusable *ReusableCadenceRuntime) NewTransactionExecutor(
 			Interface:   reusable.fvmEnv,
 			Location:    location,
 			Environment: environment,
+			UseVM:       useVM,
 		},
 	)
 }
@@ -216,6 +217,7 @@ func (reusable *ReusableCadenceRuntime) ExecuteScript(
 			Interface:   reusable.fvmEnv,
 			Location:    location,
 			Environment: environment,
+			UseVM:       useVM,
 		},
 	)
 }
