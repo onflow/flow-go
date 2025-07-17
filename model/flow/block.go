@@ -172,7 +172,8 @@ type Proposal struct {
 // ordering during construction.
 //
 // An instance of UntrustedProposal should be validated and converted into
-// a trusted Proposal using the NewProposal constructor.
+// a trusted Proposal using the NewProposal constructor (or NewRootProposal
+// for the root proposal).
 type UntrustedProposal Proposal
 
 // NewProposal creates a new Proposal.
