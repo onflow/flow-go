@@ -13,10 +13,17 @@ type ConsumerProgressInitializer interface {
 // It must be created by the ConsumerProgressInitializer, so that it can guarantee
 // the ProcessedIndex and SetProcessedIndex methods are safe to use.
 type ConsumerProgress interface {
-	// read the current processed index
-	// any error returned are exceptions
+	// ProcessedIndex returns the processed index for the consumer
+	// No errors are expected during normal operation
 	ProcessedIndex() (uint64, error)
-	// update the processed index in the storage layer.
-	// any error returned are exceptions
+
+	// SetProcessedIndex updates the processed index for the consumer
+	// The caller must use ConsumerProgressInitializer to initialize the progress index in storage
+	// No errors are expected during normal operation
 	SetProcessedIndex(processed uint64) error
+
+	// BatchSetProcessedIndex updates the processed index for the consumer within in provided batch
+	// The caller must use ConsumerProgressInitializer to initialize the progress index in storage
+	// No errors are expected during normal operation
+	BatchSetProcessedIndex(processed uint64, batch ReaderBatchWriter) error
 }

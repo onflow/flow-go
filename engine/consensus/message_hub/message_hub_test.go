@@ -291,7 +291,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		}).Return(nil)
 
 		// submit vote
-		s.hub.OnOwnVote(vote.BlockID, vote.View, vote.SigData, recipientID)
+		s.hub.OnOwnVote(vote, recipientID)
 	})
 	s.Run("timeout", func() {
 		wg.Add(1)

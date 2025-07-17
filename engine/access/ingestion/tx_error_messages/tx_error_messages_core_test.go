@@ -133,7 +133,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 		Return(nil).Once()
 
 	core := s.initCore()
-	err := core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
+	err := core.FetchErrorMessages(irrecoverableCtx, blockId)
 	require.NoError(s.T(), err)
 
 	// Verify that the mock expectations for storing the error messages were met.
@@ -145,7 +145,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 	s.txErrorMessages.On("Exists", blockId).
 		Return(true, nil).Once()
 	s.proto.state.On("AtBlockID", blockId).Return(s.proto.snapshot).Once()
-	err = core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
+	err = core.FetchErrorMessages(irrecoverableCtx, blockId)
 	require.NoError(s.T(), err)
 
 	// Verify that the mock expectations for storing the error messages were not met.
@@ -155,7 +155,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 }
 
 // TestHandleTransactionResultErrorMessages_ErrorCases tests the error handling of
-// the HandleTransactionResultErrorMessages function in the following cases:
+// the FetchErrorMessages function in the following cases:
 //
 // 1. Execution node fetch error: When fetching transaction error messages from the execution node fails,
 // the function should return an appropriate error and no further actions should be taken.
@@ -186,7 +186,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 			Return(nil, fmt.Errorf("execution node fetch error")).Once()
 
 		core := s.initCore()
-		err := core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
+		err := core.FetchErrorMessages(irrecoverableCtx, blockId)
 
 		// Assert that the function returns an error due to the client fetch error.
 		require.Error(s.T(), err)
@@ -218,7 +218,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 			Return(fmt.Errorf("storage error")).Once()
 
 		core := s.initCore()
-		err := core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
+		err := core.FetchErrorMessages(irrecoverableCtx, blockId)
 
 		// Assert that the function returns an error due to the store error.
 		require.Error(s.T(), err)
@@ -317,6 +317,23 @@ func setupReceiptsForBlock(receipts *storage.ExecutionReceipts, block *flow.Bloc
 		On("ByBlockID", block.ID()).
 		Return(func(flow.Identifier) flow.ExecutionReceiptList {
 			return receiptsList
+		}, nil)
+}
+
+// setupReceiptsForBlockWithResult sets up mock execution receipts for a block with a specific execution result
+func setupReceiptsForBlockWithResult(receipts *storage.ExecutionReceipts, executionResult *flow.ExecutionResult, executorIDs ...flow.Identifier) {
+	receiptList := make(flow.ExecutionReceiptList, 0, len(executorIDs))
+	for _, enID := range executorIDs {
+		receiptList = append(receiptList, unittest.ExecutionReceiptFixture(
+			unittest.WithResult(executionResult),
+			unittest.WithExecutorID(enID),
+		))
+	}
+
+	receipts.
+		On("ByBlockID", executionResult.BlockID).
+		Return(func(flow.Identifier) flow.ExecutionReceiptList {
+			return receiptList
 		}, nil)
 }
 

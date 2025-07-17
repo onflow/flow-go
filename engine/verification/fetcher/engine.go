@@ -605,15 +605,20 @@ func (e *Engine) requestChunkDataPack(chunkIndex uint64, chunkID flow.Identifier
 		return fmt.Errorf("could not construct locator: %w", err)
 	}
 
-	request := &verification.ChunkDataPackRequest{
-		Locator: *locator,
-		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
-			ChunkID:   chunkID,
-			Height:    header.Height,
-			Agrees:    agrees,
-			Disagrees: disagrees,
-			Targets:   allExecutors,
+	request, err := verification.NewChunkDataPackRequest(
+		verification.UntrustedChunkDataPackRequest{
+			Locator: *locator,
+			ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
+				ChunkID:   chunkID,
+				Height:    header.Height,
+				Agrees:    agrees,
+				Disagrees: disagrees,
+				Targets:   allExecutors,
+			},
 		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not construct chunk data pack request: %w", err)
 	}
 
 	e.requester.Request(request)

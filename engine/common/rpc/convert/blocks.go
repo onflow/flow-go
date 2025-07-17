@@ -107,17 +107,26 @@ func BlockSealToMessage(s *flow.Seal) *entities.BlockSeal {
 }
 
 // MessageToBlockSeal converts a protobuf BlockSeal message to a flow.Seal.
+//
+// All errors indicate the input cannot be converted to a valid seal.
 func MessageToBlockSeal(m *entities.BlockSeal) (*flow.Seal, error) {
 	finalState, err := MessageToStateCommitment(m.FinalState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert message to block seal: %w", err)
 	}
-	return &flow.Seal{
-		BlockID:                MessageToIdentifier(m.BlockId),
-		ResultID:               MessageToIdentifier(m.ResultId),
-		FinalState:             finalState,
-		AggregatedApprovalSigs: MessagesToAggregatedSignatures(m.AggregatedApprovalSigs),
-	}, nil
+	seal, err := flow.NewSeal(
+		flow.UntrustedSeal{
+			BlockID:                MessageToIdentifier(m.BlockId),
+			ResultID:               MessageToIdentifier(m.ResultId),
+			FinalState:             finalState,
+			AggregatedApprovalSigs: MessagesToAggregatedSignatures(m.AggregatedApprovalSigs),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct seal: %w", err)
+	}
+
+	return seal, nil
 }
 
 // BlockSealsToMessages converts a slice of flow.Seal to a slice of protobuf BlockSeal messages.

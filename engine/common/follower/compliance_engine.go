@@ -126,7 +126,15 @@ func NewComplianceLayer(
 		headers:                    headers,
 		core:                       core,
 	}
-	e.finalizedBlockTracker.Track(model.BlockFromFlow(finalized))
+
+	var block *model.Block
+	if finalized.ContainsParentQC() {
+		block = model.BlockFromFlow(finalized)
+	} else {
+		block = model.GenesisBlockFromFlow(finalized)
+	}
+
+	e.finalizedBlockTracker.Track(block)
 
 	for _, apply := range opts {
 		apply(e)
