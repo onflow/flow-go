@@ -509,13 +509,12 @@ func TestConcurrentPriorityQueue_Integration(t *testing.T) {
 		itemCount := 100
 		go func() {
 			for i := range itemCount {
-				time.Sleep(time.Millisecond)
 				mq.Push(fmt.Sprintf("item-%d", i), uint64(i))
 			}
 		}()
 
 		unittest.RequireReturnsBefore(t, func() {
-			for i := range itemCount {
+			for i := 0; i < itemCount; {
 				select {
 				case <-ctx.Done():
 					return
@@ -528,6 +527,7 @@ func TestConcurrentPriorityQueue_Integration(t *testing.T) {
 						break
 					}
 					assert.Equal(t, fmt.Sprintf("item-%d", i), message)
+					i++
 				}
 			}
 		}, time.Second, "did not receive all messages within timeout")
