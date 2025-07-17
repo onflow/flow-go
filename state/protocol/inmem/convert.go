@@ -167,7 +167,7 @@ func SnapshotFromBootstrapStateWithParams(
 		EpochEntry: richRootEpochState,
 	}
 
-	proposal, err := flow.NewProposal(
+	proposal, err := flow.NewRootProposal(
 		flow.UntrustedProposal{
 			Block:           *root,
 			ProposerSigData: nil,

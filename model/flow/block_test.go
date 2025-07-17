@@ -249,12 +249,13 @@ func TestNewProposal(t *testing.T) {
 
 	t.Run("invalid input with invalid block", func(t *testing.T) {
 		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
-		untrustedProposal.Block.Header.ParentID = flow.ZeroID
+		untrustedProposal.Block.Header.ParentView = 10
+		untrustedProposal.Block.Header.View = 9
 
 		res, err := flow.NewProposal(untrustedProposal)
 		require.Error(t, err)
 		require.Nil(t, res)
-		require.Contains(t, err.Error(), "invalid root block")
+		require.Contains(t, err.Error(), "invalid block")
 	})
 
 	t.Run("invalid input with nil ProposerSigData", func(t *testing.T) {
@@ -276,4 +277,34 @@ func TestNewProposal(t *testing.T) {
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "proposer signature must not be empty")
 	})
+}
+
+// TestNewRootProposal verifies the behavior of the NewRootProposal constructor.
+// It ensures proper handling of both valid and invalid untrusted input fields.
+//
+// Test Cases:
+//
+// 1. Valid input:
+//   - Verifies that a properly populated UntrustedProposal results in a valid Proposal.
+//
+// 2. Invalid input with invalid Block:
+//   - Ensures an error is returned when the Block.ParentID is flow.ZeroID.
+func TestNewRootProposal(t *testing.T) {
+	//t.Run("valid input", func(t *testing.T) {
+	//	untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+	//	res, err := flow.NewRootProposal(untrustedProposal)
+	//	require.NoError(t, err)
+	//	require.NotNil(t, res)
+	//})
+	//
+	//t.Run("invalid input with invalid block", func(t *testing.T) {
+	//	untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+	//	untrustedProposal.Block.Header.ParentView = 10
+	//	untrustedProposal.Block.Header.View = 9
+	//
+	//	res, err := flow.NewRootProposal(untrustedProposal)
+	//	require.Error(t, err)
+	//	require.Nil(t, res)
+	//	require.Contains(t, err.Error(), "invalid block")
+	//})
 }

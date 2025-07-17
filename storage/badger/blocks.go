@@ -84,15 +84,24 @@ func (b *Blocks) retrieveProposalTx(blockID flow.Identifier) func(*badger.Txn) (
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve proposer signature: %w", err)
 		}
-		proposal, err := flow.NewProposal(
-			flow.UntrustedProposal{
-				Block:           *block,
-				ProposerSigData: sig,
-			},
-		)
-		if err != nil {
-			return nil, fmt.Errorf("could not construct proposal: %w", err)
+
+		untrustedProposal := flow.UntrustedProposal{
+			Block:           *block,
+			ProposerSigData: sig,
 		}
+		var proposal *flow.Proposal
+		if block.Header.ContainsParentQC() {
+			proposal, err = flow.NewProposal(untrustedProposal)
+			if err != nil {
+				return nil, fmt.Errorf("could not construct proposal: %w", err)
+			}
+		} else {
+			proposal, err = flow.NewRootProposal(untrustedProposal)
+			if err != nil {
+				return nil, fmt.Errorf("could not construct root proposal: %w", err)
+			}
+		}
+
 		return proposal, nil
 	}
 }
