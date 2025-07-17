@@ -25,7 +25,7 @@ func TestStoreRetrieveClusterPayload(t *testing.T) {
 		// store payload
 		manager := storage.NewTestingLockManager()
 		lctx := manager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertClusterBlock))
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return procedure.InsertClusterPayload(lctx, rw, blockID, expected)
 		})
@@ -39,7 +39,7 @@ func TestStoreRetrieveClusterPayload(t *testing.T) {
 
 		// storing again should error with key already exists
 		lctx = manager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertClusterBlock))
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return procedure.InsertClusterPayload(lctx, rw, blockID, expected)
 		})

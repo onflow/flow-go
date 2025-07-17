@@ -213,8 +213,7 @@ func (suite *BuilderSuite) FinalizeBlock(block model.Block) {
 		if err != nil {
 			return err
 		}
-		err = operation.IndexClusterBlockByReferenceHeight(rw.Writer(), refBlock.Height, block.ID())
-		return err
+		return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), refBlock.Height, block.ID())
 	})
 	suite.Assert().NoError(err)
 }

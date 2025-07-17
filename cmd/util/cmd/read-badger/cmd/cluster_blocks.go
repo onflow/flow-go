@@ -63,7 +63,7 @@ var clusterBlocksCmd = &cobra.Command{
 				return nil
 			}
 
-			if flagClusterBlockID != "" {
+			if flagHeight > 0 {
 				log.Info().Msgf("getting cluster block by height: %v", flagHeight)
 				clusterBlock, err := clusterBlocks.ByHeight(flagHeight)
 				if err != nil {

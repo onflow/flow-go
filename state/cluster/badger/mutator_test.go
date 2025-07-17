@@ -199,7 +199,7 @@ func (suite *MutatorSuite) FinalizeBlock(block model.Block) {
 		if err != nil {
 			return err
 		}
-		return operation.IndexClusterBlockByReferenceHeight(rw.Writer(), refBlock.Height, block.ID())
+		return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), refBlock.Height, block.ID())
 	})
 	suite.Assert().NoError(err)
 }

@@ -3,8 +3,6 @@ package store
 import (
 	"fmt"
 
-	"github.com/jordanschalm/lockctx"
-
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -27,36 +25,6 @@ func NewClusterBlocks(db storage.DB, chainID flow.ChainID, headers *Headers, pay
 		payloads: payloads,
 	}
 	return b
-}
-
-func (b *ClusterBlocks) Store(block *cluster.Block) error {
-	// TODO: remove this once we have a proper lock manager
-	manager := storage.NewTestingLockManager()
-	lctx := manager.NewContext()
-	if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
-		return fmt.Errorf("could not acquire lock: %w", err)
-	}
-	defer lctx.Release()
-
-	return b.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return b.storeTx(lctx, rw, block)
-	})
-}
-
-func (b *ClusterBlocks) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block *cluster.Block) error {
-	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
-		return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
-	}
-
-	err := b.headers.storeTx(rw, block.Header)
-	if err != nil {
-		return fmt.Errorf("could not store header: %w", err)
-	}
-	err = b.payloads.storeTx(lctx, rw, block.ID(), block.Payload)
-	if err != nil {
-		return fmt.Errorf("could not store payload: %w", err)
-	}
-	return nil
 }
 
 func (b *ClusterBlocks) ByID(blockID flow.Identifier) (*cluster.Block, error) {

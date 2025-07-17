@@ -41,10 +41,6 @@ func NewClusterPayloads(cacheMetrics module.CacheMetrics, db storage.DB) *Cluste
 	return cp
 }
 
-func (cp *ClusterPayloads) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *cluster.Payload) error {
-	return cp.cache.PutWithLockTx(lctx, rw, blockID, payload)
-}
-
 func (cp *ClusterPayloads) retrieveTx(r storage.Reader, blockID flow.Identifier) (*cluster.Payload, error) {
 	val, err := cp.cache.Get(r, blockID)
 	if err != nil {
@@ -52,7 +48,6 @@ func (cp *ClusterPayloads) retrieveTx(r storage.Reader, blockID flow.Identifier)
 	}
 	return val, nil
 }
-
 
 func (cp *ClusterPayloads) ByBlockID(blockID flow.Identifier) (*cluster.Payload, error) {
 	return cp.retrieveTx(cp.db.Reader(), blockID)

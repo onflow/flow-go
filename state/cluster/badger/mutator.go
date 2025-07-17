@@ -407,7 +407,7 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(includedTransact
 		start = 0 // overflow check
 	}
 	end := maxRefHeight
-	err := operation.LookupClusterBlocksByReferenceHeightRange(m.db.Reader(), start, end, &clusterBlockIDs)
+	err := operation.LookupClusterBlocksByReferenceHeightRange(nil, m.db.Reader(), start, end, &clusterBlockIDs)
 	if err != nil {
 		return nil, fmt.Errorf("could not lookup finalized cluster blocks by reference height range [%d,%d]: %w", start, end, err)
 	}

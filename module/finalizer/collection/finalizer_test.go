@@ -364,7 +364,7 @@ func TestFinalizer(t *testing.T) {
 // finalization.
 func assertClusterBlocksIndexedByReferenceHeight(t *testing.T, db storage.DB, refHeight uint64, clusterBlockIDs ...flow.Identifier) {
 	var ids []flow.Identifier
-	err := operation.LookupClusterBlocksByReferenceHeightRange(db.Reader(), refHeight, refHeight, &ids)
+	err := operation.LookupClusterBlocksByReferenceHeightRange(nil, db.Reader(), refHeight, refHeight, &ids)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, clusterBlockIDs, ids)
 }

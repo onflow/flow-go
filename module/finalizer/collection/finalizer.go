@@ -163,7 +163,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				return fmt.Errorf("could not retrieve reference block (id=%x): %w", payload.ReferenceBlockID, err)
 			}
 			// index the finalized cluster block by reference block height
-			err = operation.IndexClusterBlockByReferenceHeight(rw.Writer(), refBlock.Height, clusterBlockID)
+			err = operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), refBlock.Height, clusterBlockID)
 			if err != nil {
 				return fmt.Errorf("could not index cluster block (id=%x) by reference height (%d): %w", clusterBlockID, refBlock.Height, err)
 			}
