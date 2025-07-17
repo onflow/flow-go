@@ -51,7 +51,7 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 		return nil, fmt.Errorf("could not create new flow client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	acc, err := getAccount(ctx, flowClient, accountAddr)
@@ -251,7 +251,7 @@ func (c *Client) waitForStatus(
 	var result *sdk.TransactionResult
 	var err error
 	for result == nil || (result.Status != targetStatus) {
-		childCtx, cancel := context.WithTimeout(ctx, time.Second*5)
+		childCtx, cancel := context.WithTimeout(ctx, time.Second*30)
 		result, err = c.client.GetTransactionResult(childCtx, id)
 		cancel()
 		if err != nil {
