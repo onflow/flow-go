@@ -343,9 +343,14 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	}
 
 	// create the proposal message for the collection
-	cbp := &cluster.Proposal{
-		Block:           *block,
-		ProposerSigData: proposal.ProposerSigData,
+	cbp, err := cluster.NewProposal(
+		cluster.UntrustedProposal{
+			Block:           *block,
+			ProposerSigData: proposal.ProposerSigData,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not build cluster proposal: %w", err)
 	}
 	proposalMsg := messages.UntrustedClusterProposalFromInternal(cbp)
 

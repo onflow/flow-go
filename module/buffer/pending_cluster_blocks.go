@@ -36,15 +36,22 @@ func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cl
 		return flow.Slashable[*cluster.Proposal]{}, false
 	}
 
-	proposal := flow.Slashable[*cluster.Proposal]{
-		OriginID: item.header.OriginID,
-		Message: &cluster.Proposal{
+	proposal, err := cluster.NewProposal(
+		cluster.UntrustedProposal{
 			Block:           *block,
 			ProposerSigData: item.header.Message.ProposerSigData,
 		},
+	)
+	if err != nil {
+		return flow.Slashable[*cluster.Proposal]{}, false
 	}
 
-	return proposal, true
+	slashableProposal := flow.Slashable[*cluster.Proposal]{
+		OriginID: item.header.OriginID,
+		Message:  proposal,
+	}
+
+	return slashableProposal, true
 }
 
 func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.Proposal], bool) {
@@ -53,7 +60,7 @@ func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slas
 		return nil, false
 	}
 
-	proposals := make([]flow.Slashable[*cluster.Proposal], 0, len(items))
+	slashableProposals := make([]flow.Slashable[*cluster.Proposal], 0, len(items))
 	for _, item := range items {
 		block, err := cluster.NewBlock(
 			cluster.UntrustedBlock{
@@ -65,17 +72,24 @@ func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slas
 			return nil, false
 		}
 
-		proposal := flow.Slashable[*cluster.Proposal]{
-			OriginID: item.header.OriginID,
-			Message: &cluster.Proposal{
+		proposal, err := cluster.NewProposal(
+			cluster.UntrustedProposal{
 				Block:           *block,
 				ProposerSigData: item.header.Message.ProposerSigData,
 			},
+		)
+		if err != nil {
+			return nil, false
 		}
-		proposals = append(proposals, proposal)
+
+		slashableProposal := flow.Slashable[*cluster.Proposal]{
+			OriginID: item.header.OriginID,
+			Message:  proposal,
+		}
+		slashableProposals = append(slashableProposals, slashableProposal)
 	}
 
-	return proposals, true
+	return slashableProposals, true
 }
 
 func (b *PendingClusterBlocks) DropForParent(parentID flow.Identifier) {
