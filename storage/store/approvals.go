@@ -48,7 +48,7 @@ func NewResultApprovals(collector module.CacheMetrics, db storage.DB) *ResultApp
 	}
 }
 
-// Store stores my own ResultApproval
+// StoreMyApproval stores my own ResultApproval
 // No errors are expected during normal operations.
 // it also indexes a ResultApproval by result ID and chunk index.
 //

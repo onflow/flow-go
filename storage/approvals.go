@@ -18,8 +18,7 @@ import (
 type ResultApprovals interface {
 
 	// StoreMyApproval stores my own ResultApproval
-	// No errors are expected during normal operations.
-	// it also indexes a ResultApproval by result ID and chunk index.
+	// and indexes it by result ID and chunk index.
 	//
 	// CAUTION: the Flow protocol requires multiple approvals for the same chunk from different verification
 	// nodes. In other words, there are multiple different approvals for the same chunk. Therefore, the index
@@ -31,6 +30,7 @@ type ResultApprovals interface {
 	// still the method succeeds on each call. However, when attempting to index *different* ResultApproval IDs
 	// for the same key (resultID, chunkIndex) this method returns an exception, as this should never happen for
 	// a correct Verification Node indexing its own approvals.
+	// No errors are expected during normal operations.
 	StoreMyApproval(lctx lockctx.Proof, result *flow.ResultApproval) error
 
 	// ByID retrieves a ResultApproval by its ID.

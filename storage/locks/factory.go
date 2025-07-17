@@ -9,11 +9,11 @@ import (
 )
 
 // makeLockPolicy constructs the policy used by the storage layer to prevent deadlocks.
-// We use a policy defined by a directed acyclic graph, where nodes are named locks.
-// A directed edge between two nodes A, B means: I can acquire B next after acquiring A.
+// We use a policy defined by a directed acyclic graph, where vertices are named locks.
+// A directed edge between two vertices A, B means: I can acquire B next after acquiring A.
 // When no edges are added, each lock context may acquire at most one lock.
 //
-// For example, the bootstrapping logic both inserts and finalizes block. So it needs to
+// For example, the bootstrapping logic both inserts and finalizes blocks. So it needs to
 // acquire both LockNewBlock and LockFinalizeBlock. To allow this, we add the directed
 // edge LockNewBlock -> LockFinalizeBlock with `Add(LockNewBlock, LockFinalizeBlock)`.
 // This means:
@@ -21,7 +21,8 @@ import (
 //   - a context holding LockNewBlock can acquire LockFinalizeBlock next (allowed by the edge)
 //   - a context holding LockFinalizeBlock cannot acquire LockNewBlock next (disallowed, because the edge is directed)
 //
-// This function will panic if a policy is created which does not prevent deadlocks.
+// This function will panic if a policy is created which does not prevent deadlocks,
+// i.e. if the constructed graph has cycles.
 func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
 		Add(storage.LockNewBlock, storage.LockFinalizeBlock).
