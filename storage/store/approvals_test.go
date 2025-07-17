@@ -62,7 +62,7 @@ func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		store := store.NewResultApprovals(metrics, db)
 
-		approval1, approval2 := twoApprovalsForTheSameResult()
+		approval1, approval2 := twoApprovalsForTheSameResult(t)
 
 		lockManager := locks.NewTestingLockManager()
 		lctx := lockManager.NewContext()
@@ -91,7 +91,7 @@ func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 		store := store.NewResultApprovals(metrics, db)
 
 		lockManager := locks.NewTestingLockManager()
-		approval1, approval2 := twoApprovalsForTheSameResult()
+		approval1, approval2 := twoApprovalsForTheSameResult(t)
 
 		var wg sync.WaitGroup
 		wg.Add(2)
@@ -134,11 +134,13 @@ func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 	})
 }
 
-func twoApprovalsForTheSameResult() (*flow.ResultApproval, *flow.ResultApproval) {
+func twoApprovalsForTheSameResult(t *testing.T) (*flow.ResultApproval, *flow.ResultApproval) {
 	approval1 := unittest.ResultApprovalFixture()
 	approval2 := unittest.ResultApprovalFixture()
-	// make sure the two approvals are different
+	// have two entirely different approvals, nor modify the second to reference the same result and chunk as the first
 	approval2.Body.ChunkIndex = approval1.Body.ChunkIndex
 	approval2.Body.ExecutionResultID = approval1.Body.ExecutionResultID
+	// sanity check: make sure the two approvals are different
+	require.Equal(t, approval1.ID(), approval2.ID(), "expected two different approvals, but got the same ID")
 	return approval1, approval2
 }

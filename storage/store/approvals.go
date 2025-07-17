@@ -97,7 +97,7 @@ func (r *ResultApprovals) StoreMyApproval(lctx lockctx.Proof, approval *flow.Res
 		}
 
 		// index approval
-		return operation.IndexResultApproval(lctx, rw.Writer(), resultID, chunkIndex, approvalID)
+		return operation.UnsafeIndexResultApproval(lctx, rw.Writer(), resultID, chunkIndex, approvalID)
 	})
 }
 
