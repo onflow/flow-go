@@ -87,7 +87,7 @@ func (reusable *ReusableCadenceRuntime) declareRandomSourceHistory() {
 			vm.NewNativeFunctionValue(
 				randomSourceHistoryFunctionName,
 				randomSourceHistoryFunctionType,
-				func(context *vm.Context, _ []bbq.StaticType, _ ...vm.Value) vm.Value {
+				func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, _ ...vm.Value) vm.Value {
 					return reusable.randomSourceHistory(context)
 				},
 			),

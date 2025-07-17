@@ -255,10 +255,7 @@ func newVMInternalEVMTypeEncodeABIFunction(
 	return vm.NewNativeFunctionValue(
 		stdlib.InternalEVMTypeEncodeABIFunctionName,
 		stdlib.InternalEVMTypeEncodeABIFunctionType,
-		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
-
-			// arg[0] is the receiver. Actual arguments starts from 1.
-			args = args[vm.TypeBoundFunctionArgumentOffset:]
+		func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, args ...vm.Value) vm.Value {
 
 			// Get `values` argument
 
@@ -808,10 +805,7 @@ func newVMInternalEVMTypeDecodeABIFunction(
 	return vm.NewNativeFunctionValue(
 		stdlib.InternalEVMTypeEncodeABIFunctionName,
 		stdlib.InternalEVMTypeEncodeABIFunctionType,
-		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
-
-			// arg[0] is the receiver. Actual arguments starts from 1.
-			args = args[vm.TypeBoundFunctionArgumentOffset:]
+		func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, args ...vm.Value) vm.Value {
 
 			// Get `types` argument
 

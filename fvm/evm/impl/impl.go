@@ -124,7 +124,7 @@ func newVMInternalEVMTypeGetLatestBlockFunction(
 	return vm.NewNativeFunctionValue(
 		stdlib.InternalEVMTypeGetLatestBlockFunctionName,
 		stdlib.InternalEVMTypeGetLatestBlockFunctionType,
-		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
+		func(context *vm.Context, _ []bbq.StaticType, receiver vm.Value, args ...vm.Value) vm.Value {
 
 			latestBlock := handler.LastExecutedBlock()
 
@@ -436,10 +436,7 @@ func newVMInternalEVMTypeCreateCadenceOwnedAccountFunction(
 	return vm.NewNativeFunctionValue(
 		stdlib.InternalEVMTypeCreateCadenceOwnedAccountFunctionName,
 		stdlib.InternalEVMTypeCreateCadenceOwnedAccountFunctionType,
-		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
-
-			// arg[0] is the receiver. Actual arguments starts from 1.
-			args = args[vm.TypeBoundFunctionArgumentOffset:]
+		func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, args ...vm.Value) vm.Value {
 
 			uuid, ok := args[0].(interpreter.UInt64Value)
 			if !ok {
@@ -495,10 +492,7 @@ func newVMInternalEVMTypeCodeFunction(
 	return vm.NewNativeFunctionValue(
 		stdlib.InternalEVMTypeCodeFunctionName,
 		stdlib.InternalEVMTypeCodeFunctionType,
-		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
-
-			// arg[0] is the receiver. Actual arguments starts from 1.
-			args = args[vm.TypeBoundFunctionArgumentOffset:]
+		func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, args ...vm.Value) vm.Value {
 
 			addressValue, ok := args[0].(*interpreter.ArrayValue)
 			if !ok {
@@ -570,10 +564,7 @@ func newVMInternalEVMTypeNonceFunction(
 	return vm.NewNativeFunctionValue(
 		stdlib.InternalEVMTypeNonceFunctionName,
 		stdlib.InternalEVMTypeNonceFunctionType,
-		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
-
-			// arg[0] is the receiver. Actual arguments starts from 1.
-			args = args[vm.TypeBoundFunctionArgumentOffset:]
+		func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, args ...vm.Value) vm.Value {
 
 			addressValue, ok := args[0].(*interpreter.ArrayValue)
 			if !ok {
@@ -639,10 +630,7 @@ func newVMInternalEVMTypeCallFunction(
 	return vm.NewNativeFunctionValue(
 		stdlib.InternalEVMTypeCallFunctionName,
 		stdlib.InternalEVMTypeCallFunctionType,
-		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
-
-			// arg[0] is the receiver. Actual arguments starts from 1.
-			args = args[vm.TypeBoundFunctionArgumentOffset:]
+		func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, args ...vm.Value) vm.Value {
 
 			return performCall(
 				context,
@@ -717,10 +705,7 @@ func newVMInternalEVMTypeDryCallFunction(
 	return vm.NewNativeFunctionValue(
 		stdlib.InternalEVMTypeDryCallFunctionName,
 		stdlib.InternalEVMTypeDryCallFunctionType,
-		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
-
-			// arg[0] is the receiver. Actual arguments starts from 1.
-			args = args[vm.TypeBoundFunctionArgumentOffset:]
+		func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, args ...vm.Value) vm.Value {
 
 			return performDryCall(
 				context,
@@ -821,10 +806,7 @@ func newVMInternalEVMTypeDepositFunction(
 	return vm.NewNativeFunctionValue(
 		stdlib.InternalEVMTypeDepositFunctionName,
 		stdlib.InternalEVMTypeDepositFunctionType,
-		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
-
-			// arg[0] is the receiver. Actual arguments starts from 1.
-			args = args[vm.TypeBoundFunctionArgumentOffset:]
+		func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, args ...vm.Value) vm.Value {
 
 			// Get from vault
 
@@ -929,10 +911,7 @@ func newVMInternalEVMTypeBalanceFunction(
 	return vm.NewNativeFunctionValue(
 		stdlib.InternalEVMTypeBalanceFunctionName,
 		stdlib.InternalEVMTypeBalanceFunctionType,
-		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
-
-			// arg[0] is the receiver. Actual arguments starts from 1.
-			args = args[vm.TypeBoundFunctionArgumentOffset:]
+		func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, args ...vm.Value) vm.Value {
 
 			addressValue, ok := args[0].(*interpreter.ArrayValue)
 			if !ok {
@@ -1007,10 +986,7 @@ func newVMInternalEVMTypeCodeHashFunction(
 	return vm.NewNativeFunctionValue(
 		stdlib.InternalEVMTypeCodeHashFunctionName,
 		stdlib.InternalEVMTypeCodeHashFunctionType,
-		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
-
-			// arg[0] is the receiver. Actual arguments starts from 1.
-			args = args[vm.TypeBoundFunctionArgumentOffset:]
+		func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, args ...vm.Value) vm.Value {
 
 			// Get address
 
@@ -1093,10 +1069,7 @@ func newVMInternalEVMTypeWithdrawFunction(
 	return vm.NewNativeFunctionValue(
 		stdlib.InternalEVMTypeWithdrawFunctionName,
 		stdlib.InternalEVMTypeWithdrawFunctionType,
-		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
-
-			// arg[0] is the receiver. Actual arguments starts from 1.
-			args = args[vm.TypeBoundFunctionArgumentOffset:]
+		func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, args ...vm.Value) vm.Value {
 
 			// Get from address
 
@@ -1239,10 +1212,7 @@ func newVMInternalEVMTypeDeployFunction(
 	return vm.NewNativeFunctionValue(
 		stdlib.InternalEVMTypeDeployFunctionName,
 		stdlib.InternalEVMTypeDeployFunctionType,
-		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
-
-			// arg[0] is the receiver. Actual arguments starts from 1.
-			args = args[vm.TypeBoundFunctionArgumentOffset:]
+		func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, args ...vm.Value) vm.Value {
 
 			// Get from address
 
@@ -1349,10 +1319,7 @@ func newInterpreterInternalEVMTypeCastToAttoFLOWFunction(
 var vmInternalEVMTypeCastToAttoFLOWFunction = vm.NewNativeFunctionValue(
 	stdlib.InternalEVMTypeCastToAttoFLOWFunctionName,
 	stdlib.InternalEVMTypeCastToAttoFLOWFunctionType,
-	func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
-
-		// arg[0] is the receiver. Actual arguments starts from 1.
-		args = args[vm.TypeBoundFunctionArgumentOffset:]
+	func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, args ...vm.Value) vm.Value {
 
 		// Get balance
 
@@ -1407,10 +1374,7 @@ func newInterpreterInternalEVMTypeCastToFLOWFunction(
 var vmInternalEVMTypeCastToFLOWFunction = vm.NewNativeFunctionValue(
 	stdlib.InternalEVMTypeCastToFLOWFunctionName,
 	stdlib.InternalEVMTypeCastToFLOWFunctionType,
-	func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
-
-		// arg[0] is the receiver. Actual arguments starts from 1.
-		args = args[vm.TypeBoundFunctionArgumentOffset:]
+	func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, args ...vm.Value) vm.Value {
 
 		// Get balance
 
@@ -1458,7 +1422,7 @@ func newVMInternalEVMTypeCommitBlockProposalFunction(
 	return vm.NewNativeFunctionValue(
 		stdlib.InternalEVMTypeCommitBlockProposalFunctionName,
 		stdlib.InternalEVMTypeCommitBlockProposalFunctionType,
-		func(_ *vm.Context, _ []bbq.StaticType, _ ...vm.Value) vm.Value {
+		func(_ *vm.Context, _ []bbq.StaticType, _ vm.Value, _ ...vm.Value) vm.Value {
 			handler.CommitBlockProposal()
 			return interpreter.Void
 		},
@@ -1508,10 +1472,7 @@ func newVMInternalEVMTypeRunFunction(
 	return vm.NewNativeFunctionValue(
 		stdlib.InternalEVMTypeRunFunctionName,
 		stdlib.InternalEVMTypeRunFunctionType,
-		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
-
-			// arg[0] is the receiver. Actual arguments starts from 1.
-			args = args[vm.TypeBoundFunctionArgumentOffset:]
+		func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, args ...vm.Value) vm.Value {
 
 			// Get transaction argument
 
@@ -1621,10 +1582,7 @@ func newVMInternalEVMTypeDryRunFunction(
 	return vm.NewNativeFunctionValue(
 		stdlib.InternalEVMTypeDryRunFunctionName,
 		stdlib.InternalEVMTypeDryRunFunctionType,
-		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
-
-			// arg[0] is the receiver. Actual arguments starts from 1.
-			args = args[vm.TypeBoundFunctionArgumentOffset:]
+		func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, args ...vm.Value) vm.Value {
 
 			// Get transaction argument
 
@@ -1721,10 +1679,7 @@ func newVMInternalEVMTypeBatchRunFunction(
 	return vm.NewNativeFunctionValue(
 		stdlib.InternalEVMTypeBatchRunFunctionName,
 		stdlib.InternalEVMTypeBatchRunFunctionType,
-		func(context *vm.Context, _ []bbq.StaticType, args ...vm.Value) vm.Value {
-
-			// arg[0] is the receiver. Actual arguments starts from 1.
-			args = args[vm.TypeBoundFunctionArgumentOffset:]
+		func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, args ...vm.Value) vm.Value {
 
 			// Get transactions batch argument
 			transactionsBatchValue, ok := args[0].(*interpreter.ArrayValue)
