@@ -6,12 +6,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// item represents an item in the cache: the main payload and auxiliary data that is
+// item represents an item in the cache: the main block and auxiliary data that is
 // needed to implement indexed lookups by parent ID and pruning by view.
 type item[T any] struct {
 	view     uint64
 	parentID flow.Identifier
-	payload  flow.Slashable[T]
+	block    flow.Slashable[T]
 }
 
 // extractProposalHeader is a type constraint for the generic type which allows to extract flow.ProposalHeader

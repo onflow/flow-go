@@ -23,7 +23,7 @@ func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cl
 	if !ok {
 		return flow.Slashable[*cluster.Proposal]{}, false
 	}
-	return item.payload, true
+	return item.block, true
 }
 
 func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.Proposal], bool) {
@@ -34,7 +34,7 @@ func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slas
 
 	proposals := make([]flow.Slashable[*cluster.Proposal], 0, len(items))
 	for _, item := range items {
-		proposals = append(proposals, item.payload)
+		proposals = append(proposals, item.block)
 	}
 
 	return proposals, true

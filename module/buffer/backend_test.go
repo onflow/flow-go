@@ -41,14 +41,14 @@ func (suite *BackendSuite) itemWithParent(parent *flow.Header) *item[*flow.Propo
 }
 
 func (suite *BackendSuite) Add(item *item[*flow.Proposal]) {
-	suite.backend.add(item.payload)
+	suite.backend.add(item.block)
 }
 
 func (suite *BackendSuite) TestAdd() {
 	expected := suite.item()
-	suite.backend.add(expected.payload)
+	suite.backend.add(expected.block)
 
-	actual, ok := suite.backend.byID(expected.payload.Message.Block.ID())
+	actual, ok := suite.backend.byID(expected.block.Message.Block.ID())
 	suite.Assert().True(ok)
 	suite.Assert().Equal(expected, actual)
 
@@ -61,9 +61,9 @@ func (suite *BackendSuite) TestAdd() {
 func (suite *BackendSuite) TestChildIndexing() {
 
 	parent := suite.item()
-	child1 := suite.itemWithParent(parent.payload.Message.Block.ToHeader())
-	child2 := suite.itemWithParent(parent.payload.Message.Block.ToHeader())
-	grandchild := suite.itemWithParent(child1.payload.Message.Block.ToHeader())
+	child1 := suite.itemWithParent(parent.block.Message.Block.ToHeader())
+	child2 := suite.itemWithParent(parent.block.Message.Block.ToHeader())
+	grandchild := suite.itemWithParent(child1.block.Message.Block.ToHeader())
 	unrelated := suite.item()
 
 	suite.Add(child1)
@@ -72,7 +72,7 @@ func (suite *BackendSuite) TestChildIndexing() {
 	suite.Add(unrelated)
 
 	suite.Run("retrieve by parent ID", func() {
-		byParent, ok := suite.backend.byParentID(parent.payload.Message.Block.ID())
+		byParent, ok := suite.backend.byParentID(parent.block.Message.Block.ID())
 		suite.Assert().True(ok)
 		// should only include direct children
 		suite.Assert().Len(byParent, 2)
@@ -81,22 +81,22 @@ func (suite *BackendSuite) TestChildIndexing() {
 	})
 
 	suite.Run("drop for parent ID", func() {
-		suite.backend.dropForParent(parent.payload.Message.Block.ID())
+		suite.backend.dropForParent(parent.block.Message.Block.ID())
 
 		// should only drop direct children
-		_, exists := suite.backend.byID(child1.payload.Message.Block.ID())
+		_, exists := suite.backend.byID(child1.block.Message.Block.ID())
 		suite.Assert().False(exists)
-		_, exists = suite.backend.byID(child2.payload.Message.Block.ID())
+		_, exists = suite.backend.byID(child2.block.Message.Block.ID())
 		suite.Assert().False(exists)
 
 		// grandchildren should be unaffected
-		_, exists = suite.backend.byParentID(child1.payload.Message.Block.ID())
+		_, exists = suite.backend.byParentID(child1.block.Message.Block.ID())
 		suite.Assert().True(exists)
-		_, exists = suite.backend.byID(grandchild.payload.Message.Block.ID())
+		_, exists = suite.backend.byID(grandchild.block.Message.Block.ID())
 		suite.Assert().True(exists)
 
 		// nothing else should be affected
-		_, exists = suite.backend.byID(unrelated.payload.Message.Block.ID())
+		_, exists = suite.backend.byID(unrelated.block.Message.Block.ID())
 		suite.Assert().True(exists)
 	})
 }
@@ -120,7 +120,7 @@ func (suite *BackendSuite) TestPruneByView() {
 		// 90% of the time, build on an existing header
 		if i%2 == 1 {
 			parent := items[rand.Intn(len(items))]
-			item := suite.itemWithParent(parent.payload.Message.Block.ToHeader())
+			item := suite.itemWithParent(parent.block.Message.Block.ToHeader())
 			suite.Add(item)
 			items = append(items, item)
 		}
@@ -132,7 +132,7 @@ func (suite *BackendSuite) TestPruneByView() {
 
 	for _, item := range items {
 		view := item.view
-		id := item.payload.Message.Block.ID()
+		id := item.block.Message.Block.ID()
 		parentID := item.parentID
 
 		// check that items below the prune view were removed
