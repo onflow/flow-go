@@ -30,6 +30,7 @@ func NewRemoteDebugger(
 		fvm.WithLogger(logger),
 		fvm.WithChain(chain),
 		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithEVMEnabled(true),
 	)
 
 	return &RemoteDebugger{
@@ -50,7 +51,8 @@ func (d *RemoteDebugger) RunTransaction(
 ) {
 	blockCtx := fvm.NewContextFromParent(
 		d.ctx,
-		fvm.WithBlockHeader(blockHeader))
+		fvm.WithBlockHeader(blockHeader),
+	)
 
 	tx := fvm.Transaction(txBody, 0)
 
