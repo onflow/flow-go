@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"strings"
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
@@ -36,6 +37,7 @@ var (
 	flagProposalKeySeq      uint64
 	flagUseExecutionDataAPI bool
 	flagDumpRegisters       bool
+	flagCollectionID        string
 )
 
 var Cmd = &cobra.Command{
@@ -67,6 +69,9 @@ func init() {
 	Cmd.Flags().BoolVar(&flagUseExecutionDataAPI, "use-execution-data-api", false, "use the execution data API")
 
 	Cmd.Flags().BoolVar(&flagDumpRegisters, "dump-registers", false, "dump registers")
+
+	Cmd.Flags().StringVar(&flagCollectionID, "collection-id", "", "collection ID")
+
 }
 
 func run(_ *cobra.Command, args []string) {
@@ -86,13 +91,46 @@ func run(_ *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("failed to create client")
 	}
 
-	for _, rawTxID := range args {
-		txID, err := flow.HexStringToIdentifier(rawTxID)
+	if flagCollectionID != "" {
+
+		// Collection ID provided, fetch the collection and its transaction IDs
+
+		colID, err := flow.HexStringToIdentifier(flagCollectionID)
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to parse transaction ID")
+			log.Fatal().Err(err).Str("ID", flagCollectionID).Msg("failed to parse collection ID")
 		}
 
-		runTransactionID(txID, flowClient, chain)
+		col, err := flowClient.GetCollectionByID(context.Background(), sdk.Identifier(colID))
+		if err != nil {
+			log.Fatal().Err(err).Str("ID", flagCollectionID).Msg("failed to fetch collection by ID")
+		}
+
+		var rawTxIDs []string
+		for _, txID := range col.TransactionIDs {
+			rawTxIDs = append(rawTxIDs, txID.String())
+		}
+		log.Info().Msgf("Fetched collection: %s. Transaction IDs: %s", col.ID(), strings.Join(rawTxIDs, " "))
+
+		if len(args) > 0 {
+			log.Warn().Msg("Collection ID provided, transaction IDs from args will be ignored!")
+		}
+
+		for _, txID := range col.TransactionIDs {
+			runTransactionID(flow.Identifier(txID), flowClient, chain)
+		}
+
+	} else {
+
+		// No collection ID provided, proceed with transaction IDs from args
+
+		for _, rawTxID := range args {
+			txID, err := flow.HexStringToIdentifier(rawTxID)
+			if err != nil {
+				log.Fatal().Err(err).Str("ID", rawTxID).Msg("failed to parse transaction ID")
+			}
+
+			runTransactionID(txID, flowClient, chain)
+		}
 	}
 }
 
