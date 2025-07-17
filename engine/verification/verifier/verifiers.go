@@ -332,11 +332,13 @@ func verifyHeight(
 
 		_, err = verifier.Verify(vcd)
 		if err != nil {
+			collectionID := chunkDataPack.Collection.ID()
+
 			if stopOnMismatch {
-				return fmt.Errorf("could not verify chunk (index: %v) at block %v (%v): %w", i, height, blockID, err)
+				return fmt.Errorf("could not verify chunk (index: %v, ID: %v) at block %v (%v): %w", i, collectionID, height, blockID, err)
 			}
 
-			log.Error().Err(err).Msgf("could not verify chunk (index: %v) at block %v (%v)", i, height, blockID)
+			log.Error().Err(err).Msgf("could not verify chunk (index: %v, ID: %v) at block %v (%v)", i, collectionID, height, blockID)
 		}
 	}
 	return nil
