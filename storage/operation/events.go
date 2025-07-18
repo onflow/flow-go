@@ -46,40 +46,30 @@ func RemoveEventsByBlockID(r storage.Reader, w storage.Writer, blockID flow.Iden
 }
 
 // eventIterationFunc returns an in iteration function which returns all events found during traversal or iteration
-func eventIterationFunc(events *[]flow.Event) func() (CheckFunc, CreateFunc, HandleFunc) {
-	return func() (CheckFunc, CreateFunc, HandleFunc) {
-		check := func(key []byte) (bool, error) {
-			return true, nil
+func eventIterationFunc(events *[]flow.Event) IterationFunc {
+	return func(keyCopy []byte, getValue func(destVal any) error) (bail bool, err error) {
+		var event flow.Event
+		err = getValue(&event)
+		if err != nil {
+			return true, err
 		}
-		var val flow.Event
-		create := func() interface{} {
-			return &val
-		}
-		handle := func() error {
-			*events = append(*events, val)
-			return nil
-		}
-		return check, create, handle
+		*events = append(*events, event)
+		return false, nil
 	}
 }
 
 // eventFilterIterationFunc returns an iteration function which filters the result by the given event type in the handleFunc
-func eventFilterIterationFunc(events *[]flow.Event, eventType flow.EventType) func() (CheckFunc, CreateFunc, HandleFunc) {
-	return func() (CheckFunc, CreateFunc, HandleFunc) {
-		check := func(key []byte) (bool, error) {
-			return true, nil
+func eventFilterIterationFunc(events *[]flow.Event, eventType flow.EventType) IterationFunc {
+	return func(keyCopy []byte, getValue func(destVal any) error) (bail bool, err error) {
+		var event flow.Event
+		err = getValue(&event)
+		if err != nil {
+			return true, err
 		}
-		var val flow.Event
-		create := func() interface{} {
-			return &val
+		// filter out all events not of type eventType
+		if event.Type == eventType {
+			*events = append(*events, event)
 		}
-		handle := func() error {
-			// filter out all events not of type eventType
-			if val.Type == eventType {
-				*events = append(*events, val)
-			}
-			return nil
-		}
-		return check, create, handle
+		return false, nil
 	}
 }
