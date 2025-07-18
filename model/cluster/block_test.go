@@ -16,7 +16,6 @@ import (
 // Because our NewHeaderBody constructor enforces ParentView < View we use
 // WithFieldGenerator to safely pass it.
 func TestClusterBlockMalleability(t *testing.T) {
-
 	clusterBlock := unittest.ClusterBlockFixture()
 	unittest.RequireEntityNonMalleable(
 		t,
@@ -39,25 +38,10 @@ func TestClusterBlockMalleability(t *testing.T) {
 // 1. Valid input:
 //   - Verifies that a properly populated UntrustedBlock results in a valid Block.
 //
-// 2. Invalid input with zero ParentID:
-//   - Ensures an error is returned when the Header.ParentID is flow.ZeroID.
+// 2. Invalid input with invalid HeaderBody:
+//   - Ensures an error is returned when the HeaderBody.ParentID is flow.ZeroID.
 //
-// 3. Invalid input with nil ParentVoterIndices:
-//   - Ensures an error is returned when the Header.ParentVoterIndices is nil.
-//
-// 4. Invalid input with empty ParentVoterIndices:
-//   - Ensures an error is returned when the Header.ParentVoterIndices is an empty slice.
-//
-// 5. Invalid input with nil ParentVoterSigData:
-//   - Ensures an error is returned when the Header.ParentVoterSigData is nil.
-//
-// 6. Invalid input with empty ParentVoterSigData:
-//   - Ensures an error is returned when the Header.ParentVoterSigData is an empty slice.
-//
-// 7. Invalid input with zero ProposerID:
-//   - Ensures an error is returned when the Header.ProposerID is flow.ZeroID.
-//
-// 8. Invalid input with malformed Collection in payload:
+// 3. Invalid input with invalid Payload:
 //   - Ensures an error is returned when the Payload contains a Collection with invalid transaction IDs.
 func TestNewBlock(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
@@ -68,67 +52,17 @@ func TestNewBlock(t *testing.T) {
 		require.NotNil(t, res)
 	})
 
-	t.Run("invalid input with zero ParentID", func(t *testing.T) {
+	t.Run("invalid input with invalid header body", func(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 		block.Header.ParentID = flow.ZeroID
 
 		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
-		require.Contains(t, err.Error(), "parent ID must not be zero")
+		require.Contains(t, err.Error(), "invalid header body")
 	})
 
-	t.Run("invalid input with nil ParentVoterIndices", func(t *testing.T) {
-		block := unittest.ClusterBlockFixture()
-		block.Header.ParentVoterIndices = nil
-
-		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
-		require.Error(t, err)
-		require.Nil(t, res)
-		require.Contains(t, err.Error(), "parent voter indices must not be empty")
-	})
-
-	t.Run("invalid input with empty ParentVoterIndices", func(t *testing.T) {
-		block := unittest.ClusterBlockFixture()
-		block.Header.ParentVoterIndices = []byte{}
-
-		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
-		require.Error(t, err)
-		require.Nil(t, res)
-		require.Contains(t, err.Error(), "parent voter indices must not be empty")
-	})
-
-	t.Run("invalid input with nil ParentVoterSigData", func(t *testing.T) {
-		block := unittest.ClusterBlockFixture()
-		block.Header.ParentVoterSigData = nil
-
-		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
-		require.Error(t, err)
-		require.Nil(t, res)
-		require.Contains(t, err.Error(), "parent voter signature must not be empty")
-	})
-
-	t.Run("invalid input with empty ParentVoterSigData", func(t *testing.T) {
-		block := unittest.ClusterBlockFixture()
-		block.Header.ParentVoterSigData = []byte{}
-
-		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
-		require.Error(t, err)
-		require.Nil(t, res)
-		require.Contains(t, err.Error(), "parent voter signature must not be empty")
-	})
-
-	t.Run("invalid input with zero ProposerID", func(t *testing.T) {
-		block := unittest.ClusterBlockFixture()
-		block.Header.ProposerID = flow.ZeroID
-
-		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
-		require.Error(t, err)
-		require.Nil(t, res)
-		require.Contains(t, err.Error(), "proposer ID must not be zero")
-	})
-
-	t.Run("invalid input with malformed Collection in payload", func(t *testing.T) {
+	t.Run("invalid input with invalid payload", func(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 		collection := unittest.CollectionFixture(5)
 		collection.Transactions[2] = nil
@@ -138,5 +72,78 @@ func TestNewBlock(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "invalid cluster payload")
+	})
+}
+
+// TestNewRootBlock verifies the behavior of the NewRootBlock constructor.
+// It ensures proper handling of both valid and invalid untrusted input fields.
+//
+// Test Cases:
+//
+// 1. Valid input:
+//   - Verifies that a properly populated UntrustedBlock results in a valid root Block.
+//
+// 2. Invalid input with invalid HeaderBody:
+//   - Ensures an error is returned when the HeaderBody.ParentView is not zero.
+//
+// 3. Invalid input with invalid ParentID:
+//   - Ensures an error is returned when the HeaderBody.ParentID is not zero.
+//
+// 4. Invalid input with invalid Payload:
+//   - Ensures an error is returned when the Payload.ReferenceBlockID is not flow.ZeroID.
+func TestNewRootBlock(t *testing.T) {
+	// validRootBlockFixture returns a new valid root cluster.UntrustedBlock for use in tests.
+	validRootBlockFixture := func() cluster.UntrustedBlock {
+		return cluster.UntrustedBlock{
+			Header: flow.HeaderBody{
+				ChainID:            flow.Emulator,
+				ParentID:           flow.ZeroID,
+				Height:             10,
+				Timestamp:          time.Now(),
+				View:               0,
+				ParentView:         0,
+				ParentVoterIndices: []byte{},
+				ParentVoterSigData: []byte{},
+				ProposerID:         flow.ZeroID,
+				LastViewTC:         nil,
+			},
+			Payload: *cluster.NewEmptyPayload(flow.ZeroID),
+		}
+	}
+
+	t.Run("valid input", func(t *testing.T) {
+		res, err := cluster.NewRootBlock(validRootBlockFixture())
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	})
+
+	t.Run("invalid input with invalid header body", func(t *testing.T) {
+		block := validRootBlockFixture()
+		block.Header.ParentView = 1
+
+		res, err := cluster.NewRootBlock(block)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "invalid root header body")
+	})
+
+	t.Run("invalid input with invalid ParentID", func(t *testing.T) {
+		block := validRootBlockFixture()
+		block.Header.ParentID = unittest.IdentifierFixture()
+
+		res, err := cluster.NewRootBlock(block)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "ParentID must be zero")
+	})
+
+	t.Run("invalid input with invalid payload", func(t *testing.T) {
+		block := validRootBlockFixture()
+		block.Payload.ReferenceBlockID = unittest.IdentifierFixture()
+
+		res, err := cluster.NewRootBlock(block)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "invalid root cluster payload")
 	})
 }

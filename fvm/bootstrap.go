@@ -75,7 +75,7 @@ type BootstrapProcedure struct {
 }
 
 type BootstrapParams struct {
-	rootBlock *flow.Header
+	rootHeader *flow.Header
 
 	// genesis parameters
 	accountKeys        BootstrapAccountKeys
@@ -196,7 +196,7 @@ func WithEpochConfig(epochConfig epochs.EpochConfig) BootstrapProcedureOption {
 
 func WithRootBlock(rootBlock *flow.Header) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
-		bp.rootBlock = rootBlock
+		bp.rootHeader = rootBlock
 		return bp
 	}
 }
@@ -336,8 +336,13 @@ func (b *bootstrapExecutor) Preprocess() error {
 }
 
 func (b *bootstrapExecutor) Execute() error {
-	if b.rootBlock == nil {
-		b.rootBlock = flow.Genesis(b.ctx.Chain.ChainID()).ToHeader()
+	if b.rootHeader == nil {
+		header, err := b.genesisHeader()
+		if err != nil {
+			return fmt.Errorf("failed to create genesis header: %w", err)
+		}
+
+		b.rootHeader = header
 	}
 
 	// initialize the account addressing state
@@ -473,6 +478,39 @@ func (b *bootstrapExecutor) Execute() error {
 	b.deployMigrationContract(service)
 
 	return nil
+}
+
+// genesisHeader creates genesis block header with empty payload.
+//
+// This function must always return a structurally valid genesis block header.
+func (b *bootstrapExecutor) genesisHeader() (*flow.Header, error) {
+	// create the raw content for the genesis block
+	payload := flow.NewEmptyPayload()
+
+	// create the headerBody
+	headerBody, err := flow.NewRootHeaderBody(
+		flow.UntrustedHeaderBody{
+			ChainID:   b.ctx.Chain.ChainID(),
+			ParentID:  flow.ZeroID,
+			Height:    0,
+			Timestamp: flow.GenesisTime,
+			View:      0,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create root header body: %w", err)
+	}
+
+	header, err := flow.NewRootHeader(
+		flow.UntrustedHeader{
+			HeaderBody:  *headerBody,
+			PayloadHash: payload.Hash(),
+		})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create root header: %w", err)
+	}
+
+	return header, nil
 }
 
 func (b *bootstrapExecutor) createAccount(publicKeys []flow.AccountPublicKey) flow.Address {
@@ -743,7 +781,7 @@ func (b *bootstrapExecutor) deployEpoch(deployTo flow.Address, env *templates.En
 	contract := contracts.FlowEpoch(*env)
 
 	context := NewContextFromParent(b.ctx,
-		WithBlockHeader(b.rootBlock),
+		WithBlockHeader(b.rootHeader),
 		WithBlocks(&environment.NoopBlockFinder{}),
 	)
 
@@ -1055,7 +1093,7 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	}
 
 	ctx := NewContextFromParent(b.ctx,
-		WithBlockHeader(b.rootBlock),
+		WithBlockHeader(b.rootHeader),
 		WithEntropyProvider(stubEntropyProvider{}),
 		WithEVMEnabled(true),
 	)

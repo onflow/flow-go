@@ -45,7 +45,7 @@ func (s *EventsProviderSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.api = ssmock.NewAPI(s.T())
 	s.chain = flow.Testnet.Chain()
-	s.rootBlock = flow.Genesis(s.chain.ChainID())
+	s.rootBlock = unittest.Block.Genesis(s.chain.ChainID())
 	s.factory = NewDataProviderFactory(
 		s.log,
 		s.api,

@@ -356,7 +356,14 @@ func (s *TransactionStatusSuite) addBlockWithTransaction(transaction *flow.Trans
 	light := col.Light()
 	s.sealedBlock = s.finalizedBlock
 	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true, func(block *flow.Block) {
-		block = flow.NewBlock(block.Header, unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
+		var err error
+		block, err = flow.NewBlock(
+			flow.UntrustedBlock{
+				Header:  block.Header,
+				Payload: unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)),
+			},
+		)
+		require.NoError(s.T(), err)
 		s.collections.On("LightByID", colID).Return(light, nil).Maybe()
 		s.collections.On("LightByTransactionID", transaction.ID()).Return(light, nil)
 		s.blocks.On("ByCollectionID", colID).Return(block, nil)

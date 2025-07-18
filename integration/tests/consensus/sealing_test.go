@@ -171,7 +171,9 @@ SearchLoop:
 		if !ok {
 			continue
 		}
-		block := proposal.DeclareTrusted().Block
+		proposalTrusted, err := proposal.DeclareStructurallyValid()
+		require.NoError(ss.T(), err)
+		block := proposalTrusted.Block
 
 		// make sure we skip duplicates
 		proposalID := block.ID()
@@ -362,7 +364,9 @@ SealingLoop:
 		if !ok {
 			continue
 		}
-		block := proposal.DeclareTrusted().Block
+		proposalTrusted, err := proposal.DeclareStructurallyValid()
+		require.NoError(ss.T(), err)
+		block := proposalTrusted.Block
 
 		// log the proposal details
 		proposalID := block.ID()

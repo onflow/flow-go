@@ -151,7 +151,9 @@ func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
 		if !ok {
 			continue
 		}
-		block := proposal.DeclareTrusted().Block
+		proposalTrusted, err := proposal.DeclareStructurallyValid()
+		require.NoError(is.T(), err)
+		block := proposalTrusted.Block
 
 		is.T().Logf("receive block proposal from %v, height %v", originID, block.Header.Height)
 		// wait until proposal finalized
@@ -200,7 +202,9 @@ func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Tim
 		if !ok {
 			continue
 		}
-		block := proposal.DeclareTrusted().Block
+		proposalTrusted, err := proposal.DeclareStructurallyValid()
+		require.NoError(is.T(), err)
+		block := proposalTrusted.Block
 
 		guarantees := block.Payload.Guarantees
 		height := block.Header.Height
@@ -243,7 +247,9 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 		if !ok {
 			continue
 		}
-		nextBlock := proposal.DeclareTrusted().Block
+		proposalTrusted, err := proposal.DeclareStructurallyValid()
+		require.NoError(is.T(), err)
+		nextBlock := proposalTrusted.Block
 
 		// check if the proposal was already processed
 		proposalID := nextBlock.ID()

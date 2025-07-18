@@ -844,23 +844,31 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 
 	// set payload for blocks A, B, C
 	for i := 1; i <= 3; i++ {
-		blocks[i] = flow.NewBlock(
-			blocks[i].Header,
-			flow.Payload{
-				Results:  []*flow.ExecutionResult{&receiptChain1[i-1].ExecutionResult, &receiptChain2[i-1].ExecutionResult},
-				Receipts: []*flow.ExecutionReceiptStub{receiptChain1[i-1].Stub(), receiptChain2[i-1].Stub()},
+		var err error
+		blocks[i], err = flow.NewBlock(
+			flow.UntrustedBlock{
+				Header: blocks[i].Header,
+				Payload: unittest.PayloadFixture(
+					unittest.WithReceipts(receiptChain1[i-1], receiptChain2[i-1]),
+				),
 			},
 		)
+		require.NoError(bs.T(), err)
 	}
 	sealedResult := receiptChain1[0].ExecutionResult
 	sealF := unittest.Seal.Fixture(unittest.Seal.WithResult(&sealedResult))
+	var err error
 	// set payload for block D
-	blocks[4] = flow.NewBlock(
-		blocks[4].Header,
-		flow.Payload{
-			Seals: []*flow.Seal{sealF},
+	blocks[4], err = flow.NewBlock(
+		flow.UntrustedBlock{
+			Header: blocks[4].Header,
+			Payload: unittest.PayloadFixture(
+				unittest.WithSeals(sealF),
+			),
 		},
 	)
+	require.NoError(bs.T(), err)
+
 	for i := 0; i <= 4; i++ {
 		// we need to run this several times, as in each iteration as we have _multiple_ execution chains.
 		// In each iteration, we only manage to reconnect one additional height

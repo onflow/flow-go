@@ -723,7 +723,7 @@ func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, s
 
 func buildBlock(height uint64, parent *flow.Block, seals []*flow.Header) *flow.Block {
 	if parent == nil {
-		return unittest.GenesisFixture()
+		return unittest.Block.Genesis(flow.Emulator)
 	}
 
 	if len(seals) == 0 {

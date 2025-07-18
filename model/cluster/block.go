@@ -11,7 +11,7 @@ import (
 // Block represents a block in collection node cluster consensus. It contains
 // a standard block header with a payload containing only a single collection.
 //
-// Zero values are allowed only for root blocks, which must be constructed
+// Zero values for certain HeaderBody fields are allowed only for root blocks, which must be constructed
 // using the NewRootBlock constructor. All non-root blocks must be constructed
 // using NewBlock to ensure validation of the block fields.
 //
@@ -40,18 +40,9 @@ type UntrustedBlock Block
 // All errors indicate that a valid Block cannot be constructed from the input.
 func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	// validate header body
-	untrustedHeaderBody := untrusted.Header
-	if untrustedHeaderBody.ParentID == flow.ZeroID {
-		return nil, fmt.Errorf("parent ID must not be zero")
-	}
-	if len(untrustedHeaderBody.ParentVoterIndices) == 0 {
-		return nil, fmt.Errorf("parent voter indices must not be empty")
-	}
-	if len(untrustedHeaderBody.ParentVoterSigData) == 0 {
-		return nil, fmt.Errorf("parent voter signature must not be empty")
-	}
-	if untrustedHeaderBody.ProposerID == flow.ZeroID {
-		return nil, fmt.Errorf("proposer ID must not be zero")
+	headerBody, err := flow.NewHeaderBody(flow.UntrustedHeaderBody(untrusted.Header))
+	if err != nil {
+		return nil, fmt.Errorf("invalid header body: %w", err)
 	}
 
 	// validate payload
@@ -61,7 +52,7 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	}
 
 	return &Block{
-		Header:  untrustedHeaderBody,
+		Header:  *headerBody,
 		Payload: *payload,
 	}, nil
 }
@@ -70,11 +61,25 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 //
 // This constructor must be used **only** for constructing the root block,
 // which is the only case where zero values are allowed.
-func NewRootBlock(untrusted UntrustedBlock) *Block {
-	return &Block{
-		Header:  untrusted.Header,
-		Payload: untrusted.Payload,
+func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
+	rootHeaderBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody(untrusted.Header))
+	if err != nil {
+		return nil, fmt.Errorf("invalid root header body: %w", err)
 	}
+
+	if rootHeaderBody.ParentID != flow.ZeroID {
+		return nil, fmt.Errorf("ParentID must be zero")
+	}
+
+	rootPayload, err := NewRootPayload(UntrustedPayload(untrusted.Payload))
+	if err != nil {
+		return nil, fmt.Errorf("invalid root cluster payload: %w", err)
+	}
+
+	return &Block{
+		Header:  *rootHeaderBody,
+		Payload: *rootPayload,
+	}, nil
 }
 
 // ID returns a collision-resistant hash of the cluster.Block struct.

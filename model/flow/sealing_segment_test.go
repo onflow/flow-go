@@ -614,7 +614,7 @@ func TestAddBlock_StorageError(t *testing.T) {
 			return &flow.ProtocolStateEntryWrapper{}, nil
 		}
 		block1 := unittest.BlockFixture(
-			unittest.Block.WithPayload(flow.EmptyPayload()),
+			unittest.Block.WithPayload(*flow.NewEmptyPayload()),
 		)
 		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
 
@@ -628,7 +628,7 @@ func TestAddBlock_StorageError(t *testing.T) {
 		sealLookup := func(flow.Identifier) (*flow.Seal, error) { return unittest.Seal.Fixture(), nil }
 		protocolStateEntryLookup := func(flow.Identifier) (*flow.ProtocolStateEntryWrapper, error) { return nil, exception }
 		block1 := unittest.BlockFixture(
-			unittest.Block.WithPayload(flow.EmptyPayload()),
+			unittest.Block.WithPayload(*flow.NewEmptyPayload()),
 		)
 		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
 
