@@ -825,6 +825,11 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	suite.Run("GetLatestSealedBlockHeader - happy path", func() {
 		block := unittest.BlockHeaderFixture()
 		suite.snapshot.On("Head").Return(block, nil).Once()
+
+		suite.headers.
+			On("BlockIDByHeight", block.Height).
+			Return(block.ID(), nil).Once()
+
 		suite.snapshot.On("Head").Return(block, nil).Once()
 
 		// query the handler for the latest sealed block
