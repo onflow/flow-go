@@ -8,24 +8,19 @@ import (
 // PendingBlocks is a mempool for holding blocks. Furthermore, given a block ID, we can
 // query all children that are currently stored in the mempool. The mempool's backend
 // is intended to work generically for consensus blocks as well as cluster blocks.
-// TODO: this mempool was implemented prior to generics being available in Go. Hence, the
-// backend abstracts the payload as an interface{}. This should be updated to use generics.
 type PendingBlocks struct {
-	backend *backend
+	backend *backend[*flow.Proposal]
 }
 
 var _ module.PendingBlockBuffer = (*PendingBlocks)(nil)
 
 func NewPendingBlocks() *PendingBlocks {
-	b := &PendingBlocks{backend: newBackend()}
+	b := &PendingBlocks{backend: newBackend[*flow.Proposal]()}
 	return b
 }
 
 func (b *PendingBlocks) Add(block flow.Slashable[*flow.Proposal]) bool {
-	return b.backend.add(flow.Slashable[*flow.ProposalHeader]{
-		OriginID: block.OriginID,
-		Message:  block.Message.ProposalHeader(),
-	}, block.Message.Block.Payload)
+	return b.backend.add(block)
 }
 
 func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*flow.Proposal], bool) {
@@ -33,25 +28,7 @@ func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*flow.Prop
 	if !ok {
 		return flow.Slashable[*flow.Proposal]{}, false
 	}
-
-	block, err := flow.NewBlock(
-		flow.UntrustedBlock{
-			Header:  item.header.Message.Header.HeaderBody,
-			Payload: item.payload.(flow.Payload),
-		},
-	)
-	if err != nil {
-		return flow.Slashable[*flow.Proposal]{}, false
-	}
-	proposal := flow.Slashable[*flow.Proposal]{
-		OriginID: item.header.OriginID,
-		Message: &flow.Proposal{
-			Block:           *block,
-			ProposerSigData: item.header.Message.ProposerSigData,
-		},
-	}
-
-	return proposal, true
+	return item.block, true
 }
 
 func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.Proposal], bool) {
@@ -62,26 +39,8 @@ func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*
 
 	proposals := make([]flow.Slashable[*flow.Proposal], 0, len(items))
 	for _, item := range items {
-		block, err := flow.NewBlock(
-			flow.UntrustedBlock{
-				Header:  item.header.Message.Header.HeaderBody,
-				Payload: item.payload.(flow.Payload),
-			},
-		)
-		if err != nil {
-			return nil, false
-		}
-
-		proposal := flow.Slashable[*flow.Proposal]{
-			OriginID: item.header.OriginID,
-			Message: &flow.Proposal{
-				Block:           *block,
-				ProposerSigData: item.header.Message.ProposerSigData,
-			},
-		}
-		proposals = append(proposals, proposal)
+		proposals = append(proposals, item.block)
 	}
-
 	return proposals, true
 }
 
