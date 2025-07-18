@@ -1407,13 +1407,15 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 			On("Head").
 			Return(header, nil).Once()
 
-		headerClone := *header
-		headerClone.Height = 0
+		suite.headers.
+			On("BlockIDByHeight", header.Height).
+			Return(header.ID(), nil).Once()
 
+		sealedHeader := *header
+		sealedHeader.Height = header.Height - 1 // sealed height is less than finalized height
 		suite.snapshot.
 			On("Head").
-			Return(&headerClone, nil).
-			Once()
+			Return(&sealedHeader, nil).Once()
 
 		suite.blocks.
 			On("ByHeight", header.Height).
