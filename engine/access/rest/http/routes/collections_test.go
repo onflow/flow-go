@@ -9,12 +9,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	mocks "github.com/stretchr/testify/mock"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -113,24 +113,18 @@ func TestGetCollections(t *testing.T) {
 			mockErr   error
 			response  string
 			status    int
-		}{{
-			testID.String(),
-			nil,
-			status.Error(codes.NotFound, "not found"),
-			`{"code":404,"message":"Flow resource not found: not found"}`,
-			http.StatusNotFound,
-		}, {
-			"invalidID",
-			nil,
-			nil,
-			`{"code":400,"message":"invalid ID format"}`,
-			http.StatusBadRequest,
-		},
+		}{
 			{
-				unittest.IdentifierFixture().String(),
+				testID.String(),
 				nil,
-				status.Errorf(codes.Internal, "block not found"),
-				`{"code":400,"message":"Invalid Flow request: block not found"}`,
+				access.NewDataNotFoundError("collection", storage.ErrNotFound),
+				`{"code":404,"message":"Flow resource not found: data not found for collection: key not found"}`,
+				http.StatusNotFound,
+			}, {
+				"invalidID",
+				nil,
+				nil,
+				`{"code":400,"message":"invalid ID format"}`,
 				http.StatusBadRequest,
 			},
 		}
