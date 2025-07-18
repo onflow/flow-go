@@ -18,7 +18,7 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go-sdk/templates"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
@@ -97,8 +97,8 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel),
 			testnet.WithAdditionalFlag("--supports-observer=true"),
 			testnet.WithAdditionalFlagf("--public-network-execution-data-sync-enabled=true"),
-			testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.IndexQueryModeExecutionNodesOnly),
-			testnet.WithAdditionalFlagf("--tx-result-query-mode=%s", backend.IndexQueryModeExecutionNodesOnly),
+			testnet.WithAdditionalFlagf("--script-execution-mode=%s", query_mode.IndexQueryModeExecutionNodesOnly),
+			testnet.WithAdditionalFlagf("--tx-result-query-mode=%s", query_mode.IndexQueryModeExecutionNodesOnly),
 			testnet.WithAdditionalFlag("--event-query-mode=execution-nodes-only"),
 		),
 

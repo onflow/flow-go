@@ -1,4 +1,4 @@
-package backend
+package accounts
 
 import (
 	"context"
@@ -7,11 +7,14 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	access "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -27,7 +30,7 @@ import (
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
-type BackendAccountsSuite struct {
+type AccountsSuite struct {
 	suite.Suite
 
 	log        zerolog.Logger
@@ -50,10 +53,10 @@ type BackendAccountsSuite struct {
 }
 
 func TestBackendAccountsSuite(t *testing.T) {
-	suite.Run(t, new(BackendAccountsSuite))
+	suite.Run(t, new(AccountsSuite))
 }
 
-func (s *BackendAccountsSuite) SetupTest() {
+func (s *AccountsSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.state = protocol.NewState(s.T())
 	s.snapshot = protocol.NewSnapshot(s.T())
@@ -77,76 +80,15 @@ func (s *BackendAccountsSuite) SetupTest() {
 	s.failingAddress = unittest.AddressFixture()
 }
 
-func (s *BackendAccountsSuite) defaultBackend() *backendAccounts {
-	return &backendAccounts{
-		log:              s.log,
-		state:            s.state,
-		headers:          s.headers,
-		connFactory:      s.connectionFactory,
-		nodeCommunicator: NewNodeCommunicator(false),
-		execNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
-			s.log,
-			s.state,
-			s.receipts,
-			flow.IdentifierList{},
-			flow.IdentifierList{},
-		),
-	}
-}
-
-// setupExecutionNodes sets up the mocks required to test against an EN backend
-func (s *BackendAccountsSuite) setupExecutionNodes(block *flow.Block) {
-	s.params.On("FinalizedRoot").Return(s.rootHeader, nil)
-	s.state.On("Params").Return(s.params)
-	s.state.On("Final").Return(s.snapshot)
-	s.snapshot.On("Identities", mock.Anything).Return(s.executionNodes, nil)
-
-	// this line causes a S1021 lint error because receipts is explicitly declared. this is required
-	// to ensure the mock library handles the response type correctly
-	var receipts flow.ExecutionReceiptList //nolint:gosimple
-	receipts = unittest.ReceiptsForBlockFixture(block, s.executionNodes.NodeIDs())
-	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
-
-	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).
-		Return(s.execClient, &mocks.MockCloser{}, nil)
-}
-
-// setupENSuccessResponse configures the execution node client to return a successful response
-func (s *BackendAccountsSuite) setupENSuccessResponse(blockID flow.Identifier) {
-	expectedExecRequest := &execproto.GetAccountAtBlockIDRequest{
-		BlockId: blockID[:],
-		Address: s.account.Address.Bytes(),
-	}
-
-	convertedAccount, err := convert.AccountToMessage(s.account)
-	s.Require().NoError(err)
-
-	s.execClient.On("GetAccountAtBlockID", mock.Anything, expectedExecRequest).
-		Return(&execproto.GetAccountAtBlockIDResponse{
-			Account: convertedAccount,
-		}, nil)
-}
-
-// setupENFailingResponse configures the execution node client to return an error
-func (s *BackendAccountsSuite) setupENFailingResponse(blockID flow.Identifier, err error) {
-	failingRequest := &execproto.GetAccountAtBlockIDRequest{
-		BlockId: blockID[:],
-		Address: s.failingAddress.Bytes(),
-	}
-
-	s.execClient.On("GetAccountAtBlockID", mock.Anything, failingRequest).
-		Return(nil, err)
-}
-
 // TestGetAccountFromExecutionNode_HappyPath tests successfully getting accounts from execution nodes
-func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode_HappyPath() {
+func (s *AccountsSuite) TestGetAccountFromExecutionNode_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
 	s.setupENSuccessResponse(s.block.ID())
 
-	backend := s.defaultBackend()
-	backend.scriptExecMode = IndexQueryModeExecutionNodesOnly
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeExecutionNodesOnly, scriptExecutor)
 
 	s.Run("GetAccount - happy path", func() {
 		s.testGetAccount(ctx, backend, codes.OK)
@@ -162,7 +104,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode_HappyPath() {
 }
 
 // TestGetAccountFromExecutionNode_Fails errors received from execution nodes are returned
-func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode_Fails() {
+func (s *AccountsSuite) TestGetAccountFromExecutionNode_Fails() {
 	ctx := context.Background()
 
 	// use a status code that's not used in the API to make sure it's passed through
@@ -172,8 +114,8 @@ func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode_Fails() {
 	s.setupExecutionNodes(s.block)
 	s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-	backend := s.defaultBackend()
-	backend.scriptExecMode = IndexQueryModeExecutionNodesOnly
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeExecutionNodesOnly, scriptExecutor)
 
 	s.Run("GetAccount - fails with backend err", func() {
 		s.testGetAccount(ctx, backend, statusCode)
@@ -189,16 +131,14 @@ func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode_Fails() {
 }
 
 // TestGetAccountFromStorage_HappyPath test successfully getting accounts from local storage
-func (s *BackendAccountsSuite) TestGetAccountFromStorage_HappyPath() {
+func (s *AccountsSuite) TestGetAccountFromStorage_HappyPath() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.account.Address, s.block.Header.Height).
 		Return(s.account, nil)
 
-	backend := s.defaultBackend()
-	backend.scriptExecMode = IndexQueryModeLocalOnly
-	backend.scriptExecutor = scriptExecutor
+	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeLocalOnly, scriptExecutor)
 
 	s.Run("GetAccount - happy path", func() {
 		s.testGetAccount(ctx, backend, codes.OK)
@@ -215,14 +155,11 @@ func (s *BackendAccountsSuite) TestGetAccountFromStorage_HappyPath() {
 
 // TestGetAccountFromStorage_Fails tests that errors received from local storage are handled
 // and converted to the appropriate status code
-func (s *BackendAccountsSuite) TestGetAccountFromStorage_Fails() {
+func (s *AccountsSuite) TestGetAccountFromStorage_Fails() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-
-	backend := s.defaultBackend()
-	backend.scriptExecMode = IndexQueryModeLocalOnly
-	backend.scriptExecutor = scriptExecutor
+	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeLocalOnly, scriptExecutor)
 
 	testCases := []struct {
 		err        error
@@ -267,17 +204,14 @@ func (s *BackendAccountsSuite) TestGetAccountFromStorage_Fails() {
 
 // TestGetAccountFromFailover_HappyPath tests that when an error is returned getting an account
 // from local storage, the backend will attempt to get the account from an execution node
-func (s *BackendAccountsSuite) TestGetAccountFromFailover_HappyPath() {
+func (s *AccountsSuite) TestGetAccountFromFailover_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
 	s.setupENSuccessResponse(s.block.ID())
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-
-	backend := s.defaultBackend()
-	backend.scriptExecMode = IndexQueryModeFailover
-	backend.scriptExecutor = scriptExecutor
+	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeFailover, scriptExecutor)
 
 	for _, errToReturn := range []error{storage.ErrHeightNotIndexed, storage.ErrNotFound} {
 		scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.account.Address, s.block.Header.Height).
@@ -302,7 +236,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover_HappyPath() {
 
 // TestGetAccountFromFailover_ReturnsENErrors tests that when an error is returned from the execution
 // node during a failover, it is returned to the caller.
-func (s *BackendAccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
+func (s *AccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 	ctx := context.Background()
 
 	// use a status code that's not used in the API to make sure it's passed through
@@ -316,9 +250,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 	scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.failingAddress, s.block.Header.Height).
 		Return(nil, storage.ErrHeightNotIndexed)
 
-	backend := s.defaultBackend()
-	backend.scriptExecMode = IndexQueryModeFailover
-	backend.scriptExecutor = scriptExecutor
+	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeFailover, scriptExecutor)
 
 	s.Run("GetAccount - fails with backend err", func() {
 		s.testGetAccount(ctx, backend, statusCode)
@@ -335,12 +267,9 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 
 // TestGetAccountAtLatestBlock_InconsistentState tests that signaler context received error when node state is
 // inconsistent
-func (s *BackendAccountsSuite) TestGetAccountAtLatestBlockFromStorage_InconsistentState() {
+func (s *AccountsSuite) TestGetAccountAtLatestBlockFromStorage_InconsistentState() {
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-
-	backend := s.defaultBackend()
-	backend.scriptExecMode = IndexQueryModeLocalOnly
-	backend.scriptExecutor = scriptExecutor
+	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeLocalOnly, scriptExecutor)
 
 	s.Run(fmt.Sprintf("GetAccountAtLatestBlock - fails with %v", "inconsistent node's state"), func() {
 		s.state.On("Sealed").Return(s.snapshot, nil)
@@ -358,16 +287,14 @@ func (s *BackendAccountsSuite) TestGetAccountAtLatestBlockFromStorage_Inconsiste
 }
 
 // TestGetAccountBalanceFromStorage_HappyPaths tests successfully getting accounts balance from storage
-func (s *BackendAccountsSuite) TestGetAccountBalanceFromStorage_HappyPath() {
+func (s *AccountsSuite) TestGetAccountBalanceFromStorage_HappyPath() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	backend := s.defaultBackend()
-	backend.scriptExecMode = IndexQueryModeLocalOnly
-	backend.scriptExecutor = scriptExecutor
-
 	scriptExecutor.On("GetAccountBalance", mock.Anything, s.account.Address, s.block.Header.Height).
 		Return(s.account.Balance, nil)
+
+	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeLocalOnly, scriptExecutor)
 
 	s.Run("GetAccountBalanceAtLatestBlock - happy path", func() {
 		s.testGetAccountBalanceAtLatestBlock(ctx, backend)
@@ -380,14 +307,14 @@ func (s *BackendAccountsSuite) TestGetAccountBalanceFromStorage_HappyPath() {
 }
 
 // TestGetAccountBalanceFromExecutionNode_HappyPath tests successfully getting accounts balance from execution nodes
-func (s *BackendAccountsSuite) TestGetAccountBalanceFromExecutionNode_HappyPath() {
+func (s *AccountsSuite) TestGetAccountBalanceFromExecutionNode_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
 	s.setupENSuccessResponse(s.block.ID())
 
-	backend := s.defaultBackend()
-	backend.scriptExecMode = IndexQueryModeExecutionNodesOnly
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeExecutionNodesOnly, scriptExecutor)
 
 	s.Run("GetAccountBalanceAtLatestBlock - happy path", func() {
 		s.testGetAccountBalanceAtLatestBlock(ctx, backend)
@@ -401,17 +328,14 @@ func (s *BackendAccountsSuite) TestGetAccountBalanceFromExecutionNode_HappyPath(
 
 // TestGetAccountBalanceFromFailover_HappyPath tests that when an error is returned getting accounts balance
 // from local storage,  the backend will attempt to get the account balances from an execution node
-func (s *BackendAccountsSuite) TestGetAccountBalanceFromFailover_HappyPath() {
+func (s *AccountsSuite) TestGetAccountBalanceFromFailover_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
 	s.setupENSuccessResponse(s.block.ID())
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-
-	backend := s.defaultBackend()
-	backend.scriptExecMode = IndexQueryModeFailover
-	backend.scriptExecutor = scriptExecutor
+	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeFailover, scriptExecutor)
 
 	for _, errToReturn := range []error{storage.ErrHeightNotIndexed, storage.ErrNotFound} {
 		scriptExecutor.On("GetAccountBalance", mock.Anything, s.account.Address, s.block.Header.Height).
@@ -431,16 +355,14 @@ func (s *BackendAccountsSuite) TestGetAccountBalanceFromFailover_HappyPath() {
 
 // TestGetAccountKeysScriptExecutionEnabled_HappyPath tests successfully getting accounts keys when
 // script execution is enabled.
-func (s *BackendAccountsSuite) TestGetAccountKeysFromStorage_HappyPath() {
+func (s *AccountsSuite) TestGetAccountKeysFromStorage_HappyPath() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	scriptExecutor.On("GetAccountKeys", mock.Anything, s.account.Address, s.block.Header.Height).
 		Return(s.account.Keys, nil)
 
-	backend := s.defaultBackend()
-	backend.scriptExecMode = IndexQueryModeLocalOnly
-	backend.scriptExecutor = scriptExecutor
+	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeLocalOnly, scriptExecutor)
 
 	s.Run("GetAccountKeysAtLatestBlock - happy path", func() {
 		s.testGetAccountKeysAtLatestBlock(ctx, backend)
@@ -456,13 +378,10 @@ func (s *BackendAccountsSuite) TestGetAccountKeysFromStorage_HappyPath() {
 
 // TestGetAccountKeyScriptExecutionEnabled_HappyPath tests successfully getting account key by key index when
 // script execution is enabled.
-func (s *BackendAccountsSuite) TestGetAccountKeyFromStorage_HappyPath() {
+func (s *AccountsSuite) TestGetAccountKeyFromStorage_HappyPath() {
 	ctx := context.Background()
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-
-	backend := s.defaultBackend()
-	backend.scriptExecMode = IndexQueryModeLocalOnly
-	backend.scriptExecutor = scriptExecutor
+	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeLocalOnly, scriptExecutor)
 
 	var keyIndex uint32 = 0
 	keyByIndex := findAccountKeyByIndex(s.account.Keys, keyIndex)
@@ -481,14 +400,14 @@ func (s *BackendAccountsSuite) TestGetAccountKeyFromStorage_HappyPath() {
 }
 
 // TestGetAccountKeysFromExecutionNode_HappyPath tests successfully getting accounts keys from execution nodes
-func (s *BackendAccountsSuite) TestGetAccountKeysFromExecutionNode_HappyPath() {
+func (s *AccountsSuite) TestGetAccountKeysFromExecutionNode_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
 	s.setupENSuccessResponse(s.block.ID())
 
-	backend := s.defaultBackend()
-	backend.scriptExecMode = IndexQueryModeExecutionNodesOnly
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeExecutionNodesOnly, scriptExecutor)
 
 	s.Run("GetAccountKeysAtLatestBlock - all keys - happy path", func() {
 		s.testGetAccountKeysAtLatestBlock(ctx, backend)
@@ -503,14 +422,14 @@ func (s *BackendAccountsSuite) TestGetAccountKeysFromExecutionNode_HappyPath() {
 }
 
 // TestGetAccountKeyFromExecutionNode_HappyPath tests successfully getting accounts key by key index from execution nodes
-func (s *BackendAccountsSuite) TestGetAccountKeyFromExecutionNode_HappyPath() {
+func (s *AccountsSuite) TestGetAccountKeyFromExecutionNode_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
 	s.setupENSuccessResponse(s.block.ID())
 
-	backend := s.defaultBackend()
-	backend.scriptExecMode = IndexQueryModeExecutionNodesOnly
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeExecutionNodesOnly, scriptExecutor)
 	var keyIndex uint32 = 0
 
 	s.Run("GetAccountKeysAtLatestBlock - by key index - happy path", func() {
@@ -527,17 +446,14 @@ func (s *BackendAccountsSuite) TestGetAccountKeyFromExecutionNode_HappyPath() {
 
 // TestGetAccountBalanceFromFailover_HappyPath tests that when an error is returned getting accounts keys
 // from local storage, the backend will attempt to get the account key from an execution node
-func (s *BackendAccountsSuite) TestGetAccountKeysFromFailover_HappyPath() {
+func (s *AccountsSuite) TestGetAccountKeysFromFailover_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
 	s.setupENSuccessResponse(s.block.ID())
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-
-	backend := s.defaultBackend()
-	backend.scriptExecMode = IndexQueryModeFailover
-	backend.scriptExecutor = scriptExecutor
+	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeFailover, scriptExecutor)
 
 	for _, errToReturn := range []error{storage.ErrHeightNotIndexed, storage.ErrNotFound} {
 		scriptExecutor.On("GetAccountKeys", mock.Anything, s.account.Address, s.block.Header.Height).
@@ -557,18 +473,14 @@ func (s *BackendAccountsSuite) TestGetAccountKeysFromFailover_HappyPath() {
 
 // TestGetAccountKeyFromFailover_HappyPath tests that when an error is returned getting account key by key index
 // from local storage, the backend will attempt to get the account key from an execution node
-func (s *BackendAccountsSuite) TestGetAccountKeyFromFailover_HappyPath() {
+func (s *AccountsSuite) TestGetAccountKeyFromFailover_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
 	s.setupENSuccessResponse(s.block.ID())
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-
-	backend := s.defaultBackend()
-	backend.scriptExecMode = IndexQueryModeFailover
-	backend.scriptExecutor = scriptExecutor
-
+	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeFailover, scriptExecutor)
 	var keyIndex uint32 = 0
 
 	for _, errToReturn := range []error{storage.ErrHeightNotIndexed, storage.ErrNotFound} {
@@ -587,7 +499,7 @@ func (s *BackendAccountsSuite) TestGetAccountKeyFromFailover_HappyPath() {
 	}
 }
 
-func (s *BackendAccountsSuite) testGetAccount(ctx context.Context, backend *backendAccounts, statusCode codes.Code) {
+func (s *AccountsSuite) testGetAccount(ctx context.Context, backend *Accounts, statusCode codes.Code) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
 
@@ -603,7 +515,7 @@ func (s *BackendAccountsSuite) testGetAccount(ctx context.Context, backend *back
 	}
 }
 
-func (s *BackendAccountsSuite) testGetAccountAtLatestBlock(ctx context.Context, backend *backendAccounts, statusCode codes.Code) {
+func (s *AccountsSuite) testGetAccountAtLatestBlock(ctx context.Context, backend *Accounts, statusCode codes.Code) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
 
@@ -619,7 +531,7 @@ func (s *BackendAccountsSuite) testGetAccountAtLatestBlock(ctx context.Context, 
 	}
 }
 
-func (s *BackendAccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, backend *backendAccounts, statusCode codes.Code) {
+func (s *AccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, backend *Accounts, statusCode codes.Code) {
 	height := s.block.Header.Height
 	s.headers.On("BlockIDByHeight", height).Return(s.block.Header.ID(), nil).Once()
 
@@ -635,7 +547,7 @@ func (s *BackendAccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, 
 	}
 }
 
-func (s *BackendAccountsSuite) testGetAccountBalanceAtLatestBlock(ctx context.Context, backend *backendAccounts) {
+func (s *AccountsSuite) testGetAccountBalanceAtLatestBlock(ctx context.Context, backend *Accounts) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
 
@@ -644,13 +556,13 @@ func (s *BackendAccountsSuite) testGetAccountBalanceAtLatestBlock(ctx context.Co
 	s.Require().Equal(s.account.Balance, actual)
 }
 
-func (s *BackendAccountsSuite) testGetAccountBalanceAtBlockHeight(ctx context.Context, backend *backendAccounts) {
+func (s *AccountsSuite) testGetAccountBalanceAtBlockHeight(ctx context.Context, backend *Accounts) {
 	actual, err := backend.GetAccountBalanceAtBlockHeight(ctx, s.account.Address, s.block.Header.Height)
 	s.Require().NoError(err)
 	s.Require().Equal(s.account.Balance, actual)
 }
 
-func (s *BackendAccountsSuite) testGetAccountKeysAtLatestBlock(ctx context.Context, backend *backendAccounts) {
+func (s *AccountsSuite) testGetAccountKeysAtLatestBlock(ctx context.Context, backend *Accounts) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
 
@@ -659,7 +571,7 @@ func (s *BackendAccountsSuite) testGetAccountKeysAtLatestBlock(ctx context.Conte
 	s.Require().Equal(s.account.Keys, actual)
 }
 
-func (s *BackendAccountsSuite) testGetAccountKeyAtLatestBlock(ctx context.Context, backend *backendAccounts, keyIndex uint32) {
+func (s *AccountsSuite) testGetAccountKeyAtLatestBlock(ctx context.Context, backend *Accounts, keyIndex uint32) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
 
@@ -669,14 +581,13 @@ func (s *BackendAccountsSuite) testGetAccountKeyAtLatestBlock(ctx context.Contex
 	s.Require().Equal(expectedKeyByIndex, actual)
 }
 
-func (s *BackendAccountsSuite) testGetAccountKeysAtBlockHeight(ctx context.Context, backend *backendAccounts) {
+func (s *AccountsSuite) testGetAccountKeysAtBlockHeight(ctx context.Context, backend *Accounts) {
 	actual, err := backend.GetAccountKeysAtBlockHeight(ctx, s.account.Address, s.block.Header.Height)
 	s.Require().NoError(err)
 	s.Require().Equal(s.account.Keys, actual)
 }
 
-func (s *BackendAccountsSuite) testGetAccountKeyAtBlockHeight(ctx context.Context, backend *backendAccounts, keyIndex uint32) {
-
+func (s *AccountsSuite) testGetAccountKeyAtBlockHeight(ctx context.Context, backend *Accounts, keyIndex uint32) {
 	actual, err := backend.GetAccountKeyAtBlockHeight(ctx, s.account.Address, keyIndex, s.block.Header.Height)
 	expectedKeyByIndex := findAccountKeyByIndex(s.account.Keys, keyIndex)
 	s.Require().NoError(err)
@@ -690,4 +601,70 @@ func findAccountKeyByIndex(keys []flow.AccountPublicKey, keyIndex uint32) *flow.
 		}
 	}
 	return &flow.AccountPublicKey{}
+}
+
+func (s *AccountsSuite) defaultAccountsBackend(mode query_mode.IndexQueryMode, executor *execmock.ScriptExecutor) *Accounts {
+	accounts, err := NewAccountsBackend(
+		s.log,
+		s.state,
+		s.headers,
+		s.connectionFactory,
+		node_communicator.NewNodeCommunicator(false),
+		mode,
+		executor,
+		commonrpc.NewExecutionNodeIdentitiesProvider(
+			s.log,
+			s.state,
+			s.receipts,
+			flow.IdentifierList{},
+			flow.IdentifierList{},
+		),
+	)
+	require.NoError(s.T(), err)
+
+	return accounts
+}
+
+// setupExecutionNodes sets up the mocks required to test against an EN backend
+func (s *AccountsSuite) setupExecutionNodes(block *flow.Block) {
+	s.params.On("FinalizedRoot").Return(s.rootHeader, nil)
+	s.state.On("Params").Return(s.params)
+	s.state.On("Final").Return(s.snapshot)
+	s.snapshot.On("Identities", mock.Anything).Return(s.executionNodes, nil)
+
+	// this line causes a S1021 lint error because receipts is explicitly declared. this is required
+	// to ensure the mock library handles the response type correctly
+	var receipts flow.ExecutionReceiptList //nolint:gosimple
+	receipts = unittest.ReceiptsForBlockFixture(block, s.executionNodes.NodeIDs())
+	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
+
+	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).
+		Return(s.execClient, &mocks.MockCloser{}, nil)
+}
+
+// setupENSuccessResponse configures the execution node client to return a successful response
+func (s *AccountsSuite) setupENSuccessResponse(blockID flow.Identifier) {
+	expectedExecRequest := &execproto.GetAccountAtBlockIDRequest{
+		BlockId: blockID[:],
+		Address: s.account.Address.Bytes(),
+	}
+
+	convertedAccount, err := convert.AccountToMessage(s.account)
+	s.Require().NoError(err)
+
+	s.execClient.On("GetAccountAtBlockID", mock.Anything, expectedExecRequest).
+		Return(&execproto.GetAccountAtBlockIDResponse{
+			Account: convertedAccount,
+		}, nil)
+}
+
+// setupENFailingResponse configures the execution node client to return an error
+func (s *AccountsSuite) setupENFailingResponse(blockID flow.Identifier, err error) {
+	failingRequest := &execproto.GetAccountAtBlockIDRequest{
+		BlockId: blockID[:],
+		Address: s.failingAddress.Bytes(),
+	}
+
+	s.execClient.On("GetAccountAtBlockID", mock.Anything, failingRequest).
+		Return(nil, err)
 }
