@@ -20,14 +20,9 @@ type Headers struct {
 
 func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 
+	// TODO: the current cache structure doesn't work well to pass in auxiliary info like the lock context
 	store := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
 		return operation.InsertHeader(rw.Writer(), blockID, header)
-	}
-
-	// CAUTION: should only be used to index FINALIZED blocks by their
-	// respective height
-	storeHeight := func(rw storage.ReaderBatchWriter, height uint64, id flow.Identifier) error {
-		return operation.IndexBlockHeight(rw, height, id)
 	}
 
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.Header, error) {
@@ -51,7 +46,6 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 
 		heightCache: newCache(collector, metrics.ResourceFinalizedHeight,
 			withLimit[uint64, flow.Identifier](4*flow.DefaultTransactionExpiry),
-			withStore(storeHeight),
 			withRetrieve(retrieveHeight)),
 	}
 
