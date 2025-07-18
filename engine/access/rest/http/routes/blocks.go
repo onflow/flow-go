@@ -195,13 +195,13 @@ func NewBlockProvider(backend access.API, options ...blockProviderOption) *block
 
 func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, flow.BlockStatus, error) {
 	if blkProvider.id != nil {
-		blk, _, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
+		blk, status, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
 		if err != nil { // unfortunately backend returns internal error status if not found
 			return nil, flow.BlockStatusUnknown, common.NewNotFoundError(
 				fmt.Sprintf("error looking up block with ID %s", blkProvider.id.String()), err,
 			)
 		}
-		return blk, flow.BlockStatusUnknown, nil
+		return blk, status, nil
 	}
 
 	if blkProvider.latest {
