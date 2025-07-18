@@ -19,6 +19,8 @@ type backendBlockBase struct {
 // Expected errors during normal operations:
 // - storage.ErrNotFound - Indicates that the queried block height is not finalized yet.
 func (b *backendBlockBase) getBlockStatus(header *flow.Header) (flow.BlockStatus, error) {
+	// check which block is finalized at the target block's height
+	// note: this index is only populated for finalized blocks
 	blockIDFinalizedAtHeight, err := b.headers.BlockIDByHeight(header.Height)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
