@@ -6,19 +6,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/committees"
-	"github.com/onflow/flow-go/consensus/hotstuff/signature"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -141,16 +141,23 @@ func (s *AccessSuite) TestSignerIndicesDecoding() {
 	})
 	require.NoError(s.T(), err)
 
-	blockByID, err := MakeApiRequest(client.GetBlockHeaderByID, ctx, &accessproto.GetBlockHeaderByIDRequest{Id: latestFinalizedBlock.Block.Id})
-	require.NoError(s.T(), err)
-
-	require.Equal(s.T(), latestFinalizedBlock, blockByID, "expect to receive same block by ID")
-
-	blockByHeight, err := MakeApiRequest(client.GetBlockHeaderByHeight, ctx,
-		&accessproto.GetBlockHeaderByHeightRequest{Height: latestFinalizedBlock.Block.Height})
-	require.NoError(s.T(), err)
-
-	require.Equal(s.T(), blockByID, blockByHeight, "expect to receive same block by height")
+	// request both concurrently to make sure they are likely to have the same block status
+	// note: on slower machines, running checks serially could mean that the returned block is sealed,
+	// and no longer exactly matches the finalized block
+	g := errgroup.Group{}
+	g.Go(func() error {
+		blockByID, err := MakeApiRequest(client.GetBlockHeaderByID, ctx, &accessproto.GetBlockHeaderByIDRequest{Id: latestFinalizedBlock.Block.Id})
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), latestFinalizedBlock, blockByID, "expect to receive same block by ID")
+		return nil
+	})
+	g.Go(func() error {
+		blockByHeight, err := MakeApiRequest(client.GetBlockHeaderByHeight, ctx, &accessproto.GetBlockHeaderByHeightRequest{Height: latestFinalizedBlock.Block.Height})
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), latestFinalizedBlock, blockByHeight, "expect to receive same block by height")
+		return nil
+	})
+	require.NoError(s.T(), g.Wait())
 
 	// stop container, so we can access it's state and perform assertions
 	err = s.net.StopContainerByName(ctx, testnet.PrimaryAN)
