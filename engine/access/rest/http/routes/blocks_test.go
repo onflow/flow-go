@@ -36,17 +36,17 @@ func prepareTestVectors(t *testing.T,
 	executionResults []*flow.ExecutionResult,
 	blkCnt int) []testVector {
 
-	singleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], true, flow.BlockStatusUnknown)
+	singleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], true, flow.BlockStatusSealed)
 	singleSealedBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], true, flow.BlockStatusSealed)
-	multipleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks, executionResults, true, flow.BlockStatusUnknown)
+	multipleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks, executionResults, true, flow.BlockStatusSealed)
 	multipleSealedBlockExpandedResponse := expectedBlockResponsesExpanded(blocks, executionResults, true, flow.BlockStatusSealed)
 
-	singleBlockCondensedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], false, flow.BlockStatusUnknown)
-	multipleBlockCondensedResponse := expectedBlockResponsesExpanded(blocks, executionResults, false, flow.BlockStatusUnknown)
+	singleBlockCondensedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], false, flow.BlockStatusSealed)
+	multipleBlockCondensedResponse := expectedBlockResponsesExpanded(blocks, executionResults, false, flow.BlockStatusSealed)
 
-	multipleBlockHeaderWithHeaderSelectedResponse := expectedBlockResponsesSelected(blocks, executionResults, flow.BlockStatusUnknown, []string{"header"})
-	multipleBlockHeaderWithHeaderAndStatusSelectedResponse := expectedBlockResponsesSelected(blocks, executionResults, flow.BlockStatusUnknown, []string{"header", "block_status"})
-	multipleBlockHeaderWithUnknownSelectedResponse := expectedBlockResponsesSelected(blocks, executionResults, flow.BlockStatusUnknown, []string{"unknown"})
+	multipleBlockHeaderWithHeaderSelectedResponse := expectedBlockResponsesSelected(blocks, executionResults, flow.BlockStatusSealed, []string{"header"})
+	multipleBlockHeaderWithHeaderAndStatusSelectedResponse := expectedBlockResponsesSelected(blocks, executionResults, flow.BlockStatusSealed, []string{"header", "block_status"})
+	multipleBlockHeaderWithUnknownSelectedResponse := expectedBlockResponsesSelected(blocks, executionResults, flow.BlockStatusSealed, []string{"unknown"})
 
 	invalidID := unittest.IdentifierFixture().String()
 	invalidHeight := fmt.Sprintf("%d", blkCnt+1)
