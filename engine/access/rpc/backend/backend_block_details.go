@@ -87,7 +87,6 @@ func (b *backendBlockDetails) GetBlockByHeight(ctx context.Context, height uint6
 	return block, stat, nil
 }
 
-//
 // No errors are expected during normal operations.
 func (b *backendBlockDetails) getBlockStatus(ctx context.Context, block *flow.Block) (flow.BlockStatus, error) {
 	return b.determineBlockStatus(ctx, block.ID(), block.Header.Height)

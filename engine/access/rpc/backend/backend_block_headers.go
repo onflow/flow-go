@@ -76,7 +76,6 @@ func (b *backendBlockHeaders) GetBlockHeaderByHeight(ctx context.Context, height
 	return header, stat, nil
 }
 
-//
 // No errors are expected during normal operations.
 func (b *backendBlockHeaders) getBlockStatus(ctx context.Context, header *flow.Header) (flow.BlockStatus, error) {
 	return b.determineBlockStatus(ctx, header.ID(), header.Height)
