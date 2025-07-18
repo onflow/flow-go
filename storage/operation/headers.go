@@ -57,20 +57,15 @@ func LookupCollectionBlock(r storage.Reader, collID flow.Identifier, blockID *fl
 // FindHeaders iterates through all headers, calling `filter` on each, and adding
 // them to the `found` slice if `filter` returned true
 func FindHeaders(r storage.Reader, filter func(header *flow.Header) bool, found *[]flow.Header) error {
-	return TraverseByPrefix(r, MakePrefix(codeHeader), func() (CheckFunc, CreateFunc, HandleFunc) {
-		check := func(key []byte) (bool, error) {
-			return true, nil
+	return TraverseByPrefix(r, MakePrefix(codeHeader), func(key []byte, getValue func(destVal any) error) (bail bool, err error) {
+		var h flow.Header
+		err = getValue(&h)
+		if err != nil {
+			return true, err
 		}
-		var val flow.Header
-		create := func() interface{} {
-			return &val
+		if filter(&h) {
+			*found = append(*found, h)
 		}
-		handle := func() error {
-			if filter(&val) {
-				*found = append(*found, val)
-			}
-			return nil
-		}
-		return check, create, handle
+		return false, nil
 	}, storage.DefaultIteratorOptions())
 }
