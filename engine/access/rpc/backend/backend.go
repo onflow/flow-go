@@ -174,13 +174,18 @@ func New(params Params) (*Backend, error) {
 			execNodeIdentitiesProvider: params.ExecNodeIdentitiesProvider,
 		},
 		backendBlockHeaders: backendBlockHeaders{
-			headers: params.Headers,
-			state:   params.State,
+			backendBlockBase: backendBlockBase{
+				blocks:  params.Blocks,
+				headers: params.Headers,
+				state:   params.State,
+			},
 		},
 		backendBlockDetails: backendBlockDetails{
-			blocks:  params.Blocks,
-			headers: params.Headers,
-			state:   params.State,
+			backendBlockBase: backendBlockBase{
+				blocks:  params.Blocks,
+				headers: params.Headers,
+				state:   params.State,
+			},
 		},
 		backendAccounts: backendAccounts{
 			log:                        params.Log,
@@ -387,15 +392,22 @@ func (b *Backend) GetNetworkParameters(_ context.Context) accessmodel.NetworkPar
 // - height: The queried block height.
 // - genericErr: The initial error returned when the block is not found.
 //
+// backendBlockBase provides shared functionality for block status determination
+type backendBlockBase struct {
+	blocks  storage.Blocks
+	headers storage.Headers
+	state   protocol.State
+}
+
 //
 // Expected errors during normal operations:
-func determineBlockStatus(ctx context.Context, blockID flow.Identifier, blockHeight uint64, state protocol.State, headers storage.Headers) (flow.BlockStatus, error) {
-	blockIDFinalizedAtHeight, err := headers.BlockIDByHeight(blockHeight)
+func (b *backendBlockBase) determineBlockStatus(ctx context.Context, blockID flow.Identifier, blockHeight uint64) (flow.BlockStatus, error) {
+	blockIDFinalizedAtHeight, err := b.headers.BlockIDByHeight(blockHeight)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return flow.BlockStatusUnknown, nil
+			return flow.BlockStatusUnknown, nil // height not indexed yet (not finalized)
 		}
-		return flow.BlockStatusUnknown, fmt.Errorf("failed to lookup finalized block ID by height %d: %w", blockHeight, err)
+		return flow.BlockStatusUnknown, fmt.Errorf("failed to lookup block ID by height: %w", err)
 	}
 
 	if blockIDFinalizedAtHeight != blockID {
@@ -403,16 +415,16 @@ func determineBlockStatus(ctx context.Context, blockID flow.Identifier, blockHei
 		return flow.BlockStatusUnknown, nil
 	}
 
-	sealed, err := state.Sealed().Head()
+	sealed, err := b.state.Sealed().Head()
 	if err != nil {
 		return flow.BlockStatusUnknown, fmt.Errorf("failed to get sealed head: %w", err)
 	}
 
-	if blockHeight <= sealed.Height {
-		return flow.BlockStatusSealed, nil
+	if blockHeight > sealed.Height {
+		return flow.BlockStatusFinalized, nil
 	}
 
-	return flow.BlockStatusFinalized, nil
+	return flow.BlockStatusSealed, nil
 }
 
 func resolveHeightError(

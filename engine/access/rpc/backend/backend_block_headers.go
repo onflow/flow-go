@@ -11,8 +11,7 @@ import (
 )
 
 type backendBlockHeaders struct {
-	headers storage.Headers
-	state   protocol.State
+	backendBlockBase
 }
 
 func (b *backendBlockHeaders) GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error) {
@@ -82,5 +81,5 @@ func (b *backendBlockHeaders) GetBlockHeaderByHeight(ctx context.Context, height
 //
 // No errors are expected during normal operations.
 func (b *backendBlockHeaders) getBlockStatus(ctx context.Context, header *flow.Header) (flow.BlockStatus, error) {
-	return determineBlockStatus(ctx, header.ID(), header.Height, b.state, b.headers)
+	return b.determineBlockStatus(ctx, header.ID(), header.Height)
 }
