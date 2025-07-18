@@ -169,8 +169,15 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	block := unittest.BlockHeaderFixture()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Head").Return(block, nil).Once()
+
+	suite.headers.
+		On("BlockIDByHeight", block.Height).
+		Return(block.ID(), nil).Once()
+
+	sealedHeader := *block
+	sealedHeader.Height = block.Height // same height means sealed
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.snapshot.On("Head").Return(block, nil).Once()
+	suite.snapshot.On("Head").Return(&sealedHeader, nil).Once()
 
 	params := suite.defaultBackendParams()
 
