@@ -181,30 +181,33 @@ func TestNewBlock(t *testing.T) {
 // 3. Invalid input with invalid Payload:
 //   - Ensures an error is returned when the Payload.ProtocolStateID is flow.ZeroID.
 func TestNewRootBlock(t *testing.T) {
-	base := flow.UntrustedBlock{
-		Header: flow.HeaderBody{
-			ChainID:            flow.Emulator,
-			ParentID:           unittest.IdentifierFixture(),
-			Height:             10,
-			Timestamp:          time.Now(),
-			View:               0,
-			ParentView:         0,
-			ParentVoterIndices: []byte{},
-			ParentVoterSigData: []byte{},
-			ProposerID:         flow.ZeroID,
-			LastViewTC:         nil,
-		},
-		Payload: unittest.PayloadFixture(),
+	// validRootBlockFixture returns a new valid root flow.UntrustedBlock for use in tests.
+	validRootBlockFixture := func() flow.UntrustedBlock {
+		return flow.UntrustedBlock{
+			Header: flow.HeaderBody{
+				ChainID:            flow.Emulator,
+				ParentID:           unittest.IdentifierFixture(),
+				Height:             10,
+				Timestamp:          time.Now(),
+				View:               0,
+				ParentView:         0,
+				ParentVoterIndices: []byte{},
+				ParentVoterSigData: []byte{},
+				ProposerID:         flow.ZeroID,
+				LastViewTC:         nil,
+			},
+			Payload: unittest.PayloadFixture(),
+		}
 	}
 
 	t.Run("valid input", func(t *testing.T) {
-		res, err := flow.NewRootBlock(base)
+		res, err := flow.NewRootBlock(validRootBlockFixture())
 		require.NoError(t, err)
 		require.NotNil(t, res)
 	})
 
 	t.Run("invalid input with invalid header body", func(t *testing.T) {
-		block := base
+		block := validRootBlockFixture()
 		block.Header.ParentView = 1
 
 		res, err := flow.NewRootBlock(block)
@@ -214,7 +217,7 @@ func TestNewRootBlock(t *testing.T) {
 	})
 
 	t.Run("invalid input with invalid payload", func(t *testing.T) {
-		block := base
+		block := validRootBlockFixture()
 		block.Payload.ProtocolStateID = flow.ZeroID
 
 		res, err := flow.NewRootBlock(block)

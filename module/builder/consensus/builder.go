@@ -412,10 +412,13 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 
 			// re-assemble the IncorporatedResult because we need its ID to
 			// check if it is in the seal mempool.
-			incorporatedResult := flow.NewIncorporatedResult(
-				blockID,
-				result,
-			)
+			incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+				IncorporatedBlockID: blockID,
+				Result:              result,
+			})
+			if err != nil {
+				return fmt.Errorf("could not create incorporated result for block %x: %w", blockID, err)
+			}
 
 			// enforce condition (0): candidate seals are only constructed once sufficient
 			// approvals have been collected. Hence, any incorporated result for which we

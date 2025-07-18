@@ -2969,7 +2969,7 @@ func TestExtendBlockProcessable(t *testing.T) {
 		grandChild := unittest.BlockWithParentProtocolState(child)
 
 		// extend block using certifying QC, expect that BlockProcessable will be emitted once
-		consumer.On("BlockProcessable", block.ToHeader(), child.Header.QuorumCertificate()).Once()
+		consumer.On("BlockProcessable", block.ToHeader(), child.Header.ParentQC()).Once()
 		err := state.ExtendCertified(context.Background(), unittest.CertifiedByChild(block, child))
 		require.NoError(t, err)
 
@@ -2981,7 +2981,7 @@ func TestExtendBlockProcessable(t *testing.T) {
 		// extend block using certifying QC, expect that BlockProcessable will be emitted twice.
 		// One for parent block and second for current block.
 		certifiedGrandchild := unittest.NewCertifiedBlock(grandChild)
-		consumer.On("BlockProcessable", child.ToHeader(), grandChild.Header.QuorumCertificate()).Once()
+		consumer.On("BlockProcessable", child.ToHeader(), grandChild.Header.ParentQC()).Once()
 		consumer.On("BlockProcessable", grandChild.ToHeader(), certifiedGrandchild.CertifyingQC).Once()
 		err = state.ExtendCertified(context.Background(), certifiedGrandchild)
 		require.NoError(t, err)

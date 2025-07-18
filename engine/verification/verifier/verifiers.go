@@ -30,8 +30,16 @@ import (
 // It assumes the latest sealed block has been executed, and the chunk data packs have not been
 // pruned.
 // Note, it returns nil if certain block is not executed, in this case warning will be logged
-func VerifyLastKHeight(k uint64, chainID flow.ChainID, protocolDataDir string, chunkDataPackDir string, nWorker uint, stopOnMismatch bool) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir)
+func VerifyLastKHeight(
+	k uint64,
+	chainID flow.ChainID,
+	protocolDataDir string,
+	chunkDataPackDir string,
+	nWorker uint,
+	stopOnMismatch bool,
+	transactionFeesDisabled bool,
+) (err error) {
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -83,8 +91,9 @@ func VerifyRange(
 	protocolDataDir string, chunkDataPackDir string,
 	nWorker uint,
 	stopOnMismatch bool,
+	transactionFeesDisabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -207,7 +216,12 @@ func verifyConcurrently(
 	return nil
 }
 
-func initStorages(chainID flow.ChainID, dataDir string, chunkDataPackDir string) (
+func initStorages(
+	chainID flow.ChainID,
+	dataDir string,
+	chunkDataPackDir string,
+	transactionFeesDisabled bool,
+) (
 	func() error,
 	*storage.All,
 	storage.ChunkDataPacks,
@@ -224,7 +238,7 @@ func initStorages(chainID flow.ChainID, dataDir string, chunkDataPackDir string)
 	}
 
 	// require the chunk data pack data must exist before returning the storage module
-	chunkDataPackDB, err := storagepebble.MustOpenDefaultPebbleDB(
+	chunkDataPackDB, err := storagepebble.ShouldOpenDefaultPebbleDB(
 		log.Logger.With().Str("pebbledb", "cdp").Logger(), chunkDataPackDir)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("could not open chunk data pack DB: %w", err)
@@ -232,7 +246,7 @@ func initStorages(chainID flow.ChainID, dataDir string, chunkDataPackDir string)
 	chunkDataPacks := store.NewChunkDataPacks(metrics.NewNoopCollector(),
 		pebbleimpl.ToDB(chunkDataPackDB), storages.Collections, 1000)
 
-	verifier := makeVerifier(log.Logger, chainID, storages.Headers)
+	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled)
 	closer := func() error {
 		var dbErr, chunkDataPackDBErr error
 
@@ -304,10 +318,15 @@ func makeVerifier(
 	logger zerolog.Logger,
 	chainID flow.ChainID,
 	headers storage.Headers,
+	transactionFeesDisabled bool,
 ) module.ChunkVerifier {
 
 	vm := fvm.NewVirtualMachine()
-	fvmOptions := initialize.InitFvmOptions(chainID, headers)
+	fvmOptions := initialize.InitFvmOptions(
+		chainID,
+		headers,
+		transactionFeesDisabled,
+	)
 	fvmOptions = append(
 		[]fvm.Option{fvm.WithLogger(logger)},
 		fvmOptions...,

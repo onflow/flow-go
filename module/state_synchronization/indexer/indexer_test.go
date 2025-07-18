@@ -130,6 +130,8 @@ func (m *mockProgressInitializer) Initialize(defaultIndex uint64) (storage.Consu
 	return m.progress, nil
 }
 
+var _ storage.ConsumerProgress = (*mockProgress)(nil)
+
 type mockProgress struct {
 	index     *atomic.Uint64
 	doneIndex *atomic.Uint64
@@ -157,6 +159,10 @@ func (w *mockProgress) SetProcessedIndex(index uint64) error {
 	}
 
 	return nil
+}
+
+func (w *mockProgress) BatchSetProcessedIndex(uint64, storage.ReaderBatchWriter) error {
+	return fmt.Errorf("not implemented")
 }
 
 func (w *mockProgress) InitProcessedIndex(index uint64) error {

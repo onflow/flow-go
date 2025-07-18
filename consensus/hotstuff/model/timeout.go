@@ -37,6 +37,8 @@ type NewViewEvent TimerInfo
 
 // TimeoutObject represents intent of replica to leave its current view with a timeout. This concept is very similar to
 // HotStuff vote. Valid TimeoutObject is signed by staking key.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type TimeoutObject struct {
 	// View is the view number which is replica is timing out
 	View uint64
@@ -58,6 +60,87 @@ type TimeoutObject struct {
 	// the `TimeoutTick` is incremented. Incrementing the field prevents de-duplicated within the network layer,
 	// which in turn guarantees quick delivery of the `TimeoutObject` after GST and facilitates recovery.
 	TimeoutTick uint64
+}
+
+// UntrustedTimeoutObject is an untrusted input-only representation of a TimeoutObject,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedTimeoutObject should be validated and converted into
+// a trusted TimeoutObject using NewTimeoutObject constructor.
+type UntrustedTimeoutObject TimeoutObject
+
+// NewTimeoutObject creates a new instance of TimeoutObject.
+// Construction TimeoutObject allowed only within the constructor.
+//
+// All errors indicate a valid TimeoutObject cannot be constructed from the input.
+func NewTimeoutObject(untrusted UntrustedTimeoutObject) (*TimeoutObject, error) {
+	if untrusted.NewestQC == nil {
+		return nil, fmt.Errorf("newest QC must not be nil")
+	}
+	if untrusted.SignerID == flow.ZeroID {
+		return nil, fmt.Errorf("signer ID must not be zero")
+	}
+	if len(untrusted.SigData) == 0 {
+		return nil, fmt.Errorf("signature must not be empty")
+	}
+	if untrusted.View <= untrusted.NewestQC.View {
+		return nil, fmt.Errorf("TO's QC %d cannot be newer than the TO's view %d", untrusted.NewestQC.View, untrusted.View)
+	}
+
+	// If a TC is included, the TC must be for the past round, no matter whether a QC
+	// for the last round is also included. In some edge cases, a node might observe
+	// _both_ QC and TC for the previous round, in which case it can include both.
+	if untrusted.LastViewTC != nil {
+		if untrusted.View != untrusted.LastViewTC.View+1 {
+			return nil, fmt.Errorf("invalid TC for non-previous view, expected view %d, got view %d", untrusted.View-1, untrusted.LastViewTC.View)
+		}
+		if untrusted.NewestQC.View < untrusted.LastViewTC.NewestQC.View {
+			return nil, fmt.Errorf("timeout.NewestQC is older (view=%d) than the QC in timeout.LastViewTC (view=%d)", untrusted.NewestQC.View, untrusted.LastViewTC.NewestQC.View)
+		}
+	}
+	// The TO must contain a proof that sender legitimately entered View. Transitioning
+	// to round timeout.View is possible either by observing a QC or a TC for the previous round.
+	// If no QC is included, we require a TC to be present, which by check must be for
+	// the previous round.
+	lastViewSuccessful := untrusted.View == untrusted.NewestQC.View+1
+	if !lastViewSuccessful {
+		// The TO's sender did _not_ observe a QC for round timeout.View-1. Hence, it should
+		// include a TC for the previous round. Otherwise, the TO is invalid.
+		if untrusted.LastViewTC == nil {
+			return nil, fmt.Errorf("must include TC")
+		}
+	}
+
+	return &TimeoutObject{
+		View:        untrusted.View,
+		NewestQC:    untrusted.NewestQC,
+		LastViewTC:  untrusted.LastViewTC,
+		SignerID:    untrusted.SignerID,
+		SigData:     untrusted.SigData,
+		TimeoutTick: untrusted.TimeoutTick,
+	}, nil
+}
+
+// ID returns the TimeoutObject's identifier
+func (t *TimeoutObject) ID() flow.Identifier {
+	body := struct {
+		View         uint64
+		NewestQCID   flow.Identifier
+		LastViewTCID flow.Identifier
+		SignerID     flow.Identifier
+		SigData      crypto.Signature
+	}{
+		View:         t.View,
+		NewestQCID:   t.NewestQC.ID(),
+		LastViewTCID: t.LastViewTC.ID(),
+		SignerID:     t.SignerID,
+		SigData:      t.SigData,
+	}
+	return flow.MakeID(body)
 }
 
 // Equals returns true if and only if the receiver TimeoutObject is equal to the `other`. Nil values are supported.

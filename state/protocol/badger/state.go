@@ -334,9 +334,11 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment extra block (id=%x): %w", blockID, err)
 			}
-			err = qcs.StoreTx(proposal.Block.Header.QuorumCertificate())(tx)
-			if err != nil {
-				return fmt.Errorf("could not store qc for SealingSegment extra block (id=%x): %w", blockID, err)
+			if proposal.Block.Header.ContainsParentQC() {
+				err = qcs.StoreTx(proposal.Block.Header.ParentQC())(tx)
+				if err != nil {
+					return fmt.Errorf("could not store qc for SealingSegment extra block (id=%x): %w", blockID, err)
+				}
 			}
 		}
 
@@ -352,11 +354,12 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment block (id=%x): %w", blockID, err)
 			}
-			err = qcs.StoreTx(proposal.Block.Header.QuorumCertificate())(tx)
-			if err != nil {
-				return fmt.Errorf("could not store qc for SealingSegment block (id=%x): %w", blockID, err)
+			if proposal.Block.Header.ContainsParentQC() {
+				err = qcs.StoreTx(proposal.Block.Header.ParentQC())(tx)
+				if err != nil {
+					return fmt.Errorf("could not store qc for SealingSegment block (id=%x): %w", blockID, err)
+				}
 			}
-
 			// index the latest seal as of this block
 			latestSealID, ok := segment.LatestSeals[blockID]
 			if !ok {

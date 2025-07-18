@@ -106,6 +106,9 @@ func (s *DynamicEpochTransitionSuite) StakeNode(ctx context.Context, env templat
 	latestBlockID, err := s.Client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
+	stakingKeyPoP, err := crypto.BLSGeneratePOP(stakingKey)
+	require.NoError(s.T(), err)
+
 	// create and register node
 	tx, err := utils.MakeCreateAndSetupNodeTx(
 		env,
@@ -118,6 +121,7 @@ func (s *DynamicEpochTransitionSuite) StakeNode(ctx context.Context, env templat
 		testnet.GetPrivateNodeInfoAddress(containerName),
 		strings.TrimPrefix(networkingKey.PublicKey().String(), "0x"),
 		strings.TrimPrefix(stakingKey.PublicKey().String(), "0x"),
+		strings.TrimPrefix(stakingKeyPoP.String(), "0x"),
 		machineAccountPubKey,
 	)
 	require.NoError(s.T(), err)
