@@ -55,7 +55,7 @@ func (b *backend[T]) add(block flow.Slashable[T]) bool {
 	item := &item[T]{
 		view:     header.View,
 		parentID: header.ParentID,
-		payload:  block,
+		block:    block,
 	}
 
 	b.blocksByID[blockID] = item

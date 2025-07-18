@@ -33,7 +33,7 @@ func (suite *BackendSuite) itemWithParent(parent *flow.Header) *item[*flow.Propo
 	return &item[*flow.Proposal]{
 		view:     block.Header.View,
 		parentID: block.Header.ParentID,
-		payload: flow.Slashable[*flow.Proposal]{
+		block: flow.Slashable[*flow.Proposal]{
 			OriginID: unittest.IdentifierFixture(),
 			Message:  unittest.ProposalFromBlock(block),
 		},
