@@ -673,9 +673,14 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	if err != nil {
 		return nil, fmt.Errorf("could not sign the block: %w", err)
 	}
-	proposal := &flow.Proposal{
-		Block:           *block,
-		ProposerSigData: sig,
+	proposal, err := flow.NewProposal(
+		flow.UntrustedProposal{
+			Block:           *block,
+			ProposerSigData: sig,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct proposal: %w", err)
 	}
 
 	return proposal, nil

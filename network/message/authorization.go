@@ -61,7 +61,7 @@ func initializeMessageAuthConfigsMap() {
 	authorizationConfigs[BlockProposal] = MsgAuthConfig{
 		Name: BlockProposal,
 		Type: func() interface{} {
-			return new(messages.UntrustedProposal)
+			return new(flow.UntrustedProposal)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ConsensusCommittee: {
@@ -405,7 +405,7 @@ func initializeMessageAuthConfigsMap() {
 func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 	switch v.(type) {
 	// consensus
-	case *messages.UntrustedProposal:
+	case *flow.UntrustedProposal:
 		return authorizationConfigs[BlockProposal], nil
 	case *messages.BlockVote:
 		return authorizationConfigs[BlockVote], nil

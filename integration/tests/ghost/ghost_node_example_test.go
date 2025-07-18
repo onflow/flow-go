@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -125,8 +124,8 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 
 		// the following switch should be similar to the one defined in the actual node that is being emulated
 		switch v := event.(type) {
-		case *messages.UntrustedProposal:
-			proposalTrusted, err := v.DeclareStructurallyValid()
+		case *flow.UntrustedProposal:
+			proposalTrusted, err := flow.NewProposal(*v)
 			require.NoError(t, err)
 			fmt.Printf("Received block proposal: %s from %s\n", proposalTrusted.Block.ID().String(), from.String())
 			i++

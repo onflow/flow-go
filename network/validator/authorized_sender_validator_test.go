@@ -332,7 +332,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 		require.True(s.T(), codec.IsErrUnknownMsgCode(err))
 		require.Equal(s.T(), "", msgType)
 
-		payload, err := s.codec.Encode(&messages.UntrustedProposal{})
+		payload, err := s.codec.Encode(&flow.UntrustedProposal{})
 		require.NoError(s.T(), err)
 		payload[0] = byte('x')
 		netMsg := &message.Message{

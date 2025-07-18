@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/counters"
@@ -108,18 +107,10 @@ func NewCore(
 	return c, nil
 }
 
-// OnBlockProposal handles incoming block proposals.
+// OnBlockProposal handles incoming basic structural validated block proposals.
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
-func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedProposal]) error {
-	blockProposal, err := proposalMsg.Message.DeclareStructurallyValid()
-	if err != nil {
-		return fmt.Errorf("could not convert proposal: %w", err)
-	}
-	proposal := flow.Slashable[*flow.Proposal]{
-		OriginID: proposalMsg.OriginID,
-		Message:  blockProposal,
-	}
+func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 	block := proposal.Message.Block
 	header := block.ToHeader()
 	blockID := block.ID()
@@ -185,7 +176,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedPro
 	}
 
 	// ignore proposals that were already processed
-	_, err = c.headers.ByBlockID(blockID)
+	_, err := c.headers.ByBlockID(blockID)
 	if err == nil {
 		log.Debug().Msg("skipping already processed proposal")
 		return nil

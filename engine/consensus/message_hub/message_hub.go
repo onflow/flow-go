@@ -353,12 +353,10 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 		return fmt.Errorf("could not build block: %w", err)
 	}
 
-	blockProposal := messages.NewUntrustedProposal(
-		&flow.Proposal{
-			Block:           *block,
-			ProposerSigData: proposal.ProposerSigData,
-		},
-	)
+	blockProposal := &flow.UntrustedProposal{
+		Block:           *block,
+		ProposerSigData: proposal.ProposerSigData,
+	}
 
 	// broadcast the proposal to consensus nodes
 	err = h.con.Publish(blockProposal, consRecipients.NodeIDs()...)
@@ -379,7 +377,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 
 // provideProposal is used when we want to broadcast a local block to the rest  of the
 // network (non-consensus nodes).
-func (h *MessageHub) provideProposal(proposal *messages.UntrustedProposal, recipients flow.IdentityList) {
+func (h *MessageHub) provideProposal(proposal *flow.UntrustedProposal, recipients flow.IdentityList) {
 	header := proposal.Block.ToHeader()
 	blockID := header.ID()
 	log := h.log.With().
@@ -468,10 +466,15 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicat
 // No errors are expected during normal operations.
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *messages.UntrustedProposal:
-		h.compliance.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
+	case *flow.UntrustedProposal:
+		proposal, err := flow.NewProposal(*msg)
+		if err != nil {
+			return fmt.Errorf("cannot construct proposal: %w", err)
+		}
+
+		h.compliance.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 			OriginID: originID,
-			Message:  msg,
+			Message:  proposal,
 		})
 	case *messages.BlockVote:
 		vote, err := model.NewVote(model.UntrustedVote{
