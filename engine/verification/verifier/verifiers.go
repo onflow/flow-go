@@ -223,13 +223,16 @@ func initStorages(
 	transactionFeesDisabled bool,
 ) (
 	func() error,
-	*storage.All,
+	*store.All,
 	storage.ChunkDataPacks,
 	protocol.State,
 	module.ChunkVerifier,
 	error,
 ) {
-	db := common.InitStorage(dataDir)
+	db, err := common.InitStorage(dataDir)
+	if err != nil {
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not init storage database: %w", err)
+	}
 
 	storages := common.InitStorages(db)
 	state, err := common.InitProtocolState(db, storages)
