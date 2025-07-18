@@ -168,4 +168,11 @@ func NewRootProposal(untrusted UntrustedProposal) (*Proposal, error) {
 		Block:           *block,
 		ProposerSigData: untrusted.ProposerSigData,
 	}, nil
+
+}
+
+// ProposalHeader converts the proposal into a compact [ProposalHeader] representation,
+// where the payload is compressed to a hash reference.
+func (b *Proposal) ProposalHeader() *flow.ProposalHeader {
+	return &flow.ProposalHeader{Header: b.Block.ToHeader(), ProposerSigData: b.ProposerSigData}
 }

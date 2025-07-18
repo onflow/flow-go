@@ -107,7 +107,7 @@ func NewCore(
 	return c, nil
 }
 
-// OnBlockProposal handles incoming block proposals.
+// OnBlockProposal handles incoming basic structural validated block proposals.
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
 func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {

@@ -139,7 +139,7 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 	}
 }
 
-// OnBlockProposal feeds a new block proposal into the processing pipeline.
+// OnBlockProposal feeds a new basic structural validated block proposal into the processing pipeline.
 // Incoming proposals are queued and eventually dispatched by worker.
 func (e *Engine) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
@@ -154,7 +154,7 @@ func (e *Engine) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) {
 	}
 }
 
-// OnSyncedBlocks feeds a batch of blocks obtained via sync into the processing pipeline.
+// OnSyncedBlocks feeds a batch of basic structural validated blocks obtained via sync into the processing pipeline.
 // Blocks in batch aren't required to be in any particular order.
 // Incoming proposals are queued and eventually dispatched by worker.
 func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*flow.Proposal]) {

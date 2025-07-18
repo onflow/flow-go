@@ -185,7 +185,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 					e.log.Warn().
 						Hex("origin_id", logging.ID(msg.OriginID)).
 						Interface("payload", msg.Payload).
-						Msg("cannot match the payload to entity request")
+						Msg("cannot match the payload to BlockResponse")
 					return nil, false
 				}
 				proposals, err := blockResponse.BlocksInternal()
@@ -322,7 +322,7 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 	e.core.HandleHeight(final, res.Height)
 }
 
-// onBlockResponse processes a response containing a specifically requested block.
+// onBlockResponse processes a basic structural validated block proposal containing a specifically requested block.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res []*flow.Proposal) {
 	// process the proposal one by one
 	if len(res) == 0 {
