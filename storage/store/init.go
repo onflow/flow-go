@@ -16,7 +16,7 @@ type All struct {
 	Results            *ExecutionResults
 	Receipts           *ExecutionReceipts
 
-	Setups                    *EpochSetups
+	EpochSetups               *EpochSetups
 	EpochCommits              *EpochCommits
 	EpochProtocolStateEntries *EpochProtocolStateEntries
 	ProtocolKVStore           *ProtocolKVStore
