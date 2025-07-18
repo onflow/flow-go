@@ -36,7 +36,6 @@ func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slas
 	for _, item := range items {
 		proposals = append(proposals, item.block)
 	}
-
 	return proposals, true
 }
 

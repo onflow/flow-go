@@ -1,8 +1,8 @@
 package collection
 
 import (
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/component"
 )
 
@@ -16,12 +16,12 @@ import (
 type Compliance interface {
 	component.Component
 
-	// OnClusterBlockProposal feeds a new block proposal into the processing pipeline.
+	// OnClusterBlockProposal feeds a new basic structural validated block proposal into the processing pipeline.
 	// Incoming proposals will be queued and eventually dispatched by worker.
 	// This method is non-blocking.
-	OnClusterBlockProposal(proposal flow.Slashable[*messages.UntrustedClusterProposal])
-	// OnSyncedClusterBlock feeds a block obtained from sync proposal into the processing pipeline.
+	OnClusterBlockProposal(proposal flow.Slashable[*cluster.Proposal])
+	// OnSyncedClusterBlock feeds a basic structural validated block proposal obtained from sync proposal into the processing pipeline.
 	// Incoming proposals will be queued and eventually dispatched by worker.
 	// This method is non-blocking.
-	OnSyncedClusterBlock(block flow.Slashable[*messages.UntrustedClusterProposal])
+	OnSyncedClusterBlock(block flow.Slashable[*cluster.Proposal])
 }

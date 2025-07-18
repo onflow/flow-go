@@ -201,14 +201,19 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBody
 		return nil, fmt.Errorf("could not build cluster block: %w", err)
 	}
 
-	blockProposal := cluster.Proposal{
-		Block:           *block,
-		ProposerSigData: proposal.ProposerSigData,
+	blockProposal, err := cluster.NewProposal(
+		cluster.UntrustedProposal{
+			Block:           *block,
+			ProposerSigData: proposal.ProposerSigData,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build cluster proposal: %w", err)
 	}
 
 	// STEP 4: insert the cluster block to the database.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnDBInsert)
-	err = operation.RetryOnConflict(b.db.Update, procedure.InsertClusterBlock(&blockProposal))
+	err = operation.RetryOnConflict(b.db.Update, procedure.InsertClusterBlock(blockProposal))
 	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("could not insert built block: %w", err)

@@ -343,14 +343,19 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	}
 
 	// create the proposal message for the collection
-	cbp := &cluster.Proposal{
-		Block:           *block,
-		ProposerSigData: proposal.ProposerSigData,
+	cbp, err := cluster.NewProposal(
+		cluster.UntrustedProposal{
+			Block:           *block,
+			ProposerSigData: proposal.ProposerSigData,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not build cluster proposal: %w", err)
 	}
-	proposalMsg := messages.UntrustedClusterProposalFromInternal(cbp)
+	proposalMsg := cluster.UntrustedProposal(*cbp)
 
 	// broadcast the proposal to consensus nodes
-	err = h.con.Publish(proposalMsg, recipients.NodeIDs()...)
+	err = h.con.Publish(&proposalMsg, recipients.NodeIDs()...)
 	if err != nil {
 		if !errors.Is(err, network.EmptyTargetList) {
 			log.Err(err).Msg("could not send proposal message")
@@ -432,10 +437,14 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicat
 // No errors are expected during normal operations.
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *messages.UntrustedClusterProposal:
-		h.compliance.OnClusterBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
+	case *cluster.UntrustedProposal:
+		proposal, err := cluster.NewProposal(*msg)
+		if err != nil {
+			return fmt.Errorf("could not build cluster proposal: %w", err)
+		}
+		h.compliance.OnClusterBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
-			Message:  msg,
+			Message:  proposal,
 		})
 	case *messages.ClusterBlockVote:
 		vote, err := model.NewVote(model.UntrustedVote{

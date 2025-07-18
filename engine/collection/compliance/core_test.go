@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	realbuffer "github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/metrics"
@@ -209,9 +208,9 @@ func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal)
 
 	// it should be processed without error
-	err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
+	err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 		OriginID: originID,
-		Message:  messages.UntrustedClusterProposalFromInternal(proposal),
+		Message:  proposal,
 	})
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 }
@@ -241,9 +240,9 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 
 	// it should be processed without error
-	err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
+	err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 		OriginID: originID,
-		Message:  messages.UntrustedClusterProposalFromInternal(proposal),
+		Message:  proposal,
 	})
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
@@ -260,9 +259,9 @@ func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 	)
 	proposal := unittest.ClusterProposalFromBlock(block)
 
-	err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
+	err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 		OriginID: originID,
-		Message:  messages.UntrustedClusterProposalFromInternal(proposal),
+		Message:  proposal,
 	})
 	require.NoError(cs.T(), err)
 
@@ -289,7 +288,6 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		unittest.ClusterBlock.WithParent(parent),
 	)
 	proposal := unittest.ClusterProposalFromBlock(block)
-	proposalMsg := messages.UntrustedClusterProposalFromInternal(proposal)
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 
 	// store the data for retrieval
@@ -309,9 +307,9 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
 		// the expected error should be handled within the Core
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
-			Message:  proposalMsg,
+			Message:  proposal,
 		})
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
@@ -327,9 +325,9 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(model.ErrViewForUnknownEpoch)
 
 		// this error is not expected should raise an exception
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
-			Message:  proposalMsg,
+			Message:  proposal,
 		})
 		require.Error(cs.T(), err, "proposal with invalid extension should fail")
 		require.NotErrorIs(cs.T(), err, model.ErrViewForUnknownEpoch)
@@ -347,9 +345,9 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(unexpectedErr)
 
 		// the error should be propagated
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
-			Message:  proposalMsg,
+			Message:  proposal,
 		})
 		require.ErrorIs(cs.T(), err, unexpectedErr)
 
@@ -379,7 +377,6 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		unittest.ClusterBlock.WithParent(parent),
 	)
 	proposal := unittest.ClusterProposalFromBlock(block)
-	proposalMsg := messages.UntrustedClusterProposalFromInternal(proposal)
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 
 	// store the data for retrieval
@@ -405,9 +402,9 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
 		// the expected error should be handled within the Core
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
-			Message:  proposalMsg,
+			Message:  proposal,
 		})
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
@@ -426,9 +423,9 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		cs.state.On("Extend", mock.Anything).Return(state.NewOutdatedExtensionErrorf(""))
 
 		// the expected error should be handled within the Core
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
-			Message:  proposalMsg,
+			Message:  proposal,
 		})
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
@@ -448,9 +445,9 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		cs.state.On("Extend", mock.Anything).Return(unexpectedErr)
 
 		// it should be processed without error
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
-			Message:  proposalMsg,
+			Message:  proposal,
 		})
 		require.ErrorIs(cs.T(), err, unexpectedErr)
 
@@ -563,9 +560,9 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 		)
 
 		// process and make sure no error occurs (as they are unverifiable)
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
-			Message:  messages.UntrustedClusterProposalFromInternal(proposal),
+			Message:  proposal,
 		})
 		require.NoError(cs.T(), err, "proposal buffering should pass")
 
@@ -598,9 +595,9 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	proposalsLookup[missing.ID()] = missingProposal
 
 	// process the root proposal
-	err := cs.core.OnBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
+	err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 		OriginID: originID,
-		Message:  messages.UntrustedClusterProposalFromInternal(missingProposal),
+		Message:  missingProposal,
 	})
 	require.NoError(cs.T(), err, "root proposal should pass")
 

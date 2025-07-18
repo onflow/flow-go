@@ -260,7 +260,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.ClusterBlockResponse)
 				expected := ss.heights[ref-1]
-				actual, err := res.Blocks[0].DeclareStructurallyValid()
+				actual, err := clustermodel.NewProposal(res.Blocks[0])
 				require.NoError(t, err)
 				assert.Equal(ss.T(), expected.Block.ID(), actual.Block.ID(), "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
@@ -378,7 +378,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.ClusterBlockResponse)
-				actual, err := res.Blocks[0].DeclareStructurallyValid()
+				actual, err := clustermodel.NewProposal(res.Blocks[0])
 				require.NoError(t, err)
 				assert.Equal(ss.T(), proposal, actual, "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
@@ -430,27 +430,22 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 
 	// generate origin and block response
 	originID := unittest.IdentifierFixture()
-	res := &messages.ClusterBlockResponse{
-		Nonce:  rand.Uint64(),
-		Blocks: []messages.UntrustedClusterProposal{},
-	}
+	var res []*clustermodel.Proposal
 
 	// add one block that should be processed
-	processable := unittest.ClusterBlockFixture()
-	ss.core.On("HandleBlock", processable.ToHeader()).Return(true)
-	res.Blocks = append(res.Blocks, *messages.NewUntrustedClusterProposal(*processable, unittest.SignatureFixture()))
+	processable := unittest.ClusterProposalFixture()
+	ss.core.On("HandleBlock", processable.Block.ToHeader()).Return(true)
+	res = append(res, processable)
 
 	// add one block that should not be processed
-	unprocessable := unittest.ClusterBlockFixture()
-	ss.core.On("HandleBlock", unprocessable.ToHeader()).Return(false)
-	res.Blocks = append(res.Blocks, *messages.NewUntrustedClusterProposal(*unprocessable, unittest.SignatureFixture()))
+	unprocessable := unittest.ClusterProposalFixture()
+	ss.core.On("HandleBlock", unprocessable.Block.ToHeader()).Return(false)
+	res = append(res, unprocessable)
 
 	ss.comp.On("OnSyncedClusterBlock", mock.Anything).Run(func(args mock.Arguments) {
-		res := args.Get(0).(flow.Slashable[*messages.UntrustedClusterProposal])
-		converted, err := res.Message.DeclareStructurallyValid()
-		require.NoError(ss.T(), err)
-		ss.Assert().Equal(processable.Header, converted.Block.Header)
-		ss.Assert().Equal(processable.Payload, converted.Block.Payload)
+		res := args.Get(0).(flow.Slashable[*clustermodel.Proposal])
+		ss.Assert().Equal(processable.Block.Header, res.Message.Block.Header)
+		ss.Assert().Equal(processable.Block.Payload, res.Message.Block.Payload)
 		ss.Assert().Equal(originID, res.OriginID)
 	}).Return(nil)
 
