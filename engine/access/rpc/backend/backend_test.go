@@ -170,15 +170,6 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Head").Return(block, nil).Once()
 
-	suite.headers.
-		On("BlockIDByHeight", block.Height).
-		Return(block.ID(), nil).Once()
-
-	sealedHeader := *block
-	sealedHeader.Height = block.Height // same height means sealed
-	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.snapshot.On("Head").Return(&sealedHeader, nil).Once()
-
 	params := suite.defaultBackendParams()
 
 	backend, err := New(params)
@@ -192,7 +183,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	suite.Require().Equal(block.ID(), header.ID())
 	suite.Require().Equal(block.Height, header.Height)
 	suite.Require().Equal(block.ParentID, header.ParentID)
-	suite.Require().Equal(stat, flow.BlockStatusSealed)
+	suite.Require().Equal(stat, flow.BlockStatusFinalized)
 
 	suite.assertAllExpectations()
 }
@@ -826,12 +817,6 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		block := unittest.BlockHeaderFixture()
 		suite.snapshot.On("Head").Return(block, nil).Once()
 
-		suite.headers.
-			On("BlockIDByHeight", block.Height).
-			Return(block.ID(), nil).Once()
-
-		suite.snapshot.On("Head").Return(block, nil).Once()
-
 		// query the handler for the latest sealed block
 		header, stat, err := backend.GetLatestBlockHeader(context.Background(), true)
 		suite.checkResponse(header, err)
@@ -1418,16 +1403,6 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		suite.snapshot.
 			On("Head").
 			Return(header, nil).Once()
-
-		suite.headers.
-			On("BlockIDByHeight", header.Height).
-			Return(header.ID(), nil).Once()
-
-		sealedHeader := *header
-		sealedHeader.Height = header.Height - 1 // sealed height is less than finalized height
-		suite.snapshot.
-			On("Head").
-			Return(&sealedHeader, nil).Once()
 
 		suite.blocks.
 			On("ByHeight", header.Height).
