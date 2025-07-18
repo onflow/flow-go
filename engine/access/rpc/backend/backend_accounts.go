@@ -45,7 +45,7 @@ func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) 
 func (b *backendAccounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		err := irrecoverable.NewExceptionf("failed to get sealed head: %w", err)
 		irrecoverable.Throw(ctx, err)
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (b *backendAccounts) GetAccountAtBlockHeight(
 func (b *backendAccounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		err := irrecoverable.NewExceptionf("failed to get sealed head: %w", err)
 		irrecoverable.Throw(ctx, err)
 		return 0, err
 	}
@@ -129,7 +129,7 @@ func (b *backendAccounts) GetAccountKeyAtLatestBlock(
 ) (*flow.AccountPublicKey, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		err := irrecoverable.NewExceptionf("failed to get sealed head: %w", err)
 		irrecoverable.Throw(ctx, err)
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func (b *backendAccounts) GetAccountKeysAtLatestBlock(
 ) ([]flow.AccountPublicKey, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		err := irrecoverable.NewExceptionf("failed to get sealed head: %w", err)
 		irrecoverable.Throw(ctx, err)
 		return nil, err
 	}
