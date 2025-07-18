@@ -428,7 +428,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_Inconsis
 		err := fmt.Errorf("inconsistent node's state")
 		s.snapshot.On("Head").Return(nil, err)
 
-		signCtxErr := irrecoverable.NewExceptionf("failed to get sealed head: %w", err)
+		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
 			irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), signCtxErr))
 

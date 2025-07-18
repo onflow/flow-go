@@ -851,7 +851,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		suite.snapshot.On("Head").Return(nil, err)
 
 		// mock signaler context expect an error
-		signCtxErr := irrecoverable.NewExceptionf("failed to get sealed head: %w", err)
+		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
 			irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr))
 
@@ -964,7 +964,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
-		signCtxErr := irrecoverable.NewExceptionf("failed to get sealed head: %w", err)
+		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
 			irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr))
 
@@ -1029,7 +1029,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
-		signCtxErr := irrecoverable.NewExceptionf("failed to get sealed head: %w", err)
+		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
 			irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr))
 

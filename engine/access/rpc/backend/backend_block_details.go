@@ -23,7 +23,7 @@ func (b *backendBlockDetails) GetLatestBlock(ctx context.Context, isSealed bool)
 		// get the latest seal header from storage
 		header, err = b.state.Sealed().Head()
 		if err != nil {
-			err = irrecoverable.NewExceptionf("failed to get sealed head: %w", err)
+			err = irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 
 		}
 	} else {
@@ -54,11 +54,20 @@ func (b *backendBlockDetails) GetLatestBlock(ctx context.Context, isSealed bool)
 		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block: %v", err)
 	}
 
-	stat, err := b.getBlockStatus(ctx, block.Header)
+	status, err := b.getBlockStatus(block.Header)
 	if err != nil {
-		return nil, stat, err
+		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
+		// we should halt processing requests, but do throw an exception which might cause a crash:
+		// - It is unsafe to process requests if we have an internally bad state.
+		// - We would like to avoid throwing an exception as a result of an Access API request by policy
+		//   because this can cause DOS potential
+		// - Since the protocol state is widely shared, we assume that in practice another component will
+		//   observe the protocol state error and throw an exception.
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, flow.BlockStatusUnknown, err
 	}
-	return block, stat, nil
+	return block, status, nil
 }
 
 func (b *backendBlockDetails) GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error) {
@@ -67,11 +76,20 @@ func (b *backendBlockDetails) GetBlockByID(ctx context.Context, id flow.Identifi
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
-	stat, err := b.getBlockStatus(ctx, block.Header)
+	status, err := b.getBlockStatus(block.Header)
 	if err != nil {
-		return nil, stat, err
+		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
+		// we should halt processing requests, but do throw an exception which might cause a crash:
+		// - It is unsafe to process requests if we have an internally bad state.
+		// - We would like to avoid throwing an exception as a result of an Access API request by policy
+		//   because this can cause DOS potential
+		// - Since the protocol state is widely shared, we assume that in practice another component will
+		//   observe the protocol state error and throw an exception.
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, flow.BlockStatusUnknown, err
 	}
-	return block, stat, nil
+	return block, status, nil
 }
 
 func (b *backendBlockDetails) GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block, flow.BlockStatus, error) {
@@ -80,9 +98,18 @@ func (b *backendBlockDetails) GetBlockByHeight(ctx context.Context, height uint6
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), height, err))
 	}
 
-	stat, err := b.getBlockStatus(ctx, block.Header)
+	status, err := b.getBlockStatus(block.Header)
 	if err != nil {
-		return nil, stat, err
+		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
+		// we should halt processing requests, but do throw an exception which might cause a crash:
+		// - It is unsafe to process requests if we have an internally bad state.
+		// - We would like to avoid throwing an exception as a result of an Access API request by policy
+		//   because this can cause DOS potential
+		// - Since the protocol state is widely shared, we assume that in practice another component will
+		//   observe the protocol state error and throw an exception.
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, flow.BlockStatusUnknown, err
 	}
-	return block, stat, nil
+	return block, status, nil
 }

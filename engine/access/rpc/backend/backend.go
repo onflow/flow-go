@@ -391,6 +391,9 @@ func (b *Backend) GetNetworkParameters(_ context.Context) accessmodel.NetworkPar
 // - stateParams: Protocol parameters that contain spork root and node root block heights.
 // - height: The queried block height.
 // - genericErr: The initial error returned when the block is not found.
+//
+// Expected errors during normal operation:
+// - storage.ErrNotFound - Indicates that the queried block does not exist in the local database.
 func resolveHeightError(
 	stateParams protocol.Params,
 	height uint64,
