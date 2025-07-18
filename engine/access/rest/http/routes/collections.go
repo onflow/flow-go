@@ -17,7 +17,7 @@ func GetCollectionByID(r *common.Request, backend access.API, link commonmodels.
 
 	collection, err := backend.GetCollectionByID(r.Context(), req.ID)
 	if err != nil {
-		return nil, err
+		return nil, common.ErrorToStatusError(err)
 	}
 
 	// if we expand transactions in the query retrieve each transaction data
@@ -26,6 +26,8 @@ func GetCollectionByID(r *common.Request, backend access.API, link commonmodels.
 		for _, tid := range collection.Transactions {
 			tx, err := backend.GetTransaction(r.Context(), tid)
 			if err != nil {
+				// TODO: transactions is not updated to use the new error handling convention
+				// Update this once that work is complete
 				return nil, err
 			}
 
