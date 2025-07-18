@@ -185,13 +185,14 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 	var channel channels.Channel
 	originID := unittest.IdentifierFixture()
 	s.Run("to-compliance-engine", func() {
-		blockProposalMsg := messages.NewUntrustedClusterProposal(*unittest.ClusterBlockFixture(), unittest.SignatureFixture())
-		expectedComplianceMsg := flow.Slashable[*messages.UntrustedClusterProposal]{
+		proposal := unittest.ClusterProposalFixture()
+		blockProposalMsg := cluster.UntrustedProposal(*proposal)
+		expectedComplianceMsg := flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
-			Message:  blockProposalMsg,
+			Message:  proposal,
 		}
 		s.compliance.On("OnClusterBlockProposal", expectedComplianceMsg).Return(nil).Once()
-		err := s.hub.Process(channel, originID, blockProposalMsg)
+		err := s.hub.Process(channel, originID, &blockProposalMsg)
 		require.NoError(s.T(), err)
 	})
 	s.Run("to-vote-aggregator", func() {
@@ -269,9 +270,13 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	})
 
 	s.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
-		expectedBroadcastMsg := messages.NewUntrustedClusterProposal(*block, unittest.SignatureFixture())
+		expectedBroadcastMsg := &cluster.UntrustedProposal{
+			Block:           *block,
+			ProposerSigData: unittest.SignatureFixture(),
+		}
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
+		//TODO(Uliana): use ProposalHeader() when merged Yurii`s branch
 		headerProposal := &flow.ProposalHeader{Header: block.ToHeader(), ProposerSigData: expectedBroadcastMsg.ProposerSigData}
 		hotstuffProposal := model.SignedProposalFromFlow(headerProposal)
 		s.voteAggregator.On("AddBlock", hotstuffProposal).Once()
@@ -340,7 +345,10 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		hotstuffProposal := model.SignedProposalFromFlow(proposal)
 		s.voteAggregator.On("AddBlock", hotstuffProposal)
 		s.hotstuff.On("SubmitProposal", hotstuffProposal)
-		expectedBroadcastMsg := messages.NewUntrustedClusterProposal(*block, proposal.ProposerSigData)
+		expectedBroadcastMsg := &cluster.UntrustedProposal{
+			Block:           *block,
+			ProposerSigData: proposal.ProposerSigData,
+		}
 		s.con.On("Publish", expectedBroadcastMsg, s.cluster[1].NodeID, s.cluster[2].NodeID).
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)

@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	module "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
@@ -172,9 +171,9 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 			cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 			// execute the block submission
-			cs.engine.OnClusterBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
+			cs.engine.OnClusterBlockProposal(flow.Slashable[*cluster.Proposal]{
 				OriginID: unittest.IdentifierFixture(),
-				Message:  messages.UntrustedClusterProposalFromInternal(proposal),
+				Message:  proposal,
 			})
 		}
 		wg.Done()
@@ -191,9 +190,9 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
-		cs.engine.OnClusterBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
+		cs.engine.OnClusterBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: unittest.IdentifierFixture(),
-			Message:  messages.UntrustedClusterProposalFromInternal(proposal),
+			Message:  proposal,
 		})
 		wg.Done()
 	}()
