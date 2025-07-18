@@ -14,7 +14,7 @@ import (
 // also identical (otherwise, we would have a successful pre-image attack on our
 // cryptographic hash function). Therefore, concurrent calls to this function are safe.
 func InsertResultApproval(lctx lockctx.Proof, w storage.Writer, approval *flow.ResultApproval) error {
-	if !lctx.HoldsLock(storage.LockMyResultApproval) {
+	if !lctx.HoldsLock(storage.LockIndexResultApproval) {
 		return fmt.Errorf("missing lock for insert result approval for block %v result: %v",
 			approval.Body.BlockID,
 			approval.Body.ExecutionResultID)
@@ -28,7 +28,7 @@ func RetrieveResultApproval(r storage.Reader, approvalID flow.Identifier, approv
 	return RetrieveByKey(r, MakePrefix(codeResultApproval, approvalID), approval)
 }
 
-// UnsafeIndexResultApproval inserts a ResultApproval ID keyed by ExecutionResult ID
+// IndexResultApproval inserts a ResultApproval ID keyed by ExecutionResult ID
 // and chunk index.
 // Note: Unsafe means it does not check if a different approval is indexed for the same
 // chunk, and will overwrite the existing index.
@@ -43,7 +43,7 @@ func RetrieveResultApproval(r storage.Reader, approvalID flow.Identifier, approv
 //     lockctx.Proof to prove the higher logic is holding the lock inserting the approval after checking
 //     that the approval is not already indexed.
 func UnsafeIndexResultApproval(lctx lockctx.Proof, w storage.Writer, resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockMyResultApproval) {
+	if !lctx.HoldsLock(storage.LockIndexResultApproval) {
 		return fmt.Errorf("missing lock for index result approval for result: %v", resultID)
 	}
 	return UpsertByKey(w, MakePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID)

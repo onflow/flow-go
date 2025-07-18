@@ -25,7 +25,7 @@ import (
 // i.e. if the constructed graph has cycles.
 func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
-		Add(storage.LockNewBlock, storage.LockFinalizeBlock).
+		Add(storage.LockInsertBlock, storage.LockFinalizeBlock).
 		Build()
 }
 
