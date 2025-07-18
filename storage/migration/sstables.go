@@ -6,10 +6,10 @@ import (
 	"os"
 	"sync"
 
-	"github.com/cockroachdb/pebble"
-	"github.com/cockroachdb/pebble/objstorage/objstorageprovider"
-	"github.com/cockroachdb/pebble/sstable"
-	"github.com/cockroachdb/pebble/vfs"
+	"github.com/cockroachdb/pebble/v2"
+	"github.com/cockroachdb/pebble/v2/objstorage/objstorageprovider"
+	"github.com/cockroachdb/pebble/v2/sstable"
+	"github.com/cockroachdb/pebble/v2/vfs"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog/log"
 
@@ -127,7 +127,7 @@ func writerSSTableWorker(ctx context.Context, workerIndex int, db *pebble.DB, ss
 				return fmt.Errorf("fail to close writer: %w", err)
 			}
 
-			err = db.Ingest([]string{filePath})
+			err = db.Ingest(ctx, []string{filePath})
 			if err != nil {
 				return fmt.Errorf("fail to ingest file %v: %w", filePath, err)
 			}
@@ -137,14 +137,18 @@ func writerSSTableWorker(ctx context.Context, workerIndex int, db *pebble.DB, ss
 	}
 }
 func createSSTableWriter(filePath string) (*sstable.Writer, error) {
-	f, err := vfs.Default.Create(filePath)
+	f, err := vfs.Default.Create(filePath, vfs.WriteCategoryUnspecified)
 	if err != nil {
 		return nil, err
 	}
 
 	writable := objstorageprovider.NewFileWritable(f)
 	sstWriter := sstable.NewWriter(writable, sstable.WriterOptions{
-		TableFormat: sstable.TableFormatMax,
+		// pebble 1 is using TableFormatPebblev4, pebble 2's latest is TableFormatPebblev5 (TableFormatMax)
+		// in order to be compatible with pebble 1, we use TableFormatPebblev4 for now.
+		// TODO: use TableFormatMax in next spork
+		// TableFormat: sstable.TableFormatMax,
+		TableFormat: sstable.TableFormatPebblev4,
 	})
 
 	return sstWriter, nil
@@ -152,7 +156,9 @@ func createSSTableWriter(filePath string) (*sstable.Writer, error) {
 
 func ForceCompactPebbleDB(pebbleDir string) error {
 	pebbleDB, err := pebble.Open(pebbleDir, &pebble.Options{
-		FormatMajorVersion: pebble.FormatNewest,
+		// TODO: use FormatNewest in next spork
+		// FormatMajorVersion: pebble.FormatNewest,
+		FormatMajorVersion: pebble.FormatVirtualSSTables,
 	})
 	if err != nil {
 		return err

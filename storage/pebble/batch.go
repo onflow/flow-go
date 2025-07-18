@@ -3,7 +3,7 @@ package pebble
 import (
 	"sync"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 )
 
 type Batch struct {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/pkg/errors"
 	"go.uber.org/atomic"
 

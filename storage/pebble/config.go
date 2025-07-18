@@ -1,8 +1,8 @@
 package pebble
 
 import (
-	"github.com/cockroachdb/pebble"
-	"github.com/cockroachdb/pebble/bloom"
+	"github.com/cockroachdb/pebble/v2"
+	"github.com/cockroachdb/pebble/v2/bloom"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/storage/util"
@@ -14,7 +14,7 @@ func DefaultPebbleOptions(logger zerolog.Logger, cache *pebble.Cache, comparer *
 	opts := &pebble.Options{
 		Cache:              cache,
 		Comparer:           comparer,
-		FormatMajorVersion: pebble.FormatNewest,
+		FormatMajorVersion: pebble.FormatVirtualSSTables,
 
 		// Soft and hard limits on read amplificaction of L0 respectfully.
 		L0CompactionThreshold: 2,
