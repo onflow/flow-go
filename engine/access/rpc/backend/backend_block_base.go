@@ -16,7 +16,6 @@ type backendBlockBase struct {
 	state   protocol.State
 }
 
-//
 func (b *backendBlockBase) getBlockStatus(header *flow.Header) (flow.BlockStatus, error) {
 	// check which block is finalized at the target block's height
 	// note: this index is only populated for finalized blocks
