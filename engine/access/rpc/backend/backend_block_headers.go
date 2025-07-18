@@ -31,7 +31,15 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(ctx context.Context, isSealed
 		irrecoverable.Throw(ctx, err)
 		return nil, flow.BlockStatusUnknown, err
 	}
-	return header, flow.BlockStatusFinalized, nil
+
+	// Note: there is a corner case when requesting the latest finalized block before the
+	// consensus follower has progressed past the spork root block. In this case, the returned
+	// blockStatus will be finalized, however, the block is actually sealed.
+	if header.Height == b.state.Params().SporkRootBlockHeight() {
+		return header, flow.BlockStatusSealed, nil
+	} else {
+		return header, flow.BlockStatusFinalized, nil
+	}
 }
 
 func (b *backendBlockHeaders) GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error) {

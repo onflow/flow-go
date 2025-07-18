@@ -37,7 +37,15 @@ func (b *backendBlockDetails) GetLatestBlock(ctx context.Context, isSealed bool)
 			irrecoverable.Throw(ctx, err)
 			return nil, flow.BlockStatusUnknown, err
 		}
-		blockStatus = flow.BlockStatusFinalized
+
+		// Note: there is a corner case when requesting the latest finalized block before the
+		// consensus follower has progressed past the spork root block. In this case, the returned
+		// blockStatus will be finalized, however, the block is actually sealed.
+		if header.Height == b.state.Params().SporkRootBlockHeight() {
+			blockStatus = flow.BlockStatusSealed
+		} else {
+			blockStatus = flow.BlockStatusFinalized
+		}
 	}
 
 	// since we are querying a finalized or sealed block, we can use the height index and save an ID computation

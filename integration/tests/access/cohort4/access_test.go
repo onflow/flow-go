@@ -126,16 +126,17 @@ func (s *AccessSuite) runTestSignerIndicesDecoding() {
 
 	client := accessproto.NewAccessAPIClient(conn)
 
-	// query latest finalized block. wait until at least one block has been finalized.
-	// otherwise, we may get a block that is both the latest finalized and sealed block, which will break
-	// the checks below.
+	// query latest finalized block. wait until at least two blocks have been finalized.
+	// otherwise,
+	//   1. we may the root block which does not have any voter indices.
+	//   2. ParentVoterIndices will be empty.
 	var latestFinalizedBlock *accessproto.BlockHeaderResponse
 	require.Eventually(s.T(), func() bool {
 		latestFinalizedBlock, err = MakeApiRequest(client.GetLatestBlockHeader, ctx, &accessproto.GetLatestBlockHeaderRequest{
 			IsSealed: false,
 		})
 		require.NoError(s.T(), err)
-		return latestFinalizedBlock.GetBlock().Height > 0
+		return latestFinalizedBlock.GetBlock().Height > 1
 	}, 30*time.Second, 100*time.Millisecond)
 
 	// verify we get the same block when querying by ID and height
