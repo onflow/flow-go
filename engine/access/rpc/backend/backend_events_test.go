@@ -415,7 +415,7 @@ func (s *BackendEventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 		s.state.On("Sealed").Return(s.snapshot)
 		s.snapshot.On("Head").Return(nil, storage.ErrNotFound).Once()
 
-		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", storage.ErrNotFound)
+		signCtxErr := irrecoverable.NewExceptionf("failed to get sealed head: %w", storage.ErrNotFound)
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
 			irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, signCtxErr))
 

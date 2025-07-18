@@ -71,7 +71,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
 		// sealed block must be in the store, so throw an exception for any error
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		err := irrecoverable.NewExceptionf("failed to get sealed head: %w", err)
 		irrecoverable.Throw(ctx, err)
 		return nil, err
 	}

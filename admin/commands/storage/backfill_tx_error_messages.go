@@ -59,7 +59,7 @@ func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest
 
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		return fmt.Errorf("failed to lookup sealed header: %w", err)
+		return fmt.Errorf("failed to get sealed head: %w", err)
 	}
 
 	lastSealedHeight := sealed.Height

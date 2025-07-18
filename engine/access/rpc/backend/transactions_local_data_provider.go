@@ -348,7 +348,7 @@ func (t *TransactionsLocalDataProvider) DeriveTransactionStatus(blockHeight uint
 	// get the latest sealed block from the State
 	sealed, err := t.state.Sealed().Head()
 	if err != nil {
-		return flow.TransactionStatusUnknown, irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		return flow.TransactionStatusUnknown, irrecoverable.NewExceptionf("failed to get sealed head: %w", err)
 	}
 
 	if blockHeight > sealed.Height {
