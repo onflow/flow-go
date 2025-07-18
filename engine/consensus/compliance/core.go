@@ -114,7 +114,7 @@ func NewCore(
 func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) error {
 	block := flow.Slashable[*flow.Block]{
 		OriginID: proposal.OriginID,
-		Message:  proposal.Message.Block.ToInternal(),
+		Message:  &proposal.Message.Block,
 	}
 	header := block.Message.Header
 	blockID := header.ID()

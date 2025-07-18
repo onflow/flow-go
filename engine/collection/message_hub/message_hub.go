@@ -332,7 +332,7 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 	}
 
 	// create the proposal message for the collection
-	proposal := messages.NewClusterBlockProposal(&cluster.Block{
+	proposal := messages.NewClusterBlockProposalFromInternal(&cluster.Block{
 		Header:  header,
 		Payload: payload,
 	})
