@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -56,28 +55,14 @@ func (s *AccessSuite) SetupTest() {
 
 	nodeConfigs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel)),
-	}
-
-	// need one dummy execution node (unused ghost)
-	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
-	nodeConfigs = append(nodeConfigs, exeConfig)
-
-	// need one dummy verification node (unused ghost)
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
-	nodeConfigs = append(nodeConfigs, verConfig)
-
-	// need one controllable collection node (unused ghost)
-	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
-	nodeConfigs = append(nodeConfigs, collConfig)
-
-	// need three consensus nodes (unused ghost)
-	for n := 0; n < 3; n++ {
-		conID := unittest.IdentifierFixture()
-		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
-			testnet.WithLogLevel(zerolog.FatalLevel),
-			testnet.WithID(conID),
-			testnet.AsGhost())
-		nodeConfigs = append(nodeConfigs, nodeConfig)
+		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
 	}
 
 	conf := testnet.NewNetworkConfig("access_api_test", nodeConfigs)
@@ -90,8 +75,14 @@ func (s *AccessSuite) SetupTest() {
 	s.net.Start(s.ctx)
 }
 
-func (s *AccessSuite) TestAPIsAvailable() {
+func (s *AccessSuite) TestAllTheThings() {
+	s.runTestAPIsAvailable()
 
+	// run this test last because it stops the container
+	s.runTestSignerIndicesDecoding()
+}
+
+func (s *AccessSuite) runTestAPIsAvailable() {
 	s.T().Run("TestHTTPProxyPortOpen", func(t *testing.T) {
 		httpProxyAddress := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCWebPort)
 
@@ -106,22 +97,22 @@ func (s *AccessSuite) TestAPIsAvailable() {
 		defer cancel()
 
 		grpcAddress := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort)
-		conn, err := grpc.DialContext(ctx, grpcAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		conn, err := grpc.NewClient(grpcAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		require.NoError(t, err, "failed to connect to access node")
 		defer conn.Close()
 
 		client := accessproto.NewAccessAPIClient(conn)
 
-		_, err = client.Ping(s.ctx, &accessproto.PingRequest{})
+		_, err = client.Ping(ctx, &accessproto.PingRequest{})
 		assert.NoError(t, err, "failed to ping access node")
 	})
 }
 
-// TestSignerIndicesDecoding tests that access node uses signer indices' decoder to correctly parse encoded data in blocks.
+// runTestSignerIndicesDecoding tests that access node uses signer indices' decoder to correctly parse encoded data in blocks.
 // This test receives blocks from consensus follower and then requests same blocks from access API and checks if returned data
 // matches.
-func (s *AccessSuite) TestSignerIndicesDecoding() {
-
+// CAUTION: must be run last if running multiple tests using the same network since it stops the containers.
+func (s *AccessSuite) runTestSignerIndicesDecoding() {
 	container := s.net.ContainerByName(testnet.PrimaryAN)
 
 	ctx, cancel := context.WithCancel(s.ctx)
@@ -129,35 +120,32 @@ func (s *AccessSuite) TestSignerIndicesDecoding() {
 
 	// create access API
 	grpcAddress := container.Addr(testnet.GRPCPort)
-	conn, err := grpc.DialContext(ctx, grpcAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(grpcAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(s.T(), err, "failed to connect to access node")
 	defer conn.Close()
 
 	client := accessproto.NewAccessAPIClient(conn)
 
-	// query latest finalized block
-	latestFinalizedBlock, err := MakeApiRequest(client.GetLatestBlockHeader, ctx, &accessproto.GetLatestBlockHeaderRequest{
-		IsSealed: false,
-	})
-	require.NoError(s.T(), err)
+	// query latest finalized block. wait until at least one block has been finalized.
+	// otherwise, we may get a block that is both the latest finalized and sealed block, which will break
+	// the checks below.
+	var latestFinalizedBlock *accessproto.BlockHeaderResponse
+	require.Eventually(s.T(), func() bool {
+		latestFinalizedBlock, err = MakeApiRequest(client.GetLatestBlockHeader, ctx, &accessproto.GetLatestBlockHeaderRequest{
+			IsSealed: false,
+		})
+		require.NoError(s.T(), err)
+		return latestFinalizedBlock.GetBlock().Height > 0
+	}, 30*time.Second, 100*time.Millisecond)
 
-	// request both concurrently to make sure they are likely to have the same block status
-	// note: on slower machines, running checks serially could mean that the returned block is sealed,
-	// and no longer exactly matches the finalized block
-	g := errgroup.Group{}
-	g.Go(func() error {
-		blockByID, err := MakeApiRequest(client.GetBlockHeaderByID, ctx, &accessproto.GetBlockHeaderByIDRequest{Id: latestFinalizedBlock.Block.Id})
-		require.NoError(s.T(), err)
-		require.Equal(s.T(), latestFinalizedBlock, blockByID, "expect to receive same block by ID")
-		return nil
-	})
-	g.Go(func() error {
-		blockByHeight, err := MakeApiRequest(client.GetBlockHeaderByHeight, ctx, &accessproto.GetBlockHeaderByHeightRequest{Height: latestFinalizedBlock.Block.Height})
-		require.NoError(s.T(), err)
-		require.Equal(s.T(), latestFinalizedBlock, blockByHeight, "expect to receive same block by height")
-		return nil
-	})
-	require.NoError(s.T(), g.Wait())
+	// verify we get the same block when querying by ID and height
+	blockByID, err := MakeApiRequest(client.GetBlockHeaderByID, ctx, &accessproto.GetBlockHeaderByIDRequest{Id: latestFinalizedBlock.Block.Id})
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), latestFinalizedBlock, blockByID, "expect to receive same block by ID")
+
+	blockByHeight, err := MakeApiRequest(client.GetBlockHeaderByHeight, ctx, &accessproto.GetBlockHeaderByHeightRequest{Height: latestFinalizedBlock.Block.Height})
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), latestFinalizedBlock, blockByHeight, "expect to receive same block by height")
 
 	// stop container, so we can access it's state and perform assertions
 	err = s.net.StopContainerByName(ctx, testnet.PrimaryAN)
