@@ -13,36 +13,25 @@ type backendBlockHeaders struct {
 }
 
 func (b *backendBlockHeaders) GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error) {
-	var header *flow.Header
-	var err error
-
 	if isSealed {
-		// get the latest seal header from storage
-		header, err = b.state.Sealed().Head()
+		header, err := b.state.Sealed().Head()
 		if err != nil {
+			// sealed header must exist in the db, otherwise the node's state may be corrupt
 			err = irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+			irrecoverable.Throw(ctx, err)
+			return nil, flow.BlockStatusUnknown, err
 		}
-	} else {
-		// get the finalized header from state
-		header, err = b.state.Final().Head()
-		if err != nil {
-			err = irrecoverable.NewExceptionf("failed to lookup final header: %w", err)
-		}
+		return header, flow.BlockStatusSealed, nil
 	}
 
+	header, err := b.state.Final().Head()
 	if err != nil {
-		// node should always have the latest block
+		// finalized header must exist in the db, otherwise the node's state may be corrupt
+		err = irrecoverable.NewExceptionf("failed to lookup final header: %w", err)
 		irrecoverable.Throw(ctx, err)
 		return nil, flow.BlockStatusUnknown, err
 	}
-
-	status, err := b.getBlockStatus(header)
-	if err != nil {
-		irrecoverableErr := irrecoverable.NewException(err)
-		irrecoverable.Throw(ctx, irrecoverableErr)
-		return nil, flow.BlockStatusUnknown, irrecoverableErr
-	}
-	return header, status, nil
+	return header, flow.BlockStatusFinalized, nil
 }
 
 func (b *backendBlockHeaders) GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error) {
@@ -53,9 +42,10 @@ func (b *backendBlockHeaders) GetBlockHeaderByID(ctx context.Context, id flow.Id
 
 	status, err := b.getBlockStatus(header)
 	if err != nil {
-		irrecoverableErr := irrecoverable.NewException(err)
-		irrecoverable.Throw(ctx, irrecoverableErr)
-		return nil, flow.BlockStatusUnknown, irrecoverableErr
+		// Any error returned is an indication of a bug or state corruption. we must not continue processing.
+		err = irrecoverable.NewException(err)
+		irrecoverable.Throw(ctx, err)
+		return nil, flow.BlockStatusUnknown, err
 	}
 	return header, status, nil
 }
@@ -68,9 +58,10 @@ func (b *backendBlockHeaders) GetBlockHeaderByHeight(ctx context.Context, height
 
 	status, err := b.getBlockStatus(header)
 	if err != nil {
-		irrecoverableErr := irrecoverable.NewException(err)
-		irrecoverable.Throw(ctx, irrecoverableErr)
-		return nil, flow.BlockStatusUnknown, irrecoverableErr
+		// Any error returned is an indication of a bug or state corruption. we must not continue processing.
+		err = irrecoverable.NewException(err)
+		irrecoverable.Throw(ctx, err)
+		return nil, flow.BlockStatusUnknown, err
 	}
 	return header, status, nil
 }

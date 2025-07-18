@@ -17,28 +17,27 @@ type backendBlockDetails struct {
 
 func (b *backendBlockDetails) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block, flow.BlockStatus, error) {
 	var header *flow.Header
+	var blockStatus flow.BlockStatus
 	var err error
 
 	if isSealed {
-		// get the latest seal header from storage
 		header, err = b.state.Sealed().Head()
 		if err != nil {
+			// sealed header must exist in the db, otherwise the node's state may be corrupt
 			err = irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-
+			irrecoverable.Throw(ctx, err)
+			return nil, flow.BlockStatusUnknown, err
 		}
+		blockStatus = flow.BlockStatusSealed
 	} else {
-		// get the finalized header from state
 		header, err = b.state.Final().Head()
 		if err != nil {
+			// finalized header must exist in the db, otherwise the node's state may be corrupt
 			err = irrecoverable.NewExceptionf("failed to lookup final header: %w", err)
+			irrecoverable.Throw(ctx, err)
+			return nil, flow.BlockStatusUnknown, err
 		}
-	}
-
-	if err != nil {
-		// node should always have the latest block
-
-		irrecoverable.Throw(ctx, err)
-		return nil, flow.BlockStatusUnknown, err
+		blockStatus = flow.BlockStatusFinalized
 	}
 
 	// since we are querying a finalized or sealed block, we can use the height index and save an ID computation
@@ -47,13 +46,7 @@ func (b *backendBlockDetails) GetLatestBlock(ctx context.Context, isSealed bool)
 		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block: %v", err)
 	}
 
-	status, err := b.getBlockStatus(block.Header)
-	if err != nil {
-		irrecoverableErr := irrecoverable.NewException(err)
-		irrecoverable.Throw(ctx, irrecoverableErr)
-		return nil, flow.BlockStatusUnknown, irrecoverableErr
-	}
-	return block, status, nil
+	return block, blockStatus, nil
 }
 
 func (b *backendBlockDetails) GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error) {
@@ -64,9 +57,10 @@ func (b *backendBlockDetails) GetBlockByID(ctx context.Context, id flow.Identifi
 
 	status, err := b.getBlockStatus(block.Header)
 	if err != nil {
-		irrecoverableErr := irrecoverable.NewException(err)
-		irrecoverable.Throw(ctx, irrecoverableErr)
-		return nil, flow.BlockStatusUnknown, irrecoverableErr
+		// Any error returned is an indication of a bug or state corruption. we must not continue processing.
+		err = irrecoverable.NewException(err)
+		irrecoverable.Throw(ctx, err)
+		return nil, flow.BlockStatusUnknown, err
 	}
 	return block, status, nil
 }
@@ -79,9 +73,10 @@ func (b *backendBlockDetails) GetBlockByHeight(ctx context.Context, height uint6
 
 	status, err := b.getBlockStatus(block.Header)
 	if err != nil {
-		irrecoverableErr := irrecoverable.NewException(err)
-		irrecoverable.Throw(ctx, irrecoverableErr)
-		return nil, flow.BlockStatusUnknown, irrecoverableErr
+		// Any error returned is an indication of a bug or state corruption. we must not continue processing.
+		err = irrecoverable.NewException(err)
+		irrecoverable.Throw(ctx, err)
+		return nil, flow.BlockStatusUnknown, err
 	}
 	return block, status, nil
 }
