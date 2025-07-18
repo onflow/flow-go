@@ -127,9 +127,8 @@ func (s *AccessSuite) runTestSignerIndicesDecoding() {
 	client := accessproto.NewAccessAPIClient(conn)
 
 	// query latest finalized block. wait until at least two blocks have been finalized.
-	// otherwise,
-	//   1. we may the root block which does not have any voter indices.
-	//   2. ParentVoterIndices will be empty.
+	// otherwise, we may get the root block which does not have any voter indices or its
+	// immediate child who's parent voter indices are empty.
 	var latestFinalizedBlock *accessproto.BlockHeaderResponse
 	require.Eventually(s.T(), func() bool {
 		latestFinalizedBlock, err = MakeApiRequest(client.GetLatestBlockHeader, ctx, &accessproto.GetLatestBlockHeaderRequest{
