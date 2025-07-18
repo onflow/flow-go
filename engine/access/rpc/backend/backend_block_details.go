@@ -54,7 +54,7 @@ func (b *backendBlockDetails) GetLatestBlock(ctx context.Context, isSealed bool)
 		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block: %v", err)
 	}
 
-	stat, err := b.getBlockStatus(ctx, block)
+	stat, err := b.getBlockStatus(ctx, block.Header)
 	if err != nil {
 		return nil, stat, err
 	}
@@ -67,7 +67,7 @@ func (b *backendBlockDetails) GetBlockByID(ctx context.Context, id flow.Identifi
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
-	stat, err := b.getBlockStatus(ctx, block)
+	stat, err := b.getBlockStatus(ctx, block.Header)
 	if err != nil {
 		return nil, stat, err
 	}
@@ -80,14 +80,9 @@ func (b *backendBlockDetails) GetBlockByHeight(ctx context.Context, height uint6
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), height, err))
 	}
 
-	stat, err := b.getBlockStatus(ctx, block)
+	stat, err := b.getBlockStatus(ctx, block.Header)
 	if err != nil {
 		return nil, stat, err
 	}
 	return block, stat, nil
-}
-
-// No errors are expected during normal operations.
-func (b *backendBlockDetails) getBlockStatus(ctx context.Context, block *flow.Block) (flow.BlockStatus, error) {
-	return b.determineBlockStatus(ctx, block.ID(), block.Header.Height)
 }
