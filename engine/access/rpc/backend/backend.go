@@ -178,8 +178,9 @@ func New(params Params) (*Backend, error) {
 			state:   params.State,
 		},
 		backendBlockDetails: backendBlockDetails{
-			blocks: params.Blocks,
-			state:  params.State,
+			blocks:  params.Blocks,
+			headers: params.Headers,
+			state:   params.State,
 		},
 		backendAccounts: backendAccounts{
 			log:                        params.Log,
@@ -386,8 +387,34 @@ func (b *Backend) GetNetworkParameters(_ context.Context) accessmodel.NetworkPar
 // - height: The queried block height.
 // - genericErr: The initial error returned when the block is not found.
 //
-// Expected errors during normal operation:
-// - storage.ErrNotFound - Indicates that the queried block does not exist in the local database.
+//
+// Expected errors during normal operations:
+func determineBlockStatus(ctx context.Context, blockID flow.Identifier, blockHeight uint64, state protocol.State, headers storage.Headers) (flow.BlockStatus, error) {
+	blockIDFinalizedAtHeight, err := headers.BlockIDByHeight(blockHeight)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return flow.BlockStatusUnknown, nil
+		}
+		return flow.BlockStatusUnknown, fmt.Errorf("failed to lookup finalized block ID by height %d: %w", blockHeight, err)
+	}
+
+	if blockIDFinalizedAtHeight != blockID {
+		// A different block than what was queried has been finalized at this height.
+		return flow.BlockStatusUnknown, nil
+	}
+
+	sealed, err := state.Sealed().Head()
+	if err != nil {
+		return flow.BlockStatusUnknown, fmt.Errorf("failed to get sealed head: %w", err)
+	}
+
+	if blockHeight <= sealed.Height {
+		return flow.BlockStatusSealed, nil
+	}
+
+	return flow.BlockStatusFinalized, nil
+}
+
 func resolveHeightError(
 	stateParams protocol.Params,
 	height uint64,
