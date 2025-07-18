@@ -36,7 +36,7 @@ func (b *backendBlockBase) getBlockStatus(header *flow.Header) (flow.BlockStatus
 
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		return flow.BlockStatusUnknown, err
+		return flow.BlockStatusUnknown, fmt.Errorf("failed to lookup sealed header: %w", err)
 	}
 
 	if header.Height > sealed.Height {
