@@ -1,4 +1,4 @@
-package backend
+package node_communicator
 
 import (
 	"github.com/hashicorp/go-multierror"

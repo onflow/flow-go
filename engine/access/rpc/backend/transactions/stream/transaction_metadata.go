@@ -1,13 +1,12 @@
-package backend
+package stream
 
 import (
 	"context"
 	"errors"
 	"fmt"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
+	txprovider "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -19,23 +18,26 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
-// transactionSubscriptionMetadata manages the state of a transaction subscription.
+// TransactionMetadata manages the state of a transaction subscription.
 //
 // This struct contains metadata for tracking a transaction's progress, including
 // references to relevant blocks, collections, and transaction results.
-type transactionSubscriptionMetadata struct {
+type TransactionMetadata struct {
 	blocks       storage.Blocks
 	collections  storage.Collections
 	transactions storage.Transactions
 
-	txResult             *accessmodel.TransactionResult
-	txReferenceBlockID   flow.Identifier
-	blockWithTx          *flow.Header
+	txResult           *accessmodel.TransactionResult
+	txReferenceBlockID flow.Identifier
+	blockWithTx        *flow.Header
+
 	eventEncodingVersion entities.EventEncodingVersion
-	backendTransactions  *backendTransactions
+
+	txProvider      *txprovider.FailoverTransactionProvider
+	txStatusDeriver *status_deriver.TxStatusDeriver
 }
 
-// newTransactionSubscriptionMetadata initializes a new metadata object for a transaction subscription.
+// NewTransactionMetadata initializes a new metadata object for a transaction subscription.
 //
 // This function constructs a transaction metadata object used for tracking the transaction's progress
 // and maintaining its state throughout execution.
@@ -48,20 +50,21 @@ type transactionSubscriptionMetadata struct {
 //   - eventEncodingVersion: The required version of event encoding.
 //
 // Returns:
-//   - *transactionSubscriptionMetadata: The initialized transaction metadata object.
-func newTransactionSubscriptionMetadata(
-	backendTransactions *backendTransactions,
+//   - *TransactionMetadata: The initialized transaction metadata object.
+func NewTransactionMetadata(
+	blocks storage.Blocks,
+	collections storage.Collections,
+	transactions storage.Transactions,
 	txID flow.Identifier,
 	txReferenceBlockID flow.Identifier,
 	eventEncodingVersion entities.EventEncodingVersion,
-) *transactionSubscriptionMetadata {
-	return &transactionSubscriptionMetadata{
-		backendTransactions:  backendTransactions,
+) *TransactionMetadata {
+	return &TransactionMetadata{
 		txResult:             &accessmodel.TransactionResult{TransactionID: txID},
 		eventEncodingVersion: eventEncodingVersion,
-		blocks:               backendTransactions.blocks,
-		collections:          backendTransactions.collections,
-		transactions:         backendTransactions.transactions,
+		blocks:               blocks,
+		collections:          collections,
+		transactions:         transactions,
 		txReferenceBlockID:   txReferenceBlockID,
 	}
 }
@@ -77,17 +80,17 @@ func newTransactionSubscriptionMetadata(
 //
 // All other errors are considered as state corruption (fatal) or internal errors in the refreshing transaction result
 // or when refreshing transaction status.
-func (tm *transactionSubscriptionMetadata) Refresh(ctx context.Context) error {
-	if err := tm.refreshCollection(); err != nil {
+func (t *TransactionMetadata) Refresh(ctx context.Context) error {
+	if err := t.refreshCollection(); err != nil {
 		return err
 	}
-	if err := tm.refreshBlock(); err != nil {
+	if err := t.refreshBlock(); err != nil {
 		return err
 	}
-	if err := tm.refreshTransactionResult(ctx); err != nil {
+	if err := t.refreshTransactionResult(ctx); err != nil {
 		return err
 	}
-	if err := tm.refreshStatus(ctx); err != nil {
+	if err := t.refreshStatus(ctx); err != nil {
 		return err
 	}
 	return nil
@@ -101,17 +104,17 @@ func (tm *transactionSubscriptionMetadata) Refresh(ctx context.Context) error {
 //   - txReferenceBlockID: The reference block ID of the transaction.
 //
 // No errors expected during normal operations.
-func (tm *transactionSubscriptionMetadata) refreshTransactionReferenceBlockID() error {
+func (t *TransactionMetadata) refreshTransactionReferenceBlockID() error {
 	// Get referenceBlockID if it is not set
-	if tm.txReferenceBlockID != flow.ZeroID {
+	if t.txReferenceBlockID != flow.ZeroID {
 		return nil
 	}
 
-	tx, err := tm.transactions.ByID(tm.txResult.TransactionID)
+	tx, err := t.transactions.ByID(t.txResult.TransactionID)
 	if err != nil {
 		return fmt.Errorf("failed to lookup transaction by transaction ID: %w", err)
 	}
-	tm.txReferenceBlockID = tx.ReferenceBlockID
+	t.txReferenceBlockID = tx.ReferenceBlockID
 	return nil
 }
 
@@ -121,20 +124,20 @@ func (tm *transactionSubscriptionMetadata) refreshTransactionReferenceBlockID() 
 //   - ctx: Context for managing the operation lifecycle.
 //
 // No errors expected during normal operations.
-func (tm *transactionSubscriptionMetadata) refreshStatus(ctx context.Context) error {
+func (t *TransactionMetadata) refreshStatus(ctx context.Context) error {
 	var err error
 
-	if tm.blockWithTx == nil {
-		if err = tm.refreshTransactionReferenceBlockID(); err != nil {
+	if t.blockWithTx == nil {
+		if err = t.refreshTransactionReferenceBlockID(); err != nil {
 			// transaction was not sent from this node, and it has not been indexed yet.
 			if errors.Is(err, storage.ErrNotFound) {
-				tm.txResult.Status = flow.TransactionStatusUnknown
+				t.txResult.Status = flow.TransactionStatusUnknown
 				return nil
 			}
 			return err
 		}
 
-		tm.txResult.Status, err = tm.backendTransactions.DeriveUnknownTransactionStatus(tm.txReferenceBlockID)
+		t.txResult.Status, err = t.txStatusDeriver.DeriveUnknownTransactionStatus(t.txReferenceBlockID)
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 				irrecoverable.Throw(ctx, err)
@@ -146,7 +149,7 @@ func (tm *transactionSubscriptionMetadata) refreshStatus(ctx context.Context) er
 
 	// When the transaction is included in an executed block, the `txResult` may be updated during `Refresh`
 	// Recheck the status to ensure it's accurate.
-	tm.txResult.Status, err = tm.backendTransactions.DeriveTransactionStatus(tm.blockWithTx.Height, tm.txResult.IsExecuted())
+	t.txResult.Status, err = t.txStatusDeriver.DeriveTransactionStatus(t.blockWithTx.Height, t.txResult.IsExecuted())
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -162,12 +165,12 @@ func (tm *transactionSubscriptionMetadata) refreshStatus(ctx context.Context) er
 //   - [ErrBlockNotReady] if the block for collection ID is not found.
 //
 // All other errors should be treated as exceptions.
-func (tm *transactionSubscriptionMetadata) refreshBlock() error {
-	if tm.txResult.CollectionID == flow.ZeroID || tm.blockWithTx != nil {
+func (t *TransactionMetadata) refreshBlock() error {
+	if t.txResult.CollectionID == flow.ZeroID || t.blockWithTx != nil {
 		return nil
 	}
 
-	block, err := tm.blocks.ByCollectionID(tm.txResult.CollectionID)
+	block, err := t.blocks.ByCollectionID(t.txResult.CollectionID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return subscription.ErrBlockNotReady
@@ -176,9 +179,9 @@ func (tm *transactionSubscriptionMetadata) refreshBlock() error {
 		return fmt.Errorf("failed to lookup block containing collection: %w", err)
 	}
 
-	tm.blockWithTx = block.Header
-	tm.txResult.BlockID = block.ID()
-	tm.txResult.BlockHeight = block.Header.Height
+	t.blockWithTx = block.Header
+	t.txResult.BlockID = block.ID()
+	t.txResult.BlockHeight = block.Header.Height
 	return nil
 }
 
@@ -188,19 +191,19 @@ func (tm *transactionSubscriptionMetadata) refreshBlock() error {
 //   - [ErrTransactionNotInBlock] if the transaction is not found in the block.
 //
 // All other errors should be treated as exceptions.
-func (tm *transactionSubscriptionMetadata) refreshCollection() error {
-	if tm.txResult.CollectionID != flow.ZeroID {
+func (t *TransactionMetadata) refreshCollection() error {
+	if t.txResult.CollectionID != flow.ZeroID {
 		return nil
 	}
 
-	collection, err := tm.collections.LightByTransactionID(tm.txResult.TransactionID)
+	collection, err := t.collections.LightByTransactionID(t.txResult.TransactionID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil
 		}
 		return fmt.Errorf("failed to lookup collection containing tx: %w", err)
 	}
-	tm.txResult.CollectionID = collection.ID()
+	t.txResult.CollectionID = collection.ID()
 	return nil
 }
 
@@ -213,38 +216,27 @@ func (tm *transactionSubscriptionMetadata) refreshCollection() error {
 //   - [codes.NotFound] if the transaction result is unavailable.
 //
 // All other errors should be treated as exceptions.
-func (tm *transactionSubscriptionMetadata) refreshTransactionResult(ctx context.Context) error {
+func (t *TransactionMetadata) refreshTransactionResult(ctx context.Context) error {
 	// skip check if we already have the result, or if we don't know which block it is in yet
-	if tm.blockWithTx == nil || tm.txResult.IsExecuted() {
+	if t.blockWithTx == nil || t.txResult.IsExecuted() {
 		return nil
 	}
 
-	// Trying to get transaction result from local storage
-	txResult, err := tm.backendTransactions.GetTransactionResultFromStorage(ctx, tm.blockWithTx, tm.txResult.TransactionID, tm.eventEncodingVersion)
+	txResult, err := t.txProvider.TransactionResult(
+		ctx,
+		t.blockWithTx,
+		t.txResult.TransactionID,
+		t.eventEncodingVersion,
+	)
 	if err != nil {
-		if status.Code(err) != codes.FailedPrecondition &&
-			status.Code(err) != codes.OutOfRange &&
-			status.Code(err) != codes.NotFound {
-			return fmt.Errorf("unexpected error while getting transaction result from storage: %w", err)
-		}
-
-		// If any error occurs with local storage - request transaction result from EN
-		txResult, err = tm.backendTransactions.GetTransactionResultFromExecutionNode(ctx, tm.blockWithTx, tm.txResult.TransactionID, tm.eventEncodingVersion)
-		if err != nil {
-			// if either the execution node reported no results
-			if status.Code(err) == codes.NotFound {
-				// No result yet, indicate that it has not been executed
-				return nil
-			}
-			return fmt.Errorf("failed to get transaction result from execution node: %w", err)
-		}
+		return fmt.Errorf("unexpected error while getting transaction result from storage: %w", err)
 	}
 
 	// If transaction result was found, fully replace it in metadata. New transaction status already included in result.
 	if txResult != nil {
 		// Preserve the CollectionID to ensure it is not lost during the transaction result assignment.
-		txResult.CollectionID = tm.txResult.CollectionID
-		tm.txResult = txResult
+		txResult.CollectionID = t.txResult.CollectionID
+		t.txResult = txResult
 	}
 
 	return nil
