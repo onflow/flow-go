@@ -28,7 +28,6 @@ func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*flow.Prop
 	if !ok {
 		return flow.Slashable[*flow.Proposal]{}, false
 	}
-
 	return item.block, true
 }
 
@@ -42,7 +41,6 @@ func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*
 	for _, item := range items {
 		proposals = append(proposals, item.block)
 	}
-
 	return proposals, true
 }
 
