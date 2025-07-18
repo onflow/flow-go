@@ -20,7 +20,7 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(ctx context.Context, isSealed
 		// get the latest seal header from storage
 		header, err = b.state.Sealed().Head()
 		if err != nil {
-			err = irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+			err = irrecoverable.NewExceptionf("failed to get sealed head: %w", err)
 		}
 	} else {
 		// get the finalized header from state
