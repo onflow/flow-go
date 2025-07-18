@@ -14,7 +14,7 @@ func DefaultPebbleOptions(logger zerolog.Logger, cache *pebble.Cache, comparer *
 	opts := &pebble.Options{
 		Cache:              cache,
 		Comparer:           comparer,
-		FormatMajorVersion: pebble.FormatNewest,
+		FormatMajorVersion: pebble.FormatVirtualSSTables,
 
 		// Soft and hard limits on read amplificaction of L0 respectfully.
 		L0CompactionThreshold: 2,

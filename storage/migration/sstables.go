@@ -156,7 +156,9 @@ func createSSTableWriter(filePath string) (*sstable.Writer, error) {
 
 func ForceCompactPebbleDB(pebbleDir string) error {
 	pebbleDB, err := pebble.Open(pebbleDir, &pebble.Options{
-		FormatMajorVersion: pebble.FormatNewest,
+		// TODO: use FormatNewest in next spork
+		// FormatMajorVersion: pebble.FormatNewest,
+		FormatMajorVersion: pebble.FormatVirtualSSTables,
 	})
 	if err != nil {
 		return err
