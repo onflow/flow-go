@@ -1,8 +1,6 @@
 package store
 
 import (
-	"github.com/jordanschalm/lockctx"
-
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -20,10 +18,6 @@ type ClusterPayloads struct {
 
 func NewClusterPayloads(cacheMetrics module.CacheMetrics, db storage.DB) *ClusterPayloads {
 
-	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *cluster.Payload) error {
-		return procedure.InsertClusterPayload(lctx, rw, blockID, payload)
-	}
-
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*cluster.Payload, error) {
 		var payload cluster.Payload
 		err := procedure.RetrieveClusterPayload(r, blockID, &payload)
@@ -34,7 +28,6 @@ func NewClusterPayloads(cacheMetrics module.CacheMetrics, db storage.DB) *Cluste
 		db: db,
 		cache: newCache[flow.Identifier, *cluster.Payload](cacheMetrics, metrics.ResourceClusterPayload,
 			withLimit[flow.Identifier, *cluster.Payload](flow.DefaultTransactionExpiry*4),
-			withStoreWithLock(storeWithLock),
 			withRetrieve(retrieve)),
 	}
 
