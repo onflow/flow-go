@@ -18,7 +18,6 @@ type backendBlockBase struct {
 	state   protocol.State
 }
 
-//
 // Expected errors during normal operations:
 func (b *backendBlockBase) getBlockStatus(ctx context.Context, header *flow.Header) (flow.BlockStatus, error) {
 	blockIDFinalizedAtHeight, err := b.headers.BlockIDByHeight(header.Height)
