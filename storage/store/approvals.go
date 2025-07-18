@@ -30,8 +30,8 @@ type ResultApprovals struct {
 var _ storage.ResultApprovals = (*ResultApprovals)(nil)
 
 func NewResultApprovals(collector module.CacheMetrics, db storage.DB, lockManager lockctx.Manager) *ResultApprovals {
-	store := func(rw storage.ReaderBatchWriter, key flow.Identifier, val *flow.ResultApproval) error {
-		return operation.InsertResultApproval(rw.Writer(), val)
+	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, key flow.Identifier, val *flow.ResultApproval) error {
+		return operation.InsertResultApproval(lctx, rw.Writer(), val)
 	}
 
 	retrieve := func(r storage.Reader, approvalID flow.Identifier) (*flow.ResultApproval, error) {
@@ -45,67 +45,62 @@ func NewResultApprovals(collector module.CacheMetrics, db storage.DB, lockManage
 		db:          db,
 		cache: newCache(collector, metrics.ResourceResultApprovals,
 			withLimit[flow.Identifier, *flow.ResultApproval](flow.DefaultTransactionExpiry+100),
-			withStore(store),
+			withStoreWithLock(storeWithLock),
 			withRetrieve(retrieve)),
 	}
 }
 
-// Store stores a ResultApproval
-func (r *ResultApprovals) Store(approval *flow.ResultApproval) error {
-	return r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return r.cache.PutTx(rw, approval.ID(), approval)
-	})
-}
-
-// Index indexes a ResultApproval by chunk (ResultID + chunk index).
-// This operation is idempotent (repeated calls with the same value are equivalent to
-// just calling the method once; still the method succeeds on each call).
+// StoreMyApproval stores my own ResultApproval
+// No errors are expected during normal operations.
+// it also indexes a ResultApproval by result ID and chunk index.
 //
 // CAUTION: the Flow protocol requires multiple approvals for the same chunk from different verification
 // nodes. In other words, there are multiple different approvals for the same chunk. Therefore, the index
 // Executed Chunk ➜ ResultApproval ID (populated here) is *only safe* to be used by Verification Nodes
 // for tracking their own approvals.
-func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error {
-	// For the same ExecutionResult, a correct Verifier will always produce the same approval. In other words,
-	// if we have already indexed an approval for the pair (resultID, chunkIndex) we should never overwrite it
-	// with a _different_ approval. We explicitly enforce that here to prevent state corruption.
-	// The lock guarantees that no other thread can concurrently update the index. Thereby confirming that no value
-	// is already stored for the given key (resultID, chunkIndex) and then updating the index (or aborting) is
-	// synchronized into one atomic operation.
-	lctx := r.lockManager.NewContext()
-	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockIndexResultApproval)
-	if err != nil {
-		return err
+//
+// For the same ExecutionResult, a Verifier will always produce the same approval. Therefore, this operation
+// is idempotent, i.e. repeated calls with the *same inputs* are equivalent to just calling the method once;
+// still the method succeeds on each call. However, when attempting to index *different* ResultApproval IDs
+// for the same key (resultID, chunkIndex) this method returns an exception, as this should never happen for
+// a correct Verification Node indexing its own approvals.
+func (r *ResultApprovals) StoreMyApproval(lctx lockctx.Proof, approval *flow.ResultApproval) error {
+	if !lctx.HoldsLock(storage.LockIndexResultApproval) {
+		return fmt.Errorf("missing lock for index result approval")
 	}
 
-	err = r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		var storedApprovalID flow.Identifier
-		err := operation.LookupResultApproval(rw.GlobalReader(), resultID, chunkIndex, &storedApprovalID)
-		if err != nil {
-			if !errors.Is(err, storage.ErrNotFound) {
-				return fmt.Errorf("could not lookup result approval ID: %w", err)
-			}
-			// no approval found, index the approval
-			return operation.IndexResultApproval(lctx, rw.Writer(), resultID, chunkIndex, approvalID)
-		}
+	approvalID := approval.ID()
+	resultID := approval.Body.ExecutionResultID
+	chunkIndex := approval.Body.ChunkIndex
 
-		// an approval is already indexed, double check if it is the same
-		// We don't allow indexing multiple approvals per chunk because the
-		// store is only used within Verification nodes, and it is impossible
-		// for a Verification node to compute different approvals for the same
-		// chunk.
+	var storedApprovalID flow.Identifier
+	err := operation.LookupResultApproval(r.db.Reader(), resultID, chunkIndex, &storedApprovalID)
+	if err == nil {
 		if storedApprovalID != approvalID {
 			return fmt.Errorf("attempting to store conflicting approval (result: %v, chunk index: %d): storing: %v, stored: %v. %w",
 				resultID, chunkIndex, approvalID, storedApprovalID, storage.ErrDataMismatch)
 		}
-		return nil
-	})
 
-	if err != nil {
-		return fmt.Errorf("could not index result approval: %w", err)
+		// already stored and indexed
+		return nil
 	}
-	return nil
+
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("could not lookup result approval ID: %w", err)
+	}
+
+	// no approval found, store and index the approval
+
+	return r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		// store approval
+		err := r.cache.PutWithLockTx(lctx, rw, approvalID, approval)
+		if err != nil {
+			return err
+		}
+
+		// index approval
+		return operation.UnsafeIndexResultApproval(lctx, rw.Writer(), resultID, chunkIndex, approvalID)
+	})
 }
 
 // ByID retrieves a ResultApproval by its ID

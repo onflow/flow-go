@@ -27,19 +27,14 @@ func RetrieveTransactionResultByIndex(r storage.Reader, blockID flow.Identifier,
 // tx_index index. This correctly handles cases of duplicate transactions within block.
 func LookupTransactionResultsByBlockIDUsingIndex(r storage.Reader, blockID flow.Identifier, txResults *[]flow.TransactionResult) error {
 
-	txErrIterFunc := func() (CheckFunc, CreateFunc, HandleFunc) {
-		check := func(_ []byte) (bool, error) {
-			return true, nil
-		}
+	txErrIterFunc := func(keyCopy []byte, getValue func(destVal any) error) (bail bool, err error) {
 		var val flow.TransactionResult
-		create := func() interface{} {
-			return &val
+		err = getValue(&val)
+		if err != nil {
+			return true, err
 		}
-		handle := func() error {
-			*txResults = append(*txResults, val)
-			return nil
-		}
-		return check, create, handle
+		*txResults = append(*txResults, val)
+		return false, nil
 	}
 
 	return TraverseByPrefix(r, MakePrefix(codeTransactionResultIndex, blockID), txErrIterFunc, storage.DefaultIteratorOptions())
@@ -94,19 +89,14 @@ func RetrieveLightTransactionResultByIndex(r storage.Reader, blockID flow.Identi
 // tx_index index. This correctly handles cases of duplicate transactions within block.
 func LookupLightTransactionResultsByBlockIDUsingIndex(r storage.Reader, blockID flow.Identifier, txResults *[]flow.LightTransactionResult) error {
 
-	txErrIterFunc := func() (CheckFunc, CreateFunc, HandleFunc) {
-		check := func(_ []byte) (bool, error) {
-			return true, nil
-		}
+	txErrIterFunc := func(keyCopy []byte, getValue func(destVal any) error) (bail bool, err error) {
 		var val flow.LightTransactionResult
-		create := func() interface{} {
-			return &val
+		err = getValue(&val)
+		if err != nil {
+			return true, err
 		}
-		handle := func() error {
-			*txResults = append(*txResults, val)
-			return nil
-		}
-		return check, create, handle
+		*txResults = append(*txResults, val)
+		return false, nil
 	}
 
 	return TraverseByPrefix(r, MakePrefix(codeLightTransactionResultIndex, blockID), txErrIterFunc, storage.DefaultIteratorOptions())
@@ -147,19 +137,14 @@ func TransactionResultErrorMessagesExists(r storage.Reader, blockID flow.Identif
 // LookupTransactionResultErrorMessagesByBlockIDUsingIndex retrieves all tx result error messages for a block, by using
 // tx_index index. This correctly handles cases of duplicate transactions within block.
 func LookupTransactionResultErrorMessagesByBlockIDUsingIndex(r storage.Reader, blockID flow.Identifier, txResultErrorMessages *[]flow.TransactionResultErrorMessage) error {
-	txErrIterFunc := func() (CheckFunc, CreateFunc, HandleFunc) {
-		check := func(_ []byte) (bool, error) {
-			return true, nil
-		}
+	txErrIterFunc := func(keyCopy []byte, getValue func(destVal any) error) (bail bool, err error) {
 		var val flow.TransactionResultErrorMessage
-		create := func() interface{} {
-			return &val
+		err = getValue(&val)
+		if err != nil {
+			return true, err
 		}
-		handle := func() error {
-			*txResultErrorMessages = append(*txResultErrorMessages, val)
-			return nil
-		}
-		return check, create, handle
+		*txResultErrorMessages = append(*txResultErrorMessages, val)
+		return false, nil
 	}
 
 	return TraverseByPrefix(r, MakePrefix(codeTransactionResultErrorMessageIndex, blockID), txErrIterFunc, storage.DefaultIteratorOptions())
