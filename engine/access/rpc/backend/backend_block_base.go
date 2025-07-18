@@ -16,8 +16,7 @@ type backendBlockBase struct {
 	state   protocol.State
 }
 
-// Expected errors during normal operations:
-// - storage.ErrNotFound - Indicates that the queried block height is not finalized yet.
+//
 func (b *backendBlockBase) getBlockStatus(header *flow.Header) (flow.BlockStatus, error) {
 	// check which block is finalized at the target block's height
 	// note: this index is only populated for finalized blocks
@@ -36,7 +35,7 @@ func (b *backendBlockBase) getBlockStatus(header *flow.Header) (flow.BlockStatus
 
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		return flow.BlockStatusUnknown, err
+		return flow.BlockStatusUnknown, fmt.Errorf("failed to lookup sealed header: %w", err)
 	}
 
 	if header.Height > sealed.Height {
