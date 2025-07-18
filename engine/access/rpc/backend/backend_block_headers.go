@@ -38,9 +38,9 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(ctx context.Context, isSealed
 
 	status, err := b.getBlockStatus(header)
 	if err != nil {
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return nil, flow.BlockStatusUnknown, err
+		irrecoverableErr := irrecoverable.NewException(err)
+		irrecoverable.Throw(ctx, irrecoverableErr)
+		return nil, flow.BlockStatusUnknown, irrecoverableErr
 	}
 	return header, status, nil
 }
@@ -53,9 +53,9 @@ func (b *backendBlockHeaders) GetBlockHeaderByID(ctx context.Context, id flow.Id
 
 	status, err := b.getBlockStatus(header)
 	if err != nil {
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return nil, flow.BlockStatusUnknown, err
+		irrecoverableErr := irrecoverable.NewException(err)
+		irrecoverable.Throw(ctx, irrecoverableErr)
+		return nil, flow.BlockStatusUnknown, irrecoverableErr
 	}
 	return header, status, nil
 }
@@ -68,9 +68,9 @@ func (b *backendBlockHeaders) GetBlockHeaderByHeight(ctx context.Context, height
 
 	status, err := b.getBlockStatus(header)
 	if err != nil {
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return nil, flow.BlockStatusUnknown, err
+		irrecoverableErr := irrecoverable.NewException(err)
+		irrecoverable.Throw(ctx, irrecoverableErr)
+		return nil, flow.BlockStatusUnknown, irrecoverableErr
 	}
 	return header, status, nil
 }
