@@ -79,17 +79,6 @@ type ExecutionResultQueryProviderImpl struct {
 // NewExecutionResultQueryProviderImpl creates and returns a new instance of
 // ExecutionResultQueryProviderImpl.
 //
-// Parameters:
-//   - log: The logger to use for logging.
-//   - state: The protocol state used for retrieving block information.
-//   - executionReceipts: A storage.ExecutionReceipts object that contains the execution receipts
-//     for blocks.
-//   - preferredENIdentifiers: A flow.IdentifierList of preferred execution node identifiers that
-//     are prioritized during selection.
-//   - requiredENIdentifiers: A flow.IdentifierList of required execution node identifiers that are
-//     always considered if available.
-//   - agreeingExecutors: The minimum number of receipts including the same ExecutionResult.
-//
 // No errors are expected during normal operations
 func NewExecutionResultQueryProviderImpl(
 	log zerolog.Logger,
