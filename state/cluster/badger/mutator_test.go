@@ -110,7 +110,7 @@ func (suite *MutatorSuite) SetupTest() {
 		all.Results,
 		all.Blocks,
 		all.QuorumCertificates,
-		all.Setups,
+		all.EpochSetups,
 		all.EpochCommits,
 		all.EpochProtocolStateEntries,
 		all.ProtocolKVStore,
@@ -130,7 +130,7 @@ func (suite *MutatorSuite) SetupTest() {
 		state.Params(),
 		all.Headers,
 		all.Results,
-		all.Setups,
+		all.EpochSetups,
 		all.EpochCommits,
 	)
 

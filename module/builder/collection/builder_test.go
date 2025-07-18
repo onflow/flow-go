@@ -144,7 +144,7 @@ func (suite *BuilderSuite) SetupTest() {
 		all.Results,
 		all.Blocks,
 		all.QuorumCertificates,
-		all.Setups,
+		all.EpochSetups,
 		all.EpochCommits,
 		all.EpochProtocolStateEntries,
 		all.ProtocolKVStore,

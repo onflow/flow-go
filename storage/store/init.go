@@ -58,7 +58,7 @@ func InitAll(metrics module.CacheMetrics, db storage.DB) *All {
 		Results:            results,
 		Receipts:           receipts,
 
-		Setups:                    setups,
+		EpochSetups:               setups,
 		EpochCommits:              epochCommits,
 		EpochProtocolStateEntries: epochProtocolStateEntries,
 		ProtocolKVStore:           protocolKVStore,
