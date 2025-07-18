@@ -318,7 +318,7 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 	e.core.HandleHeight(final, res.Height)
 }
 
-// onBlockResponse processes a response containing a specifically requested block.
+// onBlockResponse processes basic structural validated proposals containing a specifically requested block.
 func (e *Engine) onBlockResponse(originID flow.Identifier, proposals []*clustermodel.Proposal) {
 	// process the blocks one by one
 	for _, proposal := range proposals {
