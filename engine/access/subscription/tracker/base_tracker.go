@@ -150,7 +150,7 @@ func (b *BaseTrackerImpl) GetStartHeightFromLatest(ctx context.Context) (uint64,
 	if err != nil {
 		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
 		// we should halt processing requests
-		err := irrecoverable.NewExceptionf("failed to get sealed head: %w", err)
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		irrecoverable.Throw(ctx, err)
 		return 0, err
 	}
