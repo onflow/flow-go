@@ -266,7 +266,7 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 	err = operation.RetrieveEpochLastHeight(r, b.clusterEpoch, &refEpochFinalHeight)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, nil
+			return ctx, nil
 		}
 		return nil, fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
 	}
