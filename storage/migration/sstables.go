@@ -144,7 +144,11 @@ func createSSTableWriter(filePath string) (*sstable.Writer, error) {
 
 	writable := objstorageprovider.NewFileWritable(f)
 	sstWriter := sstable.NewWriter(writable, sstable.WriterOptions{
-		TableFormat: sstable.TableFormatMax,
+		// pebble 1 is using TableFormatPebblev4, pebble 2's latest is TableFormatPebblev5 (TableFormatMax)
+		// in order to be compatible with pebble 1, we use TableFormatPebblev4 for now.
+		// TODO: use TableFormatMax in next spork
+		// TableFormat: sstable.TableFormatMax,
+		TableFormat: sstable.TableFormatPebblev4,
 	})
 
 	return sstWriter, nil
