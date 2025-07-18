@@ -79,7 +79,7 @@ func (m *MutableState) getExtendCtx(lctx lockctx.Proof, candidate *cluster.Block
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			ctx.epochHasEnded = false
-			return extendContext{}, nil
+			return ctx, nil
 		}
 		return extendContext{}, fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
 	}
