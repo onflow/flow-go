@@ -61,6 +61,12 @@ var testWithVMTransactionExecution = flag.Bool(
 	"Run transactions in tests using the Cadence compiler/VM",
 )
 
+var testWithVMScriptExecution = flag.Bool(
+	"testWithVMScriptExecution",
+	false,
+	"Run scripts in tests using the Cadence compiler/VM",
+)
+
 type vmTest struct {
 	bootstrapOptions []fvm.BootstrapProcedureOption
 	contextOptions   []fvm.Option
@@ -92,6 +98,8 @@ func (vmt vmTest) run(
 			// default chain is Testnet
 			fvm.WithChain(flow.Testnet.Chain()),
 			fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
+			fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
+			fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 		}
 
 		opts := append(baseOpts, vmt.contextOptions...)
@@ -2302,7 +2310,11 @@ func TestScriptExecutionLimit(t *testing.T) {
 				require.True(t, errors.IsComputationLimitExceededError(output.Err))
 				require.ErrorContains(t, output.Err, "computation exceeds limit (10000)")
 				require.GreaterOrEqual(t, output.ComputationUsed, uint64(10000))
-				require.GreaterOrEqual(t, output.MemoryEstimate, uint64(548020260))
+				if *testWithVMScriptExecution {
+					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(540012179))
+				} else {
+					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(548020260))
+				}
 			},
 		),
 	)
@@ -2323,7 +2335,11 @@ func TestScriptExecutionLimit(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 				require.GreaterOrEqual(t, output.ComputationUsed, uint64(17955))
-				require.GreaterOrEqual(t, output.MemoryEstimate, uint64(984017413))
+				if *testWithVMScriptExecution {
+					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(969629012))
+				} else {
+					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(984017413))
+				}
 			},
 		),
 	)
@@ -2495,6 +2511,11 @@ func TestAttachments(t *testing.T) {
 
 	newVMTest().
 		withBootstrapProcedureOptions().
+		withContextOptions(
+			// TODO: requires support for attachments in Cadence VM
+			fvm.WithVMTransactionExecutionEnabled(false),
+			fvm.WithVMScriptExecutionEnabled(false),
+		).
 		run(
 			func(
 				t *testing.T,
@@ -2818,8 +2839,6 @@ func TestEntropyCallOnlyOkIfAllowed(t *testing.T) {
 
 				err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 				require.NoError(t, err)
-
-				ctx.VMTransactionExecutionEnabled = *testWithVMTransactionExecution
 
 				_, output, err := vm.Run(
 					ctx,
