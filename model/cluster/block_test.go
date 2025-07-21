@@ -2,6 +2,7 @@ package cluster_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -97,7 +98,7 @@ func TestNewRootBlock(t *testing.T) {
 				ChainID:            flow.Emulator,
 				ParentID:           flow.ZeroID,
 				Height:             10,
-				Timestamp:          time.Now(),
+				Timestamp:          uint64(time.Now().UnixMilli()),
 				View:               0,
 				ParentView:         0,
 				ParentVoterIndices: []byte{},

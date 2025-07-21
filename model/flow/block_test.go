@@ -3,6 +3,7 @@ package flow_test
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -186,7 +187,7 @@ func TestNewRootBlock(t *testing.T) {
 				ChainID:            flow.Emulator,
 				ParentID:           unittest.IdentifierFixture(),
 				Height:             10,
-				Timestamp:          time.Now(),
+				Timestamp:          uint64(time.Now().UnixMilli()),
 				View:               0,
 				ParentView:         0,
 				ParentVoterIndices: []byte{},
