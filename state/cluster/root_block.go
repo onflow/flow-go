@@ -21,7 +21,7 @@ func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) (*
 		ChainID:            chainID,
 		ParentID:           flow.ZeroID,
 		Height:             0,
-		Timestamp:          flow.GenesisTime,
+		Timestamp:          uint64(flow.GenesisTime.UnixMilli()),
 		View:               0,
 		ParentView:         0,
 		ParentVoterIndices: nil,
