@@ -36,7 +36,7 @@ func InsertClusterBlock(proposal *cluster.Proposal) func(*badger.Txn) error {
 		}
 
 		// index the child block for recovery
-		err = IndexNewBlock(blockID, proposal.Block.Header.ParentID)(tx)
+		err = IndexNewBlock(blockID, proposal.Block.ParentID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}
@@ -64,8 +64,8 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 		// overwrite block
 		newBlock, err := cluster.NewBlock(
 			cluster.UntrustedBlock{
-				Header:  header.HeaderBody,
-				Payload: payload,
+				HeaderBody: header.HeaderBody,
+				Payload:    payload,
 			},
 		)
 		if err != nil {

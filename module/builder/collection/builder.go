@@ -193,8 +193,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBody
 
 	block, err := cluster.NewBlock(
 		cluster.UntrustedBlock{
-			Header:  proposal.Header.HeaderBody,
-			Payload: *payload,
+			HeaderBody: proposal.Header.HeaderBody,
+			Payload:    *payload,
 		},
 	)
 	if err != nil {

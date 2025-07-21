@@ -265,9 +265,8 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 			internalClusterProposal, err := val.DeclareStructurallyValid()
 			require.NoError(suite.T(), err)
 			block := internalClusterProposal.Block
-			header := block.Header
 			collection := block.Payload.Collection
-			suite.T().Logf("got collection from %v height=%d col_id=%x size=%d", originID, header.Height, collection.ID(), collection.Len())
+			suite.T().Logf("got collection from %v height=%d col_id=%x size=%d", originID, block.Height, collection.ID(), collection.Len())
 			if guarantees[collection.ID()] {
 				for _, txID := range collection.Light().Transactions {
 					delete(lookup, txID)

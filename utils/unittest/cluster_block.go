@@ -14,8 +14,8 @@ type clusterBlockFactory struct{}
 
 func ClusterBlockFixture(opts ...func(*cluster.Block)) *cluster.Block {
 	block := &cluster.Block{
-		Header:  HeaderBodyFixture(),
-		Payload: *ClusterPayloadFixture(3),
+		HeaderBody: HeaderBodyFixture(),
+		Payload:    *ClusterPayloadFixture(3),
 	}
 	for _, opt := range opts {
 		opt(block)
@@ -25,30 +25,30 @@ func ClusterBlockFixture(opts ...func(*cluster.Block)) *cluster.Block {
 
 func (f *clusterBlockFactory) WithParent(parent *cluster.Block) func(*cluster.Block) {
 	return func(block *cluster.Block) {
-		block.Header.Height = parent.Header.Height + 1
-		block.Header.View = parent.Header.View + 1
-		block.Header.ChainID = parent.Header.ChainID
-		block.Header.Timestamp = time.Now().UTC()
-		block.Header.ParentID = parent.ID()
-		block.Header.ParentView = parent.Header.View
+		block.Height = parent.Height + 1
+		block.View = parent.View + 1
+		block.ChainID = parent.ChainID
+		block.Timestamp = time.Now().UTC()
+		block.ParentID = parent.ID()
+		block.ParentView = parent.View
 	}
 }
 
 func (f *clusterBlockFactory) WithHeight(height uint64) func(*cluster.Block) {
 	return func(block *cluster.Block) {
-		block.Header.Height = height
+		block.Height = height
 	}
 }
 
 func (f *clusterBlockFactory) WithChainID(chainID flow.ChainID) func(*cluster.Block) {
 	return func(block *cluster.Block) {
-		block.Header.ChainID = chainID
+		block.ChainID = chainID
 	}
 }
 
 func (f *clusterBlockFactory) WithProposerID(proposerID flow.Identifier) func(*cluster.Block) {
 	return func(block *cluster.Block) {
-		block.Header.ProposerID = proposerID
+		block.ProposerID = proposerID
 	}
 }
 
@@ -78,8 +78,8 @@ func (f *clusterBlockFactory) Genesis() (*cluster.Block, error) {
 
 	block, err := cluster.NewRootBlock(
 		cluster.UntrustedBlock{
-			Header:  *headerBody,
-			Payload: *payload,
+			HeaderBody: *headerBody,
+			Payload:    *payload,
 		},
 	)
 	if err != nil {

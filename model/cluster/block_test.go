@@ -20,10 +20,10 @@ func TestClusterBlockMalleability(t *testing.T) {
 	unittest.RequireEntityNonMalleable(
 		t,
 		clusterBlock,
-		unittest.WithFieldGenerator("Header.ParentView", func() uint64 {
-			return clusterBlock.Header.View - 1 // ParentView must stay below View, so set it to View-1
+		unittest.WithFieldGenerator("HeaderBody.ParentView", func() uint64 {
+			return clusterBlock.View - 1 // ParentView must stay below View, so set it to View-1
 		}),
-		unittest.WithFieldGenerator("Header.Timestamp", func() time.Time { return time.Now().UTC() }),
+		unittest.WithFieldGenerator("HeaderBody.Timestamp", func() time.Time { return time.Now().UTC() }),
 		unittest.WithFieldGenerator("Payload.Collection", func() flow.Collection {
 			return unittest.CollectionFixture(3)
 		}),
@@ -54,7 +54,7 @@ func TestNewBlock(t *testing.T) {
 
 	t.Run("invalid input with invalid header body", func(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
-		block.Header.ParentID = flow.ZeroID
+		block.ParentID = flow.ZeroID
 
 		res, err := cluster.NewBlock(cluster.UntrustedBlock(*block))
 		require.Error(t, err)
@@ -95,7 +95,7 @@ func TestNewRootBlock(t *testing.T) {
 	// validRootBlockFixture returns a new valid root cluster.UntrustedBlock for use in tests.
 	validRootBlockFixture := func() cluster.UntrustedBlock {
 		return cluster.UntrustedBlock{
-			Header: flow.HeaderBody{
+			HeaderBody: flow.HeaderBody{
 				ChainID:            flow.Emulator,
 				ParentID:           flow.ZeroID,
 				Height:             10,
@@ -119,7 +119,7 @@ func TestNewRootBlock(t *testing.T) {
 
 	t.Run("invalid input with invalid header body", func(t *testing.T) {
 		block := validRootBlockFixture()
-		block.Header.ParentView = 1
+		block.ParentView = 1
 
 		res, err := cluster.NewRootBlock(block)
 		require.Error(t, err)
@@ -129,7 +129,7 @@ func TestNewRootBlock(t *testing.T) {
 
 	t.Run("invalid input with invalid ParentID", func(t *testing.T) {
 		block := validRootBlockFixture()
-		block.Header.ParentID = unittest.IdentifierFixture()
+		block.ParentID = unittest.IdentifierFixture()
 
 		res, err := cluster.NewRootBlock(block)
 		require.Error(t, err)

@@ -43,7 +43,7 @@ func (suite *SnapshotSuite) SetupTest() {
 
 	suite.genesis, err = unittest.ClusterBlock.Genesis()
 	require.NoError(suite.T(), err)
-	suite.chainID = suite.genesis.Header.ChainID
+	suite.chainID = suite.genesis.ChainID
 
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
@@ -307,5 +307,5 @@ func (suite *SnapshotSuite) TestPending_Grandchildren() {
 
 func (suite *SnapshotSuite) TestParams_ChainID() {
 	chainID := suite.state.Params().ChainID()
-	suite.Assert().Equal(suite.genesis.Header.ChainID, chainID)
+	suite.Assert().Equal(suite.genesis.ChainID, chainID)
 }

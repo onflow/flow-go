@@ -15,18 +15,21 @@ import (
 func TestGenerateClusterRootQC(t *testing.T) {
 	participants := createClusterParticipants(t, 3)
 
-	clusterBlock := &cluster.Block{
-		Header: flow.HeaderBody{
-			ChainID:   flow.Emulator,
-			ParentID:  flow.ZeroID,
-			Timestamp: time.Now().UTC(),
-			View:      42,
+	clusterBlock, err := cluster.NewRootBlock(
+		cluster.UntrustedBlock{
+			HeaderBody: flow.HeaderBody{
+				ChainID:   flow.Emulator,
+				ParentID:  flow.ZeroID,
+				Timestamp: time.Now().UTC(),
+				View:      42,
+			},
+			Payload: *cluster.NewEmptyPayload(flow.ZeroID),
 		},
-		Payload: *cluster.NewEmptyPayload(flow.ZeroID),
-	}
+	)
+	require.NoError(t, err)
 
 	orderedParticipants := model.ToIdentityList(participants).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
-	_, err := GenerateClusterRootQC(participants, orderedParticipants, clusterBlock)
+	_, err = GenerateClusterRootQC(participants, orderedParticipants, clusterBlock)
 	require.NoError(t, err)
 }
 

@@ -334,8 +334,8 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 
 	block, err := cluster.NewBlock(
 		cluster.UntrustedBlock{
-			Header:  header.HeaderBody,
-			Payload: *payload,
+			HeaderBody: header.HeaderBody,
+			Payload:    *payload,
 		},
 	)
 	if err != nil {

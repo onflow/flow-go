@@ -38,8 +38,8 @@ func NewUntrustedClusterProposal(internal cluster.Block, proposerSig []byte) *Un
 func (cbp *UntrustedClusterProposal) DeclareStructurallyValid() (*cluster.Proposal, error) {
 	block, err := cluster.NewBlock(
 		cluster.UntrustedBlock{
-			Header:  cbp.Block.Header,
-			Payload: cbp.Block.Payload,
+			HeaderBody: cbp.Block.HeaderBody,
+			Payload:    cbp.Block.Payload,
 		},
 	)
 	if err != nil {
