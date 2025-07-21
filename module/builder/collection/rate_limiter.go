@@ -118,35 +118,65 @@ type BySealingLagRateLimiter struct {
 	state             protocol.State
 	minSealingLag     uint
 	maxSealingLag     uint
-	maxCollectionSize uint   // the maximum size of a collection that this rate limiter allows
-	config            Config // configuration for the collection builder
+	halvingInterval   uint
+	maxCollectionSize uint // the maximum size of a collection that this rate limiter allows
+
+	currentCollectionSize uint
+}
+
+func NewBySealingLagRateLimiter(
+	state protocol.State,
+	minSealingLag uint,
+	maxSealingLag uint,
+	halvingInterval uint,
+	maxCollectionSize uint,
+) (*BySealingLagRateLimiter, error) {
+	limiter := &BySealingLagRateLimiter{
+		state:             state,
+		minSealingLag:     minSealingLag,
+		maxSealingLag:     maxSealingLag,
+		halvingInterval:   halvingInterval,
+		maxCollectionSize: maxCollectionSize,
+	}
+	err := limiter.update()
+	if err != nil {
+		return nil, err
+	}
+	return limiter, nil
+}
+
+func (limiter *BySealingLagRateLimiter) update() error {
+	lastFinalized, err := limiter.state.Final().Head()
+	if err != nil {
+		return err
+	}
+	lastSealed, err := limiter.state.Sealed().Head()
+	if err != nil {
+		return err
+	}
+	sealingLag := uint(lastFinalized.Height - lastSealed.Height)
+	limiter.currentCollectionSize = StepHalving(
+		[2]uint{limiter.minSealingLag, limiter.maxSealingLag}, // [minSealingLag, maxSealingLag] is the range of input values where the halving is applied
+		[2]uint{1, limiter.maxCollectionSize},                 // [1, maxCollectionSize] is the range of collection sizes that halving function outputs
+		sealingLag,                                            // the current sealing lag
+		limiter.halvingInterval,                               // interval in blocks in which the halving is applied
+	)
+	return nil
 }
 
 // MaxCollectionSize returns the maximum size of a collection that this rate limiter allows.
 func (limiter *BySealingLagRateLimiter) MaxCollectionSize() uint {
-	return limiter.maxCollectionSize
+	return limiter.currentCollectionSize
 }
 
 // OnBlockFinalized is the event handler to receive notifications about finalized blocks.
 func (limiter *BySealingLagRateLimiter) OnBlockFinalized(_ *flow.Header) {
 	// TODO: this should be moved to a worker goroutine to avoid blocking the finalization process
 	// and proper error handling
-	lastFinalized, err := limiter.state.Final().Head()
+	err := limiter.update()
 	if err != nil {
 		panic(err)
 	}
-	lastSealed, err := limiter.state.Sealed().Head()
-	if err != nil {
-		panic(err)
-	}
-	sealingLag := uint(lastFinalized.Height - lastSealed.Height)
-	halvingInterval := uint(5)
-	limiter.maxCollectionSize = StepHalving(
-		[2]uint{limiter.minSealingLag, limiter.maxSealingLag}, // [minSealingLag, maxSealingLag] is the range of input values where the halving is applied
-		[2]uint{1, limiter.config.MaxCollectionSize},          // [1, maxCollectionSize] is the range of collection sizes that halving function outputs
-		sealingLag,      // the current sealing lag
-		halvingInterval, // interval in blocks in which the halving is applied
-	)
 }
 
 // StepHalving applies a step halving algorithm to determine the maximum collection size based on the sealing lag.

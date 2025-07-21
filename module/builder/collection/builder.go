@@ -215,8 +215,18 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 	ctx.config = b.config
 	ctx.parentID = parentID
 	ctx.lookup = newTransactionLookup()
+	bySealingLagRateLimiter, err := NewBySealingLagRateLimiter(
+		b.protoState,
+		20,
+		50,
+		5,
+		b.config.MaxCollectionSize,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not create by sealing lag rate limiter: %w", err)
+	}
+	ctx.config.MaxCollectionSize = bySealingLagRateLimiter.MaxCollectionSize()
 
-	var err error
 	ctx.parent, err = b.clusterHeaders.ByBlockID(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get parent: %w", err)
