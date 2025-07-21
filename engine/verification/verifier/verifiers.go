@@ -332,7 +332,10 @@ func verifyHeight(
 
 		_, err = verifier.Verify(vcd)
 		if err != nil {
-			collectionID := chunkDataPack.Collection.ID()
+			var collectionID flow.Identifier
+			if chunkDataPack.Collection != nil {
+				collectionID = chunkDataPack.Collection.ID()
+			}
 
 			if stopOnMismatch {
 				return fmt.Errorf("could not verify chunk (index: %v, ID: %v) at block %v (%v): %w", i, collectionID, height, blockID, err)
