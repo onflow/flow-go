@@ -13,7 +13,6 @@ import (
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/mock"
-	"github.com/onflow/flow-go/storage/deferred"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
