@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -101,7 +102,14 @@ func (s *BackendEventsSuite) SetupTest() {
 
 		payload := unittest.PayloadFixture()
 		header.PayloadHash = payload.Hash()
-		block := flow.NewBlock(header.HeaderBody, payload)
+		block, err := flow.NewBlock(
+			flow.UntrustedBlock{
+				Header:  header.HeaderBody,
+				Payload: payload,
+			},
+		)
+		require.NoError(s.T(), err)
+
 		// the last block is sealed
 		if i == blockCount-1 {
 			s.sealedHead = header

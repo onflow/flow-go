@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/stretchr/testify/assert"
@@ -35,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/integration/internal/emulator/utils/unittest"
 	"github.com/onflow/flow-go/model/flow"
 	flowgo "github.com/onflow/flow-go/model/flow"
+	commonunittest "github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestBlocks(t *testing.T) {
@@ -43,22 +43,12 @@ func TestBlocks(t *testing.T) {
 
 	store := setupStore(t)
 
-	block1 := flowgo.NewBlock(
-		flowgo.HeaderBody{
-			ChainID:   flow.Emulator,
-			Height:    1,
-			Timestamp: uint64(time.Now().UnixMilli()),
-		},
-		flowgo.Payload{},
+	block1 := commonunittest.BlockFixture(
+		commonunittest.Block.WithHeight(1),
 	)
 
-	block2 := flowgo.NewBlock(
-		flowgo.HeaderBody{
-			ChainID:   flow.Emulator,
-			Height:    2,
-			Timestamp: uint64(time.Now().UnixMilli()),
-		},
-		flowgo.Payload{},
+	block2 := commonunittest.BlockFixture(
+		commonunittest.Block.WithHeight(2),
 	)
 
 	t.Run("should return error for not found", func(t *testing.T) {

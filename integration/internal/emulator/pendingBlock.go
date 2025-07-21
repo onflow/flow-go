@@ -96,18 +96,19 @@ func (b *pendingBlock) Block() *flowgo.Block {
 		}
 	}
 
-	return flowgo.NewBlock(
-		flowgo.HeaderBody{
+	//nolint:structwrite - safe because Emulator is strictly used for integration tests
+	return &flowgo.Block{
+		Header: flowgo.HeaderBody{
 			ChainID:   b.chainID,
 			Height:    b.height,
 			View:      b.view,
 			ParentID:  b.parentID,
 			Timestamp: uint64(b.timestamp.UnixMilli()),
 		},
-		flowgo.Payload{
+		Payload: flowgo.Payload{
 			Guarantees: guarantees,
 		},
-	)
+	}
 }
 
 func (b *pendingBlock) Collections() []*flowgo.LightCollection {

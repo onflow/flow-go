@@ -110,7 +110,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedClu
 		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
 	}()
 
-	trustedBlockProposal, err := proposalMsg.Message.DeclareTrusted()
+	trustedBlockProposal, err := proposalMsg.Message.DeclareStructurallyValid()
 	if err != nil {
 		return fmt.Errorf("could not convert to cluster block proposal: %w", err)
 	}

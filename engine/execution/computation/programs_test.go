@@ -86,27 +86,24 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 
 	col := flow.Collection{Transactions: transactions}
 
-	guarantee := flow.CollectionGuarantee{
+	guarantee := &flow.CollectionGuarantee{
 		CollectionID: col.ID(),
 		Signature:    nil,
 	}
 
-	block := flow.NewBlock(
-		flow.HeaderBody{
-			ChainID:   flow.Emulator,
-			View:      26,
-			Timestamp: uint64(time.Now().UnixMilli()),
-		},
-		flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{&guarantee},
-		},
+	block := unittest.BlockFixture(
+		unittest.Block.WithView(26),
+		unittest.Block.WithParentView(25),
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
+		),
 	)
 
 	executableBlock := &entity.ExecutableBlock{
 		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.CollectionID: {
-				Guarantee:  &guarantee,
+				Guarantee:  guarantee,
 				Collection: &col,
 			},
 		},
@@ -275,16 +272,16 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	)
 
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
-		block1 = flow.NewBlock(
-			flow.HeaderBody{
+		block1 = &flow.Block{
+			Header: flow.HeaderBody{
 				View:      1,
 				ChainID:   flow.Emulator,
 				Timestamp: uint64(time.Now().UnixMilli()),
 			},
-			flow.Payload{
+			Payload: flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{},
 			},
-		)
+		}
 		block1Snapshot = snapshotTree
 		executableBlock := &entity.ExecutableBlock{
 			Block:      block1,
@@ -496,28 +493,24 @@ func createTestBlockAndRun(
 	*execution.ComputationResult,
 	snapshot.SnapshotTree,
 ) {
-	guarantee := flow.CollectionGuarantee{
+	guarantee := &flow.CollectionGuarantee{
 		CollectionID: col.ID(),
 		Signature:    nil,
 	}
 
-	block := flow.NewBlock(
-		flow.HeaderBody{
-			ChainID:   flow.Emulator,
-			ParentID:  parentBlock.ID(),
-			View:      parentBlock.Header.Height + 1,
-			Timestamp: uint64(time.Now().UnixMilli()),
-		},
-		flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{&guarantee},
-		},
+	block := unittest.BlockFixture(
+		unittest.Block.WithParent(parentBlock.ID(), parentBlock.Header.View, parentBlock.Header.Height),
+		unittest.Block.WithView(parentBlock.Header.View+1),
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
+		),
 	)
 
 	executableBlock := &entity.ExecutableBlock{
 		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.CollectionID: {
-				Guarantee:  &guarantee,
+				Guarantee:  guarantee,
 				Collection: &col,
 			},
 		},

@@ -74,7 +74,7 @@ func (s *TxErrorMessagesCoreSuite) SetupTest() {
 	s.connFactory = connectionmock.NewConnectionFactory(s.T())
 	s.receipts = storage.NewExecutionReceipts(s.T())
 	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
-	s.rootBlock = flow.Genesis(flow.Emulator)
+	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
 	s.finalizedBlock = unittest.BlockWithParentFixture(s.rootBlock.ToHeader()).ToHeader()
 
 	s.proto.state.On("Params").Return(s.proto.params)

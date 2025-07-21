@@ -55,8 +55,7 @@ func (s *RequesterSuite) SetupTest() {
 	s.execClient = accessmock.NewExecutionAPIClient(s.T())
 	s.connFactory = connectionmock.NewConnectionFactory(s.T())
 	s.receipts = storage.NewExecutionReceipts(s.T())
-
-	s.rootBlock = flow.Genesis(flow.Emulator)
+	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
 	s.finalizedBlock = unittest.BlockWithParentFixture(s.rootBlock.ToHeader()).ToHeader()
 
 	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.ToHeader(), nil)

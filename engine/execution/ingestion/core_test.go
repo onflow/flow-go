@@ -133,7 +133,7 @@ func makeBlocksAndCollections(t *testing.T) ([]*flow.Block, []*flow.Collection) 
 	cs := unittest.CollectionListFixture(2)
 	col0, col1 := cs[0], cs[1]
 
-	genesis := unittest.GenesisFixture()
+	genesis := unittest.Block.Genesis(flow.Emulator)
 	blocks := unittest.ChainFixtureFrom(4, genesis.ToHeader())
 
 	bs := append([]*flow.Block{genesis}, blocks...)
