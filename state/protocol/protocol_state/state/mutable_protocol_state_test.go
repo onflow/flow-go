@@ -435,9 +435,9 @@ func (s *StateMutatorSuite) Test_ReplicateFails() {
 	s.kvStateMachineFactories[1] = protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 
 	deferredDBOps := deferred.NewDeferredDBOps()
-		_, err := s.mutableState.EvolveState(deferredDBOps, s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
-		require.ErrorIs(s.T(), err, exception)
-		require.Nil(s.T(), deferredDBOps.Execute(nil, flow.ZeroID, nil))
+	_, err := s.mutableState.EvolveState(deferredDBOps, s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
+	require.ErrorIs(s.T(), err, exception)
+	require.Nil(s.T(), deferredDBOps.Execute(nil, flow.ZeroID, nil))
 }
 
 // Test_StateMachineFactoryFails verifies that errors received while creating the sub-state machines are escalated to the caller.
@@ -460,7 +460,7 @@ func (s *StateMutatorSuite) Test_StateMachineFactoryFails() {
 		deferredDBOps := deferred.NewDeferredDBOps()
 		_, err := s.mutableState.EvolveState(deferredDBOps, s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
-		require.True(s.T(), len(dbUpdates) == 0)
+		require.True(s.T(), deferredDBOps.IsEmpty())
 	})
 
 	s.Run("failing factory is first", func() {
@@ -469,7 +469,7 @@ func (s *StateMutatorSuite) Test_StateMachineFactoryFails() {
 		deferredDBOps := deferred.NewDeferredDBOps()
 		_, err := s.mutableState.EvolveState(deferredDBOps, s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
-		require.True(s.T(), len(dbUpdates) == 0)
+		require.True(s.T(), deferredDBOps.IsEmpty())
 	})
 }
 
@@ -520,7 +520,7 @@ func (s *StateMutatorSuite) Test_StateMachineProcessingServiceEventsFails() {
 func (s *StateMutatorSuite) Test_StateMachineBuildFails() {
 	workingStateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
 	workingStateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(nil).Twice()
-	workingStateMachine.On("Build").Return([]storage.BlockIndexingBatchWrite{}, nil).Maybe()
+	workingStateMachine.On("Build").Return(deferred.NewDeferredDBOps(), nil).Maybe()
 
 	exception := errors.New("exception")
 	failingStateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
@@ -651,10 +651,6 @@ func (m *mockStateTransition) Mock() *protocol_statemock.OrthogonalStoreStateMac
 
 	stateMachine.On("Build").Run(func(args mock.Arguments) {
 		require.True(m.T, evolveStateCalled, "Method `OrthogonalStoreStateMachine.Build` called before `EvolveState`!")
-	}).Return([]storage.BlockIndexingBatchWrite{
-		func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-			return nil
-		},
-	}, nil).Once()
+	}).Return(deferred.NewDeferredDBOps(), nil).Once()
 	return stateMachine //nolint:govet
 }

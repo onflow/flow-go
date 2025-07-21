@@ -9,20 +9,32 @@ import (
 type DBOp = func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error
 
 type DeferredDBOps struct {
-	pending DBOp
+	pending DBOp // can be nil
 }
 
 func NewDeferredDBOps() *DeferredDBOps {
 	return &DeferredDBOps{
-		pending: func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-			return nil
-		},
+		pending: nil,
 	}
+}
+
+func (d *DeferredDBOps) IsEmpty() bool {
+	return d.pending == nil
 }
 
 // AddDbOp schedules the given DeferredDBUpdate to be executed as part of the future transaction.
 // it reduces the call stack compared to adding the functors individually via `AddDbOp(op DeferredDBUpdate)`.
 func (d *DeferredDBOps) AddNextOperations(nextOperation DBOp) {
+	if nextOperation == nil {
+		// it might happen if Chain method was called with nil
+		return
+	}
+
+	if d.pending == nil {
+		d.pending = nextOperation
+		return
+	}
+
 	prior := d.pending
 	d.pending = func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 		// Execute the prior operations first
@@ -55,5 +67,8 @@ func (d *DeferredDBOps) AddSucceedCallback(callback func()) {
 }
 
 func (d *DeferredDBOps) Execute(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+	if d.pending == nil {
+		return nil // No operations to execute
+	}
 	return d.pending(lctx, blockID, rw)
 }
