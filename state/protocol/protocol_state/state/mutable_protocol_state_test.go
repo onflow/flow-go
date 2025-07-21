@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/deferred"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -125,17 +126,15 @@ func (s *StateMutatorSuite) testEvolveState(seals []*flow.Seal, expectedResultin
 		s.protocolKVStoreDB.On("BatchStore", rw, expectedResultingStateID, &s.evolvingState).Return(nil).Once()
 	}
 
-	resultingStateID, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, seals)
+	deferredDBOps := deferred.NewDeferredDBOps()
+	resultingStateID, err := s.mutableState.EvolveState(deferredDBOps, s.candidate.ParentID, s.candidate.View, seals)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), expectedResultingStateID, resultingStateID)
 
 	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
 	blockID := s.candidate.ID()
-	for _, update := range dbUpdates {
-		require.NoError(s.T(), update(blockID, rw))
-	}
-	// err = dbUpdates.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
+	err = deferredDBOps.Execute(nil, blockID, rw)
 	require.NoError(s.T(), err)
 
 	// The testify framework calls `AssertExpectations` on all mocks when the test finishes. However, note that we are calling
@@ -414,10 +413,11 @@ func (s *StateMutatorSuite) Test_InvalidParent() {
 	unknownParent := unittest.IdentifierFixture()
 	s.protocolKVStoreDB.On("ByBlockID", unknownParent).Return(nil, storage.ErrNotFound)
 
-	_, dbUpdates, err := s.mutableState.EvolveState(unknownParent, s.candidate.View, []*flow.Seal{})
+	deferredDBOps := deferred.NewDeferredDBOps()
+	_, err := s.mutableState.EvolveState(deferredDBOps, unknownParent, s.candidate.View, []*flow.Seal{})
 	require.Error(s.T(), err)
 	require.False(s.T(), protocol.IsInvalidServiceEventError(err))
-	require.True(s.T(), len(dbUpdates) == 0)
+	require.Nil(s.T(), deferredDBOps.Execute(nil, flow.ZeroID, nil))
 }
 
 // Test_ReplicateFails verifies that errors during the parent state replication are escalated to the caller.
@@ -434,9 +434,10 @@ func (s *StateMutatorSuite) Test_ReplicateFails() {
 	s.kvStateMachineFactories[0] = protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 	s.kvStateMachineFactories[1] = protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 
-	_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
-	require.ErrorIs(s.T(), err, exception)
-	require.True(s.T(), len(dbUpdates) == 0)
+	deferredDBOps := deferred.NewDeferredDBOps()
+		_, err := s.mutableState.EvolveState(deferredDBOps, s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
+		require.ErrorIs(s.T(), err, exception)
+		require.Nil(s.T(), deferredDBOps.Execute(nil, flow.ZeroID, nil))
 }
 
 // Test_StateMachineFactoryFails verifies that errors received while creating the sub-state machines are escalated to the caller.
@@ -456,7 +457,8 @@ func (s *StateMutatorSuite) Test_StateMachineFactoryFails() {
 	s.Run("failing factory is last", func() {
 		s.kvStateMachines[0], s.kvErrors[0] = stateMachine, nil
 		s.kvStateMachines[1], s.kvErrors[1] = nil, exception
-		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
+		deferredDBOps := deferred.NewDeferredDBOps()
+		_, err := s.mutableState.EvolveState(deferredDBOps, s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.True(s.T(), len(dbUpdates) == 0)
 	})
@@ -464,7 +466,8 @@ func (s *StateMutatorSuite) Test_StateMachineFactoryFails() {
 	s.Run("failing factory is first", func() {
 		s.kvStateMachines[0], s.kvErrors[0] = nil, exception
 		s.kvStateMachines[1], s.kvErrors[1] = stateMachine, nil
-		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
+		deferredDBOps := deferred.NewDeferredDBOps()
+		_, err := s.mutableState.EvolveState(deferredDBOps, s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.True(s.T(), len(dbUpdates) == 0)
 	})
@@ -493,19 +496,21 @@ func (s *StateMutatorSuite) Test_StateMachineProcessingServiceEventsFails() {
 
 	s.Run("failing state machine is last", func() {
 		s.kvStateMachines[0], s.kvStateMachines[1] = workingStateMachine, failingStateMachine //nolint:govet
-		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
+		deferredDBOps := deferred.NewDeferredDBOps()
+		_, err := s.mutableState.EvolveState(deferredDBOps, s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
-		require.True(s.T(), len(dbUpdates) == 0)
+		require.Nil(s.T(), deferredDBOps.Execute(nil, flow.ZeroID, nil))
 	})
 
 	failingStateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(exception).Once()
 	s.Run("failing state machine is first", func() {
 		s.kvStateMachines[0], s.kvStateMachines[1] = failingStateMachine, workingStateMachine //nolint:govet
-		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
+		deferredDBOps := deferred.NewDeferredDBOps()
+		_, err := s.mutableState.EvolveState(deferredDBOps, s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
-		require.True(s.T(), len(dbUpdates) == 0)
+		require.Nil(s.T(), deferredDBOps.Execute(nil, flow.ZeroID, nil))
 	})
 }
 
@@ -524,19 +529,21 @@ func (s *StateMutatorSuite) Test_StateMachineBuildFails() {
 
 	s.Run("failing state machine is last", func() {
 		s.kvStateMachines[0], s.kvStateMachines[1] = workingStateMachine, failingStateMachine //nolint:govet
-		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
+		deferredDBOps := deferred.NewDeferredDBOps()
+		_, err := s.mutableState.EvolveState(deferredDBOps, s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
-		require.True(s.T(), len(dbUpdates) == 0)
+		require.Nil(s.T(), deferredDBOps.Execute(nil, flow.ZeroID, nil))
 	})
 
 	failingStateMachine.On("Build").Return(nil, exception).Once()
 	s.Run("failing state machine is first", func() {
 		s.kvStateMachines[0], s.kvStateMachines[1] = failingStateMachine, workingStateMachine //nolint:govet
-		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
+		deferredDBOps := deferred.NewDeferredDBOps()
+		_, err := s.mutableState.EvolveState(deferredDBOps, s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
-		require.True(s.T(), len(dbUpdates) == 0)
+		require.Nil(s.T(), deferredDBOps.Execute(nil, flow.ZeroID, nil))
 	})
 }
 
@@ -557,18 +564,15 @@ func (s *StateMutatorSuite) Test_EncodeFailed() {
 	s.protocolKVStoreDB.On("BatchIndex", mock.Anything, s.candidate.ID(), expectedResultingStateID).Return(nil).Once()
 	s.protocolKVStoreDB.On("BatchStore", mock.Anything, expectedResultingStateID, &s.evolvingState).Return(exception).Once()
 
-	_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
+	deferredDBOps := deferred.NewDeferredDBOps()
+	_, err := s.mutableState.EvolveState(deferredDBOps, s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 	require.NoError(s.T(), err) // `EvolveState` should succeed, because storing the encoded snapshot only happens when we execute dbUpdates
 
 	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
 	blockID := s.candidate.ID()
-	for _, update := range dbUpdates {
-		err := update(blockID, rw)
-		if err != nil {
-			require.ErrorIs(s.T(), err, exception)
-		}
-	}
+	err = deferredDBOps.Execute(nil, blockID, rw)
+	require.ErrorIs(s.T(), err, exception)
 
 	s.protocolKVStoreDB.AssertExpectations(s.T())
 }
