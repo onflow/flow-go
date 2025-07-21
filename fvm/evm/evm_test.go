@@ -2781,7 +2781,7 @@ func TestCadenceArch(t *testing.T) {
 
 				// we fake progressing to new block height since random beacon does the check the
 				// current height (2) is bigger than the height requested (1)
-				block1.Header.Height = 2
+				block1.Height = 2
 				ctx.BlockHeader = block1.ToHeader()
 
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
@@ -2878,7 +2878,7 @@ func TestCadenceArch(t *testing.T) {
 
 				// we fake progressing to new block height since random beacon does the check the
 				// current height (2) is bigger than the height requested (1)
-				block1.Header.Height = 2
+				block1.Height = 2
 				ctx.BlockHeader = block1.ToHeader()
 
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
@@ -3359,10 +3359,6 @@ func RunWithNewEnvironment(
 
 				blocks := new(envMock.Blocks)
 				block1 := unittest.BlockFixture()
-				blocks.On("ByHeightFrom",
-					block1.Header.Height,
-					block1.Header,
-				).Return(block1.Header, nil)
 
 				opts := []fvm.Option{
 					fvm.WithChain(chain),

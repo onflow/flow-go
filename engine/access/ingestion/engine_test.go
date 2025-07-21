@@ -144,7 +144,7 @@ func (s *Suite) SetupTest() {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
 		parent = block.ToHeader()
-		s.blockMap[block.Header.Height] = block
+		s.blockMap[block.Height] = block
 	}
 	s.finalizedBlock = parent
 
@@ -279,8 +279,8 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	eng, _ := s.initEngineAndSyncer(irrecoverableCtx)
 
 	block := s.generateBlock(clusterCommittee, snap)
-	block.Header.Height = s.finalizedBlock.Height + 1
-	s.blockMap[block.Header.Height] = block
+	block.Height = s.finalizedBlock.Height + 1
+	s.blockMap[block.Height] = block
 	s.mockCollectionsForBlock(block)
 	s.finalizedBlock = block.ToHeader()
 
@@ -341,8 +341,8 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	// generate the test blocks, cgs and collections
 	for i := 0; i < newBlocksCount; i++ {
 		block := s.generateBlock(clusterCommittee, snap)
-		block.Header.Height = startHeight + uint64(i)
-		s.blockMap[block.Header.Height] = block
+		block.Height = startHeight + uint64(i)
+		s.blockMap[block.Height] = block
 		blocks[i] = block
 		s.mockCollectionsForBlock(block)
 		s.finalizedBlock = block.ToHeader()
@@ -529,7 +529,7 @@ func (s *Suite) TestRequestMissingCollections() {
 			unittest.Block.WithPayload(unittest.PayloadFixture(
 				unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(refBlockID))...)),
 			))
-		s.blockMap[block.Header.Height] = block
+		s.blockMap[block.Height] = block
 		s.finalizedBlock = block.ToHeader()
 
 		for _, c := range block.Payload.Guarantees {
@@ -674,7 +674,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			unittest.Block.WithHeight(startHeight+uint64(i)),
 			unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantees...))),
 		)
-		s.blockMap[block.Header.Height] = block
+		s.blockMap[block.Height] = block
 		blocks[i] = block
 		s.finalizedBlock = block.ToHeader()
 	}
@@ -713,7 +713,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 	rootBlk := blocks[0]
 
 	// root block is the last complete block
-	err := s.lastFullBlockHeight.Set(rootBlk.Header.Height)
+	err := s.lastFullBlockHeight.Set(rootBlk.Height)
 	s.Require().NoError(err)
 
 	s.Run("missing collections are requested when count exceeds defaultMissingCollsForBlockThreshold", func() {
@@ -786,16 +786,16 @@ func (s *Suite) TestProcessBackgroundCalls() {
 	})
 
 	// create new block
-	height := blocks[blkCnt-1].Header.Height + 1
+	height := blocks[blkCnt-1].Height + 1
 	finalizedBlk := unittest.BlockFixture(
 		unittest.Block.WithHeight(height),
 	)
 	s.blockMap[height] = finalizedBlk
 
-	finalizedHeight = finalizedBlk.Header.Height
+	finalizedHeight = finalizedBlk.Height
 	s.finalizedBlock = finalizedBlk.ToHeader()
 
-	blockBeforeFinalized := blocks[blkCnt-1].Header
+	blockBeforeFinalized := blocks[blkCnt-1]
 
 	s.Run("full block height index is advanced if newer full blocks are discovered", func() {
 		// set lastFullBlockHeight to block

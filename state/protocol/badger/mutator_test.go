@@ -137,7 +137,7 @@ func TestExtendValid(t *testing.T) {
 		require.NoError(t, err)
 
 		// we should not emit BlockProcessable for the root block
-		consumer.AssertNotCalled(t, "BlockProcessable", block.Header)
+		consumer.AssertNotCalled(t, "BlockProcessable", block.ToHeader(), mock.Anything)
 
 		t.Run("BlockFinalized event should be emitted when block1 is finalized", func(t *testing.T) {
 			consumer.On("BlockFinalized", block1.ToHeader()).Once()
@@ -418,7 +418,7 @@ func TestVersionBeaconIndex(t *testing.T) {
 		versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(db))
 
 		// No VB can be found before finalizing anything
-		vb, err := versionBeacons.Highest(b6.Header.Height)
+		vb, err := versionBeacons.Highest(b6.Height)
 		require.NoError(t, err)
 		require.Nil(t, vb)
 
@@ -433,7 +433,7 @@ func TestVersionBeaconIndex(t *testing.T) {
 		require.NoError(t, err)
 
 		// No VB can be found after finalizing B4
-		vb, err = versionBeacons.Highest(b6.Header.Height)
+		vb, err = versionBeacons.Highest(b6.Height)
 		require.NoError(t, err)
 		require.Nil(t, vb)
 
@@ -441,12 +441,12 @@ func TestVersionBeaconIndex(t *testing.T) {
 		err = state.Finalize(context.Background(), b5.ID())
 		require.NoError(t, err)
 
-		versionBeacon, err := versionBeacons.Highest(b6.Header.Height)
+		versionBeacon, err := versionBeacons.Highest(b6.Height)
 		require.NoError(t, err)
 		require.Equal(t,
 			&flow.SealedVersionBeacon{
 				VersionBeacon: vb1,
-				SealHeight:    b5.Header.Height,
+				SealHeight:    b5.Height,
 			},
 			versionBeacon,
 		)
@@ -456,12 +456,12 @@ func TestVersionBeaconIndex(t *testing.T) {
 		err = state.Finalize(context.Background(), b6.ID())
 		require.NoError(t, err)
 
-		versionBeacon, err = versionBeacons.Highest(b6.Header.Height)
+		versionBeacon, err = versionBeacons.Highest(b6.Height)
 		require.NoError(t, err)
 		require.Equal(t,
 			&flow.SealedVersionBeacon{
 				VersionBeacon: vb3,
-				SealHeight:    b6.Header.Height,
+				SealHeight:    b6.Height,
 			},
 			versionBeacon,
 		)
@@ -586,7 +586,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 			extend.ToHeader(),
 			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
 		)
-		extend2.Header.Height = 1
+		extend2.Height = 1
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(extend2))
 		require.True(t, st.IsInvalidExtensionError(err))
 
@@ -610,7 +610,7 @@ func TestExtendHeightTooLarge(t *testing.T) {
 			*flow.NewEmptyPayload(),
 		)
 		// set an invalid height
-		block.Header.Height = head.Height + 2
+		block.Height = head.Height + 2
 
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 		require.Error(t, err)
@@ -631,7 +631,7 @@ func TestExtendInconsistentParentView(t *testing.T) {
 			*flow.NewEmptyPayload(),
 		)
 		// set an invalid parent view
-		block.Header.ParentView++
+		block.ParentView++
 
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 		require.Error(t, err)
@@ -660,8 +660,8 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		require.NoError(t, err)
 
 		// create a fork at view/height 1 and try to connect it to root
-		extend.Header.Timestamp = extend.Header.Timestamp.Add(time.Second)
-		extend.Header.ParentID = head.ID()
+		extend.Timestamp = extend.Timestamp.Add(time.Second)
+		extend.ParentID = head.ID()
 
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(extend))
 		require.Error(t, err)
@@ -685,7 +685,7 @@ func TestExtendInvalidChainID(t *testing.T) {
 			*flow.NewEmptyPayload(),
 		)
 		// use an invalid chain ID
-		block.Header.ChainID = head.ChainID + "-invalid"
+		block.ChainID = head.ChainID + "-invalid"
 
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 		require.Error(t, err)
@@ -995,9 +995,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// block 3 contains the seal for block 1
 		seals := []*flow.Seal{seal1}
-		block3View := block2.Header.View + 1
+		block3View := block2.View + 1
 		block3 := unittest.BlockFixture(
-			unittest.Block.WithParent(block2.ID(), block2.Header.View, block2.Header.Height),
+			unittest.Block.WithParent(block2.ID(), block2.View, block2.Height),
 			unittest.Block.WithView(block3View),
 			unittest.Block.WithPayload(
 				flow.Payload{
@@ -1076,9 +1076,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// block 6 contains the seal for block 2
 		seals = []*flow.Seal{seal2}
-		block6View := block5.Header.View + 1
+		block6View := block5.View + 1
 		block6 := unittest.BlockFixture(
-			unittest.Block.WithParent(block5.ID(), block5.Header.View, block5.Header.Height),
+			unittest.Block.WithParent(block5.ID(), block5.View, block5.Height),
 			unittest.Block.WithView(block6View),
 			unittest.Block.WithPayload(
 				flow.Payload{
@@ -1106,7 +1106,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// block 7 has the final view of the epoch, insert it, finalized after finalizing block 6
 		block7 := unittest.BlockWithParentProtocolState(block6)
-		block7.Header.View = epoch1FinalView
+		block7.View = epoch1FinalView
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block7))
 		require.NoError(t, err)
 
@@ -1137,7 +1137,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// we should handle views that aren't exactly the first valid view of the epoch
 		block8View := epoch1FinalView + uint64(1+rand.Intn(10))
 		block8 := unittest.BlockFixture(
-			unittest.Block.WithParent(block7.ID(), block7.Header.View, block7.Header.Height),
+			unittest.Block.WithParent(block7.ID(), block7.View, block7.Height),
 			unittest.Block.WithView(block8View),
 			unittest.Block.WithPayload(
 				flow.Payload{
@@ -1160,7 +1160,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// expect epoch transition once we finalize block 9
 		consumer.On("EpochTransition", epoch2Setup.Counter, block8.ToHeader()).Once()
-		metrics.On("EpochTransitionHeight", block8.Header.Height).Once()
+		metrics.On("EpochTransitionHeight", block8.Height).Once()
 		metrics.On("CurrentEpochCounter", epoch2Setup.Counter).Once()
 		metrics.On("CurrentEpochPhase", flow.EpochPhaseStaking).Once()
 		metrics.On("CurrentEpochFinalView", epoch2Setup.FinalView).Once()
@@ -1180,12 +1180,12 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 		epoch1FinalHeight, err := block8previous.FinalHeight()
 		require.NoError(t, err)
-		assert.Equal(t, block7.Header.Height, epoch1FinalHeight)
+		assert.Equal(t, block7.Height, epoch1FinalHeight)
 		block8epoch, err = state.AtBlockID(block8.ID()).Epochs().Current()
 		require.NoError(t, err)
 		epoch2FirstHeight, err := block8epoch.FirstHeight()
 		require.NoError(t, err)
-		assert.Equal(t, block8.Header.Height, epoch2FirstHeight)
+		assert.Equal(t, block8.Height, epoch2FirstHeight)
 	})
 }
 
@@ -1284,9 +1284,9 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		seals2 := []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))}
 
 		// block 5 builds on block 3, contains seal for block 1
-		block5View := block3.Header.View + 1
+		block5View := block3.View + 1
 		block5 := unittest.BlockFixture(
-			unittest.Block.WithParent(block3.ID(), block3.Header.View, block3.Header.Height),
+			unittest.Block.WithParent(block3.ID(), block3.View, block3.Height),
 			unittest.Block.WithView(block5View),
 			unittest.Block.WithPayload(
 				flow.Payload{
@@ -1298,9 +1298,9 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		require.NoError(t, err)
 
 		// block 6 builds on block 4, contains seal for block 2
-		block6View := block4.Header.View + 1
+		block6View := block4.View + 1
 		block6 := unittest.BlockFixture(
-			unittest.Block.WithParent(block4.ID(), block4.Header.View, block4.Header.Height),
+			unittest.Block.WithParent(block4.ID(), block4.View, block4.Height),
 			unittest.Block.WithView(block6View),
 			unittest.Block.WithPayload(
 				flow.Payload{
@@ -1420,9 +1420,9 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		seals2 := []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))}
 
 		// block 5 builds on block 3, contains seal for block 1
-		block5View := block3.Header.View + 1
+		block5View := block3.View + 1
 		block5 := unittest.BlockFixture(
-			unittest.Block.WithParent(block3.ID(), block3.Header.View, block3.Header.Height),
+			unittest.Block.WithParent(block3.ID(), block3.View, block3.Height),
 			unittest.Block.WithView(block5View),
 			unittest.Block.WithPayload(
 				flow.Payload{
@@ -1434,9 +1434,9 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		require.NoError(t, err)
 
 		// block 6 builds on block 4, contains seal for block 2
-		block6View := block4.Header.View + 1
+		block6View := block4.View + 1
 		block6 := unittest.BlockFixture(
-			unittest.Block.WithParent(block4.ID(), block4.Header.View, block4.Header.Height),
+			unittest.Block.WithParent(block4.ID(), block4.View, block4.Height),
 			unittest.Block.WithView(block6View),
 			unittest.Block.WithPayload(
 				flow.Payload{
@@ -1547,7 +1547,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			block1, createSetup := setupState(t, db, state)
 
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
-				setup.FinalView = block1.Header.View
+				setup.FinalView = block1.View
 			})
 
 			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block1, receipt, seal)
@@ -1858,7 +1858,7 @@ func TestEpochFallbackMode(t *testing.T) {
 
 			// block 2 will be the first block past the first epoch boundary
 			block2 := unittest.BlockWithParentProtocolState(block1)
-			block2.Header.View = epoch1FinalView + 1
+			block2.View = epoch1FinalView + 1
 			err = state.Extend(context.Background(), unittest.ProposalFromBlock(block2))
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), block2.ID())
@@ -1943,7 +1943,7 @@ func TestEpochFallbackMode(t *testing.T) {
 			block3View := epoch1CommitmentDeadline + rand.Uint64()%2
 			seals := []*flow.Seal{seal1}
 			block3 := unittest.BlockFixture(
-				unittest.Block.WithParent(block2.ID(), block2.Header.View, block2.Header.Height),
+				unittest.Block.WithParent(block2.ID(), block2.View, block2.Height),
 				unittest.Block.WithView(block3View),
 				unittest.Block.WithPayload(
 					flow.Payload{
@@ -1969,7 +1969,7 @@ func TestEpochFallbackMode(t *testing.T) {
 
 			// block 4 will be the first block past the first epoch boundary
 			block4 := unittest.BlockWithParentProtocolState(block3)
-			block4.Header.View = epoch1FinalView + 1
+			block4.View = epoch1FinalView + 1
 			err = state.Extend(context.Background(), unittest.ProposalFromBlock(block4))
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), block4.ID())
@@ -2050,9 +2050,9 @@ func TestEpochFallbackMode(t *testing.T) {
 
 			// block 3 is where the service event state change comes into effect
 			seals := []*flow.Seal{seal1}
-			block3View := block2.Header.View + 1
+			block3View := block2.View + 1
 			block3 := unittest.BlockFixture(
-				unittest.Block.WithParent(block2.ID(), block2.Header.View, block2.Header.Height),
+				unittest.Block.WithParent(block2.ID(), block2.View, block2.Height),
 				unittest.Block.WithView(block3View),
 				unittest.Block.WithPayload(
 					flow.Payload{
@@ -2077,7 +2077,7 @@ func TestEpochFallbackMode(t *testing.T) {
 			// block 4 is the first block past the current epoch boundary
 			block4View := epoch1Setup.FinalView + 1
 			block4 := unittest.BlockFixture(
-				unittest.Block.WithParent(block3.ID(), block3.Header.View, block3.Header.Height),
+				unittest.Block.WithParent(block3.ID(), block3.View, block3.Height),
 				unittest.Block.WithView(block4View),
 				unittest.Block.WithPayload(
 					flow.Payload{
@@ -2482,7 +2482,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// B8 will trigger epoch transition to already committed epoch
 			block8View := epoch1Setup.FinalView + 1 // first block past the epoch boundary
 			block8 := unittest.BlockFixture(
-				unittest.Block.WithParent(block7.ID(), block7.Header.View, block7.Header.Height),
+				unittest.Block.WithParent(block7.ID(), block7.View, block7.Height),
 				unittest.Block.WithView(block8View),
 				unittest.Block.WithPayload(
 					flow.Payload{
@@ -2491,7 +2491,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			)
 
 			metricsMock.On("CurrentEpochCounter", epoch2Setup.Counter).Once()
-			metricsMock.On("EpochTransitionHeight", block8.Header.Height).Once()
+			metricsMock.On("EpochTransitionHeight", block8.Height).Once()
 			metricsMock.On("CurrentEpochFinalView", epoch2Setup.FinalView).Once()
 			metricsMock.On("CurrentEpochPhase", flow.EpochPhaseFallback).Once()
 			protoEventsMock.On("EpochTransition", epoch2Setup.Counter, block8.ToHeader()).Once()
@@ -2501,14 +2501,14 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			assertInPhase(t, state.Final(), flow.EpochPhaseFallback) // enter fallback phase immediately after transition
 
 			metricsMock.AssertCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)
-			metricsMock.AssertCalled(t, "EpochTransitionHeight", block8.Header.Height)
+			metricsMock.AssertCalled(t, "EpochTransitionHeight", block8.Height)
 			metricsMock.AssertCalled(t, "CurrentEpochFinalView", epoch2Setup.FinalView)
 			protoEventsMock.AssertCalled(t, "EpochTransition", epoch2Setup.Counter, block8.ToHeader())
 
 			// B9 doesn't have any seals, but it reaches the safety threshold for the current epoch, meaning we will create an EpochExtension
 			block9View := epoch2Setup.FinalView - safetyThreshold
 			block9 := unittest.BlockFixture(
-				unittest.Block.WithParent(block8.ID(), block8.Header.View, block8.Header.Height),
+				unittest.Block.WithParent(block8.ID(), block8.View, block8.Height),
 				unittest.Block.WithView(block9View),
 				unittest.Block.WithPayload(
 					flow.Payload{
@@ -2543,7 +2543,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			// B10 will be the first block past the epoch extension
 			block10 := unittest.BlockWithParentProtocolState(block9)
-			block10.Header.View = epochExtensions[0].FirstView
+			block10.View = epochExtensions[0].FirstView
 			unittest.InsertAndFinalize(t, state, block10)
 
 			// Block 11 incorporates Execution Result [ER] for block4, where the ER also includes EpochRecover event.
@@ -2598,7 +2598,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// had been set up by EpochRecover event
 			block14View := epochExtensions[0].FinalView + 1
 			block14 := unittest.BlockFixture(
-				unittest.Block.WithParent(block13.ID(), block13.Header.View, block13.Header.Height),
+				unittest.Block.WithParent(block13.ID(), block13.View, block13.Height),
 				unittest.Block.WithView(block14View),
 				unittest.Block.WithPayload(
 					flow.Payload{
@@ -2607,7 +2607,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			)
 
 			metricsMock.On("CurrentEpochCounter", epochRecover.EpochSetup.Counter).Once()
-			metricsMock.On("EpochTransitionHeight", block14.Header.Height).Once()
+			metricsMock.On("EpochTransitionHeight", block14.Height).Once()
 			metricsMock.On("CurrentEpochFinalView", epochRecover.EpochSetup.FinalView).Once()
 			protoEventsMock.On("EpochTransition", epochRecover.EpochSetup.Counter, block14.ToHeader()).Once()
 
@@ -2670,7 +2670,7 @@ func TestEpochTargetEndTime(t *testing.T) {
 		// add a second block that exceeds the safety threshold and triggers another epoch extension
 		block2View := firstExtension.FinalView
 		block2 := unittest.BlockFixture(
-			unittest.Block.WithParent(block1.ID(), block1.Header.View, block1.Header.Height),
+			unittest.Block.WithParent(block1.ID(), block1.View, block1.Height),
 			unittest.Block.WithView(block2View),
 			unittest.Block.WithPayload(
 				flow.Payload{
@@ -2739,7 +2739,7 @@ func TestEpochTargetDuration(t *testing.T) {
 		// add a second block that exceeds the safety threshold and triggers another epoch extension
 		block2View := firstExtension.FinalView
 		block2 := unittest.BlockFixture(
-			unittest.Block.WithParent(block1.ID(), block1.Header.View, block1.Header.Height),
+			unittest.Block.WithParent(block1.ID(), block1.View, block1.Height),
 			unittest.Block.WithView(block2View),
 			unittest.Block.WithPayload(
 				flow.Payload{
@@ -2824,13 +2824,13 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 				if candidate.ID() == block3.ID() {
 					return nil
 				}
-				seal, _ := all.Seals.HighestInFork(candidate.Header.ParentID)
+				seal, _ := all.Seals.HighestInFork(candidate.ParentID)
 				return seal
 			}, func(candidate *flow.Block) error {
 				if candidate.ID() == block3.ID() {
 					return engine.NewInvalidInputErrorf("")
 				}
-				_, err := all.Seals.HighestInFork(candidate.Header.ParentID)
+				_, err := all.Seals.HighestInFork(candidate.ParentID)
 				return err
 			}).
 			Times(3)
@@ -2919,7 +2919,7 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		// height must increment the parent's height by one, i.e. it should be rejected
 		// by the follower right away
 		block2 := unittest.BlockWithParentFixture(block1.ToHeader())
-		block2.Header.Height = block1.Header.Height
+		block2.Height = block1.Height
 
 		err = state.ExtendCertified(context.Background(), unittest.CertifiedByChild(block1, block2))
 		require.NoError(t, err)
@@ -2945,7 +2945,7 @@ func TestHeaderExtendHeightTooLarge(t *testing.T) {
 			*flow.NewEmptyPayload(),
 		)
 		// set an invalid height
-		block.Header.Height = head.Height + 2
+		block.Height = head.Height + 2
 
 		err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block))
 		require.False(t, st.IsInvalidExtensionError(err))
@@ -2969,7 +2969,7 @@ func TestExtendBlockProcessable(t *testing.T) {
 		grandChild := unittest.BlockWithParentProtocolState(child)
 
 		// extend block using certifying QC, expect that BlockProcessable will be emitted once
-		consumer.On("BlockProcessable", block.ToHeader(), child.Header.ParentQC()).Once()
+		consumer.On("BlockProcessable", block.ToHeader(), child.ParentQC()).Once()
 		err := state.ExtendCertified(context.Background(), unittest.CertifiedByChild(block, child))
 		require.NoError(t, err)
 
@@ -2981,7 +2981,7 @@ func TestExtendBlockProcessable(t *testing.T) {
 		// extend block using certifying QC, expect that BlockProcessable will be emitted twice.
 		// One for parent block and second for current block.
 		certifiedGrandchild := unittest.NewCertifiedBlock(grandChild)
-		consumer.On("BlockProcessable", child.ToHeader(), grandChild.Header.ParentQC()).Once()
+		consumer.On("BlockProcessable", child.ToHeader(), grandChild.ParentQC()).Once()
 		consumer.On("BlockProcessable", grandChild.ToHeader(), certifiedGrandchild.CertifyingQC).Once()
 		err = state.ExtendCertified(context.Background(), certifiedGrandchild)
 		require.NoError(t, err)
@@ -3210,8 +3210,8 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		payload.Guarantees[0].SignerIndices = checksumMismatch
 		block, err = flow.NewBlock(
 			flow.UntrustedBlock{
-				Header:  block.Header,
-				Payload: payload,
+				HeaderBody: block.HeaderBody,
+				Payload:    payload,
 			},
 		)
 		require.NoError(t, err)
@@ -3230,8 +3230,8 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		payload.Guarantees[0].SignerIndices = wrongTailing
 		block, err = flow.NewBlock(
 			flow.UntrustedBlock{
-				Header:  block.Header,
-				Payload: payload,
+				HeaderBody: block.HeaderBody,
+				Payload:    payload,
 			},
 		)
 		require.NoError(t, err)
@@ -3246,8 +3246,8 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		payload.Guarantees[0].SignerIndices = wrongbitVectorLength
 		block, err = flow.NewBlock(
 			flow.UntrustedBlock{
-				Header:  block.Header,
-				Payload: payload,
+				HeaderBody: block.HeaderBody,
+				Payload:    payload,
 			},
 		)
 		require.NoError(t, err)
@@ -3264,8 +3264,8 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		payload.Guarantees[0].ReferenceBlockID = flow.ZeroID
 		block, err = flow.NewBlock(
 			flow.UntrustedBlock{
-				Header:  block.Header,
-				Payload: payload,
+				HeaderBody: block.HeaderBody,
+				Payload:    payload,
 			},
 		)
 		require.NoError(t, err)
@@ -3286,8 +3286,8 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		payload.Guarantees[0].ChainID = flow.ChainID("some_bad_chain_ID")
 		block, err = flow.NewBlock(
 			flow.UntrustedBlock{
-				Header:  block.Header,
-				Payload: payload,
+				HeaderBody: block.HeaderBody,
+				Payload:    payload,
 			},
 		)
 		require.NoError(t, err)

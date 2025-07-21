@@ -132,9 +132,9 @@ func bootstrapVM(t *testing.T, chain flow.Chain) (*fvm.VirtualMachine, fvm.Conte
 	blocks := new(envMock.Blocks)
 	block1 := unittest.BlockFixture()
 	blocks.On("ByHeightFrom",
-		block1.Header.Height,
-		block1.Header,
-	).Return(block1.Header, nil)
+		block1.Height,
+		block1.ToHeader(),
+	).Return(block1.ToHeader(), nil)
 
 	opts := computation.DefaultFVMOptions(chain.ChainID(), false, false)
 	opts = append(opts,
