@@ -339,8 +339,7 @@ func deployContracts(
 				Interface:   runtimeInterface,
 				Environment: transactionEnvironment,
 				Location:    nextTransactionLocation(),
-				// TODO: contract deployment support in Cadence VM
-				//UseVM:       *testWithVMTransactionExecution,
+				UseVM:       *testWithVMTransactionExecution,
 			},
 		)
 		require.NoError(t, err)
@@ -351,10 +350,9 @@ func deployContracts(
 func newEVMTransactionEnvironment(
 	handler types.ContractHandler,
 	contractAddress flow.Address,
-	useVM bool,
 ) runtime.Environment {
 	var transactionEnvironment runtime.Environment
-	if useVM && *testWithVMTransactionExecution {
+	if *testWithVMTransactionExecution {
 		transactionEnvironment = runtime.NewBaseVMEnvironment(runtime.Config{})
 	} else {
 		transactionEnvironment = runtime.NewBaseInterpreterEnvironment(runtime.Config{})
@@ -418,9 +416,7 @@ func TestEVMEncodeABI(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
-
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -532,8 +528,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 	handler := &testContractHandler{}
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -982,8 +977,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 	handler := &testContractHandler{}
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -1318,8 +1312,7 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -1423,8 +1416,7 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -1519,8 +1511,7 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -1624,8 +1615,7 @@ func TestEVMDecodeABI(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -1745,8 +1735,7 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -1856,8 +1845,8 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 
 	handler := &testContractHandler{}
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 	rt := runtime.NewRuntime(runtime.Config{})
 
@@ -2119,8 +2108,7 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -2401,8 +2389,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		// TODO: contract deployment support in Cadence VM
-		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -2488,8 +2475,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		// TODO: contract deployment support in Cadence VM
-		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -2574,8 +2560,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		// TODO: contract deployment support in Cadence VM
-		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -2661,8 +2646,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		// TODO: contract deployment support in Cadence VM
-		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -2748,8 +2732,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		// TODO: contract deployment support in Cadence VM
-		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -2845,8 +2828,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		// TODO: contract deployment support in Cadence VM
-		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -2932,8 +2914,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		// TODO: contract deployment support in Cadence VM
-		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -3019,8 +3000,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		// TODO: contract deployment support in Cadence VM
-		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -3106,8 +3086,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		// TODO: contract deployment support in Cadence VM
-		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -3193,8 +3172,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		// TODO: contract deployment support in Cadence VM
-		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -3280,8 +3258,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		// TODO: contract deployment support in Cadence VM
-		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -3378,8 +3355,7 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -3503,8 +3479,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -3636,9 +3611,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
-
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -3750,9 +3723,7 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
-
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -3855,9 +3826,7 @@ func TestEVMAddressSerializationAndDeserialization(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
-
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -4037,9 +4006,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
-
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -4167,9 +4134,7 @@ func TestEVMRun(t *testing.T) {
 		},
 	}
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
-
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -4300,9 +4265,7 @@ func TestEVMDryRun(t *testing.T) {
 		},
 	}
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
-
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -4418,9 +4381,7 @@ func TestEVMDryCall(t *testing.T) {
 		},
 	}
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
-
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -4553,9 +4514,7 @@ func TestEVMBatchRun(t *testing.T) {
 		},
 	}
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
-
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -4651,10 +4610,9 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
-
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
 	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
@@ -4804,9 +4762,7 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 		},
 	}
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
-
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -4936,9 +4892,7 @@ func TestCadenceOwnedAccountDryCall(t *testing.T) {
 		},
 	}
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
-
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -5061,9 +5015,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
-
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -5178,9 +5130,7 @@ func TestCOADeposit(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
-
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -5343,9 +5293,7 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 		},
 	}
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
-
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -5508,9 +5456,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 		},
 	}
 
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
-
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -5604,9 +5550,8 @@ func RunEVMScript(
 	expectedValue cadence.Value,
 ) {
 	contractsAddress := flow.Address(handler.evmContractAddress)
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
 
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -5852,9 +5797,8 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 				return proof.EVMAddress
 			},
 		}
-		// TODO: contract deployment support in Cadence VM
-		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
-		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
+
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -5897,7 +5841,7 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 			rt,
 			contractsAddress,
 			runtimeInterface,
-			deploymentEnvironment,
+			transactionEnvironment,
 			nextTransactionLocation,
 		)
 
@@ -6135,10 +6079,10 @@ func TestInternalEVMAccess(t *testing.T) {
 	handler := &testContractHandler{}
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
-	// TODO: contract deployment support in Cadence VM
-	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress, false)
 
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
 	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`

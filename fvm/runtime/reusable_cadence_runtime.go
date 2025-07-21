@@ -137,7 +137,9 @@ func (reusable *ReusableCadenceRuntime) ReadStored(
 		address,
 		path,
 		runtime.Context{
-			Interface:   reusable.fvmEnv,
+			Interface: reusable.fvmEnv,
+			// No difference between VM and interpreter environments here,
+			// and UseVM is ignored.
 			Environment: reusable.TxRuntimeEnv,
 		},
 	)

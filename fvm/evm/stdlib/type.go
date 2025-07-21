@@ -48,6 +48,7 @@ func newContractType(chainID flow.ChainID) *sema.CompositeType {
 		},
 	}
 
+	// Kind of environment (interpreter or VM) since we are not executing the code, but only type checking it.
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 	env.Configure(
 		runtimeInterface,
