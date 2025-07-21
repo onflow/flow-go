@@ -359,7 +359,7 @@ func (builder *EpochBuilder) addBlock(block *flow.Block) {
 	dbUpdates := deferred.NewDeferredDBOps()
 	updatedStateId, err := builder.mutableProtocolState.EvolveState(dbUpdates, block.Header.ParentID, block.Header.View, block.Payload.Seals)
 	require.NoError(builder.t, err)
-	require.True(builder.t, dbUpdates.IsEmpty())
+	require.False(builder.t, dbUpdates.IsEmpty())
 
 	block.Payload.ProtocolStateID = updatedStateId
 	block.Header.PayloadHash = block.Payload.Hash()
