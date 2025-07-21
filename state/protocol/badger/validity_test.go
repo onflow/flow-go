@@ -25,7 +25,7 @@ func TestEntityExpirySnapshotValidation(t *testing.T) {
 	t.Run("not-enough-history", func(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 		blockLen := len(rootSnapshot.Encodable().SealingSegment.Blocks)
-		rootSnapshot.Encodable().SealingSegment.Blocks[blockLen-1].Block.Header.Height += 10 // advance height to be not spork root snapshot
+		rootSnapshot.Encodable().SealingSegment.Blocks[blockLen-1].Block.Height += 10 // advance height to be not spork root snapshot
 		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
 		require.Error(t, err)
 	})

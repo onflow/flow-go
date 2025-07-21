@@ -71,11 +71,11 @@ func (suite *MutatorSuite) SetupTest() {
 	genesis, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 
 	// ensure we don't enter a new epoch for tests that build many blocks
-	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = genesis.Header.View + 100_000
+	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = genesis.View + 100_000
 
 	seal.ResultID = result.ID()
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
-	safetyParams, err := protocol.DefaultEpochSafetyParams(genesis.Header.ChainID)
+	safetyParams, err := protocol.DefaultEpochSafetyParams(genesis.ChainID)
 	require.NoError(suite.T(), err)
 	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(
 		result.ServiceEvents[0].Event.(*flow.EpochSetup),

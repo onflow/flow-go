@@ -31,7 +31,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 	// create a state root and bootstrap the protocol state with it
 	participants := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(participants, func(block *flow.Block) {
-		block.Header.ParentID = unittest.IdentifierFixture()
+		block.ParentID = unittest.IdentifierFixture()
 	})
 
 	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, _ *bprotocol.State) {
@@ -88,7 +88,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 	// create a state root and bootstrap the protocol state with it
 	participants := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(participants, func(block *flow.Block) {
-		block.Header.ParentID = unittest.IdentifierFixture()
+		block.ParentID = unittest.IdentifierFixture()
 	})
 	rootBlock, err := rootSnapshot.Head()
 	require.NoError(t, err)
@@ -354,9 +354,9 @@ func TestBootstrapNonRoot(t *testing.T) {
 			buildFinalizedBlock(t, state, block2)
 
 			seals := []*flow.Seal{seal1}
-			block3View := block2.Header.View + 1
+			block3View := block2.View + 1
 			block3 := unittest.BlockFixture(
-				unittest.Block.WithParent(block2.ID(), block2.Header.View, block2.Header.Height),
+				unittest.Block.WithParent(block2.ID(), block2.View, block2.Height),
 				unittest.Block.WithView(block3View),
 				unittest.Block.WithPayload(
 					flow.Payload{
@@ -410,9 +410,9 @@ func TestBootstrapNonRoot(t *testing.T) {
 			buildFinalizedBlock(t, state, block2)
 
 			seals := []*flow.Seal{seal1}
-			block3View := block2.Header.View + 1
+			block3View := block2.View + 1
 			block3 := unittest.BlockFixture(
-				unittest.Block.WithParent(block2.ID(), block2.Header.View, block2.Header.Height),
+				unittest.Block.WithParent(block2.ID(), block2.View, block2.Height),
 				unittest.Block.WithView(block3View),
 				unittest.Block.WithPayload(
 					flow.Payload{

@@ -91,8 +91,8 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 				t.Logf("%v block proposal received from %s at height %v, view %v: %x\n",
 					time.Now().UTC(),
 					sender,
-					block.Header.Height,
-					block.Header.View,
+					block.Height,
+					block.View,
 					block.ID())
 			case *flow.ResultApproval:
 				tst.ApprovalState.Add(sender, m)

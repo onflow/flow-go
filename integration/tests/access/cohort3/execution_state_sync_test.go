@@ -162,7 +162,7 @@ func (s *ExecutionStateSyncSuite) executionStateSyncTest() {
 	// get the first block height
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
-	s.T().Logf("got block height %v ID %v", blockA.Header.Height, blockA.ID())
+	s.T().Logf("got block height %v ID %v", blockA.Height, blockA.ID())
 
 	// Loop through checkBlocks and verify the execution data was downloaded correctly
 	an := s.net.ContainerByName(testnet.PrimaryAN)
@@ -176,7 +176,7 @@ func (s *ExecutionStateSyncSuite) executionStateSyncTest() {
 	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Minute)
 	defer cancel()
 
-	for i := blockA.Header.Height; i <= blockA.Header.Height+checkBlocks; i++ {
+	for i := blockA.Height; i <= blockA.Height+checkBlocks; i++ {
 		anBED, err := s.executionDataForHeight(ctx, anClient, i)
 		require.NoError(s.T(), err, "could not get execution data from AN for height %v", i)
 

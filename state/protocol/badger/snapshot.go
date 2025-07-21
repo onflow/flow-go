@@ -161,20 +161,20 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get snapshot's reference block: %w", err)
 	}
-	if head.Header.Height < s.state.finalizedRootHeight {
+	if head.Height < s.state.finalizedRootHeight {
 		return nil, protocol.ErrSealingSegmentBelowRootBlock
 	}
 
 	// Verify that head of sealing segment is finalized.
-	finalizedBlockAtHeight, err := s.state.headers.BlockIDByHeight(head.Header.Height)
+	finalizedBlockAtHeight, err := s.state.headers.BlockIDByHeight(head.Height)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, protocol.NewUnfinalizedSealingSegmentErrorf("head of sealing segment at height %d is not finalized: %w", head.Header.Height, err)
+			return nil, protocol.NewUnfinalizedSealingSegmentErrorf("head of sealing segment at height %d is not finalized: %w", head.Height, err)
 		}
 		return nil, fmt.Errorf("exception while retrieving finzalized bloc, by height: %w", err)
 	}
 	if finalizedBlockAtHeight != s.blockID { // comparison of fixed-length arrays
-		return nil, protocol.NewUnfinalizedSealingSegmentErrorf("head of sealing segment is orphaned, finalized block at height %d is %x", head.Header.Height, finalizedBlockAtHeight)
+		return nil, protocol.NewUnfinalizedSealingSegmentErrorf("head of sealing segment is orphaned, finalized block at height %d is %x", head.Height, finalizedBlockAtHeight)
 	}
 
 	// STEP (i): highest sealed block as of `head` must be included.

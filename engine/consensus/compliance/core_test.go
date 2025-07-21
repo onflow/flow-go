@@ -284,7 +284,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 	proposal := unittest.ProposalFromBlock(block)
 
 	// store the data for retrieval
-	cs.headerDB[block.Header.ParentID] = cs.head
+	cs.headerDB[block.ParentID] = cs.head
 
 	hotstuffProposal := model.SignedProposalFromBlock(proposal)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
@@ -598,7 +598,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	cs.core.pending = real.NewPendingBlocks()
 
 	// check that we request the ancestor block each time
-	cs.sync.On("RequestBlock", missingBlock.ID(), missingBlock.Header.Height).Times(len(proposals))
+	cs.sync.On("RequestBlock", missingBlock.ID(), missingBlock.Height).Times(len(proposals))
 
 	// process all the descendants
 	for _, proposal := range proposals {

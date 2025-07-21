@@ -104,8 +104,8 @@ func (s *BackendEventsSuite) SetupTest() {
 		header.PayloadHash = payload.Hash()
 		block, err := flow.NewBlock(
 			flow.UntrustedBlock{
-				Header:  header.HeaderBody,
-				Payload: payload,
+				HeaderBody: header.HeaderBody,
+				Payload:    payload,
 			},
 		)
 		require.NoError(s.T(), err)
@@ -144,7 +144,7 @@ func (s *BackendEventsSuite) SetupTest() {
 
 	s.headers.On("BlockIDByHeight", mock.Anything).Return(func(height uint64) (flow.Identifier, error) {
 		for _, block := range s.blocks {
-			if height == block.Header.Height {
+			if height == block.Height {
 				return block.ID(), nil
 			}
 		}
@@ -236,7 +236,7 @@ func (s *BackendEventsSuite) setupENSuccessResponse(eventType string, blocks []*
 		ids[i] = id[:]
 		results[i] = &execproto.GetEventsForBlockIDsResponse_Result{
 			BlockId:     id[:],
-			BlockHeight: block.Header.Height,
+			BlockHeight: block.Height,
 			Events:      events,
 		}
 	}
@@ -274,7 +274,7 @@ func (s *BackendEventsSuite) setupENFailingResponse(eventType string, headers []
 func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 	ctx := context.Background()
 
-	startHeight := s.blocks[0].Header.Height
+	startHeight := s.blocks[0].Height
 	endHeight := s.sealedHead.Height
 
 	reporter := syncmock.NewIndexReporter(s.T())
@@ -365,8 +365,8 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 
 			// the first and last blocks are not available from storage, and should be fetched from the EN
 			reporter := syncmock.NewIndexReporter(s.T())
-			reporter.On("LowestIndexedHeight").Return(s.blocks[1].Header.Height, nil)
-			reporter.On("HighestIndexedHeight").Return(s.blocks[3].Header.Height, nil)
+			reporter.On("LowestIndexedHeight").Return(s.blocks[1].Height, nil)
+			reporter.On("HighestIndexedHeight").Return(s.blocks[3].Height, nil)
 
 			events.On("ByBlockID", s.blockIDs[1]).Return(s.blockEvents, nil)
 			events.On("ByBlockID", s.blockIDs[2]).Return(s.blockEvents, nil)
@@ -393,7 +393,7 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 func (s *BackendEventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 	ctx := context.Background()
 
-	startHeight := s.blocks[0].Header.Height
+	startHeight := s.blocks[0].Height
 	endHeight := s.sealedHead.Height
 	encoding := entities.EventEncodingVersion_CCF_V0
 
@@ -449,7 +449,7 @@ func (s *BackendEventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 	s.Run("returns error for startHeight < spork root height", func() {
 		backend := s.defaultBackend()
 
-		sporkRootHeight := s.blocks[0].Header.Height - 10
+		sporkRootHeight := s.blocks[0].Height - 10
 		startHeight := sporkRootHeight - 1
 
 		s.params.On("SporkRootBlockHeight").Return(sporkRootHeight).Once()
@@ -464,8 +464,8 @@ func (s *BackendEventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 	s.Run("returns error for startHeight < node root height", func() {
 		backend := s.defaultBackend()
 
-		sporkRootHeight := s.blocks[0].Header.Height - 10
-		nodeRootHeader := unittest.BlockHeaderWithHeight(s.blocks[0].Header.Height)
+		sporkRootHeight := s.blocks[0].Height - 10
+		nodeRootHeader := unittest.BlockHeaderWithHeight(s.blocks[0].Height)
 		startHeight := nodeRootHeader.Height - 5
 
 		s.params.On("SporkRootBlockHeight").Return(sporkRootHeight).Once()
@@ -516,7 +516,7 @@ func (s *BackendEventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {
 func (s *BackendEventsSuite) assertResponse(response []flow.BlockEvents, encoding entities.EventEncodingVersion) {
 	s.Assert().Len(response, len(s.blocks))
 	for i, block := range s.blocks {
-		s.Assert().Equal(block.Header.Height, response[i].BlockHeight)
+		s.Assert().Equal(block.Height, response[i].BlockHeight)
 		s.Assert().Equal(block.ID(), response[i].BlockID)
 		s.Assert().Len(response[i].Events, 1)
 

@@ -452,7 +452,7 @@ func TestNewRootHeader(t *testing.T) {
 			PayloadHash: nonZeroHash,
 		})
 		assert.NoError(t, err)
-		assert.Zero(t, h.HeaderBody.ParentID)
+		assert.Zero(t, h.ParentID)
 	})
 
 	t.Run("invalid root body (missing ChainID)", func(t *testing.T) {

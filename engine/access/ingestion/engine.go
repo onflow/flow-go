@@ -385,7 +385,7 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 		}
 	}
 
-	e.collectionSyncer.RequestCollectionsForBlock(block.Header.Height, block.Payload.Guarantees)
+	e.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
 	e.collectionExecutedMetric.BlockFinalized(block)
 
 	return nil

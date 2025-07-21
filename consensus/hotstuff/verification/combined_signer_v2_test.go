@@ -40,7 +40,7 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 		unittest.Block.WithLastViewTC(nil),
 	)
 	proposal := model.ProposalFromFlow(fblock.ToHeader())
-	signerID := fblock.Header.ProposerID
+	signerID := fblock.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
 	beaconKeyStore.On("ByView", proposerView).Return(beaconKey, nil)
@@ -60,7 +60,7 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	committee := &mocks.DynamicCommittee{}
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 	committee.On("Self").Return(me.NodeID())
-	committee.On("IdentityByBlock", fblock.ID(), fblock.Header.ProposerID).Return(proposerIdentity, nil)
+	committee.On("IdentityByBlock", fblock.ID(), fblock.ProposerID).Return(proposerIdentity, nil)
 	committee.On("LeaderForView", proposerView).Return(signerID, nil).Maybe()
 
 	packer := signature.NewConsensusSigDataPacker(committee)
@@ -68,8 +68,8 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 
 	persist := mocks.NewPersister(t)
 	safetyData := &hotstuff.SafetyData{
-		LockedOneChainView:      fblock.Header.ParentView,
-		HighestAcknowledgedView: fblock.Header.ParentView,
+		LockedOneChainView:      fblock.ParentView,
+		HighestAcknowledgedView: fblock.ParentView,
 	}
 	persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
 	persist.On("PutSafetyData", mock.Anything).Return(nil)
@@ -149,7 +149,7 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 		unittest.Block.WithLastViewTC(nil),
 	)
 	proposal := model.ProposalFromFlow(fblock.ToHeader())
-	signerID := fblock.Header.ProposerID
+	signerID := fblock.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
 	beaconKeyStore.On("ByView", proposerView).Return(nil, module.ErrNoBeaconKeyForEpoch)
@@ -181,8 +181,8 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 
 	persist := mocks.NewPersister(t)
 	safetyData := &hotstuff.SafetyData{
-		LockedOneChainView:      fblock.Header.ParentView,
-		HighestAcknowledgedView: fblock.Header.ParentView,
+		LockedOneChainView:      fblock.ParentView,
+		HighestAcknowledgedView: fblock.ParentView,
 	}
 	persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
 	persist.On("PutSafetyData", mock.Anything).Return(nil)

@@ -32,7 +32,7 @@ func TestUnknownReferenceBlock(t *testing.T) {
 	rootHeight := uint64(100)
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(participants, func(block *flow.Block) {
-		block.Header.Height = rootHeight
+		block.Height = rootHeight
 	})
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 
@@ -227,14 +227,14 @@ func TestClusters(t *testing.T) {
 	identities := append(unittest.IdentityListFixture(4, unittest.WithAllRolesExcept(flow.RoleCollection)), collectors...)
 
 	// bootstrap the protocol state
-	rootHeader := unittest.Block.Genesis(flow.Emulator).Header
+	rootHeaderBody := unittest.Block.Genesis(flow.Emulator).HeaderBody
 
 	counter := uint64(1)
 	setup := unittest.EpochSetupFixture(
 		unittest.WithParticipants(identities.ToSkeleton()),
 		unittest.SetupWithCounter(counter),
-		unittest.WithFirstView(rootHeader.View),
-		unittest.WithFinalView(rootHeader.View+100_000),
+		unittest.WithFirstView(rootHeaderBody.View),
+		unittest.WithFinalView(rootHeaderBody.View+100_000),
 		unittest.WithAssignments(unittest.ClusterAssignment(uint(nClusters), collectors.ToSkeleton())),
 	)
 	commit := unittest.EpochCommitFixture(
@@ -243,7 +243,7 @@ func TestClusters(t *testing.T) {
 		unittest.WithClusterQCsFromAssignments(setup.Assignments),
 	)
 
-	root, result, seal := unittest.BootstrapFixtureWithSetupAndCommit(rootHeader, setup, commit)
+	root, result, seal := unittest.BootstrapFixtureWithSetupAndCommit(rootHeaderBody, setup, commit)
 	seal.ResultID = result.ID()
 
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
@@ -352,9 +352,9 @@ func TestSealingSegment(t *testing.T) {
 
 			// build a block sealing block1
 			seals := []*flow.Seal{seal1}
-			block3View := block2.Header.View + 1
+			block3View := block2.View + 1
 			block3 := unittest.BlockFixture(
-				unittest.Block.WithParent(block2.ID(), block2.Header.View, block2.Header.Height),
+				unittest.Block.WithParent(block2.ID(), block2.View, block2.Height),
 				unittest.Block.WithView(block3View),
 				unittest.Block.WithPayload(
 					flow.Payload{
@@ -368,7 +368,7 @@ func TestSealingSegment(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Len(t, segment.ExtraBlocks, 1)
-			assert.Equal(t, segment.ExtraBlocks[0].Block.Header.Height, head.Height)
+			assert.Equal(t, segment.ExtraBlocks[0].Block.Height, head.Height)
 
 			// build a valid child B3 to ensure we have a QC
 			buildBlock(t, state, unittest.BlockWithParentProtocolState(block3))
@@ -405,7 +405,7 @@ func TestSealingSegment(t *testing.T) {
 					// Hence, we include the result only once in the direct child of B1.
 					next, err = flow.NewBlock(
 						flow.UntrustedBlock{
-							Header: next.Header,
+							HeaderBody: next.HeaderBody,
 							Payload: unittest.PayloadFixture(
 								unittest.WithReceipts(receipt1),
 								unittest.WithProtocolStateID(parent.Payload.ProtocolStateID),
@@ -435,7 +435,7 @@ func TestSealingSegment(t *testing.T) {
 			// sealing segment should cover range [B1, BN]
 			assert.Len(t, segment.Blocks, 102)
 			assert.Len(t, segment.ExtraBlocks, 1)
-			assert.Equal(t, segment.ExtraBlocks[0].Block.Header.Height, head.Height)
+			assert.Equal(t, segment.ExtraBlocks[0].Block.Height, head.Height)
 			// first and last blocks should be B1, BN
 			assert.Equal(t, block1.ID(), segment.Blocks[0].Block.ID())
 			assert.Equal(t, blockN.ID(), segment.Blocks[101].Block.ID())
@@ -735,8 +735,8 @@ func TestSealingSegment(t *testing.T) {
 			parent := root
 			for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 				next := unittest.BlockFixture(
-					unittest.Block.WithParent(parent.ID(), parent.Header.View, parent.Header.Height),
-					unittest.Block.WithView(parent.Header.View+1), // set view so we are still in the same epoch
+					unittest.Block.WithParent(parent.ID(), parent.View, parent.Height),
+					unittest.Block.WithView(parent.View+1), // set view so we are still in the same epoch
 					unittest.Block.WithPayload(unittest.PayloadFixture(
 						unittest.WithProtocolStateID(parent.Payload.ProtocolStateID)),
 					),
@@ -804,8 +804,8 @@ func TestSealingSegment(t *testing.T) {
 			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 
 			block2 := unittest.BlockFixture(
-				unittest.Block.WithParent(block1.ID(), block1.Header.View, block1.Header.Height),
-				unittest.Block.WithView(block1.Header.View+1), // set view so we are still in the same epoch
+				unittest.Block.WithParent(block1.ID(), block1.View, block1.Height),
+				unittest.Block.WithView(block1.View+1), // set view so we are still in the same epoch
 				unittest.Block.WithPayload(unittest.PayloadFixture(
 					unittest.WithReceipts(receipt1),
 					unittest.WithProtocolStateID(rootProtocolStateID)),
@@ -815,8 +815,8 @@ func TestSealingSegment(t *testing.T) {
 
 			receipt2, seal2 := unittest.ReceiptAndSealForBlock(block2)
 			block3 := unittest.BlockFixture(
-				unittest.Block.WithParent(block2.ID(), block2.Header.View, block2.Header.Height),
-				unittest.Block.WithView(block2.Header.View+1), // set view so we are still in the same epoch
+				unittest.Block.WithParent(block2.ID(), block2.View, block2.Height),
+				unittest.Block.WithView(block2.View+1), // set view so we are still in the same epoch
 				unittest.Block.WithPayload(unittest.PayloadFixture(
 					unittest.WithSeals(seal1),
 					unittest.WithReceipts(receipt2),
@@ -827,8 +827,8 @@ func TestSealingSegment(t *testing.T) {
 
 			receipt3, seal3 := unittest.ReceiptAndSealForBlock(block3)
 			block4 := unittest.BlockFixture(
-				unittest.Block.WithParent(block3.ID(), block3.Header.View, block3.Header.Height),
-				unittest.Block.WithView(block3.Header.View+1), // set view so we are still in the same epoch
+				unittest.Block.WithParent(block3.ID(), block3.View, block3.Height),
+				unittest.Block.WithView(block3.View+1), // set view so we are still in the same epoch
 				unittest.Block.WithPayload(unittest.PayloadFixture(
 					unittest.WithReceipts(receipt3),
 					unittest.WithProtocolStateID(rootProtocolStateID)),
@@ -840,8 +840,8 @@ func TestSealingSegment(t *testing.T) {
 			parent := block4
 			for i := 0; i < 1.5*flow.DefaultTransactionExpiry; i++ {
 				next := unittest.BlockFixture(
-					unittest.Block.WithParent(parent.ID(), parent.Header.View, parent.Header.Height),
-					unittest.Block.WithView(parent.Header.View+1), // set view so we are still in the same epoch
+					unittest.Block.WithParent(parent.ID(), parent.View, parent.Height),
+					unittest.Block.WithView(parent.View+1), // set view so we are still in the same epoch
 					unittest.Block.WithPayload(unittest.PayloadFixture(
 						unittest.WithProtocolStateID(parent.Payload.ProtocolStateID)),
 					),
@@ -981,7 +981,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 			require.NoError(t, state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(b2))) // adding block b2 (providing required QC for b1)
 
 			// consistency check: there should be no finalized block in the protocol state at height `b1.Height`
-			_, err = state.AtHeight(b1.Header.Height).Head() // expect statepkg.ErrUnknownSnapshotReference as only finalized blocks are indexed by height
+			_, err = state.AtHeight(b1.Height).Head() // expect statepkg.ErrUnknownSnapshotReference as only finalized blocks are indexed by height
 			assert.ErrorIs(t, err, statepkg.ErrUnknownSnapshotReference)
 
 			// requesting a sealing segment from block b1 should fail, as b1 is not yet finalized
@@ -1007,7 +1007,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 			buildFinalizedBlock(t, state, block)
 
 			// consistency check: the finalized block at height `orphaned.Height` should be different than `orphaned`
-			h, err := state.AtHeight(orphaned.Header.Height).Head()
+			h, err := state.AtHeight(orphaned.Height).Head()
 			require.NoError(t, err)
 			require.NotEqual(t, h.ID(), orphaned.ID())
 
@@ -1279,7 +1279,7 @@ func TestQuorumCertificate(t *testing.T) {
 
 			assert.Equal(t, certifyingQC.SignerIndices, qc.SignerIndices)
 			assert.Equal(t, certifyingQC.SigData, qc.SigData)
-			assert.Equal(t, block1.Header.View, qc.View)
+			assert.Equal(t, block1.View, qc.View)
 
 			_, err = state.AtBlockID(block1.ID()).RandomSource()
 			require.NoError(t, err)
@@ -1308,7 +1308,7 @@ func TestQuorumCertificate(t *testing.T) {
 			require.NoError(t, err)
 
 			// should have view matching block1 view
-			assert.Equal(t, block1.Header.View, qc.View)
+			assert.Equal(t, block1.View, qc.View)
 			assert.Equal(t, block1.ID(), qc.BlockID)
 		})
 	})
@@ -1717,7 +1717,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 func TestSnapshot_PostSporkIdentities(t *testing.T) {
 	expected := unittest.CompleteIdentitySet()
 	root, result, seal := unittest.BootstrapFixture(expected, func(block *flow.Block) {
-		block.Header.ParentID = unittest.IdentifierFixture()
+		block.ParentID = unittest.IdentifierFixture()
 	})
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
 

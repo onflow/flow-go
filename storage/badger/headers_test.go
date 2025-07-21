@@ -28,11 +28,11 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		// index the header
-		err = operation.RetryOnConflict(db.Update, operation.IndexBlockHeight(block.Header.Height, block.ID()))
+		err = operation.RetryOnConflict(db.Update, operation.IndexBlockHeight(block.Height, block.ID()))
 		require.NoError(t, err)
 
 		// retrieve header by height
-		actual, err := headers.ByHeight(block.Header.Height)
+		actual, err := headers.ByHeight(block.Height)
 		require.NoError(t, err)
 		require.Equal(t, block.ToHeader(), actual)
 

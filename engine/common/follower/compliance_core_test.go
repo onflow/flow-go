@@ -141,7 +141,7 @@ func (s *CoreSuite) TestProcessingRangeHappyPath() {
 	for i := 1; i < len(proposals); i++ {
 		expectCertified := &flow.CertifiedBlock{
 			Proposal:     proposals[i-1],
-			CertifyingQC: proposals[i].Block.Header.ParentQC(),
+			CertifyingQC: proposals[i].Block.ParentQC(),
 		}
 		s.state.On("ExtendCertified", mock.Anything, expectCertified).Return(nil).Once()
 		s.follower.On("AddCertifiedBlock", blockWithID(proposals[i-1].Block.ID())).Run(func(args mock.Arguments) {
@@ -226,9 +226,9 @@ func (s *CoreSuite) TestProcessingConnectedRangesOutOfOrder() {
 	s.state.On("ExtendCertified", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		certified := args.Get(1).(*flow.CertifiedBlock)
 		if lastSubmittedBlockID != flow.ZeroID {
-			if certified.Proposal.Block.Header.ParentID != lastSubmittedBlockID {
+			if certified.Proposal.Block.ParentID != lastSubmittedBlockID {
 				s.Failf("blocks not sequential",
-					"blocks submitted to protocol state are not sequential at height %d", certified.Proposal.Block.Header.Height)
+					"blocks submitted to protocol state are not sequential at height %d", certified.Proposal.Block.Height)
 			}
 		}
 		lastSubmittedBlockID = certified.Proposal.Block.ID()
@@ -244,7 +244,7 @@ func (s *CoreSuite) TestProcessingConnectedRangesOutOfOrder() {
 func (s *CoreSuite) TestDetectingProposalEquivocation() {
 	block := unittest.BlockWithParentFixture(s.finalizedBlock)
 	otherBlock := unittest.BlockWithParentFixture(s.finalizedBlock)
-	otherBlock.Header.View = block.Header.View
+	otherBlock.View = block.View
 	proposal := unittest.ProposalFromBlock(block)
 	otherProposal := unittest.ProposalFromBlock(otherBlock)
 
@@ -292,9 +292,9 @@ func (s *CoreSuite) TestConcurrentAdd() {
 	s.state.On("ExtendCertified", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		certified := args.Get(1).(*flow.CertifiedBlock)
 		if lastSubmittedBlockID != flow.ZeroID {
-			if certified.Proposal.Block.Header.ParentID != lastSubmittedBlockID {
+			if certified.Proposal.Block.ParentID != lastSubmittedBlockID {
 				s.Failf("blocks not sequential",
-					"blocks submitted to protocol state are not sequential at height %d", certified.Proposal.Block.Header.Height)
+					"blocks submitted to protocol state are not sequential at height %d", certified.Proposal.Block.Height)
 			}
 		}
 		lastSubmittedBlockID = certified.Proposal.Block.ID()

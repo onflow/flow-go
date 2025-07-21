@@ -660,8 +660,8 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 
 	block, err := flow.NewBlock(
 		flow.UntrustedBlock{
-			Header:  *headerBody,
-			Payload: *payload,
+			HeaderBody: *headerBody,
+			Payload:    *payload,
 		},
 	)
 	if err != nil {

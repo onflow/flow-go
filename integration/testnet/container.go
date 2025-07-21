@@ -476,7 +476,7 @@ func (c *Container) TestnetClient() (*Client, error) {
 		return nil, fmt.Errorf("container does not implement flow.access.AccessAPI")
 	}
 
-	chain := c.net.Root().Header.ChainID.Chain()
+	chain := c.net.Root().ChainID.Chain()
 	return NewClient(c.Addr(GRPCPort), chain)
 }
 

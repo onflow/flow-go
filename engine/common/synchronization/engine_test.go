@@ -372,7 +372,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 		res := args.Get(0).(flow.Slashable[[]*messages.UntrustedProposal])
 		converted, err := res.Message[0].DeclareStructurallyValid()
 		require.NoError(ss.T(), err)
-		ss.Assert().Equal(processable.Block.Header, converted.Block.Header)
+		ss.Assert().Equal(processable.Block.HeaderBody, converted.Block.HeaderBody)
 		ss.Assert().Equal(processable.Block.Payload, converted.Block.Payload)
 		ss.Assert().Equal(originID, res.OriginID)
 	})

@@ -112,11 +112,11 @@ func (s *BackendAccountStatusesSuite) SetupTest() {
 		s.blocks = append(s.blocks, block)
 		s.execDataMap[block.ID()] = execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
 		s.blockEvents[block.ID()] = events
-		s.blockMap[block.Header.Height] = block
+		s.blockMap[block.Height] = block
 		s.sealMap[block.ID()] = seal
 		s.resultMap[seal.ResultID] = result
 
-		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Header.Height, block.ID(), result.ExecutionDataID)
+		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Height, block.ID(), result.ExecutionDataID)
 	}
 
 	s.SetupTestMocks()
@@ -156,22 +156,22 @@ func (s *BackendAccountStatusesSuite) subscribeFromStartHeightTestCases() []test
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
-			startValue:      s.rootBlock.Header.Height,
+			startValue:      s.rootBlock.Height,
 		},
 		{
 			name:            "happy path - partial backfill",
 			highestBackfill: 2, // backfill the first 3 blocks
-			startValue:      s.blocks[0].Header.Height,
+			startValue:      s.blocks[0].Height,
 		},
 		{
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startValue:      s.blocks[0].Header.Height,
+			startValue:      s.blocks[0].Height,
 		},
 		{
 			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1,         // backfill all blocks
-			startValue:      s.rootBlock.Header.Height, // start from root block
+			highestBackfill: len(s.blocks) - 1,  // backfill all blocks
+			startValue:      s.rootBlock.Height, // start from root block
 		},
 	}
 
@@ -330,15 +330,15 @@ func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
 				// Consume execution data from subscription
 				unittest.RequireReturnsBefore(s.T(), func() {
 					v, ok := <-sub.Channel()
-					require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v: err: %v", b.Header.Height, b.ID(), sub.Err())
+					require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v: err: %v", b.Height, b.ID(), sub.Err())
 
 					resp, ok := v.(*AccountStatusesResponse)
 					require.True(s.T(), ok, "unexpected response type: %T", v)
 
 					assert.Equal(s.T(), b.ID(), resp.BlockID)
-					assert.Equal(s.T(), b.Header.Height, resp.Height)
+					assert.Equal(s.T(), b.Height, resp.Height)
 					assert.Equal(s.T(), expectedEvents, resp.AccountEvents)
-				}, 60*time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
+				}, 60*time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
 			}
 
 			// Make sure there are no new messages waiting. The channel should be opened with nothing waiting
@@ -440,7 +440,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() 
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeAccountStatusesFromStartHeight(subCtx, s.rootBlock.Header.Height-1, state_stream.AccountStatusFilter{})
+		sub := s.backend.SubscribeAccountStatusesFromStartHeight(subCtx, s.rootBlock.Height-1, state_stream.AccountStatusFilter{})
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -451,7 +451,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() 
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeAccountStatusesFromStartHeight(subCtx, s.blocks[len(s.blocks)-1].Header.Height+10, state_stream.AccountStatusFilter{})
+		sub := s.backend.SubscribeAccountStatusesFromStartHeight(subCtx, s.blocks[len(s.blocks)-1].Height+10, state_stream.AccountStatusFilter{})
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 }

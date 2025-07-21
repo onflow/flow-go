@@ -24,8 +24,8 @@ func NewUntrustedProposal(internal *flow.Proposal) *UntrustedProposal {
 func (msg *UntrustedProposal) DeclareStructurallyValid() (*flow.Proposal, error) {
 	block, err := flow.NewBlock(
 		flow.UntrustedBlock{
-			Header:  msg.Block.Header,
-			Payload: msg.Block.Payload,
+			HeaderBody: msg.Block.HeaderBody,
+			Payload:    msg.Block.Payload,
 		},
 	)
 	if err != nil {

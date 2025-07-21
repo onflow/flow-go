@@ -22,27 +22,27 @@ func BlockFixture(opts ...func(*flow.Block)) *flow.Block {
 
 func (f *blockFactory) WithParent(parentID flow.Identifier, parentView uint64, parentHeight uint64) func(*flow.Block) {
 	return func(block *flow.Block) {
-		block.Header.ParentID = parentID
-		block.Header.ParentView = parentView
-		block.Header.Height = parentHeight + 1
+		block.ParentID = parentID
+		block.ParentView = parentView
+		block.Height = parentHeight + 1
 	}
 }
 
 func (f *blockFactory) WithView(view uint64) func(*flow.Block) {
 	return func(block *flow.Block) {
-		block.Header.View = view
+		block.View = view
 	}
 }
 
 func (f *blockFactory) WithParentView(view uint64) func(*flow.Block) {
 	return func(block *flow.Block) {
-		block.Header.ParentView = view
+		block.ParentView = view
 	}
 }
 
 func (f *blockFactory) WithHeight(height uint64) func(*flow.Block) {
 	return func(block *flow.Block) {
-		block.Header.Height = height
+		block.Height = height
 	}
 }
 
@@ -54,13 +54,13 @@ func (f *blockFactory) WithPayload(payload flow.Payload) func(*flow.Block) {
 
 func (f *blockFactory) WithProposerID(proposerID flow.Identifier) func(*flow.Block) {
 	return func(b *flow.Block) {
-		b.Header.ProposerID = proposerID
+		b.ProposerID = proposerID
 	}
 }
 
 func (f *blockFactory) WithLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*flow.Block) {
 	return func(block *flow.Block) {
-		block.Header.LastViewTC = lastViewTC
+		block.LastViewTC = lastViewTC
 	}
 }
 
@@ -87,8 +87,8 @@ func (f *blockFactory) Genesis(chainID flow.ChainID) *flow.Block {
 	// combine to block
 	block, err := flow.NewRootBlock(
 		flow.UntrustedBlock{
-			Header:  *headerBody,
-			Payload: payload,
+			HeaderBody: *headerBody,
+			Payload:    payload,
 		},
 	)
 	if err != nil {

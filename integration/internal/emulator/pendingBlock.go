@@ -65,10 +65,10 @@ func newPendingBlock(
 	timestamp time.Time,
 ) *pendingBlock {
 	pb := &pendingBlock{
-		height: prevBlock.Header.Height + 1,
+		height: prevBlock.Height + 1,
 		// the view increments by between 1 and MaxViewIncrease to match
 		// behaviour on a real network, where views are not consecutive
-		view:               prevBlock.Header.View + uint64(rand.Intn(MaxViewIncrease)+1),
+		view:               prevBlock.View + uint64(rand.Intn(MaxViewIncrease)+1),
 		chainID:            chainID,
 		parentID:           prevBlock.ID(),
 		timestamp:          timestamp,
@@ -98,7 +98,7 @@ func (b *pendingBlock) Block() *flowgo.Block {
 
 	//nolint:structwrite - safe because Emulator is strictly used for integration tests
 	return &flowgo.Block{
-		Header: flowgo.HeaderBody{
+		HeaderBody: flowgo.HeaderBody{
 			ChainID:   b.chainID,
 			Height:    b.height,
 			View:      b.view,

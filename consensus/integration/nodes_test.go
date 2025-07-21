@@ -256,7 +256,7 @@ func createRootQC(t *testing.T, root *flow.Block, participantData *run.Participa
 // createRootBlockData creates genesis block with first epoch and real data node identities.
 // This function requires all participants to pass DKG process.
 func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
-	rootHeader := unittest.Block.Genesis(flow.Emulator).Header
+	rootHeaderBody := unittest.Block.Genesis(flow.Emulator).HeaderBody
 	consensusParticipants := participantData.Identities()
 
 	// add other roles to create a complete identity list
@@ -273,8 +273,8 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	setup := unittest.EpochSetupFixture(
 		unittest.WithParticipants(participants.ToSkeleton()),
 		unittest.SetupWithCounter(counter),
-		unittest.WithFirstView(rootHeader.View),
-		unittest.WithFinalView(rootHeader.View+1000),
+		unittest.WithFirstView(rootHeaderBody.View),
+		unittest.WithFinalView(rootHeaderBody.View+1000),
 	)
 	commit := unittest.EpochCommitFixture(
 		unittest.CommitWithCounter(counter),
@@ -288,14 +288,14 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
 	require.NoError(t, err)
 	epochProtocolStateID := minEpochStateEntry.ID()
-	safetyParams, err := protocol.DefaultEpochSafetyParams(rootHeader.ChainID)
+	safetyParams, err := protocol.DefaultEpochSafetyParams(rootHeaderBody.ChainID)
 	require.NoError(t, err)
 	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochProtocolStateID)
 	require.NoError(t, err)
 	root, err := flow.NewRootBlock(
 		flow.UntrustedBlock{
-			Header:  rootHeader,
-			Payload: flow.Payload{ProtocolStateID: rootProtocolState.ID()},
+			HeaderBody: rootHeaderBody,
+			Payload:    flow.Payload{ProtocolStateID: rootProtocolState.ID()},
 		},
 	)
 	require.NoError(t, err)

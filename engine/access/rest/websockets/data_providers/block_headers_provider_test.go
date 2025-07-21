@@ -82,14 +82,14 @@ func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []test
 		{
 			name: "happy path with start_block_height argument",
 			arguments: wsmodels.Arguments{
-				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
+				"start_block_height": strconv.FormatUint(s.rootBlock.Height, 10),
 				"block_status":       parser.Finalized,
 			},
 			setupBackend: func(sub *statestreamsmock.Subscription) {
 				s.api.On(
 					"SubscribeBlockHeadersFromStartHeight",
 					mock.Anything,
-					s.rootBlock.Header.Height,
+					s.rootBlock.Height,
 					flow.BlockStatusFinalized,
 				).Return(sub).Once()
 			},

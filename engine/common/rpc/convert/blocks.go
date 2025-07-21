@@ -18,8 +18,8 @@ func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
 ) {
 	id := h.ID()
 
-	parentID := h.Header.ParentID
-	t := timestamppb.New(h.Header.Timestamp)
+	parentID := h.ParentID
+	t := timestamppb.New(h.Timestamp)
 	cg := CollectionGuaranteesToMessages(h.Payload.Guarantees)
 
 	seals := BlockSealsToMessages(h.Payload.Seals)
@@ -36,12 +36,12 @@ func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
 
 	bh := entities.Block{
 		Id:                       IdentifierToMessage(id),
-		Height:                   h.Header.Height,
+		Height:                   h.Height,
 		ParentId:                 IdentifierToMessage(parentID),
 		Timestamp:                t,
 		CollectionGuarantees:     cg,
 		BlockSeals:               seals,
-		Signatures:               [][]byte{h.Header.ParentVoterSigData},
+		Signatures:               [][]byte{h.ParentVoterSigData},
 		ExecutionReceiptMetaList: ExecutionResultMetaListToMessages(h.Payload.Receipts),
 		ExecutionResultList:      execResults,
 		ProtocolStateId:          IdentifierToMessage(h.Payload.ProtocolStateID),
@@ -55,17 +55,17 @@ func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
 func BlockToMessageLight(h *flow.Block) *entities.Block {
 	id := h.ID()
 
-	parentID := h.Header.ParentID
-	t := timestamppb.New(h.Header.Timestamp)
+	parentID := h.ParentID
+	t := timestamppb.New(h.Timestamp)
 	cg := CollectionGuaranteesToMessages(h.Payload.Guarantees)
 
 	return &entities.Block{
 		Id:                   id[:],
-		Height:               h.Header.Height,
+		Height:               h.Height,
 		ParentId:             parentID[:],
 		Timestamp:            t,
 		CollectionGuarantees: cg,
-		Signatures:           [][]byte{h.Header.ParentVoterSigData},
+		Signatures:           [][]byte{h.ParentVoterSigData},
 	}
 }
 
@@ -81,8 +81,8 @@ func MessageToBlock(m *entities.Block) (*flow.Block, error) {
 	}
 	block, err := flow.NewBlock(
 		flow.UntrustedBlock{
-			Header:  header.HeaderBody,
-			Payload: *payload,
+			HeaderBody: header.HeaderBody,
+			Payload:    *payload,
 		},
 	)
 	if err != nil {

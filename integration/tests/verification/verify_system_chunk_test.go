@@ -21,11 +21,11 @@ func (suite *VerifySystemChunkSuite) TestSystemChunkIDsShouldBeDifferent() {
 	// // wait for next height finalized (potentially first height), called blockA
 	currentFinalized := suite.BlockState.HighestFinalizedHeight()
 	blockA := suite.BlockState.WaitForHighestFinalizedProgress(suite.T(), currentFinalized)
-	suite.T().Logf("blockA generated, height: %v ID: %v\n", blockA.Header.Height, blockA.ID())
+	suite.T().Logf("blockA generated, height: %v ID: %v\n", blockA.Height, blockA.ID())
 
 	// waits for the next finalized block after blockA, called blockB.
 	blockB := suite.BlockState.WaitForFinalizedChild(suite.T(), blockA)
-	suite.T().Logf("blockB generated, height: %v ID: %v\n", blockB.Header.Height, blockB.ID())
+	suite.T().Logf("blockB generated, height: %v ID: %v\n", blockB.Height, blockB.ID())
 
 	// waits for execution receipt for blockA from execution node, called receiptA.
 	receiptA := suite.ReceiptState.WaitForReceiptFrom(suite.T(), blockA.ID(), suite.exe1ID)
