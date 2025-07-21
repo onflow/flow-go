@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs/mock"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
-	"github.com/onflow/flow-go/storage/deferred"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
