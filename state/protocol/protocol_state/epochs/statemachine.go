@@ -166,8 +166,7 @@ type EpochStateMachine struct {
 	setups               storage.EpochSetups
 	commits              storage.EpochCommits
 	epochProtocolStateDB storage.EpochProtocolStateEntries
-	// TODO(leo): rename to pendingDBUpdates
-	pendingDBWrites *deferred.DeferredDBOps
+	pendingDBUpdates     *deferred.DeferredDBOps
 }
 
 var _ protocol_state.KeyValueStoreStateMachine = (*EpochStateMachine)(nil)
@@ -227,7 +226,7 @@ func NewEpochStateMachine(
 		setups:               setups,
 		commits:              commits,
 		epochProtocolStateDB: epochProtocolStateDB,
-		pendingDBWrites:      deferred.NewDeferredDBOps(),
+		pendingDBUpdates:     deferred.NewDeferredDBOps(),
 	}, nil
 }
 
@@ -242,18 +241,18 @@ func NewEpochStateMachine(
 func (e *EpochStateMachine) Build() (*deferred.DeferredDBOps, error) {
 	updatedEpochState, updatedStateID, hasChanges := e.activeStateMachine.Build()
 
-	e.pendingDBWrites.AddNextOperations(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+	e.pendingDBUpdates.AddNextOperations(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 		return e.epochProtocolStateDB.BatchIndex(rw, blockID, updatedStateID)
 	})
 
 	if hasChanges {
-		e.pendingDBWrites.AddNextOperations(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+		e.pendingDBUpdates.AddNextOperations(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 			return e.epochProtocolStateDB.BatchStore(rw.Writer(), updatedStateID, updatedEpochState.MinEpochStateEntry)
 		})
 	}
 	e.EvolvingState.SetEpochStateID(updatedStateID)
 
-	return e.pendingDBWrites, nil
+	return e.pendingDBUpdates, nil
 }
 
 // EvolveState applies the state change(s) on the Epoch sub-state, based on information from the candidate block
@@ -301,7 +300,7 @@ func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent)
 		}
 	}
 
-	e.pendingDBWrites.Chain(dbUpdates)
+	e.pendingDBUpdates.Chain(dbUpdates)
 	return nil
 }
 
