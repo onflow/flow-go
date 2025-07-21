@@ -355,9 +355,8 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 // addBlock adds the given block to the state by: extending the state,
 // finalizing the block, and caching the block.
 func (builder *EpochBuilder) addBlock(block *flow.Block) {
-	updatedStateId, dbUpdates, err := builder.mutableProtocolState.EvolveState(block.Header.ParentID, block.Header.View, block.Payload.Seals)
+	updatedStateId, err := builder.mutableProtocolState.EvolveState(nil, block.Header.ParentID, block.Header.View, block.Payload.Seals)
 	require.NoError(builder.t, err)
-	require.False(builder.t, len(dbUpdates) == 0)
 
 	block.Payload.ProtocolStateID = updatedStateId
 	block.Header.PayloadHash = block.Payload.Hash()
