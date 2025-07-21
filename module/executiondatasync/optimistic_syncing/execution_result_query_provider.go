@@ -155,7 +155,7 @@ func (e *ExecutionResultQueryProviderImpl) ExecutionResultQuery(blockID flow.Ide
 		}, nil
 	}
 
-	result, executorIDs, err := e.findResultAndExecutors(blockID, executorIdentities, criteria)
+	result, executorIDs, err := e.findResultAndExecutors(blockID, criteria)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find result and executors for block ID %v: %w", blockID, err)
 	}
@@ -193,7 +193,6 @@ func (e *ExecutionResultQueryProviderImpl) ExecutionResultQuery(blockID flow.Ide
 //   - All other errors are potential indicators of bugs or corrupted internal state
 func (e *ExecutionResultQueryProviderImpl) findResultAndExecutors(
 	blockID flow.Identifier,
-	allENs flow.IdentityList,
 	criteria Criteria,
 ) (*flow.ExecutionResult, flow.IdentifierList, error) {
 	type result struct {
@@ -322,7 +321,7 @@ func (e *ExecutionResultQueryProviderImpl) chooseExecutionNodes(
 	}
 
 	// finally, add any remaining required executors
-	addIfNotExists(chosenIDs, executors)
+	chosenIDs = addIfNotExists(chosenIDs, executors)
 	return chosenIDs.ToSkeleton(), nil
 }
 
@@ -346,19 +345,21 @@ func (e *ExecutionResultQueryProviderImpl) chooseFromRequiredENIDs(
 
 	// next, add any other required ENs that have executed the result
 	executedRequired := executors.Filter(filter.And(filter.HasNodeID[flow.Identity](e.requiredENIdentifiers...)))
-	addIfNotExists(chosenIDs, executedRequired)
+	chosenIDs = addIfNotExists(chosenIDs, executedRequired)
 
 	return chosenIDs
 }
 
 // function to add nodes to chosenIDs if they are not already included
-func addIfNotExists(chosenIDs, candidates flow.IdentityList) {
+func addIfNotExists(chosenIDs, candidates flow.IdentityList) flow.IdentityList {
 	for _, en := range candidates {
 		if _, exists := chosenIDs.ByNodeID(en.NodeID); !exists {
 			chosenIDs = append(chosenIDs, en)
 			if len(chosenIDs) >= maxNodesCnt {
-				return
+				break
 			}
 		}
 	}
+
+	return chosenIDs
 }

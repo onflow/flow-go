@@ -62,7 +62,7 @@ func (suite *ExecutionResultQueryProviderSuite) SetupTest() {
 		suite.receipts,
 		flow.IdentifierList{},
 		flow.IdentifierList{},
-		2,
+		Criteria{},
 	)
 	suite.Require().NoError(err)
 }
@@ -231,16 +231,12 @@ func (suite *ExecutionResultQueryProviderSuite) TestRootBlockHandling() {
 	suite.setupIdentitiesMock(allExecutionNodes)
 
 	suite.Run("root block returns execution nodes without execution result", func() {
-		criteria := Criteria{
-			AgreeingExecutors: 1,
-			// RequiredExecutors is empty, will use operator defaults (also empty)
-		}
-
-		query, err := suite.provider.ExecutionResultQuery(suite.rootBlock.ID(), criteria)
+		query, err := suite.provider.ExecutionResultQuery(suite.rootBlock.ID(), Criteria{})
 		suite.Require().NoError(err)
 
 		suite.Assert().Equal(suite.rootBlockResult, query.ExecutionResult)
-		suite.Assert().ElementsMatch(query.ExecutionNodes.NodeIDs(), allExecutionNodes.NodeIDs())
+		suite.Assert().Len(query.ExecutionNodes.NodeIDs(), maxNodesCnt)
+		suite.Assert().Subset(allExecutionNodes.NodeIDs(), query.ExecutionNodes.NodeIDs())
 	})
 
 	suite.Run("root block with required executors", func() {
