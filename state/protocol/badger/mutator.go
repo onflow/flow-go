@@ -229,13 +229,6 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 //   - state.InvalidExtensionError if the candidate block is invalid
 func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) error {
-	lctx := m.lockManager.NewContext()
-	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertBlock)
-	if err != nil {
-		return err
-	}
-
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
 	defer span.End()
 
@@ -285,6 +278,13 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 	err = m.evolveProtocolState(ctx, candidate, deferredDBOps)
 	if err != nil {
 		return fmt.Errorf("evolving protocol state failed: %w", err)
+	}
+
+	lctx := m.lockManager.NewContext()
+	defer lctx.Release()
+	err = lctx.AcquireLock(storage.LockInsertBlock)
+	if err != nil {
+		return err
 	}
 
 	// Execute the deferred database operations and emit scheduled notifications on success.
