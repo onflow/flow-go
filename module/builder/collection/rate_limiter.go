@@ -1,6 +1,7 @@
 package collection
 
 import (
+	"github.com/onflow/flow-go/state/protocol"
 	"math"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -111,4 +112,60 @@ func (limiter *rateLimiter) shouldRateLimit(tx *flow.TransactionBody) bool {
 	}
 
 	return false
+}
+
+type BySealingLagRateLimiter struct {
+	state             protocol.State
+	minSealingLag     uint
+	maxSealingLag     uint
+	maxCollectionSize uint   // the maximum size of a collection that this rate limiter allows
+	config            Config // configuration for the collection builder
+}
+
+// MaxCollectionSize returns the maximum size of a collection that this rate limiter allows.
+func (limiter *BySealingLagRateLimiter) MaxCollectionSize() uint {
+	return limiter.maxCollectionSize
+}
+
+// OnBlockFinalized is the event handler to receive notifications about finalized blocks.
+func (limiter *BySealingLagRateLimiter) OnBlockFinalized(_ *flow.Header) {
+	// TODO: this should be moved to a worker goroutine to avoid blocking the finalization process
+	// and proper error handling
+	lastFinalized, err := limiter.state.Final().Head()
+	if err != nil {
+		panic(err)
+	}
+	lastSealed, err := limiter.state.Sealed().Head()
+	if err != nil {
+		panic(err)
+	}
+	sealingLag := uint(lastFinalized.Height - lastSealed.Height)
+	halvingInterval := uint(5)
+	limiter.maxCollectionSize = StepHalving(
+		[2]uint{limiter.minSealingLag, limiter.maxSealingLag}, // [minSealingLag, maxSealingLag] is the range of input values where the halving is applied
+		[2]uint{1, limiter.config.MaxCollectionSize},          // [1, maxCollectionSize] is the range of collection sizes that halving function outputs
+		sealingLag,      // the current sealing lag
+		halvingInterval, // interval in blocks in which the halving is applied
+	)
+}
+
+// StepHalving applies a step halving algorithm to determine the maximum collection size based on the sealing lag.
+// minValue is the minimum collection size, maxValue is the maximum collection size,
+func StepHalving(xBounds, yBounds [2]uint, x, interval uint) uint {
+	if x <= xBounds[0] {
+		return yBounds[1]
+	}
+	if x >= xBounds[1] {
+		return yBounds[0]
+	}
+	x = x - xBounds[0]             // normalize x to start from 0
+	halvings := (x / interval) + 1 // + 1 because we would like to halve immediately after reaching the first interval
+	if x <= 0 {
+		return yBounds[1]
+	}
+	result := uint(float64(yBounds[1]) / math.Pow(2, float64(halvings)))
+	if result < yBounds[0] {
+		return yBounds[0]
+	}
+	return result
 }
