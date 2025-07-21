@@ -182,12 +182,9 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 	if err != nil {
 		return fmt.Errorf("failed to determine the lastest sealed block in fork: %w", err)
 	}
-	err = deferredDBOps.AddNextOperations(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+	deferredDBOps.AddNextOperations(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 		return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, latestSeal.ID())
 	})
-	if err != nil {
-		return fmt.Errorf("could not index latest seal: %w", err)
-	}
 
 	// TODO: we might not need the deferred db updates, because the candidate passed into
 	// the Extend method has already been fully constructed.
@@ -374,7 +371,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 
 	// STEP 5:
 	qc := candidate.Header.ParentQC()
-	return deferredDBOps.AddNextOperations(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+	deferredDBOps.AddNextOperations(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 		// STEP 5a: Store QC for parent block and emit `BlockProcessable` notification if and only if
 		//  - the QC for the parent has not been stored before (otherwise, we already emitted the notification) and
 		//  - the parent block's height is larger than the finalized root height (the root block is already considered processed)
@@ -415,6 +412,8 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 		}
 		return nil
 	})
+
+	return nil
 }
 
 // checkBlockAlreadyProcessed checks if block has been added to the protocol state.
