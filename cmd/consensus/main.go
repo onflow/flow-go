@@ -282,7 +282,7 @@ func main() {
 				getSealingConfigs,
 				conMetrics)
 
-			blockTimer, err = blocktimer.NewBlockTimer(minInterval, maxInterval)
+			blockTimer, err = blocktimer.NewBlockTimer(uint64(minInterval.Milliseconds()), uint64(maxInterval.Milliseconds()))
 			if err != nil {
 				return err
 			}

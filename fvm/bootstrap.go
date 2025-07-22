@@ -337,30 +337,9 @@ func (b *bootstrapExecutor) Preprocess() error {
 
 func (b *bootstrapExecutor) Execute() error {
 	if b.rootHeader == nil {
-		// create the raw content for the genesis block
-		payload := flow.NewEmptyPayload()
-
-		// create the headerBody
-		headerBody, err := flow.NewRootHeaderBody(
-			flow.UntrustedHeaderBody{
-				ChainID:   b.ctx.Chain.ChainID(),
-				ParentID:  flow.ZeroID,
-				Height:    0,
-				Timestamp: flow.GenesisTime,
-				View:      0,
-			},
-		)
+		header, err := b.genesisHeader()
 		if err != nil {
-			return fmt.Errorf("failed to create root header body: %w", err)
-		}
-
-		header, err := flow.NewRootHeader(
-			flow.UntrustedHeader{
-				HeaderBody:  *headerBody,
-				PayloadHash: payload.Hash(),
-			})
-		if err != nil {
-			return fmt.Errorf("failed to create root header: %w", err)
+			return fmt.Errorf("failed to create genesis header: %w", err)
 		}
 
 		b.rootHeader = header
@@ -499,6 +478,39 @@ func (b *bootstrapExecutor) Execute() error {
 	b.deployMigrationContract(service)
 
 	return nil
+}
+
+// genesisHeader creates genesis block header with empty payload.
+//
+// This function must always return a structurally valid genesis block header.
+func (b *bootstrapExecutor) genesisHeader() (*flow.Header, error) {
+	// create the raw content for the genesis block
+	payload := flow.NewEmptyPayload()
+
+	// create the headerBody
+	headerBody, err := flow.NewRootHeaderBody(
+		flow.UntrustedHeaderBody{
+			ChainID:   b.ctx.Chain.ChainID(),
+			ParentID:  flow.ZeroID,
+			Height:    0,
+			Timestamp: uint64(flow.GenesisTime.UnixMilli()),
+			View:      0,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create root header body: %w", err)
+	}
+
+	header, err := flow.NewRootHeader(
+		flow.UntrustedHeader{
+			HeaderBody:  *headerBody,
+			PayloadHash: payload.Hash(),
+		})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create root header: %w", err)
+	}
+
+	return header, nil
 }
 
 func (b *bootstrapExecutor) createAccount(publicKeys []flow.AccountPublicKey) flow.Address {

@@ -28,7 +28,7 @@ func (f *clusterBlockFactory) WithParent(parent *cluster.Block) func(*cluster.Bl
 		block.Header.Height = parent.Header.Height + 1
 		block.Header.View = parent.Header.View + 1
 		block.Header.ChainID = parent.Header.ChainID
-		block.Header.Timestamp = time.Now().UTC()
+		block.Header.Timestamp = uint64(time.Now().UnixMilli())
 		block.Header.ParentID = parent.ID()
 		block.Header.ParentView = parent.Header.View
 	}
@@ -62,7 +62,7 @@ func (f *clusterBlockFactory) Genesis() (*cluster.Block, error) {
 	headerBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
 		View:      0,
 		ChainID:   "cluster",
-		Timestamp: flow.GenesisTime,
+		Timestamp: uint64(flow.GenesisTime.UnixMilli()),
 		ParentID:  flow.ZeroID,
 	})
 	if err != nil {

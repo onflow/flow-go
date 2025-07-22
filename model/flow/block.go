@@ -3,8 +3,6 @@ package flow
 import (
 	"fmt"
 	"time"
-
-	"github.com/vmihailenco/msgpack/v4"
 )
 
 // Block includes both the block header metadata and the payload content.
@@ -113,30 +111,6 @@ func (b Block) ToHeader() *Header {
 		panic(fmt.Errorf("could not build header from block: %w", err))
 	}
 	return header
-}
-
-// TODO(malleability): remove MarshalMsgpack when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
-func (b Block) MarshalMsgpack() ([]byte, error) {
-	if b.Header.Timestamp.Location() != time.UTC {
-		b.Header.Timestamp = b.Header.Timestamp.UTC() //nolint:structwrite
-	}
-
-	type Encodable Block
-	return msgpack.Marshal(Encodable(b))
-}
-
-// TODO(malleability): remove UnmarshalMsgpack when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
-func (b *Block) UnmarshalMsgpack(data []byte) error {
-	type Decodable Block
-	decodable := Decodable(*b)
-	err := msgpack.Unmarshal(data, &decodable)
-	*b = Block(decodable)
-
-	if b.Header.Timestamp.Location() != time.UTC {
-		b.Header.Timestamp = b.Header.Timestamp.UTC() //nolint:structwrite
-	}
-
-	return err
 }
 
 // BlockStatus represents the status of a block.
