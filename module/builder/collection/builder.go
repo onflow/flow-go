@@ -33,6 +33,7 @@ import (
 type Builder struct {
 	db             *badger.DB
 	mainHeaders    storage.Headers
+	metrics        module.CollectionMetrics
 	clusterHeaders storage.Headers
 	protoState     protocol.State
 	clusterState   clusterstate.State
@@ -50,6 +51,7 @@ type Builder struct {
 func NewBuilder(
 	db *badger.DB,
 	tracer module.Tracer,
+	metrics module.CollectionMetrics,
 	protoState protocol.State,
 	clusterState clusterstate.State,
 	mainHeaders storage.Headers,
@@ -63,6 +65,7 @@ func NewBuilder(
 	b := Builder{
 		db:             db,
 		tracer:         tracer,
+		metrics:        metrics,
 		protoState:     protoState,
 		clusterState:   clusterState,
 		mainHeaders:    mainHeaders,
@@ -226,6 +229,7 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 		return nil, fmt.Errorf("could not create by sealing lag rate limiter: %w", err)
 	}
 	ctx.config.MaxCollectionSize = bySealingLagRateLimiter.MaxCollectionSize()
+	b.metrics.CollectionMaxSize(ctx.config.MaxCollectionSize)
 
 	ctx.parent, err = b.clusterHeaders.ByBlockID(parentID)
 	if err != nil {

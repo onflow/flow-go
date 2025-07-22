@@ -62,6 +62,7 @@ func (f *BuilderFactory) Create(
 	build, err := builder.NewBuilder(
 		f.db,
 		f.trace,
+		f.metrics,
 		f.protoState,
 		clusterState,
 		f.mainChainHeaders,
