@@ -75,7 +75,6 @@ func getFileSHA256(file string) (string, error) {
 
 // moveFile moves a file from source to destination where src and dst are full paths including the filename
 func moveFile(src, dst string) error {
-
 	// check if source file exist
 	if !ioutils.FileExists(src) {
 		return fmt.Errorf("file not found: %s", src)
@@ -154,7 +153,6 @@ func moveFile(src, dst string) error {
 }
 
 func unWrapFile(bootDir string, nodeID string) error {
-
 	log.Info().Msg("decrypting Random Beacon key")
 
 	pubKeyPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeID))
@@ -230,10 +228,9 @@ func wrapFile(bootDir string, nodeID string) error {
 }
 
 // generateKeys creates the transit keypair and writes them to disk for later
-func generateKeys(bootDir string, nodeID string) error {
-
-	privPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPriv, nodeID))
-	pubPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeID))
+func generateKeys(outputDir string, nodeID string) error {
+	privPath := filepath.Join(outputDir, fmt.Sprintf(FilenameTransitKeyPriv, nodeID))
+	pubPath := filepath.Join(outputDir, fmt.Sprintf(FilenameTransitKeyPub, nodeID))
 
 	if ioutils.FileExists(privPath) && ioutils.FileExists(pubPath) {
 		log.Warn().Msg("transit-key-path priv & pub both exist, skipping key generation")

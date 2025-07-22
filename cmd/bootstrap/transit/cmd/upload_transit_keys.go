@@ -37,7 +37,6 @@ func addUploadTransitKeysCmdFlags() {
 
 // pushTransitKey uploads transit keys to the Flow server
 func pushTransitKey(_ *cobra.Command, _ []string) {
-
 	nodeIDString, err := readNodeID()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read node ID")

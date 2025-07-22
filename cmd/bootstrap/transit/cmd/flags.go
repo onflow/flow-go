@@ -11,6 +11,8 @@ var (
 	flagTimeout       time.Duration
 	flagConcurrency   int64
 
-	flagWrapID   string // wrap ID
-	flagVoteFile string
+	flagWrapID    string // wrap ID
+	flagVoteFile  string
+	flagNodeID    string
+	flagOutputDir string // output directory for generated keys
 )
