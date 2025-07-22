@@ -38,15 +38,11 @@ func prepareSystemContractCode(chainID flow.ChainID) string {
 // SystemChunkTransaction creates and returns the transaction corresponding to the
 // system chunk for the given chain.
 func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
-	tx, err := flow.NewTransactionBodyBuilder().
-		SetScript(
-			[]byte(prepareSystemContractCode(chain.ChainID())),
-		).
-		// The heartbeat resources needed by the system tx have are on the service account,
-		// therefore, the service account is the only authorizer needed.
-		AddAuthorizer(chain.ServiceAddress()).
-		SetComputeLimit(SystemChunkTransactionGasLimit).
-		Build()
+	tx, err := flow.NewSystemChunkTransactionBody(flow.UntrustedTransactionBody{
+		Script:      []byte(prepareSystemContractCode(chain.ChainID())),
+		Authorizers: []flow.Address{chain.ServiceAddress()},
+		GasLimit:    SystemChunkTransactionGasLimit,
+	})
 
 	if err != nil {
 		return nil, fmt.Errorf("could not build system chunk transaction: %w", err)

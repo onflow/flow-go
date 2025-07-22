@@ -83,6 +83,20 @@ func NewTransactionBody(untrusted UntrustedTransactionBody) (*TransactionBody, e
 	}, nil
 }
 
+func NewSystemChunkTransactionBody(untrusted UntrustedTransactionBody) (*TransactionBody, error) {
+	return &TransactionBody{
+		ReferenceBlockID:   untrusted.ReferenceBlockID,
+		Script:             untrusted.Script,
+		Arguments:          untrusted.Arguments,
+		GasLimit:           untrusted.GasLimit,
+		ProposalKey:        untrusted.ProposalKey,
+		Payer:              untrusted.Payer,
+		Authorizers:        untrusted.Authorizers,
+		PayloadSignatures:  untrusted.PayloadSignatures,
+		EnvelopeSignatures: untrusted.EnvelopeSignatures,
+	}, nil
+}
+
 // Fingerprint returns the canonical, unique byte representation for the TransactionBody.
 // As RLP encoding logic for TransactionBody is over-ridden by EncodeRLP below, this is
 // equivalent to directly RLP encoding the TransactionBody.
