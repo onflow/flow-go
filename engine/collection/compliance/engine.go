@@ -134,7 +134,7 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 	}
 }
 
-// OnClusterBlockProposal feeds a new basic structural validated block proposal into the processing pipeline.
+// OnClusterBlockProposal feeds a new structurally validated block proposal into the processing pipeline.
 // Incoming proposals are queued and eventually dispatched by worker.
 func (e *Engine) OnClusterBlockProposal(proposal flow.Slashable[*cluster.Proposal]) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageBlockProposal)
@@ -145,7 +145,7 @@ func (e *Engine) OnClusterBlockProposal(proposal flow.Slashable[*cluster.Proposa
 	}
 }
 
-// OnSyncedClusterBlock feeds a basic structural validated block proposal obtained from sync proposal into the processing pipeline.
+// OnSyncedClusterBlock feeds a structurally validated block proposal obtained from sync proposal into the processing pipeline.
 // Incoming proposals are queued and eventually dispatched by worker.
 func (e *Engine) OnSyncedClusterBlock(syncedBlock flow.Slashable[*cluster.Proposal]) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock)
