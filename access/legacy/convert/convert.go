@@ -21,8 +21,8 @@ func MessageToTransaction(m *entitiesproto.Transaction, chain flow.Chain) (flow.
 	if m == nil {
 		return t, ErrEmptyMessage
 	}
-	tb := flow.NewTransactionBodyBuilder()
 
+	tb := flow.NewTransactionBodyBuilder()
 	proposalKey := m.GetProposalKey()
 	if proposalKey != nil {
 		proposalAddress, err := convert.Address(proposalKey.GetAddress(), chain)
@@ -65,11 +65,14 @@ func MessageToTransaction(m *entitiesproto.Transaction, chain flow.Chain) (flow.
 		tb.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature())
 	}
 
-	transactionBody := tb.SetScript(m.GetScript()).
+	transactionBody, err := tb.SetScript(m.GetScript()).
 		SetArguments(m.GetArguments()).
 		SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId())).
 		SetComputeLimit(m.GetGasLimit()).
 		Build()
+	if err != nil {
+		return t, fmt.Errorf("could not build transaction body: %w", err)
+	}
 
 	return *transactionBody, nil
 }

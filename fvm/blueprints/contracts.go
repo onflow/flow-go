@@ -88,7 +88,7 @@ func SetIsContractDeploymentRestrictedTransaction(serviceAccount flow.Address, r
 		AddAuthorizer(serviceAccount).
 		AddArgument(argRestricted).
 		AddArgument(argPath).
-		Build(), nil
+		Build()
 }
 
 // TODO (ramtin) get rid of authorizers

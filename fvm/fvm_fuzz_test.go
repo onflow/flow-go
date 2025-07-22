@@ -37,13 +37,13 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 
 		vmt.run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// create the transaction
-			txBody := tt.createTxBody(t, tctx)
+			txBodyBuilder := tt.createTxBody(t, tctx)
 			// set the computation limit
-			txBody.SetComputeLimit(computationLimit)
+			txBodyBuilder.SetComputeLimit(computationLimit)
 
 			// sign the transaction
 			err := testutil.SignEnvelope(
-				txBody,
+				txBodyBuilder,
 				tctx.address,
 				tctx.privateKey,
 			)
@@ -56,11 +56,14 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 
 			var output fvm.ProcedureOutput
 
+			txBody, err := txBodyBuilder.Build()
+			require.NoError(t, err)
+
 			// run the transaction
 			require.NotPanics(t, func() {
 				_, output, err = vm.Run(
 					ctx,
-					fvm.Transaction(txBody.Build(), 0),
+					fvm.Transaction(txBody, 0),
 					snapshotTree)
 			}, "Transaction should never result in a panic.")
 			require.NoError(t, err, "Transaction should never result in an error.")
@@ -287,7 +290,9 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 			return snapshotTree, err
 		}
 
-		txBody := txBodyBuilder.Build()
+		txBody, err := txBodyBuilder.Build()
+		require.NoError(tb, err)
+
 		executionSnapshot, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
@@ -325,7 +330,9 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		)
 		require.NoError(tb, err)
 
-		txBody = txBodyBuilder.Build()
+		txBody, err = txBodyBuilder.Build()
+		require.NoError(tb, err)
+
 		executionSnapshot, output, err = vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),

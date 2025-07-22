@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	flowrlp "github.com/onflow/flow-go/model/encoding/rlp"
-
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
@@ -66,7 +65,11 @@ type UntrustedTransactionBody TransactionBody
 // Construction of TransactionBody is allowed only within the constructor
 //
 // All errors indicate a valid TransactionBody cannot be constructed from the input.
-func NewTransactionBody(untrusted UntrustedTransactionBody) *TransactionBody {
+func NewTransactionBody(untrusted UntrustedTransactionBody) (*TransactionBody, error) {
+	//if untrusted.Payer == EmptyAddress {
+	//	return nil, fmt.Errorf("Payer address must not be empty")
+	//}
+
 	return &TransactionBody{
 		ReferenceBlockID:   untrusted.ReferenceBlockID,
 		Script:             untrusted.Script,
@@ -77,7 +80,7 @@ func NewTransactionBody(untrusted UntrustedTransactionBody) *TransactionBody {
 		Authorizers:        untrusted.Authorizers,
 		PayloadSignatures:  untrusted.PayloadSignatures,
 		EnvelopeSignatures: untrusted.EnvelopeSignatures,
-	}
+	}, nil
 }
 
 // Fingerprint returns the canonical, unique byte representation for the TransactionBody.

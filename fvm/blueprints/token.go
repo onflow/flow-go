@@ -99,8 +99,7 @@ var createFlowTokenMinterTransactionTemplate string
 //go:embed scripts/mintFlowTokenTransactionTemplate.cdc
 var mintFlowTokenTransactionTemplate string
 
-func DeployFlowTokenContractTransaction(service, flowToken flow.Address, contract []byte) *flow.TransactionBody {
-
+func DeployFlowTokenContractTransaction(service, flowToken flow.Address, contract []byte) (*flow.TransactionBody, error) {
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(deployFlowTokenTransactionTemplate)).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
@@ -112,7 +111,7 @@ func DeployFlowTokenContractTransaction(service, flowToken flow.Address, contrac
 // CreateFlowTokenMinterTransaction returns a transaction which creates a Flow
 // token Minter resource and stores it in the service account. This Minter is
 // expected to be stored here by the epoch smart contracts.
-func CreateFlowTokenMinterTransaction(service, flowToken flow.Address) *flow.TransactionBody {
+func CreateFlowTokenMinterTransaction(service, flowToken flow.Address) (*flow.TransactionBody, error) {
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(templates.ReplaceAddresses(
 			createFlowTokenMinterTransactionTemplate,
@@ -127,7 +126,7 @@ func CreateFlowTokenMinterTransaction(service, flowToken flow.Address) *flow.Tra
 func MintFlowTokenTransaction(
 	fungibleToken, flowToken, service flow.Address,
 	initialSupply cadence.UFix64,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	initialSupplyArg, err := jsoncdc.Encode(initialSupply)
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode initial token supply: %s", err.Error()))

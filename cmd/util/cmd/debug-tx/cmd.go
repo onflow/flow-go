@@ -246,7 +246,10 @@ func runTransaction(
 		proposalKeySequenceNumber,
 	)
 
-	txBody := txBodyBuilder.Build()
+	txBody, err := txBodyBuilder.Build()
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to build transaction body")
+	}
 
 	resultSnapshot, txErr, processErr := debugger.RunTransaction(
 		txBody,

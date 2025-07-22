@@ -240,10 +240,11 @@ func (s *scriptTestSuite) createAccount() flow.Address {
 		  }
 		}`
 
-	txBody := flow.NewTransactionBodyBuilder().
+	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(createAccountTransaction)).
 		AddAuthorizer(s.chain.ServiceAddress()).
 		Build()
+	s.Require().NoError(err)
 
 	executionSnapshot, output, err := s.vm.Run(
 		s.vmCtx,
@@ -281,10 +282,11 @@ func (s *scriptTestSuite) createAccount() flow.Address {
 }
 
 func (s *scriptTestSuite) transferTokens(accountAddress flow.Address, amount uint64) {
-	transferTx := transferTokensTx(s.chain).
+	transferTx, err := transferTokensTx(s.chain).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(amount))).
 		AddArgument(jsoncdc.MustEncode(cadence.Address(accountAddress))).
 		AddAuthorizer(s.chain.ServiceAddress()).Build()
+	s.Require().NoError(err)
 
 	executionSnapshot, _, err := s.vm.Run(
 		s.vmCtx,
@@ -331,11 +333,12 @@ transaction(key: [UInt8]) {
 
 	publicKey, encodedCadencePublicKey := newAccountKey(s.T(), privateKey, apiVersion)
 
-	txBody := flow.NewTransactionBodyBuilder().
+	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(addAccountKeyTransaction)).
 		AddArgument(encodedCadencePublicKey).
 		AddAuthorizer(accountAddress).
 		Build()
+	s.Require().NoError(err)
 
 	executionSnapshot, _, err := s.vm.Run(
 		s.vmCtx,

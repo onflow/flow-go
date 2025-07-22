@@ -65,7 +65,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 
 	t.Run("single transaction event", func(t *testing.T) {
 
-		deployTx := blueprints.DeployContractTransaction(chain.ServiceAddress(), []byte(""+
+		deployTxBuilder := blueprints.DeployContractTransaction(chain.ServiceAddress(), []byte(""+
 			`access(all) contract Foo {
 				access(all) event FooEvent(x: Int, y: Int)
 
@@ -74,7 +74,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 				}
 			}`), "Foo")
 
-		emitTx := flow.NewTransactionBodyBuilder().
+		emitTxBuilder := flow.NewTransactionBodyBuilder().
 			SetScript([]byte(fmt.Sprintf(`
 			import Foo from 0x%s
 			transaction {
@@ -84,15 +84,20 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 				}
 			}`, chain.ServiceAddress())))
 
-		err := testutil.SignTransactionAsServiceAccount(deployTx, 0, chain)
+		err := testutil.SignTransactionAsServiceAccount(deployTxBuilder, 0, chain)
 		require.NoError(t, err)
 
-		err = testutil.SignTransactionAsServiceAccount(emitTx, 1, chain)
+		err = testutil.SignTransactionAsServiceAccount(emitTxBuilder, 1, chain)
+		require.NoError(t, err)
+
+		deployTx, err := deployTxBuilder.Build()
+		require.NoError(t, err)
+		emitTx, err := emitTxBuilder.Build()
 		require.NoError(t, err)
 
 		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
 			{
-				deployTx.Build(), emitTx.Build(),
+				deployTx, emitTx,
 			},
 		}, fvm.BootstrapProcedureFeeParameters{}, fvm.DefaultMinimumStorageReservation)
 
@@ -107,7 +112,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 	})
 
 	t.Run("multiple collections events", func(t *testing.T) {
-		deployTx := blueprints.DeployContractTransaction(chain.ServiceAddress(), []byte(""+
+		deployTxBuilder := blueprints.DeployContractTransaction(chain.ServiceAddress(), []byte(""+
 			`access(all) contract Foo {
 				access(all) event FooEvent(x: Int, y: Int)
 
@@ -116,7 +121,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 				}
 			}`), "Foo")
 
-		emitTx1 := flow.NewTransactionBodyBuilder().
+		emitTx1Builder := flow.NewTransactionBodyBuilder().
 			SetScript([]byte(fmt.Sprintf(`
 			import Foo from 0x%s
 			transaction {
@@ -127,29 +132,38 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			}`, chain.ServiceAddress())))
 
 		// copy txs
-		emitTx2 := *emitTx1
-		emitTx3 := *emitTx1
+		emitTx2Builder := *emitTx1Builder
+		emitTx3Builder := *emitTx1Builder
 
-		err := testutil.SignTransactionAsServiceAccount(deployTx, 0, chain)
+		err := testutil.SignTransactionAsServiceAccount(deployTxBuilder, 0, chain)
 		require.NoError(t, err)
 
-		err = testutil.SignTransactionAsServiceAccount(emitTx1, 1, chain)
+		err = testutil.SignTransactionAsServiceAccount(emitTx1Builder, 1, chain)
 		require.NoError(t, err)
 
-		err = testutil.SignTransactionAsServiceAccount(&emitTx2, 2, chain)
+		err = testutil.SignTransactionAsServiceAccount(&emitTx2Builder, 2, chain)
 		require.NoError(t, err)
-		err = testutil.SignTransactionAsServiceAccount(&emitTx3, 3, chain)
+		err = testutil.SignTransactionAsServiceAccount(&emitTx3Builder, 3, chain)
+		require.NoError(t, err)
+
+		deployTx, err := deployTxBuilder.Build()
+		require.NoError(t, err)
+		emitTx1, err := emitTx1Builder.Build()
+		require.NoError(t, err)
+		emitTx2, err := emitTx2Builder.Build()
+		require.NoError(t, err)
+		emitTx3, err := emitTx3Builder.Build()
 		require.NoError(t, err)
 
 		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
 			{
-				deployTx.Build(), emitTx1.Build(),
+				deployTx, emitTx1,
 			},
 			{
-				emitTx2.Build(),
+				emitTx2,
 			},
 			{
-				emitTx3.Build(),
+				emitTx3,
 			},
 		}, fvm.BootstrapProcedureFeeParameters{}, fvm.DefaultMinimumStorageReservation)
 
@@ -198,21 +212,25 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		err = testutil.SignTransactionAsServiceAccount(createAccountTxBuilder, 0, chain)
 		require.NoError(t, err)
 
-		addKeyTx := testutil.CreateAddAnAccountKeyMultipleTimesTransaction(t, &accountPrivKey, 100).
+		addKeyTxBuilder := testutil.CreateAddAnAccountKeyMultipleTimesTransaction(t, &accountPrivKey, 100).
 			AddAuthorizer(accountAddress)
-		err = testutil.SignTransaction(addKeyTx, accountAddress, accountPrivKey, 0)
+		err = testutil.SignTransaction(addKeyTxBuilder, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
 		minimumStorage, err := cadence.NewUFix64("0.00011661")
 		require.NoError(t, err)
 
-		createAccountTx := createAccountTxBuilder.Build()
+		createAccountTx, err := createAccountTxBuilder.Build()
+		require.NoError(t, err)
+		addKeyTx, err := addKeyTxBuilder.Build()
+		require.NoError(t, err)
+
 		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
 			{
 				createAccountTx,
 			},
 			{
-				addKeyTx.Build(),
+				addKeyTx,
 			},
 		}, fvm.DefaultTransactionFees, minimumStorage)
 
@@ -243,7 +261,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		err = testutil.SignTransactionAsServiceAccount(createAccountTxBuilder, 0, chain)
 		require.NoError(t, err)
 
-		spamTx := flow.NewTransactionBodyBuilder().
+		spamTxBuilder := flow.NewTransactionBodyBuilder().
 			SetScript([]byte(`
 			transaction {
 				prepare() {}
@@ -263,16 +281,18 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 				}
 			}`)).SetComputeLimit(800000)
 
-		err = testutil.SignTransaction(spamTx, accountAddress, accountPrivKey, 0)
+		err = testutil.SignTransaction(spamTxBuilder, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
+		createAccountTx, err := createAccountTxBuilder.Build()
+		require.NoError(t, err)
+		spamTx, err := spamTxBuilder.Build()
 		require.NoError(t, err)
 
-		createAccountTx := createAccountTxBuilder.Build()
 		cr := executeBlockAndVerifyWithParameters(t, [][]*flow.TransactionBody{
 			{
 				createAccountTx,
-				spamTx.Build(),
+				spamTx,
 			},
 		},
 			[]fvm.Option{
@@ -635,7 +655,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			require.NoError(t, err)
 
 			// ==== Transfer tokens to new account ====
-			transferTx := transferTokensTx(chain).
+			transferTxBuilder := transferTokensTx(chain).
 				AddAuthorizer(chain.ServiceAddress()).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(tc.fundWith))).
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(address))).
@@ -643,7 +663,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				SetPayer(chain.ServiceAddress())
 
 			err = testutil.SignEnvelope(
-				transferTx,
+				transferTxBuilder,
 				chain.ServiceAddress(),
 				unittest.ServiceAccountPrivateKey,
 			)
@@ -651,7 +671,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 			// ==== Transfer tokens from new account ====
 
-			transferTx2 := transferTokensTx(chain).
+			transferTx2Builder := transferTokensTx(chain).
 				AddAuthorizer(address).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(tc.tryToTransfer))).
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress()))).
@@ -659,22 +679,30 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				SetPayer(address)
 
 			err = testutil.SignEnvelope(
-				transferTx2,
+				transferTx2Builder,
 				address,
 				privateKey,
 			)
 			require.NoError(t, err)
 
-			createAccountTx := createAccountTxBuilder.Build()
+			createAccountTx, err := createAccountTxBuilder.Build()
+			require.NoError(t, err)
+
+			transferTx, err := transferTxBuilder.Build()
+			require.NoError(t, err)
+
+			transferTx2, err := transferTx2Builder.Build()
+			require.NoError(t, err)
+
 			cr := executeBlockAndVerifyWithParameters(t, [][]*flow.TransactionBody{
 				{
 					createAccountTx,
 				},
 				{
-					transferTx.Build(),
+					transferTx,
 				},
 				{
-					transferTx2.Build(),
+					transferTx2,
 				},
 			}, opts, bootstrapOpts)
 

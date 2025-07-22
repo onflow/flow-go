@@ -309,11 +309,16 @@ func CreateAccountsWithSimpleAddresses(
 			),
 		)
 
-		txBody := flow.NewTransactionBodyBuilder().
+		txBody, err := flow.NewTransactionBodyBuilder().
 			SetScript(script).
 			AddArgument(encCadPublicKey).
 			AddAuthorizer(serviceAddress).
 			Build()
+		if err != nil {
+			return snapshot.SnapshotTree{}, nil, fmt.Errorf(
+				"failed to build transaction body: %w",
+				err)
+		}
 
 		tx := fvm.Transaction(txBody, 0)
 		executionSnapshot, output, err := vm.Run(ctx, tx, snapshotTree)

@@ -317,11 +317,14 @@ func messageToTrustedTransaction(
 		tb.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature())
 	}
 
-	transactionBody := tb.SetScript(m.GetScript()).
+	transactionBody, err := tb.SetScript(m.GetScript()).
 		SetArguments(m.GetArguments()).
 		SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId())).
 		SetComputeLimit(m.GetGasLimit()).
 		Build()
+	if err != nil {
+		return t, fmt.Errorf("could not build transaction body: %w", err)
+	}
 
 	return *transactionBody, nil
 }

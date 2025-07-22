@@ -149,7 +149,7 @@ func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 		// create an empty transaction
-		txBody := flow.NewTransactionBodyBuilder().
+		txBody, err := flow.NewTransactionBodyBuilder().
 			SetScript([]byte(`
 				transaction() {
 					prepare() {}
@@ -159,6 +159,7 @@ func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
 			SetProposalKey(sc.FlowServiceAccount.Address, 0, 0).
 			SetPayer(sc.FlowServiceAccount.Address).
 			Build()
+		require.NoError(t, err)
 
 		executionSnapshot, output, err := vm.Run(ctx, fvm.Transaction(txBody, 0), storageSnapshot)
 		require.NoError(t, err)

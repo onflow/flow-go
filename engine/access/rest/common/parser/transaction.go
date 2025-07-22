@@ -100,7 +100,7 @@ func (t *Transaction) Parse(raw io.Reader, chain flow.Chain) error {
 		return fmt.Errorf("invalid gas limit: %w", err)
 	}
 
-	flowTransaction := flow.NewTransactionBody(flow.UntrustedTransactionBody{
+	flowTransaction, err := flow.NewTransactionBody(flow.UntrustedTransactionBody{
 		ReferenceBlockID:   blockID.Flow(),
 		Script:             script,
 		Arguments:          args.Flow(),
@@ -111,6 +111,9 @@ func (t *Transaction) Parse(raw io.Reader, chain flow.Chain) error {
 		PayloadSignatures:  payloadSigs.Flow(),
 		EnvelopeSignatures: envelopeSigs.Flow(),
 	})
+	if err != nil {
+		return fmt.Errorf("invalid payer address: %w", err)
+	}
 
 	// we use the gRPC method of converting the incoming transaction to a Flow transaction since
 	// it sets the signer_index appropriately.

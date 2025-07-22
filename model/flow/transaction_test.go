@@ -27,7 +27,7 @@ func TestTransaction_SignatureOrdering(t *testing.T) {
 	payerKeyIndex := uint32(0)
 	payerSignature := []byte{7, 8, 9}
 
-	tx := flow.NewTransactionBodyBuilder().
+	tx, err := flow.NewTransactionBodyBuilder().
 		SetProposalKey(proposerAddress, proposerKeyIndex, proposerSequenceNumber).
 		AddPayloadSignature(proposerAddress, proposerKeyIndex, proposerSignature).
 		SetPayer(payerAddress).
@@ -35,6 +35,7 @@ func TestTransaction_SignatureOrdering(t *testing.T) {
 		AddAuthorizer(authorizerAddress).
 		AddPayloadSignature(authorizerAddress, authorizerKeyIndex, authorizerSignature).
 		Build()
+	require.NoError(t, err)
 
 	require.Len(t, tx.PayloadSignatures, 2)
 

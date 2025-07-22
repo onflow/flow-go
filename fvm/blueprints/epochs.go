@@ -34,7 +34,7 @@ var fundAccountTemplate string
 var deployLockedTokensTemplate string
 
 // DeployEpochTransaction returns the transaction body for the deploy epoch transaction
-func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig epochs.EpochConfig) *flow.TransactionBody {
+func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig epochs.EpochConfig) (*flow.TransactionBody, error) {
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(
 			templates.ReplaceAddresses(
@@ -63,7 +63,7 @@ func SetupAccountTransaction(
 	fungibleToken flow.Address,
 	flowToken flow.Address,
 	accountAddress flow.Address,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(
 			templates.ReplaceAddresses(
@@ -79,7 +79,7 @@ func SetupAccountTransaction(
 }
 
 // DeployIDTableStakingTransaction returns the transaction body for the deploy id table staking transaction
-func DeployIDTableStakingTransaction(service flow.Address, contract []byte, epochTokenPayout cadence.UFix64, rewardCut cadence.UFix64) *flow.TransactionBody {
+func DeployIDTableStakingTransaction(service flow.Address, contract []byte, epochTokenPayout cadence.UFix64, rewardCut cadence.UFix64) (*flow.TransactionBody, error) {
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(deployIDTableStakingTransactionTemplate)).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
@@ -95,7 +95,7 @@ func FundAccountTransaction(
 	fungibleToken flow.Address,
 	flowToken flow.Address,
 	nodeAddress flow.Address,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 
 	cdcAmount, err := cadence.NewUFix64(fmt.Sprintf("%d.0", 2_000_000))
 	if err != nil {
@@ -117,7 +117,7 @@ func FundAccountTransaction(
 }
 
 // DeployLockedTokensTransaction returns the transaction body for the deploy locked tokens transaction
-func DeployLockedTokensTransaction(service flow.Address, contract []byte, publicKeys []cadence.Value) *flow.TransactionBody {
+func DeployLockedTokensTransaction(service flow.Address, contract []byte, publicKeys []cadence.Value) (*flow.TransactionBody, error) {
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(
 			deployLockedTokensTemplate,
@@ -203,7 +203,8 @@ func RegisterNodeTransaction(
 	}
 
 	// register node
-	return flow.NewTransactionBodyBuilder().
+
+	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(templates.GenerateEpochRegisterNodeScript(env)).
 		AddArgument(jsoncdc.MustEncode(cdcNodeID)).
 		AddArgument(jsoncdc.MustEncode(cadence.NewUInt8(uint8(node.Role)))).
@@ -215,10 +216,15 @@ func RegisterNodeTransaction(
 		AddArgument(jsoncdc.MustEncode(cadencePublicKeys)).
 		AddAuthorizer(nodeAddress).
 		Build()
+	if err != nil {
+		panic(err)
+	}
+
+	return txBody
 }
 
 // SetStakingAllowlistTransaction returns transaction body for set staking allowlist transaction
-func SetStakingAllowlistTransaction(idTableStakingAddr flow.Address, allowedNodeIDs []flow.Identifier) *flow.TransactionBody {
+func SetStakingAllowlistTransaction(idTableStakingAddr flow.Address, allowedNodeIDs []flow.Identifier) (*flow.TransactionBody, error) {
 	env := templates.Environment{
 		IDTableAddress: idTableStakingAddr.HexWithPrefix(),
 	}

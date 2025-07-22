@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -105,11 +107,14 @@ func MessageToTransaction(
 		tb.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature())
 	}
 
-	transactionBody := tb.SetScript(m.GetScript()).
+	transactionBody, err := tb.SetScript(m.GetScript()).
 		SetArguments(m.GetArguments()).
 		SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId())).
 		SetComputeLimit(m.GetGasLimit()).
 		Build()
+	if err != nil {
+		return t, fmt.Errorf("could not build transaction body: %w", err)
+	}
 
 	return *transactionBody, nil
 }

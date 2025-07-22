@@ -2,6 +2,7 @@ package blueprints
 
 import (
 	_ "embed"
+	"fmt"
 	"strings"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
@@ -37,7 +38,7 @@ func prepareSystemContractCode(chainID flow.ChainID) string {
 // SystemChunkTransaction creates and returns the transaction corresponding to the
 // system chunk for the given chain.
 func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
-	tx := flow.NewTransactionBodyBuilder().
+	tx, err := flow.NewTransactionBodyBuilder().
 		SetScript(
 			[]byte(prepareSystemContractCode(chain.ChainID())),
 		).
@@ -46,6 +47,10 @@ func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 		AddAuthorizer(chain.ServiceAddress()).
 		SetComputeLimit(SystemChunkTransactionGasLimit).
 		Build()
+
+	if err != nil {
+		return nil, fmt.Errorf("could not build system chunk transaction: %w", err)
+	}
 
 	return tx, nil
 }

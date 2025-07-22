@@ -276,12 +276,13 @@ func (tc *ClusterSwitchoverTestCase) ServiceAddress() flow.Address {
 // Transaction returns a transaction which is valid for ingestion by a
 // collection node in this test suite.
 func (tc *ClusterSwitchoverTestCase) Transaction(opts ...func(*flow.TransactionBody)) *flow.TransactionBody {
-	tx := flow.NewTransactionBodyBuilder().
+	tx, err := flow.NewTransactionBodyBuilder().
 		AddAuthorizer(tc.ServiceAddress()).
 		SetPayer(tc.ServiceAddress()).
 		SetScript(unittest.NoopTxScript()).
 		SetReferenceBlockID(tc.RootBlock().ID()).
 		Build()
+	require.NoError(tc.T(), err)
 
 	for _, apply := range opts {
 		apply(tx)

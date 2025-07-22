@@ -223,7 +223,11 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 	require.Equal(t.t, string(tx.PayloadMessage()), string(txBodyBuilder.PayloadMessage()))
 	require.Equal(t.t, string(tx.EnvelopeMessage()), string(txBodyBuilder.EnvelopeMessage()))
 
-	txBody := txBodyBuilder.Build()
+	txBody, err := txBodyBuilder.Build()
+	if err != nil {
+		return sdk.TransactionResult{}, fmt.Errorf("failed to build transaction body: %w", err)
+	}
+
 	proc := fvm.Transaction(txBody, 0)
 
 	t.snapshot.Lock()

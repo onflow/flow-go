@@ -68,7 +68,7 @@ func DeployEVMContractTransaction(
 	bytecode string,
 	gasLimit int,
 	deploymentValue float64,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/evm/deploy.cdc", bridgeEnv, env)
 	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
@@ -88,7 +88,7 @@ func DeployFlowEVMBridgeUtilsContractTransaction(
 	contract []byte,
 	contractName string,
 	factoryAddress string,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/deploy_bridge_utils.cdc", *bridgeEnv, env)
 	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
@@ -106,7 +106,7 @@ func PauseBridgeTransaction(
 	bridgeEnv bridge.Environment,
 	service flow.Address,
 	pause bool,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/pause/update_bridge_pause_status.cdc", bridgeEnv, env)
 	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
@@ -121,7 +121,7 @@ func SetRegistrarTransaction(
 	bridgeEnv bridge.Environment,
 	service flow.Address,
 	registryAddress string,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/evm/set_registrar.cdc", bridgeEnv, env)
 	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
@@ -137,7 +137,7 @@ func SetDeploymentRegistryTransaction(
 	bridgeEnv bridge.Environment,
 	service flow.Address,
 	registryAddress string,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/evm/set_deployment_registry.cdc", bridgeEnv, env)
 	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
@@ -153,7 +153,7 @@ func SetDelegatedDeployerTransaction(
 	bridgeEnv bridge.Environment,
 	service flow.Address,
 	deployerAddress string,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/evm/set_delegated_deployer.cdc", bridgeEnv, env)
 	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
@@ -169,7 +169,7 @@ func AddDeployerTransaction(
 	bridgeEnv bridge.Environment,
 	service flow.Address,
 	deployerTag, deployerAddress string,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/evm/add_deployer.cdc", bridgeEnv, env)
 	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
@@ -184,7 +184,7 @@ func DeployFlowEVMBridgeAccessorContractTransaction(
 	env templates.Environment,
 	bridgeEnv bridge.Environment,
 	service flow.Address,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	contract, _ := bridge.GetCadenceContractCode("cadence/contracts/bridge/FlowEVMBridgeAccessor.cdc", bridgeEnv, env)
 	contractName := "FlowEVMBridgeAccessor"
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/deploy_bridge_accessor.cdc", bridgeEnv, env)
@@ -203,7 +203,7 @@ func IntegrateEVMWithBridgeAccessorTransaction(
 	env templates.Environment,
 	bridgeEnv bridge.Environment,
 	service flow.Address,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/evm-integration/claim_accessor_capability_and_save_router.cdc", bridgeEnv, env)
 	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
@@ -220,7 +220,7 @@ func UpdateOnboardFeeTransaction(
 	bridgeEnv bridge.Environment,
 	service flow.Address,
 	fee float64,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/fee/update_onboard_fee.cdc", bridgeEnv, env)
 	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
@@ -236,7 +236,7 @@ func UpdateBaseFeeTransaction(
 	bridgeEnv bridge.Environment,
 	service flow.Address,
 	fee float64,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/fee/update_base_fee.cdc", bridgeEnv, env)
 	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
@@ -253,7 +253,7 @@ func UpsertContractCodeChunksTransaction(
 	service flow.Address,
 	forTemplate string,
 	newChunks []string,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/templates/upsert_contract_code_chunks.cdc", bridgeEnv, env)
 
 	chunks := make([]cadence.Value, len(newChunks))
@@ -276,7 +276,7 @@ func CreateWFLOWTokenHandlerTransaction(
 	bridgeEnv bridge.Environment,
 	service flow.Address,
 	wflowEVMAddress string,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/token-handler/create_wflow_token_handler.cdc", bridgeEnv, env)
 
 	return flow.NewTransactionBodyBuilder().
@@ -295,7 +295,7 @@ func EnableWFLOWTokenHandlerTransaction(
 	bridgeEnv bridge.Environment,
 	service flow.Address,
 	flowTokenType string,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/token-handler/enable_token_handler.cdc", bridgeEnv, env)
 
 	return flow.NewTransactionBodyBuilder().

@@ -84,14 +84,17 @@ func mustFundAccounts(
 ) snapshot.SnapshotTree {
 	var err error
 	for _, acc := range accs.accounts {
-		transferTx := testutil.CreateTokenTransferTransaction(chain, 1_000_000, acc.address, chain.ServiceAddress())
-		err = testutil.SignTransactionAsServiceAccount(transferTx, accs.seq, chain)
+		transferTxBuilder := testutil.CreateTokenTransferTransaction(chain, 1_000_000, acc.address, chain.ServiceAddress())
+		err = testutil.SignTransactionAsServiceAccount(transferTxBuilder, accs.seq, chain)
 		require.NoError(b, err)
 		accs.seq++
 
+		transferTx, err := transferTxBuilder.Build()
+		require.NoError(b, err)
+
 		executionSnapshot, output, err := vm.Run(
 			execCtx,
-			fvm.Transaction(transferTx.Build(), 0),
+			fvm.Transaction(transferTx, 0),
 			snapshotTree)
 		require.NoError(b, err)
 		require.NoError(b, output.Err)
@@ -300,17 +303,20 @@ func createTokenTransferTransaction(b *testing.B, accs *testAccounts) *flow.Tran
 	src := accs.accounts[rnd]
 	dst := accs.accounts[(rnd+1)%len(accs.accounts)]
 
-	tx := testutil.CreateTokenTransferTransaction(chain, 1, dst.address, src.address).
+	txBuilder := testutil.CreateTokenTransferTransaction(chain, 1, dst.address, src.address).
 		SetProposalKey(chain.ServiceAddress(), 0, accs.seq).
 		SetComputeLimit(1000).
 		SetPayer(chain.ServiceAddress())
 	accs.seq++
 
-	err = testutil.SignPayload(tx, src.address, src.privateKey)
+	err = testutil.SignPayload(txBuilder, src.address, src.privateKey)
 	require.NoError(b, err)
 
-	err = testutil.SignEnvelope(tx, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+	err = testutil.SignEnvelope(txBuilder, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(b, err)
 
-	return tx.Build()
+	txBody, err := txBuilder.Build()
+	require.NoError(b, err)
+
+	return txBody
 }
