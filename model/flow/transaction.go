@@ -37,7 +37,7 @@ type TransactionBody struct {
 	// Account that pays for this transaction fees
 	Payer Address
 
-	// A ordered (ascending) list of addresses that scripts will touch their assets (including payer address)
+	// An ordered (ascending) list of addresses that scripts will touch their assets (including payer address)
 	// Accounts listed here all have to provide signatures
 	// Each account might provide multiple signatures (sum of weight should be at least 1)
 	// If code touches accounts that is not listed here, tx fails
@@ -66,9 +66,9 @@ type UntrustedTransactionBody TransactionBody
 //
 // All errors indicate a valid TransactionBody cannot be constructed from the input.
 func NewTransactionBody(untrusted UntrustedTransactionBody) (*TransactionBody, error) {
-	//if untrusted.Payer == EmptyAddress {
-	//	return nil, fmt.Errorf("Payer address must not be empty")
-	//}
+	if untrusted.Payer == EmptyAddress {
+		return nil, fmt.Errorf("Payer address must not be empty")
+	}
 
 	return &TransactionBody{
 		ReferenceBlockID:   untrusted.ReferenceBlockID,
