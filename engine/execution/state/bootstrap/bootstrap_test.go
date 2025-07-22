@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"encoding/hex"
+	"flag"
 	"fmt"
 	"testing"
 
@@ -18,6 +19,18 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
+)
+
+var testWithVMTransactionExecution = flag.Bool(
+	"testWithVMTransactionExecution",
+	false,
+	"Run transactions in tests using the Cadence compiler/VM",
+)
+
+var testWithVMScriptExecution = flag.Bool(
+	"testWithVMScriptExecution",
+	false,
+	"Run scripts in tests using the Cadence compiler/VM",
 )
 
 func TestBootstrapLedger(t *testing.T) {
@@ -144,6 +157,8 @@ func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
 			fvm.WithAccountStorageLimit(true),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
+			fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 		)
 
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
