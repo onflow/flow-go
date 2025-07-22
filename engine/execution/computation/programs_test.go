@@ -276,7 +276,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 			HeaderBody: flow.HeaderBody{
 				View:      1,
 				ChainID:   flow.Emulator,
-				Timestamp: time.Now(),
+				Timestamp: uint64(time.Now().UnixMilli()),
 			},
 			Payload: flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{},

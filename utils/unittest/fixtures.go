@@ -527,7 +527,7 @@ func HeaderBodyWithParentFixture(parent *flow.Header) flow.HeaderBody {
 		ChainID:            parent.ChainID,
 		ParentID:           parent.ID(),
 		Height:             height,
-		Timestamp:          time.Now().UTC(),
+		Timestamp:          uint64(time.Now().UnixMilli()),
 		View:               view,
 		ParentView:         parent.View,
 		ParentVoterIndices: SignerIndicesFixture(4),
@@ -1812,7 +1812,7 @@ func BlockEventsFixture(
 	return flow.BlockEvents{
 		BlockID:        header.ID(),
 		BlockHeight:    header.Height,
-		BlockTimestamp: header.Timestamp,
+		BlockTimestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
 		Events:         EventsFixture(n),
 	}
 }

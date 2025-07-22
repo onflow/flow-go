@@ -3,7 +3,6 @@ package flow
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/vmihailenco/msgpack/v4"
@@ -39,9 +38,9 @@ type HeaderBody struct {
 	ParentID Identifier
 	// Height is the height of the parent + 1
 	Height uint64
-	// Timestamp is the time at which this block was proposed.
+	// Timestamp is the time at which this block was proposed, in Unix milliseconds.
 	// The proposer can choose any time, so this should not be trusted as accurate.
-	Timestamp time.Time
+	Timestamp uint64
 	// View number at which this block was proposed.
 	View uint64
 	// ParentView number at which parent block was proposed.
@@ -108,7 +107,7 @@ func NewHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 			untrusted.ParentView, untrusted.View,
 		)
 	}
-	if untrusted.Timestamp.IsZero() {
+	if untrusted.Timestamp == 0 {
 		return nil, fmt.Errorf("Timestamp must not be zero-value")
 	}
 
@@ -136,7 +135,7 @@ func NewRootHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 	if untrusted.ParentView != 0 {
 		return nil, fmt.Errorf("ParentView of root header body must be zero")
 	}
-	if untrusted.Timestamp.IsZero() {
+	if untrusted.Timestamp == 0 {
 		return nil, fmt.Errorf("Timestamp of root header body must not be zero")
 	}
 
@@ -240,8 +239,7 @@ func NewRootHeader(untrusted UntrustedHeader) (*Header, error) {
 }
 
 // Fingerprint defines custom encoding for the header to calculate its ID.
-// Timestamp is converted from time.Time to unix time (uint64), which is necessary
-// because time.Time is not RLP-encodable (due to having private fields).
+// The hash of the LastViewTC is used instead of directly encoding the Header.
 func (h Header) Fingerprint() []byte {
 	return fingerprint.Fingerprint(struct {
 		ChainID            ChainID
@@ -260,7 +258,7 @@ func (h Header) Fingerprint() []byte {
 		ParentID:           h.ParentID,
 		Height:             h.Height,
 		PayloadHash:        h.PayloadHash,
-		Timestamp:          uint64(h.Timestamp.UnixNano()),
+		Timestamp:          h.Timestamp,
 		View:               h.View,
 		ParentView:         h.ParentView,
 		ParentVoterIndices: h.ParentVoterIndices,
@@ -280,12 +278,6 @@ func (h Header) ID() Identifier {
 //
 //nolint:structwrite
 func (h Header) MarshalJSON() ([]byte, error) {
-
-	// NOTE: this is just a sanity check to make sure that we don't get
-	// different encodings if someone forgets to use UTC timestamps
-	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
-	}
 
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// marshal function and encode like a raw header
@@ -309,13 +301,6 @@ func (h *Header) UnmarshalJSON(data []byte) error {
 	type Decodable *Header
 	err := json.Unmarshal(data, Decodable(h))
 
-	// NOTE: the timezone check is not required for JSON, as it already encodes
-	// timezones, but it doesn't hurt to add it in case someone messes with the
-	// raw encoded format
-	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
-	}
-
 	return err
 }
 
@@ -323,12 +308,6 @@ func (h *Header) UnmarshalJSON(data []byte) error {
 //
 //nolint:structwrite
 func (h Header) MarshalCBOR() ([]byte, error) {
-
-	// NOTE: this is just a sanity check to make sure that we don't get
-	// different encodings if someone forgets to use UTC timestamps
-	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
-	}
 
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// marshal function and encode like a raw header
@@ -350,13 +329,6 @@ func (h *Header) UnmarshalCBOR(data []byte) error {
 	err := cbor.Unmarshal(data, &decodable)
 	*h = Header(decodable)
 
-	// NOTE: the timezone check is not required for CBOR, as it already encodes
-	// timezones, but it doesn't hurt to add it in case someone messes with the
-	// raw encoded format
-	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
-	}
-
 	return err
 }
 
@@ -364,12 +336,6 @@ func (h *Header) UnmarshalCBOR(data []byte) error {
 //
 //nolint:structwrite
 func (h Header) MarshalMsgpack() ([]byte, error) {
-
-	// NOTE: this is just a sanity check to make sure that we don't get
-	// different encodings if someone forgets to use UTC timestamps
-	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
-	}
 
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// marshal function and encode like a raw header
@@ -390,13 +356,6 @@ func (h *Header) UnmarshalMsgpack(data []byte) error {
 	decodable := Decodable(*h)
 	err := msgpack.Unmarshal(data, &decodable)
 	*h = Header(decodable)
-
-	// NOTE: Msgpack unmarshals timestamps with the local timezone, which means
-	// that a block ID would suddenly be different after encoding and decoding
-	// on a machine with non-UTC local time
-	if h.Timestamp.Location() != time.UTC {
-		h.Timestamp = h.Timestamp.UTC()
-	}
 
 	return err
 }

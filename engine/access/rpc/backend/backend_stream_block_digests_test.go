@@ -84,7 +84,7 @@ func (s *BackendBlockDigestSuite) requireBlockDigests(v interface{}, expectedBlo
 
 	s.Require().Equal(expectedBlock.ID(), actualBlock.BlockID)
 	s.Require().Equal(expectedBlock.Height, actualBlock.Height)
-	s.Require().Equal(expectedBlock.Timestamp, actualBlock.Timestamp)
+	s.Require().Equal(expectedBlock.Timestamp, uint64(actualBlock.Timestamp.UnixMilli()))
 }
 
 // TestSubscribeBlockDigestsHandlesErrors tests error handling scenarios for the SubscribeBlockDigestsFromStartBlockID and SubscribeBlockDigestsFromStartHeight methods in the Backend.

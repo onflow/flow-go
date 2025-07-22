@@ -251,8 +251,8 @@ func (b *Blockchain) PendingBlockView() uint64 {
 	return b.pendingBlock.view
 }
 
-// PendingBlockTimestamp returns the Timestamp of the pending block.
-func (b *Blockchain) PendingBlockTimestamp() time.Time {
+// PendingBlockTimestamp returns the Timestamp of the pending block (Unix time in milliseconds).
+func (b *Blockchain) PendingBlockTimestamp() uint64 {
 	return b.pendingBlock.Block().Timestamp
 }
 
@@ -496,7 +496,7 @@ func (b *Blockchain) GetEventsForBlockIDs(eventType string, blockIDs []flowgo.Id
 		result = append(result, flowgo.BlockEvents{
 			BlockID:        block.ID(),
 			BlockHeight:    block.Height,
-			BlockTimestamp: block.Timestamp,
+			BlockTimestamp: time.UnixMilli(int64(block.Timestamp)).UTC(),
 			Events:         events,
 		})
 	}
@@ -522,7 +522,7 @@ func (b *Blockchain) GetEventsForHeightRange(eventType string, startHeight, endH
 		result = append(result, flowgo.BlockEvents{
 			BlockID:        block.ID(),
 			BlockHeight:    block.Height,
-			BlockTimestamp: block.Timestamp,
+			BlockTimestamp: time.UnixMilli(int64(block.Timestamp)).UTC(),
 			Events:         events,
 		})
 	}

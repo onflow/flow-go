@@ -19,7 +19,7 @@ func TestUUIDPartition(t *testing.T) {
 
 	// With enough samples, all partitions should be used.  (The first 1500 blocks
 	// only uses 254 partitions)
-	for numBlocks := 0; numBlocks < 2000; numBlocks++ {
+	for numBlocks := 0; numBlocks < 2500; numBlocks++ {
 		blockId := blockHeader.ID()
 
 		partition0 := uuidPartition(blockId, 0)

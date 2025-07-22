@@ -1479,7 +1479,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 				block1.Height,
 				block1.View,
 				block1.ID(),
-				float64(block1.Timestamp.Unix()),
+				float64(block1.Timestamp/1000), // Unix time in seconds
 			),
 			output.Logs[0],
 		)
@@ -1490,7 +1490,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 				block2.Height,
 				block2.View,
 				block2.ID(),
-				float64(block2.Timestamp.Unix()),
+				float64(block2.Timestamp/1000), // Unix time in seconds
 			),
 			output.Logs[1],
 		)
@@ -1521,7 +1521,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 				block1.Height,
 				block1.View,
 				block1.ID(),
-				float64(block1.Timestamp.Unix()),
+				float64(block1.Timestamp/1000), // Unix time in seconds
 			),
 			output.Logs[0],
 		)
@@ -1532,7 +1532,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 				block2.Height,
 				block2.View,
 				block2.ID(),
-				float64(block2.Timestamp.Unix()),
+				float64(block2.Timestamp/1000), // Unix time in seconds
 			),
 			output.Logs[1],
 		)

@@ -117,7 +117,6 @@ func TestBlockMalleability(t *testing.T) {
 		unittest.WithFieldGenerator("HeaderBody.ParentView", func() uint64 {
 			return block.View - 1 // ParentView must stay below View, so set it to View-1
 		}),
-		unittest.WithFieldGenerator("HeaderBody.Timestamp", func() time.Time { return time.Now().UTC() }),
 		unittest.WithFieldGenerator("Payload.Results", func() flow.ExecutionResultList {
 			return flow.ExecutionResultList{unittest.ExecutionResultFixture()}
 		}),
@@ -188,7 +187,7 @@ func TestNewRootBlock(t *testing.T) {
 				ChainID:            flow.Emulator,
 				ParentID:           unittest.IdentifierFixture(),
 				Height:             10,
-				Timestamp:          time.Now(),
+				Timestamp:          uint64(time.Now().UnixMilli()),
 				View:               0,
 				ParentView:         0,
 				ParentVoterIndices: []byte{},
