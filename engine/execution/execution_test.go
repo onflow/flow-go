@@ -105,32 +105,38 @@ func TestExecutionFlow(t *testing.T) {
 	signerIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
 	require.NoError(t, err)
-	block = flow.NewBlock(
-		block.Header,
-		flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{
-					CollectionID:     col1.ID(),
-					SignerIndices:    signerIndices,
-					ChainID:          clusterChainID,
-					ReferenceBlockID: genesis.ID(),
+	block, err = flow.NewBlock(
+		flow.UntrustedBlock{
+			Header: block.Header,
+			Payload: flow.Payload{
+				Guarantees: []*flow.CollectionGuarantee{
+					{
+						CollectionID:     col1.ID(),
+						SignerIndices:    signerIndices,
+						ChainID:          clusterChainID,
+						ReferenceBlockID: genesis.ID(),
+					},
+					{
+						CollectionID:     col2.ID(),
+						SignerIndices:    signerIndices,
+						ChainID:          clusterChainID,
+						ReferenceBlockID: genesis.ID(),
+					},
 				},
-				{
-					CollectionID:     col2.ID(),
-					SignerIndices:    signerIndices,
-					ChainID:          clusterChainID,
-					ReferenceBlockID: genesis.ID(),
-				},
+				ProtocolStateID: genesis.Payload.ProtocolStateID,
 			},
-			ProtocolStateID: genesis.Payload.ProtocolStateID,
 		},
 	)
+	require.NoError(t, err)
 
 	child := unittest.BlockWithParentAndProposerFixture(t, block.ToHeader(), conID.NodeID) // sets field `ParentVoterIndices` such that `conID.NodeID` is the sole signer
-	child = flow.NewBlock(
-		child.Header,
-		unittest.PayloadFixture(unittest.WithProtocolStateID(block.Payload.ProtocolStateID)),
+	child, err = flow.NewBlock(
+		flow.UntrustedBlock{
+			Header:  child.Header,
+			Payload: unittest.PayloadFixture(unittest.WithProtocolStateID(block.Payload.ProtocolStateID)),
+		},
 	)
+	require.NoError(t, err)
 
 	log.Info().Msgf("child block ID: %v, indices: %x", child.ID(), child.Header.ParentVoterIndices)
 
@@ -278,20 +284,23 @@ func deployContractBlock(
 
 	// make block
 	block := unittest.BlockWithParentAndProposerFixture(t, parent.ToHeader(), conID.NodeID) // sets field `ParentVoterIndices` such that `conID.NodeID` is the sole signer
-	block = flow.NewBlock(
-		block.Header,
-		flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{
-					CollectionID:     col.ID(),
-					SignerIndices:    signerIndices,
-					ChainID:          clusterChainID,
-					ReferenceBlockID: ref.ID(),
+	block, err = flow.NewBlock(
+		flow.UntrustedBlock{
+			Header: block.Header,
+			Payload: flow.Payload{
+				Guarantees: []*flow.CollectionGuarantee{
+					{
+						CollectionID:     col.ID(),
+						SignerIndices:    signerIndices,
+						ChainID:          clusterChainID,
+						ReferenceBlockID: ref.ID(),
+					},
 				},
+				ProtocolStateID: parent.Payload.ProtocolStateID,
 			},
-			ProtocolStateID: parent.Payload.ProtocolStateID,
 		},
 	)
+	require.NoError(t, err)
 
 	// make proposal
 	proposal := messages.NewUntrustedProposal(unittest.ProposalFromBlock(block))
@@ -316,15 +325,18 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
 	require.NoError(t, err)
 
-	block = flow.NewBlock(
-		block.Header,
-		flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{CollectionID: col.ID(), SignerIndices: signerIndices, ChainID: clusterChainID, ReferenceBlockID: ref.ID()},
+	block, err = flow.NewBlock(
+		flow.UntrustedBlock{
+			Header: block.Header,
+			Payload: flow.Payload{
+				Guarantees: []*flow.CollectionGuarantee{
+					{CollectionID: col.ID(), SignerIndices: signerIndices, ChainID: clusterChainID, ReferenceBlockID: ref.ID()},
+				},
+				ProtocolStateID: parent.Payload.ProtocolStateID,
 			},
-			ProtocolStateID: parent.Payload.ProtocolStateID,
 		},
 	)
+	require.NoError(t, err)
 
 	proposal := messages.NewUntrustedProposal(unittest.ProposalFromBlock(block))
 
@@ -344,15 +356,18 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx.Build()}}
 	block := unittest.BlockWithParentAndProposerFixture(t, parent.ToHeader(), conID.NodeID) // sets field `ParentVoterIndices` such that `conID.NodeID` is the sole signer
-	block = flow.NewBlock(
-		block.Header,
-		flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{CollectionID: col.ID(), SignerIndices: signerIndices, ChainID: clusterChainID, ReferenceBlockID: ref.ID()},
+	block, err = flow.NewBlock(
+		flow.UntrustedBlock{
+			Header: block.Header,
+			Payload: flow.Payload{
+				Guarantees: []*flow.CollectionGuarantee{
+					{CollectionID: col.ID(), SignerIndices: signerIndices, ChainID: clusterChainID, ReferenceBlockID: ref.ID()},
+				},
+				ProtocolStateID: parent.Payload.ProtocolStateID,
 			},
-			ProtocolStateID: parent.Payload.ProtocolStateID,
 		},
 	)
+	require.NoError(t, err)
 
 	proposal := messages.NewUntrustedProposal(unittest.ProposalFromBlock(block))
 
@@ -578,10 +593,13 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	voterIndices, err := signature.EncodeSignersToIndices([]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
 	block.Header.ParentVoterIndices = voterIndices
-	block = flow.NewBlock(
-		block.Header,
-		unittest.PayloadFixture(unittest.WithProtocolStateID(genesis.Payload.ProtocolStateID)),
+	block, err = flow.NewBlock(
+		flow.UntrustedBlock{
+			Header:  block.Header,
+			Payload: unittest.PayloadFixture(unittest.WithProtocolStateID(genesis.Payload.ProtocolStateID)),
+		},
 	)
+	require.NoError(t, err)
 	proposal := messages.NewUntrustedProposal(unittest.ProposalFromBlock(block))
 
 	child := unittest.BlockWithParentAndProposerFixture(t, block.ToHeader(), conID.NodeID)

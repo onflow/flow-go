@@ -332,12 +332,20 @@ func ExecutionResultFixture(t *testing.T,
 			}
 		}
 
-		payload := flow.Payload{
-			Guarantees:      guarantees,
-			ProtocolStateID: protocolStateID,
-		}
-		referenceBlock = flow.NewBlock(refBlkHeader.HeaderBody, payload)
-
+		payload, err := flow.NewPayload(
+			flow.UntrustedPayload{
+				Guarantees:      guarantees,
+				ProtocolStateID: protocolStateID,
+			},
+		)
+		require.NoError(t, err)
+		referenceBlock, err = flow.NewBlock(
+			flow.UntrustedBlock{
+				Header:  refBlkHeader.HeaderBody,
+				Payload: *payload,
+			},
+		)
+		require.NoError(t, err)
 		executableBlock := &entity.ExecutableBlock{
 			Block:               referenceBlock,
 			CompleteCollections: completeColls,
@@ -496,8 +504,10 @@ func ContainerBlockFixture(parent *flow.Header, protocolStateID flow.Identifier,
 func ExecutionResultForkFixture(t *testing.T) (*flow.ExecutionResult, *flow.ExecutionResult, *flow.Collection, *flow.Block) {
 	// collection and block
 	collections := unittest.CollectionListFixture(1)
-	block := unittest.BlockWithGuaranteesFixture(
-		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(unittest.CollectionGuaranteesWithCollectionIDFixture(collections)...)),
+		),
 	)
 
 	// execution fork at block with resultA and resultB that share first chunk

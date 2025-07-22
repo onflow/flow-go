@@ -55,7 +55,7 @@ func (suite *ReadProtocolStateBlocksSuite) SetupTest() {
 
 	var blocks []*flow.Block
 
-	genesis := unittest.GenesisFixture()
+	genesis := unittest.Block.Genesis(flow.Emulator)
 	blocks = append(blocks, genesis)
 	sealed := unittest.BlockWithParentFixture(genesis.ToHeader())
 	blocks = append(blocks, sealed)

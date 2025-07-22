@@ -137,7 +137,7 @@ func (s *Suite) SetupTest() {
 
 	blockCount := 5
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
-	s.rootBlock = flow.Genesis(flow.Emulator)
+	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
 	parent := s.rootBlock.ToHeader()
 
 	for i := 0; i < blockCount; i++ {
@@ -435,7 +435,12 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 
 	// we should store the light collection and index its transactions
 	s.collections.On("StoreLightAndIndexByTransaction", light).Return(nil).Once()
-	block := flow.NewBlock(flow.HeaderBody{Height: 0}, flow.Payload{Guarantees: []*flow.CollectionGuarantee{}})
+	block := unittest.BlockFixture(
+		unittest.Block.WithHeight(0),
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees([]*flow.CollectionGuarantee{}...)),
+		),
+	)
 	s.blocks.On("ByID", mock.Anything).Return(block, nil)
 
 	// for each transaction in the collection, we should store it

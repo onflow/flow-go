@@ -174,7 +174,7 @@ func benchmarkComputeBlock(
 	snapshotTree = mustFundAccounts(b, vm, snapshotTree, execCtx, accs)
 
 	me := new(module.Local)
-	me.On("NodeID").Return(flow.ZeroID)
+	me.On("NodeID").Return(unittest.IdentifierFixture())
 	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
@@ -214,7 +214,7 @@ func benchmarkComputeBlock(
 		derivedChainData: derivedChainData,
 	}
 
-	parentBlock := flow.NewBlock(flow.HeaderBody{}, flow.Payload{})
+	parentBlock := unittest.BlockFixture()
 
 	b.StopTimer()
 	b.ResetTimer()
@@ -278,15 +278,12 @@ func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colN
 		}
 	}
 
-	block := flow.NewBlock(
-		flow.HeaderBody{
-			ChainID:  chain.ChainID(),
-			ParentID: parentBlock.ID(),
-			View:     parentBlock.Header.Height + 1,
-		},
-		flow.Payload{
-			Guarantees: guarantees,
-		},
+	block := unittest.BlockFixture(
+		unittest.Block.WithParent(parentBlock.ID(), parentBlock.Header.View, parentBlock.Header.Height),
+		unittest.Block.WithView(parentBlock.Header.View+1),
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(guarantees...)),
+		),
 	)
 
 	return &entity.ExecutableBlock{

@@ -1,6 +1,8 @@
 package notifications
 
 import (
+	"time"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -32,7 +34,7 @@ func (c *SlashingViolationsConsumer) OnInvalidBlockDetected(err flow.Slashable[m
 		Hex("proposer_id", block.ProposerID[:]).
 		Uint64("block_view", block.View).
 		Hex("block_id", block.BlockID[:]).
-		Time("block_timestamp", block.Timestamp).
+		Time("block_timestamp", time.UnixMilli(int64(block.Timestamp)).UTC()).
 		Msgf("OnInvalidBlockDetected: %s", err.Message.Error())
 }
 

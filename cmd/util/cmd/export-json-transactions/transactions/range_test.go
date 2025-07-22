@@ -37,6 +37,7 @@ func TestFindBlockTransactions(t *testing.T) {
 							ReferenceBlockID: col2.ReferenceBlockID,
 						},
 					},
+					ProtocolStateID: unittest.IdentifierFixture(),
 				},
 			),
 		)
@@ -51,6 +52,7 @@ func TestFindBlockTransactions(t *testing.T) {
 							ReferenceBlockID: col3.ReferenceBlockID,
 						},
 					},
+					ProtocolStateID: unittest.IdentifierFixture(),
 				},
 			),
 		)

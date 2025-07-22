@@ -49,7 +49,7 @@ func (suite *ReadResultsSuite) SetupTest() {
 	var blocks []*flow.Block
 	var results []*flow.ExecutionResult
 
-	genesis := unittest.GenesisFixture()
+	genesis := unittest.Block.Genesis(flow.Emulator)
 	genesisResult := unittest.ExecutionResultFixture(unittest.WithBlock(genesis), unittest.WithPreviousResultID(flow.ZeroID))
 	blocks = append(blocks, genesis)
 	results = append(results, genesisResult)

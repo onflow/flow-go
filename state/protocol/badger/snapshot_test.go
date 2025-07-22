@@ -227,7 +227,7 @@ func TestClusters(t *testing.T) {
 	identities := append(unittest.IdentityListFixture(4, unittest.WithAllRolesExcept(flow.RoleCollection)), collectors...)
 
 	// bootstrap the protocol state
-	rootHeader := unittest.GenesisFixture().Header
+	rootHeader := unittest.Block.Genesis(flow.Emulator).Header
 
 	counter := uint64(1)
 	setup := unittest.EpochSetupFixture(
@@ -403,13 +403,16 @@ func TestSealingSegment(t *testing.T) {
 				if i == 0 {
 					// Repetitions of the same receipt in one fork would be a protocol violation.
 					// Hence, we include the result only once in the direct child of B1.
-					next = flow.NewBlock(
-						next.Header,
-						unittest.PayloadFixture(
-							unittest.WithReceipts(receipt1),
-							unittest.WithProtocolStateID(parent.Payload.ProtocolStateID),
-						),
+					next, err = flow.NewBlock(
+						flow.UntrustedBlock{
+							Header: next.Header,
+							Payload: unittest.PayloadFixture(
+								unittest.WithReceipts(receipt1),
+								unittest.WithProtocolStateID(parent.Payload.ProtocolStateID),
+							),
+						},
 					)
+					require.NoError(t, err)
 				}
 				buildFinalizedBlock(t, state, next)
 				parent = next

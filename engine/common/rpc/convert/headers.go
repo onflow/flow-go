@@ -3,8 +3,6 @@ package convert
 import (
 	"fmt"
 
-	"google.golang.org/protobuf/types/known/timestamppb"
-
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -17,7 +15,6 @@ func BlockHeaderToMessage(
 ) (*entities.BlockHeader, error) {
 	id := h.ID()
 
-	t := timestamppb.New(h.Timestamp)
 	var lastViewTC *entities.TimeoutCertificate
 	if h.LastViewTC != nil {
 		newestQC := h.LastViewTC.NewestQC
@@ -41,7 +38,7 @@ func BlockHeaderToMessage(
 		ParentId:           h.ParentID[:],
 		Height:             h.Height,
 		PayloadHash:        h.PayloadHash[:],
-		Timestamp:          t,
+		Timestamp:          BlockTimestamp2ProtobufTime(h.Timestamp),
 		View:               h.View,
 		ParentView:         h.ParentView,
 		ParentVoterIndices: h.ParentVoterIndices,
@@ -95,7 +92,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 		rootHeaderBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
 			ParentID:           MessageToIdentifier(m.ParentId),
 			Height:             m.Height,
-			Timestamp:          m.Timestamp.AsTime(),
+			Timestamp:          uint64(m.Timestamp.AsTime().UnixMilli()),
 			View:               m.View,
 			ParentView:         m.ParentView,
 			ParentVoterIndices: m.ParentVoterIndices,
@@ -122,7 +119,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 	headerBody, err := flow.NewHeaderBody(flow.UntrustedHeaderBody{
 		ParentID:           MessageToIdentifier(m.ParentId),
 		Height:             m.Height,
-		Timestamp:          m.Timestamp.AsTime(),
+		Timestamp:          uint64(m.Timestamp.AsTime().UnixMilli()),
 		View:               m.View,
 		ParentView:         m.ParentView,
 		ParentVoterIndices: m.ParentVoterIndices,

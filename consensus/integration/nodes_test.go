@@ -256,7 +256,7 @@ func createRootQC(t *testing.T, root *flow.Block, participantData *run.Participa
 // createRootBlockData creates genesis block with first epoch and real data node identities.
 // This function requires all participants to pass DKG process.
 func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
-	rootHeader := unittest.GenesisFixture().Header
+	rootHeader := unittest.Block.Genesis(flow.Emulator).Header
 	consensusParticipants := participantData.Identities()
 
 	// add other roles to create a complete identity list
@@ -292,7 +292,13 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	require.NoError(t, err)
 	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochProtocolStateID)
 	require.NoError(t, err)
-	root := flow.NewBlock(rootHeader, flow.Payload{ProtocolStateID: rootProtocolState.ID()})
+	root, err := flow.NewRootBlock(
+		flow.UntrustedBlock{
+			Header:  rootHeader,
+			Payload: flow.Payload{ProtocolStateID: rootProtocolState.ID()},
+		},
+	)
+	require.NoError(t, err)
 	result := unittest.BootstrapExecutionResultFixture(root, unittest.GenesisStateCommitment)
 	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
 
@@ -421,7 +427,7 @@ func createNode(
 	)
 	require.NoError(t, err)
 
-	blockTimer, err := blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second)
+	blockTimer, err := blocktimer.NewBlockTimer(1, 90_000)
 	require.NoError(t, err)
 
 	fullState, err := bprotocol.NewFullConsensusState(

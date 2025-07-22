@@ -61,7 +61,7 @@ func RunWithReader(
 		blocksByHeight := make(map[uint64]*flow.Block, blockCount)
 
 		var seals []*flow.Header
-		parent := unittest.GenesisFixture().ToHeader()
+		parent := unittest.Block.Genesis(flow.Emulator).ToHeader()
 		for i := 0; i < blockCount; i++ {
 			seals = []*flow.Header{parent}
 			height := uint64(i) + 1

@@ -55,7 +55,7 @@ func NewBuilder(
 	options ...func(*Config),
 ) (*Builder, error) {
 
-	blockTimer, err := blocktimer.NewBlockTimer(500*time.Millisecond, 10*time.Second)
+	blockTimer, err := blocktimer.NewBlockTimer(500, 10_000)
 	if err != nil {
 		return nil, fmt.Errorf("could not create default block timer: %w", err)
 	}
@@ -645,14 +645,28 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		return nil, fmt.Errorf("evolving protocol state failed: %w", err)
 	}
 
-	payload := flow.Payload{
-		Guarantees:      guarantees,
-		Seals:           seals,
-		Receipts:        insertableReceipts.receipts,
-		Results:         insertableReceipts.results,
-		ProtocolStateID: protocolStateID,
+	payload, err := flow.NewPayload(
+		flow.UntrustedPayload{
+			Guarantees:      guarantees,
+			Seals:           seals,
+			Receipts:        insertableReceipts.receipts,
+			Results:         insertableReceipts.results,
+			ProtocolStateID: protocolStateID,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build the payload: %w", err)
 	}
-	block := flow.NewBlock(*headerBody, payload)
+
+	block, err := flow.NewBlock(
+		flow.UntrustedBlock{
+			Header:  *headerBody,
+			Payload: *payload,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build the block: %w", err)
+	}
 
 	// sign the proposal
 	sig, err := sign(block.ToHeader())

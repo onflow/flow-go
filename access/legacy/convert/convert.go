@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/crypto/hash"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/legacy/entities"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -132,21 +131,16 @@ func TransactionResultToMessage(result accessmodel.TransactionResult) *accesspro
 func BlockHeaderToMessage(h *flow.Header) (*entitiesproto.BlockHeader, error) {
 	id := h.ID()
 
-	t := timestamppb.New(h.Timestamp)
-
 	return &entitiesproto.BlockHeader{
 		Id:        id[:],
 		ParentId:  h.ParentID[:],
 		Height:    h.Height,
-		Timestamp: t,
+		Timestamp: convert.BlockTimestamp2ProtobufTime(h.Timestamp),
 	}, nil
 }
 
 func BlockToMessage(h *flow.Block) (*entitiesproto.Block, error) {
 	id := h.ID()
-
-	parentID := h.Header.ParentID
-	t := timestamppb.New(h.Header.Timestamp)
 
 	cg := make([]*entitiesproto.CollectionGuarantee, len(h.Payload.Guarantees))
 	for i, g := range h.Payload.Guarantees {
@@ -161,8 +155,8 @@ func BlockToMessage(h *flow.Block) (*entitiesproto.Block, error) {
 	bh := entitiesproto.Block{
 		Id:                   id[:],
 		Height:               h.Header.Height,
-		ParentId:             parentID[:],
-		Timestamp:            t,
+		ParentId:             h.Header.ParentID[:],
+		Timestamp:            convert.BlockTimestamp2ProtobufTime(h.Header.Timestamp),
 		CollectionGuarantees: cg,
 		BlockSeals:           seals,
 		Signatures:           [][]byte{h.Header.ParentVoterSigData},

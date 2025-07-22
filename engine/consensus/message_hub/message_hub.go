@@ -316,7 +316,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 		Int("guarantees_count", len(payload.Guarantees)).
 		Int("seals_count", len(payload.Seals)).
 		Int("receipts_count", len(payload.Receipts)).
-		Time("timestamp", header.Timestamp).
+		Time("timestamp", time.UnixMilli(int64(header.Timestamp)).UTC()).
 		Hex("signers", header.ParentVoterIndices).
 		//Dur("delay", delay).
 		Logger()
@@ -343,10 +343,22 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	// NOTE: some fields are not needed for the message
 	// - proposer ID is conveyed over the network message
 	// - the payload hash is deduced from the payload
-	blockProposal := messages.NewUntrustedProposal(&flow.Proposal{
-		Block:           *flow.NewBlock(header.HeaderBody, *payload),
-		ProposerSigData: proposal.ProposerSigData,
-	})
+	block, err := flow.NewBlock(
+		flow.UntrustedBlock{
+			Header:  header.HeaderBody,
+			Payload: *payload,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not build block: %w", err)
+	}
+
+	blockProposal := messages.NewUntrustedProposal(
+		&flow.Proposal{
+			Block:           *block,
+			ProposerSigData: proposal.ProposerSigData,
+		},
+	)
 
 	// broadcast the proposal to consensus nodes
 	err = h.con.Publish(blockProposal, consRecipients.NodeIDs()...)

@@ -112,7 +112,7 @@ func TestThrottleFallBehindCatchUp(t *testing.T) {
 }
 
 func makeBlocks(t *testing.T, start, count int) []*flow.Block {
-	genesis := unittest.GenesisFixture()
+	genesis := unittest.Block.Genesis(flow.Emulator)
 	blocks := unittest.ChainFixtureFrom(count, genesis.ToHeader())
 	return append([]*flow.Block{genesis}, blocks...)
 }

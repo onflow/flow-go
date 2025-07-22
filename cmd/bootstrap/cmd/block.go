@@ -22,16 +22,31 @@ func constructRootHeaderBody(rootChain string, rootParent string, rootHeight uin
 }
 
 // constructRootBlock constructs a valid root block based on the given header and protocol state ID for that block.
-func constructRootBlock(rootHeaderBody *flow.HeaderBody, protocolStateID flow.Identifier) *flow.Block {
-	payload := flow.Payload{
-		Guarantees:      nil,
-		Seals:           nil,
-		Receipts:        nil,
-		Results:         nil,
-		ProtocolStateID: protocolStateID,
+func constructRootBlock(rootHeaderBody *flow.HeaderBody, protocolStateID flow.Identifier) (*flow.Block, error) {
+	payload, err := flow.NewPayload(
+		flow.UntrustedPayload{
+			Guarantees:      nil,
+			Seals:           nil,
+			Receipts:        nil,
+			Results:         nil,
+			ProtocolStateID: protocolStateID,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct payload: %w", err)
 	}
 
-	return flow.NewBlock(*rootHeaderBody, payload)
+	block, err := flow.NewRootBlock(
+		flow.UntrustedBlock{
+			Header:  *rootHeaderBody,
+			Payload: *payload,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct root block: %w", err)
+	}
+
+	return block, nil
 }
 
 // constructRootEpochEvents constructs the epoch setup and commit events for the first epoch after spork.

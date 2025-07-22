@@ -3,33 +3,15 @@ package flow
 import (
 	"fmt"
 	"time"
-
-	"github.com/vmihailenco/msgpack/v4"
 )
 
-// Genesis creates genesis block.
-// This function must always return a structurally valid genesis block otherwise it will panic.
-func Genesis(chainID ChainID) *Block {
-	// create the raw content for the genesis block
-	payload := Payload{}
-
-	// create the headerBody
-	headerBody, err := NewRootHeaderBody(UntrustedHeaderBody{
-		ChainID:   chainID,
-		ParentID:  ZeroID,
-		Height:    0,
-		Timestamp: GenesisTime,
-		View:      0,
-	})
-	if err != nil {
-		panic(fmt.Errorf("failed to create genesis header body: %w", err))
-	}
-
-	// combine to block
-	return NewBlock(*headerBody, payload)
-}
-
-// Block (currently) includes the all block header metadata and the payload content.
+// Block includes both the block header metadata and the payload content.
+//
+// Zero values for certain HeaderBody fields are allowed only for root blocks, which must be constructed
+// using the NewRootBlock constructor. All non-root blocks must be constructed
+// using NewBlock to ensure validation of the block fields.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Block struct {
 	// Header is a container encapsulating most of the header fields - *excluding* the payload hash
 	// and the proposer signature. Generally, the type [HeaderBody] should not be used on its own.
@@ -43,19 +25,61 @@ type Block struct {
 	Payload Payload
 }
 
-// NewBlock creates a new block.
+// UntrustedBlock is an untrusted input-only representation of a Block,
+// used for construction.
 //
-// Parameters:
-// - headerBody: the header fields to use for the block
-// - payload: the payload to associate with the block
-func NewBlock(
-	headerBody HeaderBody,
-	payload Payload,
-) *Block {
-	return &Block{
-		Header:  headerBody,
-		Payload: payload,
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedBlock should be validated and converted into
+// a trusted Block using the NewBlock constructor (or NewRootBlock
+// for the root block).
+type UntrustedBlock Block
+
+// NewBlock creates a new block.
+// This constructor enforces validation rules to ensure the block is well-formed.
+// It must be used to construct all non-root blocks.
+//
+// All errors indicate that a valid Block cannot be constructed from the input.
+func NewBlock(untrusted UntrustedBlock) (*Block, error) {
+	// validate header body
+	headerBody, err := NewHeaderBody(UntrustedHeaderBody(untrusted.Header))
+	if err != nil {
+		return nil, fmt.Errorf("invalid header body: %w", err)
 	}
+
+	// validate payload
+	payload, err := NewPayload(UntrustedPayload(untrusted.Payload))
+	if err != nil {
+		return nil, fmt.Errorf("invalid payload: %w", err)
+	}
+
+	return &Block{
+		Header:  *headerBody,
+		Payload: *payload,
+	}, nil
+}
+
+// NewRootBlock creates a root block.
+// This constructor must be used **only** for constructing the root block,
+// which is the only case where zero values are allowed.
+func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
+	rootHeaderBody, err := NewRootHeaderBody(UntrustedHeaderBody(untrusted.Header))
+	if err != nil {
+		return nil, fmt.Errorf("invalid root header body: %w", err)
+	}
+
+	// validate payload
+	payload, err := NewPayload(UntrustedPayload(untrusted.Payload))
+	if err != nil {
+		return nil, fmt.Errorf("invalid payload: %w", err)
+	}
+
+	return &Block{
+		Header:  *rootHeaderBody,
+		Payload: *payload,
+	}, nil
 }
 
 // ID returns a collision-resistant hash of the Block struct.
@@ -87,30 +111,6 @@ func (b Block) ToHeader() *Header {
 		panic(fmt.Errorf("could not build header from block: %w", err))
 	}
 	return header
-}
-
-// TODO(malleability): remove MarshalMsgpack when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
-func (b Block) MarshalMsgpack() ([]byte, error) {
-	if b.Header.Timestamp.Location() != time.UTC {
-		b.Header.Timestamp = b.Header.Timestamp.UTC() //nolint:structwrite
-	}
-
-	type Encodable Block
-	return msgpack.Marshal(Encodable(b))
-}
-
-// TODO(malleability): remove UnmarshalMsgpack when PR #7325 will be merged (convert Header.Timestamp to Unix Milliseconds)
-func (b *Block) UnmarshalMsgpack(data []byte) error {
-	type Decodable Block
-	decodable := Decodable(*b)
-	err := msgpack.Unmarshal(data, &decodable)
-	*b = Block(decodable)
-
-	if b.Header.Timestamp.Location() != time.UTC {
-		b.Header.Timestamp = b.Header.Timestamp.UTC() //nolint:structwrite
-	}
-
-	return err
 }
 
 // BlockStatus represents the status of a block.

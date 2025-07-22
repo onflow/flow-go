@@ -1,6 +1,8 @@
 package unittest
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -60,4 +62,38 @@ func (f *blockFactory) WithLastViewTC(lastViewTC *flow.TimeoutCertificate) func(
 	return func(block *flow.Block) {
 		block.Header.LastViewTC = lastViewTC
 	}
+}
+
+func (f *blockFactory) Genesis(chainID flow.ChainID) *flow.Block {
+	// create the raw content for the genesis block
+	payload := flow.Payload{
+		ProtocolStateID: IdentifierFixture(),
+	}
+
+	// create the headerBody
+	headerBody, err := flow.NewRootHeaderBody(
+		flow.UntrustedHeaderBody{
+			ChainID:   chainID,
+			ParentID:  flow.ZeroID,
+			Height:    0,
+			Timestamp: uint64(flow.GenesisTime.UnixMilli()),
+			View:      0,
+		},
+	)
+	if err != nil {
+		panic(fmt.Errorf("failed to create root header body: %w", err))
+	}
+
+	// combine to block
+	block, err := flow.NewRootBlock(
+		flow.UntrustedBlock{
+			Header:  *headerBody,
+			Payload: payload,
+		},
+	)
+	if err != nil {
+		panic(fmt.Errorf("failed to create root block: %w", err))
+	}
+
+	return block
 }

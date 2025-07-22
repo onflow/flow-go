@@ -57,7 +57,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 
 	s.sealsDB = &storage.Seals{}
 
-	s.finalizedRootHeader = unittest.GenesisFixture().ToHeader()
+	s.finalizedRootHeader = unittest.Block.Genesis(flow.Emulator).ToHeader()
 	params := new(mockstate.Params)
 	s.State.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(s.ParentBlock, nil)).Maybe()
 	s.State.On("Params").Return(params)
@@ -680,10 +680,18 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 
 	rootSnapshot := unittest.StateSnapshotForKnownBlock(s.finalizedRootHeader, nil)
 	s.Snapshots[s.finalizedRootHeader.ID()] = rootSnapshot
+	block, err := flow.NewRootBlock(
+		flow.UntrustedBlock{
+			Header:  s.finalizedRootHeader.HeaderBody,
+			Payload: unittest.PayloadFixture(),
+		},
+	)
+	require.NoError(s.T(), err)
+
 	rootSnapshot.On("SealingSegment").Return(
 		&flow.SealingSegment{Blocks: []*flow.Proposal{
 			{
-				Block: *flow.NewBlock(s.finalizedRootHeader.HeaderBody, flow.Payload{}),
+				Block: *block,
 				// By convention, root block has no proposer signature - implementation has to handle this edge case
 				ProposerSigData: nil,
 			},
@@ -700,8 +708,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 				unittest.WithResult(s.IncorporatedResult.Result))))
 	payloads.On("ByBlockID", s.IncorporatedBlock.ID()).Return(&incorporatedBlockPayload, nil)
 
-	emptyPayload := flow.EmptyPayload()
-	payloads.On("ByBlockID", s.Block.ID()).Return(&emptyPayload, nil)
+	emptyPayload := flow.NewEmptyPayload()
+	payloads.On("ByBlockID", s.Block.ID()).Return(emptyPayload, nil)
 
 	s.IdentitiesCache[s.IncorporatedBlock.ID()] = s.AuthorizedVerifiers
 

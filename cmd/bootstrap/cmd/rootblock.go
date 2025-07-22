@@ -126,7 +126,6 @@ func addRootBlockCmdFlags() {
 }
 
 func rootBlock(cmd *cobra.Command, args []string) {
-
 	// maintain backward compatibility with old flag name
 	if deprecatedFlagPartnerStakes != "" {
 		log.Warn().Msg("using deprecated flag --partner-stakes (use --partner-weights instead)")
@@ -267,7 +266,10 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to construct root kvstore")
 	}
-	block := constructRootBlock(headerBody, rootProtocolState.ID())
+	block, err := constructRootBlock(headerBody, rootProtocolState.ID())
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to construct root block")
+	}
 	err = common.WriteJSON(model.PathRootBlockData, flagOutdir, block)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")

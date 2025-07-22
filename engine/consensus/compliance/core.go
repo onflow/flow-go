@@ -112,9 +112,13 @@ func NewCore(
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
 func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedProposal]) error {
+	blockProposal, err := proposalMsg.Message.DeclareStructurallyValid()
+	if err != nil {
+		return fmt.Errorf("could not convert proposal: %w", err)
+	}
 	proposal := flow.Slashable[*flow.Proposal]{
 		OriginID: proposalMsg.OriginID,
-		Message:  proposalMsg.Message.DeclareTrusted(),
+		Message:  blockProposal,
 	}
 	block := proposal.Message.Block
 	header := block.ToHeader()
@@ -138,7 +142,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedPro
 		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("proposer", header.ProposerID[:]).
-		Time("timestamp", header.Timestamp).
+		Time("timestamp", time.UnixMilli(int64(header.Timestamp)).UTC()).
 		Logger()
 	if log.Debug().Enabled() {
 		log = log.With().
@@ -181,7 +185,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedPro
 	}
 
 	// ignore proposals that were already processed
-	_, err := c.headers.ByBlockID(blockID)
+	_, err = c.headers.ByBlockID(blockID)
 	if err == nil {
 		log.Debug().Msg("skipping already processed proposal")
 		return nil
@@ -362,7 +366,7 @@ func (c *Core) processBlockProposal(proposal *flow.Proposal) error {
 		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("payload_hash", header.PayloadHash[:]).
-		Time("timestamp", header.Timestamp).
+		Time("timestamp", time.UnixMilli(int64(header.Timestamp)).UTC()).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Logger()

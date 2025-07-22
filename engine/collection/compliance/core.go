@@ -110,7 +110,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedClu
 		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
 	}()
 
-	trustedBlockProposal, err := proposalMsg.Message.DeclareTrusted()
+	trustedBlockProposal, err := proposalMsg.Message.DeclareStructurallyValid()
 	if err != nil {
 		return fmt.Errorf("could not convert to cluster block proposal: %w", err)
 	}
@@ -135,7 +135,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedClu
 		Int("tx_count", payload.Collection.Len()).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("proposer", header.ProposerID[:]).
-		Time("timestamp", header.Timestamp).
+		Time("timestamp", time.UnixMilli(int64(header.Timestamp)).UTC()).
 		Logger()
 	if log.Debug().Enabled() {
 		payloadHash := payload.Hash()
@@ -321,7 +321,7 @@ func (c *Core) processBlockProposal(proposal *cluster.Proposal) error {
 		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("payload_hash", payloadHash[:]).
-		Time("timestamp", header.Timestamp).
+		Time("timestamp", time.UnixMilli(int64(header.Timestamp)).UTC()).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Logger()

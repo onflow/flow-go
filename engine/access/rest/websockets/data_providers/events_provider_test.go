@@ -45,7 +45,7 @@ func (s *EventsProviderSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.api = ssmock.NewAPI(s.T())
 	s.chain = flow.Testnet.Chain()
-	s.rootBlock = flow.Genesis(s.chain.ChainID())
+	s.rootBlock = unittest.Block.Genesis(s.chain.ChainID())
 	s.factory = NewDataProviderFactory(
 		s.log,
 		s.api,
@@ -167,7 +167,7 @@ func (s *EventsProviderSuite) backendEventsResponses(events []flow.Event) []*bac
 			Height:         s.rootBlock.Header.Height,
 			BlockID:        s.rootBlock.ID(),
 			Events:         events,
-			BlockTimestamp: s.rootBlock.Header.Timestamp,
+			BlockTimestamp: time.UnixMilli(int64(s.rootBlock.Header.Timestamp)).UTC(),
 		}
 	}
 

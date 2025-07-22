@@ -93,7 +93,7 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	s.rootHeader = &flow.Header{
 		HeaderBody: flow.HeaderBody{
 			ParentID:   parentID,
-			Timestamp:  time.Now().UTC(),
+			Timestamp:  uint64(time.Now().UnixMilli()),
 			Height:     21053,
 			View:       52078,
 			ParentView: 52077,

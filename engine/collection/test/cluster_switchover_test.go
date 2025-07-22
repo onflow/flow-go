@@ -87,7 +87,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	tc.sentTransactions = make(map[uint64]map[uint]flow.IdentifierList)
 	tc.hub = stub.NewNetworkHub()
 
-	rootHeader := unittest.GenesisFixture().Header
+	rootHeader := unittest.Block.Genesis(flow.Emulator).Header
 	counter := uint64(1)
 
 	setup := unittest.EpochSetupFixture(

@@ -2,7 +2,6 @@ package flow
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 )
@@ -93,7 +92,7 @@ func (h *HeaderBodyBuilder) WithHeight(height uint64) *HeaderBodyBuilder {
 	bitutils.WriteBit(h.present, int(heightFieldBitIndex), 1)
 	return h
 }
-func (h *HeaderBodyBuilder) WithTimestamp(t time.Time) *HeaderBodyBuilder {
+func (h *HeaderBodyBuilder) WithTimestamp(t uint64) *HeaderBodyBuilder {
 	h.u.Timestamp = t
 	bitutils.WriteBit(h.present, int(timestampFieldBitIndex), 1)
 	return h
