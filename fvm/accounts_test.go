@@ -1339,11 +1339,6 @@ func TestGetAccountKey(t *testing.T) {
 	t.Run("Multiple keys",
 		newVMTest().
 			withContextOptions(options...).
-			withContextOptions(
-				// TODO: fix field iteration order difference between Cadence interpreter and VM
-				fvm.WithVMScriptExecutionEnabled(false),
-				fvm.WithVMTransactionExecutionEnabled(false),
-			).
 			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				snapshotTree, address := createAccount(
 					t,
