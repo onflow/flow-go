@@ -106,9 +106,7 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 	// Provide the blockID and execute the resulting `DBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
 	blockID := s.candidate.ID()
-	for _, update := range dbUpdates {
-		require.NoError(s.T(), update(blockID, rw))
-	}
+	err = dbUpdates.Execute(nil, blockID, rw)
 	require.NoError(s.T(), err)
 }
 
@@ -150,9 +148,7 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	// Provide the blockID and execute the resulting `DBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
 	blockID := s.candidate.ID()
-	for _, update := range dbUpdates {
-		require.NoError(s.T(), update(blockID, rw))
-	}
+	err = dbUpdates.Execute(nil, blockID, rw)
 	require.NoError(s.T(), err)
 }
 
@@ -555,8 +551,6 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	// Provide the blockID and execute the resulting `DBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
 	blockID := s.candidate.ID()
-	for _, update := range dbOps {
-		require.NoError(s.T(), update(blockID, rw))
-	}
+	err = dbOps.Execute(nil, blockID, rw)
 	require.NoError(s.T(), err)
 }

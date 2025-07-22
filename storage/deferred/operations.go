@@ -1,0 +1,93 @@
+package deferred
+
+import (
+	"github.com/jordanschalm/lockctx"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
+)
+
+// DBOp is a shorthand for a deferred database operation that works within a lock-protected context.
+// It accepts a lock proof, a block ID, and a reader/writer interface to perform its task.
+// This pattern allows chaining database updates for atomic execution in one batch updates.
+type DBOp = func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error
+
+// DeferredDBOps accumulates deferred database operations to be executed later in a single atomic batch updates.
+// This utility allows the caller to enqueue multiple DB operations that will be executed in-order.
+// These operations typically include state mutations related to a given block.
+type DeferredDBOps struct {
+	pending DBOp // Holds the accumulated operations as a single composed function. Can be nil if no ops are added.
+}
+
+// NewDeferredDBOps instantiates a DeferredDBOps instance. Initially, it behaves as a no-op until operations are added.
+func NewDeferredDBOps() *DeferredDBOps {
+	return &DeferredDBOps{
+		pending: nil,
+	}
+}
+
+// IsEmpty returns true if no operations have been enqueued.
+func (d *DeferredDBOps) IsEmpty() bool {
+	return d.pending == nil
+}
+
+// AddNextOperation adds a new deferred database operation to the queue of pending operations.
+// If there are already pending operations, this new operation will be composed to run after them.
+// This method ensures the operations execute sequentially and short-circuits on the first error.
+//
+// If `nil` is passed, it is ignored — this might happen if chaining with an empty DeferredDBOps.
+func (d *DeferredDBOps) AddNextOperation(nextOperation DBOp) {
+	if nextOperation == nil {
+		// No-op if the provided operation is nil.
+		return
+	}
+
+	if d.pending == nil {
+		// If this is the first operation being added, set it directly.
+		d.pending = nextOperation
+		return
+	}
+
+	// Compose the prior and next operations into a single function.
+	prior := d.pending
+	d.pending = func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+		// Execute the prior operations first.
+		if err := prior(lctx, blockID, rw); err != nil {
+			return err
+		}
+		// Execute the newly added operation next.
+		if err := nextOperation(lctx, blockID, rw); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+// Chain merges the deferred operations from another DeferredDBOps into this one, preserving order.
+func (d *DeferredDBOps) Chain(deferred *DeferredDBOps) {
+	d.AddNextOperation(deferred.pending)
+}
+
+// AddSucceedCallback adds a callback to be executed **after** the pending database operations succeed.
+// This is useful for registering indexing tasks or post-commit hooks.
+// The callback is only invoked if no error occurred during batch updates execution.
+func (d *DeferredDBOps) AddSucceedCallback(callback func()) {
+	d.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+		// Schedule the callback to run after a successful commit.
+		rw.AddCallback(func(err error) {
+			if err == nil {
+				callback()
+			}
+		})
+		return nil
+	})
+}
+
+// Execute runs all the accumulated deferred database operations in-order.
+// If no operations were added, it is effectively a no-op.
+// This method should be called exactly once per batch updates context.
+func (d *DeferredDBOps) Execute(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+	if d.pending == nil {
+		return nil // No operations to execute.
+	}
+	return d.pending(lctx, blockID, rw)
+}

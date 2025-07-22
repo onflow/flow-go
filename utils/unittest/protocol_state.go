@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage/deferred"
 )
 
 // FinalizedProtocolStateWithParticipants returns a protocol state with finalized participants
@@ -86,9 +87,11 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState 
 
 	block3 := BlockWithParentFixture(block2.Header)
 	seals := []*flow.Seal{seal}
-	updatedStateId, dbUpdates, err := mutableProtocolState.EvolveState(block3.Header.ParentID, block3.Header.View, seals)
+
+	dbUpdates := deferred.NewDeferredDBOps()
+	updatedStateId, err := mutableProtocolState.EvolveState(dbUpdates, block3.Header.ParentID, block3.Header.View, seals)
 	require.NoError(t, err)
-	require.False(t, len(dbUpdates) == 0)
+	require.False(t, dbUpdates.IsEmpty())
 
 	block3.SetPayload(flow.Payload{
 		Seals:           seals,
