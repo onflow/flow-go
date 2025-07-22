@@ -2,6 +2,7 @@ package convert
 
 import (
 	"fmt"
+	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -10,18 +11,20 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
+// BlockTimestamp2ProtobufTime is just a shorthand function to ensure consistent conversion
+// of block timestamps (measured in unix milliseconds) to protobuf's Timestamp format.
+func BlockTimestamp2ProtobufTime(blockTimestamp uint64) *timestamppb.Timestamp {
+	return timestamppb.New(time.UnixMilli(int64(blockTimestamp)))
+}
+
 // BlockToMessage converts a flow.Block to a protobuf Block message.
-// signerIDs is a precomputed list of signer IDs for the block based on the block's signer indicies.
+// signerIDs is a precomputed list of signer IDs for the block based on the block's signer indices.
 func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
 	*entities.Block,
 	error,
 ) {
 	id := h.ID()
-
-	parentID := h.ParentID
-	t := timestamppb.New(h.Timestamp)
 	cg := CollectionGuaranteesToMessages(h.Payload.Guarantees)
-
 	seals := BlockSealsToMessages(h.Payload.Seals)
 
 	execResults, err := ExecutionResultsToMessages(h.Payload.Results)
@@ -37,8 +40,8 @@ func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
 	bh := entities.Block{
 		Id:                       IdentifierToMessage(id),
 		Height:                   h.Height,
-		ParentId:                 IdentifierToMessage(parentID),
-		Timestamp:                t,
+		ParentId:                 IdentifierToMessage(h.ParentID),
+		Timestamp:                BlockTimestamp2ProtobufTime(h.Timestamp),
 		CollectionGuarantees:     cg,
 		BlockSeals:               seals,
 		Signatures:               [][]byte{h.ParentVoterSigData},
@@ -47,23 +50,19 @@ func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
 		ProtocolStateId:          IdentifierToMessage(h.Payload.ProtocolStateID),
 		BlockHeader:              blockHeader,
 	}
-
 	return &bh, nil
 }
 
 // BlockToMessageLight converts a flow.Block to the light form of a protobuf Block message.
 func BlockToMessageLight(h *flow.Block) *entities.Block {
 	id := h.ID()
-
-	parentID := h.ParentID
-	t := timestamppb.New(h.Timestamp)
 	cg := CollectionGuaranteesToMessages(h.Payload.Guarantees)
 
 	return &entities.Block{
 		Id:                   id[:],
 		Height:               h.Height,
-		ParentId:             parentID[:],
-		Timestamp:            t,
+		ParentId:             h.ParentID[:],
+		Timestamp:            BlockTimestamp2ProtobufTime(h.Timestamp),
 		CollectionGuarantees: cg,
 		Signatures:           [][]byte{h.ParentVoterSigData},
 	}

@@ -135,7 +135,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedClu
 		Int("tx_count", payload.Collection.Len()).
 		Hex("parent_id", block.ParentID[:]).
 		Hex("proposer", block.ProposerID[:]).
-		Time("timestamp", block.Timestamp).
+		Time("timestamp", time.UnixMilli(int64(block.Timestamp)).UTC()).
 		Logger()
 	if log.Debug().Enabled() {
 		payloadHash := payload.Hash()
@@ -321,7 +321,7 @@ func (c *Core) processBlockProposal(proposal *cluster.Proposal) error {
 		Hex("block_id", blockID[:]).
 		Hex("parent_id", block.ParentID[:]).
 		Hex("payload_hash", payloadHash[:]).
-		Time("timestamp", block.Timestamp).
+		Time("timestamp", time.UnixMilli(int64(block.Timestamp)).UTC()).
 		Hex("proposer", block.ProposerID[:]).
 		Hex("parent_signer_indices", block.ParentVoterIndices).
 		Logger()

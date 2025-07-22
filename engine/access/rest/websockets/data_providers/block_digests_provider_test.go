@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -40,7 +41,7 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_HappyPath() {
 		s.validBlockDigestsArgumentsTestCases(),
 		func(dataChan chan interface{}) {
 			for _, block := range s.blocks {
-				dataChan <- flow.NewBlockDigest(block.ID(), block.Height, block.Timestamp)
+				dataChan <- flow.NewBlockDigest(block.ID(), block.Height, time.UnixMilli(int64(block.Timestamp)).UTC())
 			}
 		},
 		s.requireBlockDigest,
@@ -52,7 +53,7 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_HappyPath() {
 func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []testType {
 	expectedResponses := make([]interface{}, len(s.blocks))
 	for i, b := range s.blocks {
-		blockDigest := flow.NewBlockDigest(b.ID(), b.Height, b.Timestamp)
+		blockDigest := flow.NewBlockDigest(b.ID(), b.Height, time.UnixMilli(int64(b.Timestamp)).UTC())
 		blockDigestPayload := models.NewBlockDigest(blockDigest)
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   BlockDigestsTopic,

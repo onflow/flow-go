@@ -202,14 +202,14 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 								Height:         block.Height,
 								BlockID:        blockID,
 								Events:         expectedEvents,
-								BlockTimestamp: block.Timestamp,
+								BlockTimestamp: time.UnixMilli(int64(block.Timestamp)).UTC(),
 							})
 						}
 						subscriptionEventsResponses = append(subscriptionEventsResponses, &backend.EventsResponse{
 							Height:         block.Height,
 							BlockID:        blockID,
 							Events:         subscriptionEvents,
-							BlockTimestamp: block.Timestamp,
+							BlockTimestamp: time.UnixMilli(int64(block.Timestamp)).UTC(),
 						})
 					}
 				}

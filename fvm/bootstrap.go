@@ -493,7 +493,7 @@ func (b *bootstrapExecutor) genesisHeader() (*flow.Header, error) {
 			ChainID:   b.ctx.Chain.ChainID(),
 			ParentID:  flow.ZeroID,
 			Height:    0,
-			Timestamp: flow.GenesisTime,
+			Timestamp: uint64(flow.GenesisTime.UnixMilli()),
 			View:      0,
 		},
 	)

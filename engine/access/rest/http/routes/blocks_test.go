@@ -302,7 +302,7 @@ func expectedBlockResponse(
 	blockLink := fmt.Sprintf("/v1/blocks/%s", id)
 	payloadLink := fmt.Sprintf("/v1/blocks/%s/payload", id)
 	execLink := fmt.Sprintf("/v1/execution_results/%s", execResultID)
-	timestamp := block.Timestamp.Format(time.RFC3339Nano)
+	timestamp := time.UnixMilli(int64(block.Timestamp)).UTC().Format(time.RFC3339Nano)
 
 	header := fmt.Sprintf(`"header": {
 		"id": "%s",

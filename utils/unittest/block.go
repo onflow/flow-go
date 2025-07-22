@@ -76,7 +76,7 @@ func (f *blockFactory) Genesis(chainID flow.ChainID) *flow.Block {
 			ChainID:   chainID,
 			ParentID:  flow.ZeroID,
 			Height:    0,
-			Timestamp: flow.GenesisTime,
+			Timestamp: uint64(flow.GenesisTime.UnixMilli()),
 			View:      0,
 		},
 	)

@@ -417,7 +417,7 @@ func (s *BackendEventsSuite) subscribe(
 						BlockID:        b.ID(),
 						Height:         b.Height,
 						Events:         expectedEvents,
-						BlockTimestamp: b.Timestamp,
+						BlockTimestamp: time.UnixMilli(int64(b.Timestamp)).UTC(),
 					}
 					requireFn(v, expected)
 

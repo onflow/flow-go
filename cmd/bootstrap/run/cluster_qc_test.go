@@ -20,7 +20,7 @@ func TestGenerateClusterRootQC(t *testing.T) {
 			HeaderBody: flow.HeaderBody{
 				ChainID:   flow.Emulator,
 				ParentID:  flow.ZeroID,
-				Timestamp: time.Now().UTC(),
+				Timestamp: uint64(time.Now().UnixMilli()),
 				View:      42,
 			},
 			Payload: *cluster.NewEmptyPayload(flow.ZeroID),

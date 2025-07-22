@@ -23,7 +23,6 @@ func TestClusterBlockMalleability(t *testing.T) {
 		unittest.WithFieldGenerator("HeaderBody.ParentView", func() uint64 {
 			return clusterBlock.View - 1 // ParentView must stay below View, so set it to View-1
 		}),
-		unittest.WithFieldGenerator("HeaderBody.Timestamp", func() time.Time { return time.Now().UTC() }),
 		unittest.WithFieldGenerator("Payload.Collection", func() flow.Collection {
 			return unittest.CollectionFixture(3)
 		}),
@@ -99,7 +98,7 @@ func TestNewRootBlock(t *testing.T) {
 				ChainID:            flow.Emulator,
 				ParentID:           flow.ZeroID,
 				Height:             10,
-				Timestamp:          time.Now(),
+				Timestamp:          uint64(time.Now().UnixMilli()),
 				View:               0,
 				ParentView:         0,
 				ParentVoterIndices: []byte{},

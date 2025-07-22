@@ -203,7 +203,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				WithParentID(parentID).
 				WithParentView(parent.View).
 				WithHeight(parent.Height + 1).
-				WithTimestamp(time.Now().UTC())
+				WithTimestamp(uint64(time.Now().UnixMilli()))
 			require.NoError(t, setter(headerBuilder))
 			headerBody, err := headerBuilder.Build()
 			require.NoError(t, err)
