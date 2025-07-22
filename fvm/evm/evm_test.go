@@ -2,6 +2,7 @@ package evm_test
 
 import (
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"math"
 	"math/big"
@@ -32,6 +33,18 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+)
+
+var testWithVMTransactionExecution = flag.Bool(
+	"testWithVMTransactionExecution",
+	false,
+	"Run transactions in tests using the Cadence compiler/VM",
+)
+
+var testWithVMScriptExecution = flag.Bool(
+	"testWithVMScriptExecution",
+	false,
+	"Run scripts in tests using the Cadence compiler/VM",
 )
 
 func TestEVMRun(t *testing.T) {
@@ -3371,6 +3384,8 @@ func RunWithNewEnvironment(
 					fvm.WithRandomSourceHistoryCallAllowed(true),
 					fvm.WithBlocks(blocks),
 					fvm.WithCadenceLogging(true),
+					fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
+					fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 				}
 				ctx := fvm.NewContext(opts...)
 
