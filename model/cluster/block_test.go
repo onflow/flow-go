@@ -226,7 +226,7 @@ func TestNewRootProposal(t *testing.T) {
 				ChainID:            flow.Emulator,
 				ParentID:           flow.ZeroID,
 				Height:             10,
-				Timestamp:          time.Now(),
+				Timestamp:          uint64(time.Now().UnixMilli()),
 				View:               0,
 				ParentView:         0,
 				ParentVoterIndices: []byte{},
