@@ -65,13 +65,13 @@ func NewResultApprovals(collector module.CacheMetrics, db storage.DB, lockManage
 // for the same key (resultID, chunkIndex) this method returns an exception, as this should never happen for
 // a correct Verification Node indexing its own approvals.
 func (r *ResultApprovals) StoreMyApproval(lctx lockctx.Proof, approval *flow.ResultApproval) error {
-	if !lctx.HoldsLock(storage.LockIndexResultApproval) {
-		return fmt.Errorf("missing lock for index result approval")
-	}
-
 	approvalID := approval.ID()
 	resultID := approval.Body.ExecutionResultID
 	chunkIndex := approval.Body.ChunkIndex
+
+	if !lctx.HoldsLock(storage.LockIndexResultApproval) {
+		return fmt.Errorf("missing lock for index result approval")
+	}
 
 	var storedApprovalID flow.Identifier
 	err := operation.LookupResultApproval(r.db.Reader(), resultID, chunkIndex, &storedApprovalID)
