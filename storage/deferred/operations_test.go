@@ -1,4 +1,3 @@
-
 package deferred_test
 
 import (
@@ -27,17 +26,17 @@ func TestDeferredDBOps_IsEmpty(t *testing.T) {
 		d := deferred.NewDeferredDBOps()
 		assert.True(t, d.IsEmpty())
 
-		d.AddNextOperations(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+		d.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 			return nil
 		})
 		assert.False(t, d.IsEmpty())
 	})
 }
 
-func TestDeferredDBOps_AddNextOperations_Nil(t *testing.T) {
+func TestDeferredDBOps_AddNextOperation_Nil(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		d := deferred.NewDeferredDBOps()
-		d.AddNextOperations(nil)
+		d.AddNextOperation(nil)
 		assert.True(t, d.IsEmpty())
 	})
 }
@@ -52,7 +51,7 @@ func TestDeferredDBOps_Execute_NoOps(t *testing.T) {
 	})
 }
 
-func TestDeferredDBOps_AddNextOperations_Single(t *testing.T) {
+func TestDeferredDBOps_AddNextOperation_Single(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		d := deferred.NewDeferredDBOps()
 		var executed bool
@@ -61,7 +60,7 @@ func TestDeferredDBOps_AddNextOperations_Single(t *testing.T) {
 			return nil
 		}
 
-		d.AddNextOperations(op)
+		d.AddNextOperation(op)
 		err := db.WithReaderBatchWriter(func(writer storage.ReaderBatchWriter) error {
 			return d.Execute(nil, flow.Identifier{}, writer)
 		})
@@ -71,7 +70,7 @@ func TestDeferredDBOps_AddNextOperations_Single(t *testing.T) {
 	})
 }
 
-func TestDeferredDBOps_AddNextOperations_Multiple(t *testing.T) {
+func TestDeferredDBOps_AddNextOperation_Multiple(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		d := deferred.NewDeferredDBOps()
 		var executionOrder []int
@@ -85,8 +84,8 @@ func TestDeferredDBOps_AddNextOperations_Multiple(t *testing.T) {
 			return nil
 		}
 
-		d.AddNextOperations(op1)
-		d.AddNextOperations(op2)
+		d.AddNextOperation(op1)
+		d.AddNextOperation(op2)
 
 		err := db.WithReaderBatchWriter(func(writer storage.ReaderBatchWriter) error {
 			return d.Execute(nil, flow.Identifier{}, writer)
@@ -97,7 +96,7 @@ func TestDeferredDBOps_AddNextOperations_Multiple(t *testing.T) {
 	})
 }
 
-func TestDeferredDBOps_AddNextOperations_Error(t *testing.T) {
+func TestDeferredDBOps_AddNextOperation_Error(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		d := deferred.NewDeferredDBOps()
 		var op2Executed bool
@@ -111,8 +110,8 @@ func TestDeferredDBOps_AddNextOperations_Error(t *testing.T) {
 			return nil
 		}
 
-		d.AddNextOperations(op1)
-		d.AddNextOperations(op2)
+		d.AddNextOperation(op1)
+		d.AddNextOperation(op2)
 
 		err := db.WithReaderBatchWriter(func(writer storage.ReaderBatchWriter) error {
 			return d.Execute(nil, flow.Identifier{}, writer)
@@ -132,7 +131,7 @@ func TestDeferredDBOps_Chain(t *testing.T) {
 			d1op1Executed = true
 			return nil
 		}
-		d1.AddNextOperations(d1op1)
+		d1.AddNextOperation(d1op1)
 
 		d2 := deferred.NewDeferredDBOps()
 		var d2op1Executed bool
@@ -140,7 +139,7 @@ func TestDeferredDBOps_Chain(t *testing.T) {
 			d2op1Executed = true
 			return nil
 		}
-		d2.AddNextOperations(d2op1)
+		d2.AddNextOperation(d2op1)
 
 		d1.Chain(d2)
 
@@ -161,7 +160,7 @@ func TestDeferredDBOps_Chain_Empty(t *testing.T) {
 			opExecuted = true
 			return nil
 		}
-		d1.AddNextOperations(op)
+		d1.AddNextOperation(op)
 
 		d2 := deferred.NewDeferredDBOps()
 		d1.Chain(d2)
@@ -235,7 +234,7 @@ func TestDeferredDBOps_AddSucceedCallback_Chained(t *testing.T) {
 			callbackExecuted = true
 		}
 
-		d.AddNextOperations(op)
+		d.AddNextOperation(op)
 		d.AddSucceedCallback(callback)
 
 		err := db.WithReaderBatchWriter(func(writer storage.ReaderBatchWriter) error {

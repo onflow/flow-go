@@ -241,12 +241,12 @@ func NewEpochStateMachine(
 func (e *EpochStateMachine) Build() (*deferred.DeferredDBOps, error) {
 	updatedEpochState, updatedStateID, hasChanges := e.activeStateMachine.Build()
 
-	e.pendingDBUpdates.AddNextOperations(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+	e.pendingDBUpdates.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 		return e.epochProtocolStateDB.BatchIndex(rw, blockID, updatedStateID)
 	})
 
 	if hasChanges {
-		e.pendingDBUpdates.AddNextOperations(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+		e.pendingDBUpdates.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 			return e.epochProtocolStateDB.BatchStore(rw.Writer(), updatedStateID, updatedEpochState.MinEpochStateEntry)
 		})
 	}
@@ -335,7 +335,7 @@ func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.
 				return nil, fmt.Errorf("could not process epoch setup event: %w", err)
 			}
 			if processed {
-				dbUpdates.AddNextOperations(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+				dbUpdates.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 					return e.setups.BatchStore(rw, ev) // we'll insert the setup event when we insert the block
 				})
 			}
@@ -346,7 +346,7 @@ func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.
 				return nil, fmt.Errorf("could not process epoch commit event: %w", err)
 			}
 			if processed {
-				dbUpdates.AddNextOperations(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+				dbUpdates.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 					return e.commits.BatchStore(rw, ev) // we'll insert the commit event when we insert the block
 				})
 			}
@@ -356,7 +356,7 @@ func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.
 				return nil, fmt.Errorf("could not process epoch recover event: %w", err)
 			}
 			if processed {
-				dbUpdates.AddNextOperations(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+				dbUpdates.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 					err := e.setups.BatchStore(rw, &ev.EpochSetup)
 					if err != nil {
 						return err

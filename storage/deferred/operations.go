@@ -30,12 +30,12 @@ func (d *DeferredDBOps) IsEmpty() bool {
 	return d.pending == nil
 }
 
-// AddNextOperations adds a new deferred database operation to the queue of pending operations.
+// AddNextOperation adds a new deferred database operation to the queue of pending operations.
 // If there are already pending operations, this new operation will be composed to run after them.
 // This method ensures the operations execute sequentially and short-circuits on the first error.
 //
 // If `nil` is passed, it is ignored — this might happen if chaining with an empty DeferredDBOps.
-func (d *DeferredDBOps) AddNextOperations(nextOperation DBOp) {
+func (d *DeferredDBOps) AddNextOperation(nextOperation DBOp) {
 	if nextOperation == nil {
 		// No-op if the provided operation is nil.
 		return
@@ -64,14 +64,14 @@ func (d *DeferredDBOps) AddNextOperations(nextOperation DBOp) {
 
 // Chain merges the deferred operations from another DeferredDBOps into this one, preserving order.
 func (d *DeferredDBOps) Chain(deferred *DeferredDBOps) {
-	d.AddNextOperations(deferred.pending)
+	d.AddNextOperation(deferred.pending)
 }
 
 // AddSucceedCallback adds a callback to be executed **after** the pending database operations succeed.
 // This is useful for registering indexing tasks or post-commit hooks.
 // The callback is only invoked if no error occurred during batch updates execution.
 func (d *DeferredDBOps) AddSucceedCallback(callback func()) {
-	d.AddNextOperations(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+	d.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 		// Schedule the callback to run after a successful commit.
 		rw.AddCallback(func(err error) {
 			if err == nil {
