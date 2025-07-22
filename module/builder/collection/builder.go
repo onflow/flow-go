@@ -217,9 +217,9 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 	ctx.lookup = newTransactionLookup()
 	bySealingLagRateLimiter, err := NewBySealingLagRateLimiter(
 		b.protoState,
-		20,
-		50,
-		5,
+		25,
+		55,
+		10,
 		b.config.MaxCollectionSize,
 	)
 	if err != nil {

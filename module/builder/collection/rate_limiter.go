@@ -1,10 +1,10 @@
 package collection
 
 import (
-	"github.com/onflow/flow-go/state/protocol"
 	"math"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // rateLimiter implements payer-based rate limiting. See Config for details.
