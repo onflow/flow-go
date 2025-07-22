@@ -70,8 +70,9 @@ consensus:
       args:{{template "args" .}}
         - --loglevel=DEBUG
         - --admin-addr=0.0.0.0:9002
-        - --block-rate-delay=800ms
-        - --cruise-ctl-max-view-duration=2s
+        # Benchnet networks use default 1bps timing
+        - --cruise-ctl-max-view-duration=1500ms
+        - --hotstuff-min-timeout=2s
         - --chunk-alpha=1
         - --emergency-sealing-active=false
         - --insecure-access-api=false
