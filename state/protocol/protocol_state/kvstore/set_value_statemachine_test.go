@@ -110,5 +110,5 @@ func (s *SetKeyValueStoreValueStateMachineSuite) TestEvolveState_SetEpochExtensi
 func (s *SetKeyValueStoreValueStateMachineSuite) TestBuild() {
 	dbOps, err := s.stateMachine.Build()
 	require.NoError(s.T(), err)
-	require.Nil(s.T(), dbOps.Execute(nil, flow.ZeroID, nil))
+	require.False(s.T(), dbOps.IsEmpty())
 }
