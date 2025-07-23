@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	storage "github.com/onflow/flow-go/storage/badger"
+	storage "github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -42,7 +42,7 @@ func TestProduceConsume(t *testing.T) {
 			defer lock.Unlock()
 			called = append(called, locator)
 		}
-		WithConsumer(t, neverFinish, func(consumer *chunkconsumer.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
+		WithConsumer(t, neverFinish, func(consumer *chunkconsumer.ChunkConsumer, chunksQueue storage.ChunksQueue) {
 			<-consumer.Ready()
 
 			locators := unittest.ChunkLocatorListFixture(10)
@@ -78,7 +78,7 @@ func TestProduceConsume(t *testing.T) {
 				finishAll.Done()
 			}()
 		}
-		WithConsumer(t, alwaysFinish, func(consumer *chunkconsumer.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
+		WithConsumer(t, alwaysFinish, func(consumer *chunkconsumer.ChunkConsumer, chunksQueue storage.ChunksQueue) {
 			<-consumer.Ready()
 
 			locators := unittest.ChunkLocatorListFixture(10)
@@ -113,7 +113,7 @@ func TestProduceConsume(t *testing.T) {
 				finishAll.Done()
 			}()
 		}
-		WithConsumer(t, alwaysFinish, func(consumer *chunkconsumer.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
+		WithConsumer(t, alwaysFinish, func(consumer *chunkconsumer.ChunkConsumer, chunksQueue storage.ChunksQueue) {
 			<-consumer.Ready()
 			total := atomic.NewUint32(0)
 
@@ -141,13 +141,15 @@ func TestProduceConsume(t *testing.T) {
 func WithConsumer(
 	t *testing.T,
 	process func(module.ProcessingNotifier, *chunks.Locator),
-	withConsumer func(*chunkconsumer.ChunkConsumer, *storage.ChunksQueue),
+	withConsumer func(*chunkconsumer.ChunkConsumer, storage.ChunksQueue),
 ) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(badgerdb *badger.DB) {
 		maxProcessing := uint64(3)
+		db := badgerimpl.ToDB(badgerdb)
 
-		processedIndex := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressVerificationChunkIndex)
-		chunksQueue := storage.NewChunkQueue(db)
+		collector := &metrics.NoopCollector{}
+		processedIndex := store.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex)
+		chunksQueue := store.NewChunkQueue(collector, db)
 		ok, err := chunksQueue.Init(chunkconsumer.DefaultJobIndex)
 		require.NoError(t, err)
 		require.True(t, ok)
@@ -156,7 +158,6 @@ func WithConsumer(
 			process: process,
 		}
 
-		collector := &metrics.NoopCollector{}
 		consumer, err := chunkconsumer.NewChunkConsumer(
 			unittest.Logger(),
 			collector,
