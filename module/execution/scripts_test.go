@@ -242,6 +242,7 @@ func (s *scriptTestSuite) createAccount() flow.Address {
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(createAccountTransaction)).
+		SetPayer(unittest.RandomAddressFixture()).
 		AddAuthorizer(s.chain.ServiceAddress()).
 		Build()
 	s.Require().NoError(err)
@@ -285,7 +286,9 @@ func (s *scriptTestSuite) transferTokens(accountAddress flow.Address, amount uin
 	transferTx, err := transferTokensTx(s.chain).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(amount))).
 		AddArgument(jsoncdc.MustEncode(cadence.Address(accountAddress))).
-		AddAuthorizer(s.chain.ServiceAddress()).Build()
+		AddAuthorizer(s.chain.ServiceAddress()).
+		SetPayer(accountAddress).
+		Build()
 	s.Require().NoError(err)
 
 	executionSnapshot, _, err := s.vm.Run(
@@ -335,6 +338,7 @@ transaction(key: [UInt8]) {
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(addAccountKeyTransaction)).
+		SetPayer(accountAddress).
 		AddArgument(encodedCadencePublicKey).
 		AddAuthorizer(accountAddress).
 		Build()
