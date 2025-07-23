@@ -28,6 +28,7 @@ func TestTransaction_SignatureOrdering(t *testing.T) {
 	payerSignature := []byte{7, 8, 9}
 
 	tx, err := flow.NewTransactionBodyBuilder().
+		SetScript([]byte(`transaction(){}`)).
 		SetProposalKey(proposerAddress, proposerKeyIndex, proposerSequenceNumber).
 		AddPayloadSignature(proposerAddress, proposerKeyIndex, proposerSignature).
 		SetPayer(payerAddress).
