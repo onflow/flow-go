@@ -40,6 +40,11 @@ type TxErrorMessagesCoreSuite struct {
 
 	receipts        *storage.ExecutionReceipts
 	txErrorMessages *storage.TransactionResultErrorMessages
+	lightTxResults  *storage.LightTransactionResults
+
+	reporter       *syncmock.IndexReporter
+	indexReporter  *index.Reporter
+	txResultsIndex *index.TransactionResultsIndex
 
 	enNodeIDs   flow.IdentityList
 	execClient  *accessmock.ExecutionAPIClient
@@ -51,11 +56,6 @@ type TxErrorMessagesCoreSuite struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
-
-	lightTxResults *storage.LightTransactionResults
-	reporter       *syncmock.IndexReporter
-	indexReporter  *index.Reporter
-	txResultsIndex *index.TransactionResultsIndex
 }
 
 func TestTxErrorMessagesCore(t *testing.T) {

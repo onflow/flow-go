@@ -48,8 +48,8 @@ type TxErrorMessagesEngineSuite struct {
 	headers         *storage.Headers
 	receipts        *storage.ExecutionReceipts
 	txErrorMessages *storage.TransactionResultErrorMessages
+	lightTxResults  *storage.LightTransactionResults
 
-	lightTxResults *storage.LightTransactionResults
 	reporter       *syncmock.IndexReporter
 	indexReporter  *index.Reporter
 	txResultsIndex *index.TransactionResultsIndex

@@ -77,6 +77,8 @@ type Backend struct {
 
 	stateParams    protocol.Params
 	versionControl *version.VersionControl
+
+	BlockTracker tracker.BlockTracker
 }
 
 type Params struct {
@@ -113,6 +115,7 @@ type Params struct {
 	IndexReporter              state_synchronization.IndexReporter
 	VersionControl             *version.VersionControl
 	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
+	TxErrorMessageProvider     error_message_provider.TxErrorMessageProvider
 }
 
 var _ access.API = (*Backend)(nil)
@@ -191,15 +194,6 @@ func New(params Params) (*Backend, error) {
 		return nil, fmt.Errorf("could not create transaction validator: %w", err)
 	}
 
-	txErrorMessageProvider := error_message_provider.NewTxErrorMessageProvider(
-		params.Log,
-		params.TxResultErrorMessages,
-		params.TxResultsIndex,
-		params.ConnFactory,
-		params.Communicator,
-		params.ExecNodeIdentitiesProvider,
-	)
-
 	txStatusDeriver := status_deriver.NewTxStatusDeriver(params.State, params.LastFullBlockHeight)
 
 	txBackend, err := transactions.NewTransactionsBackend(
@@ -218,14 +212,15 @@ func New(params Params) (*Backend, error) {
 			Blocks:                      params.Blocks,
 			Collections:                 params.Collections,
 			Transactions:                params.Transactions,
-			TxErrorMessageProvider:      txErrorMessageProvider,
+			TxErrorMessageProvider:      params.TxErrorMessageProvider,
 			TxResultCache:               txResCache,
 			TxResultQueryMode:           params.TxResultQueryMode,
 			TxValidator:                 txValidator,
 			TxStatusDeriver:             txStatusDeriver,
 			EventsIndex:                 params.EventsIndex,
 			TxResultsIndex:              params.TxResultsIndex,
-		})
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transactions backend: %w", err)
 	}
@@ -289,6 +284,7 @@ func New(params Params) (*Backend, error) {
 		staticCollectionRPC: params.CollectionRPC,
 		stateParams:         params.State.Params(),
 		versionControl:      params.VersionControl,
+		BlockTracker:        params.BlockTracker,
 	}
 
 	return b, nil
