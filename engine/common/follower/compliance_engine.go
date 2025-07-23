@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 type EngineOption func(*ComplianceEngine)
@@ -220,7 +221,14 @@ func (e *ComplianceEngine) Process(channel channels.Channel, originID flow.Ident
 	case *flow.UntrustedProposal:
 		proposal, err := flow.NewProposal(*msg)
 		if err != nil {
-			return fmt.Errorf("cannot construct proposal: %w", err)
+			e.log.Warn().
+				Hex("origin_id", originID[:]).
+				Hex("block_id", logging.ID(msg.Block.ID())).
+				Uint64("block_height", msg.Block.Header.Height).
+				Uint64("block_view", msg.Block.Header.View).
+				Hex("proposer_signature", msg.ProposerSigData[:]).
+				Err(err).Msgf("received invalid proposal message")
+			return nil
 		}
 
 		e.OnBlockProposal(flow.Slashable[*flow.Proposal]{
