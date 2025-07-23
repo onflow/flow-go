@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var (
@@ -724,6 +725,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 						}
 					}`,
 				)).
+			SetPayer(unittest.RandomAddressFixture()).
 			Build()
 		require.NoError(t, err)
 
@@ -837,6 +839,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 						}
 					}`,
 			)).
+			SetPayer(unittest.RandomAddressFixture()).
 			Build()
 		require.NoError(t, err)
 
@@ -886,31 +889,41 @@ func callTx(name string, address flow.Address) (*flow.TransactionBody, error) {
                 log(%s.hello())
               }
             }`, name, address.HexWithPrefix(), name)),
-	).Build()
+	).
+		SetPayer(address).
+		Build()
 }
 
 func contractDeployTx(name, code string, address flow.Address) (*flow.TransactionBody, error) {
 	encoded := hex.EncodeToString([]byte(code))
 
-	return flow.NewTransactionBodyBuilder().SetScript(
-		[]byte(fmt.Sprintf(`transaction {
+	return flow.NewTransactionBodyBuilder().
+		SetScript(
+			[]byte(fmt.Sprintf(`transaction {
               prepare(signer: auth(AddContract) &Account) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex())
               }
             }`, name, encoded)),
-	).AddAuthorizer(address).Build()
+		).
+		AddAuthorizer(address).
+		SetPayer(address).
+		Build()
 }
 
 func updateContractTx(name, code string, address flow.Address) (*flow.TransactionBody, error) {
 	encoded := hex.EncodeToString([]byte(code))
 
-	return flow.NewTransactionBodyBuilder().SetScript([]byte(
-		fmt.Sprintf(`transaction {
+	return flow.NewTransactionBodyBuilder().
+		SetScript(
+			[]byte(fmt.Sprintf(`transaction {
              prepare(signer: auth(UpdateContract) &Account) {
                signer.contracts.update(name: "%s", code: "%s".decodeHex())
              }
            }`, name, encoded)),
-	).AddAuthorizer(address).Build()
+		).
+		AddAuthorizer(address).
+		SetPayer(address).
+		Build()
 }
 
 func compareExecutionSnapshots(t *testing.T, a, b *snapshot.ExecutionSnapshot) {

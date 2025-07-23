@@ -92,6 +92,7 @@ func TestEVMRun(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					AddArgument(json.MustEncode(innerTx)).
 					AddArgument(json.MustEncode(coinbase)).
@@ -255,6 +256,7 @@ func TestEVMRun(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					AddArgument(json.MustEncode(innerTx)).
 					AddArgument(json.MustEncode(coinbase)).
@@ -366,6 +368,7 @@ func TestEVMRun(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					AddArgument(json.MustEncode(innerTx)).
 					AddArgument(json.MustEncode(coinbase)).
@@ -450,6 +453,7 @@ func TestEVMRun(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					AddArgument(json.MustEncode(innerTx)).
 					AddArgument(json.MustEncode(coinbase)).
@@ -535,6 +539,7 @@ func TestEVMRun(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					AddArgument(json.MustEncode(innerTx)).
 					AddArgument(json.MustEncode(coinbase)).
@@ -643,6 +648,7 @@ func TestEVMBatchRun(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(batchRunCode).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					AddArgument(json.MustEncode(txs)).
 					AddArgument(json.MustEncode(coinbase)).
@@ -840,6 +846,7 @@ func TestEVMBatchRun(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(batchRunCode).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					AddArgument(json.MustEncode(txs)).
 					AddArgument(json.MustEncode(coinbase)).
@@ -986,6 +993,7 @@ func TestEVMBatchRun(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(batchRunCode).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddArgument(json.MustEncode(txs)).
 					AddArgument(json.MustEncode(coinbase)).
 					Build()
@@ -1156,6 +1164,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 			txBody, err := flow.NewTransactionBodyBuilder().
 				SetScript(code).
+				SetPayer(sc.FlowServiceAccount.Address).
 				AddAuthorizer(sc.FlowServiceAccount.Address).
 				AddArgument(json.MustEncode(cadence.NewArray(
 					unittest.BytesToCdcUInt8(addr.Bytes()),
@@ -1357,6 +1366,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					Build()
 				require.NoError(t, err)
@@ -1619,6 +1629,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					AddArgument(json.MustEncode(innerTx)).
 					AddArgument(json.MustEncode(coinbase)).
@@ -1694,6 +1705,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				txBody, err = flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					AddArgument(data).
 					AddArgument(to).
@@ -1930,6 +1942,7 @@ func TestDryRun(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					AddArgument(json.MustEncode(innerTx)).
 					AddArgument(json.MustEncode(coinbase)).
@@ -2058,6 +2071,7 @@ func TestDryRun(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					AddArgument(json.MustEncode(innerTx)).
 					AddArgument(json.MustEncode(coinbase)).
@@ -2419,6 +2433,7 @@ func TestDryCall(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					AddArgument(json.MustEncode(innerTx)).
 					AddArgument(json.MustEncode(coinbase)).
@@ -2482,6 +2497,7 @@ func TestDryCall(t *testing.T) {
 
 				txBody, err = flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					AddArgument(data).
 					AddArgument(to).
@@ -2786,6 +2802,7 @@ func TestCadenceArch(t *testing.T) {
 							}
 						}`, sc.RandomBeaconHistory.Address.HexWithPrefix())),
 					).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					Build()
 				require.NoError(t, err)
@@ -2885,6 +2902,7 @@ func TestCadenceArch(t *testing.T) {
 							}
 						}`, sc.RandomBeaconHistory.Address.HexWithPrefix())),
 					).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					Build()
 				require.NoError(t, err)
@@ -3145,6 +3163,7 @@ func createAndFundFlowAccount(
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(code).
+		SetPayer(sc.FlowServiceAccount.Address).
 		AddAuthorizer(sc.FlowServiceAccount.Address).
 		Build()
 	require.NoError(t, err)
@@ -3216,6 +3235,7 @@ func setupCOA(
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(script).
+		SetPayer(coaOwner).
 		AddAuthorizer(coaOwner).
 		AddArgument(json.MustEncode(cadence.UFix64(initialFund))).
 		Build()
@@ -3258,6 +3278,7 @@ func callEVMHeartBeat(
 	))
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(heartBeatCode).
+		SetPayer(sc.FlowServiceAccount.Address).
 		AddAuthorizer(sc.FlowServiceAccount.Address).
 		Build()
 	require.NoError(t, err)
