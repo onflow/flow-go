@@ -3,7 +3,6 @@ package store
 import (
 	"errors"
 	"fmt"
-	"maps"
 
 	"github.com/jordanschalm/lockctx"
 
@@ -38,34 +37,23 @@ func NewPayloads(db storage.DB, index *Index, guarantees *Guarantees, seals *Sea
 // storeTx stores the payloads and their components in the database.
 // it takes a map of storingResults to ensure the receipt to be stored contains a known result,
 // which is either already stored in the database or is going to be stored in the same batch.
-func (p *Payloads) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *flow.Payload, storingResults map[flow.Identifier]*flow.ExecutionResult) error {
-	// For correct payloads, the execution result is part of the payload or it's already stored
-	// in storage. If execution result is not present in either of those places, we error.
-	// ATTENTION: this is unnecessarily complex if we have execution receipt which points an execution result
-	// which is not included in current payload but was incorporated in one of previous blocks.
-
+func (p *Payloads) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *flow.Payload) error {
 	resultsByID := payload.Results.Lookup()
 	fullReceipts := make([]*flow.ExecutionReceipt, 0, len(payload.Receipts))
 	var err error
 	for _, meta := range payload.Receipts {
 		result, ok := resultsByID[meta.ResultID]
 		if !ok {
-			// check if the result exists in previous blocks that stored within the same batch
-			result, ok = storingResults[meta.ResultID]
-			if !ok {
-				result, err = p.results.ByID(meta.ResultID)
-				if err != nil {
-					if errors.Is(err, storage.ErrNotFound) {
-						return fmt.Errorf("invalid payload referencing unknown execution result %v, err: %w", meta.ResultID, err)
-					}
-					return err
+			result, err = p.results.ByID(meta.ResultID)
+			if err != nil {
+				if errors.Is(err, storage.ErrNotFound) {
+					return fmt.Errorf("invalid payload referencing unknown execution result %v, err: %w", meta.ResultID, err)
 				}
+				return err
 			}
 		}
 		fullReceipts = append(fullReceipts, flow.ExecutionReceiptFromMeta(*meta, *result))
 	}
-
-	maps.Copy(storingResults, resultsByID)
 
 	// make sure all payload guarantees are stored
 	for _, guarantee := range payload.Guarantees {

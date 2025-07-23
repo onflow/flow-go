@@ -37,21 +37,11 @@ func (b *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
 
 // BatchStore stores a valid block in a batch.
 func (b *Blocks) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block *flow.Block) error {
-	// require LockInsertBlock
-	return b.BatchStoreWithStoringResults(lctx, rw, block, make(map[flow.Identifier]*flow.ExecutionResult))
-}
-
-// BatchStoreWithStoringResults stores multiple blocks as a batch.
-// The additional storingResults parameter helps verify that each receipt in the block
-// refers to a known result. This check is essential during bootstrapping
-// when multiple blocks are stored together in a batch.
-func (b *Blocks) BatchStoreWithStoringResults(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block *flow.Block, storingResults map[flow.Identifier]*flow.ExecutionResult) error {
-	// require LockInsertBlock
 	err := b.headers.storeTx(rw, block.Header)
 	if err != nil {
 		return fmt.Errorf("could not store header %v: %w", block.Header.ID(), err)
 	}
-	err = b.payloads.storeTx(lctx, rw, block.ID(), block.Payload, storingResults)
+	err = b.payloads.storeTx(lctx, rw, block.ID(), block.Payload)
 	if err != nil {
 		return fmt.Errorf("could not store payload: %w", err)
 	}

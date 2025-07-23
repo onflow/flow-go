@@ -18,12 +18,6 @@ type Blocks interface {
 	// BatchStore stores a valid block in a batch.
 	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, block *flow.Block) error
 
-	// BatchStoreWithStoringResults stores multiple blocks as a batch.
-	// The additional storingResults parameter helps verify that each receipt in the block
-	// refers to a known result. This check is essential during bootstrapping
-	// when multiple blocks are stored together in a batch.
-	BatchStoreWithStoringResults(lctx lockctx.Proof, rw ReaderBatchWriter, block *flow.Block, storingResults map[flow.Identifier]*flow.ExecutionResult) error
-
 	// ByID returns the block with the given hash. It is available for
 	// finalized and ambiguous blocks.
 	ByID(blockID flow.Identifier) (*flow.Block, error)
