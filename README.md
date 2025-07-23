@@ -30,7 +30,7 @@ digital assets that power them. Read more about it [here](https://github.com/onf
 
 ## Documentation
 
-You can find an overview of the Flow architecture on the [documentation website](https://www.onflow.org/primer).
+You can find an overview of the Flow architecture on the [documentation website](https://www.flow.com/primer).
 
 Development on Flow is divided into work streams. Each work stream has a home directory containing high-level
 documentation for the stream, as well as links to documentation for relevant components used by that work stream.
