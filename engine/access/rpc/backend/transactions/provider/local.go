@@ -337,7 +337,6 @@ func (t *LocalTransactionProvider) buildTxIDToCollectionIDMapping(block *flow.Bl
 			txToCollectionID[txID] = guarantee.ID()
 		}
 	}
-
 	txToCollectionID[t.systemTxID] = flow.ZeroID
 
 	return txToCollectionID, nil

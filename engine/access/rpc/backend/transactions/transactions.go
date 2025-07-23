@@ -61,7 +61,7 @@ type Transactions struct {
 	systemTx   *flow.TransactionBody
 
 	// RPC Clients & Network
-	staticCollectionRPCClient   accessproto.AccessAPIClient // RPC client tied to a fixed collection node
+	collectionRPCClient         accessproto.AccessAPIClient // RPC client tied to a fixed collection node
 	historicalAccessNodeClients []accessproto.AccessAPIClient
 	nodeCommunicator            node_communicator.Communicator
 	connectionFactory           connection.ConnectionFactory
@@ -170,7 +170,7 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		state:                       params.State,
 		systemTxID:                  params.SystemTxID,
 		systemTx:                    params.SystemTx,
-		staticCollectionRPCClient:   params.StaticCollectionRPCClient,
+		collectionRPCClient:         params.StaticCollectionRPCClient,
 		historicalAccessNodeClients: params.HistoricalAccessNodeClients,
 		nodeCommunicator:            params.NodeCommunicator,
 		connectionFactory:           params.ConnFactory,
@@ -197,10 +197,7 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 }
 
 // SendTransaction forwards the transaction to the collection node
-func (t *Transactions) SendTransaction(
-	ctx context.Context,
-	tx *flow.TransactionBody,
-) error {
+func (t *Transactions) SendTransaction(ctx context.Context, tx *flow.TransactionBody) error {
 	now := time.Now().UTC()
 
 	err := t.txValidator.Validate(ctx, tx)
@@ -223,6 +220,7 @@ func (t *Transactions) SendTransaction(
 		return status.Errorf(codes.Internal, "failed to store transaction: %v", err)
 	}
 
+	//TODO: can we use noop retrier to avoid check for nil?
 	if t.retrier != nil {
 		go t.registerTransactionForRetry(tx)
 	}
@@ -232,9 +230,11 @@ func (t *Transactions) SendTransaction(
 
 // trySendTransaction tries to transaction to a collection node
 func (t *Transactions) trySendTransaction(ctx context.Context, tx *flow.TransactionBody) error {
+	//TODO: can we use noop rpc client to avoid check for nil?
+
 	// if a collection node rpc client was provided at startup, just use that
-	if t.staticCollectionRPCClient != nil {
-		return t.grpcTxSend(ctx, t.staticCollectionRPCClient, tx)
+	if t.collectionRPCClient != nil {
+		return t.grpcTxSend(ctx, t.collectionRPCClient, tx)
 	}
 
 	// otherwise choose all collection nodes to try
@@ -308,7 +308,11 @@ func (t *Transactions) sendTransactionToCollector(
 	return nil
 }
 
-func (t *Transactions) grpcTxSend(ctx context.Context, client accessproto.AccessAPIClient, tx *flow.TransactionBody) error {
+func (t *Transactions) grpcTxSend(
+	ctx context.Context,
+	client accessproto.AccessAPIClient,
+	tx *flow.TransactionBody,
+) error {
 	colReq := &accessproto.SendTransactionRequest{
 		Transaction: convert.TransactionToMessage(*tx),
 	}
