@@ -1,6 +1,10 @@
 package operation
 
 import (
+	"fmt"
+
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -9,7 +13,12 @@ import (
 // The same key (`approval.ID()`) necessitates that the value (full `approval`) is
 // also identical (otherwise, we would have a successful pre-image attack on our
 // cryptographic hash function). Therefore, concurrent calls to this function are safe.
-func InsertResultApproval(w storage.Writer, approval *flow.ResultApproval) error {
+func InsertResultApproval(lctx lockctx.Proof, w storage.Writer, approval *flow.ResultApproval) error {
+	if !lctx.HoldsLock(storage.LockMyResultApproval) {
+		return fmt.Errorf("missing lock for insert result approval for block %v result: %v",
+			approval.Body.BlockID,
+			approval.Body.ExecutionResultID)
+	}
 	return UpsertByKey(w, MakePrefix(codeResultApproval, approval.ID()), approval)
 }
 
@@ -21,7 +30,7 @@ func RetrieveResultApproval(r storage.Reader, approvalID flow.Identifier, approv
 
 // UnsafeIndexResultApproval inserts a ResultApproval ID keyed by ExecutionResult ID
 // and chunk index.
-// Unsafe means that it does not check if a different approval is indexed for the same
+// Note: Unsafe means it does not check if a different approval is indexed for the same
 // chunk, and will overwrite the existing index.
 // CAUTION:
 //   - In general, the Flow protocol requires multiple approvals for the same chunk from different
@@ -31,8 +40,12 @@ func RetrieveResultApproval(r storage.Reader, approvalID flow.Identifier, approv
 //     will always produce the same approval)
 //   - In order to make sure only one approval is indexed for the chunk, _all calls_ to
 //     `UnsafeIndexResultApproval` must be synchronized by the higher-logic. Currently, we have the
-//     convention that `store.ResultApprovals` is the only place that is allowed to call this method.
-func UnsafeIndexResultApproval(w storage.Writer, resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error {
+//     lockctx.Proof to prove the higher logic is holding the lock inserting the approval after checking
+//     that the approval is not already indexed.
+func UnsafeIndexResultApproval(lctx lockctx.Proof, w storage.Writer, resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockMyResultApproval) {
+		return fmt.Errorf("missing lock for index result approval for result: %v", resultID)
+	}
 	return UpsertByKey(w, MakePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID)
 }
 
