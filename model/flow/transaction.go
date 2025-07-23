@@ -2,7 +2,6 @@ package flow
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/fvm/blueprints"
 	"io"
 
 	"github.com/ethereum/go-ethereum/rlp"
