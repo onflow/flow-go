@@ -62,12 +62,16 @@ type TransactionBody struct {
 type UntrustedTransactionBody TransactionBody
 
 // NewTransactionBody creates a new instance of TransactionBody.
-// Construction of TransactionBody is allowed only within the constructor
+// Construction of TransactionBody is allowed only within the constructor.
 //
 // All errors indicate a valid TransactionBody cannot be constructed from the input.
 func NewTransactionBody(untrusted UntrustedTransactionBody) (*TransactionBody, error) {
-	if untrusted.Payer == EmptyAddress {
-		return nil, fmt.Errorf("Payer address must not be empty")
+	//if untrusted.Payer == EmptyAddress {
+	//	return nil, fmt.Errorf("Payer address must not be empty")
+	//}
+
+	if len(untrusted.Script) == 0 {
+		return nil, fmt.Errorf("Script must not be empty")
 	}
 
 	return &TransactionBody{
@@ -83,6 +87,10 @@ func NewTransactionBody(untrusted UntrustedTransactionBody) (*TransactionBody, e
 	}, nil
 }
 
+// NewSystemChunkTransactionBody creates a new instance of TransactionBody corresponding to the system chunk.
+// Construction of TransactionBody is allowed only within the constructor.
+//
+// All errors indicate a valid TransactionBody cannot be constructed from the input.
 func NewSystemChunkTransactionBody(untrusted UntrustedTransactionBody) (*TransactionBody, error) {
 	return &TransactionBody{
 		ReferenceBlockID:   untrusted.ReferenceBlockID,
