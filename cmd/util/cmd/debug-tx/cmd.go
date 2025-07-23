@@ -38,6 +38,7 @@ var (
 	flagUseExecutionDataAPI bool
 	flagDumpRegisters       bool
 	flagCollectionID        string
+	flagBlockID             string
 	flagUseVM               bool
 )
 
@@ -73,12 +74,12 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagCollectionID, "collection-id", "", "collection ID")
 
+	Cmd.Flags().StringVar(&flagBlockID, "block-id", "", "block ID")
+
 	Cmd.Flags().BoolVar(&flagUseVM, "use-vm", false, "use the VM for transaction execution (default: false)")
 }
 
 func run(_ *cobra.Command, args []string) {
-
-	log.Info().Msgf("Starting transaction debugger ... %v", args)
 
 	chainID := flow.ChainID(flagChain)
 	chain := chainID.Chain()
@@ -94,6 +95,9 @@ func run(_ *cobra.Command, args []string) {
 	}
 
 	if flagCollectionID != "" {
+		if flagBlockID != "" {
+			log.Fatal().Msg("Cannot specify both collection ID and block ID")
+		}
 
 		// Collection ID provided, fetch the collection and its transaction IDs
 
@@ -120,6 +124,31 @@ func run(_ *cobra.Command, args []string) {
 		for _, txID := range col.TransactionIDs {
 			runTransactionID(flow.Identifier(txID), flowClient, chain)
 		}
+
+	} else if flagBlockID != "" {
+		if flagCollectionID != "" {
+			log.Fatal().Msg("Cannot specify both collection ID and block ID")
+		}
+
+		// Block ID provided, fetch the block and its transaction IDs
+
+		blockID, err := flow.HexStringToIdentifier(flagBlockID)
+		if err != nil {
+			log.Fatal().Err(err).Str("ID", flagBlockID).Msg("failed to parse block ID")
+		}
+
+		block, err := flowClient.GetBlockByID(context.Background(), sdk.Identifier(blockID))
+		if err != nil {
+			log.Fatal().Err(err).Str("ID", flagBlockID).Msg("failed to fetch block by ID")
+		}
+
+		runBlockID(
+			blockID,
+			block.Height,
+			flow.ZeroID,
+			flowClient,
+			chain,
+		)
 
 	} else {
 
@@ -154,7 +183,23 @@ func runTransactionID(txID flow.Identifier, flowClient *client.Client, chain flo
 		blockHeight,
 	)
 
-	log.Info().Msg("Fetching transactions of block ...")
+	runBlockID(
+		blockID,
+		blockHeight,
+		txID,
+		flowClient,
+		chain,
+	)
+}
+
+func runBlockID(
+	blockID flow.Identifier,
+	blockHeight uint64,
+	txID flow.Identifier,
+	flowClient *client.Client,
+	chain flow.Chain,
+) {
+	log.Info().Msgf("Fetching transactions of block %s ...", blockID)
 
 	txsResult, err := flowClient.GetTransactionsByBlockID(context.Background(), sdk.Identifier(blockID))
 	if err != nil {
@@ -225,7 +270,7 @@ func runTransactionID(txID flow.Identifier, flowClient *client.Client, chain flo
 
 		isDebuggedTx := blockTxID == txID
 
-		dumpRegisters := flagDumpRegisters && isDebuggedTx
+		dumpRegisters := flagDumpRegisters && (isDebuggedTx || txID == flow.ZeroID)
 
 		runTransaction(
 			debugger,
