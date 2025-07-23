@@ -221,14 +221,12 @@ func TestExecutionFlow(t *testing.T) {
 		Once()
 
 	// submit block from consensus node
-	untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFromBlock(block))
-	err = sendBlock(&exeNode, conID.NodeID, &untrustedProposal)
+	err = sendBlock(&exeNode, conID.NodeID, (*flow.UntrustedProposal)(unittest.ProposalFromBlock(block)))
 	require.NoError(t, err)
 
 	// submit the child block from consensus node, which trigger the parent block
 	// to be passed to BlockProcessable
-	untrustedProposal = flow.UntrustedProposal(*unittest.ProposalFromBlock(child))
-	err = sendBlock(&exeNode, conID.NodeID, &untrustedProposal)
+	err = sendBlock(&exeNode, conID.NodeID, (*flow.UntrustedProposal)(unittest.ProposalFromBlock(child)))
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
@@ -630,8 +628,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	err = sendBlock(&exeNode, exeID.NodeID, &untrustedProposal)
 	require.NoError(t, err)
 
-	untrustedProposal = flow.UntrustedProposal(*unittest.ProposalFromBlock(child))
-	err = sendBlock(&exeNode, conID.NodeID, &untrustedProposal)
+	err = sendBlock(&exeNode, conID.NodeID, (*flow.UntrustedProposal)(unittest.ProposalFromBlock(child)))
 	require.NoError(t, err)
 
 	hub.DeliverAllEventually(t, func() bool {
