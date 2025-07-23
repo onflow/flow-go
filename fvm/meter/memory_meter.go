@@ -256,9 +256,13 @@ var (
 
 		common.MemoryKindContractVariable: 17,
 		common.MemoryKindGoSliceLength:    17,
+
 		common.MemoryKindCompiler:         17,
 		common.MemoryKindCompilerGlobal:   17,
 		common.MemoryKindCompilerConstant: 17,
+
+		common.MemoryKindBoundFunctionVMValue:     17,
+		common.MemoryKindImplicitReferenceVMValue: 17,
 	}
 )
 
