@@ -6,6 +6,8 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
@@ -73,13 +75,19 @@ func (snapshot *ExecutionNodeStorageSnapshot) Get(
 		req,
 	)
 	if err != nil {
-		return nil, err
+		if status.Code(err) == codes.NotFound {
+			value = nil
+		} else {
+			return nil, err
+		}
+	} else {
+		value = resp.Value
 	}
 
 	// append register to the cache
-	snapshot.Cache.Set(id.Owner, id.Key, resp.Value)
+	snapshot.Cache.Set(id.Owner, id.Key, value)
 
-	return resp.Value, nil
+	return value, nil
 }
 
 // ExecutionDataStorageSnapshot provides a storage snapshot connected
@@ -144,10 +152,14 @@ func (snapshot *ExecutionDataStorageSnapshot) Get(
 		req,
 	)
 	if err != nil {
-		return nil, err
+		if status.Code(err) == codes.NotFound {
+			value = nil
+		} else {
+			return nil, err
+		}
+	} else {
+		value = resp.Values[0]
 	}
-
-	value = resp.Values[0]
 
 	// append register to the cache
 	snapshot.Cache.Set(id.Owner, id.Key, value)
