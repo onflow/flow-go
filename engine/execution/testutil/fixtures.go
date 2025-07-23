@@ -311,6 +311,7 @@ func CreateAccountsWithSimpleAddresses(
 
 		txBody, err := flow.NewTransactionBodyBuilder().
 			SetScript(script).
+			SetPayer(serviceAddress).
 			AddArgument(encCadPublicKey).
 			AddAuthorizer(serviceAddress).
 			Build()

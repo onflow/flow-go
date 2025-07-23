@@ -57,6 +57,7 @@ func createAccount(
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(createAccountTransaction)).
+		SetPayer(chain.ServiceAddress()).
 		AddAuthorizer(chain.ServiceAddress()).
 		Build()
 	require.NoError(t, err)
@@ -115,6 +116,7 @@ func addAccountKey(
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(addAccountKeyTransaction)).
+		SetPayer(address).
 		AddArgument(cadencePublicKey).
 		AddAuthorizer(address).
 		Build()
@@ -149,6 +151,7 @@ func addAccountCreator(
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(script).
+		SetPayer(chain.ServiceAddress()).
 		AddAuthorizer(chain.ServiceAddress()).
 		Build()
 	require.NoError(t, err)
@@ -181,6 +184,7 @@ func removeAccountCreator(
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(script).
+		SetPayer(chain.ServiceAddress()).
 		AddAuthorizer(chain.ServiceAddress()).
 		Build()
 	require.NoError(t, err)
@@ -373,6 +377,7 @@ func TestCreateAccount(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(createAccountTransaction)).
+					SetPayer(payer).
 					AddAuthorizer(payer).
 					Build()
 				require.NoError(t, err)
@@ -421,6 +426,7 @@ func TestCreateAccount(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(createMultipleAccountsTransaction)).
+					SetPayer(payer).
 					AddAuthorizer(payer).
 					Build()
 				require.NoError(t, err)
@@ -482,6 +488,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(createAccountTransaction)).
+					SetPayer(payer).
 					AddAuthorizer(payer).
 					Build()
 				require.NoError(t, err)
@@ -502,6 +509,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(createAccountTransaction)).
+					SetPayer(chain.ServiceAddress()).
 					AddAuthorizer(chain.ServiceAddress()).
 					Build()
 				require.NoError(t, err)
@@ -571,6 +579,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(createAccountTransaction)).
+					SetPayer(payer).
 					AddAuthorizer(payer).
 					Build()
 				require.NoError(t, err)
@@ -647,6 +656,7 @@ func TestAddAccountKey(t *testing.T) {
 
 					txBody, err := flow.NewTransactionBodyBuilder().
 						SetScript([]byte(test.source)).
+						SetPayer(address).
 						AddArgument(cadencePublicKey).
 						AddAuthorizer(address).
 						Build()
@@ -705,6 +715,7 @@ func TestAddAccountKey(t *testing.T) {
 
 					txBody, err := flow.NewTransactionBodyBuilder().
 						SetScript([]byte(test.source)).
+						SetPayer(address).
 						AddArgument(publicKey2Arg).
 						AddAuthorizer(address).
 						Build()
@@ -756,6 +767,7 @@ func TestAddAccountKey(t *testing.T) {
 
 					txBody, err := flow.NewTransactionBodyBuilder().
 						SetScript([]byte(test.source)).
+						SetPayer(address).
 						AddArgument(invalidPublicKeyArg).
 						AddAuthorizer(address).
 						Build()
@@ -813,6 +825,7 @@ func TestAddAccountKey(t *testing.T) {
 
 					txBody, err := flow.NewTransactionBodyBuilder().
 						SetScript([]byte(test.source)).
+						SetPayer(address).
 						AddArgument(publicKey1Arg).
 						AddArgument(publicKey2Arg).
 						AddAuthorizer(address).
@@ -887,6 +900,7 @@ func TestAddAccountKey(t *testing.T) {
 								`,
 								hashAlgo,
 							))).
+							SetPayer(address).
 							AddArgument(publicKeyArg).
 							AddAuthorizer(address).
 							Build()
@@ -973,6 +987,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 						txBody, err := flow.NewTransactionBodyBuilder().
 							SetScript([]byte(test.source)).
+							SetPayer(address).
 							AddArgument(keyIndexArg).
 							AddAuthorizer(address).
 							Build()
@@ -1035,6 +1050,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					txBody, err := flow.NewTransactionBodyBuilder().
 						SetScript([]byte(test.source)).
+						SetPayer(address).
 						AddArgument(keyIndexArg).
 						AddAuthorizer(address).
 						Build()
@@ -1093,6 +1109,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					txBody, err := flow.NewTransactionBodyBuilder().
 						SetScript([]byte(test.source)).
+						SetPayer(address).
 						AddArgument(keyIndexArg).
 						AddAuthorizer(address).
 						Build()
@@ -1158,6 +1175,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					txBodyBuilder := flow.NewTransactionBodyBuilder().
 						SetScript([]byte(test.source)).
+						SetPayer(address).
 						AddAuthorizer(address)
 
 					for i := 0; i < keyCount; i++ {
@@ -1231,6 +1249,7 @@ func TestGetAccountKey(t *testing.T) {
 
 					txBody, err := flow.NewTransactionBodyBuilder().
 						SetScript([]byte(getAccountKeyTransaction)).
+						SetPayer(address).
 						AddArgument(keyIndexArg).
 						AddAuthorizer(address).
 						Build()
@@ -1284,6 +1303,7 @@ func TestGetAccountKey(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(getAccountKeyTransaction)).
+					SetPayer(address).
 					AddArgument(keyIndexArg).
 					AddAuthorizer(address).
 					Build()
@@ -1350,6 +1370,7 @@ func TestGetAccountKey(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(getAccountKeyTransaction)).
+					SetPayer(address).
 					AddArgument(keyIndexArg).
 					AddAuthorizer(address).
 					Build()
@@ -1411,6 +1432,7 @@ func TestGetAccountKey(t *testing.T) {
 
 				txBodyBuilder := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(getMultipleAccountKeysTransaction)).
+					SetPayer(address).
 					AddAuthorizer(address)
 
 				for i := 0; i < keyCount; i++ {
@@ -1476,6 +1498,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					snapshotTree)
 
 				txBody, err := transferTokensTx(chain).
+					SetPayer(chain.ServiceAddress()).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress()).
@@ -1592,6 +1615,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					snapshotTree)
 
 				txBody, err := transferTokensTx(chain).
+					SetPayer(chain.ServiceAddress()).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress()).
@@ -1667,6 +1691,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					snapshotTree)
 
 				txBody, err := transferTokensTx(chain).
+					SetPayer(chain.ServiceAddress()).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress()).
@@ -1720,6 +1745,7 @@ func TestGetStorageCapacity(t *testing.T) {
 					snapshotTree)
 
 				txBody, err := transferTokensTx(chain).
+					SetPayer(chain.ServiceAddress()).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress()).

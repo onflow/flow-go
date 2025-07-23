@@ -37,6 +37,7 @@ func NewDeploymentMigration(
 		SetScript(script).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract.Name))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract.Code))).
+		SetPayer(authorizer).
 		AddAuthorizer(authorizer).
 		Build()
 	if err != nil {

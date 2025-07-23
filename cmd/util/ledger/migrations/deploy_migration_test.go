@@ -141,6 +141,7 @@ func TestDeploy(t *testing.T) {
             `,
 			targetAddress.HexWithPrefix(),
 		))).
+		SetPayer(serviceAccountAddress).
 		Build()
 	require.NoError(t, err)
 

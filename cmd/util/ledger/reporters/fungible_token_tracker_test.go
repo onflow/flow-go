@@ -106,6 +106,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(deployingTestContractScript).
+		SetPayer(chain.ServiceAddress()).
 		AddAuthorizer(chain.ServiceAddress()).
 		Build()
 	require.NoError(t, err)
@@ -141,6 +142,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 
 	txBody, err = flow.NewTransactionBodyBuilder().
 		SetScript(wrapTokenScript).
+		SetPayer(chain.ServiceAddress()).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(105))).
 		AddAuthorizer(chain.ServiceAddress()).
 		Build()
