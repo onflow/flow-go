@@ -31,7 +31,7 @@ func (b *backendBlockBase) getBlockStatus(header *flow.Header) (flow.BlockStatus
 	}
 
 	if blockIDFinalizedAtHeight != header.ID() {
-		// A different block than what was queried has been finalized at this height.
+		// The queried block has been orphaned. It will never be finalized or sealed.
 		return flow.BlockStatusUnknown, nil
 	}
 
