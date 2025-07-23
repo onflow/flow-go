@@ -357,6 +357,9 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 		Block:           *block,
 		ProposerSigData: proposal.ProposerSigData,
 	}
+	if _, err = flow.NewProposal(*blockProposal); err != nil {
+		return fmt.Errorf("could not build proposal: %w", err)
+	}
 
 	// broadcast the proposal to consensus nodes
 	err = h.con.Publish(blockProposal, consRecipients.NodeIDs()...)
