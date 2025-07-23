@@ -68,11 +68,7 @@ func RetrieveClusterBlock(r storage.Reader, blockID flow.Identifier, block *clus
 
 // RetrieveLatestFinalizedClusterHeader retrieves the latest finalized for the
 // given cluster chain ID.
-func RetrieveLatestFinalizedClusterHeader(lctx lockctx.Proof, r storage.Reader, chainID flow.ChainID, final *flow.Header) error {
-	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
-		return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
-	}
-
+func RetrieveLatestFinalizedClusterHeader(r storage.Reader, chainID flow.ChainID, final *flow.Header) error {
 	var boundary uint64
 	err := operation.RetrieveClusterFinalizedHeight(r, chainID, &boundary)
 	if err != nil {
