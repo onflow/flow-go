@@ -66,6 +66,7 @@ func MessageToTransaction(
 	tb := flow.NewTransactionBodyBuilder()
 
 	proposalKey := m.GetProposalKey()
+	var proposalAddress flow.Address
 	if proposalKey != nil {
 		proposalAddress, err := Address(proposalKey.GetAddress(), chain)
 		if err != nil {
@@ -75,6 +76,7 @@ func MessageToTransaction(
 	}
 
 	payer := m.GetPayer()
+	var payerAddress flow.Address
 	if payer != nil {
 		payerAddress, err := Address(payer, chain)
 		if err != nil {
@@ -105,6 +107,10 @@ func MessageToTransaction(
 			return t, err
 		}
 		tb.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature())
+	}
+
+	if proposalAddress == flow.EmptyAddress && payerAddress == flow.EmptyAddress {
+
 	}
 
 	transactionBody, err := tb.SetScript(m.GetScript()).

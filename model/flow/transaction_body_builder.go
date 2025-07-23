@@ -22,6 +22,10 @@ func NewTransactionBodyBuilder() *TransactionBodyBuilder {
 	return &TransactionBodyBuilder{}
 }
 
+func (tb *TransactionBodyBuilder) GetUntrustedTransactionBody() UntrustedTransactionBody {
+	return tb.u
+}
+
 // Build validates and returns an immutable TransactionBody. All required fields must be explicitly set (even if they are zero).
 // All errors indicate that a valid TransactionBody cannot be created from the current builder state.
 func (tb *TransactionBodyBuilder) Build() (*TransactionBody, error) {

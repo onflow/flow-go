@@ -440,6 +440,7 @@ func TestWithServiceAccount(t *testing.T) {
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(`transaction { prepare(signer: auth(BorrowValue) &Account) { Account(payer: signer) } }`)).
+		SetPayer(chain.ServiceAddress()).
 		AddAuthorizer(chain.ServiceAddress()).
 		Build()
 	require.NoError(t, err)
@@ -540,6 +541,7 @@ func TestEventLimits(t *testing.T) {
 				TestContract.EmitEvent()
 			}
 		}`, chain.ServiceAddress()))).
+		SetPayer(chain.ServiceAddress()).
 		AddAuthorizer(chain.ServiceAddress()).
 		Build()
 	require.NoError(t, err)
@@ -1814,6 +1816,8 @@ func TestEnforcingComputationLimit(t *testing.T) {
 			if test.payerIsServAcc {
 				txBodyBuilder.SetPayer(chain.ServiceAddress()).
 					SetComputeLimit(0)
+			} else {
+				txBodyBuilder.SetPayer(unittest.RandomAddressFixture())
 			}
 			txBody, err := txBodyBuilder.Build()
 			require.NoError(t, err)
@@ -1933,6 +1937,7 @@ func TestStorageCapacity(t *testing.T) {
 					sc.FungibleToken.Address.Hex(),
 					sc.FlowToken.Address.Hex(),
 				))).
+				SetPayer(signer).
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(target))).
 				AddAuthorizer(signer).
 				Build()
