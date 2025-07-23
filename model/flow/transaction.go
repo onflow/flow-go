@@ -2,6 +2,7 @@ package flow
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"io"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -92,6 +93,18 @@ func NewTransactionBody(untrusted UntrustedTransactionBody) (*TransactionBody, e
 //
 // All errors indicate a valid TransactionBody cannot be constructed from the input.
 func NewSystemChunkTransactionBody(untrusted UntrustedTransactionBody) (*TransactionBody, error) {
+	if len(untrusted.Script) == 0 {
+		return nil, fmt.Errorf("Script must not be empty in system chunk transaction")
+	}
+
+	if untrusted.GasLimit == 0 {
+		return nil, fmt.Errorf("Compute limit must not be empty in system chunk transaction")
+	}
+
+	if len(untrusted.Authorizers) == 0 {
+		return nil, fmt.Errorf("Authorizers must not be empty in system chunk transaction")
+	}
+
 	return &TransactionBody{
 		ReferenceBlockID:   untrusted.ReferenceBlockID,
 		Script:             untrusted.Script,
