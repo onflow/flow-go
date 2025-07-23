@@ -109,8 +109,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	// checks end-to-end message delivery works on GossipSub.
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
-		return &untrustedProposal
+		return (*flow.UntrustedProposal)(unittest.ProposalFixture())
 	})
 
 	// simulates node2 spamming node1 with invalid gossipsub control messages until node2 gets dissallow listed.
@@ -136,7 +135,6 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		blockTopic,
 		1,
 		func() interface{} {
-			untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
-			return &untrustedProposal
+			return (*flow.UntrustedProposal)(unittest.ProposalFixture())
 		})
 }

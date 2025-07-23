@@ -96,11 +96,10 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
 
-	untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
 	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
-		&untrustedProposal,
+		(*flow.UntrustedProposal)(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
@@ -227,12 +226,11 @@ func TestTopicValidator_TopicMismatch(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
 
-	untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
 	// create a dummy block proposal to publish from our SN node
 	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
-		&untrustedProposal,
+		(*flow.UntrustedProposal)(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
@@ -289,14 +287,13 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
 
-	untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
 	// invalid topic is malformed, hence it cannot be used to create a message scope, as it faces an error.
 	// Hence, we create a dummy block proposal message scope to publish on a legit topic, and then override
 	// the topic in the next step to a malformed topic.
 	dummyMessageScope, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		channels.TopicFromChannel(channels.PushBlocks, sporkId),
-		&untrustedProposal,
+		(*flow.UntrustedProposal)(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
@@ -391,14 +388,13 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel5s()
 
-	untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
 	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
 	// SN nodes are authorized to send block proposals
 	// create a dummy block proposal to publish from our SN node
 	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
-		&untrustedProposal,
+		(*flow.UntrustedProposal)(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
@@ -420,13 +416,12 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	timedCtx, cancel2s := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel2s()
 
-	untrustedProposal = flow.UntrustedProposal(*unittest.ProposalFixture())
 	// the access node now publishes the block proposal message, AN are not authorized to publish block proposals
 	// the message should be rejected by the topic validator on sn1
 	outgoingMessageScope2, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
-		&untrustedProposal,
+		(*flow.UntrustedProposal)(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
@@ -515,13 +510,12 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
 
-	untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
 	// create a dummy block proposal to publish from our SN node
 	// sn2 publishes the block proposal on the sync committee channel
 	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
-		&untrustedProposal,
+		(*flow.UntrustedProposal)(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
@@ -609,14 +603,13 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
 
-	untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
 	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
 	// SN nodes are authorized to send block proposals
 	// create a dummy block proposal to publish from our SN node
 	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
-		&untrustedProposal,
+		(*flow.UntrustedProposal)(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
@@ -638,11 +631,10 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	// "eject" sn2 to ensure messages published by ejected nodes get rejected
 	identity2.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 
-	untrustedProposal = flow.UntrustedProposal(*unittest.ProposalFixture())
 	outgoingMessageScope3, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
-		&untrustedProposal,
+		(*flow.UntrustedProposal)(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
