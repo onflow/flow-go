@@ -472,7 +472,14 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 	case *flow.UntrustedProposal:
 		proposal, err := flow.NewProposal(*msg)
 		if err != nil {
-			return fmt.Errorf("cannot construct proposal: %w", err)
+			h.log.Warn().
+				Hex("origin_id", originID[:]).
+				Hex("block_id", logging.ID(msg.Block.ID())).
+				Uint64("block_height", msg.Block.Header.Height).
+				Uint64("block_view", msg.Block.Header.View).
+				Hex("proposer_signature", msg.ProposerSigData[:]).
+				Err(err).Msgf("received invalid proposal message")
+			return nil
 		}
 
 		h.compliance.OnBlockProposal(flow.Slashable[*flow.Proposal]{
@@ -491,8 +498,9 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 				Hex("origin_id", originID[:]).
 				Hex("block_id", msg.BlockID[:]).
 				Uint64("view", msg.View).
+				Hex("sig_data", msg.SigData[:]).
 				Err(err).Msgf("received invalid vote message")
-			return err
+			return nil
 		}
 
 		h.forwardToOwnVoteAggregator(vote)
@@ -508,7 +516,18 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 			},
 		)
 		if err != nil {
-			return fmt.Errorf("could not construct timeout object: %w", err)
+			h.log.Warn().
+				Hex("origin_id", originID[:]).
+				Uint64("view", msg.View).
+				Uint64("newest_qc_view", msg.NewestQC.View).
+				Hex("newest_qc_block_id", logging.ID(msg.NewestQC.BlockID)).
+				Uint64("last_view_tc_view", msg.LastViewTC.View).
+				Uint64("last_view_tc_newest_qc_view", msg.LastViewTC.NewestQC.View).
+				Hex("last_view_tc_newest_qc_block_id", logging.ID(msg.LastViewTC.NewestQC.BlockID)).
+				Hex("sig_data", msg.SigData[:]).
+				Uint64("timeout_tick", msg.TimeoutTick).
+				Err(err).Msgf("received invalid timeout object message")
+			return nil
 		}
 		h.forwardToOwnTimeoutAggregator(t)
 	default:
