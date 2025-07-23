@@ -59,7 +59,11 @@ func (mq *ConcurrentPriorityQueue[T]) Pop() (T, bool) {
 	mq.mu.Lock()
 	defer mq.mu.Unlock()
 
+<<<<<<< HEAD
 	for mq.queue.Len() == 0 {
+=======
+	if mq.queue.Len() == 0 {
+>>>>>>> peter/results-forestv2
 		var nilT T
 		return nilT, false
 	}
