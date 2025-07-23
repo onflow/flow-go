@@ -440,7 +440,14 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 	case *cluster.UntrustedProposal:
 		proposal, err := cluster.NewProposal(*msg)
 		if err != nil {
-			return fmt.Errorf("could not build cluster proposal: %w", err)
+			h.log.Warn().
+				Hex("origin_id", originID[:]).
+				Hex("block_id", logging.ID(msg.Block.ID())).
+				Uint64("block_height", msg.Block.Header.Height).
+				Uint64("block_view", msg.Block.Header.View).
+				Hex("proposer_signature", msg.ProposerSigData[:]).
+				Err(err).Msgf("received invalid cluster proposal message")
+			return nil
 		}
 		h.compliance.OnClusterBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
@@ -454,7 +461,13 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 			SigData:  msg.SigData,
 		})
 		if err != nil {
-			h.log.Warn().Err(err).Msgf("failed to forward vote")
+			h.log.Warn().
+				Hex("origin_id", originID[:]).
+				Hex("block_id", msg.BlockID[:]).
+				Uint64("view", msg.View).
+				Hex("sig_data", msg.SigData[:]).
+				Err(err).Msgf("received invalid cluser vote message")
+			return nil
 		}
 
 		h.forwardToOwnVoteAggregator(vote)
@@ -470,7 +483,18 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 			},
 		)
 		if err != nil {
-			return fmt.Errorf("could not construct timeout object: %w", err)
+			h.log.Warn().
+				Hex("origin_id", originID[:]).
+				Uint64("view", msg.View).
+				Uint64("newest_qc_view", msg.NewestQC.View).
+				Hex("newest_qc_block_id", logging.ID(msg.NewestQC.BlockID)).
+				Uint64("last_view_tc_view", msg.LastViewTC.View).
+				Uint64("last_view_tc_newest_qc_view", msg.LastViewTC.NewestQC.View).
+				Hex("last_view_tc_newest_qc_block_id", logging.ID(msg.LastViewTC.NewestQC.BlockID)).
+				Hex("sig_data", msg.SigData[:]).
+				Uint64("timeout_tick", msg.TimeoutTick).
+				Err(err).Msgf("received invalid cluster timeout object message")
+			return nil
 		}
 		h.forwardToOwnTimeoutAggregator(t)
 	default:
