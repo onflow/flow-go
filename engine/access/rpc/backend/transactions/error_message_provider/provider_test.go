@@ -151,7 +151,7 @@ func (suite *Suite) TestLookupByTxID_FromExecutionNode_HappyPath() {
 		Once()
 
 	// Perform the lookup and assert that the error message is retrieved correctly.
-	errMsg, err := errMessageProvider.LookupErrorMessageByTransactionID(
+	errMsg, err := errMessageProvider.ErrorMessageByTransactionID(
 		context.Background(),
 		suite.blockID,
 		suite.block.Header.Height,
@@ -186,7 +186,7 @@ func (suite *Suite) TestLookupByTxID_FromStorage_HappyPath() {
 		}, nil).
 		Once()
 
-	errMsg, err := errMessageProvider.LookupErrorMessageByTransactionID(
+	errMsg, err := errMessageProvider.ErrorMessageByTransactionID(
 		context.Background(),
 		suite.blockID,
 		suite.block.Header.Height,
@@ -235,7 +235,7 @@ func (suite *Suite) TestLookupByTxID_ExecNodeError_UnknownTx() {
 		suite.nodeProvider,
 	)
 
-	errMsg, err := errMessageProvider.LookupErrorMessageByTransactionID(
+	errMsg, err := errMessageProvider.ErrorMessageByTransactionID(
 		context.Background(),
 		suite.blockID,
 		suite.block.Header.Height,
@@ -291,7 +291,7 @@ func (suite *Suite) TestLookupByTxID_ExecNodeError_TxResultNotFailed() {
 		suite.nodeProvider,
 	)
 
-	errMsg, err := errMessageProvider.LookupErrorMessageByTransactionID(
+	errMsg, err := errMessageProvider.ErrorMessageByTransactionID(
 		context.Background(),
 		suite.blockID,
 		suite.block.Header.Height,
@@ -346,7 +346,7 @@ func (suite *Suite) TestLookupByTxID_ExecNodeError_TxResultFailed() {
 		suite.nodeProvider,
 	)
 
-	errMsg, err := errMessageProvider.LookupErrorMessageByTransactionID(
+	errMsg, err := errMessageProvider.ErrorMessageByTransactionID(
 		context.Background(),
 		suite.blockID,
 		suite.block.Header.Height,
@@ -399,7 +399,7 @@ func (suite *Suite) TestLookupByIndex_FromExecutionNode_HappyPath() {
 		suite.nodeProvider,
 	)
 
-	errMsg, err := errMessageProvider.LookupErrorMessageByIndex(
+	errMsg, err := errMessageProvider.ErrorMessageByIndex(
 		context.Background(),
 		suite.blockID,
 		suite.block.Header.Height,
@@ -455,7 +455,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 			suite.nodeProvider,
 		)
 
-		errMsg, err := errMessageProvider.LookupErrorMessageByIndex(context.Background(), suite.blockID, suite.block.Header.Height, failedTxIndex)
+		errMsg, err := errMessageProvider.ErrorMessageByIndex(context.Background(), suite.blockID, suite.block.Header.Height, failedTxIndex)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedErrorMsg, errMsg)
 	})
@@ -480,7 +480,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 			}, nil).
 			Once()
 
-		errMsg, err := errMessageProvider.LookupErrorMessageByIndex(
+		errMsg, err := errMessageProvider.ErrorMessageByIndex(
 			context.Background(),
 			suite.blockID,
 			suite.block.Header.Height,
@@ -529,7 +529,7 @@ func (suite *Suite) TestLookupByIndex_ExecutionNodeError_UnknownTx() {
 		suite.nodeProvider,
 	)
 
-	errMsg, err := errMessageProvider.LookupErrorMessageByIndex(
+	errMsg, err := errMessageProvider.ErrorMessageByIndex(
 		context.Background(),
 		suite.blockID,
 		suite.block.Header.Height,
@@ -586,7 +586,7 @@ func (suite *Suite) TestLookupByIndex_ExecutionNodeError_TxResultNotFailed() {
 		suite.nodeProvider,
 	)
 
-	errMsg, err := errMessageProvider.LookupErrorMessageByIndex(
+	errMsg, err := errMessageProvider.ErrorMessageByIndex(
 		context.Background(),
 		suite.blockID,
 		suite.block.Header.Height,
@@ -642,7 +642,7 @@ func (suite *Suite) TestLookupByIndex_ExecutionNodeError_TxResultFailed() {
 		suite.nodeProvider,
 	)
 
-	errMsg, err := errMessageProvider.LookupErrorMessageByIndex(
+	errMsg, err := errMessageProvider.ErrorMessageByIndex(
 		context.Background(),
 		suite.blockID,
 		suite.block.Header.Height,
@@ -704,7 +704,7 @@ func (suite *Suite) TestLookupByBlockID_FromExecutionNode_HappyPath() {
 		suite.nodeProvider,
 	)
 
-	errMessages, err := errMessageProvider.LookupErrorMessagesByBlockID(
+	errMessages, err := errMessageProvider.ErrorMessagesByBlockID(
 		context.Background(),
 		suite.blockID,
 		suite.block.Header.Height,
@@ -756,7 +756,7 @@ func (suite *Suite) TestLookupByBlockID_FromStorage_HappyPath() {
 		suite.nodeProvider,
 	)
 
-	errMessages, err := errMessageProvider.LookupErrorMessagesByBlockID(
+	errMessages, err := errMessageProvider.ErrorMessagesByBlockID(
 		context.Background(),
 		suite.blockID,
 		suite.block.Header.Height,
@@ -807,7 +807,7 @@ func (suite *Suite) TestLookupByBlockID_ExecutionNodeError_UnknownTx() {
 	)
 
 	// Perform the lookup and expect a "NotFound" error with an empty error message.
-	errMsg, err := errMessageProvider.LookupErrorMessagesByBlockID(
+	errMsg, err := errMessageProvider.ErrorMessagesByBlockID(
 		context.Background(),
 		suite.blockID,
 		suite.block.Header.Height,
@@ -866,7 +866,7 @@ func (suite *Suite) TestLookupByBlockID_ExecutionNodeError_TxResultNotFailed() {
 		suite.nodeProvider,
 	)
 
-	errMsg, err := errMessageProvider.LookupErrorMessagesByBlockID(
+	errMsg, err := errMessageProvider.ErrorMessagesByBlockID(
 		context.Background(),
 		suite.blockID,
 		suite.block.Header.Height,
@@ -933,7 +933,7 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_FailedToFetch() 
 	)
 
 	// Perform the lookup and expect the failed error messages to be returned.
-	errMsg, err := errMessageProvider.LookupErrorMessagesByBlockID(
+	errMsg, err := errMessageProvider.ErrorMessagesByBlockID(
 		context.Background(),
 		suite.blockID,
 		suite.block.Header.Height,

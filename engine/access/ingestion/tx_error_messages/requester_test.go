@@ -14,14 +14,14 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -44,6 +44,12 @@ type RequesterSuite struct {
 
 	rootBlock      flow.Block
 	finalizedBlock *flow.Header
+
+	txErrorMessages *storage.TransactionResultErrorMessages
+	lightTxResults  *storage.LightTransactionResults
+	reporter        *syncmock.IndexReporter
+	indexReporter   *index.Reporter
+	txResultsIndex  *index.TransactionResultsIndex
 }
 
 func TestRequester(t *testing.T) {
@@ -58,6 +64,14 @@ func (s *RequesterSuite) SetupTest() {
 	s.execClient = accessmock.NewExecutionAPIClient(s.T())
 	s.connFactory = connectionmock.NewConnectionFactory(s.T())
 	s.receipts = storage.NewExecutionReceipts(s.T())
+
+	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
+	s.lightTxResults = storage.NewLightTransactionResults(s.T())
+	s.reporter = syncmock.NewIndexReporter(s.T())
+	s.indexReporter = index.NewReporter()
+	err := s.indexReporter.Initialize(s.reporter)
+	s.Require().NoError(err)
+	s.txResultsIndex = index.NewTransactionResultsIndex(s.indexReporter, s.lightTxResults)
 
 	s.rootBlock = unittest.BlockFixture()
 	s.rootBlock.Header.Height = 0
@@ -86,21 +100,14 @@ func (s *RequesterSuite) TestRequest_HappyPath() {
 		s.enNodeIDs.NodeIDs(),
 	)
 
-	back, err := backend.New(backend.Params{
-		State:                      s.proto.state,
-		ExecutionReceipts:          s.receipts,
-		ConnFactory:                s.connFactory,
-		MaxHeightRange:             events.DefaultMaxHeightRange,
-		Log:                        s.log,
-		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-		Communicator:               node_communicator.NewNodeCommunicator(false),
-		EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
-		ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
-		ChainID:                    flow.Testnet,
-		ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
-	})
-	require.NoError(s.T(), err)
+	errorMessageProvider := error_message_provider.NewTxErrorMessageProvider(
+		s.log,
+		s.txErrorMessages,
+		s.txResultsIndex,
+		s.connFactory,
+		node_communicator.NewNodeCommunicator(false),
+		execNodeIdentitiesProvider,
+	)
 
 	block := unittest.BlockWithParentFixture(s.finalizedBlock)
 	blockId := block.ID()
@@ -128,7 +135,7 @@ func (s *RequesterSuite) TestRequest_HappyPath() {
 		RetryDelay:    1 * time.Second,
 		MaxRetryDelay: 5 * time.Second,
 	}
-	requester := NewRequester(s.log, config, back, execNodeIdentitiesProvider, executionResult)
+	requester := NewRequester(s.log, config, errorMessageProvider, execNodeIdentitiesProvider, executionResult)
 	actualErrorMessages, err := requester.Request(context.Background())
 	require.NoError(s.T(), err)
 	require.ElementsMatch(s.T(), expectedErrorMessages, actualErrorMessages)
@@ -143,21 +150,14 @@ func (s *RequesterSuite) TestRequest_ErrorCases() {
 		s.enNodeIDs.NodeIDs(),
 	)
 
-	back, err := backend.New(backend.Params{
-		State:                      s.proto.state,
-		ExecutionReceipts:          s.receipts,
-		ConnFactory:                s.connFactory,
-		MaxHeightRange:             events.DefaultMaxHeightRange,
-		Log:                        s.log,
-		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-		Communicator:               node_communicator.NewNodeCommunicator(false),
-		EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
-		ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
-		ChainID:                    flow.Testnet,
-		ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
-	})
-	require.NoError(s.T(), err)
+	errorMessageProvider := error_message_provider.NewTxErrorMessageProvider(
+		s.log,
+		s.txErrorMessages,
+		s.txResultsIndex,
+		s.connFactory,
+		node_communicator.NewNodeCommunicator(false),
+		execNodeIdentitiesProvider,
+	)
 
 	block := unittest.BlockWithParentFixture(s.finalizedBlock)
 	blockId := block.ID()
@@ -186,7 +186,7 @@ func (s *RequesterSuite) TestRequest_ErrorCases() {
 			Return(nil, expectedError).
 			Once()
 
-		requester := NewRequester(s.log, config, back, execNodeIdentitiesProvider, executionResult)
+		requester := NewRequester(s.log, config, errorMessageProvider, execNodeIdentitiesProvider, executionResult)
 		actualErrorMessages, err := requester.Request(context.Background())
 		require.ErrorIs(s.T(), err, expectedError)
 		require.Nil(s.T(), actualErrorMessages)
@@ -198,7 +198,7 @@ func (s *RequesterSuite) TestRequest_ErrorCases() {
 			Return(nil, expectedError).
 			Once()
 
-		requester := NewRequester(s.log, config, back, execNodeIdentitiesProvider, executionResult)
+		requester := NewRequester(s.log, config, errorMessageProvider, execNodeIdentitiesProvider, executionResult)
 		actualErrorMessages, err := requester.Request(context.Background())
 		require.ErrorIs(s.T(), err, expectedError)
 		require.Nil(s.T(), actualErrorMessages)
@@ -210,7 +210,7 @@ func (s *RequesterSuite) TestRequest_ErrorCases() {
 			Return(nil, expectedError).
 			Once()
 
-		requester := NewRequester(s.log, config, back, execNodeIdentitiesProvider, executionResult)
+		requester := NewRequester(s.log, config, errorMessageProvider, execNodeIdentitiesProvider, executionResult)
 		actualErrorMessages, err := requester.Request(context.Background())
 		require.ErrorIs(s.T(), err, expectedError)
 		require.Nil(s.T(), actualErrorMessages)
@@ -229,7 +229,7 @@ func (s *RequesterSuite) TestRequest_ErrorCases() {
 			Once()
 
 		expectedErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
-		requester := NewRequester(s.log, config, back, execNodeIdentitiesProvider, executionResult)
+		requester := NewRequester(s.log, config, errorMessageProvider, execNodeIdentitiesProvider, executionResult)
 		actualErrorMessages, err := requester.Request(context.Background())
 		require.NoError(s.T(), err)
 		require.ElementsMatch(s.T(), expectedErrorMessages, actualErrorMessages)
@@ -248,7 +248,7 @@ func (s *RequesterSuite) TestRequest_ErrorCases() {
 			Once()
 
 		expectedErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
-		requester := NewRequester(s.log, config, back, execNodeIdentitiesProvider, executionResult)
+		requester := NewRequester(s.log, config, errorMessageProvider, execNodeIdentitiesProvider, executionResult)
 		actualErrorMessages, err := requester.Request(context.Background())
 		require.NoError(s.T(), err)
 		require.ElementsMatch(s.T(), expectedErrorMessages, actualErrorMessages)

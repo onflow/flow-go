@@ -20,7 +20,7 @@ func (_m *TxErrorMessageProvider) LookupErrorMessageByIndex(ctx context.Context,
 	ret := _m.Called(ctx, blockID, height, index)
 
 	if len(ret) == 0 {
-		panic("no return value specified for LookupErrorMessageByIndex")
+		panic("no return value specified for ErrorMessageByIndex")
 	}
 
 	var r0 string
@@ -48,7 +48,7 @@ func (_m *TxErrorMessageProvider) LookupErrorMessageByTransactionID(ctx context.
 	ret := _m.Called(ctx, blockID, height, transactionID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for LookupErrorMessageByTransactionID")
+		panic("no return value specified for ErrorMessageByTransactionID")
 	}
 
 	var r0 string
@@ -76,7 +76,7 @@ func (_m *TxErrorMessageProvider) LookupErrorMessagesByBlockID(ctx context.Conte
 	ret := _m.Called(ctx, blockID, height)
 
 	if len(ret) == 0 {
-		panic("no return value specified for LookupErrorMessagesByBlockID")
+		panic("no return value specified for ErrorMessagesByBlockID")
 	}
 
 	var r0 map[flow.Identifier]string

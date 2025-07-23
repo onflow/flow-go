@@ -86,7 +86,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 	var txErrorMessage string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		txErrorMessage, err = t.txErrorMessages.LookupErrorMessageByTransactionID(ctx, blockID, block.Height, transactionID)
+		txErrorMessage, err = t.txErrorMessages.ErrorMessageByTransactionID(ctx, blockID, block.Height, transactionID)
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +159,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	var txErrorMessage string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		txErrorMessage, err = t.txErrorMessages.LookupErrorMessageByIndex(ctx, blockID, block.Header.Height, index)
+		txErrorMessage, err = t.txErrorMessages.ErrorMessageByIndex(ctx, blockID, block.Header.Height, index)
 		if err != nil {
 			return nil, err
 		}
@@ -229,7 +229,7 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 		return nil, rpc.ConvertIndexError(err, block.Header.Height, "failed to get transaction result")
 	}
 
-	txErrors, err := t.txErrorMessages.LookupErrorMessagesByBlockID(ctx, blockID, block.Header.Height)
+	txErrors, err := t.txErrorMessages.ErrorMessagesByBlockID(ctx, blockID, block.Header.Height)
 	if err != nil {
 		return nil, err
 	}
