@@ -235,7 +235,7 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 	if err != nil {
 		return nil, fmt.Errorf("could not get parent: %w", err)
 	}
-	ctx.limiter = newRateLimiter(b.config, ctx.parent.Height+1)
+	ctx.limiter = newRateLimiter(ctx.config, ctx.parent.Height+1)
 
 	// retrieve the finalized boundary ON THE CLUSTER CHAIN
 	ctx.clusterChainFinalizedBlock, err = b.clusterState.Final().Head()
@@ -379,6 +379,7 @@ func (b *Builder) populateFinalizedAncestryLookup(ctx *blockBuildContext) error 
 func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, error) {
 	lookup := buildCtx.lookup
 	limiter := buildCtx.limiter
+	config := buildCtx.config
 	maxRefHeight := buildCtx.highestPossibleReferenceBlockHeight()
 	// keep track of the actual smallest reference height of all included transactions
 	minRefHeight := maxRefHeight
@@ -390,7 +391,7 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 	for _, tx := range b.transactions.All() {
 
 		// if we have reached maximum number of transactions, stop
-		if uint(len(transactions)) >= b.config.MaxCollectionSize {
+		if uint(len(transactions)) >= config.MaxCollectionSize {
 			break
 		}
 
@@ -398,25 +399,25 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 		// ignore transactions with tx byte size bigger that the max amount per collection
 		// this case shouldn't happen ever since we keep a limit on tx byte size but in case
 		// we keep this condition
-		if txByteSize > b.config.MaxCollectionByteSize {
+		if txByteSize > config.MaxCollectionByteSize {
 			continue
 		}
 
 		// because the max byte size per tx is way smaller than the max collection byte size, we can stop here and not continue.
 		// to make it more effective in the future we can continue adding smaller ones
-		if totalByteSize+txByteSize > b.config.MaxCollectionByteSize {
+		if totalByteSize+txByteSize > config.MaxCollectionByteSize {
 			break
 		}
 
 		// ignore transactions with max gas bigger that the max total gas per collection
 		// this case shouldn't happen ever but in case we keep this condition
-		if tx.GasLimit > b.config.MaxCollectionTotalGas {
+		if tx.GasLimit > config.MaxCollectionTotalGas {
 			continue
 		}
 
 		// cause the max gas limit per tx is way smaller than the total max gas per collection, we can stop here and not continue.
 		// to make it more effective in the future we can continue adding smaller ones
-		if totalGas+tx.GasLimit > b.config.MaxCollectionTotalGas {
+		if totalGas+tx.GasLimit > config.MaxCollectionTotalGas {
 			break
 		}
 
@@ -467,18 +468,18 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 
 		// enforce rate limiting rules
 		if limiter.shouldRateLimit(tx) {
-			if b.config.DryRunRateLimit {
+			if config.DryRunRateLimit {
 				// log that this transaction would have been rate-limited, but we will still include it in the collection
 				b.log.Info().
 					Hex("tx_id", logging.ID(txID)).
 					Str("payer_addr", tx.Payer.String()).
-					Float64("rate_limit", b.config.MaxPayerTransactionRate).
+					Float64("rate_limit", config.MaxPayerTransactionRate).
 					Msg("dry-run: observed transaction that would have been rate limited")
 			} else {
 				b.log.Debug().
 					Hex("tx_id", logging.ID(txID)).
 					Str("payer_addr", tx.Payer.String()).
-					Float64("rate_limit", b.config.MaxPayerTransactionRate).
+					Float64("rate_limit", config.MaxPayerTransactionRate).
 					Msg("transaction is rate-limited")
 				continue
 			}

@@ -895,6 +895,62 @@ func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
 	}
 }
 
+// TestBuildOn_MaxCollectionSizeRateLimiting tests that when sealing lag is larger than maximum allowed value,
+// then the builder will apply rate-limiting to the collection size, resulting in minimal collection size.
+func (suite *BuilderSuite) TestBuildOn_MaxCollectionSizeRateLimiting() {
+
+	// start with an empty mempool
+	suite.ClearPool()
+
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), metrics.NewNoopCollector(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter,
+		builder.WithMaxCollectionSize(100),
+	)
+
+	// fill the pool with 50 transactions from the same payer
+	payer := unittest.RandomAddressFixture()
+	create := func() *flow.TransactionBody {
+		tx := unittest.TransactionBodyFixture()
+		tx.ReferenceBlockID = suite.ProtoStateRoot().ID()
+		tx.Payer = payer
+		return &tx
+	}
+	suite.FillPool(50, create)
+
+	// add an unfinalized block to the protocol state
+	genesis, err := suite.protoState.Final().Head()
+	suite.Require().NoError(err)
+	protocolState, err := suite.protoState.Final().ProtocolState()
+	suite.Require().NoError(err)
+	protocolStateID := protocolState.ID()
+
+	head := genesis
+	// build a long chain of blocks that were finalized but not sealed
+	// this will lead to a big sealing lag.
+	for i := 0; i < 100; i++ {
+		block := unittest.BlockWithParentFixture(head)
+		block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
+		err = suite.protoState.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+		suite.Require().NoError(err)
+		err = suite.protoState.Finalize(context.Background(), block.ID())
+		suite.Require().NoError(err)
+		head = block.Header
+	}
+
+	// rate-limiting should be applied, resulting in minimum collection size.
+	parentID := suite.genesis.ID()
+	for i := 0; i < 10; i++ {
+		header, err := suite.builder.BuildOn(parentID, noopSetter, noopSigner)
+		suite.Require().NoError(err)
+		parentID = header.ID()
+
+		// each collection should be half-full with 5 transactions
+		var built model.Block
+		err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+		suite.Assert().NoError(err)
+		suite.Assert().Len(built.Payload.Collection.Transactions, 1)
+	}
+}
+
 // When configured with a rate limit of k<1, we should be able to include 1
 // transactions with a given payer every ceil(1/k) collections
 func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
