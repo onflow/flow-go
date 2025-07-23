@@ -10,6 +10,7 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
@@ -154,12 +155,12 @@ func (p *PipelineFunctionalSuite) TearDownTest() {
 	p.Require().NoError(os.RemoveAll(p.tmpDir))
 }
 
-// TestPipelineHappyCase verifies the complete happy path flow of the pipeline.
+// TestPipelineCompletesSuccessfully verifies the successful completion of the pipeline.
 // It tests that:
 // 1. Pipeline processes execution data through all states correctly
 // 2. All data types (events, collections, transactions, registers, error messages) are correctly persisted to storage
 // 3. No errors occur during the entire process
-func (p *PipelineFunctionalSuite) TestPipelineHappyCase() {
+func (p *PipelineFunctionalSuite) TestPipelineCompletesSuccessfully() {
 	expectedExecutionData, expectedTxResultErrMsgs := p.initializeTestData()
 
 	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
@@ -200,7 +201,7 @@ func (p *PipelineFunctionalSuite) TestPipelineDownloadError() {
 		},
 		{
 			name:        "transaction result error messages requester not found error",
-			expectedErr: storage.ErrNotFound,
+			expectedErr: assert.AnError,
 			requesterInitialization: func(err error) {
 				p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
 				p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(([]flow.TransactionResultErrorMessage)(nil), err).Once()
@@ -216,6 +217,7 @@ func (p *PipelineFunctionalSuite) TestPipelineDownloadError() {
 				pipeline.OnParentStateUpdated(StateComplete)
 
 				waitForError(p.T(), errChan, test.expectedErr)
+				p.Assert().Equal(StateProcessing, pipeline.GetState())
 			})
 		})
 	}
@@ -225,14 +227,18 @@ func (p *PipelineFunctionalSuite) TestPipelineDownloadError() {
 // It verifies that when execution data contains invalid block IDs, the pipeline
 // properly detects the inconsistency and returns an appropriate error.
 func (p *PipelineFunctionalSuite) TestPipelineIndexingError() {
+	invalidBlockID := unittest.IdentifierFixture()
 	// Setup successful download
 	expectedExecutionData := unittest.BlockExecutionDataFixture(
-		unittest.WithBlockExecutionDataBlockID(unittest.IdentifierFixture()), // Wrong block ID to cause indexing error
+		unittest.WithBlockExecutionDataBlockID(invalidBlockID), // Wrong block ID to cause indexing error
 	)
 	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
 
+	// note: txResultErrMsgsRequester.Request() currently never returns and error, so skipping the case
 	expectedTxResultErrMsgs := unittest.TransactionResultErrorMessagesFixture(5)
 	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(expectedTxResultErrMsgs, nil).Once()
+
+	expectedIndexingError := fmt.Errorf("could not perform indexing: invalid block execution data. expected block_id=%s, actual block_id=%s", p.block.ID().String(), invalidBlockID.String())
 
 	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
 		pipeline.OnParentStateUpdated(StateComplete)
@@ -240,8 +246,9 @@ func (p *PipelineFunctionalSuite) TestPipelineIndexingError() {
 		waitForErrorWithCustomCheckers(p.T(), errChan, func(err error) {
 			p.Require().Error(err)
 
-			p.Assert().Contains(err.Error(), "could not perform")
+			p.Assert().Equal(expectedIndexingError.Error(), err.Error())
 		})
+		p.Assert().Equal(StateProcessing, pipeline.GetState())
 	})
 }
 
@@ -262,7 +269,7 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingExecuti
 				return nil, ctx.Err()
 			}).Once()
 
-		//This call marked as `Maybe`m because it may not be called depending on timing.
+		// This call marked as `Maybe()` because it may not be called depending on timing.
 		p.txResultErrMsgsRequester.On("Request", mock.Anything).Return([]flow.TransactionResultErrorMessage{}, nil).Maybe()
 
 		waitForStateUpdates(p.T(), updateChan, StateProcessing)
@@ -278,9 +285,9 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingTxResul
 	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
 		pipeline.OnParentStateUpdated(StateComplete)
 
+		// This call marked as `Maybe()` because it may not be called depending on timing.
 		p.execDataRequester.On("RequestExecutionData", mock.Anything).Return((*execution_data.BlockExecutionData)(nil), nil).Maybe()
 
-		//This call marked as `Maybe`m because it may not be called depending on timing.
 		p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(
 			func(ctx context.Context) ([]flow.TransactionResultErrorMessage, error) {
 				// Wait for cancellation
@@ -330,7 +337,7 @@ func (p *PipelineFunctionalSuite) WithRunningPipeline(testFunc func(pipeline Pip
 	defer cancel()
 
 	errChan := make(chan error)
-	//wait until a pipeline goroutine run a pipeline
+	// wait until a pipeline goroutine run a pipeline
 	pipelineIsReady := make(chan struct{})
 
 	go func() {
