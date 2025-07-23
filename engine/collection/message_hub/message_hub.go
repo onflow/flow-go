@@ -466,7 +466,7 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 				Hex("block_id", msg.BlockID[:]).
 				Uint64("view", msg.View).
 				Hex("sig_data", msg.SigData[:]).
-				Err(err).Msgf("received invalid cluser vote message")
+				Err(err).Msgf("received invalid cluster vote message")
 			return nil
 		}
 
