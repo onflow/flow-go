@@ -11,8 +11,6 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -30,14 +28,15 @@ type event struct {
 func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) error {
 
 	// traverse backward from the given block (parent block) and fetch by blockHash
-	db := common.InitStorage(dbPath)
+	db, err := common.InitStorage(dbPath)
+	if err != nil {
+		return fmt.Errorf("could not initialize storage: %w", err)
+	}
 	defer db.Close()
 
-	sdb := badgerimpl.ToDB(db)
-
 	cacheMetrics := &metrics.NoopCollector{}
-	headers := badger.NewHeaders(cacheMetrics, db)
-	events := store.NewEvents(cacheMetrics, sdb)
+	headers := store.NewHeaders(cacheMetrics, db)
+	events := store.NewEvents(cacheMetrics, db)
 	activeBlockID := blockID
 
 	outputFile := filepath.Join(outputPath, "events.jsonl")
