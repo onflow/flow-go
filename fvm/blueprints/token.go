@@ -102,6 +102,7 @@ var mintFlowTokenTransactionTemplate string
 func DeployFlowTokenContractTransaction(service, flowToken flow.Address, contract []byte) (*flow.TransactionBody, error) {
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(deployFlowTokenTransactionTemplate)).
+		SetPayer(service).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddAuthorizer(flowToken).
 		AddAuthorizer(service).
@@ -119,6 +120,7 @@ func CreateFlowTokenMinterTransaction(service, flowToken flow.Address) (*flow.Tr
 				FlowTokenAddress: flowToken.Hex(),
 			})),
 		).
+		SetPayer(service).
 		AddAuthorizer(service).
 		Build()
 }
@@ -139,6 +141,7 @@ func MintFlowTokenTransaction(
 				FungibleTokenAddress: fungibleToken.Hex(),
 			})),
 		).
+		SetPayer(service).
 		AddArgument(initialSupplyArg).
 		AddAuthorizer(service).
 		Build()
@@ -153,6 +156,7 @@ func TransferFlowTokenTransaction(
 	txScript := templates.GenerateTransferGenericVaultWithAddressScript(env)
 	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
+		SetPayer(from).
 		AddArgument(jsoncdc.MustEncode(cadenceAmount)).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(to))).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(flow.HexToAddress(env.FlowTokenAddress)))).

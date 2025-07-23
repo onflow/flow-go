@@ -56,7 +56,8 @@ func CreateCOATransaction(
 	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(0.0))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		SetPayer(service)
 }
 
 // DeployEVMContractTransaction returns the transaction body for
@@ -76,6 +77,7 @@ func DeployEVMContractTransaction(
 		AddArgument(jsoncdc.MustEncode(cadence.UInt64(gasLimit))).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(deploymentValue))).
 		AddAuthorizer(service).
+		SetPayer(service).
 		Build()
 }
 
@@ -96,6 +98,7 @@ func DeployFlowEVMBridgeUtilsContractTransaction(
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(factoryAddress))).
 		AddAuthorizer(service).
+		SetPayer(service).
 		Build()
 }
 
@@ -112,6 +115,7 @@ func PauseBridgeTransaction(
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.Bool(pause))).
 		AddAuthorizer(service).
+		SetPayer(service).
 		Build()
 }
 
@@ -127,6 +131,7 @@ func SetRegistrarTransaction(
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(registryAddress))).
 		AddAuthorizer(service).
+		SetPayer(service).
 		Build()
 }
 
@@ -143,6 +148,7 @@ func SetDeploymentRegistryTransaction(
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(registryAddress))).
 		AddAuthorizer(service).
+		SetPayer(service).
 		Build()
 }
 
@@ -159,6 +165,7 @@ func SetDelegatedDeployerTransaction(
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(deployerAddress))).
 		AddAuthorizer(service).
+		SetPayer(service).
 		Build()
 }
 
@@ -176,6 +183,7 @@ func AddDeployerTransaction(
 		AddArgument(jsoncdc.MustEncode(cadence.String(deployerTag))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(deployerAddress))).
 		AddAuthorizer(service).
+		SetPayer(service).
 		Build()
 }
 
@@ -194,6 +202,7 @@ func DeployFlowEVMBridgeAccessorContractTransaction(
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract))).
 		AddArgument(jsoncdc.MustEncode(cadence.Address(service))).
 		AddAuthorizer(service).
+		SetPayer(service).
 		Build()
 }
 
@@ -210,6 +219,7 @@ func IntegrateEVMWithBridgeAccessorTransaction(
 		AddArgument(jsoncdc.MustEncode(cadence.String("FlowEVMBridgeAccessor"))).
 		AddArgument(jsoncdc.MustEncode(cadence.Address(service))).
 		AddAuthorizer(service).
+		SetPayer(service).
 		Build()
 }
 
@@ -226,6 +236,7 @@ func UpdateOnboardFeeTransaction(
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(fee))).
 		AddAuthorizer(service).
+		SetPayer(service).
 		Build()
 }
 
@@ -242,6 +253,7 @@ func UpdateBaseFeeTransaction(
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(fee))).
 		AddAuthorizer(service).
+		SetPayer(service).
 		Build()
 }
 
@@ -260,12 +272,12 @@ func UpsertContractCodeChunksTransaction(
 	for i, chunk := range newChunks {
 		chunks[i] = cadence.String(chunk)
 	}
-
 	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadence.String(forTemplate))).
 		AddArgument(jsoncdc.MustEncode(cadence.NewArray(chunks))).
 		AddAuthorizer(service).
+		SetPayer(service).
 		Build()
 }
 

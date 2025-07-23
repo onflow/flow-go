@@ -47,6 +47,7 @@ var setExecutionMemoryLimit string
 func DeployTxFeesContractTransaction(flowFees, service flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(deployTxFeesTransactionTemplate)).
+		SetPayer(service).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddAuthorizer(flowFees).
 		AddAuthorizer(service)
@@ -91,6 +92,7 @@ func SetupParametersTransaction(
 		AddArgument(minimumStorageReservationArg).
 		AddArgument(storagePerFlowArg).
 		AddArgument(restrictedAccountCreationEnabledArg).
+		SetPayer(service).
 		AddAuthorizer(service).
 		Build()
 }
@@ -107,6 +109,7 @@ func SetupStorageForServiceAccountsTransaction(
 				FlowTokenAddress:      flowToken.Hex(),
 			})),
 		).
+		SetPayer(service).
 		AddAuthorizer(service).
 		AddAuthorizer(fungibleToken).
 		AddAuthorizer(flowToken).
@@ -126,6 +129,7 @@ func SetupStorageForAccountTransaction(
 				FlowTokenAddress:      flowToken.Hex(),
 			})),
 		).
+		SetPayer(service).
 		AddAuthorizer(account).
 		AddAuthorizer(service).
 		Build()
@@ -157,6 +161,7 @@ func SetupFeesTransaction(
 				FlowFeesAddress: flowFees.Hex(),
 			})),
 		).
+		SetPayer(service).
 		AddArgument(surgeFactorArg).
 		AddArgument(inclusionEffortCostArg).
 		AddArgument(executionEffortCostArg).
@@ -214,6 +219,7 @@ func setExecutionWeightsTransaction(
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(setExecutionWeightsScript)).
+		SetPayer(parametersAccount).
 		AddArgument(newWeights).
 		AddArgument(storagePath).
 		AddAuthorizer(parametersAccount).
@@ -244,6 +250,7 @@ func SetExecutionMemoryLimitTransaction(
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(setExecutionMemoryLimit)).
+		SetPayer(parametersAccount).
 		AddArgument(newLimit).
 		AddArgument(storagePath).
 		AddAuthorizer(parametersAccount).

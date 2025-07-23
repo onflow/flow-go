@@ -44,6 +44,7 @@ func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig e
 				},
 			),
 		)).
+		SetPayer(service).
 		AddArgument(jsoncdc.MustEncode(cadence.String("FlowEpoch"))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddArgument(jsoncdc.MustEncode(epochConfig.CurrentEpochCounter)).
@@ -74,6 +75,7 @@ func SetupAccountTransaction(
 				},
 			),
 		)).
+		SetPayer(accountAddress).
 		AddAuthorizer(accountAddress).
 		Build()
 }
@@ -82,6 +84,7 @@ func SetupAccountTransaction(
 func DeployIDTableStakingTransaction(service flow.Address, contract []byte, epochTokenPayout cadence.UFix64, rewardCut cadence.UFix64) (*flow.TransactionBody, error) {
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(deployIDTableStakingTransactionTemplate)).
+		SetPayer(service).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddArgument(jsoncdc.MustEncode(epochTokenPayout)).
 		AddArgument(jsoncdc.MustEncode(rewardCut)).
@@ -110,6 +113,7 @@ func FundAccountTransaction(
 				FlowTokenAddress:     flowToken.Hex(),
 			},
 		))).
+		SetPayer(service).
 		AddArgument(jsoncdc.MustEncode(cdcAmount)).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(nodeAddress))).
 		AddAuthorizer(service).
@@ -122,6 +126,7 @@ func DeployLockedTokensTransaction(service flow.Address, contract []byte, public
 		SetScript([]byte(
 			deployLockedTokensTemplate,
 		)).
+		SetPayer(service).
 		AddArgument(jsoncdc.MustEncode(cadence.NewArray(publicKeys))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddAuthorizer(service).
@@ -206,6 +211,7 @@ func RegisterNodeTransaction(
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(templates.GenerateEpochRegisterNodeScript(env)).
+		SetPayer(service).
 		AddArgument(jsoncdc.MustEncode(cdcNodeID)).
 		AddArgument(jsoncdc.MustEncode(cadence.NewUInt8(uint8(node.Role)))).
 		AddArgument(jsoncdc.MustEncode(cdcAddress)).
@@ -231,6 +237,7 @@ func SetStakingAllowlistTransaction(idTableStakingAddr flow.Address, allowedNode
 	allowedNodesArg := SetStakingAllowlistTxArg(allowedNodeIDs)
 	return flow.NewTransactionBodyBuilder().
 		SetScript(templates.GenerateSetApprovedNodesScript(env)).
+		SetPayer(idTableStakingAddr).
 		AddArgument(jsoncdc.MustEncode(allowedNodesArg)).
 		AddAuthorizer(idTableStakingAddr).
 		Build()

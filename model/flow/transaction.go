@@ -66,9 +66,9 @@ type UntrustedTransactionBody TransactionBody
 //
 // All errors indicate a valid TransactionBody cannot be constructed from the input.
 func NewTransactionBody(untrusted UntrustedTransactionBody) (*TransactionBody, error) {
-	//if untrusted.Payer == EmptyAddress {
-	//	return nil, fmt.Errorf("Payer address must not be empty")
-	//}
+	if untrusted.Payer == EmptyAddress {
+		return nil, fmt.Errorf("Payer address must not be empty")
+	}
 
 	if len(untrusted.Script) == 0 {
 		return nil, fmt.Errorf("Script must not be empty")

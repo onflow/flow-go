@@ -66,6 +66,7 @@ func setContractAuthorizersTransaction(
 
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(setContractOperationAuthorizersTransactionTemplate)).
+		SetPayer(serviceAccount).
 		AddAuthorizer(serviceAccount).
 		AddArgument(addressesArg).
 		AddArgument(pathArg), nil
@@ -85,6 +86,7 @@ func SetIsContractDeploymentRestrictedTransaction(serviceAccount flow.Address, r
 
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(setIsContractDeploymentRestrictedTransactionTemplate)).
+		SetPayer(serviceAccount).
 		AddAuthorizer(serviceAccount).
 		AddArgument(argRestricted).
 		AddArgument(argPath).
@@ -97,5 +99,6 @@ func DeployContractTransaction(address flow.Address, contract []byte, contractNa
 		SetScript(DeployContractTransactionTemplate).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contractName))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract))).
+		SetPayer(address).
 		AddAuthorizer(address)
 }
