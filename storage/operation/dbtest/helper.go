@@ -36,7 +36,7 @@ func RunWithDB(t *testing.T, fn func(*testing.T, storage.DB)) {
 	})
 }
 
-// RunFuncsWithNewPebbleDBHandle runs provided functions with
+// RunFuncsWithNewDBHandle runs provided functions with
 // new database handles of the same underlying database.
 // Each provided function will receive a new (different) DB handle.
 // This can be used to test database persistence.
