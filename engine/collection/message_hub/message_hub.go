@@ -343,16 +343,13 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	}
 
 	// create the proposal message for the collection
-	cbp, err := cluster.NewProposal(
-		cluster.UntrustedProposal{
-			Block:           *block,
-			ProposerSigData: proposal.ProposerSigData,
-		},
-	)
-	if err != nil {
+	proposalMsg := &cluster.UntrustedProposal{
+		Block:           *block,
+		ProposerSigData: proposal.ProposerSigData,
+	}
+	if _, err = cluster.NewProposal(*proposalMsg); err != nil {
 		return fmt.Errorf("could not build cluster proposal: %w", err)
 	}
-	proposalMsg := cluster.UntrustedProposal(*cbp)
 
 	// broadcast the proposal to consensus nodes
 	err = h.con.Publish(&proposalMsg, recipients.NodeIDs()...)
