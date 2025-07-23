@@ -149,7 +149,7 @@ func InitStorageWithTruncate(datadir string, truncate bool) *badger.DB {
 		WithLogger(nil).
 		WithTruncate(truncate)
 
-	db, err := badger.Open(opts)
+	db, err := storagebadger.SafeOpen(opts)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not open key-value store")
 	}
