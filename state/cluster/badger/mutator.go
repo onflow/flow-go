@@ -128,8 +128,15 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 		return fmt.Errorf("error checking reference block: %w", err)
 	}
 
+	lctx := m.lockManager.NewContext()
+	err = lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
+	if err != nil {
+		return fmt.Errorf("could not acquire lock for inserting cluster block: %w", err)
+	}
+	defer lctx.Release()
+
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
-	err = m.checkPayloadTransactions(extendCtx)
+	err = m.checkPayloadTransactions(lctx, extendCtx)
 	span.End()
 	if err != nil {
 		return fmt.Errorf("error checking payload transactions: %w", err)
@@ -137,12 +144,6 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
 
-	lctx := m.lockManager.NewContext()
-	err = lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
-	if err != nil {
-		return fmt.Errorf("could not acquire lock for inserting cluster block: %w", err)
-	}
-	defer lctx.Release()
 	err = m.State.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return procedure.InsertClusterBlock(lctx, rw, candidate)
 	})
@@ -273,7 +274,7 @@ func (m *MutableState) checkPayloadReferenceBlock(ctx extendContext) error {
 // Expected error returns:
 //   - state.InvalidExtensionError if the reference block is invalid for use.
 //   - state.UnverifiableExtensionError if the reference block is unknown.
-func (m *MutableState) checkPayloadTransactions(ctx extendContext) error {
+func (m *MutableState) checkPayloadTransactions(lctx lockctx.Proof, ctx extendContext) error {
 	block := ctx.candidate
 	payload := block.Payload
 
@@ -341,7 +342,7 @@ func (m *MutableState) checkPayloadTransactions(ctx extendContext) error {
 	}
 
 	// second, check for duplicate transactions in the finalized ancestry
-	duplicateTxIDs, err = m.checkDupeTransactionsInFinalizedAncestry(txLookup, minRefHeight, maxRefHeight)
+	duplicateTxIDs, err = m.checkDupeTransactionsInFinalizedAncestry(lctx, txLookup, minRefHeight, maxRefHeight)
 	if err != nil {
 		return fmt.Errorf("could not check for duplicate txs in finalized ancestry: %w", err)
 	}
@@ -378,7 +379,7 @@ func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster
 
 // checkDupeTransactionsInFinalizedAncestry checks for duplicate transactions in the finalized
 // ancestry, and returns a list of all duplicates if there are any.
-func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(includedTransactions map[flow.Identifier]struct{}, minRefHeight, maxRefHeight uint64) ([]flow.Identifier, error) {
+func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(lctx lockctx.Proof, includedTransactions map[flow.Identifier]struct{}, minRefHeight, maxRefHeight uint64) ([]flow.Identifier, error) {
 	var duplicatedTxIDs []flow.Identifier
 
 	// Let E be the global transaction expiry constant, measured in blocks. For each
@@ -407,7 +408,7 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(includedTransact
 		start = 0 // overflow check
 	}
 	end := maxRefHeight
-	err := operation.LookupClusterBlocksByReferenceHeightRange(nil, m.db.Reader(), start, end, &clusterBlockIDs)
+	err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, m.db.Reader(), start, end, &clusterBlockIDs)
 	if err != nil {
 		return nil, fmt.Errorf("could not lookup finalized cluster blocks by reference height range [%d,%d]: %w", start, end, err)
 	}
