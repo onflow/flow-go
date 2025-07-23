@@ -5,12 +5,13 @@ import (
 	"testing"
 
 	"github.com/jordanschalm/lockctx"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/deferred"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestNewDeferredDBOps(t *testing.T) {
