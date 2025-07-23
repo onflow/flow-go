@@ -312,7 +312,7 @@ func bootstrapSealingSegment(
 	head *flow.Block,
 	rootSeal *flow.Seal,
 ) error {
-	return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+	err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		w := rw.Writer()
 		for _, result := range segment.ExecutionResults {
 			err := operation.InsertExecutionResult(w, result)
@@ -342,7 +342,26 @@ func bootstrapSealingSegment(
 			return fmt.Errorf("could not index root result: %w", err)
 		}
 
-		for _, block := range segment.ExtraBlocks {
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// why not storing all blocks in the same batch?
+	// because we need to ensure a block does not include a result that refers a unknown block.
+	// when validating the results, we could check if the referred block exists in the database,
+	// however if we are storing multiple blocks in the same batch, the previous block from the same
+	// batch has not been stored in database yet, so the check can't distinguish between a block that
+	// refers to a previous block in the same batch and a block that refers to a block that does not
+	// exist in the database. Unless we pass down the previous blocks to the validation function as well
+	// as the database operation functions, such as blocks.BatchStore method, which we consider a bad
+	// practice, since having the database operation function taking previous blocks (or previous results)
+	// as an argument is confusing and vulnerable to bugs.
+	// since storing multiple blocks in the same batch only happens during bootstrapping, we decided to
+	// store each block in a separate batch.
+	for _, block := range segment.ExtraBlocks {
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			blockID := block.ID()
 			height := block.Header.Height
 			err := blocks.BatchStore(lctx, rw, block)
@@ -360,14 +379,24 @@ func bootstrapSealingSegment(
 					return fmt.Errorf("could not store qc for SealingSegment extra block (id=%x): %w", blockID, err)
 				}
 			}
-		}
 
-		sealsLookup := make(map[flow.Identifier]struct{})
-		sealsLookup[rootSeal.ID()] = struct{}{}
-		if segment.FirstSeal != nil {
-			sealsLookup[segment.FirstSeal.ID()] = struct{}{}
+			return nil
+		})
+
+		if err != nil {
+			return err
 		}
-		for i, block := range segment.Blocks {
+	}
+
+	sealsLookup := make(map[flow.Identifier]struct{})
+	sealsLookup[rootSeal.ID()] = struct{}{}
+	if segment.FirstSeal != nil {
+		sealsLookup[segment.FirstSeal.ID()] = struct{}{}
+	}
+
+	for i, block := range segment.Blocks {
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			w := rw.Writer()
 			blockID := block.ID()
 			height := block.Header.Height
 
@@ -414,14 +443,20 @@ func bootstrapSealingSegment(
 					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
 				}
 			}
-		}
 
-		// insert an empty child index for the final block in the segment
-		err = operation.UpsertBlockChildren(w, head.ID(), nil)
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	// insert an empty child index for the final block in the segment
+	return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err := operation.UpsertBlockChildren(rw.Writer(), head.ID(), nil)
 		if err != nil {
 			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
 		}
-
 		return nil
 	})
 }
