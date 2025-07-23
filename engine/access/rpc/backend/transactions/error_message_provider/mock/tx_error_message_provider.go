@@ -5,6 +5,8 @@ package mock
 import (
 	context "context"
 
+	execution "github.com/onflow/flow/protobuf/go/flow/execution"
+
 	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
@@ -15,8 +17,47 @@ type TxErrorMessageProvider struct {
 	mock.Mock
 }
 
-// LookupErrorMessageByIndex provides a mock function with given fields: ctx, blockID, height, index
-func (_m *TxErrorMessageProvider) LookupErrorMessageByIndex(ctx context.Context, blockID flow.Identifier, height uint64, index uint32) (string, error) {
+// ErrorMessageByBlockIDFromAnyEN provides a mock function with given fields: ctx, execNodes, req
+func (_m *TxErrorMessageProvider) ErrorMessageByBlockIDFromAnyEN(ctx context.Context, execNodes flow.GenericIdentityList[flow.IdentitySkeleton], req *execution.GetTransactionErrorMessagesByBlockIDRequest) ([]*execution.GetTransactionErrorMessagesResponse_Result, *flow.IdentitySkeleton, error) {
+	ret := _m.Called(ctx, execNodes, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ErrorMessageByBlockIDFromAnyEN")
+	}
+
+	var r0 []*execution.GetTransactionErrorMessagesResponse_Result
+	var r1 *flow.IdentitySkeleton
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.GenericIdentityList[flow.IdentitySkeleton], *execution.GetTransactionErrorMessagesByBlockIDRequest) ([]*execution.GetTransactionErrorMessagesResponse_Result, *flow.IdentitySkeleton, error)); ok {
+		return rf(ctx, execNodes, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, flow.GenericIdentityList[flow.IdentitySkeleton], *execution.GetTransactionErrorMessagesByBlockIDRequest) []*execution.GetTransactionErrorMessagesResponse_Result); ok {
+		r0 = rf(ctx, execNodes, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*execution.GetTransactionErrorMessagesResponse_Result)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, flow.GenericIdentityList[flow.IdentitySkeleton], *execution.GetTransactionErrorMessagesByBlockIDRequest) *flow.IdentitySkeleton); ok {
+		r1 = rf(ctx, execNodes, req)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*flow.IdentitySkeleton)
+		}
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, flow.GenericIdentityList[flow.IdentitySkeleton], *execution.GetTransactionErrorMessagesByBlockIDRequest) error); ok {
+		r2 = rf(ctx, execNodes, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// ErrorMessageByIndex provides a mock function with given fields: ctx, blockID, height, index
+func (_m *TxErrorMessageProvider) ErrorMessageByIndex(ctx context.Context, blockID flow.Identifier, height uint64, index uint32) (string, error) {
 	ret := _m.Called(ctx, blockID, height, index)
 
 	if len(ret) == 0 {
@@ -43,8 +84,38 @@ func (_m *TxErrorMessageProvider) LookupErrorMessageByIndex(ctx context.Context,
 	return r0, r1
 }
 
-// LookupErrorMessageByTransactionID provides a mock function with given fields: ctx, blockID, height, transactionID
-func (_m *TxErrorMessageProvider) LookupErrorMessageByTransactionID(ctx context.Context, blockID flow.Identifier, height uint64, transactionID flow.Identifier) (string, error) {
+// ErrorMessageByIndexFromAnyEN provides a mock function with given fields: ctx, execNodes, req
+func (_m *TxErrorMessageProvider) ErrorMessageByIndexFromAnyEN(ctx context.Context, execNodes flow.GenericIdentityList[flow.IdentitySkeleton], req *execution.GetTransactionErrorMessageByIndexRequest) (*execution.GetTransactionErrorMessageResponse, error) {
+	ret := _m.Called(ctx, execNodes, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ErrorMessageByIndexFromAnyEN")
+	}
+
+	var r0 *execution.GetTransactionErrorMessageResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.GenericIdentityList[flow.IdentitySkeleton], *execution.GetTransactionErrorMessageByIndexRequest) (*execution.GetTransactionErrorMessageResponse, error)); ok {
+		return rf(ctx, execNodes, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, flow.GenericIdentityList[flow.IdentitySkeleton], *execution.GetTransactionErrorMessageByIndexRequest) *execution.GetTransactionErrorMessageResponse); ok {
+		r0 = rf(ctx, execNodes, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*execution.GetTransactionErrorMessageResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, flow.GenericIdentityList[flow.IdentitySkeleton], *execution.GetTransactionErrorMessageByIndexRequest) error); ok {
+		r1 = rf(ctx, execNodes, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ErrorMessageByTransactionID provides a mock function with given fields: ctx, blockID, height, transactionID
+func (_m *TxErrorMessageProvider) ErrorMessageByTransactionID(ctx context.Context, blockID flow.Identifier, height uint64, transactionID flow.Identifier) (string, error) {
 	ret := _m.Called(ctx, blockID, height, transactionID)
 
 	if len(ret) == 0 {
@@ -71,8 +142,38 @@ func (_m *TxErrorMessageProvider) LookupErrorMessageByTransactionID(ctx context.
 	return r0, r1
 }
 
-// LookupErrorMessagesByBlockID provides a mock function with given fields: ctx, blockID, height
-func (_m *TxErrorMessageProvider) LookupErrorMessagesByBlockID(ctx context.Context, blockID flow.Identifier, height uint64) (map[flow.Identifier]string, error) {
+// ErrorMessageFromAnyEN provides a mock function with given fields: ctx, execNodes, req
+func (_m *TxErrorMessageProvider) ErrorMessageFromAnyEN(ctx context.Context, execNodes flow.GenericIdentityList[flow.IdentitySkeleton], req *execution.GetTransactionErrorMessageRequest) (*execution.GetTransactionErrorMessageResponse, error) {
+	ret := _m.Called(ctx, execNodes, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ErrorMessageFromAnyEN")
+	}
+
+	var r0 *execution.GetTransactionErrorMessageResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.GenericIdentityList[flow.IdentitySkeleton], *execution.GetTransactionErrorMessageRequest) (*execution.GetTransactionErrorMessageResponse, error)); ok {
+		return rf(ctx, execNodes, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, flow.GenericIdentityList[flow.IdentitySkeleton], *execution.GetTransactionErrorMessageRequest) *execution.GetTransactionErrorMessageResponse); ok {
+		r0 = rf(ctx, execNodes, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*execution.GetTransactionErrorMessageResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, flow.GenericIdentityList[flow.IdentitySkeleton], *execution.GetTransactionErrorMessageRequest) error); ok {
+		r1 = rf(ctx, execNodes, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ErrorMessagesByBlockID provides a mock function with given fields: ctx, blockID, height
+func (_m *TxErrorMessageProvider) ErrorMessagesByBlockID(ctx context.Context, blockID flow.Identifier, height uint64) (map[flow.Identifier]string, error) {
 	ret := _m.Called(ctx, blockID, height)
 
 	if len(ret) == 0 {
