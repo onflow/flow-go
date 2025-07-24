@@ -254,12 +254,18 @@ func New(params Params) (*Backend, error) {
 			execNodeIdentitiesProvider: params.ExecNodeIdentitiesProvider,
 		},
 		backendBlockHeaders: backendBlockHeaders{
-			headers: params.Headers,
-			state:   params.State,
+			backendBlockBase: backendBlockBase{
+				blocks:  params.Blocks,
+				headers: params.Headers,
+				state:   params.State,
+			},
 		},
 		backendBlockDetails: backendBlockDetails{
-			blocks: params.Blocks,
-			state:  params.State,
+			backendBlockBase: backendBlockBase{
+				blocks:  params.Blocks,
+				headers: params.Headers,
+				state:   params.State,
+			},
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: params.ExecutionResults,
