@@ -4,19 +4,19 @@ import (
 	"context"
 	"time"
 
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
-	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/state/protocol"
-
 	"github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 type ENAccountRetriever struct {
@@ -24,7 +24,7 @@ type ENAccountRetriever struct {
 	state                      protocol.State
 	connFactory                connection.ConnectionFactory
 	nodeCommunicator           node_communicator.Communicator
-	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
+	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider
 }
 
 var _ AccountRetriever = (*ENAccountRetriever)(nil)
@@ -34,7 +34,7 @@ func NewENAccountRetriever(
 	state protocol.State,
 	connFactory connection.ConnectionFactory,
 	nodeCommunicator node_communicator.Communicator,
-	execNodeIdentityProvider *commonrpc.ExecutionNodeIdentitiesProvider,
+	execNodeIdentityProvider *rpc.ExecutionNodeIdentitiesProvider,
 ) *ENAccountRetriever {
 	return &ENAccountRetriever{
 		log:                        log.With().Str("account_retriever", "execution_node").Logger(),

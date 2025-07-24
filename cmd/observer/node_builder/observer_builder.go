@@ -49,6 +49,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -299,7 +300,7 @@ type ObserverServiceBuilder struct {
 	RegistersAsyncStore *execution.RegistersAsyncStore
 	Reporter            *index.Reporter
 	EventsIndex         *index.EventsIndex
-	ScriptExecutor      *backend.ScriptExecutor
+	ScriptExecutor      *scripts.ScriptExecutor
 
 	// storage
 	events                  storage.Events
@@ -1811,7 +1812,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 	builder.Module("script executor", func(node *cmd.NodeConfig) error {
-		builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
+		builder.ScriptExecutor = scripts.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
 		return nil
 	})
 
@@ -1932,6 +1933,27 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
 		}
 
+		scriptExecMode, err := query_mode.ParseIndexQueryMode(config.BackendConfig.ScriptExecutionMode)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse script execution mode: %w", err)
+		}
+
+		eventQueryMode, err := query_mode.ParseIndexQueryMode(config.BackendConfig.EventQueryMode)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse event query mode: %w", err)
+		}
+		if eventQueryMode == query_mode.IndexQueryModeCompare {
+			return nil, fmt.Errorf("event query mode 'compare' is not supported")
+		}
+
+		txResultQueryMode, err := query_mode.ParseIndexQueryMode(config.BackendConfig.TxResultQueryMode)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse transaction result query mode: %w", err)
+		}
+		if txResultQueryMode == query_mode.IndexQueryModeCompare {
+			return nil, fmt.Errorf("transaction result query mode 'compare' is not supported")
+		}
+
 		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 			node.Logger,
 			node.State,
@@ -1957,6 +1979,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
 			Communicator:         node_communicator.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
 			BlockTracker:         blockTracker,
+			ScriptExecutionMode:  scriptExecMode,
+			EventQueryMode:       eventQueryMode,
+			TxResultQueryMode:    txResultQueryMode,
 			SubscriptionHandler: subscription.NewSubscriptionHandler(
 				builder.Logger,
 				broadcaster,
