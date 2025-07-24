@@ -432,14 +432,6 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicat
 // Process handles incoming messages from consensus channel. After matching message by type, sends it to the correct
 // component for handling.
 // No errors are expected during normal operations.
-//
-// TODO(BFT, #7620): This function should not return an error. The networking layer's responsibility is fulfilled
-// once it delivers a message to an engine. It does not possess the context required to handle
-// errors that may arise during an engine's processing of the message, as error handling for
-// message processing falls outside the domain of the networking layer.
-//
-// Some of the current error returns signal Byzantine behavior, such as forged or malformed
-// messages. These cases must be logged and routed to a dedicated violation reporting consumer.
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
 	case *cluster.UntrustedProposal:
