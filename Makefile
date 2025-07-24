@@ -210,6 +210,8 @@ generate-mocks: install-mock-generators
 	mockery --name 'WebsocketConnection' --dir="./engine/access/rest/websockets" --case=underscore --output="./engine/access/rest/websockets/mock"  --outpkg="mock"
 	mockery --name 'ConnectionFactory' --dir="./engine/access/rpc/connection" --case=underscore --output="./engine/access/rpc/connection/mock" --outpkg="mock"
 	mockery --name 'Communicator' --dir="./engine/access/rpc/backend/node_communicator" --case=underscore --output="./engine/access/rpc/backend/node_communicator/mock" --outpkg="mock"
+	mockery --name 'AccountRetriever' --dir="./engine/access/rpc/backend/accounts/retriever" --case=underscore --output="./engine/access/rpc/backend/accounts/retriever/mock" --outpkg="mock"
+	mockery --name 'EventRetriever' --dir="./engine/access/rpc/backend/events/retriever" --case=underscore --output="./engine/access/rpc/backend/events/retriever/mock" --outpkg="mock"
 	mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"
 	mockery --name 'ExecForkActor' --structname 'ExecForkActorMock' --dir=module/mempool/consensus/mock/ --case=underscore --output="./module/mempool/consensus/mock/" --outpkg="mock"
 	mockery --name '.*' --dir=engine/verification/fetcher/ --case=underscore --output="./engine/verification/fetcher/mock" --outpkg="mockfetcher"
@@ -217,7 +219,7 @@ generate-mocks: install-mock-generators
 	mockery --name 'Storage' --dir=module/executiondatasync/tracker --case=underscore --output="module/executiondatasync/tracker/mock" --outpkg="mocktracker"
 	mockery --name 'ScriptExecutor' --dir=module/execution --case=underscore --output="module/execution/mock" --outpkg="mock"
 	mockery --name 'StorageSnapshot' --dir=fvm/storage/snapshot --case=underscore --output="fvm/storage/snapshot/mock" --outpkg="mock"
-	mockery --name 'Core' --dir=module/executiondatasync/optimistic_syncing --case=underscore --output="module/executiondatasync/optimistic_syncing/mock" --outpkg="mock"
+	mockery --name 'Core' --dir=module/executiondatasync/optimistic_sync --case=underscore --output="module/executiondatasync/optimistic_sync/mock" --outpkg="mock"
 	mockery --name 'Requester' --dir=engine/access/ingestion/tx_error_messages --case=underscore --output="engine/access/ingestion/tx_error_messages/mock" --outpkg="mock"
 	mockery --name 'ExecutionDataRequester' --dir=module/state_synchronization/requester --case=underscore --output="module/state_synchronization/requester/mock" --outpkg="mock"
 

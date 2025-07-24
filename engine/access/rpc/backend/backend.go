@@ -152,7 +152,6 @@ func New(params Params) (*Backend, error) {
 		params.ConnFactory,
 		params.Communicator,
 		params.ScriptExecutionMode,
-
 		params.ScriptExecutor,
 		params.ExecNodeIdentitiesProvider,
 	)
@@ -197,12 +196,18 @@ func New(params Params) (*Backend, error) {
 		Events:   *eventsBackend,
 		Scripts:  *scriptsBackend,
 		backendBlockHeaders: backendBlockHeaders{
-			headers: params.Headers,
-			state:   params.State,
+			backendBlockBase: backendBlockBase{
+				blocks:  params.Blocks,
+				headers: params.Headers,
+				state:   params.State,
+			},
 		},
 		backendBlockDetails: backendBlockDetails{
-			blocks: params.Blocks,
-			state:  params.State,
+			backendBlockBase: backendBlockBase{
+				blocks:  params.Blocks,
+				headers: params.Headers,
+				state:   params.State,
+			},
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: params.ExecutionResults,
