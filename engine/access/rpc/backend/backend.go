@@ -151,7 +151,6 @@ func New(params Params) (*Backend, error) {
 		params.ConnFactory,
 		params.Communicator,
 		params.ScriptExecutionMode,
-
 		params.ScriptExecutor,
 		params.ExecNodeIdentitiesProvider,
 	)
