@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -17,10 +18,15 @@ func TestInsertQuorumCertificate(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		expected := unittest.QuorumCertificateFixture()
 
+		lockManager := locks.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
+
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UnsafeUpsertQuorumCertificate(rw.Writer(), expected)
+			return operation.UpsertQuorumCertificate(lctx, rw, expected)
 		})
 		require.NoError(t, err)
+		lctx.Release()
 
 		var actual flow.QuorumCertificate
 		err = operation.RetrieveQuorumCertificate(db.Reader(), expected.BlockID, &actual)
@@ -32,14 +38,18 @@ func TestInsertQuorumCertificate(t *testing.T) {
 		different := unittest.QuorumCertificateFixture()
 		different.BlockID = expected.BlockID
 
+		lctx2 := lockManager.NewContext()
+		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UnsafeUpsertQuorumCertificate(rw.Writer(), different)
+			return operation.UpsertQuorumCertificate(lctx2, rw, different)
 		})
-		require.NoError(t, err)
+		lctx2.Release()
+		require.Error(t, err)
+		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 
 		err = operation.RetrieveQuorumCertificate(db.Reader(), expected.BlockID, &actual)
 		require.NoError(t, err)
 
-		assert.Equal(t, different, &actual)
+		assert.Equal(t, expected, &actual)
 	})
 }

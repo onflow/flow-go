@@ -163,5 +163,5 @@ type MutableProtocolState interface {
 	//   - A consistency or sanity check failing within the StateMutator is likely the symptom of an internal bug
 	//     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 	//     of this function is not nil. If such an exception is returned, continuing is not an option.
-	EvolveState(deferredDBOps *deferred.DeferredDBOps, parentBlockID flow.Identifier, candidateView uint64, candidateSeals []*flow.Seal) (stateID flow.Identifier, err error)
+	EvolveState(deferredDBOps *deferred.DeferredBlockPersist, parentBlockID flow.Identifier, candidateView uint64, candidateSeals []*flow.Seal) (stateID flow.Identifier, err error)
 }

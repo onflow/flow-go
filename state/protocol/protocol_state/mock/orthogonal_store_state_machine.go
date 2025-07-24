@@ -15,23 +15,23 @@ type OrthogonalStoreStateMachine[P interface{}] struct {
 }
 
 // Build provides a mock function with no fields
-func (_m *OrthogonalStoreStateMachine[P]) Build() (*deferred.DeferredDBOps, error) {
+func (_m *OrthogonalStoreStateMachine[P]) Build() (*deferred.DeferredBlockPersist, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Build")
 	}
 
-	var r0 *deferred.DeferredDBOps
+	var r0 *deferred.DeferredBlockPersist
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (*deferred.DeferredDBOps, error)); ok {
+	if rf, ok := ret.Get(0).(func() (*deferred.DeferredBlockPersist, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() *deferred.DeferredDBOps); ok {
+	if rf, ok := ret.Get(0).(func() *deferred.DeferredBlockPersist); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*deferred.DeferredDBOps)
+			r0 = ret.Get(0).(*deferred.DeferredBlockPersist)
 		}
 	}
 

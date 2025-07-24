@@ -29,8 +29,8 @@ func NewBaseKeyValueStoreStateMachine(
 }
 
 // Build is a no-op by default. If a state machine needs to persist data, it should override this method.
-func (m *BaseKeyValueStoreStateMachine) Build() (*deferred.DeferredDBOps, error) {
-	return deferred.NewDeferredDBOps(), nil
+func (m *BaseKeyValueStoreStateMachine) Build() (*deferred.DeferredBlockPersist, error) {
+	return deferred.NewDeferredBlockPersist(), nil
 }
 
 // View returns the view associated with this state machine.

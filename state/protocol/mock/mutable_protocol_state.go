@@ -47,7 +47,7 @@ func (_m *MutableProtocolState) EpochStateAtBlockID(blockID flow.Identifier) (pr
 }
 
 // EvolveState provides a mock function with given fields: deferredDBOps, parentBlockID, candidateView, candidateSeals
-func (_m *MutableProtocolState) EvolveState(deferredDBOps *deferred.DeferredDBOps, parentBlockID flow.Identifier, candidateView uint64, candidateSeals []*flow.Seal) (flow.Identifier, error) {
+func (_m *MutableProtocolState) EvolveState(deferredDBOps *deferred.DeferredBlockPersist, parentBlockID flow.Identifier, candidateView uint64, candidateSeals []*flow.Seal) (flow.Identifier, error) {
 	ret := _m.Called(deferredDBOps, parentBlockID, candidateView, candidateSeals)
 
 	if len(ret) == 0 {
@@ -56,10 +56,10 @@ func (_m *MutableProtocolState) EvolveState(deferredDBOps *deferred.DeferredDBOp
 
 	var r0 flow.Identifier
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*deferred.DeferredDBOps, flow.Identifier, uint64, []*flow.Seal) (flow.Identifier, error)); ok {
+	if rf, ok := ret.Get(0).(func(*deferred.DeferredBlockPersist, flow.Identifier, uint64, []*flow.Seal) (flow.Identifier, error)); ok {
 		return rf(deferredDBOps, parentBlockID, candidateView, candidateSeals)
 	}
-	if rf, ok := ret.Get(0).(func(*deferred.DeferredDBOps, flow.Identifier, uint64, []*flow.Seal) flow.Identifier); ok {
+	if rf, ok := ret.Get(0).(func(*deferred.DeferredBlockPersist, flow.Identifier, uint64, []*flow.Seal) flow.Identifier); ok {
 		r0 = rf(deferredDBOps, parentBlockID, candidateView, candidateSeals)
 	} else {
 		if ret.Get(0) != nil {
@@ -67,7 +67,7 @@ func (_m *MutableProtocolState) EvolveState(deferredDBOps *deferred.DeferredDBOp
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*deferred.DeferredDBOps, flow.Identifier, uint64, []*flow.Seal) error); ok {
+	if rf, ok := ret.Get(1).(func(*deferred.DeferredBlockPersist, flow.Identifier, uint64, []*flow.Seal) error); ok {
 		r1 = rf(deferredDBOps, parentBlockID, candidateView, candidateSeals)
 	} else {
 		r1 = ret.Error(1)

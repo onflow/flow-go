@@ -356,7 +356,7 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 // addBlock adds the given block to the state by: extending the state,
 // finalizing the block, and caching the block.
 func (builder *EpochBuilder) addBlock(block *flow.Block) {
-	dbUpdates := deferred.NewDeferredDBOps()
+	dbUpdates := deferred.NewDeferredBlockPersist()
 	updatedStateId, err := builder.mutableProtocolState.EvolveState(dbUpdates, block.Header.ParentID, block.Header.View, block.Payload.Seals)
 	require.NoError(builder.t, err)
 	require.False(builder.t, dbUpdates.IsEmpty())

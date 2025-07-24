@@ -12,22 +12,27 @@ import (
 // This pattern allows chaining database updates for atomic execution in one batch updates.
 type DBOp = func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error
 
-// DeferredDBOps accumulates deferred database operations to be executed later in a single atomic batch updates.
-// This utility allows the caller to enqueue multiple DB operations that will be executed in-order.
-// These operations typically include state mutations related to a given block.
-type DeferredDBOps struct {
+// DeferredBlockPersist accumulates deferred database operations to be executed later in a single atomic batch update.
+// Operations are executed in the order in which they were queued.
+// Since Pebble does not provide serializable snapshot isolation, callers MUST ensure that the necessary locks are
+// acquired before executing the set of deferred operations.
+//
+// This construct accomplishes two distinct goals:
+//  1. Deferring block indexing write operations when the block ID is not yet known.
+//  2. Deferring lock-requiring read-then-write operations, to minimize time spent holding a lock.
+type DeferredBlockPersist struct {
 	pending DBOp // Holds the accumulated operations as a single composed function. Can be nil if no ops are added.
 }
 
-// NewDeferredDBOps instantiates a DeferredDBOps instance. Initially, it behaves as a no-op until operations are added.
-func NewDeferredDBOps() *DeferredDBOps {
-	return &DeferredDBOps{
+// NewDeferredBlockPersist instantiates a DeferredBlockPersist instance. Initially, it behaves as a no-op until operations are added.
+func NewDeferredBlockPersist() *DeferredBlockPersist {
+	return &DeferredBlockPersist{
 		pending: nil,
 	}
 }
 
 // IsEmpty returns true if no operations have been enqueued.
-func (d *DeferredDBOps) IsEmpty() bool {
+func (d *DeferredBlockPersist) IsEmpty() bool {
 	return d.pending == nil
 }
 
@@ -35,8 +40,8 @@ func (d *DeferredDBOps) IsEmpty() bool {
 // If there are already pending operations, this new operation will be composed to run after them.
 // This method ensures the operations execute sequentially and short-circuits on the first error.
 //
-// If `nil` is passed, it is ignored — this might happen if chaining with an empty DeferredDBOps.
-func (d *DeferredDBOps) AddNextOperation(nextOperation DBOp) {
+// If `nil` is passed, it is ignored — this might happen if chaining with an empty DeferredBlockPersist.
+func (d *DeferredBlockPersist) AddNextOperation(nextOperation DBOp) {
 	if nextOperation == nil {
 		// No-op if the provided operation is nil.
 		return
@@ -63,15 +68,15 @@ func (d *DeferredDBOps) AddNextOperation(nextOperation DBOp) {
 	}
 }
 
-// Chain merges the deferred operations from another DeferredDBOps into this one, preserving order.
-func (d *DeferredDBOps) Chain(deferred *DeferredDBOps) {
+// Chain merges the deferred operations from another DeferredBlockPersist into this one, preserving order.
+func (d *DeferredBlockPersist) Chain(deferred *DeferredBlockPersist) {
 	d.AddNextOperation(deferred.pending)
 }
 
 // AddSucceedCallback adds a callback to be executed **after** the pending database operations succeed.
 // This is useful for registering indexing tasks or post-commit hooks.
 // The callback is only invoked if no error occurred during batch updates execution.
-func (d *DeferredDBOps) AddSucceedCallback(callback func()) {
+func (d *DeferredBlockPersist) AddSucceedCallback(callback func()) {
 	d.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 		// Schedule the callback to run after a successful commit.
 		rw.AddCallback(func(err error) {
@@ -86,7 +91,7 @@ func (d *DeferredDBOps) AddSucceedCallback(callback func()) {
 // Execute runs all the accumulated deferred database operations in-order.
 // If no operations were added, it is effectively a no-op.
 // This method should be called exactly once per batch updates context.
-func (d *DeferredDBOps) Execute(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+func (d *DeferredBlockPersist) Execute(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 	if d.pending == nil {
 		return nil // No operations to execute.
 	}

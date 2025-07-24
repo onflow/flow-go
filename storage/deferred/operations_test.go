@@ -14,17 +14,17 @@ import (
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 )
 
-func TestNewDeferredDBOps(t *testing.T) {
+func TestNewDeferredBlockPersist(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		d := deferred.NewDeferredDBOps()
+		d := deferred.NewDeferredBlockPersist()
 		assert.NotNil(t, d)
 		assert.True(t, d.IsEmpty())
 	})
 }
 
-func TestDeferredDBOps_IsEmpty(t *testing.T) {
+func TestDeferredBlockPersist_IsEmpty(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		d := deferred.NewDeferredDBOps()
+		d := deferred.NewDeferredBlockPersist()
 		assert.True(t, d.IsEmpty())
 
 		d.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
@@ -34,17 +34,17 @@ func TestDeferredDBOps_IsEmpty(t *testing.T) {
 	})
 }
 
-func TestDeferredDBOps_AddNextOperation_Nil(t *testing.T) {
+func TestDeferredBlockPersist_AddNextOperation_Nil(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		d := deferred.NewDeferredDBOps()
+		d := deferred.NewDeferredBlockPersist()
 		d.AddNextOperation(nil)
 		assert.True(t, d.IsEmpty())
 	})
 }
 
-func TestDeferredDBOps_Execute_NoOps(t *testing.T) {
+func TestDeferredBlockPersist_Execute_NoOps(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		d := deferred.NewDeferredDBOps()
+		d := deferred.NewDeferredBlockPersist()
 		err := db.WithReaderBatchWriter(func(writer storage.ReaderBatchWriter) error {
 			return d.Execute(nil, flow.Identifier{}, writer)
 		})
@@ -52,9 +52,9 @@ func TestDeferredDBOps_Execute_NoOps(t *testing.T) {
 	})
 }
 
-func TestDeferredDBOps_AddNextOperation_Single(t *testing.T) {
+func TestDeferredBlockPersist_AddNextOperation_Single(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		d := deferred.NewDeferredDBOps()
+		d := deferred.NewDeferredBlockPersist()
 		var executed bool
 		op := func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 			executed = true
@@ -71,9 +71,9 @@ func TestDeferredDBOps_AddNextOperation_Single(t *testing.T) {
 	})
 }
 
-func TestDeferredDBOps_AddNextOperation_Multiple(t *testing.T) {
+func TestDeferredBlockPersist_AddNextOperation_Multiple(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		d := deferred.NewDeferredDBOps()
+		d := deferred.NewDeferredBlockPersist()
 		var executionOrder []int
 
 		op1 := func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
@@ -97,9 +97,9 @@ func TestDeferredDBOps_AddNextOperation_Multiple(t *testing.T) {
 	})
 }
 
-func TestDeferredDBOps_AddNextOperation_Error(t *testing.T) {
+func TestDeferredBlockPersist_AddNextOperation_Error(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		d := deferred.NewDeferredDBOps()
+		d := deferred.NewDeferredBlockPersist()
 		var op2Executed bool
 		testErr := errors.New("test error")
 
@@ -124,9 +124,9 @@ func TestDeferredDBOps_AddNextOperation_Error(t *testing.T) {
 	})
 }
 
-func TestDeferredDBOps_Chain(t *testing.T) {
+func TestDeferredBlockPersist_Chain(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		d1 := deferred.NewDeferredDBOps()
+		d1 := deferred.NewDeferredBlockPersist()
 		var d1op1Executed bool
 		d1op1 := func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 			d1op1Executed = true
@@ -134,7 +134,7 @@ func TestDeferredDBOps_Chain(t *testing.T) {
 		}
 		d1.AddNextOperation(d1op1)
 
-		d2 := deferred.NewDeferredDBOps()
+		d2 := deferred.NewDeferredBlockPersist()
 		var d2op1Executed bool
 		d2op1 := func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 			d2op1Executed = true
@@ -153,9 +153,9 @@ func TestDeferredDBOps_Chain(t *testing.T) {
 	})
 }
 
-func TestDeferredDBOps_Chain_Empty(t *testing.T) {
+func TestDeferredBlockPersist_Chain_Empty(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		d1 := deferred.NewDeferredDBOps()
+		d1 := deferred.NewDeferredBlockPersist()
 		var opExecuted bool
 		op := func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 			opExecuted = true
@@ -163,7 +163,7 @@ func TestDeferredDBOps_Chain_Empty(t *testing.T) {
 		}
 		d1.AddNextOperation(op)
 
-		d2 := deferred.NewDeferredDBOps()
+		d2 := deferred.NewDeferredBlockPersist()
 		d1.Chain(d2)
 
 		err := db.WithReaderBatchWriter(func(writer storage.ReaderBatchWriter) error {
@@ -174,9 +174,9 @@ func TestDeferredDBOps_Chain_Empty(t *testing.T) {
 	})
 }
 
-func TestDeferredDBOps_AddSucceedCallback(t *testing.T) {
+func TestDeferredBlockPersist_AddSucceedCallback(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		d := deferred.NewDeferredDBOps()
+		d := deferred.NewDeferredBlockPersist()
 		var callbackExecuted bool
 		callback := func() {
 			callbackExecuted = true
@@ -192,9 +192,9 @@ func TestDeferredDBOps_AddSucceedCallback(t *testing.T) {
 	})
 }
 
-func TestDeferredDBOps_AddSucceedCallback_Error(t *testing.T) {
+func TestDeferredBlockPersist_AddSucceedCallback_Error(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		d := deferred.NewDeferredDBOps()
+		d := deferred.NewDeferredBlockPersist()
 		var callbackExecuted bool
 		callback := func() {
 			callbackExecuted = true
@@ -221,9 +221,9 @@ func TestDeferredDBOps_AddSucceedCallback_Error(t *testing.T) {
 	})
 }
 
-func TestDeferredDBOps_AddSucceedCallback_Chained(t *testing.T) {
+func TestDeferredBlockPersist_AddSucceedCallback_Chained(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		d := deferred.NewDeferredDBOps()
+		d := deferred.NewDeferredBlockPersist()
 		var opExecuted bool
 		var callbackExecuted bool
 
