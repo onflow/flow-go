@@ -223,6 +223,7 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 		25,
 		55,
 		10,
+		0,
 		b.config.MaxCollectionSize,
 	)
 	if err != nil {

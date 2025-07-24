@@ -119,6 +119,7 @@ type BySealingLagRateLimiter struct {
 	minSealingLag     uint
 	maxSealingLag     uint
 	halvingInterval   uint
+	minCollectionSize uint
 	maxCollectionSize uint // the maximum size of a collection that this rate limiter allows
 
 	currentCollectionSize uint
@@ -129,6 +130,7 @@ func NewBySealingLagRateLimiter(
 	minSealingLag uint,
 	maxSealingLag uint,
 	halvingInterval uint,
+	minCollectionSize uint,
 	maxCollectionSize uint,
 ) (*BySealingLagRateLimiter, error) {
 	limiter := &BySealingLagRateLimiter{
@@ -136,6 +138,7 @@ func NewBySealingLagRateLimiter(
 		minSealingLag:     minSealingLag,
 		maxSealingLag:     maxSealingLag,
 		halvingInterval:   halvingInterval,
+		minCollectionSize: minCollectionSize,
 		maxCollectionSize: maxCollectionSize,
 	}
 	err := limiter.update()
@@ -156,10 +159,10 @@ func (limiter *BySealingLagRateLimiter) update() error {
 	}
 	sealingLag := uint(lastFinalized.Height - lastSealed.Height)
 	limiter.currentCollectionSize = StepHalving(
-		[2]uint{limiter.minSealingLag, limiter.maxSealingLag}, // [minSealingLag, maxSealingLag] is the range of input values where the halving is applied
-		[2]uint{1, limiter.maxCollectionSize},                 // [1, maxCollectionSize] is the range of collection sizes that halving function outputs
-		sealingLag,                                            // the current sealing lag
-		limiter.halvingInterval,                               // interval in blocks in which the halving is applied
+		[2]uint{limiter.minSealingLag, limiter.maxSealingLag},         // [minSealingLag, maxSealingLag] is the range of input values where the halving is applied
+		[2]uint{limiter.minCollectionSize, limiter.maxCollectionSize}, // [minCollectionSize, maxCollectionSize] is the range of collection sizes that halving function outputs
+		sealingLag,                                                    // the current sealing lag
+		limiter.halvingInterval,                                       // interval in blocks in which the halving is applied
 	)
 	return nil
 }
