@@ -10,6 +10,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// uniqueScriptLoggingTimeWindow is the duration for checking the uniqueness of scripts sent for execution
+const uniqueScriptLoggingTimeWindow = 10 * time.Minute
+
 type LoggedScriptCache struct {
 	log           zerolog.Logger
 	loggedScripts *lru.Cache[[md5.Size]byte, time.Time]
@@ -49,15 +52,16 @@ func (s *LoggedScriptCache) LogFailedScript(
 	address string,
 	script []byte,
 ) {
-	if s.shouldLogScript(executionTime, scriptHash) {
-		s.log.Debug().
-			Str("block_id", blockID.String()).
-			Str("script_executor_addr", address).
-			Str("script", string(script)).
-			Msg("Successfully executed script")
+	logEvent := s.log.Debug().
+		Str("block_id", blockID.String()).
+		Str("script_executor_addr", address)
 
-		s.loggedScripts.Add(scriptHash, executionTime)
+	if s.shouldLogScript(executionTime, scriptHash) {
+		logEvent.Str("script", string(script))
 	}
+
+	logEvent.Msg("failed to execute script")
+	s.loggedScripts.Add(scriptHash, executionTime)
 }
 
 func (s *LoggedScriptCache) shouldLogScript(execTime time.Time, scriptHash [md5.Size]byte) bool {

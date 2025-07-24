@@ -3,13 +3,13 @@ package scripts
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
+	"fmt"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
@@ -24,19 +24,13 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type API interface {
-	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error)
-	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error)
-	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error)
-}
-
 type Scripts struct {
 	headers  storage.Headers
 	state    protocol.State
 	executor executor.ScriptExecutor
 }
 
-var _ API = (*Scripts)(nil)
+var _ access.ScriptsAPI = (*Scripts)(nil)
 
 func NewScriptsBackend(
 	log zerolog.Logger,
@@ -71,7 +65,7 @@ func NewScriptsBackend(
 		exec = executor.NewComparingScriptExecutor(log, metrics, cache, local, execNode)
 
 	default:
-		return nil, status.Error(codes.InvalidArgument, "invalid index mode")
+		return nil, fmt.Errorf("invalid index mode: %s", scriptExecMode.String())
 	}
 
 	return &Scripts{

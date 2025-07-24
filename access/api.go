@@ -10,8 +10,16 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type ScriptsAPI interface {
+	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error)
+	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error)
+	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error)
+}
+
 // API provides all public-facing functionality of the Flow Access API.
 type API interface {
+	ScriptsAPI
+
 	Ping(ctx context.Context) error
 	GetNetworkParameters(ctx context.Context) accessmodel.NetworkParameters
 	GetNodeVersionInfo(ctx context.Context) (*accessmodel.NodeVersionInfo, error)

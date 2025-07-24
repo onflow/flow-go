@@ -18,9 +18,6 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// uniqueScriptLoggingTimeWindow is the duration for checking the uniqueness of scripts sent for execution
-const uniqueScriptLoggingTimeWindow = 10 * time.Minute
-
 type ENScriptExecutor struct {
 	log     zerolog.Logger
 	metrics module.BackendScriptsMetrics //TODO: move this metrics to scriptCache struct?
