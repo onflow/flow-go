@@ -325,6 +325,7 @@ func messageToTrustedTransaction(
 		SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId())).
 		SetComputeLimit(m.GetGasLimit())
 
+	//proposal key and payer are empty addresses for service tx
 	if proposalAddress == flow.EmptyAddress && payerAddress == flow.EmptyAddress {
 		transactionBody, err := flow.NewSystemChunkTransactionBody(tb.GetUntrustedTransactionBody())
 		if err != nil {

@@ -74,10 +74,6 @@ func NewTransactionBody(untrusted UntrustedTransactionBody) (*TransactionBody, e
 		return nil, fmt.Errorf("Script must not be empty")
 	}
 
-	if len(untrusted.Authorizers) == 0 {
-		return nil, fmt.Errorf("Authorizers must not be empty")
-	}
-
 	return &TransactionBody{
 		ReferenceBlockID:   untrusted.ReferenceBlockID,
 		Script:             untrusted.Script,

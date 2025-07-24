@@ -221,6 +221,7 @@ func TestNewHeaderBody(t *testing.T) {
 		hb, err := flow.NewHeaderBody(u)
 		assert.NoError(t, err)
 		assert.NotNil(t, hb)
+		assert.Equal(t, flow.HeaderBody(u), *hb)
 	})
 
 	t.Run("missing ChainID", func(t *testing.T) {

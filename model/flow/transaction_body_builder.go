@@ -81,12 +81,6 @@ func (tb *TransactionBodyBuilder) SetPayer(payer Address) *TransactionBodyBuilde
 	return tb
 }
 
-// SetAuthorizers sets authorizers accounts to this transaction.
-func (tb *TransactionBodyBuilder) SetAuthorizers(authorizers []Address) *TransactionBodyBuilder {
-	tb.u.Authorizers = authorizers
-	return tb
-}
-
 // AddAuthorizer adds an authorizer account to this transaction.
 func (tb *TransactionBodyBuilder) AddAuthorizer(authorizer Address) *TransactionBodyBuilder {
 	tb.u.Authorizers = append(tb.u.Authorizers, authorizer)
