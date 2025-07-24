@@ -35,6 +35,10 @@ func InsertAndIndexResultApproval(approval *flow.ResultApproval) func(lctx lockc
 	resultID := approval.Body.ExecutionResultID
 	chunkIndex := approval.Body.ChunkIndex
 
+	// the following functors allows encoding to be done before acquiring the lock
+	inserting := Upserting(MakePrefix(codeResultApproval, approvalID), approval)
+	indexing := Upserting(MakePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID)
+
 	return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 		if !lctx.HoldsLock(storage.LockIndexResultApproval) {
 			return fmt.Errorf("missing lock for index result approval for result: %v", resultID)
@@ -56,12 +60,17 @@ func InsertAndIndexResultApproval(approval *flow.ResultApproval) func(lctx lockc
 			return fmt.Errorf("could not lookup result approval ID: %w", err)
 		}
 
-		err = UpsertByKey(rw.Writer(), MakePrefix(codeResultApproval, approvalID), approval)
+		err = inserting(rw.Writer())
 		if err != nil {
 			return fmt.Errorf("could not store result approval: %w", err)
 		}
 
-		return UpsertByKey(rw.Writer(), MakePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID)
+		err = indexing(rw.Writer())
+		if err != nil {
+			return fmt.Errorf("could not index result approval: %w", err)
+		}
+
+		return nil
 	}
 }
 
