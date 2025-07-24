@@ -1,6 +1,7 @@
 package protocol_state
 
 import (
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -17,10 +18,11 @@ type ProtocolKVStore interface {
 	// BatchStore writes the given KV-store snapshot to the input write batch. Per convention, all implementations
 	// of `protocol.KVStoreReader` should be able to successfully encode their state into a data blob.
 	// If the encoding fails, the anonymous function returns an error upon call.
+	// It requires the caller to acquire storage.LockInsertBlock lock
 	//
 	// Expected errors of the returned anonymous function:
 	//   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
-	BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, kvStore protocol.KVStoreReader) error
+	BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, stateID flow.Identifier, kvStore protocol.KVStoreReader) error
 
 	// BatchIndex writes the blockID->stateID index to the input write batch.
 	// In a nutshell, we want to maintain a map from `blockID` to `stateID`, where `blockID` references the
@@ -32,9 +34,10 @@ type ProtocolKVStore interface {
 	//   - CAUTION: The updated state requires confirmation by a QC and will only become active at the
 	//     child block, _after_ validating the QC.
 	//
+	// It requires the caller to acquire storage.LockInsertBlock lock
 	// Expected errors of the returned anonymous function:
 	//   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
-	BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error
+	BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error
 
 	// ByID retrieves the KV store snapshot with the given ID.
 	// Expected errors during normal operations:

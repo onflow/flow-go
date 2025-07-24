@@ -27,10 +27,14 @@ func TestKeyValueStoreStorage(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 
 		// store protocol state and auxiliary info
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		defer lctx.Release()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			err := store.BatchStore(rw, stateID, expected)
+			err := store.BatchStore(lctx, rw, stateID, expected)
 			require.NoError(t, err)
-			return store.BatchIndex(rw, blockID, stateID)
+			return store.BatchIndex(lctx, rw, blockID, stateID)
 		})
 		require.NoError(t, err)
 
@@ -58,13 +62,17 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 			Data:    unittest.RandomBytes(32),
 		}
 
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		defer lctx.Release()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchStore(rw, stateID, expected)
+			return store.BatchStore(lctx, rw, stateID, expected)
 		})
 		require.NoError(t, err)
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchStore(rw, stateID, expected)
+			return store.BatchStore(lctx, rw, stateID, expected)
 		})
 		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 	})
@@ -79,13 +87,17 @@ func TestProtocolKVStore_IndexTx(t *testing.T) {
 		stateID := unittest.IdentifierFixture()
 		blockID := unittest.IdentifierFixture()
 
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		defer lctx.Release()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchIndex(rw, blockID, stateID)
+			return store.BatchIndex(lctx, rw, blockID, stateID)
 		})
 		require.NoError(t, err)
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchIndex(rw, blockID, stateID)
+			return store.BatchIndex(lctx, rw, blockID, stateID)
 		})
 		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 	})
