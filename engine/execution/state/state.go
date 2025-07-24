@@ -128,6 +128,7 @@ func NewExecutionState(
 	tracer module.Tracer,
 	registerStore execution.RegisterStore,
 	enableRegisterStore bool,
+	lockManager lockctx.Manager,
 ) ExecutionState {
 	return &state{
 		tracer:              tracer,
@@ -145,6 +146,7 @@ func NewExecutionState(
 		getLatestFinalized:  getLatestFinalized,
 		registerStore:       registerStore,
 		enableRegisterStore: enableRegisterStore,
+		lockManager:         lockManager,
 	}
 
 }

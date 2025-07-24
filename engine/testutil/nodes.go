@@ -647,11 +647,15 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		}
 		return final.Height, nil
 	}
+
+	lockManager := locks.NewTestingLockManager()
+
 	execState := executionState.NewExecutionState(
 		ls, commitsStorage, node.Blocks, node.Headers, chunkDataPackStorage, results, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, db, getLatestFinalized, node.Tracer,
 		// TODO: test with register store
 		registerStore,
 		storehouseEnabled,
+		lockManager,
 	)
 
 	requestEngine, err := requester.New(
