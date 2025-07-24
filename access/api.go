@@ -10,8 +10,42 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type AccountsAPI interface {
+	GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error)
+	GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error)
+	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
+
+	GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error)
+	GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error)
+
+	GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex uint32) (*flow.AccountPublicKey, error)
+	GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error)
+	GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error)
+	GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error)
+}
+
+type EventsAPI interface {
+	GetEventsForHeightRange(
+		ctx context.Context,
+		eventType string,
+		startHeight,
+		endHeight uint64,
+		requiredEventEncodingVersion entities.EventEncodingVersion,
+	) ([]flow.BlockEvents, error)
+
+	GetEventsForBlockIDs(
+		ctx context.Context,
+		eventType string,
+		blockIDs []flow.Identifier,
+		requiredEventEncodingVersion entities.EventEncodingVersion,
+	) ([]flow.BlockEvents, error)
+}
+
 // API provides all public-facing functionality of the Flow Access API.
 type API interface {
+	AccountsAPI
+	EventsAPI
+
 	Ping(ctx context.Context) error
 	GetNetworkParameters(ctx context.Context) accessmodel.NetworkParameters
 	GetNodeVersionInfo(ctx context.Context) (*accessmodel.NodeVersionInfo, error)
@@ -36,24 +70,9 @@ type API interface {
 	GetSystemTransaction(ctx context.Context, blockID flow.Identifier) (*flow.TransactionBody, error)
 	GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
 
-	GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error)
-	GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error)
-	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
-
-	GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error)
-	GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error)
-
-	GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex uint32) (*flow.AccountPublicKey, error)
-	GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error)
-	GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error)
-	GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error)
-
 	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error)
 	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error)
 	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error)
-
-	GetEventsForHeightRange(ctx context.Context, eventType string, startHeight, endHeight uint64, requiredEventEncodingVersion entities.EventEncodingVersion) ([]flow.BlockEvents, error)
-	GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) ([]flow.BlockEvents, error)
 
 	GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, error)
 	GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error)

@@ -7,11 +7,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -49,14 +50,14 @@ func (e *ENEventRetriever) Events(
 	eventType flow.EventType,
 	encoding entities.EventEncodingVersion,
 ) (Response, error) {
+	if len(blocks) == 0 {
+		return Response{}, nil
+	}
+
 	// create an execution API request for events at block ID
 	blockIDs := make([]flow.Identifier, len(blocks))
 	for i := range blocks {
 		blockIDs[i] = blocks[i].ID
-	}
-
-	if len(blockIDs) == 0 {
-		return Response{}, nil
 	}
 
 	req := &execproto.GetEventsForBlockIDsRequest{
@@ -72,14 +73,14 @@ func (e *ENEventRetriever) Events(
 		lastBlockID,
 	)
 	if err != nil {
-		return Response{}, rpc.ConvertError(err, "failed to retrieve events from execution node", codes.Internal)
+		return Response{}, rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
 	}
 
 	var resp *execproto.GetEventsForBlockIDsResponse
 	var successfulNode *flow.IdentitySkeleton
 	resp, successfulNode, err = e.getEventsFromAnyExeNode(ctx, execNodes, req)
 	if err != nil {
-		return Response{}, rpc.ConvertError(err, "failed to retrieve events from execution nodes", codes.Internal)
+		return Response{}, rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
 	}
 	e.log.Trace().
 		Str("execution_id", successfulNode.String()).

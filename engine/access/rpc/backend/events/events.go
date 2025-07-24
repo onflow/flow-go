@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
@@ -80,7 +81,7 @@ func NewEventsBackend(
 		eventRetriever = retriever.NewFailoverEventRetriever(log, local, execNode)
 
 	default:
-		return nil, status.Errorf(codes.Internal, "unknown execution mode: %v", queryMode)
+		return nil, fmt.Errorf("unknown execution mode: %v", queryMode)
 	}
 
 	return &Events{

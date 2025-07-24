@@ -4,8 +4,9 @@ import (
 	"context"
 	"sort"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/model/flow"
 )

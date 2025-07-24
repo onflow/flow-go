@@ -2,11 +2,11 @@ package accounts
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/accounts/retriever"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
@@ -20,20 +20,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type API interface {
-	GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error)
-	GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error)
-	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
-
-	GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error)
-	GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error)
-
-	GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex uint32) (*flow.AccountPublicKey, error)
-	GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error)
-	GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error)
-	GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error)
-}
-
 type Accounts struct {
 	log       zerolog.Logger
 	state     protocol.State
@@ -41,7 +27,7 @@ type Accounts struct {
 	retriever retriever.AccountRetriever
 }
 
-var _ API = (*Accounts)(nil)
+var _ access.AccountsAPI = (*Accounts)(nil)
 
 func NewAccountsBackend(
 	log zerolog.Logger,
@@ -73,7 +59,7 @@ func NewAccountsBackend(
 		accountsRetriever = retriever.NewComparingAccountRetriever(log, state, local, execNode)
 
 	default:
-		return nil, status.Errorf(codes.Internal, "unknown execution mode: %v", scriptExecMode)
+		return nil, fmt.Errorf("unknown execution mode: %v", scriptExecMode)
 	}
 
 	return &Accounts{

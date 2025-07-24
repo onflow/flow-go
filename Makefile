@@ -210,6 +210,8 @@ generate-mocks: install-mock-generators
 	mockery --name 'WebsocketConnection' --dir="./engine/access/rest/websockets" --case=underscore --output="./engine/access/rest/websockets/mock"  --outpkg="mock"
 	mockery --name 'ConnectionFactory' --dir="./engine/access/rpc/connection" --case=underscore --output="./engine/access/rpc/connection/mock" --outpkg="mock"
 	mockery --name 'Communicator' --dir="./engine/access/rpc/backend/node_communicator" --case=underscore --output="./engine/access/rpc/backend/node_communicator/mock" --outpkg="mock"
+	mockery --name 'AccountRetriever' --dir="./engine/access/rpc/backend/accounts/retriever" --case=underscore --output="./engine/access/rpc/backend/accounts/retriever/mock" --outpkg="mock"
+	mockery --name 'EventRetriever' --dir="./engine/access/rpc/backend/events/retriever" --case=underscore --output="./engine/access/rpc/backend/events/retriever/mock" --outpkg="mock"
 	mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"
 	mockery --name 'ExecForkActor' --structname 'ExecForkActorMock' --dir=module/mempool/consensus/mock/ --case=underscore --output="./module/mempool/consensus/mock/" --outpkg="mock"
 	mockery --name '.*' --dir=engine/verification/fetcher/ --case=underscore --output="./engine/verification/fetcher/mock" --outpkg="mockfetcher"
