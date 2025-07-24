@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -28,20 +29,6 @@ const TransactionExpiryForUnknownStatus = flow.DefaultTransactionExpiry
 // sendTransaction defines a function type for sending a transaction.
 type sendTransaction func(ctx context.Context, tx *flow.TransactionBody) error
 
-type API interface {
-	SubscribeTransactionStatuses(
-		ctx context.Context,
-		txID flow.Identifier,
-		requiredEventEncodingVersion entities.EventEncodingVersion,
-	) subscription.Subscription
-
-	SendAndSubscribeTransactionStatuses(
-		ctx context.Context,
-		tx *flow.TransactionBody,
-		requiredEventEncodingVersion entities.EventEncodingVersion,
-	) subscription.Subscription
-}
-
 // TransactionStream manages transaction subscriptions for monitoring transaction statuses.
 // It provides functionalities to send transactions, subscribe to transaction status updates,
 // and handle subscription lifecycles.
@@ -57,7 +44,7 @@ type TransactionStream struct {
 	transactions storage.Transactions
 }
 
-var _ API = (*TransactionStream)(nil)
+var _ access.TransactionStreamAPI = (*TransactionStream)(nil)
 
 func NewTransactionStreamBackend(
 	log zerolog.Logger,

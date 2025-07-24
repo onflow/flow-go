@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
@@ -36,20 +37,6 @@ import (
 
 // ErrTransactionNotInBlock represents an error indicating that the transaction is not found in the block.
 var ErrTransactionNotInBlock = errors.New("transaction not in block")
-
-type API interface {
-	SendTransaction(ctx context.Context, tx *flow.TransactionBody) error
-
-	GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error)
-	GetTransactionsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.TransactionBody, error)
-
-	GetTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
-	GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
-	GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) ([]*accessmodel.TransactionResult, error)
-
-	GetSystemTransaction(ctx context.Context, blockID flow.Identifier) (*flow.TransactionBody, error)
-	GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
-}
 
 type Transactions struct {
 	log     zerolog.Logger
@@ -79,7 +66,7 @@ type Transactions struct {
 	txStatusDeriver *status_deriver.TxStatusDeriver
 }
 
-var _ API = (*Transactions)(nil)
+var _ access.TransactionsAPI = (*Transactions)(nil)
 
 type Params struct {
 	Log                         zerolog.Logger

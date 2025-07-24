@@ -47,11 +47,41 @@ type ScriptsAPI interface {
 	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error)
 }
 
+type TransactionsAPI interface {
+	SendTransaction(ctx context.Context, tx *flow.TransactionBody) error
+
+	GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error)
+	GetTransactionsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.TransactionBody, error)
+
+	GetTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
+	GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
+	GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) ([]*accessmodel.TransactionResult, error)
+
+	GetSystemTransaction(ctx context.Context, blockID flow.Identifier) (*flow.TransactionBody, error)
+	GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
+}
+
+type TransactionStreamAPI interface {
+	SubscribeTransactionStatuses(
+		ctx context.Context,
+		txID flow.Identifier,
+		requiredEventEncodingVersion entities.EventEncodingVersion,
+	) subscription.Subscription
+
+	SendAndSubscribeTransactionStatuses(
+		ctx context.Context,
+		tx *flow.TransactionBody,
+		requiredEventEncodingVersion entities.EventEncodingVersion,
+	) subscription.Subscription
+}
+
 // API provides all public-facing functionality of the Flow Access API.
 type API interface {
 	AccountsAPI
 	EventsAPI
 	ScriptsAPI
+	TransactionsAPI
+	TransactionStreamAPI
 
 	Ping(ctx context.Context) error
 	GetNetworkParameters(ctx context.Context) accessmodel.NetworkParameters
