@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/events/retriever"
@@ -27,23 +28,6 @@ import (
 // DefaultMaxHeightRange is the default maximum size of range requests.
 const DefaultMaxHeightRange = 250
 
-type API interface {
-	GetEventsForHeightRange(
-		ctx context.Context,
-		eventType string,
-		startHeight,
-		endHeight uint64,
-		requiredEventEncodingVersion entities.EventEncodingVersion,
-	) ([]flow.BlockEvents, error)
-
-	GetEventsForBlockIDs(
-		ctx context.Context,
-		eventType string,
-		blockIDs []flow.Identifier,
-		requiredEventEncodingVersion entities.EventEncodingVersion,
-	) ([]flow.BlockEvents, error)
-}
-
 type Events struct {
 	headers        storage.Headers
 	state          protocol.State
@@ -52,7 +36,7 @@ type Events struct {
 	retriever      retriever.EventRetriever
 }
 
-var _ API = (*Events)(nil)
+var _ access.EventsAPI = (*Events)(nil)
 
 func NewEventsBackend(
 	log zerolog.Logger,
