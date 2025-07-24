@@ -30,6 +30,7 @@ type ResultApprovals interface {
 	// still the method succeeds on each call. However, when attempting to index *different* ResultApproval IDs
 	// for the same key (resultID, chunkIndex) this method returns an exception, as this should never happen for
 	// a correct Verification Node indexing its own approvals.
+	// It requires storage.LockIndexResultApproval lock to be held by the caller.
 	// No errors are expected during normal operations.
 	StoreMyApproval(approval *flow.ResultApproval) func(lctx lockctx.Proof) error
 

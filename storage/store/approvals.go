@@ -46,6 +46,7 @@ func NewResultApprovals(collector module.CacheMetrics, db storage.DB, lockManage
 
 // StoreMyApproval stores my own ResultApproval
 // No errors are expected during normal operations.
+// It requires storage.LockIndexResultApproval lock to be held by the caller.
 // it also indexes a ResultApproval by result ID and chunk index.
 //
 // CAUTION: the Flow protocol requires multiple approvals for the same chunk from different verification
@@ -61,7 +62,10 @@ func NewResultApprovals(collector module.CacheMetrics, db storage.DB, lockManage
 // It returns a functor so that some computation (such as computing approval ID) can be done
 // before acquiring the lock.
 func (r *ResultApprovals) StoreMyApproval(approval *flow.ResultApproval) func(lctx lockctx.Proof) error {
+	// pre-compute the approval ID and encoded data to be stored
+	// db operation is deferred until the returned function is called
 	storing := operation.InsertAndIndexResultApproval(approval)
+
 	return func(lctx lockctx.Proof) error {
 		if !lctx.HoldsLock(storage.LockIndexResultApproval) {
 			return fmt.Errorf("missing lock for index result approval")
@@ -69,6 +73,8 @@ func (r *ResultApprovals) StoreMyApproval(approval *flow.ResultApproval) func(lc
 
 		return r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			storage.OnCommitSucceed(rw, func() {
+				// the success callback is called after the lock is released, so
+				// the id computation here would not increase the lock contention
 				r.cache.Insert(approval.ID(), approval)
 			})
 			return storing(lctx, rw)
