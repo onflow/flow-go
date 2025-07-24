@@ -201,7 +201,7 @@ func newMutableProtocolState(
 //     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 //     of this function is not nil. If such an exception is returned, continuing is not an option.
 func (s *MutableProtocolState) EvolveState(
-	deferredDBOps *deferred.DeferredDBOps,
+	deferredDBOps *deferred.DeferredBlockPersist,
 	parentBlockID flow.Identifier,
 	candidateView uint64,
 	candidateSeals []*flow.Seal,
@@ -318,7 +318,7 @@ func (s *MutableProtocolState) serviceEventsFromSeals(candidateSeals []*flow.Sea
 //     on the candidate block's ID, which is still unknown at the time of block construction.
 //   - err: All error returns indicate potential state corruption and should therefore be treated as fatal.
 func (s *MutableProtocolState) build(
-	deferredDBOps *deferred.DeferredDBOps,
+	deferredDBOps *deferred.DeferredBlockPersist,
 	parentStateID flow.Identifier,
 	stateMachines []protocol_state.KeyValueStoreStateMachine,
 	serviceEvents []flow.ServiceEvent,

@@ -103,7 +103,7 @@ type OrthogonalStoreStateMachine[P any] interface {
 	//     Deferred updates must be applied in a transaction to ensure atomicity.
 	//
 	// No errors are expected during normal operations.
-	Build() (*deferred.DeferredDBOps, error)
+	Build() (*deferred.DeferredBlockPersist, error)
 
 	// EvolveState applies the state change(s) on sub-state P for the candidate block (under construction).
 	// Information that potentially changes the Epoch state (compared to the parent block's state):

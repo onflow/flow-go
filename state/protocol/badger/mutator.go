@@ -168,9 +168,9 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 		return fmt.Errorf("qc doesn't certify candidate block, expect %x blockID, got %x", blockID, certifyingQC.BlockID)
 	}
 
-	deferredDBOps := deferred.NewDeferredDBOps()
+	deferredBlockPersist := deferred.NewDeferredBlockPersist()
 	// check if the block header is a valid extension of parent block
-	err = m.headerExtend(ctx, candidate, certifyingQC, deferredDBOps)
+	err = m.headerExtend(ctx, candidate, certifyingQC, deferredBlockPersist)
 	if err != nil {
 		// since we have a QC for this block, it cannot be an invalid extension
 		return fmt.Errorf("unexpected invalid block (id=%x) with certifying qc (id=%x): %s",
@@ -182,14 +182,14 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 	if err != nil {
 		return fmt.Errorf("failed to determine the lastest sealed block in fork: %w", err)
 	}
-	deferredDBOps.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+	deferredBlockPersist.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 		return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, latestSeal.ID())
 	})
 
 	// TODO: we might not need the deferred db updates, because the candidate passed into
 	// the Extend method has already been fully constructed.
 	// evolve protocol state and verify consistency with commitment included in
-	err = m.evolveProtocolState(ctx, candidate, deferredDBOps)
+	err = m.evolveProtocolState(ctx, candidate, deferredBlockPersist)
 	if err != nil {
 		return fmt.Errorf("evolving protocol state failed: %w", err)
 	}
@@ -204,7 +204,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 	// Execute the deferred database operations as one atomic transaction and emit scheduled notifications on success.
 	// The `candidate` block _must be valid_ (otherwise, the state will be corrupted)!
 	return m.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return deferredDBOps.Execute(lctx, blockID, rw)
+		return deferredBlockPersist.Execute(lctx, blockID, rw)
 	})
 }
 
@@ -239,10 +239,10 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 		return err
 	}
 
-	deferredDBOps := deferred.NewDeferredDBOps()
+	deferredBlockPersist := deferred.NewDeferredBlockPersist()
 
 	// check if the block header is a valid extension of parent block
-	err = m.headerExtend(ctx, candidate, nil, deferredDBOps)
+	err = m.headerExtend(ctx, candidate, nil, deferredBlockPersist)
 	if err != nil {
 		return fmt.Errorf("header not compliant with chain state: %w", err)
 	}
@@ -269,13 +269,13 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 	}
 
 	// check if the seals in the payload is a valid extension of the finalized state
-	_, err = m.sealExtend(ctx, candidate, deferredDBOps)
+	_, err = m.sealExtend(ctx, candidate, deferredBlockPersist)
 	if err != nil {
 		return fmt.Errorf("payload seal(s) not compliant with chain state: %w", err)
 	}
 
 	// evolve protocol state and verify consistency with commitment included in payload
-	err = m.evolveProtocolState(ctx, candidate, deferredDBOps)
+	err = m.evolveProtocolState(ctx, candidate, deferredBlockPersist)
 	if err != nil {
 		return fmt.Errorf("evolving protocol state failed: %w", err)
 	}
@@ -290,7 +290,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 	// Execute the deferred database operations and emit scheduled notifications on success.
 	// The `candidate` block _must be valid_ (otherwise, the state will be corrupted)!
 	return m.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return deferredDBOps.Execute(lctx, blockID, rw)
+		return deferredBlockPersist.Execute(lctx, blockID, rw)
 	})
 }
 
@@ -317,7 +317,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 //
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the candidate block is invalid
-func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate, deferredDBOps *deferred.DeferredDBOps) error {
+func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate, deferredBlockPersist *deferred.DeferredBlockPersist) error {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckHeader)
 	defer span.End()
 	blockID := candidate.ID()
@@ -371,7 +371,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 
 	// STEP 5:
 	qc := candidate.Header.ParentQC()
-	deferredDBOps.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+	deferredBlockPersist.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 		// STEP 5a: Store QC for parent block and emit `BlockProcessable` notification if and only if
 		//  - the QC for the parent has not been stored before (otherwise, we already emitted the notification) and
 		//  - the parent block's height is larger than the finalized root height (the root block is already considered processed)
@@ -560,7 +560,7 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 // operation for indexing the latest seal as of the candidate block and returns the latest seal.
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the candidate block has invalid seals
-func (m *ParticipantState) sealExtend(ctx context.Context, candidate *flow.Block, deferredDBOps *deferred.DeferredDBOps) (*flow.Seal, error) {
+func (m *ParticipantState) sealExtend(ctx context.Context, candidate *flow.Block, deferredBlockPersist *deferred.DeferredBlockPersist) (*flow.Seal, error) {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckSeals)
 	defer span.End()
 
@@ -569,7 +569,7 @@ func (m *ParticipantState) sealExtend(ctx context.Context, candidate *flow.Block
 		return nil, state.NewInvalidExtensionErrorf("seal validation error: %w", err)
 	}
 
-	deferredDBOps.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+	deferredBlockPersist.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 		return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, lastSeal.ID())
 	})
 
@@ -650,13 +650,13 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (latestSeal *flow.Seal
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the Protocol State commitment in the candidate block does
 //     not match the Protocol State we constructed locally
-func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow.Block, deferredDBOps *deferred.DeferredDBOps) error {
+func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow.Block, deferredBlockPersist *deferred.DeferredBlockPersist) error {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorEvolveProtocolState)
 	defer span.End()
 
 	// Evolve the Protocol State starting from the parent block's state. Information that may change the state is:
 	// the candidate block's view and Service Events from execution results sealed in the candidate block.
-	updatedStateID, err := m.protocolState.EvolveState(deferredDBOps, candidate.Header.ParentID, candidate.Header.View, candidate.Payload.Seals)
+	updatedStateID, err := m.protocolState.EvolveState(deferredBlockPersist, candidate.Header.ParentID, candidate.Header.View, candidate.Payload.Seals)
 	if err != nil {
 		return fmt.Errorf("evolving protocol state failed: %w", err)
 	}
