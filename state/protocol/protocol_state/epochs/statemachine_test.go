@@ -106,6 +106,7 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 	// Provide the blockID and execute the resulting `DBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
 	blockID := s.candidate.ID()
+	// passing nil lockctx proof because no operations require lock; operations are deferred only because block ID is not known yet
 	err = dbUpdates.Execute(nil, blockID, rw)
 	require.NoError(s.T(), err)
 }
@@ -148,6 +149,7 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	// Provide the blockID and execute the resulting `DBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
 	blockID := s.candidate.ID()
+	// passing nil lockctx proof because no operations require lock; operations are deferred only because block ID is not known yet
 	err = dbUpdates.Execute(nil, blockID, rw)
 	require.NoError(s.T(), err)
 }
@@ -551,6 +553,7 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	// Provide the blockID and execute the resulting `DBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
 	blockID := s.candidate.ID()
+	// passing nil lockctx proof because no operations require lock; operations are deferred only because block ID is not known yet
 	err = dbOps.Execute(nil, blockID, rw)
 	require.NoError(s.T(), err)
 }

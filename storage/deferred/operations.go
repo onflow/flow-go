@@ -11,9 +11,14 @@ import (
 // This pattern allows chaining database updates for atomic execution in one batch updates.
 type DBOp = func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error
 
-// DeferredDBOps accumulates deferred database operations to be executed later in a single atomic batch updates.
-// This utility allows the caller to enqueue multiple DB operations that will be executed in-order.
-// These operations typically include state mutations related to a given block.
+// DeferredBlockPersist accumulates deferred database operations to be executed later in a single atomic batch update.
+// Operations are executed in the order in which they were queued.
+// Since Pebble does not provide serializable snapshot isolation, callers MUST ensure that the necessary locks are
+// acquired before executing the set of deferred operations. 
+//
+// This construct accomplishes two distinct goals:
+//   1. Deferring block indexing write operations when the block ID is not yet known.
+//   2. Deferring lock-requiring read-then-write operations, to minimize time spent holding a lock.
 type DeferredDBOps struct {
 	pending DBOp // Holds the accumulated operations as a single composed function. Can be nil if no ops are added.
 }
