@@ -50,7 +50,7 @@ type API interface {
 	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
-	// Expected errors:
+	// Expected sentinel errors providing details to clients about failed requests:
 	//   - access.DataNotFoundError - No header with the given height was found
 	GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, flow.BlockStatus, error)
 
@@ -60,7 +60,7 @@ type API interface {
 	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
-	// Expected errors:
+	// Expected sentinel errors providing details to clients about failed requests:
 	//   - access.DataNotFoundError - No header with the given ID was found
 	GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error)
 
@@ -77,7 +77,7 @@ type API interface {
 	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
-	// Expected errors:
+	// Expected sentinel errors providing details to clients about failed requests:
 	//   - access.DataNotFoundError - No block with the given height was found
 	GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block, flow.BlockStatus, error)
 
@@ -87,7 +87,7 @@ type API interface {
 	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
-	// Expected errors:
+	// Expected sentinel errors providing details to clients about failed requests:
 	//   - access.DataNotFoundError - No block with the given ID was found
 	GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error)
 
@@ -98,7 +98,7 @@ type API interface {
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
-	// - access.DataNotFoundError if the collection is not found.
+	//   - access.DataNotFoundError if the collection is not found.
 	GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error)
 
 	// GetFullCollectionByID returns a full collection by its ID.
@@ -109,7 +109,7 @@ type API interface {
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
-	// - access.DataNotFoundError if the collection is not found.
+	//   - access.DataNotFoundError if the collection is not found.
 	GetFullCollectionByID(ctx context.Context, id flow.Identifier) (*flow.Collection, error)
 
 	SendTransaction(ctx context.Context, tx *flow.TransactionBody) error

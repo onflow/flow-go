@@ -215,6 +215,7 @@ func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
 	)
 	suite.blocks.On("ByID", blockHeader.ID()).Return(blockHeader, nil)
+	suite.headers.On("BlockIDByHeight", blockHeader.Header.Height).Return(blockHeader.ID(), nil)
 
 	err := fmt.Errorf("inconsistent node state")
 	suite.snapshot.On("Head").Return(nil, err)

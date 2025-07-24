@@ -174,12 +174,18 @@ func New(params Params) (*Backend, error) {
 			execNodeIdentitiesProvider: params.ExecNodeIdentitiesProvider,
 		},
 		backendBlockHeaders: backendBlockHeaders{
-			headers: params.Headers,
-			state:   params.State,
+			backendBlockBase: backendBlockBase{
+				blocks:  params.Blocks,
+				headers: params.Headers,
+				state:   params.State,
+			},
 		},
 		backendBlockDetails: backendBlockDetails{
-			blocks: params.Blocks,
-			state:  params.State,
+			backendBlockBase: backendBlockBase{
+				blocks:  params.Blocks,
+				headers: params.Headers,
+				state:   params.State,
+			},
 		},
 		backendAccounts: backendAccounts{
 			log:                        params.Log,
@@ -360,7 +366,7 @@ func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*accessmodel.NodeVers
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected sentinel errors providing details to clients about failed requests:
-// - access.DataNotFoundError if the collection is not found.
+//   - access.DataNotFoundError if the collection is not found.
 func (b *Backend) GetCollectionByID(ctx context.Context, colID flow.Identifier) (*flow.LightCollection, error) {
 	col, err := b.collections.LightByID(colID)
 	if err != nil {
@@ -381,7 +387,7 @@ func (b *Backend) GetCollectionByID(ctx context.Context, colID flow.Identifier) 
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected sentinel errors providing details to clients about failed requests:
-// - access.DataNotFoundError if the collection is not found.
+//   - access.DataNotFoundError if the collection is not found.
 func (b *Backend) GetFullCollectionByID(ctx context.Context, colID flow.Identifier) (*flow.Collection, error) {
 	col, err := b.collections.ByID(colID)
 	if err != nil {

@@ -6,13 +6,11 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
 type backendBlockHeaders struct {
-	headers storage.Headers
-	state   protocol.State
+	backendBlockBase
 }
 
 // GetLatestBlockHeader returns the latest block header in the chain.
@@ -41,7 +39,15 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(
 		err = fmt.Errorf("failed to find latest finalized header: %w", err)
 		return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 	}
-	return header, flow.BlockStatusFinalized, nil
+
+	// Note: there is a corner case when requesting the latest finalized block before the
+	// consensus follower has progressed past the spork root block. In this case, the returned
+	// blockStatus will be finalized, however, the block is actually sealed.
+	if header.Height == b.state.Params().SporkRootBlockHeight() {
+		return header, flow.BlockStatusSealed, nil
+	} else {
+		return header, flow.BlockStatusFinalized, nil
+	}
 }
 
 // GetBlockHeaderByID returns the block header with the given ID.
@@ -64,11 +70,11 @@ func (b *backendBlockHeaders) GetBlockHeaderByID(
 		return nil, flow.BlockStatusUnknown, access.NewDataNotFoundError("header", err)
 	}
 
-	stat, err := b.getBlockStatus(header)
+	status, err := b.getBlockStatus(header)
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 	}
-	return header, stat, nil
+	return header, status, nil
 }
 
 // GetBlockHeaderByHeight returns the block header at the given height.
@@ -92,25 +98,9 @@ func (b *backendBlockHeaders) GetBlockHeaderByHeight(
 		return nil, flow.BlockStatusUnknown, access.NewDataNotFoundError("header", err)
 	}
 
-	stat, err := b.getBlockStatus(header)
+	status, err := b.getBlockStatus(header)
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 	}
-	return header, stat, nil
-}
-
-// getBlockStatus returns the status of the block
-//
-// No errors are expected during normal operations.
-func (b *backendBlockHeaders) getBlockStatus(header *flow.Header) (flow.BlockStatus, error) {
-	sealed, err := b.state.Sealed().Head()
-	if err != nil {
-		// sealed header must exist in the db, otherwise the node's state may be corrupt
-		return flow.BlockStatusUnknown, fmt.Errorf("failed to lookup latest sealed header: %w", err)
-	}
-
-	if header.Height > sealed.Height {
-		return flow.BlockStatusFinalized, nil
-	}
-	return flow.BlockStatusSealed, nil
+	return header, status, nil
 }

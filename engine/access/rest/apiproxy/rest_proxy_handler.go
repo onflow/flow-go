@@ -89,7 +89,7 @@ func (r *RestProxyHandler) log(handler, rpc string, err error) {
 //   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-// - access.DataNotFoundError if the collection is not found.
+//   - access.DataNotFoundError if the collection is not found.
 func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {

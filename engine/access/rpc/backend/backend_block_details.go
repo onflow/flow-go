@@ -6,13 +6,11 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
 type backendBlockDetails struct {
-	blocks storage.Blocks
-	state  protocol.State
+	backendBlockBase
 }
 
 // GetLatestBlock returns the latest block in the chain.
@@ -26,7 +24,7 @@ func (b *backendBlockDetails) GetLatestBlock(
 	isSealed bool,
 ) (*flow.Block, flow.BlockStatus, error) {
 	var header *flow.Header
-	var status flow.BlockStatus
+	var blockStatus flow.BlockStatus
 	var err error
 
 	if isSealed {
@@ -36,7 +34,7 @@ func (b *backendBlockDetails) GetLatestBlock(
 			err = fmt.Errorf("failed to lookup latest sealed header: %w", err)
 			return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 		}
-		status = flow.BlockStatusSealed
+		blockStatus = flow.BlockStatusSealed
 	} else {
 		header, err = b.state.Final().Head()
 		if err != nil {
@@ -44,7 +42,16 @@ func (b *backendBlockDetails) GetLatestBlock(
 			err = fmt.Errorf("failed to lookup latest finalize header: %w", err)
 			return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 		}
-		status = flow.BlockStatusFinalized
+		blockStatus = flow.BlockStatusFinalized
+
+		// Note: there is a corner case when requesting the latest finalized block before the
+		// consensus follower has progressed past the spork root block. In this case, the returned
+		// blockStatus will be finalized, however, the block is actually sealed.
+		if header.Height == b.state.Params().SporkRootBlockHeight() {
+			blockStatus = flow.BlockStatusSealed
+		} else {
+			blockStatus = flow.BlockStatusFinalized
+		}
 	}
 
 	// since we are querying a finalized or sealed block, we can use the height index and save an ID computation
@@ -55,7 +62,7 @@ func (b *backendBlockDetails) GetLatestBlock(
 		return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 	}
 
-	return block, status, nil
+	return block, blockStatus, nil
 }
 
 // GetBlockByID returns the block with the given ID.
@@ -78,11 +85,11 @@ func (b *backendBlockDetails) GetBlockByID(
 		return nil, flow.BlockStatusUnknown, access.NewDataNotFoundError("block", err)
 	}
 
-	stat, err := b.getBlockStatus(block)
+	status, err := b.getBlockStatus(block.Header)
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 	}
-	return block, stat, nil
+	return block, status, nil
 }
 
 // GetBlockByHeight returns the block at the given height.
@@ -106,25 +113,9 @@ func (b *backendBlockDetails) GetBlockByHeight(
 		return nil, flow.BlockStatusUnknown, access.NewDataNotFoundError("block", err)
 	}
 
-	stat, err := b.getBlockStatus(block)
+	status, err := b.getBlockStatus(block.Header)
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 	}
-	return block, stat, nil
-}
-
-// getBlockStatus returns the status of the block
-//
-// No errors are expected during normal operations.
-func (b *backendBlockDetails) getBlockStatus(block *flow.Block) (flow.BlockStatus, error) {
-	sealed, err := b.state.Sealed().Head()
-	if err != nil {
-		// sealed header must exist in the db, otherwise the node's state may be corrupt
-		return flow.BlockStatusUnknown, fmt.Errorf("failed to lookup latest sealed header: %w", err)
-	}
-
-	if block.Header.Height > sealed.Height {
-		return flow.BlockStatusFinalized, nil
-	}
-	return flow.BlockStatusSealed, nil
+	return block, status, nil
 }

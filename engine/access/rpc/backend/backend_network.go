@@ -47,15 +47,15 @@ func (b *backendNetwork) GetLatestProtocolStateSnapshot(ctx context.Context) ([]
 // GetProtocolStateSnapshotByBlockID returns serializable Snapshot for a block, by blockID.
 // The requested block must be finalized, otherwise an error is returned.
 //
-// Dedicated sentinel errors providing details to clients about failed requests:
-//   - access.DataNotFoundError - No block with the given ID was found
-//   - access.InvalidRequestError - Block ID is for an orphaned block and will never have a valid snapshot
-//   - access.PreconditionFailedError - A block was found, but it is not finalized and is above the finalized height.
-//
 // CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
 // As documented in the [access.API], which we partially implement with this function
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - access.DataNotFoundError - No block with the given ID was found
+//   - access.InvalidRequestError - Block ID is for an orphaned block and will never have a valid snapshot
+//   - access.PreconditionFailedError - A block was found, but it is not finalized and is above the finalized height.
 func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error) {
 	snapshot := b.state.AtBlockID(blockID)
 	snapshotHeadByBlockId, err := snapshot.Head()
@@ -98,13 +98,13 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 // GetProtocolStateSnapshotByHeight returns serializable Snapshot by block height.
 // The block must be finalized (otherwise the by-height query is ambiguous).
 //
-// Dedicated sentinel errors providing details to clients about failed requests:
-//   - access.DataNotFoundError - No finalized block with the given height was found.
-//
 // CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
 // As documented in the [access.API], which we partially implement with this function
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - access.DataNotFoundError - No finalized block with the given height was found.
 func (b *backendNetwork) GetProtocolStateSnapshotByHeight(ctx context.Context, blockHeight uint64) ([]byte, error) {
 	snapshot := b.state.AtHeight(blockHeight)
 	_, err := snapshot.Head()
