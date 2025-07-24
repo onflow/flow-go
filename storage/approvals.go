@@ -31,7 +31,7 @@ type ResultApprovals interface {
 	// for the same key (resultID, chunkIndex) this method returns an exception, as this should never happen for
 	// a correct Verification Node indexing its own approvals.
 	// No errors are expected during normal operations.
-	StoreMyApproval(lctx lockctx.Proof, result *flow.ResultApproval) error
+	StoreMyApproval(approval *flow.ResultApproval) func(lctx lockctx.Proof) error
 
 	// ByID retrieves a ResultApproval by its ID.
 	// Returns [storage.ErrNotFound] if no Approval with the given ID has been stored.

@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -9,26 +10,13 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// InsertResultApproval inserts a ResultApproval by ID.
-// The same key (`approval.ID()`) necessitates that the value (full `approval`) is
-// also identical (otherwise, we would have a successful pre-image attack on our
-// cryptographic hash function). Therefore, concurrent calls to this function are safe.
-func InsertResultApproval(lctx lockctx.Proof, w storage.Writer, approval *flow.ResultApproval) error {
-	if !lctx.HoldsLock(storage.LockIndexResultApproval) {
-		return fmt.Errorf("missing lock for insert result approval for block %v result: %v",
-			approval.Body.BlockID,
-			approval.Body.ExecutionResultID)
-	}
-	return UpsertByKey(w, MakePrefix(codeResultApproval, approval.ID()), approval)
-}
-
 // RetrieveResultApproval retrieves an approval by ID.
 // Returns `storage.ErrNotFound` if no Approval with the given ID has been stored.
 func RetrieveResultApproval(r storage.Reader, approvalID flow.Identifier, approval *flow.ResultApproval) error {
 	return RetrieveByKey(r, MakePrefix(codeResultApproval, approvalID), approval)
 }
 
-// IndexResultApproval inserts a ResultApproval ID keyed by ExecutionResult ID
+// InsertAndIndexResultApproval inserts a ResultApproval ID keyed by ExecutionResult ID
 // and chunk index.
 // Note: Unsafe means it does not check if a different approval is indexed for the same
 // chunk, and will overwrite the existing index.
@@ -42,11 +30,39 @@ func RetrieveResultApproval(r storage.Reader, approvalID flow.Identifier, approv
 //     `UnsafeIndexResultApproval` must be synchronized by the higher-logic. Currently, we have the
 //     lockctx.Proof to prove the higher logic is holding the lock inserting the approval after checking
 //     that the approval is not already indexed.
-func UnsafeIndexResultApproval(lctx lockctx.Proof, w storage.Writer, resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockIndexResultApproval) {
-		return fmt.Errorf("missing lock for index result approval for result: %v", resultID)
+func InsertAndIndexResultApproval(approval *flow.ResultApproval) func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
+	approvalID := approval.ID()
+	resultID := approval.Body.ExecutionResultID
+	chunkIndex := approval.Body.ChunkIndex
+
+	return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
+		if !lctx.HoldsLock(storage.LockIndexResultApproval) {
+			return fmt.Errorf("missing lock for index result approval for result: %v", resultID)
+		}
+
+		var storedApprovalID flow.Identifier
+		err := LookupResultApproval(rw.GlobalReader(), resultID, chunkIndex, &storedApprovalID)
+		if err == nil {
+			if storedApprovalID != approvalID {
+				return fmt.Errorf("attempting to store conflicting approval (result: %v, chunk index: %d): storing: %v, stored: %v. %w",
+					resultID, chunkIndex, approvalID, storedApprovalID, storage.ErrDataMismatch)
+			}
+
+			// already stored and indexed
+			return nil
+		}
+
+		if !errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("could not lookup result approval ID: %w", err)
+		}
+
+		err = UpsertByKey(rw.Writer(), MakePrefix(codeResultApproval, approvalID), approval)
+		if err != nil {
+			return fmt.Errorf("could not store result approval: %w", err)
+		}
+
+		return UpsertByKey(rw.Writer(), MakePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID)
 	}
-	return UpsertByKey(w, MakePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID)
 }
 
 // LookupResultApproval finds a ResultApproval by result ID and chunk index.
