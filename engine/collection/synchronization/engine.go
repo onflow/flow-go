@@ -160,7 +160,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 				blockResponse, ok := msg.Payload.(*messages.ClusterBlockResponse)
 				if !ok {
 					// should never happen, unless there is a bug.
-					e.log.Warn().
+					e.log.Fatal().
 						Hex("origin_id", logging.ID(msg.OriginID)).
 						Interface("payload", msg.Payload).
 						Msg("cannot match the payload to ClusterBlockResponse")
