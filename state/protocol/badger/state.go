@@ -177,7 +177,7 @@ func Bootstrap(
 			return fmt.Errorf("could not bootstrap spork info: %w", err)
 		}
 
-		err = bootstrapProtocolState(rw, segment, root.Params(), epochProtocolStateSnapshots, protocolKVStoreSnapshots, setups, commits, !config.SkipNetworkAddressValidation)
+		err = bootstrapProtocolState(lctx, rw, segment, root.Params(), epochProtocolStateSnapshots, protocolKVStoreSnapshots, setups, commits, !config.SkipNetworkAddressValidation)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap protocol state: %w", err)
 		}
@@ -252,6 +252,7 @@ func Bootstrap(
 // For each distinct protocol state entry, we also store the associated EpochSetup and
 // EpochCommit service events.
 func bootstrapProtocolState(
+	lctx lockctx.Proof,
 	rw storage.ReaderBatchWriter,
 	segment *flow.SealingSegment,
 	params protocol.GlobalParams,
@@ -264,7 +265,7 @@ func bootstrapProtocolState(
 	// The sealing segment contains a protocol state entry for every block in the segment, including the root block.
 	for protocolStateID, stateEntry := range segment.ProtocolStateEntries {
 		// Store the protocol KV Store entry
-		err := protocolKVStoreSnapshots.BatchStore(rw, protocolStateID, &stateEntry.KVStore)
+		err := protocolKVStoreSnapshots.BatchStore(lctx, rw, protocolStateID, &stateEntry.KVStore)
 		if err != nil {
 			return fmt.Errorf("could not store protocol state kvstore: %w", err)
 		}
@@ -292,7 +293,7 @@ func bootstrapProtocolState(
 		if err != nil {
 			return fmt.Errorf("could not index root protocol state: %w", err)
 		}
-		err = protocolKVStoreSnapshots.BatchIndex(rw, blockID, block.Payload.ProtocolStateID)
+		err = protocolKVStoreSnapshots.BatchIndex(lctx, rw, blockID, block.Payload.ProtocolStateID)
 		if err != nil {
 			return fmt.Errorf("could not index root kv store: %w", err)
 		}

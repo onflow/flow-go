@@ -321,6 +321,9 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 // concurrency safe and guarantees that an approval for a result
 // is never overwritten by a different one
 func (e *Engine) storeApproval(approval *flow.ResultApproval) error {
+	// store the approval in the database
+	storing := e.approvals.StoreMyApproval(approval)
+
 	lctx := e.lockManager.NewContext()
 	defer lctx.Release()
 
@@ -329,8 +332,7 @@ func (e *Engine) storeApproval(approval *flow.ResultApproval) error {
 		return fmt.Errorf("fail to acquire lock to insert result approval: %w", err)
 	}
 
-	// store the approval in the database
-	err = e.approvals.StoreMyApproval(lctx, approval)
+	err = storing(lctx)
 	if err != nil {
 		return fmt.Errorf("could not store result approval: %w", err)
 	}

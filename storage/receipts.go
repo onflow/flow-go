@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -34,7 +36,7 @@ type MyExecutionReceipts interface {
 	// No errors are expected during normal operation
 	// If entity fails marshalling, the error is wrapped in a generic error and returned.
 	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-	BatchStoreMyReceipt(receipt *flow.ExecutionReceipt, batch ReaderBatchWriter) error
+	BatchStoreMyReceipt(lctx lockctx.Proof, receipt *flow.ExecutionReceipt, batch ReaderBatchWriter) error
 
 	// MyReceipt retrieves my receipt for the given block.
 	MyReceipt(blockID flow.Identifier) (*flow.ExecutionReceipt, error)

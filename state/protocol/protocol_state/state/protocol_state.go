@@ -344,13 +344,13 @@ func (s *MutableProtocolState) build(
 
 	// We _always_ index the protocol state by the candidate block's ID. But only if the
 	// state actually changed, we add a database operation to persist it.
-	deferredDBOps.AddNextOperation(func(_ lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-		return s.kvStoreSnapshots.BatchIndex(rw, blockID, resultingStateID)
+	deferredDBOps.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+		return s.kvStoreSnapshots.BatchIndex(lctx, rw, blockID, resultingStateID)
 	})
 
 	if parentStateID != resultingStateID {
-		deferredDBOps.AddNextOperation(func(_ lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-			err := s.kvStoreSnapshots.BatchStore(rw, resultingStateID, evolvingState)
+		deferredDBOps.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+			err := s.kvStoreSnapshots.BatchStore(lctx, rw, resultingStateID, evolvingState)
 			if err == nil {
 				return nil
 			}
