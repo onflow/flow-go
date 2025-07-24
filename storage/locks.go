@@ -15,6 +15,7 @@ const (
 	LockFinalizeBlock = "lock_finalize_block"
 	// LockIndexResultApproval protects indexing result approvals by approval and chunk.
 	LockIndexResultApproval = "lock_index_result_approval"
+	LockInsertOwnReceipt    = "lock_insert_own_receipt"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -23,6 +24,7 @@ func Locks() []string {
 		LockInsertBlock,
 		LockFinalizeBlock,
 		LockIndexResultApproval,
+		LockInsertOwnReceipt,
 	}
 }
 
