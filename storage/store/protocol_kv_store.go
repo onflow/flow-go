@@ -3,7 +3,8 @@ package store
 import (
 	"errors"
 	"fmt"
-	"sync"
+
+	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -37,8 +38,6 @@ type ProtocolKVStore struct {
 	// `byBlockIdCache` will contain an entry for every block. We want to be able to cover a broad interval of views
 	// without cache misses, so a cache size of roughly 1000 entries is reasonable.
 	byBlockIdCache *Cache[flow.Identifier, flow.Identifier]
-	storing        *sync.Mutex
-	indexing       *sync.Mutex
 }
 
 var _ storage.ProtocolKVStore = (*ProtocolKVStore)(nil)
@@ -80,9 +79,7 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 	}
 
 	return &ProtocolKVStore{
-		db:       db,
-		storing:  new(sync.Mutex),
-		indexing: new(sync.Mutex),
+		db: db,
 		cache: newCache(collector, metrics.ResourceProtocolKVStore,
 			withLimit[flow.Identifier, *flow.PSKeyValueStoreData](kvStoreCacheSize),
 			withStore(storeByStateID),
@@ -94,9 +91,10 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 	}
 }
 
-func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
-	// TODO(7355): lockctx
-	rw.Lock(s.storing)
+func (s *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
+	if !lctx.HoldsLock(storage.LockInsertBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+	}
 
 	_, err := s.ByID(stateID)
 	if err == nil {
@@ -125,9 +123,10 @@ func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.
 //
 // Expected errors during normal operations:
 //   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
-func (s *ProtocolKVStore) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
-	// TODO(7355): lockctx
-	rw.Lock(s.indexing)
+func (s *ProtocolKVStore) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+	}
 
 	_, err := s.byBlockIdCache.Get(s.db.Reader(), blockID)
 	if err == nil {

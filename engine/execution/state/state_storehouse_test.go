@@ -65,7 +65,7 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 			results := storage.NewExecutionResults(t)
 			results.On("BatchIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			myReceipts := storage.NewMyExecutionReceipts(t)
-			myReceipts.On("BatchStoreMyReceipt", mock.Anything, mock.Anything).Return(nil)
+			myReceipts.On("BatchStoreMyReceipt", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 			withRegisterStore(t, func(t *testing.T,
 				rs *storehouse.RegisterStore,

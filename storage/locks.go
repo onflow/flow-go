@@ -19,6 +19,8 @@ const (
 	// The reason they are combined is because insertion process reads some data updated by finalization process,
 	// in order to prevent dirty reads, we need to acquire the lock for both operations.
 	LockInsertOrFinalizeClusterBlock = "lock_insert_or_finalize_cluster_block"
+	// LockInsertOwnReceipt protects the insertion of own receipt.
+	LockInsertOwnReceipt = "lock_insert_own_receipt"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -28,6 +30,7 @@ func Locks() []string {
 		LockFinalizeBlock,
 		LockIndexResultApproval,
 		LockInsertOrFinalizeClusterBlock,
+		LockInsertOwnReceipt,
 	}
 }
 
