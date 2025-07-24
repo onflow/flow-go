@@ -41,6 +41,7 @@ type PipelineFunctionalSuite struct {
 	tmpDir                        string
 	bdb                           *badger.DB
 	pdb                           *pebble.DB
+	db                            storage.DB
 	persistentRegisters           *pebbleStorage.Registers
 	persistentEvents              *store.Events
 	persistentCollections         *store.Collections
@@ -73,7 +74,7 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	p.logger = zerolog.Nop()
 	p.metrics = metrics.NewNoopCollector()
 	p.bdb = unittest.BadgerDB(t, p.tmpDir)
-	db := badgerimpl.ToDB(p.bdb)
+	p.db = badgerimpl.ToDB(p.bdb)
 
 	rootBlock := unittest.BlockHeaderFixture()
 	sealedBlock := unittest.BlockWithParentFixture(rootBlock)
@@ -85,14 +86,14 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	p.persistentRegisters, err = pebbleStorage.NewRegisters(p.pdb, pebbleStorage.PruningDisabled)
 	p.Require().NoError(err)
 
-	p.persistentEvents = store.NewEvents(p.metrics, db)
-	p.persistentTransactions = store.NewTransactions(p.metrics, db)
-	p.persistentCollections = store.NewCollections(db, p.persistentTransactions)
-	p.persistentResults = store.NewLightTransactionResults(p.metrics, db, bstorage.DefaultCacheSize)
-	p.persistentTxResultErrMsg = store.NewTransactionResultErrorMessages(p.metrics, db, bstorage.DefaultCacheSize)
-	p.results = store.NewExecutionResults(p.metrics, db)
+	p.persistentEvents = store.NewEvents(p.metrics, p.db)
+	p.persistentTransactions = store.NewTransactions(p.metrics, p.db)
+	p.persistentCollections = store.NewCollections(p.db, p.persistentTransactions)
+	p.persistentResults = store.NewLightTransactionResults(p.metrics, p.db, bstorage.DefaultCacheSize)
+	p.persistentTxResultErrMsg = store.NewTransactionResultErrorMessages(p.metrics, p.db, bstorage.DefaultCacheSize)
+	p.results = store.NewExecutionResults(p.metrics, p.db)
 
-	p.consumerProgress, err = store.NewConsumerProgress(db, "test_consumer").Initialize(sealedBlock.Header.Height)
+	p.consumerProgress, err = store.NewConsumerProgress(p.db, "test_consumer").Initialize(sealedBlock.Header.Height)
 	p.Require().NoError(err)
 
 	// store and index the root header
@@ -127,23 +128,6 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	p.execDataRequester = reqestermock.NewExecutionDataRequester(t)
 	p.txResultErrMsgsRequester = txerrmsgsmock.NewRequester(t)
 	p.txResultErrMsgsRequestTimeout = DefaultTxResultErrMsgsRequestTimeout
-
-	p.core = NewCoreImpl(
-		p.logger,
-		p.executionResult,
-		p.block.Header,
-		p.execDataRequester,
-		p.txResultErrMsgsRequester,
-		p.txResultErrMsgsRequestTimeout,
-		p.persistentRegisters,
-		p.persistentEvents,
-		p.persistentCollections,
-		p.persistentTransactions,
-		p.persistentResults,
-		p.persistentTxResultErrMsg,
-		p.persistentLatestSealedResult,
-		db,
-	)
 }
 
 // TearDownTest cleans up resources after each test case.
@@ -257,8 +241,6 @@ func (p *PipelineFunctionalSuite) TestPipelineIndexingError() {
 // while execution data is being downloaded.
 func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingExecutionData() {
 	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
-		pipeline.OnParentStateUpdated(StateComplete)
-
 		p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(
 			func(ctx context.Context) (*execution_data.BlockExecutionData, error) {
 				// Wait for cancellation
@@ -272,8 +254,12 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingExecuti
 		// This call marked as `Maybe()` because it may not be called depending on timing.
 		p.txResultErrMsgsRequester.On("Request", mock.Anything).Return([]flow.TransactionResultErrorMessage{}, nil).Maybe()
 
+		pipeline.OnParentStateUpdated(StateComplete)
+
 		waitForStateUpdates(p.T(), updateChan, StateProcessing)
 		waitForError(p.T(), errChan, context.Canceled)
+
+		p.Assert().Equal(StateProcessing, pipeline.GetState())
 	})
 }
 
@@ -283,8 +269,6 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingExecuti
 // and transitions to the correct state.
 func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingTxResultErrMsgs() {
 	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
-		pipeline.OnParentStateUpdated(StateComplete)
-
 		// This call marked as `Maybe()` because it may not be called depending on timing.
 		p.execDataRequester.On("RequestExecutionData", mock.Anything).Return((*execution_data.BlockExecutionData)(nil), nil).Maybe()
 
@@ -298,37 +282,96 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingTxResul
 				return nil, ctx.Err()
 			}).Once()
 
+		pipeline.OnParentStateUpdated(StateComplete)
+
 		waitForStateUpdates(p.T(), updateChan, StateProcessing)
 		waitForError(p.T(), errChan, context.Canceled)
+
+		p.Assert().Equal(StateProcessing, pipeline.GetState())
 	})
 }
 
-// TestPipelineShutdownOnParentAbandon tests pipeline behavior when the parent state
-// is abandoned. It verifies that the pipeline properly shuts down, cancels ongoing
-// operations, and cleans up its working data when the parent abandons the operation.
-func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
+// TestMainCtxCancellationDuringWaitingPersist tests the pipeline's behavior when the main context is canceled during StateWaitingPersist.
+func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringWaitingPersist() {
 	expectedExecutionData, expectedTxResultErrMsgs := p.initializeTestData()
 
 	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
 	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(expectedTxResultErrMsgs, nil).Once()
 
 	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
+		pipeline.OnParentStateUpdated(StateComplete)
+
 		waitForStateUpdates(p.T(), updateChan, StateProcessing, StateWaitingPersist)
 
-		pipeline.OnParentStateUpdated(StateAbandoned)
+		cancel()
 
-		waitForStateUpdates(p.T(), updateChan, StateAbandoned)
-		waitForError(p.T(), errChan, nil)
+		pipeline.SetSealed()
 
-		p.Assert().Equal(StateAbandoned, pipeline.GetState())
-		p.Assert().Nil(p.core.workingData)
+		waitForError(p.T(), errChan, context.Canceled)
+
+		p.Assert().Equal(StateWaitingPersist, pipeline.GetState())
 	})
+}
+
+// TestPipelineShutdownOnParentAbandon verifies that the pipeline transitions correctly to a shutdown state when the parent is abandoned.
+func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
+	expectedExecutionData, expectedTxResultErrMsgs := p.initializeTestData()
+
+	tests := []struct {
+		name   string
+		states []State
+	}{
+		{
+			name:   "from StateProcessing",
+			states: []State{StateProcessing},
+		},
+		{
+			name:   "from StateWaitingPersist",
+			states: []State{StateProcessing, StateWaitingPersist},
+		},
+	}
+
+	for _, test := range tests {
+		p.T().Run(test.name, func(t *testing.T) {
+			p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
+				p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Maybe()
+				p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(expectedTxResultErrMsgs, nil).Maybe()
+
+				waitForStateUpdates(p.T(), updateChan, test.states...)
+
+				pipeline.OnParentStateUpdated(StateAbandoned)
+
+				waitForStateUpdates(p.T(), updateChan, StateAbandoned)
+				waitForError(p.T(), errChan, nil)
+
+				p.Assert().Equal(StateAbandoned, pipeline.GetState())
+				p.Assert().Nil(p.core.workingData)
+			})
+		})
+	}
 }
 
 // WithRunningPipeline is a test helper that initializes and starts a pipeline instance.
 // It manages the context and channels needed to run the pipeline and invokes the testFunc
 // with access to the pipeline, update channel, error channel, and cancel function.
 func (p *PipelineFunctionalSuite) WithRunningPipeline(testFunc func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc)) {
+	p.core = NewCoreImpl(
+		p.logger,
+		p.executionResult,
+		p.block.Header,
+		p.execDataRequester,
+		p.txResultErrMsgsRequester,
+		p.txResultErrMsgsRequestTimeout,
+		p.persistentRegisters,
+		p.persistentEvents,
+		p.persistentCollections,
+		p.persistentTransactions,
+		p.persistentResults,
+		p.persistentTxResultErrMsg,
+		p.persistentLatestSealedResult,
+		p.db,
+	)
+
 	pipelineStateConsumer := NewMockStateConsumer()
 
 	pipeline := NewPipeline(p.logger, p.executionResult, false, pipelineStateConsumer)
