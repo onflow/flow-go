@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
@@ -17,7 +18,7 @@ type QuorumCertificates interface {
 
 	// BatchStore stores a Quorum Certificate as part of database batch update. QC is indexed by QC.BlockID.
 	// * storage.ErrAlreadyExists if a different QC for blockID is already stored
-	BatchStore(ReaderBatchWriter, *flow.QuorumCertificate) error
+	BatchStore(lockctx.Proof, ReaderBatchWriter, *flow.QuorumCertificate) error
 
 	// ByBlockID returns QC that certifies block referred by blockID.
 	// * storage.ErrNotFound if no QC for blockID doesn't exist.
