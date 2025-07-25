@@ -53,6 +53,7 @@ type SyncSuite struct {
 	blocks       *storage.ClusterBlocks
 	comp         *mockcollection.Compliance
 	core         *module.SyncCore
+	metrics      *module.EngineMetrics
 	e            *Engine
 }
 
@@ -149,9 +150,9 @@ func (ss *SyncSuite) SetupTest() {
 
 	// initialize the engine
 	log := zerolog.New(io.Discard)
-	metrics := metrics.NewNoopCollector()
+	ss.metrics = new(module.EngineMetrics)
 
-	e, err := New(log, metrics, ss.net, ss.me, ss.participants.ToSkeleton(), ss.state, ss.blocks, ss.comp, ss.core)
+	e, err := New(log, ss.metrics, ss.net, ss.me, ss.participants.ToSkeleton(), ss.state, ss.blocks, ss.comp, ss.core)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
 	ss.e = e
@@ -452,6 +453,33 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	ss.e.onBlockResponse(originID, res)
 	ss.comp.AssertExpectations(ss.T())
 	ss.core.AssertExpectations(ss.T())
+}
+
+// TestOnInvalidBlockResponse verifies that the engine correctly handles a BlockResponse
+// containing an invalid block proposal that cannot be converted to a trusted proposal.
+func (ss *SyncSuite) TestOnInvalidBlockResponse() {
+	// generate origin and block response
+	originID := unittest.IdentifierFixture()
+
+	proposal := unittest.ClusterProposalFixture()
+	proposal.ProposerSigData = nil // invalid value
+
+	req := &messages.ClusterBlockResponse{
+		Nonce:  0,
+		Blocks: []clustermodel.UntrustedProposal{clustermodel.UntrustedProposal(*proposal)},
+	}
+
+	// Expect metrics to track message receipt and message drop for invalid block proposal
+	ss.metrics.On("MessageReceived", metrics.EngineClusterSynchronization, metrics.MessageBlockResponse).Once()
+	ss.metrics.On("InboundMessageDropped", metrics.EngineClusterSynchronization, metrics.MessageBlockProposal).Once()
+
+	// Process the block response message through the engine
+	require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
+
+	// HandleBlock should NOT be called for invalid Proposal
+	ss.core.AssertNotCalled(ss.T(), "HandleBlock", mock.Anything)
+	// OnSyncedBlocks should NOT be called for invalid Proposal
+	ss.comp.AssertNotCalled(ss.T(), "onBlockResponse", mock.Anything)
 }
 
 func (ss *SyncSuite) TestPollHeight() {
