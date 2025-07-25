@@ -129,8 +129,14 @@ func (s *ProtocolKVStore) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.
 	// TODO(7355): lockctx
 	rw.Lock(s.indexing)
 
-	_, err := s.byBlockIdCache.Get(s.db.Reader(), blockID)
+	existingStateID, err := s.byBlockIdCache.Get(s.db.Reader(), blockID)
 	if err == nil {
+
+		// if it's about to index the same state ID, then we can skip the operation
+		if existingStateID == stateID {
+			return nil
+		}
+
 		return fmt.Errorf("kv-store snapshot with block id (%x) already exists: %w", blockID[:], storage.ErrAlreadyExists)
 	}
 	if !errors.Is(err, storage.ErrNotFound) {
