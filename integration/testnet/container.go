@@ -408,10 +408,11 @@ func (c *Container) OpenState() (*state.State, error) {
 		store.DefaultProtocolKVStoreCacheSize, store.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := store.NewVersionBeacons(db)
 
+	lockManager := storage.NewTestingLockManager()
 	return state.OpenState(
 		metrics,
 		db,
-		storage.NewTestingLockManager(),
+		lockManager,
 		headers,
 		seals,
 		results,
