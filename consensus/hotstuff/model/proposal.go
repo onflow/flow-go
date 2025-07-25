@@ -85,7 +85,7 @@ func SignedProposalFromClusterBlock(p *cluster.Proposal) *SignedProposal {
 	proposal := SignedProposal{
 		Proposal: Proposal{
 			Block:      BlockFromFlow(p.Block.ToHeader()),
-			LastViewTC: p.Block.Header.LastViewTC,
+			LastViewTC: p.Block.LastViewTC,
 		},
 		SigData: p.ProposerSigData,
 	}

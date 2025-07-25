@@ -41,8 +41,8 @@ func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) (*
 
 	block, err := cluster.NewRootBlock(
 		cluster.UntrustedBlock{
-			Header:  *rootHeaderBody,
-			Payload: *rootBlockPayload,
+			HeaderBody: *rootHeaderBody,
+			Payload:    *rootBlockPayload,
 		},
 	)
 	if err != nil {

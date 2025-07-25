@@ -19,7 +19,7 @@ type ClusterLightBlock struct {
 func ClusterBlockToLight(clusterBlock *cluster.Block) *ClusterLightBlock {
 	return &ClusterLightBlock{
 		ID:           clusterBlock.ID(),
-		Height:       clusterBlock.Header.Height,
+		Height:       clusterBlock.Height,
 		CollectionID: clusterBlock.Payload.Collection.ID(),
 		Transactions: clusterBlock.Payload.Collection.Light().Transactions,
 	}
