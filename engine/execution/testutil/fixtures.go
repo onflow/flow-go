@@ -113,51 +113,6 @@ func CreateUnauthorizedContractDeploymentTransaction(contractName string, contra
 		AddAuthorizer(authorizer)
 }
 
-//func SignPayload(
-//	tx *flow.TransactionBody,
-//	account flow.Address,
-//	privateKey flow.AccountPrivateKey,
-//) error {
-//	hasher, err := utils.NewHasher(privateKey.HashAlgo)
-//	if err != nil {
-//		return fmt.Errorf("failed to create hasher: %w", err)
-//	}
-//
-//	err = tx.SignPayload(account, 0, privateKey.PrivateKey, hasher)
-//
-//	if err != nil {
-//		return fmt.Errorf("failed to sign transaction: %w", err)
-//	}
-//
-//	return nil
-//}
-
-//func SignEnvelope(tx *flow.TransactionBody, account flow.Address, privateKey flow.AccountPrivateKey) error {
-//	hasher, err := utils.NewHasher(privateKey.HashAlgo)
-//	if err != nil {
-//		return fmt.Errorf("failed to create hasher: %w", err)
-//	}
-//
-//	err = tx.SignEnvelope(account, 0, privateKey.PrivateKey, hasher)
-//
-//	if err != nil {
-//		return fmt.Errorf("failed to sign transaction: %w", err)
-//	}
-//
-//	return nil
-//}
-
-//func SignTransaction(
-//	tx *flow.TransactionBody,
-//	address flow.Address,
-//	privateKey flow.AccountPrivateKey,
-//	seqNum uint64,
-//) error {
-//	tx.SetProposalKey(address, 0, seqNum)
-//	tx.SetPayer(address)
-//	return SignEnvelope(tx, address, privateKey)
-//}
-
 func SignTransaction(
 	tx *flow.TransactionBodyBuilder,
 	address flow.Address,

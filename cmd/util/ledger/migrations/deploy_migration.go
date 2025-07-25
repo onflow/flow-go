@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
