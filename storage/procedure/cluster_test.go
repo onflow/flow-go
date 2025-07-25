@@ -44,7 +44,6 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return InsertClusterBlock(lctx, rw, &block)
 		}))
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), block.Header.ChainID, parent.Header.Height, parent.ID())
