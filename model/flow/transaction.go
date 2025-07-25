@@ -172,6 +172,8 @@ func (tb TransactionBody) ID() Identifier {
 }
 
 // Transaction is the smallest unit of task.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Transaction struct {
 	TransactionBody
 	Status           TransactionStatus

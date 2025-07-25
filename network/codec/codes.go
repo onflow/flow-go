@@ -188,7 +188,8 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 		var transactionBody flow.TransactionBody
 		return &transactionBody, what(&transactionBody), nil
 	case CodeTransaction:
-		return &flow.Transaction{}, what(&flow.Transaction{}), nil
+		var transaction flow.Transaction
+		return &transaction, what(&transaction), nil
 
 	// core messages for execution & verification
 	case CodeExecutionReceipt:
