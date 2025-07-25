@@ -66,7 +66,30 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return store.BatchStore(rw, stateID, expected)
 		})
-		require.ErrorIs(t, err, storage.ErrAlreadyExists)
+		// No error when storing same data again
+		require.NoError(t, err)
+
+		// Attempt to store different data with the same stateID
+		dataDifferent := &flow.PSKeyValueStoreData{
+			Version: 2,
+			Data:    unittest.RandomBytes(32),
+		}
+
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return store.BatchStore(rw, stateID, dataDifferent)
+		})
+		require.ErrorIs(t, err, storage.ErrDataMismatch)
+
+		// Attempt to store different version with the same stateID
+		versionDifferent := &flow.PSKeyValueStoreData{
+			Version: 3,
+			Data:    expected.Data,
+		}
+
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return store.BatchStore(rw, stateID, versionDifferent)
+		})
+		require.ErrorIs(t, err, storage.ErrDataMismatch)
 	})
 }
 
@@ -93,7 +116,7 @@ func TestProtocolKVStore_IndexTx(t *testing.T) {
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return store.BatchIndex(rw, blockID, differentStateID)
 		})
-		require.ErrorIs(t, err, storage.ErrAlreadyExists)
+		require.ErrorIs(t, err, storage.ErrDataMismatch)
 	})
 }
 
