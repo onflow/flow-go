@@ -84,7 +84,7 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		}
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchStore(rw, stateID, dataDifferent)
+			return store.BatchStore(lctx, rw, stateID, dataDifferent)
 		})
 		require.ErrorIs(t, err, storage.ErrDataMismatch)
 
@@ -95,7 +95,7 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		}
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchStore(rw, stateID, versionDifferent)
+			return store.BatchStore(lctx, rw, stateID, versionDifferent)
 		})
 		require.ErrorIs(t, err, storage.ErrDataMismatch)
 	})
@@ -126,7 +126,7 @@ func TestProtocolKVStore_IndexTx(t *testing.T) {
 
 		differentStateID := unittest.IdentifierFixture()
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchIndex(rw, blockID, differentStateID)
+			return store.BatchIndex(lctx, rw, blockID, differentStateID)
 		})
 		require.ErrorIs(t, err, storage.ErrDataMismatch)
 	})
