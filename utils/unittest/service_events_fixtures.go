@@ -815,7 +815,6 @@ func createEpochCommitEvent() cadence.Event {
 	}).WithType(newFlowEpochEpochCommitEventType())
 }
 
-
 func createEpochRecoverEvent(randomSourceHex string) cadence.Event {
 
 	clusterQCVoteDataType := newFlowClusterQCClusterQCVoteDataStructType()

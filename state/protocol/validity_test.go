@@ -201,7 +201,6 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 	})
 }
 
-
 // TestIsValidExtendingEpochSetup tests that implementation enforces the following protocol rules in case they are violated:
 // (a) We should only have a single epoch setup event per epoch.
 // (b) The setup event should have the counter increased by one

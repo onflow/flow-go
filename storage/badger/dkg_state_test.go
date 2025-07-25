@@ -683,8 +683,6 @@ func TestDKGState_InsertedKeyIsIncludedInTheEpoch(t *testing.T) {
 			require.NoError(t, err)
 		})
 
-
-
 		t.Run("inserted key is included in the epoch but current node is not part of the random beacon committee", func(t *testing.T) {
 			epochCounter := setupState()
 			expectedKey := unittest.StakingPrivKeyFixture()
@@ -752,8 +750,6 @@ func TestDKGState_UpsertedKeyIsIncludedInTheEpoch(t *testing.T) {
 			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
 			require.NoError(t, err)
 		})
-
-
 
 		t.Run("upserted key is included in the epoch but current node is not part of the random beacon committee", func(t *testing.T) {
 			epochCounter := setupState()
