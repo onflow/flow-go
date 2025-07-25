@@ -215,6 +215,7 @@ generate-mocks: install-mock-generators
 	mockery --name 'TransactionProvider' --dir="./engine/access/rpc/backend/transactions/provider" --case=underscore --output="./engine/access/rpc/backend/transactions/provider/mock" --outpkg="mock"
 	mockery --name 'TxErrorMessageProvider' --dir="./engine/access/rpc/backend/transactions/error_message_provider" --case=underscore --output="./engine/access/rpc/backend/transactions/error_message_provider/mock" --outpkg="mock"
 	mockery --name 'TransactionSender' --dir="./engine/access/rpc/backend/transactions/retrier" --case=underscore --output="./engine/access/rpc/backend/transactions/retrier/mock" --outpkg="mock"
+	mockery --name 'Retrier' --dir="./engine/access/rpc/backend/transactions/retrier" --case=underscore --output="./engine/access/rpc/backend/transactions/retrier/mock" --outpkg="mock"
 	mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"
 	mockery --name 'ExecForkActor' --structname 'ExecForkActorMock' --dir=module/mempool/consensus/mock/ --case=underscore --output="./module/mempool/consensus/mock/" --outpkg="mock"
 	mockery --name '.*' --dir=engine/verification/fetcher/ --case=underscore --output="./engine/verification/fetcher/mock" --outpkg="mockfetcher"

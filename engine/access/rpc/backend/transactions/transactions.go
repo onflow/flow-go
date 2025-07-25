@@ -52,7 +52,7 @@ type Transactions struct {
 	historicalAccessNodeClients []accessproto.AccessAPIClient
 	nodeCommunicator            node_communicator.Communicator
 	connectionFactory           connection.ConnectionFactory
-	retrier                     *retrier.Retrier
+	retrier                     retrier.Retrier
 
 	// Storages
 	blocks       storage.Blocks
@@ -178,6 +178,8 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 			txs,
 			params.TxStatusDeriver,
 		)
+	} else {
+		txs.retrier = retrier.NewNoopRetrier()
 	}
 
 	return txs, nil
@@ -207,10 +209,7 @@ func (t *Transactions) SendTransaction(ctx context.Context, tx *flow.Transaction
 		return status.Errorf(codes.Internal, "failed to store transaction: %v", err)
 	}
 
-	//TODO: can we use noop retrier to avoid check for nil?
-	if t.retrier != nil {
-		go t.registerTransactionForRetry(tx)
-	}
+	go t.registerTransactionForRetry(tx)
 
 	return nil
 }

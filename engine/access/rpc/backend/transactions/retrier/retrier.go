@@ -14,18 +14,23 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type TransactionSender interface {
-	SendRawTransaction(ctx context.Context, tx *flow.TransactionBody) error
-}
-
 // RetryFrequency has to be less than TransactionExpiry or else this module does nothing
 const RetryFrequency uint64 = 120 // Blocks
 
 type Transactions map[flow.Identifier]*flow.TransactionBody
 type BlockHeightToTransactions = map[uint64]Transactions
 
-// Retrier implements a simple retry mechanism for transaction submission.
-type Retrier struct {
+type TransactionSender interface {
+	SendRawTransaction(ctx context.Context, tx *flow.TransactionBody) error
+}
+
+type Retrier interface {
+	Retry(height uint64) error
+	RegisterTransaction(height uint64, tx *flow.TransactionBody)
+}
+
+// RetrierImpl implements a simple retry mechanism for transaction submission.
+type RetrierImpl struct {
 	log zerolog.Logger
 
 	mu                  sync.RWMutex
@@ -44,8 +49,8 @@ func NewRetrier(
 	collections storage.Collections,
 	txSender TransactionSender,
 	txStatusDeriver *status_deriver.TxStatusDeriver,
-) *Retrier {
-	return &Retrier{
+) *RetrierImpl {
+	return &RetrierImpl{
 		log:                 log,
 		pendingTransactions: BlockHeightToTransactions{},
 		blocks:              blocks,
@@ -61,7 +66,7 @@ func NewRetrier(
 // The method takes a block height as input. If the provided height is lower than
 // flow.DefaultTransactionExpiry, no retries are performed, and the method returns nil.
 // No errors expected during normal operations.
-func (r *Retrier) Retry(height uint64) error {
+func (r *RetrierImpl) Retry(height uint64) error {
 	// No need to retry if height is lower than DefaultTransactionExpiry
 	if height < flow.DefaultTransactionExpiry {
 		return nil
@@ -85,7 +90,7 @@ func (r *Retrier) Retry(height uint64) error {
 }
 
 // RegisterTransaction adds a transaction that could possibly be retried
-func (r *Retrier) RegisterTransaction(height uint64, tx *flow.TransactionBody) {
+func (r *RetrierImpl) RegisterTransaction(height uint64, tx *flow.TransactionBody) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.pendingTransactions[height] == nil {
@@ -94,7 +99,7 @@ func (r *Retrier) RegisterTransaction(height uint64, tx *flow.TransactionBody) {
 	r.pendingTransactions[height][tx.ID()] = tx
 }
 
-func (r *Retrier) prune(height uint64) {
+func (r *RetrierImpl) prune(height uint64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	// If height is less than the default, there will be no expired Transactions
@@ -114,7 +119,7 @@ func (r *Retrier) prune(height uint64) {
 // transactions that are no longer pending or have an unknown status.
 // Error returns:
 //   - errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
-func (r *Retrier) retryTxsAtHeight(heightToRetry uint64) error {
+func (r *RetrierImpl) retryTxsAtHeight(heightToRetry uint64) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	txsAtHeight := r.pendingTransactions[heightToRetry]
@@ -161,7 +166,7 @@ func (r *Retrier) retryTxsAtHeight(heightToRetry uint64) error {
 // Error returns:
 //   - `storage.ErrNotFound` - collection referenced by transaction or block by a collection has not been found.
 //   - all other errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
-func (r *Retrier) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
+func (r *RetrierImpl) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
 	collection, err := r.collections.LightByTransactionID(txID)
 	if err != nil {
 		return nil, err
