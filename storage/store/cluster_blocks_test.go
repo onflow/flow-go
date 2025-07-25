@@ -25,7 +25,6 @@ func TestClusterBlocks(t *testing.T) {
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.Header.ChainID, parent.Header.Height, parent.ID())
 		})
-		lctx.Release()
 		require.NoError(t, err)
 
 		// add parent as boundary
@@ -33,6 +32,7 @@ func TestClusterBlocks(t *testing.T) {
 			return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), parent.Header.ChainID, parent.Header.Height)
 		})
 		require.NoError(t, err)
+		lctx.Release()
 
 		// store a chain of blocks
 		for _, block := range blocks {
