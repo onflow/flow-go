@@ -42,24 +42,6 @@ func (_m *Index) ByBlockID(blockID flow.Identifier) (*flow.Index, error) {
 	return r0, r1
 }
 
-// Store provides a mock function with given fields: blockID, index
-func (_m *Index) Store(blockID flow.Identifier, index *flow.Index) error {
-	ret := _m.Called(blockID, index)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Store")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.Index) error); ok {
-		r0 = rf(blockID, index)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // NewIndex creates a new instance of Index. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewIndex(t interface {
