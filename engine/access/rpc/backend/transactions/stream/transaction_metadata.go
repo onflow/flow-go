@@ -29,7 +29,7 @@ type TransactionMetadata struct {
 
 	txResult           *accessmodel.TransactionResult
 	txReferenceBlockID flow.Identifier
-	blockWithTx        *flow.Header
+	blockWithTx        *flow.Header //TODO: what is this???
 
 	eventEncodingVersion entities.EventEncodingVersion
 
@@ -58,6 +58,8 @@ func NewTransactionMetadata(
 	txID flow.Identifier,
 	txReferenceBlockID flow.Identifier,
 	eventEncodingVersion entities.EventEncodingVersion,
+	txProvider *txprovider.FailoverTransactionProvider,
+	txStatusDeriver *status_deriver.TxStatusDeriver,
 ) *TransactionMetadata {
 	return &TransactionMetadata{
 		txResult:             &accessmodel.TransactionResult{TransactionID: txID},
@@ -66,6 +68,8 @@ func NewTransactionMetadata(
 		collections:          collections,
 		transactions:         transactions,
 		txReferenceBlockID:   txReferenceBlockID,
+		txProvider:           txProvider,
+		txStatusDeriver:      txStatusDeriver,
 	}
 }
 
@@ -229,7 +233,7 @@ func (t *TransactionMetadata) refreshTransactionResult(ctx context.Context) erro
 		t.eventEncodingVersion,
 	)
 	if err != nil {
-		return fmt.Errorf("unexpected error while getting transaction result from storage: %w", err)
+		return fmt.Errorf("unexpected error while getting transaction result: %w", err)
 	}
 
 	// If transaction result was found, fully replace it in metadata. New transaction status already included in result.

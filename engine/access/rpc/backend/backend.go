@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
 	txstream "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/stream"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -225,6 +226,29 @@ func New(params Params) (*Backend, error) {
 		return nil, fmt.Errorf("failed to create transactions backend: %w", err)
 	}
 
+	localTxProvider := provider.NewLocalTransactionProvider(
+		params.State,
+		params.Collections,
+		params.Blocks,
+		params.EventsIndex,
+		params.TxResultsIndex,
+		params.TxErrorMessageProvider,
+		systemTxID,
+		txStatusDeriver,
+	)
+	execNodeTxProvider := provider.NewENTransactionProvider(
+		params.Log,
+		params.State,
+		params.Collections,
+		params.ConnFactory,
+		params.Communicator,
+		params.ExecNodeIdentitiesProvider,
+		txStatusDeriver,
+		systemTxID,
+		systemTx,
+	)
+	failoverTxProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
+
 	txStreamBackend := txstream.NewTransactionStreamBackend(
 		params.Log,
 		params.State,
@@ -234,6 +258,8 @@ func New(params Params) (*Backend, error) {
 		params.Blocks,
 		params.Collections,
 		params.Transactions,
+		failoverTxProvider,
+		txStatusDeriver,
 	)
 
 	scriptsBackend, err := scripts.NewScriptsBackend(

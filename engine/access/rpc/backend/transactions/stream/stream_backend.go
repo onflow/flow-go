@@ -13,6 +13,8 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/access"
+	txprovider "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -42,6 +44,9 @@ type TransactionStream struct {
 	blocks       storage.Blocks
 	collections  storage.Collections
 	transactions storage.Transactions
+
+	txProvider      *txprovider.FailoverTransactionProvider
+	txStatusDeriver *status_deriver.TxStatusDeriver
 }
 
 var _ access.TransactionStreamAPI = (*TransactionStream)(nil)
@@ -55,6 +60,8 @@ func NewTransactionStreamBackend(
 	blocks storage.Blocks,
 	collections storage.Collections,
 	transactions storage.Transactions,
+	txProvider *txprovider.FailoverTransactionProvider,
+	txStatusDeriver *status_deriver.TxStatusDeriver,
 ) *TransactionStream {
 	return &TransactionStream{
 		log:                 log,
@@ -65,6 +72,8 @@ func NewTransactionStreamBackend(
 		blocks:              blocks,
 		collections:         collections,
 		transactions:        transactions,
+		txProvider:          txProvider,
+		txStatusDeriver:     txStatusDeriver,
 	}
 }
 
@@ -155,6 +164,8 @@ func (t *TransactionStream) createSubscription(
 		txID,
 		referenceBlockID,
 		requiredEventEncodingVersion,
+		t.txProvider,
+		t.txStatusDeriver,
 	)
 
 	return t.subscriptionHandler.Subscribe(ctx, startHeight, t.getTransactionStatusResponse(txInfo, startHeight))
