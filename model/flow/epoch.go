@@ -593,6 +593,7 @@ func (commit *EpochCommit) EncodeRLP(w io.Writer) error {
 	for _, key := range commit.DKGParticipantKeys {
 		rlpEncodable.DKGParticipantKeys = append(rlpEncodable.DKGParticipantKeys, key.Encode())
 	}
+	// ensure index map is serialized in a consistent ordered manner
 	for id, index := range commit.DKGIndexMap {
 		rlpEncodable.DKGIndexMap[index] = id
 	}
