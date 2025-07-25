@@ -3359,6 +3359,10 @@ func RunWithNewEnvironment(
 
 				blocks := new(envMock.Blocks)
 				block1 := unittest.BlockFixture()
+				blocks.On("ByHeightFrom",
+					block1.Height,
+					block1.ToHeader(),
+				).Return(block1.ToHeader(), nil)
 
 				opts := []fvm.Option{
 					fvm.WithChain(chain),
