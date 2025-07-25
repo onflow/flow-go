@@ -110,8 +110,8 @@ func (s *EngineSuite) TestProcessSyncedBlock() {
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
 
-// TestProcessGossipedBlock check that processing single gossiped block results in call to FollowerCore.
-func (s *EngineSuite) TestProcessGossipedBlock() {
+// TestProcessGossipedValidBlock check that processing single structurally valid gossiped block results in call to FollowerCore.
+func (s *EngineSuite) TestProcessGossipedValidBlock() {
 	block := unittest.BlockWithParentFixture(s.finalized)
 	proposal := unittest.ProposalFromBlock(block)
 
@@ -125,6 +125,21 @@ func (s *EngineSuite) TestProcessGossipedBlock() {
 	require.NoError(s.T(), err)
 
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
+}
+
+// TestProcessGossipedInvalidBlock check that processing single structurally invalid gossiped block results in call to FollowerCore.
+func (s *EngineSuite) TestProcessGossipedInvalidBlock() {
+	block := unittest.BlockWithParentFixture(s.finalized)
+	proposal := unittest.ProposalFromBlock(block)
+	proposal.ProposerSigData = nil
+
+	originID := unittest.IdentifierFixture()
+
+	err := s.engine.Process(channels.ReceiveBlocks, originID, (*flow.UntrustedProposal)(proposal))
+	require.NoError(s.T(), err)
+
+	// OnBlockRange should NOT be called for invalid proposal
+	s.core.AssertNotCalled(s.T(), "OnBlockRange", mock.Anything, mock.Anything)
 }
 
 // TestProcessBlockFromComplianceInterface check that processing single gossiped block using compliance interface results in call to FollowerCore.
