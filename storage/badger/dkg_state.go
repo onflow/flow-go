@@ -327,21 +327,6 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) ensureKeyIncludedInEpoch(epoc
 	expectedPublicKey := commit.DKGParticipantKeys[myDKGIndex]
 	if !publicKey.Equals(expectedPublicKey) {
 		return fmt.Errorf("stored private key does not match public key in epoch commit for epoch %d", epochCounter)
-		// the check still catches the case where the DKG smart contract determined a different public key for this node compared to the node local DKG result.
-		// Nevertheless, we remain vulnerable to misconfigurations, where the node operator mixed up keys.
-		isMatchingKey := func(lhs crypto.PublicKey) bool { return lhs.Equals(publicKey) }
-		if slices.IndexFunc(commit.DKGParticipantKeys, isMatchingKey) < 0 {
-			return fmt.Errorf("key not included in epoch commit: %s", publicKey)
-		}
-		return nil
-	} // the following code will be reached if and only if `commit` follows the new protocol convention, where `EpochCommit.DKGIndexMap` is not nil
-
-	keyIndex, exists := commit.DKGIndexMap[ds.myNodeID]
-	if !exists {
-		return fmt.Errorf("this node is not part of the random beacon committee as specified by the EpochCommit event")
-	}
-	if !commit.DKGParticipantKeys[keyIndex].Equals(publicKey) {
-		return fmt.Errorf("provided private key does not match random beacon public key in the EpochCommit event")
 	}
 	return nil
 }
