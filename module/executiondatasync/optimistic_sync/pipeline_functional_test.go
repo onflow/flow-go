@@ -57,6 +57,7 @@ type PipelineFunctionalSuite struct {
 	block                         *flow.Block
 	executionResult               *flow.ExecutionResult
 	metrics                       module.CacheMetrics
+	config                        PipelineConfig
 }
 
 func TestPipelineFunctionalSuite(t *testing.T) {
@@ -129,6 +130,10 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	p.execDataRequester = reqestermock.NewExecutionDataRequester(t)
 	p.txResultErrMsgsRequester = txerrmsgsmock.NewRequester(t)
 	p.txResultErrMsgsRequestTimeout = DefaultTxResultErrMsgsRequestTimeout
+
+	p.config = PipelineConfig{
+		parentState: StateWaitingPersist,
+	}
 }
 
 // TearDownTest cleans up resources after each test case.
@@ -162,7 +167,7 @@ func (p *PipelineFunctionalSuite) TestPipelineCompletesSuccessfully() {
 
 		expectedChunkExecutionData := expectedExecutionData.ChunkExecutionDatas[0]
 		p.verifyDataPersistence(expectedChunkExecutionData, expectedTxResultErrMsgs)
-	})
+	}, p.config)
 }
 
 // TestPipelineDownloadError tests how the pipeline handles errors during the download phase.
@@ -203,7 +208,7 @@ func (p *PipelineFunctionalSuite) TestPipelineDownloadError() {
 
 				waitForError(p.T(), errChan, test.expectedErr)
 				p.Assert().Equal(StateProcessing, pipeline.GetState())
-			})
+			}, p.config)
 		})
 	}
 }
@@ -234,7 +239,7 @@ func (p *PipelineFunctionalSuite) TestPipelineIndexingError() {
 			p.Assert().Equal(expectedIndexingError.Error(), err.Error())
 		})
 		p.Assert().Equal(StateProcessing, pipeline.GetState())
-	})
+	}, p.config)
 }
 
 // TestPipelinePersistingError tests the pipeline behavior when an error occurs during the persisting step.
@@ -258,7 +263,7 @@ func (p *PipelineFunctionalSuite) TestPipelinePersistingError() {
 
 		waitForError(p.T(), errChan, assert.AnError)
 		p.Assert().Equal(StateWaitingPersist, pipeline.GetState())
-	})
+	}, p.config)
 }
 
 // TestMainCtxCancellationDuringRequestingExecutionData tests context cancellation during the
@@ -285,7 +290,7 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingExecuti
 		waitForError(p.T(), errChan, context.Canceled)
 
 		p.Assert().Equal(StateProcessing, pipeline.GetState())
-	})
+	}, p.config)
 }
 
 // TestMainCtxCancellationDuringRequestingTxResultErrMsgs tests context cancellation during
@@ -313,7 +318,7 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingTxResul
 		waitForError(p.T(), errChan, context.Canceled)
 
 		p.Assert().Equal(StateProcessing, pipeline.GetState())
-	})
+	}, p.config)
 }
 
 // TestMainCtxCancellationDuringWaitingPersist tests the pipeline's behavior when the main context is canceled during StateWaitingPersist.
@@ -335,7 +340,7 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringWaitingPersist() 
 		waitForError(p.T(), errChan, context.Canceled)
 
 		p.Assert().Equal(StateWaitingPersist, pipeline.GetState())
-	})
+	}, p.config)
 }
 
 // TestPipelineShutdownOnParentAbandon verifies that the pipeline transitions correctly to a shutdown state when the parent is abandoned.
@@ -343,16 +348,36 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 	expectedExecutionData, expectedTxResultErrMsgs := p.initializeTestData()
 
 	tests := []struct {
-		name   string
-		states []State
+		name        string
+		config      PipelineConfig
+		customSetup func(pipeline Pipeline, updateChan chan State)
 	}{
 		{
-			name:   "from StateProcessing",
-			states: []State{StateProcessing},
+			name: "from StatePending",
+			config: PipelineConfig{
+				beforePipelineRun: func(pipeline *PipelineImpl) {
+					pipeline.OnParentStateUpdated(StateAbandoned)
+				},
+				parentState: StateAbandoned,
+			},
 		},
 		{
-			name:   "from StateWaitingPersist",
-			states: []State{StateProcessing, StateWaitingPersist},
+			name: "from StateProcessing",
+			customSetup: func(pipeline Pipeline, updateChan chan State) {
+				waitForStateUpdates(p.T(), updateChan, StateProcessing)
+
+				pipeline.OnParentStateUpdated(StateAbandoned)
+			},
+			config: p.config,
+		},
+		{
+			name: "from StateWaitingPersist",
+			customSetup: func(pipeline Pipeline, updateChan chan State) {
+				waitForStateUpdates(p.T(), updateChan, StateProcessing, StateWaitingPersist)
+
+				pipeline.OnParentStateUpdated(StateAbandoned)
+			},
+			config: p.config,
 		},
 	}
 
@@ -362,24 +387,29 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 				p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Maybe()
 				p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(expectedTxResultErrMsgs, nil).Maybe()
 
-				waitForStateUpdates(p.T(), updateChan, test.states...)
-
-				pipeline.OnParentStateUpdated(StateAbandoned)
+				if test.customSetup != nil {
+					test.customSetup(pipeline, updateChan)
+				}
 
 				waitForStateUpdates(p.T(), updateChan, StateAbandoned)
 				waitForError(p.T(), errChan, nil)
 
 				p.Assert().Equal(StateAbandoned, pipeline.GetState())
 				p.Assert().Nil(p.core.workingData)
-			})
+			}, test.config)
 		})
 	}
+}
+
+type PipelineConfig struct {
+	beforePipelineRun func(pipeline *PipelineImpl)
+	parentState       State
 }
 
 // WithRunningPipeline is a test helper that initializes and starts a pipeline instance.
 // It manages the context and channels needed to run the pipeline and invokes the testFunc
 // with access to the pipeline, update channel, error channel, and cancel function.
-func (p *PipelineFunctionalSuite) WithRunningPipeline(testFunc func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc)) {
+func (p *PipelineFunctionalSuite) WithRunningPipeline(testFunc func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc), pipelineConfig PipelineConfig) {
 	p.core = NewCoreImpl(
 		p.logger,
 		p.executionResult,
@@ -409,9 +439,13 @@ func (p *PipelineFunctionalSuite) WithRunningPipeline(testFunc func(pipeline Pip
 	pipelineIsReady := make(chan struct{})
 
 	go func() {
+		if pipelineConfig.beforePipelineRun != nil {
+			pipelineConfig.beforePipelineRun(pipeline)
+		}
+
 		close(pipelineIsReady)
 
-		errChan <- pipeline.Run(ctx, p.core, StateWaitingPersist)
+		errChan <- pipeline.Run(ctx, p.core, pipelineConfig.parentState)
 	}()
 
 	<-pipelineIsReady
