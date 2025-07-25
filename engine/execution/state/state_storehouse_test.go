@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/locks"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/pebble"
@@ -66,6 +67,7 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 			results.On("BatchIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			myReceipts := storage.NewMyExecutionReceipts(t)
 			myReceipts.On("BatchStoreMyReceipt", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			lockManager := locks.NewTestingLockManager()
 
 			withRegisterStore(t, func(t *testing.T,
 				rs *storehouse.RegisterStore,
@@ -96,6 +98,7 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 					trace.NewNoopTracer(),
 					rs,
 					true,
+					lockManager,
 				)
 
 				f(t, es, ls, headers, stateCommitments, finalized)
