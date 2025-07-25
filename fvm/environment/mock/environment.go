@@ -909,26 +909,6 @@ func (_m *Environment) GetCurrentBlockHeight() (uint64, error) {
 	return r0, r1
 }
 
-// GetInterpreterSharedState provides a mock function with no fields
-func (_m *Environment) GetInterpreterSharedState() *interpreter.SharedState {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetInterpreterSharedState")
-	}
-
-	var r0 *interpreter.SharedState
-	if rf, ok := ret.Get(0).(func() *interpreter.SharedState); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*interpreter.SharedState)
-		}
-	}
-
-	return r0
-}
-
 // GetOrLoadProgram provides a mock function with given fields: location, load
 func (_m *Environment) GetOrLoadProgram(location common.Location, load func() (*cadenceruntime.Program, error)) (*cadenceruntime.Program, error) {
 	ret := _m.Called(location, load)
@@ -1607,11 +1587,6 @@ func (_m *Environment) ServiceEvents() flow.EventsList {
 	}
 
 	return r0
-}
-
-// SetInterpreterSharedState provides a mock function with given fields: state
-func (_m *Environment) SetInterpreterSharedState(state *interpreter.SharedState) {
-	_m.Called(state)
 }
 
 // SetNumberOfDeployedCOAs provides a mock function with given fields: count

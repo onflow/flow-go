@@ -190,10 +190,18 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 
 	// setup EVM
 	if executor.ctx.EVMEnabled {
+
+		var txRuntimeEnv runtime.Environment
+		if executor.ctx.VMTransactionExecutionEnabled {
+			txRuntimeEnv = executor.cadenceRuntime.VMTxRuntimeEnv
+		} else {
+			txRuntimeEnv = executor.cadenceRuntime.TxRuntimeEnv
+		}
+
 		err := evm.SetupEnvironment(
 			chainID,
 			executor.env,
-			executor.cadenceRuntime.TxRuntimeEnv,
+			txRuntimeEnv,
 		)
 		if err != nil {
 			return err
@@ -232,7 +240,9 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 			Source:    executor.proc.Transaction.Script,
 			Arguments: executor.proc.Transaction.Arguments,
 		},
-		common.TransactionLocation(executor.proc.ID))
+		common.TransactionLocation(executor.proc.ID),
+		executor.ctx.VMTransactionExecutionEnabled,
+	)
 
 	// This initializes various cadence variables and parses the programs used
 	// by the transaction body.
@@ -259,10 +269,18 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 
 	// setup EVM
 	if executor.ctx.EVMEnabled {
+
+		var txRuntimeEnv runtime.Environment
+		if executor.ctx.VMTransactionExecutionEnabled {
+			txRuntimeEnv = executor.cadenceRuntime.VMTxRuntimeEnv
+		} else {
+			txRuntimeEnv = executor.cadenceRuntime.TxRuntimeEnv
+		}
+
 		err := evm.SetupEnvironment(
 			chainID,
 			executor.env,
-			executor.cadenceRuntime.TxRuntimeEnv,
+			txRuntimeEnv,
 		)
 		if err != nil {
 			return err
