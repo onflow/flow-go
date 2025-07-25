@@ -174,6 +174,22 @@ func New(params Params) (*Backend, error) {
 		return nil, fmt.Errorf("failed to create events: %w", err)
 	}
 
+	scriptsBackend, err := scripts.NewScriptsBackend(
+		params.Log,
+		params.AccessMetrics,
+		params.Headers,
+		params.State,
+		params.ConnFactory,
+		params.Communicator,
+		params.ScriptExecutor,
+		params.ScriptExecutionMode,
+		params.ExecNodeIdentitiesProvider,
+		loggedScripts,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create scripts: %w", err)
+	}
+
 	txValidator, err := validator.NewTransactionValidator(
 		validator.NewProtocolStateBlocks(params.State, params.IndexReporter),
 		params.ChainID.Chain(),
@@ -262,26 +278,10 @@ func New(params Params) (*Backend, error) {
 		txStatusDeriver,
 	)
 
-	scriptsBackend, err := scripts.NewScriptsBackend(
-		params.Log,
-		params.AccessMetrics,
-		params.Headers,
-		params.State,
-		params.ConnFactory,
-		params.Communicator,
-		params.ScriptExecutor,
-		params.ScriptExecutionMode,
-		params.ExecNodeIdentitiesProvider,
-		loggedScripts,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create scripts: %w", err)
-	}
-
 	b := &Backend{
 		Accounts:          *accountsBackend,
-		Scripts:           *scriptsBackend,
 		Events:            *eventsBackend,
+		Scripts:           *scriptsBackend,
 		Transactions:      *txBackend,
 		TransactionStream: *txStreamBackend,
 		backendBlockHeaders: backendBlockHeaders{
