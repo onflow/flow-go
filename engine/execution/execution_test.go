@@ -303,8 +303,8 @@ func deployContractBlock(
 	require.NoError(t, err)
 
 	// make proposal
-	proposal := flow.UntrustedProposal(*unittest.ProposalFromBlock(block))
-	return tx, col, block, &proposal, seq + 1
+	proposal := (*flow.UntrustedProposal)(unittest.ProposalFromBlock(block))
+	return tx, col, block, proposal, seq + 1
 }
 
 func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Block, ref *flow.Header) (
@@ -338,9 +338,9 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 	)
 	require.NoError(t, err)
 
-	proposal := flow.UntrustedProposal(*unittest.ProposalFromBlock(block))
+	proposal := (*flow.UntrustedProposal)(unittest.ProposalFromBlock(block))
 
-	return tx, col, block, &proposal, seq + 1
+	return tx, col, block, proposal, seq + 1
 }
 
 func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Block, ref *flow.Header) (
@@ -369,9 +369,9 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 	)
 	require.NoError(t, err)
 
-	proposal := flow.UntrustedProposal(*unittest.ProposalFromBlock(block))
+	proposal := (*flow.UntrustedProposal)(unittest.ProposalFromBlock(block))
 
-	return tx, col, block, &proposal, seq + 1
+	return tx, col, block, proposal, seq + 1
 }
 
 // Test a successful tx should change the statecommitment,

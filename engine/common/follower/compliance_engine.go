@@ -229,12 +229,12 @@ func (e *ComplianceEngine) Process(channel channels.Channel, originID flow.Ident
 	case *flow.UntrustedProposal:
 		proposal, err := flow.NewProposal(*msg)
 		if err != nil {
+			// TODO: Replace this log statement with a call to the protocol violation consumer.
 			e.log.Warn().
 				Hex("origin_id", originID[:]).
 				Hex("block_id", logging.ID(msg.Block.ID())).
 				Uint64("block_height", msg.Block.Header.Height).
 				Uint64("block_view", msg.Block.Header.View).
-				Hex("proposer_signature", msg.ProposerSigData[:]).
 				Err(err).Msgf("received invalid proposal message")
 			return nil
 		}

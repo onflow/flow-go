@@ -166,9 +166,9 @@ func (s *MessageHubSuite) TearDownTest() {
 	}
 }
 
-// TestProcessIncomingMessages tests processing of incoming messages, MessageHub matches messages by type
+// TestProcessValidIncomingMessages tests processing of structurally valid incoming messages, MessageHub matches messages by type
 // and sends them to other modules which execute business logic.
-func (s *MessageHubSuite) TestProcessIncomingMessages() {
+func (s *MessageHubSuite) TestProcessValidIncomingMessages() {
 	var channel channels.Channel
 	originID := unittest.IdentifierFixture()
 	s.Run("to-compliance-engine", func() {
@@ -204,6 +204,56 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 		s.timeoutAggregator.On("AddTimeout", expectedTimeout)
 		err := s.hub.Process(channel, originID, msg)
 		require.NoError(s.T(), err)
+	})
+	s.Run("unsupported-msg-type", func() {
+		err := s.hub.Process(channel, originID, struct{}{})
+		require.NoError(s.T(), err)
+	})
+}
+
+// TestProcessInvalidIncomingMessages tests processing of structurally invalid incoming messages, MessageHub matches messages by type
+// and sends them to other modules which execute business logic.
+func (s *MessageHubSuite) TestProcessInvalidIncomingMessages() {
+	var channel channels.Channel
+	originID := unittest.IdentifierFixture()
+	s.Run("to-compliance-engine", func() {
+		proposal := unittest.ProposalFixture()
+		proposal.ProposerSigData = nil // invalid value
+
+		err := s.hub.Process(channel, originID, (*flow.UntrustedProposal)(proposal))
+		require.NoError(s.T(), err)
+
+		// OnBlockRange should NOT be called for invalid proposal
+		s.compliance.AssertNotCalled(s.T(), "OnBlockRange", mock.Anything)
+	})
+	s.Run("to-vote-aggregator", func() {
+		expectedVote := unittest.VoteFixture(unittest.WithVoteSignerID(originID))
+		msg := &messages.BlockVote{
+			View:    expectedVote.View,
+			BlockID: flow.ZeroID, // invalid value
+			SigData: expectedVote.SigData,
+		}
+
+		err := s.hub.Process(channel, originID, msg)
+		require.NoError(s.T(), err)
+
+		// AddVote should NOT be called for invalid Vote
+		s.voteAggregator.AssertNotCalled(s.T(), "AddVote", mock.Anything)
+	})
+	s.Run("to-timeout-aggregator", func() {
+		expectedTimeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectSignerID(originID))
+		msg := &messages.TimeoutObject{
+			View:       expectedTimeout.View,
+			NewestQC:   expectedTimeout.NewestQC,
+			LastViewTC: expectedTimeout.LastViewTC,
+			SigData:    nil, // invalid value
+		}
+
+		err := s.hub.Process(channel, originID, msg)
+		require.NoError(s.T(), err)
+
+		// AddTimeout should NOT be called for invalid TimeoutObject
+		s.timeoutAggregator.AssertNotCalled(s.T(), "AddTimeout", mock.Anything)
 	})
 	s.Run("unsupported-msg-type", func() {
 		err := s.hub.Process(channel, originID, struct{}{})
