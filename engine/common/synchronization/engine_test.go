@@ -377,11 +377,6 @@ func (ss *SyncSuite) TestOnValidBlockResponse() {
 // TestOnInvalidBlockResponse verifies that the engine correctly handles a BlockResponse
 // containing an invalid block proposal that cannot be converted to a trusted proposal.
 func (ss *SyncSuite) TestOnInvalidBlockResponse() {
-	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
-	ss.e.Start(ctx)
-	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
-	defer cancel()
-
 	// generate origin and block response
 	originID := unittest.IdentifierFixture()
 
