@@ -132,6 +132,7 @@ func TestClusterBoundaries(t *testing.T) {
 				err = operation.RetrieveClusterFinalizedHeight(db.Reader(), clusterID, &actual)
 				assert.NoError(t, err)
 				assert.Equal(t, expected, actual)
+				lctx.Release()
 			}
 		})
 	})
