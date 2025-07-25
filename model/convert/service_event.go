@@ -208,15 +208,6 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 // Execution or Verification Node; it is not resilient to malicious inputs.
 // No errors are expected during normal operation.
 func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error) {
-	return convertServiceEventEpochCommitV1(event)
-}
-
-// convertServiceEventEpochCommit converts a service event encoded as the generic
-// flow.Event type to a ServiceEvent type for an EpochCommit event.
-// CAUTION: This function must only be used for input events computed locally, by an
-// Execution or Verification Node; it is not resilient to malicious inputs.
-// No errors are expected during normal operation.
-func convertServiceEventEpochCommitV1(event flow.Event) (*flow.ServiceEvent, error) {
 	// decode bytes using ccf
 	payload, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
