@@ -15,6 +15,8 @@ import (
 // KV-store, it is just an encoded data blob
 type ProtocolKVStore interface {
 	// BatchStore stores the protocol state key value data with the given stateID.into the database
+	// Expected errors during normal operations:
+	// - storage.ErrDataMismatch if a KV store for the given stateID has already been indexed, but different
 	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error
 
 	// BatchIndex returns an anonymous function intended to be executed as part of a database transaction.
@@ -29,7 +31,7 @@ type ProtocolKVStore interface {
 	//     child block, _after_ validating the QC.
 	//
 	// Expected errors during normal operations:
-	//   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
+	//   - storage.ErrDataMismatch if a KV store for the given blockID has already been indexed, but different
 	BatchIndex(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error
 
 	// ByID retrieves the KV store snapshot with the given ID.
