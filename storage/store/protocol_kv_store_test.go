@@ -99,6 +99,12 @@ func TestProtocolKVStore_IndexTx(t *testing.T) {
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return store.BatchIndex(lctx, rw, blockID, stateID)
 		})
+		require.NoError(t, err)
+
+		differentStateID := unittest.IdentifierFixture()
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return store.BatchIndex(rw, blockID, differentStateID)
+		})
 		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 	})
 }
