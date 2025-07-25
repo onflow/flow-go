@@ -79,11 +79,7 @@ func (d *DeferredBlockPersist) Chain(deferred *DeferredBlockPersist) {
 func (d *DeferredBlockPersist) AddSucceedCallback(callback func()) {
 	d.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 		// Schedule the callback to run after a successful commit.
-		rw.AddCallback(func(err error) {
-			if err == nil {
-				callback()
-			}
-		})
+		storage.OnCommitSucceed(rw, callback)
 		return nil
 	})
 }
