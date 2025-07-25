@@ -84,10 +84,8 @@ func (m *MyExecutionReceipts) BatchStoreMyReceipt(lctx lockctx.Proof, receipt *f
 		return err
 	}
 
-	rw.AddCallback(func(err error) {
-		if err != nil {
-			m.cache.Insert(blockID, receipt)
-		}
+	storage.OnCommitSucceed(rw, func() {
+		m.cache.Insert(blockID, receipt)
 	})
 
 	// assemble DB operations to index receipt as one of my own (no execution)
