@@ -317,10 +317,16 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) ensureKeyIncludedInEpoch(epoc
 		return fmt.Errorf("commit counter does not match epoch counter: %d != %d", epochCounter, commit.Counter)
 	}
 	publicKey := key.PublicKey()
-	// TODO(EFM, #6794): allowing a nil DKGIndexMap is a temporary shortcut for backwards compatibility. This should be removed once we complete the network upgrade:
-	if commit.DKGIndexMap == nil {
-		// If commit.DKGIndexMap is nil, we verify that there exists *some* public key in the EpochCommit that matches our private key. This is a much weaker sanity
-		// check than enforcing that the public Beacon key in the EpochCommit corresponding to *my* NodeID matches the locally stored private key. However,
+	myDKGIndex, found := commit.DKGIndexMap[ds.myNodeID]
+	if !found {
+		return fmt.Errorf("my node ID %v is not in the DKG committee for epoch %d", ds.myNodeID, epochCounter)
+	}
+	if myDKGIndex < 0 || myDKGIndex >= len(commit.DKGParticipantKeys) {
+		return fmt.Errorf("my DKG index %d is out of range for epoch %d", myDKGIndex, epochCounter)
+	}
+	expectedPublicKey := commit.DKGParticipantKeys[myDKGIndex]
+	if !publicKey.Equals(expectedPublicKey) {
+		return fmt.Errorf("stored private key does not match public key in epoch commit for epoch %d", epochCounter)
 		// the check still catches the case where the DKG smart contract determined a different public key for this node compared to the node local DKG result.
 		// Nevertheless, we remain vulnerable to misconfigurations, where the node operator mixed up keys.
 		isMatchingKey := func(lhs crypto.PublicKey) bool { return lhs.Equals(publicKey) }
