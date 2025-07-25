@@ -1162,7 +1162,6 @@ func newFlowEpochEpochCommitEventType() *cadence.EventType {
 	)
 }
 
-
 func newFlowEpochEpochRecoverEventType() *cadence.EventType {
 
 	// A.01cf0e2f2f715450.FlowEpoch.EpochRecover
