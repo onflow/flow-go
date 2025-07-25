@@ -210,7 +210,7 @@ func TestPendingReceipts(t *testing.T) {
 			require.True(t, pool.Has(id))
 		}
 
-		err := pool.PruneUpToHeight(nextExecutedBlock.Header.Height)
+		err := pool.PruneUpToHeight(nextExecutedBlock.Height)
 		require.NoError(t, err)
 
 		// these receipts should be pruned

@@ -349,7 +349,7 @@ func (suite *SealingSegmentSuite) TestBuild_RootSegmentWrongView() {
 	root, result, seal := unittest.BootstrapFixture(
 		unittest.IdentityListFixture(5, unittest.WithAllRoles()),
 		func(block *flow.Block) {
-			block.Header.View = 10 // invalid root block view
+			block.View = 10 // invalid root block view
 		})
 	suite.sealsByBlockID[root.ID()] = seal
 	suite.addProtocolStateEntry(root.Payload.ProtocolStateID, suite.ProtocolStateEntryWrapperFixture())
@@ -529,7 +529,7 @@ func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_ExtraBlocks(
 	suite.addProtocolStateEntry(protocolStateID2, suite.ProtocolStateEntryWrapperFixture())
 
 	extraBlock1 := unittest.BlockFixture(
-		unittest.Block.WithHeight(block1.Header.Height-1),
+		unittest.Block.WithHeight(block1.Height-1),
 		unittest.Block.WithPayload(unittest.PayloadFixture(
 			unittest.WithProtocolStateID(protocolStateID2),
 		)),
@@ -538,7 +538,7 @@ func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_ExtraBlocks(
 	require.NoError(suite.T(), err)
 
 	extraBlock2 := suite.BlockFixture()
-	extraBlock2.Header.Height = extraBlock1.Header.Height - 1
+	extraBlock2.Height = extraBlock1.Height - 1
 	err = suite.builder.AddExtraBlock(unittest.ProposalFromBlock(extraBlock2))
 	require.NoError(suite.T(), err)
 
@@ -571,7 +571,7 @@ func (suite *SealingSegmentSuite) TestAddBlock_InvalidHeight() {
 	block1 := suite.FirstBlock()
 	// block 2 has an invalid height
 	block2 := suite.BlockFixture()
-	block2.Header.Height = block1.Header.Height + 2
+	block2.Height = block1.Height + 2
 
 	err := suite.builder.AddBlock(unittest.ProposalFromBlock(block1))
 	require.NoError(suite.T(), err)
@@ -641,7 +641,7 @@ func TestAddBlock_StorageError(t *testing.T) {
 func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 	// populate sealing segment with one block
 	firstBlock := suite.FirstBlock()
-	firstBlock.Header.Height += 100
+	firstBlock.Height += 100
 	firstProposal := unittest.ProposalFromBlock(firstBlock)
 	suite.AddBlocks(firstBlock)
 
@@ -654,7 +654,7 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 	suite.T().Run("extra-block-does-not-connect", func(t *testing.T) {
 		// adding extra block that doesn't connect to the lowest is an error
 		extraBlock := suite.BlockFixture()
-		extraBlock.Header.Height = firstBlock.Header.Height + 10 // make sure it doesn't connect by height
+		extraBlock.Height = firstBlock.Height + 10 // make sure it doesn't connect by height
 		err := suite.builder.AddExtraBlock(unittest.ProposalFromBlock(extraBlock))
 		require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 	})
@@ -663,11 +663,11 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 		err := builder.AddBlock(firstProposal)
 		require.NoError(t, err)
 		extraBlock := suite.BlockFixture()
-		extraBlock.Header.Height = firstBlock.Header.Height - 1 // make it connect
+		extraBlock.Height = firstBlock.Height - 1 // make it connect
 		err = builder.AddExtraBlock(unittest.ProposalFromBlock(extraBlock))
 		require.NoError(t, err)
 		extraBlockWithSkip := suite.BlockFixture()
-		extraBlockWithSkip.Header.Height = extraBlock.Header.Height - 2 // skip one height
+		extraBlockWithSkip.Height = extraBlock.Height - 2 // skip one height
 		err = builder.AddExtraBlock(unittest.ProposalFromBlock(extraBlockWithSkip))
 		require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 	})
@@ -677,7 +677,7 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 		require.NoError(t, err)
 
 		extraBlock := suite.BlockFixture()
-		extraBlock.Header.Height = firstBlock.Header.Height - 1
+		extraBlock.Height = firstBlock.Height - 1
 		err = builder.AddExtraBlock(unittest.ProposalFromBlock(extraBlock))
 		require.NoError(t, err)
 		_, err = builder.SealingSegment()
@@ -705,11 +705,11 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 		// construct two extra blocks that connect to the lowest block and add them to builder
 		// EB2 <- EB1 <- B1(S*) <- B2(R1) <- B3(S1)
 		extraBlock := suite.BlockFixture()
-		extraBlock.Header.Height = firstBlock.Header.Height - 1
+		extraBlock.Height = firstBlock.Height - 1
 		err := suite.builder.AddExtraBlock(unittest.ProposalFromBlock(extraBlock))
 		require.NoError(t, err)
 		secondExtraBlock := suite.BlockFixture()
-		secondExtraBlock.Header.Height = extraBlock.Header.Height - 1
+		secondExtraBlock.Height = extraBlock.Height - 1
 		err = suite.builder.AddExtraBlock(unittest.ProposalFromBlock(secondExtraBlock))
 		require.NoError(t, err)
 		segment, err := suite.builder.SealingSegment()

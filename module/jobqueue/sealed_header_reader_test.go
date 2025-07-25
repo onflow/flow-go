@@ -24,13 +24,13 @@ func TestSealedBlockHeaderReader(t *testing.T) {
 		// head of the reader is the last sealed block
 		head, err := reader.Head()
 		assert.NoError(t, err)
-		assert.Equal(t, lastSealedBlock.Header.Height, head, "head does not match last sealed block")
+		assert.Equal(t, lastSealedBlock.Height, head, "head does not match last sealed block")
 
 		// retrieved blocks from block reader should be the same as the original blocks stored in it.
 		// all except the last block should be sealed
 		lastIndex := len(blocks)
 		for _, expected := range blocks[:lastIndex-1] {
-			index := expected.Header.Height
+			index := expected.Height
 			job, err := reader.AtIndex(index)
 			assert.NoError(t, err)
 

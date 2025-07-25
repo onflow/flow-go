@@ -121,7 +121,7 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 
 	if ti, found := c.blocksToMarkExecuted.Get(blockID); found {
 		c.blockExecuted(block, ti)
-		c.accessMetrics.UpdateExecutionReceiptMaxHeight(block.Header.Height)
+		c.accessMetrics.UpdateExecutionReceiptMaxHeight(block.Height)
 		c.blocksToMarkExecuted.Remove(blockID)
 	}
 }
@@ -145,7 +145,7 @@ func (c *CollectionExecutedMetricImpl) ExecutionReceiptReceived(r *flow.Executio
 		return
 	}
 
-	c.accessMetrics.UpdateExecutionReceiptMaxHeight(b.Header.Height)
+	c.accessMetrics.UpdateExecutionReceiptMaxHeight(b.Height)
 
 	c.blockExecuted(b, now)
 }

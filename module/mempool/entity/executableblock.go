@@ -45,11 +45,11 @@ func (b *ExecutableBlock) BlockID() flow.Identifier {
 }
 
 func (b *ExecutableBlock) Height() uint64 {
-	return b.Block.Header.Height
+	return b.Block.Height
 }
 
 func (b *ExecutableBlock) ParentID() flow.Identifier {
-	return b.Block.Header.ParentID
+	return b.Block.ParentID
 }
 
 func (b *ExecutableBlock) Collections() []*CompleteCollection {

@@ -101,13 +101,13 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 			// consume execution data from subscription
 			unittest.RequireReturnsBefore(s.T(), func() {
 				resp, ok := <-reader.received
-				require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v", b.Header.Height, b.ID())
+				require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v", b.Height, b.ID())
 
 				blockID, err := convert.BlockID(resp.BlockId)
 				require.NoError(s.T(), err)
 				require.Equal(s.T(), b.ID(), blockID)
-				require.Equal(s.T(), b.Header.Height, resp.BlockHeight)
-			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
+				require.Equal(s.T(), b.Height, resp.BlockHeight)
+			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
 		}
 	})
 
@@ -136,13 +136,13 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 			// consume execution data from subscription
 			unittest.RequireReturnsBefore(s.T(), func() {
 				resp, ok := <-reader.received
-				require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v", b.Header.Height, b.ID())
+				require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v", b.Height, b.ID())
 
 				blockID, err := convert.BlockID(resp.BlockId)
 				require.NoError(s.T(), err)
 				require.Equal(s.T(), b.ID(), blockID)
-				require.Equal(s.T(), b.Header.Height, resp.BlockHeight)
-			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
+				require.Equal(s.T(), b.Height, resp.BlockHeight)
+			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
 		}
 	})
 
@@ -181,14 +181,14 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 			// consume execution data from subscription
 			unittest.RequireReturnsBefore(s.T(), func() {
 				resp, ok := <-reader.received
-				require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v", b.Header.Height, b.ID())
+				require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v", b.Height, b.ID())
 
 				blockID, err := convert.BlockID(resp.BlockId)
 				require.NoError(s.T(), err)
-				require.Equal(s.T(), b.Header.Height, resp.BlockHeight)
+				require.Equal(s.T(), b.Height, resp.BlockHeight)
 				require.Equal(s.T(), b.ID(), blockID)
 				require.Empty(s.T(), resp.Events)
-			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
+			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
 		}
 	})
 }

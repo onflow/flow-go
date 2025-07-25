@@ -704,10 +704,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Validation of the start block height needs to be done after loading state
 			if builder.executionDataStartHeight > 0 {
-				if builder.executionDataStartHeight <= builder.FinalizedRootBlock.Header.Height {
+				if builder.executionDataStartHeight <= builder.FinalizedRootBlock.Height {
 					return nil, fmt.Errorf(
 						"execution data start block height (%d) must be greater than the root block height (%d)",
-						builder.executionDataStartHeight, builder.FinalizedRootBlock.Header.Height)
+						builder.executionDataStartHeight, builder.FinalizedRootBlock.Height)
 				}
 
 				latestSeal, err := builder.State.Sealed().Head()
@@ -729,7 +729,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// requester expects the initial last processed height, which is the first height - 1
 				builder.executionDataConfig.InitialBlockHeight = builder.executionDataStartHeight - 1
 			} else {
-				builder.executionDataConfig.InitialBlockHeight = builder.SealedRootBlock.Header.Height
+				builder.executionDataConfig.InitialBlockHeight = builder.SealedRootBlock.Height
 			}
 
 			execDataDistributor = edrequester.NewExecutionDataDistributor()
@@ -891,7 +891,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 						return nil, fmt.Errorf("could not verify checkpoint file: %w", err)
 					}
 
-					checkpointHeight := builder.SealedRootBlock.Header.Height
+					checkpointHeight := builder.SealedRootBlock.Height
 
 					if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
 						return nil, fmt.Errorf("mismatching sealed root block and root seal: %v != %v",
@@ -1881,7 +1881,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.Logger,
 				node.Storage.VersionBeacons,
 				nodeVersion,
-				builder.SealedRootBlock.Header.Height,
+				builder.SealedRootBlock.Height,
 				builder.LastFinalizedHeader.Height,
 			)
 			if err != nil {
@@ -1964,7 +1964,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// handles block-related operations.
 			blockTracker, err := subscriptiontracker.NewBlockTracker(
 				node.State,
-				builder.FinalizedRootBlock.Header.Height,
+				builder.FinalizedRootBlock.Height,
 				node.Storage.Headers,
 				broadcaster,
 			)

@@ -153,12 +153,12 @@ func BlockToMessage(h *flow.Block) (*entitiesproto.Block, error) {
 
 	bh := entitiesproto.Block{
 		Id:                   id[:],
-		Height:               h.Header.Height,
-		ParentId:             h.Header.ParentID[:],
-		Timestamp:            convert.BlockTimestamp2ProtobufTime(h.Header.Timestamp),
+		Height:               h.Height,
+		ParentId:             h.ParentID[:],
+		Timestamp:            convert.BlockTimestamp2ProtobufTime(h.Timestamp),
 		CollectionGuarantees: cg,
 		BlockSeals:           seals,
-		Signatures:           [][]byte{h.Header.ParentVoterSigData},
+		Signatures:           [][]byte{h.ParentVoterSigData},
 	}
 
 	return &bh, nil

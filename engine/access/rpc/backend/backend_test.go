@@ -538,7 +538,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHei
 
 		// since block was added to the block tree it must be queryable by block ID
 		suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
-		suite.headers.On("BlockIDByHeight", newBlock.Header.Height).Return(flow.ZeroID, storage.ErrNotFound)
+		suite.headers.On("BlockIDByHeight", newBlock.Height).Return(flow.ZeroID, storage.ErrNotFound)
 
 		// query the handler for the snapshot for non finalized block
 		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
@@ -586,14 +586,14 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalize
 		err = state.Extend(ctx, unittest.ProposalFromBlock(orphanBlock))
 		suite.Require().NoError(err)
 
-		suite.Equal(finalizedBlock.Header.Height, orphanBlock.Header.Height,
+		suite.Equal(finalizedBlock.Height, orphanBlock.Height,
 			"expect both blocks to have same height to have a fork")
 
 		// since block was added to the block tree it must be queryable by block ID
 		suite.state.On("AtBlockID", orphanBlock.ID()).Return(state.AtBlockID(orphanBlock.ID()))
 
 		// since there are two candidate blocks with the same height, we will return the one that was finalized
-		suite.headers.On("BlockIDByHeight", finalizedBlock.Header.Height).Return(finalizedBlock.ID(), nil)
+		suite.headers.On("BlockIDByHeight", finalizedBlock.Height).Return(finalizedBlock.ID(), nil)
 
 		// query the handler for the snapshot for non finalized block
 		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, orphanBlock.ID())
@@ -635,8 +635,8 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockID
 		// since block was added to the block tree it must be queryable by block ID
 		suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
 		// expectedError := errors.New("runtime-error")
-		suite.headers.On("BlockIDByHeight", newBlock.Header.Height).Return(flow.ZeroID,
-			status.Errorf(codes.Internal, "failed to lookup block id by height %d", newBlock.Header.Height))
+		suite.headers.On("BlockIDByHeight", newBlock.Height).Return(flow.ZeroID,
+			status.Errorf(codes.Internal, "failed to lookup block id by height %d", newBlock.Height))
 
 		// query the handler for the snapshot
 		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
@@ -795,7 +795,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 		suite.Require().NoError(err)
 
 		// since block was not yet finalized AtHeight must return an invalid snapshot
-		suite.state.On("AtHeight", newBlock.Header.Height).Return(invalid.NewSnapshot(realstate.ErrUnknownSnapshotReference))
+		suite.state.On("AtHeight", newBlock.Height).Return(invalid.NewSnapshot(realstate.ErrUnknownSnapshotReference))
 
 		params := suite.defaultBackendParams()
 		params.MaxHeightRange = TEST_MAX_HEIGHT
@@ -804,7 +804,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 		suite.Require().NoError(err)
 
 		// query the handler for the snapshot for non finalized block
-		bytes, err := backend.GetProtocolStateSnapshotByHeight(context.Background(), newBlock.Header.Height)
+		bytes, err := backend.GetProtocolStateSnapshotByHeight(context.Background(), newBlock.Height)
 
 		suite.Require().Nil(bytes)
 		suite.Require().Error(err)
@@ -950,7 +950,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		suite.snapshot.On("Head").Return(block.ToHeader(), nil).Once()
 		result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.checkResponse(result, err)
-		suite.Assert().Equal(result.BlockHeight, block.Header.Height)
+		suite.Assert().Equal(result.BlockHeight, block.Height)
 
 		suite.assertAllExpectations()
 	})
@@ -1053,7 +1053,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		)),
 	)
 	headBlock := unittest.BlockFixture(
-		unittest.Block.WithHeight(block.Header.Height - 1), // head is behind the current block
+		unittest.Block.WithHeight(block.Height - 1), // head is behind the current block
 	)
 
 	suite.snapshot.
@@ -1133,7 +1133,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	suite.Assert().Equal(flow.TransactionStatusExecuted, result.Status)
 
 	// now let the head block be finalized
-	headBlock.Header.Height = block.Header.Height + 1
+	headBlock.Height = block.Height + 1
 
 	// third call - when block under test's height is less than sealed head's height
 	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
@@ -1143,7 +1143,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	suite.Assert().Equal(flow.TransactionStatusSealed, result.Status)
 
 	// now go far into the future
-	headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
+	headBlock.Height = block.Height + flow.DefaultTransactionExpiry + 1
 
 	// fourth call - when block under test's height so much less than the head's height that it's considered expired,
 	// but since there is a execution result, means it should retain it's sealed status
@@ -1171,11 +1171,11 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	transactionBody.SetReferenceBlockID(block.ID())
 
 	headBlock := unittest.BlockFixture(
-		unittest.Block.WithHeight(block.Header.Height - 1), // head is behind the current block
+		unittest.Block.WithHeight(block.Height - 1), // head is behind the current block
 	)
 
 	// set up GetLastFullBlockHeight mock
-	fullHeight := headBlock.Header.Height
+	fullHeight := headBlock.Height
 
 	suite.snapshot.
 		On("Head").
@@ -1221,9 +1221,9 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	suite.Run("expiry un-confirmed", func() {
 		suite.Run("ONLY finalized expiry block", func() {
 			// we have finalized an expiry block
-			headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
+			headBlock.Height = block.Height + flow.DefaultTransactionExpiry + 1
 			// we have NOT observed all intermediary Collections
-			fullHeight = block.Header.Height + flow.DefaultTransactionExpiry/2
+			fullHeight = block.Height + flow.DefaultTransactionExpiry/2
 			err := suite.lastFullBlockHeight.Set(fullHeight)
 			suite.Require().NoError(err)
 
@@ -1233,13 +1233,13 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		})
 
 		// we have observed all intermediary Collections
-		fullHeight = block.Header.Height + flow.DefaultTransactionExpiry + 1
+		fullHeight = block.Height + flow.DefaultTransactionExpiry + 1
 		err = suite.lastFullBlockHeight.Set(fullHeight)
 		suite.Require().NoError(err)
 
 		suite.Run("ONLY observed intermediary Collections", func() {
 			// we have NOT finalized an expiry block
-			headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry/2
+			headBlock.Height = block.Height + flow.DefaultTransactionExpiry/2
 
 			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 			suite.checkResponse(result, err)
@@ -1250,7 +1250,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		// and have observed all intermediary Collections
 		suite.Run("expired", func() {
 			// we have finalized an expiry block
-			headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
+			headBlock.Height = block.Height + flow.DefaultTransactionExpiry + 1
 
 			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 			suite.checkResponse(result, err)
@@ -1284,7 +1284,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	txID := transactionBody.ID()
 
 	headBlock := unittest.BlockFixture(
-		unittest.Block.WithHeight(refBlock.Header.Height - 1), // head is behind the current refBlock
+		unittest.Block.WithHeight(refBlock.Height - 1), // head is behind the current refBlock
 	)
 
 	suite.snapshot.

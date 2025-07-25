@@ -384,7 +384,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_HappyPath()
 		suite.execClient.On("GetTransactionErrorMessage", mock.Anything, exeEventReq).Return(exeEventResp, nil).Once()
 
 		// Perform the lookup and assert that the error message is retrieved correctly.
-		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, block.Header.Height, failedTxId)
+		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, block.Height, failedTxId)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedErrorMsg, errMsg)
 		suite.assertAllExpectations()
@@ -405,7 +405,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_HappyPath()
 			}, nil).Once()
 
 		// Perform the lookup and assert that the error message is retrieved correctly from storage.
-		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, block.Header.Height, failedTxId)
+		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, block.Height, failedTxId)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedErrorMsg, errMsg)
 		suite.assertAllExpectations()
@@ -431,8 +431,8 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_FailedToFet
 
 	// Create a mock index reporter
 	reporter := syncmock.NewIndexReporter(suite.T())
-	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
-	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+	reporter.On("LowestIndexedHeight").Return(block.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Height+10, nil)
 
 	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
 
@@ -462,7 +462,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_FailedToFet
 			Return(nil, storage.ErrNotFound).Once()
 
 		// Perform the lookup and expect a "NotFound" error with an empty error message.
-		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, block.Header.Height, failedTxId)
+		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, block.Height, failedTxId)
 		suite.Require().Error(err)
 		suite.Require().Equal(codes.NotFound, status.Code(err))
 		suite.Require().Empty(errMsg)
@@ -488,7 +488,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_FailedToFet
 			}, nil).Once()
 
 		// Perform the lookup and expect no error and an empty error message.
-		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, block.Header.Height, failedTxId)
+		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, block.Height, failedTxId)
 		suite.Require().NoError(err)
 		suite.Require().Empty(errMsg)
 		suite.assertAllExpectations()
@@ -513,7 +513,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_FailedToFet
 			}, nil).Once()
 
 		// Perform the lookup and expect the failed error message to be returned.
-		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, block.Header.Height, failedTxId)
+		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, block.Height, failedTxId)
 		suite.Require().NoError(err)
 		suite.Require().Equal(errMsg, DefaultFailedErrorMessage)
 		suite.assertAllExpectations()
@@ -566,7 +566,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 		suite.execClient.On("GetTransactionErrorMessageByIndex", mock.Anything, exeEventReq).Return(exeEventResp, nil).Once()
 
 		// Perform the lookup and assert that the error message is retrieved correctly.
-		errMsg, err := backend.LookupErrorMessageByIndex(context.Background(), blockId, block.Header.Height, failedTxIndex)
+		errMsg, err := backend.LookupErrorMessageByIndex(context.Background(), blockId, block.Height, failedTxIndex)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedErrorMsg, errMsg)
 		suite.assertAllExpectations()
@@ -587,7 +587,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 			}, nil).Once()
 
 		// Perform the lookup and assert that the error message is retrieved correctly from storage.
-		errMsg, err := backend.LookupErrorMessageByIndex(context.Background(), blockId, block.Header.Height, failedTxIndex)
+		errMsg, err := backend.LookupErrorMessageByIndex(context.Background(), blockId, block.Height, failedTxIndex)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedErrorMsg, errMsg)
 		suite.assertAllExpectations()
@@ -618,8 +618,8 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 
 	// Create a mock index reporter
 	reporter := syncmock.NewIndexReporter(suite.T())
-	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
-	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+	reporter.On("LowestIndexedHeight").Return(block.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Height+10, nil)
 
 	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
 
@@ -649,7 +649,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 			Return(nil, storage.ErrNotFound).Once()
 
 		// Perform the lookup and expect a "NotFound" error with an empty error message.
-		errMsg, err := backend.LookupErrorMessageByIndex(context.Background(), blockId, block.Header.Height, failedTxIndex)
+		errMsg, err := backend.LookupErrorMessageByIndex(context.Background(), blockId, block.Height, failedTxIndex)
 		suite.Require().Error(err)
 		suite.Require().Equal(codes.NotFound, status.Code(err))
 		suite.Require().Empty(errMsg)
@@ -675,7 +675,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 			}, nil).Once()
 
 		// Perform the lookup and expect no error and an empty error message.
-		errMsg, err := backend.LookupErrorMessageByIndex(context.Background(), blockId, block.Header.Height, failedTxIndex)
+		errMsg, err := backend.LookupErrorMessageByIndex(context.Background(), blockId, block.Height, failedTxIndex)
 		suite.Require().NoError(err)
 		suite.Require().Empty(errMsg)
 		suite.assertAllExpectations()
@@ -700,7 +700,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 			}, nil).Once()
 
 		// Perform the lookup and expect the failed error message to be returned.
-		errMsg, err := backend.LookupErrorMessageByIndex(context.Background(), blockId, block.Header.Height, failedTxIndex)
+		errMsg, err := backend.LookupErrorMessageByIndex(context.Background(), blockId, block.Height, failedTxIndex)
 		suite.Require().NoError(err)
 		suite.Require().Equal(errMsg, DefaultFailedErrorMessage)
 		suite.assertAllExpectations()
@@ -765,7 +765,7 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_HappyPath() {
 			Once()
 
 		// Perform the lookup and assert that the error message is retrieved correctly.
-		errMessages, err := backend.LookupErrorMessagesByBlockID(context.Background(), blockId, block.Header.Height)
+		errMessages, err := backend.LookupErrorMessagesByBlockID(context.Background(), blockId, block.Height)
 		suite.Require().NoError(err)
 		suite.Require().Len(errMessages, len(exeErrMessagesResp.Results))
 		for _, expectedResult := range exeErrMessagesResp.Results {
@@ -800,7 +800,7 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_HappyPath() {
 			Return(txErrorMessages, nil).Once()
 
 		// Perform the lookup and assert that the error message is retrieved correctly from storage.
-		errMessages, err := backend.LookupErrorMessagesByBlockID(context.Background(), blockId, block.Header.Height)
+		errMessages, err := backend.LookupErrorMessagesByBlockID(context.Background(), blockId, block.Height)
 		suite.Require().NoError(err)
 		suite.Require().Len(errMessages, len(txErrorMessages))
 		for _, expected := range txErrorMessages {
@@ -829,8 +829,8 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_FailedToFetch() 
 
 	// Create a mock index reporter
 	reporter := syncmock.NewIndexReporter(suite.T())
-	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
-	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+	reporter.On("LowestIndexedHeight").Return(block.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Height+10, nil)
 
 	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
 
@@ -860,7 +860,7 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_FailedToFetch() 
 			Return(nil, storage.ErrNotFound).Once()
 
 		// Perform the lookup and expect a "NotFound" error with an empty error message.
-		errMsg, err := backend.LookupErrorMessagesByBlockID(context.Background(), blockId, block.Header.Height)
+		errMsg, err := backend.LookupErrorMessagesByBlockID(context.Background(), blockId, block.Height)
 		suite.Require().Error(err)
 		suite.Require().Equal(codes.NotFound, status.Code(err))
 		suite.Require().Empty(errMsg)
@@ -893,7 +893,7 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_FailedToFetch() 
 			}, nil).Once()
 
 		// Perform the lookup and expect no error and an empty error messages.
-		errMsg, err := backend.LookupErrorMessagesByBlockID(context.Background(), blockId, block.Header.Height)
+		errMsg, err := backend.LookupErrorMessagesByBlockID(context.Background(), blockId, block.Height)
 		suite.Require().NoError(err)
 		suite.Require().Empty(errMsg)
 		suite.assertAllExpectations()
@@ -935,7 +935,7 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_FailedToFetch() 
 		}
 
 		// Perform the lookup and expect the failed error messages to be returned.
-		errMsg, err := backend.LookupErrorMessagesByBlockID(context.Background(), blockId, block.Header.Height)
+		errMsg, err := backend.LookupErrorMessagesByBlockID(context.Background(), blockId, block.Height)
 		suite.Require().NoError(err)
 		suite.Require().Len(errMsg, len(expectedTxErrorMessages))
 		for txID, expectedMessage := range expectedTxErrorMessages {
@@ -1097,8 +1097,8 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 
 	// create a mock index reporter
 	reporter := syncmock.NewIndexReporter(suite.T())
-	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
-	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+	reporter.On("LowestIndexedHeight").Return(block.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Height+10, nil)
 
 	indexReporter := index.NewReporter()
 	err = indexReporter.Initialize(reporter)
@@ -1243,7 +1243,7 @@ func (suite *Suite) assertTransactionResultResponse(
 ) {
 	suite.Require().NoError(err)
 	suite.Assert().Equal(block.ID(), response.BlockID)
-	suite.Assert().Equal(block.Header.Height, response.BlockHeight)
+	suite.Assert().Equal(block.Height, response.BlockHeight)
 	suite.Assert().Equal(txId, response.TransactionID)
 	if txId == suite.systemTx.ID() {
 		suite.Assert().Equal(flow.ZeroID, response.CollectionID)
@@ -1315,8 +1315,8 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 
 	// create a mock index reporter
 	reporter := syncmock.NewIndexReporter(suite.T())
-	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
-	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+	reporter.On("LowestIndexedHeight").Return(block.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Height+10, nil)
 
 	indexReporter := index.NewReporter()
 	err := indexReporter.Initialize(reporter)
@@ -1403,8 +1403,8 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 
 	// create a mock index reporter
 	reporter := syncmock.NewIndexReporter(suite.T())
-	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
-	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+	reporter.On("LowestIndexedHeight").Return(block.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Height+10, nil)
 
 	indexReporter := index.NewReporter()
 	err := indexReporter.Initialize(reporter)
@@ -1497,8 +1497,8 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 
 	// create a mock index reporter
 	reporter := syncmock.NewIndexReporter(suite.T())
-	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
-	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+	reporter.On("LowestIndexedHeight").Return(block.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Height+10, nil)
 
 	indexReporter := index.NewReporter()
 	err := indexReporter.Initialize(reporter)

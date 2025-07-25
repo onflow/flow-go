@@ -82,7 +82,7 @@ func (bs *MockBlockStore) CreateBlockAndMockResult(t *testing.T, block *entity.E
 	_, exist := bs.ResultByBlock[blockID]
 	require.False(t, exist, "block %s already exists", blockID)
 
-	parent := block.Block.Header.ParentID
+	parent := block.Block.ParentID
 	parentResult, ok := bs.ResultByBlock[parent]
 	require.True(t, ok, "parent block %s not found", parent)
 

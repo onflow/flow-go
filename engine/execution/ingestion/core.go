@@ -141,7 +141,7 @@ func (e *Core) launchWorkerToExecuteBlocks(ctx irrecoverable.SignalerContext, re
 			err := e.execute(ctx, executable)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("execution ingestion engine failed to execute block %v (%v): %w",
-					executable.Block.Header.Height,
+					executable.Block.Height,
 					executable.Block.ID(), err))
 			}
 		}
@@ -244,12 +244,12 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 ) {
 	lg := e.log.With().
 		Hex("block_id", blockID[:]).
-		Uint64("height", block.Header.Height).
+		Uint64("height", block.Height).
 		Logger()
 
 	lg.Info().Msg("handling new block")
 
-	parentCommitment, err := e.execState.StateCommitmentByBlockID(block.Header.ParentID)
+	parentCommitment, err := e.execState.StateCommitmentByBlockID(block.ParentID)
 
 	if err == nil {
 		// the parent block is an executed block.
@@ -269,7 +269,7 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 	// handle exception
 	if !errors.Is(err, storage.ErrNotFound) {
 		return nil, nil, fmt.Errorf("failed to get state commitment for parent block %v of block %v (height: %v): %w",
-			block.Header.ParentID, blockID, block.Header.Height, err)
+			block.ParentID, blockID, block.Height, err)
 	}
 
 	// the parent block is an unexecuted block.
@@ -294,13 +294,13 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 		// parent commit. It's necessary to check again whether the parent block is executed after the call.
 		lg.Warn().Msgf(
 			"block is missing parent block, re-enqueueing %v (parent: %v)",
-			blockID, block.Header.ParentID,
+			blockID, block.ParentID,
 		)
 
-		parentCommitment, err := e.execState.StateCommitmentByBlockID(block.Header.ParentID)
+		parentCommitment, err := e.execState.StateCommitmentByBlockID(block.ParentID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get parent state commitment when re-enqueue block %v (parent: %v): %w",
-				blockID, block.Header.ParentID, err)
+				blockID, block.ParentID, err)
 		}
 
 		// now re-enqueue the block with parent commit
@@ -326,7 +326,7 @@ func (e *Core) onBlockExecuted(
 ) error {
 	commit := computationResult.CurrentEndState()
 
-	e.metrics.ExecutionLastExecutedBlockHeight(block.Block.Header.Height)
+	e.metrics.ExecutionLastExecutedBlockHeight(block.Block.Height)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -345,7 +345,7 @@ func (e *Core) onBlockExecuted(
 	blockID := block.BlockID()
 	lg := e.log.With().
 		Hex("block_id", blockID[:]).
-		Uint64("height", block.Block.Header.Height).
+		Uint64("height", block.Block.Height).
 		Logger()
 
 	lg.Debug().Msgf("execution state saved")
@@ -367,7 +367,7 @@ func (e *Core) onBlockExecuted(
 	receipt := computationResult.ExecutionReceipt
 	lg.Info().
 		Int("collections", len(block.CompleteCollections)).
-		Hex("parent_block", block.Block.Header.ParentID[:]).
+		Hex("parent_block", block.Block.ParentID[:]).
 		Int("collections", len(block.Block.Payload.Guarantees)).
 		Hex("start_state", block.StartState[:]).
 		Hex("final_state", commit[:]).
@@ -387,7 +387,7 @@ func (e *Core) onBlockExecuted(
 	// OnBlockExecuted(childBlock) being called before OnBlockExecuted(parentBlock).
 
 	e.executeConcurrently(executables)
-	err = e.throttle.OnBlockExecuted(blockID, block.Block.Header.Height)
+	err = e.throttle.OnBlockExecuted(blockID, block.Block.Height)
 	if err != nil {
 		return fmt.Errorf("failed to notify throttle that block %v has been executed: %w", blockID, err)
 	}
@@ -469,14 +469,14 @@ func (e *Core) executeConcurrently(executables []*entity.ExecutableBlock) {
 }
 
 func (e *Core) execute(ctx context.Context, executable *entity.ExecutableBlock) error {
-	if !e.stopControl.ShouldExecuteBlock(executable.Block.ID(), executable.Block.Header.Height) {
+	if !e.stopControl.ShouldExecuteBlock(executable.Block.ID(), executable.Block.Height) {
 		return nil
 	}
 
 	blockID := executable.BlockID()
 	e.log.Info().
 		Hex("block_id", blockID[:]).
-		Uint64("height", executable.Block.Header.Height).
+		Uint64("height", executable.Block.Height).
 		Int("collections", len(executable.CompleteCollections)).
 		Msgf("executing block")
 

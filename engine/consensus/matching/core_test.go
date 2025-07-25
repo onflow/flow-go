@@ -272,7 +272,6 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 //
 // TODO: this test is temporarily requires as long as sealing.Core requires _two_ receipts from different ENs to seal
 func (ms *MatchingSuite) TestRequestSecondPendingReceipt() {
-
 	ms.core.config.SealingThreshold = 0 // request receipts for all unsealed finalized blocks
 
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(ms.LatestFinalizedBlock))
@@ -282,8 +281,8 @@ func (ms *MatchingSuite) TestRequestSecondPendingReceipt() {
 	receipt2 := unittest.ExecutionReceiptFixture(unittest.WithResult(result))
 
 	// receipts from storage are potentially added to receipts mempool and incorporated results mempool
-	ms.ReceiptsPL.On("AddReceipt", receipt1, ms.LatestFinalizedBlock.Header).Return(false, nil).Maybe()
-	ms.ReceiptsPL.On("AddReceipt", receipt2, ms.LatestFinalizedBlock.Header).Return(false, nil).Maybe()
+	ms.ReceiptsPL.On("AddReceipt", receipt1, ms.LatestFinalizedBlock.ToHeader()).Return(false, nil).Maybe()
+	ms.ReceiptsPL.On("AddReceipt", receipt2, ms.LatestFinalizedBlock.ToHeader()).Return(false, nil).Maybe()
 
 	// Situation A: we have _once_ receipt for an unsealed finalized block in storage
 	ms.ReceiptsDB.On("ByBlockID", ms.LatestFinalizedBlock.ID()).Return(flow.ExecutionReceiptList{receipt1}, nil).Once()

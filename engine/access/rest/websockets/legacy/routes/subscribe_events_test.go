@@ -87,7 +87,7 @@ func (s *SubscribeEventsSuite) SetupTest() {
 
 		s.blockEvents[block.ID()] = events
 
-		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Header.Height, block.ID(), result.ExecutionDataID)
+		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Height, block.ID(), result.ExecutionDataID)
 	}
 }
 
@@ -117,7 +117,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 		{
 			name:              "happy path - all events from startHeight",
 			startBlockID:      flow.ZeroID,
-			startHeight:       s.blocks[0].Header.Height,
+			startHeight:       s.blocks[0].Height,
 			heartbeatInterval: 1,
 		},
 		{
@@ -183,7 +183,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 				blockID := block.ID()
 				if startBlockFound || blockID == test.startBlockID {
 					startBlockFound = true
-					if test.startHeight == request.EmptyHeight || block.Header.Height >= test.startHeight {
+					if test.startHeight == request.EmptyHeight || block.Height >= test.startHeight {
 						// track 2 lists, one for the expected results and one that is passed back
 						// from the subscription to the handler. These cannot be shared since the
 						// response struct is passed by reference from the mock to the handler, so
@@ -199,17 +199,17 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 						}
 						if len(expectedEvents) > 0 || (i+1)%int(test.heartbeatInterval) == 0 {
 							expectedEventsResponses = append(expectedEventsResponses, &backend.EventsResponse{
-								Height:         block.Header.Height,
+								Height:         block.Height,
 								BlockID:        blockID,
 								Events:         expectedEvents,
-								BlockTimestamp: time.UnixMilli(int64(block.Header.Timestamp)).UTC(),
+								BlockTimestamp: time.UnixMilli(int64(block.Timestamp)).UTC(),
 							})
 						}
 						subscriptionEventsResponses = append(subscriptionEventsResponses, &backend.EventsResponse{
-							Height:         block.Header.Height,
+							Height:         block.Height,
 							BlockID:        blockID,
 							Events:         subscriptionEvents,
-							BlockTimestamp: time.UnixMilli(int64(block.Header.Timestamp)).UTC(),
+							BlockTimestamp: time.UnixMilli(int64(block.Timestamp)).UTC(),
 						})
 					}
 				}
@@ -256,7 +256,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 	s.Run("returns error for block id and height", func() {
 		stateStreamBackend := mockstatestream.NewAPI(s.T())
-		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Header.Height, nil, nil, nil, 1, nil)
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Height, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := router.NewTestHijackResponseRecorder()
 		router.ExecuteLegacyWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())

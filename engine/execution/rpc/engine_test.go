@@ -155,7 +155,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// create the expected result for this block
 		expectedResult[i] = &execution.GetEventsForBlockIDsResponse_Result{
 			BlockId:     id[:],
-			BlockHeight: block.Header.Height,
+			BlockHeight: block.Height,
 			Events:      eventMessages,
 		}
 	}

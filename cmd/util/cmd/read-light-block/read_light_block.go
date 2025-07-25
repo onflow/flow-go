@@ -50,7 +50,7 @@ type LightBlock struct {
 func BlockToLight(block *flow.Block) *LightBlock {
 	return &LightBlock{
 		ID:          block.ID(),
-		Height:      block.Header.Height,
+		Height:      block.Height,
 		Collections: flow.EntitiesToIDs(block.Payload.Guarantees),
 	}
 }

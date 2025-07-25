@@ -38,8 +38,8 @@ func constructRootBlock(rootHeaderBody *flow.HeaderBody, protocolStateID flow.Id
 
 	block, err := flow.NewRootBlock(
 		flow.UntrustedBlock{
-			Header:  *rootHeaderBody,
-			Payload: *payload,
+			HeaderBody: *rootHeaderBody,
+			Payload:    *payload,
 		},
 	)
 	if err != nil {

@@ -392,7 +392,7 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 	var err error
 	blocks[3], err = flow.NewBlock(
 		flow.UntrustedBlock{
-			Header: blocks[3].Header,
+			HeaderBody: blocks[3].HeaderBody,
 			Payload: unittest.PayloadFixture(
 				unittest.WithReceipts(receipts[0], receipts[1], receipts[2]),
 			),
@@ -488,7 +488,7 @@ func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
 		// set payload for blocks A, B, C
 		blocks[i], err = flow.NewBlock(
 			flow.UntrustedBlock{
-				Header: blocks[i].Header,
+				HeaderBody: blocks[i].HeaderBody,
 				Payload: unittest.PayloadFixture(
 					unittest.WithReceipts(receiptChain1[i-1], receiptChain2[i-1]),
 				),
@@ -499,7 +499,7 @@ func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
 
 	blocks[4], err = flow.NewBlock(
 		flow.UntrustedBlock{
-			Header: blocks[4].Header,
+			HeaderBody: blocks[4].HeaderBody,
 			Payload: unittest.PayloadFixture(
 				unittest.WithSeals(unittest.Seal.Fixture(unittest.Seal.WithResult(&receiptChain1[0].ExecutionResult))),
 			),
@@ -602,7 +602,7 @@ func (s *SealValidationSuite) TestExtendSealDuplicate() {
 		_, _, b3, _, sealB1 := s.generateBasicTestFork()
 		b3, err := flow.NewBlock(
 			flow.UntrustedBlock{
-				Header: b3.Header,
+				HeaderBody: b3.HeaderBody,
 				Payload: unittest.PayloadFixture(
 					unittest.WithSeals(sealB1, sealB1),
 				),
@@ -674,7 +674,7 @@ func (s *SealValidationSuite) TestExtendSeal_DifferentIncorporatedResult() {
 	seal := unittest.Seal.Fixture(unittest.Seal.WithResult(differentResult))
 	newBlock, err := flow.NewBlock(
 		flow.UntrustedBlock{
-			Header: newBlock.Header,
+			HeaderBody: newBlock.HeaderBody,
 			Payload: unittest.PayloadFixture(
 				unittest.WithSeals(seal),
 			),

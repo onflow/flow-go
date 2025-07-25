@@ -282,9 +282,9 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 			}
 			log := e.log.With().
 				Hex("origin_id", proposalMsg.OriginID[:]).
-				Str("chain_id", proposal.Block.Header.ChainID.String()).
-				Uint64("view", proposal.Block.Header.View).
-				Uint64("height", proposal.Block.Header.Height).
+				Str("chain_id", proposal.Block.ChainID.String()).
+				Uint64("view", proposal.Block.View).
+				Uint64("height", proposal.Block.Height).
 				Logger()
 			latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
 			e.submitConnectedBatch(log, latestFinalizedView, proposalMsg.OriginID, []*flow.Proposal{proposal})
@@ -314,8 +314,8 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 
 		}
 
-		firstBlock := blocks[0].Block.Header
-		lastBlock := blocks[len(blocks)-1].Block.Header
+		firstBlock := blocks[0].Block
+		lastBlock := blocks[len(blocks)-1].Block
 		log := e.log.With().
 			Hex("origin_id", batch.OriginID[:]).
 			Str("chain_id", lastBlock.ChainID.String()).
@@ -332,7 +332,7 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		parentID := blocks[0].Block.ID()
 		indexOfLastConnected := 0
 		for i, block := range blocks {
-			if block.Block.Header.ParentID != parentID {
+			if block.Block.ParentID != parentID {
 				e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, blocks[indexOfLastConnected:i])
 				indexOfLastConnected = i
 			}
@@ -349,8 +349,8 @@ func (e *ComplianceEngine) submitConnectedBatch(log zerolog.Logger, latestFinali
 		return
 	}
 	// if latest block of batch is already finalized we can drop such input.
-	firstBlock := blocks[0].Block.Header
-	lastBlock := blocks[len(blocks)-1].Block.Header
+	firstBlock := blocks[0].Block
+	lastBlock := blocks[len(blocks)-1].Block
 	if lastBlock.View < latestFinalizedView {
 		log.Debug().Msgf("dropping range [%d, %d] below finalized view %d", firstBlock.View, lastBlock.View, latestFinalizedView)
 		return
