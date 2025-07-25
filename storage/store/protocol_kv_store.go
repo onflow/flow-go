@@ -94,12 +94,23 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 	}
 }
 
+// BatchStore stores the protocol state key value data with the given stateID.into the database
+// Expected errors during normal operations:
+// - storage.ErrDataMismatch if a KV store for the given stateID has already been indexed, but different
 func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
 	rw.Lock(s.storing)
 
-	_, err := s.ByID(stateID)
+	existingData, err := s.ByID(stateID)
 	if err == nil {
-		return fmt.Errorf("kv-store snapshot with id (%x) already exists: %w", stateID[:], storage.ErrAlreadyExists)
+
+		if existingData.Equal(data) {
+			return nil
+		}
+
+		return fmt.Errorf("kv-store snapshot with id (%x) already exists but different, ([%v,%x] != [%v,%x]): %w", stateID[:],
+			data.Version, data.Data,
+			existingData.Version, existingData.Data,
+			storage.ErrDataMismatch)
 	}
 
 	if !errors.Is(err, storage.ErrNotFound) {
@@ -123,7 +134,7 @@ func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.
 //     _after_ validating the QC.
 //
 // Expected errors during normal operations:
-//   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
+//   - storage.ErrDataMismatch if a KV store for the given blockID has already been indexed, but different
 func (s *ProtocolKVStore) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
 	rw.Lock(s.indexing)
 
@@ -135,7 +146,10 @@ func (s *ProtocolKVStore) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.
 			return nil
 		}
 
-		return fmt.Errorf("kv-store snapshot with block id (%x) already exists: %w", blockID[:], storage.ErrAlreadyExists)
+		return fmt.Errorf("kv-store snapshot with block id (%x) already exists and different (%v != %v): %w",
+			blockID[:],
+			stateID, existingStateID,
+			storage.ErrDataMismatch)
 	}
 	if !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("could not check if kv-store snapshot with block id (%x) exists: %w", blockID[:], err)
