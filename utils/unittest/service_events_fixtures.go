@@ -161,7 +161,6 @@ func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCom
 	return event, expected
 }
 
-
 // EpochRecoverFixtureByChainID returns an EpochRecover service event as a Cadence event
 // representation and as a protocol model representation.
 func EpochRecoverFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochRecover) {
