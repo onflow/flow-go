@@ -502,6 +502,7 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 			SigData:  msg.SigData,
 		})
 		if err != nil {
+			// TODO: Replace this log statement with a call to the protocol violation consumer.
 			h.log.Warn().
 				Hex("origin_id", originID[:]).
 				Hex("block_id", msg.BlockID[:]).
@@ -523,6 +524,7 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 			},
 		)
 		if err != nil {
+			// TODO: Replace this log statement with a call to the protocol violation consumer.
 			h.log.Warn().
 				Hex("origin_id", originID[:]).
 				Uint64("view", msg.View).
