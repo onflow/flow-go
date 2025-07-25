@@ -6,7 +6,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/admin"
