@@ -428,7 +428,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// setup mock state mutator, we don't need a real once since we are using mocked participant state.
 	bs.stateMutator = protocol.NewMutableProtocolState(bs.T())
-	bs.stateMutator.On("EvolveState", mock.Anything, mock.Anything, mock.Anything).Return(unittest.IdentifierFixture(), []storage.BlockIndexingBatchWrite{}, nil).Maybe()
+	bs.stateMutator.On("EvolveState", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(unittest.IdentifierFixture(), nil).Maybe()
 
 	// initialize the builder
 	bs.build, err = NewBuilder(

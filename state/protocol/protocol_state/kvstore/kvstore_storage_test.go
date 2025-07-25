@@ -5,6 +5,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/onflow/flow-go/storage"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -35,10 +37,14 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		}
 		kvState.On("VersionedEncode").Return(expectedVersion, encData, nil).Once()
 
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		defer lctx.Release()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		rw := storagemock.NewReaderBatchWriter(t)
-		llStorage.On("BatchStore", rw, kvStateID, versionedSnapshot).Return(nil).Once()
+		llStorage.On("BatchStore", lctx, rw, kvStateID, versionedSnapshot).Return(nil).Once()
 
-		require.NoError(t, store.BatchStore(rw, kvStateID, kvState))
+		require.NoError(t, store.BatchStore(lctx, rw, kvStateID, kvState))
 	})
 
 	// On the unhappy path, i.e. when the encoding of input `kvState` failed, `ProtocolKVStore` should produce
@@ -47,8 +53,12 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		encodingError := errors.New("encoding error")
 		kvState.On("VersionedEncode").Return(uint64(0), nil, encodingError).Once()
 
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		defer lctx.Release()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		rw := storagemock.NewReaderBatchWriter(t)
-		err := store.BatchStore(rw, kvStateID, kvState)
+		err := store.BatchStore(lctx, rw, kvStateID, kvState)
 		require.ErrorIs(t, err, encodingError)
 	})
 }
@@ -64,20 +74,28 @@ func TestProtocolKVStore_IndexTx(t *testing.T) {
 
 	// should be called to persist the version-encoded snapshot.
 	t.Run("happy path", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		defer lctx.Release()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		rw := storagemock.NewReaderBatchWriter(t)
-		llStorage.On("BatchIndex", rw, blockID, stateID).Return(nil).Once()
+		llStorage.On("BatchIndex", lctx, rw, blockID, stateID).Return(nil).Once()
 
-		require.NoError(t, store.BatchIndex(rw, blockID, stateID))
+		require.NoError(t, store.BatchIndex(lctx, rw, blockID, stateID))
 	})
 
 	// On the unhappy path, the deferred database update from the lower level just errors upon execution.
 	// This error should be escalated.
 	t.Run("unhappy path", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		defer lctx.Release()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		indexingError := errors.New("indexing error")
 		rw := storagemock.NewReaderBatchWriter(t)
-		llStorage.On("BatchIndex", rw, blockID, stateID).Return(indexingError).Once()
+		llStorage.On("BatchIndex", lctx, rw, blockID, stateID).Return(indexingError).Once()
 
-		err := store.BatchIndex(rw, blockID, stateID)
+		err := store.BatchIndex(lctx, rw, blockID, stateID)
 		require.ErrorIs(t, err, indexingError)
 	})
 }

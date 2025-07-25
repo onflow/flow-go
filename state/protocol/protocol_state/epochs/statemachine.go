@@ -3,12 +3,15 @@ package epochs
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/common"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/deferred"
 )
 
 // StateMachine implements a low-level interface for state-changing operations on the Epoch state.
@@ -164,7 +167,7 @@ type EpochStateMachine struct {
 	setups               storage.EpochSetups
 	commits              storage.EpochCommits
 	epochProtocolStateDB storage.EpochProtocolStateEntries
-	pendingDBWrites      []storage.BlockIndexingBatchWrite
+	pendingDBUpdates     *deferred.DeferredBlockPersist
 }
 
 var _ protocol_state.KeyValueStoreStateMachine = (*EpochStateMachine)(nil)
@@ -224,6 +227,7 @@ func NewEpochStateMachine(
 		setups:               setups,
 		commits:              commits,
 		epochProtocolStateDB: epochProtocolStateDB,
+		pendingDBUpdates:     deferred.NewDeferredBlockPersist(),
 	}, nil
 }
 
@@ -235,21 +239,21 @@ func NewEpochStateMachine(
 // epoch state is consistent with the KV Store. Using this approach, we commit the epoch sub-state to the KV Store which in
 // affects the Dynamic Protocol State ID which is essentially hash of the KV Store.
 // TODO: update comments
-func (e *EpochStateMachine) Build() ([]storage.BlockIndexingBatchWrite, error) {
+func (e *EpochStateMachine) Build() (*deferred.DeferredBlockPersist, error) {
 	updatedEpochState, updatedStateID, hasChanges := e.activeStateMachine.Build()
 
-	e.pendingDBWrites = append(e.pendingDBWrites, func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+	e.pendingDBUpdates.AddNextOperation(func(_ lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 		return e.epochProtocolStateDB.BatchIndex(rw, blockID, updatedStateID)
 	})
 
 	if hasChanges {
-		e.pendingDBWrites = append(e.pendingDBWrites, func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+		e.pendingDBUpdates.AddNextOperation(func(_ lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 			return e.epochProtocolStateDB.BatchStore(rw.Writer(), updatedStateID, updatedEpochState.MinEpochStateEntry)
 		})
 	}
 	e.EvolvingState.SetEpochStateID(updatedStateID)
 
-	return e.pendingDBWrites, nil
+	return e.pendingDBUpdates, nil
 }
 
 // EvolveState applies the state change(s) on the Epoch sub-state, based on information from the candidate block
@@ -297,7 +301,7 @@ func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent)
 		}
 	}
 
-	e.pendingDBWrites = append(e.pendingDBWrites, dbUpdates...)
+	e.pendingDBUpdates.Chain(dbUpdates)
 	return nil
 }
 
@@ -310,7 +314,7 @@ func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent)
 // it returns the deferred DB updates to be applied to the storage.
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if any service event is invalid or is not a valid state transition for the current protocol state
-func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.ServiceEvent) ([]storage.BlockIndexingBatchWrite, error) {
+func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.ServiceEvent) (*deferred.DeferredBlockPersist, error) {
 	parentProtocolState := e.activeStateMachine.ParentState()
 
 	// STEP 1: transition to next epoch if next epoch is committed *and* we are at first block of epoch
@@ -323,7 +327,7 @@ func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.
 	}
 
 	// STEP 2: apply service events (input events already required to be ordered by block height).
-	dbUpdates := make([]storage.BlockIndexingBatchWrite, 0, len(sealedServiceEvents))
+	dbUpdates := deferred.NewDeferredBlockPersist()
 	for _, event := range sealedServiceEvents {
 		switch ev := event.Event.(type) {
 		case *flow.EpochSetup:
@@ -332,7 +336,7 @@ func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.
 				return nil, fmt.Errorf("could not process epoch setup event: %w", err)
 			}
 			if processed {
-				dbUpdates = append(dbUpdates, func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+				dbUpdates.AddNextOperation(func(_ lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 					return e.setups.BatchStore(rw, ev) // we'll insert the setup event when we insert the block
 				})
 			}
@@ -343,7 +347,7 @@ func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.
 				return nil, fmt.Errorf("could not process epoch commit event: %w", err)
 			}
 			if processed {
-				dbUpdates = append(dbUpdates, func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+				dbUpdates.AddNextOperation(func(_ lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 					return e.commits.BatchStore(rw, ev) // we'll insert the commit event when we insert the block
 				})
 			}
@@ -353,7 +357,7 @@ func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.
 				return nil, fmt.Errorf("could not process epoch recover event: %w", err)
 			}
 			if processed {
-				dbUpdates = append(dbUpdates, func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+				dbUpdates.AddNextOperation(func(_ lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 					err := e.setups.BatchStore(rw, &ev.EpochSetup)
 					if err != nil {
 						return err
