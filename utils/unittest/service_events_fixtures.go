@@ -1451,7 +1451,6 @@ var EpochCommitFixtureCCF = func() []byte {
 	return b
 }()
 
-
 func EpochRecoverFixtureCCF(randomSource []byte) []byte {
 	randomSourceHex := hex.EncodeToString(randomSource)
 	b, err := ccf.Encode(createEpochRecoverEvent(randomSourceHex))
