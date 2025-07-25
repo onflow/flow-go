@@ -1,7 +1,6 @@
 package operation
 
 import (
-	"encoding/binary"
 	"math/rand"
 	"testing"
 
