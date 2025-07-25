@@ -26,8 +26,6 @@ type Criteria struct {
 	AgreeingExecutors uint
 	// RequiredExecutors is the list of EN node IDs, one of which must have produced the result
 	RequiredExecutors flow.IdentifierList
-	// ResultInFork is an optional ExecutionResult that must exist in the fork. Used to ensure consistency between requests
-	ResultInFork flow.Identifier
 }
 
 // Merge merges the `incoming` criteria into the current criteria, returning a new Criteria object.
@@ -41,10 +39,6 @@ func (c Criteria) Merge(incoming Criteria) Criteria {
 
 	if len(incoming.RequiredExecutors) > 0 {
 		merged.RequiredExecutors = incoming.RequiredExecutors
-	}
-
-	if incoming.ResultInFork != flow.ZeroID {
-		merged.ResultInFork = incoming.ResultInFork
 	}
 
 	return merged
@@ -104,14 +98,19 @@ type ExecutionResultQueryProviderImpl struct {
 func NewExecutionResultQueryProviderImpl(
 	log zerolog.Logger,
 	state protocol.State,
+	headers storage.Headers,
 	executionReceipts storage.ExecutionReceipts,
 	preferredENIdentifiers flow.IdentifierList,
 	requiredENIdentifiers flow.IdentifierList,
 	operatorCriteria Criteria,
 ) (*ExecutionResultQueryProviderImpl, error) {
 	// Root block ID and result should not change and could be cached.
-	rootBlock := state.Params().FinalizedRoot()
-	rootBlockID := rootBlock.ID()
+	sporkRootBlockHeight := state.Params().SporkRootBlockHeight()
+	rootBlockID, err := headers.BlockIDByHeight(sporkRootBlockHeight)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve block ID by height: %w", err)
+	}
+
 	rootBlockResult, _, err := state.AtBlockID(rootBlockID).SealedResult()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve root block result: %w", err)
@@ -253,8 +252,7 @@ func checkCriteria(executorGroup flow.ExecutionReceiptGroupedList, criteria Crit
 	}
 
 	// TODO: Implement the `ResultInFork` check here, which iteratively checks ancestors to determine if
-	// the current result's fork includes the requested result.
-	// https://github.com/onflow/flow-go/issues/7587
+	//       the current result's fork includes the requested result. https://github.com/onflow/flow-go/issues/7587
 
 	return true
 }
