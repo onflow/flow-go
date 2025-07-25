@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -221,42 +221,27 @@ func TestRemove(t *testing.T) {
 }
 
 func TestRemoveDiskUsage(t *testing.T) {
-	count := 10000
-	wg := sync.WaitGroup{}
-	// 10000 chunk data packs will produce 4 log files
-	// Wait for the 4 log file to be deleted
-	wg.Add(4)
+	const count = 10000
 
-	// Create an event listener to monitor compaction events
-	listener := pebble.EventListener{
-		// Capture when compaction ends
-		WALDeleted: func(info pebble.WALDeleteInfo) {
-			wg.Done()
-		},
-	}
-
-	// Configure Pebble DB with the event listener
 	opts := &pebble.Options{
-		MemTableSize:  64 << 20, // required for rotating WAL
-		EventListener: &listener,
+		MemTableSize: 64 << 20, // required for rotating WAL
 	}
 
 	dbtest.RunWithPebbleDB(t, opts, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter, dir string, db *pebble.DB) {
-		items := make([]*flow.ChunkDataPack, count)
-
-		// prefix is needed for defining the key range for compaction
 		prefix := []byte{1}
+		endPrefix := []byte{2}
 		getKey := func(c *flow.ChunkDataPack) []byte {
 			return append(prefix, c.ChunkID[:]...)
 		}
 
+		items := make([]*flow.ChunkDataPack, count)
 		for i := 0; i < count; i++ {
 			chunkID := unittest.IdentifierFixture()
 			chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
 			items[i] = chunkDataPack
 		}
 
-		// Insert 100 entities
+		// 1. Insert 10000 entities.
 		require.NoError(t, withWriter(func(writer storage.Writer) error {
 			for i := 0; i < count; i++ {
 				if err := operation.Upsert(getKey(items[i]), items[i])(writer); err != nil {
@@ -265,9 +250,16 @@ func TestRemoveDiskUsage(t *testing.T) {
 			}
 			return nil
 		}))
-		sizeBefore := getFolderSize(t, dir)
 
-		// Remove all entities
+		// 2. Flush and compact to get a stable state.
+		require.NoError(t, db.Flush())
+		require.NoError(t, db.Compact(prefix, endPrefix, true))
+
+		// 3. Get sizeBefore.
+		sizeBefore := getFolderSize(t, dir)
+		t.Logf("Size after initial write and compact: %d", sizeBefore)
+
+		// 4. Remove all entities
 		require.NoError(t, withWriter(func(writer storage.Writer) error {
 			for i := 0; i < count; i++ {
 				if err := operation.Remove(getKey(items[i]))(writer); err != nil {
@@ -277,29 +269,18 @@ func TestRemoveDiskUsage(t *testing.T) {
 			return nil
 		}))
 
-		// Trigger compaction
-		require.NoError(t, db.Compact(prefix, []byte{2}, true))
+		// 5. Flush and compact again.
+		require.NoError(t, db.Flush())
+		require.NoError(t, db.Compact(prefix, endPrefix, true))
 
-		// Use a timer to implement a timeout for wg.Wait()
-		timeout := time.After(30 * time.Second)
-		done := make(chan struct{})
-
-		go func() {
-			wg.Wait()
-			close(done)
-		}()
-
-		select {
-		case <-done:
-			// WaitGroup finished successfully
-		case <-timeout:
-			t.Fatal("Test timed out waiting for WAL files to be deleted")
-		}
-
-		// Verify the disk usage is reduced
-		sizeAfter := getFolderSize(t, dir)
-		require.Greater(t, sizeBefore, sizeAfter,
-			fmt.Sprintf("expected disk usage to be reduced after compaction, before: %d, after: %d", sizeBefore, sizeAfter))
+		// 6. Verify the disk usage is reduced.
+		require.Eventually(t, func() bool {
+			sizeAfter := getFolderSize(t, dir)
+			t.Logf("Size after delete and compact: %d", sizeAfter)
+			return sizeAfter < sizeBefore
+		}, 30*time.Second, 200*time.Millisecond,
+			"expected disk usage to be reduced after compaction. before: %d, after: %d",
+			sizeBefore, getFolderSize(t, dir))
 	})
 }
 

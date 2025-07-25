@@ -128,8 +128,14 @@ func (s *ProtocolKVStore) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchW
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
 	}
 
-	_, err := s.byBlockIdCache.Get(s.db.Reader(), blockID)
+	existingStateID, err := s.byBlockIdCache.Get(s.db.Reader(), blockID)
 	if err == nil {
+
+		// if it's about to index the same state ID, then we can skip the operation
+		if existingStateID == stateID {
+			return nil
+		}
+
 		return fmt.Errorf("kv-store snapshot with block id (%x) already exists: %w", blockID[:], storage.ErrAlreadyExists)
 	}
 	if !errors.Is(err, storage.ErrNotFound) {
