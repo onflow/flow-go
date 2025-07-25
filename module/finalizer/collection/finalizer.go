@@ -178,17 +178,15 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// collection.
 
 			// only submit the collection guarantee if the write is successful
-			rw.AddCallback(func(err error) {
-				if err != nil {
-					// TODO add real signatures here (https://github.com/onflow/flow-go-internal/issues/4569)
-					f.pusher.SubmitCollectionGuarantee(&flow.CollectionGuarantee{
-						CollectionID:     payload.Collection.ID(),
-						ReferenceBlockID: payload.ReferenceBlockID,
-						ChainID:          header.ChainID,
-						SignerIndices:    step.ParentVoterIndices,
-						Signature:        nil, // TODO: to remove because it's not easily verifiable by consensus nodes
-					})
-				}
+			storage.OnCommitSucceed(rw, func() {
+				// TODO add real signatures here (https://github.com/onflow/flow-go-internal/issues/4569)
+				f.pusher.SubmitCollectionGuarantee(&flow.CollectionGuarantee{
+					CollectionID:     payload.Collection.ID(),
+					ReferenceBlockID: payload.ReferenceBlockID,
+					ChainID:          header.ChainID,
+					SignerIndices:    step.ParentVoterIndices,
+					Signature:        nil, // TODO: to remove because it's not easily verifiable by consensus nodes
+				})
 			})
 
 			return nil

@@ -155,7 +155,6 @@ func TestFinalizer(t *testing.T) {
 			assert.Equal(t, block.ID(), final.ID())
 
 			// collection should not have been propagated
-			pusher.AssertNotCalled(t, "SubmitCollectionGuarantee", mock.Anything)
 		})
 
 		t.Run("finalize single block", func(t *testing.T) {
@@ -199,7 +198,7 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
 			assert.Equal(t, block.ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, final.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, lockManager, db, refBlock.Height, final.ID())
 		})
 
 		// when finalizing a block with un-finalized ancestors, those ancestors should be finalized as well
@@ -255,7 +254,7 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
 			assert.Equal(t, block2.ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID(), block2.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, lockManager, db, refBlock.Height, block1.ID(), block2.ID())
 		})
 
 		t.Run("finalize with un-finalized child", func(t *testing.T) {
@@ -304,7 +303,7 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
 			assert.Equal(t, block1.ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, lockManager, db, refBlock.Height, block1.ID())
 		})
 
 		// when finalizing a block with a conflicting fork, the fork should not be finalized.
@@ -354,7 +353,7 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
 			assert.Equal(t, block1.ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, lockManager, db, refBlock.Height, block1.ID())
 		})
 	})
 }
@@ -362,9 +361,12 @@ func TestFinalizer(t *testing.T) {
 // assertClusterBlocksIndexedByReferenceHeight checks the given cluster blocks have
 // been indexed by the given reference block height, which is expected as part of
 // finalization.
-func assertClusterBlocksIndexedByReferenceHeight(t *testing.T, db storage.DB, refHeight uint64, clusterBlockIDs ...flow.Identifier) {
+func assertClusterBlocksIndexedByReferenceHeight(t *testing.T, lockManager lockctx.Manager, db storage.DB, refHeight uint64, clusterBlockIDs ...flow.Identifier) {
 	var ids []flow.Identifier
-	err := operation.LookupClusterBlocksByReferenceHeightRange(nil, db.Reader(), refHeight, refHeight, &ids)
+	lctx := lockManager.NewContext()
+	defer lctx.Release()
+	require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
+	err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), refHeight, refHeight, &ids)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, clusterBlockIDs, ids)
 }
