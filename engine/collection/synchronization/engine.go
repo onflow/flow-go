@@ -168,6 +168,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 				}
 				proposals, err := blockResponse.BlocksInternal()
 				if err != nil {
+					// TODO: Replace this log statement with a call to the protocol violation consumer.
 					e.log.Warn().
 						Hex("origin_id", logging.ID(msg.OriginID)).
 						Uint64("nonce", blockResponse.Nonce).
