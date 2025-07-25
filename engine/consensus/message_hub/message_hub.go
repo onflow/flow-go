@@ -480,6 +480,7 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 	case *flow.UntrustedProposal:
 		proposal, err := flow.NewProposal(*msg)
 		if err != nil {
+			// TODO: Replace this log statement with a call to the protocol violation consumer.
 			h.log.Warn().
 				Hex("origin_id", originID[:]).
 				Hex("block_id", logging.ID(msg.Block.ID())).
