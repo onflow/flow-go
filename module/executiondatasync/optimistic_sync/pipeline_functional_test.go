@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
@@ -43,7 +44,7 @@ type PipelineFunctionalSuite struct {
 	pdb                           *pebble.DB
 	db                            storage.DB
 	persistentRegisters           *pebbleStorage.Registers
-	persistentEvents              *store.Events
+	persistentEvents              storage.Events
 	persistentCollections         *store.Collections
 	persistentTransactions        *store.Transactions
 	persistentResults             *store.LightTransactionResults
@@ -236,6 +237,30 @@ func (p *PipelineFunctionalSuite) TestPipelineIndexingError() {
 	})
 }
 
+// TestPipelinePersistingError tests the pipeline behavior when an error occurs during the persisting step.
+func (p *PipelineFunctionalSuite) TestPipelinePersistingError() {
+	// Mock events storage to simulate an error on a persisting step. In normal flow and with real storages, it is hard to make a meaningful error explicitly.
+	mockEvents := storagemock.NewEvents(p.T())
+	mockEvents.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError).Maybe()
+	p.persistentEvents = mockEvents
+
+	expectedExecutionData, expectedTxResultErrMsgs := p.initializeTestData()
+
+	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
+	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(expectedTxResultErrMsgs, nil).Once()
+
+	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
+		pipeline.OnParentStateUpdated(StateComplete)
+
+		waitForStateUpdates(p.T(), updateChan, StateProcessing, StateWaitingPersist)
+
+		pipeline.SetSealed()
+
+		waitForError(p.T(), errChan, assert.AnError)
+		p.Assert().Equal(StateWaitingPersist, pipeline.GetState())
+	})
+}
+
 // TestMainCtxCancellationDuringRequestingExecutionData tests context cancellation during the
 // request of execution data. It ensures that cancellation is handled properly when triggered
 // while execution data is being downloaded.
@@ -402,7 +427,7 @@ func (p *PipelineFunctionalSuite) initializeTestData() (*execution_data.BlockExe
 		p.T(),
 		0,
 		unittest.WithChunkEvents(unittest.EventsFixture(5)),
-		unittest.WithTrieUpdate(indexer.CreateTestTrieUpdate(p.T())),
+		unittest.WithTrieUpdate(indexer.TrieUpdateRandomLedgerPayloadsFixture(p.T())),
 	)
 	systemChunkCollection := unittest.CollectionFixture(1)
 	systemChunkData := &execution_data.ChunkExecutionData{

@@ -33,7 +33,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 		indexer := createInMemoryIndexer(exeResult, header)
 
-		trie := CreateTestTrieUpdate(t)
+		trie := TrieUpdateRandomLedgerPayloadsFixture(t)
 		require.NotEmpty(t, trie.Payloads)
 		collection := unittest.CollectionFixture(0)
 
@@ -75,7 +75,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 		indexer := createInMemoryIndexer(exeResult, header)
 
-		tries := []*ledger.TrieUpdate{CreateTestTrieUpdate(t), CreateTestTrieUpdate(t)}
+		tries := []*ledger.TrieUpdate{TrieUpdateRandomLedgerPayloadsFixture(t), TrieUpdateRandomLedgerPayloadsFixture(t)}
 		// Make sure we have two register updates that are updating the same value
 		tries[1].Paths[0] = tries[0].Paths[0]
 		testValue := tries[1].Payloads[0]
@@ -238,7 +238,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		expectedResults := unittest.LightTransactionResultsFixture(20)
 		expectedCollections := unittest.CollectionListFixture(2)
 		systemChunkCollection := unittest.CollectionFixture(1)
-		expectedTries := []*ledger.TrieUpdate{CreateTestTrieUpdate(t), CreateTestTrieUpdate(t)}
+		expectedTries := []*ledger.TrieUpdate{TrieUpdateRandomLedgerPayloadsFixture(t), TrieUpdateRandomLedgerPayloadsFixture(t)}
 
 		ed := &execution_data.BlockExecutionData{
 			BlockID: blockID,
