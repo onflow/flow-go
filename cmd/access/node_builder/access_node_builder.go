@@ -53,7 +53,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_retriever"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -374,9 +374,9 @@ type FlowAccessNodeBuilder struct {
 	stateStreamBackend *statestreambackend.StateStreamBackend
 	nodeBackend        *backend.Backend
 
-	ExecNodeIdentitiesProvider   *commonrpc.ExecutionNodeIdentitiesProvider
-	TxResultErrorMessagesCore    *tx_error_messages.TxErrorMessagesCore
-	txResultErrorMessageProvider error_message_provider.TxErrorMessageProvider
+	ExecNodeIdentitiesProvider    *commonrpc.ExecutionNodeIdentitiesProvider
+	TxResultErrorMessagesCore     *tx_error_messages.TxErrorMessagesCore
+	txResultErrorMessageRetriever error_message_retriever.TxErrorMessageRetriever
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -2033,7 +2033,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			)
 
 			nodeCommunicator := node_communicator.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled)
-			builder.txResultErrorMessageProvider = error_message_provider.NewTxErrorMessageProvider(
+			builder.txResultErrorMessageRetriever = error_message_retriever.NewTxErrorMessageRetriever(
 				node.Logger,
 				builder.transactionResultErrorMessages, // might be nil
 				notNil(builder.TxResultsIndex),
@@ -2081,7 +2081,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				IndexReporter:              indexReporter,
 				VersionControl:             notNil(builder.VersionControl),
 				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
-				TxErrorMessageProvider:     notNil(builder.txResultErrorMessageProvider),
+				TxErrorMessageRetriever:    notNil(builder.txResultErrorMessageRetriever),
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -2138,7 +2138,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if builder.storeTxResultErrorMessages {
 				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 					node.Logger,
-					notNil(builder.txResultErrorMessageProvider),
+					notNil(builder.txResultErrorMessageRetriever),
 					builder.transactionResultErrorMessages,
 					notNil(builder.ExecNodeIdentitiesProvider),
 				)

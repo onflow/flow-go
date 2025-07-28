@@ -1,4 +1,4 @@
-package error_message_provider
+package error_message_retriever
 
 import (
 	"context"
@@ -126,7 +126,7 @@ func (suite *Suite) TestLookupByTxID_FromExecutionNode_HappyPath() {
 		Return(nil, storage.ErrNotFound).
 		Once()
 
-	errMessageProvider := NewTxErrorMessageProvider(
+	errMessageProvider := NewTxErrorMessageRetriever(
 		suite.log,
 		suite.txResultErrorMessages,
 		suite.txResultsIndex,
@@ -166,7 +166,7 @@ func (suite *Suite) TestLookupByTxID_FromStorage_HappyPath() {
 	failedTxId := failedTx.ID()
 	failedTxIndex := rand.Uint32()
 
-	errMessageProvider := NewTxErrorMessageProvider(
+	errMessageProvider := NewTxErrorMessageRetriever(
 		suite.log,
 		suite.txResultErrorMessages,
 		suite.txResultsIndex,
@@ -226,7 +226,7 @@ func (suite *Suite) TestLookupByTxID_ExecNodeError_UnknownTx() {
 		Return(nil, storage.ErrNotFound).
 		Once()
 
-	errMessageProvider := NewTxErrorMessageProvider(
+	errMessageProvider := NewTxErrorMessageRetriever(
 		suite.log,
 		suite.txResultErrorMessages,
 		suite.txResultsIndex,
@@ -282,7 +282,7 @@ func (suite *Suite) TestLookupByTxID_ExecNodeError_TxResultNotFailed() {
 		}, nil).
 		Once()
 
-	errMessageProvider := NewTxErrorMessageProvider(
+	errMessageProvider := NewTxErrorMessageRetriever(
 		suite.log,
 		suite.txResultErrorMessages,
 		suite.txResultsIndex,
@@ -337,7 +337,7 @@ func (suite *Suite) TestLookupByTxID_ExecNodeError_TxResultFailed() {
 		}, nil).
 		Once()
 
-	errMessageProvider := NewTxErrorMessageProvider(
+	errMessageProvider := NewTxErrorMessageRetriever(
 		suite.log,
 		suite.txResultErrorMessages,
 		suite.txResultsIndex,
@@ -390,7 +390,7 @@ func (suite *Suite) TestLookupByIndex_FromExecutionNode_HappyPath() {
 		Return(nil, storage.ErrNotFound).
 		Once()
 
-	errMessageProvider := NewTxErrorMessageProvider(
+	errMessageProvider := NewTxErrorMessageRetriever(
 		suite.log,
 		suite.txResultErrorMessages,
 		suite.txResultsIndex,
@@ -446,7 +446,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 			Return(nil, storage.ErrNotFound).
 			Once()
 
-		errMessageProvider := NewTxErrorMessageProvider(
+		errMessageProvider := NewTxErrorMessageRetriever(
 			suite.log,
 			suite.txResultErrorMessages,
 			suite.txResultsIndex,
@@ -461,7 +461,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 	})
 
 	suite.Run("happy path from storage db", func() {
-		errMessageProvider := NewTxErrorMessageProvider(
+		errMessageProvider := NewTxErrorMessageRetriever(
 			suite.log,
 			suite.txResultErrorMessages,
 			suite.txResultsIndex,
@@ -520,7 +520,7 @@ func (suite *Suite) TestLookupByIndex_ExecutionNodeError_UnknownTx() {
 		Return(nil, storage.ErrNotFound).
 		Once()
 
-	errMessageProvider := NewTxErrorMessageProvider(
+	errMessageProvider := NewTxErrorMessageRetriever(
 		suite.log,
 		suite.txResultErrorMessages,
 		suite.txResultsIndex,
@@ -577,7 +577,7 @@ func (suite *Suite) TestLookupByIndex_ExecutionNodeError_TxResultNotFailed() {
 		}, nil).
 		Once()
 
-	errMessageProvider := NewTxErrorMessageProvider(
+	errMessageProvider := NewTxErrorMessageRetriever(
 		suite.log,
 		suite.txResultErrorMessages,
 		suite.txResultsIndex,
@@ -633,7 +633,7 @@ func (suite *Suite) TestLookupByIndex_ExecutionNodeError_TxResultFailed() {
 		}, nil).
 		Once()
 
-	errMessageProvider := NewTxErrorMessageProvider(
+	errMessageProvider := NewTxErrorMessageRetriever(
 		suite.log,
 		suite.txResultErrorMessages,
 		suite.txResultsIndex,
@@ -695,7 +695,7 @@ func (suite *Suite) TestLookupByBlockID_FromExecutionNode_HappyPath() {
 		Return(nil, storage.ErrNotFound).
 		Once()
 
-	errMessageProvider := NewTxErrorMessageProvider(
+	errMessageProvider := NewTxErrorMessageRetriever(
 		suite.log,
 		suite.txResultErrorMessages,
 		suite.txResultsIndex,
@@ -747,7 +747,7 @@ func (suite *Suite) TestLookupByBlockID_FromStorage_HappyPath() {
 		Return(txErrorMessages, nil).
 		Once()
 
-	errMessageProvider := NewTxErrorMessageProvider(
+	errMessageProvider := NewTxErrorMessageRetriever(
 		suite.log,
 		suite.txResultErrorMessages,
 		suite.txResultsIndex,
@@ -797,7 +797,7 @@ func (suite *Suite) TestLookupByBlockID_ExecutionNodeError_UnknownTx() {
 		Return(nil, storage.ErrNotFound).
 		Once()
 
-	errMessageProvider := NewTxErrorMessageProvider(
+	errMessageProvider := NewTxErrorMessageRetriever(
 		suite.log,
 		suite.txResultErrorMessages,
 		suite.txResultsIndex,
@@ -857,7 +857,7 @@ func (suite *Suite) TestLookupByBlockID_ExecutionNodeError_TxResultNotFailed() {
 		}, nil).
 		Once()
 
-	errMessageProvider := NewTxErrorMessageProvider(
+	errMessageProvider := NewTxErrorMessageRetriever(
 		suite.log,
 		suite.txResultErrorMessages,
 		suite.txResultsIndex,
@@ -923,7 +923,7 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_FailedToFetch() 
 		}
 	}
 
-	errMessageProvider := NewTxErrorMessageProvider(
+	errMessageProvider := NewTxErrorMessageRetriever(
 		suite.log,
 		suite.txResultErrorMessages,
 		suite.txResultsIndex,

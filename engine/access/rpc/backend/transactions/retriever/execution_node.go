@@ -1,4 +1,4 @@
-package provider
+package retriever
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type ENTransactionProvider struct {
+type ENTransactionRetriever struct {
 	log   zerolog.Logger
 	state protocol.State
 
@@ -40,9 +40,9 @@ type ENTransactionProvider struct {
 	systemTx   *flow.TransactionBody
 }
 
-var _ TransactionProvider = (*ENTransactionProvider)(nil)
+var _ TransactionRetriever = (*ENTransactionRetriever)(nil)
 
-func NewENTransactionProvider(
+func NewENTransactionRetriever(
 	log zerolog.Logger,
 	state protocol.State,
 	collections storage.Collections,
@@ -52,9 +52,9 @@ func NewENTransactionProvider(
 	txStatusDeriver *status_deriver.TxStatusDeriver,
 	systemTxID flow.Identifier,
 	systemTx *flow.TransactionBody,
-) *ENTransactionProvider {
+) *ENTransactionRetriever {
 
-	return &ENTransactionProvider{
+	return &ENTransactionRetriever{
 		log:              log.With().Str("transaction_provider", "execution_node").Logger(),
 		state:            state,
 		collections:      collections,
@@ -67,7 +67,7 @@ func NewENTransactionProvider(
 	}
 }
 
-func (e *ENTransactionProvider) TransactionResult(
+func (e *ENTransactionRetriever) TransactionResult(
 	ctx context.Context,
 	block *flow.Header,
 	transactionID flow.Identifier,
@@ -122,7 +122,7 @@ func (e *ENTransactionProvider) TransactionResult(
 	}, nil
 }
 
-func (e *ENTransactionProvider) TransactionResultByIndex(
+func (e *ENTransactionRetriever) TransactionResultByIndex(
 	ctx context.Context,
 	block *flow.Block,
 	index uint32,
@@ -176,7 +176,7 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 	}, nil
 }
 
-func (e *ENTransactionProvider) TransactionResultsByBlockID(
+func (e *ENTransactionRetriever) TransactionResultsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
@@ -298,7 +298,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 	return results, nil
 }
 
-func (e *ENTransactionProvider) getTransactionResultFromAnyExeNode(
+func (e *ENTransactionRetriever) getTransactionResultFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionResultRequest,
@@ -333,7 +333,7 @@ func (e *ENTransactionProvider) getTransactionResultFromAnyExeNode(
 	return resp, errToReturn
 }
 
-func (e *ENTransactionProvider) getTransactionResultsByBlockIDFromAnyExeNode(
+func (e *ENTransactionRetriever) getTransactionResultsByBlockIDFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionsByBlockIDRequest,
@@ -373,7 +373,7 @@ func (e *ENTransactionProvider) getTransactionResultsByBlockIDFromAnyExeNode(
 	return resp, errToReturn
 }
 
-func (e *ENTransactionProvider) getTransactionResultByIndexFromAnyExeNode(
+func (e *ENTransactionRetriever) getTransactionResultByIndexFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionByIndexRequest,
@@ -411,7 +411,7 @@ func (e *ENTransactionProvider) getTransactionResultByIndexFromAnyExeNode(
 	return resp, errToReturn
 }
 
-func (e *ENTransactionProvider) tryGetTransactionResult(
+func (e *ENTransactionRetriever) tryGetTransactionResult(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionResultRequest,
@@ -430,7 +430,7 @@ func (e *ENTransactionProvider) tryGetTransactionResult(
 	return resp, nil
 }
 
-func (e *ENTransactionProvider) tryGetTransactionResultsByBlockID(
+func (e *ENTransactionRetriever) tryGetTransactionResultsByBlockID(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionsByBlockIDRequest,
@@ -449,7 +449,7 @@ func (e *ENTransactionProvider) tryGetTransactionResultsByBlockID(
 	return resp, nil
 }
 
-func (e *ENTransactionProvider) tryGetTransactionResultByIndex(
+func (e *ENTransactionRetriever) tryGetTransactionResultByIndex(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionByIndexRequest,

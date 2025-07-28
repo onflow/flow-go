@@ -1,4 +1,4 @@
-package provider
+package retriever
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type TransactionProvider interface {
+type TransactionRetriever interface {
 	TransactionResult(
 		ctx context.Context,
 		header *flow.Header,

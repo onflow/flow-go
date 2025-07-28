@@ -1,4 +1,4 @@
-package provider
+package retriever
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/codes"
 
 	"github.com/onflow/flow-go/engine/access/index"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_retriever"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -26,31 +26,31 @@ import (
 // ErrTransactionNotInBlock represents an error indicating that the transaction is not found in the block.
 var ErrTransactionNotInBlock = errors.New("transaction not in block")
 
-// LocalTransactionProvider provides functionality for retrieving transaction results and error messages from local storages
-type LocalTransactionProvider struct {
+// LocalTransactionRetriever provides functionality for retrieving transaction results and error messages from local storages
+type LocalTransactionRetriever struct {
 	state           protocol.State
 	collections     storage.Collections
 	blocks          storage.Blocks
 	eventsIndex     *index.EventsIndex
 	txResultsIndex  *index.TransactionResultsIndex
-	txErrorMessages error_message_provider.TxErrorMessageProvider
+	txErrorMessages error_message_retriever.TxErrorMessageRetriever
 	systemTxID      flow.Identifier
 	txStatusDeriver *status_deriver.TxStatusDeriver
 }
 
-var _ TransactionProvider = (*LocalTransactionProvider)(nil)
+var _ TransactionRetriever = (*LocalTransactionRetriever)(nil)
 
-func NewLocalTransactionProvider(
+func NewLocalTransactionRetriever(
 	state protocol.State,
 	collections storage.Collections,
 	blocks storage.Blocks,
 	eventsIndex *index.EventsIndex,
 	txResultsIndex *index.TransactionResultsIndex,
-	txErrorMessages error_message_provider.TxErrorMessageProvider,
+	txErrorMessages error_message_retriever.TxErrorMessageRetriever,
 	systemTxID flow.Identifier,
 	txStatusDeriver *status_deriver.TxStatusDeriver,
-) *LocalTransactionProvider {
-	return &LocalTransactionProvider{
+) *LocalTransactionRetriever {
+	return &LocalTransactionRetriever{
 		state:           state,
 		collections:     collections,
 		blocks:          blocks,
@@ -71,7 +71,7 @@ func NewLocalTransactionProvider(
 //
 // All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
 // getter or when deriving transaction status.
-func (t *LocalTransactionProvider) TransactionResult(
+func (t *LocalTransactionRetriever) TransactionResult(
 	ctx context.Context,
 	block *flow.Header,
 	transactionID flow.Identifier,
@@ -144,7 +144,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 //
 // All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
 // getter or when deriving transaction status.
-func (t *LocalTransactionProvider) TransactionResultByIndex(
+func (t *LocalTransactionRetriever) TransactionResultByIndex(
 	ctx context.Context,
 	block *flow.Block,
 	index uint32,
@@ -218,7 +218,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 //
 // All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
 // getter or when deriving transaction status.
-func (t *LocalTransactionProvider) TransactionResultsByBlockID(
+func (t *LocalTransactionRetriever) TransactionResultsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
@@ -304,7 +304,7 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 
 // lookupCollectionIDInBlock returns the collection ID based on the transaction ID.
 // The lookup is performed in block collections.
-func (t *LocalTransactionProvider) lookupCollectionIDInBlock(
+func (t *LocalTransactionRetriever) lookupCollectionIDInBlock(
 	block *flow.Block,
 	txID flow.Identifier,
 ) (flow.Identifier, error) {
@@ -325,7 +325,7 @@ func (t *LocalTransactionProvider) lookupCollectionIDInBlock(
 
 // buildTxIDToCollectionIDMapping returns a map of transaction ID to collection ID based on the provided block.
 // No errors expected during normal operations.
-func (t *LocalTransactionProvider) buildTxIDToCollectionIDMapping(block *flow.Block) (map[flow.Identifier]flow.Identifier, error) {
+func (t *LocalTransactionRetriever) buildTxIDToCollectionIDMapping(block *flow.Block) (map[flow.Identifier]flow.Identifier, error) {
 	txToCollectionID := make(map[flow.Identifier]flow.Identifier)
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := t.collections.LightByID(guarantee.ID())

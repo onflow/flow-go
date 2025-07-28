@@ -18,9 +18,9 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_retriever"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retriever"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
@@ -62,7 +62,7 @@ type Transactions struct {
 	txResultCache *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 
 	txValidator     *validator.TransactionValidator
-	txProvider      provider.TransactionProvider
+	txRetriever     retriever.TransactionRetriever
 	txStatusDeriver *status_deriver.TxStatusDeriver
 }
 
@@ -83,7 +83,7 @@ type Params struct {
 	Blocks                      storage.Blocks
 	Collections                 storage.Collections
 	Transactions                storage.Transactions
-	TxErrorMessageProvider      error_message_provider.TxErrorMessageProvider
+	TxErrorMessageRetriever     error_message_retriever.TxErrorMessageRetriever
 	TxResultCache               *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 	TxResultQueryMode           query_mode.IndexQueryMode
 	TxValidator                 *validator.TransactionValidator
@@ -93,23 +93,23 @@ type Params struct {
 }
 
 func NewTransactionsBackend(params Params) (*Transactions, error) {
-	var txProvider provider.TransactionProvider
+	var txRetriever retriever.TransactionRetriever
 
 	switch params.TxResultQueryMode {
 	case query_mode.IndexQueryModeLocalOnly:
-		txProvider = provider.NewLocalTransactionProvider(
+		txRetriever = retriever.NewLocalTransactionRetriever(
 			params.State,
 			params.Collections,
 			params.Blocks,
 			params.EventsIndex,
 			params.TxResultsIndex,
-			params.TxErrorMessageProvider,
+			params.TxErrorMessageRetriever,
 			params.SystemTxID,
 			params.TxStatusDeriver,
 		)
 
 	case query_mode.IndexQueryModeExecutionNodesOnly:
-		txProvider = provider.NewENTransactionProvider(
+		txRetriever = retriever.NewENTransactionRetriever(
 			params.Log,
 			params.State,
 			params.Collections,
@@ -122,18 +122,18 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		)
 
 	case query_mode.IndexQueryModeFailover:
-		local := provider.NewLocalTransactionProvider(
+		local := retriever.NewLocalTransactionRetriever(
 			params.State,
 			params.Collections,
 			params.Blocks,
 			params.EventsIndex,
 			params.TxResultsIndex,
-			params.TxErrorMessageProvider,
+			params.TxErrorMessageRetriever,
 			params.SystemTxID,
 			params.TxStatusDeriver,
 		)
 
-		execNode := provider.NewENTransactionProvider(
+		execNode := retriever.NewENTransactionRetriever(
 			params.Log,
 			params.State,
 			params.Collections,
@@ -145,7 +145,7 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 			params.SystemTx,
 		)
 
-		txProvider = provider.NewFailoverTransactionProvider(local, execNode)
+		txRetriever = retriever.NewFailoverTransactionRetriever(local, execNode)
 
 	default:
 		return nil, status.Error(codes.Internal, "invalid index query mode")
@@ -166,7 +166,7 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		transactions:                params.Transactions,
 		txResultCache:               params.TxResultCache,
 		txValidator:                 params.TxValidator,
-		txProvider:                  txProvider,
+		txRetriever:                 txRetriever,
 		txStatusDeriver:             params.TxStatusDeriver,
 	}
 
@@ -543,7 +543,7 @@ func (t *Transactions) GetTransactionResultsByBlockID(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	return t.txProvider.TransactionResultsByBlockID(ctx, block, requiredEventEncodingVersion)
+	return t.txRetriever.TransactionResultsByBlockID(ctx, block, requiredEventEncodingVersion)
 }
 
 // GetTransactionResultByIndex returns transactions Results for an index in a block that is executed,
@@ -560,7 +560,7 @@ func (t *Transactions) GetTransactionResultByIndex(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	return t.txProvider.TransactionResultByIndex(ctx, block, index, requiredEventEncodingVersion)
+	return t.txRetriever.TransactionResultByIndex(ctx, block, index, requiredEventEncodingVersion)
 }
 
 // GetSystemTransaction returns system transaction
@@ -601,7 +601,7 @@ func (t *Transactions) lookupTransactionResult(
 	header *flow.Header,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
-	txResult, err := t.txProvider.TransactionResult(ctx, header, txID, requiredEventEncodingVersion)
+	txResult, err := t.txRetriever.TransactionResult(ctx, header, txID, requiredEventEncodingVersion)
 
 	if err != nil {
 		// if either the storage or execution node reported no results or there were not enough execution results

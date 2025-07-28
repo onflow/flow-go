@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	txprovider "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
+	txretriever "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retriever"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
@@ -33,7 +33,7 @@ type TransactionMetadata struct {
 
 	eventEncodingVersion entities.EventEncodingVersion
 
-	txProvider      *txprovider.FailoverTransactionProvider
+	txRetriever     *txretriever.FailoverTransactionRetriever
 	txStatusDeriver *status_deriver.TxStatusDeriver
 }
 
@@ -58,7 +58,7 @@ func NewTransactionMetadata(
 	txID flow.Identifier,
 	txReferenceBlockID flow.Identifier,
 	eventEncodingVersion entities.EventEncodingVersion,
-	txProvider *txprovider.FailoverTransactionProvider,
+	txRetriever *txretriever.FailoverTransactionRetriever,
 	txStatusDeriver *status_deriver.TxStatusDeriver,
 ) *TransactionMetadata {
 	return &TransactionMetadata{
@@ -68,7 +68,7 @@ func NewTransactionMetadata(
 		collections:          collections,
 		transactions:         transactions,
 		txReferenceBlockID:   txReferenceBlockID,
-		txProvider:           txProvider,
+		txRetriever:          txRetriever,
 		txStatusDeriver:      txStatusDeriver,
 	}
 }
@@ -226,7 +226,7 @@ func (t *TransactionMetadata) refreshTransactionResult(ctx context.Context) erro
 		return nil
 	}
 
-	txResult, err := t.txProvider.TransactionResult(
+	txResult, err := t.txRetriever.TransactionResult(
 		ctx,
 		t.blockWithTx,
 		t.txResult.TransactionID,
