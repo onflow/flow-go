@@ -255,7 +255,7 @@ func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 	// create a proposal which is far enough ahead to be dropped
 	originID := unittest.IdentifierFixture()
 	block := unittest.ClusterBlockFixture(
-		unittest.ClusterBlock.WithHeight(cs.head.Block.Header.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1),
+		unittest.ClusterBlock.WithHeight(cs.head.Block.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1),
 	)
 	proposal := unittest.ClusterProposalFromBlock(block)
 
@@ -483,7 +483,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 
 	pendingFromProposal := func(block *cluster.Proposal) flow.Slashable[*cluster.Proposal] {
 		return flow.Slashable[*cluster.Proposal]{
-			OriginID: block.Block.Header.ProposerID,
+			OriginID: block.Block.ProposerID,
 			Message:  block,
 		}
 	}

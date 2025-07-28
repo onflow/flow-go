@@ -386,7 +386,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 			if blockIndex > 0 {
 				// create a result
 				result := unittest.ExecutionResultFixture(unittest.WithPreviousResult(*previousResult))
-				result.BlockID = block.Header.ParentID
+				result.BlockID = block.ParentID
 				result.Chunks = s.Chunks
 				forkResults[forkIndex] = append(forkResults[forkIndex], result)
 				previousResult = result
@@ -466,7 +466,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnproces
 		previousResult := s.IncorporatedResult.Result
 		for blockIndex, block := range fork {
 			result := unittest.ExecutionResultFixture(unittest.WithPreviousResult(*previousResult))
-			result.BlockID = block.Header.ParentID
+			result.BlockID = block.ParentID
 			result.Chunks = s.Chunks
 			previousResult = result
 
@@ -682,8 +682,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	s.Snapshots[s.finalizedRootHeader.ID()] = rootSnapshot
 	block, err := flow.NewRootBlock(
 		flow.UntrustedBlock{
-			Header:  s.finalizedRootHeader.HeaderBody,
-			Payload: unittest.PayloadFixture(),
+			HeaderBody: s.finalizedRootHeader.HeaderBody,
+			Payload:    unittest.PayloadFixture(),
 		},
 	)
 	require.NoError(s.T(), err)
@@ -728,7 +728,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 			result := unittest.ExecutionResultFixture(
 				unittest.WithPreviousResult(*prevResult),
 			)
-			result.BlockID = block.Header.ParentID
+			result.BlockID = block.ParentID
 
 			// update caches
 			s.Blocks[blockID] = block.ToHeader()

@@ -17,7 +17,7 @@ import (
 //
 //structwrite:immutable - mutations allowed only within the constructor
 type Block struct {
-	Header  flow.HeaderBody
+	flow.HeaderBody
 	Payload Payload
 }
 
@@ -40,7 +40,7 @@ type UntrustedBlock Block
 // All errors indicate that a valid Block cannot be constructed from the input.
 func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	// validate header body
-	headerBody, err := flow.NewHeaderBody(flow.UntrustedHeaderBody(untrusted.Header))
+	headerBody, err := flow.NewHeaderBody(flow.UntrustedHeaderBody(untrusted.HeaderBody))
 	if err != nil {
 		return nil, fmt.Errorf("invalid header body: %w", err)
 	}
@@ -52,8 +52,8 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	}
 
 	return &Block{
-		Header:  *headerBody,
-		Payload: *payload,
+		HeaderBody: *headerBody,
+		Payload:    *payload,
 	}, nil
 }
 
@@ -62,7 +62,7 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 // This constructor must be used **only** for constructing the root block,
 // which is the only case where zero values are allowed.
 func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
-	rootHeaderBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody(untrusted.Header))
+	rootHeaderBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody(untrusted.HeaderBody))
 	if err != nil {
 		return nil, fmt.Errorf("invalid root header body: %w", err)
 	}
@@ -77,8 +77,8 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 	}
 
 	return &Block{
-		Header:  *rootHeaderBody,
-		Payload: *rootPayload,
+		HeaderBody: *rootHeaderBody,
+		Payload:    *rootPayload,
 	}, nil
 }
 
@@ -92,9 +92,9 @@ func (b *Block) ID() flow.Identifier {
 // The receiver Block must be well-formed (enforced by mutation protection on the type).
 // This function may panic if invoked on a malformed Block.
 func (b *Block) ToHeader() *flow.Header {
-	if !b.Header.ContainsParentQC() {
+	if !b.ContainsParentQC() {
 		rootHeader, err := flow.NewRootHeader(flow.UntrustedHeader{
-			HeaderBody:  b.Header,
+			HeaderBody:  b.HeaderBody,
 			PayloadHash: b.Payload.Hash(),
 		})
 		if err != nil {
@@ -104,7 +104,7 @@ func (b *Block) ToHeader() *flow.Header {
 	}
 
 	header, err := flow.NewHeader(flow.UntrustedHeader{
-		HeaderBody:  b.Header,
+		HeaderBody:  b.HeaderBody,
 		PayloadHash: b.Payload.Hash(),
 	})
 	if err != nil {

@@ -96,7 +96,7 @@ func (bs *BuilderSuite) storeBlock(block *flow.Block) {
 	bs.headers[block.ID()] = block.ToHeader()
 	bs.blocks[block.ID()] = block
 	bs.index[block.ID()] = block.Payload.Index()
-	bs.blockChildren[block.Header.ParentID] = append(bs.blockChildren[block.Header.ParentID], block.ID())
+	bs.blockChildren[block.ParentID] = append(bs.blockChildren[block.ParentID], block.ID())
 	for _, result := range block.Payload.Results {
 		bs.resultByID[result.ID()] = result
 	}
@@ -207,7 +207,6 @@ func (bs *BuilderSuite) SetupTest() {
 	// initialise the dbs
 	bs.lastSeal = nil
 	bs.headers = make(map[flow.Identifier]*flow.Header)
-	//bs.heights = make(map[uint64]*flow.Header)
 	bs.index = make(map[flow.Identifier]*flow.Index)
 	bs.blocks = make(map[flow.Identifier]*flow.Block)
 	bs.blockChildren = make(map[flow.Identifier][]flow.Identifier)
@@ -251,17 +250,17 @@ func (bs *BuilderSuite) SetupTest() {
 	// set up temporary database for tests
 	bs.db, bs.dir = unittest.TempBadgerDB(bs.T())
 
-	err := bs.db.Update(operation.InsertFinalizedHeight(final.Header.Height))
+	err := bs.db.Update(operation.InsertFinalizedHeight(final.Height))
 	bs.Require().NoError(err)
-	err = bs.db.Update(operation.IndexBlockHeight(final.Header.Height, bs.finalID))
+	err = bs.db.Update(operation.IndexBlockHeight(final.Height, bs.finalID))
 	bs.Require().NoError(err)
 
 	err = bs.db.Update(operation.InsertRootHeight(13))
 	bs.Require().NoError(err)
 
-	err = bs.db.Update(operation.InsertSealedHeight(first.Header.Height))
+	err = bs.db.Update(operation.InsertSealedHeight(first.Height))
 	bs.Require().NoError(err)
-	err = bs.db.Update(operation.IndexBlockHeight(first.Header.Height, first.ID()))
+	err = bs.db.Update(operation.IndexBlockHeight(first.Height, first.ID()))
 	bs.Require().NoError(err)
 
 	bs.sentinel = 1337
@@ -284,7 +283,7 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.state = &protocol.ParticipantState{}
 	bs.state.On("Extend", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		proposal := args.Get(1).(*flow.Proposal)
-		bs.Assert().Equal(bs.sentinel, proposal.Block.Header.View)
+		bs.Assert().Equal(bs.sentinel, proposal.Block.View)
 		bs.assembled = &proposal.Block.Payload
 	}).Return(nil)
 	bs.state.On("Final").Return(func() realproto.Snapshot {
@@ -847,7 +846,7 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 		var err error
 		blocks[i], err = flow.NewBlock(
 			flow.UntrustedBlock{
-				Header: blocks[i].Header,
+				HeaderBody: blocks[i].HeaderBody,
 				Payload: unittest.PayloadFixture(
 					unittest.WithReceipts(receiptChain1[i-1], receiptChain2[i-1]),
 				),
@@ -861,7 +860,7 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 	// set payload for block D
 	blocks[4], err = flow.NewBlock(
 		flow.UntrustedBlock{
-			Header: blocks[4].Header,
+			HeaderBody: blocks[4].HeaderBody,
 			Payload: unittest.PayloadFixture(
 				unittest.WithSeals(sealF),
 			),

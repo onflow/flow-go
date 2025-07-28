@@ -273,7 +273,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
 		block1 = &flow.Block{
-			Header: flow.HeaderBody{
+			HeaderBody: flow.HeaderBody{
 				View:      1,
 				ChainID:   flow.Emulator,
 				Timestamp: uint64(time.Now().UnixMilli()),
@@ -499,8 +499,8 @@ func createTestBlockAndRun(
 	}
 
 	block := unittest.BlockFixture(
-		unittest.Block.WithParent(parentBlock.ID(), parentBlock.Header.View, parentBlock.Header.Height),
-		unittest.Block.WithView(parentBlock.Header.View+1),
+		unittest.Block.WithParent(parentBlock.ID(), parentBlock.View, parentBlock.Height),
+		unittest.Block.WithView(parentBlock.View+1),
 		unittest.Block.WithPayload(
 			unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
 		),

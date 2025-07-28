@@ -148,16 +148,15 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	rootBlock := unittest.BlockFixture()
 	parent := rootBlock.ToHeader()
-	suite.blockMap[rootBlock.Header.Height] = rootBlock
+	suite.blockMap[rootBlock.Height] = rootBlock
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
-		suite.blockMap[block.Header.Height] = block
+		suite.blockMap[block.Height] = block
 	}
 
 	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-	params.On("SporkRootBlockHeight").Return(rootBlock.Header.Height, nil)
-	params.On("SealedRoot").Return(rootBlock.Header, nil)
+	params.On("SporkRootBlockHeight").Return(rootBlock.Height, nil)
 
 	// generate a server certificate that will be served by the GRPC server
 	networkingKey := unittest.NetworkingPrivKeyFixture()
@@ -257,10 +256,10 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.executionDataTracker = tracker.NewExecutionDataTracker(
 		suite.log,
 		suite.state,
-		rootBlock.Header.Height,
+		rootBlock.Height,
 		suite.headers,
 		nil,
-		rootBlock.Header.Height,
+		rootBlock.Height,
 		eventIndexer,
 		false,
 	)

@@ -396,7 +396,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		require.NoError(suite.T(), all.Blocks.Store(proposal2))
 
 		// the follower logic should update height index on the block storage when a block is finalized
-		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
+		err := db.Update(operation.IndexBlockHeight(block2.Height, block2.ID()))
 		require.NoError(suite.T(), err)
 
 		assertHeaderResp := func(
@@ -486,7 +486,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 			// get header by height
 			req := &accessproto.GetBlockHeaderByHeightRequest{
-				Height: block2.Header.Height,
+				Height: block2.Height,
 			}
 
 			resp, err := handler.GetBlockHeaderByHeight(context.Background(), req)
@@ -497,7 +497,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		suite.Run("get block 2 by height", func() {
 			// get block details by height
 			req := &accessproto.GetBlockByHeightRequest{
-				Height:            block2.Header.Height,
+				Height:            block2.Height,
 				FullBlockResponse: true,
 			}
 
@@ -509,7 +509,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		suite.Run("get block 2 by height", func() {
 			// get block details by height
 			req := &accessproto.GetBlockByHeightRequest{
-				Height: block2.Header.Height,
+				Height: block2.Height,
 			}
 
 			resp, err := handler.GetBlockByHeight(context.Background(), req)
@@ -727,7 +727,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		err = all.Blocks.Store(proposal)
 		require.NoError(suite.T(), err)
 
-		err = db.Update(operation.IndexBlockHeight(block.Header.Height, block.ID()))
+		err = db.Update(operation.IndexBlockHeight(block.Height, block.ID()))
 		require.NoError(suite.T(), err)
 
 		suite.sealedBlock = block.ToHeader()
@@ -948,7 +948,7 @@ func (suite *Suite) TestGetTransactionResult() {
 				require.NoError(suite.T(), err)
 			}
 		}
-		err = db.Update(operation.IndexBlockHeight(block.Header.Height, block.ID()))
+		err = db.Update(operation.IndexBlockHeight(block.Height, block.ID()))
 		require.NoError(suite.T(), err)
 		finalSnapshot.On("Head").Return(block.ToHeader(), nil)
 
@@ -1182,7 +1182,7 @@ func (suite *Suite) TestExecuteScript() {
 		lastProposal := unittest.ProposalFromBlock(lastBlock)
 		err = all.Blocks.Store(lastProposal)
 		require.NoError(suite.T(), err)
-		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
+		err = db.Update(operation.IndexBlockHeight(lastBlock.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
 		// update latest sealed block
 		suite.sealedBlock = lastBlock.ToHeader()
@@ -1196,7 +1196,7 @@ func (suite *Suite) TestExecuteScript() {
 
 		err = all.Blocks.Store(prevProposal)
 		require.NoError(suite.T(), err)
-		err = db.Update(operation.IndexBlockHeight(prevBlock.Header.Height, prevBlock.ID()))
+		err = db.Update(operation.IndexBlockHeight(prevBlock.Height, prevBlock.ID()))
 		require.NoError(suite.T(), err)
 
 		// create execution receipts for each of the execution node and the previous block
@@ -1280,7 +1280,7 @@ func (suite *Suite) TestExecuteScript() {
 
 			expectedResp := setupExecClientMock(prevBlock.ID())
 			req := accessproto.ExecuteScriptAtBlockHeightRequest{
-				BlockHeight: prevBlock.Header.Height,
+				BlockHeight: prevBlock.Height,
 				Script:      script,
 			}
 			actualResp, err := handler.ExecuteScriptAtBlockHeight(ctx, &req)

@@ -345,8 +345,8 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	// - the payload hash is deduced from the payload
 	block, err := flow.NewBlock(
 		flow.UntrustedBlock{
-			Header:  header.HeaderBody,
-			Payload: *payload,
+			HeaderBody: header.HeaderBody,
+			Payload:    *payload,
 		},
 	)
 	if err != nil {
@@ -484,8 +484,8 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 			h.log.Warn().
 				Hex("origin_id", originID[:]).
 				Hex("block_id", logging.ID(msg.Block.ID())).
-				Uint64("block_height", msg.Block.Header.Height).
-				Uint64("block_view", msg.Block.Header.View).
+				Uint64("block_height", msg.Block.Height).
+				Uint64("block_view", msg.Block.View).
 				Err(err).Msgf("received invalid proposal message")
 			return nil
 		}

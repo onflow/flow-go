@@ -208,7 +208,7 @@ func RechainBlocks(blocks []*flow.Block) {
 	parent := blocks[0]
 
 	for _, block := range blocks[1:] {
-		block.Header.ParentID = parent.ID()
+		block.ParentID = parent.ID()
 		parent = block
 	}
 }
@@ -216,8 +216,8 @@ func RechainBlocks(blocks []*flow.Block) {
 func FullBlockFixture() *flow.Block {
 	b := BlockFixture()
 	return &flow.Block{
-		Header:  b.Header,
-		Payload: PayloadFixture(WithAllTheFixins),
+		HeaderBody: b.HeaderBody,
+		Payload:    PayloadFixture(WithAllTheFixins),
 	}
 }
 
@@ -378,15 +378,15 @@ func BlockWithParentFixture(parent *flow.Header) *flow.Block {
 // with respect to the given parent block and with given payload.
 func BlockWithParentAndPayload(parent *flow.Header, payload flow.Payload) *flow.Block {
 	return &flow.Block{
-		Header:  HeaderBodyWithParentFixture(parent),
-		Payload: payload,
+		HeaderBody: HeaderBodyWithParentFixture(parent),
+		Payload:    payload,
 	}
 }
 
 func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
 	return &flow.Block{
-		Header:  HeaderBodyWithParentFixture(parent.ToHeader()),
-		Payload: PayloadFixture(WithProtocolStateID(parent.Payload.ProtocolStateID)),
+		HeaderBody: HeaderBodyWithParentFixture(parent.ToHeader()),
+		Payload:    PayloadFixture(WithProtocolStateID(parent.Payload.ProtocolStateID)),
 	}
 }
 
@@ -401,11 +401,11 @@ func BlockWithParentAndProposerFixture(
 		[]flow.Identifier{proposer}, []flow.Identifier{proposer})
 	require.NoError(t, err)
 
-	block.Header.ProposerID = proposer
-	block.Header.ParentVoterIndices = indices
-	if block.Header.LastViewTC != nil {
-		block.Header.LastViewTC.SignerIndices = indices
-		block.Header.LastViewTC.NewestQC.SignerIndices = indices
+	block.ProposerID = proposer
+	block.ParentVoterIndices = indices
+	if block.LastViewTC != nil {
+		block.LastViewTC.SignerIndices = indices
+		block.LastViewTC.NewestQC.SignerIndices = indices
 	}
 
 	return block
@@ -1555,8 +1555,8 @@ func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.HeaderBody
 	}
 
 	block := &flow.Block{
-		Header:  headerBody,
-		Payload: payload,
+		HeaderBody: headerBody,
+		Payload:    payload,
 	}
 
 	chunks := make([]*flow.Chunk, 0)
@@ -1974,7 +1974,7 @@ func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
 func CertifiedByChild(block *flow.Block, child *flow.Block) *flow.CertifiedBlock {
 	return &flow.CertifiedBlock{
 		Proposal:     &flow.Proposal{Block: *block, ProposerSigData: SignatureFixture()},
-		CertifyingQC: child.Header.ParentQC(),
+		CertifyingQC: child.ParentQC(),
 	}
 }
 
@@ -2267,8 +2267,8 @@ func BootstrapFixtureWithChainID(
 	setup := EpochSetupFixture(
 		WithParticipants(participants.ToSkeleton()),
 		SetupWithCounter(counter),
-		WithFirstView(root.Header.View),
-		WithFinalView(root.Header.View+100_000),
+		WithFirstView(root.View),
+		WithFinalView(root.View+100_000),
 	)
 	commit := EpochCommitFixture(
 		CommitWithCounter(counter),
@@ -2276,7 +2276,7 @@ func BootstrapFixtureWithChainID(
 		WithDKGFromParticipants(participants.ToSkeleton()),
 	)
 
-	return BootstrapFixtureWithSetupAndCommit(root.Header, setup, commit)
+	return BootstrapFixtureWithSetupAndCommit(root.HeaderBody, setup, commit)
 }
 
 // BootstrapFixtureWithSetupAndCommit generates all the artifacts necessary to bootstrap the
@@ -2300,8 +2300,8 @@ func BootstrapFixtureWithSetupAndCommit(
 	}
 
 	root := &flow.Block{
-		Header:  header,
-		Payload: flow.Payload{ProtocolStateID: rootProtocolState.ID()},
+		HeaderBody: header,
+		Payload:    flow.Payload{ProtocolStateID: rootProtocolState.ID()},
 	}
 
 	stateCommit := GenesisStateCommitmentByChainID(header.ChainID)
@@ -2425,10 +2425,10 @@ func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.Execution
 		b := blocks[i]
 		p := i - 1
 		prev := blocks[p]
-		if prev.Header.Height+1 != b.Header.Height {
-			panic(fmt.Sprintf("height has gap when connecting blocks: expect %v, but got %v", prev.Header.Height+1, b.Header.Height))
+		if prev.Height+1 != b.Height {
+			panic(fmt.Sprintf("height has gap when connecting blocks: expect %v, but got %v", prev.Height+1, b.Height))
 		}
-		b.Header.ParentID = prev.ID()
+		b.ParentID = prev.ID()
 		receipts[i].ExecutionResult.BlockID = b.ID()
 		prevReceipt := receipts[p]
 		receipts[i].ExecutionResult.PreviousResultID = prevReceipt.ExecutionResult.ID()

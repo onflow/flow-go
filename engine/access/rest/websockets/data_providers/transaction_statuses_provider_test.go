@@ -128,7 +128,7 @@ func backendTransactionStatusesResponse(block *flow.Block) []*accessmodel.Transa
 		ErrorMessage: "",
 		BlockID:      block.ID(),
 		CollectionID: cid,
-		BlockHeight:  block.Header.Height,
+		BlockHeight:  block.Height,
 	}
 
 	var expectedTxResultsResponses []*accessmodel.TransactionResult
@@ -219,7 +219,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	var txResults []*accessmodel.TransactionResult
 	for i := 0; i < txStatusesCount; i++ {
 		txResults = append(txResults, &accessmodel.TransactionResult{
-			BlockHeight: s.rootBlock.Header.Height,
+			BlockHeight: s.rootBlock.Height,
 		})
 	}
 

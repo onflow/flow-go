@@ -54,8 +54,8 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Bl
 		}
 
 		untrustedBlock := flow.UntrustedBlock{
-			Header:  header.HeaderBody,
-			Payload: *payload,
+			HeaderBody: header.HeaderBody,
+			Payload:    *payload,
 		}
 		var block *flow.Block
 		if header.ContainsParentQC() {
@@ -90,7 +90,7 @@ func (b *Blocks) retrieveProposalTx(blockID flow.Identifier) func(*badger.Txn) (
 			ProposerSigData: sig,
 		}
 		var proposal *flow.Proposal
-		if block.Header.ContainsParentQC() {
+		if block.ContainsParentQC() {
 			proposal, err = flow.NewProposal(untrustedProposal)
 			if err != nil {
 				return nil, fmt.Errorf("could not construct proposal: %w", err)

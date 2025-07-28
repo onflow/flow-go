@@ -230,7 +230,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	ref := ss.head.Height
 	for height := ref; height >= ref-4; height-- {
 		block := unittest.ClusterBlockFixture()
-		block.Header.Height = height
+		block.Height = height
 		ss.heights[height] = unittest.ClusterProposalFromBlock(block)
 		ss.blockIDs[block.ID()] = ss.heights[height]
 	}
@@ -372,7 +372,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 	// a non-empty request for existing block IDs should send right response
 	ss.T().Run("request for existing blocks", func(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
-		block.Header.Height = ss.head.Height - 1
+		block.Height = ss.head.Height - 1
 		req.BlockIDs = []flow.Identifier{block.ID()}
 		proposal := unittest.ClusterProposalFromBlock(block)
 		ss.blockIDs[block.ID()] = proposal
@@ -398,7 +398,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		req.BlockIDs = make([]flow.Identifier, 5)
 		for i := 0; i < len(req.BlockIDs); i++ {
 			b := unittest.ClusterBlockFixture()
-			b.Header.Height = ss.head.Height - uint64(i)
+			b.Height = ss.head.Height - uint64(i)
 			req.BlockIDs[i] = b.ID()
 			ss.blockIDs[b.ID()] = unittest.ClusterProposalFromBlock(b)
 		}
@@ -445,7 +445,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 
 	ss.comp.On("OnSyncedClusterBlock", mock.Anything).Run(func(args mock.Arguments) {
 		res := args.Get(0).(flow.Slashable[*clustermodel.Proposal])
-		ss.Assert().Equal(processable.Block.Header, res.Message.Block.Header)
+		ss.Assert().Equal(processable.Block.HeaderBody, res.Message.Block.HeaderBody)
 		ss.Assert().Equal(processable.Block.Payload, res.Message.Block.Payload)
 		ss.Assert().Equal(originID, res.OriginID)
 	}).Return(nil)

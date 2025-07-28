@@ -78,7 +78,7 @@ func (suite *BuilderSuite) SetupTest() {
 
 	suite.genesis, err = unittest.ClusterBlock.Genesis()
 	require.NoError(suite.T(), err)
-	suite.chainID = suite.genesis.Header.ChainID
+	suite.chainID = suite.genesis.ChainID
 
 	suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
 
@@ -99,9 +99,9 @@ func (suite *BuilderSuite) SetupTest() {
 	// just bootstrap with a genesis block, we'll use this as reference
 	root, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	// ensure we don't enter a new epoch for tests that build many blocks
-	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
+	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.View + 100000
 	seal.ResultID = result.ID()
-	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
+	safetyParams, err := protocol.DefaultEpochSafetyParams(root.ChainID)
 	require.NoError(suite.T(), err)
 	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(
 		result.ServiceEvents[0].Event.(*flow.EpochSetup),
@@ -495,7 +495,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 		unittest.ClusterBlock.WithPayload(finalizedPayload),
 	)
 	suite.InsertBlock(finalizedBlock)
-	t.Logf("finalized: height=%d id=%s txs=%s parent_id=%s\t\n", finalizedBlock.Header.Height, finalizedBlock.ID(), finalizedPayload.Collection.Light(), finalizedBlock.Header.ParentID)
+	t.Logf("finalized: height=%d id=%s txs=%s parent_id=%s\t\n", finalizedBlock.Height, finalizedBlock.ID(), finalizedPayload.Collection.Light(), finalizedBlock.ParentID)
 
 	// build a block containing tx2 on the first block
 	unFinalizedPayload := suite.Payload(tx2)
@@ -504,7 +504,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 		unittest.ClusterBlock.WithPayload(unFinalizedPayload),
 	)
 	suite.InsertBlock(unFinalizedBlock)
-	t.Logf("finalized: height=%d id=%s txs=%s parent_id=%s\t\n", unFinalizedBlock.Header.Height, unFinalizedBlock.ID(), unFinalizedPayload.Collection.Light(), unFinalizedBlock.Header.ParentID)
+	t.Logf("finalized: height=%d id=%s txs=%s parent_id=%s\t\n", unFinalizedBlock.Height, unFinalizedBlock.ID(), unFinalizedPayload.Collection.Light(), unFinalizedBlock.ParentID)
 
 	// finalize first block
 	suite.FinalizeBlock(*finalizedBlock)
@@ -546,7 +546,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 		unittest.ClusterBlock.WithPayload(suite.Payload(tx1)),
 	)
 	suite.InsertBlock(finalizedBlock)
-	t.Logf("finalized: id=%s\tparent_id=%s\theight=%d\n", finalizedBlock.ID(), finalizedBlock.Header.ParentID, finalizedBlock.Header.Height)
+	t.Logf("finalized: id=%s\tparent_id=%s\theight=%d\n", finalizedBlock.ID(), finalizedBlock.ParentID, finalizedBlock.Height)
 
 	// build a block containing tx2 ALSO on genesis - will be invalidated
 	invalidatedBlock := unittest.ClusterBlockFixture(
@@ -554,7 +554,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 		unittest.ClusterBlock.WithPayload(suite.Payload(tx2)),
 	)
 	suite.InsertBlock(invalidatedBlock)
-	t.Logf("invalidated: id=%s\tparent_id=%s\theight=%d\n", invalidatedBlock.ID(), invalidatedBlock.Header.ParentID, invalidatedBlock.Header.Height)
+	t.Logf("invalidated: id=%s\tparent_id=%s\theight=%d\n", invalidatedBlock.ID(), invalidatedBlock.ParentID, invalidatedBlock.Height)
 
 	// finalize first block - this indirectly invalidates the second block
 	suite.FinalizeBlock(*finalizedBlock)
@@ -614,7 +614,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 		// conflicting fork, build on the parent of the head
 		parent := *head
 		if conflicting {
-			err = suite.db.View(procedure.RetrieveClusterBlock(parent.Header.ParentID, &parent))
+			err = suite.db.View(procedure.RetrieveClusterBlock(parent.ParentID, &parent))
 			assert.NoError(t, err)
 			// add the transaction to the invalidated list
 			invalidatedTxIds = append(invalidatedTxIds, tx.ID())
@@ -637,7 +637,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 		// stop building blocks once we've built a history which exceeds the transaction
 		// expiry length - this tests that deduplication works properly against old blocks
 		// which nevertheless have a potentially conflicting reference block
-		if head.Header.Height > flow.DefaultTransactionExpiry+100 {
+		if head.Height > flow.DefaultTransactionExpiry+100 {
 			break
 		}
 	}
@@ -1149,7 +1149,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		suite.genesis, err = unittest.ClusterBlock.Genesis()
 		require.NoError(suite.T(), err)
-		suite.chainID = suite.genesis.Header.ChainID
+		suite.chainID = suite.genesis.ChainID
 
 		suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
 

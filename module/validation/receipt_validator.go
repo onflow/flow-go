@@ -274,19 +274,19 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 // Note that module.UnknownResultError is not possible; we have either an invalid candidate block
 // (yields engine.InvalidInputError) or a missing parent block (yields module.UnknownBlockError).
 func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
-	header := candidate.Header
 	payload := candidate.Payload
+	parentID := candidate.ParentID
 
 	// As a prerequisite, we check that candidate's parent block is known. Otherwise, we cannot validate it.
 	// This check is important to distinguish expected error cases from unexpected exceptions. By confirming
 	// that the protocol state knows the parent block, we guarantee that we can successfully traverse the
 	// candidate's ancestry below.
-	exists, err := v.headers.Exists(header.ParentID)
+	exists, err := v.headers.Exists(parentID)
 	if err != nil {
-		return irrecoverable.NewExceptionf("unexpected exception retrieving the candidate block's parent %v: %w", header.ParentID, err)
+		return irrecoverable.NewExceptionf("unexpected exception retrieving the candidate block's parent %v: %w", parentID, err)
 	}
 	if !exists {
-		return module.NewUnknownBlockError("cannot validate receipts in block, as its parent block is unknown %v", header.ParentID)
+		return module.NewUnknownBlockError("cannot validate receipts in block, as its parent block is unknown %v", parentID)
 	}
 
 	// return if nothing to validate
@@ -296,9 +296,9 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 
 	// Get the latest sealed result on this fork and the corresponding block,
 	// whose result is sealed. This block is not necessarily finalized.
-	lastSeal, err := v.seals.HighestInFork(header.ParentID)
+	lastSeal, err := v.seals.HighestInFork(parentID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve latest seal for fork with head %x: %w", header.ParentID, err)
+		return fmt.Errorf("could not retrieve latest seal for fork with head %x: %w", parentID, err)
 	}
 	latestSealedResult, err := v.results.ByID(lastSeal.ResultID)
 	if err != nil {
@@ -350,7 +350,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 		}
 		return nil
 	}
-	err = fork.TraverseForward(v.headers, header.ParentID, bookKeeper, fork.ExcludingBlock(lastSeal.BlockID))
+	err = fork.TraverseForward(v.headers, parentID, bookKeeper, fork.ExcludingBlock(lastSeal.BlockID))
 	if err != nil {
 		// At the beginning, we checked that candidate's parent exists in the protocol state, i.e. its
 		// ancestry is known and valid. Hence, any error here is a symptom of internal state corruption.

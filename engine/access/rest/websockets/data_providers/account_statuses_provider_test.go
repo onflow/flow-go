@@ -137,7 +137,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 		{
 			name: "SubscribeAccountStatusesFromStartHeight happy path",
 			arguments: wsmodels.Arguments{
-				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
+				"start_block_height": strconv.FormatUint(s.rootBlock.Height, 10),
 				"event_types":        []string{string(flow.EventAccountCreated)},
 				"account_addresses":  []string{unittest.AddressFixture().String()},
 			},
@@ -145,7 +145,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 				s.api.On(
 					"SubscribeAccountStatusesFromStartHeight",
 					mock.Anything,
-					s.rootBlock.Header.Height,
+					s.rootBlock.Height,
 					mock.Anything,
 				).Return(sub).Once()
 			},
@@ -338,7 +338,7 @@ func (s *AccountStatusesProviderSuite) backendAccountStatusesResponses(events []
 
 	for i := range events {
 		responses[i] = &backend.AccountStatusesResponse{
-			Height:  s.rootBlock.Header.Height,
+			Height:  s.rootBlock.Height,
 			BlockID: s.rootBlock.ID(),
 			AccountEvents: map[string]flow.EventsList{
 				unittest.RandomAddressFixture().String(): events,
@@ -355,7 +355,7 @@ func invalidAccountStatusesArgumentsTestCases() []testErrType {
 			name: "provide both 'start_block_id' and 'start_block_height' arguments",
 			arguments: wsmodels.Arguments{
 				"start_block_id":     unittest.BlockFixture().ID().String(),
-				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
+				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Height),
 				"event_types":        []string{state_stream.CoreEventAccountCreated},
 				"account_addresses":  []string{unittest.AddressFixture().String()},
 			},

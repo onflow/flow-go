@@ -101,7 +101,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 
 	// create an account to use for sending transactions
 	var err error
-	suite.acct.addr, suite.acct.key, suite.acct.signer, err = lib.GetAccount(suite.net.Root().Header.ChainID.Chain())
+	suite.acct.addr, suite.acct.key, suite.acct.signer, err = lib.GetAccount(suite.net.Root().ChainID.Chain())
 	require.NoError(suite.T(), err)
 	suite.serviceAccountIdx = 2
 
@@ -178,7 +178,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentitySkeletonList) *sdk
 
 	// hash-grind the script until the transaction will be routed to target cluster
 	for {
-		serviceAccountAddr, err := suite.net.Root().Header.ChainID.Chain().AddressAtIndex(suite.serviceAccountIdx)
+		serviceAccountAddr, err := suite.net.Root().ChainID.Chain().AddressAtIndex(suite.serviceAccountIdx)
 		suite.Require().NoError(err)
 		suite.serviceAccountIdx++
 		tx.SetScript(append(tx.Script, '/', '/'))
@@ -264,9 +264,8 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 			internalClusterProposal, err := cluster.NewProposal(*val)
 			require.NoError(suite.T(), err)
 			block := internalClusterProposal.Block
-			header := block.Header
 			collection := block.Payload.Collection
-			suite.T().Logf("got collection from %v height=%d col_id=%x size=%d", originID, header.Height, collection.ID(), collection.Len())
+			suite.T().Logf("got collection from %v height=%d col_id=%x size=%d", originID, block.Height, collection.ID(), collection.Len())
 			if guarantees[collection.ID()] {
 				for _, txID := range collection.Light().Transactions {
 					delete(lookup, txID)

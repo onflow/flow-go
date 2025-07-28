@@ -84,11 +84,11 @@ func (s *PendingTreeSuite) TestAllConnectedForksAreCollected() {
 	longestFork := certifiedBlocksFixture(s.T(), 5, s.finalized)
 	B2 := unittest.BlockWithParentFixture(longestFork[0].Proposal.Block.ToHeader())
 	// make sure short fork doesn't have conflicting views, so we don't trigger exception
-	B2.Header.View = longestFork[len(longestFork)-1].Proposal.Block.Header.View + 1
+	B2.View = longestFork[len(longestFork)-1].Proposal.Block.View + 1
 	B3 := unittest.BlockWithParentFixture(B2.ToHeader())
 	shortFork := []flow.CertifiedBlock{{
 		Proposal:     unittest.ProposalFromBlock(B2),
-		CertifyingQC: B3.Header.ParentQC(),
+		CertifyingQC: B3.ParentQC(),
 	}, certifiedBlockFixture(B3)}
 
 	connectedBlocks, err := s.pendingTree.AddBlocks(shortFork)
@@ -123,7 +123,7 @@ func (s *PendingTreeSuite) TestByzantineThresholdExceeded() {
 	conflictingBlock := unittest.BlockWithParentFixture(s.finalized)
 	// use same view for conflicted blocks, this is not possible unless there is more than
 	// 1/3 byzantine participants
-	conflictingBlock.Header.View = block.Header.View
+	conflictingBlock.View = block.View
 	_, err := s.pendingTree.AddBlocks([]flow.CertifiedBlock{certifiedBlockFixture(block)})
 	require.NoError(s.T(), err)
 	// adding same block should result in no-op
@@ -175,11 +175,11 @@ func (s *PendingTreeSuite) TestResolveBlocksAfterFinalization() {
 	longestFork := certifiedBlocksFixture(s.T(), 5, s.finalized)
 	B2 := unittest.BlockWithParentFixture(longestFork[0].Proposal.Block.ToHeader())
 	// make sure short fork doesn't have conflicting views, so we don't trigger exception
-	B2.Header.View = longestFork[len(longestFork)-1].Proposal.Block.Header.View + 1
+	B2.View = longestFork[len(longestFork)-1].Proposal.Block.View + 1
 	B3 := unittest.BlockWithParentFixture(B2.ToHeader())
 	shortFork := []flow.CertifiedBlock{{
 		Proposal:     unittest.ProposalFromBlock(B2),
-		CertifyingQC: B3.Header.ParentQC(),
+		CertifyingQC: B3.ParentQC(),
 	}, certifiedBlockFixture(B3)}
 
 	connectedBlocks, err := s.pendingTree.AddBlocks(shortFork)
@@ -236,13 +236,13 @@ func (s *PendingTreeSuite) TestAddingBlockAfterFinalization() {
 func (s *PendingTreeSuite) TestAddingBlocksWithSameHeight() {
 	A := unittest.BlockWithParentFixture(s.finalized)
 	B := unittest.BlockWithParentFixture(s.finalized)
-	B.Header.View = A.Header.View + 1
+	B.View = A.View + 1
 	C := unittest.BlockWithParentFixture(A.ToHeader())
-	C.Header.View = B.Header.View + 1
+	C.View = B.View + 1
 	D := unittest.BlockWithParentFixture(B.ToHeader())
-	D.Header.View = C.Header.View + 1
+	D.View = C.View + 1
 	E := unittest.BlockWithParentFixture(D.ToHeader())
-	E.Header.View = D.Header.View + 1
+	E.View = D.View + 1
 
 	firstBatch := []flow.CertifiedBlock{certifiedBlockFixture(A), certifiedBlockFixture(B), certifiedBlockFixture(D)}
 	secondBatch := []flow.CertifiedBlock{certifiedBlockFixture(C), certifiedBlockFixture(E)}
@@ -261,7 +261,7 @@ func certifiedBlocksFixture(t *testing.T, count int, parent *flow.Header) []flow
 	result := make([]flow.CertifiedBlock, 0, count)
 	blocks := unittest.ProposalChainFixtureFrom(count, parent)
 	for i := 0; i < count-1; i++ {
-		certBlock, err := flow.NewCertifiedBlock(blocks[i], blocks[i+1].Block.Header.ParentQC())
+		certBlock, err := flow.NewCertifiedBlock(blocks[i], blocks[i+1].Block.ParentQC())
 		if err != nil {
 			// this should never happen, as we are specifically constructing a certifying QC for the input block
 			panic(fmt.Sprintf("unexpected error constructing certified block: %s", err.Error()))

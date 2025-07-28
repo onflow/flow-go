@@ -40,7 +40,7 @@ type indexerTest struct {
 func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *indexerTest {
 	blocks := unittest.BlockchainFixture(availableBlocks)
 	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
-	lastIndexedHeight := blocks[lastIndexedIndex].Header.Height
+	lastIndexedHeight := blocks[lastIndexedIndex].Height
 	progress := newMockProgress()
 	err := progress.SetProcessedIndex(lastIndexedHeight)
 	require.NoError(t, err)
@@ -78,7 +78,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 
 	test.worker, err = NewIndexer(
 		unittest.Logger(),
-		test.first().Header.Height,
+		test.first().Height,
 		registers,
 		indexerCoreTest.indexer,
 		exeCache,
@@ -97,7 +97,7 @@ func (w *indexerTest) setBlockDataGet(f func(ID flow.Identifier) (*execution_dat
 }
 
 func (w *indexerTest) latestHeight() (uint64, error) {
-	return w.last().Header.Height, nil
+	return w.last().Height, nil
 }
 
 func (w *indexerTest) last() *flow.Block {
@@ -200,7 +200,7 @@ func TestIndexer_Success(t *testing.T) {
 			var blockHeight uint64
 			for _, b := range test.blocks {
 				if b.ID() == ID {
-					blockHeight = b.Header.Height
+					blockHeight = b.Height
 				}
 			}
 
@@ -213,7 +213,7 @@ func TestIndexer_Success(t *testing.T) {
 	})
 
 	signalerCtx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
-	lastHeight := test.blocks[len(test.blocks)-1].Header.Height
+	lastHeight := test.blocks[len(test.blocks)-1].Height
 	test.run(signalerCtx, lastHeight, cancel)
 
 	// make sure store was called correct number of times
@@ -248,14 +248,14 @@ func TestIndexer_Failure(t *testing.T) {
 	// make sure the error returned is as expected
 	expectedErr := fmt.Errorf(
 		"failed to index block data at height %d: %w",
-		test.blocks[lastIndexedIndex].Header.Height+1,
+		test.blocks[lastIndexedIndex].Height+1,
 		fmt.Errorf(
-			"could not index register payloads at height %d: %w", test.blocks[lastIndexedIndex].Header.Height+1, fmt.Errorf("error persisting data")),
+			"could not index register payloads at height %d: %w", test.blocks[lastIndexedIndex].Height+1, fmt.Errorf("error persisting data")),
 	)
 
 	_, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContextExpectError(t, context.Background(), expectedErr)
-	lastHeight := test.blocks[lastIndexedIndex].Header.Height
+	lastHeight := test.blocks[lastIndexedIndex].Height
 	test.run(signalerCtx, lastHeight, cancel)
 
 	// make sure store was called correct number of times

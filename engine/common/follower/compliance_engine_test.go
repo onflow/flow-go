@@ -208,7 +208,7 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	// check if batch gets filtered out since it's lower than finalized view
 	done = make(chan struct{})
 	block := unittest.BlockWithParentFixture(s.finalized)
-	block.Header.View = newFinalizedBlock.View - 1 // use block view lower than new latest finalized view
+	block.View = newFinalizedBlock.View - 1 // use block view lower than new latest finalized view
 
 	proposal := unittest.ProposalFromBlock(block)
 

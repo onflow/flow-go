@@ -81,7 +81,7 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	suite.blockHeadersMap = make(map[uint64]*flow.Header, suite.blockCount)
 
 	suite.nodeRootBlock = unittest.Block.Genesis(flow.Emulator)
-	suite.blockHeadersMap[suite.nodeRootBlock.Header.Height] = suite.nodeRootBlock.ToHeader()
+	suite.blockHeadersMap[suite.nodeRootBlock.Height] = suite.nodeRootBlock.ToHeader()
 
 	parent := suite.nodeRootBlock.ToHeader()
 
@@ -89,7 +89,7 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
 		parent = block.ToHeader()
-		suite.blockHeadersMap[block.Header.Height] = block.ToHeader()
+		suite.blockHeadersMap[block.Height] = block.ToHeader()
 		suite.sealedBlock = block
 	}
 
@@ -190,12 +190,12 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		})
 		suite.Error(err)
 		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
-			"'start-height' %d must not be greater than latest sealed block %d", startHeight, suite.sealedBlock.Header.Height))
+			"'start-height' %d must not be greater than latest sealed block %d", startHeight, suite.sealedBlock.Height))
 	})
 
 	// invalid start-height, start-height is less than root block
 	suite.Run("start-height is less than root block", func() {
-		suite.nodeRootBlock.Header = suite.blockHeadersMap[2].HeaderBody // mock sealed root block to height 2
+		suite.nodeRootBlock.HeaderBody = suite.blockHeadersMap[2].HeaderBody // mock sealed root block to height 2
 
 		startHeight := 1
 		err := suite.command.Validator(&admin.CommandRequest{
@@ -205,9 +205,9 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		})
 		suite.Error(err)
 		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
-			"'start-height' %d must not be less than root block %d", startHeight, suite.nodeRootBlock.Header.Height))
+			"'start-height' %d must not be less than root block %d", startHeight, suite.nodeRootBlock.Height))
 
-		suite.nodeRootBlock.Header = suite.blockHeadersMap[0].HeaderBody // mock sealed root block back to height 0
+		suite.nodeRootBlock.HeaderBody = suite.blockHeadersMap[0].HeaderBody // mock sealed root block back to height 0
 	})
 
 	// invalid end-height
@@ -237,7 +237,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
 			"'end-height' %d must not be greater than latest sealed block %d",
 			endHeight,
-			suite.sealedBlock.Header.Height,
+			suite.sealedBlock.Height,
 		))
 	})
 
@@ -337,7 +337,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 		// Create a mock execution client to simulate communication with execution nodes.
 		suite.connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &unittestMocks.MockCloser{}, nil)
 
-		for i := suite.nodeRootBlock.Header.Height; i <= suite.blockHeadersMap[uint64(suite.blockCount)].Height; i++ {
+		for i := suite.nodeRootBlock.Height; i <= suite.blockHeadersMap[uint64(suite.blockCount)].Height; i++ {
 			blockId := suite.blockHeadersMap[i].ID()
 
 			// Setup mock storing the transaction error message after retrieving the failed result.
@@ -358,7 +358,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 	})
 
 	suite.Run("happy case, all default parameters, tx error messages exist in db", func() {
-		for i := suite.nodeRootBlock.Header.Height; i <= suite.blockHeadersMap[uint64(suite.blockCount)].Height; i++ {
+		for i := suite.nodeRootBlock.Height; i <= suite.blockHeadersMap[uint64(suite.blockCount)].Height; i++ {
 			blockId := suite.blockHeadersMap[i].ID()
 
 			// Setup mock storing the transaction error message after retrieving the failed result.

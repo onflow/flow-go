@@ -132,11 +132,11 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.blocks = append(s.blocks, block)
 		s.execDataMap[block.ID()] = execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
 		s.blockEvents[block.ID()] = blockEvents.Events
-		s.blockMap[block.Header.Height] = block
+		s.blockMap[block.Height] = block
 		s.sealMap[block.ID()] = seal
 		s.resultMap[seal.ResultID] = result
 
-		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Header.Height, block.ID(), result.ExecutionDataID)
+		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Height, block.ID(), result.ExecutionDataID)
 	}
 
 	s.SetupTestMocks()
@@ -171,10 +171,10 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
-	s.blockMap[s.rootBlock.Header.Height] = s.rootBlock
+	s.blockMap[s.rootBlock.Height] = s.rootBlock
 	s.highestBlockHeader = s.rootBlock.ToHeader()
 
-	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Header.Height, s.rootBlock.ID())
+	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Height, s.rootBlock.ID())
 }
 
 func (s *BackendExecutionDataSuite) SetupTestMocks() {
@@ -185,8 +185,8 @@ func (s *BackendExecutionDataSuite) SetupTestMocks() {
 	s.registers = storagemock.NewRegisterIndex(s.T())
 	err := s.registersAsync.Initialize(s.registers)
 	require.NoError(s.T(), err)
-	s.registers.On("LatestHeight").Return(s.rootBlock.Header.Height).Maybe()
-	s.registers.On("FirstHeight").Return(s.rootBlock.Header.Height).Maybe()
+	s.registers.On("LatestHeight").Return(s.rootBlock.Height).Maybe()
+	s.registers.On("FirstHeight").Return(s.rootBlock.Height).Maybe()
 	s.registers.On("Get", mock.AnythingOfType("RegisterID"), mock.AnythingOfType("uint64")).Return(
 		func(id flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 			if id == s.registerID {
@@ -263,10 +263,10 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 	s.executionDataTrackerReal = tracker.NewExecutionDataTracker(
 		s.logger,
 		s.state,
-		s.rootBlock.Header.Height,
+		s.rootBlock.Height,
 		s.headers,
 		s.broadcaster,
-		s.rootBlock.Header.Height,
+		s.rootBlock.Height,
 		s.eventsIndex,
 		useEventsIndex,
 	)
@@ -363,7 +363,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 			name:            "happy path - partial backfill",
 			highestBackfill: 2, // backfill the first 3 blocks
 			startBlockID:    flow.ZeroID,
-			startHeight:     s.blocks[0].Header.Height,
+			startHeight:     s.blocks[0].Height,
 		},
 		{
 			name:            "happy path - complete backfill",
@@ -375,7 +375,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 			name:            "happy path - start from root block by height",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
 			startBlockID:    flow.ZeroID,
-			startHeight:     s.rootBlock.Header.Height, // start from root block
+			startHeight:     s.rootBlock.Height, // start from root block
 		},
 		{
 			name:            "happy path - start from root block by id",
@@ -435,22 +435,22 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartBlockHeig
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
-			startHeight:     s.rootBlock.Header.Height,
+			startHeight:     s.rootBlock.Height,
 		},
 		{
 			name:            "happy path - partial backfill",
 			highestBackfill: 2, // backfill the first 3 blocks
-			startHeight:     s.blocks[0].Header.Height,
+			startHeight:     s.blocks[0].Height,
 		},
 		{
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startHeight:     s.blocks[0].Header.Height,
+			startHeight:     s.blocks[0].Height,
 		},
 		{
 			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1,         // backfill all blocks
-			startHeight:     s.rootBlock.Header.Height, // start from root block
+			highestBackfill: len(s.blocks) - 1,  // backfill all blocks
+			startHeight:     s.rootBlock.Height, // start from root block
 		},
 	}
 
@@ -522,7 +522,7 @@ func (s *BackendExecutionDataSuite) subscribe(subscribeFunc func(ctx context.Con
 			// loop over of the all blocks
 			for i, b := range s.blocks {
 				execData := s.execDataMap[b.ID()]
-				s.T().Logf("checking block %d %v %v", i, b.Header.Height, b.ID())
+				s.T().Logf("checking block %d %v %v", i, b.Height, b.ID())
 
 				// simulate new exec data received.
 				// exec data for all blocks with index <= highestBackfill were already received
@@ -534,14 +534,14 @@ func (s *BackendExecutionDataSuite) subscribe(subscribeFunc func(ctx context.Con
 				// consume execution data from subscription
 				unittest.RequireReturnsBefore(s.T(), func() {
 					v, ok := <-sub.Channel()
-					require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v: err: %v", b.Header.Height, b.ID(), sub.Err())
+					require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v: err: %v", b.Height, b.ID(), sub.Err())
 
 					resp, ok := v.(*ExecutionDataResponse)
 					require.True(s.T(), ok, "unexpected response type: %T", v)
 
-					assert.Equal(s.T(), b.Header.Height, resp.Height)
+					assert.Equal(s.T(), b.Height, resp.Height)
 					assert.Equal(s.T(), execData.BlockExecutionData, resp.ExecutionData)
-				}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
+				}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
 			}
 
 			// make sure there are no new messages waiting. the channel should be opened with nothing waiting
@@ -579,7 +579,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.rootBlock.Header.Height-1)
+		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.rootBlock.Height-1)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
 	})
 
@@ -598,33 +598,33 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height+10)
+		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Height+10)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()))
 	})
 }
 
 func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 	s.Run("normal case", func() {
-		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Header.Height)
+		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Height)
 		require.NoError(s.T(), err)
 		require.NotEmpty(s.T(), res)
 	})
 
 	s.Run("returns error if block height is out of range", func() {
-		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Header.Height+1)
+		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Height+1)
 		require.Nil(s.T(), res)
 		require.Equal(s.T(), codes.OutOfRange, status.Code(err))
 	})
 
 	s.Run("returns error if register path is not indexed", func() {
 		falseID := flow.RegisterIDs{flow.RegisterID{Owner: "ha", Key: "ha"}}
-		res, err := s.backend.GetRegisterValues(falseID, s.rootBlock.Header.Height)
+		res, err := s.backend.GetRegisterValues(falseID, s.rootBlock.Height)
 		require.Nil(s.T(), res)
 		require.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
 
 	s.Run("returns error if too many registers are requested", func() {
-		res, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.rootBlock.Header.Height)
+		res, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.rootBlock.Height)
 		require.Nil(s.T(), res)
 		require.Equal(s.T(), codes.InvalidArgument, status.Code(err))
 	})

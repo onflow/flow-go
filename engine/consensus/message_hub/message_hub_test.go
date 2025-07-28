@@ -224,7 +224,7 @@ func (s *MessageHubSuite) TestProcessInvalidIncomingMessages() {
 		require.NoError(s.T(), err)
 
 		// OnBlockRange should NOT be called for invalid proposal
-		s.compliance.AssertNotCalled(s.T(), "OnBlockRange", mock.Anything)
+		s.compliance.AssertNotCalled(s.T(), "OnBlockProposal", mock.Anything)
 	})
 	s.Run("to-vote-aggregator", func() {
 		expectedVote := unittest.VoteFixture(unittest.WithVoteSignerID(originID))
@@ -273,7 +273,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 
 	// create a block with the parent and store the payload with correct ID
 	block := unittest.BlockWithParentFixture(parent)
-	block.Header.ProposerID = s.myID
+	block.ProposerID = s.myID
 
 	s.payloads.On("ByBlockID", block.ID()).Return(&block.Payload, nil)
 	s.payloads.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)

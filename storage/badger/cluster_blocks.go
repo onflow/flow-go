@@ -65,8 +65,8 @@ func (b *ClusterBlocks) ProposalByID(blockID flow.Identifier) (*cluster.Proposal
 		return nil, fmt.Errorf("could not retrieve proposer signature: %w", err)
 	}
 	untrustedBlock := cluster.UntrustedBlock{
-		Header:  header.HeaderBody,
-		Payload: *payload,
+		HeaderBody: header.HeaderBody,
+		Payload:    *payload,
 	}
 	var block *cluster.Block
 	if header.ContainsParentQC() {

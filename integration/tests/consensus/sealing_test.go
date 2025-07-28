@@ -183,12 +183,12 @@ SearchLoop:
 		confirmations[proposalID] = 0
 
 		// we map the proposal to its parent for later
-		parentID := block.Header.ParentID
+		parentID := block.ParentID
 		parents[proposalID] = parentID
 
 		ss.T().Logf("received block proposal height %v, view %v, id %v",
-			block.Header.Height,
-			block.Header.View,
+			block.Height,
+			block.View,
 			proposalID)
 
 		// we add one confirmation for each ancestor

@@ -13,7 +13,7 @@ import (
 //
 //structwrite:immutable - mutations allowed only within the constructor
 type Block struct {
-	// Header is a container encapsulating most of the header fields - *excluding* the payload hash
+	// HeaderBody is a container encapsulating most of the header fields - *excluding* the payload hash
 	// and the proposer signature. Generally, the type [HeaderBody] should not be used on its own.
 	// CAUTION regarding security:
 	//  * HeaderBody does not contain the hash of the block payload. Therefore, it is not a cryptographic digest
@@ -21,7 +21,7 @@ type Block struct {
 	//    of a block.
 	//  * With a byzantine HeaderBody alone, an honest node cannot prove who created that faulty data structure,
 	//    because HeaderBody does not include the proposer's signature.
-	Header  HeaderBody
+	HeaderBody
 	Payload Payload
 }
 
@@ -44,7 +44,7 @@ type UntrustedBlock Block
 // All errors indicate that a valid Block cannot be constructed from the input.
 func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	// validate header body
-	headerBody, err := NewHeaderBody(UntrustedHeaderBody(untrusted.Header))
+	headerBody, err := NewHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))
 	if err != nil {
 		return nil, fmt.Errorf("invalid header body: %w", err)
 	}
@@ -56,8 +56,8 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 	}
 
 	return &Block{
-		Header:  *headerBody,
-		Payload: *payload,
+		HeaderBody: *headerBody,
+		Payload:    *payload,
 	}, nil
 }
 
@@ -65,7 +65,7 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 // This constructor must be used **only** for constructing the root block,
 // which is the only case where zero values are allowed.
 func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
-	rootHeaderBody, err := NewRootHeaderBody(UntrustedHeaderBody(untrusted.Header))
+	rootHeaderBody, err := NewRootHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))
 	if err != nil {
 		return nil, fmt.Errorf("invalid root header body: %w", err)
 	}
@@ -77,8 +77,8 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 	}
 
 	return &Block{
-		Header:  *rootHeaderBody,
-		Payload: *payload,
+		HeaderBody: *rootHeaderBody,
+		Payload:    *payload,
 	}, nil
 }
 
@@ -92,9 +92,9 @@ func (b Block) ID() Identifier {
 // The receiver Block must be well-formed (enforced by mutation protection on the type).
 // This function may panic if invoked on a malformed Block.
 func (b Block) ToHeader() *Header {
-	if !b.Header.ContainsParentQC() {
+	if !b.ContainsParentQC() {
 		rootHeader, err := NewRootHeader(UntrustedHeader{
-			HeaderBody:  b.Header,
+			HeaderBody:  b.HeaderBody,
 			PayloadHash: b.Payload.Hash(),
 		})
 		if err != nil {
@@ -104,7 +104,7 @@ func (b Block) ToHeader() *Header {
 	}
 
 	header, err := NewHeader(UntrustedHeader{
-		HeaderBody:  b.Header,
+		HeaderBody:  b.HeaderBody,
 		PayloadHash: b.Payload.Hash(),
 	})
 	if err != nil {
@@ -218,8 +218,8 @@ type CertifiedBlock struct {
 //
 //	Block.View == QC.View and Block.BlockID == QC.BlockID
 func NewCertifiedBlock(proposal *Proposal, qc *QuorumCertificate) (CertifiedBlock, error) {
-	if proposal.Block.Header.View != qc.View {
-		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", proposal.Block.Header.View, qc.View)
+	if proposal.Block.View != qc.View {
+		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", proposal.Block.View, qc.View)
 	}
 	if proposal.Block.ID() != qc.BlockID {
 		return CertifiedBlock{}, fmt.Errorf("block's ID (%v) should equal the block referenced by the qc (%d)", proposal.Block.ID(), qc.BlockID)
@@ -241,7 +241,7 @@ func (b *CertifiedBlock) View() uint64 {
 
 // Height returns height of the block.
 func (b *CertifiedBlock) Height() uint64 {
-	return b.Proposal.Block.Header.Height
+	return b.Proposal.Block.Height
 }
 
 // BlockDigest holds lightweight block information which includes only the block's id, height and timestamp

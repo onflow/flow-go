@@ -217,7 +217,7 @@ func (cs *EngineSuite) TestOnFinalizedBlock() {
 	// wait for both expected calls before ending the test
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
-	cs.pending.On("PruneByView", finalizedBlock.Header.View).
+	cs.pending.On("PruneByView", finalizedBlock.View).
 		Run(func(_ mock.Arguments) { wg.Done() }).
 		Return(nil).Once()
 	cs.pending.On("Size").

@@ -178,7 +178,7 @@ func (tm *transactionSubscriptionMetadata) refreshBlock() error {
 
 	tm.blockWithTx = block.ToHeader()
 	tm.txResult.BlockID = block.ID()
-	tm.txResult.BlockHeight = block.Header.Height
+	tm.txResult.BlockHeight = block.Height
 	return nil
 }
 
