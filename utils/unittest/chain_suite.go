@@ -597,7 +597,4 @@ func (bc *BaseChainSuite) AddSubgraphFixtureToMempools(subgraph subgraphFixture)
 
 // MockProtocolStateVersion mocks the given protocol state version on the snapshot.
 func MockProtocolStateVersion(snapshot *protocol.Snapshot, version uint64) {
-	kvstore := &protocol.KVStoreReader{}
-	kvstore.On("GetProtocolStateVersion").Return(version)
-	snapshot.On("ProtocolState").Return(kvstore, nil)
 }
